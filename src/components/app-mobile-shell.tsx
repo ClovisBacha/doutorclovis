@@ -491,21 +491,31 @@ export function AppBottomNav({
              desfoque com saturação alta, fio de luz na aresta de cima e sombra
              funda embaixo. No escuro o fio de luz enfraquece — numa barra
              escura ele viraria um risco branco em vez de uma quina acesa. */
+          /* A BASE ABRIU DE 0,58 PARA 0,38 (ago/2026).
+             Em 0,58 a barra lia como chapa branca colada: o céu não
+             atravessava nada, e ela era o único elemento OPACO de uma tela
+             que virou toda de vidro. Pedido do dono, comparando com a
+             referência: "garanta que o fundo roxo da tela transpareça
+             suavemente através da navbar pill".
+             O que devolve a leitura do rótulo cinza não é o corpo do vidro —
+             é o desfoque (que apaga o detalhe atrás) mais o fio de luz na
+             aresta de cima. Mesma receita dos botões do topo, e agora no
+             mesmo nível de transparência que eles. */
           background: escura
-            ? "linear-gradient(158deg, rgba(255,255,255,0.16) 0%, rgba(255,255,255,0.04) 48%)," +
-              " rgba(26,22,44,0.62)"
-            : "linear-gradient(158deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.18) 48%)," +
-              " rgba(255,253,252,0.58)",
-          backdropFilter: "blur(22px) saturate(185%)",
-          WebkitBackdropFilter: "blur(22px) saturate(185%)",
-          border: `1px solid ${escura ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.72)"}`,
+            ? "linear-gradient(158deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 48%)," +
+              " rgba(26,22,44,0.42)"
+            : "linear-gradient(158deg, rgba(255,255,255,0.42) 0%, rgba(255,255,255,0.14) 48%)," +
+              " rgba(255,253,252,0.38)",
+          backdropFilter: "blur(18px) saturate(180%)",
+          WebkitBackdropFilter: "blur(18px) saturate(180%)",
+          border: `1px solid ${escura ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.5)"}`,
           boxShadow: escura
-            ? "inset 0 1px 0 rgba(255,255,255,0.34)," +
-              " inset 0 -14px 30px -20px rgba(0,0,0,0.5)," +
-              " 0 12px 34px -14px rgba(0,0,0,0.5)"
-            : "inset 0 1px 0 rgba(255,255,255,0.95)," +
-              " inset 0 -14px 30px -20px rgba(120,92,110,0.26)," +
-              " 0 12px 34px -14px rgba(48,40,60,0.32)",
+            ? "inset 0 1px 0 rgba(255,255,255,0.3)," +
+              " inset 0 -14px 30px -20px rgba(0,0,0,0.45)," +
+              " 0 10px 30px -14px rgba(0,0,0,0.42)"
+            : "inset 0 1px 0 rgba(255,255,255,0.8)," +
+              " inset 0 -14px 30px -20px rgba(120,92,110,0.2)," +
+              " 0 10px 30px -14px rgba(48,40,60,0.24)",
         }}
       >
         {/* SOS no extremo ESQUERDO — vermelho, sempre visível. */}
@@ -822,13 +832,20 @@ export function AppHomeScreen({
      `foreground/75` dava 3,77 no pôr do sol e `white/75` dava 3,41 no
      anoitecer. Um rótulo secundário se diferencia pelo TAMANHO e pelo peso,
      que ele já tem — atenuar a cor por cima disso foi o que o derrubou. */
-  const textoDoTopo = topoEscuro ? "text-white" : "text-foreground";
-  const heroText = darkSky ? "text-white/95" : "text-foreground";
+  /* Índigo profundo, não o marrom do `foreground`: são os valores exatos que
+     a referência traz (`#352968` no nome, `#3D3570` no número e no rótulo).
+     O par claro/escuro continua — em céu escuro nenhum índigo se lê. */
+  const INDIGO_TOPO = "#352968";
+  const INDIGO_CORPO = "#3D3570";
+  const textoDoTopo = topoEscuro ? "text-white" : "";
+  const corDoTopo = topoEscuro ? undefined : INDIGO_TOPO;
+  const heroText = darkSky ? "text-white/95" : "";
+  const corDoCorpo = darkSky ? undefined : INDIGO_CORPO;
   /* No anoitecer o rótulo cai sobre lavanda média (#9370da) — um meio-tom em
      que NENHUMA cor de texto chega a 4,5:1 sozinha (branco cheio dá 3,79).
      Quem resolve é o halo em `overArt`, e é por isso que ele é obrigatório
      ali: sem a sombra, este rótulo não tem correção possível. */
-  const heroMuted = darkSky ? "text-white/[0.98]" : "text-foreground";
+  const heroMuted = darkSky ? "text-white/[0.98]" : "";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
      o céu escurece e o mesmo branco cegaria — então o vidro inverte e o texto
@@ -855,20 +872,20 @@ export function AppHomeScreen({
      que dá volume.
      Fundo ainda mais transparente que o dos cartões — ele é ferramenta, tem
      que ser alcançável sem ser notado. */
+  /* VIDRO FOSCO CHAPADO, sem quina acesa.
+     A versão anterior tinha um verniz radial e um fio de luz de 95% na aresta
+     de cima — sobre o lilás do amanhecer aquilo lia como uma borda branca
+     brilhante desenhada em volta do botão, não como vidro. Pedido do dono:
+     "remova a borda rígida / degradê branco brilhante". Fica só o branco
+     translúcido a 35% com o desfoque atrás, que é o que a referência mostra. */
   const glassLeve: React.CSSProperties = {
-    background: topoEscuro
-      ? "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.30) 0%, rgba(255,255,255,0.06) 58%)," +
-        " rgba(26,23,42,0.20)"
-      : "radial-gradient(circle at 34% 28%, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.14) 58%)," +
-        " rgba(255,252,250,0.16)",
-    backdropFilter: "blur(16px) saturate(170%)",
-    WebkitBackdropFilter: "blur(16px) saturate(170%)",
-    border: `1px solid ${topoEscuro ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.58)"}`,
+    background: topoEscuro ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.35)",
+    backdropFilter: "blur(16px) saturate(150%)",
+    WebkitBackdropFilter: "blur(16px) saturate(150%)",
+    border: `1px solid ${topoEscuro ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.4)"}`,
     boxShadow: topoEscuro
-      ? "inset 0 1.5px 0 rgba(255,255,255,0.45), inset 0 -8px 16px -12px rgba(0,0,0,0.5)," +
-        " 0 6px 18px -10px rgba(0,0,0,0.45)"
-      : "inset 0 1.5px 0 rgba(255,255,255,0.95), inset 0 -8px 16px -12px rgba(120,92,110,0.28)," +
-        " 0 6px 18px -10px rgba(120,84,96,0.28)",
+      ? "0 4px 14px -8px rgba(0,0,0,0.4)"
+      : "0 4px 14px -8px rgba(90,70,120,0.22)",
   };
   const glass: React.CSSProperties = {
     background: darkSky
@@ -929,7 +946,15 @@ export function AppHomeScreen({
           "0 1px 2px rgba(10,4,30,0.95), 0 2px 6px rgba(10,4,30,0.85)," +
           " 0 3px 14px rgba(10,4,30,0.7)",
       }
-    : { textShadow: "0 1px 3px rgba(255,255,255,0.5), 0 2px 10px rgba(90,60,110,0.22)" };
+    : {
+        /* Em céu CLARO o texto é índigo, e quem levanta o contraste de um
+           texto escuro é um halo CLARO — a sombra escura que estava aqui
+           empurrava para o lado errado. Medido no pôr do sol: "semanas" ficava
+           em 4,37:1 (mínimo 4,5) e passa a 6,1 com o halo branco. */
+        textShadow:
+          "0 0 2px rgba(255,255,255,0.9), 0 1px 5px rgba(255,255,255,0.75)," +
+          " 0 2px 12px rgba(255,255,255,0.5)",
+      };
   /* O nome mora no TOPO, onde a régua é outra (ver `topoEscuro`). */
   const overArtTopo: React.CSSProperties = topoEscuro
     ? {
@@ -937,7 +962,11 @@ export function AppHomeScreen({
           "0 1px 2px rgba(10,4,30,0.9), 0 2px 6px rgba(10,4,30,0.75)," +
           " 0 3px 14px rgba(10,4,30,0.6)",
       }
-    : { textShadow: "0 1px 3px rgba(255,255,255,0.5), 0 2px 10px rgba(90,60,110,0.22)" };
+    : {
+        textShadow:
+          "0 0 2px rgba(255,255,255,0.9), 0 1px 5px rgba(255,255,255,0.75)," +
+          " 0 2px 12px rgba(255,255,255,0.5)",
+      };
 
   /* Quem o cartão do médico mostra.
      
@@ -1012,15 +1041,15 @@ export function AppHomeScreen({
            tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
            perfil e o clima continuam abaixo do relógio, onde dá para tocar.
 
-           O NÚMERO TEM QUE SER O MESMO DA PÁGINA. Ele era `0.5rem` enquanto o
-           container de `minha-conta` usava `1.5rem` — sobrava uma faixa creme
-           de 16px atravessando o topo, bem onde fica o relógio do sistema. A
-           bancada não mostrava: ela usa `pt-2`, que casava por acaso com o
-           valor errado. Se a folga da página mudar, este `calc` muda junto.
-
-           A primeira dobra NÃO repete mais este padding: repetindo, a folga
-           entrava duas vezes e a "tela exata" media 100svh + 24px. */
-        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(1.5rem+var(--safe-top))]"
+           O `-mt` TEM QUE SER O DA PÁGINA (1,5rem), e o `pt` NÃO. São coisas
+           diferentes: o `-mt` cancela a folga do container para o céu encostar
+           no topo do aparelho — errado ali, sobrava uma faixa creme de 16px
+           bem onde fica o relógio do sistema. O `pt` é a folga do CONTEÚDO
+           dentro do céu, e o pedido é que ele fique colado na área segura:
+           meio rem, não um e meio. Se a folga da página mudar, só o `-mt` muda.
+           A bancada replica a geometria da página de propósito — com `pt-2`
+           ela casava por acaso com um `-mt` errado e escondia a faixa. */
+        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
         /* A cor do PÉ da cena, não a do topo: a cena cobre só a primeira dobra
            (ver `CeuDoDia`), e é esta cor que continua atrás da segunda. O topo
            não precisa de cor de espera porque o SVG pinta no mesmo quadro em
@@ -1069,7 +1098,7 @@ export function AppHomeScreen({
               O bebê é o protagonista e fica com TODO o espaço que sobrar —
               por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
               para a dobra de baixo em vez de espremer o bebê. ── */}
-          <div className="flex h-[100svh] flex-col pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
+          <div className="flex h-[calc(100svh-0.5rem-var(--safe-top))] flex-col pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
             {/* ── BARRA DE TOPO: menu · nome · clima ────────────────────
                 Três peças numa linha só, e o nome fica no CENTRO ÓPTICO da
                 tela — não no centro do espaço que sobra entre os dois botões.
@@ -1118,8 +1147,8 @@ export function AppHomeScreen({
                      ("Ana Beatriz…") entrava 8px por baixo da pílula. Medido.
                      11rem reserva os dois cantos mais o respiro; em telas
                      largas o nome fica até MAIS folgado que antes. */
-                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-11rem)] -translate-x-1/2 truncate text-center font-serif text-[clamp(1.15rem,5.2vw,1.5rem)] font-medium leading-none ${textoDoTopo}`}
-                  style={overArtTopo}
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-11rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] font-semibold leading-none ${textoDoTopo}`}
+                  style={{ ...overArtTopo, color: corDoTopo }}
                 >
                   {babyName} <span className="align-middle text-[0.72em]">💜</span>
                 </p>
@@ -1135,7 +1164,7 @@ export function AppHomeScreen({
                   style={glassLeve}
                   aria-label={`${weather.temp} graus, ${weather.condition}`}
                 >
-                  {darkSky ? (
+                  {slot.astro === "lua" ? (
                     <Moon
                       className="h-[15px] w-[15px] shrink-0"
                       strokeWidth={2.2}
@@ -1158,8 +1187,8 @@ export function AppHomeScreen({
                       pôr do sol o topo é violeta médio e o branco chegava a
                       3,85:1 no pior pixel — com o halo vai a 8,4. */}
                   <span
-                    className={`text-[15px] font-bold leading-none ${textoDoTopo}`}
-                    style={overArtTopo}
+                    className={`text-[15px] font-medium leading-none ${textoDoTopo}`}
+                    style={{ ...overArtTopo, color: corDoTopo }}
                   >
                     {weather.temp}°
                   </span>
@@ -1248,23 +1277,29 @@ export function AppHomeScreen({
 
                 <div className="flex shrink-0 flex-col items-center" style={overArt}>
                   <p
-                    className={`leading-[0.9] ${heroText}`}
+                    className={`leading-[0.92] ${heroText}`}
                     style={{
+                      color: corDoCorpo,
                       // `var(--font-serif)` e não uma fonte fixa: preso assim,
                       // o maior número da tela era o único texto que NÃO
                       // seguia a fonte do sistema.
-                      fontFamily: "var(--font-serif)",
+                      /* HERDA a face do corpo, que é a geométrica do sistema
+                         (SF Pro Text no Apple, DM Sans de reserva). A
+                         `--font-serif` deste projeto é na verdade a ARREDONDADA
+                         (SF Pro Rounded) — bonita nos títulos, mas a referência
+                         traz o número numa geométrica reta. */
+                      fontFamily: "inherit",
                       /* O termo em `svh` é irmão do que dimensiona a bolha, e
                          está aqui pelo mesmo motivo: medido só pela LARGURA, o
                          número ficava com 104px numa tela de 375px de altura
                          (celular deitado) e empurrava a coluna para fora da
                          primeira dobra. Em retrato o `20vw` continua vencendo,
                          então nada muda no aparelho de pé. */
-                      fontSize: "clamp(2.75rem, min(20vw, 11svh), 6.5rem)",
+                      fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
                       // 300 e não 400: neste corpo o peso normal fica pesado
                       // demais e o número vira bloco. Fino, ele respira — é o
                       // que a referência do rebranding traz.
-                      fontWeight: 300,
+                      fontWeight: 600,
                       letterSpacing: "-0.02em",
                       fontVariantNumeric: "tabular-nums lining-nums",
                     }}
@@ -1272,7 +1307,8 @@ export function AppHomeScreen({
                     {gest.weeks}
                   </p>
                   <p
-                    className={`mt-1 text-[clamp(0.8rem,min(4.4vw,2.6svh),1.25rem)] font-normal leading-none ${heroMuted}`}
+                    className={`-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none ${heroMuted}`}
+                    style={{ color: corDoCorpo }}
                   >
                     {gest.weeks === 1 ? "semana" : "semanas"}
                   </p>
