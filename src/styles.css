@@ -1241,19 +1241,55 @@ button:active > .duo3d {
   will-change: transform;
 }
 
-/* A bolha desenhada pelo app (quando a arte vier sem esfera): mesma
-   respiração, aplicada ao elemento em vez do céu inteiro. */
+/* ─── QUEM SE MEXE É O BEBÊ, NÃO O VIDRO (ago/2026) ──────────────────
+   A versão anterior subia e descia a `.dc-orb` inteira 3px, e o desenho do
+   bebê — que é IRMÃO dela no DOM, não filho — ficava parado. Na tela isso
+   lia ao contrário do mundo: a casca de vidro balançava e o que boia dentro
+   do líquido não. Ninguém sabe dizer o que está errado, mas a cena para de
+   convencer.
+   Agora são duas animações separadas, e a que tem amplitude é a do bebê. */
+
+/* A BOLHA: tensão superficial, não flutuação. Só escala — sem `translateY`,
+   que era justamente o balanço de casca. */
 @keyframes dcOrbBreathe {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
   50% {
-    transform: translateY(-3px) scale(1.015);
+    transform: scale(1.016);
   }
 }
 .dc-orb {
-  animation: dcOrbBreathe 16s ease-in-out infinite;
+  animation: dcOrbBreathe 19s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* O BEBÊ: deriva. Sobe, desce e gira um grau — o movimento de quem está
+   suspenso em líquido, sem peso apoiado em lugar nenhum.
+   `rotate` junto com `translate` porque subir e descer em linha reta lê como
+   elevador; é a inclinação que faz virar deriva.
+
+   ─── POR QUE 13s CONTRA OS 19s DA BOLHA ─────────────────────────────
+   Períodos próximos (ou múltiplos) sincronizam, e sincronizados os dois
+   voltam a parecer UM bloco se mexendo — que é o defeito que este par de
+   animações existe para desfazer. 13 e 19 são primos entre si: o ciclo
+   conjunto só se repete a cada 247s, e nesse meio-tempo o bebê passa por
+   toda posição relativa dentro da bolha. */
+@keyframes dcBebeDeriva {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(0.7%, -1.6%) rotate(0.9deg);
+  }
+  66% {
+    transform: translate(-0.6%, 1.1%) rotate(-0.7deg);
+  }
+}
+.dc-bebe-deriva {
+  animation: dcBebeDeriva 13s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -1399,6 +1435,9 @@ button:active > .duo3d {
     transform: scale(1.04);
   }
   .dc-orb {
+    animation: none;
+  }
+  .dc-bebe-deriva {
     animation: none;
   }
 }

@@ -1344,7 +1344,12 @@ export function AppHomeScreen({
                       tone={babyTone}
                       showSac={false}
                       showInfo={false}
-                      className="absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                      /* `dc-bebe-deriva` anima `transform`; o `scale-[1.65]`
+                         do Tailwind v4 escreve na propriedade `scale`, que é
+                         OUTRA. As duas compõem sem se atropelar — se a escala
+                         viesse por `transform`, a animação a apagaria e o bebê
+                         encolheria de volta ao tamanho antigo. */
+                      className="dc-bebe-deriva absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
                     />
                   </div>
                 </button>
