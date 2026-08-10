@@ -94,10 +94,22 @@ export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpre
  * `Bolha` desenha a arte num quadrado de `tamanho` e põe a sombra do chão POR
  * FORA da imagem, então o enquadramento é o que impede o personagem de mudar
  * de tamanho e de altura ao trocar de humor — na mesma tela, na mesma bolha.
- * As cinco novas foram recortadas casando a ESFERA da arte `feliz` (221px de
- * diâmetro, centro em 153×132 na caixa de 320), e não a caixa da imagem: a
+ * As cinco foram recortadas casando a ESFERA umas das outras (663px de
+ * diâmetro, centro em 459×396 na caixa de 960), e não a caixa da imagem: a
  * caixa inclui faíscas, confete e o ZZZ, que estão em lugares diferentes em
  * cada arte, e casar por ela encolheria a esfera para caber os extras.
+ *
+ * ─── A GRADE É 960, E NÃO 320 ───────────────────────────────────────────────
+ *
+ * Elas nasceram em 320 porque era o tamanho das artes anteriores — que só
+ * apareciam em 44px e 104px. Hoje a maior aparição é `tamanho={298}`, e num
+ * iPhone (dsf 3) isso são 894 pixels reais: a arte de 320 era esticada 2,76×,
+ * e a bolha aparecia borrada. Medido, não suposto.
+ *
+ * Em 960 a mesma geometria vale multiplicada por três, e a esfera de 663px sai
+ * por REDUÇÃO das fontes (esferas de 803 a 955px, escalas de 0,69 a 0,83) —
+ * que é o que preserva o desenho: ampliar inventa pixel, reduzir só descarta.
+ * Se um dia a bolha aparecer maior que 320 CSS, esta conta refaz.
  *
  * Onde os extras não cabiam nesse tamanho — o chapéu de festa do
  * `comemorando`, o ZZZ do `dormindo` —, a escala cedeu o mínimo. Bolha um tico
