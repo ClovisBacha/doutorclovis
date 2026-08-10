@@ -6067,6 +6067,16 @@ const WELLNESS_META: Record<
   }
 > = {
   aula: {
+    /* `tile`/`ink` entraram quando a aula virou LINHA da lista (ago/2026).
+       Sem eles o tile caía no `?? meta.a` e saía com o gradiente SATURADO —
+       o mesmo defeito que o comentário do tile descreve, e logo na primeira
+       linha da lista: cinco pastéis e um azul berrante no topo.
+       O índigo é o que sobrou de livre: azul é do Respirar, roxo do Meditar,
+       âmbar do Movimento, rosa do Bebê e verde da Gratidão. */
+    inkDark: "#a9a8ff",
+    ink: "#3d34c4",
+    tile: "#dfe0fb",
+    tileB: "#c9cbf7",
     title: "Aula de hoje",
     a: "#818cf8",
     b: "#3b82f6",
@@ -6265,6 +6275,16 @@ function AtividadeIcone({ chave }: { chave: string }) {
           <path d="M12 20.4s-7.8-4.8-7.8-10.1A4.7 4.7 0 0 1 12 7.2a4.7 4.7 0 0 1 7.8 3.1c0 5.3-7.8 10.1-7.8 10.1z" />
         </svg>
       );
+    case "aula": // livro aberto
+      /* Sem este `case` a aula cairia no `default` e usaria as FAÍSCAS da
+         gratidão — duas linhas da mesma lista com o mesmo desenho, e a de
+         cima seria a errada. */
+      return (
+        <svg {...comum}>
+          <path d="M11.2 6.4C9.6 5.2 7.6 4.6 5.2 4.6c-.7 0-1.2.5-1.2 1.2v11c0 .7.5 1.2 1.2 1.2 2.2 0 4 .5 5.4 1.5.3.2.6 0 .6-.3V6.4z" />
+          <path d="M12.8 6.4c1.6-1.2 3.6-1.8 6-1.8.7 0 1.2.5 1.2 1.2v11c0 .7-.5 1.2-1.2 1.2-2.2 0-4 .5-5.4 1.5-.3.2-.6 0-.6-.3V6.4z" />
+        </svg>
+      );
     default: // gratidão — faíscas
       return (
         <svg {...comum}>
@@ -6381,9 +6401,6 @@ function WellnessScreen({
   const openMeta = openKey ? WELLNESS_META[openKey] : null;
   const lessonEmoji = lesson.emoji;
 
-  /* O cartão da aula fala do conteúdo de HOJE. Título e duração saem do
-     próprio quiz: um exercício de 5 perguntas não leva o mesmo tempo que um
-     de 3, e escrever "8 min" fixo seria número de enfeite. */
   const aulaFeita = lesson.alreadyDone;
   /* O quiz não tem campo de título — tem `teach`, a lição. A primeira frase
      dela É o assunto do dia, então ela vira o título, cortada no ponto. Sem
@@ -6404,12 +6421,33 @@ function WellnessScreen({
           return `${(espaco > 24 ? corte.slice(0, espaco) : corte).trimEnd()}…`;
         })()
       : lesson.label || "O desafio de hoje";
-  const minutosAula =
-    lesson.kind === "quiz" ? Math.max(3, Math.round(lesson.quiz.questions.length * 1.6)) : 2;
-  /* 100% quando a aula está feita; senão o quanto do DIA já andou — é o que a
-     barra do desenho comunica, e inventar uma porcentagem por dentro do quiz
-     exigiria rastrear pergunta a pergunta fora dele. */
-  const pctAula = aulaFeita ? 100 : Math.round((halves / 6) * 100);
+
+  /* ─── AS SEIS LINHAS DO DIA ──────────────────────────────────────────────
+     A aula voltou a ter porta, e voltou como LINHA da mesma lista — não como
+     cartão em destaque. Pedido do dono: "o ensino tem que ser criado como uma
+     nova linha que nem os outros".
+
+     É uma lista só, percorrida por um `map` só, e isso é o ponto: a versão
+     anterior tinha a aula num bloco de marcação PRÓPRIO, com selo, barra de
+     progresso e botão. Duas marcações para a mesma ideia divergem sempre —
+     bastava mexer no raio ou na folga dos cinco para a aula ficar de fora.
+     Agora ela não pode ficar diferente por acidente; se ficar, é porque
+     alguém mudou esta linha de propósito.
+
+     Ela vem PRIMEIRO porque é o conteúdo do dia — as outras cinco são
+     bem-estar e cabem em qualquer ordem; a aula é o que muda a cada 24h.
+
+     A descrição dela é o ASSUNTO DE HOJE (`tituloAula`), e não um texto fixo:
+     "A lição da professora + o quiz" descreve a mecânica e não dá motivo
+     nenhum para tocar. O assunto dá. */
+  const linhasDoDia: { key: string; desc: string; feito: boolean }[] = [
+    { key: "aula", desc: tituloAula, feito: aulaFeita },
+    ...WELLNESS_TYPES.map((a) => ({
+      key: a.key,
+      desc: WELLNESS_META[a.key].desc,
+      feito: done.has(a.key),
+    })),
+  ];
 
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
      Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a
@@ -6755,24 +6793,21 @@ function WellnessScreen({
               </div>
             </div>
 
-            {/* ─── O CARTÃO DA AULA SAIU DAQUI (ago/2026) ──────────────
-                Era o bloco em destaque entre o balão e a lista: selo
-                "Recomendada", título da aula da semana, duração, o bebê da
-                semana e o botão "Continuar aula". Saiu porque a arte de
-                referência não o traz, e o pedido foi tela 100% igual a ela.
+            {/* ─── O CARTÃO EM DESTAQUE DA AULA SAIU, E NÃO VOLTA ──────
+                Era um bloco entre o balão e a lista: selo "Recomendada",
+                título da semana, duração, o bebê da semana e um botão
+                "Continuar aula". Saiu porque a arte de referência não o traz.
 
-                ⚠️ ELE ERA A ÚNICA PORTA DA AULA. `setOpenKey("aula")` não é
-                chamado de nenhum outro lugar do app, então enquanto não
-                existir outra entrada:
-                  · a aula da semana e o quiz ficam inalcançáveis;
-                  · `halves` nunca chega a 6 (a aula vale 1 dos 6), então
-                    "Dia completo" e as 3 estrelas do dia ficam fora de
-                    alcance mesmo fazendo tudo o que a tela mostra.
+                Por um commit ele levou junto a ÚNICA porta da aula, e o dia
+                deixou de poder fechar em 6/6 — a aula vale 1 dos 6. A porta
+                voltou logo abaixo, como LINHA da lista de atividades: pedido
+                do dono, "o ensino tem que ser criado como uma nova linha que
+                nem os outros".
 
-                O ramo `openKey === "aula"` continua inteiro e funcionando
-                logo acima — falta só quem o acione. Três saídas possíveis: um
-                sexto cartão na lista, o cartão de volta abaixo das estrelas,
-                ou um botão na trilha. É decisão do dono. */}
+                Fica registrado para quem for mexer: `openKey === "aula"` é o
+                ramo que monta o quiz, e hoje quem o aciona é a primeira linha
+                de `linhasDoDia`. Se alguém tirar a aula dali de novo, tem que
+                pôr a porta em outro lugar no mesmo commit. */}
 
             {/* ── Atividades de hoje ─────────────────────────────────── */}
             <div className="mt-3.5 flex items-center justify-between gap-3">
@@ -6792,9 +6827,9 @@ function WellnessScreen({
                 essa folga que faz cinco deles lerem como lista em vez de
                 bloco único. */}
             <div className="mt-2.5 flex flex-col gap-2">
-              {WELLNESS_TYPES.map((a) => {
+              {linhasDoDia.map((a) => {
                 const meta = WELLNESS_META[a.key];
-                const isDone = !careMode && done.has(a.key);
+                const isDone = !careMode && a.feito;
                 return (
                   <button
                     key={a.key}
@@ -6844,7 +6879,7 @@ function WellnessScreen({
                         className="mt-0.5 block text-[12.5px] leading-[1.35]"
                         style={{ color: tintaSec }}
                       >
-                        {meta.desc}
+                        {a.desc}
                       </span>
                     </span>
                     {!careMode && (
