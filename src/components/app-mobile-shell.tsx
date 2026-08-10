@@ -1254,17 +1254,38 @@ export function AppHomeScreen({
                       ficava mais apertada que a menor. */}
                   <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
                     <BabyOrb />
-                    {/* `scale` porque o SVG tem margem interna larga: a tinta do
-                      bebê é ~55% da caixa, e 1.43 leva ela a ~80% da bolha — a
-                      proporção que a referência tem. Medido na tela, não
-                      estimado: em 1.8 ela vazava (101% da bolha). O tamanho é o MESMO
-                      em todas as semanas; o que muda é o desenho. */}
+                    {/* `scale` porque o SVG do bebê tem margem interna larga.
+                      O valor anterior (1.43) vinha de uma medição ERRADA: ela
+                      media a CAIXA do SVG, não a tinta. Medido pixel a pixel
+                      na tela — contando só o que é pele contra o azul da
+                      bolha —, em 1.43 o bebê ocupava 55,8% da altura da
+                      bolha, e a referência do rebranding traz ~80%. Daí a
+                      leitura de "bola COM um bebê" em vez de "bebê DENTRO".
+                      O que limita não é a caixa (ela pode transbordar à
+                      vontade, é margem vazia): é a TINTA encostar na parede
+                      de vidro.
+
+                      ─── POR QUE 1,65 E NÃO 2 ────────────────────────────
+                      A escala é a MESMA em todas as semanas, mas o DESENHO
+                      cresce com a gestação — é o ponto do produto. Então o
+                      teto não é a semana 20 da referência: é a 40. Medido
+                      (altura da tinta sobre a altura da bolha):
+
+                        escala   s8      s20     s32     s40
+                        1,43    34,5%   55,8%   71,6%   80,8%
+                        2,00    49,6%   78,1%   ENCOSTA ENCOSTA
+                        1,65    39,7%   64,5%   82,6%   93,2%
+
+                      Em 2,00 a semana 20 chega aos 80% da referência, mas a
+                      32 e a 40 batem na parede de vidro. 1,65 é o maior valor
+                      em que as quatro ainda cabem. Mexer aqui obriga a medir
+                      a 40 de novo, nunca só a 20. */}
                     <BabyIllustration
                       week={gest.weeks}
                       tone={babyTone}
                       showSac={false}
                       showInfo={false}
-                      className="absolute inset-0 h-full w-full origin-center scale-[1.43] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                      className="absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
                     />
                   </div>
                 </button>
