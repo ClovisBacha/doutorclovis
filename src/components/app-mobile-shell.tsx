@@ -678,23 +678,60 @@ function BabyOrb() {
         width: "97%",
         height: "100%",
         margin: "auto",
+        /* ─── SEIS CAMADAS DE LUZ, E O CORPO QUASE SUMINDO (ago/2026) ─────
+           Pedido do dono: "coloca mais reflexos na bola, deixe ela mais
+           transparente". As duas coisas puxam para lados opostos se forem
+           feitas no mesmo lugar — clarear o CORPO é o que tira a
+           transparência, e era ele que carregava quase toda a luz (0,26 de
+           branco chapado no miolo).
+
+           A saída foi trocar UM brilho grande e um corpo forte por VÁRIOS
+           reflexos pequenos e um corpo fraco: o corpo caiu de 0,26 para 0,10
+           (o céu passa) e a luz voltou repartida em pontos que uma esfera de
+           vidro de verdade tem — o ponto duro da fonte, o lençol que ele
+           espalha, o reflexo da segunda janela, a contra-luz da parede de
+           baixo e a cáustica.
+
+           A ordem importa: a primeira camada fica POR CIMA. O ponto duro vem
+           primeiro justamente para não ser lavado pelo lençol. */
         background: [
-          // Brilho ESPECULAR no alto à esquerda: é a marca de esfera de vidro,
-          // o ponto onde a fonte de luz se reflete. Sem ele a bolha vira disco.
-          "radial-gradient(circle at 30% 24%, rgba(255,255,255,0.55) 0%," +
-            " rgba(255,255,255,0.14) 26%, rgba(255,255,255,0) 46%)",
-          // Corpo do vidro: claro no miolo, morrendo antes da borda.
-          "radial-gradient(circle at 50% 47%, rgba(255,252,254,0.26) 0%," +
-            " rgba(255,247,251,0.14) 42%, rgba(255,255,255,0.04) 70%," +
-            " rgba(255,255,255,0) 86%)",
-          // Contra-luz na base: a parede oposta do vidro devolve luz de volta.
-          "radial-gradient(circle at 62% 88%, rgba(255,255,255,0.22) 0%," +
-            " rgba(255,255,255,0) 34%)",
+          // 1. O PONTO DURO — a fonte de luz refletida na parede de vidro.
+          //    Pequeno e quase branco: é o que faz o olho ler "esfera" em vez
+          //    de "disco". Elipse e não círculo porque a parede é curva e o
+          //    reflexo chega achatado.
+          //    O miolo cai rápido (0,9 → 0,3 em 36%) porque reflexo de vidro
+          //    tem NÚCLEO: com queda mansa a mancha lê como algodão.
+          "radial-gradient(ellipse 12.5% 8.5% at 29% 19%, rgba(255,255,255,0.92) 0%," +
+            " rgba(255,255,255,0.3) 36%, rgba(255,255,255,0.08) 62%," +
+            " rgba(255,255,255,0) 84%)",
+          // 2. O LENÇOL que esse ponto espalha em volta, largo e fraco.
+          "radial-gradient(ellipse 33% 26% at 33% 25%, rgba(255,255,255,0.3) 0%," +
+            " rgba(255,255,255,0.09) 52%, rgba(255,255,255,0) 82%)",
+          // 3. O SEGUNDO REFLEXO, alto e do lado oposto: vidro reflete o
+          //    ambiente inteiro, não só a lâmpada principal.
+          "radial-gradient(ellipse 10% 6.5% at 71% 26%, rgba(255,255,255,0.28) 0%," +
+            " rgba(255,255,255,0) 76%)",
+          // 4. CONTRA-LUZ na base: a parede oposta devolve luz para dentro.
+          "radial-gradient(ellipse 30% 18% at 62% 87%, rgba(255,255,255,0.28) 0%," +
+            " rgba(255,255,255,0) 70%)",
+          // 5. CÁUSTICA: o arco que a luz desenha ao atravessar e reencontrar
+          //    a parede, embaixo e do lado de onde ela entrou.
+          "radial-gradient(ellipse 20% 12% at 25% 75%, rgba(255,242,250,0.18) 0%," +
+            " rgba(255,255,255,0) 72%)",
+          // 6. O CORPO — o que sobrou dele. Era 0,26 no miolo; agora 0,10.
+          //    É esta linha, e não os reflexos, que decide o quanto de céu
+          //    atravessa a bolha.
+          "radial-gradient(circle at 50% 47%, rgba(255,252,254,0.1) 0%," +
+            " rgba(255,247,251,0.05) 46%, rgba(255,255,255,0.015) 72%," +
+            " rgba(255,255,255,0) 88%)",
         ].join(", "),
-        // Véu: dentro da bolha o céu perde nitidez e cor, como atrás de vidro.
-        // É o que a faz OCUPAR volume em vez de ser um decalque.
-        backdropFilter: "blur(2.5px) saturate(0.88) brightness(1.05)",
-        WebkitBackdropFilter: "blur(2.5px) saturate(0.88) brightness(1.05)",
+        /* Véu: dentro da bolha o céu perde nitidez e cor, como atrás de vidro.
+           É o que a faz OCUPAR volume em vez de ser um decalque.
+           Afrouxado junto com o corpo (era blur 2,5px / brightness 1,05): véu
+           forte é opacidade por outro caminho — ele apaga o desenho do céu
+           atrás da bolha tanto quanto uma camada branca apagaria. */
+        backdropFilter: "blur(1.5px) saturate(0.95) brightness(1.02)",
+        WebkitBackdropFilter: "blur(1.5px) saturate(0.95) brightness(1.02)",
         /* A PAREDE do vidro. A versão anterior deixava o aro em 0.12 para não
            virar "anel desenhado" — o problema real, porém, não era a força do
            aro e sim ele ser uniforme. Aro de espessura igual em toda a volta
@@ -705,7 +742,15 @@ function BabyOrb() {
           "inset 0 2px 3px -1px rgba(255,255,255,0.75)",
           "inset 6px 10px 22px -14px rgba(255,255,255,0.85)",
           "inset -8px -12px 26px -16px rgba(255,255,255,0.5)",
-          "inset 0 0 0 1px rgba(255,255,255,0.20)",
+          /* O ARO ACESO DA PARTE DE BAIXO, fino e nítido. Numa esfera de
+             vidro a parede mais brilhante não é a que a luz toca: é a
+             OPOSTA, onde o raio sai depois de atravessar. Curto (-8px de
+             spread) para virar um fio de luz, não um segundo halo. */
+          "inset -3px -5px 9px -7px rgba(255,255,255,0.85)",
+          /* O aro uniforme desceu de 0,20 para 0,15: com o corpo mais fraco,
+             o mesmo contorno passava a ser a coisa mais forte da bolha e ela
+             lia como círculo desenhado a caneta. */
+          "inset 0 0 0 1px rgba(255,255,255,0.15)",
           "0 0 46px 16px rgba(255,246,251,0.16)",
         ].join(", "),
       }}
@@ -941,20 +986,34 @@ export function AppHomeScreen({
      ponto a 7,39 e o rótulo "semanas" de 3,41 para 13,09.
      No céu claro o halo é o oposto — claro e fraco — porque ali o texto é
      escuro e o que ele precisa é de separação, não de peso. */
+  /* ─── O HALO AFROUXOU (ago/2026) ─────────────────────────────────────────
+     As três camadas acima nasceram para resgatar 1,4:1 e foram calibradas com
+     folga larga. Medido depois, o "20" chegava a 17,4:1 no anoitecer contra um
+     mínimo de 3 — folga que se pagava em aparência: sombra opaca colada no
+     glifo (0,95 a 2px) lê como relevo de gravação, e foi metade do "muito
+     grosseira" que o dono viu.
+     O que ficou é a MESMA arquitetura de três camadas, com alfas menores e
+     raios maiores: a sombra deixa de desenhar contorno e passa a apenas
+     apagar o céu atrás do texto. O piso continua sendo medido, não estimado:
+     `scripts/contraste-hero.mjs` reprova qualquer céu abaixo do mínimo, e
+     `scripts/centragem-hero.mjs` mede a centragem óptica. */
   const overArt: React.CSSProperties = darkSky
     ? {
         textShadow:
-          "0 1px 2px rgba(10,4,30,0.95), 0 2px 6px rgba(10,4,30,0.85)," +
-          " 0 3px 14px rgba(10,4,30,0.7)",
+          "0 1px 3px rgba(10,4,30,0.55), 0 2px 9px rgba(10,4,30,0.5)," +
+          " 0 4px 20px rgba(10,4,30,0.42)",
       }
     : {
         /* Em céu CLARO o texto é índigo, e quem levanta o contraste de um
            texto escuro é um halo CLARO — a sombra escura que estava aqui
            empurrava para o lado errado. Medido no pôr do sol: "semanas" ficava
-           em 4,37:1 (mínimo 4,5) e passa a 6,1 com o halo branco. */
+           em 4,37:1 (mínimo 4,5) e passa a 6,1 com o halo branco.
+           Também afrouxado: um halo branco duro em volta de texto índigo lê
+           como recorte mal feito, do mesmo jeito que a sombra dura lia como
+           relevo no céu escuro. */
         textShadow:
-          "0 0 2px rgba(255,255,255,0.9), 0 1px 5px rgba(255,255,255,0.75)," +
-          " 0 2px 12px rgba(255,255,255,0.5)",
+          "0 0 4px rgba(255,255,255,0.62), 0 1px 8px rgba(255,255,255,0.5)," +
+          " 0 2px 16px rgba(255,255,255,0.36)",
       };
   /* O nome mora no TOPO, onde a régua é outra (ver `topoEscuro`). */
   const overArtTopo: React.CSSProperties = topoEscuro
@@ -1326,12 +1385,34 @@ export function AppHomeScreen({
                          primeira dobra. Em retrato o `20vw` continua vencendo,
                          então nada muda no aparelho de pé. */
                       fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
-                      // 300 e não 400: neste corpo o peso normal fica pesado
-                      // demais e o número vira bloco. Fino, ele respira — é o
-                      // que a referência do rebranding traz.
-                      fontWeight: 600,
-                      letterSpacing: "-0.02em",
-                      fontVariantNumeric: "tabular-nums lining-nums",
+                      /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta:
+                         a contra-forma do "0" fecha e o número lê como bloco
+                         — foi o "muito grosseira" do dono. A referência traz
+                         Medium, e é em Medium que a curva do "2" volta a ter
+                         desenho. */
+                      fontWeight: 500,
+                      letterSpacing: "-0.03em",
+                      /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
+                         Figura tabular existe para alinhar COLUNA de números;
+                         ela dá a todo dígito a mesma largura de avanço, o que
+                         obriga o "1" a nadar num vão largo e desloca a tinta
+                         dentro da caixa. Medido: com tabular, a tinta do "20"
+                         caía 2,25px à direita do centro da tela enquanto a de
+                         "semanas" caía 0,75px à esquerda — 3px de desencontro
+                         entre duas linhas empilhadas, que é o "descentralizada".
+                         Sem tabular, e com o `textIndent` abaixo, o desencontro
+                         cai para 0,15px (`scripts/centragem-hero.mjs`).
+                         Aqui é UM número solto, então vale a figura
+                         proporcional, que é a que a fonte desenhou para ficar
+                         bem centrada sozinha.
+
+                         `textIndent` corrige o que sobra: `letter-spacing`
+                         entra DEPOIS de cada caractere, inclusive o último, e
+                         esse vão fantasma no fim empurra a tinta para o lado.
+                         Metade do valor, com sinal trocado, devolve a tinta ao
+                         eixo. */
+                      fontVariantNumeric: "lining-nums",
+                      textIndent: "-0.015em",
                     }}
                   >
                     {gest.weeks}
