@@ -209,3 +209,62 @@ describe("o boot nativo acontece antes de qualquer componente montar", () => {
     expect(classe).toBeLessThan(carga);
   });
 });
+
+describe("o SOS não pode prender a paciente numa tela sem saída", () => {
+  /**
+   * O DEFEITO, como o dono viu: depois de acionar o SOS, o app ficava numa
+   * tela verde "Abrindo o WhatsApp…" para sempre, e só saía fechando e
+   * reabrindo o app inteiro.
+   *
+   * A causa: `window.open("", "_blank")` num PWA instalado NÃO abre aba. Abre
+   * uma visão que toma a tela toda — e sem barra de navegador não existe botão
+   * de voltar. No navegador comum a mesma linha é inofensiva (é uma aba, e ela
+   * fecha), e é por isso que o defeito não aparece em nenhuma máquina de
+   * desenvolvimento.
+   */
+  const sos = readFileSync("src/components/emergency-sheet.tsx", "utf8");
+  const nativo = readFileSync("src/lib/nativo.ts", "utf8");
+
+  test("a tela de passagem só é aberta FORA do app instalado", () => {
+    const i = sos.indexOf('window.open("", "_blank")');
+    expect(i).toBeGreaterThan(-1);
+    /* A condição tem de estar na MESMA guarda que decide abrir. */
+    const guarda = sos.slice(Math.max(0, i - 260), i);
+    expect(guarda).toContain("!emTelaCheia()");
+  });
+
+  test("e a segunda tentativa também respeita isso", () => {
+    /* Havia um `window.open` de recuo, para quando a aba do toque não
+       sobrevive. Sem a mesma guarda, ele reabriria a armadilha no app
+       instalado — pelo caminho que ninguém testa. */
+    const todas = [...sos.matchAll(/window\.open\(/g)];
+    expect(todas.length).toBe(2);
+    expect(sos).toContain("} else if (!emTelaCheia()) {");
+  });
+
+  test("`emTelaCheia` cobre PWA instalado E casca nativa", () => {
+    /* `ehNativo` sozinho não serve: um PWA na Tela de Início não tem ponte
+       Capacitor e é justamente onde o defeito acontece. */
+    expect(nativo).toContain("display-mode: standalone");
+    expect(nativo).toMatch(/standalone\?: boolean.*\}\)\.standalone === true/s);
+    expect(nativo).toMatch(
+      /export function emTelaCheia\(\)[\s\S]{0,200}if \(ehNativo\(\)\) return true;/,
+    );
+  });
+
+  test("a tela de passagem tem PORTA e um cão de guarda", () => {
+    /* Duas redes, porque as duas falham por motivos diferentes: o botão salva
+       quem não tem WhatsApp instalado, e o temporizador salva de um envio que
+       nunca responde. */
+    expect(sos).toContain("Voltar ao app");
+    expect(sos).toContain("window.close()");
+    expect(sos).toMatch(/cachorro = window\.setTimeout/);
+    expect(sos).toMatch(/\}, 12000\);/);
+  });
+
+  test("o cão de guarda é desarmado nos dois desfechos", () => {
+    /* Deixá-lo armado depois de navegar fecharia o WhatsApp da paciente 12
+       segundos depois de abrir. */
+    expect([...sos.matchAll(/window\.clearTimeout\(cachorro\)/g)]).toHaveLength(2);
+  });
+});

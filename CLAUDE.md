@@ -871,6 +871,17 @@ estranho.
 - Nenhum estado se perdeu — `sending`/`sent`/`ninguem`, o recuo para 193 quando
   o médico não tem telefone, o aviso de perfil incompleto e o painel de "quem
   foi avisado" continuam iguais.
+- **`window.open` NÃO abre aba no app instalado** — abre uma visão que toma a
+  tela inteira, e sem barra de navegador não há botão de voltar. Depois do SOS,
+  a paciente ficava presa na tela verde "Abrindo o WhatsApp…" e só saía matando
+  o app. `emTelaCheia()` (`nativo.ts`, cobre PWA na Tela de Início E casca
+  nativa) guarda as DUAS chamadas; ali o WhatsApp abre pelo botão verde, que é
+  um toque de verdade e o iOS entrega ao aplicativo sem tirar ninguém do app.
+  ⚠️ Este defeito é invisível em desenvolvimento: no navegador comum a mesma
+  linha abre uma aba inofensiva.
+- A tela de passagem ganhou **porta** ("Voltar ao app") e **cão de guarda** de
+  12 s. São duas redes para falhas diferentes: o botão salva quem não tem
+  WhatsApp instalado, o temporizador salva de um envio que nunca responde.
 - **Bancada:** `/preview-sos` (e `?outro=1` para ver o cartão verde do WhatsApp,
   `?semtel=1` para o recuo, `?vazio=1` para o perfil incompleto).
 

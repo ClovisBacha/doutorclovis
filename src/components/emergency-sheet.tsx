@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
+import { emTelaCheia } from "@/lib/nativo";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
@@ -172,7 +173,20 @@ export function EmergencySheet({
        o pedido de socorro" para ela não olhar para um vazio, e no fim
        apontamos essa mesma aba para o WhatsApp com a mensagem pronta. */
     let janela: Window | null = null;
-    if (linkWhatsApp(info.emergencyPhone)) {
+    let cachorro: number | null = null;
+    /* ── E NÃO FAZEMOS ISSO NO APP INSTALADO ──────────────────────────────
+       Num PWA na Tela de Início (ou na casca nativa) NÃO existe aba: o
+       `window.open` abre uma visão que toma a tela inteira, e sem barra de
+       navegador não há botão de voltar. Se ela não navegar para lugar nenhum,
+       a paciente fica presa na tela verde "Abrindo o WhatsApp…" e só sai
+       matando o app — que foi exatamente o que o dono viu, e é o pior defeito
+       possível numa tela de emergência.
+
+       Ali o caminho é outro e é seguro: o aviso sai igual (push, e-mail e SMS
+       já não dependiam desta janela), e o WhatsApp abre pelo BOTÃO VERDE que
+       aparece logo depois — um toque de verdade, que o iOS entrega ao
+       aplicativo do WhatsApp sem tirar a paciente do app. */
+    if (linkWhatsApp(info.emergencyPhone) && !emTelaCheia()) {
       janela = window.open("", "_blank");
       try {
         /* Esta tela dura o tempo de pegar a coordenada e chamar o servidor —
@@ -187,12 +201,41 @@ export function EmergencySheet({
            <title>Abrindo o WhatsApp…</title>
            <body style="margin:0;display:grid;place-items:center;height:100vh;
              font-family:system-ui,sans-serif;background:#25D366;color:#fff;text-align:center">
-             <p style="font-size:16px;font-weight:600;margin:0">Abrindo o WhatsApp…</p>
+             <div>
+               <p style="font-size:17px;font-weight:700;margin:0">Abrindo o WhatsApp…</p>
+               <p style="font-size:13px;margin:14px 24px 0;opacity:.92;line-height:1.4">
+                 O aviso já foi enviado para quem você cadastrou.
+               </p>
+               <!-- SAÍDA. Uma tela de passagem sem porta é uma armadilha:
+                    basta o WhatsApp não estar instalado para ela virar o fim
+                    do caminho. O botão fecha esta aba e devolve a paciente ao
+                    app, onde o 192 continua a um toque. -->
+               <button onclick="window.close()" style="margin-top:22px;border:0;
+                 border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700;
+                 background:#fff;color:#178a45">Voltar ao app</button>
+             </div>
            </body>`,
         );
       } catch {
         /* algumas WebViews não deixam escrever; a aba em branco resolve igual */
       }
+      /* ── CÃO DE GUARDA ────────────────────────────────────────────────
+         A tela de passagem existe para durar ~1 s. Se o servidor demorar, a
+         rede cair ou algo lançar num caminho que eu não previ, ela ficaria
+         aberta para sempre — e uma tela verde parada é indistinguível de app
+         travado, ainda mais em pânico.
+
+         12 s: mais que o pior caso somado (5 s de GPS + 2 s de endereço + o
+         disparo), e menos que a paciência de quem está passando mal. Fechar
+         não perde nada: o aviso já saiu por push, e-mail e SMS, e o botão
+         verde continua na tela. */
+      cachorro = window.setTimeout(() => {
+        try {
+          if (janela && !janela.closed) janela.close();
+        } catch {
+          /* aba de outra origem já navegada: nada a fazer, e nada a quebrar */
+        }
+      }, 12000);
     }
 
     let lat: number | null = null;
@@ -298,17 +341,22 @@ export function EmergencySheet({
 
          Ela ainda aperta ENVIAR dentro do WhatsApp: a mensagem chega escrita,
          mas quem manda de dentro do aplicativo é sempre a pessoa. */
+      if (cachorro !== null) window.clearTimeout(cachorro);
       const alvo = linkWhatsApp(info.emergencyPhone);
       if (alvo && r.mensagem) {
         const url = `${alvo}?text=${encodeURIComponent(r.mensagem)}`;
         if (janela && !janela.closed) {
           janela.location.href = url;
           setZapAbriu(true);
-        } else {
+        } else if (!emTelaCheia()) {
           // A aba do toque não sobreviveu (ela fechou, ou a WebView recusou):
           // tenta agora e, se falhar, o botão verde continua a um toque.
           setZapAbriu(!!window.open(url, "_blank", "noopener,noreferrer"));
         }
+        /* No app instalado não tentamos abrir nada sozinhos — nem aqui nem
+           acima. `zapAbriu` fica falso de propósito, e é ele que faz o botão
+           verde aparecer dizendo "Mandar no WhatsApp" em vez de "abrir de
+           novo". */
       } else {
         janela?.close();
       }
@@ -318,6 +366,7 @@ export function EmergencySheet({
         toast.error("Não consegui avisar ninguém automaticamente — ligue 192.");
       }
     } catch {
+      if (cachorro !== null) window.clearTimeout(cachorro);
       janela?.close();
       setPanic("idle");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
