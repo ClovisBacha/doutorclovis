@@ -1,8 +1,8 @@
-import babyEmbriao from "@/assets/baby-embriao.png";
-import babyInicial from "@/assets/baby-inicial.png";
-import babyFeto from "@/assets/baby-feto.png";
-import babyTardio from "@/assets/baby-tardio.png";
-import babyTermo from "@/assets/baby-termo.png";
+import semana06 from "@/assets/bebes/semana-06.webp";
+import semana10 from "@/assets/bebes/semana-10.webp";
+import semana20 from "@/assets/bebes/semana-20.webp";
+import semana30 from "@/assets/bebes/semana-30.webp";
+import semana40 from "@/assets/bebes/semana-40.webp";
 import { babyStage, babyForWeek, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
 
 export const STAGE_LABEL: Record<BabyStage, string> = {
@@ -21,59 +21,63 @@ export const STAGE_RANGES: Record<BabyStage, [number, number]> = {
   termo: [37, 42],
 };
 
-const STAGE_IMG: Record<BabyStage, string> = {
-  embriao: babyEmbriao,
-  inicial: babyInicial,
-  feto: babyFeto,
-  tardio: babyTardio,
-  termo: babyTermo,
-};
+/**
+ * AS CINCO ARTES DO DONO — e por que são cinco.
+ *
+ * Pedido dele (ago/2026): "tire todos os bebês e só coloque os que tem no
+ * drive, na qualidade exata deles, não perca a qualidade".
+ *
+ * Saíram daqui DUAS séries: os cinco PNGs por estágio (`baby-embriao` e
+ * companhia) e os 39 `.webp` gerados semana a semana. As 39 tinham a vantagem
+ * de mudar toda semana; nenhuma delas era arte que o dono aprovou, e é ele quem
+ * responde pelo que a paciente vê do próprio filho.
+ *
+ * ─── O QUE AINDA MUDA TODA SEMANA ───────────────────────────────────────────
+ *
+ * O TAMANHO. `escalaDoCorpo` é contínuo na semana, então entre a 20 e a 21 o
+ * bebê cresce um pouco mesmo desenhado pela mesma arte. Cinco desenhos não
+ * viraram cinco tamanhos.
+ *
+ * ─── `tinta`: MEDIDA, NUNCA ESTIMADA ────────────────────────────────────────
+ *
+ * Quanto do maior lado do arquivo a tinta ocupa, medido por
+ * `scripts/bebes/do-drive.mjs` (α ≥ 128, sobre o maior lado — que é o lado que
+ * o `preserveAspectRatio="meet"` faz caber no quadrado de 200).
+ *
+ * É o que impede o bebê de SALTAR de tamanho ao trocar de arte: o salto não
+ * seria crescimento, seria o enquadramento do arquivo mudando. As cinco variam
+ * de 58,6% a 91,4% — mais de 30 pontos —, então sem este número a semana 36
+ * mostraria um bebê 56% maior que a 35 sem nada ter acontecido.
+ *
+ * ⚠️ Trocar um arquivo obriga a medir de novo. O script imprime o valor.
+ */
+const ARTES: { semana: number; src: string; tinta: number }[] = [
+  { semana: 6, src: semana06, tinta: 0.5856 },
+  { semana: 10, src: semana10, tinta: 0.64 },
+  { semana: 20, src: semana20, tinta: 0.8125 },
+  { semana: 30, src: semana30, tinta: 0.7109 },
+  { semana: 40, src: semana40, tinta: 0.9137 },
+];
 
 /**
- * A ARTE POR SEMANA — 39 arquivos, um para cada semana de 4 a 42.
+ * A arte MAIS PRÓXIMA da semana, com empate para a mais NOVA.
  *
- * Antes eram cinco desenhos para 39 semanas: a mesma imagem ficava parada por
- * até doze semanas seguidas (16 a 27). Numa tela que ela abre todo dia, "nada
- * mudou" doze semanas seguidas é o oposto do que o produto promete.
+ * Empate para baixo não é detalhe de implementação: na 15 e na 25 a distância
+ * é a mesma para os dois lados, e mostrar um bebê mais desenvolvido do que ele
+ * está é o erro que um app de gestação não pode cometer. Adiantar a arte
+ * antecipa marcos — cabelo, unhas, gordura — que ainda não existem.
  *
- * `import.meta.glob` com `eager` + `?url` devolve um MAPA de caminho para URL
- * com hash de conteúdo. As 39 entram no manifesto do build, mas o navegador só
- * baixa a que o `<image href>` apontar — a paciente carrega ~24 KB da semana
- * dela, não 39 arquivos. Pôr as imagens em `public/` daria o mesmo download e
- * perderia o hash (e com ele o cache eterno).
+ * Faixas que isto produz: 4–8 → 6 · 9–15 → 10 · 16–25 → 20 · 26–35 → 30 ·
+ * 36–42 → 40.
  */
-const ARTE_POR_SEMANA: Record<number, string> = Object.fromEntries(
-  Object.entries(
-    import.meta.glob<string>("@/assets/bebes/semana-*.webp", {
-      eager: true,
-      query: "?url",
-      import: "default",
-    }),
-  ).map(([caminho, url]) => [Number(caminho.match(/semana-(\d+)\.webp$/)?.[1]), url]),
-);
-
-/**
- * A arte da semana, com as cinco antigas como rede.
- *
- * A série de 39 é gerada em lotes, então em qualquer momento pode faltar
- * semana. Faltando, cai no desenho do estágio — que é o comportamento de hoje.
- * Nunca fica sem imagem: uma home sem bebê é pior que um bebê repetido.
- */
-function arteDaSemana(week: number, stage: BabyStage): { src: string; nova: boolean } {
+function arteDaSemana(week: number): { src: string; tinta: number } {
   const w = Math.max(WEEK_MIN, Math.min(WEEK_MAX, Math.round(week)));
-  const propria = ARTE_POR_SEMANA[w];
-  return propria ? { src: propria, nova: true } : { src: STAGE_IMG[stage], nova: false };
+  let melhor = ARTES[0];
+  for (const a of ARTES) {
+    if (Math.abs(a.semana - w) < Math.abs(melhor.semana - w)) melhor = a;
+  }
+  return melhor;
 }
-
-/* FUNDO BRANCO CHAPADO — só na arte antiga.
-   `baby-embriao` e `baby-termo` não têm transparência: o branco está gravado no
-   PNG, e o `multiply` existe para apagá-lo sobre fundo claro. Sobre o céu
-   noturno da home isso nunca funcionou — a semana 6 mostra um QUADRICULADO de
-   transparência e a 40 uma CAIXA BRANCA, ambos em produção hoje.
-
-   A arte nova tem alfa de verdade e não passa por aqui. O `multiply` fica
-   restrito ao caminho de fallback, e some junto com a última imagem antiga. */
-const WHITE_BG_STAGES = new Set<BabyStage>(["embriao", "termo"]);
 
 /**
  * Tons de pele do bebê (0 = arte original clara → 4 = pele retinta).
@@ -98,25 +102,6 @@ export function clampTone(tone: number | null | undefined): number {
 function growth(week: number) {
   return Math.max(0, Math.min(1, (week - WEEK_MIN) / (WEEK_MAX - WEEK_MIN)));
 }
-
-/**
- * QUANTO DA CAIXA A TINTA DO BEBÊ OCUPA, em cada arte.
- *
- * Medido com bounding box do alfa, não estimado. A arte antiga nunca foi
- * uniforme, e é essa variação que faz o bebê SALTAR de tamanho ao cruzar a
- * fronteira de um estágio — o salto não é crescimento, é o enquadramento do
- * arquivo mudando.
- *
- * A arte nova sai toda normalizada em 83% por `scripts/bebes/normalizar.mjs`.
- */
-const TINTA_DA_ARTE: Record<BabyStage, number> = {
-  embriao: 0.873,
-  inicial: 0.721,
-  feto: 0.788,
-  tardio: 0.83,
-  termo: 0.887,
-};
-const TINTA_DA_ARTE_NOVA = 0.83;
 
 /**
  * A ESCALA NASCE DA BOLHA, não de um número por estágio.
@@ -147,9 +132,8 @@ const TINTA_DA_ARTE_NOVA = 0.83;
 const TINTA_ALVO_MIN = 0.14;
 const TINTA_ALVO_MAX = 0.585;
 
-function escalaDoCorpo(week: number, stage: BabyStage, arteNova: boolean): number {
+function escalaDoCorpo(week: number, tinta: number): number {
   const alvo = TINTA_ALVO_MIN + (TINTA_ALVO_MAX - TINTA_ALVO_MIN) * Math.pow(growth(week), 0.65);
-  const tinta = arteNova ? TINTA_DA_ARTE_NOVA : TINTA_DA_ARTE[stage];
   return alvo / tinta;
 }
 
@@ -178,17 +162,15 @@ export function BabyIllustration({
   const sacR = 72 + g * 16;
   const info = babyForWeek(week);
 
-  const arte = arteDaSemana(week, stage);
+  const arte = arteDaSemana(week);
   /* Sem `freeBoost`. Ele existia para inchar o bebê 18% quando o componente não
      desenhava o próprio saco — um ajuste relativo, feito quando o tamanho vinha
      de um número por estágio. Agora o alvo é ABSOLUTO (fração da caixa) e já
      cabe nos dois casos: dentro da bolha da home (68,75% da caixa) e dentro do
      saco que o próprio componente desenha (72% a 88%). Um alvo só, sem exceção
      que precise ser lembrada. */
-  const bodyScale = Math.min(1.1, escalaDoCorpo(week, stage, arte.nova));
+  const bodyScale = Math.min(1.1, escalaDoCorpo(week, arte.tinta));
   const tx = 100 * (1 - bodyScale);
-  /* Só a arte antiga precisa do `multiply`: a nova tem alfa de verdade. */
-  const isWhiteBg = !arte.nova && WHITE_BG_STAGES.has(stage);
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center">
@@ -279,7 +261,6 @@ export function BabyIllustration({
             height="200"
             preserveAspectRatio="xMidYMid meet"
             filter={toneIdx > 0 ? `url(#${toneFilterId})` : undefined}
-            style={isWhiteBg ? { mixBlendMode: "multiply" } : undefined}
           />
         </g>
       </svg>

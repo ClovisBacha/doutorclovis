@@ -1029,16 +1029,81 @@ tamanho exato que quero".
   com o ALVO ainda de 40px: quem some é o desenho, não a área que o dedo acerta.
   A cor segue `topoEscuro` — branco sobre topo escuro, índigo sobre topo claro;
   branco fixo sumiria no amanhecer, que é a cena de topo mais claro.
-- **Desceram para o fundo claro**: o número da semana, o rótulo "semanas" e o
-  cartão de saudação do clima. O cartão largou o `glass` pelo material do
-  cartão, pela MESMA razão da barra de progresso — vidro precisa de céu
-  atravessando, e sobre o creme vira retângulo cinza. Com eles saíram
-  `glassLeve`, `glass`, `tracoDeVidro`, `overArt`, `heroText`, `cardText`,
-  `cardMuted` e `INDIGO_CORPO`, que existiam só para texto sobre arte.
-- **`scripts/contraste-hero.mjs` ficou com UM alvo**, o nome — é o único texto
-  que sobrou sobre a arte, e é justamente o que já falhou de verdade (3,43:1).
-  Ele ganhou uma trava: alvo fora do viewport REPROVA com o motivo escrito, em
-  vez de o Playwright estourar num recorte vazio.
+- **Desceu para o fundo claro** o cartão de saudação do clima. Ele largou o
+  `glass` pelo material do cartão, pela MESMA razão da barra de progresso —
+  vidro precisa de céu atravessando, e sobre o creme vira retângulo cinza. Com
+  ele saíram `glassLeve`, `glass`, `tracoDeVidro`, `cardText` e `cardMuted`,
+  que existiam só para material sobre arte.
+- **`scripts/contraste-hero.mjs` ganhou uma trava**: alvo fora do viewport
+  REPROVA com o motivo escrito, em vez de o Playwright estourar num recorte
+  vazio.
+
+### O número voltou para o meio, entre a bolha e a barra (ago/2026)
+
+Pedido do dono na volta seguinte: "coloque o número 20 semanas ali no meio
+entre a bolha e a navbar". Ele tinha descido para o fundo claro por uma volta
+só; voltou para cima da arte, e agora com lugar definido.
+
+- **A bolha e o número são DUAS camadas, não uma coluna.** Tentei a coluna
+  primeiro — dois `flex-1` em volta da bolha, com o `pb` da barra flutuante
+  dentro do item de baixo — e a bolha saiu **65px acima do centro**, medido.
+  ⚠️ **Num item flex, `flex-basis: 0%` mede a caixa de CONTEÚDO e o padding
+  entra por fora**: os 130px reservados para a barra viraram 130px a mais no
+  item de baixo. Padding não é neutro num item flexível.
+- **A camada do número começa em `top-1/2`** e vai até `bottom-0`. Num bloco
+  posicionado com topo E base presos, o padding não muda o tamanho de fora —
+  só encolhe o miolo. Então `pt` de meia bolha + `pb` da barra recortam
+  exatamente o vão, e `items-center` põe o número no meio dele. Medido no
+  iPhone 15 Pro: bolha termina em 543,8 · número em 622,7 · barra em ~719,6.
+- O `min(60vw,19.5rem,38svh)` do `pt` é o MESMO da caixa da bolha, e tem de
+  continuar sendo: é meia bolha que ele reserva.
+- O halo (`overArt`) e as cores de céu (`heroText`, `corDoCorpo`,
+  `INDIGO_CORPO`) voltaram junto, e `contraste-hero.mjs` voltou a medir
+  `numero` e `semanas`. No dia isso importa mais que antes: a faixa amarela do
+  horizonte da arte nova passa bem atrás dos dígitos. Doze medições passam
+  (o pior é 6,74:1 no amanhecer, contra 4,5 de mínimo).
+
+### Os bebês são os cinco do Drive (ago/2026)
+
+Pedido do dono: "tire todos os bebês e só coloque os que tem no drive, na
+qualidade exata deles, não perca a qualidade".
+
+Saíram DUAS séries: os cinco PNGs por estágio (`baby-embriao` e companhia) e os
+39 `.webp` gerados semana a semana. Entraram cinco artes — 6, 10, 20, 30 e 40
+semanas — em `src/assets/bebes/semana-NN.webp`.
+
+- **Três das cinco chegaram SEM canal alfa**, com o XADREZ de transparência
+  gravado como pixel (dois cinzas neutros, 254 e 241/243/246, em células
+  grandes). É o que acontece quando o editor mostra transparência em xadrez e a
+  exportação salva em RGB. No app viraria um retângulo quadriculado dentro da
+  bolha — invisível no editor, só aparece sobre o céu.
+- **O recorte não é limiar de brilho**, que comeria os reflexos claros da testa.
+  São três testes juntos, em `scripts/bebes/do-drive.mjs`: **croma** (o xadrez é
+  neutro, a pele nunca é), **brilho** (rampa de 250 a 220 no canal mais escuro,
+  que dá borda suave e salva o cordão que se apaga em degradê por ~150px) e
+  **conexão com a borda do quadro** (reflexo no meio da testa não alcança a
+  borda, então fica opaco por construção). Depois a cor é
+  DES-PREMULTIPLICADA — sem isso sobra auréola clara, que é o xadrez ainda
+  misturado ao pixel.
+- **"Não perca a qualidade" é medido, não afirmado.** O script não aceita
+  largura de saída (nunca reduz) e imprime o PSNR contra a origem, reprovando
+  abaixo de 42 dB. As cinco saíram entre **46,8 e 52,2 dB** — a mesma faixa com
+  que os céus foram aprovados. Total: 548 KB, e só uma carrega por vez.
+- **A semana escolhe a arte MAIS PRÓXIMA, com empate para a mais NOVA**
+  (4–8 → 6 · 9–15 → 10 · 16–25 → 20 · 26–35 → 30 · 36–42 → 40). Empate para
+  baixo não é detalhe: mostrar um bebê mais desenvolvido do que ele está
+  antecipa marcos — cabelo, unhas, gordura — que ainda não existem.
+- **`tinta` é MEDIDA por arte** (58,6% · 64% · 81,3% · 71,1% · 91,4% do maior
+  lado, α ≥ 128) e é ela que `escalaDoCorpo` divide. Sem isso a semana 36
+  mostraria um bebê 56% maior que a 35 sem nada ter acontecido — o salto não
+  seria crescimento, seria o enquadramento do arquivo mudando. **Trocar um
+  arquivo obriga a medir de novo**; o script imprime o valor.
+- **O que ainda muda toda semana é o TAMANHO**: `escalaDoCorpo` é contínuo na
+  semana, então entre a 20 e a 21 o bebê cresce mesmo desenhado pela mesma
+  arte. Cinco desenhos não viraram cinco tamanhos.
+- `scripts/bebes/olhar.mjs` responde as três perguntas antes de qualquer
+  conversão: tem alfa de verdade? o fundo é xadrez gravado? que fração da caixa
+  a tinta ocupa?
 
 **Bancada:** `/preview-home?w=20` renderiza a tela real sem login (`?clima=1`
 liga o clima). Para medir composição, injete

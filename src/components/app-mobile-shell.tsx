@@ -876,18 +876,19 @@ export function AppHomeScreen({
      `foreground/75` dava 3,77 no pôr do sol e `white/75` dava 3,41 no
      anoitecer. Um rótulo secundário se diferencia pelo TAMANHO e pelo peso,
      que ele já tem — atenuar a cor por cima disso foi o que o derrubou. */
-  /* Índigo profundo, não o marrom do `foreground`: é o valor exato que a
-     referência traz para o nome do bebê. O par claro/escuro continua — em céu
-     escuro nenhum índigo se lê.
-
-     O irmão dele (`INDIGO_CORPO`, #3D3570) saiu com o número da semana, que
-     desceu para o fundo claro em ago/2026: lá quem manda é o `foreground` do
-     tema, e um índigo cravado seria a única cor da página fora do sistema. */
+  /* Índigo profundo, não o marrom do `foreground`: são os valores exatos que
+     a referência traz (`#352968` no nome, `#3D3570` no número e no rótulo).
+     O par claro/escuro continua — em céu escuro nenhum índigo se lê. */
   const INDIGO_TOPO = "#352968";
+  const INDIGO_CORPO = "#3D3570";
   const textoDoTopo = topoEscuro ? "text-white" : "";
   const corDoTopo = topoEscuro ? undefined : INDIGO_TOPO;
-  /* Sobrou UM texto no corpo da arte: o recado de "configure sua gestação",
-     que ocupa o lugar da bolha quando não há gestação. */
+  const heroText = darkSky ? "text-white/95" : "";
+  const corDoCorpo = darkSky ? undefined : INDIGO_CORPO;
+  /* No anoitecer o rótulo cai sobre lavanda média (#9370da) — um meio-tom em
+     que NENHUMA cor de texto chega a 4,5:1 sozinha (branco cheio dá 3,79).
+     Quem resolve é o halo em `overArt`, e é por isso que ele é obrigatório
+     ali: sem a sombra, este rótulo não tem correção possível. */
   const heroMuted = darkSky ? "text-white/[0.98]" : "";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
@@ -939,12 +940,27 @@ export function AppHomeScreen({
      a sombra não desenha contorno, ela apaga o céu atrás do texto. Halo duro
      lê como relevo de gravação, e foi metade do "muito grosseira" do dono.
 
-     Sobrou UM halo, o do topo: número e rótulo desceram para o fundo claro em
-     ago/2026, e lá o contraste vem do tema, não de sombra. O piso continua
-     medido, não estimado — `scripts/contraste-hero.mjs` reprova qualquer céu
-     abaixo do mínimo, e `scripts/centragem-hero.mjs` mede a centragem óptica.
-
-     O nome mora no TOPO, onde a régua é `topoEscuro` e não `darkSky`. */
+     São DOIS halos: `overArt` para o corpo da cena (o número da semana e o
+     rótulo, que voltaram para cima da arte a pedido do dono) e `overArtTopo`
+     para o nome, que encosta no topo — onde a régua é `topoEscuro` e não
+     `darkSky`. O piso continua medido, não estimado:
+     `scripts/contraste-hero.mjs` reprova qualquer céu abaixo do mínimo, e
+     `scripts/centragem-hero.mjs` mede a centragem óptica. */
+  const overArt: React.CSSProperties = darkSky
+    ? {
+        textShadow:
+          "0 1px 3px rgba(10,4,30,0.55), 0 2px 9px rgba(10,4,30,0.5)," +
+          " 0 4px 20px rgba(10,4,30,0.42)",
+      }
+    : {
+        /* Em céu CLARO o texto é índigo, e quem levanta o contraste de um
+           texto escuro é um halo CLARO — a sombra escura empurrava para o lado
+           errado. Medido no pôr do sol: "semanas" ficava em 4,37:1 (mínimo
+           4,5) e passa a 6,1 com o halo branco. */
+        textShadow:
+          "0 0 4px rgba(255,255,255,0.62), 0 1px 8px rgba(255,255,255,0.5)," +
+          " 0 2px 16px rgba(255,255,255,0.36)",
+      };
   const overArtTopo: React.CSSProperties = topoEscuro
     ? {
         textShadow:
@@ -1258,14 +1274,19 @@ export function AppHomeScreen({
 
              Centrada NA IMAGEM, e não no que sobra da tela: por isso é uma
              camada `absolute inset-0` do hero — que tem a proporção da arte —,
-             e não mais um item de coluna entre espaçadores. Os três pesos
-             (1,20 / 0,72 / 0,80) que repartiam a folga saíram junto: eles
-             existiam para acomodar bolha e número na mesma tela, e o número
-             desceu para o fundo claro.
+             e não mais um item de coluna entre espaçadores.
 
              `inset-0` no filho de um container com padding pega a CAIXA DE
              PREENCHIMENTO inteira — o `px-5`/`pt` do hero não desloca o
              centro, que é o que faz o eixo da bolha bater com o eixo da arte.
+
+             ⚠️ A BOLHA E O NÚMERO SÃO DUAS CAMADAS, e não uma coluna com
+             espaçadores. Tentei a coluna primeiro — dois `flex-1` em volta da
+             bolha, com o `pb` da barra flutuante dentro do item de baixo — e o
+             resultado foi a bolha 65px ACIMA do centro, medido. O motivo: num
+             flex, `flex-basis: 0%` mede a caixa de CONTEÚDO, e o padding entra
+             POR FORA — então os 130px reservados para a barra viraram 130px a
+             mais no item de baixo. Padding não é neutro num item flexível.
 
              `pointer-events-none` na camada e `auto` no botão: a camada cobre a
              barra de topo, e sem isso ela engoliria o toque do menu. */
@@ -1337,9 +1358,94 @@ export function AppHomeScreen({
               </div>
             </button>
           </div>
-        ) : (
-          /* Sem gestação configurada não há bolha, e o recado ocupa o mesmo
-             lugar dela — centrado na arte, pela mesma camada. */
+        ) : null}
+
+        {/* ── A SEMANA, NO MEIO ENTRE A BOLHA E A BARRA ────────────────────
+            Pedido do dono: "coloque o número 20 semanas ali no meio entre a
+            bolha e a navbar". Ela tinha descido para o fundo claro na volta
+            anterior; volta para a arte, e agora com um lugar DEFINIDO.
+
+            ─── POR QUE ESTA CAMADA COMEÇA NA METADE DA ARTE ──────────────
+            `top-1/2` é o CENTRO da bolha, e daí para baixo a caixa é fixa
+            (`bottom-0`): num bloco posicionado com topo E base presos, o
+            padding não muda o tamanho de fora — ele só encolhe o miolo. Então
+            o `pt` de meia bolha e o `pb` da barra flutuante recortam
+            exatamente o vão entre as duas, e `items-center` põe o número no
+            meio dele. É a mesma reserva que, dentro de um item flex, tinha
+            arrastado a bolha para cima.
+
+            Medido no iPhone 15 Pro: bolha termina em 542,7 · número centrado
+            em 631,2 · barra começa em 719,6.
+
+            O `min(60vw,19.5rem,38svh)` é o MESMO da caixa da bolha, e tem de
+            continuar sendo: é meia bolha que este `pt` reserva. Mudar o
+            tamanho da bolha sem mudar aqui faz o número subir por cima dela.
+
+            O halo (`overArt`) volta junto e não é enfeite: aqui o fundo é a
+            arte, e a do dia tem a faixa amarela do horizonte passando bem
+            atrás dos dígitos. */}
+        {gest && baby && (
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 flex items-center justify-center pt-[calc(min(60vw,19.5rem,38svh)/2)] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]"
+            style={overArt}
+          >
+            <div className="flex flex-col items-center">
+              <p
+                className={`leading-[0.92] ${heroText}`}
+                style={{
+                  color: corDoCorpo,
+                  /* HERDA a face do corpo, que é a geométrica do sistema (SF
+                       Pro Text no Apple, DM Sans de reserva). A `--font-serif`
+                       deste projeto é na verdade a ARREDONDADA — bonita nos
+                       títulos, mas a referência traz o número numa geométrica
+                       reta. Preso a uma fonte fixa, o maior número da tela era
+                       o único texto que NÃO seguia a fonte do sistema. */
+                  fontFamily: "inherit",
+                  /* O termo em `svh` é irmão do que dimensiona a bolha: só
+                       pela LARGURA, o número ficava com 104px numa tela de
+                       375px de altura (celular deitado) e empurrava a coluna
+                       para fora da dobra. Em retrato o `21vw` vence, então
+                       nada muda no aparelho de pé. */
+                  fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
+                  /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta: a
+                       contra-forma do "0" fecha e o número lê como bloco — foi
+                       o "muito grosseira" do dono. */
+                  fontWeight: 500,
+                  letterSpacing: "-0.03em",
+                  /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
+                       Figura tabular existe para alinhar COLUNA de números:
+                       dá a todo dígito a mesma largura de avanço, o que obriga
+                       o "1" a nadar num vão largo e desloca a tinta dentro da
+                       caixa. Medido: com tabular, a tinta do "20" caía 2,25px
+                       à direita do centro enquanto a de "semanas" caía 0,75px
+                       à esquerda — 3px de desencontro entre duas linhas
+                       empilhadas. Sem tabular, e com o `textIndent` abaixo, o
+                       desencontro cai para 0,15px
+                       (`scripts/centragem-hero.mjs`).
+
+                       `textIndent` corrige o que sobra: `letter-spacing` entra
+                       DEPOIS de cada caractere, inclusive o último, e esse vão
+                       fantasma no fim empurra a tinta para o lado. Metade do
+                       valor, com sinal trocado, devolve a tinta ao eixo. */
+                  fontVariantNumeric: "lining-nums",
+                  textIndent: "-0.015em",
+                }}
+              >
+                {gest.weeks}
+              </p>
+              <p
+                className={`-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none ${heroMuted}`}
+                style={{ color: corDoCorpo }}
+              >
+                {gest.weeks === 1 ? "semana" : "semanas"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Sem gestação configurada não há bolha nem número, e o recado ocupa o
+            lugar dos dois — centrado na arte, pela mesma régua. */}
+        {!(gest && baby) && (
           <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
             <p className={`text-sm ${heroMuted}`}>
               Configure sua data de gestação em <strong>Perfil</strong> para ver o desenvolvimento.
@@ -1354,81 +1460,9 @@ export function AppHomeScreen({
         )}
       </div>
 
-      {/* ── A SEMANA DESCEU PARA O FUNDO CLARO (ago/2026) ─────────────────
-          Ela ficava sobre a arte, abaixo da bolha, e desceu pelo mesmo pedido
-          que trouxe a imagem nova: "além disso deve ficar fora dessa nova
-          imagem de fundo, outros elementos vão ficar embaixo com o fundo rosa
-          claro". Com o número ali em cima a bolha não teria como ficar
-          CENTRADA na imagem — ela ficaria centrada no que sobra acima do
-          número, que é outra coisa.
-
-          É o primeiro elemento depois do céu, e continua sendo o maior texto
-          da tela: quem rola encontra o número antes de qualquer cartão.
-
-          Some o halo (`overArt`) e somem as cores de céu (`heroText`,
-          `corDoCorpo`): eles existiam para sustentar contraste sobre arte com
-          crista de onda acesa por trás dos dígitos. Sobre o creme da página
-          quem manda é o `foreground`, como em toda a segunda dobra. */}
-      {gest && baby && (
-        <div className="flex flex-col items-center pt-1">
-          <p
-            className="leading-[0.92] text-foreground"
-            style={{
-              // `var(--font-serif)` e não uma fonte fixa: preso assim,
-              // o maior número da tela era o único texto que NÃO
-              // seguia a fonte do sistema.
-              /* HERDA a face do corpo, que é a geométrica do sistema
-                         (SF Pro Text no Apple, DM Sans de reserva). A
-                         `--font-serif` deste projeto é na verdade a ARREDONDADA
-                         (SF Pro Rounded) — bonita nos títulos, mas a referência
-                         traz o número numa geométrica reta. */
-              fontFamily: "inherit",
-              /* O termo em `svh` é irmão do que dimensiona a bolha, e
-                         está aqui pelo mesmo motivo: medido só pela LARGURA, o
-                         número ficava com 104px numa tela de 375px de altura
-                         (celular deitado). Ele já não disputa a primeira dobra
-                         com a bolha, mas continua: um "40" de 104px de altura
-                         numa tela deitada empurraria o cartão do médico para
-                         longe demais do céu. Em retrato o `21vw` vence, então
-                         nada muda no aparelho de pé. */
-              fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
-              /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta:
-                         a contra-forma do "0" fecha e o número lê como bloco
-                         — foi o "muito grosseira" do dono. A referência traz
-                         Medium, e é em Medium que a curva do "2" volta a ter
-                         desenho. */
-              fontWeight: 500,
-              letterSpacing: "-0.03em",
-              /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
-                         Figura tabular existe para alinhar COLUNA de números;
-                         ela dá a todo dígito a mesma largura de avanço, o que
-                         obriga o "1" a nadar num vão largo e desloca a tinta
-                         dentro da caixa. Medido: com tabular, a tinta do "20"
-                         caía 2,25px à direita do centro da tela enquanto a de
-                         "semanas" caía 0,75px à esquerda — 3px de desencontro
-                         entre duas linhas empilhadas, que é o "descentralizada".
-                         Sem tabular, e com o `textIndent` abaixo, o desencontro
-                         cai para 0,15px (`scripts/centragem-hero.mjs`).
-                         Aqui é UM número solto, então vale a figura
-                         proporcional, que é a que a fonte desenhou para ficar
-                         bem centrada sozinha.
-
-                         `textIndent` corrige o que sobra: `letter-spacing`
-                         entra DEPOIS de cada caractere, inclusive o último, e
-                         esse vão fantasma no fim empurra a tinta para o lado.
-                         Metade do valor, com sinal trocado, devolve a tinta ao
-                         eixo. */
-              fontVariantNumeric: "lining-nums",
-              textIndent: "-0.015em",
-            }}
-          >
-            {gest.weeks}
-          </p>
-          <p className="-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none text-muted-foreground">
-            {gest.weeks === 1 ? "semana" : "semanas"}
-          </p>
-        </div>
-      )}
+      {/* A semana VOLTOU para cima da arte (ago/2026), no meio entre a bolha
+          e a barra de baixo — ver o bloco dela dentro do hero. Ela chegou a
+          morar aqui, no fundo claro, por uma volta só. */}
 
       {/* ── Saudação do dia e o conselho ──────────────────────────────────
           Desceu junto com a semana, pelo mesmo pedido, e por isso trocou o

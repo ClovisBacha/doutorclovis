@@ -33,26 +33,19 @@ const HORA = {
   anoitecer: "2026-08-10T21:00:00-03:00",
 };
 /* Os pisos são os da WCAG 2.1 AA: 4,5:1 para texto normal e 3:1 para texto
-   grande.
+   grande (o número da semana passa dos 24px em negrito por larga margem).
 
-   ─── SÓ SOBROU UM ALVO, E ISSO É O PONTO (ago/2026) ────────────────────────
    Este script mede TEXTO SOBRE ARTE — o caso em que o fundo é uma foto com
    contraste local (uma crista de onda acesa passando atrás dos glifos) e
-   nenhuma cor de tema garante nada.
+   nenhuma cor de tema garante nada. A pílula do clima ("graus") saiu da barra
+   em ago/2026 e saiu daqui junto: alvo que não está mais sobre a arte vira
+   linha que nunca reprova.
 
-   O número da semana e o rótulo "semanas" desceram para o fundo claro da
-   página quando a arte nova do dia entrou, e lá o contraste é o do tema
-   (`foreground` sobre `card`), o mesmo do app inteiro. Medi-los aqui exigiria
-   rolar a tela e passaria a testar os tokens de cor, não a arte.
-
-   A pílula do clima ("graus") saiu da barra antes, pelo mesmo raciocínio:
-   alvo que não está mais sobre a arte vira linha que nunca reprova.
-
-   O que fica é justamente o alvo que já falhou de verdade: o nome do bebê, que
-   encosta no topo e depende de `topoEscuro`. A arte nova do dia inverteu esse
-   campo (topo escuro, base clara), e é esta medição que prova que o nome não
-   saiu em índigo sobre azul-cobalto. */
-const MIN = { nome: 4.5 };
+   O número e o rótulo passaram uma volta no fundo claro da página e voltaram
+   para cima da arte a pedido do dono — e voltam para cá com eles. No dia isso
+   importa mais que antes: a faixa amarela do horizonte da arte nova passa bem
+   atrás dos dígitos, que é o tipo de contraste local que só a medição pega. */
+const MIN = { nome: 4.5, numero: 3, semanas: 4.5 };
 /* Alvos que a tela pode legitimamente não ter (o nome só existe se a paciente
    deu nome ao bebê). Some da lista sem reprovar; o que NÃO pode é um alvo
    obrigatório sumir em silêncio, e é isso que a conferência abaixo cobra. */
@@ -88,6 +81,15 @@ for (const [ceu, t] of Object.entries(HORA)) {
   // marca os alvos
   await p.evaluate(() => {
     const ps = [...document.querySelectorAll("p,span,div")];
+    const num = ps.find(
+      (e) =>
+        e.children.length === 0 &&
+        /^\d+$/.test(e.textContent.trim()) &&
+        parseFloat(getComputedStyle(e).fontSize) > 40,
+    );
+    const lab = ps.find((e) => e.children.length === 0 && /^semanas?$/.test(e.textContent.trim()));
+    num && num.setAttribute("data-alvo", "numero");
+    lab && lab.setAttribute("data-alvo", "semanas");
     /* O nome do bebê carrega corações em <span>, então ele NÃO tem
        `children.length === 0` como os outros. A regra aqui é "o <p> mais raso
        que CONTÉM o nome" — sem isso o alvo não é encontrado, e o texto mais

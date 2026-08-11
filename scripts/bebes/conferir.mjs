@@ -1,4 +1,15 @@
 /**
+ * ⚠️ DORMENTE desde ago/2026 — a série de 39 ilustrações saiu do app.
+ *
+ * O dono pediu "tire todos os bebês e só coloque os que tem no drive": hoje o
+ * app usa as cinco artes dele (6, 10, 20, 30 e 40 semanas), e quem as prepara é
+ * `scripts/bebes/do-drive.mjs`. Este arquivo opera sobre uma pasta de origem
+ * que não existe mais no repositório.
+ *
+ * Fica de pé porque o raciocínio dele continua valendo se a série voltar um
+ * dia — não porque haja o que rodar hoje.
+ */
+/**
  * CONFERE as ilustrações geradas antes de qualquer coisa entrar no app.
  *
  * Olhar 39 imagens e achar que estão boas não é conferir — é torcer. Estes são
