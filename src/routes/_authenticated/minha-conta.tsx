@@ -429,16 +429,44 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
    cada destino ganha nome, uma linha dizendo o que tem dentro, um ícone e um
    alvo do tamanho do polegar — e, principalmente, todos aparecem de uma vez.
 
+   ─── O QUE ENTROU E O QUE SAIU DAQUI (ago/2026) ──────────────────────────
+   A aba se chamava Saúde e as DUAS ferramentas de automonitoramento com mais
+   peso clínico da gestação estavam fora dela: contar movimentos do bebê e
+   cronometrar contrações moravam em Registros, dentro do grupo Gestação.
+
+   Isso era pior que uma escolha de arrumação, porque a triagem de sintomas
+   mora AQUI e cita as duas pelo nome: "redução dos movimentos do bebê" e
+   "contrações regulares antes de 37 semanas" são dois dos nove sintomas
+   VERMELHOS. Uma paciente que sente o bebê parado abria Saúde, encontrava a
+   pergunta, e não tinha como contar dali.
+
+   Entraram como ATALHOS, não como cópias: os dois ladrilhos abrem
+   `Registros` já na sub-tela certa. Duas implementações de contagem de
+   chutes divergiriam no primeiro conserto.
+
+   E "Saúde da mulher" saiu da grade enquanto ela está grávida — ver
+   `mostrarSaudeDaMulher`.
+
    `aspect-square` de propósito: é o que garante "dois quadrados grandes por
    linha" em qualquer largura, de um iPhone SE a um tablet em retrato. */
-const HUB_SAUDE: {
-  key: Tab;
-  label: Tab;
+type LadrilhoDaSaude = {
+  key: string;
+  label: string;
   sub: string;
   Icon: LucideIcon;
   caixa: string;
   tinta: string;
-}[] = [
+  /** Aba de destino. Nem todo ladrilho é uma aba de mesmo nome. */
+  destino: Tab;
+  /** Sub-tela dentro do destino — é o que faz Chutes abrir em Chutes. */
+  subDestino?: string;
+};
+
+/* A ORDEM É CLÍNICA, e não alfabética nem histórica: primeiro o que responde
+   "estou bem?" (números, triagem), depois o que responde "e o bebê?" (chutes,
+   contrações), e só então o que cuida do resto do dia. Alertas subiu para o
+   segundo lugar porque é a tela que decide se ela procura atendimento. */
+const HUB_SAUDE: LadrilhoDaSaude[] = [
   {
     key: "Saúde",
     label: "Saúde",
@@ -446,22 +474,7 @@ const HUB_SAUDE: {
     Icon: HeartPulse,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
-  },
-  {
-    key: "Nutrição",
-    label: "Nutrição",
-    sub: "O que comer hoje",
-    Icon: Salad,
-    caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
-    tinta: "text-lime-600",
-  },
-  {
-    key: "Bem-estar",
-    label: "Bem-estar",
-    sub: "Meditar, sons e humor",
-    Icon: Flower2,
-    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
-    tinta: "text-violet-600",
+    destino: "Saúde",
   },
   {
     key: "Alertas",
@@ -470,6 +483,45 @@ const HUB_SAUDE: {
     Icon: TriangleAlert,
     caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
     tinta: "text-rose-600",
+    destino: "Alertas",
+  },
+  {
+    key: "chutes",
+    label: "Chutes",
+    sub: "Contar os movimentos",
+    Icon: Footprints,
+    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
+    tinta: "text-sky-600",
+    destino: "Registros",
+    subDestino: "chutes",
+  },
+  {
+    key: "contracoes",
+    label: "Contrações",
+    sub: "Cronometrar e ver",
+    Icon: Timer,
+    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
+    tinta: "text-orange-600",
+    destino: "Registros",
+    subDestino: "contracoes",
+  },
+  {
+    key: "Nutrição",
+    label: "Nutrição",
+    sub: "O que comer hoje",
+    Icon: Salad,
+    caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
+    tinta: "text-lime-600",
+    destino: "Nutrição",
+  },
+  {
+    key: "Bem-estar",
+    label: "Bem-estar",
+    sub: "Meditar, sons e humor",
+    Icon: Flower2,
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
+    destino: "Bem-estar",
   },
   {
     key: "Saúde da mulher",
@@ -478,14 +530,53 @@ const HUB_SAUDE: {
     Icon: Ribbon,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
+    destino: "Saúde da mulher",
   },
 ];
 
-export function HubSaude({ onAbrir }: { onAbrir: (t: Tab) => void }) {
+/**
+ * A GRADE MOSTRA "SAÚDE DA MULHER"?
+ *
+ * Dois dos cinco quadrados da aba eram para uma mulher que NÃO está grávida:
+ * "Ciclo menstrual" não tem o que mostrar por nove meses, e os preventivos que
+ * ele lembra — Papanicolau, mamografia, perfil lipídico — em geral não se faz
+ * durante a gestação. Não são recursos ruins; estavam na hora errada, ocupando
+ * 40% da tela mais clínica do app.
+ *
+ * A régua é a mesma do Portal Pós-parto: aparece quando FAZ SENTIDO. Sem
+ * gestação em andamento, é a aba certa; a partir da 36ª semana o pós-parto
+ * entra no horizonte e ela volta.
+ *
+ * ⚠️ **Isto NÃO tira o acesso.** A aba continua listada no grupo "Saúde" do
+ * menu (`SECOES`), que é a navegação completa. O que sai é o atalho da grade —
+ * a diferença entre "não está aqui agora" e "não existe mais" é o que separa
+ * arrumar de apagar, e eu já confundi as duas neste app.
+ */
+export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean {
+  return weeks == null || weeks >= 36;
+}
+
+export function HubSaude({
+  onAbrir,
+  weeks,
+}: {
+  onAbrir: (t: Tab, sub?: string) => void;
+  /** Semana gestacional — `null` quando não há gestação configurada. */
+  weeks: number | null;
+}) {
   /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
      cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
      elas divergirem no próximo ajuste. */
-  return <GradeHub itens={HUB_SAUDE} onAbrir={(k) => onAbrir(k as Tab)} />;
+  const itens = HUB_SAUDE.filter((i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks));
+  return (
+    <GradeHub
+      itens={itens}
+      onAbrir={(k) => {
+        const item = itens.find((i) => i.key === k);
+        if (item) onAbrir(item.destino, item.subDestino);
+      }}
+    />
+  );
 }
 
 const CAT_STYLE: Record<string, { pill: string; glass: string; accent: string; emoji: string }> = {
@@ -805,11 +896,24 @@ function MinhaContaPage() {
    */
   const [origem, setOrigem] = useState<Tab | null>(null);
 
+  /**
+   * A seta deve voltar para um HUB, e não para uma aba.
+   *
+   * Nasceu com os atalhos de Chutes e Contrações na grade da Saúde: eles abrem
+   * `Registros`, que é uma aba de OUTRA seção. Sem isto, a seta não encontra
+   * nada — `tabToSection("Registros")` não é "saude" e `origem` fica vazia,
+   * porque o hub troca a aba direto — e cai na regra do fim, despejando a
+   * paciente na tela do bebê. É o mesmo defeito que a regra 2 do `voltarDaBarra`
+   * existe para consertar, só que por um caminho novo.
+   */
+  const [voltarAoHub, setVoltarAoHub] = useState<BottomSection | null>(null);
+
   const goToTab = (t: string, sub?: string) => {
     /* Só guarda origem quando existe uma: na home mobile não há "tela
        anterior", e guardar a aba que estava por baixo faria o voltar pular
        para um lugar que ela não estava vendo. E nunca guarda a si mesma. */
     setOrigem(!mobileHome && tab !== (t as Tab) ? (tab as Tab) : null);
+    setVoltarAoHub(null);
     setTab(t as Tab);
     setMobileHome(false);
     setHubAberto(null);
@@ -1211,8 +1315,10 @@ function MinhaContaPage() {
   function handleBottomNav(section: BottomSection) {
     /* A barra de baixo é destino, não aprofundamento: ir para "Jogo" por ela
        apaga a origem, senão o voltar levaria de volta a uma tela que a
-       paciente já abandonou por outro caminho. */
+       paciente já abandonou por outro caminho. Vale igual para o hub guardado:
+       quem saiu da Saúde pela barra não quer voltar para a grade dela. */
     setOrigem(null);
+    setVoltarAoHub(null);
     if (section === "home") {
       setMobileHome(true);
       return;
@@ -1239,6 +1345,16 @@ function MinhaContaPage() {
           trilha;
        3. não veio de lugar nenhum → home. */
   function voltarDaBarra() {
+    /* Antes da regra 1, e não depois: quem veio de um hub para uma aba de
+       fora da seção dele (Chutes, Contrações) volta para o hub. A regra 1 não
+       pega esse caso porque ela olha a SEÇÃO da aba atual, e a aba atual é
+       Registros. */
+    if (!hubAberto && voltarAoHub) {
+      setHubAberto(voltarAoHub);
+      setVoltarAoHub(null);
+      setConsultasSub(null);
+      return;
+    }
     if (!hubAberto && tabToSection(tab as AppTab) === "saude") {
       setHubAberto("saude");
       return;
@@ -1707,9 +1823,20 @@ function MinhaContaPage() {
             {hubAberto === "saude" && (
               <div className="mt-5 md:hidden">
                 <HubSaude
-                  onAbrir={(t) => {
+                  weeks={gest?.weeks ?? null}
+                  onAbrir={(t, sub) => {
                     setHubAberto(null);
+                    /* Só quando o destino sai da seção: dentro dela a regra 1
+                       do `voltarDaBarra` já resolve, e guardar aqui também
+                       seria um segundo caminho para o mesmo lugar. */
+                    setVoltarAoHub(tabToSection(t as AppTab) === "saude" ? null : "saude");
                     setTab(t);
+                    /* O MESMO estado de sub-tela que Consultas e Bebê já usam.
+                       É ele que faz o ladrilho "Chutes" abrir em Chutes, e não
+                       na grade de Registros — sem isso o atalho custaria dois
+                       toques a mais que o caminho antigo, e a mudança
+                       inteira perderia o sentido. */
+                    setConsultasSub(sub ?? null);
                   }}
                 />
               </div>
@@ -1773,6 +1900,7 @@ function MinhaContaPage() {
                     gest={gest}
                     careMode={careMode}
                     onNavigate={goToTab}
+                    initialSub={consultasSub}
                   />
                 )}
                 {tab === "Saúde" && (
@@ -2419,18 +2547,32 @@ export const REGISTROS_SUBTABS = [
   },
 ] as const;
 
+type SubDeRegistros = (typeof REGISTROS_SUBTABS)[number]["key"];
+
 function RegistrosHub({
   profile,
   gest,
   careMode = false,
   onNavigate,
+  initialSub = null,
 }: {
   profile: Profile | null;
   gest: Gest;
   careMode?: boolean;
   onNavigate?: (t: Tab) => void;
+  /**
+   * Sub-tela para abrir direto, como em `ConsultasHub` e `BebeHub`.
+   *
+   * É o que faz os ladrilhos "Chutes" e "Contrações" da aba Saúde caírem na
+   * tela certa. Valor desconhecido é ignorado em silêncio (cai na grade), e
+   * não é preguiça: `initialSub` vem do mesmo estado que a navegação inteira
+   * usa, então um dia ele vai chegar aqui com a sub-tela de OUTRA aba.
+   */
+  initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<(typeof REGISTROS_SUBTABS)[number]["key"] | null>(null);
+  const [sub, setSub] = useState<SubDeRegistros | null>(
+    () => REGISTROS_SUBTABS.find((s) => s.key === initialSub)?.key ?? null,
+  );
   const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
   if (!sub || !atual) {
     return (
@@ -4978,7 +5120,10 @@ function HealthTab({
     sleep_hours: "",
     notes: "",
   });
-  const [showWearable, setShowWearable] = useState(false);
+  /* `showWearable` saiu junto com o bloco que ele abria. Os campos do
+     formulário (`form.spo2` e companhia) continuam no estado e no `payload`:
+     o INSERT segue aceitando as colunas, e um registro antigo aberto para
+     correção não perde os valores por passar por aqui. */
 
   async function load() {
     const { data } = await (supabase as any)
@@ -5280,15 +5425,18 @@ function HealthTab({
             </div>
           );
         })()}
-        <div className="press glass-card glass-pink rounded-3xl p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-pink-600">🫀 SpO₂ / FC</p>
-          <p className="mt-2 font-serif text-2xl">
-            {last?.spo2 ? `${last.spo2}%` : "—"}
-            {last?.heart_rate_bpm ? (
-              <span className="ml-1 text-lg text-muted-foreground"> {last.heart_rate_bpm}bpm</span>
-            ) : null}
-          </p>
-        </div>
+        {/* ─── O CARTÃO DE SpO₂ / FC SAIU (ago/2026) ────────────────────────
+            Ele mostrava o que a paciente tinha DIGITADO À MÃO, copiando do
+            Apple Health. Saiu junto com o formulário que o alimentava, e a
+            razão é a mesma: SpO₂, frequência, passos e sono não mudam conduta
+            obstétrica. Era o pior formato possível de recurso — trabalho dela,
+            decisão de ninguém —, ocupando um dos cinco lugares mais visíveis
+            da tela mais clínica do app.
+
+            Os valores JÁ REGISTRADOS não sumiram: as colunas continuam em
+            `health_logs`, aparecem na lista de correção mais abaixo e seguem
+            para o `clinical_events` que o médico lê. Parar de pedir é uma
+            decisão; apagar o que ela já mandou seria outra. */}
       </div>
 
       {/* IOM weight corridor chart — Feature #9 */}
@@ -5557,63 +5705,23 @@ function HealthTab({
         );
       })()}
 
-      {/* Wearable data summary — Feature #6 */}
-      {logs.some(
-        (l) =>
-          (l as any).spo2 ||
-          (l as any).heart_rate_bpm ||
-          (l as any).steps ||
-          (l as any).sleep_hours,
-      ) && (
-        <div className="grid gap-4 sm:grid-cols-4">
-          {[
-            { label: "SpO₂", value: logs.find((l) => (l as any).spo2)?.spo2, unit: "%" },
-            {
-              label: "FC",
-              value: logs.find((l) => (l as any).heart_rate_bpm)?.heart_rate_bpm,
-              unit: "bpm",
-            },
-            { label: "Passos", value: logs.find((l) => (l as any).steps)?.steps, unit: "" },
-            {
-              label: "Sono",
-              value: logs.find((l) => (l as any).sleep_hours)?.sleep_hours,
-              unit: "h",
-            },
-          ].map((m) => (
-            <div key={m.label} className="rounded-2xl border border-border bg-card p-4 text-center">
-              <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">{m.label}</p>
-              <p className="mt-1 font-serif text-2xl">
-                {m.value != null ? `${m.value}${m.unit}` : "—"}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
+      {/* ─── O WEARABLE SAIU INTEIRO (ago/2026) ────────────────────────────
+          Aqui moravam duas coisas: quatro cartões de SpO₂ / FC / Passos / Sono
+          e um guia ensinando a ABRIR o Apple Health, LER os números e DIGITAR
+          cada um deles aqui.
 
-      {/* Wearable sync guide */}
-      <details className="rounded-2xl border border-border bg-card">
-        <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
-          📱 Como sincronizar com seu dispositivo
-        </summary>
-        <div className="space-y-2 px-5 pb-4 pt-2 text-sm text-muted-foreground">
-          <p>
-            <strong>Apple Health (iPhone):</strong> Abra o app Saúde → Resumo → veja SpO2, FC, Sono
-            e Passos → registre manualmente os valores aqui.
-          </p>
-          <p>
-            <strong>Google Fit (Android):</strong> Abra o Google Fit → Diário → copie os valores do
-            dia → registre abaixo nos campos de wearable.
-          </p>
-          <p>
-            <strong>Garmin / Fitbit / Samsung Health:</strong> Acesse o app do seu dispositivo →
-            Dashboard → Atividade do Dia → copie os valores desejados.
-          </p>
-          <p className="text-xs">
-            A integração automática requer aplicativo nativo. Por ora, o registro manual mantém seu
-            histórico no portal.
-          </p>
-        </div>
-      </details>
+          Nenhum dos quatro muda conduta obstétrica. O que este bloco pedia era
+          trabalho manual e diário da paciente para produzir um dado que nenhuma
+          decisão do médico consulta — e o guia deixava isso explícito ao
+          admitir que "a integração automática requer aplicativo nativo".
+
+          Não confundir com a pressão e a glicemia, que ficam: aquelas são
+          aferições que ELA faz com aparelho próprio e que entram na régua
+          clínica. A diferença não é o esforço, é quem lê o resultado.
+
+          As colunas continuam em `health_logs` e o que já foi registrado
+          aparece na lista de correção — parar de pedir é uma decisão; apagar o
+          que ela já mandou seria outra. */}
 
       {/* New log form */}
       <div className="rounded-3xl border border-border bg-card p-6">
@@ -5649,40 +5757,11 @@ function HealthTab({
             onChange={(v) => setForm({ ...form, notes: v })}
           />
         </div>
-        <button
-          onClick={() => setShowWearable((v) => !v)}
-          className="mt-3 text-xs font-medium text-primary hover:underline"
-        >
-          {showWearable ? "▲ Ocultar wearable" : "▼ Adicionar dados do wearable"}
-        </button>
-        {showWearable && (
-          <div className="mt-3 grid gap-3 sm:grid-cols-4">
-            <Field
-              label="SpO₂ (%)"
-              type="number"
-              value={form.spo2}
-              onChange={(v) => setForm({ ...form, spo2: v })}
-            />
-            <Field
-              label="FC (bpm)"
-              type="number"
-              value={form.heart_rate_bpm}
-              onChange={(v) => setForm({ ...form, heart_rate_bpm: v })}
-            />
-            <Field
-              label="Passos"
-              type="number"
-              value={form.steps}
-              onChange={(v) => setForm({ ...form, steps: v })}
-            />
-            <Field
-              label="Sono (horas)"
-              type="number"
-              value={form.sleep_hours}
-              onChange={(v) => setForm({ ...form, sleep_hours: v })}
-            />
-          </div>
-        )}
+        {/* Os quatro campos de wearable ficavam aqui, atrás de um botão que os
+            revelava. Ver a nota acima — e note que o rótulo dele não aparece
+            nem em comentário: `hub-da-saude.test.ts` procura a string no
+            arquivo inteiro, e citá-la aqui reprovaria o teste que existe para
+            impedir o bloco de voltar. */}
         <button
           onClick={add}
           className="mt-4 rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground"
@@ -5691,39 +5770,71 @@ function HealthTab({
         </button>
       </div>
 
-      {/* History list */}
-      <div className="space-y-2">
-        {logs.map((l) => (
-          <div
-            key={l.id}
-            className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm"
-          >
-            <span className="text-muted-foreground shrink-0">
-              {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
+      {/* ─── A LISTA VIROU "CORRIGIR", E ISSO É O QUE ELA SEMPRE FOI ───────
+          Ela era a TERCEIRA cópia dos mesmos números na mesma tela: cinco
+          cartões dizem "como estou", os gráficos dizem "para onde isso vai", e
+          a lista repetia tudo mais uma vez, crua.
+
+          Mas apagá-la seria tirar uma capacidade, não uma repetição: é o único
+          lugar com o × que apaga um registro. Quem digitou 1200 em vez de 120
+          precisa dele — e num app cujo painel do médico pinta a gravidade
+          desses números, um valor errado que não se pode apagar vira alarme
+          falso no consultório.
+
+          Então ela recolhe. Fechada não ocupa tela; aberta é o que a paciente
+          procura quando quer arrumar alguma coisa — e o rótulo passa a dizer
+          isso, em vez de fingir ser um resumo. */}
+      <details className="rounded-2xl border border-border bg-card">
+        <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
+          ✏️ Ver e corrigir meus registros
+          {logs.length > 0 && (
+            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+              ({logs.length})
             </span>
-            <span className="flex-1 px-3 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-              {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
-              {l.systolic && l.diastolic && (
-                <span>
-                  💓 {l.systolic}/{l.diastolic}
-                </span>
-              )}
-              {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
-              {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
-              {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
-              {l.steps && <span>🚶 {l.steps} passos</span>}
-              {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
-              {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
-            </span>
-            <button
-              onClick={() => remove(l.id)}
-              className="text-xs text-muted-foreground hover:text-destructive shrink-0"
+          )}
+        </summary>
+        <div className="space-y-2 px-3 pb-3">
+          {logs.length === 0 && (
+            <p className="px-2 pb-1 text-sm text-muted-foreground">
+              Você ainda não registrou nada.
+            </p>
+          )}
+          {logs.map((l) => (
+            <div
+              key={l.id}
+              className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm"
             >
-              ×
-            </button>
-          </div>
-        ))}
-      </div>
+              <span className="shrink-0 text-muted-foreground">
+                {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
+              </span>
+              <span className="flex flex-1 flex-wrap gap-x-3 gap-y-0.5 px-3 text-xs">
+                {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
+                {l.systolic && l.diastolic && (
+                  <span>
+                    💓 {l.systolic}/{l.diastolic}
+                  </span>
+                )}
+                {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
+                {/* Os quatro de wearable continuam aqui de propósito: o app
+                    parou de PEDIR, mas quem já registrou tem de conseguir ver
+                    (e apagar) o que mandou. */}
+                {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
+                {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
+                {l.steps && <span>🚶 {l.steps} passos</span>}
+                {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
+                {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
+              </span>
+              <button
+                onClick={() => remove(l.id)}
+                aria-label="Apagar este registro"
+                className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      </details>
     </div>
   );
 }

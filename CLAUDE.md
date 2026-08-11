@@ -470,6 +470,61 @@ em DIAS no corpo grande, alergias/medicações/risco/sangue, o que mudou desde a
   que entra no campo de achados — duas versões divergiriam, e ele leria uma e
   assinaria a outra.
 
+### A aba Saúde da paciente ficou clínica (ago/2026)
+
+A aba se chamava Saúde e as duas ferramentas de automonitoramento com mais peso
+clínico da gestação estavam **fora** dela: contar movimentos e cronometrar
+contrações moravam em Registros, no grupo Gestação. Isso não era arrumação: a
+triagem de sintomas mora na Saúde e cita as duas **pelo nome** — "redução dos
+movimentos do bebê" e "contrações regulares antes de 37 semanas" são dois dos
+nove sintomas VERMELHOS de `triage.ts`. Quem sentia o bebê parado abria Saúde,
+encontrava a pergunta, e não tinha como contar dali.
+
+- **Chutes e Contrações entraram como ATALHOS**, não cópias: os ladrilhos
+  abrem `Registros` já na sub-tela certa (`destino` + `subDestino` em
+  `HUB_SAUDE`, e `RegistrosHub` ganhou `initialSub` como Consultas e Bebê já
+  tinham). Duas implementações de contagem de chutes divergiriam no primeiro
+  conserto. Testado em `hub-da-saude.test.ts`, que lê `RED_SYMPTOMS` de
+  verdade — o teste cobra o VÍNCULO, não a existência do quadrado.
+- ⚠️ **A seta de voltar precisou de estado novo** (`voltarAoHub`). O hub abre
+  uma aba de outra seção, então `tabToSection("Registros")` não é "saude" e
+  `origem` fica vazia — a seta caía na última regra e despejava a paciente na
+  tela do bebê. É o mesmo defeito que a regra 2 do `voltarDaBarra` conserta,
+  chegando por um caminho novo.
+- **"Saúde da mulher" sai da grade durante a gestação** (`mostrarSaudeDaMulher`:
+  aparece sem gestação ou a partir da 36ª semana, a régua do Portal Pós-parto).
+  Ciclo menstrual não tem o que mostrar por nove meses, e Papanicolau,
+  mamografia e perfil lipídico em geral não se faz grávida — dois dos cinco
+  quadrados eram para uma mulher que não está grávida, ocupando 40% da tela
+  mais clínica do app. **Não tira o acesso**: a aba continua no grupo "Saúde"
+  do menu (`SECOES`). A diferença entre "não está aqui agora" e "não existe
+  mais" é o que separa arrumar de apagar.
+- **O bloco de wearable saiu inteiro** — quatro cartões (SpO₂ · FC · Passos ·
+  Sono), os quatro campos e o guia que ensinava a abrir o Apple Health e
+  DIGITAR cada número aqui. Nenhum muda conduta obstétrica: era trabalho diário
+  da paciente para um dado que nenhuma decisão consulta, e o próprio guia
+  admitia que "a integração automática requer aplicativo nativo". Não confundir
+  com pressão e glicemia, que ficam — a diferença não é o esforço, é quem lê o
+  resultado. As colunas seguem em `health_logs` e o que já foi registrado
+  continua à mostra: parar de pedir é uma decisão, apagar o que ela mandou
+  seria outra.
+- **A lista de registros recolheu, e virou "✏️ Ver e corrigir meus registros".**
+  Ela era a terceira cópia dos mesmos números na mesma tela, mas apagá-la
+  tiraria uma CAPACIDADE: é o único lugar com o × que apaga um registro. Quem
+  digitou 1200 em vez de 120 precisa dele, e o painel do médico pinta a
+  gravidade desses números — valor errado que não se pode apagar vira alarme
+  falso no consultório.
+- **A ordem da grade é clínica**: Saúde · Alertas · Chutes · Contrações ·
+  Nutrição · Bem-estar. Alertas subiu para o segundo lugar porque é a tela que
+  decide se ela procura atendimento.
+- **Bancada:** `/preview-saude?w=20` (grávida, seis quadrados) · `?w=38` e sem
+  parâmetro (sete, com Saúde da mulher).
+  ⚠️ `validateSearch` usa `q.w == null` e **não** `=== undefined`: o router
+  serializa e revalida, então na segunda passada chega `null` — e `Number(null)`
+  é **0**. Com o `===`, abrir sem parâmetro terminava em `?w=0` e a grade
+  escondia Saúde da mulher como se fosse uma gestante de zero semanas. Mesma
+  armadilha que `preview-jogo` documenta para `?tela=`.
+
 ### A aba Pacientes mais tecnológica, e a pré-consulta mudou de casa (ago/2026)
 
 - **O quadro da paciente (`PatientMirrorCard`) ganhou rodapé.** Nome branco
