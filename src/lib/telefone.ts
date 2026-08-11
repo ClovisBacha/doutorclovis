@@ -29,6 +29,27 @@ export function linkWhatsApp(tel?: string | null): string | null {
 }
 
 /**
+ * `whatsapp://send?phone=…` — o ESQUEMA DO APLICATIVO, e não o link web.
+ *
+ * A diferença importa numa situação só, e ela é a do SOS: o esquema **não
+ * navega a página**. O sistema entrega ao WhatsApp e a página que disparou
+ * continua viva — o que permite a ela se fechar sozinha depois.
+ *
+ * Com `https://wa.me/…` a página NAVEGA, e aí quem a abriu perde o controle
+ * dela: foi assim que a tela verde "Abrindo o WhatsApp…" ficava para sempre no
+ * app instalado, sem barra de navegador e sem botão de voltar.
+ *
+ * Não substitui o link web: se o WhatsApp não estiver instalado, o esquema não
+ * faz nada, e aí o `wa.me` é o recuo. Ver `emergency-sheet.tsx`.
+ */
+export function esquemaWhatsApp(tel?: string | null, texto?: string): string | null {
+  const d = digitos(tel);
+  if (!d) return null;
+  const t = texto ? `&text=${encodeURIComponent(texto)}` : "";
+  return `whatsapp://send?phone=${d}${t}`;
+}
+
+/**
  * `tel:+55...` — o toque abre o discador com o número já preenchido.
  *
  * Não existe "discar sozinho": iOS e Android exigem que a pessoa confirme a

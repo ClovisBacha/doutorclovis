@@ -871,17 +871,27 @@ estranho.
 - Nenhum estado se perdeu — `sending`/`sent`/`ninguem`, o recuo para 193 quando
   o médico não tem telefone, o aviso de perfil incompleto e o painel de "quem
   foi avisado" continuam iguais.
-- **`window.open` NÃO abre aba no app instalado** — abre uma visão que toma a
-  tela inteira, e sem barra de navegador não há botão de voltar. Depois do SOS,
-  a paciente ficava presa na tela verde "Abrindo o WhatsApp…" e só saía matando
-  o app. `emTelaCheia()` (`nativo.ts`, cobre PWA na Tela de Início E casca
-  nativa) guarda as DUAS chamadas; ali o WhatsApp abre pelo botão verde, que é
-  um toque de verdade e o iOS entrega ao aplicativo sem tirar ninguém do app.
-  ⚠️ Este defeito é invisível em desenvolvimento: no navegador comum a mesma
-  linha abre uma aba inofensiva.
-- A tela de passagem ganhou **porta** ("Voltar ao app") e **cão de guarda** de
-  12 s. São duas redes para falhas diferentes: o botão salva quem não tem
-  WhatsApp instalado, o temporizador salva de um envio que nunca responde.
+- **A tela de passagem SE RETIRA — e o WhatsApp continua abrindo sozinho.**
+  No app instalado, `window.open` não abre aba: abre uma visão que toma a tela
+  inteira, e sem barra de navegador não há botão de voltar. Navegar essa visão
+  para `wa.me` a punha fora do nosso alcance, e ela ficava para sempre.
+  ⚠️ **A correção NÃO é deixar de abrir.** Tentei isso primeiro e apaguei o
+  recurso junto com o defeito — o dono foi claro: "estava funcionando
+  perfeitamente, tinha que continuar abrindo e enviando; única coisa é que essa
+  tela fica infinita".
+  A entrega passou a usar o **esquema do aplicativo** (`esquemaWhatsApp`,
+  `whatsapp://send`), que **não navega a página**: ela continua viva, percebe o
+  WhatsApp assumir (`visibilitychange` → `document.hidden`) e se fecha. Ao
+  voltar, a paciente encontra o app.
+  O ouvinte é armado no CARREGAMENTO, não dentro de `__abrir`: entre abrir a
+  tela e o servidor responder passam segundos, e sair do app nesse meio
+  deixaria ela voltando para a tela verde.
+- **Três redes, três falhas diferentes:** recuo para `wa.me` em 1,8 s (WhatsApp
+  não instalado), botão "Voltar ao app" (a página web também não abriu), e cão
+  de guarda de 12 s no pai (o envio nunca respondeu).
+  ⚠️ **Nenhuma crase dentro do `<script>` injetado**: ele mora num template
+  literal do TypeScript, e uma crase ali fecha a string. Custou uma volta, e há
+  teste cobrando.
 - **Bancada:** `/preview-sos` (e `?outro=1` para ver o cartão verde do WhatsApp,
   `?semtel=1` para o recuo, `?vazio=1` para o perfil incompleto).
 

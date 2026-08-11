@@ -216,55 +216,84 @@ describe("o SOS não pode prender a paciente numa tela sem saída", () => {
    * tela verde "Abrindo o WhatsApp…" para sempre, e só saía fechando e
    * reabrindo o app inteiro.
    *
-   * A causa: `window.open("", "_blank")` num PWA instalado NÃO abre aba. Abre
-   * uma visão que toma a tela toda — e sem barra de navegador não existe botão
-   * de voltar. No navegador comum a mesma linha é inofensiva (é uma aba, e ela
-   * fecha), e é por isso que o defeito não aparece em nenhuma máquina de
-   * desenvolvimento.
+   * ─── A CORREÇÃO ERRADA, E POR QUE ELA ERA ERRADA ──────────────────────
+   *
+   * Minha primeira tentativa foi NÃO abrir a tela no app instalado. Isso
+   * apagava o defeito e apagava junto o recurso: o WhatsApp deixava de abrir
+   * sozinho, e o dono foi claro — "estava funcionando perfeitamente, tinha que
+   * continuar abrindo e enviando; única coisa é que essa tela fica infinita".
+   *
+   * ─── A CORREÇÃO CERTA ─────────────────────────────────────────────────
+   *
+   * A tela continua abrindo, e passa a SE RETIRAR. O que muda é como ela
+   * entrega ao WhatsApp: pelo ESQUEMA do aplicativo (`whatsapp://`), que não
+   * navega a página. Navegando para `wa.me` ela saía do nosso alcance — e era
+   * isso que a deixava para sempre. Viva, ela percebe o WhatsApp assumir
+   * (`visibilitychange`) e fecha, para que ao voltar a paciente encontre o app.
    */
   const sos = readFileSync("src/components/emergency-sheet.tsx", "utf8");
-  const nativo = readFileSync("src/lib/nativo.ts", "utf8");
+  const tel = readFileSync("src/lib/telefone.ts", "utf8");
 
-  test("a tela de passagem só é aberta FORA do app instalado", () => {
+  test("a tela de passagem CONTINUA sendo aberta — o recurso não foi apagado", () => {
+    expect(sos).toContain('window.open("", "_blank")');
+    /* Sem guarda de plataforma: o comportamento que funcionava vale para
+       todo mundo. */
     const i = sos.indexOf('window.open("", "_blank")');
-    expect(i).toBeGreaterThan(-1);
-    /* A condição tem de estar na MESMA guarda que decide abrir. */
-    const guarda = sos.slice(Math.max(0, i - 260), i);
-    expect(guarda).toContain("!emTelaCheia()");
+    expect(sos.slice(Math.max(0, i - 200), i)).not.toContain("emTelaCheia");
   });
 
-  test("e a segunda tentativa também respeita isso", () => {
-    /* Havia um `window.open` de recuo, para quando a aba do toque não
-       sobrevive. Sem a mesma guarda, ele reabriria a armadilha no app
-       instalado — pelo caminho que ninguém testa. */
-    const todas = [...sos.matchAll(/window\.open\(/g)];
-    expect(todas.length).toBe(2);
-    expect(sos).toContain("} else if (!emTelaCheia()) {");
+  test("a entrega usa o ESQUEMA do aplicativo, que não navega a página", () => {
+    /* É o que mantém a tela viva para poder sair. Com `wa.me` ela navega e
+       fica fora do alcance de quem a abriu. */
+    expect(tel).toContain("export function esquemaWhatsApp");
+    expect(tel).toMatch(/whatsapp:\/\/send\?phone=/);
+    expect(sos).toContain("esquemaWhatsApp(info.emergencyPhone, r.mensagem)");
+    expect(sos).toContain("filha.__abrir(url, esquema)");
   });
 
-  test("`emTelaCheia` cobre PWA instalado E casca nativa", () => {
-    /* `ehNativo` sozinho não serve: um PWA na Tela de Início não tem ponte
-       Capacitor e é justamente onde o defeito acontece. */
-    expect(nativo).toContain("display-mode: standalone");
-    expect(nativo).toMatch(/standalone\?: boolean.*\}\)\.standalone === true/s);
-    expect(nativo).toMatch(
-      /export function emTelaCheia\(\)[\s\S]{0,200}if \(ehNativo\(\)\) return true;/,
-    );
+  test("e ela fecha quando o WhatsApp assume", () => {
+    /* `document.hidden` é o sinal de que ela cumpriu o papel. */
+    expect(sos).toContain('document.addEventListener("visibilitychange"');
+    expect(sos).toMatch(/if \(document\.hidden\) setTimeout\(fecha, 500\);/);
   });
 
-  test("a tela de passagem tem PORTA e um cão de guarda", () => {
-    /* Duas redes, porque as duas falham por motivos diferentes: o botão salva
-       quem não tem WhatsApp instalado, e o temporizador salva de um envio que
-       nunca responde. */
+  test("o ouvinte é armado ANTES de `__abrir`, não dentro dele", () => {
+    /* Entre abrir a tela e o servidor responder passam alguns segundos. Se o
+       ouvinte só existisse dentro de `__abrir`, sair do app nesse meio
+       deixaria a paciente voltando para a tela verde. */
+    const ouvinte = sos.indexOf('document.addEventListener("visibilitychange"');
+    const abrir = sos.indexOf("window.__abrir = function");
+    expect(ouvinte).toBeGreaterThan(-1);
+    expect(abrir).toBeGreaterThan(-1);
+    expect(ouvinte).toBeLessThan(abrir);
+  });
+
+  test("sem WhatsApp instalado, cai na página web em vez de travar", () => {
+    expect(sos).toMatch(/if \(!document\.hidden && !saiu\) window\.location\.href = web;/);
+    expect(sos).toMatch(/\}, 1800\);/);
+  });
+
+  test("e ainda há porta manual e cão de guarda", () => {
+    /* Três redes para três falhas diferentes: o esquema que não existe, a
+       página que não carrega, e o envio que nunca responde. */
     expect(sos).toContain("Voltar ao app");
-    expect(sos).toContain("window.close()");
     expect(sos).toMatch(/cachorro = window\.setTimeout/);
     expect(sos).toMatch(/\}, 12000\);/);
   });
 
   test("o cão de guarda é desarmado nos dois desfechos", () => {
-    /* Deixá-lo armado depois de navegar fecharia o WhatsApp da paciente 12
-       segundos depois de abrir. */
+    /* Armado depois de navegar, fecharia a tela 12 s depois — no meio do
+       caminho de quem não tem WhatsApp e caiu na página web. */
     expect([...sos.matchAll(/window\.clearTimeout\(cachorro\)/g)]).toHaveLength(2);
+  });
+
+  test("NENHUMA crase dentro do script injetado", () => {
+    /* Ele mora dentro de um template literal do TypeScript: uma crase ali
+       fecha a string, e o arquivo inteiro deixa de compilar. Custou uma
+       volta. */
+    const i = sos.indexOf("<script>");
+    const j = sos.indexOf("</script>", i);
+    expect(i).toBeGreaterThan(-1);
+    expect(sos.slice(i, j)).not.toContain("`");
   });
 });

@@ -77,33 +77,6 @@ export function ehNativo(): boolean {
   return ponte()?.isNativePlatform?.() === true;
 }
 
-/**
- * ESTÁ EM TELA CHEIA, SEM BARRA DE NAVEGADOR?
- *
- * Vale para o PWA instalado na Tela de Início E para a casca nativa. É outra
- * pergunta que `ehNativo`: aqui não interessa se há ponte para haptics —
- * interessa se existe uma barra de endereço com botão de voltar.
- *
- * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
- *
- * `window.open("", "_blank")` num PWA instalado NÃO abre uma aba: ele abre uma
- * visão que toma a tela inteira do app. E como não há barra de navegador, não
- * há botão de voltar — se aquela visão não navegar para lugar nenhum, a
- * paciente fica presa nela e só sai fechando e reabrindo o app.
- *
- * Foi exatamente o que aconteceu depois do SOS: a tela verde "Abrindo o
- * WhatsApp…" ficava para sempre. Numa emergência, obrigar alguém a matar o app
- * e reabrir é o pior defeito que esta tela pode ter.
- */
-export function emTelaCheia(): boolean {
-  if (typeof window === "undefined") return false;
-  if (ehNativo()) return true;
-  return (
-    window.matchMedia?.("(display-mode: standalone)").matches === true ||
-    (window.navigator as unknown as { standalone?: boolean }).standalone === true
-  );
-}
-
 /** `"ios"`, `"android"` ou `"web"`. */
 export function plataforma(): string {
   return ponte()?.getPlatform?.() ?? "web";

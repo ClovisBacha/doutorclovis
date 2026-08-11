@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
-import { emTelaCheia } from "@/lib/nativo";
 import { RED_SYMPTOMS } from "@/lib/triage";
-import { linkTel, linkWhatsApp } from "@/lib/telefone";
+import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
@@ -174,19 +173,7 @@ export function EmergencySheet({
        apontamos essa mesma aba para o WhatsApp com a mensagem pronta. */
     let janela: Window | null = null;
     let cachorro: number | null = null;
-    /* ── E NÃO FAZEMOS ISSO NO APP INSTALADO ──────────────────────────────
-       Num PWA na Tela de Início (ou na casca nativa) NÃO existe aba: o
-       `window.open` abre uma visão que toma a tela inteira, e sem barra de
-       navegador não há botão de voltar. Se ela não navegar para lugar nenhum,
-       a paciente fica presa na tela verde "Abrindo o WhatsApp…" e só sai
-       matando o app — que foi exatamente o que o dono viu, e é o pior defeito
-       possível numa tela de emergência.
-
-       Ali o caminho é outro e é seguro: o aviso sai igual (push, e-mail e SMS
-       já não dependiam desta janela), e o WhatsApp abre pelo BOTÃO VERDE que
-       aparece logo depois — um toque de verdade, que o iOS entrega ao
-       aplicativo do WhatsApp sem tirar a paciente do app. */
-    if (linkWhatsApp(info.emergencyPhone) && !emTelaCheia()) {
+    if (linkWhatsApp(info.emergencyPhone)) {
       janela = window.open("", "_blank");
       try {
         /* Esta tela dura o tempo de pegar a coordenada e chamar o servidor —
@@ -206,14 +193,51 @@ export function EmergencySheet({
                <p style="font-size:13px;margin:14px 24px 0;opacity:.92;line-height:1.4">
                  O aviso já foi enviado para quem você cadastrou.
                </p>
-               <!-- SAÍDA. Uma tela de passagem sem porta é uma armadilha:
-                    basta o WhatsApp não estar instalado para ela virar o fim
-                    do caminho. O botão fecha esta aba e devolve a paciente ao
-                    app, onde o 192 continua a um toque. -->
+               <!-- SAÍDA MANUAL. Terceira rede, para o caso de o esquema do
+                    aplicativo não existir E a página web não carregar. -->
                <button onclick="window.close()" style="margin-top:22px;border:0;
                  border-radius:999px;padding:12px 22px;font-size:15px;font-weight:700;
                  background:#fff;color:#178a45">Voltar ao app</button>
              </div>
+             <script>
+             /* ⚠️ SEM CRASE NESTE BLOCO: ele mora dentro de um template
+                literal do TypeScript, e uma crase aqui fecha a string.
+                (Custou uma volta.)
+
+                ── ESTA TELA SE RETIRA SOZINHA ────────────────────────────
+                O defeito era ela ficar para sempre: no app instalado não há
+                barra de navegador, e navegar para wa.me a deixava fora do
+                nosso alcance.
+
+                Agora o pai chama __abrir e nós:
+                 1. entregamos ao WhatsApp pelo ESQUEMA do aplicativo, que NÃO
+                    navega a página — continuamos vivos para poder sair;
+                 2. quando o WhatsApp assume, esta página fica ESCONDIDA. É o
+                    sinal de que ela cumpriu o papel, e é aí que ela fecha —
+                    para que, ao voltar, a paciente encontre o app e não isto;
+                 3. se em 1,8 s nada aconteceu, o WhatsApp não está instalado:
+                    aí sim vamos para a página web, que é melhor que nada. */
+             var saiu = false;
+             function fecha() {
+               if (saiu) return;
+               saiu = true;
+               try { window.close(); } catch (e) {}
+             }
+             /* O ouvinte é armado AGORA, e não dentro de __abrir: entre abrir
+                esta tela e o servidor responder passam alguns segundos, e se a
+                paciente sair do app nesse meio ela voltaria para cá. Ficar
+                escondida é sempre o sinal de que esta tela não é mais o
+                assunto. */
+             document.addEventListener("visibilitychange", function () {
+               if (document.hidden) setTimeout(fecha, 500);
+             });
+             window.__abrir = function (web, app) {
+               try { window.location.href = app; } catch (e) {}
+               setTimeout(function () {
+                 if (!document.hidden && !saiu) window.location.href = web;
+               }, 1800);
+             };
+             </script>
            </body>`,
         );
       } catch {
@@ -346,17 +370,26 @@ export function EmergencySheet({
       if (alvo && r.mensagem) {
         const url = `${alvo}?text=${encodeURIComponent(r.mensagem)}`;
         if (janela && !janela.closed) {
-          janela.location.href = url;
+          /* Chama a função da própria tela de passagem: ela entrega ao
+             WhatsApp pelo esquema do aplicativo e SE FECHA quando ele assume.
+             Navegar a filha direto (o que fazíamos) a punha fora do nosso
+             alcance — e era isso que a deixava para sempre no app instalado.
+
+             O recuo é o comportamento antigo, para a WebView que recusou o
+             `document.write` e por isso não tem a função. */
+          const filha = janela as Window & { __abrir?: (web: string, app: string) => void };
+          const esquema = esquemaWhatsApp(info.emergencyPhone, r.mensagem);
+          if (typeof filha.__abrir === "function" && esquema) {
+            filha.__abrir(url, esquema);
+          } else {
+            janela.location.href = url;
+          }
           setZapAbriu(true);
-        } else if (!emTelaCheia()) {
+        } else {
           // A aba do toque não sobreviveu (ela fechou, ou a WebView recusou):
           // tenta agora e, se falhar, o botão verde continua a um toque.
           setZapAbriu(!!window.open(url, "_blank", "noopener,noreferrer"));
         }
-        /* No app instalado não tentamos abrir nada sozinhos — nem aqui nem
-           acima. `zapAbriu` fica falso de propósito, e é ele que faz o botão
-           verde aparecer dizendo "Mandar no WhatsApp" em vez de "abrir de
-           novo". */
       } else {
         janela?.close();
       }
