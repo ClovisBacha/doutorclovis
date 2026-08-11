@@ -609,6 +609,48 @@ a ENTREGA não tinha nenhum — a mesma armadilha de `bonus-e-mesada.test.ts`.
 
 Sem migration: tudo sai de colunas que já existem.
 
+### O presente perdeu o limite mensal, e a chave mudou de sentido (ago/2026)
+
+Pedido do dono: "aqui eu posso mandar quantos presentes eu quiser pra cada
+paciente, então tira essa limitação". O teto que sobrou é a **mesada** — o
+mesmo número que paga a conta. Duas travas para o mesmo risco só serviam para
+o médico bater na que ele não escolheu.
+
+- **A `dedupe_key` trocou o CICLO pelo TOKEN DO CLIQUE**
+  (`presente:<medico>:<paciente>:<token>`), e essa troca é o ponto todo.
+  `grantSementinhas` grava com `ignoreDuplicates`, então a chave é a ÚNICA
+  coisa entre um toque nervoso e dois presentes: **apagar o campo faria "sem
+  limite" virar "sem defesa"**. O token nasce no navegador, um por clique —
+  idempotência por INTENÇÃO, e não por calendário.
+- **Achar a linha deixou de ser recusa.** Com o ciclo na chave, `jaExistia`
+  queria dizer "ela já ganhou este mês"; com o token, quer dizer "este mesmo
+  envio já foi processado" — sucesso, marcado com `repetido: true` para a tela
+  não festejar duas vezes. Devolver erro aqui faria ele mandar DE NOVO, com
+  token novo, e aí sim gastar a mesada duas vezes.
+- **`tokenDePresente` limpa o que vem do cliente** (só `[a-zA-Z0-9-]`): o token
+  entra numa chave separada por `:`, e um token forjado com dois-pontos
+  deslocaria o parser e creditaria o presente à paciente errada. Vazio depois
+  da limpeza vira `null` e o servidor sorteia — string vazia faria todos os
+  presentes daquela paciente colidirem numa chave só, o limite de volta pela
+  porta dos fundos.
+- **`presenteadas: string[]` virou `recebido: Record<string, number>`.** Deixou
+  de ser "quem está bloqueada" e virou informação ("já recebeu 90 🌱 este
+  mês"), porque não há mais bloqueio. O teste cobra que o número **não**
+  desabilite o botão — seria o limite de volta, agora só na tela, que é o pior
+  lugar: o servidor aceitaria e a tela recusaria.
+- **A mesada da PACIENTE (amigas) mantém o limite de uma por ciclo.** Bolso
+  muito menor, e é o que impede uma assinante de despejar o mês numa conta só.
+- **Busca por nome** (`src/lib/buscar-paciente.ts`, puro e testado) em vez da
+  lista inteira: sem acento, sem caixa, e o nome do BEBÊ também acha ("a mãe da
+  Helena"). Mora em `lib/` e não no componente porque `mesada-do-medico.tsx`
+  importa `sonner`, que toca `document` ao carregar e derruba o `bun test`
+  inteiro — o teste chegou a fazer isso.
+- **"Modo Cuidado" virou link azul** com explicação em quatro perguntas (o que
+  é · quem liga · o que fica pausado · por que o presente não chega). É
+  vocabulário NOSSO, e decidia se a paciente recebia sem nunca se apresentar.
+  A explicação diz também o que **não** para (SOS, conversa, registros,
+  lembretes), senão o médico lê como paciente desassistida.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

@@ -331,10 +331,20 @@ describe("5. a mesada tem tela — e a tela conta a mesma história do servidor"
 
   test("cada recusa do servidor tem frase própria na tela", () => {
     /* "Não foi possível" faz o médico tentar de novo contra uma parede que não
-       vai ceder — e três dessas recusas são estados normais, não erros. */
-    for (const motivo of ["ja_presenteada", "mesada_esgotada", "modo_cuidado", "sem_vinculo"]) {
+       vai ceder — e estas recusas são estados normais, não erros.
+
+       `ja_presenteada` saiu da lista porque saiu do servidor: o limite de um
+       presente por paciente por mês foi removido a pedido do dono, e não há
+       mais essa parede para explicar. */
+    for (const motivo of ["mesada_esgotada", "modo_cuidado", "sem_vinculo"]) {
       expect(mesada).toContain(motivo);
     }
+  });
+
+  test("e a tela não guarda frase para uma recusa que não existe mais", () => {
+    /* Texto morto de um limite removido é pior que texto ausente: quem ler o
+       componente vai acreditar que o limite continua lá. */
+    expect(mesada).not.toContain("ja_presenteada");
   });
 
   test("Modo Cuidado aparece como explicação, não como falha", () => {

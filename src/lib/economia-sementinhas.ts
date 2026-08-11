@@ -167,17 +167,30 @@ export const RAZAO_PRESENTE_AMIGA = "presente-de-amiga";
 /**
  * A CHAVE DO PRESENTE DO MÉDICO — construtor e leitor, no mesmo lugar.
  *
- * `presente:<medico>:<paciente>:<AAAA-MM>`. Ela faz três trabalhos de uma vez:
- * é o índice único que impede o segundo presente no mesmo ciclo, é o `LIKE` que
- * conta a mesada de volta, e é de onde sai a lista de quem já recebeu.
+ * `presente:<medico>:<paciente>:<token>`.
  *
- * Os três moravam separados — o construtor numa linha, o prefixo do `LIKE`
- * escrito à mão três linhas acima, e agora o leitor. Três cópias do mesmo
- * formato que precisam concordar é como se perde um presente sem erro nenhum:
- * o médico vê a mesada descer e a lista de presenteadas não muda.
+ * ─── O QUE ERA, E POR QUE MUDOU ─────────────────────────────────────────────
+ *
+ * O último campo era o CICLO (`2026-08`), e era ele — junto com o índice único
+ * do ledger — que impunha "um presente por paciente por mês". O dono tirou esse
+ * limite: ele pode presentear a mesma paciente quantas vezes quiser.
+ *
+ * Trocar o ciclo por um token de envio, e não simplesmente apagar o campo, é o
+ * ponto todo. `grantSementinhas` grava com `ignoreDuplicates`, então a chave é
+ * a ÚNICA coisa que impede um clique duplo (ou uma retentativa de rede) de
+ * virar dois presentes. Sem chave estável, "sem limite" viraria "sem defesa".
+ *
+ * O token nasce no NAVEGADOR, um por clique: a mesma intenção reenviada carrega
+ * o mesmo token e não grava de novo; dois cliques deliberados carregam tokens
+ * diferentes e valem dois presentes. É idempotência por intenção, e não por
+ * calendário.
+ *
+ * O ciclo não faz falta na chave porque quem recorta o mês é o
+ * `created_at >= inicioDoCiclo()` da consulta — a mesada nunca dependeu do
+ * texto da chave para saber em que mês está.
  */
-export function chaveDoPresente(doctorId: string, patientId: string, ciclo: string): string {
-  return `presente:${doctorId}:${patientId}:${ciclo}`;
+export function chaveDoPresente(doctorId: string, patientId: string, token: string): string {
+  return `presente:${doctorId}:${patientId}:${token}`;
 }
 
 /** O `LIKE` que pega todos os presentes de um médico. */
@@ -186,19 +199,43 @@ export function prefixoDosPresentes(doctorId: string): string {
 }
 
 /**
- * Os ids das pacientes dentro das chaves.
+ * O token de envio, limpo.
+ *
+ * Ele vem do cliente e vai para dentro de uma chave cujos campos são separados
+ * por `:` — um token com dois-pontos deslocaria o parser e faria o painel
+ * atribuir o presente à paciente errada. Só letras, números e hífen entram.
+ *
+ * Vazio depois da limpeza devolve `null`, e o servidor sorteia um: um token
+ * inútil é melhor descartado que aceito, porque um token vazio faria TODOS os
+ * presentes daquela paciente colidirem numa chave só — que é exatamente o
+ * limite que acabamos de tirar, de volta pela porta dos fundos.
+ */
+export function tokenDePresente(bruto: string | null | undefined): string | null {
+  const limpo = (bruto ?? "").replace(/[^a-zA-Z0-9-]/g, "").slice(0, 64);
+  return limpo || null;
+}
+
+/**
+ * Quanto cada paciente já recebeu deste médico no ciclo.
+ *
+ * Deixou de ser uma lista de quem está BLOQUEADA (não há mais bloqueio) e
+ * virou informação: o painel mostra "já recebeu 90 🌱 este mês" ao lado do
+ * nome, e o botão continua valendo.
  *
  * Uma chave com formato inesperado é DESCARTADA em vez de virar um id
- * inventado: um id errado aqui desabilitaria o botão de uma paciente que nunca
- * ganhou nada — o defeito oposto, e pior, porque é silencioso.
+ * inventado — um id errado aqui carimbaria um valor na paciente errada, que é
+ * o defeito silencioso e pior.
  */
-export function quemJaRecebeu(chaves: (string | null | undefined)[]): string[] {
-  const ids = new Set<string>();
-  for (const k of chaves) {
-    const partes = (k ?? "").split(":");
-    if (partes.length === 4 && partes[0] === "presente" && partes[2]) ids.add(partes[2]);
+export function recebidoPorPaciente(
+  linhas: { dedupe_key?: string | null; amount?: number | null }[],
+): Record<string, number> {
+  const mapa: Record<string, number> = {};
+  for (const l of linhas) {
+    const partes = (l.dedupe_key ?? "").split(":");
+    if (partes.length !== 4 || partes[0] !== "presente" || !partes[2]) continue;
+    mapa[partes[2]] = (mapa[partes[2]] ?? 0) + (l.amount ?? 0);
   }
-  return [...ids];
+  return mapa;
 }
 
 /**

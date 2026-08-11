@@ -156,7 +156,14 @@ describe("5. a mesada não mente sobre o que enviou", () => {
   test("relê a linha e confere que ela é DESTE presente", () => {
     expect(mesada).toContain('.eq("dedupe_key", dedupeKey)');
     expect(mesada).toContain('error: "nao_gravou"');
-    expect(mesada).toContain('error: "ja_presenteada"');
+    /* Era `error: "ja_presenteada"`, quando a chave carregava o CICLO e achar a
+       linha significava "ela já ganhou este mês". O limite de um por paciente
+       por mês caiu (pedido do dono), a chave passou a carregar o token do
+       CLIQUE, e achar a linha passou a significar outra coisa: este mesmo envio
+       já foi processado. Isso é sucesso — mas sucesso MARCADO, para a tela não
+       comemorar duas vezes o que saiu uma. O que não pode voltar é `ok: true`
+       mudo, que era a mentira original. */
+    expect(mesada).toContain("repetido: true as const");
   });
 
   test("e NÃO apaga linha do livro-caixa", () => {
@@ -219,10 +226,25 @@ describe("5b. dizer «enviado» duas vezes era MENTIRA nos dois lados", () => {
       expect(iLeitura).toBeLessThan(iEscrita);
     });
 
-    test(`${onde} recusa quando a linha já existe`, () => {
+    test(`${onde} não repassa a duplicata como envio novo`, () => {
+      /* A DUAS mesadas precisam distinguir "gravou agora" de "já estava lá" —
+         `grantSementinhas` ignora duplicata em silêncio, e `ok: true` mudo era
+         a mentira original.
+
+         O que muda entre as duas é o SENTIDO de achar a linha, porque só a do
+         médico perdeu o limite mensal:
+
+          · na do MÉDICO a chave carrega o token do clique, então a linha só
+            existe se este mesmo envio já rodou — sucesso, marcado com
+            `repetido` para a tela não festejar de novo;
+          · na da PACIENTE a chave ainda carrega o ciclo e o limite de uma amiga
+            por mês continua de pé, então a linha significa recusa. */
       const i = fonte.indexOf("if (jaExistia)");
       expect(i).toBeGreaterThan(-1);
-      expect(fonte.slice(i, i + 260)).toContain('error: "ja_presenteada"');
+      const bloco = fonte.slice(i, i + 260);
+      const esperado =
+        onde === "a mesada do médico" ? "repetido: true as const" : 'error: "ja_presenteada"';
+      expect(bloco).toContain(esperado);
     });
 
     test(`${onde} não decide repetição comparando VALORES`, () => {
@@ -230,6 +252,14 @@ describe("5b. dizer «enviado» duas vezes era MENTIRA nos dois lados", () => {
       expect(fonte).not.toContain("!== quanto");
     });
   }
+
+  test("a mesada da PACIENTE mantém uma amiga por ciclo", () => {
+    /* O dono tirou o limite da mesada do MÉDICO, e só dela. Entre amigas o
+       bolso é bem menor (`MESADA_DA_ASSINANTE`) e o limite é o que impede uma
+       assinante de despejar o mês inteiro numa conta só. */
+    expect(pacienteFns).toContain("const ciclo = inicioDoCiclo()");
+    expect(pacienteFns).toMatch(/amiga:\$\{uid\}:\$\{data\.amigaId\}:\$\{ciclo\}/);
+  });
 });
 
 describe("6. a mesada não sai do plano ANTIGO", () => {

@@ -25,8 +25,13 @@ import {
   RAZAO_PRESENTE_MEDICO,
   chaveDoPresente,
   prefixoDosPresentes,
-  quemJaRecebeu,
+  recebidoPorPaciente,
+  tokenDePresente,
 } from "./economia-sementinhas";
+/* De `lib/`, e não do componente: `mesada-do-medico.tsx` importa `sonner`, que
+   toca `document` ao carregar e derruba o `bun test` inteiro com um erro que
+   não tem nada a ver com busca de nome. */
+import { filtrarPacientes } from "./buscar-paciente";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -38,36 +43,79 @@ const mesada = semComentarios("src/lib/mesada.functions.ts");
 const jogo = semComentarios("src/components/gestacao-path.tsx");
 const cartao = semComentarios("src/components/mesada-do-medico.tsx");
 
+/** Três pacientes de mentira para o filtro do nome. */
+const PACIENTES = [
+  { id: "1", display_name: "Sofía Andrade", baby_name: "Miguel" },
+  { id: "2", display_name: "Ana Paula", baby_name: "Helena" },
+  { id: "3", display_name: "Beatriz Lima", baby_name: null },
+] as unknown as Parameters<typeof filtrarPacientes>[0];
+
 describe("a chave do presente tem um dono só", () => {
   test("construtor e prefixo do LIKE concordam", () => {
     /* Era esta a divergência possível: o construtor numa linha e o `LIKE`
        escrito à mão três linhas acima. Se os dois deixarem de casar, a mesada
        conta zero gasto e o médico distribui sem teto. */
-    const k = chaveDoPresente("med-1", "pac-9", "2026-08");
+    const k = chaveDoPresente("med-1", "pac-9", "tok1");
     const prefixo = prefixoDosPresentes("med-1").replace(/%$/, "");
     expect(k.startsWith(prefixo)).toBe(true);
   });
 
-  test("quemJaRecebeu tira a paciente do meio, não o ciclo", () => {
-    expect(quemJaRecebeu([chaveDoPresente("med-1", "pac-9", "2026-08")])).toEqual(["pac-9"]);
+  test("recebidoPorPaciente soma pelo id do meio", () => {
+    expect(
+      recebidoPorPaciente([{ dedupe_key: chaveDoPresente("med-1", "pac-9", "t1"), amount: 30 }]),
+    ).toEqual({ "pac-9": 30 });
   });
 
-  test("chave torta é descartada, nunca vira id inventado", () => {
-    /* Um id errado aqui desabilitaria o botão de uma paciente que nunca ganhou
-       nada — silencioso, e do lado ruim do erro. */
+  test("chave torta é descartada, nunca carimba valor na paciente errada", () => {
     expect(
-      quemJaRecebeu(["presente:med-1:pac-9", "checkin:2026-08-11", "", null, undefined]),
-    ).toEqual([]);
+      recebidoPorPaciente([
+        { dedupe_key: "presente:med-1:pac-9", amount: 30 },
+        { dedupe_key: "checkin:2026-08-11", amount: 5 },
+        { dedupe_key: "", amount: 9 },
+        { dedupe_key: null, amount: 9 },
+      ]),
+    ).toEqual({});
   });
 
-  test("a mesma paciente duas vezes conta uma", () => {
+  test("SEM LIMITE: dois presentes à mesma paciente somam, não colidem", () => {
+    /* O limite de "um por paciente por mês" caiu a pedido do dono. Este teste é
+       o que impede alguém de ressuscitá-lo sem perceber: com a chave carregando
+       o ciclo, os dois envios abaixo teriam a MESMA chave, o índice único
+       recusaria o segundo, e o total daria 30 em vez de 90. */
+    const chaves = [
+      { dedupe_key: chaveDoPresente("m", "p", "t1"), amount: 30 },
+      { dedupe_key: chaveDoPresente("m", "p", "t2"), amount: 60 },
+    ];
+    expect(new Set(chaves.map((c) => c.dedupe_key)).size).toBe(2);
+    expect(recebidoPorPaciente(chaves)).toEqual({ p: 90 });
+  });
+
+  test("pacientes diferentes ficam separadas", () => {
     expect(
-      quemJaRecebeu([
-        chaveDoPresente("m", "p", "2026-07"),
-        chaveDoPresente("m", "p", "2026-08"),
-        chaveDoPresente("m", "outra", "2026-08"),
-      ]).sort(),
-    ).toEqual(["outra", "p"]);
+      recebidoPorPaciente([
+        { dedupe_key: chaveDoPresente("m", "p", "t1"), amount: 30 },
+        { dedupe_key: chaveDoPresente("m", "outra", "t2"), amount: 100 },
+      ]),
+    ).toEqual({ p: 30, outra: 100 });
+  });
+
+  test("token com dois-pontos não desloca o parser", () => {
+    /* O token vem do CLIENTE e entra numa chave separada por `:`. Sem limpeza,
+       um token forjado com dois-pontos faria o painel creditar o presente à
+       paciente errada. */
+    expect(tokenDePresente("aa:bb:cc")).toBe("aabbcc");
+    expect(tokenDePresente("../../etc")).toBe("etc");
+    const k = chaveDoPresente("m", "p", tokenDePresente("x:y") ?? "");
+    expect(k.split(":")).toHaveLength(4);
+    expect(recebidoPorPaciente([{ dedupe_key: k, amount: 30 }])).toEqual({ p: 30 });
+  });
+
+  test("token vazio devolve null, e nunca string vazia", () => {
+    /* String vazia faria TODOS os presentes daquela paciente colidirem numa
+       chave só — o limite de um por mês voltando pela porta dos fundos. */
+    for (const v of ["", "   ", ":::", null, undefined]) {
+      expect(tokenDePresente(v)).toBeNull();
+    }
   });
 
   test("a razão não é escrita à mão em lugar nenhum", () => {
@@ -176,21 +224,103 @@ describe("ela é avisada mesmo com o app fechado", () => {
   });
 });
 
-describe("o painel do médico não esquece quem já recebeu", () => {
-  test("a mesada devolve a lista", () => {
-    /* Era memória do componente: bastava recarregar o painel para o botão de
-       uma paciente presenteada voltar a dizer "Dar 30 🌱", o servidor recusar,
-       e o recurso parecer quebrado justamente quando funcionava. */
-    expect(mesada).toContain("presenteadas: quemJaRecebeu(");
+describe("o painel mostra quanto cada uma já recebeu", () => {
+  test("a mesada devolve o mapa", () => {
+    expect(mesada).toContain("recebido: recebidoPorPaciente(");
   });
 
-  test("a tela nasce com ela, e não vazia", () => {
-    expect(cartao).toMatch(/for \(const id of m\.presenteadas \?\? \[\]\) nova\.add\(id\)/);
+  test("a tela nasce com ele, e não vazio", () => {
+    /* Era memória do componente: bastava recarregar o painel para o número
+       sumir da tela sem ter sumido do ledger. */
+    expect(cartao).toMatch(/setRecebido\(m\.recebido \?\? \{\}\)/);
   });
 
   test("toda resposta do servidor passa pelo mesmo aplicador", () => {
-    /* Atualizar a mesada sem a lista (ou o contrário) é como as duas passaram a
+    /* Atualizar a mesada sem o mapa (ou o contrário) é como os dois passaram a
        discordar antes. */
     expect(cartao).not.toMatch(/setMesada\(res\.mesada\)/);
+  });
+
+  test("o número NÃO desabilita o botão", () => {
+    /* O pedido do dono foi tirar o limite. Um `disabled` amarrado ao que ela já
+       recebeu seria o limite de volta, agora só na tela — o pior lugar, porque
+       o servidor aceitaria e a tela recusaria. */
+    const linha = cartao.slice(cartao.indexOf("disabled={!cabe"));
+    expect(linha.slice(0, 120)).not.toContain("recebido");
+  });
+});
+
+describe("sem limite não pode virar sem defesa", () => {
+  test("a tela manda um token por clique", () => {
+    /* `grantSementinhas` usa `ignoreDuplicates`, então a chave é a ÚNICA coisa
+       entre um toque duplo e dois presentes. */
+    expect(cartao).toContain("token: crypto.randomUUID()");
+  });
+
+  test("o servidor sorteia um token quando não vem nenhum", () => {
+    expect(mesada).toMatch(
+      /tokenDePresente\(data\.token\) \?\? globalThis\.crypto\.randomUUID\(\)/,
+    );
+  });
+
+  test("o mesmo clique repetido é sucesso, não recusa", () => {
+    /* Devolver erro num toque nervoso faria ele mandar DE NOVO, com token novo,
+       e aí sim gastar a mesada duas vezes. */
+    expect(mesada).toMatch(/repetido: true as const/);
+    expect(mesada).not.toContain('error: "ja_presenteada"');
+  });
+
+  test("o segundo 'enviado!' não aparece na tela", () => {
+    expect(cartao).toMatch(/if \(!res\.repetido\)/);
+  });
+});
+
+describe("o médico entende o que é Modo Cuidado", () => {
+  test("o termo virou um link, e não texto solto", () => {
+    /* Ele decide se a paciente recebe o presente e estava escrito como se todo
+       médico já soubesse — é vocabulário nosso, não do consultório. */
+    expect(cartao).toContain("setExplicandoCuidado(true)");
+    expect(cartao).toMatch(/text-sky-600/);
+  });
+
+  test("a explicação responde o que muda para ELE", () => {
+    expect(cartao).toContain("Por que o presente não chega");
+    expect(cartao).toContain("Quem liga é a paciente");
+  });
+
+  test("e diz o que NÃO para — senão ele lê como paciente desassistida", () => {
+    expect(cartao).toContain("O Modo Cuidado cala a");
+    expect(cartao).toMatch(/SOS/);
+  });
+});
+
+describe("achar a paciente sem rolar a lista toda", () => {
+  test("busca por nome, sem acento e sem caixa", () => {
+    expect(filtrarPacientes(PACIENTES, "sof")).toHaveLength(1);
+    expect(filtrarPacientes(PACIENTES, "SOFIA")).toHaveLength(1);
+    expect(filtrarPacientes(PACIENTES, "sofía")).toHaveLength(1);
+  });
+
+  test("busca também pelo nome do bebê", () => {
+    /* É assim que muito médico guarda a paciente na cabeça — "a mãe da
+       Helena" —, e o dado já está na mão. */
+    const r = filtrarPacientes(PACIENTES, "helena");
+    expect(r.map((p) => p.display_name)).toEqual(["Ana Paula"]);
+  });
+
+  test("busca vazia devolve todas", () => {
+    expect(filtrarPacientes(PACIENTES, "   ")).toHaveLength(PACIENTES.length);
+  });
+
+  test("nome que não existe devolve nenhuma, e não todas", () => {
+    /* Cair para "todas" num filtro sem resultado é o defeito clássico: ele
+       digitaria um nome, veria a lista inteira e presentearia a errada. */
+    expect(filtrarPacientes(PACIENTES, "zzz")).toHaveLength(0);
+  });
+
+  test("a lista cortada diz quantas ficaram de fora", () => {
+    /* Lista truncada em silêncio faz o médico concluir que a paciente que ele
+       procura não está vinculada a ele. */
+    expect(cartao).toMatch(/escreva o nome para encontrar/);
   });
 });

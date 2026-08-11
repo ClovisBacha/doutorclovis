@@ -39,7 +39,8 @@ import {
   chaveDoPresente,
   mesadaDoMedico,
   prefixoDosPresentes,
-  quemJaRecebeu,
+  recebidoPorPaciente,
+  tokenDePresente,
 } from "@/lib/economia-sementinhas";
 
 /**
@@ -81,19 +82,18 @@ export type EstadoDaMesada = {
   /** O valor sugerido no botão de um clique. */
   sugerido: number;
   /**
-   * Quem JÁ recebeu neste ciclo.
+   * Quanto cada paciente já recebeu neste ciclo — `patientId → Sementinhas`.
    *
-   * A tela guardava isso só na memória do componente, então bastava recarregar
-   * o painel para todos os botões voltarem a dizer "Dar 30 🌱" — inclusive o da
-   * paciente presenteada dez minutos antes. O médico clicava, o servidor
-   * recusava com "já ganhou um presente seu neste mês", e o recurso passava a
-   * parecer quebrado justamente quando estava funcionando.
+   * Era uma lista de quem estava BLOQUEADA, quando havia um presente por
+   * paciente por mês. Sem o limite, bloquear ninguém: o mapa virou INFORMAÇÃO
+   * ("Fulana já recebeu 90 🌱 este mês"), que é o que o médico precisa para
+   * dosar a mesada entre as pacientes dele sem que o app decida por ele.
    *
    * Sai dos `dedupe_key` que a própria mesada já lê para contar o gasto — sem
    * consulta nova e sem uma segunda fonte de verdade que possa discordar do
    * número exibido ao lado.
    */
-  presenteadas: string[];
+  recebido: Record<string, number>;
 };
 
 /**
@@ -149,7 +149,7 @@ export async function lerMesada(sb: any, doctorId: string): Promise<EstadoDaMesa
      presentear é chato; errar para o outro deixa o médico distribuir sem teto
      e some com a única trava que existe. */
   if (error) {
-    return { total, usado: total, restante: 0, sugerido: PRESENTE_SUGERIDO, presenteadas: [] };
+    return { total, usado: total, restante: 0, sugerido: PRESENTE_SUGERIDO, recebido: {} };
   }
 
   const linhas = (data ?? []) as { amount: number; dedupe_key: string | null }[];
@@ -159,7 +159,7 @@ export async function lerMesada(sb: any, doctorId: string): Promise<EstadoDaMesa
     usado,
     restante: Math.max(0, total - usado),
     sugerido: PRESENTE_SUGERIDO,
-    presenteadas: quemJaRecebeu(linhas.map((l) => l.dedupe_key)),
+    recebido: recebidoPorPaciente(linhas),
   };
 }
 
@@ -185,9 +185,18 @@ export const getMesada = createServerFn({ method: "POST" })
  *  2. **Teto da mesada** — conferido DEPOIS de gravar, e revertido se estourar.
  *     Conferir antes deixa uma janela em que dois cliques simultâneos passam
  *     dos dois lados do `if`. É a mesma correção que `platform_coupons` já tinha.
- *  3. **Um presente por paciente por ciclo** — a `dedupeKey` carrega o ciclo, e
- *     o índice único do ledger faz o resto. Sem isso, dez cliques dão dez
- *     presentes e a mesada some num minuto.
+ *  3. **Um presente por ENVIO, e não por ciclo.** O limite de "uma vez por
+ *     paciente por mês" caiu a pedido do dono: ele presenteia quem quiser,
+ *     quantas vezes quiser, até a mesada acabar. O que continua de pé é a
+ *     idempotência do CLIQUE — `dedupeKey` carrega um token de envio, então
+ *     clique duplo e retentativa de rede gravam uma vez só. Sem essa troca,
+ *     "sem limite" viraria "sem defesa": `grantSementinhas` usa
+ *     `ignoreDuplicates`, e a chave é a única coisa entre um toque nervoso e
+ *     dois presentes.
+ *
+ * O TETO DA MESADA é o que sobrou de limite, e ele basta — é o mesmo número que
+ * paga a conta. Duas travas para o mesmo risco só serviam para o médico bater
+ * na que ele não escolheu.
  */
 export const presentearPaciente = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -198,6 +207,10 @@ export const presentearPaciente = createServerFn({ method: "POST" })
         /* Quanto dar. O padrão é o sugerido; o médico pode mudar, mas não pode
            dar mais que a mesada nem um valor absurdo numa paciente só. */
         quantidade: z.number().int().min(1).max(1000).optional(),
+        /* O token do CLIQUE (ver `chaveDoPresente`). Opcional para não quebrar
+           nenhum chamador antigo — mas quem não manda perde a idempotência,
+           então a tela sempre manda. */
+        token: z.string().max(80).optional(),
       })
       .parse(i),
   )
@@ -231,12 +244,20 @@ export const presentearPaciente = createServerFn({ method: "POST" })
       return { ok: false as const, error: "modo_cuidado" as const };
     }
 
-    const { inicioDoCiclo } = await import("@/lib/cota-ia.server");
-    const ciclo = inicioDoCiclo().toISOString().slice(0, 7);
-    /* 3. UM POR PACIENTE POR CICLO — a chave carrega médico, paciente e ciclo,
-          e o índice único de `sementinhas_ledger` recusa o segundo. O formato
-          mora em `economia-sementinhas.ts`, junto do `LIKE` que a lê de volta. */
-    const dedupeKey = chaveDoPresente(doctorId, data.patientId, ciclo);
+    /* 3. UM POR ENVIO. A chave carrega médico, paciente e o token DO CLIQUE —
+          não mais o ciclo. O formato mora em `economia-sementinhas.ts`, junto
+          do `LIKE` que a lê de volta.
+
+          `tokenDePresente` limpa o que veio do cliente e devolve `null` se
+          sobrar nada; aí o servidor sorteia um. Sortear é o certo aqui: um
+          token vazio faria todos os presentes daquela paciente colidirem numa
+          chave só, ressuscitando pela porta dos fundos exatamente o limite que
+          o dono mandou tirar. */
+    const dedupeKey = chaveDoPresente(
+      doctorId,
+      data.patientId,
+      tokenDePresente(data.token) ?? globalThis.crypto.randomUUID(),
+    );
 
     /* ─── CONFERE O TETO ANTES, E NÃO DESFAZ DEPOIS ───────────────────────
      *
@@ -255,21 +276,20 @@ export const presentearPaciente = createServerFn({ method: "POST" })
      * máximo UM presente a mais que o teto, e isso é Sementinha, que não custa
      * dinheiro. Aceitar um erro de 50 🌱 é muito melhor que manter uma escrita
      * destrutiva num livro-caixa que o produto inteiro assume ser append-only. */
-    /* ─── "ENVIADO" SÓ SE FOI MESMO — E A VERSÃO ANTERIOR MENTIA ──────────
+    /* ─── O MESMO CLIQUE CHEGANDO DUAS VEZES NÃO É ERRO ───────────────────
      *
-     * `grantSementinhas` usa `ignoreDuplicates: true`: um segundo presente à
-     * mesma paciente no mesmo ciclo é DO NOTHING, sem erro.
+     * `grantSementinhas` usa `ignoreDuplicates: true`: gravar de novo a mesma
+     * chave é DO NOTHING, sem erro. Antes, a chave carregava o CICLO, então
+     * encontrar a linha significava "ela já ganhou este mês" — uma recusa.
      *
-     * A conferência anterior relia a linha e só acusava repetição quando o
-     * valor gravado DIFERIA do novo. Ou seja, pegava "mandei Semente e agora
-     * Jardim", e deixava passar o caso mais comum de todos: **mandar o mesmo
-     * presente duas vezes**. Dois toques no mesmo botão devolviam `ok: true`
-     * nos dois, o médico lia "enviadas" duas vezes, e a segunda não escreveu
-     * nada — exatamente o defeito que o comentário anterior dizia ter
-     * consertado, e que um verificador adversarial achou de volta.
+     * Agora a chave carrega o token do clique, e encontrar a linha significa
+     * outra coisa: **este mesmo envio já foi processado** (o médico tocou duas
+     * vezes, ou a rede repetiu o POST). Isso é sucesso, não recusa — devolver
+     * erro aqui faria um toque nervoso parecer falha, e ele mandaria de novo,
+     * agora com token novo, gastando a mesada duas vezes de verdade.
      *
-     * A régua certa é a EXISTÊNCIA da linha antes da escrita, não o valor dela
-     * depois. */
+     * Um envio deliberado a mais, esse sim, tem token próprio e passa direto —
+     * que é o limite tirado a pedido do dono. */
     const { data: jaExistia } = await sb
       .from("sementinhas_ledger")
       .select("amount")
@@ -278,10 +298,11 @@ export const presentearPaciente = createServerFn({ method: "POST" })
       .maybeSingle();
     if (jaExistia) {
       return {
-        ok: false as const,
-        error: "ja_presenteada" as const,
+        ok: true as const,
         mesada,
         quantidade: jaExistia.amount as number,
+        /* A tela usa isto para NÃO comemorar de novo nem mandar outro push. */
+        repetido: true as const,
       };
     }
 
@@ -291,9 +312,9 @@ export const presentearPaciente = createServerFn({ method: "POST" })
       { amount: quanto, reason: RAZAO_PRESENTE, dedupeKey },
     ]);
 
-    /* E confere que a escrita aconteceu: entre a leitura acima e esta linha
-       cabe um clique simultâneo, e o índice único do ledger recusa o segundo.
-       Quem perder a corrida ouve "já presenteada", que é a verdade. */
+    /* E confere que a escrita aconteceu. Com a chave por token, a corrida que
+       sobra é o MESMO clique chegando duas vezes — e aí a linha existe, o
+       `gravou` a encontra, e o resultado é o certo dos dois lados. */
     const { data: gravou } = await sb
       .from("sementinhas_ledger")
       .select("amount")
