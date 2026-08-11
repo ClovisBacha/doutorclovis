@@ -651,6 +651,41 @@ o médico bater na que ele não escolheu.
   A explicação diz também o que **não** para (SOS, conversa, registros,
   lembretes), senão o médico lê como paciente desassistida.
 
+### A chama da sequência (ago/2026)
+
+O contador de dias seguidos no topo da trilha ganhou fogo animado — aceso
+enquanto a sequência vive, apagado em zero dias.
+
+- **A arte veio em `.webm` com alfa de verdade** (medido: cantos alpha 0, 86%
+  transparente), e mesmo assim virou **folha de sprites**. O motivo é o
+  iPhone: **WebM com alfa não tem transparência no motor do Safari**, e o app é
+  instalado na tela de início — a chama sairia dentro de um retângulo preto, só
+  nos iPhones, que é a categoria de defeito que nenhuma máquina de
+  desenvolvimento mostra. A folha não passa por codec nenhum, não esbarra em
+  política de autoplay e não deixa um `<video>` decodificando num canto.
+- 36 quadros, grade 6×6, 128 px por quadro, 83 KB. Animada por DUAS `steps(6)`
+  (X varre as colunas, Y desce as linhas — daí a de X durar um sexto da de Y).
+  O `to` vai a **120%**, não 100%: `steps(6)` amostra em `i/6`, então 120%
+  entrega 0/20/40/60/80/100% — os seis quadros. Parando em 100%, o último
+  sumiria e o primeiro apareceria duas vezes.
+- **Apagada NÃO carrega a folha**: quem está em zero dias é justamente quem
+  acabou de chegar. O desenho de apagado é um contorno, nunca fogo cinza —
+  fogo sem cor lê como imagem que falhou.
+- **`prefers-reduced-motion` PARA a chama, não a esconde**: apagá-la diria à
+  paciente que ela perdeu a sequência.
+- **`src/lib/sequencia.ts` unificou TRÊS cópias** do mesmo laço que viviam
+  soltas em `gestacao-path.tsx` (gestação, pós-parto e meditação), nenhuma
+  testada. A regra que elas repetiam é a que mais importa: **hoje ainda não
+  fechado conta a partir de ONTEM** — sem isso, quem tem 40 dias abre o app às
+  7h e vê zero. `sequenciaDeDatas` converte ISO → dias inteiros em UTC a partir
+  de ano/mês/dia LOCAIS; ler a string crua com `new Date` a trataria como UTC e
+  em São Paulo tudo antes das 21h viraria o dia anterior.
+- **Reproduzível:** `node scripts/chama-sprite.mjs <video.webm>`. Ele ABORTA se
+  a origem não tiver alfa, em vez de gravar uma folha opaca.
+- **Bancada:** `/preview-jogo?streak=7` acende a chama sem conta — ela só arde
+  com dias fechados de verdade, e é assim que uma animação entra no app sem
+  ninguém nunca ter olhado para ela rodando.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

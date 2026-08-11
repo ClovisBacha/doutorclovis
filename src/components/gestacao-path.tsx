@@ -412,6 +412,8 @@ import {
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
+import { ChamaDaSequencia } from "@/components/chama-sequencia";
+import { sequenciaAcesa, sequenciaDeDatas, sequenciaDeDias } from "@/lib/sequencia";
 import { faixaDaHora, recadoDaBolha } from "@/lib/recado-da-bolha";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
@@ -461,6 +463,14 @@ interface GestacaoPathProps {
      * tempo não existindo.
      */
     presente?: PresenteRecebido;
+    /**
+     * Finge a sequência de dias, para fotografar a chama ACESA.
+     *
+     * Ela só arde quando há dias fechados de verdade, então conferir o desenho
+     * exigiria uma conta com semanas de uso — e é assim que uma animação entra
+     * no app sem ninguém nunca ter olhado para ela rodando.
+     */
+    streak?: number;
   };
 }
 
@@ -1554,17 +1564,13 @@ export function GestacaoPath({
 
   const journeyStartD = journeyStart?.gestDay ?? todayD;
 
-  const streak = useMemo(() => {
-    if (!hasGest || doneDays.length === 0) return 0;
-    const set = new Set(doneDays);
-    let s = 0;
-    let d = set.has(todayD) ? todayD : todayD - 1;
-    while (set.has(d)) {
-      s++;
-      d--;
-    }
-    return s;
-  }, [doneDays, todayD, hasGest]);
+  /* A régua mora em `sequencia.ts`, testada. Estava escrita aqui e OUTRA VEZ no
+     pós-parto, idêntica — e a virada da meia-noite (contar a partir de ontem
+     quando hoje ainda não foi fechado) é fácil demais de consertar num lugar só. */
+  const streak = useMemo(
+    () => bancada?.streak ?? (hasGest ? sequenciaDeDias(doneDays, todayD) : 0),
+    [doneDays, todayD, hasGest, bancada?.streak],
+  );
 
   // Caminho contínuo: todas as fases numa página só, como o Duolingo
   const { nodes, height } = useMemo(() => buildFullJourney(phases, todayD), [phases, todayD]);
@@ -2340,10 +2346,14 @@ export function GestacaoPath({
         {!careMode && (
           <>
             <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
-              <IconeChama
-                className={`h-[22px] w-[22px] ${streak > 0 ? "text-amber-500" : "text-slate-300"}`}
-              />
-              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              <ChamaDaSequencia acesa={sequenciaAcesa(streak)} tamanho={26} />
+              <span
+                className={`text-lg font-extrabold ${
+                  sequenciaAcesa(streak) ? "text-amber-500" : "text-slate-400"
+                }`}
+              >
+                {streak}
+              </span>
               <span className="text-xs font-medium text-muted-foreground">
                 {streak === 1 ? "dia" : "dias"}
               </span>
@@ -4539,26 +4549,6 @@ function diaISO(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/**
- * Dias seguidos com meditação.
- *
- * Detalhe que separa "gancho gentil" de "gancho punitivo": se ela AINDA não
- * meditou hoje, a sequência de ontem continua contando. Ela só quebra quando
- * um dia inteiro passa em branco. Zerar o número às 00h01 de um dia que mal
- * começou é o tipo de pressão que não cabe numa tela de gestante.
- */
-function sequenciaDeDias(dias: string[]): number {
-  const set = new Set(dias);
-  const d = new Date();
-  if (!set.has(diaISO(d))) d.setDate(d.getDate() - 1);
-  let n = 0;
-  while (set.has(diaISO(d))) {
-    n++;
-    d.setDate(d.getDate() - 1);
-  }
-  return n;
-}
-
 function registrarMeditacao(minutos: number, humor: string | null) {
   const log = lsGet<MedLog>(MED_LOG_KEY, MED_LOG_VAZIO);
   const hoje = diaISO(new Date());
@@ -4678,7 +4668,9 @@ function MeditationBlock({
   useEffect(() => {
     if (open) setLog(lsGet<MedLog>(MED_LOG_KEY, MED_LOG_VAZIO));
   }, [open, etapa]);
-  const seq = sequenciaDeDias(log.dias ?? []);
+  /* Mesma régua da trilha, sobre datas do calendário — ver `sequencia.ts`.
+     Era a terceira cópia do mesmo laço neste arquivo. */
+  const seq = sequenciaDeDatas(log.dias ?? []);
 
   /* Não há mais o que preparar: a voz desta tela é arquivo nosso, então o
      botão aparece sempre. Antes ele ficava escondido em quem não tinha voz
@@ -7312,17 +7304,8 @@ function PosPartoJourney({
     setSelectedPhase(idx >= 0 ? idx : 0);
   }, [currentPhase, phases]);
 
-  const streak = useMemo(() => {
-    if (posDone.length === 0) return 0;
-    const set = new Set(posDone);
-    let s = 0;
-    let d = set.has(todayD) ? todayD : todayD - 1;
-    while (set.has(d)) {
-      s++;
-      d--;
-    }
-    return s;
-  }, [posDone, todayD]);
+  /* Mesma régua da gestação — ver `sequencia.ts`. */
+  const streak = useMemo(() => sequenciaDeDias(posDone, todayD), [posDone, todayD]);
 
   const phase = phases[selectedPhase] ?? phases[0];
   // Jornada pós-parto começa no nascimento: sem semanas-álbum aqui
@@ -7431,8 +7414,16 @@ function PosPartoJourney({
         {!careMode && (
           <>
             <div className="flex items-center gap-1.5">
-              <span className={`text-xl ${streak > 0 ? "" : "grayscale opacity-50"}`}>🔥</span>
-              <span className="text-lg font-extrabold text-amber-500">{streak}</span>
+              {/* O emoji 🔥 saiu: cada sistema desenha o seu, e a paciente via
+                  uma chama na gestação e outra no pós-parto. */}
+              <ChamaDaSequencia acesa={sequenciaAcesa(streak)} tamanho={24} />
+              <span
+                className={`text-lg font-extrabold ${
+                  sequenciaAcesa(streak) ? "text-amber-500" : "text-slate-400"
+                }`}
+              >
+                {streak}
+              </span>
               <span className="text-xs font-medium text-muted-foreground">
                 {streak === 1 ? "dia" : "dias"}
               </span>

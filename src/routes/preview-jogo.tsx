@@ -51,6 +51,11 @@ export const Route = createFileRoute("/preview-jogo")({
     /* Vazio de propósito no padrão: prova o caso do vínculo encerrado, em que
        o título cai para "O seu médico" em vez de um espaço em branco. */
     quem: String(q.quem ?? ""),
+    /* `?streak=7` acende a chama da sequência. Ela só arde com dias fechados
+       de verdade, então sem isto o desenho da animação só se confere numa
+       conta com semanas de uso — que é como uma animação entra no app sem
+       ninguém nunca ter olhado para ela rodando. */
+    streak: Math.max(0, Number(q.streak ?? 0)),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -59,7 +64,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele, dia, premium, feitos, presente, de, quem } = Route.useSearch();
+  const { tela, bebe, pele, dia, premium, feitos, presente, de, quem, streak } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -93,9 +98,10 @@ function PreviewJogo() {
         careMode={false}
         onOpenShop={() => {}}
         bancada={
-          tela === "jogos" || presente > 0
+          tela === "jogos" || presente > 0 || streak > 0
             ? {
                 jogos: tela === "jogos",
+                streak: streak > 0 ? streak : undefined,
                 saldo: 125,
                 halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],

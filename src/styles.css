@@ -1293,6 +1293,56 @@ button:active > .duo3d {
   will-change: transform;
 }
 
+/* ══════════════ A chama da sequência ══════════════════════════════
+   Folha de sprites 6×6 (36 quadros) animada por `steps()`. Ver
+   `src/components/chama-sequencia.tsx` para por que não é o `.webm` que
+   chegou: WebM com alfa não tem transparência no Safari, e o app é instalado
+   no iPhone.
+
+   Duas animações porque a folha é 2D: X varre as seis colunas de uma linha, Y
+   desce uma linha quando X fecha a volta — daí a de X durar um SEXTO da de Y.
+
+   O `to` vai a 120%: `steps(6)` amostra em i/6 do percurso, então 120% dá
+   exatamente 0/20/40/60/80/100% — os seis quadros. Parando em 100%, o último
+   nunca apareceria e o primeiro apareceria duas vezes. */
+@keyframes dcChamaX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 120%;
+  }
+}
+@keyframes dcChamaY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 120%;
+  }
+}
+.dc-chama {
+  display: inline-block;
+  /* 600% = as seis colunas e as seis linhas da folha dentro de um quadro. */
+  background-size: 600% 600%;
+  background-repeat: no-repeat;
+  background-position: 0% 0%;
+  animation:
+    dcChamaX 0.5s steps(6) infinite,
+    dcChamaY 3s steps(6) infinite;
+}
+
+/* MENOS MOVIMENTO: a chama PARA, e não some. Ela é o indicador de que a
+   sequência está viva — apagá-la sob `prefers-reduced-motion` diria à paciente
+   que ela perdeu a sequência. Fica no quadro mais cheio (o do meio da folha),
+   que é o que lê como fogo estando parado. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-chama {
+    animation: none;
+    background-position: 60% 40%;
+  }
+}
+
 /* ══════════════ Vida por cima da arte do céu ══════════════════════
    Ver `src/components/ceu-efeitos.tsx` para as cinco regras. Em resumo: só
    `transform` e `opacity`, ciclos longos, e nada cruzando a faixa do bebê. */
