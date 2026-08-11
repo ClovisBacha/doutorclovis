@@ -753,6 +753,20 @@ destranca três itens da loja.
   o **quadro 0 da folha está 100% vazio** (medido) — é uma animação que
   CONSTRÓI o troféu, não um ciclo. Em laço, um ícone de 22px sumiria e
   renasceria a cada 5 s, que lê como imagem quebrada. Fica no último quadro.
+- **A fita inteira pousa na LINHA DE BASE** (`src/lib/alinhar-na-linha.ts`).
+  `items-center` centra a CAIXA, e cada arte tem margem interna própria — a
+  tinta termina a 78,1% da caixa na chama, 89,4% no calendário e 98,3% no
+  troféu (medidos). Centradas, as bases caíam em 33,3 · 37,0 · 39,1 numa fita
+  cuja base do texto está em 31,5: o troféu ficava pendurado 7,5px abaixo dos
+  números, e o dono viu. `deslocamentoDaLinha` recebe altura e fração e devolve
+  o `translateY` — px cravado quebraria no primeiro ícone que mudasse de
+  tamanho. Depois: 31,67 · 31,67 · 32,00.
+  ⚠️ **Medir a tinta DENTRO da fita não funciona**: o `bg-background/95` dela é
+  opaco e vira "tinta" em toda linha — foi assim que uma verificação minha
+  "aprovou" três ícones desalinhados. Mede-se o ícone isolado sobre fundo
+  transparente, ou por diferença de duas fotos **com a chama congelada**
+  (`animation-play-state: paused`), senão ela anima entre os dois quadros e a
+  diferença vira ruído.
 - **O ícone tem caixa de 34px, não 24.** O desenho não preenche o quadro: no
   último quadro ele ocupa 108×89 de 150×120 (medido), 72% da largura. Com 24 o
   troféu saía com ~17px visíveis ao lado de uma chama de 26 — e o dono viu na

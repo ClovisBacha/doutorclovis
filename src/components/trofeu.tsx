@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
 import trofeuSprite from "@/assets/trofeu.webp";
 
 /**
@@ -28,6 +29,14 @@ const COLUNAS = 10;
 const LINHAS = 6;
 /** Proporção do quadro (150×120). Forçar quadrado achataria o troféu. */
 const PROPORCAO = 120 / 150;
+/**
+ * Onde a TINTA do último quadro termina dentro da célula — medido na folha
+ * (caixa 20,29 → 127,117 de 150×120), não estimado.
+ *
+ * É o que faz o troféu pousar na linha dos números em vez de ficar pendurado
+ * 7,5px abaixo deles, que foi o que o dono viu na fita.
+ */
+const BASE_DA_TINTA = 0.9833;
 
 /**
  * O ÍCONE — troféu pronto, parado.
@@ -48,19 +57,30 @@ export function TrofeuIcone({
      é essa, e não gosto: comparar caixas de arte com margens diferentes é
      comparar coisas que não se veem. */
   tamanho = 34,
+  /** Tamanho da fonte do número ao lado — é nela que a base se apoia. */
+  fonteAoLado = 18,
   className = "",
 }: {
   tamanho?: number;
+  fonteAoLado?: number;
   className?: string;
 }) {
+  const altura = Math.round(tamanho * PROPORCAO);
   return (
     <span
       aria-hidden
       className={`dc-trofeu-fim shrink-0 ${className}`}
       style={{
         width: tamanho,
-        height: Math.round(tamanho * PROPORCAO),
+        height: altura,
         backgroundImage: `url(${trofeuSprite})`,
+        /* `translateY` e não `margin`: o deslocamento é visual e não pode
+           empurrar os vizinhos na fita. */
+        transform: `translateY(${deslocamentoDaLinha({
+          altura,
+          baseDaTinta: BASE_DA_TINTA,
+          fonte: fonteAoLado,
+        })}px)`,
       }}
     />
   );

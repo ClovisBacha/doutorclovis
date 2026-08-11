@@ -1,3 +1,4 @@
+import type React from "react";
 /**
  * Os ícones do painel da jornada — desenhados aqui, não emprestados do sistema.
  *
@@ -16,13 +17,24 @@
  * violeta sem duplicar arquivo.
  */
 
-type Props = { className?: string };
+type Props = {
+  className?: string;
+  /**
+   * Estilo em linha — existe para o alinhamento da fita.
+   *
+   * Os ícones ficam ao lado de números, e a base do DESENHO de cada um mora
+   * numa altura diferente dentro do `viewBox`. Quem calcula o deslocamento é
+   * `alinhar-na-linha.ts`, com a fração medida; aqui só se recebe o resultado.
+   */
+  style?: React.CSSProperties;
+};
 
-const base = (className?: string) => ({
+const base = (className?: string, style?: React.CSSProperties) => ({
   viewBox: "0 0 24 24",
   fill: "currentColor",
   "aria-hidden": true as const,
   className: className ?? "h-6 w-6",
+  style,
 });
 
 /**
@@ -53,9 +65,9 @@ export function IconeChama({ className }: Props) {
  * Sem nenhum número dentro — era exatamente o defeito do emoji. Quem informa o
  * dia é o texto ao lado, que vem do estado real. O ícone só diz "calendário".
  */
-export function IconeCalendario({ className }: Props) {
+export function IconeCalendario({ className, style }: Props) {
   return (
-    <svg {...base(className)}>
+    <svg {...base(className, style)}>
       <path d="M7 2.2c.6 0 1 .4 1 1v1.3h8V3.2c0-.6.4-1 1-1s1 .4 1 1v1.3h.8c1.4 0 2.5 1.1 2.5 2.5v12c0 1.4-1.1 2.5-2.5 2.5H4.2a2.5 2.5 0 0 1-2.5-2.5V7c0-1.4 1.1-2.5 2.5-2.5H5V3.2c0-.6.4-1 1-1z" />
       <path
         d="M3.7 9.5h16.6V19c0 .3-.2.5-.5.5H4.2a.5.5 0 0 1-.5-.5V9.5z"

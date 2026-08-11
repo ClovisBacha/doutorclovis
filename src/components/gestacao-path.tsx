@@ -414,6 +414,7 @@ import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
+import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
 import { TrofeuConquistado, TrofeuIcone } from "@/components/trofeu";
 import {
   diasComAlgumMomento,
@@ -2442,7 +2443,16 @@ export function GestacaoPath({
           </>
         )}
         <div className="flex items-center gap-1.5" title="Dia da sua jornada">
-          <IconeCalendario className="h-[22px] w-[22px] text-sky-500" />
+          {/* 0,8949 é MEDIDO com o ícone isolado sobre fundo transparente — o
+              traço do calendário vai de y=2,2 a y=22 num `viewBox` de 24, e
+              não encosta na borda. Medir dentro da fita daria 1, porque o
+              `bg-background/95` dela é opaco e vira "tinta" em toda linha. */}
+          <IconeCalendario
+            className="h-[22px] w-[22px] text-sky-500"
+            style={{
+              transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 0.8949 })}px)`,
+            }}
+          />
           <span className="text-lg font-extrabold text-sky-500">{journeyDayNum}º</span>
           <span className="text-xs font-medium text-muted-foreground">dia</span>
         </div>
@@ -2461,7 +2471,10 @@ export function GestacaoPath({
           <>
             <div className="h-6 w-px bg-slate-200" />
             <div className="flex items-center gap-1.5" title="Suas Sementinhas">
-              <span className="text-xl">🌱</span>
+              {/* O broto é GLIFO, não imagem: ele já se apoia na mesma linha de
+                  base dos algarismos por construção da fonte, e deslocá-lo o
+                  tiraria de lá. */}
+              <span className="text-xl leading-none">🌱</span>
               <span className="text-lg font-extrabold text-emerald-500">{saldo}</span>
             </div>
           </>

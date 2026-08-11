@@ -1,3 +1,4 @@
+import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
 import chamaSprite from "@/assets/chama-sequencia.webp";
 
 /**
@@ -35,17 +36,31 @@ import chamaSprite from "@/assets/chama-sequencia.webp";
  * quadros. Parando em 100%, o último quadro nunca apareceria e o primeiro
  * apareceria duas vezes.
  */
+/**
+ * Onde a TINTA da chama termina dentro da célula — a base MAIS BAIXA entre os
+ * 36 quadros (medida), e não a de um quadro qualquer: alinhar por um quadro
+ * médio faria o fogo subir e descer em relação ao número enquanto anima.
+ */
+const BASE_DA_TINTA = 0.7813;
+
 export function ChamaDaSequencia({
   acesa,
   tamanho = 26,
+  /** Tamanho da fonte do número ao lado — é nela que a base se apoia. */
+  fonteAoLado = 18,
   className = "",
 }: {
   /** `sequenciaAcesa(streak)` — nunca `streak > 0` escrito à mão aqui. */
   acesa: boolean;
   /** Lado em px. A folha tem 128px por quadro, então há folga até dsf 4. */
   tamanho?: number;
+  fonteAoLado?: number;
   className?: string;
 }) {
+  /* O contorno de apagado é um traço que encosta na borda do viewBox, então a
+     tinta dele vai até 1 — outra fração, mesma régua. */
+  const deslocar = (baseDaTinta: number) =>
+    `translateY(${deslocamentoDaLinha({ altura: tamanho, baseDaTinta, fonte: fonteAoLado })}px)`;
   /* APAGADA NÃO CARREGA A FOLHA. Quem está em zero dias é justamente quem
      acabou de chegar (ou quem voltou depois de sumir), e cobrar 84 KB dela
      para desenhar um contorno cinza é o pior momento possível para cobrar.
@@ -59,6 +74,7 @@ export function ChamaDaSequencia({
         viewBox="0 0 24 24"
         aria-hidden
         className={`shrink-0 ${className}`}
+        style={{ transform: deslocar(1) }}
       >
         <path
           d="M12 2.5c.6 3.2-1.2 4.4-2.6 5.8C8 9.7 7 11 7 13.4a5 5 0 0 0 10 0c0-2-.8-3.4-1.8-4.7-.5 1-1.2 1.6-2 1.9.6-2.6-.2-5.6-1.2-8.1Z"
@@ -80,6 +96,7 @@ export function ChamaDaSequencia({
         width: tamanho,
         height: tamanho,
         backgroundImage: `url(${chamaSprite})`,
+        transform: deslocar(BASE_DA_TINTA),
       }}
     />
   );
