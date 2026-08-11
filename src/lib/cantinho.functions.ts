@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
+import { PREFIXO_TROFEU, faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
 import {
   CANTINHO_BY_ID,
   CANTINHO_ITEMS,
@@ -37,6 +38,45 @@ async function authUid(accessToken: string): Promise<string | null> {
 }
 
 /** Saldo + itens que a paciente já possui. */
+/**
+ * QUANTOS TROFÉUS ELA TEM — dias de cinco estrelas, contados no ledger.
+ *
+ * Aqui e não em `sementinhas.functions.ts` porque quem precisa do número é a
+ * LOJA: a vitrine mostra "faltam 4 troféus" e a compra recusa com a mesma
+ * conta. Duas contagens para a mesma palavra é como o troféu do topo passou a
+ * discordar das conquistas — foi esse defeito que abriu este trabalho.
+ *
+ * `head: true`: o PostgREST devolve só o número. Quem fecha o dia por 300 dias
+ * tem 300 linhas, e elas não têm nada a dizer além de existirem.
+ */
+async function contarTrofeus(
+  admin: typeof import("@/integrations/supabase/client.server").supabaseAdmin,
+  uid: string,
+): Promise<{ trofeus: number; falhou: boolean }> {
+  const { count, error } = await (
+    admin as unknown as {
+      from: (t: string) => {
+        select: (
+          c: string,
+          o: { count: "exact"; head: true },
+        ) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
+            like: (c: string, v: string) => Promise<{ count: number | null; error: unknown }>;
+          };
+        };
+      };
+    }
+  )
+    .from("sementinhas_ledger")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", uid)
+    .like("dedupe_key", `${PREFIXO_TROFEU}%`);
+  return { trofeus: error ? 0 : (count ?? 0), falhou: Boolean(error) };
+}
+
 export const getCantinho = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
@@ -78,6 +118,9 @@ export const getCantinho = createServerFn({ method: "POST" })
         collectionComplete: false,
         collectionOwned: 0,
         collectionTotal: CANTINHO_COMPLETION_MIN,
+        /* Zero no luto, como o saldo: o troféu é gamificação. Nada é apagado
+           no banco — a loja inteira é que se cala. */
+        trofeus: 0,
         careMode: true as const,
       };
     }
@@ -102,6 +145,9 @@ export const getCantinho = createServerFn({ method: "POST" })
       collectionComplete,
       collectionOwned,
       collectionTotal: CANTINHO_COMPLETION_MIN,
+      /* Para a vitrine desenhar o cadeado e dizer QUANTOS faltam. A compra
+         reconta no servidor — este número é para a tela, nunca para a decisão. */
+      trofeus: (await contarTrofeus(supabaseAdmin, uid)).trofeus,
     };
   });
 
@@ -137,6 +183,32 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
           .maybeSingle();
         if (!(prof as { quiz_premium?: boolean } | null)?.quiz_premium) {
           return { ok: false as const, error: "Item exclusivo do Premium 💎" };
+        }
+      }
+
+      /* ─── GATE DE TROFÉU, NO SERVIDOR ────────────────────────────────────
+       *
+       * Três itens só abrem depois de N dias de cinco estrelas
+       * (`TROFEUS_PARA`). Conferir só na tela deixaria o cadeado decorativo:
+       * o botão sumiria e a chamada continuaria passando.
+       *
+       * A contagem sai das linhas `day_stars:` do LEDGER, que só o servidor
+       * escreve e só depois de conferir as cinco atividades do dia. Contar
+       * `doneDays` do `journey_state` seria contar o que o navegador digitou. */
+      if (trofeusExigidos(item.id) > 0) {
+        const { trofeus, falhou } = await contarTrofeus(supabaseAdmin, uid);
+        /* Falha de leitura RECUSA a compra. É o único lado seguro: liberar por
+           não ter conseguido contar entrega o item a quem não o conquistou, e
+           a Sementinha sairia do saldo dela do mesmo jeito. */
+        if (falhou) {
+          return { ok: false as const, error: "Não consegui conferir seus troféus agora." };
+        }
+        const faltam = faltamTrofeus(item.id, trofeus);
+        if (faltam > 0) {
+          return {
+            ok: false as const,
+            error: `Faltam ${faltam} ${faltam === 1 ? "troféu" : "troféus"} 🏆`,
+          };
         }
       }
       // Chama o RPC DIRETO no objeto (sem extrair o método pra uma variável):

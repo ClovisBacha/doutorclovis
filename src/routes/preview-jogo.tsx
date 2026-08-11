@@ -56,6 +56,13 @@ export const Route = createFileRoute("/preview-jogo")({
        conta com semanas de uso — que é como uma animação entra no app sem
        ninguém nunca ter olhado para ela rodando. */
     streak: Math.max(0, Number(q.streak ?? 0)),
+    /* `?trofeus=12` põe número no contador do topo; `?trofeuNovo=12` abre a
+       comemoração inteira. Ela só nasce de um dia de cinco estrelas fechado
+       agora, então sem isto os 5 segundos de animação só se conferem tendo
+       feito as cinco atividades — que é como uma animação entra no app sem
+       ninguém nunca ter olhado para ela rodando. */
+    trofeus: Math.max(0, Number(q.trofeus ?? 0)),
+    trofeuNovo: Math.max(0, Number(q.trofeuNovo ?? 0)),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -64,7 +71,20 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele, dia, premium, feitos, presente, de, quem, streak } = Route.useSearch();
+  const {
+    tela,
+    bebe,
+    pele,
+    dia,
+    premium,
+    feitos,
+    presente,
+    de,
+    quem,
+    streak,
+    trofeus,
+    trofeuNovo,
+  } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -98,10 +118,12 @@ function PreviewJogo() {
         careMode={false}
         onOpenShop={() => {}}
         bancada={
-          tela === "jogos" || presente > 0 || streak > 0
+          tela === "jogos" || presente > 0 || streak > 0 || trofeus > 0 || trofeuNovo > 0
             ? {
                 jogos: tela === "jogos",
                 streak: streak > 0 ? streak : undefined,
+                trofeus: trofeus > 0 ? trofeus : undefined,
+                trofeuNovo: trofeuNovo > 0 ? trofeuNovo : undefined,
                 saldo: 125,
                 halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],

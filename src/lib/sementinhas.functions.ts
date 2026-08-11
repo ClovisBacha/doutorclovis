@@ -7,6 +7,7 @@ import { quizForDay } from "@/lib/daily-quizzes";
 import { RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_MEDICO } from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
+import { PREFIXO_TROFEU } from "@/lib/trofeus";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -240,6 +241,49 @@ async function nomeDeQuemDeu(
   }
 }
 
+/**
+ * QUANTOS TROFÉUS ELA TEM — uma linha `day_stars:` por dia de cinco estrelas.
+ *
+ * A contagem sai do LEDGER e não de `doneDays`, e a diferença é o que permite o
+ * troféu destrancar item da loja: `doneDays` mora no `localStorage` da paciente
+ * e sobe no blob do `journey_state`, então quem o escreve é o navegador.
+ * `grantDayStarsBonus` só grava a linha depois de o ledger confirmar as cinco
+ * atividades do dia — é escrita de servidor, e é a única aqui que não se forja.
+ *
+ * `head: true` com `count`: o PostgREST devolve só o número, sem trazer as
+ * linhas. Quem fecha o dia por 300 dias tem 300 linhas, e elas não têm nada a
+ * dizer além de existirem.
+ */
+async function contarTrofeus(db: Db, userId: string): Promise<number> {
+  const { count, error } = await (
+    db as unknown as {
+      from: (t: string) => {
+        select: (
+          c: string,
+          o: { count: "exact"; head: true },
+        ) => {
+          eq: (
+            c: string,
+            v: string,
+          ) => {
+            like: (c: string, v: string) => Promise<{ count: number | null; error: unknown }>;
+          };
+        };
+      };
+    }
+  )
+    .from("sementinhas_ledger")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .like("dedupe_key", `${PREFIXO_TROFEU}%`);
+
+  /* Falha de leitura → ZERO, nunca um palpite. O número destranca item pago:
+     errar para cima entrega de graça o que ela ainda não conquistou, e errar
+     para baixo só adia. */
+  if (error) return 0;
+  return count ?? 0;
+}
+
 async function walletPayload(db: Db, userId: string, careMode: boolean) {
   const balance = await computeBalance(db, userId);
   const { data: recent } = await db
@@ -252,6 +296,9 @@ async function walletPayload(db: Db, userId: string, careMode: boolean) {
     balance,
     recent: (recent ?? []) as Pick<SementinhasLedgerRow, "amount" | "reason" | "created_at">[],
     presente: await presenteRecente(db, userId, careMode),
+    /* Fora do Modo Cuidado: o troféu é gamificação, e no luto ela some junto
+       com o resto. Zero aqui esconde o contador — não apaga nada no banco. */
+    trofeus: careMode ? 0 : await contarTrofeus(db, userId),
   };
 }
 

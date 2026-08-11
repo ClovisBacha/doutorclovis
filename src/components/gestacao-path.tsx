@@ -11,6 +11,7 @@ import {
   grantWellnessReward,
   getWellnessProgress,
   grantDayStarsBonus,
+  getWallet,
   type PresenteRecebido,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
@@ -413,6 +414,7 @@ import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
+import { TrofeuConquistado, TrofeuIcone } from "@/components/trofeu";
 import {
   diasComAlgumMomento,
   sequenciaAcesa,
@@ -476,6 +478,10 @@ interface GestacaoPathProps {
      * no app sem ninguém nunca ter olhado para ela rodando.
      */
     streak?: number;
+    /** Finge o contador de troféus. */
+    trofeus?: number;
+    /** Abre a comemoração do troféu direto, para fotografar os 5 segundos. */
+    trofeuNovo?: number;
   };
 }
 
@@ -1373,6 +1379,12 @@ export function GestacaoPath({
      Ver `PresenteRecebido` em `sementinhas.functions.ts` para por que ele
      precisou existir: o saldo subia sozinho e nada dizia de onde tinha vindo. */
   const [presente, setPresente] = useState<PresenteRecebido | null>(bancada?.presente ?? null);
+  /* Troféus: dias de cinco estrelas, contados no SERVIDOR pelas linhas
+     `day_stars:` do ledger. Não é `doneDays.length` — esse mora no navegador,
+     e é este número que destranca item pago na loja. */
+  const [trofeus, setTrofeus] = useState(bancada?.trofeus ?? 0);
+  /* O troféu que ela acabou de ganhar, esperando a comemoração aparecer. */
+  const [trofeuNovo, setTrofeuNovo] = useState<number | null>(bancada?.trofeuNovo ?? null);
   // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
   const [decor, setDecor] = useState<string[]>([]);
   /* Pele das bolinhas. Mora no `journey_state` (chave `dc-path-`), não numa
@@ -1458,6 +1470,7 @@ export function GestacaoPath({
         // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
         if (w.ok && w.careMode) return;
+        if (w.ok) setTrofeus(w.trofeus ?? 0);
         /* O anúncio do presente. A chave do "já vi" é o INSTANTE da linha do
            ledger, e não o valor: dois presentes de 100 no mesmo mês são duas
            notícias, e uma chave por valor engoliria a segunda. Fica no aparelho
@@ -1862,6 +1875,23 @@ export function GestacaoPath({
               });
               if (r.ok && r.granted > 0) toast.success(`⭐ 5 estrelas! +${r.granted} 🌱`);
               else toast.success("⭐ As 5 estrelas do dia!");
+
+              /* O TROFÉU. Relê a carteira em vez de somar 1 no número local:
+                 é o servidor que decide se o dia virou troféu (ele confere as
+                 cinco atividades no ledger antes de gravar a linha), e um
+                 contador que anda sozinho na tela mostraria um troféu a mais
+                 que o gate da loja — o mesmo número dizendo duas coisas.
+
+                 A comemoração só abre se o número REALMENTE subiu: quem
+                 refizer o dia, ou quem já tinha a linha gravada, não merece a
+                 tela de cinco segundos de novo. */
+              const w = await getWallet({ data: { accessToken: s.session.access_token } });
+              if (w.ok && typeof w.trofeus === "number") {
+                setTrofeus((antes) => {
+                  if (w.trofeus > antes) setTrofeuNovo(w.trofeus);
+                  return w.trofeus;
+                });
+              }
             }
           } catch {
             /* o bônus é secundário */
@@ -2406,8 +2436,14 @@ export function GestacaoPath({
         </div>
         <div className="h-6 w-px bg-slate-200" />
         <div className="flex items-center gap-1.5" title="Figurinhas coletadas">
-          <IconeTrofeu className="h-[22px] w-[22px] text-violet-500" />
-          <span className="text-lg font-extrabold text-violet-500">{stickers.length}</span>
+          {/* O TROFÉU CONTA DIAS DE CINCO ESTRELAS, e não mais figurinhas de
+              álbum da semana. O dono viu "8" com três conquistas e disse a
+              coisa certa: não significava nada. O número vem do SERVIDOR
+              (linhas `day_stars:` do ledger), que é o mesmo que destranca item
+              da loja — dois números diferentes para a mesma palavra seria o
+              defeito antigo de volta. */}
+          <TrofeuIcone tamanho={24} />
+          <span className="text-lg font-extrabold text-violet-500">{trofeus}</span>
         </div>
         {saldo != null && (
           <>
@@ -2461,6 +2497,14 @@ export function GestacaoPath({
             </button>
           )}
         </>
+      )}
+
+      {/* A COMEMORAÇÃO DO TROFÉU. Cinco segundos, e um toque em qualquer
+          lugar da tela pula — pedido do dono, e ele está certo: comemoração
+          que não se pode pular vira pedágio, e quem fecha o dia todo dia é
+          quem mais pagaria esse pedágio. */}
+      {trofeuNovo != null && (
+        <TrofeuConquistado numero={trofeuNovo} aoFechar={() => setTrofeuNovo(null)} />
       )}
 
       {/* O ANÚNCIO DO PRESENTE. Fora do bloco acima de propósito: aquele some

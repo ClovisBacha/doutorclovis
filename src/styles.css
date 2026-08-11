@@ -1343,6 +1343,65 @@ button:active > .duo3d {
   }
 }
 
+/* ══════════════ O troféu das cinco estrelas ═══════════════════════
+   Folha 10×6 (60 quadros, 5 s, 12 fps). Ver `src/components/trofeu.tsx`.
+
+   A conta do `to` é a mesma da chama, com outros números: para N colunas,
+   `steps(N)` amostra em i/N, então o percurso tem de ir a 100%·N/(N−1) para
+   que os pontos caiam em 0…100%. Com 10 colunas dá 111.111%; com 6 linhas,
+   120%. Errar isso não quebra nada visivelmente — só engole o último quadro e
+   repete o primeiro, que num troféu é justamente a estrela final. */
+@keyframes dcTrofeuX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 111.1111%;
+  }
+}
+@keyframes dcTrofeuY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 120%;
+  }
+}
+
+.dc-trofeu-anim,
+.dc-trofeu-fim {
+  display: inline-block;
+  background-size: 1000% 600%;
+  background-repeat: no-repeat;
+}
+
+/* A ANIMAÇÃO: uma vez só, e PARA no último quadro.
+   `forwards` é o que segura o troféu pronto na tela depois dos 5 s — sem ele a
+   propriedade volta ao início e o troféu SOME no instante em que a última
+   estrela acende. X repete uma vez por linha (6×), Y desce uma vez só. */
+.dc-trofeu-anim {
+  background-position: 0% 0%;
+  animation:
+    dcTrofeuX 0.83333s steps(10) 6 forwards,
+    dcTrofeuY 5s steps(6) 1 forwards;
+}
+
+/* O ÍCONE: o último quadro, parado. Não é laço de propósito — o quadro 0 da
+   folha está VAZIO, então repetir a animação num ícone de 22px faria o troféu
+   sumir e renascer a cada 5 s, que lê como imagem quebrada. */
+.dc-trofeu-fim {
+  background-position: 100% 100%;
+}
+
+/* MENOS MOVIMENTO: o troféu aparece PRONTO, sem a construção. A conquista
+   continua sendo anunciada — o que sai é o movimento, não a notícia. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-trofeu-anim {
+    animation: none;
+    background-position: 100% 100%;
+  }
+}
+
 /* ══════════════ Vida por cima da arte do céu ══════════════════════
    Ver `src/components/ceu-efeitos.tsx` para as cinco regras. Em resumo: só
    `transform` e `opacity`, ciclos longos, e nada cruzando a faixa do bebê. */

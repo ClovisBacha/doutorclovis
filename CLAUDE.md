@@ -692,11 +692,53 @@ enquanto a sequência vive, apagado em zero dias.
   hora), e uma lista nova nasceria vazia zerando a sequência de todo mundo. Os
   prefixos saem de `LS.dayTasks(0)`/`LS.posDayTasks(0)`, nunca escritos à mão —
   uma cópia divergente faria a chama parar de acender sem erro nenhum.
-- **Reproduzível:** `node scripts/chama-sprite.mjs <video.webm>`. Ele ABORTA se
-  a origem não tiver alfa, em vez de gravar uma folha opaca.
+- **Reproduzível:** `node scripts/sprite-de-video.mjs <video.webm> <destino.webp>
+  [quadros] [colunas] [larguraDoQuadro]`. Ele ABORTA se a origem não tiver alfa
+  (em vez de gravar uma folha opaca) e se os quadros não fecharem a grade (celas
+  vazias fariam o desenho sumir por uma fração de segundo a cada volta).
 - **Bancada:** `/preview-jogo?streak=7` acende a chama sem conta — ela só arde
   com dias fechados de verdade, e é assim que uma animação entra no app sem
   ninguém nunca ter olhado para ela rodando.
+
+### O troféu das cinco estrelas (ago/2026)
+
+O troféu roxo do topo mostrava `stickers.length` — figurinhas de ÁLBUM DA
+SEMANA. O dono olhou e disse a coisa certa: "tenho três conquistas e ele marca
+oito, não tem significado nenhum". Agora ele conta **dias de cinco estrelas** e
+destranca três itens da loja.
+
+- **A fonte é o LEDGER, e isso é o ponto todo.** Não é `doneDays.length`: esse
+  mora no `localStorage` e sobe no blob do `journey_state`, então quem o escreve
+  é o navegador — e ele destrancaria item pago. A contagem lê as linhas
+  `day_stars:<ciclo>:<dia>` que `grantDayStarsBonus` grava **depois de o próprio
+  ledger confirmar as cinco atividades**. Uma linha por dia, só o servidor
+  escreve, e já existia.
+- **O gate é conferido NA COMPRA** (`cantinho.functions.ts`), não só na vitrine
+  — cadeado que só existe na tela é decoração. Falha ao contar **recusa**:
+  liberar por não ter conseguido contar entrega o item e gasta a Sementinha
+  dela do mesmo jeito. **Uma contagem só** serve vitrine e compra (`contarTrofeus`),
+  porque dois números para a mesma palavra foi o defeito que abriu isto.
+- **A escada** (`TROFEUS_PARA`): Borboleta (74 🌱) → 10, Fim de tarde no deserto
+  (240 🌱) → 20, Bolinhas Coração (400 🌱) → 30. O troféu **não substitui o
+  preço** — ele diz QUANDO a prateleira aparece. A vitrine mostra "faltam 4 🏆",
+  nunca "bloqueado": a segunda frase não dá o que fazer a seguir e faz a
+  paciente achar que o item é pago em dinheiro.
+- **A comemoração roda UMA vez e para no último quadro** (`forwards`): sem isso
+  o troféu some no instante em que a última estrela acende, que é o quadro que a
+  tela inteira existe para mostrar. Fecha sozinha em 5,5 s, e **um toque em
+  qualquer lugar pula** — a área é a tela toda, não o troféu, porque mirar num
+  desenho de 60px que está crescendo é pedir para errar o alvo. `useRef` no
+  fechamento: dois toques rápidos avançariam dois troféus com uma conquista só.
+- **O ícone do topo NÃO roda em laço**, e aqui ele difere da chama de propósito:
+  o **quadro 0 da folha está 100% vazio** (medido) — é uma animação que
+  CONSTRÓI o troféu, não um ciclo. Em laço, um ícone de 22px sumiria e
+  renasceria a cada 5 s, que lê como imagem quebrada. Fica no último quadro.
+- **Nitidez:** a origem tem 150px de largura, então a comemoração desenha 200 e
+  não 250 — em dsf 3 seriam 750 pixels reais de uma arte de 150. Ampliar o vídeo
+  num upscaler NÃO serve: eles devolvem H.264, que não tem canal alfa. O ganho
+  real está em exportar a animação em 512px; o conversor já aceita.
+- **Bancada:** `/preview-jogo?trofeus=12` põe número no topo;
+  `?trofeuNovo=12` abre os 5 segundos inteiros.
 
 ### Ciclo menstrual + cérebro do paciente
 

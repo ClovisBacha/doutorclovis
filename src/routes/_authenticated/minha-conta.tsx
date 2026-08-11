@@ -74,6 +74,7 @@ import {
   trimesterForWeek,
 } from "@/lib/gestacao";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
+import { faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
@@ -16253,6 +16254,10 @@ function CantinhoTab({
   /* Pele equipada das bolinhas do Caminho. Lida no cliente (localStorage
      dentro do blob da jornada), então começa nula e se corrige ao montar. */
   const [skinAtiva, setSkinAtiva] = useState<string | null>(null);
+  /* Troféus (dias de cinco estrelas). Três itens só abrem com eles — ver
+     `TROFEUS_PARA`. O número é só para a VITRINE desenhar o cadeado e dizer
+     quantos faltam; quem decide a compra é o servidor, que reconta. */
+  const [trofeus, setTrofeus] = useState(0);
   useEffect(() => {
     setSkinAtiva(lsGet<string | null>(SKIN_KEY, null));
   }, []);
@@ -16278,6 +16283,7 @@ function CantinhoTab({
           total: res.collectionTotal ?? 0,
           complete: res.collectionComplete ?? false,
         });
+        setTrofeus(res.trofeus ?? 0);
       }
       setLoading(false);
     })();
@@ -16544,6 +16550,10 @@ function CantinhoTab({
                  ela ainda pode comprar, nunca sobre o que já é dela. */
             const locked = i.premium && !premium && !has;
             const trophyLocked = isTrophy && !has; // troféu ainda não conquistado
+            /* Cadeado de TROFÉU: três itens só abrem depois de N dias de cinco
+               estrelas. Não substitui o preço — ela ainda paga em Sementinhas;
+               o troféu diz QUANDO a prateleira aparece. */
+            const faltamTrof = has ? 0 : faltamTrofeus(i.id, trofeus);
             const cant = !has && !locked && saldo < i.price;
             return (
               <div
@@ -16574,8 +16584,17 @@ function CantinhoTab({
                     Coleção
                   </span>
                 )}
+                {/* O selo do troféu fica à ESQUERDA: o canto direito já é do
+                    selo Premium, e dois desses itens são premium também. */}
+                {trofeusExigidos(i.id) > 0 && !has && (
+                  <span className="absolute left-2 top-2 rounded-full bg-amber-200/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
+                    {faltamTrof > 0 ? "🔒" : "✓"} {trofeusExigidos(i.id)} 🏆
+                  </span>
+                )}
                 <span
-                  className={`text-4xl ${locked || trophyLocked ? "opacity-40 grayscale" : ""}`}
+                  className={`text-4xl ${
+                    locked || trophyLocked || faltamTrof > 0 ? "opacity-40 grayscale" : ""
+                  }`}
                 >
                   {i.emoji}
                 </span>
@@ -16632,6 +16651,18 @@ function CantinhoTab({
                         então o aviso saiu, e no lugar entrou o que fazer. */}
                     <span className="mt-1 text-[9px] font-medium text-amber-700/70">
                       Um enfeite de cada tipo
+                    </span>
+                  </>
+                ) : faltamTrof > 0 ? (
+                  /* Diz o que FALTA, e não "bloqueado": a segunda frase não dá
+                     o que fazer a seguir, e é ela que faz a paciente achar que
+                     o item é pago em dinheiro. */
+                  <>
+                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+                      🔒 faltam {faltamTrof} 🏆
+                    </span>
+                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
+                      1 troféu por dia de 5 estrelas
                     </span>
                   </>
                 ) : locked ? (

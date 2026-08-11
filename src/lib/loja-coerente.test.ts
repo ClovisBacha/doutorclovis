@@ -72,9 +72,27 @@ describe("2. a tela usa essa expressão, e não uma parecida", () => {
 
   test("o cinza e o cadeado saem os DOIS de `locked`", () => {
     /* Se um deles passasse a olhar `i.premium` cru, metade do defeito voltava
-       — e voltaria só para quem comprou, que é quem menos olha. */
-    expect(codigo).toContain('locked || trophyLocked ? "opacity-40 grayscale" : ""');
+       — e voltaria só para quem comprou, que é quem menos olha.
+
+       O cinza ganhou um TERCEIRO motivo (ago/2026): três itens só abrem depois
+       de N dias de cinco estrelas. A régua continua a mesma — o tile apagado
+       tem de cobrir todos os motivos de não poder comprar, senão sobra um
+       estado em que o botão recusa e o desenho diz que está tudo bem. */
+    const cinza = codigo.slice(codigo.indexOf("className={`text-4xl ${"));
+    const ate = cinza.slice(0, cinza.indexOf("}`}"));
+    expect(ate).toContain("locked");
+    expect(ate).toContain("trophyLocked");
+    expect(ate).toContain("faltamTrof > 0");
+    expect(ate).toContain("opacity-40 grayscale");
     expect(codigo).toContain('{locked ? "🔒 Premium" : "Premium"}');
+  });
+
+  test("o cadeado de troféu diz quantos faltam, e o botão não some", () => {
+    /* "Bloqueado" não dá o que fazer a seguir, e é a frase que faz a paciente
+       achar que o item é pago em dinheiro. */
+    expect(codigo).toContain("faltam {faltamTrof} 🏆");
+    /* E o cinza não pode aparecer para quem JÁ comprou: `has` zera a conta. */
+    expect(codigo).toContain("const faltamTrof = has ? 0 : faltamTrofeus(i.id, trofeus);");
   });
 });
 

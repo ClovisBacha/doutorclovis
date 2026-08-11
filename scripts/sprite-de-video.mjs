@@ -1,7 +1,13 @@
 /**
  * O VÍDEO DA CHAMA VIRA FOLHA DE SPRITES.
  *
- *   node scripts/chama-sprite.mjs <caminho-do-video.webm>
+ *   node scripts/sprite-de-video.mjs <video.webm> <destino.webp> [quadros] [colunas]
+
+ *
+ * Nasceu para a chama da sequência e serviu ao troféu no dia seguinte — daí o
+ * nome genérico e os parâmetros. Duas cópias quase iguais deste arquivo
+ * divergiriam no primeiro conserto, e o conserto que importa aqui (a guarda de
+ * alfa lá embaixo) é justamente o que ninguém lembra de copiar.
  *
  * ─── POR QUE NÃO USAR O VÍDEO DIRETO ────────────────────────────────────────
  *
@@ -25,16 +31,30 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const ORIGEM = process.argv[2];
-if (!ORIGEM) {
-  console.error("uso: node scripts/chama-sprite.mjs <video.webm>");
+const [, , ORIGEM, DESTINO, QUADROS_ARG, COLUNAS_ARG, LARGURA_ARG] = process.argv;
+if (!ORIGEM || !DESTINO) {
+  console.error(
+    "uso: node scripts/sprite-de-video.mjs <video.webm> <destino.webp> [quadros] [colunas] [larguraDoQuadro]",
+  );
   process.exit(1);
 }
-const DESTINO = "src/assets/chama-sequencia.webp";
 
-const QUADROS = 36; // 12 fps ao longo dos ~3 s do original: é onde fogo lê como fogo
-const COLUNAS = 6;
-const LADO = 128; // a UI desenha ~26px CSS; 128 dá folga até dsf 4
+/* Largura do quadro na folha. Sem ela, o quadro sai no tamanho da origem —
+   que é o certo para o que aparece grande na tela. Para um ícone de 26px isso
+   é peso sem ganho nenhum: a chama em 150px pesa 121 KB e em 128px pesa 83 KB,
+   e a diferença é invisível em qualquer densidade que exista. */
+const LARGURA = LARGURA_ARG ? Number(LARGURA_ARG) : 0;
+
+const QUADROS = Number(QUADROS_ARG ?? 36);
+const COLUNAS = Number(COLUNAS_ARG ?? 6);
+
+/* QUADROS tem de ser múltiplo de COLUNAS: uma grade com celas sobrando deixa
+   quadros VAZIOS no fim do ciclo, e o desenho some por uma fração de segundo a
+   cada volta. Falhar aqui é muito mais barato que descobrir isso na tela. */
+if (!Number.isInteger(QUADROS / COLUNAS)) {
+  console.error(`✗ ${QUADROS} quadros não fecham uma grade de ${COLUNAS} colunas.`);
+  process.exit(1);
+}
 
 const dataUri = `data:video/webm;base64,${readFileSync(ORIGEM).toString("base64")}`;
 
@@ -45,7 +65,7 @@ const p = await b.newPage();
 await p.setContent("<body></body>");
 
 const r = await p.evaluate(
-  async ({ dataUri, QUADROS, COLUNAS, LADO }) => {
+  async ({ dataUri, QUADROS, COLUNAS, LARGURA }) => {
     const v = document.createElement("video");
     v.src = dataUri;
     v.muted = true;
@@ -55,10 +75,18 @@ const r = await p.evaluate(
       v.onerror = () => no(new Error("não decodificou"));
     });
 
-    const linhas = Math.ceil(QUADROS / COLUNAS);
+    /* O quadro sai no TAMANHO DA ORIGEM. Ampliar aqui só inventaria pixels
+       (o navegador faria o mesmo na hora de desenhar) e multiplicaria o peso
+       do arquivo; e forçar quadrado deformaria um vídeo 5:4 como o do troféu. */
+    const LADO_X = LARGURA > 0 ? LARGURA : v.videoWidth;
+    /* Proporção MANTIDA: forçar quadrado deformaria um vídeo 5:4 como o do
+       troféu, e um troféu achatado é o tipo de defeito que passa despercebido
+       até alguém comparar com a arte original. */
+    const LADO_Y = Math.round((LADO_X * v.videoHeight) / v.videoWidth);
+    const linhas = QUADROS / COLUNAS;
     const c = document.createElement("canvas");
-    c.width = COLUNAS * LADO;
-    c.height = linhas * LADO;
+    c.width = COLUNAS * LADO_X;
+    c.height = linhas * LADO_Y;
     const ctx = c.getContext("2d", { willReadFrequently: true });
     ctx.imageSmoothingQuality = "high";
 
@@ -70,10 +98,10 @@ const r = await p.evaluate(
         v.onseeked = ok;
         v.currentTime = (v.duration * i) / QUADROS;
       });
-      const x = (i % COLUNAS) * LADO;
-      const y = Math.floor(i / COLUNAS) * LADO;
-      ctx.clearRect(x, y, LADO, LADO);
-      ctx.drawImage(v, x, y, LADO, LADO);
+      const x = (i % COLUNAS) * LADO_X;
+      const y = Math.floor(i / COLUNAS) * LADO_Y;
+      ctx.clearRect(x, y, LADO_X, LADO_Y);
+      ctx.drawImage(v, x, y, LADO_X, LADO_Y);
     }
 
     /* Confere que o alfa sobreviveu ao canvas ANTES de gravar: uma folha opaca
@@ -87,11 +115,13 @@ const r = await p.evaluate(
       w: c.width,
       h: c.height,
       linhas,
+      ladoX: LADO_X,
+      ladoY: LADO_Y,
       dur: +v.duration.toFixed(2),
       pctTransparente: +((transp / (c.width * c.height)) * 100).toFixed(1),
     };
   },
-  { dataUri, QUADROS, COLUNAS, LADO },
+  { dataUri, QUADROS, COLUNAS, LARGURA },
 );
 await b.close();
 
@@ -109,7 +139,7 @@ writeFileSync(DESTINO, bytes);
 console.log(
   `✓ ${DESTINO}\n` +
     `  origem  ${r.dur}s → ${QUADROS} quadros (${(QUADROS / r.dur).toFixed(1)} fps)\n` +
-    `  folha   ${r.w}×${r.h}, grade ${COLUNAS}×${r.linhas}\n` +
+    `  folha   ${r.w}×${r.h}, grade ${COLUNAS}×${r.linhas} de ${r.ladoX}×${r.ladoY}\n` +
     `  alfa    ${r.pctTransparente}% transparente\n` +
     `  peso    ${(bytes.length / 1024).toFixed(1)} KB`,
 );
