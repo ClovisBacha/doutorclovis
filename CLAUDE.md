@@ -955,14 +955,21 @@ entraram **quatro cenas em SVG** (`src/components/ceu-do-dia.tsx`).
 - **A barra de navegação inferior não mudou** — estava fora do escopo por
   pedido explícito.
 
-**A barra de progresso saiu (ago/2026).** Ela mostrava Início · % concluído ·
-Parto previsto na segunda dobra. Nada se perdeu — a DPP está na Carteirinha e
-no Calendário, e a semana é o número gigante da primeira dobra. O que ela fazia
-de diferente era transformar a gestação numa porcentagem, e numa gestação de
-ALTO RISCO uma barra que anda sozinha para um fim marcado tem um custo que num
-app comum ela não tem. `progress`, `daysLeft` e `dateOffsetLabel` saíram junto:
-resto calculado e sem leitor é o que a próxima pessoa reacende sem saber por
-quê.
+**A barra de progresso MUDOU DE LUGAR (ago/2026)** — e não saiu. Ela mostra
+Início · % concluído · Parto previsto, e hoje vive na **área clara**, logo
+antes do cartão do médico.
+
+⚠️ **Eu li "tirar da vista" como "apagar" e apaguei.** O dono corrigiu: "não
+era tirar esse elemento, e sim posicionar mais embaixo para ficar fora da vista
+da tela principal, antes dessa área do seu médico, porém já nessa outra parte
+onde o fundo é mais claro". A primeira dobra é do bebê — a bolha e o número da
+semana, nada mais; quem rola encontra o resto, e é aí que uma porcentagem cabe,
+porque quem rolou escolheu olhar.
+
+O cartão deixou de usar o `glass`: vidro precisa de céu atravessando, e sobre o
+creme da página ele vira um retângulo cinza. Agora usa o mesmo material do
+cartão do médico, que é o vizinho dele. Medido: a barra começa em 923px numa
+tela de 852 (fora da dobra) e antes do médico, em 1012px.
 
 **Os pesos dos espaçadores saíram de medição COM A ÁREA SEGURA injetada.** O
 Chromium headless devolve 0 em `env(safe-area-inset-*)`, então a bancada media

@@ -637,6 +637,13 @@ function dayGreetingLabel(): string {
   return "Boa noite";
 }
 
+/** dd/mm/aaaa a N dias de hoje (N negativo = passado). Só para exibição. */
+function dateOffsetLabel(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toLocaleDateString("pt-BR");
+}
+
 /**
  * Véu de sonho do tema V1: leva o gradiente de céu à paleta lavanda→rosa→
  * pêssego do conceito. A opacidade CRESCE para a base porque lá o céu diurno
@@ -811,9 +818,8 @@ export function AppHomeScreen({
   onOrigemLocal?: (origem: OrigemLocal | null) => void;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
-  /* `progress`, `daysLeft` e `dateOffsetLabel` saíram junto com a barra de
-     progresso. Deixar as três calculadas e sem leitor é o tipo de resto que a
-     próxima pessoa reacende sem saber por que a barra tinha sido tirada. */
+  const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
+  const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
   /* A home lê o céu pelo MESMO hook que a tela do jogo. Antes ela tinha a
      conta própria aqui dentro; agora existe uma só, e as duas telas não têm
      como divergir. */
@@ -1468,21 +1474,10 @@ export function AppHomeScreen({
               saíram da primeira tela para o bebê caber grande. ── */}
           {gest && baby && (
             <div className="pt-4">
-              {/* ── A BARRA DE PROGRESSO SAIU (ago/2026) ─────────────────
-                  Pedido do dono: "a barra que está aparecendo lá embaixo onde
-                  está escrito 25% concluído não é para aparecer".
-
-                  Ela mostrava Início · % concluído · Parto previsto. As três
-                  informações continuam no app, e nenhuma se perdeu: a DPP está
-                  na Carteirinha e no Calendário, e a semana — que é o que a
-                  paciente realmente olha — é o número gigante da primeira
-                  dobra, logo acima.
-
-                  O que a barra fazia de diferente era transformar a gestação
-                  numa porcentagem. Num app de gestação de ALTO RISCO isso tem
-                  um custo que um app comum não tem: uma barra que anda sozinha
-                  em direção a um fim marcado é a última coisa que alguém
-                  precisa ver num dia ruim. */}
+              {/* A barra de progresso MUDOU DE LUGAR, e não saiu: ela agora
+                  vive na área clara, logo antes do cartão do médico. Eu tinha
+                  entendido "tirar da vista" como "apagar", e o dono corrigiu.
+                  Ver o bloco `PROGRESSO` mais abaixo. */}
 
               {/* O convite de ativar a localização saiu daqui.
                   Ele era o terceiro cartão empilhado no alto desta tela, e
@@ -1540,6 +1535,68 @@ export function AppHomeScreen({
           virou o subtítulo da linha de Consultas, Pós-parto continua
           aparecendo só a partir da semana 36, e o marco da semana já era
           repetição da linha do tempo do Calendário. */}
+
+      {/* ── PROGRESSO ─────────────────────────────────────────────────
+          Início · % concluído · Parto previsto.
+
+          ─── POR QUE AQUI, E NÃO NA PRIMEIRA DOBRA ────────────────────
+          Pedido do dono, e ele teve de repetir porque eu errei na primeira
+          vez: "não era tirar esse elemento, e sim posicionar mais embaixo
+          para ficar fora da vista da tela principal, antes dessa área do seu
+          médico, porém já nessa outra parte onde o fundo é mais claro".
+
+          A primeira dobra é do bebê: a bolha, o número da semana, e nada
+          mais. Quem rola encontra o resto — e é aí que uma porcentagem cabe,
+          porque quem rolou escolheu olhar.
+
+          ─── E POR QUE ELE NÃO USA MAIS O `glass` ─────────────────────
+          O vidro existe para ter céu atravessando. Aqui embaixo o fundo é o
+          creme da página, e vidro sobre fundo chapado vira um retângulo
+          cinza. Este cartão passa a usar o mesmo material do cartão do
+          médico, que é o vizinho dele. */}
+      {gest && baby && (
+        <div className="mb-3 rounded-3xl border border-border bg-card px-4 py-3.5 shadow-[var(--shadow-card)]">
+          <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
+            <div className="text-left">
+              <p className="text-[10px] font-medium text-muted-foreground">Início</p>
+              <p className="text-[11px] font-bold text-foreground">
+                {dateOffsetLabel(-(gest.totalDays ?? 0))}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-center text-[11px] font-bold text-muted-foreground">
+                {Math.round(progress ?? 0)}% concluído
+              </p>
+              {/* Trilho com o coração na posição de hoje */}
+              <div className="relative mt-1.5 h-5">
+                <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-secondary" />
+                <div
+                  className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-all duration-700"
+                  style={{
+                    width: `${progress ?? 0}%`,
+                    background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
+                  }}
+                />
+                <span
+                  aria-hidden
+                  className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[10px] shadow-md transition-all duration-700"
+                  style={{ left: `${progress ?? 0}%` }}
+                >
+                  💜
+                </span>
+              </div>
+            </div>
+
+            <div className="text-right">
+              <p className="text-[10px] font-medium text-muted-foreground">Parto previsto</p>
+              <p className="text-[11px] font-bold text-foreground">
+                {dateOffsetLabel(daysLeft ?? 0)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
