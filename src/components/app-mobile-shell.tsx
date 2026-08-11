@@ -1029,12 +1029,18 @@ export function AppHomeScreen({
        somavam ~216px. Com quatro cartões embaixo do bebê isso não aparecia;
        agora que sobrou só o médico, virou meia tela em branco. */
     <div className="space-y-4">
-      {/* ── Hero imersivo: céu real do momento + bebê + clima ────────
-          Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
-          para cima (-mt-2). Retângulo reto — sem cantos arredondados, o céu
-          encosta nas quatro bordas para máxima imersão no celular. */}
-      <div
-        /* O céu sobe ATÉ O TOPO DA TELA, por baixo da barra de status.
+      {/* ─── O CÉU E A EMENDA DELE VIVEM JUNTOS ───────────────────────────
+          Este invólucro existe só para que a faixa de emenda encoste no pé do
+          céu: irmãos diretos do `space-y-4` ganham 16px de margem entre si, e
+          16px do creme da página no meio é exatamente o que a faixa serve para
+          não deixar acontecer. */}
+      <div>
+        {/* ── Hero imersivo: céu real do momento + bebê ────────────────
+            Full-bleed nas laterais (-mx-5 cancela o px-5 da página) e puxado
+            para cima. Retângulo reto — sem cantos arredondados, o céu encosta
+            nas quatro bordas para máxima imersão no celular. */}
+        <div
+          /* O céu sobe ATÉ O TOPO DA TELA, por baixo da barra de status.
 
            A página empurra o conteúdo para baixo pela altura da safe area
            (`pt-[calc(0.5rem+var(--safe-top))]`), e este bloco só subia
@@ -1054,7 +1060,7 @@ export function AppHomeScreen({
            meio rem, não um e meio. Se a folga da página mudar, só o `-mt` muda.
            A bancada replica a geometria da página de propósito — com `pt-2`
            ela casava por acaso com um `-mt` errado e escondia a faixa. */
-        /* ─── O HERO TEM O TAMANHO DA IMAGEM (ago/2026) ────────────────────
+          /* ─── O HERO TEM O TAMANHO DA IMAGEM (ago/2026) ────────────────────
            ─── A CAIXA É UMA TELA CHEIA, E NÃO A PROPORÇÃO DA ARTE ────────
            Ela chegou a ser `aspect-[853/1844]`, a proporção exata do arquivo,
            para atender "sem expandir a imagem, ela já está no tamanho exato que
@@ -1068,11 +1074,16 @@ export function AppHomeScreen({
            o creme da página aparece por baixo do céu — uma faixa clara que não
            é decisão de ninguém.
 
-           `100svh` fecha essa fresta em qualquer tela, e o preço é ínfimo: o
+           Uma tela cheia fecha essa fresta, e o preço é ínfimo: o
            `object-cover` amplia a arte 0,3% num 15 Pro. Isso não é "esticar a
            imagem", que era o que o pedido original barrava — aquilo era a arte
            puxada para cobrir um hero de altura arbitrária, com a lua saindo
            cortada pela borda.
+
+           ⚠️ **"Uma tela cheia" NÃO é `100svh`** — ver `.dc-hero-tela` no
+           `styles.css`. Com `svh` a faixa creme voltou a aparecer no aparelho
+           do dono, e a conta só fecha de um jeito: naquele iOS o `svh` é menor
+           que a tela visível. A classe usa `lvh` com `svh` de reserva.
 
            ⚠️ Nada de `aspect-ratio` aqui de novo: além da fresta, `aspect-ratio`
            com `max-height` e largura `auto` encolhe a LARGURA (o iPhone SE
@@ -1080,80 +1091,80 @@ export function AppHomeScreen({
 
            `pb` saiu junto: a folga do pé pertencia à segunda dobra, que não
            mora mais aqui dentro. */
-        className="shine relative -mx-5 h-[100svh] overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
-        /* Cor de espera enquanto o `.webp` não decodifica. Agora é a do TOPO e
+          className="shine dc-hero-tela relative -mx-5 overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
+          /* Cor de espera enquanto o `.webp` não decodifica. Agora é a do TOPO e
            não a do pé: a caixa acabou junto com a imagem, então não há mais
            "depois da arte" para o pé continuar — e o que apareceria sem esta
            cor é justamente a faixa atrás do relógio do sistema. */
-        style={{
-          background: ceuClassico ? gradientFor(period, weather?.code ?? 1) : slot.corDeTopo,
-        }}
-      >
-        {/* A CENA DO MOMENTO — amanhecer, dia, pôr do sol ou anoitecer.
+          style={{
+            background: ceuClassico ? gradientFor(period, weather?.code ?? 1) : slot.corDeTopo,
+          }}
+        >
+          {/* A CENA DO MOMENTO — amanhecer, dia, pôr do sol ou anoitecer.
             SEM `dc-sky-breathe`: aquele respiro era um zoom de 4% a 7,5%, isto
             é, recorte lento de uma arte que o dono disse estar no tamanho
             exato. A vida da cena ficou toda em `CeuEfeitos`, que anima o que
             está por CIMA da arte sem mexer no enquadramento dela. */}
-        {!ceuClassico && (
-          <>
-            <CeuDoDia nome={slot.nome} />
-            {/* A vida por cima da arte: estrelas, cadentes e a luz do astro
+          {!ceuClassico && (
+            <>
+              <CeuDoDia nome={slot.nome} />
+              {/* A vida por cima da arte: estrelas, cadentes e a luz do astro
                 respirando. Fica FORA do `dc-sky-breathe` de propósito — o zoom
                 lento arrastaria as cadentes junto e o risco sairia torto. */}
-            <CeuEfeitos nome={slot.nome} careMode={careMode} />
-          </>
-        )}
+              <CeuEfeitos nome={slot.nome} careMode={careMode} />
+            </>
+          )}
 
-        {/* ─── O CÉU CLÁSSICO CONTINUA DE PÉ ───────────────────────────
+          {/* ─── O CÉU CLÁSSICO CONTINUA DE PÉ ───────────────────────────
             Ele é item PAGO da Loja (150 🌱). As dez artes que saíram em
             ago/2026 eram o tema padrão; este é a alternativa que alguém
             comprou, e apagá-la tiraria da paciente uma coisa que ela pagou —
             decisão de produto, não de refator. Continua sendo o gradiente com
             sol, lua, estrelas e nuvens desenhados, como sempre foi. */}
-        {ceuClassico && (
-          <>
-            <SkyLayers code={weather?.code ?? 1} isDark={darkSky} mini period={period} />
-            {!darkSky && (
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-                style={{ background: DREAM_VEIL }}
-              />
-            )}
-          </>
-        )}
+          {ceuClassico && (
+            <>
+              <SkyLayers code={weather?.code ?? 1} isDark={darkSky} mini period={period} />
+              {!darkSky && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                  style={{ background: DREAM_VEIL }}
+                />
+              )}
+            </>
+          )}
 
-        {/* Chuva: entra DEPOIS da cena porque molha o cenário inteiro, e
+          {/* Chuva: entra DEPOIS da cena porque molha o cenário inteiro, e
             continua abaixo do conteúdo — a chuva não pinga em cima do texto.
             Só no céu novo: o Clássico já desenha os próprios fios de chuva no
             `SkyLayers`, e as duas juntas dariam chuva dupla. */}
-        {!ceuClassico && (
-          <SkyRain
-            forca={weather ? forcaDaChuva(weather.code, weather.mm) : null}
-            careMode={careMode}
-          />
-        )}
+          {!ceuClassico && (
+            <SkyRain
+              forca={weather ? forcaDaChuva(weather.code, weather.mm) : null}
+              careMode={careMode}
+            />
+          )}
 
-        {/* ── SOBRE A IMAGEM SÓ FICAM DUAS COISAS ───────────────────────
+          {/* ── SOBRE A IMAGEM SÓ FICAM DUAS COISAS ───────────────────────
             A barra de topo (menu + nome do bebê) e a bolha do bebê, centrada.
             Tudo o mais desceu para o fundo claro da página — pedido do dono:
             "além disso deve ficar fora dessa nova imagem de fundo, outros
             elementos vão ficar embaixo com o fundo rosa claro". ── */}
-        <div className="relative">
-          {/* ── BARRA DE TOPO: menu · nome ────────────────────────────
+          <div className="relative">
+            {/* ── BARRA DE TOPO: menu · nome ────────────────────────────
                 O nome fica no CENTRO ÓPTICO da tela — não no centro do espaço
                 que sobra ao lado do botão. Por isso ele é posicionado em
                 `absolute` com `-translate-x-1/2` em vez de entrar no fluxo: o
                 botão da esquerda mede 40px, e num `justify-between` o nome
                 nasceria 16px fora do eixo. */}
-          <div className="relative flex h-10 items-center justify-between gap-3">
-            <button
-              onClick={() => {
-                hapticTap();
-                onOpenMenu?.();
-              }}
-              aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
-              /* ─── O BOTÃO PERDEU A PASTILHA DE VIDRO (ago/2026) ──────
+            <div className="relative flex h-10 items-center justify-between gap-3">
+              <button
+                onClick={() => {
+                  hapticTap();
+                  onOpenMenu?.();
+                }}
+                aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
+                /* ─── O BOTÃO PERDEU A PASTILHA DE VIDRO (ago/2026) ──────
                    Pedido do dono: "maneirar o elemento dos 3 hambúrgueres".
                    Ele era um disco de vidro de 40px com fundo, borda e sombra
                    — quatro camadas de material para abrir um menu, ao lado de
@@ -1163,36 +1174,36 @@ export function AppHomeScreen({
                    desenho do botão, não a área que o dedo acerta — encolher o
                    toque para o tamanho do ícone seria "maneirar" cobrando o
                    preço no lugar errado. */
-              className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-            >
-              {/* O ponto fica encostado na borda do alvo, e não do ícone:
+                className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              >
+                {/* O ponto fica encostado na borda do alvo, e não do ícone:
                     dentro ele competiria com o traço e sumiria contra nuvem
                     clara. O anel branco o descola do céu. */}
-              {temNaoLidas && (
-                <span
-                  aria-hidden
-                  className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white/85"
-                />
-              )}
-              {/* Sem a pastilha atrás, o traço passa a se separar do céu
+                {temNaoLidas && (
+                  <span
+                    aria-hidden
+                    className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white/85"
+                  />
+                )}
+                {/* Sem a pastilha atrás, o traço passa a se separar do céu
                     sozinho — daí a sombra, que continua sendo a MESMA régua do
                     `topoEscuro`: branco sobre topo escuro, índigo sobre topo
                     claro. Um traço branco fixo ficaria invisível no amanhecer,
                     que é justamente a cena de topo mais claro. */}
-              <Menu
-                className="h-[22px] w-[22px]"
-                strokeWidth={1.9}
-                style={tracoDoMenu}
-                aria-hidden
-              />
-            </button>
+                <Menu
+                  className="h-[22px] w-[22px]"
+                  strokeWidth={1.9}
+                  style={tracoDoMenu}
+                  aria-hidden
+                />
+              </button>
 
-            {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
+              {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
                   ele atravessa a faixa inteira: sem isso a metade invisível do
                   bloco cobriria o botão do menu. */}
-            {babyName && (
-              <p
-                /* O teto é o que SOBRA depois dos cantos, não uma fração da
+              {babyName && (
+                <p
+                  /* O teto é o que SOBRA depois dos cantos, não uma fração da
                      linha. `52%` era metade da faixa — mas a faixa tem um
                      botão de 40px de um lado, e em 320px de largura um nome
                      comprido ("Ana Beatriz…") passava por baixo dele. Medido.
@@ -1202,11 +1213,11 @@ export function AppHomeScreen({
                      canto vazio valer a pena. O reserva continua SIMÉTRICO
                      porque o bloco é centrado: encolher só a esquerda tiraria
                      o nome do eixo. */
-                className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
-                style={{
-                  ...overArtTopo,
-                  color: corDoTopo,
-                  /* ─── O NOME SEGUE A MESMA RÉGUA DO NÚMERO DA SEMANA ────
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
+                  style={{
+                    ...overArtTopo,
+                    color: corDoTopo,
+                    /* ─── O NOME SEGUE A MESMA RÉGUA DO NÚMERO DA SEMANA ────
                        Medido, os dois maiores textos da tela estavam em pesos
                        diferentes: o número em 500 (Medium) e o nome em 600.
                        Semi-Bold empasta pelo mesmo motivo que empastava no
@@ -1216,11 +1227,11 @@ export function AppHomeScreen({
                        o número usa −0,03em porque tem 90px, e texto grande
                        precisa de tracking negativo. Em 20px, −0,03em fecharia
                        as letras; −0,01em é o passo equivalente nesse corpo. */
-                  fontWeight: 500,
-                  letterSpacing: "-0.01em",
-                }}
-              >
-                {/* ─── O CORAÇÃO GÊMEO INVISÍVEL ──────────────────────────
+                    fontWeight: 500,
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  {/* ─── O CORAÇÃO GÊMEO INVISÍVEL ──────────────────────────
                       O 💜 é decoração e fica só à direita, mas o bloco todo é
                       que está centrado — então ele empurrava a PALAVRA para a
                       esquerda. Medido: o nome saía com o centro em 202,5 numa
@@ -1233,17 +1244,17 @@ export function AppHomeScreen({
                       px ou em `em` estaria certa num celular e errada no
                       seguinte. O gêmeo mede sempre exatamente o mesmo que o
                       original, porque É o original. */}
-                <span aria-hidden className="align-middle text-[0.72em] opacity-0">
-                  💜
-                </span>{" "}
-                {babyName}{" "}
-                <span aria-hidden className="align-middle text-[0.72em]">
-                  💜
-                </span>
-              </p>
-            )}
+                  <span aria-hidden className="align-middle text-[0.72em] opacity-0">
+                    💜
+                  </span>{" "}
+                  {babyName}{" "}
+                  <span aria-hidden className="align-middle text-[0.72em]">
+                    💜
+                  </span>
+                </p>
+              )}
 
-            {/* ─── A PÍLULA DO CLIMA SAIU (ago/2026) ────────────────────
+              {/* ─── A PÍLULA DO CLIMA SAIU (ago/2026) ────────────────────
                   Ficava aqui, à direita: ícone do céu + graus. Saiu por
                   decisão do dono, e a razão está registrada porque ela vale
                   para o que quiser ocupar este canto depois — "17°" com um
@@ -1255,17 +1266,17 @@ export function AppHomeScreen({
                   O CLIMA em si NÃO saiu do produto: `useWeather` continua de
                   pé porque a chuva do céu (`SkyRain`) e o cartão de saudação
                   da segunda dobra leem dele. O que saiu foi só o mostrador. */}
+            </div>
+
+            {isMadrugada && (
+              <p className="mt-3 text-center text-[11px] text-white/65">
+                🌙 Madrugada — tente descansar um pouco
+              </p>
+            )}
           </div>
 
-          {isMadrugada && (
-            <p className="mt-3 text-center text-[11px] text-white/65">
-              🌙 Madrugada — tente descansar um pouco
-            </p>
-          )}
-        </div>
-
-        {gest && baby ? (
-          /* ─── A BOLHA, CENTRADA NA IMAGEM (ago/2026) ───────────────────
+          {gest && baby ? (
+            /* ─── A BOLHA, CENTRADA NA IMAGEM (ago/2026) ───────────────────
              Pedido do dono, ao mandar a arte nova: "você vai deixar a bolha do
              bebê centralizada nessa imagem".
 
@@ -1287,17 +1298,17 @@ export function AppHomeScreen({
 
              `pointer-events-none` na camada e `auto` no botão: a camada cobre a
              barra de topo, e sem isso ela engoliria o toque do menu. */
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            {/* Bebê protagonista dentro da bolha (o "ventre").
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              {/* Bebê protagonista dentro da bolha (o "ventre").
                 Toque abre a aba do Bebê com a semana detalhada — e pede a
                 sub-aba "semana" de propósito: a aba do Bebê agora abre numa
                 grade de seis, e este toque promete a semana, não um menu. */}
-            <button
-              onClick={() => onNavigate("Bebê", "semana")}
-              aria-label="Ver a semana do bebê"
-              className="press pointer-events-auto relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
-            >
-              {/* A caixa que manda em bolha e bebê. TRÊS tetos, e o menor
+              <button
+                onClick={() => onNavigate("Bebê", "semana")}
+                aria-label="Ver a semana do bebê"
+                className="press pointer-events-auto relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
+              >
+                {/* A caixa que manda em bolha e bebê. TRÊS tetos, e o menor
                       vence: 60% da largura, 19,5rem de teto absoluto, e 38% da
                       ALTURA da tela.
 
@@ -1312,9 +1323,9 @@ export function AppHomeScreen({
                       desnecessário, e some junto o degrau que ele criava: em
                       849px a bolha saltava 25% de uma vez, e a tela MAIOR
                       ficava mais apertada que a menor. */}
-              <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
-                <BabyOrb />
-                {/* `scale` porque o SVG do bebê tem margem interna larga.
+                <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
+                  <BabyOrb />
+                  {/* `scale` porque o SVG do bebê tem margem interna larga.
                       O valor anterior (1.43) vinha de uma medição ERRADA: ela
                       media a CAIXA do SVG, não a tinta. Medido pixel a pixel
                       na tela — contando só o que é pele contra o azul da
@@ -1340,24 +1351,24 @@ export function AppHomeScreen({
                       32 e a 40 batem na parede de vidro. 1,65 é o maior valor
                       em que as quatro ainda cabem. Mexer aqui obriga a medir
                       a 40 de novo, nunca só a 20. */}
-                <BabyIllustration
-                  week={gest.weeks}
-                  tone={babyTone}
-                  showSac={false}
-                  showInfo={false}
-                  /* `dc-bebe-deriva` anima `transform`; o `scale-[1.65]`
+                  <BabyIllustration
+                    week={gest.weeks}
+                    tone={babyTone}
+                    showSac={false}
+                    showInfo={false}
+                    /* `dc-bebe-deriva` anima `transform`; o `scale-[1.65]`
                          do Tailwind v4 escreve na propriedade `scale`, que é
                          OUTRA. As duas compõem sem se atropelar — se a escala
                          viesse por `transform`, a animação a apagaria e o bebê
                          encolheria de volta ao tamanho antigo. */
-                  className="dc-bebe-deriva absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
-                />
-              </div>
-            </button>
-          </div>
-        ) : null}
+                    className="dc-bebe-deriva absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                  />
+                </div>
+              </button>
+            </div>
+          ) : null}
 
-        {/* ── A SEMANA, NO MEIO ENTRE A BOLHA E A BARRA ────────────────────
+          {/* ── A SEMANA, NO MEIO ENTRE A BOLHA E A BARRA ────────────────────
             Pedido do dono: "coloque o número 20 semanas ali no meio entre a
             bolha e a navbar". Ela tinha descido para o fundo claro na volta
             anterior; volta para a arte, e agora com um lugar DEFINIDO.
@@ -1381,35 +1392,35 @@ export function AppHomeScreen({
             O halo (`overArt`) volta junto e não é enfeite: aqui o fundo é a
             arte, e a do dia tem a faixa amarela do horizonte passando bem
             atrás dos dígitos. */}
-        {gest && baby && (
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 flex items-center justify-center pt-[calc(min(60vw,19.5rem,38svh)/2)] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]"
-            style={overArt}
-          >
-            <div className="flex flex-col items-center">
-              <p
-                className={`leading-[0.92] ${heroText}`}
-                style={{
-                  color: corDoCorpo,
-                  /* HERDA a face do corpo, que é a geométrica do sistema (SF
+          {gest && baby && (
+            <div
+              className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 flex items-center justify-center pt-[calc(min(60vw,19.5rem,38svh)/2)] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]"
+              style={overArt}
+            >
+              <div className="flex flex-col items-center">
+                <p
+                  className={`leading-[0.92] ${heroText}`}
+                  style={{
+                    color: corDoCorpo,
+                    /* HERDA a face do corpo, que é a geométrica do sistema (SF
                        Pro Text no Apple, DM Sans de reserva). A `--font-serif`
                        deste projeto é na verdade a ARREDONDADA — bonita nos
                        títulos, mas a referência traz o número numa geométrica
                        reta. Preso a uma fonte fixa, o maior número da tela era
                        o único texto que NÃO seguia a fonte do sistema. */
-                  fontFamily: "inherit",
-                  /* O termo em `svh` é irmão do que dimensiona a bolha: só
+                    fontFamily: "inherit",
+                    /* O termo em `svh` é irmão do que dimensiona a bolha: só
                        pela LARGURA, o número ficava com 104px numa tela de
                        375px de altura (celular deitado) e empurrava a coluna
                        para fora da dobra. Em retrato o `21vw` vence, então
                        nada muda no aparelho de pé. */
-                  fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
-                  /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta: a
+                    fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
+                    /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta: a
                        contra-forma do "0" fecha e o número lê como bloco — foi
                        o "muito grosseira" do dono. */
-                  fontWeight: 500,
-                  letterSpacing: "-0.03em",
-                  /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
+                    fontWeight: 500,
+                    letterSpacing: "-0.03em",
+                    /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
                        Figura tabular existe para alinhar COLUNA de números:
                        dá a todo dígito a mesma largura de avanço, o que obriga
                        o "1" a nadar num vão largo e desloca a tinta dentro da
@@ -1424,36 +1435,72 @@ export function AppHomeScreen({
                        DEPOIS de cada caractere, inclusive o último, e esse vão
                        fantasma no fim empurra a tinta para o lado. Metade do
                        valor, com sinal trocado, devolve a tinta ao eixo. */
-                  fontVariantNumeric: "lining-nums",
-                  textIndent: "-0.015em",
-                }}
-              >
-                {gest.weeks}
-              </p>
-              <p
-                className={`-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none ${heroMuted}`}
-                style={{ color: corDoCorpo }}
-              >
-                {gest.weeks === 1 ? "semana" : "semanas"}
-              </p>
+                    fontVariantNumeric: "lining-nums",
+                    textIndent: "-0.015em",
+                  }}
+                >
+                  {gest.weeks}
+                </p>
+                <p
+                  className={`-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none ${heroMuted}`}
+                  style={{ color: corDoCorpo }}
+                >
+                  {gest.weeks === 1 ? "semana" : "semanas"}
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Sem gestação configurada não há bolha nem número, e o recado ocupa o
+          {/* Sem gestação configurada não há bolha nem número, e o recado ocupa o
             lugar dos dois — centrado na arte, pela mesma régua. */}
-        {!(gest && baby) && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
-            <p className={`text-sm ${heroMuted}`}>
-              Configure sua data de gestação em <strong>Perfil</strong> para ver o desenvolvimento.
-            </p>
-            <button
-              onClick={() => onNavigate("Perfil")}
-              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              Configurar perfil
-            </button>
-          </div>
+          {!(gest && baby) && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+              <p className={`text-sm ${heroMuted}`}>
+                Configure sua data de gestação em <strong>Perfil</strong> para ver o
+                desenvolvimento.
+              </p>
+              <button
+                onClick={() => onNavigate("Perfil")}
+                className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Configurar perfil
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* ── A EMENDA ENTRE O CÉU E A PÁGINA ──────────────────────────────
+            O céu tem de acabar em algum lugar, e até aqui ele acabava num
+            CORTE: a última linha da arte e, encostado nela, o creme da página.
+            Foi assim que o dono viu a "faixa embaixo" — o que salta aos olhos
+            não é a faixa existir, é ela ser uma aresta.
+
+            Esta é a segunda defesa, e ela vale mesmo que a primeira falhe: se
+            um aparelho ainda fechar o céu antes do fim da tela, o que aparece
+            ali embaixo é a COR DO PÉ DA CENA continuando, e não creme. Some a
+            aresta, some o defeito — e num aparelho em que a altura fecha certo,
+            esta faixa só se vê ao rolar, que é quando a página começa mesmo.
+
+            `corDeBaixo` é o último pixel da arte, amostrado dela e não
+            estimado, então a emenda começa exatamente na cor em que a cena
+            termina. O degradê vai a `--background` explícito e não a
+            `transparent`: `transparent` é preto-transparente, e o meio do
+            caminho sairia acinzentado.
+
+            O Céu Clássico fica de fora porque ele não tem `corDeBaixo` — é um
+            gradiente desenhado, não uma foto amostrada. Inventar uma cor para
+            ele seria pintar uma emenda de cor errada, que é pior que a aresta
+            que já existia. */}
+        {!ceuClassico && (
+          <div
+            aria-hidden
+            className="-mx-5 h-32 short:h-24"
+            style={{
+              background:
+                `linear-gradient(to bottom, ${slot.corDeBaixo} 0%,` +
+                ` ${slot.corDeBaixo} 22%, var(--background) 100%)`,
+            }}
+          />
         )}
       </div>
 

@@ -993,9 +993,25 @@ imagem e maneirar o elemento dos 3 hambúrgueres… os outros elementos vão fic
 embaixo com o fundo rosa claro… **sem expandir a imagem**, ela já está no
 tamanho exato que quero".
 
-- **A arte é o fundo da PRIMEIRA TELA INTEIRA** (`h-[100svh]`), e o
+- **A arte é o fundo da PRIMEIRA TELA INTEIRA** (`.dc-hero-tela`), e o
   `object-cover` do `CeuDoDia` cobre o que falta. Medido: hero de 0 até o pé do
   viewport em 15 Pro, 16 Pro, 16 Pro Max, 13 mini e SE — fresta zero nos cinco.
+- ⚠️ **`100svh` NÃO é "uma tela" em todo iOS.** Com `svh` a faixa creme voltou a
+  aparecer no aparelho do dono, e a caixa começa em y=0 — então sobrar tela só é
+  possível se o `svh` daquele iOS for menor que a tela visível, que é
+  literalmente o que `svh` significa (viewport com TODAS as barras à mostra).
+  `.dc-hero-tela` usa `lvh` com `svh` de reserva, nas duas declarações da mesma
+  propriedade. **Não é `dvh`**: `dvh` muda enquanto se rola e faria a bolha
+  pular de lugar. Sobrar céu é invisível; faltar céu é o defeito.
+- **A EMENDA é a segunda defesa, e vale mesmo se a primeira falhar.** Logo
+  abaixo do hero há uma faixa de 8rem que sai de `corDeBaixo` (o último pixel da
+  arte, amostrado) e desmancha no `--background`. O que saltava aos olhos não
+  era a faixa existir — era ela ser uma ARESTA entre a foto e o creme. Com a
+  emenda, um aparelho que ainda feche o céu cedo mostra a cor do pé da cena
+  continuando. O degradê termina em `var(--background)` explícito e não em
+  `transparent`, que é preto-transparente e deixaria o meio acinzentado. O Céu
+  Clássico fica de fora: ele não tem `corDeBaixo` amostrado, e inventar uma cor
+  seria pintar a emenda errada.
 - ⚠️ **"Colar sem expandir" e "preencher a tela" só são compatíveis num
   aparelho com EXATAMENTE a proporção da arte, e nenhum iPhone tem.** A caixa
   chegou a ser `aspect-[853/1844]` (a proporção do arquivo) para atender "ela já
