@@ -993,18 +993,23 @@ imagem e maneirar o elemento dos 3 hambúrgueres… os outros elementos vão fic
 embaixo com o fundo rosa claro… **sem expandir a imagem**, ela já está no
 tamanho exato que quero".
 
-- **Quem manda no tamanho é a IMAGEM, não a tela.** O hero deixou de ser
-  `100svh` com a arte esticada por dentro e passou a ter a proporção da arte
-  (`aspect-[853/1844]`, `PROPORCAO_DO_CEU`). Com isso o `object-cover` do
-  `CeuDoDia` vira identidade — mapeia 1:1, sem recorte e sem zoom. Medido num
-  iPhone 15 Pro: 393 × 849,6 numa tela de 852.
+- **A arte é o fundo da PRIMEIRA TELA INTEIRA** (`h-[100svh]`), e o
+  `object-cover` do `CeuDoDia` cobre o que falta. Medido: hero de 0 até o pé do
+  viewport em 15 Pro, 16 Pro, 16 Pro Max, 13 mini e SE — fresta zero nos cinco.
+- ⚠️ **"Colar sem expandir" e "preencher a tela" só são compatíveis num
+  aparelho com EXATAMENTE a proporção da arte, e nenhum iPhone tem.** A caixa
+  chegou a ser `aspect-[853/1844]` (a proporção do arquivo) para atender "ela já
+  está no tamanho exato que quero"; o dono olhou no aparelho e devolveu o
+  defeito: "embaixo ainda não está totalmente preenchido". A arte é 2,1618, um
+  15 Pro é 2,168 e um 16 Pro é 2,174 — a caixa fechava alguns pixels antes do
+  fim e o creme da página aparecia por baixo do céu. Com `100svh` o `cover`
+  amplia **0,16% a 0,57%** nos iPhones reais (medido), que não é o "esticar"
+  que o pedido barrava: aquilo era a arte puxada para um hero de altura
+  arbitrária, com a lua saindo cortada.
 - ⚠️ **`aspect-ratio` + `max-height` encolhe a LARGURA** se a largura for
   `auto`. No iPhone SE o hero nasceu com 308px em vez de 375 — a arte inteira
-  deslocada para o meio da tela. Conserto: `w-[calc(100%+2.5rem)]` explícito, e
-  aí o `max-h-[100svh]` só corta a altura. O teto existe para desktop
-  (`max-w-5xl` daria 2,3 MIL pixels de céu) e para o celular deitado; no iPhone
-  em pé ele nunca entra em ação, porque a arte (2,1618) é mais estreita que a
-  tela (2,168).
+  deslocada para o meio da tela. Custou uma volta antes de a proporção sair de
+  vez; não reintroduza `aspect-ratio` aqui.
 - **Os quatro campos da cena foram MEDIDOS de novo** por
   `node scripts/ceu-do-drive.mjs <origem.png> <destino.webp> [largura]`, que
   converte e mede no mesmo passe. O dia virou a TERCEIRA cena a inverter o

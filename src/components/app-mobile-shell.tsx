@@ -1055,35 +1055,32 @@ export function AppHomeScreen({
            A bancada replica a geometria da página de propósito — com `pt-2`
            ela casava por acaso com um `-mt` errado e escondia a faixa. */
         /* ─── O HERO TEM O TAMANHO DA IMAGEM (ago/2026) ────────────────────
-           `aspect-[853/1844]` é a proporção da arte (`PROPORCAO_DO_CEU`), e é
-           ela que decide a altura desta caixa. Antes era `100svh`, e a arte é
-           que se esticava para caber — o dono foi explícito ao mandar a arte
-           nova: "sem expandir a imagem, somente colocar no fundo, ela já está
-           no tamanho exato que quero".
+           ─── A CAIXA É UMA TELA CHEIA, E NÃO A PROPORÇÃO DA ARTE ────────
+           Ela chegou a ser `aspect-[853/1844]`, a proporção exata do arquivo,
+           para atender "sem expandir a imagem, ela já está no tamanho exato que
+           quero". O dono olhou no aparelho dele e devolveu o defeito: "embaixo
+           ainda não está totalmente preenchido".
 
-           Com a proporção aqui, o `object-cover` lá dentro vira identidade: a
-           arte aparece inteira, sem recorte e sem zoom, em qualquer aparelho. O
-           que muda de celular para celular é quanto da TELA ela ocupa — num
-           iPhone (proporção 2,16, praticamente a da arte) ela é a primeira
-           dobra exata; num aparelho mais quadrado sobra tela embaixo, e ali já
-           começa o fundo claro da página, que é justamente o pedido.
+           E ele está certo — as duas coisas só são compatíveis num aparelho
+           cuja tela tenha EXATAMENTE a proporção da arte, e nenhum iPhone tem.
+           A arte é 2,1618; um 15 Pro é 2,168, um 16 Pro é 2,174. Presa à
+           própria proporção, a caixa fecha alguns pixels antes do fim da tela e
+           o creme da página aparece por baixo do céu — uma faixa clara que não
+           é decisão de ninguém.
+
+           `100svh` fecha essa fresta em qualquer tela, e o preço é ínfimo: o
+           `object-cover` amplia a arte 0,3% num 15 Pro. Isso não é "esticar a
+           imagem", que era o que o pedido original barrava — aquilo era a arte
+           puxada para cobrir um hero de altura arbitrária, com a lua saindo
+           cortada pela borda.
+
+           ⚠️ Nada de `aspect-ratio` aqui de novo: além da fresta, `aspect-ratio`
+           com `max-height` e largura `auto` encolhe a LARGURA (o iPhone SE
+           nasceu com 308px em vez de 375).
 
            `pb` saiu junto: a folga do pé pertencia à segunda dobra, que não
-           mora mais aqui dentro.
-
-           ─── O TETO DE UMA TELA ─────────────────────────────────────────
-           `max-h-[100svh]` não é hesitação sobre o pedido: no iPhone ele NUNCA
-           entra em ação, porque a arte (2,1618) é mais estreita que a tela
-           (2,168) e a caixa fecha em 849,6px contra 852 de altura. Ele existe
-           para os dois casos em que a proporção deixa de fazer sentido:
-
-             · desktop, onde a página vai a `max-w-5xl` — 1064px de largura
-               dariam 2,3 MIL pixels de céu antes do primeiro elemento;
-             · celular deitado, onde a mesma conta dá 1841px numa tela de 393.
-
-           Nos dois o `object-cover` recorta em vez de ampliar, que é o pior
-           lado certo: a arte nunca aparece esticada. */
-        className="shine relative -mx-5 aspect-[853/1844] max-h-[100svh] w-[calc(100%+2.5rem)] overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
+           mora mais aqui dentro. */
+        className="shine relative -mx-5 h-[100svh] overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
         /* Cor de espera enquanto o `.webp` não decodifica. Agora é a do TOPO e
            não a do pé: a caixa acabou junto com a imagem, então não há mais
            "depois da arte" para o pé continuar — e o que apareceria sem esta
