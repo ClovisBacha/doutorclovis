@@ -39,7 +39,7 @@ import {
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import {
   IconeCadeado,
-  IconeCalendario,
+  IconeAmigas,
   IconeChama,
   IconeLoja,
   IconeTrofeu,
@@ -446,6 +446,8 @@ interface GestacaoPathProps {
   careMode?: boolean;
   /** Abre o Cantinho (lojinha das Sementinhas). */
   onOpenShop?: () => void;
+  /** Abre a aba das Amigas — o ícone que substituiu o calendário na fita. */
+  onOpenAmigas?: () => void;
   /** Cidade do cadastro — chega até o céu da tela de atividades. */
   homeCity?: { nome: string; lat: number; lon: number } | null;
   /**
@@ -1351,6 +1353,7 @@ export function GestacaoPath({
   onOpenShop,
   homeCity = null,
   bancada,
+  onOpenAmigas,
 }: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
@@ -2442,20 +2445,32 @@ export function GestacaoPath({
             <div className="h-6 w-px bg-slate-200" />
           </>
         )}
-        <div className="flex items-center gap-1.5" title="Dia da sua jornada">
-          {/* 0,8949 é MEDIDO com o ícone isolado sobre fundo transparente — o
-              traço do calendário vai de y=2,2 a y=22 num `viewBox` de 24, e
-              não encosta na borda. Medir dentro da fita daria 1, porque o
-              `bg-background/95` dela é opaco e vira "tinta" em toda linha. */}
-          <IconeCalendario
+        {/* ── AMIGAS ────────────────────────────────────────────────────
+            Substituiu o calendário (pedido do dono). O "11º dia da jornada"
+            que estava aqui não se perdeu: ele conta a mesma história que o
+            "no app há X" do perfil, e é lá que ele passa a morar.
+
+            É o ÚNICO item da fita que é botão, então ele tem `press`,
+            `aria-label` e alvo de toque próprio — os outros três são placar,
+            e um deles virar link sem parecer link é o jeito de a paciente
+            nunca descobrir a aba. */}
+        <button
+          type="button"
+          onClick={onOpenAmigas}
+          disabled={!onOpenAmigas}
+          aria-label="Abrir as Amigas"
+          className="press flex items-center gap-1.5 rounded-full px-1 py-0.5 disabled:opacity-100"
+        >
+          {/* A tinta do ombro encosta na borda do `viewBox`, então a fração é
+              1 — mesma régua da chama e do troféu. Ver `alinhar-na-linha`. */}
+          <IconeAmigas
             className="h-[22px] w-[22px] text-sky-500"
             style={{
-              transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 0.8949 })}px)`,
+              transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 1 })}px)`,
             }}
           />
-          <span className="text-lg font-extrabold text-sky-500">{journeyDayNum}º</span>
-          <span className="text-xs font-medium text-muted-foreground">dia</span>
-        </div>
+          <span className="text-xs font-semibold text-sky-500">Amigas</span>
+        </button>
         <div className="h-6 w-px bg-slate-200" />
         <div className="flex items-center gap-1.5" title="Figurinhas coletadas">
           {/* O TROFÉU CONTA DIAS DE CINCO ESTRELAS, e não mais figurinhas de

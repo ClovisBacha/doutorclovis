@@ -162,3 +162,36 @@ export function IconePresente({ className }: Props) {
     </svg>
   );
 }
+
+/**
+ * AMIGAS — o que substituiu o calendário na fita.
+ *
+ * Duas silhuetas e um `+`, como o ícone que o dono mandou. Desenhado aqui e
+ * não emprestado do sistema pelo mesmo motivo dos outros: emoji de pessoas tem
+ * tom de pele, e um app de gestação não escolhe o tom de pele da paciente por
+ * ela.
+ *
+ * A tinta encosta em baixo (o ombro da silhueta grande vai até a borda do
+ * `viewBox`), então a fração de alinhamento dele é 1 — ver `alinhar-na-linha`.
+ */
+export function IconeAmigas({ className, style }: Props) {
+  return (
+    <svg {...base(className, style)}>
+      {/* a de trás, menor e mais clara */}
+      <circle cx="16.1" cy="7.4" r="3.1" opacity=".55" />
+      <path
+        d="M16.1 11.6c2.7 0 5 1.7 5.6 4.1.2.7-.4 1.4-1.1 1.4h-3.2c0-2.2-1.2-4.1-3-5.2.6-.2 1.1-.3 1.7-.3z"
+        opacity=".55"
+      />
+      {/* a da frente */}
+      <circle cx="9.4" cy="6.9" r="3.9" />
+      <path d="M9.4 12c3.4 0 6.3 2.2 7.1 5.2.3 1-.5 1.9-1.5 1.9H3.8c-1 0-1.8-.9-1.5-1.9.8-3 3.7-5.2 7.1-5.2z" />
+      {/* o mais, num disco próprio para não sumir no ombro */}
+      <circle cx="18.2" cy="18" r="4.1" />
+      <path
+        d="M18.2 15.6c.4 0 .7.3.7.7v1h1c.4 0 .7.3.7.7s-.3.7-.7.7h-1v1c0 .4-.3.7-.7.7s-.7-.3-.7-.7v-1h-1c-.4 0-.7-.3-.7-.7s.3-.7.7-.7h1v-1c0-.4.3-.7.7-.7z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}

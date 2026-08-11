@@ -8,6 +8,9 @@
  *
  *   chama 78,1% · calendário 89,4% · troféu 98,3%  (medidos)
  *
+ * O calendário depois virou o ícone das Amigas, cuja tinta encosta na borda
+ * (fração 1) — a régua não mudou, só a arte que passa por ela.
+ *
  * Com as caixas centradas, isso punha as bases em 33,3 · 37,0 · 39,1 numa fita
  * cuja base do texto está em 31,5. Depois da régua, medido no navegador com as
  * duas fotos e a chama congelada: 31,67 · 31,67 · 32,00.
@@ -82,7 +85,9 @@ describe("a fita usa a régua, e não px soltos", () => {
   const chama = readFileSync("src/components/chama-sequencia.tsx", "utf8");
 
   test("os três passam por `deslocamentoDaLinha`", () => {
-    expect(jogo).toContain("deslocamentoDaLinha({ altura: 22, baseDaTinta: 0.8949 })");
+    /* O calendário saiu da fita (virou o ícone das Amigas, a pedido do dono),
+       e a arte nova encosta na borda do `viewBox` — fração 1, mesma régua. */
+    expect(jogo).toContain("deslocamentoDaLinha({ altura: 22, baseDaTinta: 1 })");
     expect(trofeu).toContain("deslocamentoDaLinha({");
     expect(chama).toContain("deslocamentoDaLinha({");
   });

@@ -132,6 +132,7 @@ import {
 } from "@/lib/testimonials.functions";
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
 import { PresentearAmigas } from "@/components/presentear-amigas";
+import { AmigasTab } from "@/components/amigas";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
    alfabética que só devolvia nome e especialidade — e exigia selo, então
@@ -370,6 +371,7 @@ async function fetchAppointmentsCached(force = false): Promise<MyAppointment[]> 
 const TABS = [
   "Bebê",
   "Caminho",
+  "Amigas",
   "Calendário",
   "Registros",
   "Saúde",
@@ -400,7 +402,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Família",
-    tabs: ["Acompanhante", "Pós-parto"],
+    tabs: ["Acompanhante", "Amigas", "Pós-parto"],
   },
   {
     label: "Consultas",
@@ -1747,6 +1749,7 @@ function MinhaContaPage() {
                     quizPremium={!!profile?.quiz_premium}
                     careMode={careMode}
                     onOpenShop={() => goToTab("Recompensas")}
+                    onOpenAmigas={() => goToTab("Amigas")}
                     homeCity={
                       profile?.home_city && profile.home_lat != null && profile.home_lon != null
                         ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
@@ -1754,6 +1757,7 @@ function MinhaContaPage() {
                     }
                   />
                 )}
+                {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}
                 {(tab === "Calendário" || tab === "Consultas") && (
                   <PrenatalCalendarTab

@@ -779,6 +779,53 @@ destranca três itens da loja.
 - **Bancada:** `/preview-jogo?trofeus=12` põe número no topo;
   `?trofeuNovo=12` abre os 5 segundos inteiros.
 
+### A aba das Amigas (ago/2026)
+
+Pedido do dono: o ícone de "adicionar amigos" substitui o calendário azul da
+fita e abre uma aba social "como as amizades do Duolingo", com perfil em
+formato de jogo. Três funções: **Cantinho visitável · presente entre amigas ·
+dupla de sequência**.
+
+- **O que separa isto do Duolingo é clínico, não estético.** Num app de idioma,
+  comparar é ganhar um jogo; aqui é comparar cuidado com o próprio bebê. E
+  existe o caso que nenhum app de idioma tem: **uma delas pode perder a
+  gestação**. Daí as três regras que atravessam `amigas.ts` inteiro:
+  **nada clínico no perfil** (sem semana, sem DPP, sem medida),
+  **cooperativo e nunca competitivo** (não há placar), e
+  **só quem já se conhece**.
+- **O grafo é o da INDICAÇÃO, nos dois sentidos** (`referred_by`). Sem busca,
+  sem pedido de estranho, sem aceitar/recusar amizade — para duas contas se
+  enxergarem foi preciso que uma mandasse o convite para a outra FORA do app.
+  Não é economia de trabalho: é o que torna a aba segura **sem moderação**, num
+  lugar onde o risco é conselho médico de leiga e assédio ao mesmo tempo.
+- **O vínculo é conferido ANTES de toda leitura** (`saoAmigas`). Sem isso,
+  qualquer uuid no corpo do pedido devolveria o Cantinho e o perfil de qualquer
+  paciente — o mesmo defeito que `contatoDaPaciente` teve no painel.
+- **Modo Cuidado tira a pessoa da aba SEM anunciar.** Ela sai da lista **no
+  servidor** (filtrar na tela deixaria o nome viajar pela rede), o perfil
+  responde `indisponivel` e nunca o motivo, e a dupla some dos dois lados **sem
+  apagar a linha** — quando ela voltar, a dupla volta com a chama que tinham.
+  "Fulana saiu" contaria a perda dela para todo mundo.
+- **A dupla conta pelo CALENDÁRIO, não pelo dia gestacional.** Às segundas, uma
+  pode estar no dia 65 e a outra no 190: intersectar números de dia juntaria
+  terças com sábados. A data sai do `created_at` da linha `wellness:`, que o
+  servidor carimba. Herda o perdão da meia-noite — e aqui ele importa mais,
+  porque sem ele cada uma acharia que a OUTRA deixou cair.
+- **O par é ordenado** (`menor < maior`): (A,B) e (B,A) são a mesma linha, senão
+  duas convidando uma à outra ao mesmo tempo criam duas duplas e cada tela lê a
+  sua. **Uma dupla ATIVA por pessoa** (índice parcial) — duas seriam um placar
+  de várias frentes. **Recusar APAGA** a linha: marcar "recusada" bloquearia o
+  par para sempre pela chave única.
+- **O blob da jornada dela NÃO vai inteiro para a tela**: ele carrega dias
+  feitos, notas das aulas e progresso. Só a decoração sai, e **saneada**
+  (`saneiaEnfeites`) — é blob escrito pelo navegador dela, e um `s: 900` viraria
+  um enfeite cobrindo a tela de quem visita.
+- **O "11º dia da jornada" que estava no calendário** não se perdeu: virou o
+  "no app há X" do perfil, que conta a mesma história.
+- **Aplicar no Supabase:** `supabase/APLICAR_DUPLAS.sql`. Só a dupla depende
+  dele — `lerDupla` engole a falha e devolve `null`, então lista, perfil,
+  Cantinho e presente funcionam antes de ele rodar.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o
