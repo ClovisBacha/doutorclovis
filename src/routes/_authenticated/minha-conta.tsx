@@ -73,6 +73,7 @@ import {
   retaFinalMensagemFor,
   trimesterForWeek,
 } from "@/lib/gestacao";
+import { nomeDoMedico } from "@/lib/nome-do-medico";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
 import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
@@ -6616,12 +6617,12 @@ function buildPatientContext(profile: Profile | null, gest: Gest): string {
  * o nome sem "Dr.".
  */
 function aiNameFrom(displayName: string | null | undefined): string {
-  const nome = (displayName ?? "").trim();
-  if (!nome) return "Assistente IA";
-  const partes = nome.split(/\s+/);
-  const temTitulo = /^(dr|dra|drª)\.?$/i.test(partes[0]);
-  const base = temTitulo ? partes.slice(0, 2).join(" ") : partes[0];
-  return `${base} IA`;
+  /* A régua de "título + primeiro nome" mora em `nome-do-medico.ts`, e não
+     mais aqui: o aviso de presente precisou da MESMA conta, e uma segunda
+     cópia é como a mesma pessoa vira "Dr. Clóvis" numa tela e "Dr." na
+     outra. O que continua sendo desta tela é só o fallback. */
+  const base = nomeDoMedico(displayName);
+  return base ? `${base} IA` : "Assistente IA";
 }
 
 /** As perguntas que o campo de mensagem digita sozinho quando está vazio. */

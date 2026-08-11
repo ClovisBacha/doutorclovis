@@ -32,10 +32,14 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { MESADA_DA_ASSINANTE, PRESENTE_ENTRE_AMIGAS } from "@/lib/economia-sementinhas";
+import {
+  MESADA_DA_ASSINANTE,
+  PRESENTE_ENTRE_AMIGAS,
+  RAZAO_PRESENTE_AMIGA as RAZAO_AMIGA,
+} from "@/lib/economia-sementinhas";
 
 /** A razão gravada no ledger — é por ela que o bolso é contado de volta. */
-export const RAZAO_PRESENTE_AMIGA = "presente-de-amiga";
+export const RAZAO_PRESENTE_AMIGA = RAZAO_AMIGA;
 
 export type EstadoDaMesadaAmiga = {
   /** Ela assina? Sem Premium não há bolso, e a tela nem aparece. */

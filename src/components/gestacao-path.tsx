@@ -11,6 +11,7 @@ import {
   grantWellnessReward,
   getWellnessProgress,
   grantDayStarsBonus,
+  type PresenteRecebido,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
@@ -139,6 +140,119 @@ function EstrelaDoDia({ acesa, tamanho = 34 }: { acesa: boolean; tamanho?: numbe
         </defs>
       )}
     </svg>
+  );
+}
+
+/**
+ * O AVISO DE QUE ALGUÉM TE DEU SEMENTINHAS.
+ *
+ * ─── POR QUE ISTO É UMA TELA, E NÃO UM TOAST ────────────────────────────────
+ *
+ * O presente do médico era invisível: o servidor gravava, o saldo dela subia e
+ * NADA dizia de onde tinha vindo. Um toast de três segundos consertaria o
+ * "chegou" e perderia a parte que importa — que foi **ele** quem mandou. O
+ * desenho inteiro da mesada (ele dá, ela vê que foi ele, ela volta) mora nesse
+ * nome, e nome que passa em três segundos ninguém lê.
+ *
+ * ─── O NOME É O TÍTULO, E O NÚMERO VEM DEPOIS ───────────────────────────────
+ *
+ * "100 Sementinhas" com o remetente em letrinha embaixo transformaria um gesto
+ * em um crédito bancário. Aqui a ordem é a do gesto: quem, o que, e só então
+ * para que serve.
+ *
+ * ─── SEM REMETENTE AINDA É UM PRESENTE ──────────────────────────────────────
+ *
+ * `nome` volta `null` quando o vínculo foi encerrado depois do envio. Aí o
+ * título cai para "do seu médico" — nunca um espaço em branco e nunca um
+ * genérico "alguém", que numa tela de gestante lê como erro.
+ */
+function AvisoDePresente({
+  presente,
+  careMode,
+  onFechar,
+  onIrAoCantinho,
+}: {
+  presente: PresenteRecebido;
+  /**
+   * Sim, DE NOVO — e o servidor já filtrou.
+   *
+   * `presenteRecente` devolve `null` em Modo Cuidado, então esta tela não
+   * deveria nem existir no luto. Mas o portão do mascote é o do componente
+   * (`bolha.tsx` rebaixa a arte de comemorar e engole o pulo), e confiar no
+   * chamador já falhou uma vez nesta base. Passar aqui custa uma prop e cobre
+   * o dia em que alguém chamar isto de outro lugar.
+   */
+  careMode: boolean;
+  onFechar: () => void;
+  /** Sem loja aberta (bancada, telas antigas) o botão simplesmente não aparece. */
+  onIrAoCantinho?: () => void;
+}) {
+  /* A festa acontece uma vez, na montagem. `fireConfetti` e `celebrateChime`
+     já respeitam `prefers-reduced-motion` e a ausência de áudio — repetir a
+     checagem aqui seria uma segunda régua para divergir da primeira. */
+  useEffect(() => {
+    if (careMode) return;
+    fireConfetti();
+    celebrateChime(2);
+    celebrateHaptic(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* O nome vem PRONTO do servidor ("Dr. Clóvis", "Ana") — `nome-do-medico.ts`
+     já resolveu título e primeiro nome lá. Montar `Dr(a). ${nome}` aqui era o
+     defeito: o `display_name` do cadastro já traz o título, e a primeira foto
+     desta tela saiu com "Dr(a). Dr. Clóvis Bacha". */
+  const deQuem = presente.nome ?? (presente.de === "medico" ? "O seu médico" : "Uma amiga");
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Você ganhou um presente"
+      className="fixed inset-0 z-[70] flex items-center justify-center p-5"
+      style={{ background: "rgba(38,20,40,0.44)", backdropFilter: "blur(3px)" }}
+      onClick={onFechar}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[340px] rounded-[28px] bg-white p-6 text-center shadow-[0_24px_60px_rgba(0,0,0,0.28)]"
+      >
+        <div className="mx-auto w-fit">
+          <Bolha tamanho={132} humor="comemorando" careMode={careMode} />
+        </div>
+
+        <p className="mt-2 font-serif text-[22px] leading-tight text-slate-800">
+          {deQuem} te mandou um presente
+        </p>
+
+        <p className="mt-3 flex items-center justify-center gap-1.5">
+          <span className="text-[34px] leading-none">🌱</span>
+          <span className="text-[40px] font-black leading-none text-emerald-500">
+            {presente.quantidade}
+          </span>
+        </p>
+        <p className="mt-1 text-sm text-slate-500">
+          Sementinhas já estão no seu saldo — são suas para gastar no Cantinho.
+        </p>
+
+        <div className="mt-5 flex flex-col gap-2">
+          {onIrAoCantinho && (
+            <button
+              onClick={onIrAoCantinho}
+              className="press w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white"
+            >
+              Ver o Cantinho
+            </button>
+          )}
+          <button
+            onClick={onFechar}
+            className="w-full rounded-full py-2.5 text-sm font-semibold text-slate-500"
+          >
+            Agora não
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -333,7 +447,21 @@ interface GestacaoPathProps {
    * trilha) e os outros dois fingem um estado com progresso, porque a tela
    * vazia esconde justamente o anel e o ✓ das linhas.
    */
-  bancada?: { jogos?: boolean; saldo?: number; halves?: number; enfeites?: string[] };
+  bancada?: {
+    jogos?: boolean;
+    saldo?: number;
+    halves?: number;
+    enfeites?: string[];
+    /**
+     * O aviso do presente, sem conta e sem ledger.
+     *
+     * Ele só nasce de uma linha real de `sementinhas_ledger`, então conferir o
+     * desenho exigiria um médico logado presenteando uma paciente logada — e
+     * foi justamente por ninguém conseguir olhar essa tela que ela passou tanto
+     * tempo não existindo.
+     */
+    presente?: PresenteRecebido;
+  };
 }
 
 /* ══════════════════════════ FASES (7 semanas cada) ══════════════════════════ */
@@ -535,6 +663,18 @@ const LS = {
   birth: "dc-path-birth",
   celebrated: "dc-path-birth-celebrated",
 };
+
+/**
+ * A chave do "já vi este presente".
+ *
+ * Carrega o prefixo `dc-path-` de propósito: assim ela entra no blob do
+ * `journey_state` e viaja com a jornada. Sem isso, quem abre o app no celular e
+ * depois no computador receberia o mesmo anúncio duas vezes — e um presente
+ * anunciado duas vezes faz duvidar se chegaram dois.
+ */
+function chaveDoPresente(quando: string): string {
+  return `dc-path-presente-visto-${quando}`;
+}
 
 export function lsGet<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -1192,6 +1332,10 @@ export function GestacaoPath({
   const [stickers, setStickers] = useState<number[]>([]);
   const [doneDays, setDoneDays] = useState<number[]>([]);
   const [saldo, setSaldo] = useState<number | null>(null);
+  /* O presente que o médico (ou a amiga) mandou e que ela ainda não viu.
+     Ver `PresenteRecebido` em `sementinhas.functions.ts` para por que ele
+     precisou existir: o saldo subia sozinho e nada dizia de onde tinha vindo. */
+  const [presente, setPresente] = useState<PresenteRecebido | null>(bancada?.presente ?? null);
   // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
   const [decor, setDecor] = useState<string[]>([]);
   /* Pele das bolinhas. Mora no `journey_state` (chave `dc-path-`), não numa
@@ -1277,6 +1421,14 @@ export function GestacaoPath({
         // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
         if (w.ok && w.careMode) return;
+        /* O anúncio do presente. A chave do "já vi" é o INSTANTE da linha do
+           ledger, e não o valor: dois presentes de 100 no mesmo mês são duas
+           notícias, e uma chave por valor engoliria a segunda. Fica no aparelho
+           — no pior caso ela recebe a boa notícia de novo no computador, que é
+           um erro muito melhor que engolir a única vez que ela apareceria. */
+        if (w.ok && w.presente && !lsGet(chaveDoPresente(w.presente.quando), false)) {
+          setPresente(w.presente);
+        }
         // Itens comprados decoram o Caminho.
         const c = await getCantinho({ data: { accessToken: token } });
         if (c.ok) {
@@ -2261,6 +2413,31 @@ export function GestacaoPath({
             </button>
           )}
         </>
+      )}
+
+      {/* O ANÚNCIO DO PRESENTE. Fora do bloco acima de propósito: aquele some
+          quando ela está arrumando os enfeites, e um presente não pode depender
+          do modo em que a tela está. O Modo Cuidado já foi barrado no servidor
+          (`presenteRecente` devolve `null`), então aqui não há segundo portão a
+          esquecer. */}
+      {presente && (
+        <AvisoDePresente
+          presente={presente}
+          careMode={careMode}
+          onFechar={() => {
+            lsSet(chaveDoPresente(presente.quando), true);
+            setPresente(null);
+          }}
+          onIrAoCantinho={
+            onOpenShop
+              ? () => {
+                  lsSet(chaveDoPresente(presente.quando), true);
+                  setPresente(null);
+                  onOpenShop();
+                }
+              : undefined
+          }
+        />
       )}
 
       {/* Barra do modo Arrumar: bandeja de enfeites + sair. Fica ACIMA da

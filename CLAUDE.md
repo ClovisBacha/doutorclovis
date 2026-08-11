@@ -562,6 +562,53 @@ de entrada:
   o médico PEDINDO um exame por mensagem de texto é outra função — sempre
   foi um modelo de texto, nunca guardou arquivo, e continua existindo.
 
+### O presente do médico agora CHEGA na paciente (ago/2026)
+
+O médico presenteava Sementinhas (`MesadaDoMedico`), o servidor gravava a linha
+em `sementinhas_ledger`, a mesada dele descia e o botão dizia "Enviado ✓". Do
+lado dela: **nada**. O saldo subia sozinho e nenhuma tela dizia de onde veio.
+
+Do lado de quem dá o recurso parecia inteiro; do lado de quem recebe, saldo que
+sobe sozinho é indistinguível de bug. O desenho da mesada inteira (ele dá, **ela
+vê que foi ele**, ela volta) morria no silêncio. A economia tinha 1.300 testes;
+a ENTREGA não tinha nenhum — a mesma armadilha de `bonus-e-mesada.test.ts`.
+
+- **`walletPayload` devolve `presente`** (`sementinhas.functions.ts`): a linha
+  mais recente de presente nos últimos 30 dias, já com o nome de quem deu.
+  Reaproveita o `claimDailyAndGetWallet` que o Caminho já chamava — sem viagem
+  nova ao servidor.
+- **O portão do Modo Cuidado mora DENTRO de `presenteRecente`**, não em cada
+  tela. `presentearPaciente` já recusa enviar no luto, mas o modo pode ser
+  ligado DEPOIS de um presente legítimo, e confete para quem acabou de perder a
+  gestação é o que o Modo Cuidado existe para impedir.
+- **Lê as DUAS razões** (`RAZAO_PRESENTE_MEDICO` e `RAZAO_PRESENTE_AMIGA`): a
+  assinante presenteia as amigas pelo mesmo ledger.
+- **`AvisoDePresente`** (`gestacao-path.tsx`): bolha comemorando, o NOME de quem
+  deu como título e o número embaixo. Nessa ordem — "100 Sementinhas" com o
+  remetente em letrinha viraria extrato bancário, e o nome é o ponto inteiro.
+  O "já vi" é gravado com prefixo `dc-path-`, então viaja no `journey_state` e
+  não reaparece no outro aparelho. A chave é o **instante** da linha, nunca o
+  valor: dois presentes de 100 no mesmo mês são duas notícias.
+- **Push junto** (`sendPushToUser`), depois do `if (!gravou)` — avisar de um
+  presente que não gravou é pior que não avisar. Deep-link `?tab=Caminho`, com
+  a caixa exata: `minha-conta` compara com os rótulos de `TABS` e ignora em
+  silêncio o que não bate.
+- **`nome-do-medico.ts`** nasceu de dois erros simétricos no mesmo dia:
+  `Dr(a). ${display_name}` deu "Dr(a). Dr. Clóvis Bacha", e `split(" ")[0]` deu
+  "**Dr.** te mandou um presente". `display_name` é campo livre e quase todo
+  mundo escreve o título dentro. Régua única, e `aiNameFrom` passou a usá-la.
+- **O painel não esquece mais quem já recebeu**: `EstadoDaMesada.presenteadas`
+  sai dos `dedupe_key` que a mesada já lia. Era memória do componente — bastava
+  recarregar para o botão de uma paciente presenteada voltar a dizer "Dar 30 🌱"
+  e o servidor recusar. O formato da chave (`presente:<medico>:<paciente>:<mês>`)
+  virou construtor + leitor em `economia-sementinhas.ts`, porque estava escrito
+  em três lugares que precisavam concordar.
+- **Bancada:** `/preview-jogo?presente=100&quem=Dr.%20Clóvis%20Bacha` desenha o
+  aviso sem conta e sem ledger — ele só nasce de uma linha real, e foi por essa
+  tela ser impossível de olhar que ela passou tanto tempo não existindo.
+
+Sem migration: tudo sai de colunas que já existem.
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

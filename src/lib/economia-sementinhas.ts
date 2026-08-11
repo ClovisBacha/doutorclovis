@@ -147,6 +147,61 @@ export function mesadaDoMedico(mensagensContratadas: number): number {
 export const PRESENTE_SUGERIDO = 30;
 
 /**
+ * AS DUAS RAZÕES DE PRESENTE, NO ARQUIVO PURO.
+ *
+ * Elas moravam cada uma no seu `*.functions.ts` — o que estava certo enquanto só
+ * quem GRAVA precisava delas. Agora quem LÊ também precisa: a tela da paciente
+ * anuncia o presente, e para isso tem de reconhecer a linha do ledger.
+ *
+ * Importar `mesada.functions` de dentro de `sementinhas.functions` fecharia um
+ * ciclo (a mesada importa a carteira para gravar). Aqui não há ciclo: este
+ * arquivo é puro e já é importado pelos dois lados.
+ *
+ * **Nunca escreva estas strings à mão em outro lugar.** Elas são a chave que
+ * conta a mesada de volta; uma cópia divergente faria o médico ver bolso cheio
+ * enquanto o ledger já estava gasto.
+ */
+export const RAZAO_PRESENTE_MEDICO = "presente-do-medico";
+export const RAZAO_PRESENTE_AMIGA = "presente-de-amiga";
+
+/**
+ * A CHAVE DO PRESENTE DO MÉDICO — construtor e leitor, no mesmo lugar.
+ *
+ * `presente:<medico>:<paciente>:<AAAA-MM>`. Ela faz três trabalhos de uma vez:
+ * é o índice único que impede o segundo presente no mesmo ciclo, é o `LIKE` que
+ * conta a mesada de volta, e é de onde sai a lista de quem já recebeu.
+ *
+ * Os três moravam separados — o construtor numa linha, o prefixo do `LIKE`
+ * escrito à mão três linhas acima, e agora o leitor. Três cópias do mesmo
+ * formato que precisam concordar é como se perde um presente sem erro nenhum:
+ * o médico vê a mesada descer e a lista de presenteadas não muda.
+ */
+export function chaveDoPresente(doctorId: string, patientId: string, ciclo: string): string {
+  return `presente:${doctorId}:${patientId}:${ciclo}`;
+}
+
+/** O `LIKE` que pega todos os presentes de um médico. */
+export function prefixoDosPresentes(doctorId: string): string {
+  return `presente:${doctorId}:%`;
+}
+
+/**
+ * Os ids das pacientes dentro das chaves.
+ *
+ * Uma chave com formato inesperado é DESCARTADA em vez de virar um id
+ * inventado: um id errado aqui desabilitaria o botão de uma paciente que nunca
+ * ganhou nada — o defeito oposto, e pior, porque é silencioso.
+ */
+export function quemJaRecebeu(chaves: (string | null | undefined)[]): string[] {
+  const ids = new Set<string>();
+  for (const k of chaves) {
+    const partes = (k ?? "").split(":");
+    if (partes.length === 4 && partes[0] === "presente" && partes[2]) ids.add(partes[2]);
+  }
+  return [...ids];
+}
+
+/**
  * AS TRÊS CLASSES DE PRESENTE.
  *
  * ─── POR QUE TRÊS, E NÃO UM CAMPO DE DIGITAR ────────────────────────────────

@@ -4,7 +4,9 @@ import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/type
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
 import { quizForDay } from "@/lib/daily-quizzes";
+import { RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_MEDICO } from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
+import { nomeDoMedico } from "@/lib/nome-do-medico";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -112,7 +114,133 @@ async function loadCycleAndGestation(
   return { cycle, gest };
 }
 
-async function walletPayload(db: Db, userId: string) {
+/**
+ * O PRESENTE QUE ALGUÉM DEU A ELA — e por que ele precisava existir.
+ *
+ * ─── O DEFEITO QUE ISTO CONSERTA ────────────────────────────────────────────
+ *
+ * O médico presenteava, o servidor gravava a linha no ledger, o saldo dela
+ * subia — e **nada, em lugar nenhum do app dela, dizia que aquilo aconteceu**.
+ * Ela abriria o Caminho um dia e teria 100 🌱 a mais que ontem, sem explicação.
+ *
+ * Do lado do médico o recurso parecia inteiro: o botão dizia "Enviado ✓" e a
+ * mesada descia. Do lado dela, presente sem remetente é indistinguível de bug —
+ * e presente que ninguém percebe não é presente, é uma linha de banco. O ponto
+ * inteiro do desenho (ele dá, ela vê que foi ELE, ela volta) morria no silêncio.
+ *
+ * ─── MODO CUIDADO É BARRADO AQUI, NÃO NO CHAMADOR ───────────────────────────
+ *
+ * `presentearPaciente` já recusa enviar para quem está em Modo Cuidado, mas o
+ * modo pode ser ligado DEPOIS de um presente legítimo. Anunciar moedinha e
+ * confete para quem acabou de perder a gestação é exatamente o que o Modo
+ * Cuidado existe para impedir — então o portão mora dentro desta função, e não
+ * em cada tela que a chama. É a mesma lição de `recado-da-bolha.ts`: nove
+ * pontos de uso lembram e o décimo esquece.
+ *
+ * ─── A JANELA DE 30 DIAS ────────────────────────────────────────────────────
+ *
+ * Sem ela, uma paciente que ficasse dois meses fora voltaria e receberia o
+ * anúncio de um presente de abril como se fosse de hoje. Trinta dias cobre com
+ * folga o ciclo da mesada, que é o intervalo em que um presente ainda é notícia.
+ */
+export type PresenteRecebido = {
+  /** Quantas Sementinhas. */
+  quantidade: number;
+  /** ISO — também é o que a tela usa para lembrar que já anunciou este. */
+  quando: string;
+  /** Quem deu: o médico dela ou a amiga que a trouxe. */
+  de: "medico" | "amiga";
+  /** Primeiro nome de quem deu, quando dá para saber. */
+  nome: string | null;
+};
+
+const JANELA_DO_PRESENTE_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function presenteRecente(
+  db: Db,
+  userId: string,
+  careMode: boolean,
+): Promise<PresenteRecebido | null> {
+  if (careMode) return null;
+
+  const desde = new Date(Date.now() - JANELA_DO_PRESENTE_MS).toISOString();
+  const { data, error } = await db
+    .from("sementinhas_ledger")
+    .select("amount, reason, created_at")
+    .eq("user_id", userId)
+    .in("reason", [RAZAO_PRESENTE_MEDICO, RAZAO_PRESENTE_AMIGA])
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const linha = (data ?? [])[0] as
+    | Pick<SementinhasLedgerRow, "amount" | "reason" | "created_at">
+    | undefined;
+  /* Falha de leitura → nenhum anúncio. O saldo dela já está certo de qualquer
+     jeito; o que se perde é a festa, e festa errada é pior que festa ausente. */
+  if (error || !linha) return null;
+
+  const de = linha.reason === RAZAO_PRESENTE_MEDICO ? "medico" : "amiga";
+  return {
+    quantidade: linha.amount ?? 0,
+    quando: linha.created_at as string,
+    de,
+    nome: await nomeDeQuemDeu(db, userId, de),
+  };
+}
+
+/**
+ * O NOME DE QUEM DEU — lido do VÍNCULO, nunca gravado no presente.
+ *
+ * A linha do ledger não carrega quem deu (o `dedupe_key` carrega, mas ele é
+ * chave técnica e não deve virar fonte de exibição). O médico sai de
+ * `patient_profiles.doctor_id` e a amiga de `referred_by` — os mesmos campos que
+ * autorizaram o presente lá atrás.
+ *
+ * `null` é resposta legítima: o vínculo pode ter sido encerrado depois. Aí o
+ * anúncio diz "do seu médico" em vez de inventar um nome.
+ */
+async function nomeDeQuemDeu(
+  db: Db,
+  userId: string,
+  de: "medico" | "amiga",
+): Promise<string | null> {
+  const sb = db as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown }> };
+      };
+    };
+  };
+  try {
+    const { data: perfil } = await sb
+      .from("patient_profiles")
+      .select("doctor_id, referred_by")
+      .eq("id", userId)
+      .maybeSingle();
+    const p = perfil as { doctor_id?: string | null; referred_by?: string | null } | null;
+    const quem = de === "medico" ? p?.doctor_id : p?.referred_by;
+    if (!quem) return null;
+
+    const { data: dono } = await sb
+      .from(de === "medico" ? "doctors" : "patient_profiles")
+      .select("display_name")
+      .eq("id", quem)
+      .maybeSingle();
+    const bruto = (dono as { display_name?: string | null } | null)?.display_name ?? "";
+    /* O médico volta como "Dr. Clóvis" (título + primeiro nome, régua única em
+       `nome-do-medico.ts`); a amiga, só o primeiro nome. Nome inteiro estoura
+       o título do aviso, e o cadastro do médico já traz o título dentro do
+       `display_name` — daí o `Dr(a). ${nome}` que eu tinha escrito virar
+       "Dr(a). Dr. Clóvis Bacha" na primeira foto. */
+    if (de === "medico") return nomeDoMedico(bruto);
+    return bruto.trim().split(/\s+/)[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+async function walletPayload(db: Db, userId: string, careMode: boolean) {
   const balance = await computeBalance(db, userId);
   const { data: recent } = await db
     .from("sementinhas_ledger")
@@ -123,6 +251,7 @@ async function walletPayload(db: Db, userId: string) {
   return {
     balance,
     recent: (recent ?? []) as Pick<SementinhasLedgerRow, "amount" | "reason" | "created_at">[],
+    presente: await presenteRecente(db, userId, careMode),
   };
 }
 
@@ -149,7 +278,7 @@ export const claimDailyAndGetWallet = createServerFn({ method: "POST" })
         },
       ]);
     }
-    return { ok: true as const, careMode, ...(await walletPayload(db, uid)) };
+    return { ok: true as const, careMode, ...(await walletPayload(db, uid, careMode)) };
   });
 
 /** Só lê a carteira (sem conceder nada). */
@@ -160,7 +289,8 @@ export const getWallet = createServerFn({ method: "POST" })
     const db = typedDb(supabaseAdmin);
     const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
-    return { ok: true as const, ...(await walletPayload(db, u.user.id)) };
+    const careMode = await isCareModeActive(supabaseAdmin, u.user.id);
+    return { ok: true as const, ...(await walletPayload(db, u.user.id, careMode)) };
   });
 
 /**

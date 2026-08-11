@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { GestacaoPath, lsSet } from "@/components/gestacao-path";
 import { SKIN_KEY } from "@/lib/trilha-skins";
+import { nomeDoMedico } from "@/lib/nome-do-medico";
 
 /**
  * Bancada de design do JOGO (Caminho) — irmã da /preview-home.
@@ -40,6 +41,16 @@ export const Route = createFileRoute("/preview-jogo")({
     /* `?premium=1` só para fotografar a tela liberada. Fora disso a bancada
        mostra o que uma visitante sem assinatura veria. */
     premium: q.premium === "1" || q.premium === true,
+    /* `?presente=100` abre o aviso de "alguém te mandou Sementinhas".
+       Ele só nasce de uma linha real do ledger, então sem isto conferir o
+       desenho exigiria um médico logado presenteando uma paciente logada —
+       e foi por essa tela ser impossível de olhar que ela passou tanto tempo
+       simplesmente não existindo. `?de=amiga` troca o remetente. */
+    presente: Math.max(0, Number(q.presente ?? 0)),
+    de: q.de === "amiga" ? ("amiga" as const) : ("medico" as const),
+    /* Vazio de propósito no padrão: prova o caso do vínculo encerrado, em que
+       o título cai para "O seu médico" em vez de um espaço em branco. */
+    quem: String(q.quem ?? ""),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -48,7 +59,7 @@ export const Route = createFileRoute("/preview-jogo")({
 });
 
 function PreviewJogo() {
-  const { tela, bebe, pele, dia, premium, feitos } = Route.useSearch();
+  const { tela, bebe, pele, dia, premium, feitos, presente, de, quem } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -82,12 +93,29 @@ function PreviewJogo() {
         careMode={false}
         onOpenShop={() => {}}
         bancada={
-          tela === "jogos"
+          tela === "jogos" || presente > 0
             ? {
-                jogos: true,
+                jogos: tela === "jogos",
                 saldo: 125,
                 halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],
+                presente:
+                  presente > 0
+                    ? {
+                        quantidade: presente,
+                        /* Data fixa: a chave do "já vi" é o instante, e uma
+                           data de agora faria a foto marcar visto e a segunda
+                           rodada do Playwright fotografar tela vazia. */
+                        quando: "2026-08-11T12:00:00.000Z",
+                        de,
+                        /* A MESMA régua do servidor, e não o texto cru da URL:
+                           uma bancada que mostra "Dr. Clóvis Bacha" enquanto a
+                           produção mostra "Dr. Clóvis" é um instrumento que
+                           mente — e o defeito que ela existe para pegar é
+                           exatamente um de nome. */
+                        nome: de === "medico" ? nomeDoMedico(quem) : quem || null,
+                      }
+                    : undefined,
               }
             : undefined
         }

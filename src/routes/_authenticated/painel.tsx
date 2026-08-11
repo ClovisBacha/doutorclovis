@@ -9827,7 +9827,17 @@ function MeuPerfilSection({
   const temEndereco = !pendencias.some((p) => p.campo === "endereco");
 
   return (
-    <div className="max-w-2xl space-y-4">
+    /* LARGURA: a seção inteira, e não uma coluna estreita dentro dela.
+       Isto era `max-w-2xl` (672px) dentro do `max-w-5xl` (1024px) do painel —
+       ou seja, os cartões ocupavam dois terços da tela e o resto ficava vazio,
+       com a fita de abas acima deles chegando até a borda. Lido de longe,
+       parecia tela cortada pela metade, e era: nenhuma outra aba do painel
+       encolhe assim.
+       A medida de leitura não se perde porque ela mora nos PARÁGRAFOS
+       (`max-w-prose`), não no contêiner, e o formulário abaixo já é
+       `md:grid-cols-2` — com a largura toda ele vira duas colunas de verdade
+       em vez de uma fileira de campos meio vazios. */
+    <div className="space-y-4">
       {/* O aviso fica no TOPO da seção, acima até da cobrança: enquanto ele
           estiver aqui, as pacientes deste médico abrem o SOS e não encontram
           nenhum caminho até ele. */}
@@ -9836,7 +9846,7 @@ function MeuPerfilSection({
           <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
             Suas pacientes estão sem você no botão de emergência
           </p>
-          <p className="mt-1 text-[13px] leading-snug text-rose-900/85 dark:text-rose-200/85">
+          <p className="mt-1 max-w-prose text-[13px] leading-snug text-rose-900/85 dark:text-rose-200/85">
             Falta {!form.crm.trim() ? "o CRM" : ""}
             {!form.crm.trim() && form.whatsapp.replace(/\D/g, "").length < 10 ? " e " : ""}
             {form.whatsapp.replace(/\D/g, "").length < 10 ? "o WhatsApp de emergência" : ""}. Sem
@@ -9879,7 +9889,10 @@ function MeuPerfilSection({
             Faltam {outrasPendencias.length}{" "}
             {outrasPendencias.length === 1 ? "informação" : "informações"} no seu cadastro
           </p>
-          <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+          {/* `max-w-prose` aqui e não no contêiner: com a seção agora ocupando
+              a largura toda, é o parágrafo que precisa de medida de leitura —
+              o cartão pode ser largo, a linha de texto não. */}
+          <p className="mt-1 max-w-prose text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
             Seu perfil aparece na busca, mas <strong>abaixo</strong> de quem preencheu tudo — uma
             paciente que abre um card sem valor, sem convênio e sem formação volta para a lista.
           </p>

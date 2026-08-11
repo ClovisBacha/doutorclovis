@@ -40,15 +40,32 @@ export function MesadaDoMedico({
   const [classe, setClasse] = useState<ClasseDePresente>(CLASSES_DE_PRESENTE[0]);
   const [enviando, setEnviando] = useState<string | null>(null);
   /* Quem já recebeu NESTE ciclo — o servidor deduplica, e a tela precisa contar
-     a mesma história ou o médico clica de novo achando que falhou. */
+     a mesma história ou o médico clica de novo achando que falhou.
+
+     Ele NASCE do servidor (`mesada.presenteadas`), e não vazio. Vazio era um
+     defeito real: bastava recarregar o painel para o botão de uma paciente já
+     presenteada voltar a dizer "Dar 30 🌱", o clique ser recusado, e o recurso
+     parecer quebrado exatamente quando estava funcionando. */
   const [presenteadas, setPresenteadas] = useState<Set<string>>(new Set());
+
+  /* Uma função só para as duas portas de entrada (a leitura inicial e cada
+     resposta de envio): mesada e lista de presenteadas viajam juntas, e
+     atualizar uma sem a outra é como as duas passaram a discordar antes. */
+  function aplicar(m: EstadoDaMesada) {
+    setMesada(m);
+    setPresenteadas((s) => {
+      const nova = new Set(s);
+      for (const id of m.presenteadas ?? []) nova.add(id);
+      return nova;
+    });
+  }
 
   useEffect(() => {
     (async () => {
       try {
         const { getMesada } = await import("@/lib/mesada.functions");
         const res = await getMesada({ data: { accessToken: await tokenFn() } });
-        if (res.ok) setMesada(res.mesada);
+        if (res.ok) aplicar(res.mesada);
       } catch {
         /* Sem mesada, o cartão simplesmente não aparece. */
       } finally {
@@ -81,10 +98,10 @@ export function MesadaDoMedico({
         },
       });
       if (res.ok) {
-        setMesada(res.mesada);
+        aplicar(res.mesada);
         setPresenteadas((s) => new Set(s).add(p.id));
         toast.success(
-          `${classe.emoji} ${classe.quantidade} Sementinhas para ${nomeCurto(p)} — ela recebe agora.`,
+          `${classe.emoji} ${classe.quantidade} Sementinhas para ${nomeCurto(p)} — ela recebe um aviso com o seu nome.`,
         );
         return;
       }
@@ -100,7 +117,7 @@ export function MesadaDoMedico({
               : res.error === "sem_vinculo"
                 ? `${nomeCurto(p)} não está mais vinculada a você.`
                 : "Não foi possível enviar o presente.";
-      if ("mesada" in res && res.mesada) setMesada(res.mesada);
+      if ("mesada" in res && res.mesada) aplicar(res.mesada);
       if (res.error === "ja_presenteada") setPresenteadas((s) => new Set(s).add(p.id));
       toast(mensagem, { duration: 6000 });
     } catch {
@@ -208,9 +225,13 @@ export function MesadaDoMedico({
         </ul>
       )}
 
+      {/* O que ela vê. Sem esta linha o médico não tinha como saber se o
+          presente chega até ela ou se some no saldo — e foi exatamente essa
+          dúvida que revelou que, até aqui, ele SUMIA mesmo. */}
       <p className="mt-3 text-xs text-muted-foreground">
-        Uma paciente por mês, cada. Quem está em Modo Cuidado não recebe — o app desliga toda a
-        gamificação para quem perdeu a gestação.
+        Ela recebe uma notificação com o seu nome e, ao abrir o Caminho, um aviso de que o presente
+        veio de você. Uma paciente por mês, cada. Quem está em Modo Cuidado não recebe — o app
+        desliga toda a gamificação para quem perdeu a gestação.
       </p>
     </div>
   );

@@ -33,7 +33,14 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { PRESENTE_SUGERIDO, mesadaDoMedico } from "@/lib/economia-sementinhas";
+import {
+  PRESENTE_SUGERIDO,
+  RAZAO_PRESENTE_MEDICO,
+  chaveDoPresente,
+  mesadaDoMedico,
+  prefixoDosPresentes,
+  quemJaRecebeu,
+} from "@/lib/economia-sementinhas";
 
 /**
  * O médico da sessão — cópia local, como fazem `secondbrain`, `clinical`,
@@ -55,8 +62,14 @@ async function medicoDaSessao(accessToken: string): Promise<{ id: string } | nul
   return doc && doc.active !== false ? { id: u.user.id } : null;
 }
 
-/** A razão gravada no ledger — é por ela que a mesada é contada de volta. */
-export const RAZAO_PRESENTE = "presente-do-medico";
+/**
+ * A razão gravada no ledger — é por ela que a mesada é contada de volta.
+ *
+ * O valor mora em `economia-sementinhas.ts` (puro) porque a tela da PACIENTE
+ * também precisa reconhecê-lo para anunciar o presente, e ela não pode importar
+ * este arquivo de servidor.
+ */
+export const RAZAO_PRESENTE = RAZAO_PRESENTE_MEDICO;
 
 export type EstadoDaMesada = {
   /** O bolso do mês, em Sementinhas. */
@@ -67,6 +80,20 @@ export type EstadoDaMesada = {
   restante: number;
   /** O valor sugerido no botão de um clique. */
   sugerido: number;
+  /**
+   * Quem JÁ recebeu neste ciclo.
+   *
+   * A tela guardava isso só na memória do componente, então bastava recarregar
+   * o painel para todos os botões voltarem a dizer "Dar 30 🌱" — inclusive o da
+   * paciente presenteada dez minutos antes. O médico clicava, o servidor
+   * recusava com "já ganhou um presente seu neste mês", e o recurso passava a
+   * parecer quebrado justamente quando estava funcionando.
+   *
+   * Sai dos `dedupe_key` que a própria mesada já lê para contar o gasto — sem
+   * consulta nova e sem uma segunda fonte de verdade que possa discordar do
+   * número exibido ao lado.
+   */
+  presenteadas: string[];
 };
 
 /**
@@ -112,23 +139,27 @@ export async function lerMesada(sb: any, doctorId: string): Promise<EstadoDaMesa
      chance de o painel dizer um número e o extrato dela dizer outro. */
   const { data, error } = await sb
     .from("sementinhas_ledger")
-    .select("amount")
+    .select("amount, dedupe_key")
     .eq("reason", RAZAO_PRESENTE)
-    .like("dedupe_key", `presente:${doctorId}:%`)
+    .like("dedupe_key", prefixoDosPresentes(doctorId))
     .gte("created_at", inicioDoCiclo().toISOString())
     .limit(5000);
 
   /* Falha de leitura → mesada ZERADA, não cheia. Errar para o lado de não
      presentear é chato; errar para o outro deixa o médico distribuir sem teto
      e some com a única trava que existe. */
-  if (error) return { total, usado: total, restante: 0, sugerido: PRESENTE_SUGERIDO };
+  if (error) {
+    return { total, usado: total, restante: 0, sugerido: PRESENTE_SUGERIDO, presenteadas: [] };
+  }
 
-  const usado = ((data ?? []) as { amount: number }[]).reduce((s, l) => s + (l.amount ?? 0), 0);
+  const linhas = (data ?? []) as { amount: number; dedupe_key: string | null }[];
+  const usado = linhas.reduce((s, l) => s + (l.amount ?? 0), 0);
   return {
     total,
     usado,
     restante: Math.max(0, total - usado),
     sugerido: PRESENTE_SUGERIDO,
+    presenteadas: quemJaRecebeu(linhas.map((l) => l.dedupe_key)),
   };
 }
 
@@ -203,8 +234,9 @@ export const presentearPaciente = createServerFn({ method: "POST" })
     const { inicioDoCiclo } = await import("@/lib/cota-ia.server");
     const ciclo = inicioDoCiclo().toISOString().slice(0, 7);
     /* 3. UM POR PACIENTE POR CICLO — a chave carrega médico, paciente e ciclo,
-          e o índice único de `sementinhas_ledger` recusa o segundo. */
-    const dedupeKey = `presente:${doctorId}:${data.patientId}:${ciclo}`;
+          e o índice único de `sementinhas_ledger` recusa o segundo. O formato
+          mora em `economia-sementinhas.ts`, junto do `LIKE` que a lê de volta. */
+    const dedupeKey = chaveDoPresente(doctorId, data.patientId, ciclo);
 
     /* ─── CONFERE O TETO ANTES, E NÃO DESFAZ DEPOIS ───────────────────────
      *
@@ -271,6 +303,42 @@ export const presentearPaciente = createServerFn({ method: "POST" })
     const depois = await lerMesada(sb, doctorId);
     if (!gravou) {
       return { ok: false as const, error: "nao_gravou" as const, mesada: depois };
+    }
+
+    /* ─── E AGORA ELA FICA SABENDO ────────────────────────────────────────
+     *
+     * Sem isto, o presente era uma linha de banco: o saldo dela subia e nada,
+     * em canto nenhum do app, dizia que o médico tinha feito aquilo. O ponto do
+     * desenho é ELA saber que foi ele — o push é o único canal que funciona com
+     * o app fechado, que é onde ela está na maior parte do tempo.
+     *
+     * Depois do `if (!gravou)`, de propósito: avisar de um presente que não foi
+     * gravado é pior que não avisar. E best-effort — `sendPushToUser` engole os
+     * próprios erros, e um push que não sai não pode desfazer um presente que
+     * já está no ledger. */
+    try {
+      const { sendPushToUser } = await import("@/lib/push.server");
+      const { data: eu } = await sb
+        .from("doctors")
+        .select("display_name")
+        .eq("id", doctorId)
+        .maybeSingle();
+      /* `nomeDoMedico` e não `split(" ")[0]`: o `display_name` do cadastro já
+         traz o título, então a primeira parte é "Dr." — e o push chegaria
+         dizendo "Dr. te mandou um presente". Mesma régua do aviso na tela dela,
+         para os dois textos nunca chamarem a mesma pessoa de nomes diferentes. */
+      const { nomeDoMedico } = await import("@/lib/nome-do-medico");
+      const nome = nomeDoMedico(eu?.display_name as string | null);
+      await sendPushToUser(data.patientId, {
+        title: nome ? `${nome} te mandou um presente 🌱` : "Você ganhou um presente 🌱",
+        body: `${quanto} Sementinhas para gastar no seu Cantinho.`,
+        /* "Caminho" com C maiúsculo: o deep-link de `minha-conta` compara o
+           `?tab=` com os rótulos de `TABS` e ignora o que não bate — errar a
+           caixa deixaria o push abrindo a aba do Bebê, sem erro nenhum. */
+        url: "/minha-conta?tab=Caminho",
+      });
+    } catch {
+      /* best-effort: o presente já está gravado. */
     }
 
     return { ok: true as const, mesada: depois, quantidade: quanto };
