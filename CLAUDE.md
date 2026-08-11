@@ -761,6 +761,12 @@ destranca três itens da loja.
   números, e o dono viu. `deslocamentoDaLinha` recebe altura e fração e devolve
   o `translateY` — px cravado quebraria no primeiro ícone que mudasse de
   tamanho. Depois: 31,67 · 31,67 · 32,00.
+  ⚠️ **`baseDaTinta: 1` é sinal de estimativa, não de medição.** Nenhuma das
+  quatro artes da fita encosta na borda do quadro — chama acesa 0,7813, chama
+  apagada 0,7879, amigas 0,9242, troféu 0,9833. Escrevi `1` duas vezes por
+  suposição e as duas custaram uma volta: o ícone das Amigas nasceu 1,67px
+  acima da linha (o dono viu) e o contorno da chama apagada, 5,5px. O teste
+  `alinhar-na-linha.test.ts` agora recusa qualquer `1`.
   ⚠️ **Medir a tinta DENTRO da fita não funciona**: o `bg-background/95` dela é
   opaco e vira "tinta" em toda linha — foi assim que uma verificação minha
   "aprovou" três ícones desalinhados. Mede-se o ícone isolado sobre fundo

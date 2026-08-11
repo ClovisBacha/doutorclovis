@@ -43,6 +43,16 @@ import chamaSprite from "@/assets/chama-sequencia.webp";
  */
 const BASE_DA_TINTA = 0.7813;
 
+/**
+ * A mesma medida para o contorno de APAGADA (0,7879).
+ *
+ * Estava como `1` — estimativa, e errada por 5,5px: o traço vai de y=2,5 a
+ * y≈18,9 num `viewBox` de 24 e não encosta em lugar nenhum. Que ela caia tão
+ * perto da acesa (0,7813) é o que importa aqui: a chama não pula de altura no
+ * dia em que a paciente fecha o primeiro momento e ela acende.
+ */
+const BASE_DA_TINTA_APAGADA = 0.7879;
+
 export function ChamaDaSequencia({
   acesa,
   tamanho = 26,
@@ -57,8 +67,7 @@ export function ChamaDaSequencia({
   fonteAoLado?: number;
   className?: string;
 }) {
-  /* O contorno de apagado é um traço que encosta na borda do viewBox, então a
-     tinta dele vai até 1 — outra fração, mesma régua. */
+  /* Duas frações medidas, uma régua só — ver as constantes acima. */
   const deslocar = (baseDaTinta: number) =>
     `translateY(${deslocamentoDaLinha({ altura: tamanho, baseDaTinta, fonte: fonteAoLado })}px)`;
   /* APAGADA NÃO CARREGA A FOLHA. Quem está em zero dias é justamente quem
@@ -74,7 +83,7 @@ export function ChamaDaSequencia({
         viewBox="0 0 24 24"
         aria-hidden
         className={`shrink-0 ${className}`}
-        style={{ transform: deslocar(1) }}
+        style={{ transform: deslocar(BASE_DA_TINTA_APAGADA) }}
       >
         <path
           d="M12 2.5c.6 3.2-1.2 4.4-2.6 5.8C8 9.7 7 11 7 13.4a5 5 0 0 0 10 0c0-2-.8-3.4-1.8-4.7-.5 1-1.2 1.6-2 1.9.6-2.6-.2-5.6-1.2-8.1Z"

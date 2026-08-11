@@ -85,11 +85,29 @@ describe("a fita usa a régua, e não px soltos", () => {
   const chama = readFileSync("src/components/chama-sequencia.tsx", "utf8");
 
   test("os três passam por `deslocamentoDaLinha`", () => {
-    /* O calendário saiu da fita (virou o ícone das Amigas, a pedido do dono),
-       e a arte nova encosta na borda do `viewBox` — fração 1, mesma régua. */
-    expect(jogo).toContain("deslocamentoDaLinha({ altura: 22, baseDaTinta: 1 })");
+    /* O calendário saiu da fita (virou o ícone das Amigas, a pedido do dono).
+       A fração dele é 0,9242 — MEDIDA com o ícone isolado sobre fundo
+       transparente. Eu tinha estimado 1, supondo que o disco do `+` encostasse
+       na borda do `viewBox`, e o ícone subiu 1,67px acima da linha. */
+    expect(jogo).toContain("deslocamentoDaLinha({ altura: 22, baseDaTinta: 0.9242 })");
     expect(trofeu).toContain("deslocamentoDaLinha({");
     expect(chama).toContain("deslocamentoDaLinha({");
+  });
+
+  test("nenhuma fração da fita é 1 — nenhuma arte encosta na borda", () => {
+    /* `1` é o valor que se escreve quando se ESTIMA em vez de medir: significa
+       "a tinta vai até a borda do quadro", e nenhum dos três ícones faz isso
+       (0,7813 · 0,9242 · 0,9833). Um `1` reaparecendo aqui é o sinal de que
+       alguém pulou a medição — foi assim que o ícone das Amigas nasceu 1,67px
+       acima da linha. */
+    expect(jogo).not.toMatch(/baseDaTinta: 1\s*\}/);
+    expect(trofeu).not.toMatch(/const BASE_DA_TINTA = 1;/);
+    /* A chama tem DUAS artes — acesa e o contorno de apagada —, e a apagada
+       também estava em 1 (5,5px alta). As duas medidas caem quase juntas
+       (0,7813 e 0,7879), que é o que impede a chama de pular de altura no dia
+       em que ela acende. */
+    expect(chama).not.toMatch(/deslocar\(1\)/);
+    expect(chama).toMatch(/const BASE_DA_TINTA_APAGADA = 0\.7879;/);
   });
 
   test("as frações são constantes nomeadas, não literais no meio do JSX", () => {

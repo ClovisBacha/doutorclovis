@@ -2485,12 +2485,17 @@ export function GestacaoPath({
           aria-label="Abrir as Amigas"
           className="press flex items-center gap-1.5 rounded-full px-1 py-0.5 disabled:opacity-100"
         >
-          {/* A tinta do ombro encosta na borda do `viewBox`, então a fração é
-              1 — mesma régua da chama e do troféu. Ver `alinhar-na-linha`. */}
+          {/* 0,9242 é MEDIDO com o ícone isolado sobre fundo transparente.
+
+              Eu tinha ESTIMADO 1, supondo que o disco do `+` encostasse na
+              borda do `viewBox` — ele para em y≈22,2 de 24. A diferença
+              levantava o ícone 1,67px acima da linha dos números, e o dono viu
+              na fita. É a terceira vez nesta fita que estimar custa uma volta:
+              a fração se mede, nunca se supõe. */}
           <IconeAmigas
             className="h-[22px] w-[22px] text-sky-500"
             style={{
-              transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 1 })}px)`,
+              transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 0.9242 })}px)`,
             }}
           />
           {/* O NÚMERO, no mesmo peso da chama e do troféu — a fita é um placar
