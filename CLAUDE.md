@@ -843,6 +843,37 @@ dupla de sequência**.
   dele — `lerDupla` engole a falha e devolve `null`, então lista, perfil,
   Cantinho e presente funcionam antes de ele rodar.
 
+### A Central de Emergência segue o modelo do dono (ago/2026)
+
+A primeira dobra do SOS (`emergency-sheet.tsx`) foi refeita a partir de uma
+imagem de referência do Drive. **O que mudou não foi estilo: foi HIERARQUIA.**
+
+Antes, a primeira coisa da tela eram dois botões lado a lado (192 e WhatsApp), e
+o "pedir socorro" vinha depois como uma pílula fina. Agora o SOS é um círculo de
+66% da largura e os outros números viram "Outras opções" abaixo dele.
+
+A razão é o dedo em pânico: um alvo circular de ~250px acerta-se sem mirar, e é
+o ÚNICO caminho da tela que avisa médico e contato de uma vez, com localização,
+sem ela digitar nada. Os outros dois exigem que ela saiba o que dizer a um
+estranho.
+
+- **A ordem da tela**: título · círculo SOS · "avisa X e Y, **sem você precisar
+  escrever nada**" · estado da localização · "Outras opções" · 192 e WhatsApp ·
+  CVV. O 193 desceu para depois do CVV — não saiu do app, saiu da disputa pelo
+  olho de quem está em pânico.
+- **Telefone e pin são DESENHADOS, não emoji.** 📞 sai preto no iOS, e o modelo
+  pede vermelho no cartão do 192 e verde no do WhatsApp. Mesma lição do
+  calendário da fita: emoji tem cor própria em cada sistema.
+- **Cores amostradas da referência**, não estimadas: vermelho do círculo
+  `#fd1010→#e80709`, verde do WhatsApp `#2da348→#259941`.
+- **O cartão do 192 é CLARO**, e não vermelho cheio: vermelho cheio ao lado do
+  círculo do SOS faria dois "botões de emergência" disputando o olho.
+- Nenhum estado se perdeu — `sending`/`sent`/`ninguem`, o recuo para 193 quando
+  o médico não tem telefone, o aviso de perfil incompleto e o painel de "quem
+  foi avisado" continuam iguais.
+- **Bancada:** `/preview-sos` (e `?outro=1` para ver o cartão verde do WhatsApp,
+  `?semtel=1` para o recuo, `?vazio=1` para o perfil incompleto).
+
 ### Ciclo menstrual + cérebro do paciente
 
 - `buildCycleMoodBlock` em `src/routes/api/chat.ts` injeta no system prompt o

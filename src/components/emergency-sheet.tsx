@@ -361,120 +361,154 @@ export function EmergencySheet({
       >
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
 
-        <div className="flex items-center justify-between">
-          <p className="font-serif text-xl text-foreground">Emergência</p>
+        {/* ─────────────────────────────────────────────────────────────
+            A PRIMEIRA DOBRA SEGUE O MODELO APROVADO (ago/2026).
+
+            O que mudou não foi só estilo: mudou a HIERARQUIA. Antes, a
+            primeira coisa da tela eram dois botões lado a lado (192 e
+            WhatsApp) e o "pedir socorro" vinha depois, como uma pílula fina.
+            Agora o SOS é um círculo que ocupa dois terços da largura e os
+            outros números viram "Outras opções" abaixo dele.
+
+            A razão é o dedo em pânico: um alvo circular de ~250px acerta-se
+            sem mirar, e é o único caminho da tela que avisa MÉDICO e CONTATO
+            de uma vez, com localização, sem ela digitar nada. Os outros dois
+            exigem que ela saiba o que dizer a um estranho.
+            ───────────────────────────────────────────────────────────── */}
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[2rem] font-extrabold leading-none tracking-tight text-foreground">
+            Emergência
+          </p>
           <button
             onClick={onClose}
             aria-label="Fechar"
-            className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground"
+            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card text-xl text-foreground shadow-[0_2px_10px_rgba(0,0,0,0.10)] ring-1 ring-black/5"
           >
-            ×
+            ✕
           </button>
         </div>
 
-        {/* Ações imediatas */}
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <a
-            href="tel:192"
-            className="flex flex-col items-center gap-1 rounded-2xl bg-rose-500 px-4 py-4 text-center text-sm font-semibold text-white"
+        {/* ── O BOTÃO SOS ────────────────────────────────────────────────
+            Círculo, e não retângulo: num alvo redondo qualquer direção do
+            toque cai dentro, e o anel branco com halo o separa do fundo sem
+            depender da cor — que é o que faz ele continuar óbvio para quem
+            enxerga pouco ou está com a tela no sol. */}
+        <div className="mt-5 flex justify-center">
+          <button
+            onClick={sendLocation}
+            disabled={panic !== "idle"}
+            aria-label="Pedir socorro agora"
+            className="press relative flex aspect-square w-[min(66vw,16.5rem)] items-center justify-center rounded-full disabled:opacity-90"
+            style={{
+              /* Halo VERMELHO por fora e anel BRANCO por dentro: os dois
+                 juntos sustentam o botão sobre fundo claro e sobre a foto de
+                 um hospital, que é onde esta tela costuma ser aberta. */
+              background:
+                panic === "ninguem"
+                  ? "linear-gradient(180deg,#f0a30a,#d98600)"
+                  : "linear-gradient(180deg,#fd1010,#e80709)",
+              boxShadow:
+                "0 0 0 8px #fff, 0 0 0 12px rgba(253,16,16,0.16), 0 18px 40px -12px rgba(232,7,9,0.55)",
+            }}
           >
-            <span className="text-2xl">🚑</span>
-            Ligar 192 (SAMU)
-          </a>
-          {medZap ? (
-            <a
-              href={medZap}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
-            >
-              <span className="text-2xl">💬</span>
-              WhatsApp do médico
-            </a>
-          ) : (
-            /* Médico vinculado sem telefone cadastrado. O lugar não fica
-               vazio: 193 é um número que atende sempre, em qualquer estado. */
-            <a
-              href="tel:193"
-              className="flex flex-col items-center gap-1 rounded-2xl bg-primary px-4 py-4 text-center text-sm font-semibold text-primary-foreground"
-            >
-              <span className="text-2xl">🚒</span>
-              Ligar 193 (Bombeiros)
-            </a>
-          )}
+            <span className="flex flex-col items-center px-6 text-white">
+              {panic === "idle" ? (
+                <>
+                  {/* A sirene, desenhada: emoji de sirene tem cor e forma
+                      próprias em cada sistema, e este é o único desenho da
+                      tela que precisa ler igual em todo aparelho. */}
+                  <svg viewBox="0 0 48 40" className="h-9 w-11" aria-hidden fill="currentColor">
+                    <path d="M24 12c5.2 0 9.4 4.2 9.4 9.4V27H14.6v-5.6C14.6 16.2 18.8 12 24 12z" />
+                    <rect x="11.5" y="28.4" width="25" height="4.4" rx="2.2" />
+                    <g strokeWidth="2.6" stroke="currentColor" strokeLinecap="round">
+                      <path d="M24 6.5V2.6" />
+                      <path d="M34.6 10.4l2.8-2.8" />
+                      <path d="M13.4 10.4l-2.8-2.8" />
+                      <path d="M39.4 19.6h4" />
+                      <path d="M8.6 19.6h-4" />
+                    </g>
+                  </svg>
+                  <span className="mt-1 text-[clamp(3.2rem,17vw,4.6rem)] font-black leading-[0.9] tracking-[-0.02em]">
+                    SOS
+                  </span>
+                  <span className="mt-1 text-center text-[clamp(1rem,4.6vw,1.3rem)] font-semibold leading-tight">
+                    Pedir socorro agora
+                  </span>
+                </>
+              ) : (
+                <span className="text-center text-[clamp(1.05rem,4.8vw,1.35rem)] font-bold leading-snug">
+                  {panic === "sending"
+                    ? "Localizando e avisando…"
+                    : panic === "sent"
+                      ? "✓ Aviso enviado"
+                      : "Ninguém foi avisado — ligue 192"}
+                </span>
+              )}
+            </span>
+          </button>
         </div>
-        {!medZap && !medTel && (
-          <p className="mt-2 rounded-xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900">
-            {medNome
-              ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
-              : medicoIndefinido
-                ? "Carregando os dados do seu médico… o 192 e o 193 acima funcionam agora."
-                : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
-          </p>
-        )}
-        {medTel && (
-          <a
-            href={medTel}
-            className="mt-2 flex items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-foreground"
-          >
-            📞 Ligar para {medNome.split(" ").slice(0, 2).join(" ")}
-          </a>
-        )}
 
-        {/* Pedir socorro: um toque, o servidor avisa. */}
-        <button
-          onClick={sendLocation}
-          disabled={panic !== "idle"}
-          className={`mt-2 flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold text-white disabled:opacity-70 ${
-            panic === "ninguem" ? "bg-amber-600" : "bg-rose-600"
-          }`}
-        >
-          {panic === "sending"
-            ? "📍 Localizando e avisando…"
-            : panic === "sent"
-              ? "✓ Aviso enviado"
-              : panic === "ninguem"
-                ? "⚠️ Ninguém foi avisado — ligue 192"
-                : "🆘 Pedir socorro agora"}
-        </button>
         {panic === "idle" && (
           <>
-            <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
-              Avisa{" "}
-              {[
-                medNome ? medNome.split(" ").slice(0, 2).join(" ") : null,
-                info.emergencyContact ? info.emergencyContact.split(" ")[0] : null,
-              ]
-                .filter(Boolean)
-                .join(" e ") || "quem você cadastrou"}
-              {posicao ? " com a sua localização" : ""}, sem você precisar escrever nada.
-            </p>
-            {/* O estado da localização, ANTES da emergência.
+            {/* ── O QUE O BOTÃO FAZ, antes de ela apertar ──────────────
+                A frase mais importante da tela é a segunda: "sem você
+                precisar escrever nada". É ela que responde ao medo de quem
+                está passando mal e não sabe o que dizer. */}
+            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-card px-3.5 py-3 ring-1 ring-black/5">
+              {/* Pin desenhado pelo mesmo motivo do fone. */}
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-500/15">
+                <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden fill="currentColor">
+                  <path d="M12 2.2c-4 0-7.2 3.2-7.2 7.2 0 5.4 6.4 11.6 6.7 11.9.3.3.7.3 1 0 .3-.3 6.7-6.5 6.7-11.9 0-4-3.2-7.2-7.2-7.2zm0 9.9a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4z" />
+                </svg>
+              </span>
+              <p className="text-[13.5px] leading-snug text-foreground">
+                Avisa{" "}
+                {[
+                  medNome ? medNome.split(" ").slice(0, 2).join(" ") : null,
+                  info.emergencyContact ? info.emergencyContact.split(" ")[0] : null,
+                ]
+                  .filter(Boolean)
+                  .join(" e ") || "quem você cadastrou"}
+                {posicao ? " com a sua localização" : ""},{" "}
+                <strong className="font-bold text-rose-600 dark:text-rose-400">
+                  sem você precisar escrever nada.
+                </strong>
+              </p>
+            </div>
 
+            {/* ── O ESTADO DA LOCALIZAÇÃO, ANTES DA EMERGÊNCIA ─────────
                 A hora de descobrir que o aviso vai sair sem localização não é
                 depois de apertar — é agora, com calma, quando ainda dá para
                 liberar a permissão. */}
-            {posicao ? (
-              <p className="mt-1 text-center text-[11px] font-medium text-emerald-700">
-                📍 Localização pronta
-              </p>
-            ) : posicaoNegada ? (
-              <button
-                type="button"
-                onClick={() =>
-                  toast("Libere a localização nos ajustes do navegador e reabra esta tela.", {
-                    duration: 7000,
-                  })
-                }
-                className="mt-1 block w-full text-center text-[11px] font-medium text-amber-700 underline underline-offset-2"
-              >
-                📍 Sem permissão de localização — o aviso vai sem ela
-              </button>
-            ) : (
-              <p className="mt-1 text-center text-[11px] text-muted-foreground">
-                📍 Buscando sua localização…
-              </p>
-            )}
+            <div className="mt-2.5 flex justify-center">
+              {posicao ? (
+                <span className="flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-1.5 text-[13px] font-bold text-emerald-700 dark:bg-emerald-500/12 dark:text-emerald-300">
+                  <span className="h-2 w-2 rounded-full bg-emerald-600" aria-hidden />
+                  Localização pronta
+                </span>
+              ) : posicaoNegada ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    toast("Libere a localização nos ajustes do navegador e reabra esta tela.", {
+                      duration: 7000,
+                    })
+                  }
+                  className="flex items-center gap-2 rounded-full bg-amber-50 px-4 py-1.5 text-[13px] font-bold text-amber-800 underline underline-offset-2 dark:bg-amber-500/12 dark:text-amber-300"
+                >
+                  <span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden />
+                  Sem localização — o aviso vai sem ela
+                </button>
+              ) : (
+                <span className="flex items-center gap-2 rounded-full bg-secondary px-4 py-1.5 text-[13px] font-medium text-muted-foreground">
+                  <span
+                    className="h-2 w-2 animate-pulse rounded-full bg-muted-foreground"
+                    aria-hidden
+                  />
+                  Buscando sua localização…
+                </span>
+              )}
+            </div>
           </>
         )}
 
@@ -557,36 +591,161 @@ export function EmergencySheet({
           </div>
         )}
 
-        {/* Terceira camada de urgência: sempre visível, nunca competindo.
-            193 e 188 estavam dentro da carteirinha RECOLHIDA — três toques até
-            um número de socorro. Agora ficam na primeira dobra, mas com metade
-            da altura, sem cor de fundo e com o número em segundo plano: quem
-            varre a tela em pânico continua batendo o olho primeiro no 192
-            vermelho e no botão de socorro. */}
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        {/* ── OUTRAS OPÇÕES ──────────────────────────────────────────────
+            Depois do SOS, e não antes. Os dois são caminhos que EXIGEM que ela
+            saiba o que dizer — para um atendente do SAMU ou para o médico. O
+            botão de cima não exige nada, e por isso vem primeiro. */}
+        <div className="mt-6 flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" aria-hidden />
+          <span className="text-[14px] font-bold text-foreground">Outras opções</span>
+          <span className="h-px flex-1 bg-border" aria-hidden />
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          {/* 192 — cartão CLARO com o telefone vermelho. No modelo ele não é
+              um bloco vermelho cheio: vermelho cheio ao lado do círculo do SOS
+              faria dois "botões de emergência" disputando o olho. */}
+          <a
+            href="tel:192"
+            className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
+          >
+            <span className="text-[2.6rem] leading-none" aria-hidden>
+              🚑
+            </span>
+            <span>
+              <span className="block text-[1.05rem] font-extrabold leading-tight text-foreground">
+                Ligar 192
+              </span>
+              <span className="block text-[1.05rem] font-extrabold leading-tight text-rose-600">
+                (SAMU)
+              </span>
+            </span>
+            {/* O telefone DESENHADO, e não o emoji 📞: emoji tem cor própria em
+                cada sistema (sai preto no iOS) e o modelo pede um fone
+                vermelho aqui e verde no cartão do WhatsApp. É a mesma lição do
+                calendário da fita. */}
+            <span
+              className="flex h-14 w-14 items-center justify-center rounded-full text-rose-600 ring-1 ring-rose-300"
+              aria-hidden
+            >
+              <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden fill="currentColor">
+                <path d="M6.6 3.5c.5 0 1 .3 1.2.8l1.3 3a1.3 1.3 0 0 1-.3 1.5l-1.3 1.1a12 12 0 0 0 5.6 5.6l1.1-1.3a1.3 1.3 0 0 1 1.5-.3l3 1.3c.5.2.8.7.8 1.2v2.7c0 .8-.6 1.4-1.4 1.4C10 20.5 3.5 14 3.5 5.9c0-.8.6-1.4 1.4-1.4h1.7z" />
+              </svg>
+            </span>
+          </a>
+
+          {medZap ? (
+            <a
+              href={medZap}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="press flex flex-col items-center justify-between gap-3 rounded-3xl px-3 py-4 text-center text-white"
+              style={{ background: "linear-gradient(180deg,#2da348,#259941)" }}
+            >
+              {/* O logo desenhado, e não o emoji 💬: o balão genérico não diz
+                  WhatsApp, e é o reconhecimento da marca que faz o dedo ir. */}
+              <svg viewBox="0 0 32 32" className="h-11 w-11" aria-hidden fill="currentColor">
+                <path d="M16 3C8.8 3 3 8.8 3 16c0 2.3.6 4.5 1.7 6.4L3 29l6.8-1.7c1.9 1 4 1.6 6.2 1.6 7.2 0 13-5.8 13-13S23.2 3 16 3zm0 23.6c-2 0-3.9-.5-5.6-1.5l-.4-.2-4 1 1.1-3.9-.3-.4A10.5 10.5 0 015.4 16C5.4 10.2 10.2 5.4 16 5.4S26.6 10.2 26.6 16 21.8 26.6 16 26.6z" />
+                <path d="M21.8 18.6c-.3-.2-1.9-.9-2.2-1s-.5-.2-.7.2c-.2.3-.8 1-1 1.2-.2.2-.4.2-.7.1-.3-.2-1.4-.5-2.6-1.6-1-.9-1.6-1.9-1.8-2.3-.2-.3 0-.5.1-.7l.5-.6c.2-.2.2-.3.3-.5.1-.2 0-.4 0-.6l-1-2.3c-.3-.6-.5-.5-.7-.5h-.6c-.2 0-.6.1-.9.4-.3.3-1.2 1.1-1.2 2.8s1.2 3.3 1.4 3.5c.2.2 2.4 3.7 5.9 5.1 2.9 1.2 3.5 1 4.1.9.6-.1 1.9-.8 2.2-1.5.3-.8.3-1.4.2-1.5-.1-.2-.3-.3-.6-.4z" />
+              </svg>
+              <span className="text-[1.05rem] font-extrabold leading-tight">
+                WhatsApp do médico
+              </span>
+              <span
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-[#259941]"
+                aria-hidden
+              >
+                <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden fill="currentColor">
+                  <path d="M6.6 3.5c.5 0 1 .3 1.2.8l1.3 3a1.3 1.3 0 0 1-.3 1.5l-1.3 1.1a12 12 0 0 0 5.6 5.6l1.1-1.3a1.3 1.3 0 0 1 1.5-.3l3 1.3c.5.2.8.7.8 1.2v2.7c0 .8-.6 1.4-1.4 1.4C10 20.5 3.5 14 3.5 5.9c0-.8.6-1.4 1.4-1.4h1.7z" />
+                </svg>
+              </span>
+            </a>
+          ) : (
+            /* Médico vinculado sem telefone cadastrado, ou nenhum médico. O
+               lugar não fica vazio: 193 atende sempre, em qualquer estado. */
+            <a
+              href="tel:193"
+              className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
+            >
+              <span className="text-[2.6rem] leading-none" aria-hidden>
+                🚒
+              </span>
+              <span>
+                <span className="block text-[1.05rem] font-extrabold leading-tight text-foreground">
+                  Ligar 193
+                </span>
+                <span className="block text-[1.05rem] font-extrabold leading-tight text-rose-600">
+                  (Bombeiros)
+                </span>
+              </span>
+              <span
+                className="flex h-14 w-14 items-center justify-center rounded-full text-rose-600 ring-1 ring-rose-300"
+                aria-hidden
+              >
+                <svg viewBox="0 0 24 24" className="h-7 w-7" aria-hidden fill="currentColor">
+                  <path d="M6.6 3.5c.5 0 1 .3 1.2.8l1.3 3a1.3 1.3 0 0 1-.3 1.5l-1.3 1.1a12 12 0 0 0 5.6 5.6l1.1-1.3a1.3 1.3 0 0 1 1.5-.3l3 1.3c.5.2.8.7.8 1.2v2.7c0 .8-.6 1.4-1.4 1.4C10 20.5 3.5 14 3.5 5.9c0-.8.6-1.4 1.4-1.4h1.7z" />
+                </svg>
+              </span>
+            </a>
+          )}
+        </div>
+
+        {!medZap && !medTel && (
+          <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
+            {medNome
+              ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
+              : medicoIndefinido
+                ? "Carregando os dados do seu médico… o 192 e o 193 acima funcionam agora."
+                : "Você ainda não tem um médico vinculado no app. Use o 192 ou o 193 acima."}
+          </p>
+        )}
+        {medTel && (
+          <a
+            href={medTel}
+            className="press mt-2.5 flex items-center justify-center gap-2 rounded-full bg-card px-4 py-2.5 text-sm font-semibold text-foreground ring-1 ring-black/5"
+          >
+            📞 Ligar para {medNome.split(" ").slice(0, 2).join(" ")}
+          </a>
+        )}
+
+        {/* ── CVV ────────────────────────────────────────────────────────
+            Quase ninguém sabe o que é "CVV", e um número que a pessoa não
+            entende é um número que ela não liga. Por isso a linha explica
+            ANTES de oferecer — e a segunda linha nomeia o que ela está
+            sentindo, que é o que faz alguém reconhecer que é para ela. */}
+        <a
+          href="tel:188"
+          className="press mt-3 flex items-center gap-3 rounded-2xl bg-card px-3.5 py-3 ring-1 ring-black/5"
+        >
+          <span className="text-2xl leading-none" aria-hidden>
+            ❤️
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] leading-snug text-foreground">
+              <strong className="font-bold">CVV:</strong> apoio emocional gratuito, 24h, sigiloso.
+            </span>
+            <span className="block text-[13px] leading-snug text-muted-foreground">
+              Quando a angústia é o que está doendo.
+            </span>
+          </span>
+          <span className="shrink-0 text-xl text-muted-foreground" aria-hidden>
+            ›
+          </span>
+        </a>
+
+        {/* 193 desceu para cá: no modelo aprovado a primeira dobra termina no
+            CVV. Ele não saiu do app — sai da disputa pelo olho de quem está em
+            pânico, que já tem o círculo vermelho e o 192 acima. */}
+        {medZap && (
           <a
             href="tel:193"
-            className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-foreground"
+            className="press mt-2 flex items-center justify-center gap-2 rounded-2xl bg-card px-3 py-2.5 text-[13px] text-foreground ring-1 ring-black/5"
           >
             <span aria-hidden>🚒</span>
-            <span className="font-semibold">193</span>
+            <span className="font-bold">193</span>
             <span className="text-muted-foreground">Bombeiros</span>
           </a>
-          <a
-            href="tel:188"
-            className="flex items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs text-foreground"
-          >
-            <span aria-hidden>💚</span>
-            <span className="font-semibold">188</span>
-            <span className="text-muted-foreground">CVV</span>
-          </a>
-        </div>
-        {/* Quase ninguém sabe o que é "CVV" — e um número que a pessoa não
-            entende é um número que ela não liga. */}
-        <p className="mt-1.5 text-center text-[10.5px] leading-snug text-muted-foreground">
-          CVV: Centro de Valorização da Vida — apoio emocional gratuito, 24h, sigiloso. Para quando
-          a angústia é o que está doendo.
-        </p>
+        )}
 
         {/* Carteirinha de emergência (QR gerado no aparelho) — toca pra ver tudo */}
         <div className="mt-5 rounded-2xl border border-border bg-secondary/40 p-4">
