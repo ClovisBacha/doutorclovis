@@ -637,13 +637,6 @@ function dayGreetingLabel(): string {
   return "Boa noite";
 }
 
-/** dd/mm/aaaa a N dias de hoje (N negativo = passado). Só para exibição. */
-function dateOffsetLabel(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toLocaleDateString("pt-BR");
-}
-
 /**
  * Véu de sonho do tema V1: leva o gradiente de céu à paleta lavanda→rosa→
  * pêssego do conceito. A opacidade CRESCE para a base porque lá o céu diurno
@@ -818,8 +811,9 @@ export function AppHomeScreen({
   onOrigemLocal?: (origem: OrigemLocal | null) => void;
 }) {
   const baby = gest ? babyForWeek(gest.weeks) : null;
-  const progress = gest ? Math.min(100, (gest.totalDays / 280) * 100) : null;
-  const daysLeft = gest ? Math.max(0, 280 - gest.totalDays) : null;
+  /* `progress`, `daysLeft` e `dateOffsetLabel` saíram junto com a barra de
+     progresso. Deixar as três calculadas e sem leitor é o tipo de resto que a
+     próxima pessoa reacende sem saber por que a barra tinha sido tirada. */
   /* A home lê o céu pelo MESMO hook que a tela do jogo. Antes ela tinha a
      conta própria aqui dentro; agora existe uma só, e as duas telas não têm
      como divergir. */
@@ -1291,12 +1285,25 @@ export function AppHomeScreen({
                     sobreposição).
 
                     Agora a folga é repartida por três espaçadores com pesos
-                    fixos. Os pesos não são gosto: saíram das proporções da
-                    referência do rebranding — bolha centrada a 39% da altura,
-                    número a 68%, e um respiro de ~14% antes da barra. Como
-                    são PESOS e não pixels, a mesma proporção vale de um SE a
-                    um Pro Max. */}
-                <div className="flex-[1.15] short:flex-[0.7]" aria-hidden />
+                    fixos, e os pesos saíram de MEDIÇÃO com a área segura do
+                    iPhone injetada — sem ela, o Chromium devolve 0 em
+                    `env(safe-area-inset-*)` e a bancada mede uma tela sem a
+                    ilha dinâmica nem a barra de gestos, que é justamente a
+                    folga que empurra a composição no aparelho de verdade.
+
+                    Medido com 59px em cima e 34px embaixo (iPhone 15 Pro), as
+                    folgas VISÍVEIS eram 100,5 / 75,8 / 111,6px: o grupo ficava
+                    alto e sobrava ar antes da barra — o "centralize" do dono.
+                    Movendo 5,5px do último espaçador para o primeiro, os dois
+                    de fora ficam em 106px e o do meio segue menor (75,8).
+
+                    O meio ser MENOR é de propósito, e não sobra: elementos
+                    próximos lêem como um grupo. Três folgas iguais fariam a
+                    bolha e o número parecerem dois assuntos soltos na tela.
+
+                    Como são PESOS e não pixels, a proporção vale de um SE a um
+                    Pro Max. */}
+                <div className="flex-[1.20] short:flex-[0.73]" aria-hidden />
 
                 <button
                   onClick={() => onNavigate("Bebê", "semana")}
@@ -1437,7 +1444,7 @@ export function AppHomeScreen({
                   </p>
                 </div>
 
-                <div className="flex-[0.85] short:flex-[0.6]" aria-hidden />
+                <div className="flex-[0.80] short:flex-[0.57]" aria-hidden />
               </>
             ) : (
               /* flex-1 centrado: sem isso o texto ficava colado no topo com
@@ -1461,54 +1468,21 @@ export function AppHomeScreen({
               saíram da primeira tela para o bebê caber grande. ── */}
           {gest && baby && (
             <div className="pt-4">
-              {/* ── Progresso em 3 colunas: a barra mora no MEIO, entre as
-                  duas datas — é assim no conceito, não largura cheia. ── */}
-              <div className="rounded-[22px] px-4 py-3 short:py-2" style={glass}>
-                <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
-                  <div className="text-left">
-                    <p className={`text-[10px] font-medium ${cardMuted}`}>Início</p>
-                    <p className={`text-[11px] font-bold ${cardText}`}>
-                      {dateOffsetLabel(-(gest.totalDays ?? 0))}
-                    </p>
-                  </div>
+              {/* ── A BARRA DE PROGRESSO SAIU (ago/2026) ─────────────────
+                  Pedido do dono: "a barra que está aparecendo lá embaixo onde
+                  está escrito 25% concluído não é para aparecer".
 
-                  <div>
-                    <p className={`text-center text-[11px] font-bold ${cardMuted}`}>
-                      {Math.round(progress ?? 0)}% concluído
-                    </p>
-                    {/* Trilho com o coração na posição de hoje */}
-                    <div className="relative mt-1.5 h-5 short:h-4 short:mt-1">
-                      <div
-                        className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full"
-                        style={{
-                          background: darkSky ? "rgba(255,255,255,0.18)" : "rgba(150,110,130,0.16)",
-                        }}
-                      />
-                      <div
-                        className="absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full transition-all duration-700"
-                        style={{
-                          width: `${progress ?? 0}%`,
-                          background: "linear-gradient(90deg, #c4b5fd, #a855f7)",
-                        }}
-                      />
-                      <span
-                        aria-hidden
-                        className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[10px] shadow-md transition-all duration-700"
-                        style={{ left: `${progress ?? 0}%`, background: "#fff" }}
-                      >
-                        💜
-                      </span>
-                    </div>
-                  </div>
+                  Ela mostrava Início · % concluído · Parto previsto. As três
+                  informações continuam no app, e nenhuma se perdeu: a DPP está
+                  na Carteirinha e no Calendário, e a semana — que é o que a
+                  paciente realmente olha — é o número gigante da primeira
+                  dobra, logo acima.
 
-                  <div className="text-right">
-                    <p className={`text-[10px] font-medium ${cardMuted}`}>Parto previsto</p>
-                    <p className={`text-[11px] font-bold ${cardText}`}>
-                      {dateOffsetLabel(daysLeft ?? 0)}
-                    </p>
-                  </div>
-                </div>
-              </div>
+                  O que a barra fazia de diferente era transformar a gestação
+                  numa porcentagem. Num app de gestação de ALTO RISCO isso tem
+                  um custo que um app comum não tem: uma barra que anda sozinha
+                  em direção a um fim marcado é a última coisa que alguém
+                  precisa ver num dia ruim. */}
 
               {/* O convite de ativar a localização saiu daqui.
                   Ele era o terceiro cartão empilhado no alto desta tela, e

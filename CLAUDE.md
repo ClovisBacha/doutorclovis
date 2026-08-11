@@ -903,8 +903,28 @@ entraram **quatro cenas em SVG** (`src/components/ceu-do-dia.tsx`).
 - **A barra de navegação inferior não mudou** — estava fora do escopo por
   pedido explícito.
 
+**A barra de progresso saiu (ago/2026).** Ela mostrava Início · % concluído ·
+Parto previsto na segunda dobra. Nada se perdeu — a DPP está na Carteirinha e
+no Calendário, e a semana é o número gigante da primeira dobra. O que ela fazia
+de diferente era transformar a gestação numa porcentagem, e numa gestação de
+ALTO RISCO uma barra que anda sozinha para um fim marcado tem um custo que num
+app comum ela não tem. `progress`, `daysLeft` e `dateOffsetLabel` saíram junto:
+resto calculado e sem leitor é o que a próxima pessoa reacende sem saber por
+quê.
+
+**Os pesos dos espaçadores saíram de medição COM A ÁREA SEGURA injetada.** O
+Chromium headless devolve 0 em `env(safe-area-inset-*)`, então a bancada media
+uma tela sem a ilha dinâmica nem a barra de gestos — e é essa folga que empurra
+a composição no aparelho de verdade. Com 59/34px (iPhone 15 Pro), as folgas
+visíveis eram 100,5 / 75,8 / 111,6px; depois de mover 5,5px do último espaçador
+para o primeiro (`1.20 / 0.72 / 0.80`), as de fora ficaram em 105,6 e 105,7. O
+meio segue MENOR de propósito: elementos próximos lêem como um grupo, e três
+folgas iguais fariam a bolha e o número parecerem dois assuntos soltos.
+
 **Bancada:** `/preview-home?w=20` renderiza a tela real sem login (`?clima=1`
-liga o clima). O céu vem do relógio do navegador, então o Playwright o escolhe
+liga o clima). Para medir composição, injete
+`:root{--safe-area-inset-top:59px;--safe-area-inset-bottom:34px}` — sem isso
+você mede uma tela que não existe em nenhum iPhone. O céu vem do relógio do navegador, então o Playwright o escolhe
 com `page.clock.setFixedTime` — sempre com offset explícito (`-03:00`), senão
 o fuso do contêiner (UTC) muda a cena.
 
