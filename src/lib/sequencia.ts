@@ -53,6 +53,57 @@ export function sequenciaDeDias(dias: readonly number[], hoje: number): number {
 }
 
 /**
+ * OS DIAS EM QUE ELA FEZ ALGUMA COISA — e por que não são os dias "completos".
+ *
+ * A chama contava `doneDays`: dias com os CINCO momentos fechados. O dono fez
+ * um exercício, a chama não acendeu, e ele estava certo em estranhar — um dia
+ * em que ela abriu o app e cuidou de si é um dia em que ela veio, e a sequência
+ * mede exatamente isso. Exigir os cinco transforma o gancho em cobrança: quem
+ * fez três de cinco fica com o mesmo zero de quem não abriu.
+ *
+ * ─── POR QUE NÃO BASTOU MUDAR `doneDays` ────────────────────────────────────
+ *
+ * Porque `doneDays` não é da chama: ele pinta o nó da trilha como concluído,
+ * solta a figurinha da semana e alimenta o total da jornada. Marcar o dia como
+ * feito por causa de um exercício daria estrela e figurinha por um quinto do
+ * trabalho — e aí o placar de cinco pontinhos passaria a mentir.
+ *
+ * Então são duas perguntas com duas fontes: `doneDays` responde "fechou o dia?"
+ * e esta função responde "ela veio hoje?".
+ *
+ * ─── LÊ O QUE JÁ ESTÁ GRAVADO, EM VEZ DE UMA LISTA NOVA ─────────────────────
+ *
+ * Cada dia já guarda o seu estado em `dc-path-day-<D>`. Derivar daí sai de
+ * graça e, o que importa mais, sai RETROATIVO: o dia que a paciente fez antes
+ * desta mudança conta na mesma hora. Uma lista nova começaria vazia e apagaria
+ * a sequência de todo mundo no dia do deploy.
+ *
+ * Recebe as entradas em vez de ler `localStorage` aqui dentro para poder ser
+ * testada — quem varre o armazenamento é o componente.
+ */
+export function diasComAlgumMomento(
+  entradas: Iterable<readonly [string, string | null]>,
+  prefixo: string,
+): number[] {
+  const dias: number[] = [];
+  for (const [chave, bruto] of entradas) {
+    if (!chave.startsWith(prefixo)) continue;
+    /* O resto da chave tem de ser SÓ dígitos. `dc-path-day-` é prefixo de
+       `dc-path-day-12`, mas também casaria com uma chave futura como
+       `dc-path-day-notas` — que viraria `NaN` e, sem esta guarda, um dia. */
+    const resto = chave.slice(prefixo.length);
+    if (!/^\d+$/.test(resto)) continue;
+    try {
+      const v = JSON.parse(bruto ?? "null");
+      if (v && typeof v === "object" && Object.values(v).some(Boolean)) dias.push(Number(resto));
+    } catch {
+      /* chave corrompida: não conta como dia, e não derruba a contagem */
+    }
+  }
+  return dias;
+}
+
+/**
  * A MESMA CONTAGEM, sobre datas do calendário.
  *
  * O registro da meditação guarda `"2026-08-11"` em vez de dia gestacional —

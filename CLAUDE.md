@@ -680,6 +680,18 @@ enquanto a sequência vive, apagado em zero dias.
   7h e vê zero. `sequenciaDeDatas` converte ISO → dias inteiros em UTC a partir
   de ano/mês/dia LOCAIS; ler a string crua com `new Date` a trataria como UTC e
   em São Paulo tudo antes das 21h viraria o dia anterior.
+- **UM momento já conta o dia** (`diasComAlgumMomento`), e não os cinco. A
+  primeira versão lia `doneDays` — o dono fez um exercício, a chama não acendeu,
+  e ele estava certo: quem fez três de cinco ficava com o mesmo zero de quem
+  não abriu o app. **`doneDays` NÃO mudou** — ele pinta o nó da trilha, solta a
+  figurinha da semana e alimenta o total; dar isso por um exercício faria o
+  placar de cinco pontinhos mentir. São duas perguntas ("fechou o dia?" e "ela
+  veio hoje?") com duas fontes.
+- A lista sai das chaves `dc-path-day-<D>` que já existem, e não de uma lista
+  nova: assim é **retroativo** (o dia que ela fez antes do deploy conta na
+  hora), e uma lista nova nasceria vazia zerando a sequência de todo mundo. Os
+  prefixos saem de `LS.dayTasks(0)`/`LS.posDayTasks(0)`, nunca escritos à mão —
+  uma cópia divergente faria a chama parar de acender sem erro nenhum.
 - **Reproduzível:** `node scripts/chama-sprite.mjs <video.webm>`. Ele ABORTA se
   a origem não tiver alfa, em vez de gravar uma folha opaca.
 - **Bancada:** `/preview-jogo?streak=7` acende a chama sem conta — ela só arde

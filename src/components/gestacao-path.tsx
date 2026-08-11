@@ -413,7 +413,12 @@ import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
-import { sequenciaAcesa, sequenciaDeDatas, sequenciaDeDias } from "@/lib/sequencia";
+import {
+  diasComAlgumMomento,
+  sequenciaAcesa,
+  sequenciaDeDatas,
+  sequenciaDeDias,
+} from "@/lib/sequencia";
 import { faixaDaHora, recadoDaBolha } from "@/lib/recado-da-bolha";
 /* Arte própria desta tela, feita a partir do desenho de referência. Ela mora
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
@@ -684,6 +689,28 @@ const LS = {
  */
 function chaveDoPresente(quando: string): string {
   return `dc-path-presente-visto-${quando}`;
+}
+
+/* Os dois prefixos que `diasComAlgumMomento` varre. Saem de `LS.dayTasks(0)`
+   e `LS.posDayTasks(0)` em vez de escritos à mão: são a MESMA chave que a
+   gravação usa, e uma cópia divergente faria a chama nunca acender sem erro
+   nenhum aparecer. */
+const DIA_KEY = LS.dayTasks(0).slice(0, -1);
+const POS_DIA_KEY = LS.posDayTasks(0).slice(0, -1);
+
+/** As chaves do armazém, para a varredura da sequência. */
+function entradasDoArmazem(): [string, string | null][] {
+  if (typeof window === "undefined") return [];
+  const fora: [string, string | null][] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k) fora.push([k, localStorage.getItem(k)]);
+    }
+  } catch {
+    /* modo privado com armazenamento bloqueado: sem sequência, e a tela de pé */
+  }
+  return fora;
 }
 
 export function lsGet<T>(key: string, fallback: T): T {
@@ -1566,10 +1593,21 @@ export function GestacaoPath({
 
   /* A régua mora em `sequencia.ts`, testada. Estava escrita aqui e OUTRA VEZ no
      pós-parto, idêntica — e a virada da meia-noite (contar a partir de ontem
-     quando hoje ainda não foi fechado) é fácil demais de consertar num lugar só. */
+     quando hoje ainda não foi fechado) é fácil demais de consertar num lugar só.
+
+     Conta dias com PELO MENOS UM momento, e não `doneDays` (os cinco fechados):
+     quem fez um exercício veio, e a sequência mede vinda. Ver
+     `diasComAlgumMomento` para por que as duas listas continuam separadas.
+
+     `todayTasks`/`dayTasks` entram nas dependências porque são eles que mudam
+     quando ela marca um momento — sem isso a chama só acenderia no próximo
+     carregamento da tela, que é justamente o instante em que ela quer ver. */
   const streak = useMemo(
-    () => bancada?.streak ?? (hasGest ? sequenciaDeDias(doneDays, todayD) : 0),
-    [doneDays, todayD, hasGest, bancada?.streak],
+    () =>
+      bancada?.streak ??
+      (hasGest ? sequenciaDeDias(diasComAlgumMomento(entradasDoArmazem(), DIA_KEY), todayD) : 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [doneDays, todayTasks, dayTasks, todayD, hasGest, bancada?.streak],
   );
 
   // Caminho contínuo: todas as fases numa página só, como o Duolingo
@@ -7304,8 +7342,12 @@ function PosPartoJourney({
     setSelectedPhase(idx >= 0 ? idx : 0);
   }, [currentPhase, phases]);
 
-  /* Mesma régua da gestação — ver `sequencia.ts`. */
-  const streak = useMemo(() => sequenciaDeDias(posDone, todayD), [posDone, todayD]);
+  /* Mesma régua da gestação — dias com ALGUM momento, não os cinco. */
+  const streak = useMemo(
+    () => sequenciaDeDias(diasComAlgumMomento(entradasDoArmazem(), POS_DIA_KEY), todayD),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [posDone, dayTasks, todayD],
+  );
 
   const phase = phases[selectedPhase] ?? phases[0];
   // Jornada pós-parto começa no nascimento: sem semanas-álbum aqui

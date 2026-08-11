@@ -9,7 +9,12 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { sequenciaAcesa, sequenciaDeDatas, sequenciaDeDias } from "./sequencia";
+import {
+  diasComAlgumMomento,
+  sequenciaAcesa,
+  sequenciaDeDatas,
+  sequenciaDeDias,
+} from "./sequencia";
 
 describe("a virada da meia-noite não apaga a sequência", () => {
   test("hoje ainda não feito conta a partir de ONTEM", () => {
@@ -107,6 +112,96 @@ describe("a chama pergunta ao arquivo, não ao componente", () => {
     expect([...fonte.matchAll(/<ChamaDaSequencia/g)]).toHaveLength(2);
     /* E ninguém escreveu `streak > 0` à mão para decidir se acende. */
     expect(fonte).not.toMatch(/streak > 0/);
+  });
+});
+
+describe("UM exercício já conta o dia", () => {
+  /* O defeito que abriu esta parte: o dono fez um exercício e a chama não
+     acendeu, porque a sequência lia `doneDays` — dias com os CINCO momentos
+     fechados. Quem fez três de cinco ficava com o mesmo zero de quem não abriu
+     o app, o que transforma o gancho em cobrança. */
+  const K = "dc-path-day-";
+
+  test("um único momento marcado já vira dia", () => {
+    expect(diasComAlgumMomento([[`${K}100`, '{"agua":true}']], K)).toEqual([100]);
+  });
+
+  test("dia aberto e sem nada feito NÃO conta", () => {
+    /* Só abrir a folha do dia grava o objeto vazio. Se isso contasse, a
+       sequência mediria visita em vez de cuidado. */
+    expect(diasComAlgumMomento([[`${K}100`, "{}"]], K)).toEqual([]);
+    expect(diasComAlgumMomento([[`${K}100`, '{"agua":false}']], K)).toEqual([]);
+  });
+
+  test("três dias com um momento cada acendem a chama em 3", () => {
+    const armazem: [string, string][] = [
+      [`${K}98`, '{"aula":true}'],
+      [`${K}99`, '{"respirar":true}'],
+      [`${K}100`, '{"movimento":true}'],
+    ];
+    expect(sequenciaDeDias(diasComAlgumMomento(armazem, K), 100)).toBe(3);
+  });
+
+  test("as outras chaves da jornada não viram dia", () => {
+    /* `dc-path-done-days`, `dc-path-lessons`, `dc-path-presente-visto-…` e a
+       chave do pós-parto convivem no mesmo armazém. */
+    const armazem: [string, string][] = [
+      ["dc-path-done-days", "[97,98,99]"],
+      ["dc-path-lessons", '{"12":100}'],
+      ["dc-path-pos-day-3", '{"banho":true}'],
+      ["dc-path-presente-visto-2026-08-11T12:00:00.000Z", "true"],
+      [`${K}100`, '{"agua":true}'],
+    ];
+    expect(diasComAlgumMomento(armazem, K)).toEqual([100]);
+  });
+
+  test("o pós-parto tem prefixo PRÓPRIO e não invade a gestação", () => {
+    const armazem: [string, string][] = [
+      [`${K}100`, '{"agua":true}'],
+      ["dc-path-pos-day-5", '{"banho":true}'],
+    ];
+    expect(diasComAlgumMomento(armazem, "dc-path-pos-day-")).toEqual([5]);
+  });
+
+  test("sufixo que não é número é descartado", () => {
+    /* `dc-path-day-` é prefixo de `dc-path-day-12`, mas casaria também com uma
+       chave futura como `dc-path-day-notas` — que viraria NaN e, sem a guarda,
+       um dia fantasma na contagem. */
+    expect(diasComAlgumMomento([[`${K}notas`, '{"x":true}']], K)).toEqual([]);
+    expect(diasComAlgumMomento([[`${K}12abc`, '{"x":true}']], K)).toEqual([]);
+  });
+
+  test("JSON corrompido não derruba a contagem", () => {
+    const armazem: [string, string | null][] = [
+      [`${K}99`, "{quebrado"],
+      [`${K}100`, '{"agua":true}'],
+      [`${K}98`, null],
+    ];
+    expect(diasComAlgumMomento(armazem, K)).toEqual([100]);
+  });
+
+  test("armazém vazio é zero, e não erro", () => {
+    expect(diasComAlgumMomento([], K)).toEqual([]);
+    expect(sequenciaDeDias(diasComAlgumMomento([], K), 100)).toBe(0);
+  });
+
+  test("a chama NÃO lê mais doneDays", () => {
+    /* `doneDays` continua existindo e continua pintando o nó da trilha e
+       soltando a figurinha da semana — ele responde "fechou o dia?", que é
+       outra pergunta. Se a chama voltar a lê-lo, um exercício deixa de contar
+       e o defeito do dono volta. */
+    const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+    expect(fonte).not.toMatch(/sequenciaDeDias\(doneDays/);
+    expect(fonte).not.toMatch(/sequenciaDeDias\(posDone/);
+    expect([...fonte.matchAll(/diasComAlgumMomento\(/g)]).toHaveLength(2);
+  });
+
+  test("os prefixos saem da MESMA chave que grava", () => {
+    /* Escritos à mão, uma renomeação futura de `LS.dayTasks` faria a chama
+       parar de acender sem erro nenhum aparecer. */
+    const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+    expect(fonte).toMatch(/const DIA_KEY = LS\.dayTasks\(0\)\.slice\(0, -1\)/);
+    expect(fonte).toMatch(/const POS_DIA_KEY = LS\.posDayTasks\(0\)\.slice\(0, -1\)/);
   });
 });
 
