@@ -1217,16 +1217,17 @@ button:active > .duo3d {
   }
 }
 
-/* ── O céu da home respira devagar ───────────────────────────────────
-   A bolha que envolve o bebê é PINTADA na arte, não desenhada por cima:
-   uma esfera de UI sobre a esfera da arte dava duas bolas, com centros e
-   diâmetros diferentes, e a interseção virava uma silhueta de ovo. Elas
-   não têm como ficar alinhadas — `cover` move a da arte conforme a
-   proporção da tela, e a de UI fica presa ao container.
+/* ── O céu da home respirava devagar ─────────────────────────────────
+   ⚠️ SEM USO desde ago/2026, e guardado de propósito.
 
-   Então quem se move é a arte inteira. A escala parte de 1.04 para a
-   folga do zoom nunca revelar borda, e 16s deixa o movimento no limiar
-   do perceptível — a bolha parece viva sem parecer animação. */
+   A escala parte de 1.04 para a folga do zoom nunca revelar borda, e 16s
+   deixa o movimento no limiar do perceptível.
+
+   Saiu quando a arte do dia passou a ser colada no fundo em vez de
+   esticada: um zoom de 4% a 7,5% é recorte lento de uma imagem que o dono
+   disse já estar no tamanho exato. Fica escrito aqui porque a régua vale
+   para qualquer céu que volte a respirar um dia — e porque a razão de ela
+   ter saído não é "não prestava". */
 @keyframes dcSkyBreathe {
   0%,
   100% {

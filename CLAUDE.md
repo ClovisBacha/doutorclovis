@@ -693,7 +693,7 @@ enquanto a sequência vive, apagado em zero dias.
   prefixos saem de `LS.dayTasks(0)`/`LS.posDayTasks(0)`, nunca escritos à mão —
   uma cópia divergente faria a chama parar de acender sem erro nenhum.
 - **Reproduzível:** `node scripts/sprite-de-video.mjs <video.webm> <destino.webp>
-  [quadros] [colunas] [larguraDoQuadro]`. Ele ABORTA se a origem não tiver alfa
+[quadros] [colunas] [larguraDoQuadro]`. Ele ABORTA se a origem não tiver alfa
   (em vez de gravar uma folha opaca) e se os quadros não fecharem a grade (celas
   vazias fariam o desenho sumir por uma fração de segundo a cada volta).
 - **Bancada:** `/preview-jogo?streak=7` acende a chama sem conta — ela só arde
@@ -979,6 +979,66 @@ visíveis eram 100,5 / 75,8 / 111,6px; depois de mover 5,5px do último espaçad
 para o primeiro (`1.20 / 0.72 / 0.80`), as de fora ficaram em 105,6 e 105,7. O
 meio segue MENOR de propósito: elementos próximos lêem como um grupo, e três
 folgas iguais fariam a bolha e o número parecerem dois assuntos soltos.
+
+⚠️ **Os três espaçadores SAÍRAM em seguida** (ver a seção abaixo): eles
+repartiam a folga entre bolha e número, e o número desceu para a área clara. A
+medição fica registrada porque o método — injetar a área segura antes de medir —
+continua valendo para tudo que se compõe nessa tela.
+
+### A imagem do dia é o fundo, e a bolha é centrada nela (ago/2026)
+
+Pedido do dono, com o arquivo do Drive na mão ("Referência Imagem Fundo Dia"):
+"é literalmente colar lá no fundo… deixar a bolha do bebê centralizada nessa
+imagem e maneirar o elemento dos 3 hambúrgueres… os outros elementos vão ficar
+embaixo com o fundo rosa claro… **sem expandir a imagem**, ela já está no
+tamanho exato que quero".
+
+- **Quem manda no tamanho é a IMAGEM, não a tela.** O hero deixou de ser
+  `100svh` com a arte esticada por dentro e passou a ter a proporção da arte
+  (`aspect-[853/1844]`, `PROPORCAO_DO_CEU`). Com isso o `object-cover` do
+  `CeuDoDia` vira identidade — mapeia 1:1, sem recorte e sem zoom. Medido num
+  iPhone 15 Pro: 393 × 849,6 numa tela de 852.
+- ⚠️ **`aspect-ratio` + `max-height` encolhe a LARGURA** se a largura for
+  `auto`. No iPhone SE o hero nasceu com 308px em vez de 375 — a arte inteira
+  deslocada para o meio da tela. Conserto: `w-[calc(100%+2.5rem)]` explícito, e
+  aí o `max-h-[100svh]` só corta a altura. O teto existe para desktop
+  (`max-w-5xl` daria 2,3 MIL pixels de céu) e para o celular deitado; no iPhone
+  em pé ele nunca entra em ação, porque a arte (2,1618) é mais estreita que a
+  tela (2,168).
+- **Os quatro campos da cena foram MEDIDOS de novo** por
+  `node scripts/ceu-do-drive.mjs <origem.png> <destino.webp> [largura]`, que
+  converte e mede no mesmo passe. O dia virou a TERCEIRA cena a inverter o
+  brilho entre as pontas: topo 0,118 (escuro) e base 0,524. Herdar o
+  `topoEscuro: false` da arte antiga poria o nome do bebê em índigo sobre
+  azul-cobalto — o defeito que fez estes serem dois booleanos e não um. Medido
+  depois: o nome passa a 16,38:1 no dia novo.
+- ⚠️ **A arte do dia tem 853 de largura**, e as outras três têm 1440. Ela não
+  passou por upscale — o que salvou o anoitecer foi feito FORA (Higgsfield) e só
+  depois reduzido aqui, e ampliar no script não inventa detalhe. Num iPhone Pro
+  (densidade 3) o navegador estica a arte do dia em 1,38×.
+- **`dc-sky-breathe` saiu do céu** (o CSS ficou, sem uso). O respiro era um zoom
+  de 4% a 7,5% — recorte lento de uma imagem que o dono disse estar no tamanho
+  exato. A vida da cena continua em `CeuEfeitos`, que anima o que está POR CIMA
+  da arte.
+- **Sobre a arte ficaram DUAS coisas**: a barra de topo (traço do menu + nome do
+  bebê) e a bolha, centrada por uma camada `absolute inset-0` do hero.
+  `inset-0` num filho de container com padding pega a caixa de preenchimento
+  inteira, então o `px-5`/`pt` não desloca o centro — medido: o centro da bolha
+  e o centro do hero batem em todos os aparelhos testados.
+- **O botão do menu perdeu a pastilha de vidro** ("maneirar"). Ficou o traço,
+  com o ALVO ainda de 40px: quem some é o desenho, não a área que o dedo acerta.
+  A cor segue `topoEscuro` — branco sobre topo escuro, índigo sobre topo claro;
+  branco fixo sumiria no amanhecer, que é a cena de topo mais claro.
+- **Desceram para o fundo claro**: o número da semana, o rótulo "semanas" e o
+  cartão de saudação do clima. O cartão largou o `glass` pelo material do
+  cartão, pela MESMA razão da barra de progresso — vidro precisa de céu
+  atravessando, e sobre o creme vira retângulo cinza. Com eles saíram
+  `glassLeve`, `glass`, `tracoDeVidro`, `overArt`, `heroText`, `cardText`,
+  `cardMuted` e `INDIGO_CORPO`, que existiam só para texto sobre arte.
+- **`scripts/contraste-hero.mjs` ficou com UM alvo**, o nome — é o único texto
+  que sobrou sobre a arte, e é justamente o que já falhou de verdade (3,43:1).
+  Ele ganhou uma trava: alvo fora do viewport REPROVA com o motivo escrito, em
+  vez de o Playwright estourar num recorte vazio.
 
 **Bancada:** `/preview-home?w=20` renderiza a tela real sem login (`?clima=1`
 liga o clima). Para medir composição, injete

@@ -876,19 +876,18 @@ export function AppHomeScreen({
      `foreground/75` dava 3,77 no pôr do sol e `white/75` dava 3,41 no
      anoitecer. Um rótulo secundário se diferencia pelo TAMANHO e pelo peso,
      que ele já tem — atenuar a cor por cima disso foi o que o derrubou. */
-  /* Índigo profundo, não o marrom do `foreground`: são os valores exatos que
-     a referência traz (`#352968` no nome, `#3D3570` no número e no rótulo).
-     O par claro/escuro continua — em céu escuro nenhum índigo se lê. */
+  /* Índigo profundo, não o marrom do `foreground`: é o valor exato que a
+     referência traz para o nome do bebê. O par claro/escuro continua — em céu
+     escuro nenhum índigo se lê.
+
+     O irmão dele (`INDIGO_CORPO`, #3D3570) saiu com o número da semana, que
+     desceu para o fundo claro em ago/2026: lá quem manda é o `foreground` do
+     tema, e um índigo cravado seria a única cor da página fora do sistema. */
   const INDIGO_TOPO = "#352968";
-  const INDIGO_CORPO = "#3D3570";
   const textoDoTopo = topoEscuro ? "text-white" : "";
   const corDoTopo = topoEscuro ? undefined : INDIGO_TOPO;
-  const heroText = darkSky ? "text-white/95" : "";
-  const corDoCorpo = darkSky ? undefined : INDIGO_CORPO;
-  /* No anoitecer o rótulo cai sobre lavanda média (#9370da) — um meio-tom em
-     que NENHUMA cor de texto chega a 4,5:1 sozinha (branco cheio dá 3,79).
-     Quem resolve é o halo em `overArt`, e é por isso que ele é obrigatório
-     ali: sem a sombra, este rótulo não tem correção possível. */
+  /* Sobrou UM texto no corpo da arte: o recado de "configure sua gestação",
+     que ocupa o lugar da bolha quando não há gestação. */
   const heroMuted = darkSky ? "text-white/[0.98]" : "";
 
   /* Vidro dos cartões. O conceito é um céu claro com cartões brancos; à noite
@@ -911,109 +910,41 @@ export function AppHomeScreen({
      branco funcionavam. Quem devolve a leitura sem engrossar mais o vidro é
      o conjunto: gradiente diagonal, rim claro no topo, sombra interna
      embaixo e sombra externa que descola o cartão do céu. */
-  /* O botão da conta é uma ESFERA de vidro, não um disco: a luz entra pela
-     quina de cima à esquerda e escapa pela de baixo à direita, e é esse par
-     que dá volume.
-     Fundo ainda mais transparente que o dos cartões — ele é ferramenta, tem
-     que ser alcançável sem ser notado. */
-  /* VIDRO FOSCO CHAPADO, sem quina acesa.
-     A versão anterior tinha um verniz radial e um fio de luz de 95% na aresta
-     de cima — sobre o lilás do amanhecer aquilo lia como uma borda branca
-     brilhante desenhada em volta do botão, não como vidro. Pedido do dono:
-     "remova a borda rígida / degradê branco brilhante". Fica só o branco
-     translúcido a 35% com o desfoque atrás, que é o que a referência mostra. */
-  const glassLeve: React.CSSProperties = {
-    background: topoEscuro ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.35)",
-    backdropFilter: "blur(16px) saturate(150%)",
-    WebkitBackdropFilter: "blur(16px) saturate(150%)",
-    border: `1px solid ${topoEscuro ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.4)"}`,
-    boxShadow: topoEscuro
-      ? "0 4px 14px -8px rgba(0,0,0,0.4)"
-      : "0 4px 14px -8px rgba(90,70,120,0.22)",
-  };
-  const glass: React.CSSProperties = {
-    background: darkSky
-      ? "linear-gradient(158deg, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.04) 48%)," +
-        " rgba(24,21,38,0.56)"
-      : "linear-gradient(158deg, rgba(255,255,255,0.50) 0%, rgba(255,255,255,0.18) 48%)," +
-        " rgba(255,252,250,0.46)",
+  /* ─── O VIDRO SAIU DA TELA COM O QUE ELE VESTIA (ago/2026) ────────────────
+     Aqui moravam três materiais: `glassLeve` (a pastilha do botão de menu),
+     `glass` (os cartões da segunda dobra) e `tracoDeVidro` (o bisel do ícone).
+     Os três dependiam de CÉU ATRAVESSANDO para existir — é o que separa vidro
+     de plástico translúcido, e é a mesma razão pela qual a barra de progresso
+     largou o `glass` ao descer para a área clara.
 
-    backdropFilter: "blur(20px) saturate(185%)",
-    WebkitBackdropFilter: "blur(20px) saturate(185%)",
-    border: `1px solid ${darkSky ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.66)"}`,
-    boxShadow: darkSky
-      ? "inset 0 1px 0 rgba(255,255,255,0.40), inset 0 -14px 30px -20px rgba(0,0,0,0.55)," +
-        " 0 14px 36px -18px rgba(0,0,0,0.55)"
-      : "inset 0 1px 0 rgba(255,255,255,0.92), inset 0 -14px 30px -20px rgba(120,92,110,0.30)," +
-        " 0 14px 36px -18px rgba(120,84,96,0.34)",
-  };
-  /* O BISEL DO VIDRO, para ícone.
-     Ícone é traço e não aceita `background-clip`, então o bisel do vidro vira
-     `drop-shadow`: luz
-     acima e à esquerda, sombra abaixo e à direita. No céu claro a sombra
-     escura precisa ser mais fraca — sobre lavanda ela viraria contorno sujo. */
-  const tracoDeVidro: React.CSSProperties = {
-    stroke: topoEscuro ? "rgba(255,255,255,0.92)" : "rgba(255,255,255,0.96)",
+     Sobre a arte sobraram só a bolha e o traço do menu, e o dono pediu
+     justamente para "maneirar" esse traço. O resto do conteúdo desceu para o
+     fundo claro da página, onde o material certo é o do cartão — vidro sobre
+     fundo chapado vira um retângulo cinza.
+
+     Do bisel ficou o essencial: a sombra que descola o traço do céu. */
+  const tracoDoMenu: React.CSSProperties = {
+    stroke: topoEscuro ? "rgba(255,255,255,0.94)" : INDIGO_TOPO,
     filter: topoEscuro
-      ? "drop-shadow(-0.8px -1px 0 rgba(255,255,255,0.85))" +
-        " drop-shadow(0.8px 1.5px 0 rgba(26,40,76,0.44))" +
-        " drop-shadow(1.6px 3px 3px rgba(26,40,76,0.28))" +
-        " drop-shadow(0 8px 18px rgba(18,30,62,0.32))"
-      : "drop-shadow(-0.6px -0.8px 0 rgba(255,255,255,0.9))" +
-        " drop-shadow(0.7px 1.2px 0 rgba(96,66,110,0.34))" +
-        " drop-shadow(1.2px 2.4px 3px rgba(96,66,110,0.22))",
+      ? "drop-shadow(0 1px 3px rgba(10,20,50,0.45)) drop-shadow(0 2px 10px rgba(10,20,50,0.35))"
+      : "drop-shadow(0 1px 3px rgba(255,255,255,0.75)) drop-shadow(0 0 8px rgba(255,255,255,0.55))",
   };
-  const cardText = darkSky ? "text-white" : "text-foreground";
-  /* O rótulo secundário é o que mais sofre com vidro transparente: ele já
-     nasce de baixo contraste por ser secundário, e agora o céu passa por trás
-     dele. Medido sobre o vidro novo, dava 2,36:1 no entardecer e 2,99:1 no
-     meio-dia — o mínimo é 4,5.
-     A saída foi escurecer o RÓTULO em vez de engrossar o vidro: engrossar
-     desfaria justamente o efeito pedido. `foreground/70` continua lendo como
-     secundário ao lado do texto principal, mas parte de um preto, não de um
-     cinza médio. */
-  const cardMuted = darkSky ? "text-white/85" : "text-foreground/80";
   /* ─── O HALO NÃO É ENFEITE: É O QUE SUSTENTA O CONTRASTE ─────────────────
-     Nome, número e rótulo ficam SOBRE a cena, sem cartão atrás — e a cena tem
-     contraste LOCAL: uma crista de onda acesa passando exatamente atrás da
-     base dos dígitos.
-     No anoitecer, medido pixel a pixel: sem sombra o pior ponto do "20" cai a
-     1,4:1 onde ele cruza a crista clara (#ddcef8). A sombra de uma camada só
-     levava aquele ponto a 2,65 — passa na mediana e falha no pior pixel. As
-     três camadas abaixo (curta e opaca, média, larga e difusa) levam o pior
-     ponto a 7,39 e o rótulo "semanas" de 3,41 para 13,09.
-     No céu claro o halo é o oposto — claro e fraco — porque ali o texto é
-     escuro e o que ele precisa é de separação, não de peso. */
-  /* ─── O HALO AFROUXOU (ago/2026) ─────────────────────────────────────────
-     As três camadas acima nasceram para resgatar 1,4:1 e foram calibradas com
-     folga larga. Medido depois, o "20" chegava a 17,4:1 no anoitecer contra um
-     mínimo de 3 — folga que se pagava em aparência: sombra opaca colada no
-     glifo (0,95 a 2px) lê como relevo de gravação, e foi metade do "muito
-     grosseira" que o dono viu.
-     O que ficou é a MESMA arquitetura de três camadas, com alfas menores e
-     raios maiores: a sombra deixa de desenhar contorno e passa a apenas
-     apagar o céu atrás do texto. O piso continua sendo medido, não estimado:
-     `scripts/contraste-hero.mjs` reprova qualquer céu abaixo do mínimo, e
-     `scripts/centragem-hero.mjs` mede a centragem óptica. */
-  const overArt: React.CSSProperties = darkSky
-    ? {
-        textShadow:
-          "0 1px 3px rgba(10,4,30,0.55), 0 2px 9px rgba(10,4,30,0.5)," +
-          " 0 4px 20px rgba(10,4,30,0.42)",
-      }
-    : {
-        /* Em céu CLARO o texto é índigo, e quem levanta o contraste de um
-           texto escuro é um halo CLARO — a sombra escura que estava aqui
-           empurrava para o lado errado. Medido no pôr do sol: "semanas" ficava
-           em 4,37:1 (mínimo 4,5) e passa a 6,1 com o halo branco.
-           Também afrouxado: um halo branco duro em volta de texto índigo lê
-           como recorte mal feito, do mesmo jeito que a sombra dura lia como
-           relevo no céu escuro. */
-        textShadow:
-          "0 0 4px rgba(255,255,255,0.62), 0 1px 8px rgba(255,255,255,0.5)," +
-          " 0 2px 16px rgba(255,255,255,0.36)",
-      };
-  /* O nome mora no TOPO, onde a régua é outra (ver `topoEscuro`). */
+     Texto sobre a cena não tem cartão atrás, e a cena tem contraste LOCAL: uma
+     crista de onda acesa passando exatamente atrás da base dos glifos. No
+     anoitecer, medido pixel a pixel, o pior ponto do "20" caía a 1,4:1 onde
+     cruzava a crista clara (#ddcef8); uma sombra de camada só levava aquele
+     ponto a 2,65 — passa na mediana e falha no pior pixel. São TRÊS camadas
+     (curta e opaca, média, larga e difusa), com alfas baixos e raios largos:
+     a sombra não desenha contorno, ela apaga o céu atrás do texto. Halo duro
+     lê como relevo de gravação, e foi metade do "muito grosseira" do dono.
+
+     Sobrou UM halo, o do topo: número e rótulo desceram para o fundo claro em
+     ago/2026, e lá o contraste vem do tema, não de sombra. O piso continua
+     medido, não estimado — `scripts/contraste-hero.mjs` reprova qualquer céu
+     abaixo do mínimo, e `scripts/centragem-hero.mjs` mede a centragem óptica.
+
+     O nome mora no TOPO, onde a régua é `topoEscuro` e não `darkSky`. */
   const overArtTopo: React.CSSProperties = topoEscuro
     ? {
         textShadow:
@@ -1107,21 +1038,52 @@ export function AppHomeScreen({
            meio rem, não um e meio. Se a folga da página mudar, só o `-mt` muda.
            A bancada replica a geometria da página de propósito — com `pt-2`
            ela casava por acaso com um `-mt` errado e escondia a faixa. */
-        className="shine relative -mx-5 flex flex-col overflow-hidden px-5 pb-6 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
-        /* A cor do PÉ da cena, não a do topo: a cena cobre só a primeira dobra
-           (ver `CeuDoDia`), e é esta cor que continua atrás da segunda. O topo
-           não precisa de cor de espera porque o SVG pinta no mesmo quadro em
-           que monta — não há imagem para carregar. */
+        /* ─── O HERO TEM O TAMANHO DA IMAGEM (ago/2026) ────────────────────
+           `aspect-[853/1844]` é a proporção da arte (`PROPORCAO_DO_CEU`), e é
+           ela que decide a altura desta caixa. Antes era `100svh`, e a arte é
+           que se esticava para caber — o dono foi explícito ao mandar a arte
+           nova: "sem expandir a imagem, somente colocar no fundo, ela já está
+           no tamanho exato que quero".
+
+           Com a proporção aqui, o `object-cover` lá dentro vira identidade: a
+           arte aparece inteira, sem recorte e sem zoom, em qualquer aparelho. O
+           que muda de celular para celular é quanto da TELA ela ocupa — num
+           iPhone (proporção 2,16, praticamente a da arte) ela é a primeira
+           dobra exata; num aparelho mais quadrado sobra tela embaixo, e ali já
+           começa o fundo claro da página, que é justamente o pedido.
+
+           `pb` saiu junto: a folga do pé pertencia à segunda dobra, que não
+           mora mais aqui dentro.
+
+           ─── O TETO DE UMA TELA ─────────────────────────────────────────
+           `max-h-[100svh]` não é hesitação sobre o pedido: no iPhone ele NUNCA
+           entra em ação, porque a arte (2,1618) é mais estreita que a tela
+           (2,168) e a caixa fecha em 849,6px contra 852 de altura. Ele existe
+           para os dois casos em que a proporção deixa de fazer sentido:
+
+             · desktop, onde a página vai a `max-w-5xl` — 1064px de largura
+               dariam 2,3 MIL pixels de céu antes do primeiro elemento;
+             · celular deitado, onde a mesma conta dá 1841px numa tela de 393.
+
+           Nos dois o `object-cover` recorta em vez de ampliar, que é o pior
+           lado certo: a arte nunca aparece esticada. */
+        className="shine relative -mx-5 aspect-[853/1844] max-h-[100svh] w-[calc(100%+2.5rem)] overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
+        /* Cor de espera enquanto o `.webp` não decodifica. Agora é a do TOPO e
+           não a do pé: a caixa acabou junto com a imagem, então não há mais
+           "depois da arte" para o pé continuar — e o que apareceria sem esta
+           cor é justamente a faixa atrás do relógio do sistema. */
         style={{
-          background: ceuClassico ? gradientFor(period, weather?.code ?? 1) : slot.corDeBaixo,
+          background: ceuClassico ? gradientFor(period, weather?.code ?? 1) : slot.corDeTopo,
         }}
       >
         {/* A CENA DO MOMENTO — amanhecer, dia, pôr do sol ou anoitecer.
-            `dc-sky-breathe` dá o zoom lento que faz o céu parecer vivo; o SVG
-            já nasce em `slice`, então a folga do zoom nunca revela borda. */}
+            SEM `dc-sky-breathe`: aquele respiro era um zoom de 4% a 7,5%, isto
+            é, recorte lento de uma arte que o dono disse estar no tamanho
+            exato. A vida da cena ficou toda em `CeuEfeitos`, que anima o que
+            está por CIMA da arte sem mexer no enquadramento dela. */}
         {!ceuClassico && (
           <>
-            <CeuDoDia nome={slot.nome} className="dc-sky-breathe" />
+            <CeuDoDia nome={slot.nome} />
             {/* A vida por cima da arte: estrelas, cadentes e a luz do astro
                 respirando. Fica FORA do `dc-sky-breathe` de propósito — o zoom
                 lento arrastaria as cadentes junto e o risco sairia torto. */}
@@ -1159,54 +1121,65 @@ export function AppHomeScreen({
           />
         )}
 
-        <div className="relative flex flex-col">
-          {/* ── PRIMEIRA DOBRA: uma tela exata, do topo ao cartão da semana.
-              O bebê é o protagonista e fica com TODO o espaço que sobrar —
-              por isso `h-[100svh]` aqui e não `min-h`: o que não couber vai
-              para a dobra de baixo em vez de espremer o bebê. ── */}
-          <div className="flex h-[calc(100svh-0.5rem-var(--safe-top))] flex-col pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]">
-            {/* ── BARRA DE TOPO: menu · nome · clima ────────────────────
-                Três peças numa linha só, e o nome fica no CENTRO ÓPTICO da
-                tela — não no centro do espaço que sobra entre os dois botões.
-                Por isso ele é posicionado em `absolute` com `-translate-x-1/2`
-                em vez de entrar no fluxo: o botão da esquerda mede 40px e a
-                pílula do clima mede ~72px, e num `justify-between` o nome
-                nasceria 16px fora do eixo. Com a pílula ausente (clima ainda
-                carregando) ele sairia de novo, e do outro lado — o nome
-                andaria pela tela sozinho conforme a rede respondesse. */}
-            <div className="relative flex h-10 items-center justify-between gap-3">
-              <button
-                onClick={() => {
-                  hapticTap();
-                  onOpenMenu?.();
-                }}
-                aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
-                className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
-                style={glassLeve}
-              >
-                {/* O ponto fica FORA do círculo de vidro, encostado na borda:
-                    dentro ele competiria com o ícone num botão de 40px e
-                    sumiria contra nuvem clara. O anel branco o descola do céu. */}
-                {temNaoLidas && (
-                  <span
-                    aria-hidden
-                    className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 ring-2 ring-white/85"
-                  />
-                )}
-                {/* Ícone não aceita `background-clip: text`, então o material
-                    do vidro vira traço: linha branca translúcida com as MESMAS
-                    sombras deslocadas dos cartões — claras para cima e à
-                    esquerda, escuras para baixo e à direita. É o mesmo bisel,
-                    escrito em `drop-shadow`. */}
-                <Menu className="h-5 w-5" strokeWidth={2.2} style={{ ...tracoDeVidro }} />
-              </button>
+        {/* ── SOBRE A IMAGEM SÓ FICAM DUAS COISAS ───────────────────────
+            A barra de topo (menu + nome do bebê) e a bolha do bebê, centrada.
+            Tudo o mais desceu para o fundo claro da página — pedido do dono:
+            "além disso deve ficar fora dessa nova imagem de fundo, outros
+            elementos vão ficar embaixo com o fundo rosa claro". ── */}
+        <div className="relative">
+          {/* ── BARRA DE TOPO: menu · nome ────────────────────────────
+                O nome fica no CENTRO ÓPTICO da tela — não no centro do espaço
+                que sobra ao lado do botão. Por isso ele é posicionado em
+                `absolute` com `-translate-x-1/2` em vez de entrar no fluxo: o
+                botão da esquerda mede 40px, e num `justify-between` o nome
+                nasceria 16px fora do eixo. */}
+          <div className="relative flex h-10 items-center justify-between gap-3">
+            <button
+              onClick={() => {
+                hapticTap();
+                onOpenMenu?.();
+              }}
+              aria-label={temNaoLidas ? "Menu — há notificações novas" : "Menu"}
+              /* ─── O BOTÃO PERDEU A PASTILHA DE VIDRO (ago/2026) ──────
+                   Pedido do dono: "maneirar o elemento dos 3 hambúrgueres".
+                   Ele era um disco de vidro de 40px com fundo, borda e sombra
+                   — quatro camadas de material para abrir um menu, ao lado de
+                   uma tela cujo assunto é o bebê.
 
-              {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
+                   Ficou só o traço. O ALVO continua com 40px: quem some é o
+                   desenho do botão, não a área que o dedo acerta — encolher o
+                   toque para o tamanho do ícone seria "maneirar" cobrando o
+                   preço no lugar errado. */
+              className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            >
+              {/* O ponto fica encostado na borda do alvo, e não do ícone:
+                    dentro ele competiria com o traço e sumiria contra nuvem
+                    clara. O anel branco o descola do céu. */}
+              {temNaoLidas && (
+                <span
+                  aria-hidden
+                  className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white/85"
+                />
+              )}
+              {/* Sem a pastilha atrás, o traço passa a se separar do céu
+                    sozinho — daí a sombra, que continua sendo a MESMA régua do
+                    `topoEscuro`: branco sobre topo escuro, índigo sobre topo
+                    claro. Um traço branco fixo ficaria invisível no amanhecer,
+                    que é justamente a cena de topo mais claro. */}
+              <Menu
+                className="h-[22px] w-[22px]"
+                strokeWidth={1.9}
+                style={tracoDoMenu}
+                aria-hidden
+              />
+            </button>
+
+            {/* O NOME DO BEBÊ, no eixo da tela. `pointer-events-none` porque
                   ele atravessa a faixa inteira: sem isso a metade invisível do
                   bloco cobriria o botão do menu. */}
-              {babyName && (
-                <p
-                  /* O teto é o que SOBRA depois dos cantos, não uma fração da
+            {babyName && (
+              <p
+                /* O teto é o que SOBRA depois dos cantos, não uma fração da
                      linha. `52%` era metade da faixa — mas a faixa tem um
                      botão de 40px de um lado, e em 320px de largura um nome
                      comprido ("Ana Beatriz…") passava por baixo dele. Medido.
@@ -1216,11 +1189,11 @@ export function AppHomeScreen({
                      canto vazio valer a pena. O reserva continua SIMÉTRICO
                      porque o bloco é centrado: encolher só a esquerda tiraria
                      o nome do eixo. */
-                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
-                  style={{
-                    ...overArtTopo,
-                    color: corDoTopo,
-                    /* ─── O NOME SEGUE A MESMA RÉGUA DO NÚMERO DA SEMANA ────
+                className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
+                style={{
+                  ...overArtTopo,
+                  color: corDoTopo,
+                  /* ─── O NOME SEGUE A MESMA RÉGUA DO NÚMERO DA SEMANA ────
                        Medido, os dois maiores textos da tela estavam em pesos
                        diferentes: o número em 500 (Medium) e o nome em 600.
                        Semi-Bold empasta pelo mesmo motivo que empastava no
@@ -1230,11 +1203,11 @@ export function AppHomeScreen({
                        o número usa −0,03em porque tem 90px, e texto grande
                        precisa de tracking negativo. Em 20px, −0,03em fecharia
                        as letras; −0,01em é o passo equivalente nesse corpo. */
-                    fontWeight: 500,
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  {/* ─── O CORAÇÃO GÊMEO INVISÍVEL ──────────────────────────
+                  fontWeight: 500,
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {/* ─── O CORAÇÃO GÊMEO INVISÍVEL ──────────────────────────
                       O 💜 é decoração e fica só à direita, mas o bloco todo é
                       que está centrado — então ele empurrava a PALAVRA para a
                       esquerda. Medido: o nome saía com o centro em 202,5 numa
@@ -1247,17 +1220,17 @@ export function AppHomeScreen({
                       px ou em `em` estaria certa num celular e errada no
                       seguinte. O gêmeo mede sempre exatamente o mesmo que o
                       original, porque É o original. */}
-                  <span aria-hidden className="align-middle text-[0.72em] opacity-0">
-                    💜
-                  </span>{" "}
-                  {babyName}{" "}
-                  <span aria-hidden className="align-middle text-[0.72em]">
-                    💜
-                  </span>
-                </p>
-              )}
+                <span aria-hidden className="align-middle text-[0.72em] opacity-0">
+                  💜
+                </span>{" "}
+                {babyName}{" "}
+                <span aria-hidden className="align-middle text-[0.72em]">
+                  💜
+                </span>
+              </p>
+            )}
 
-              {/* ─── A PÍLULA DO CLIMA SAIU (ago/2026) ────────────────────
+            {/* ─── A PÍLULA DO CLIMA SAIU (ago/2026) ────────────────────
                   Ficava aqui, à direita: ícone do céu + graus. Saiu por
                   decisão do dono, e a razão está registrada porque ela vale
                   para o que quiser ocupar este canto depois — "17°" com um
@@ -1269,54 +1242,44 @@ export function AppHomeScreen({
                   O CLIMA em si NÃO saiu do produto: `useWeather` continua de
                   pé porque a chuva do céu (`SkyRain`) e o cartão de saudação
                   da segunda dobra leem dele. O que saiu foi só o mostrador. */}
-            </div>
+          </div>
 
-            {isMadrugada && (
-              <p className="mt-3 text-center text-[11px] text-white/65">
-                🌙 Madrugada — tente descansar um pouco
-              </p>
-            )}
+          {isMadrugada && (
+            <p className="mt-3 text-center text-[11px] text-white/65">
+              🌙 Madrugada — tente descansar um pouco
+            </p>
+          )}
+        </div>
 
-            {gest && baby ? (
-              <>
-                {/* Bebê protagonista dentro da bolha (o "ventre").
-                  Toque abre a aba do Bebê com a semana detalhada — e pede a
-                  sub-aba "semana" de propósito: a aba do Bebê agora abre numa
-                  grade de seis, e este toque promete a semana, não um menu. */}
-                {/* ─── A COMPOSIÇÃO VERTICAL, EM TRÊS RESPIROS ──────────
-                    Antes o botão da bolha era `flex-1` e engolia TODA a folga
-                    da tela — a bolha ficava centrada num vão de 684px e
-                    empurrava o número para 90% da altura, encostado na barra
-                    de baixo (medido: sobrava 21px, e em tela curta virava
-                    sobreposição).
+        {gest && baby ? (
+          /* ─── A BOLHA, CENTRADA NA IMAGEM (ago/2026) ───────────────────
+             Pedido do dono, ao mandar a arte nova: "você vai deixar a bolha do
+             bebê centralizada nessa imagem".
 
-                    Agora a folga é repartida por três espaçadores com pesos
-                    fixos, e os pesos saíram de MEDIÇÃO com a área segura do
-                    iPhone injetada — sem ela, o Chromium devolve 0 em
-                    `env(safe-area-inset-*)` e a bancada mede uma tela sem a
-                    ilha dinâmica nem a barra de gestos, que é justamente a
-                    folga que empurra a composição no aparelho de verdade.
+             Centrada NA IMAGEM, e não no que sobra da tela: por isso é uma
+             camada `absolute inset-0` do hero — que tem a proporção da arte —,
+             e não mais um item de coluna entre espaçadores. Os três pesos
+             (1,20 / 0,72 / 0,80) que repartiam a folga saíram junto: eles
+             existiam para acomodar bolha e número na mesma tela, e o número
+             desceu para o fundo claro.
 
-                    Medido com 59px em cima e 34px embaixo (iPhone 15 Pro), as
-                    folgas VISÍVEIS eram 100,5 / 75,8 / 111,6px: o grupo ficava
-                    alto e sobrava ar antes da barra — o "centralize" do dono.
-                    Movendo 5,5px do último espaçador para o primeiro, os dois
-                    de fora ficam em 106px e o do meio segue menor (75,8).
+             `inset-0` no filho de um container com padding pega a CAIXA DE
+             PREENCHIMENTO inteira — o `px-5`/`pt` do hero não desloca o
+             centro, que é o que faz o eixo da bolha bater com o eixo da arte.
 
-                    O meio ser MENOR é de propósito, e não sobra: elementos
-                    próximos lêem como um grupo. Três folgas iguais fariam a
-                    bolha e o número parecerem dois assuntos soltos na tela.
-
-                    Como são PESOS e não pixels, a proporção vale de um SE a um
-                    Pro Max. */}
-                <div className="flex-[1.20] short:flex-[0.73]" aria-hidden />
-
-                <button
-                  onClick={() => onNavigate("Bebê", "semana")}
-                  aria-label="Ver a semana do bebê"
-                  className="relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
-                >
-                  {/* A caixa que manda em bolha e bebê. TRÊS tetos, e o menor
+             `pointer-events-none` na camada e `auto` no botão: a camada cobre a
+             barra de topo, e sem isso ela engoliria o toque do menu. */
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            {/* Bebê protagonista dentro da bolha (o "ventre").
+                Toque abre a aba do Bebê com a semana detalhada — e pede a
+                sub-aba "semana" de propósito: a aba do Bebê agora abre numa
+                grade de seis, e este toque promete a semana, não um menu. */}
+            <button
+              onClick={() => onNavigate("Bebê", "semana")}
+              aria-label="Ver a semana do bebê"
+              className="press pointer-events-auto relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
+            >
+              {/* A caixa que manda em bolha e bebê. TRÊS tetos, e o menor
                       vence: 60% da largura, 19,5rem de teto absoluto, e 38% da
                       ALTURA da tela.
 
@@ -1331,9 +1294,9 @@ export function AppHomeScreen({
                       desnecessário, e some junto o degrau que ele criava: em
                       849px a bolha saltava 25% de uma vez, e a tela MAIOR
                       ficava mais apertada que a menor. */}
-                  <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
-                    <BabyOrb />
-                    {/* `scale` porque o SVG do bebê tem margem interna larga.
+              <div className="relative aspect-square w-[min(60vw,19.5rem,38svh)]">
+                <BabyOrb />
+                {/* `scale` porque o SVG do bebê tem margem interna larga.
                       O valor anterior (1.43) vinha de uma medição ERRADA: ela
                       media a CAIXA do SVG, não a tinta. Medido pixel a pixel
                       na tela — contando só o que é pele contra o azul da
@@ -1359,65 +1322,84 @@ export function AppHomeScreen({
                       32 e a 40 batem na parede de vidro. 1,65 é o maior valor
                       em que as quatro ainda cabem. Mexer aqui obriga a medir
                       a 40 de novo, nunca só a 20. */}
-                    <BabyIllustration
-                      week={gest.weeks}
-                      tone={babyTone}
-                      showSac={false}
-                      showInfo={false}
-                      /* `dc-bebe-deriva` anima `transform`; o `scale-[1.65]`
+                <BabyIllustration
+                  week={gest.weeks}
+                  tone={babyTone}
+                  showSac={false}
+                  showInfo={false}
+                  /* `dc-bebe-deriva` anima `transform`; o `scale-[1.65]`
                          do Tailwind v4 escreve na propriedade `scale`, que é
                          OUTRA. As duas compõem sem se atropelar — se a escala
                          viesse por `transform`, a animação a apagaria e o bebê
                          encolheria de volta ao tamanho antigo. */
-                      className="dc-bebe-deriva absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
-                    />
-                  </div>
-                </button>
+                  className="dc-bebe-deriva absolute inset-0 h-full w-full origin-center scale-[1.65] drop-shadow-[0_14px_32px_rgba(120,70,90,0.26)]"
+                />
+              </div>
+            </button>
+          </div>
+        ) : (
+          /* Sem gestação configurada não há bolha, e o recado ocupa o mesmo
+             lugar dela — centrado na arte, pela mesma camada. */
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+            <p className={`text-sm ${heroMuted}`}>
+              Configure sua data de gestação em <strong>Perfil</strong> para ver o desenvolvimento.
+            </p>
+            <button
+              onClick={() => onNavigate("Perfil")}
+              className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            >
+              Configurar perfil
+            </button>
+          </div>
+        )}
+      </div>
 
-                {/* ── A SEMANA, direto no céu ──────────────────────────
-                  O cartão de vidro que ficava aqui saiu inteiro (ago/2026).
-                  Ele empilhava número, rótulo, um divisor com coração e três
-                  medidas (comprimento, peso, fruta) num bloco de ~140px —
-                  metade da altura que o bebê tinha para ser protagonista.
+      {/* ── A SEMANA DESCEU PARA O FUNDO CLARO (ago/2026) ─────────────────
+          Ela ficava sobre a arte, abaixo da bolha, e desceu pelo mesmo pedido
+          que trouxe a imagem nova: "além disso deve ficar fora dessa nova
+          imagem de fundo, outros elementos vão ficar embaixo com o fundo rosa
+          claro". Com o número ali em cima a bolha não teria como ficar
+          CENTRADA na imagem — ela ficaria centrada no que sobra acima do
+          número, que é outra coisa.
 
-                  As três medidas não se perderam: continuam na aba do Bebê,
-                  que é onde ela vai quando quer o DETALHE da semana. Aqui
-                  ficou o que a tela existe para dizer, e que se lê de longe.
+          É o primeiro elemento depois do céu, e continua sendo o maior texto
+          da tela: quem rola encontra o número antes de qualquer cartão.
 
-                  Sem vidro atrás porque o número agora se apoia direto na
-                  cena — e é justamente isso que deixa o material funcionar:
-                  vidro precisa de céu atravessando para existir. */}
-                <div className="flex-[0.72] short:flex-[0.5]" aria-hidden />
-
-                <div className="flex shrink-0 flex-col items-center" style={overArt}>
-                  <p
-                    className={`leading-[0.92] ${heroText}`}
-                    style={{
-                      color: corDoCorpo,
-                      // `var(--font-serif)` e não uma fonte fixa: preso assim,
-                      // o maior número da tela era o único texto que NÃO
-                      // seguia a fonte do sistema.
-                      /* HERDA a face do corpo, que é a geométrica do sistema
+          Some o halo (`overArt`) e somem as cores de céu (`heroText`,
+          `corDoCorpo`): eles existiam para sustentar contraste sobre arte com
+          crista de onda acesa por trás dos dígitos. Sobre o creme da página
+          quem manda é o `foreground`, como em toda a segunda dobra. */}
+      {gest && baby && (
+        <div className="flex flex-col items-center pt-1">
+          <p
+            className="leading-[0.92] text-foreground"
+            style={{
+              // `var(--font-serif)` e não uma fonte fixa: preso assim,
+              // o maior número da tela era o único texto que NÃO
+              // seguia a fonte do sistema.
+              /* HERDA a face do corpo, que é a geométrica do sistema
                          (SF Pro Text no Apple, DM Sans de reserva). A
                          `--font-serif` deste projeto é na verdade a ARREDONDADA
                          (SF Pro Rounded) — bonita nos títulos, mas a referência
                          traz o número numa geométrica reta. */
-                      fontFamily: "inherit",
-                      /* O termo em `svh` é irmão do que dimensiona a bolha, e
+              fontFamily: "inherit",
+              /* O termo em `svh` é irmão do que dimensiona a bolha, e
                          está aqui pelo mesmo motivo: medido só pela LARGURA, o
                          número ficava com 104px numa tela de 375px de altura
-                         (celular deitado) e empurrava a coluna para fora da
-                         primeira dobra. Em retrato o `20vw` continua vencendo,
-                         então nada muda no aparelho de pé. */
-                      fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
-                      /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta:
+                         (celular deitado). Ele já não disputa a primeira dobra
+                         com a bolha, mas continua: um "40" de 104px de altura
+                         numa tela deitada empurraria o cartão do médico para
+                         longe demais do céu. Em retrato o `21vw` vence, então
+                         nada muda no aparelho de pé. */
+              fontSize: "clamp(2.75rem, min(21vw, 11.5svh), 6rem)",
+              /* 500 (Medium) e não 600. Em 90px o Semi-Bold empasta:
                          a contra-forma do "0" fecha e o número lê como bloco
                          — foi o "muito grosseira" do dono. A referência traz
                          Medium, e é em Medium que a curva do "2" volta a ter
                          desenho. */
-                      fontWeight: 500,
-                      letterSpacing: "-0.03em",
-                      /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
+              fontWeight: 500,
+              letterSpacing: "-0.03em",
+              /* ─── POR QUE NÃO `tabular-nums` AQUI ─────────────────
                          Figura tabular existe para alinhar COLUNA de números;
                          ela dá a todo dígito a mesma largura de avanço, o que
                          obriga o "1" a nadar num vão largo e desloca a tinta
@@ -1436,90 +1418,44 @@ export function AppHomeScreen({
                          esse vão fantasma no fim empurra a tinta para o lado.
                          Metade do valor, com sinal trocado, devolve a tinta ao
                          eixo. */
-                      fontVariantNumeric: "lining-nums",
-                      textIndent: "-0.015em",
-                    }}
-                  >
-                    {gest.weeks}
-                  </p>
-                  <p
-                    className={`-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none ${heroMuted}`}
-                    style={{ color: corDoCorpo }}
-                  >
-                    {gest.weeks === 1 ? "semana" : "semanas"}
-                  </p>
-                </div>
-
-                <div className="flex-[0.80] short:flex-[0.57]" aria-hidden />
-              </>
-            ) : (
-              /* flex-1 centrado: sem isso o texto ficava colado no topo com
-               ~380px de gradiente vazio abaixo (hero tem min-h de 66svh). */
-              <div className="flex h-[100svh] flex-col items-center justify-center text-center">
-                <p className={`text-sm ${heroMuted}`}>
-                  Configure sua data de gestação em <strong>Perfil</strong> para ver o
-                  desenvolvimento.
-                </p>
-                <button
-                  onClick={() => onNavigate("Perfil")}
-                  className="mt-3 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-                >
-                  Configurar perfil
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* ── SEGUNDA DOBRA: rola para ver. Progresso e recado do dia
-              saíram da primeira tela para o bebê caber grande. ── */}
-          {gest && baby && (
-            <div className="pt-4">
-              {/* A barra de progresso MUDOU DE LUGAR, e não saiu: ela agora
-                  vive na área clara, logo antes do cartão do médico. Eu tinha
-                  entendido "tirar da vista" como "apagar", e o dono corrigiu.
-                  Ver o bloco `PROGRESSO` mais abaixo. */}
-
-              {/* O convite de ativar a localização saiu daqui.
-                  Ele era o terceiro cartão empilhado no alto desta tela, e
-                  três avisos ao mesmo tempo empurravam o bebê para fora da
-                  primeira dobra. Agora vive na central de notificações, atrás
-                  do ☰ — com a vantagem de não sumir para sempre quando ela
-                  recusa: dá para voltar lá e ativar depois. A origem da
-                  localização sobe pela `onOrigemLocal`. */}
-
-              {/* ── Saudação do dia e o conselho ──────────────────────
-                  O clima aparece UMA vez na tela, no chip lá em cima: é lá
-                  que mora o dado (temperatura e condição), colado na arte do
-                  céu que ele explica. Aqui fica só o conselho.
-                  Antes havia repetição em três camadas: o chip dizia "Céu
-                  limpo", esta linha trazia DOIS emojis de sol (um de cada
-                  lado do nome) e a dica ainda abria com "Céu aberto —". */}
-              {weather && (
-                <div
-                  className="mt-2.5 short:mt-2 flex items-start gap-3 rounded-[22px] px-4 py-3 short:py-2"
-                  style={glass}
-                >
-                  {/* O ícone REAL da condição, que antes vivia no chip lá em cima.
-                      Aqui ele tem espaço, e o chip fica só com o número. */}
-                  <span className="mt-0.5 text-xl leading-none">{weather.emoji}</span>
-                  <div className="min-w-0">
-                    <p className={`text-[14px] font-extrabold ${cardText}`}>
-                      {dayGreetingLabel()}
-                      {babyName ? `, ${babyName}!` : "!"}
-                    </p>
-                    {/* Mesma cor do cartão de cima. `cardMuted` a 12px e peso
-                        normal lia bem mais claro que o mesmo `cardMuted` a
-                        11px em negrito do "% concluído" logo acima — mesma
-                        cor no código, dois cinzas diferentes no olho. Aqui o
-                        que separa título de dica é o PESO, não a cor. */}
-                    <p className={`mt-0.5 text-[12px] leading-snug ${cardText}`}>{weather.tip}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+              fontVariantNumeric: "lining-nums",
+              textIndent: "-0.015em",
+            }}
+          >
+            {gest.weeks}
+          </p>
+          <p className="-mt-0.5 text-[clamp(0.85rem,min(4.8vw,2.8svh),1.375rem)] font-medium leading-none text-muted-foreground">
+            {gest.weeks === 1 ? "semana" : "semanas"}
+          </p>
         </div>
-      </div>
+      )}
+
+      {/* ── Saudação do dia e o conselho ──────────────────────────────────
+          Desceu junto com a semana, pelo mesmo pedido, e por isso trocou o
+          `glass` pelo material do cartão: vidro precisa de céu atravessando
+          para existir, e aqui embaixo o fundo é o creme da página — o mesmo
+          motivo pelo qual a barra de progresso largou o vidro quando desceu.
+
+          O clima aparece UMA vez na tela. Antes havia repetição em três
+          camadas: uma pílula lá em cima dizia "Céu limpo", esta linha trazia
+          DOIS emojis de sol (um de cada lado do nome) e a dica ainda abria com
+          "Céu aberto —". */}
+      {gest && baby && weather && (
+        <div className="flex items-start gap-3 rounded-3xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-card)]">
+          <span className="mt-0.5 text-xl leading-none">{weather.emoji}</span>
+          <div className="min-w-0">
+            <p className="text-[14px] font-extrabold text-foreground">
+              {dayGreetingLabel()}
+              {babyName ? `, ${babyName}!` : "!"}
+            </p>
+            {/* O que separa título de dica é o PESO, não a cor: o mesmo
+                `muted` a 12px e peso normal lia bem mais claro que o `muted` a
+                11px em negrito do "% concluído" — mesma cor no código, dois
+                cinzas diferentes no olho. */}
+            <p className="mt-0.5 text-[12px] leading-snug text-foreground">{weather.tip}</p>
+          </div>
+        </div>
+      )}
 
       {/* Aqui moravam quatro blocos: Meu calendário (com o marco da semana
           dentro), Registros, Pós-parto e o link de Dúvidas frequentes. Todos

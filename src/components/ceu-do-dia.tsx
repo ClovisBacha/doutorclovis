@@ -36,6 +36,13 @@
  * (4096/1900): 0,3% de diferença bastaria para deslocar o enquadramento já
  * calibrado — foi assim que a lua saiu cortada da primeira vez.
  *
+ * ⚠️ **O `dia` voltou a 853 de largura em ago/2026**, quando o dono trocou a
+ * arte pela do Drive. Ela não passou por upscale: só as outras três têm 1440, e
+ * ampliar aqui não inventa detalhe (o upscale que salvou o anoitecer foi feito
+ * FORA e só depois reduzido). Num iPhone Pro (densidade 3) o navegador estica a
+ * arte do dia em 1,38× — se ela parecer macia, o caminho é o mesmo de antes:
+ * upscale externo e `node scripts/ceu-do-drive.mjs <arte> src/assets/ceu/dia.webp 1440`.
+ *
  * ─── A REGRA QUE NÃO PODE SE PERDER ─────────────────────────────────────────
  *
  * `dark` e `topoEscuro` NÃO são gosto: saíram da luminância MEDIDA de cada
@@ -124,11 +131,22 @@ const CEUS: Ceu[] = [
   {
     nome: "dia",
     src: diaSrc,
+    /* ─── A ARTE DO DIA MUDOU, E COM ELA OS QUATRO CAMPOS (ago/2026) ────────
+       Pedido do dono, com o arquivo do Drive na mão ("Referência Imagem Fundo
+       Dia"): azul saturado, sol em raios no alto à direita e dunas azuis no pé,
+       no lugar do degradê lavado que estava aqui.
+
+       Os quatro campos foram MEDIDOS de novo por `scripts/ceu-do-drive.mjs`, e
+       o dia virou a TERCEIRA cena a inverter o brilho entre as pontas: topo
+       0,118 (escuro) e base 0,524 (a mais clara das quatro). Herdar o
+       `topoEscuro: false` da arte antiga poria o nome do bebê em índigo sobre
+       azul-cobalto — é exatamente o defeito que fez estes serem dois booleanos
+       e não um. */
     dark: false,
-    topoEscuro: false,
+    topoEscuro: true,
     astro: "sol",
-    corDeTopo: "#3fabf9",
-    corDeBaixo: "#2ea9c2",
+    corDeTopo: "#0244e4",
+    corDeBaixo: "#0272e4",
   },
   {
     nome: "por-do-sol",
@@ -206,25 +224,44 @@ export function ceuPeloSol(agora: Date, sunrise: Date | null, sunset: Date | nul
 }
 
 /**
+ * A PROPORÇÃO DAS QUATRO ARTES — 853 × 1844.
+ *
+ * O hero usa este número para nascer do TAMANHO DA IMAGEM, em vez de esticar a
+ * imagem até o tamanho do hero. Fica exportado porque quem precisa dele é o
+ * container, não o `<img>`: a régua tem de morar num lugar só.
+ */
+export const PROPORCAO_DO_CEU = "853 / 1844";
+
+/**
  * A arte do momento, pronta para ser o fundo absoluto de um container
- * `relative overflow-hidden`.
+ * `relative overflow-hidden` que JÁ TENHA a proporção da arte
+ * (`aspect-[853/1844]`, ver `PROPORCAO_DO_CEU`).
  *
- * ─── POR QUE A ALTURA É A DA PRIMEIRA DOBRA, E NÃO `inset-0` ────────────────
+ * ─── QUEM MANDA NO TAMANHO É A IMAGEM, E NÃO A TELA (ago/2026) ──────────────
  *
- * A arte tem a proporção de UMA TELA. O hero é mais alto — ele segue atrás da
- * segunda dobra. Com `inset-0` o `cover` ampliava a arte para cobrir os
- * ~1100px do hero: a lua saía cortada pela borda direita. Medido, não suposto.
+ * Pedido do dono, sobre a arte nova do dia: "sem expandir a imagem, somente
+ * colocar no fundo, ela já está no tamanho exato que quero".
  *
- * Presa à altura da primeira dobra, a arte fica no enquadramento para que foi
- * desenhada, e o `corDeBaixo` do container continua dali para baixo.
+ * Antes esta camada tinha altura própria (`100svh + safe-top`) e o `cover`
+ * ampliava a arte para caber nela — na primeira versão isso cortou a lua pela
+ * borda direita, e continuava sendo ampliação mesmo depois de acertada a
+ * altura, porque `svh` não tem a proporção da arte: num aparelho mais quadrado
+ * o `cover` recorta as pontas, num mais comprido ele estica.
+ *
+ * Agora o container é que tem a proporção da arte, e o `object-cover` aqui vira
+ * uma identidade — mapeia 1:1, sem recorte e sem zoom. O que sobra da tela fica
+ * ABAIXO da imagem, no fundo claro da página, que é onde o resto da home passou
+ * a morar.
+ *
+ * Não há mais `dc-sky-breathe` nesta camada, e a razão é a mesma frase: aquele
+ * respiro era um zoom de 4% a 7,5%, ou seja, recorte lento da arte que o dono
+ * disse já estar no tamanho certo. A vida da cena continua em `CeuEfeitos`, que
+ * anima o que está POR CIMA da arte sem mexer no enquadramento dela.
  */
 export function CeuDoDia({ nome, className = "" }: { nome: NomeDoCeu; className?: string }) {
   const ceu = PORNOME.get(nome) ?? PORNOME.get("dia")!;
   return (
-    <div
-      className={`pointer-events-none absolute inset-x-0 top-0 h-[calc(100svh+0.5rem+var(--safe-top))] ${className}`}
-      aria-hidden
-    >
+    <div className={`pointer-events-none absolute inset-0 ${className}`} aria-hidden>
       {/* `fetchPriority="high"`: é o primeiro pixel que a paciente vê, e sem
           isso ele disputa a fila com o resto da página. */}
       <img
