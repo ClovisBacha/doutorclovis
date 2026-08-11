@@ -18,6 +18,7 @@ import {
   diasDeAtividade,
   estadoDaDupla,
   parOrdenado,
+  rotuloDeAmigas,
   saneiaEnfeites,
   sequenciaDaDupla,
   tempoNoApp,
@@ -285,6 +286,50 @@ describe("o layout do Cantinho dela chega saneado", () => {
 
   test("o que não é lista vira lista vazia", () => {
     for (const v of [null, undefined, {}, "x", 7]) expect(saneiaEnfeites(v)).toEqual([]);
+  });
+});
+
+describe("o contador da fita", () => {
+  test("mostra o número", () => {
+    expect(rotuloDeAmigas(0)).toBe("0");
+    expect(rotuloDeAmigas(1)).toBe("1");
+    expect(rotuloDeAmigas(12)).toBe("12");
+  });
+
+  test("99 ainda é 99; a partir de 100 vira 99+", () => {
+    /* O teto é de LARGURA: a fita tem quatro itens dividindo a tela de um
+       celular, e um "137" empurraria a chama e o troféu de lugar. */
+    expect(rotuloDeAmigas(99)).toBe("99");
+    expect(rotuloDeAmigas(100)).toBe("99+");
+    expect(rotuloDeAmigas(4821)).toBe("99+");
+  });
+
+  test("número torto vira zero, e nunca NaN na tela", () => {
+    /* A contagem vem de uma consulta que pode falhar, e "NaN" na fita é o tipo
+       de coisa que a paciente fotografa. */
+    for (const v of [NaN, Infinity, -7, undefined as unknown as number]) {
+      expect(rotuloDeAmigas(v)).toBe("0");
+    }
+  });
+
+  test("o contador e a lista contam o MESMO conjunto", () => {
+    /* Um contador que diz 5 e uma lista que mostra 4 faz a paciente procurar a
+       amiga que sumiu — e o sumiço é justamente o que não pode ser perguntado.
+       As duas funções filtram `care_mode` e usam `idsDasAmigas`. */
+    const i = servidor.indexOf("export const contarAmigas");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = servidor.slice(i, i + 1200);
+    expect(corpo).toContain("idsDasAmigas(sb, eu)");
+    expect(corpo).toContain("filter((p) => !p.care_mode)");
+    expect(corpo).toContain("await emLuto(sb, eu)");
+  });
+
+  test("a fita não paga a lista inteira para mostrar um número", () => {
+    /* `minhasAmigas` varre o ledger de todas as amigas para calcular chama e
+       troféus. A fita abre em TODA visita ao Caminho. */
+    const jogo = readFileSync("src/components/gestacao-path.tsx", "utf8");
+    expect(jogo).toContain("contarAmigas");
+    expect(jogo).not.toContain("minhasAmigas");
   });
 });
 

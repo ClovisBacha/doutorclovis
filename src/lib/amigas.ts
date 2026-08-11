@@ -154,6 +154,26 @@ export type PerfilDeAmiga = {
   diasNoApp: number;
 };
 
+/**
+ * O CONTADOR DA FITA — o número que substituiu a palavra "Amigas".
+ *
+ * Pedido do dono: o ícone mostra QUANTAS, e acima de cem vira `99+`. O teto
+ * existe porque a fita tem quatro itens dividindo a largura de um celular: um
+ * "137" empurra os vizinhos e faz a linha inteira dançar quando alguém entra.
+ *
+ * `99+` e não `100+`: o `+` já diz "e mais", e 99 é o último número que cabe em
+ * dois dígitos — que é a largura que a fita foi desenhada para segurar.
+ */
+export const TETO_DO_CONTADOR = 99;
+
+export function rotuloDeAmigas(n: number): string {
+  /* Número torto vira zero, nunca `NaN` na fita: a contagem vem de uma consulta
+     que pode falhar, e "NaN amigas" é o tipo de coisa que a paciente
+     fotografa. */
+  const v = Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  return v > TETO_DO_CONTADOR ? `${TETO_DO_CONTADOR}+` : String(v);
+}
+
 /** Um enfeite posto na trilha dela: posição em % da largura, y em px, escala. */
 export type EnfeitePosto = { id: string; x: number; y: number; s: number };
 

@@ -415,6 +415,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
 import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
+import { rotuloDeAmigas } from "@/lib/amigas";
 import { TrofeuConquistado, TrofeuIcone } from "@/components/trofeu";
 import {
   diasComAlgumMomento,
@@ -483,6 +484,8 @@ interface GestacaoPathProps {
     streak?: number;
     /** Finge o contador de troféus. */
     trofeus?: number;
+    /** Finge o contador de amigas — inclusive acima de 99, para ver o `99+`. */
+    amigas?: number;
     /** Abre a comemoração do troféu direto, para fotografar os 5 segundos. */
     trofeuNovo?: number;
   };
@@ -1389,6 +1392,27 @@ export function GestacaoPath({
   const [trofeus, setTrofeus] = useState(bancada?.trofeus ?? 0);
   /* O troféu que ela acabou de ganhar, esperando a comemoração aparecer. */
   const [trofeuNovo, setTrofeuNovo] = useState<number | null>(bancada?.trofeuNovo ?? null);
+  /* Quantas amigas — o número que a fita mostra no lugar do calendário.
+     Consulta própria e leve (`contarAmigas`), e não a lista inteira: a fita
+     abre em toda visita ao Caminho, e a lista calcula chama e troféus de cada
+     amiga. */
+  const [amigas, setAmigas] = useState(bancada?.amigas ?? 0);
+  useEffect(() => {
+    if (bancada?.amigas != null) return;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        const { contarAmigas } = await import("@/lib/amigas.functions");
+        const r = await contarAmigas({ data: { accessToken: s.session.access_token } });
+        if (r.ok) setAmigas(r.amigas);
+      } catch {
+        /* fica em 0: a fita mostra o número honesto de quem não tem ninguém */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Itens do Cantinho que decoram o Caminho (não-fundo) + o fundo ativo.
   const [decor, setDecor] = useState<string[]>([]);
   /* Pele das bolinhas. Mora no `journey_state` (chave `dc-path-`), não numa
@@ -2469,7 +2493,19 @@ export function GestacaoPath({
               transform: `translateY(${deslocamentoDaLinha({ altura: 22, baseDaTinta: 1 })}px)`,
             }}
           />
-          <span className="text-xs font-semibold text-sky-500">Amigas</span>
+          {/* O NÚMERO, no mesmo peso da chama e do troféu — a fita é um placar
+              e os três itens têm de ler como a mesma coisa.
+
+              `tabular-nums` + largura mínima: sem os dois, a fita se
+              redesenharia quando o número passasse de "9" para "10", e o
+              `justify-around` empurraria a chama e o troféu de lugar. A largura
+              é a de `99+`, o valor mais largo que pode aparecer. */}
+          <span
+            className="min-w-[2.1ch] text-center text-lg font-extrabold tabular-nums text-sky-500"
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {rotuloDeAmigas(amigas)}
+          </span>
         </button>
         <div className="h-6 w-px bg-slate-200" />
         <div className="flex items-center gap-1.5" title="Figurinhas coletadas">

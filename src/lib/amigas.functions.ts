@@ -188,6 +188,39 @@ export const minhasAmigas = createServerFn({ method: "POST" })
     return { ok: true as const, careMode: false as const, amigas, dupla: await lerDupla(sb, eu) };
   });
 
+/**
+ * SÓ O NÚMERO — para o contador da fita do Caminho.
+ *
+ * Separada de `minhasAmigas` porque a fita aparece em TODA abertura do Caminho,
+ * e a lista completa calcula chama e troféus de cada amiga (uma varredura do
+ * ledger de todas elas). Pagar isso para desenhar um número de dois dígitos
+ * seria caro na tela mais visitada do app.
+ *
+ * Conta o MESMO conjunto que a lista mostra — as em Modo Cuidado ficam de fora
+ * dos dois lados. Um contador que diz 5 e uma lista que mostra 4 é o tipo de
+ * discordância que faz a paciente procurar a amiga que sumiu, e é justamente
+ * o sumiço que não pode ser perguntado.
+ */
+export const contarAmigas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, amigas: 0 };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+    /* No luto a fita não mostra número nenhum, como não mostra saldo. */
+    if (await emLuto(sb, eu)) return { ok: true as const, amigas: 0 };
+
+    const ids = await idsDasAmigas(sb, eu);
+    if (ids.length === 0) return { ok: true as const, amigas: 0 };
+    const { data: perfis } = await sb
+      .from("patient_profiles")
+      .select("id, care_mode")
+      .in("id", ids);
+    const n = ((perfis ?? []) as { care_mode?: boolean }[]).filter((p) => !p.care_mode).length;
+    return { ok: true as const, amigas: n };
+  });
+
 /* ══════════════════════════ O PERFIL + O CANTINHO ══════════════════════════ */
 
 export const perfilDaAmiga = createServerFn({ method: "POST" })

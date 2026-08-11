@@ -822,6 +822,17 @@ dupla de sequência**.
   um enfeite cobrindo a tela de quem visita.
 - **O "11º dia da jornada" que estava no calendário** não se perdeu: virou o
   "no app há X" do perfil, que conta a mesma história.
+- **A fita mostra o NÚMERO de amigas, não a palavra** (`rotuloDeAmigas`), com
+  teto em `99+`. O teto é de LARGURA: são quatro itens dividindo a tela de um
+  celular, e um "137" empurraria a chama e o troféu de lugar. `tabular-nums` +
+  largura mínima de dois dígitos mantêm a fita imóvel entre 1 e 99 (medido: a
+  chama e o troféu ficam no mesmo x com 7 e com 12).
+- **O contador tem consulta PRÓPRIA** (`contarAmigas`), e não a lista:
+  `minhasAmigas` varre o ledger de todas as amigas para calcular chama e
+  troféus de cada uma, e a fita abre em toda visita ao Caminho. Os dois contam
+  o MESMO conjunto (as em Modo Cuidado fora dos dois) — um contador que diz 5 e
+  uma lista que mostra 4 faria a paciente procurar a amiga que sumiu, e é o
+  sumiço que não pode ser perguntado.
 - **Aplicar no Supabase:** `supabase/APLICAR_DUPLAS.sql`. Só a dupla depende
   dele — `lerDupla` engole a falha e devolve `null`, então lista, perfil,
   Cantinho e presente funcionam antes de ele rodar.

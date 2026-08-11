@@ -63,6 +63,9 @@ export const Route = createFileRoute("/preview-jogo")({
        ninguém nunca ter olhado para ela rodando. */
     trofeus: Math.max(0, Number(q.trofeus ?? 0)),
     trofeuNovo: Math.max(0, Number(q.trofeuNovo ?? 0)),
+    /* `?amigas=137` mostra o contador da fita, inclusive acima de 99 para
+       conferir o `99+` sem precisar de 137 contas de verdade. */
+    amigas: Math.max(0, Number(q.amigas ?? 0)),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -84,6 +87,7 @@ function PreviewJogo() {
     streak,
     trofeus,
     trofeuNovo,
+    amigas,
   } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
@@ -118,12 +122,18 @@ function PreviewJogo() {
         careMode={false}
         onOpenShop={() => {}}
         bancada={
-          tela === "jogos" || presente > 0 || streak > 0 || trofeus > 0 || trofeuNovo > 0
+          tela === "jogos" ||
+          presente > 0 ||
+          streak > 0 ||
+          trofeus > 0 ||
+          trofeuNovo > 0 ||
+          amigas > 0
             ? {
                 jogos: tela === "jogos",
                 streak: streak > 0 ? streak : undefined,
                 trofeus: trofeus > 0 ? trofeus : undefined,
                 trofeuNovo: trofeuNovo > 0 ? trofeuNovo : undefined,
+                amigas: amigas > 0 ? amigas : undefined,
                 saldo: 125,
                 halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],
