@@ -1876,22 +1876,34 @@ export function GestacaoPath({
               if (r.ok && r.granted > 0) toast.success(`⭐ 5 estrelas! +${r.granted} 🌱`);
               else toast.success("⭐ As 5 estrelas do dia!");
 
-              /* O TROFÉU. Relê a carteira em vez de somar 1 no número local:
-                 é o servidor que decide se o dia virou troféu (ele confere as
-                 cinco atividades no ledger antes de gravar a linha), e um
-                 contador que anda sozinho na tela mostraria um troféu a mais
-                 que o gate da loja — o mesmo número dizendo duas coisas.
+              /* O TROFÉU.
+                 A comemoração acontece AQUI, e não numa comparação de números.
+                 A primeira versão só abria se `novo > antes` — e foi assim que
+                 o dono fechou as cinco estrelas e não viu animação nenhuma: a
+                 contagem daquele momento devolvia 0, então `0 > 0` era falso e
+                 a tela simplesmente não aparecia.
 
-                 A comemoração só abre se o número REALMENTE subiu: quem
-                 refizer o dia, ou quem já tinha a linha gravada, não merece a
-                 tela de cinco segundos de novo. */
+                 Este bloco já é o instante exato da conquista, e já roda uma
+                 vez por dia (`!doneDays.includes(D)`). Deixar a festa depender
+                 de um segundo número, lido logo depois por outra viagem à rede,
+                 é pôr uma condição a mais entre ela e o momento que a condição
+                 existe para celebrar.
+
+                 O número exibido ainda vem do servidor — é o mesmo que
+                 destranca item na loja, e um contador que anda sozinho na tela
+                 mostraria um troféu a mais que o gate. Se a leitura falhar, a
+                 festa acontece com o número local + 1: melhor um número que se
+                 corrige no próximo carregamento do que engolir a conquista. */
               const w = await getWallet({ data: { accessToken: s.session.access_token } });
-              if (w.ok && typeof w.trofeus === "number") {
-                setTrofeus((antes) => {
-                  if (w.trofeus > antes) setTrofeuNovo(w.trofeus);
-                  return w.trofeus;
-                });
-              }
+              const doServidor = w.ok && typeof w.trofeus === "number" ? w.trofeus : null;
+              /* Fora do atualizador de estado: chamar `setTrofeuNovo` de dentro
+                 de um `setTrofeus(fn)` é efeito colateral dentro de função que
+                 o React pode executar duas vezes — e duas execuções abririam a
+                 comemoração duas vezes. O `trofeus` do fecho pode estar velho,
+                 mas ele só serve de rede quando o servidor não respondeu. */
+              const agora = doServidor ?? trofeus + 1;
+              setTrofeus(agora);
+              setTrofeuNovo(agora);
             }
           } catch {
             /* o bônus é secundário */
@@ -2442,7 +2454,7 @@ export function GestacaoPath({
               (linhas `day_stars:` do ledger), que é o mesmo que destranca item
               da loja — dois números diferentes para a mesma palavra seria o
               defeito antigo de volta. */}
-          <TrofeuIcone tamanho={24} />
+          <TrofeuIcone />
           <span className="text-lg font-extrabold text-violet-500">{trofeus}</span>
         </div>
         {saldo != null && (

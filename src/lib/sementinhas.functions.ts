@@ -7,7 +7,7 @@ import { quizForDay } from "@/lib/daily-quizzes";
 import { RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_MEDICO } from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
-import { PREFIXO_TROFEU } from "@/lib/trofeus";
+import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -254,34 +254,22 @@ async function nomeDeQuemDeu(
  * linhas. Quem fecha o dia por 300 dias tem 300 linhas, e elas não têm nada a
  * dizer além de existirem.
  */
-async function contarTrofeus(db: Db, userId: string): Promise<number> {
-  const { count, error } = await (
-    db as unknown as {
-      from: (t: string) => {
-        select: (
-          c: string,
-          o: { count: "exact"; head: true },
-        ) => {
-          eq: (
-            c: string,
-            v: string,
-          ) => {
-            like: (c: string, v: string) => Promise<{ count: number | null; error: unknown }>;
-          };
-        };
-      };
-    }
-  )
+export async function contarTrofeus(db: Db, userId: string): Promise<number> {
+  const { data, error } = await db
     .from("sementinhas_ledger")
-    .select("id", { count: "exact", head: true })
+    .select("dedupe_key")
     .eq("user_id", userId)
-    .like("dedupe_key", `${PREFIXO_TROFEU}%`);
+    .like("dedupe_key", `${PREFIXO_ATIVIDADE}%`)
+    .limit(5000);
 
   /* Falha de leitura → ZERO, nunca um palpite. O número destranca item pago:
      errar para cima entrega de graça o que ela ainda não conquistou, e errar
      para baixo só adia. */
   if (error) return 0;
-  return count ?? 0;
+  return trofeusDasChaves(
+    ((data ?? []) as { dedupe_key: string | null }[]).map((r) => r.dedupe_key),
+    WELLNESS_ACTIVITIES,
+  );
 }
 
 async function walletPayload(db: Db, userId: string, careMode: boolean) {

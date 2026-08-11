@@ -16,12 +16,14 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
-  PREFIXO_TROFEU,
+  ATIVIDADES_POR_TROFEU,
+  PREFIXO_ATIVIDADE,
   TROFEUS_PARA,
   escadaDeTrofeus,
   faltamTrofeus,
   itemLiberado,
   proximoDesbloqueio,
+  trofeusDasChaves,
   trofeusExigidos,
 } from "./trofeus";
 import { CANTINHO_BY_ID } from "./cantinho";
@@ -36,6 +38,9 @@ const sementinhas = semComentarios("src/lib/sementinhas.functions.ts");
 const jogo = semComentarios("src/components/gestacao-path.tsx");
 const conta = semComentarios("src/routes/_authenticated/minha-conta.tsx");
 const css = readFileSync("src/styles.css", "utf8");
+
+/** As quatro atividades de bem-estar, como o servidor as nomeia. */
+const WELLNESS: readonly string[] = ["movement", "meditation", "bonding", "gratitude"];
 
 describe("a escada dos três itens", () => {
   test("os três itens EXISTEM no catálogo", () => {
@@ -100,15 +105,91 @@ describe("quantos faltam", () => {
   });
 });
 
-describe("a fonte é o LEDGER, e não o navegador", () => {
-  test("a contagem lê as linhas `day_stars:`", () => {
-    /* `doneDays` mora no localStorage e sobe no blob do `journey_state` — quem
-       o escreve é o navegador, e ele destrancaria item pago. A linha
-       `day_stars:` só é gravada pelo servidor, e só depois de o ledger
-       confirmar as cinco atividades do dia. */
-    expect(PREFIXO_TROFEU).toBe("day_stars:");
-    expect(sementinhas).toContain('grantSementinhas(db, uid, [{ amount, reason: "5 estrelas');
-    expect(sementinhas).toMatch(/const dedupeKey = `day_stars:\$\{cycle\}:\$\{data\.day\}`/);
+describe("a fonte é a PROVA, e não o recibo", () => {
+  /* O dono fechou as cinco estrelas e o contador ficou em ZERO. A causa: a
+     contagem lia `day_stars:`, gravada por UMA chamada, no instante exato do
+     fechamento, dentro de um `try/catch` que engole erros. Rede oscilando ou
+     app fechado antes da resposta e a linha nunca existe — sem rastro, sem
+     segunda tentativa, troféu perdido para sempre.
+
+     As linhas `wellness:` são gravadas uma por atividade, no momento em que
+     cada uma é feita, e já eram o que `grantDayStarsBonus` consultava para
+     decidir o bônus. Sempre foram a prova; `day_stars` era o recibo. */
+  const chavesDoDia = (ciclo: string, dia: number, quais = WELLNESS) =>
+    quais.map((a) => `${PREFIXO_ATIVIDADE}${a}:${ciclo}:${dia}`);
+
+  test("quatro atividades no mesmo dia = um troféu", () => {
+    expect(trofeusDasChaves(chavesDoDia("2026-03-07", 65), WELLNESS)).toBe(1);
+  });
+
+  test("três atividades NÃO valem troféu", () => {
+    /* É o que separa "ela veio hoje" de "ela fechou o dia" — a chama mede o
+       primeiro, o troféu mede o segundo. */
+    expect(trofeusDasChaves(chavesDoDia("2026-03-07", 65, WELLNESS.slice(0, 3)), WELLNESS)).toBe(0);
+  });
+
+  test("dias diferentes somam", () => {
+    const chaves = [
+      ...chavesDoDia("2026-03-07", 63),
+      ...chavesDoDia("2026-03-07", 64),
+      ...chavesDoDia("2026-03-07", 65),
+    ];
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(3);
+  });
+
+  test("o CICLO separa uma gestação da outra", () => {
+    /* Sem o ciclo na chave do agrupamento, o dia 65 de duas gestações viraria
+       um dia só — apagando um troféu de quem já teve outro bebê no app. */
+    const chaves = [...chavesDoDia("2024-01-10", 65), ...chavesDoDia("2026-03-07", 65)];
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(2);
+  });
+
+  test("chave repetida não infla a conta", () => {
+    const chaves = [...chavesDoDia("2026-03-07", 65), ...chavesDoDia("2026-03-07", 65)];
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(1);
+  });
+
+  test("atividade desconhecida não fecha o dia", () => {
+    /* Se amanhã alguém gravar `wellness:banho:...`, o dia não pode passar a
+       valer troféu com três atividades de verdade e uma inventada. */
+    const chaves = [
+      ...chavesDoDia("2026-03-07", 65, WELLNESS.slice(0, 3)),
+      `${PREFIXO_ATIVIDADE}banho:2026-03-07:65`,
+    ];
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(0);
+  });
+
+  test("outras linhas do ledger são ignoradas", () => {
+    const chaves = [
+      "checkin:2026-08-11",
+      "day_stars:2026-03-07:65",
+      "presente:med:pac:tok",
+      "",
+      null,
+      undefined,
+      ...chavesDoDia("2026-03-07", 65),
+    ];
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(1);
+  });
+
+  test("dia que não é número é descartado", () => {
+    const chaves = WELLNESS.map((a) => `${PREFIXO_ATIVIDADE}${a}:2026-03-07:hoje`);
+    expect(trofeusDasChaves(chaves, WELLNESS)).toBe(0);
+  });
+
+  test("o servidor conta pelas chaves de atividade", () => {
+    expect(PREFIXO_ATIVIDADE).toBe("wellness:");
+    expect(ATIVIDADES_POR_TROFEU).toBe(4);
+    expect(sementinhas).toMatch(/\.like\("dedupe_key", `\$\{PREFIXO_ATIVIDADE\}%`\)/);
+    expect(sementinhas).toContain("trofeusDasChaves(");
+  });
+
+  test("o número de atividades sai da MESMA lista que grava", () => {
+    /* Já foram seis, e depois cinco (a respiração virou tema da meditação).
+       Um número cravado à mão faria o troféu parar de aparecer no dia em que
+       a lista mudasse de novo. */
+    expect(sementinhas).toMatch(/trofeusDasChaves\([\s\S]{0,120}WELLNESS_ACTIVITIES/);
+    expect(ATIVIDADES_POR_TROFEU).toBe(WELLNESS.length);
   });
 
   test("nem a carteira nem a loja contam por doneDays", () => {
@@ -118,7 +199,6 @@ describe("a fonte é o LEDGER, e não o navegador", () => {
 
   test("a tela do Caminho recebe o número do servidor", () => {
     expect(jogo).toMatch(/setTrofeus\(w\.trofeus \?\? 0\)/);
-    /* E o topo não mostra mais figurinhas de álbum no lugar de troféu. */
     expect(jogo).not.toMatch(/text-violet-500">\{stickers\.length\}/);
   });
 });
@@ -145,12 +225,12 @@ describe("o cadeado não pode ser decorativo", () => {
     expect(gate).toBeLessThan(rpc);
   });
 
-  test("uma contagem só serve vitrine e compra", () => {
+  test("uma implementação só serve vitrine e compra", () => {
     /* Duas contagens para a mesma palavra é como o troféu do topo passou a
-       discordar das conquistas — o defeito que abriu este trabalho. */
-    expect([
-      ...cantinhoFns.matchAll(/\.like\("dedupe_key", `\$\{PREFIXO_TROFEU\}%`\)/g),
-    ]).toHaveLength(1);
+       discordar das conquistas — o defeito que abriu este trabalho. A loja
+       DELEGA para `sementinhas.functions`, e não reimplementa a consulta. */
+    expect(cantinhoFns).not.toContain('.like("dedupe_key"');
+    expect(cantinhoFns).toContain('await import("@/lib/sementinhas.functions")');
     expect([...cantinhoFns.matchAll(/contarTrofeus\(supabaseAdmin, uid\)/g)]).toHaveLength(2);
   });
 
@@ -169,6 +249,39 @@ describe("o luto cala o troféu junto com o resto", () => {
     const i = cantinhoFns.indexOf("careMode: true as const");
     expect(i).toBeGreaterThan(-1);
     expect(cantinhoFns.slice(Math.max(0, i - 400), i)).toContain("trofeus: 0");
+  });
+});
+
+describe("a comemoração dispara no fechamento do dia", () => {
+  /* O defeito exato que o dono viu: ele fechou as cinco estrelas e NENHUMA
+     animação apareceu. A festa estava condicionada a `novo > antes`, e a
+     contagem daquele momento devolvia 0 — `0 > 0` é falso, e a tela
+     simplesmente não existia. */
+  test("nada de comparar números para decidir se comemora", () => {
+    expect(jogo).not.toMatch(/if \(w\.trofeus > antes\)/);
+    expect(jogo).not.toMatch(/trofeus > antes/);
+  });
+
+  test("`setTrofeuNovo` mora no bloco do dia fechado", () => {
+    /* Esse bloco JÁ é o instante da conquista e JÁ roda uma vez por dia
+       (`!doneDays.includes(D)`). Qualquer condição a mais entre ele e a tela é
+       uma chance a mais de a conquista passar em branco. */
+    const i = jogo.indexOf("if (allDone && !doneDays.includes(D))");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = jogo.slice(i, i + 2600);
+    expect(bloco).toContain("setTrofeuNovo(agora)");
+  });
+
+  test("servidor caindo não engole a conquista", () => {
+    /* Sem a rede o número sai errado por um; sem a rede E sem esta linha, a
+       paciente fecha o dia e não vê nada. */
+    expect(jogo).toMatch(/const agora = doServidor \?\? trofeus \+ 1;/);
+  });
+
+  test("e o efeito NÃO fica dentro do atualizador de estado", () => {
+    /* React pode executar o atualizador duas vezes; duas execuções abririam a
+       comemoração duas vezes. */
+    expect(jogo).not.toMatch(/setTrofeus\(\(antes\) => \{[\s\S]{0,200}setTrofeuNovo/);
   });
 });
 

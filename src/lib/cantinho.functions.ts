@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
-import { PREFIXO_TROFEU, faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
+import { faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
 import {
   CANTINHO_BY_ID,
   CANTINHO_ITEMS,
@@ -39,42 +39,29 @@ async function authUid(accessToken: string): Promise<string | null> {
 
 /** Saldo + itens que a paciente já possui. */
 /**
- * QUANTOS TROFÉUS ELA TEM — dias de cinco estrelas, contados no ledger.
+ * QUANTOS TROFÉUS ELA TEM — delega, e não reimplementa.
  *
- * Aqui e não em `sementinhas.functions.ts` porque quem precisa do número é a
- * LOJA: a vitrine mostra "faltam 4 troféus" e a compra recusa com a mesma
- * conta. Duas contagens para a mesma palavra é como o troféu do topo passou a
- * discordar das conquistas — foi esse defeito que abriu este trabalho.
+ * A conta mora em `sementinhas.functions.ts` (`contarTrofeus`), junto do
+ * `WELLNESS_ACTIVITIES` que ela precisa conhecer. Aqui só se envolve o
+ * `typedDb` e se distingue "zero troféus" de "não consegui contar" — a
+ * diferença que decide se a compra é recusada.
  *
- * `head: true`: o PostgREST devolve só o número. Quem fecha o dia por 300 dias
- * tem 300 linhas, e elas não têm nada a dizer além de existirem.
+ * Duas contagens para a mesma palavra é como o troféu do topo passou a
+ * discordar das conquistas, que foi o defeito que abriu este trabalho.
  */
 async function contarTrofeus(
   admin: typeof import("@/integrations/supabase/client.server").supabaseAdmin,
   uid: string,
 ): Promise<{ trofeus: number; falhou: boolean }> {
-  const { count, error } = await (
-    admin as unknown as {
-      from: (t: string) => {
-        select: (
-          c: string,
-          o: { count: "exact"; head: true },
-        ) => {
-          eq: (
-            c: string,
-            v: string,
-          ) => {
-            like: (c: string, v: string) => Promise<{ count: number | null; error: unknown }>;
-          };
-        };
-      };
-    }
-  )
-    .from("sementinhas_ledger")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", uid)
-    .like("dedupe_key", `${PREFIXO_TROFEU}%`);
-  return { trofeus: error ? 0 : (count ?? 0), falhou: Boolean(error) };
+  try {
+    const { contarTrofeus: contar } = await import("@/lib/sementinhas.functions");
+    return { trofeus: await contar(typedDb(admin), uid), falhou: false };
+  } catch {
+    /* Falha aqui RECUSA a compra (ver o chamador). Liberar por não ter
+       conseguido contar entrega o item e gasta a Sementinha dela do mesmo
+       jeito. */
+    return { trofeus: 0, falhou: true };
+  }
 }
 
 export const getCantinho = createServerFn({ method: "POST" })

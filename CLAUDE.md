@@ -709,10 +709,22 @@ destranca três itens da loja.
 
 - **A fonte é o LEDGER, e isso é o ponto todo.** Não é `doneDays.length`: esse
   mora no `localStorage` e sobe no blob do `journey_state`, então quem o escreve
-  é o navegador — e ele destrancaria item pago. A contagem lê as linhas
-  `day_stars:<ciclo>:<dia>` que `grantDayStarsBonus` grava **depois de o próprio
-  ledger confirmar as cinco atividades**. Uma linha por dia, só o servidor
-  escreve, e já existia.
+  é o navegador — e ele destrancaria item pago.
+- **E é a PROVA, não o recibo.** A primeira versão contava as linhas
+  `day_stars:<ciclo>:<dia>`. Parecia certo e não era: o dono fechou as cinco
+  estrelas e o contador ficou em **zero**. `grantDayStarsBonus` é chamada UMA
+  vez, no instante do fechamento, dentro de um `try/catch` que engole erros —
+  rede oscilando, sessão expirada ou app fechado antes da resposta e a linha
+  nunca é gravada, sem rastro e sem segunda tentativa. Agora a contagem lê as
+  linhas `wellness:<atividade>:<ciclo>:<dia>`, uma por atividade, gravadas no
+  momento em que cada uma é feita — e que `grantDayStarsBonus` já consultava
+  para decidir o bônus. **Sempre foram a prova; `day_stars` era o recibo.**
+  Conta dias com as quatro; é retroativo, sem migration; e a força anti-fraude
+  é a mesma, porque quem escreve continua sendo só o servidor.
+- **O agrupamento carrega o CICLO** (`<ciclo>:<dia>`): sem ele o dia 65 de duas
+  gestações viraria um dia só, apagando um troféu de quem já teve outro bebê
+  no app. E `ATIVIDADES_POR_TROFEU` sai da mesma lista que grava — já foram
+  seis, depois cinco (a respiração virou tema da meditação).
 - **O gate é conferido NA COMPRA** (`cantinho.functions.ts`), não só na vitrine
   — cadeado que só existe na tela é decoração. Falha ao contar **recusa**:
   liberar por não ter conseguido contar entrega o item e gasta a Sementinha
@@ -723,6 +735,14 @@ destranca três itens da loja.
   preço** — ele diz QUANDO a prateleira aparece. A vitrine mostra "faltam 4 🏆",
   nunca "bloqueado": a segunda frase não dá o que fazer a seguir e faz a
   paciente achar que o item é pago em dinheiro.
+- **A comemoração dispara no bloco do dia fechado, e não numa comparação de
+  números.** A primeira versão só abria se `novo > antes` — e como a contagem
+  daquele momento devolvia 0, `0 > 0` era falso e a animação simplesmente não
+  aparecia. Aquele bloco já É o instante da conquista e já roda uma vez por dia
+  (`!doneDays.includes(D)`); qualquer condição a mais entre ele e a tela é uma
+  chance a mais de a conquista passar em branco. Servidor fora do ar mostra
+  `trofeus + 1` — número que se corrige no próximo carregamento é melhor que
+  conquista engolida.
 - **A comemoração roda UMA vez e para no último quadro** (`forwards`): sem isso
   o troféu some no instante em que a última estrela acende, que é o quadro que a
   tela inteira existe para mostrar. Fecha sozinha em 5,5 s, e **um toque em
@@ -733,6 +753,11 @@ destranca três itens da loja.
   o **quadro 0 da folha está 100% vazio** (medido) — é uma animação que
   CONSTRÓI o troféu, não um ciclo. Em laço, um ícone de 22px sumiria e
   renasceria a cada 5 s, que lê como imagem quebrada. Fica no último quadro.
+- **O ícone tem caixa de 34px, não 24.** O desenho não preenche o quadro: no
+  último quadro ele ocupa 108×89 de 150×120 (medido), 72% da largura. Com 24 o
+  troféu saía com ~17px visíveis ao lado de uma chama de 26 — e o dono viu na
+  hora. 34 × 0,72 ≈ 24px visíveis. Comparar caixas de arte com margens
+  diferentes é comparar o que não se vê.
 - **Nitidez:** a origem tem 150px de largura, então a comemoração desenha 200 e
   não 250 — em dsf 3 seriam 750 pixels reais de uma arte de 150. Ampliar o vídeo
   num upscaler NÃO serve: eles devolvem H.264, que não tem canal alfa. O ganho

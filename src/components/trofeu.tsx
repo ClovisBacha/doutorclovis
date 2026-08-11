@@ -38,7 +38,16 @@ const PROPORCAO = 120 / 150;
  * dispara.
  */
 export function TrofeuIcone({
-  tamanho = 24,
+  /* ─── 34, E NÃO 24 ────────────────────────────────────────────────────
+     O desenho NÃO preenche o quadro: no último quadro da folha ele ocupa
+     108×89 de 150×120 (medido) — 72% da largura. Com a caixa em 24px o troféu
+     saía com ~17px visíveis, ao lado de uma chama de 26 e de um calendário de
+     22, e o dono viu na hora: "está pequeno em relação aos outros".
+
+     34 × 0,72 ≈ 24px de troféu visível, que é o tamanho dos vizinhos. A conta
+     é essa, e não gosto: comparar caixas de arte com margens diferentes é
+     comparar coisas que não se veem. */
+  tamanho = 34,
   className = "",
 }: {
   tamanho?: number;
