@@ -24,18 +24,15 @@ import {
   type Soundscape,
   type SoundscapeKey,
 } from "@/lib/soundscapes";
+import { tocar as tocarVoz, parar as pararVoz, faixaDoMovimento, RESPIRACAO } from "@/lib/voz";
+import { faixaDaFala } from "@/lib/voz-meditacao";
 import {
-  tocar as tocarVoz,
-  parar as pararVoz,
-  faixaDoTema,
-  guiaTerminou,
-  faixaDoMovimento,
-  decorrido as vozDecorrido,
-  duracao as vozDuracao,
-  RESPIRACAO,
-  RECHAMADAS_AUDIO,
-  FECHAMENTO as VOZ_FECHAMENTO,
-} from "@/lib/voz";
+  DENSIDADES,
+  falaNoCiclo,
+  planejarSessao,
+  type Densidade,
+  type Plano,
+} from "@/lib/meditacao-sessao";
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import {
   IconeCadeado,
@@ -4636,20 +4633,17 @@ function MovementBlock({
  *     tema a cada cinco ciclos;
  *   · e, no fechamento, "Esse instante também é cuidado com ele."
  *
- * Agora cada tema declara se sobrevive ao luto (`noLuto`) e, quando sobrevive
- * com ressalva, quais falas ela ouve no lugar (`linesLuto`). É a mesma régua
- * de `frases-do-mascote.ts`: passar pelo luto é uma decisão consciente, fala
- * por fala, e o padrão é NÃO passar.
+ * Agora cada tema declara se sobrevive ao luto (`noLuto`), e as FALAS são
+ * limpas uma a uma por `planejarSessao`. É a mesma régua de
+ * `frases-do-mascote.ts`: passar pelo luto é decisão consciente, e o padrão é
+ * NÃO passar.
  */
 const MEDITACOES: {
   theme: string;
   need: string;
   emoji: string;
-  lines: string[];
   /** Oferecido no Modo Cuidado. O padrão é não. */
   noLuto?: boolean;
-  /** As falas do Modo Cuidado, quando o tema passa mas o texto não. */
-  linesLuto?: string[];
 }[] = [
   {
     /* ─── A RESPIRAÇÃO VIROU UM TEMA (ago/2026) ─────────────────────────
@@ -4659,14 +4653,13 @@ const MEDITACOES: {
        mesma classe `dc-guiado`. A única coisa que ela tinha de diferente
        está logo abaixo, no centro da sessão: a Bolha respirando junto.
 
-       E não precisou de código para virar tema. `lines: []` já produz
-       exatamente a respiração: `frase` volta nulo, a tela escreve "Só
-       respire.", a voz das fases continua conduzindo e as rechamadas entram
-       de cinco em cinco ciclos. O silêncio guiado É o exercício. */
+       E não precisou de código para virar tema: ele simplesmente não tem
+       falas de corpo em `meditacao-roteiros`. O plano da sessão monta
+       acolhimento, ancoragem, silêncio e volta, e o meio fica com o compasso.
+       O silêncio guiado É o exercício. */
     theme: "Só respirar",
     need: "Quero só respirar",
     emoji: "🌬️",
-    lines: [],
     /* Sem falas, sem risco: é só o compasso. No luto, é o único exercício que
        não precisa de nenhuma ressalva — e costuma ser o que serve. */
     noLuto: true,
@@ -4675,132 +4668,46 @@ const MEDITACOES: {
     theme: "Calma",
     need: "Estou tensa",
     emoji: "🌊",
-    lines: [
-      "Feche os olhos e solte os ombros.",
-      "Sinta o ar entrando… e saindo, sem pressa.",
-      "A cada expiração, solte um pouco da tensão do dia.",
-      "Você está segura. Seu bebê está bem aqui com você.",
-      "Deixe o corpo pesar, como se afundasse em algo macio.",
-      "Fique mais um instante, só respirando.",
-      "Quando quiser, abra os olhos devagar.",
-    ],
     /* Calma é o tema que alguém em sofrimento escolhe — tirá-lo do luto seria
-       fechar a porta certa. O que sai é a quarta fala, que fala do bebê. */
+       fechar a porta certa. Quem limpa as falas é `planejarSessao`, fala a
+       fala: nenhuma que cite o bebê, a barriga ou o parto entra no plano. */
     noLuto: true,
-    linesLuto: [
-      "Feche os olhos e solte os ombros.",
-      "Sinta o ar entrando… e saindo, sem pressa.",
-      "A cada expiração, solte um pouco da tensão do dia.",
-      "Você está em segurança neste lugar, neste minuto.",
-      "Deixe o corpo pesar, como se afundasse em algo macio.",
-      "Fique mais um instante, só respirando.",
-      "Quando quiser, abra os olhos devagar.",
-    ],
   },
   {
     theme: "Conexão com o bebê",
     need: "Quero sentir o bebê",
     emoji: "💛",
-    lines: [
-      "Leve uma das mãos até a barriga, sem apertar.",
-      "Respire fundo e imagine esse ar chegando até o bebê.",
-      "Por dentro, mande um 'oi' carinhoso pra ele.",
-      "Sinta que, agora, vocês dois estão respirando juntos.",
-      "Não precisa fazer nada — só estar aqui já é cuidado.",
-      "Guarde essa sensação de vínculo.",
-      "Abra os olhos quando estiver pronta.",
-    ],
   },
   {
     theme: "Descanso",
     need: "Preciso descansar",
     emoji: "🌙",
-    lines: [
-      "Acomode-se do jeito mais confortável possível.",
-      "Solte a mandíbula, solte a testa, solte as mãos.",
-      "Deixe a respiração ficar mais lenta, sozinha.",
-      "Imagine um lugar tranquilo e seguro só seu.",
-      "Aqui, não há nada pra resolver agora.",
-      "Descanse mais um pouco nesse lugar.",
-      "Volte devagar, sem pressa.",
-    ],
-    /* Nenhuma fala cita o bebê. Passa inteiro. */
     noLuto: true,
   },
   {
     theme: "Gratidão",
     need: "Quero um respiro bom",
     emoji: "✨",
-    lines: [
-      "Respire fundo uma vez, bem devagar.",
-      "Pense em uma coisa boa que aconteceu hoje.",
-      "Pode ser bem pequena — um gole de água, um sol na pele.",
-      "Deixe esse pensamento aquecer o peito.",
-      "Agradeça ao seu corpo por estar cuidando de duas vidas.",
-      "Respire mais uma vez, sorrindo por dentro.",
-      "Abra os olhos levando essa calma com você.",
-    ],
   },
   {
     theme: "Sono tranquilo",
     need: "Não consigo dormir",
     emoji: "😴",
-    lines: [
-      "Deite-se de lado, com um travesseiro apoiando a barriga.",
-      "Solte o peso do corpo no colchão, parte por parte.",
-      "Deixe a respiração ficar longa e silenciosa.",
-      "Imagine cada pensamento indo embora como uma nuvem.",
-      "Não precisa dormir agora — só descansar já basta.",
-      "Fique nesse aconchego mais um pouquinho.",
-    ],
-    /* Dormir é o que mais falta a quem está de luto, e o tema é neutro salvo
-       pela primeira fala, que supõe barriga. */
+    /* Dormir é o que mais falta a quem está de luto. */
     noLuto: true,
-    linesLuto: [
-      "Deite-se do jeito mais confortável, com um travesseiro onde precisar.",
-      "Solte o peso do corpo no colchão, parte por parte.",
-      "Deixe a respiração ficar longa e silenciosa.",
-      "Imagine cada pensamento indo embora como uma nuvem.",
-      "Não precisa dormir agora — só descansar já basta.",
-      "Fique nesse aconchego mais um pouquinho.",
-    ],
   },
   {
     theme: "Coragem pro parto",
     need: "Estou com medo do parto",
     emoji: "🦁",
-    lines: [
-      "Respire fundo e sinta a força que já existe em você.",
-      "Seu corpo sabe o caminho — ele foi feito pra isso.",
-      "A cada respiração, diga por dentro: 'eu sou capaz'.",
-      "O medo pode vir junto — e você segue mesmo assim.",
-      "Milhões de mulheres já fizeram isso. Você não está só.",
-      "Guarde essa confiança pra quando precisar dela.",
-    ],
   },
   {
     theme: "Aqui e agora",
     need: "Minha cabeça não para",
     emoji: "🍃",
-    lines: [
-      "Sinta os pontos do corpo que tocam o chão ou a cadeira.",
-      "Perceba 3 sons ao seu redor, sem julgar.",
-      "Perceba o ar tocando a sua pele.",
-      "Não há passado nem futuro neste instante — só agora.",
-      "Você e o bebê, respirando, neste exato momento.",
-      "Leve essa presença pro resto do dia.",
-    ],
     /* Ancorar no presente é das poucas práticas que servem no luto agudo — a
-       cabeça é justamente o lugar de onde ela precisa sair. Sai a quinta. */
+       cabeça é justamente o lugar de onde ela precisa sair. */
     noLuto: true,
-    linesLuto: [
-      "Sinta os pontos do corpo que tocam o chão ou a cadeira.",
-      "Perceba 3 sons ao seu redor, sem julgar.",
-      "Perceba o ar tocando a sua pele.",
-      "Não há passado nem futuro neste instante — só agora.",
-      "Você está respirando, neste exato momento. É só disso que se trata.",
-      "Leve essa presença pro resto do dia.",
-    ],
   },
 ];
 
@@ -4857,15 +4764,6 @@ const CICLO_SEGS = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
    degrau, quem só tinha um minuto perdia o exercício inteiro.
    Cai redondo: o ciclo tem 12s, então 1 min são exatamente 5 respirações. */
 const DURACOES = [1, 2, 5, 10] as const;
-
-/** Frases esparsas do trecho silencioso — nunca instruem, só reancoram. */
-const RECHAMADAS = [
-  "Se a cabeça foi embora, tudo bem. Volte pra respiração.",
-  "Nada pra resolver agora. Só o ar entrando e saindo.",
-  "Solte os ombros de novo.",
-  "Você e o bebê, respirando juntos.",
-  "Deixe a expiração ser mais longa que a inspiração.",
-];
 
 const COMO_ESTOU = [
   { emoji: "😌", label: "Mais calma" },
@@ -4931,6 +4829,26 @@ const FECHAMENTO: Record<string, string> = {
     "Ansiedade que não passa em 5 minutos merece ser falada. Leve isso pra consulta.",
 };
 
+/**
+ * A faixa de cada fechamento.
+ *
+ * Antes havia UMA faixa de fechamento para as cinco respostas — a voz dizia a
+ * mesma coisa para quem saiu mais calma e para quem saiu ainda ansiosa,
+ * enquanto a tela escrevia coisas diferentes. Agora cada resposta tem a sua, e
+ * é a mesma frase que ela lê.
+ *
+ * A de "Ainda ansiosa" é a única do app que manda levar algo para a consulta.
+ * Ela ganhou voz de propósito: é a que mais precisa ser ouvida, e não lida de
+ * relance antes de fechar a tela.
+ */
+const FALA_DO_FECHAMENTO: Record<string, string> = {
+  "Mais calma": "fe-calma",
+  "Com sono": "fe-sono",
+  Conectada: "fe-conectada",
+  Igual: "fe-igual",
+  "Ainda ansiosa": "fe-ansiosa",
+};
+
 function MeditationBlock({
   day,
   canEarn,
@@ -4971,6 +4889,18 @@ function MeditationBlock({
   const [minutos, setMinutos] = useState<(typeof DURACOES)[number]>(5);
   const [som, setSom] = useState<SoundscapeKey>("pad");
   const [voz, setVoz] = useState(true);
+  /* Quanta voz ela quer — guiada, pouca, ou só o desenho. É o controle que o
+     Headspace tem e que faltava aqui: quem quer silêncio pedia silêncio
+     desligando a voz inteira, e aí perdia também o acolhimento e a volta. */
+  const [densidade, setDensidade] = useState<Densidade>("guiada");
+  /**
+   * O PLANO DA SESSÃO — quais falas tocam, e em qual respiração.
+   *
+   * Montado uma vez, no clique de começar. Se fosse derivado do render, a
+   * semente mudaria e as rechamadas trocariam debaixo da paciente — o mesmo
+   * defeito que o balão do mascote teve com o clima.
+   */
+  const [plano, setPlano] = useState<Plano | null>(null);
   const [ciclo, setCiclo] = useState(0);
   const [fase, setFase] = useState<"in" | "hold" | "out">("in");
   const [humor, setHumor] = useState<string | null>(null);
@@ -4985,8 +4915,6 @@ function MeditationBlock({
   /* `Math.min` porque `temaIdx` pode ter sido escolhido com a lista cheia e o
      Modo Cuidado ser ligado depois — a lista encolhe debaixo do índice. */
   const med = temas[Math.min(temaIdx, temas.length - 1)];
-  /* As falas do luto quando o tema passa mas o texto não. Ver `linesLuto`. */
-  const falasDoTema = (careMode ? (med.linesLuto ?? med.lines) : med.lines) as string[];
   const totalCiclos = Math.round((minutos * 60) / CICLO_SEGS);
   // Relido a cada troca de etapa de propósito: quando a sessão termina ela
   // acabou de gravar o dia de hoje, e a tela de fim precisa mostrar a sequência
@@ -5011,17 +4939,19 @@ function MeditationBlock({
     [],
   );
 
-  /** Frase da vez: as do tema abrem a sessão; depois, silêncio com rechamadas. */
-  const frase = useMemo(() => {
-    if (ciclo < falasDoTema.length) return falasDoTema[ciclo];
-    const desde = ciclo - falasDoTema.length;
-    /* ⚠️ As rechamadas entram em QUALQUER tema, então uma delas falando do
-       bebê alcançava até quem escolheu "Só respirar" no Modo Cuidado. */
-    const poco = careMode ? RECHAMADAS.filter((r) => !/bebê/i.test(r)) : RECHAMADAS;
-    if (desde > 0 && desde % 5 === 0) return poco[(desde / 5 - 1) % poco.length];
-    return null;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ciclo, falasDoTema, careMode]);
+  /**
+   * A FALA DESTA RESPIRAÇÃO — e ela é a mesma coisa que a tela escreve e que a
+   * voz diz.
+   *
+   * ⚠️ Era esse o defeito estrutural que a auditoria mediu: o texto andava uma
+   * linha a cada 12 s por um relógio próprio, e a faixa gravada lia as sete
+   * frases em 34 s. No tema Calma, aos 30 s a voz estava na sétima frase e a
+   * tela mostrava a terceira; das linhas 4 a 7 ela lia em silêncio. Agora cada
+   * fala é um arquivo, e o mesmo objeto alimenta os dois — não há como
+   * dessincronizar.
+   */
+  const falaAgora = plano ? falaNoCiclo(plano, ciclo) : null;
+  const frase = falaAgora?.texto ?? null;
 
   // Relógio da respiração: cada fase agenda a próxima. O ciclo fecha na
   // expiração — inspirar é o começo natural, expirar é o fim natural.
@@ -5101,27 +5031,11 @@ function MeditationBlock({
   const faseVisual: "in" | "hold" | "out" = respiroPronto ? fase : "out";
   const respiroMs = respiroPronto ? RESPIRO[fase] * 1000 : 0;
 
-  /**
-   * Quem COMEÇA a faixa guiada é o clique em `begin()`, por causa do bloqueio
-   * de autoplay. Aqui só cuidamos de calá-la: ao sair da sessão, e quando ela
-   * desliga a voz no meio.
-   *
-   * A faixa é contínua, e não uma frase por ciclo. A voz gravada guia, respira
-   * junto, e o silêncio faz parte — como em qualquer meditação de verdade.
-   * Frase-por-frase produzia voz picotada com silêncio seco entre elas.
-   */
+  /* Cala a voz ao sair da sessão e quando ela desliga no meio. */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz) pararVoz("guia");
+    if (etapa !== "sessao" || !voz) pararVoz();
   }, [etapa, voz]);
 
-  /**
-   * As três palavras da respiração, na virada de cada fase.
-   *
-   * Só entram DEPOIS que a guia terminou. Durante a faixa longa elas seriam
-   * uma interrupção a cada quatro segundos — e a guia já está dizendo o que
-   * fazer. Depois dela, são a única coisa que orienta quem está de olhos
-   * fechados, que é o estado em que a tela pede que ela fique.
-   */
   /* Tela acesa durante a meditação. É a atividade mais longa do app — até dez
      minutos — e a própria tela pede "com a voz você pode fechar os olhos".
      Sem isto, o aparelho bloqueia em uns trinta segundos, o ciclo é suspenso e
@@ -5131,34 +5045,38 @@ function MeditationBlock({
     return manterTelaAcesa();
   }, [etapa]);
 
+  /**
+   * A FALA DA RESPIRAÇÃO ATUAL, no canal da guia.
+   *
+   * Uma fala por ciclo, e o ciclo tem 12 s contra os ~5 s de fala: sobra
+   * silêncio dentro da própria respiração, que é onde o exercício acontece. O
+   * canal é o `guia` porque as três palavras vivem no `pulso` — assim uma
+   * nunca corta a outra, que era o motivo de existirem dois canais.
+   */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz || !guiaTerminou()) return;
+    if (etapa !== "sessao" || !voz || !falaAgora) return;
+    const faixa = faixaDaFala(falaAgora.id);
+    /* Sem arquivo, a tela segue escrevendo e a sessão anda em silêncio naquele
+       trecho. Nunca com a voz errada, que seria pior. */
+    if (faixa) tocarVoz(faixa, { canal: "guia" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, voz, falaAgora?.id]);
+
+  /**
+   * As três palavras da respiração, na virada de cada fase.
+   *
+   * ⚠️ Elas tocavam a sessão INTEIRA — 47 vezes em dez minutos, 141 palavras,
+   * o grosso de tudo que se ouvia. Agora conduzem só enquanto o desenho ainda
+   * está ensinando o compasso (`palavrasAte`), e depois calam. Na densidade
+   * "só o ritmo" vão até o fim: são o único guia que sobra.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || !voz || !plano || ciclo >= plano.palavrasAte) return;
     const palavra =
       fase === "in" ? RESPIRACAO.in : fase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
     tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
-  }, [etapa, fase, voz]);
-
-  /**
-   * As rechamadas, a cada cinco ciclos, depois que a guia acabou.
-   *
-   * `frase` continua sendo a fonte da verdade do que está escrito na tela; aqui
-   * só se procura o áudio correspondente àquele texto. Se um dia alguém
-   * acrescentar uma rechamada escrita sem gravar a faixa, esta busca devolve
-   * nada e a tela segue muda — nunca com a frase errada na boca.
-   */
-  useEffect(() => {
-    if (etapa !== "sessao" || !voz || !frase || !guiaTerminou()) return;
-    const i = RECHAMADAS.indexOf(frase);
-    if (i < 0 || !RECHAMADAS_AUDIO[i]) return;
-    tocarVoz(RECHAMADAS_AUDIO[i], { canal: "pulso" });
-  }, [etapa, frase, voz]);
-
-  /** O fim ganha voz. Antes a sessão simplesmente parava. */
-  useEffect(() => {
-    if (etapa !== "reflexo" || !voz) return;
-    pararVoz("guia");
-    tocarVoz(VOZ_FECHAMENTO, { canal: "pulso" });
-  }, [etapa, voz]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, fase, voz, ciclo, plano?.palavrasAte]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -5206,17 +5124,35 @@ function MeditationBlock({
     audioRef.current = createSoundscape(som);
     audioRef.current.start();
     /**
-     * A faixa guiada começa AQUI, dentro do clique — não num efeito.
+     * O PLANO NASCE AQUI, no clique — e a primeira fala toca junto.
      *
      * O navegador só deixa tocar áudio a partir de um gesto do usuário, e um
      * `useEffect` roda depois que o React pintou: para o Safari e o Chrome do
      * celular isso já não é mais o gesto, e o `play()` volta rejeitado. O som
      * ambiente ao lado sempre soube disso — nasce neste mesmo clique. A voz
-     * precisava do mesmo tratamento, senão a paciente abriria a meditação e
+     * precisa do mesmo tratamento, senão a paciente abriria a meditação e
      * ouviria apenas o ambiente, sem nunca entender por quê.
+     *
+     * A semente vem dos minutos já meditados: duas sessões seguidas ouvem
+     * rechamadas diferentes, e a mesma sessão pedida duas vezes dá o mesmo
+     * plano. Com vinte no poço, ela medita duas semanas sem repetir uma frase.
      */
+    const p = planejarSessao({
+      minutos,
+      tema: med.theme,
+      /* A leitura do tema gira com os dias meditados: a segunda sessão de
+         "Calma" não é a primeira de novo. É a resposta direta à queixa nº 2
+         dos usuários de Calm e Headspace — repetição de conteúdo. */
+      variacao: (((log.dias?.length ?? 0) % 3) + 1) as 1 | 2 | 3,
+      semanas: Math.floor(day / 7),
+      densidade,
+      careMode,
+      semente: log.minutos ?? 0,
+    });
+    setPlano(p);
     if (voz) {
-      const faixa = faixaDoTema(med.theme);
+      const primeira = p.deixas.find((d) => d.ciclo === 0);
+      const faixa = primeira ? faixaDaFala(primeira.fala.id) : null;
       if (faixa) tocarVoz(faixa, { canal: "guia" });
     }
     setEtapa("sessao");
@@ -5448,28 +5384,46 @@ function MeditationBlock({
                 ))}
               </div>
 
-              {
-                <button
-                  onClick={alternarVoz}
-                  className={`press mt-4 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
-                    voz ? "bg-violet-500 text-white" : "border border-violet-200 bg-white/70"
-                  }`}
-                >
-                  <span className="text-xl leading-none">🗣️</span>
-                  <span className="min-w-0 flex-1">
-                    <span
-                      className={`block text-sm font-extrabold ${voz ? "" : "text-violet-900"}`}
-                    >
-                      Voz guiada {voz ? "ligada" : "desligada"}
+              {/* ── QUANTA VOZ ELA QUER ────────────────────────────────
+                  Substitui o interruptor de liga/desliga. Ele era binário e
+                  caro: quem queria silêncio desligava a voz inteira e perdia
+                  junto o acolhimento e a volta ao corpo — as duas partes que
+                  mais importam para quem está começando. Três degraus é o que
+                  o Headspace oferece (guiada, semi-guiada, não guiada), e é uma
+                  das razões de ele ser o melhor app para iniciante. */}
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                Quanta voz você quer?
+              </p>
+              <div className="mt-2 grid gap-2">
+                {DENSIDADES.map((d) => (
+                  <button
+                    key={d.chave}
+                    onClick={() => {
+                      setDensidade(d.chave);
+                      /* "Só o ritmo" ainda usa as três palavras da respiração,
+                         então a voz continua ligada — o que muda é o quanto
+                         ela fala. Só o desligamento manual cala tudo. */
+                      setVoz(true);
+                    }}
+                    className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                      densidade === d.chave
+                        ? "bg-violet-500 text-white"
+                        : "border border-violet-200 bg-white/70 text-violet-900"
+                    }`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-extrabold">{d.rotulo}</span>
+                      <span
+                        className={`block text-[11px] ${
+                          densidade === d.chave ? "text-white/75" : "text-violet-700/70"
+                        }`}
+                      >
+                        {d.sub}
+                      </span>
                     </span>
-                    <span
-                      className={`block text-[11px] ${voz ? "text-white/75" : "text-violet-700/70"}`}
-                    >
-                      Com a voz você pode fechar os olhos.
-                    </span>
-                  </span>
-                </button>
-              }
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -5598,6 +5552,13 @@ function MeditationBlock({
                     key={c.label}
                     onClick={() => {
                       setHumor(c.label);
+                      /* A voz do fechamento sai do CLIQUE dela, e não de um
+                         efeito: é o gesto que libera o áudio no Safari, e sem
+                         ele a última palavra da sessão sairia muda. */
+                      if (voz) {
+                        const f = faixaDaFala(FALA_DO_FECHAMENTO[c.label] ?? "");
+                        if (f) tocarVoz(f, { canal: "guia" });
+                      }
                       registrarMeditacao(0, c.label);
                       /* Fora do aparelho também — é o que faz esta resposta
                          chegar ao gráfico de humor dela e ao prontuário. */

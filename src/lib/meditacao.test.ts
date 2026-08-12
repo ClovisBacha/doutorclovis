@@ -160,7 +160,11 @@ describe("o Modo Cuidado chegou à meditação", () => {
      "Conexão com o bebê" na lista, a fala "Você está segura. Seu bebê está bem
      aqui com você." dentro de "Calma" — que é justamente o tema que alguém em
      sofrimento escolhe — e a rechamada "Você e o bebê, respirando juntos", que
-     entra em QUALQUER tema a cada cinco ciclos. */
+     entra em QUALQUER tema.
+
+     São DUAS travas, e as duas precisam existir: a lista de temas (aqui) e as
+     falas uma a uma (`meditacao-sessao.test.ts`, que compara os TEXTOS do
+     plano em vez de procurar uma linha no fonte). */
   const bloco = path.slice(
     path.indexOf("const MEDITACOES"),
     path.indexOf("function MeditationBlock"),
@@ -172,37 +176,13 @@ describe("o Modo Cuidado chegou à meditação", () => {
       passa: /noLuto: true/.test(m[2]),
     }));
     expect(temas.length).toBeGreaterThanOrEqual(8);
-    const proibidos = ["Conexão com o bebê", "Coragem pro parto"];
-    for (const nome of proibidos) {
+    for (const nome of ["Conexão com o bebê", "Coragem pro parto"]) {
       const t = temas.find((x) => x.nome === nome);
       expect(t).toBeTruthy();
       expect(t!.passa).toBe(false);
     }
     /* E sobra o que serve: respirar, calma, descanso, presente, sono. */
     expect(temas.filter((t) => t.passa).length).toBeGreaterThanOrEqual(4);
-  });
-
-  test("nenhuma fala do luto cita o bebê, a barriga ou o parto", () => {
-    /* Um tema pode passar e o texto dele não — é para isso que existe
-       `linesLuto`. O teste lê as falas que o luto realmente ouve. */
-    const proibido = /\b(beb[êe]|barriga|parto|filho|nascer|v[íi]nculo|voc[êe]s dois)\b/i;
-    const temas = [...bloco.matchAll(/theme: "([^"]+)"([\s\S]*?)(?=\n {2}\{|\n\];)/g)];
-    for (const [, nome, corpo] of temas) {
-      if (!/noLuto: true/.test(corpo)) continue;
-      const usadas =
-        /linesLuto:\s*\[([\s\S]*?)\]/.exec(corpo) ?? /lines:\s*\[([\s\S]*?)\]/.exec(corpo);
-      for (const f of [...(usadas?.[1] ?? "").matchAll(/"([^"]+)"/g)]) {
-        expect({ tema: nome, fala: f[1], cita: proibido.test(f[1]) }).toEqual({
-          tema: nome,
-          fala: f[1],
-          cita: false,
-        });
-      }
-    }
-  });
-
-  test("a rechamada do bebê é filtrada — ela entra em qualquer tema", () => {
-    expect(path).toContain("careMode ? RECHAMADAS.filter((r) => !/bebê/i.test(r)) : RECHAMADAS");
   });
 
   test("o índice do tema sugerido nasce dentro da lista JÁ filtrada", () => {
@@ -217,5 +197,48 @@ describe("o Modo Cuidado chegou à meditação", () => {
     /* Ele responde "Esse instante também é cuidado com ele. Vocês dois
        sentiram." */
     expect(path).toContain('!careMode || c.label !== "Conectada"');
+  });
+
+  test("o `careMode` chega ao plano da sessão", () => {
+    /* É o que limpa as falas uma a uma. Sem repassá-lo, a lista de temas
+       ficaria filtrada e o acolhimento e as rechamadas continuariam falando
+       do bebê dentro de um tema "seguro". */
+    const i = path.indexOf("const p = planejarSessao({");
+    expect(i).toBeGreaterThan(-1);
+    expect(path.slice(i, path.indexOf("});", i))).toContain("careMode,");
+  });
+});
+
+describe("a sessão toca trechos, e o texto é o mesmo que a voz", () => {
+  test("a fala da tela vem do PLANO, não de um relógio próprio", () => {
+    /* ⚠️ O defeito estrutural que a auditoria mediu: o texto andava uma linha
+       a cada 12 s e a faixa lia as sete frases em 34 s. No tema Calma, aos 30 s
+       a voz estava na sétima e a tela na terceira. Agora o mesmo objeto
+       alimenta os dois. */
+    expect(path).toContain("const falaAgora = plano ? falaNoCiclo(plano, ciclo) : null;");
+    expect(path).toContain("const frase = falaAgora?.texto ?? null;");
+    expect(path).toContain("const faixa = faixaDaFala(falaAgora.id);");
+  });
+
+  test("as três palavras param quando a ancoragem acaba", () => {
+    /* Tocavam 47 vezes em dez minutos — 141 palavras, o grosso do que se ouvia. */
+    expect(path).toContain("ciclo >= plano.palavrasAte");
+  });
+
+  test("o caminho velho não sobrou em lugar nenhum", () => {
+    /* Duas fontes de fala para a mesma tela divergiriam no primeiro conserto —
+       e a divergência seria invisível, porque as duas escrevem na mesma `frase`. */
+    for (const morto of ["faixaDoTema", "guiaTerminou", "RECHAMADAS_AUDIO", "falasDoTema"]) {
+      expect(path).not.toContain(morto);
+    }
+  });
+
+  test("cada fechamento tem a própria voz", () => {
+    /* Havia UMA faixa para as cinco respostas: a voz dizia a mesma coisa para
+       quem saiu mais calma e para quem saiu ainda ansiosa. */
+    expect(path).toContain("const FALA_DO_FECHAMENTO");
+    for (const id of ["fe-calma", "fe-sono", "fe-conectada", "fe-igual", "fe-ansiosa"]) {
+      expect(path).toContain(id);
+    }
   });
 });
