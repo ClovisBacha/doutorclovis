@@ -143,6 +143,49 @@ export function sinalSaturacao(valor?: number | null): Sinal | null {
 }
 
 /**
+ * CONTRAÇÕES REGULARES ANTES DAS 37 SEMANAS.
+ *
+ * ─── POR QUE ESTA RÉGUA PRECISAVA EXISTIR ───────────────────────────────────
+ *
+ * O app já declarava "contrações regulares antes de 37 semanas" como sintoma
+ * VERMELHO em `triage.ts` — o mesmo quadro que, na triagem, manda procurar
+ * atendimento agora. Mas o cronômetro de contrações recebia a semana
+ * gestacional e a DESCARTAVA: ele só olhava intervalo e duração médios.
+ *
+ * Resultado medido: uma paciente de 28 semanas com contrações a cada 12
+ * minutos por 40 segundos lia "Padrão normal"; a cada 8 minutos, "Atenção —
+ * padrão irregular, monitore de perto". A mesma paciente, respondendo a
+ * triagem, receberia "procure atendimento agora". Duas telas do mesmo app
+ * dizendo coisas opostas sobre o mesmo quadro — e a que ela abre com o
+ * cronômetro na mão é a que tranquiliza.
+ *
+ * ─── O CORTE ────────────────────────────────────────────────────────────────
+ *
+ * 37 semanas é a fronteira do termo, e é a mesma escrita em `triage.ts`.
+ * "Regular" aqui é intervalo médio ≤ 10 minutos — o mesmo limiar que o
+ * cronômetro já usava para sair de "normal", só que agora ele PROMOVE em vez
+ * de tranquilizar quando a gestação ainda não chegou ao termo.
+ *
+ * Sem semana conhecida devolve `null`: sem saber em que semana ela está, não há
+ * como afirmar prematuridade, e inventar aqui seria alarmar quem está de 39.
+ */
+export function sinalContracoesPrematuras(o: {
+  semanas?: number | null;
+  /** Intervalo médio entre o início de uma contração e a seguinte, em minutos. */
+  intervaloMin?: number | null;
+}): Sinal | null {
+  const s = o.semanas;
+  const iv = o.intervaloMin;
+  if (s == null || !Number.isFinite(s) || iv == null || !Number.isFinite(iv)) return null;
+  if (s >= 37) return null;
+  if (iv > 10) return null;
+  return {
+    gravidade: "grave",
+    nota: `Contrações regulares antes das 37 semanas (você está com ${Math.floor(s)}). Ligue para o seu médico agora.`,
+  };
+}
+
+/**
  * Silêncio: há quanto tempo ela não registra nada no app.
  *
  * Os cortes são de produto, não clínicos. Duas semanas é o intervalo em que uma

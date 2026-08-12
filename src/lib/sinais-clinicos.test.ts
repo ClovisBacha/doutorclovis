@@ -12,6 +12,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   diasDeSilencio,
   sinalGlicemia,
@@ -20,6 +21,7 @@ import {
   sinalSilencio,
   validaRegistro,
   vozDaPaciente,
+  sinalContracoesPrematuras,
 } from "./sinais-clinicos";
 
 describe("pressão arterial", () => {
@@ -172,5 +174,51 @@ describe("validação na entrada", () => {
   test("mmol/L recebe explicação, não erro genérico", () => {
     const e = validaRegistro({ glucose_mg_dl: "5,4" });
     expect(e).toContain("mmol/L");
+  });
+});
+
+describe("contrações regulares antes das 37 semanas", () => {
+  /* ⚠️ Este bloco existe porque o cronômetro RECEBIA a semana gestacional e a
+     descartava. Uma paciente de 28 semanas com contrações a cada 12 minutos
+     lia "Padrão normal", e a mesma paciente, na triagem, receberia "procure
+     atendimento agora" — o app dizendo coisas opostas sobre o mesmo quadro. */
+
+  test("28 semanas com padrão regular é GRAVE, mesmo sendo um padrão leve", () => {
+    /* 8 minutos é o padrão que a régua de trabalho de parto chamaria de
+       "atenção — monitore de perto". Antes do termo, ele é vermelho. */
+    const s = sinalContracoesPrematuras({ semanas: 28, intervaloMin: 8 });
+    expect(s?.gravidade).toBe("grave");
+    expect(s?.nota).toContain("37 semanas");
+  });
+
+  test("no limite de 10 minutos ainda conta como regular", () => {
+    expect(sinalContracoesPrematuras({ semanas: 30, intervaloMin: 10 })?.gravidade).toBe("grave");
+    expect(sinalContracoesPrematuras({ semanas: 30, intervaloMin: 11 })).toBeNull();
+  });
+
+  test("a partir das 37 não é prematuro — 37 é a fronteira do termo", () => {
+    expect(sinalContracoesPrematuras({ semanas: 37, intervaloMin: 5 })).toBeNull();
+    expect(sinalContracoesPrematuras({ semanas: 36, intervaloMin: 5 })?.gravidade).toBe("grave");
+  });
+
+  test("sem semana conhecida NÃO afirma prematuridade", () => {
+    /* Inventar aqui alarmaria quem está de 39 semanas em trabalho de parto
+       normal — que é exatamente quem mais usa o cronômetro. */
+    expect(sinalContracoesPrematuras({ semanas: null, intervaloMin: 5 })).toBeNull();
+    expect(sinalContracoesPrematuras({ semanas: Number.NaN, intervaloMin: 5 })).toBeNull();
+    expect(sinalContracoesPrematuras({ semanas: 28, intervaloMin: null })).toBeNull();
+  });
+
+  test("o cronômetro usa a régua, e o teste da semana vem ANTES dos cortes de parto", () => {
+    /* Sem a ordem, o caso perigoso — padrão leve antes do termo — só seria
+       alcançado depois de passar pelos cortes de trabalho de parto ativo, que
+       o classificariam como normal. */
+    const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+    const i = conta.indexOf("function analyzeContractions(");
+    const corpo = conta.slice(i, conta.indexOf("\nfunction ContracoesTab", i));
+    expect(corpo).toContain("sinalContracoesPrematuras({ semanas: weeks");
+    expect(corpo.indexOf("sinalContracoesPrematuras")).toBeLessThan(
+      corpo.indexOf("avgInterval <= 3"),
+    );
   });
 });

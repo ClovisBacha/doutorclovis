@@ -63,7 +63,13 @@ import {
   type DuvidaRegistrada,
 } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
-import { sinalGlicemia, sinalPressao, validaRegistro, vozDaPaciente } from "@/lib/sinais-clinicos";
+import {
+  sinalContracoesPrematuras,
+  sinalGlicemia,
+  sinalPressao,
+  validaRegistro,
+  vozDaPaciente,
+} from "@/lib/sinais-clinicos";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -8694,7 +8700,24 @@ const INTENSITY_COLOR = [
   "bg-rose-100 text-rose-700",
 ];
 
-function analyzeContractions(list: Contraction[]): {
+/**
+ * ⚠️ `weeks` NÃO É DECORATIVO — ele era descartado, e isso custava caro.
+ *
+ * A função só olhava intervalo e duração médios. Uma paciente de 28 semanas com
+ * contrações a cada 12 minutos lia "Padrão normal"; a cada 8, "Atenção — monitore
+ * de perto". E `triage.ts` lista "Contrações regulares antes de 37 semanas" como
+ * sintoma VERMELHO: a mesma paciente, respondendo a triagem, receberia "procure
+ * atendimento agora". Duas telas do mesmo app dizendo coisas opostas sobre o
+ * mesmo quadro — e a que ela abre com o cronômetro na mão era a que
+ * tranquilizava.
+ *
+ * A régua nova mora em `sinais-clinicos.ts`, com as outras, porque CLAUDE.md é
+ * explícito: nunca duplique um limite clínico fora daquele arquivo.
+ */
+function analyzeContractions(
+  list: Contraction[],
+  weeks: number | null,
+): {
   status: "normal" | "atencao" | "alerta" | "urgente";
   label: string;
   detail: string;
@@ -8730,6 +8753,20 @@ function analyzeContractions(list: Contraction[]): {
   }
   const avgInterval = intervals.reduce((s, x) => s + x, 0) / intervals.length;
 
+  /* ─── PREMATURIDADE VEM ANTES DE TUDO ────────────────────────────────────
+     Antes das 37 semanas, contração regular é sinal vermelho independentemente
+     de quão "leve" o padrão parece — e é justamente o padrão leve que a régua
+     de trabalho de parto classificaria como normal. Por isso este teste vem
+     PRIMEIRO: ele não pode ser alcançado só depois de a paciente passar pelos
+     cortes de parto ativo. */
+  const prematuro = sinalContracoesPrematuras({ semanas: weeks, intervaloMin: avgInterval });
+  if (prematuro)
+    return {
+      status: "urgente",
+      label: "⚠️ Ligue para o seu médico agora",
+      detail: `${prematuro.nota} Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
+    };
+
   if (avgInterval <= 3 && avgDur >= 60)
     return {
       status: "urgente",
@@ -8756,6 +8793,7 @@ function analyzeContractions(list: Contraction[]): {
 }
 
 function ContracoesTab({ weeks }: { weeks: number | null }) {
+  /* `weeks` é lido de verdade agora — ver `analyzeContractions`. */
   const [contractions, setContractions] = useState<Contraction[]>([]);
   const [active, setActive] = useState<Contraction | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -8845,7 +8883,7 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   const analysisWindow = contractions
     .filter((c) => Date.now() - new Date(c.started_at).getTime() < ANALYSIS_WINDOW_MS)
     .slice(0, 10);
-  const analysis = analyzeContractions(analysisWindow);
+  const analysis = analyzeContractions(analysisWindow, weeks);
 
   const statusStyle: Record<string, string> = {
     normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
