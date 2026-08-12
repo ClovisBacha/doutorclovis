@@ -86,6 +86,45 @@ type Canal = "guia" | "pulso";
 
 const tocando: Record<Canal, HTMLAudioElement | null> = { guia: null, pulso: null };
 
+/**
+ * ⚠️ AS FAIXAS PRECISAM SER BUSCADAS ANTES DA HORA DE TOCAR.
+ *
+ * Medido no Chromium com 3G lento (400 kbps, 300 ms de latência — a rede de
+ * quem está no ônibus): entre criar o `Audio` e ele COMEÇAR a soar passavam
+ * de 0,97 a 1,80 segundo. A pior era a primeira fala da sessão, logo depois
+ * de ela tocar em "Começar": 1,8 s de nada, que lê como app quebrado.
+ *
+ * O ciclo tem 12 segundos, então um atraso desses não perde a respiração —
+ * mas desloca cada fala um segundo para dentro do ciclo, e numa tela cujo
+ * assunto é ritmo isso se sente.
+ *
+ * `preparar` busca a faixa enquanto a anterior ainda toca. O cache é pequeno
+ * de propósito: guardar 149 elementos de áudio seria carregar 11 MB na
+ * memória de um celular para usar 24 deles.
+ */
+const PRONTAS_MAX = 4;
+const prontas = new Map<string, HTMLAudioElement>();
+
+export function preparar(src: string): void {
+  if (typeof window === "undefined" || !src || prontas.has(src)) return;
+  try {
+    const a = new Audio();
+    a.preload = "auto";
+    a.src = src;
+    a.load();
+    prontas.set(src, a);
+    /* O mais antigo sai quando o cache enche — e nunca o que está tocando,
+       que seria pará-lo no meio da frase. */
+    for (const [k, v] of prontas) {
+      if (prontas.size <= PRONTAS_MAX) break;
+      if (v === tocando.guia || v === tocando.pulso) continue;
+      prontas.delete(k);
+    }
+  } catch {
+    /* sem áudio no ambiente: `tocar` cria na hora, como antes */
+  }
+}
+
 export function tocar(
   src: string,
   opts?: { canal?: Canal; volume?: number; aoTerminar?: () => void },
@@ -94,7 +133,18 @@ export function tocar(
   const canal = opts?.canal ?? "guia";
   parar(canal);
   try {
-    const a = new Audio(src);
+    /* Reaproveita o que `preparar` já baixou. `currentTime = 0` porque o
+       elemento pode ter sido usado antes — sem isso a segunda vez que uma
+       rechamada tocasse começaria do fim dela. */
+    const pronta = prontas.get(src);
+    const a = pronta ?? new Audio(src);
+    if (pronta) {
+      try {
+        a.currentTime = 0;
+      } catch {
+        /* metadados ainda não chegaram: toca do começo de qualquer jeito */
+      }
+    }
     a.volume = opts?.volume ?? 1;
     if (opts?.aoTerminar) a.addEventListener("ended", opts.aoTerminar, { once: true });
     // O navegador bloqueia som sem gesto do usuário. A tela só chama isto

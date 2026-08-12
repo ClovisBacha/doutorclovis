@@ -24,7 +24,13 @@ import {
   type Soundscape,
   type SoundscapeKey,
 } from "@/lib/soundscapes";
-import { tocar as tocarVoz, parar as pararVoz, faixaDoMovimento, RESPIRACAO } from "@/lib/voz";
+import {
+  tocar as tocarVoz,
+  parar as pararVoz,
+  preparar as prepararVoz,
+  faixaDoMovimento,
+  RESPIRACAO,
+} from "@/lib/voz";
 import { faixaDaFala } from "@/lib/voz-meditacao";
 import {
   DENSIDADES,
@@ -5063,6 +5069,62 @@ function MeditationBlock({
   }, [etapa, voz, falaAgora?.id]);
 
   /**
+   * ⚠️ E A PRIMEIRA FALA É BUSCADA ENQUANTO ELA AINDA ESCOLHE.
+   *
+   * Ela é a única que o prefetch de ciclo não alcança: toca no mesmo instante
+   * do clique em "Começar". Medido em 3G lento, saía 1,76 s depois — quase dois
+   * segundos de nada logo após o toque, que é onde alguém desiste achando que
+   * travou. A tela de escolha fica no ar enquanto ela lê duração, tema e som:
+   * é tempo de rede de graça.
+   *
+   * O plano é montado com as escolhas ATUAIS, então trocar de tema busca a
+   * fala certa — em vez de adivinhar qual seria a primeira e errar quando a
+   * ordem do roteiro mudar.
+   */
+  useEffect(() => {
+    if (!open || etapa !== "escolha" || !voz) return;
+    const previa = planejarSessao({
+      minutos,
+      tema: med.theme,
+      semanas: Math.floor(day / 7),
+      densidade,
+      careMode,
+    });
+    const f = previa.deixas.length ? faixaDaFala(previa.deixas[0].fala.id) : null;
+    if (!f) return;
+    /* Um respiro antes de buscar: ela pode estar tocando nos botões, e a cada
+       toque este efeito roda de novo. */
+    const t = setTimeout(() => prepararVoz(f), 600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, etapa, voz, minutos, med.theme, densidade, careMode, day]);
+
+  /**
+   * ⚠️ A PRÓXIMA FALA É BUSCADA ENQUANTO A ATUAL AINDA TOCA.
+   *
+   * Medido em 3G lento (400 kbps, 300 ms de latência): sem isto, cada fala
+   * levava de 0,97 a 1,80 segundo entre ser criada e começar a soar — e a pior
+   * era a primeira da sessão, logo depois do toque em "Começar". O ciclo tem
+   * 12 s, então o atraso não perde a respiração, mas empurra cada fala um
+   * segundo para dentro dela; numa tela cujo assunto é ritmo, isso se sente.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || !voz || !plano) return;
+    const proxima = plano.deixas.find((d) => d.ciclo > ciclo);
+    if (!proxima) return;
+    const f = faixaDaFala(proxima.fala.id);
+    if (!f) return;
+    /* ⚠️ ESPERA A FALA ATUAL SAIR NA FRENTE.
+       Buscar a próxima no mesmo instante em que a atual começa faz as duas
+       disputarem o cano: medido em 3G lento, a primeira fala da sessão ia de
+       1,8 s para 2,5 s só por causa disso. A próxima só toca daqui a 12
+       segundos ou mais — dois segundos e meio de espera não custam nada, e é
+       o que devolve a prioridade a quem está tocando agora. */
+    const t = setTimeout(() => prepararVoz(f), 2500);
+    return () => clearTimeout(t);
+  }, [etapa, voz, plano, ciclo]);
+
+  /**
    * As três palavras da respiração, na virada de cada fase.
    *
    * ⚠️ Elas tocavam a sessão INTEIRA — 47 vezes em dez minutos, 141 palavras,
@@ -5154,6 +5216,14 @@ function MeditationBlock({
       const primeira = p.deixas.find((d) => d.ciclo === 0);
       const faixa = primeira ? faixaDaFala(primeira.fala.id) : null;
       if (faixa) tocarVoz(faixa, { canal: "guia" });
+      /* ⚠️ NADA MAIS É BAIXADO NESTE INSTANTE.
+         Eu cheguei a pedir aqui as três palavras da respiração, achando que
+         adiantava o primeiro "Inspire". O efeito medido em 3G lento foi o
+         oposto: quatro arquivos disputando um cano de 400 kbps fizeram a
+         PRIMEIRA FALA — a que ela ouve logo depois de tocar em "Começar" —
+         saltar de 1,8 s para 4,8 s. Numa rede estreita, buscar mais coisa é
+         atrasar a que importa. As palavras são pequenas (27 a 46 KB) e vêm
+         sozinhas quando chega a hora delas. */
     }
     setEtapa("sessao");
   }

@@ -242,3 +242,42 @@ describe("a sessão toca trechos, e o texto é o mesmo que a voz", () => {
     }
   });
 });
+
+describe("nenhuma fala começa atrasada", () => {
+  /* ⚠️ Medido no Chromium com 3G lento (400 kbps, 300 ms de latência — a rede
+     de quem está no ônibus): entre o `play()` e o som começar passavam de 0,97
+     a 1,80 segundo. A pior era a PRIMEIRA fala, logo depois do toque em
+     "Começar" — quase dois segundos de nada, que é onde alguém desiste achando
+     que travou. Depois destas três travas: 9 ms na primeira, 0 a 1 ms nas
+     demais. */
+
+  test("a próxima fala é buscada enquanto a atual toca", () => {
+    expect(path).toContain("const proxima = plano.deixas.find((d) => d.ciclo > ciclo);");
+    expect(path).toContain("prepararVoz(f)");
+  });
+
+  test("a busca da próxima ESPERA — senão ela rouba o cano da atual", () => {
+    /* Buscar as duas ao mesmo tempo levou a primeira fala de 1,8 s para 2,5 s.
+       A próxima só toca daqui a 12 segundos; a espera não custa nada. */
+    const i = path.indexOf("const proxima = plano.deixas.find");
+    expect(path.slice(i, i + 700)).toContain("setTimeout(() => prepararVoz(f), 2500)");
+  });
+
+  test("a primeira fala é buscada na tela de ESCOLHA", () => {
+    /* É a única que o prefetch de ciclo não alcança: toca no mesmo instante do
+       clique. A tela de escolha fica no ar enquanto ela lê duração, tema e
+       som — tempo de rede de graça. */
+    expect(path).toContain('if (!open || etapa !== "escolha" || !voz) return;');
+    expect(path).toContain("const previa = planejarSessao({");
+  });
+
+  test("e nada mais é baixado no clique de começar", () => {
+    /* ⚠️ Cheguei a pedir as três palavras da respiração ali, achando que
+       adiantava o primeiro "Inspire". Em 3G lento fez o oposto: quatro
+       arquivos disputando 400 kbps levaram a primeira fala de 1,8 s a 4,8 s.
+       Numa rede estreita, buscar mais coisa é atrasar a que importa. */
+    const i = path.indexOf("const p = planejarSessao({");
+    const bloco = path.slice(i, path.indexOf('setEtapa("sessao");', i));
+    expect(bloco).not.toContain("prepararVoz(RESPIRACAO");
+  });
+});
