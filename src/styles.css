@@ -2979,10 +2979,16 @@ button:active > .duo3d {
    Quem liga "menos movimento" tem enxaqueca ou labirintite, e recebia
    exatamente o estímulo mais agressivo da tela. A duração vem da variável que
    o componente escreve; o `!important` é o que a faz sobreviver. */
+/* Os aneis que cercam a bolha na meditacao.
+   ⚠️ `linear`, e nao uma curva suavizada: e a MESMA funcao de tempo de
+   `.bolha-respira`, que fica no centro deles. Com curvas diferentes os tres
+   circulos concentricos deslizam um dentro do outro — medido, aos 13,1s a
+   bolha tinha andado 26% do percurso e o anel 19%. E o pulmao enche em ritmo
+   constante mesmo; a suavizacao fazia o comeco da inspiracao parecer travado. */
 .dc-guiado {
   transition-property: transform !important;
   transition-duration: var(--guiado-ms, 0ms) !important;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.4, 1) !important;
+  transition-timing-function: linear !important;
 }
 @media (prefers-reduced-motion: reduce) {
   /* A amplitude também cai: o movimento continua legível como compasso, sem

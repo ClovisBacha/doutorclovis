@@ -11110,13 +11110,28 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 
 /* ---------- Humor (Feature #18) ---------- */
 
+/**
+ * ⚠️ TODO EMOJI QUE O APP GRAVA EM `journal_entries.mood` PRECISA ESTAR AQUI.
+ *
+ * O gráfico faz `MOOD_VALUE[e.mood] ?? 3` — um emoji que falte nesta tabela
+ * entra como "normal" e some no meio da média, sem erro e sem rastro. Foi o
+ * risco de acrescentar o fechamento da meditação (😌 🥱 💛 😐 😟): dois já
+ * existiam e três não, e três quintos das respostas dela viravam ruído neutro.
+ *
+ * Quem escreve nesta tabela hoje: o check-in rápido da home, o diário, a
+ * Gratidão (🙏) e o fechamento da meditação.
+ */
 const MOOD_VALUE: Record<string, number> = {
   "🥰": 5,
   "😊": 4,
-  "😌": 4, // tranquila (check-in rápido da home)
+  "😌": 4, // tranquila (check-in rápido da home) · "mais calma" (meditação)
+  "💛": 4, // conectada (fechamento da meditação)
+  "🙏": 4, // gratidão registrada
   "😴": 3,
+  "🥱": 3, // com sono (fechamento da meditação)
+  "😐": 3, // igual (fechamento da meditação)
   "🤢": 2,
-  "😟": 2, // ansiosa (check-in rápido da home)
+  "😟": 2, // ansiosa (check-in rápido da home) · "ainda ansiosa" (meditação)
   "😢": 1,
   "😰": 1,
 };
@@ -11125,7 +11140,11 @@ const MOOD_LABEL: Record<string, string> = {
   "🥰": "Muito bem",
   "😊": "Bem",
   "😌": "Tranquila",
+  "💛": "Conectada",
+  "🙏": "Gratidão",
   "😴": "Cansada",
+  "🥱": "Com sono",
+  "😐": "Igual",
   "🤢": "Mal-estar",
   "😟": "Ansiosa",
   "😢": "Triste",

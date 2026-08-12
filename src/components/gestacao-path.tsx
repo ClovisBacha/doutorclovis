@@ -415,7 +415,7 @@ import {
 } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
-import { Bolha, humorDaJornada } from "@/components/bolha";
+import { Bolha, ESCALA_RESPIRO, humorDaJornada } from "@/components/bolha";
 import { SpriteDoJogo } from "@/components/sprites-do-jogo";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
 import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
@@ -4806,6 +4806,53 @@ const COMO_ESTOU = [
   { emoji: "😟", label: "Ainda ansiosa" },
 ] as const;
 
+/**
+ * O HUMOR DO FECHAMENTO VAI PARA O DIÁRIO — e de lá para o prontuário.
+ *
+ * ⚠️ Antes ele ia só para o `localStorage` (`log.humores`), onde ficava
+ * guardado, limitado às últimas 30 sessões, e NENHUMA tela do app o lia: nem a
+ * dela, nem a do médico. "Ainda ansiosa" cinco sessões seguidas é achado
+ * clínico de gestação de alto risco, e morria no aparelho.
+ *
+ * O caminho não precisou de migration nem de tabela nova: `journal_entries` já
+ * é onde o app guarda humor (o check-in rápido da home e a Gratidão escrevem
+ * lá), a aba Humor desenha o gráfico a partir dela, e `clinical_events` já une
+ * essa tabela como espécie `humor` — levando **só o rótulo**, nunca o texto do
+ * diário. A régua está escrita no próprio SQL: "o conteúdo do diário é dela, e
+ * um fluxo de eventos que o carrega para o painel transforma desabafo em
+ * prontuário".
+ *
+ * ⚠️ E o `mood` gravado é o EMOJI CRU, não "😌 Mais calma": `MOOD_VALUE`, que
+ * alimenta o gráfico de humor dela, é indexado por emoji. Um rótulo colado
+ * junto viraria uma chave desconhecida e a sessão entraria no gráfico como
+ * valor neutro, sem ninguém perceber. O rótulo legível vai no `content`, que
+ * fica com ela.
+ */
+async function registrarHumorDaMeditacao(emoji: string, label: string, minutos: number) {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    await (
+      supabase as unknown as {
+        from: (t: string) => {
+          insert: (v: Record<string, unknown>) => Promise<{ error: unknown }>;
+        };
+      }
+    )
+      .from("journal_entries")
+      .insert({
+        user_id: u.user.id,
+        content: `Meditação de ${minutos} min · ${label}`,
+        mood: emoji,
+      });
+  } catch {
+    /* O registro local já aconteceu e a tela já seguiu. Falhar aqui em silêncio
+       é melhor que um erro no fim de uma meditação — que é o pior lugar do app
+       para uma mensagem vermelha. */
+  }
+}
+
 const FECHAMENTO: Record<string, string> = {
   "Mais calma": "É isso mesmo. Guarde esse ritmo pro resto do dia.",
   "Com sono": "Sono depois de meditar é o corpo aceitando descansar. Vá deitar.",
@@ -4849,7 +4896,6 @@ function MeditationBlock({
   const [voz, setVoz] = useState(true);
   const [ciclo, setCiclo] = useState(0);
   const [fase, setFase] = useState<"in" | "hold" | "out">("in");
-  const [tick, setTick] = useState<number>(RESPIRO.in);
   const [humor, setHumor] = useState<string | null>(null);
   /* Quantos minutos ela DE FATO ficou. Igual a `minutos` quando a sessão vai
      até o fim, menor quando ela encerra antes — a tela de fim não pode dizer
@@ -4897,8 +4943,16 @@ function MeditationBlock({
   useEffect(() => {
     if (etapa !== "sessao") return;
     const dur = RESPIRO[fase];
-    setTick(dur);
-    const iv = setInterval(() => setTick((t) => Math.max(1, t - 1)), 1000);
+    /* ⚠️ NÃO HÁ MAIS CONTADOR REGRESSIVO AQUI.
+       Existia um `setInterval` de 1s escrevendo um número embaixo da bolha, e
+       ele tinha dois problemas. O pequeno: o intervalo e o `setTimeout` da fase
+       disparavam no mesmo milissegundo no fim de cada fase, então o último
+       decremento corria contra a troca. O grande é de desenho — o número era
+       "segundos restantes DESTA fase", então contava 4→1, depois 2→1, depois
+       6→1, três máximos diferentes por ciclo. Ninguém lê isso como progresso, e
+       somado ao atraso da animação era o que fazia a tela parecer quebrada.
+       Nenhum dos três líderes do gênero põe um número aí: quem conta é o
+       desenho que enche e esvazia, e agora ele está certo. */
     const t = setTimeout(() => {
       if (fase === "in") setFase("hold");
       else if (fase === "hold") setFase("out");
@@ -4916,12 +4970,51 @@ function MeditationBlock({
        `dur` significava coisas diferentes nos dois. Passar cru daria um padrão
        de 4 ms, imperceptível, e o defeito pareceria "vibração não funciona". */
     vibratePhase(fase, dur * 1000);
-    return () => {
-      clearInterval(iv);
-      clearTimeout(t);
-    };
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [etapa, fase, ciclo]);
+
+  /**
+   * ⚠️ A PRIMEIRA INSPIRAÇÃO PRECISA DE UM QUADRO PEQUENO ANTES DELA.
+   *
+   * O defeito medido: a sessão abria com a bolha JÁ CHEIA (escala 1,160 aos
+   * 78 ms) e ela ficava imóvel os 4 s do "Inspire" e os 2 s do "Segure" — o
+   * primeiro movimento aparecia só aos 7,2 s, no "Solte". A causa é banal e
+   * invisível no código: a fase inicial é `"in"`, então o elemento MONTA já na
+   * escala inspirada, e transição de CSS não tem de onde animar sem um valor
+   * anterior.
+   *
+   * O estrago não é estético. Este é o quadro em que o exercício se explica
+   * sozinho — a bola cresce, você puxa o ar — e ele simplesmente não existia
+   * para quem abria a meditação pela primeira vez. Ela aprendia a mecânica ao
+   * contrário, pela expiração.
+   *
+   * Dois `requestAnimationFrame` aninhados, e não um: com um só, o React ainda
+   * pode não ter PINTADO o quadro pequeno, e o navegador colapsa as duas
+   * escalas numa transição que nunca acontece. O segundo quadro garante que o
+   * pequeno foi para a tela antes de o grande ser pedido.
+   */
+  const [respiroPronto, setRespiroPronto] = useState(false);
+  useEffect(() => {
+    if (etapa !== "sessao") {
+      setRespiroPronto(false);
+      return;
+    }
+    let b = 0;
+    const a = requestAnimationFrame(() => {
+      b = requestAnimationFrame(() => setRespiroPronto(true));
+    });
+    return () => {
+      cancelAnimationFrame(a);
+      cancelAnimationFrame(b);
+    };
+  }, [etapa]);
+
+  /* A fase que o DESENHO usa. Igual à real, menos no primeiro quadro da
+     sessão, em que ela é a expiração (bolha pequena, sem transição) para a
+     inspiração seguinte ter de onde crescer. */
+  const faseVisual: "in" | "hold" | "out" = respiroPronto ? fase : "out";
+  const respiroMs = respiroPronto ? RESPIRO[fase] * 1000 : 0;
 
   /**
    * Quem COMEÇA a faixa guiada é o clique em `begin()`, por causa do bloqueio
@@ -5044,7 +5137,37 @@ function MeditationBlock({
     setEtapa("sessao");
   }
 
+  /**
+   * Encerra a sessão em curso GUARDANDO o que ela fez.
+   *
+   * É o mesmo caminho do botão "Encerrar por aqui", extraído para poder ser
+   * chamado também pelo ✕ — ver `close()`.
+   */
+  function encerrarGuardando() {
+    const feitos = Math.max(1, Math.round(((ciclo + 1) * CICLO_SEGS) / 60));
+    setMinutosFeitos(feitos);
+    setEtapa("reflexo");
+    registrarMeditacao(feitos, null);
+    finish();
+  }
+
   function close() {
+    /* ⚠️ O ✕ NO MEIO DA SESSÃO PASSOU A GUARDAR, EM VEZ DE JOGAR FORA.
+       Ele descartava tudo: nove minutos de meditação, e nem estrela, nem
+       minutos, nem dia de sequência. O único caminho que salvava era o botão
+       "Encerrar por aqui" — pequeno, no rodapé, em texto de baixo contraste —,
+       enquanto o ✕ fica no canto superior, que é onde o dedo vai quando alguém
+       decide que já é o bastante. O app cobrava dela saber a diferença entre
+       dois botões que significam a mesma coisa.
+       O corte é o mesmo do outro botão (5 ciclos = um minuto redondo): abaixo
+       disso não houve sessão para guardar, e aí o ✕ continua sendo só sair. */
+    if (etapa === "sessao" && ciclo >= 5) {
+      audioRef.current?.stop();
+      audioRef.current = null;
+      pararVoz();
+      encerrarGuardando();
+      return;
+    }
     audioRef.current?.stop();
     audioRef.current = null;
     pararVoz();
@@ -5070,10 +5193,15 @@ function MeditationBlock({
   }
 
   const faseLabel = fase === "in" ? "Inspire" : fase === "hold" ? "Segure" : "Solte";
-  // O círculo cresce na inspiração e volta na expiração; na pausa ele fica
-  // parado, cheio. A transição dura exatamente a fase, então o desenho e o
-  // pulmão andam juntos.
-  const escala = fase === "out" ? 1 : 1.34;
+  /* O ANEL USA A TABELA DA BOLHA, e não uma própria.
+     Ele tinha 1,00 → 1,34 com curva suavizada enquanto a bolha no centro dele
+     fazia 0,90 → 1,16 em ritmo linear: dois círculos concêntricos com
+     amplitudes e acelerações diferentes, que é exatamente o que se vê como um
+     deslizando dentro do outro. Medido antes: aos 13,1 s a bolha tinha andado
+     26% do percurso e o anel 19%.
+     Agora os dois leem os MESMOS números (`ESCALA_RESPIRO`, exportada de
+     `bolha.tsx`) e a mesma função de tempo (`linear`, ver `.dc-guiado`). */
+  const escala = ESCALA_RESPIRO[faseVisual];
 
   return (
     <>
@@ -5286,7 +5414,7 @@ function MeditationBlock({
                   style={
                     {
                       transform: `scale(${escala})`,
-                      "--guiado-ms": `${RESPIRO[fase] * 1000}ms`,
+                      "--guiado-ms": `${respiroMs}ms`,
                       "--guiado-escala": escala,
                     } as React.CSSProperties
                   }
@@ -5297,7 +5425,7 @@ function MeditationBlock({
                   style={
                     {
                       transform: `scale(${escala})`,
-                      "--guiado-ms": `${RESPIRO[fase] * 1000}ms`,
+                      "--guiado-ms": `${respiroMs}ms`,
                       "--guiado-escala": escala,
                       boxShadow: "inset 0 1px 0 rgba(255,255,255,0.9)",
                     } as React.CSSProperties
@@ -5321,13 +5449,13 @@ function MeditationBlock({
                     tamanho={96}
                     humor="dormindo"
                     flutua={false}
-                    respiro={{ fase, duracaoMs: RESPIRO[fase] * 1000 }}
+                    respiro={{ fase: faseVisual, duracaoMs: respiroMs }}
                   />
-                  <span className="text-[13px] font-bold uppercase tracking-[0.18em] text-violet-500">
+                  {/* Só a PALAVRA. O número que ficava aqui saiu — ver o
+                      comentário no relógio da respiração. Quem conta é o
+                      desenho, e ele voltou a contar certo. */}
+                  <span className="text-[15px] font-bold uppercase tracking-[0.18em] text-violet-500">
                     {faseLabel}
-                  </span>
-                  <span className="tabular-nums text-3xl font-extrabold leading-none text-violet-800">
-                    {tick}
                   </span>
                 </div>
               </div>
@@ -5360,13 +5488,7 @@ function MeditationBlock({
                   tem por que fingir que não. */}
               {ciclo >= 5 && (
                 <button
-                  onClick={() => {
-                    const feitos = Math.max(1, Math.round(((ciclo + 1) * CICLO_SEGS) / 60));
-                    setMinutosFeitos(feitos);
-                    setEtapa("reflexo");
-                    registrarMeditacao(feitos, null);
-                    finish();
-                  }}
+                  onClick={encerrarGuardando}
                   className="press mt-8 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
                 >
                   Encerrar por aqui
@@ -5392,6 +5514,9 @@ function MeditationBlock({
                     onClick={() => {
                       setHumor(c.label);
                       registrarMeditacao(0, c.label);
+                      /* Fora do aparelho também — é o que faz esta resposta
+                         chegar ao gráfico de humor dela e ao prontuário. */
+                      void registrarHumorDaMeditacao(c.emoji, c.label, minutosFeitos || minutos);
                       setEtapa("fim");
                     }}
                     className="press flex items-center gap-3 rounded-2xl border border-violet-200 bg-white/75 px-4 py-3 text-left text-sm font-bold text-violet-900"

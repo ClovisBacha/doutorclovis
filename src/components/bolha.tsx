@@ -192,8 +192,21 @@ export function humorDaJornada(o: {
  */
 export type Respiro = { fase: "in" | "hold" | "out"; duracaoMs: number };
 
-/** Quanto ela cresce em cada fase. Cheia no ápice, murcha no fim da expiração. */
-const ESCALA: Record<Respiro["fase"], number> = { in: 1.16, hold: 1.16, out: 0.9 };
+/**
+ * Quanto ela cresce em cada fase. Cheia no ápice, murcha no fim da expiração.
+ *
+ * EXPORTADA porque os anéis que a cercam na meditação precisam usar os MESMOS
+ * números. Eles tinham amplitude própria (1,00 → 1,34 contra 0,90 → 1,16) e
+ * curva própria (suavizada contra linear): medido, aos 13,1 s a bolha tinha
+ * andado 26% do percurso e o anel 19%. São dois círculos concêntricos, então
+ * qualquer diferença entre eles é vista como um deslizando dentro do outro.
+ */
+export const ESCALA_RESPIRO: Record<Respiro["fase"], number> = {
+  in: 1.16,
+  hold: 1.16,
+  out: 0.9,
+};
+const ESCALA = ESCALA_RESPIRO;
 
 /**
  * As ações de um disparo só.
