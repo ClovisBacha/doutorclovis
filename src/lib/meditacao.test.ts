@@ -151,3 +151,71 @@ describe("o humor do fechamento sai do aparelho", () => {
     }
   });
 });
+
+describe("o Modo Cuidado chegou à meditação", () => {
+  /* ⚠️ O PIOR DEFEITO DESTA REVISÃO, e ele estava em produção.
+     `careMode` aparecia UMA vez no bloco inteiro da meditação: no portão de
+     recompensa do `finish()`. Nada filtrava o conteúdo. Uma paciente que
+     acabou de perder a gestação abria a meditação e encontrava o tema
+     "Conexão com o bebê" na lista, a fala "Você está segura. Seu bebê está bem
+     aqui com você." dentro de "Calma" — que é justamente o tema que alguém em
+     sofrimento escolhe — e a rechamada "Você e o bebê, respirando juntos", que
+     entra em QUALQUER tema a cada cinco ciclos. */
+  const bloco = path.slice(
+    path.indexOf("const MEDITACOES"),
+    path.indexOf("function MeditationBlock"),
+  );
+
+  test("os temas sobre o bebê e o parto NÃO são oferecidos no luto", () => {
+    const temas = [...bloco.matchAll(/theme: "([^"]+)"([\s\S]*?)(?=\n {2}\{|\n\];)/g)].map((m) => ({
+      nome: m[1],
+      passa: /noLuto: true/.test(m[2]),
+    }));
+    expect(temas.length).toBeGreaterThanOrEqual(8);
+    const proibidos = ["Conexão com o bebê", "Coragem pro parto"];
+    for (const nome of proibidos) {
+      const t = temas.find((x) => x.nome === nome);
+      expect(t).toBeTruthy();
+      expect(t!.passa).toBe(false);
+    }
+    /* E sobra o que serve: respirar, calma, descanso, presente, sono. */
+    expect(temas.filter((t) => t.passa).length).toBeGreaterThanOrEqual(4);
+  });
+
+  test("nenhuma fala do luto cita o bebê, a barriga ou o parto", () => {
+    /* Um tema pode passar e o texto dele não — é para isso que existe
+       `linesLuto`. O teste lê as falas que o luto realmente ouve. */
+    const proibido = /\b(beb[êe]|barriga|parto|filho|nascer|v[íi]nculo|voc[êe]s dois)\b/i;
+    const temas = [...bloco.matchAll(/theme: "([^"]+)"([\s\S]*?)(?=\n {2}\{|\n\];)/g)];
+    for (const [, nome, corpo] of temas) {
+      if (!/noLuto: true/.test(corpo)) continue;
+      const usadas =
+        /linesLuto:\s*\[([\s\S]*?)\]/.exec(corpo) ?? /lines:\s*\[([\s\S]*?)\]/.exec(corpo);
+      for (const f of [...(usadas?.[1] ?? "").matchAll(/"([^"]+)"/g)]) {
+        expect({ tema: nome, fala: f[1], cita: proibido.test(f[1]) }).toEqual({
+          tema: nome,
+          fala: f[1],
+          cita: false,
+        });
+      }
+    }
+  });
+
+  test("a rechamada do bebê é filtrada — ela entra em qualquer tema", () => {
+    expect(path).toContain("careMode ? RECHAMADAS.filter((r) => !/bebê/i.test(r)) : RECHAMADAS");
+  });
+
+  test("o índice do tema sugerido nasce dentro da lista JÁ filtrada", () => {
+    /* `day % MEDITACOES.length` apontaria para a lista completa, e o tema do
+       dia poderia ser um que nem está desenhado. */
+    expect(path).toContain("const sugerida = day % temas.length;");
+    expect(path).toContain("careMode ? MEDITACOES.filter((m) => m.noLuto) : MEDITACOES");
+    expect(path).toContain("{temas.map((m, i) => (");
+  });
+
+  test("o fechamento 'Conectada' não é oferecido no luto", () => {
+    /* Ele responde "Esse instante também é cuidado com ele. Vocês dois
+       sentiram." */
+    expect(path).toContain('!careMode || c.label !== "Conectada"');
+  });
+});

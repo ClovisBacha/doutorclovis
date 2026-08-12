@@ -4620,7 +4620,37 @@ function MovementBlock({
    Meditação guiada curta (~1,5 min): frases calmas que avançam sozinhas, tema
    do dia. Recompensa fixa por concluir (nunca punitiva). */
 
-const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] }[] = [
+/**
+ * ⚠️ O MODO CUIDADO NÃO EXISTIA NESTA TELA — e este é o pior defeito que a
+ * revisão de ago/2026 encontrou, porque ele estava em produção.
+ *
+ * `careMode` aparecia UMA vez no bloco inteiro da meditação: no portão de
+ * recompensa do `finish()`. Nada filtrava o conteúdo. Uma paciente que acabou
+ * de perder a gestação abria a meditação e encontrava:
+ *
+ *   · o tema "Conexão com o bebê" oferecido na lista, com "leve uma das mãos
+ *     até a barriga" e "mande um oi carinhoso pra ele";
+ *   · em "Calma" — que é justamente o tema que alguém em sofrimento escolhe —
+ *     a fala "Você está segura. Seu bebê está bem aqui com você.";
+ *   · a rechamada "Você e o bebê, respirando juntos", que entra em QUALQUER
+ *     tema a cada cinco ciclos;
+ *   · e, no fechamento, "Esse instante também é cuidado com ele."
+ *
+ * Agora cada tema declara se sobrevive ao luto (`noLuto`) e, quando sobrevive
+ * com ressalva, quais falas ela ouve no lugar (`linesLuto`). É a mesma régua
+ * de `frases-do-mascote.ts`: passar pelo luto é uma decisão consciente, fala
+ * por fala, e o padrão é NÃO passar.
+ */
+const MEDITACOES: {
+  theme: string;
+  need: string;
+  emoji: string;
+  lines: string[];
+  /** Oferecido no Modo Cuidado. O padrão é não. */
+  noLuto?: boolean;
+  /** As falas do Modo Cuidado, quando o tema passa mas o texto não. */
+  linesLuto?: string[];
+}[] = [
   {
     /* ─── A RESPIRAÇÃO VIROU UM TEMA (ago/2026) ─────────────────────────
        Era uma atividade separada, com 600 linhas de componente próprio — e
@@ -4637,6 +4667,9 @@ const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] 
     need: "Quero só respirar",
     emoji: "🌬️",
     lines: [],
+    /* Sem falas, sem risco: é só o compasso. No luto, é o único exercício que
+       não precisa de nenhuma ressalva — e costuma ser o que serve. */
+    noLuto: true,
   },
   {
     theme: "Calma",
@@ -4647,6 +4680,18 @@ const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] 
       "Sinta o ar entrando… e saindo, sem pressa.",
       "A cada expiração, solte um pouco da tensão do dia.",
       "Você está segura. Seu bebê está bem aqui com você.",
+      "Deixe o corpo pesar, como se afundasse em algo macio.",
+      "Fique mais um instante, só respirando.",
+      "Quando quiser, abra os olhos devagar.",
+    ],
+    /* Calma é o tema que alguém em sofrimento escolhe — tirá-lo do luto seria
+       fechar a porta certa. O que sai é a quarta fala, que fala do bebê. */
+    noLuto: true,
+    linesLuto: [
+      "Feche os olhos e solte os ombros.",
+      "Sinta o ar entrando… e saindo, sem pressa.",
+      "A cada expiração, solte um pouco da tensão do dia.",
+      "Você está em segurança neste lugar, neste minuto.",
       "Deixe o corpo pesar, como se afundasse em algo macio.",
       "Fique mais um instante, só respirando.",
       "Quando quiser, abra os olhos devagar.",
@@ -4679,6 +4724,8 @@ const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] 
       "Descanse mais um pouco nesse lugar.",
       "Volte devagar, sem pressa.",
     ],
+    /* Nenhuma fala cita o bebê. Passa inteiro. */
+    noLuto: true,
   },
   {
     theme: "Gratidão",
@@ -4700,6 +4747,17 @@ const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] 
     emoji: "😴",
     lines: [
       "Deite-se de lado, com um travesseiro apoiando a barriga.",
+      "Solte o peso do corpo no colchão, parte por parte.",
+      "Deixe a respiração ficar longa e silenciosa.",
+      "Imagine cada pensamento indo embora como uma nuvem.",
+      "Não precisa dormir agora — só descansar já basta.",
+      "Fique nesse aconchego mais um pouquinho.",
+    ],
+    /* Dormir é o que mais falta a quem está de luto, e o tema é neutro salvo
+       pela primeira fala, que supõe barriga. */
+    noLuto: true,
+    linesLuto: [
+      "Deite-se do jeito mais confortável, com um travesseiro onde precisar.",
       "Solte o peso do corpo no colchão, parte por parte.",
       "Deixe a respiração ficar longa e silenciosa.",
       "Imagine cada pensamento indo embora como uma nuvem.",
@@ -4730,6 +4788,17 @@ const MEDITACOES: { theme: string; need: string; emoji: string; lines: string[] 
       "Perceba o ar tocando a sua pele.",
       "Não há passado nem futuro neste instante — só agora.",
       "Você e o bebê, respirando, neste exato momento.",
+      "Leve essa presença pro resto do dia.",
+    ],
+    /* Ancorar no presente é das poucas práticas que servem no luto agudo — a
+       cabeça é justamente o lugar de onde ela precisa sair. Sai a quinta. */
+    noLuto: true,
+    linesLuto: [
+      "Sinta os pontos do corpo que tocam o chão ou a cadeira.",
+      "Perceba 3 sons ao seu redor, sem julgar.",
+      "Perceba o ar tocando a sua pele.",
+      "Não há passado nem futuro neste instante — só agora.",
+      "Você está respirando, neste exato momento. É só disso que se trata.",
       "Leve essa presença pro resto do dia.",
     ],
   },
@@ -4887,7 +4956,15 @@ function MeditationBlock({
    */
   aoSair?: () => void;
 }) {
-  const sugerida = day % MEDITACOES.length;
+  /* ⚠️ NO LUTO A LISTA ENCOLHE, e o índice tem de nascer dentro dela.
+     `day % MEDITACOES.length` apontaria para a lista COMPLETA — e o tema
+     sugerido do dia poderia ser "Conexão com o bebê" para quem acabou de
+     perder a gestação, mesmo com ele fora da lista desenhada. */
+  const temas = useMemo(
+    () => (careMode ? MEDITACOES.filter((m) => m.noLuto) : MEDITACOES),
+    [careMode],
+  );
+  const sugerida = day % temas.length;
   const [open, setOpen] = useState(!!aoSair);
   const [etapa, setEtapa] = useState<"escolha" | "sessao" | "reflexo" | "fim">("escolha");
   const [temaIdx, setTemaIdx] = useState(sugerida);
@@ -4905,7 +4982,11 @@ function MeditationBlock({
   const grantedRef = useRef(false);
   const audioRef = useRef<Soundscape | null>(null);
 
-  const med = MEDITACOES[temaIdx];
+  /* `Math.min` porque `temaIdx` pode ter sido escolhido com a lista cheia e o
+     Modo Cuidado ser ligado depois — a lista encolhe debaixo do índice. */
+  const med = temas[Math.min(temaIdx, temas.length - 1)];
+  /* As falas do luto quando o tema passa mas o texto não. Ver `linesLuto`. */
+  const falasDoTema = (careMode ? (med.linesLuto ?? med.lines) : med.lines) as string[];
   const totalCiclos = Math.round((minutos * 60) / CICLO_SEGS);
   // Relido a cada troca de etapa de propósito: quando a sessão termina ela
   // acabou de gravar o dia de hoje, e a tela de fim precisa mostrar a sequência
@@ -4932,11 +5013,15 @@ function MeditationBlock({
 
   /** Frase da vez: as do tema abrem a sessão; depois, silêncio com rechamadas. */
   const frase = useMemo(() => {
-    if (ciclo < med.lines.length) return med.lines[ciclo];
-    const desde = ciclo - med.lines.length;
-    if (desde > 0 && desde % 5 === 0) return RECHAMADAS[(desde / 5 - 1) % RECHAMADAS.length];
+    if (ciclo < falasDoTema.length) return falasDoTema[ciclo];
+    const desde = ciclo - falasDoTema.length;
+    /* ⚠️ As rechamadas entram em QUALQUER tema, então uma delas falando do
+       bebê alcançava até quem escolheu "Só respirar" no Modo Cuidado. */
+    const poco = careMode ? RECHAMADAS.filter((r) => !/bebê/i.test(r)) : RECHAMADAS;
+    if (desde > 0 && desde % 5 === 0) return poco[(desde / 5 - 1) % poco.length];
     return null;
-  }, [ciclo, med]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ciclo, falasDoTema, careMode]);
 
   // Relógio da respiração: cada fase agenda a próxima. O ciclo fecha na
   // expiração — inspirar é o começo natural, expirar é o fim natural.
@@ -5312,7 +5397,7 @@ function MeditationBlock({
                 O que você precisa agora?
               </p>
               <div className="mt-2 grid gap-2">
-                {MEDITACOES.map((m, i) => (
+                {temas.map((m, i) => (
                   <button
                     key={m.theme}
                     onClick={() => setTemaIdx(i)}
@@ -5508,7 +5593,7 @@ function MeditationBlock({
                 Sem resposta certa — é só pra você notar a diferença.
               </p>
               <div className="mt-6 grid w-full max-w-xs grid-cols-1 gap-2">
-                {COMO_ESTOU.map((c) => (
+                {COMO_ESTOU.filter((c) => !careMode || c.label !== "Conectada").map((c) => (
                   <button
                     key={c.label}
                     onClick={() => {
