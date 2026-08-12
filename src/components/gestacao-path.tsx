@@ -2970,7 +2970,19 @@ export function GestacaoPath({
               <button
                 id={isToday ? "dc-today-node" : undefined}
                 onClick={() => {
-                  if (isFuture) {
+                  /* ─── ESPIAR O QUE VEM (ago/2026) ────────────────────────
+                     Pedido do dono: "eu tenho que conseguir acessar também os
+                     próximos exercícios". Quem assina passa a ABRIR o dia que
+                     ainda não chegou; quem não assina continua com o "um passo
+                     de cada vez", que é a pedagogia da trilha.
+
+                     ⚠️ E isto NÃO abre buraco de economia: `canEarn` é
+                     `D === todayD` e sozinho já barra Sementinhas, estrela,
+                     fechamento do dia e sequência — a espiada é de LEITURA por
+                     construção, em todos os blocos. É a mesma porta que o
+                     Premium já tinha para o passado (`locked: !isT &&
+                     !quizPremium`), agora simétrica para o futuro. */
+                  if (isFuture && !quizPremium) {
                     const em = D - todayD;
                     toast(
                       `🔒 Esse dia abre ${em === 1 ? "amanhã" : `em ${em} dias`} — um passo de cada vez 💛`,
@@ -2979,8 +2991,8 @@ export function GestacaoPath({
                   }
                   openDay(D);
                 }}
-                aria-disabled={isFuture}
-                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture ? "cursor-not-allowed" : ""}`}
+                aria-disabled={isFuture && !quizPremium}
+                className={`group absolute flex -translate-x-1/2 -translate-y-1/2 flex-col items-center focus:outline-none ${isFuture && !quizPremium ? "cursor-not-allowed" : ""}`}
                 style={{ left: `${node.x}%`, top: `${node.y}px` }}
                 /* O rótulo diz o ESTADO, não só a data. Eram ~300 botões com
                    "Dia 3 da semana 12" e nada mais: um leitor de tela lia
