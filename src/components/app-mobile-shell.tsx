@@ -936,8 +936,13 @@ export function AppHomeScreen({
   const humorDoMascote = humorDaJornada({
     madrugada: isMadrugada,
     noite: h >= 22,
-    diaFeito: h >= 22 && !temNaoLidas,
-    ritmoIncomum: temNaoLidas,
+    /* `diaFeito` é o que devolve a PISCADINHA (`orgulhosa`) — e é o caso do
+       recado esperando: ela tem algo para contar. Antes isto era
+       `ritmoIncomum`, que em `humorDaJornada` devolve `surpresa`; o comentário
+       prometia a piscadinha e o código entregava espanto, e `orgulhosa` ficava
+       inalcançável na home. Ver a ordem de prioridade em `bolha.tsx`. */
+    diaFeito: temNaoLidas || (h >= 22 && !temNaoLidas),
+    ritmoIncomum: false,
     careMode,
   });
 
@@ -1178,6 +1183,14 @@ export function AppHomeScreen({
            tanto por dentro: a arte encosta no topo do aparelho, e o ícone do
            perfil e o clima continuam abaixo do relógio, onde dá para tocar.
 
+           ⚠️ O `pt` tem um PISO de 1,5rem (`max(...)`), e ele não é folga
+           estética: o bebê bolha mede 88px numa faixa de 40, então transborda
+           24px para cima. Onde `--safe-top` é 0 — Android Chrome, iPhone no
+           Safari, e a bancada — os 8px de `pt` não cobriam isso e o
+           `overflow-hidden` do hero CORTAVA a cabeça dele. Com o piso, o pior
+           caso passa a ser exatamente 24px. No iPhone instalado nada muda: 59
+           de área segura + 8 já passam do piso.
+
            O `-mt` TEM QUE SER O DA PÁGINA (1,5rem), e o `pt` NÃO. São coisas
            diferentes: o `-mt` cancela a folga do container para o céu encostar
            no topo do aparelho — errado ali, sobrava uma faixa creme de 16px
@@ -1217,7 +1230,7 @@ export function AppHomeScreen({
 
            `pb` saiu junto: a folga do pé pertencia à segunda dobra, que não
            mora mais aqui dentro. */
-          className="shine dc-hero-tela relative -mx-5 overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[calc(0.5rem+var(--safe-top))]"
+          className="shine dc-hero-tela relative -mx-5 overflow-hidden px-5 transition-[background] duration-1000 -mt-[calc(1.5rem+var(--safe-top))] pt-[max(1.5rem,calc(0.5rem+var(--safe-top)))]"
           /* Cor de espera enquanto o `.webp` não decodifica. Agora é a do TOPO e
            não a do pé: a caixa acabou junto com a imagem, então não há mais
            "depois da arte" para o pé continuar — e o que apareceria sem esta
@@ -1408,7 +1421,11 @@ export function AppHomeScreen({
                   voltou a dizer algo, e o que ele diz é sobre ela. */}
               <MascoteDaHome
                 humor={humorDoMascote}
-                fala={conforto ? { texto: conforto, aria: "Abrir recados" } : null}
+                /* O `aria` acompanha o TEXTO. Cravado em "Abrir recados", o
+                   rótulo do botão virava "Abrir recados" justamente nos dias
+                   em que não há recado nenhum — a fala de conforto só existe
+                   quando a caixa está vazia. */
+                fala={conforto ? { texto: conforto, aria: "Falar com a bolha" } : null}
                 /* DOBRO do tamanho, a pedido do dono. 44 → 88px: ele deixou de
                    ser um ícone no canto e virou personagem. O alvo do menu
                    continua com 40px do outro lado, e os dois seguem sem se

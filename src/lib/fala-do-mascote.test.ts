@@ -81,9 +81,14 @@ describe("um aviso só para o mesmo fato", () => {
        para quem perdeu a gestação. */
     /* A chamada cresceu quando as cinco expressões entraram em uso (dormindo
        à noite, surpresa de madrugada, orgulhosa com recado). O que o teste
-       cobra é o VÍNCULO com a régua — não a forma exata da chamada. */
-    expect(shell).toContain("humorDaJornada({");
-    expect(shell).toMatch(/humorDaJornada\(\{[\s\S]{0,200}careMode,?\s*\}\)/);
+       cobra é o VÍNCULO com a régua — não a forma exata da chamada.
+
+       ⚠️ Não meça por NÚMERO DE CARACTERES (era `{0,200}`): um comentário
+       explicando um dos campos estourou a janela e reprovou uma chamada
+       correta. O recorte é do `{` até o `})` que o fecha. */
+    const i = shell.indexOf("humorDaJornada({");
+    expect(i).toBeGreaterThan(-1);
+    expect(shell.slice(i, shell.indexOf("});", i))).toContain("careMode");
   });
 });
 

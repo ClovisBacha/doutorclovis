@@ -892,6 +892,12 @@ function MinhaContaPage() {
         },
         data: new Date(Date.now() + 60_000).toISOString(),
       });
+      /* ⚠️ `ordenar` só ordena as ENVIADAS por data — as derivadas entram na
+         ordem em que foram empurradas. O comentário acima prometia "fica no
+         topo (data futura força a primeira posição)" e ela caía em ÚLTIMO,
+         abaixo do convite promocional de Premium. Como o `push` é condicional
+         e no fim do memo, quem resolve é tirá-la da fila. */
+      derivadas.unshift(derivadas.pop()!);
     }
 
     return ordenar([], derivadas);
@@ -998,6 +1004,11 @@ function MinhaContaPage() {
     setTab(t as Tab);
     setMobileHome(false);
     setHubAberto(null);
+    /* A folha de recados é renderizada dentro do bloco da home mobile, mas o
+       estado é da rota: uma notificação que NAVEGA (ex.: "Complete o seu
+       contato de emergência" → Perfil) desmontava a folha com `notifOpen`
+       ainda verdadeiro, e ela reabria sozinha ao voltar para o Bebê. */
+    setNotifOpen(false);
     setConsultasSub(sub ?? null);
   };
 
@@ -1418,6 +1429,12 @@ function MinhaContaPage() {
        quem saiu da Saúde pela barra não quer voltar para a grade dela. */
     setOrigem(null);
     setVoltarAoHub(null);
+    /* ⚠️ ANTES do ramo da home. Ele sai com `return`, então só o caminho de
+       baixo limpava: tocar em Saúde e depois no círculo do Bebê voltava à home
+       com `hubAberto` ainda aceso, e o toque seguinte em Bebê abria a grade da
+       Saúde em vez da tela do bebê. */
+    setHubAberto(null);
+    setNotifOpen(false);
     if (section === "home") {
       setMobileHome(true);
       return;
