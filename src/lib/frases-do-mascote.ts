@@ -39,10 +39,48 @@ export function periodoDaHora(hora: number): Periodo {
   return "noite";
 }
 
+/**
+ * O TEMPO LÁ FORA, em três estados — e só três.
+ *
+ * Pedido do dono: as frases também devem conversar com o clima, "que já tem
+ * meio caminho andado" no cartão de saudação. O que vem da API é um `weather
+ * code` da Open-Meteo com dezenas de valores; o que muda o QUE SE DIZ a uma
+ * gestante são três situações:
+ *
+ *  · **chuva** — o convite muda de "caminhar" para "chá quentinho";
+ *  · **calor** — água e sombra viram a única coisa que importa dizer;
+ *  · **frio** — agasalho, e nada de mandar sair.
+ *
+ * Vinte estados climáticos dariam vinte frases quase iguais, e a paciente
+ * leria a mesma coisa com sinônimos. O resto do tempo é `null`: dia comum, e a
+ * frase fala do dia dela em vez de falar do céu.
+ *
+ * Os cortes de temperatura são os do senso comum brasileiro (28 °C e 15 °C), e
+ * a chuva sai do MESMO limiar que o cartão de saudação usa (`code >= 51`) —
+ * duas réguas para "está chovendo" na mesma tela é como o app começa a se
+ * contradizer.
+ */
+export type Tempo = "chuva" | "calor" | "frio" | null;
+
+export function tempoDoMomento(code: number | null, temp: number | null): Tempo {
+  if (code != null && code >= 51) return "chuva";
+  if (temp != null && temp >= 28) return "calor";
+  if (temp != null && temp <= 15) return "frio";
+  return null;
+}
+
 export type FraseDoMascote = {
   texto: string;
   /** Vazio = serve a qualquer hora. */
   periodos?: Periodo[];
+  /**
+   * Só entra com este tempo lá fora.
+   *
+   * Vazio = serve com qualquer clima. As frases de clima são MINORIA de
+   * propósito: se toda frase falasse do tempo, o personagem viraria boletim
+   * meteorológico com carinha.
+   */
+  tempo?: Exclude<Tempo, null>;
   /**
    * Sobrevive ao Modo Cuidado.
    *
@@ -90,6 +128,13 @@ export const FRASES: FraseDoMascote[] = [
     noLuto: true,
   },
 
+  // ── Fim da noite: a hora dita a frase ───────────────────────────────────
+  {
+    texto: "Já são quase onze{nome} 🌙 Que tal fechar o dia com uma respiração?",
+    periodos: ["noite"],
+  },
+  { texto: "Fim de noite. Uma meditação curta ajuda a soltar o dia 🌿", periodos: ["noite"] },
+
   // ── Madrugada ───────────────────────────────────────────────────────────
   {
     texto: "Acordada a essa hora? Estou aqui com você 🌙",
@@ -108,6 +153,19 @@ export const FRASES: FraseDoMascote[] = [
   { texto: "Se hoje só der para respirar, já está ótimo.", noLuto: true },
   { texto: "Estou aqui do seu lado, no cantinho da tela. Sempre 💛", noLuto: true },
   { texto: "Não existe jeito certo de viver um dia difícil.", noLuto: true },
+
+  // ── Com o tempo lá fora ─────────────────────────────────────────────────
+  { texto: "Chuva lá fora 🌧️ Dia perfeito para uma meditação sem pressa.", tempo: "chuva" },
+  {
+    texto: "Está chovendo{nome} — chá quentinho e um cantinho macio 🌧️",
+    tempo: "chuva",
+    noLuto: true,
+  },
+  { texto: "Chovendo? O Caminho não molha 😄 Passa lá quando quiser.", tempo: "chuva" },
+  { texto: "Calor hoje 🥵 Água por perto e sombra sempre que der.", tempo: "calor" },
+  { texto: "Dia quente{nome}. Bebe uma água por nós dois? 💧", tempo: "calor" },
+  { texto: "Friozinho hoje 🧣 Se agasalha bem antes de sair.", tempo: "frio" },
+  { texto: "Está frio{nome} — manta, chá e um episódio bom 💛", tempo: "frio", noLuto: true },
 
   // ── Convite para o app, sem cobrança ────────────────────────────────────
   { texto: "Tem uma meditação novinha te esperando 🌿 Que tal agora?" },
@@ -140,11 +198,18 @@ export function fraseDoDia(o: {
   periodo: Periodo;
   nome?: string | null;
   careMode?: boolean;
+  /** O tempo lá fora. `null`/ausente = dia comum, e as frases de clima saem. */
+  tempo?: Tempo;
 }): string | null {
   const temNome = !!(o.nome ?? "").trim();
   const servem = FRASES.filter((f) => {
     if (o.careMode && !f.noLuto) return false;
     if (f.periodos && !f.periodos.includes(o.periodo)) return false;
+    /* Frase de clima só com AQUELE clima. Sem o tempo conhecido (a API ainda
+       não respondeu, ou ela negou a localização), elas simplesmente não
+       entram: melhor uma frase genérica que uma frase sobre uma chuva que não
+       está caindo. */
+    if (f.tempo && f.tempo !== o.tempo) return false;
     /* Frase que chama pelo nome só entra se houver nome. Trocar por vazio
        deixaria "Bebeu água hoje?" — que é outra frase, e pior. */
     if (!temNome && f.texto.includes("{nome}")) return false;

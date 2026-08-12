@@ -517,6 +517,39 @@ arte nova.
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
 
+### As três animações de conquista, e um troféu que sumia (ago/2026)
+
+Check verde (atividade feita) · estrela (uma por atividade) · cinco estrelas (o
+dia fechado). Folha de sprites pelo mesmo motivo da chama: **WebM com alfa não
+tem transparência no Safari**. As três em grade 6×4, para o par de keyframes ser
+um só (`.dc-sprite`).
+
+- **O gatilho é a TRANSIÇÃO**, nunca o estado: com o estado, a folha do dia
+  explodiria confete em cinco linhas toda vez que ela abrisse a tela. `useRef`
+  fotografa o que já estava feito na montagem.
+- ⚠️ **`steps(n, jump-none)` em animação de UMA passada.** A fórmula do `to`
+  esticado (100%·n/(n−1)) vale para LAÇO; com `forwards`, o valor segurado no
+  fim é o `to` literal, que está FORA da folha. Medido: o troféu terminava em
+  `111.111% 120%` sobre `background-size: 1000% 600%` e ficava **invisível** no
+  último meio segundo — o quadro que a tela existe para mostrar. O teste dele
+  travava a fórmula errada; agora cobra que o percurso termine dentro da folha.
+- `scripts/sprite-de-video.mjs` ganhou janela de amostragem: o check tinha 3 s
+  de vídeo com a ação no primeiro 1,25 s, e 20 quadros repetidos é peso sem
+  imagem.
+
+### O bebê bolha ficou maior e mais atento (ago/2026)
+
+- **88px, o dobro** — deixou de ser ícone e virou personagem. Medido: não
+  encosta no menu nem no nome do bebê, nem no iPhone SE.
+- **As cinco expressões entraram em uso.** A régua continua sendo
+  `humorDaJornada` (o portão de Modo Cuidado mora nela): dormindo depois das
+  22h sem recado, surpresa de madrugada, orgulhosa quando há recado.
+- **As frases conversam com o CLIMA**, do mesmo `useWeather` do cartão de
+  saudação — e o limiar de chuva é o MESMO (`code >= 51`). Duas réguas para
+  "está chovendo" na mesma tela é como o app começa a se contradizer.
+- Sem clima conhecido, **nenhuma frase fala do tempo**: melhor calar que falar
+  de uma chuva que não está caindo. Há teste.
+
 ### O bebê bolha ganhou voz, tutorial e caixa de entrada (ago/2026)
 
 Pedido do dono, em três partes: tutorial no primeiro acesso pelos cinco itens

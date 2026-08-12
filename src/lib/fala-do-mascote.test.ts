@@ -79,7 +79,11 @@ describe("um aviso só para o mesmo fato", () => {
     /* `humorDaJornada` e não um `if` local: o portão de Modo Cuidado mora
        dentro dela, e uma segunda régua faria uma carinha festiva aparecer
        para quem perdeu a gestação. */
-    expect(shell).toContain("humorDaJornada({ madrugada: isMadrugada, careMode })");
+    /* A chamada cresceu quando as cinco expressões entraram em uso (dormindo
+       à noite, surpresa de madrugada, orgulhosa com recado). O que o teste
+       cobra é o VÍNCULO com a régua — não a forma exata da chamada. */
+    expect(shell).toContain("humorDaJornada({");
+    expect(shell).toMatch(/humorDaJornada\(\{[\s\S]{0,200}careMode,?\s*\}\)/);
   });
 });
 

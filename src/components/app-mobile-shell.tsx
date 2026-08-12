@@ -26,7 +26,7 @@ import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
 import { CeuEfeitos } from "@/components/ceu-efeitos";
 import { MascoteDaHome } from "@/components/mascote-da-home";
 import { humorDaJornada } from "@/components/bolha";
-import { diaLocalDe, fraseDoDia, periodoDaHora } from "@/lib/frases-do-mascote";
+import { diaLocalDe, fraseDoDia, periodoDaHora, tempoDoMomento } from "@/lib/frases-do-mascote";
 import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
@@ -915,7 +915,31 @@ export function AppHomeScreen({
    * informa é o que ela tem: a hora. De madrugada ele se espanta de bom; no
    * resto do dia, sorri.
    */
-  const humorDoMascote = humorDaJornada({ madrugada: isMadrugada, careMode });
+  /**
+   * A CARA MUDA COM O MOMENTO, e não só com a hora.
+   *
+   * Pedido do dono: "dependendo do momento, usar as outras expressões que ele
+   * tem". São cinco artes (feliz · comemorando · dormindo · orgulhosa ·
+   * surpresa) e até aqui a home usava duas.
+   *
+   * A régua continua sendo `humorDaJornada` — o portão de Modo Cuidado mora
+   * dentro dela, e uma segunda régua faria carinha festiva aparecer para quem
+   * perdeu a gestação. O que mudou é o que a home CONTA para ela:
+   *
+   *  · `noite` + `diaFeito` → dormindo. A home não sabe do Caminho, mas sabe
+   *    que é tarde e que não há recado pendente: para quem abre o app às 23h
+   *    sem nada em aberto, a bolha cochilando é a companhia certa.
+   *  · `madrugada` → surpresa, o espanto BOM ("olha quem apareceu").
+   *  · recado esperando → orgulhosa, a piscadinha: ela tem algo para contar.
+   *  · o resto → feliz.
+   */
+  const humorDoMascote = humorDaJornada({
+    madrugada: isMadrugada,
+    noite: h >= 22,
+    diaFeito: h >= 22 && !temNaoLidas,
+    ritmoIncomum: temNaoLidas,
+    careMode,
+  });
 
   /**
    * O QUE ELE DIZ QUANDO NÃO HÁ RECADO.
@@ -940,6 +964,11 @@ export function AppHomeScreen({
           periodo: periodoDaHora(h),
           nome: firstName,
           careMode,
+          /* O MESMO clima do cartão de saudação, e não uma segunda consulta:
+             `useWeather` já respondeu para a chuva do céu e para a dica lá
+             embaixo. Duas fontes para "está chovendo" na mesma tela é como o
+             app começa a se contradizer. */
+          tempo: tempoDoMomento(weather?.code ?? null, weather?.temp ?? null),
         });
   /** O tema pago da Loja. `v2` (as quatro cenas novas) é o padrão de todo mundo. */
   const ceuClassico = skyTheme === "v1";
@@ -1376,6 +1405,11 @@ export function AppHomeScreen({
               <MascoteDaHome
                 humor={humorDoMascote}
                 fala={conforto ? { texto: conforto, aria: "Abrir recados" } : null}
+                /* DOBRO do tamanho, a pedido do dono. 44 → 88px: ele deixou de
+                   ser um ícone no canto e virou personagem. O alvo do menu
+                   continua com 40px do outro lado, e os dois seguem sem se
+                   tocar — medido no iPhone SE, que é a tela mais estreita. */
+                tamanho={88}
                 /* `temNaoLidas` continua mandando no SE, e `naoLidas` só no
                    QUANTOS. Quem passa só o booleano (a bancada, e qualquer
                    chamador antigo) recebe 1 em vez de zero — senão o mascote

@@ -13,6 +13,7 @@ import {
   fraseDoDia,
   FRASES,
   periodoDaHora,
+  tempoDoMomento,
   type Periodo,
 } from "./frases-do-mascote";
 
@@ -114,7 +115,11 @@ describe("uma por dia, e ela roda", () => {
        frases, ficava presa em duas — este teste é o que pegou. */
     for (const periodo of PERIODOS) {
       const vistas = new Set<string>();
-      const total = FRASES.filter((f) => !f.periodos || f.periodos.includes(periodo)).length;
+      /* Sem clima conhecido, as frases de tempo não entram — o teste conta a
+         mesma lista que a régua monta. */
+      const total = FRASES.filter(
+        (f) => (!f.periodos || f.periodos.includes(periodo)) && !f.tempo,
+      ).length;
       for (let dia = 0; dia < total * 2; dia++) {
         const f = fraseDoDia({ dia, periodo, nome: "Ana" });
         if (f) vistas.add(f);
@@ -135,5 +140,45 @@ describe("o dia vem do calendário LOCAL", () => {
     const hoje = new Date(2026, 7, 12, 23, 59, 0);
     const amanha = new Date(2026, 7, 13, 0, 1, 0);
     expect(diaLocalDe(amanha)).toBe(diaLocalDe(hoje) + 1);
+  });
+});
+
+describe("o tempo lá fora", () => {
+  test("chuva vem do MESMO limiar do cartão de saudação", () => {
+    /* Duas réguas para "está chovendo" na mesma tela é como o app começa a se
+       contradizer: o cartão diria "chá quentinho" e a bolha, "vamos caminhar". */
+    expect(tempoDoMomento(51, 22)).toBe("chuva");
+    expect(tempoDoMomento(95, 30)).toBe("chuva");
+    expect(tempoDoMomento(3, 22)).toBeNull();
+  });
+
+  test("calor e frio pelos cortes do senso comum", () => {
+    expect(tempoDoMomento(1, 31)).toBe("calor");
+    expect(tempoDoMomento(1, 12)).toBe("frio");
+    expect(tempoDoMomento(1, 22)).toBeNull();
+  });
+
+  test("chuva ganha do calor — quem se molha não pensa em sombra", () => {
+    expect(tempoDoMomento(61, 33)).toBe("chuva");
+  });
+
+  test("sem clima conhecido, nenhuma frase fala do tempo", () => {
+    /* A API pode não ter respondido, ou ela negou a localização. Falar de uma
+       chuva que não está caindo é pior que não falar do tempo. */
+    for (const periodo of ["madrugada", "manha", "tarde", "noite"] as Periodo[]) {
+      for (let dia = 0; dia < 40; dia++) {
+        const f = fraseDoDia({ dia, periodo, nome: "Ana" });
+        expect(f).not.toMatch(/chuva|chovendo|calor|frio/i);
+      }
+    }
+  });
+
+  test("com chuva, a frase da chuva pode aparecer", () => {
+    const vistas = new Set<string>();
+    for (let dia = 0; dia < 60; dia++) {
+      const f = fraseDoDia({ dia, periodo: "tarde", nome: "Ana", tempo: "chuva" });
+      if (f) vistas.add(f);
+    }
+    expect([...vistas].some((t) => /chuv|chovendo/i.test(t))).toBe(true);
   });
 });
