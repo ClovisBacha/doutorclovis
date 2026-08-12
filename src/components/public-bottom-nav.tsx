@@ -17,7 +17,15 @@ export function PublicBottomNav() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel"))
+  /* As BANCADAS (`/preview-*`) existem para fotografar pedaços do app fora do
+     login, e esta barra pousava por cima do que elas fotografam — foi ela que
+     cobriu a navbar na bancada do tutorial. São telas `noindex` de desenho:
+     um convite para entrar no app não tem o que fazer ali. */
+  if (
+    location.pathname.startsWith("/minha-conta") ||
+    location.pathname.startsWith("/painel") ||
+    location.pathname.startsWith("/preview-")
+  )
     return null;
 
   const to = signedIn ? ("/minha-conta" as const) : ("/auth" as const);

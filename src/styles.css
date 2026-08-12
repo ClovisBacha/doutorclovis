@@ -1217,6 +1217,50 @@ button:active > .duo3d {
   }
 }
 
+/* ── O ITEM DA BARRA QUE O TUTORIAL ESTÁ EXPLICANDO ──────────────────
+   Um anel que pulsa atrás do ícone. É `::before` e não uma borda: borda
+   empurraria o conteúdo e faria a barra inteira dançar a cada passo.
+
+   `scale` e `opacity` só — as duas propriedades que o compositor anima sem
+   recalcular layout. Numa barra de vidro com `backdrop-filter`, animar
+   qualquer coisa que peça layout custa um repaint do desfoque a cada quadro.
+
+   Com "menos movimento" o anel PARA aceso, em vez de sumir: ele é o que diz
+   de qual ícone o personagem está falando, e sem ele o tutorial vira um texto
+   solto apontando para lugar nenhum. */
+@keyframes dcNavDestaque {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.12);
+    opacity: 0.95;
+  }
+}
+.dc-nav-destaque::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  transform: translate(-50%, -50%);
+  animation: dcNavDestaque 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-nav-destaque::before {
+    animation: none;
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
 /* ── O BALÃO DE FALA DO BEBÊ BOLHA ───────────────────────────────────
    Ele NASCE do mascote, e não do nada: começa pequeno e ancorado no canto
    superior direito (`transform-origin`), que é exatamente onde a personagem

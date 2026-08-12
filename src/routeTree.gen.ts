@@ -15,6 +15,7 @@ import { Route as SobreRouteImport } from './routes/sobre'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
+import { Route as PreviewTutorialRouteImport } from './routes/preview-tutorial'
 import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
@@ -99,6 +100,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
   id: '/primeira-consulta',
   path: '/primeira-consulta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewTutorialRoute = PreviewTutorialRouteImport.update({
+  id: '/preview-tutorial',
+  path: '/preview-tutorial',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewSosRoute = PreviewSosRouteImport.update({
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -472,6 +479,7 @@ export interface FileRoutesByTo {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -536,6 +544,7 @@ export interface FileRoutesById {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -600,6 +609,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sos'
+    | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -662,6 +672,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sos'
+    | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -725,6 +736,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sos'
+    | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
     | '/sitemap.xml'
@@ -789,6 +801,7 @@ export interface RootRouteChildren {
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSosRoute: typeof PreviewSosRoute
+  PreviewTutorialRoute: typeof PreviewTutorialRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -857,6 +870,13 @@ declare module '@tanstack/react-router' {
       path: '/primeira-consulta'
       fullPath: '/primeira-consulta'
       preLoaderRoute: typeof PrimeiraConsultaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-tutorial': {
+      id: '/preview-tutorial'
+      path: '/preview-tutorial'
+      fullPath: '/preview-tutorial'
+      preLoaderRoute: typeof PreviewTutorialRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-sos': {
@@ -1297,6 +1317,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSosRoute: PreviewSosRoute,
+  PreviewTutorialRoute: PreviewTutorialRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

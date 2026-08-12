@@ -26,6 +26,7 @@ import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
 import { CeuEfeitos } from "@/components/ceu-efeitos";
 import { MascoteDaHome } from "@/components/mascote-da-home";
 import { humorDaJornada } from "@/components/bolha";
+import { diaLocalDe, fraseDoDia, periodoDaHora } from "@/lib/frases-do-mascote";
 import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
@@ -374,6 +375,7 @@ function NavItem({
   color,
   compact,
   active = false,
+  destacado = false,
   escura = false,
   onClick,
   Icon,
@@ -382,6 +384,8 @@ function NavItem({
   color: string;
   compact: boolean;
   active?: boolean;
+  /** O tutorial está falando deste item agora. */
+  destacado?: boolean;
   /** Barra escura: o rótulo inverte. O ÍCONE não — a cor dele é significado
       (vermelho = SOS), e os cinco tons já leem sobre o vidro escuro. */
   escura?: boolean;
@@ -396,7 +400,9 @@ function NavItem({
       }}
       aria-current={active ? "page" : undefined}
       aria-label={label}
-      className="flex min-w-0 flex-1 flex-col items-center py-1"
+      className={`relative flex min-w-0 flex-1 flex-col items-center py-1 ${
+        destacado ? "dc-nav-destaque" : ""
+      }`}
     >
       <Icon
         className={`${color} transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
@@ -426,10 +432,20 @@ export function AppBottomNav({
   onSelect,
   onEmergency,
   escura = false,
+  destaque = null,
 }: {
   activeSection: BottomSection | null;
   onSelect: (s: BottomSection) => void;
   onEmergency?: () => void;
+  /**
+   * Qual item o tutorial está explicando AGORA — ele ganha um anel pulsando.
+   *
+   * `"sos"` não é uma `BottomSection`: o SOS não abre aba nenhuma, ele abre a
+   * Central de Emergência. Por isso o tipo é a união, e não `BottomSection`
+   * sozinho — o primeiro item que a paciente precisa conhecer seria justamente
+   * o único que o tutorial não conseguiria apontar.
+   */
+  destaque?: BottomSection | "sos" | null;
   /**
    * Vidro ESCURO. Verdadeiro só na home com céu de noite/madrugada.
    *
@@ -526,6 +542,7 @@ export function AppBottomNav({
             color="text-rose-500"
             compact={compact}
             escura={escura}
+            destacado={destaque === "sos"}
             onClick={onEmergency}
             Icon={LifeBuoy}
           />
@@ -546,7 +563,9 @@ export function AppBottomNav({
               }}
               aria-current={activeSection === id ? "page" : undefined}
               aria-label={label}
-              className="relative flex min-w-0 flex-1 flex-col items-center py-1"
+              className={`relative flex min-w-0 flex-1 flex-col items-center py-1 ${
+                destaque === id ? "dc-nav-destaque" : ""
+              }`}
             >
               <span aria-hidden className={compact ? "h-5 w-5" : "h-[22px] w-[22px]"} />
               <span
@@ -581,6 +600,7 @@ export function AppBottomNav({
               color={color}
               compact={compact}
               active={activeSection === id}
+              destacado={destaque === id}
               escura={escura}
               onClick={() => onSelect(id)}
               Icon={Icon}
@@ -887,6 +907,31 @@ export function AppHomeScreen({
    * resto do dia, sorri.
    */
   const humorDoMascote = humorDaJornada({ madrugada: isMadrugada, careMode });
+
+  /**
+   * O QUE ELE DIZ QUANDO NÃO HÁ RECADO.
+   *
+   * Pedido do dono: sem notificação, o personagem escreve conforto e motivação
+   * — inclusive chamando para o Caminho, para meditar e para aprender.
+   *
+   * É UMA POR DIA, e não uma por montagem: esta tela remonta toda vez que ela
+   * toca em "Bebê", e um balão novo a cada toque viraria letreiro. A régua
+   * (com o filtro de Modo Cuidado e o uso do nome) mora em
+   * `lib/frases-do-mascote.ts`, testada.
+   *
+   * ⚠️ Só entra quando NÃO há recado. O `MascoteDaHome` já dá precedência à
+   * `fala` explícita, então mandar as duas faria a frase de conforto ENGOLIR o
+   * aviso de que o médico escreveu — exatamente o contrário da prioridade.
+   */
+  const conforto =
+    temNaoLidas || !agora
+      ? null
+      : fraseDoDia({
+          dia: diaLocalDe(agora),
+          periodo: periodoDaHora(h),
+          nome: firstName,
+          careMode,
+        });
   /** O tema pago da Loja. `v2` (as quatro cenas novas) é o padrão de todo mundo. */
   const ceuClassico = skyTheme === "v1";
   const period = periodFor(h);
@@ -1321,6 +1366,7 @@ export function AppHomeScreen({
                   voltou a dizer algo, e o que ele diz é sobre ela. */}
               <MascoteDaHome
                 humor={humorDoMascote}
+                fala={conforto ? { texto: conforto, aria: "Abrir recados" } : null}
                 /* `temNaoLidas` continua mandando no SE, e `naoLidas` só no
                    QUANTOS. Quem passa só o booleano (a bancada, e qualquer
                    chamador antigo) recebe 1 em vez de zero — senão o mascote

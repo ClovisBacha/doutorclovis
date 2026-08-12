@@ -148,12 +148,16 @@ import { SKIN_KEY } from "@/lib/trilha-skins";
 import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
 import { MenuDaConta } from "@/components/menu-conta";
+import { TutorialDaBolha } from "@/components/tutorial-da-bolha";
+import { chaveDoTutorial } from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
 import {
   contarNaoLidas,
   lerLidas,
   marcarLidas,
   ordenar,
+  visiveis,
+  type Lidas,
   type Notificacao,
 } from "@/lib/notificacoes";
 import type { OrigemLocal } from "@/components/app-mobile-shell";
@@ -725,13 +729,34 @@ function MinhaContaPage() {
 
   /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
   const [homeMenu, setHomeMenu] = useState(false);
+
+  /* ── O TUTORIAL DO PRIMEIRO ACESSO ──────────────────────────────────────
+     Quem apresenta o app é o bebê bolha, pela barra de baixo. O estado do
+     DESTAQUE mora aqui porque a barra mora aqui: o tutorial diz de qual item
+     está falando, e quem acende é o `AppBottomNav`. */
+  const [tutorialAberto, setTutorialAberto] = useState(false);
+  const [destaqueDaBarra, setDestaqueDaBarra] = useState<BottomSection | "sos" | null>(null);
+
+  function fecharTutorial() {
+    setTutorialAberto(false);
+    setDestaqueDaBarra(null);
+    try {
+      localStorage.setItem(chaveDoTutorial(profile?.id ?? null), "1");
+    } catch {
+      /* modo privado: ele volta na próxima abertura. Chato, não quebra — e
+         quem está em modo privado sabe que nada é lembrado. */
+    }
+  }
   /* ── Central de notificações ──────────────────────────────────────────
      `lidas` começa VAZIA e só é preenchida ao montar. Ler o localStorage
      durante o render faria o servidor (que não tem storage) e o navegador
      produzirem marcações diferentes, e a hidratação do React não corrige
      isso — a bolinha piscaria em quem já leu tudo. */
   const [notifOpen, setNotifOpen] = useState(false);
-  const [lidas, setLidas] = useState<Set<string>>(() => new Set());
+  /* `Map` e não `Set`: o valor é o INSTANTE da leitura, e é ele que faz a
+     notificação lida sumir da caixa depois de sete dias. `has()` continua
+     sendo a mesma chamada, então a folha não mudou. */
+  const [lidas, setLidas] = useState<Lidas>(() => new Map());
   const [origemLocal, setOrigemLocal] = useState<OrigemLocal | null>(null);
   /* A barra de baixo escurece SÓ na home com céu de noite. Nas outras abas o
      conteúdo é claro e uma barra escura destoaria — e a tela do jogo é uma
@@ -840,24 +865,48 @@ function MinhaContaPage() {
     return ordenar([], derivadas);
   }, [profile, isDoctor, isAdmin, origemLocal, navigate]);
 
+  /**
+   * A caixa de entrada como a paciente a vê: sem o que ela leu há mais de sete
+   * dias.
+   *
+   * Fica separada de `notificacoes` de propósito. A lista crua continua sendo
+   * a verdade do estado da conta — é dela que nascem as derivadas —, e a poda
+   * é uma decisão de APRESENTAÇÃO. Misturar as duas faria a notificação lida
+   * "deixar de existir" para quem lê o código, quando ela só deixou de ser
+   * mostrada.
+   */
+  const caixaDeEntrada = useMemo(() => visiveis(notificacoes, lidas), [notificacoes, lidas]);
+
   /** Some quando ela preenche — é o que apaga o ponto vermelho do Perfil. */
   const perfilPendente =
     !!profile && (!profile.emergency_email?.trim() || !profile.emergency_contact?.trim());
 
-  const naoLidas = contarNaoLidas(notificacoes, lidas);
+  /* A CAIXA é a lista já podada: a lida há mais de sete dias sai de cena.
+     O emblema conta sobre ESTA lista, e não sobre a crua — senão uma
+     notificação invisível continuaria puxando o número, e ela abriria a caixa
+     procurando um recado que não está lá. */
+  const naoLidas = contarNaoLidas(caixaDeEntrada, lidas);
 
-  /* Abrir a gaveta É ler. Marca tudo o que está na lista NAQUELE instante —
-     não a lista inteira de sempre —, então um aviso que chegue com a gaveta
-     aberta continua contando como novo. */
+  /**
+   * ⚠️ ABRIR A CAIXA NÃO É MAIS LER TUDO.
+   *
+   * Era: a gaveta abria e marcava a lista inteira como lida. Pedido do dono
+   * com o bebê bolha: "se a pessoa abrir a mensagem, clicando nela, conta como
+   * lida". A diferença importa — quem abre a caixa e vê cinco recados sem
+   * tempo de ler perdia o rastro de todos os cinco de uma vez, e o emblema
+   * zerava sem que nada tivesse sido lido de verdade.
+   *
+   * Agora quem marca é o toque em CADA item (`marcarUmaLida`, passado à
+   * folha). O que abrir a caixa faz é só abrir a caixa.
+   */
   function abrirNotificacoes() {
     setHomeMenu(false);
     setNotifOpen(true);
-    setLidas(
-      marcarLidas(
-        profile?.id ?? null,
-        notificacoes.map((n) => n.id),
-      ),
-    );
+  }
+
+  /** Um toque, um recado lido. */
+  function marcarUmaLida(id: string) {
+    setLidas(marcarLidas(profile?.id ?? null, [id]));
   }
   // Jornada do Bebê (toque na foto do bebê) + popup do Premium (gatilho)
   const [journeyOpen, setJourneyOpen] = useState(false);
@@ -1180,6 +1229,20 @@ function MinhaContaPage() {
           /* modo privado: sem persistência do "pular" */
         }
         if (!hasAnchor && !dismissed) setShowOnboarding(true);
+
+        /* ── O TUTORIAL DO BEBÊ BOLHA ────────────────────────────────────
+           Só para paciente, só uma vez, e só em quem já passou pelo ritual de
+           boas-vindas: duas telas cheias empilhadas no primeiro minuto seriam
+           dois tutoriais, não um. Quem ainda vai ver o ritual encontra o
+           tutorial na próxima abertura, com o app já personalizado — e aí a
+           barra que ele explica leva a telas com o nome dela dentro. */
+        let jaViu = false;
+        try {
+          jaViu = !!localStorage.getItem(chaveDoTutorial(u.user.id));
+        } catch {
+          /* modo privado: ele volta. Ver `fecharTutorial`. */
+        }
+        if (!jaViu && (hasAnchor || dismissed)) setTutorialAberto(true);
       }
     })();
   }, []);
@@ -1463,6 +1526,18 @@ function MinhaContaPage() {
         </div>
       )}
 
+      {/* ── O bebê bolha apresentando a barra de baixo ────────────
+          Só na home do celular: ele explica a barra, e a barra só existe ali.
+          E nunca em Modo Cuidado — quem acabou de perder a gestação não abre o
+          app para um passeio guiado pelas funcionalidades. */}
+      {tutorialAberto && mobileHome && !careMode && !showOnboarding && (
+        <TutorialDaBolha
+          nome={profile?.display_name ?? null}
+          onPasso={(d) => setDestaqueDaBarra(d as BottomSection | "sos" | null)}
+          onFechar={fecharTutorial}
+        />
+      )}
+
       {/* ── Ritual de boas-vindas (primeiro acesso) ─────────────── */}
       {showOnboarding && (
         <OnboardingRitual
@@ -1530,6 +1605,7 @@ function MinhaContaPage() {
            única porta de entrada do SOS no app inteiro. */
         onEmergency={() => setEmergencyOpen(true)}
         escura={barraEscura}
+        destaque={destaqueDaBarra}
       />
 
       {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
@@ -1756,8 +1832,9 @@ function MinhaContaPage() {
 
               {notifOpen && (
                 <NotificacoesSheet
-                  lista={notificacoes}
+                  lista={caixaDeEntrada}
                   lidas={lidas}
+                  onLer={marcarUmaLida}
                   onFechar={() => setNotifOpen(false)}
                 />
               )}

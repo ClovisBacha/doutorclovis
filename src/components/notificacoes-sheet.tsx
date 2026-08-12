@@ -1,5 +1,5 @@
 import { Bell, ChevronRight, X } from "lucide-react";
-import type { Notificacao } from "@/lib/notificacoes";
+import type { Lidas, Notificacao } from "@/lib/notificacoes";
 import { useVoltar } from "@/lib/use-voltar";
 
 /**
@@ -17,10 +17,23 @@ import { useVoltar } from "@/lib/use-voltar";
 export function NotificacoesSheet({
   lista,
   lidas,
+  onLer,
   onFechar,
 }: {
   lista: Notificacao[];
-  lidas: Set<string>;
+  lidas: Lidas;
+  /**
+   * Marca UM recado como lido.
+   *
+   * ⚠️ Antes, abrir a gaveta marcava a lista inteira. Pedido do dono junto com
+   * o bebê bolha: quem lê é o toque na mensagem. A diferença não é detalhe —
+   * quem abria a caixa e via cinco recados sem tempo de ler perdia o rastro
+   * dos cinco de uma vez, e o emblema zerava sem nada ter sido lido.
+   *
+   * Vale para os DOIS tipos: o que tem ação leva a algum lugar, e o que não
+   * tem é só um aviso — mas os dois foram lidos ao serem tocados.
+   */
+  onLer?: (id: string) => void;
   onFechar: () => void;
 }) {
   /* Voltar (Android) e Escape fecham a folha, não o app. */
@@ -61,14 +74,23 @@ export function NotificacoesSheet({
           ) : (
             lista.map((n) => {
               const naoLida = !lidas.has(n.id);
-              const Tag = n.acao ? "button" : "div";
+              /* Todo item vira BOTÃO, tenha ação ou não: tocar é ler, e o
+                 aviso sem destino também precisa poder ser lido. Antes, o que
+                 não tinha para onde levar era uma `div` e ficava com o ponto
+                 vermelho para sempre. */
               return (
-                <Tag
+                <button
                   key={n.id}
-                  {...(n.acao ? { onClick: n.acao.executar, type: "button" as const } : {})}
-                  className={`flex w-full items-start gap-3 rounded-2xl px-3.5 py-3.5 text-left transition-colors ${
-                    n.acao ? "hover:bg-primary/8 active:bg-primary/12" : ""
-                  }`}
+                  type="button"
+                  onClick={() => {
+                    /* Marcar ANTES de executar: a ação pode fechar a folha,
+                       trocar de aba e desmontar tudo — e aí a marcação nunca
+                       aconteceria. É o mesmo motivo pelo qual o lembrete de
+                       consulta é gravado antes de ser enviado. */
+                    onLer?.(n.id);
+                    n.acao?.executar();
+                  }}
+                  className="flex w-full items-start gap-3 rounded-2xl px-3.5 py-3.5 text-left transition-colors hover:bg-primary/8 active:bg-primary/12"
                 >
                   <span className="relative mt-0.5 shrink-0 text-xl leading-none">
                     {n.icone}
@@ -101,7 +123,7 @@ export function NotificacoesSheet({
                       </span>
                     )}
                   </span>
-                </Tag>
+                </button>
               );
             })
           )}

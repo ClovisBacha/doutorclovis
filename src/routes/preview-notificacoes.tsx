@@ -53,8 +53,11 @@ const EXEMPLO: Notificacao[] = [
 function PreviewNotificacoes() {
   const { vazio } = Route.useSearch();
   const [aberta, setAberta] = useState(true);
-  // Só a primeira aparece como lida: é o caso que mostra as duas aparências.
-  const lidas = new Set(["medico-ausente"]);
+  /* Só a primeira aparece como lida: é o caso que mostra as duas aparências.
+     O valor é o INSTANTE da leitura — é ele que faz a lida sumir da caixa
+     depois de sete dias, e por isso a bancada usa uma data de agora: com uma
+     data velha o item nem apareceria aqui. */
+  const lidas = new Map([["medico-ausente", new Date().toISOString()]]);
   return (
     <div className="fixed inset-0 z-[75] bg-gradient-to-b from-sky-200 to-rose-100">
       {aberta && (

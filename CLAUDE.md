@@ -517,6 +517,56 @@ arte nova.
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
 
+### O bebê bolha ganhou voz, tutorial e caixa de entrada (ago/2026)
+
+Pedido do dono, em três partes: tutorial no primeiro acesso pelos cinco itens
+da barra; TODA notificação passando pelo personagem, com número em cima e
+leitura por toque; e frases de conforto quando não há recado.
+
+**Os textos ficam em `lib/`, nunca no JSX** — `tutorial-do-mascote.ts` (sete
+cartões) e `frases-do-mascote.ts` (22 frases). São o que o dono reescreve; um
+texto enterrado em componente é um texto que ele não edita.
+
+- **O holofote sai do `z-index`, e não de máscara.** O véu para em `z-38` e a
+  barra vive em `z-40`: a tela apaga, a barra segue acesa e o item pulsa
+  (`dc-nav-destaque`). Um `clip-path` com furo precisaria ser recalculado toda
+  vez que a barra encolhe ao rolar — e tutorial que aponta para o lugar errado
+  é pior que nenhum.
+- **A barra continua clicável durante a aula.** Tocar num ícone encerra o
+  tutorial e leva até lá: prender a paciente em sete telas para poder usar o
+  app que ela acabou de instalar é a definição de tutorial ruim.
+- **O tutorial espera o ritual de boas-vindas.** Duas telas cheias no primeiro
+  minuto seriam dois tutoriais. Quem ainda vai ver o ritual encontra o tutorial
+  na abertura seguinte, com o app já personalizado.
+- **Nunca em Modo Cuidado**: quem perdeu a gestação não abre o app para um
+  passeio guiado pelas funcionalidades.
+- **Abrir a caixa deixou de ser ler tudo.** Quem abria e via cinco recados sem
+  tempo de ler perdia o rastro dos cinco, e o emblema zerava sem nada ter sido
+  lido. Agora quem marca é o toque em CADA item — e a marcação acontece ANTES
+  de executar a ação, porque a ação pode fechar a folha e desmontar tudo.
+- **Lida some depois de 7 dias; NÃO lida nunca some.** `lidas` virou
+  `Map<id, instante>` (`Map.has()` é a mesma chamada do `Set`, então a folha
+  não mudou uma linha). O formato antigo — array de ids — é convertido com o
+  instante de AGORA: com zero, tudo que ela já leu sumiria no primeiro
+  carregamento da versão nova.
+- **O emblema conta sobre a lista JÁ PODADA** (`visiveis`), senão uma
+  notificação invisível continuaria puxando o número e ela abriria a caixa
+  procurando um recado que não está lá.
+- **Uma frase por DIA, não por abertura.** A home remonta a cada toque em
+  "Bebê"; um balão novo a cada toque viraria letreiro.
+- ⚠️ **A rotação é `dia % n`, e a versão "esperta" quebrou.** A primeira andava
+  de 7 em 7, e o próprio comentário avisava que 7 só serve quando `n` não é
+  múltiplo de 7 — a lista da MANHÃ tem exatamente 14 frases, e a paciente via
+  duas, alternadas, para sempre. O teste pegou; o comentário tinha previsto.
+- **As frases nunca cobram e nunca prometem clínica** — há teste com regex
+  proibindo "você não fez", "está tudo bem", "vai passar". É a mesma razão pela
+  qual a carinha `preocupada` saiu da personagem.
+- **`PublicBottomNav` some nas bancadas** (`/preview-*`): ela cobria a navbar na
+  bancada do tutorial. O mesmo defeito continua em `/auth`, onde o app
+  instalado abre com um botão "Entrar no app" por cima do login.
+- **Bancadas:** `/preview-tutorial?nome=Ana` (e `?escura=1`) ·
+  `/preview-home?w=20&notif=3`.
+
 ### A aba Saúde da paciente ficou clínica (ago/2026)
 
 A aba se chamava Saúde e as duas ferramentas de automonitoramento com mais peso

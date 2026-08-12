@@ -31,6 +31,20 @@
  * gaveta para resolver um problema que quase ninguém tem (a mesma conta em
  * dois celulares). Quando as notificações enviadas entrarem, o "lida" delas
  * sobe para o banco junto com elas.
+ *
+ * ─── QUANDO uma lida foi lida (ago/2026) ────────────────────────────────
+ *
+ * O formato deixou de ser uma lista de ids e passou a ser id → INSTANTE. A
+ * razão é um pedido do dono: "sempre ficará guardado ali as notificações
+ * durante pelo menos 7 dias, depois elas somem (as que já foram lidas)".
+ *
+ * Sem o instante não há como saber quando os sete dias começam — e a poda
+ * antiga (`slice(-200)`) jogava fora pela ORDEM DE INSERÇÃO, o que é outra
+ * coisa: apagava a lida mais velha mesmo que fosse de ontem, e mantinha uma de
+ * um ano atrás se ela tivesse sido reinserida.
+ *
+ * O tipo é `Map`, e não um objeto, porque `Map.has()` é a mesma chamada que o
+ * `Set` de antes: a folha de notificações não mudou uma linha.
  */
 
 export type NotifAcao = {
@@ -57,37 +71,100 @@ function chaveDe(uid: string | null): string {
   return `${CHAVE}:${uid ?? "anon"}`;
 }
 
-/** Ids já lidos por este usuário neste aparelho. */
-export function lerLidas(uid: string | null): Set<string> {
-  if (typeof window === "undefined") return new Set();
+/** id → instante (ISO) em que foi lida. `has()` responde "já li isto". */
+export type Lidas = Map<string, string>;
+
+/**
+ * Quanto tempo uma notificação LIDA continua na caixa antes de sumir.
+ *
+ * Sete dias, pedido do dono. A palavra dele foi "pelo menos", e é isso que o
+ * número faz: a não lida NUNCA some — quem some é só a que ela já abriu, uma
+ * semana depois. Tempo suficiente para reencontrar o que dispensou sem querer,
+ * curto o bastante para a caixa não virar arquivo morto.
+ */
+export const DIAS_APOS_LIDA = 7;
+const MS_DA_JANELA = DIAS_APOS_LIDA * 86_400_000;
+
+/** Ids já lidos por este usuário neste aparelho, com o instante da leitura. */
+export function lerLidas(uid: string | null): Lidas {
+  if (typeof window === "undefined") return new Map();
   try {
     const cru = localStorage.getItem(chaveDe(uid));
-    const arr = cru ? (JSON.parse(cru) as unknown) : [];
-    return new Set(Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : []);
+    const dado = cru ? (JSON.parse(cru) as unknown) : null;
+    /* ─── O FORMATO ANTIGO ERA UM ARRAY DE IDS ────────────────────────────
+       Quem já usava o app tem isso gravado. Convertido com o instante de
+       AGORA, e não com zero: com zero, tudo o que ela já leu sumiria da caixa
+       no primeiro carregamento da versão nova — inclusive um recado de ontem.
+       Assim elas cumprem os sete dias a partir daqui, uma vez só. */
+    if (Array.isArray(dado)) {
+      const agora = new Date().toISOString();
+      return new Map(
+        dado.filter((x): x is string => typeof x === "string").map((id) => [id, agora]),
+      );
+    }
+    if (dado && typeof dado === "object") {
+      return new Map(
+        Object.entries(dado as Record<string, unknown>).filter(
+          (par): par is [string, string] => typeof par[1] === "string",
+        ),
+      );
+    }
+    return new Map();
   } catch {
     /* storage cheio, desligado ou com lixo: ninguém leu nada, e tudo bem —
        o pior caso é a bolinha vermelha aparecer de novo. */
-    return new Set();
+    return new Map();
   }
 }
 
 /**
- * Marca ids como lidos.
+ * Marca ids como lidos, AGORA.
  *
- * Guarda no máximo 200: a lista só cresce, e as derivadas trocam de id quando
- * a cidade muda (`local:BH` → `local:SP`), então sem teto isso viraria lixo
- * eterno no storage da paciente.
+ * A poda deixou de ser por quantidade e passou a ser por IDADE: some o que já
+ * passou dos sete dias. Guardar por ordem de inserção apagava a lida mais nova
+ * quando a lista estourava, que é o oposto do que se quer.
+ *
+ * Um teto de 400 continua existindo como rede: as derivadas trocam de id
+ * quando a cidade muda (`local:BH` → `local:SP`), e sem nenhum limite um
+ * aparelho que viaja acumularia lixo mais rápido do que a idade poda. Ele quase
+ * nunca entra em ação — a poda por idade chega antes.
  */
-export function marcarLidas(uid: string | null, ids: string[]): Set<string> {
+export function marcarLidas(uid: string | null, ids: string[], agora = new Date()): Lidas {
   const atual = lerLidas(uid);
-  ids.forEach((id) => atual.add(id));
-  const podadas = [...atual].slice(-200);
+  const carimbo = agora.toISOString();
+  ids.forEach((id) => atual.set(id, carimbo));
+  const limite = agora.getTime() - MS_DA_JANELA;
+  const vivas = [...atual.entries()]
+    .filter(([, quando]) => {
+      const t = Date.parse(quando);
+      return Number.isFinite(t) && t >= limite;
+    })
+    .slice(-400);
   try {
-    localStorage.setItem(chaveDe(uid), JSON.stringify(podadas));
+    localStorage.setItem(chaveDe(uid), JSON.stringify(Object.fromEntries(vivas)));
   } catch {
     /* sem storage a bolinha volta na próxima abertura — irritante, não quebra */
   }
-  return new Set(podadas);
+  return new Map(vivas);
+}
+
+/**
+ * O que a caixa MOSTRA: tudo que não foi lido, mais o que foi lido há menos de
+ * sete dias.
+ *
+ * ⚠️ A não lida nunca é filtrada, por mais velha que seja. Uma notificação que
+ * ela nunca abriu sumir sozinha é a única falha grave possível nesta tela —
+ * seria o app decidir por ela que aquilo não importava.
+ */
+export function visiveis(lista: Notificacao[], lidas: Lidas, agora = new Date()): Notificacao[] {
+  const limite = agora.getTime() - MS_DA_JANELA;
+  return lista.filter((n) => {
+    const quando = lidas.get(n.id);
+    if (!quando) return true;
+    const t = Date.parse(quando);
+    /* Carimbo ilegível conta como recém-lida: na dúvida, mostrar. */
+    return !Number.isFinite(t) || t >= limite;
+  });
 }
 
 /**
@@ -102,7 +179,7 @@ export function ordenar(enviadas: Notificacao[], derivadas: Notificacao[]): Noti
   return [...porData, ...derivadas];
 }
 
-/** Quantas ainda não foram abertas — é isto que acende a bolinha. */
-export function contarNaoLidas(lista: Notificacao[], lidas: Set<string>): number {
+/** Quantas ainda não foram abertas — é isto que acende o emblema do mascote. */
+export function contarNaoLidas(lista: Notificacao[], lidas: Lidas): number {
   return lista.filter((n) => !lidas.has(n.id)).length;
 }
