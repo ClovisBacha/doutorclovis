@@ -10,6 +10,7 @@ import { describe, expect, test } from "bun:test";
 import {
   contarNaoLidas,
   DIAS_APOS_LIDA,
+  marcarLidas,
   visiveis,
   type Lidas,
   type Notificacao,
@@ -69,5 +70,38 @@ describe("a conta do emblema", () => {
     const lista = [n("velha"), n("nova")];
     const lidas: Lidas = new Map([["velha", haDias(30)]]);
     expect(contarNaoLidas(visiveis(lista, lidas, AGORA), lidas)).toBe(1);
+  });
+});
+
+describe("a memória de leitura sobrevive à janela de exibição", () => {
+  test("marcar uma lida não ressuscita outra que já passou dos 7 dias", () => {
+    /* ⚠️ O laço que este teste fecha: a poda do storage usava a MESMA janela
+       de sete dias da caixa. Quem esconde a lida é o carimbo — apagado o
+       carimbo, `visiveis` não tem o que esconder e a notificação volta, não
+       lida, com ponto vermelho. E como as derivadas renascem do estado da
+       conta, ela voltava para sempre.
+
+       Aqui a paciente leu "velha" há 30 dias (some da caixa, certo) e hoje
+       toca em "nova". A "velha" tem de CONTINUAR sumida. */
+    const chave = "dc-notif-lidas:u1";
+    const trintaDias = new Date(AGORA.getTime() - 30 * 86_400_000).toISOString();
+    const guardado: Record<string, string> = { velha: trintaDias };
+    const store: Record<string, string> = { [chave]: JSON.stringify(guardado) };
+    // @ts-expect-error — bancada mínima de localStorage para este teste
+    globalThis.window = globalThis;
+    // @ts-expect-error — idem
+    globalThis.localStorage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = v;
+      },
+    };
+    const depois = marcarLidas("u1", ["nova"], AGORA);
+    /* O carimbo da velha SOBREVIVE — é ele que a mantém escondida. */
+    expect(depois.has("velha")).toBe(true);
+    /* "nova" foi lida agora, então continua na caixa pelos sete dias; "velha"
+       continua fora. O defeito era ela reaparecer aqui. */
+    expect(visiveis([n("velha"), n("nova")], depois, AGORA).map((x) => x.id)).toEqual(["nova"]);
+    expect(contarNaoLidas(visiveis([n("velha"), n("nova")], depois, AGORA), depois)).toBe(0);
   });
 });

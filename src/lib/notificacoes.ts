@@ -120,20 +120,28 @@ export function lerLidas(uid: string | null): Lidas {
 /**
  * Marca ids como lidos, AGORA.
  *
- * A poda deixou de ser por quantidade e passou a ser por IDADE: some o que já
- * passou dos sete dias. Guardar por ordem de inserção apagava a lida mais nova
- * quando a lista estourava, que é o oposto do que se quer.
+ * ─── ⚠️ O REGISTRO DE LEITURA VIVE MUITO MAIS QUE A JANELA DE EXIBIÇÃO ─────
  *
- * Um teto de 400 continua existindo como rede: as derivadas trocam de id
- * quando a cidade muda (`local:BH` → `local:SP`), e sem nenhum limite um
- * aparelho que viaja acumularia lixo mais rápido do que a idade poda. Ele quase
- * nunca entra em ação — a poda por idade chega antes.
+ * A primeira versão podava aqui pelos MESMOS sete dias da caixa, e isso criava
+ * um laço: quem esconde a notificação lida é justamente o carimbo. Apagado o
+ * carimbo, `visiveis` não tem o que esconder e a notificação VOLTA — não lida,
+ * com ponto vermelho, contando no emblema do mascote. Como as derivadas são
+ * recriadas para sempre a partir do estado da conta ("você ainda não tem
+ * médico"), o alvo era garantido: reproduzido em teste, uma notificação lida há
+ * 30 dias reaparecia sob o dedo dela no instante em que ela tocasse em qualquer
+ * outra.
+ *
+ * A janela do storage é de meio ano — folgada de propósito. Quem esconde é
+ * `visiveis`, com `DIAS_APOS_LIDA`; o storage só precisa LEMBRAR, e lembrar
+ * custa alguns bytes. O teto de 400 continua como rede para o caso de as
+ * derivadas trocarem de id (a cidade muda: `local:BH` → `local:SP`).
  */
+const MS_DA_MEMORIA = 180 * 86_400_000;
 export function marcarLidas(uid: string | null, ids: string[], agora = new Date()): Lidas {
   const atual = lerLidas(uid);
   const carimbo = agora.toISOString();
   ids.forEach((id) => atual.set(id, carimbo));
-  const limite = agora.getTime() - MS_DA_JANELA;
+  const limite = agora.getTime() - MS_DA_MEMORIA;
   const vivas = [...atual.entries()]
     .filter(([, quando]) => {
       const t = Date.parse(quando);

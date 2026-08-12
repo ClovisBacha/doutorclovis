@@ -29,12 +29,28 @@ type Info = {
  * pra mostrar no hospital.
  */
 export function EmergencySheet({
+  onTriagem,
   info,
   medico,
   medicoResolvido,
   onClose,
   onOpenCard,
 }: {
+  /**
+   * Abre a triagem de sintomas (aba Alertas).
+   *
+   * ⚠️ Existe porque a triagem ficou SEM CAMINHO no celular quando o ladrilho
+   * "Alertas" saiu da grade da Saúde: ela não está no menu da conta, e as
+   * fileiras de categorias que a listam são `hidden md:flex` — desktop. No app
+   * instalado, a paciente deixou de poder avaliar sintomas, e a espécie
+   * "triagem" parou de ser gravada, então o médico deixou de recebê-la em
+   * `clinical_events`.
+   *
+   * O lugar certo é este: a lista vermelha abaixo diz o que é grave, e a
+   * pergunta seguinte — "é o meu caso?" — é exatamente o que a triagem
+   * responde. Antes ela morava a três toques daqui.
+   */
+  onTriagem?: () => void;
   info: Info;
   /**
    * O médico DA PACIENTE, lido do cadastro dele (`getMyDoctorContact`).
@@ -913,6 +929,25 @@ export function EmergencySheet({
               </li>
             ))}
           </ul>
+
+          {/* A PORTA DA TRIAGEM.
+              A lista acima diz o que é grave; a pergunta seguinte — "é o meu
+              caso?" — é a que a triagem responde, com os sintomas amarelos, a
+              pressão do momento e um veredito. Ela é a ÚNICA porta dela no
+              celular desde que o ladrilho saiu da grade da Saúde, e é também
+              o que faz a espécie "triagem" continuar chegando no prontuário.
+
+              Discreto de propósito: quem está em pânico aperta o círculo
+              vermelho lá em cima, e este botão é para quem está em dúvida. */}
+          {onTriagem && (
+            <button
+              type="button"
+              onClick={onTriagem}
+              className="press mt-3 w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+            >
+              Não tenho certeza — avaliar meus sintomas
+            </button>
+          )}
         </div>
 
         <p className="mt-4 text-center text-[11px] text-muted-foreground">

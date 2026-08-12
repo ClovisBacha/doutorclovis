@@ -747,7 +747,7 @@ function MinhaContaPage() {
     setPassoDoTutorial((v) => {
       const proximo = v + 1;
       try {
-        localStorage.setItem(chaveDoPassoDoTutorial(profile?.id ?? null), String(proximo));
+        localStorage.setItem(chaveDoPassoDoTutorial(userId), String(proximo));
       } catch {
         /* modo privado: continua funcionando dentro da sessão, que é o caso
            que o dono relatou. */
@@ -760,8 +760,14 @@ function MinhaContaPage() {
     setTutorialAberto(false);
     setDestaqueDaBarra(null);
     try {
-      localStorage.setItem(chaveDoTutorial(profile?.id ?? null), "1");
-      localStorage.removeItem(chaveDoPassoDoTutorial(profile?.id ?? null));
+      /* ⚠️ `userId` (o id do Auth) e NÃO `profile?.id`: a leitura, lá no
+         carregamento, usa `u.user.id`. Com `profile` nulo — que é estado
+         alcançável: quem se cadastrou como médico não tem linha em
+         `patient_profiles`, e o botão "não sou médico" não a cria — a escrita
+         caía em `:anon` e a leitura procurava `:<uid>`. O tutorial então
+         recomeçava em TODA abertura, para sempre. */
+      localStorage.setItem(chaveDoTutorial(userId), "1");
+      localStorage.removeItem(chaveDoPassoDoTutorial(userId));
     } catch {
       /* modo privado: ele volta na próxima abertura. Chato, não quebra — e
          quem está em modo privado sabe que nada é lembrado. */
@@ -1594,6 +1600,15 @@ function MinhaContaPage() {
       {/* ── Central de emergência (aberta pelo SOS da barra) ────── */}
       {emergencyOpen && !careMode && (
         <EmergencySheet
+          /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
+             sem caminho nenhum no celular — as fileiras de categorias que a
+             listam são `hidden md:flex`. Esta é a porta dela agora, e é a
+             porta certa: quem lê a lista vermelha e fica em dúvida está a um
+             toque de responder. */
+          onTriagem={() => {
+            setEmergencyOpen(false);
+            goToTab("Alertas");
+          }}
           info={{
             name: profile?.display_name?.split(" ")[0] ?? null,
             weekLabel: gest ? `${gest.weeks}s ${gest.days}d` : null,
@@ -1789,11 +1804,21 @@ function MinhaContaPage() {
           {/* ── Mobile: home screen ──────────────────────────────── */}
           {mobileHome && (
             <div className="md:hidden">
-              {careMode && (
-                <div className="mb-4">
-                  <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
-                </div>
-              )}
+              {/* ⚠️ O BANNER DO MODO CUIDADO VEM DEPOIS DO HERO, e não antes.
+                  Ele ficava aqui em cima, e o hero — que cancela a folga da
+                  página com `-mt-[calc(1.5rem+var(--safe-top))]` para encostar
+                  no topo do aparelho — subia POR CIMA dele. Medido no
+                  navegador (393×852, safe-top 59): o banner ia até 403 e o céu
+                  começava em 336, guilhotinando 67px; `elementFromPoint` no
+                  centro de "Sair do Modo Cuidado" devolvia a div do hero, ou
+                  seja, o botão não recebia toque. E o estrago cresce 1:1 com o
+                  notch, então o pior caso é o app instalado — que é onde o Modo
+                  Cuidado é usado.
+
+                  A margem negativa é um cancelamento CEGO do `pt` da página, e
+                  só está certa enquanto o hero for o primeiro filho em fluxo.
+                  Pôr o banner depois dele resolve sem tocar na régua do céu, e
+                  ainda o coloca no fundo claro, que é onde moram os cartões. */}
               <AppHomeScreen
                 firstName={firstName}
                 babyName={profile?.baby_name ?? null}
@@ -1830,6 +1855,11 @@ function MinhaContaPage() {
                     : null
                 }
               />
+              {careMode && (
+                <div className="mt-4">
+                  <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
+                </div>
+              )}
 
               {/* Menu do ☰: as ações que viviam na barra de topo da home
                   (saudação, Painel, Perfil e Sair) continuam todas aqui. */}
@@ -2683,6 +2713,14 @@ function RegistrosHub({
   const [sub, setSub] = useState<SubDeRegistros | null>(
     () => REGISTROS_SUBTABS.find((s) => s.key === initialSub)?.key ?? null,
   );
+  /* ⚠️ O valor inicial de `useState` só vale na MONTAGEM. Voltando ao hub da
+     Saúde e tocando no outro atalho, a aba continua sendo "Registros" — o
+     componente não remonta, e a paciente que pediu Contrações caía em Chutes,
+     a sub-tela da vez anterior. O efeito é o que faz o segundo pedido valer. */
+  useEffect(() => {
+    const pedida = REGISTROS_SUBTABS.find((s) => s.key === initialSub)?.key;
+    if (pedida) setSub(pedida);
+  }, [initialSub]);
   const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
   if (!sub || !atual) {
     return (

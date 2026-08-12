@@ -1519,6 +1519,13 @@ export function GestacaoPath({
 
      `estrelaNova` é o índice da que acabou de acender (0–4); `cincoAgora` é o
      dia inteiro fechado. Os dois se apagam sozinhos quando o sprite termina. */
+  /* ⚠️ `hidratou` não é zelo: `todayTasks` nasce `{}` e só é preenchido pelo
+     `hydrateFromLocal()` do efeito de carregamento, que roda DEPOIS deste
+     gatilho. Sem a trava, a "primeira passada que só fotografa" fotografava
+     ZERO, e quando a hidratação chegava o contador saltava de 0 para o valor
+     real — uma subida. Resultado medido: abrir o Caminho num dia já fechado
+     disparava a comemoração das cinco estrelas sozinha, toda vez. */
+  const hidratou = useRef(false);
   const momentosAntes = useRef<number | null>(null);
   const [estrelaNova, setEstrelaNova] = useState<number | null>(null);
   const [cincoAgora, setCincoAgora] = useState(false);
@@ -1526,9 +1533,9 @@ export function GestacaoPath({
   useEffect(() => {
     const antes = momentosAntes.current;
     momentosAntes.current = momentosHoje;
-    /* Primeira passada só fotografa: sem isto, entrar na trilha com três
-       atividades prontas dispararia a animação da terceira. */
-    if (antes === null || momentosHoje <= antes) return;
+    /* Enquanto a hidratação não aconteceu, qualquer subida é dado chegando —
+       não conquista. */
+    if (!hidratou.current || antes === null || momentosHoje <= antes) return;
     if (momentosHoje >= TOTAL_DO_DIA) setCincoAgora(true);
     else setEstrelaNova(momentosHoje - 1);
   }, [momentosHoje]);
@@ -1611,7 +1618,17 @@ export function GestacaoPath({
       setBirth(lsGet<Birth | null>(LS.birth, null));
       setCelebrated(lsGet<boolean>(LS.celebrated, false));
       setJourneyStart(lsGet<JourneyStart | null>(LS.journeyStart, null));
-      setTodayTasks(lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {}));
+      const doDia = lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {});
+      setTodayTasks(doDia);
+      /* ⚠️ A BASE DO GATILHO É FIXADA AQUI, com o valor que ACABOU de ser
+         lido — e não por um sinalizador ligado antes do estado chegar.
+         `todayTasks` nasce `{}`, então uma comparação feita antes da hidratação
+         vê o contador saltar de 0 para o valor real e lê isso como conquista:
+         abrir o Caminho num dia já fechado disparava a comemoração das cinco
+         estrelas sozinha, toda vez. Com a base tomada da mesma leitura, a
+         subida só existe quando ela faz alguma coisa de verdade. */
+      momentosAntes.current = momentosDoDia(doDia);
+      hidratou.current = true;
     };
 
     // Render imediato com o que o aparelho tem
@@ -6451,6 +6468,17 @@ function WellnessScreen({
 
   function handleEarn(key: string) {
     onEarn(key);
+    /* ⚠️ A ANIMAÇÃO NASCE AQUI, no evento, e não de comparar listas.
+       A versão anterior comparava o conjunto de feitos entre renderizações —
+       mas `done` nasce vazio e só é preenchido por `refresh()`, que é
+       assíncrono. Quando a resposta do servidor chegava, o conjunto saltava de
+       vazio para "tudo que ela fez hoje", e a comparação lia isso como uma
+       atividade recém-concluída: a bolinha verde "completava" de novo numa
+       tarefa terminada de manhã, toda vez que a folha do dia abria.
+
+       Aqui não há ambiguidade — este é o único ponto do arquivo em que uma
+       atividade acabou de ser feita. */
+    setRecemFeito(key);
     setTimeout(refresh, 500);
   }
 
@@ -6507,34 +6535,9 @@ function WellnessScreen({
     })),
   ];
 
-  /* ─── QUAL ATIVIDADE ACABOU DE SER FEITA ─────────────────────────────────
-     Pedido do dono: a bolinha verde tem de COMPLETAR com animação quando ela
-     sai da meditação (ou de qualquer um dos cinco) tendo terminado.
-
-     O gatilho é a TRANSIÇÃO de não-feito para feito, e não o estado "feito" —
-     senão a folha do dia explodiria confete em cinco linhas toda vez que ela
-     abrisse a tela. `useRef` guarda o que já estava pronto quando esta tela
-     montou: assim, reabrir um dia inteiro concluído não anima nada, e concluir
-     o quinto anima só o quinto.
-
-     O contador de estrelas usa o MESMO gatilho: uma atividade = uma estrela,
-     e as duas animações nascem do mesmo instante. */
-  const feitosAntes = useRef<Set<string> | null>(null);
+  /* Qual atividade acabou de ser feita — para a bolinha verde completar com
+     animação. Quem escreve é `handleEarn`, o instante real; ver lá. */
   const [recemFeito, setRecemFeito] = useState<string | null>(null);
-  const feitosAgora = linhasDoDia
-    .filter((l) => l.feito)
-    .map((l) => l.key)
-    .join(",");
-  useEffect(() => {
-    const agora = new Set(feitosAgora ? feitosAgora.split(",") : []);
-    const antes = feitosAntes.current;
-    feitosAntes.current = agora;
-    /* Primeira passada: só fotografa o que já estava feito. Sem isto, abrir um
-       dia com três atividades prontas dispararia três animações de uma vez. */
-    if (antes === null) return;
-    const novo = [...agora].find((k) => !antes.has(k));
-    if (novo) setRecemFeito(novo);
-  }, [feitosAgora]);
 
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
      Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a

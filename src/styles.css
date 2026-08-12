@@ -1277,7 +1277,7 @@ button:active > .duo3d {
   /* 600% × 400% = a folha inteira medida em quadros. */
   background-size: 600% 400%;
   animation:
-    dcSpriteX var(--sprite-x) steps(6, jump-none) forwards,
+    dcSpriteX var(--sprite-x) steps(6, jump-none) 4 forwards,
     dcSpriteY var(--sprite-dur) steps(4, jump-none) forwards;
 }
 /* Com "menos movimento" ela PULA para o último quadro em vez de sumir: o

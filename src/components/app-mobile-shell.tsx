@@ -1333,11 +1333,15 @@ export function AppHomeScreen({
                      comprido ("Ana Beatriz…") passava por baixo dele. Medido.
                      Eram 11rem enquanto a pílula do clima ocupava o canto
                      direito; com ela fora, sobra só o botão a reservar, e o
-                     nome ganhou 4rem de folga — que é justamente o que faz o
-                     canto vazio valer a pena. O reserva continua SIMÉTRICO
-                     porque o bloco é centrado: encolher só a esquerda tiraria
-                     o nome do eixo. */
-                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-7rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
+                     nome ganhou 4rem de folga.
+
+                     ⚠️ E devolveu essa folga quando o BEBÊ BOLHA ocupou o canto
+                     e dobrou para 88px: a reserva voltou a ser calculada pelo
+                     lado MAIOR (88px de mascote + 20px de folga = 6,75rem),
+                     dobrada porque o bloco é centrado — encolher só um lado
+                     tiraria o nome do eixo. Com os 7rem antigos, "Bebê Teste"
+                     passava por baixo da bolha. */
+                  className={`pointer-events-none absolute left-1/2 max-w-[calc(100%-13.5rem)] -translate-x-1/2 truncate text-center text-[clamp(1.125rem,4.8vw,1.25rem)] leading-none ${textoDoTopo}`}
                   style={{
                     ...overArtTopo,
                     color: corDoTopo,
