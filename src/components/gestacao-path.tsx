@@ -5946,8 +5946,21 @@ function GratitudeBlock({
          estrela no luto. Em Modo Cuidado não há jornada, não há estrela e não
          há placar — o diário continua funcionando, que é o que importa. */
       if (careMode) return;
-      onEarn();
+      /* ⚠️ `onEarn` SÓ NO DIA DE HOJE — e esta era a única das quatro
+         atividades que não conferia.
+         As outras três (`movement`, `meditation`, `bonding`) barram logo na
+         primeira linha do `finish()` com `!canEarn`; aqui o `onEarn()` estava
+         FORA do `if (canEarn)`, então escrever uma gratidão num dia que não é
+         hoje marcava `w_gratitude` daquele dia no `localStorage`. E o que lê
+         essas chaves não é só o placar: `sequencia.ts` conta a chama a partir
+         das chaves `dc-path-day-<D>`, e `doneDays` solta a figurinha da semana.
+         Ou seja, dava para inflar a sequência escrevendo em dias avulsos.
+         Ficou pior quando o Premium passou a abrir o FUTURO: a chama nasceria
+         acesa em dias que ainda não aconteceram.
+         O diário NÃO é afetado — o texto dela já foi gravado acima, em
+         qualquer dia. O que passa a depender de ser hoje é só a estrela. */
       if (canEarn) {
+        onEarn();
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
         if (token) {

@@ -37,6 +37,23 @@ describe("o futuro abre, mas não paga", () => {
     expect(path).toContain("um passo de cada vez 💛");
   });
 
+  test("as QUATRO atividades barram o ganho fora do dia", () => {
+    /* ⚠️ A Gratidão era a única que chamava `onEarn()` FORA do `if (canEarn)`.
+       Escrever uma gratidão num dia que não é hoje marcava `w_gratitude`
+       daquele dia no `localStorage` — e quem lê essas chaves não é só o
+       placar: `sequencia.ts` conta a chama a partir de `dc-path-day-<D>`.
+       Dava para inflar a sequência escrevendo em dias avulsos, e com o
+       Premium abrindo o futuro a chama nasceria acesa em dias que ainda não
+       aconteceram.
+
+       As outras três barram na primeira linha do `finish()`. O teste cobra
+       que continuem barrando, e que a Gratidão não volte a ganhar solta. */
+    const guardas = path.match(/if \(grantedRef\.current \|\| !canEarn \|\| careMode\) return;/g);
+    expect(guardas?.length).toBe(3);
+    /* A Gratidão ganha DENTRO do `if (canEarn)`. */
+    expect(path).toContain("if (canEarn) {\n        onEarn();");
+  });
+
   test("o estado do botão acompanha a permissão", () => {
     /* `aria-disabled` e o cursor precisam concordar com o clique: um botão que
        se anuncia desabilitado e abre é pior que os dois estados errados. */
