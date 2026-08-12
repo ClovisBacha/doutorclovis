@@ -33,13 +33,13 @@ ATUAL da paciente. Quem troca de médico continua aparecendo para o anterior.
 
 Marcados com ✅ os já consertados nesta madrugada.
 
-
 ### 🔴 VAZAMENTO
 
-**Fila de espera do painel recortada por doctor_id carimbado no ingresso, não pelo vínculo atual**  
+**Fila de espera do painel recortada por doctor_id carimbado no ingresso, não pelo vínculo atual**
+
 > ❎ FALSO POSITIVO — conferido. `appointment_waitlist` não tem `user_id` (identifica por e-mail de formulário) e é fila de ENTRADA: quem pede vaga ainda não é paciente de ninguém. Mesma exceção que `vinculo.server.ts` documenta para `appointment_requests`.  
-`/home/user/doutorclovis/src/lib/admin.functions.ts:587`  
-joinWaitlist carimba doctor_id na linha da fila no momento em que a paciente entra. Se ela depois troca de médico (patient_profiles.doctor_id muda), getDoctorWaitlist continua devolvendo a linha antiga: o médico anterior segue vendo nome, e-mail e telefone dela na fila dele. Pior que ver: quando ele cancela uma consulta, offerNextForWeek oferta a vaga a ela e respondWaitlistOffer cria um appointment_requests confirmado com o doctor_id ANTIGO — ela é agendada com um médico que não é mais o dela. As irmãs desta função no mesmo arquivo já fazem o cruzamento certo (getAdminData e getPreConsultaForms filtram por nameById, que vem de patient_profiles recortado por doctor_id); só a fila ficou de fora, e appointment_waitlist sequer tem user_id para cruzar.
+> `/home/user/doutorclovis/src/lib/admin.functions.ts:587`  
+> joinWaitlist carimba doctor_id na linha da fila no momento em que a paciente entra. Se ela depois troca de médico (patient_profiles.doctor_id muda), getDoctorWaitlist continua devolvendo a linha antiga: o médico anterior segue vendo nome, e-mail e telefone dela na fila dele. Pior que ver: quando ele cancela uma consulta, offerNextForWeek oferta a vaga a ela e respondWaitlistOffer cria um appointment_requests confirmado com o doctor_id ANTIGO — ela é agendada com um médico que não é mais o dela. As irmãs desta função no mesmo arquivo já fazem o cruzamento certo (getAdminData e getPreConsultaForms filtram por nameById, que vem de patient_profiles recortado por doctor_id); só a fila ficou de fora, e appointment_waitlist sequer tem user_id para cruzar.
 
 **✅ ConsumoDaIACard: "Quem mais conversou" é recortado pelo doctor_id carimbado, e o nome vem sem filtro de médico**  
 `src/lib/cota-ia.server.ts:252`  
@@ -53,12 +53,11 @@ O medico encerra o acompanhamento (encerrarAcompanhamento zera patient_profiles.
 `src/lib/teleconsulta.functions.ts:43`  
 A paciente encerra o acompanhamento e passa para outro médico (patient_profiles.doctor_id muda; o carimbo em teleconsulta_sessions.doctor_id NÃO). A LISTA do médico anterior já esconde a sessão (passa por vinculadasAgora/soVinculadas). Mas se ele estiver com a aba aberta desde antes da transferência — ou repetir o POST da server function com o id que já tem — openTeleconsultaRoom passa: cria um evento no Google Agenda DELE convidando o e-mail da ex-paciente, dispara e-mail para ela e reabre a sala. saveDoctorClinicalNote e updateTeleconsultaStatus passam pelo mesmo portão. É a regra que o próprio vinculo.server.ts existe para impor, aplicada só na metade de leitura.
 
-
 ### 🟠 QUEBRA
 
 **✅ Calendário e Fila dependem de colunas/tabela que podem não existir em produção**  
 `/home/user/doutorclovis/src/routes/_authenticated/painel.tsx:4770`  
-O médico abre a aba Calendário e vê a grade da semana toda vazia mais "Nenhuma consulta confirmada com data definida", tendo dez consultas confirmadas. Abre Agendamentos e a Fila de espera diz "Ninguém na fila de espera no momento". Nada de erro aparece. Causa: confirmed_date/confirmed_time/price_brl/payment_status/internal_notes nascem em supabase/migrations/20260610010000_doctor_scheduling.sql, proposed_date/proposed_time em 20260723010000 e a tabela appointment_waitlist inteira em 20260723020000 — todas posteriores a 20260608120000, a fronteira do que o CLAUDE.md declara pendente em produção. Como o painel lê com select("*"), coluna ausente não dá erro: vira undefined, o filtro descarta tudo e a tela mente. Só o botão Confirmar falha em voz alta (PGRST204 no toast).
+O médico abre a aba Calendário e vê a grade da semana toda vazia mais "Nenhuma consulta confirmada com data definida", tendo dez consultas confirmadas. Abre Agendamentos e a Fila de espera diz "Ninguém na fila de espera no momento". Nada de erro aparece. Causa: confirmed_date/confirmed_time/price_brl/payment_status/internal_notes nascem em supabase/migrations/20260610010000_doctor_scheduling.sql, proposed_date/proposed_time em 20260723010000 e a tabela appointment_waitlist inteira em 20260723020000 — todas posteriores a 20260608120000, a fronteira do que o CLAUDE.md declara pendente em produção. Como o painel lê com select("\*"), coluna ausente não dá erro: vira undefined, o filtro descarta tudo e a tela mente. Só o botão Confirmar falha em voz alta (PGRST204 no toast).
 
 **✅ APLICAR_AGENDA.sql aborta antes de criar appointment_waitlist se as colunas de agenda não existirem**  
 `/home/user/doutorclovis/supabase/APLICAR_AGENDA.sql:17`  
@@ -80,10 +79,11 @@ A paciente pergunta, depois troca de medico (patientlink.functions.ts:487 grava 
 `/home/user/doutorclovis/src/lib/secondbrain.functions.ts:1447`  
 O CLAUDE.md manda rodar supabase/APLICAR_PENDENTES.sql para fechar as migrations pendentes. Esse arquivo cria brain_gaps e brain_feedback, mas NAO cria brain_gap_askers (a tabela nasceu na migration 20260731010000, pendente, e no arquivo separado APLICAR_QUEM_PERGUNTOU.sql). Sem ela, com o painel parecendo perfeito: (a) entregarRespostaDaLacuna cai no catch e devolve 0 — nenhuma paciente recebe a resposta que a IA prometeu ("registrei aqui para ele ver"), e nao ha nada na tela dizendo isso; (b) listBrainGaps deixa `pacientes` undefined, entao o aviso "So uma paciente perguntou isto — talvez seja do caso dela" nunca aparece; (c) marcar "Responder so para ela" cai no `if (cntErr)` e devolve varias_pacientes/quantas:null, mostrando "Nao consegui confirmar quem esta esperando. Tente de novo." — um botao que nunca funciona, com uma mensagem que convida a repetir.
 
-**Pergunta generalizada com 1 a 7 caracteres derruba a RESPOSTA CLINICA inteira**  
+**Pergunta generalizada com 1 a 7 caracteres derruba a RESPOSTA CLINICA inteira**
+
 > ❎ FALSO POSITIVO — conferido. Os DOIS chamadores (`answerAndTrain` e `resolveBrainGap`) omitem o campo quando o texto tem menos de 8 caracteres (`edited.length >= 8 ? {...} : {}`), então o `.min(8)` do zod nunca chega a rejeitar a chamada.  
-`src/routes/_authenticated/painel.tsx:2901`  
-O medico escreve a resposta, marca 'Ensinar isto a minha IA' e digita algo curto no campo da pergunta generalizada (ex.: 'febre', 5 letras). O cliente manda perguntaGeneralizada='febre'; o zod do servidor exige min(8), o inputValidator LANCA, a server function nunca roda e o catch da tela mostra 'Nao consegui enviar. Tente de novo.'. Clicar de novo repete o mesmo erro para sempre e a paciente nao recebe resposta nenhuma. O aviso na tela afirma o contrario, textualmente: 'Muito curta — sem isso a IA nao aprende (a resposta chega a ela de qualquer jeito)' (painel.tsx:2998). Nao chega. O botao continua habilitado e nada indica que a culpa e do campo opcional de treino.
+> `src/routes/_authenticated/painel.tsx:2901`  
+> O medico escreve a resposta, marca 'Ensinar isto a minha IA' e digita algo curto no campo da pergunta generalizada (ex.: 'febre', 5 letras). O cliente manda perguntaGeneralizada='febre'; o zod do servidor exige min(8), o inputValidator LANCA, a server function nunca roda e o catch da tela mostra 'Nao consegui enviar. Tente de novo.'. Clicar de novo repete o mesmo erro para sempre e a paciente nao recebe resposta nenhuma. O aviso na tela afirma o contrario, textualmente: 'Muito curta — sem isso a IA nao aprende (a resposta chega a ela de qualquer jeito)' (painel.tsx:2998). Nao chega. O botao continua habilitado e nada indica que a culpa e do campo opcional de treino.
 
 **Transcrição devolve 402 para gestor de clínica que já paga**  
 `src/routes/api/transcribe.ts:47`  
@@ -95,7 +95,7 @@ O commit HEAD anterior ("Imagens saem do Postgres e vão para o Storage") passou
 
 **✅ Abrir um exame na aba Exames da paciente estoura a tela: preview.image_data é undefined no primeiro render**  
 `src/routes/_authenticated/minha-conta.tsx:19151`  
-A paciente abre Minha Conta -> Exames e clica no botão 'Abrir' de qualquer exame. `abrirExame` faz `setPreview(exam)` SÍNCRONO e só depois vai buscar a imagem. Mas `exam` veio de `load()`, cujo select foi propositalmente enxugado e NÃO traz image_data — então `exam.image_data` é `undefined`. O React renderiza o lightbox nesse estado e executa `preview.image_data!.startsWith("data:application/pdf")` sobre undefined: TypeError em tempo de render, que sobe para o error boundary do __root e mata a tela. Acontece em 100% dos cliques. E mesmo depois de aplicado o Storage o bug persiste por outro caminho: o exame vindo do chat grava image_data NULL e image_path preenchido, e `abrirExame` só busca `select("image_data")` — nunca image_path —, então o fetch traz null e o crash continua.
+A paciente abre Minha Conta -> Exames e clica no botão 'Abrir' de qualquer exame. `abrirExame` faz `setPreview(exam)` SÍNCRONO e só depois vai buscar a imagem. Mas `exam` veio de `load()`, cujo select foi propositalmente enxugado e NÃO traz image_data — então `exam.image_data` é `undefined`. O React renderiza o lightbox nesse estado e executa `preview.image_data!.startsWith("data:application/pdf")` sobre undefined: TypeError em tempo de render, que sobe para o error boundary do \_\_root e mata a tela. Acontece em 100% dos cliques. E mesmo depois de aplicado o Storage o bug persiste por outro caminho: o exame vindo do chat grava image_data NULL e image_path preenchido, e `abrirExame` só busca `select("image_data")` — nunca image_path —, então o fetch traz null e o crash continua.
 
 **✅ assessSymptoms chama o Gemini sem token de sessão, sem limite de taxa e sem nenhum gate de plano**  
 `src/lib/triage.functions.ts:18`  
@@ -132,7 +132,6 @@ O medico abre Ferramentas, expande 'Suplementacao pre-natal padrao', clica 'Envi
 **✅ "Salvar perfil" falha SEMPRE num banco sem APLICAR_MEDICO.sql — a rede de 42703 esqueceu 4 colunas**  
 `src/lib/doctors.functions.ts:513`  
 O médico abre Meu Perfil, preenche/corrige qualquer campo e clica "Salvar perfil". O painel monta `perfil` sempre com consultation_currency, consultation_price_cents, focos e photo_url (painel.tsx:9596 — nunca undefined: moeda cai em "BRL", cents em 0, focos em [] e photo_url em ""). Num banco onde só o APLICAR_PENDENTES.sql foi rodado essas 4 colunas NÃO existem: o 1º update devolve 42703, a retentativa apaga só as 12 chaves de RICH_UPDATE_KEYS, manda as 4 de novo, toma 42703 outra vez e volta ok:false. A tela diz apenas "Não foi possível salvar o perfil." — sem citar SQL nenhum. Nada do perfil é salvo, nunca, por nenhum caminho: registerDoctor tem a MESMA lista incompleta, então o médico novo também não consegue se cadastrar.
-
 
 ### 🟡 SILENCIOSO
 
@@ -351,7 +350,6 @@ doctor_addresses só existe no APLICAR_MEDICO.sql (não está no APLICAR_PENDENT
 **Salvar um endereço desmarca o principal ANTES de gravar e não desfaz se a gravação falhar**  
 `src/lib/doctor-addresses.functions.ts:119`  
 O médico edita o endereço já existente (ou cria um novo) com "Este é o endereço principal" marcado. A função primeiro roda um UPDATE que zera is_primary em TODOS os endereços dele — sem conferir o error dessa escrita — e só depois tenta gravar a linha. Se o insert/update falhar (CHECK, rede, coluna faltando), volta ok:false e a tela diz "Não foi possível salvar o endereço", mas o consultório que era o principal já perdeu a marca e ninguém repõe. A partir daí a paciente passa a ver um endereço escolhido por ordem de chegada em vez do que o médico elegeu, e nada na tela indica isso.
-
 
 ### ⚪ INCÔMODO
 

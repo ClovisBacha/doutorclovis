@@ -129,22 +129,22 @@ export function NotificacoesSheet({
           )}
         </div>
 
-        {/* ── Régua do aparelho ──────────────────────────────────────────
-            App instalado na Tela de Início NÃO TEM barra de endereço: não há
-            como digitar uma URL de diagnóstico ali. Uma bancada que só se
-            alcança pelo Safari é inútil justamente para investigar o que só
-            acontece no app instalado.
+        {/* ─── ⚠️ "RÉGUA DO APARELHO" SAIU DAQUI (ago/2026) ─────────────────
+            Havia um link no pé desta folha levando a `/preview-regua`, uma
+            tela de DIAGNÓSTICO com `safe-area`, `innerHeight`, `devicePixelRatio`
+            e afins. Ele existia porque o app instalado não tem barra de
+            endereço, e sem esse atalho não havia como abrir a régua dentro do
+            aplicativo para investigar defeitos que só acontecem lá.
 
-            Por isso a entrada mora aqui, discreta, e usa `<a>` de verdade —
-            navegação interna, dentro do `scope` do manifesto, então continua
-            no app em vez de abrir o Safari. */}
-        <a
-          href="/preview-regua"
-          className="flex items-center justify-between border-t border-border/60 px-5 py-3 text-[11px] text-muted-foreground/70"
-        >
-          Régua do aparelho
-          <ChevronRight className="h-3.5 w-3.5" strokeWidth={2.2} />
-        </a>
+            O dono abriu a caixa de recados, encontrou aquilo e disse: "não
+            entendi o que é isso… em nenhum momento é pra estar essa função
+            ali". Ele está certo, e a razão é simples: a caixa de entrada é
+            onde a PACIENTE lê o que o médico mandou. Uma ferramenta de
+            desenvolvimento no meio disso não é discreta, é confusa.
+
+            A rota `/preview-regua` CONTINUA de pé — ela é `noindex` e se
+            alcança digitando o endereço no Safari. O que saiu foi a porta na
+            tela da paciente, não a capacidade de diagnosticar. */}
       </div>
     </div>
   );

@@ -470,10 +470,20 @@ type LadrilhoDaSaude = {
   subDestino?: string;
 };
 
-/* A ORDEM É CLÍNICA, e não alfabética nem histórica: primeiro o que responde
-   "estou bem?" (números, triagem), depois o que responde "e o bebê?" (chutes,
-   contrações), e só então o que cuida do resto do dia. Alertas subiu para o
-   segundo lugar porque é a tela que decide se ela procura atendimento. */
+/* ─── QUATRO LADRILHOS, E NÃO SEIS (ago/2026) ─────────────────────────────
+   Pedido do dono: "nessa tela eu não quero que tenha as funções de alertas, e
+   nem de bem-estar — tudo que é do bem-estar está dentro da aba do jogo".
+
+   Ele está certo sobre o Jogo: o Caminho tem os quatro momentos do dia
+   (`MovementBlock`, `MeditationBlock`, `BondingBlock`, `GratitudeBlock`), então
+   Meditar e Mexer já vivem lá, com implementação própria.
+
+   E os nove sintomas VERMELHOS que a triagem lista continuam no SOS, que é o
+   primeiro botão da barra — `emergency-sheet` os mostra sob "Procure
+   atendimento agora se sentir". A grade perdeu um atalho, não o conteúdo.
+
+   A ordem que ficou é clínica: primeiro "estou bem?" (números), depois "e o
+   bebê?" (chutes, contrações), e por fim o que se come. */
 const HUB_SAUDE: LadrilhoDaSaude[] = [
   {
     key: "Saúde",
@@ -483,15 +493,6 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
     destino: "Saúde",
-  },
-  {
-    key: "Alertas",
-    label: "Alertas",
-    sub: "Sinais de atenção",
-    Icon: TriangleAlert,
-    caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
-    tinta: "text-rose-600",
-    destino: "Alertas",
   },
   {
     key: "chutes",
@@ -521,15 +522,6 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
     caixa: "border-lime-200/70 from-lime-50 to-amber-50/60",
     tinta: "text-lime-600",
     destino: "Nutrição",
-  },
-  {
-    key: "Bem-estar",
-    label: "Bem-estar",
-    sub: "Meditar, sons e humor",
-    Icon: Flower2,
-    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
-    tinta: "text-violet-600",
-    destino: "Bem-estar",
   },
   {
     key: "Saúde da mulher",
@@ -579,6 +571,10 @@ export function HubSaude({
   return (
     <GradeHub
       itens={itens}
+      /* Quatro é o caso da gestação (Saúde da mulher sai de cena): dois por
+         linha, preenchendo a tela. Com cinco — fora da gestação — volta ao
+         quadrado, senão a quinta ficaria sozinha numa linha esticada. */
+      preencherTela={itens.length === 4}
       onAbrir={(k) => {
         const item = itens.find((i) => i.key === k);
         if (item) onAbrir(item.destino, item.subDestino);

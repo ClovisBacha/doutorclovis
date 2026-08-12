@@ -59,7 +59,11 @@ describe("o que a grade da Saúde oferece", () => {
     /* Sem `destino`, o `find` do `HubSaude` devolve o item e o toque não faz
        nada — um quadrado que promete uma tela e não abre nada. */
     const ladrilhos = gradeDaSaude.split(/\n {2}\{/).slice(1);
-    expect(ladrilhos.length).toBeGreaterThanOrEqual(7);
+    /* Cinco na lista: quatro na gestação (Saúde da mulher sai de cena) e o
+       quinto fora dela. Eram sete; Alertas e Bem-estar saíram a pedido do
+       dono — os nove sintomas vermelhos continuam no SOS, e os momentos de
+       bem-estar têm implementação própria no Caminho. */
+    expect(ladrilhos.length).toBe(5);
     const semDestino = ladrilhos.filter((l) => !/destino: "/.test(l));
     /* A lista dos culpados entra na mensagem de falha: "esperava 0, veio 1"
        mandaria a próxima pessoa procurar qual dos sete é. */

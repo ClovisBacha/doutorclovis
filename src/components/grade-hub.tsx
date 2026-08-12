@@ -34,17 +34,41 @@ export type Ladrilho = {
 export function GradeHub({
   itens,
   onAbrir,
+  preencherTela = false,
 }: {
   itens: readonly Ladrilho[];
   onAbrir: (key: string) => void;
+  /**
+   * Dois por linha PREENCHENDO a tela, em vez de quadrados.
+   *
+   * Pedido do dono para a aba Saúde depois de ela cair para quatro destinos:
+   * "eles vão preencher a tela inteira, esses quatro blocos, dois por linha,
+   * maiores". Com `aspect-square` e quatro ladrilhos sobrava meia tela vazia
+   * embaixo — o quadrado é o que garante duas colunas quando são seis, e vira
+   * desperdício quando são quatro.
+   *
+   * A altura desconta o que a página já reserva: a folga de topo com a área
+   * segura, o cabeçalho da aba e o rodapé da barra flutuante. `min-h` impede
+   * que uma tela muito baixa (celular deitado) esmague os ladrilhos até o
+   * texto sumir — ali ela volta a rolar, que é o comportamento certo.
+   */
+  preencherTela?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div
+      className={
+        preencherTela
+          ? "grid auto-rows-fr grid-cols-2 gap-3 h-[calc(100svh-var(--safe-top)-var(--safe-bottom)-15rem)] min-h-[26rem]"
+          : "grid grid-cols-2 gap-3"
+      }
+    >
       {itens.map(({ key, label, sub, Icon, caixa, tinta }) => (
         <button
           key={key}
           onClick={() => onAbrir(key)}
-          className={`press flex aspect-square flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3 text-left ${caixa}`}
+          className={`press flex flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3 text-left ${
+            preencherTela ? "min-h-0 p-4" : "aspect-square"
+          } ${caixa}`}
         >
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
             <Icon className={`h-5 w-5 ${tinta}`} strokeWidth={1.7} />
