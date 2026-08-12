@@ -4,6 +4,7 @@ import semana20 from "@/assets/bebes/semana-20.webp";
 import semana30 from "@/assets/bebes/semana-30.webp";
 import semana40 from "@/assets/bebes/semana-40.webp";
 import { babyStage, babyForWeek, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
+import { semanaDaArte } from "@/lib/arte-do-bebe";
 
 export const STAGE_LABEL: Record<BabyStage, string> = {
   embriao: "Embrião",
@@ -13,13 +14,11 @@ export const STAGE_LABEL: Record<BabyStage, string> = {
   termo: "Bebê a termo",
 };
 
-export const STAGE_RANGES: Record<BabyStage, [number, number]> = {
-  embriao: [4, 9],
-  inicial: [10, 15],
-  feto: [16, 27],
-  tardio: [28, 36],
-  termo: [37, 42],
-};
+/* As faixas e a escolha da arte moram em `lib/arte-do-bebe.ts` (puro, testado):
+   este arquivo abre com cinco `import` de `.webp` e um teste morreria na
+   primeira linha. Reexportado aqui porque quem já importava daqui continua
+   funcionando. */
+export { STAGE_RANGES } from "@/lib/arte-do-bebe";
 
 /**
  * AS CINCO ARTES DO DONO — e por que são cinco.
@@ -59,24 +58,10 @@ const ARTES: { semana: number; src: string; tinta: number }[] = [
   { semana: 40, src: semana40, tinta: 0.9137 },
 ];
 
-/**
- * A arte MAIS PRÓXIMA da semana, com empate para a mais NOVA.
- *
- * Empate para baixo não é detalhe de implementação: na 15 e na 25 a distância
- * é a mesma para os dois lados, e mostrar um bebê mais desenvolvido do que ele
- * está é o erro que um app de gestação não pode cometer. Adiantar a arte
- * antecipa marcos — cabelo, unhas, gordura — que ainda não existem.
- *
- * Faixas que isto produz: 4–8 → 6 · 9–15 → 10 · 16–25 → 20 · 26–35 → 30 ·
- * 36–42 → 40.
- */
+/** O arquivo da semana. Quem decide QUAL é `semanaDaArte`, em `lib/`. */
 function arteDaSemana(week: number): { src: string; tinta: number } {
-  const w = Math.max(WEEK_MIN, Math.min(WEEK_MAX, Math.round(week)));
-  let melhor = ARTES[0];
-  for (const a of ARTES) {
-    if (Math.abs(a.semana - w) < Math.abs(melhor.semana - w)) melhor = a;
-  }
-  return melhor;
+  const alvo = semanaDaArte(week);
+  return ARTES.find((a) => a.semana === alvo) ?? ARTES[0];
 }
 
 /**

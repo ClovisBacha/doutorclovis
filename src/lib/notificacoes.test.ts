@@ -10,6 +10,7 @@ import { describe, expect, test } from "bun:test";
 import {
   contarNaoLidas,
   DIAS_APOS_LIDA,
+  lerLidas,
   marcarLidas,
   visiveis,
   type Lidas,
@@ -103,5 +104,32 @@ describe("a memória de leitura sobrevive à janela de exibição", () => {
        continua fora. O defeito era ela reaparecer aqui. */
     expect(visiveis([n("velha"), n("nova")], depois, AGORA).map((x) => x.id)).toEqual(["nova"]);
     expect(contarNaoLidas(visiveis([n("velha"), n("nova")], depois, AGORA), depois)).toBe(0);
+  });
+
+  test("o formato antigo (lista de ids) é convertido UMA vez e gravado", () => {
+    /* ⚠️ Sem gravar, a conversão nunca termina: `lerLidas` roda a cada abertura
+       da caixa e carimbaria o array de novo com o instante daquele momento. O
+       relógio dos sete dias reiniciaria para sempre, e nada do que a paciente
+       já tinha lido sumiria — que é justamente o que o dono pediu. */
+    const chave = "dc-notif-lidas:u2";
+    const store: Record<string, string> = { [chave]: JSON.stringify(["a", "b"]) };
+    // @ts-expect-error — bancada mínima de localStorage para este teste
+    globalThis.window = globalThis;
+    // @ts-expect-error — idem
+    globalThis.localStorage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => {
+        store[k] = v;
+      },
+    };
+    const lidas = lerLidas("u2");
+    expect([...lidas.keys()].sort()).toEqual(["a", "b"]);
+    /* O storage NÃO pode mais conter um array. */
+    const gravado = JSON.parse(store[chave]) as unknown;
+    expect(Array.isArray(gravado)).toBe(false);
+    expect(Object.keys(gravado as Record<string, string>).sort()).toEqual(["a", "b"]);
+    /* E o carimbo tem de sobreviver a uma segunda leitura, sem se renovar. */
+    const carimbo = (gravado as Record<string, string>).a;
+    expect(lerLidas("u2").get("a")).toBe(carimbo);
   });
 });

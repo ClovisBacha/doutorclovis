@@ -82,6 +82,33 @@ export type FraseDoMascote = {
    */
   tempo?: Exclude<Tempo, null>;
   /**
+   * Recorte de HORA dentro do período, quando a frase cita o relógio.
+   *
+   * "Já são quase onze" é verdade às 22h40 e mentira às 18h05 — e as duas caem
+   * no mesmo período `noite`, que vai das 18h à meia-noite. Um personagem que
+   * erra a hora que ele mesmo anunciou perde a única coisa que ele tem, que é
+   * parecer estar ali junto.
+   *
+   * `[de, ate)` na hora cheia local. Sem `hora` conhecida em `fraseDoDia`, a
+   * frase com recorte simplesmente não entra: na dúvida, uma frase genérica.
+   */
+  horas?: [number, number];
+  /**
+   * Semana gestacional MÍNIMA para a frase fazer sentido.
+   *
+   * Existe por uma só: "Já sentiu o bebê hoje? Dá para contar os chutes". Ela
+   * saía em qualquer semana, e a mulher de 11 semanas — que ainda não tem como
+   * sentir nada, e sabe disso vagamente — lia todo dia um personagem
+   * perguntando se ela já sentiu. Num app de alto risco, plantar "eu deveria
+   * estar sentindo e não estou" é o oposto do que este balão existe para
+   * fazer.
+   *
+   * A régua é a do PRÓPRIO app: o módulo do 3º trimestre é quem diz "é hora de
+   * começar a contar os chutes (10 movimentos em 2 horas)". Sem semana
+   * conhecida (sem DUM, pós-parto), a frase não entra: na dúvida, calar.
+   */
+  desde?: number;
+  /**
    * Sobrevive ao Modo Cuidado.
    *
    * O padrão é **não**: no luto, quase tudo aqui é a coisa errada a dizer.
@@ -132,8 +159,18 @@ export const FRASES: FraseDoMascote[] = [
   {
     texto: "Já são quase onze{nome} 🌙 Que tal fechar o dia com uma respiração?",
     periodos: ["noite"],
+    horas: [22, 24],
   },
-  { texto: "Fim de noite. Uma meditação curta ajuda a soltar o dia 🌿", periodos: ["noite"] },
+  {
+    texto: "Fim de noite. Uma meditação curta ajuda a soltar o dia 🌿",
+    periodos: ["noite"],
+    horas: [21, 24],
+  },
+  {
+    texto: "Começou a noite{nome}. Cinco minutinhos para você antes do jantar? 🌿",
+    periodos: ["noite"],
+    horas: [18, 21],
+  },
 
   // ── Madrugada ───────────────────────────────────────────────────────────
   {
@@ -172,7 +209,7 @@ export const FRASES: FraseDoMascote[] = [
   { texto: "Curiosidade do dia sobre o bebê? É só passar no Caminho 🎓" },
   { texto: "Sabia que dá para ver o bebê crescer semana a semana? Toque nele ☝️" },
   { texto: "Anotar seu peso hoje leva dez segundos — e o seu médico vê ⚖️" },
-  { texto: "Já sentiu o bebê hoje{nome}? Dá para contar os chutes na aba Saúde 👣" },
+  { texto: "Já sentiu o bebê hoje{nome}? Dá para contar os chutes na aba Saúde 👣", desde: 28 },
 ];
 
 /**
@@ -200,6 +237,10 @@ export function fraseDoDia(o: {
   careMode?: boolean;
   /** O tempo lá fora. `null`/ausente = dia comum, e as frases de clima saem. */
   tempo?: Tempo;
+  /** Hora local cheia (0–23). Sem ela, as frases que citam o relógio saem. */
+  hora?: number;
+  /** Semana gestacional. Sem ela, as frases com `desde` saem. */
+  semanas?: number | null;
 }): string | null {
   const temNome = !!(o.nome ?? "").trim();
   const servem = FRASES.filter((f) => {
@@ -210,6 +251,15 @@ export function fraseDoDia(o: {
        entram: melhor uma frase genérica que uma frase sobre uma chuva que não
        está caindo. */
     if (f.tempo && f.tempo !== o.tempo) return false;
+    /* Recorte de hora: "quase onze" às 18h05 é o personagem mentindo sobre a
+       única coisa que ele podia saber com certeza. */
+    if (f.horas) {
+      if (o.hora == null) return false;
+      const hh = Math.floor(o.hora);
+      if (hh < f.horas[0] || hh >= f.horas[1]) return false;
+    }
+    /* Semana mínima: sem semana conhecida a frase sai. Ver `desde`. */
+    if (f.desde != null && (o.semanas == null || o.semanas < f.desde)) return false;
     /* Frase que chama pelo nome só entra se houver nome. Trocar por vazio
        deixaria "Bebeu água hoje?" — que é outra frase, e pior. */
     if (!temNome && f.texto.includes("{nome}")) return false;

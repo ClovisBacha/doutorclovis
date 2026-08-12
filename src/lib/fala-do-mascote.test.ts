@@ -117,7 +117,20 @@ describe("o passo do tutorial não mora no componente que desmonta", () => {
 
   test("durante o tutorial o mascote do canto fica calado", () => {
     /* Dois balões do mesmo personagem na mesma tela, um deles atrás do véu —
-       está na foto que o dono mandou. */
-    expect(conta).toContain("mascoteCalado={tutorialAberto}");
+       está na foto que o dono mandou.
+       `&& ehCelular` é a MESMA condição que desenha o tutorial: `tutorialAberto`
+       sozinho calava o mascote numa janela larga por causa de um tutorial que
+       não está na tela (quem esconde a barra no computador é CSS, não estado). */
+    expect(conta).toContain("mascoteCalado={tutorialAberto && ehCelular}");
+  });
+
+  test("o tutorial só abre onde a barra existe", () => {
+    /* Ele explica os cinco itens da barra de baixo, e a barra é `md:hidden`.
+       Num monitor ele abria por cima de uma tela sem barra nenhuma, apontava
+       para ícones invisíveis e, no fim, gravava "já viu" — quem entrou pelo
+       computador perdia o tutorial do celular para sempre. */
+    expect(conta).toContain("tutorialAberto && mobileHome && ehCelular");
+    /* E o corte é o MESMO do `md:hidden` do Tailwind. */
+    expect(conta).toContain('matchMedia("(max-width: 767px)")');
   });
 });

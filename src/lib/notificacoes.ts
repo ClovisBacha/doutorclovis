@@ -98,9 +98,21 @@ export function lerLidas(uid: string | null): Lidas {
        Assim elas cumprem os sete dias a partir daqui, uma vez só. */
     if (Array.isArray(dado)) {
       const agora = new Date().toISOString();
-      return new Map(
+      const convertido: Lidas = new Map(
         dado.filter((x): x is string => typeof x === "string").map((id) => [id, agora]),
       );
+      /* ⚠️ GRAVA NA HORA — sem isto a conversão nunca termina.
+         `lerLidas` roda a cada abertura da caixa. Deixando o array no storage,
+         a próxima leitura converte DE NOVO com o instante daquele momento: o
+         relógio dos sete dias reinicia toda vez, e a notificação lida de quem
+         já usava o app não sumiria nunca. A conversão é "uma vez só" apenas se
+         ela apagar o formato antigo. */
+      try {
+        localStorage.setItem(chaveDe(uid), JSON.stringify(Object.fromEntries(convertido)));
+      } catch {
+        /* storage cheio: a caixa segue funcionando, só sem a poda dos 7 dias */
+      }
+      return convertido;
     }
     if (dado && typeof dado === "object") {
       return new Map(

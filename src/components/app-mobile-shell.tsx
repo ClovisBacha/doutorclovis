@@ -21,7 +21,7 @@ import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
-import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
+import { SkyLayers, corDeTopoClassica, gradientFor, periodFor } from "@/components/weather-sky";
 import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
 import { CeuEfeitos } from "@/components/ceu-efeitos";
 import { MascoteDaHome } from "@/components/mascote-da-home";
@@ -961,20 +961,49 @@ export function AppHomeScreen({
    * `fala` explícita, então mandar as duas faria a frase de conforto ENGOLIR o
    * aviso de que o médico escreveu — exatamente o contrário da prioridade.
    */
-  const conforto =
-    temNaoLidas || !agora
-      ? null
-      : fraseDoDia({
-          dia: diaLocalDe(agora),
-          periodo: periodoDaHora(h),
-          nome: firstName,
-          careMode,
-          /* O MESMO clima do cartão de saudação, e não uma segunda consulta:
-             `useWeather` já respondeu para a chuva do céu e para a dica lá
-             embaixo. Duas fontes para "está chovendo" na mesma tela é como o
-             app começa a se contradizer. */
-          tempo: tempoDoMomento(weather?.code ?? null, weather?.temp ?? null),
-        });
+  /* ⚠️ A FRASE É DECIDIDA UMA VEZ, E NÃO A CADA RENDER.
+     O clima chega DEPOIS da primeira pintura (é uma ida à Open-Meteo). Como as
+     frases de clima entram e saem do sorteio conforme `tempo`, o balão nascia
+     com uma frase e trocava por outra um segundo depois — sob os olhos de quem
+     estava lendo. Personagem que muda de assunto no meio da frase é exatamente
+     o que o tutorial evita, e aqui acontecia sozinho.
+     A saída tem duas metades: ESPERAR o clima por um instante (`climaPronto`) e
+     depois CONGELAR (`fraseFixa` só é escrita uma vez). O prazo existe porque
+     esperar para sempre deixaria sem frase quem está sem rede — e o balão é
+     companhia, não urgência: aparecer meio segundo depois não custa nada. */
+  const [fraseFixa, setFraseFixa] = useState<string | null | undefined>(undefined);
+  const [prazoDoClima, setPrazoDoClima] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setPrazoDoClima(true), 2500);
+    return () => clearTimeout(t);
+  }, []);
+  const climaPronto = !!weather || prazoDoClima;
+  useEffect(() => {
+    if (fraseFixa !== undefined || !agora || !climaPronto) return;
+    setFraseFixa(
+      fraseDoDia({
+        dia: diaLocalDe(agora),
+        periodo: periodoDaHora(agora.getHours()),
+        hora: agora.getHours(),
+        /* A semana é o que impede "já sentiu o bebê hoje?" de aparecer na 11ª —
+           quando ainda não há o que sentir, e a pergunta vira dúvida. */
+        semanas: gest?.weeks ?? null,
+        nome: firstName,
+        careMode,
+        /* O MESMO clima do cartão de saudação, e não uma segunda consulta:
+           `useWeather` já respondeu para a chuva do céu e para a dica lá
+           embaixo. Duas fontes para "está chovendo" na mesma tela é como o
+           app começa a se contradizer. */
+        tempo: tempoDoMomento(weather?.code ?? null, weather?.temp ?? null),
+      }),
+    );
+    // `fraseFixa` fica fora de propósito: ela é o próprio trinco.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agora, climaPronto, firstName, careMode, gest?.weeks, weather?.code, weather?.temp]);
+  /* O recado VENCE a frase, e essa decisão é de render (não do trinco): um
+     recado que chega depois cala o conforto na hora, e some o recado, a mesma
+     frase de sempre volta — sem sortear outra. */
+  const conforto = temNaoLidas ? null : (fraseFixa ?? null);
   /** O tema pago da Loja. `v2` (as quatro cenas novas) é o padrão de todo mundo. */
   const ceuClassico = skyTheme === "v1";
   const period = periodFor(h);
@@ -1140,7 +1169,12 @@ export function AppHomeScreen({
        declara a sua (`corDeTopo`), ao lado do gradiente de onde ela saiu:
        separadas em dois arquivos, elas divergiriam na primeira troca de
        paleta e a emenda apareceria como uma linha de cor errada. */
-    raiz.style.backgroundColor = slot.corDeTopo;
+    /* ⚠️ No Céu Clássico a cor vem do gradiente DELE. Usar `slot.corDeTopo`
+       aqui punha a paleta das cenas novas encostada na paleta do tema pago,
+       com a emenda passando bem atrás do relógio do sistema. */
+    raiz.style.backgroundColor = ceuClassico
+      ? corDeTopoClassica(period, weather?.code ?? 1)
+      : slot.corDeTopo;
     /* No app nativo, o relógio e a bateria do SISTEMA ficam sobre este mesmo
        céu — e o céu muda com a hora. Ícones escuros somem no céu de madrugada;
        ícones claros somem no azul do meio-dia. Então quem decide a barra é a
@@ -1152,7 +1186,7 @@ export function AppHomeScreen({
       raiz.style.backgroundColor = antes;
       barraDeStatus(false);
     };
-  }, [slot.corDeTopo, topoEscuro]);
+  }, [slot.corDeTopo, topoEscuro, ceuClassico, period, weather?.code]);
 
   return (
     /* Sem `pb` aqui: a página que renderiza esta tela (minha-conta) já reserva

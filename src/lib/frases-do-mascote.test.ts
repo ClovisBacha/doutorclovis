@@ -32,6 +32,66 @@ describe("o relógio", () => {
   });
 });
 
+describe("o relógio dentro da frase", () => {
+  test("'quase onze' não aparece às seis da tarde", () => {
+    /* 18h05 e 22h40 caem as duas em `noite`, e a segunda é a única em que essa
+       frase é verdade. Errar a hora que ele mesmo anunciou destrói a única
+       coisa que o personagem tem: parecer estar ali junto. */
+    const noite = (hora: number) =>
+      Array.from({ length: 40 }, (_, i) =>
+        fraseDoDia({ dia: 20_000 + i, periodo: "noite", hora, nome: "Ana" }),
+      );
+    expect(noite(18).some((f) => f?.includes("quase onze"))).toBe(false);
+    expect(noite(22).some((f) => f?.includes("quase onze"))).toBe(true);
+  });
+
+  test("toda hora da noite ainda tem o que dizer", () => {
+    /* O recorte não pode deixar um buraco: quem abre às 19h precisa de frase
+       tanto quanto quem abre às 23h. */
+    for (let hora = 18; hora <= 23; hora++) {
+      expect(fraseDoDia({ dia: 20_000, periodo: "noite", hora, nome: "Ana" })).toBeTruthy();
+      expect(fraseDoDia({ dia: 20_001, periodo: "noite", hora, nome: null })).toBeTruthy();
+    }
+  });
+
+  test("sem hora conhecida, nenhuma frase cita o relógio", () => {
+    const comRelogio = FRASES.filter((f) => f.horas).map((f) => f.texto);
+    expect(comRelogio.length).toBeGreaterThan(0);
+    for (let dia = 20_000; dia < 20_060; dia++) {
+      const f = fraseDoDia({ dia, periodo: "noite", nome: "Ana" });
+      expect(comRelogio.some((t) => t === f || comNomeNaFrase(t, "Ana") === f)).toBe(false);
+    }
+  });
+});
+
+describe("a semana da gestação", () => {
+  const CHUTES = /sentiu o bebê/;
+  const trintaDias = (semanas: number | null) =>
+    Array.from({ length: 40 }, (_, i) =>
+      fraseDoDia({ dia: 20_000 + i, periodo: "tarde", hora: 15, nome: "Ana", semanas }),
+    );
+
+  test("não pergunta se ela sentiu o bebê antes da hora", () => {
+    /* Uma mulher de 11 semanas não tem como sentir movimento, e sabe disso
+       vagamente. Um personagem perguntando todo dia se ela já sentiu planta
+       "eu deveria estar sentindo e não estou" — num app de alto risco, o
+       oposto do que este balão existe para fazer. */
+    expect(trintaDias(11).some((f) => f && CHUTES.test(f))).toBe(false);
+    expect(trintaDias(27).some((f) => f && CHUTES.test(f))).toBe(false);
+  });
+
+  test("a partir da 28ª ela aparece", () => {
+    /* A régua é a do próprio app: o módulo do 3º trimestre é quem diz "é hora
+       de começar a contar os chutes". */
+    expect(trintaDias(28).some((f) => f && CHUTES.test(f))).toBe(true);
+  });
+
+  test("sem semana conhecida, cala", () => {
+    /* Sem DUM, ou no pós-parto. Na dúvida, calar. */
+    expect(trintaDias(null).some((f) => f && CHUTES.test(f))).toBe(false);
+  });
+});
+
 describe("nenhuma hora fica muda", () => {
   test("existe frase para as quatro faixas, com nome e sem nome", () => {
     /* Uma faixa sem frase deixaria o mascote calado o dia inteiro para quem
@@ -115,10 +175,11 @@ describe("uma por dia, e ela roda", () => {
        frases, ficava presa em duas — este teste é o que pegou. */
     for (const periodo of PERIODOS) {
       const vistas = new Set<string>();
-      /* Sem clima conhecido, as frases de tempo não entram — o teste conta a
-         mesma lista que a régua monta. */
+      /* Sem clima, hora nem semana conhecidos, as frases com esses recortes não
+         entram — o teste conta a mesma lista que a régua monta. */
       const total = FRASES.filter(
-        (f) => (!f.periodos || f.periodos.includes(periodo)) && !f.tempo,
+        (f) =>
+          (!f.periodos || f.periodos.includes(periodo)) && !f.tempo && !f.horas && f.desde == null,
       ).length;
       for (let dia = 0; dia < total * 2; dia++) {
         const f = fraseDoDia({ dia, periodo, nome: "Ana" });

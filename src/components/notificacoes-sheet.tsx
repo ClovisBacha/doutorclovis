@@ -67,8 +67,18 @@ export function NotificacoesSheet({
             <div className="px-5 py-12 text-center">
               <Bell className="mx-auto h-8 w-8 text-muted-foreground/40" strokeWidth={1.4} />
               <p className="mt-3 text-sm font-semibold text-foreground">Tudo em dia</p>
+              {/* ⚠️ O texto NÃO promete recado do médico.
+                  Ele prometia — "avisos do app e recados do seu médico aparecem
+                  aqui" —, e não é verdade: esta caixa só monta notificações
+                  DERIVADAS do estado da conta (ver `lib/notificacoes.ts`). As
+                  mensagens que o médico manda chegam pela conversa e por push,
+                  e nunca aparecem aqui. A paciente que lesse isso passaria a
+                  vir olhar uma caixa vazia esperando o médico dela — e o
+                  silêncio de um obstetra de alto risco não é um detalhe de
+                  interface. Volte a citá-lo aqui SÓ quando as enviadas
+                  existirem de fato. */}
               <p className="mt-1 text-xs text-muted-foreground">
-                Avisos do app e recados do seu médico aparecem aqui.
+                Quando o app tiver algo para lembrar você, aparece aqui.
               </p>
             </div>
           ) : (

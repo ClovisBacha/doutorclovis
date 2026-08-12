@@ -748,6 +748,23 @@ function MinhaContaPage() {
      cartão. Foi o defeito que o dono viu. Guardado aqui ele sobrevive à ida e
      volta; guardado também no `localStorage`, sobrevive a fechar o app. */
   const [passoDoTutorial, setPassoDoTutorial] = useState(0);
+  /* ⚠️ QUEM ESCONDE A BARRA NO COMPUTADOR É CSS, NÃO ESTADO.
+     `mobileHome` continua verdadeiro num monitor — a home e a barra somem por
+     `md:hidden`. O tutorial abria por cima de uma tela sem barra nenhuma,
+     apontando para ícones invisíveis, e no fim gravava "já viu": quem entrou
+     pelo computador perdia o tutorial do celular para sempre.
+     Começa `false` e só é lido no efeito: `window` não existe no SSR, e uma
+     leitura no render daria hidratação divergente. */
+  const [ehCelular, setEhCelular] = useState(false);
+  useEffect(() => {
+    /* 768px é o `md` do Tailwind — o MESMO corte do `md:hidden` que esconde a
+       barra. Um número próprio aqui divergiria no primeiro ajuste de tema. */
+    const mq = window.matchMedia("(max-width: 767px)");
+    const ver = () => setEhCelular(mq.matches);
+    ver();
+    mq.addEventListener("change", ver);
+    return () => mq.removeEventListener("change", ver);
+  }, []);
 
   function avancarTutorial() {
     setPassoDoTutorial((v) => {
@@ -1582,8 +1599,17 @@ function MinhaContaPage() {
       {/* ── O bebê bolha apresentando a barra de baixo ────────────
           Só na home do celular: ele explica a barra, e a barra só existe ali.
           E nunca em Modo Cuidado — quem acabou de perder a gestação não abre o
-          app para um passeio guiado pelas funcionalidades. */}
-      {tutorialAberto && mobileHome && !careMode && !showOnboarding && (
+          app para um passeio guiado pelas funcionalidades.
+
+          ⚠️ `ehCelular` é OBRIGATÓRIO ao lado de `mobileHome`, e não uma
+          redundância: `mobileHome` é ESTADO (a aba escolhida), enquanto quem
+          esconde a home e a barra no computador é a classe `md:hidden`, que é
+          CSS. Num monitor, o estado continuava verdadeiro e o tutorial abria
+          apontando com holofote e setas para uma barra que não está na tela —
+          sete cartões falando de ícones invisíveis, e a marca de "já viu"
+          gravada no fim. Quem entrou pelo computador perdia o tutorial do
+          celular para sempre. */}
+      {tutorialAberto && mobileHome && ehCelular && !careMode && !showOnboarding && (
         <TutorialDaBolha
           nome={profile?.display_name ?? null}
           passo={passoDoTutorial}
@@ -1864,8 +1890,11 @@ function MinhaContaPage() {
                    acabou de anunciar o recado, e fazer a paciente procurá-lo
                    dentro da lista da conta desmentiria o anúncio. */
                 onOpenRecados={() => setNotifOpen(true)}
-                /* Durante o tutorial ele fala pelo cartão, não pelo canto. */
-                mascoteCalado={tutorialAberto}
+                /* Durante o tutorial ele fala pelo cartão, não pelo canto.
+                   A MESMA condição que desenha o tutorial (`&& ehCelular`):
+                   com só `tutorialAberto`, uma janela larga calava o mascote
+                   por causa de um tutorial que não está na tela. */
+                mascoteCalado={tutorialAberto && ehCelular}
                 onOrigemLocal={setOrigemLocal}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}
@@ -2040,11 +2069,6 @@ function MinhaContaPage() {
                     careMode={careMode}
                     onOpenShop={() => goToTab("Recompensas")}
                     onOpenAmigas={() => goToTab("Amigas")}
-                    homeCity={
-                      profile?.home_city && profile.home_lat != null && profile.home_lon != null
-                        ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
-                        : null
-                    }
                   />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}

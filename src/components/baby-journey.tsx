@@ -17,6 +17,7 @@ import {
   clampTone,
 } from "@/components/baby-illustration";
 import { babyForWeek, babyStage, type BabyStage } from "@/lib/gestacao";
+import { semanaTipicaDoEstagio } from "@/lib/arte-do-bebe";
 
 /**
  * Jornada do Bebê — o gatilho de Premium pedido pelo produto:
@@ -104,6 +105,22 @@ export function BabyJourneyModal({
                 // passados/futuros, o meio do intervalo (arte mais típica).
                 const showWeek = isCurrent ? currentWeek : Math.round((wMin + wMax) / 2);
                 const info = babyForWeek(showWeek);
+                /* ⚠️ A ARTE VEM DO ESTÁGIO, NUNCA DA SEMANA REAL.
+                   As cinco artes do Drive são 6 · 10 · 20 · 30 · 40, e
+                   `BabyIllustration` escolhe a MAIS PRÓXIMA da semana pedida —
+                   régua certa na bolha da home, errada numa lista em que cada
+                   linha é rotulada por estágio. Na 27ª semana (fim do "feto"),
+                   a arte mais próxima é a de 30, que é a do "tardio": a linha
+                   "você está aqui · feto" e a linha seguinte mostravam O MESMO
+                   desenho, e a jornada — que existe para mostrar a mudança —
+                   passava a negá-la. Vale para 26–27 e para a 36.
+                   O meio do intervalo cai na arte daquele estágio nos cinco
+                   casos, então as cinco linhas ficam com cinco desenhos
+                   diferentes, sempre. A semana real continua no cabeçalho e no
+                   tamanho/peso, que é onde ela informa.
+                   A régua é `semanaTipicaDoEstagio` (pura, testada) — a conta
+                   escrita aqui divergiria no dia em que uma faixa mudasse. */
+                const semanaDaArte = semanaTipicaDoEstagio(stage);
 
                 return (
                   <button
@@ -131,7 +148,7 @@ export function BabyJourneyModal({
                     >
                       {unlocked ? (
                         <BabyIllustration
-                          week={showWeek}
+                          week={semanaDaArte}
                           tone={clampTone(tone)}
                           showSac={false}
                           showInfo={false}

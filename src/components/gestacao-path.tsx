@@ -432,7 +432,6 @@ import { faixaDaHora, recadoDaBolha } from "@/lib/recado-da-bolha";
    em `assets/jogo` e não em `assets/sky` porque não é um céu do relógio: é o
    cenário fixo da tela de atividades. */
 import jogoBolha from "@/assets/jogo/bolha.webp";
-import { BabyIllustration } from "@/components/baby-illustration";
 import { ehNativo, tocarPadrao } from "@/lib/nativo";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { brl as brlPromo } from "@/lib/promo";
@@ -453,8 +452,6 @@ interface GestacaoPathProps {
   onOpenShop?: () => void;
   /** Abre a aba das Amigas — o ícone que substituiu o calendário na fita. */
   onOpenAmigas?: () => void;
-  /** Cidade do cadastro — chega até o céu da tela de atividades. */
-  homeCity?: { nome: string; lat: number; lon: number } | null;
   /**
    * SÓ a bancada de design `/preview-jogo` usa.
    *
@@ -1358,7 +1355,6 @@ export function GestacaoPath({
   quizPremium = false,
   careMode = false,
   onOpenShop,
-  homeCity = null,
   bancada,
   onOpenAmigas,
 }: GestacaoPathProps) {
@@ -3138,7 +3134,6 @@ export function GestacaoPath({
                   bancada?.halves ?? (doneDays.includes(D) ? TOTAL_DO_DIA : momentosDoDia(st))
                 }
                 babyName={profile?.baby_name ?? null}
-                homeCity={homeCity ?? null}
                 enfeites={
                   bancada?.enfeites ??
                   trayItems.map((id) => CANTINHO_BY_ID[id]?.emoji).filter((e): e is string => !!e)
@@ -6314,7 +6309,6 @@ function WellnessScreen({
   halves,
   lesson,
   babyName,
-  homeCity,
   enfeites = [],
   onEarn,
   onEarnLesson,
@@ -6337,8 +6331,6 @@ function WellnessScreen({
   lesson: WellnessLesson;
   /** Nome do bebê — a tela cumprimenta por ele. */
   babyName?: string | null;
-  /** Cidade do cadastro — o degrau entre o GPS e o IP, igual ao da home. */
-  homeCity?: { nome: string; lat: number; lon: number } | null;
   /** Emojis dos itens comprados na loja — boiam atrás do conteúdo. */
   enfeites?: string[];
   onEarn: (key: string) => void;
