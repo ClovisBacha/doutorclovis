@@ -467,6 +467,16 @@ interface GestacaoPathProps {
     halves?: number;
     enfeites?: string[];
     /**
+     * Liga UMA das três animações de conquista já na abertura da tela.
+     *
+     * Elas só nascem de `handleEarn` — o instante em que uma atividade acaba de
+     * ser feita —, então conferir o desenho exigia fazer a atividade de verdade,
+     * numa conta de verdade, e ainda acertar os dois segundos em que a
+     * animação existe. É como uma animação entra no app sem ninguém nunca ter
+     * olhado para ela rodando; a chama e o troféu já custaram essa lição.
+     */
+    anim?: "check" | "estrela" | "cinco";
+    /**
      * O aviso do presente, sem conta e sem ledger.
      *
      * Ele só nasce de uma linha real de `sementinhas_ledger`, então conferir o
@@ -3146,6 +3156,7 @@ export function GestacaoPath({
                   bancada?.halves ?? (doneDays.includes(D) ? TOTAL_DO_DIA : momentosDoDia(st))
                 }
                 babyName={profile?.baby_name ?? null}
+                anim={bancada?.anim}
                 enfeites={
                   bancada?.enfeites ??
                   trayItems.map((id) => CANTINHO_BY_ID[id]?.emoji).filter((e): e is string => !!e)
@@ -6321,6 +6332,7 @@ function WellnessScreen({
   halves,
   lesson,
   babyName,
+  anim,
   enfeites = [],
   onEarn,
   onEarnLesson,
@@ -6343,6 +6355,8 @@ function WellnessScreen({
   lesson: WellnessLesson;
   /** Nome do bebê — a tela cumprimenta por ele. */
   babyName?: string | null;
+  /** SÓ a bancada: liga uma das três animações de conquista na abertura. */
+  anim?: "check" | "estrela" | "cinco";
   /** Emojis dos itens comprados na loja — boiam atrás do conteúdo. */
   enfeites?: string[];
   onEarn: (key: string) => void;
@@ -6490,9 +6504,13 @@ function WellnessScreen({
      atividade acabou de ser feita — e não de comparar contadores que chegam do
      servidor, que foi o que fazia a bolinha "completar" de novo numa tarefa
      terminada de manhã. */
-  const [recemFeito, setRecemFeito] = useState<string | null>(null);
-  const [estrelaNova, setEstrelaNova] = useState<number | null>(null);
-  const [cincoNovas, setCincoNovas] = useState(false);
+  const [recemFeito, setRecemFeito] = useState<string | null>(
+    /* A bancada acende o check na PRIMEIRA atividade da lista, que é a que
+       aparece sem rolar a tela. */
+    anim === "check" ? "movement" : null,
+  );
+  const [estrelaNova, setEstrelaNova] = useState<number | null>(anim === "estrela" ? 0 : null);
+  const [cincoNovas, setCincoNovas] = useState(anim === "cinco");
 
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
      Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a

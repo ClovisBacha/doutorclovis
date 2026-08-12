@@ -66,6 +66,18 @@ export const Route = createFileRoute("/preview-jogo")({
     /* `?amigas=137` mostra o contador da fita, inclusive acima de 99 para
        conferir o `99+` sem precisar de 137 contas de verdade. */
     amigas: Math.max(0, Number(q.amigas ?? 0)),
+    /* `?anim=check|estrela|cinco` abre a tela das atividades JÁ COM uma das
+       três animações de conquista rodando. Elas só nascem no instante em que
+       uma atividade acaba de ser feita, então conferir o desenho exigia fazer
+       a atividade numa conta de verdade e ainda acertar os dois segundos em
+       que a animação existe. É como uma animação entra no app sem ninguém
+       nunca ter olhado para ela rodando — a chama e o troféu já custaram essa
+       lição duas vezes.
+       Implica `tela=jogos`: as três moram dentro da folha do dia. */
+    anim:
+      q.anim === "check" || q.anim === "estrela" || q.anim === "cinco"
+        ? (q.anim as "check" | "estrela" | "cinco")
+        : undefined,
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -88,6 +100,7 @@ function PreviewJogo() {
     trofeus,
     trofeuNovo,
     amigas,
+    anim,
   } = Route.useSearch();
   useEffect(() => {
     if (!pele) return;
@@ -123,13 +136,18 @@ function PreviewJogo() {
         onOpenShop={() => {}}
         bancada={
           tela === "jogos" ||
+          !!anim ||
           presente > 0 ||
           streak > 0 ||
           trofeus > 0 ||
           trofeuNovo > 0 ||
           amigas > 0
             ? {
-                jogos: tela === "jogos",
+                /* `?anim=` implica a tela das atividades: as três animações
+                   moram dentro da folha do dia, e sem ela a bancada abriria a
+                   trilha com o parâmetro sem efeito nenhum. */
+                jogos: tela === "jogos" || !!anim,
+                anim,
                 streak: streak > 0 ? streak : undefined,
                 trofeus: trofeus > 0 ? trofeus : undefined,
                 trofeuNovo: trofeuNovo > 0 ? trofeuNovo : undefined,

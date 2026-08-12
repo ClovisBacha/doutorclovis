@@ -1044,6 +1044,39 @@ destranca três itens da loja.
 - **Bancada:** `/preview-jogo?trofeus=12` põe número no topo;
   `?trofeuNovo=12` abre os 5 segundos inteiros.
 
+### As três animações de conquista (ago/2026)
+
+Três `.webm` do dono: o **check** verde que completa a bolinha da atividade
+recém-feita, a **estrela** que acende no placar a cada atividade, e as **cinco**
+enfileiradas quando o dia fecha. Viraram folhas de sprite pela mesma razão da
+chama e do troféu — **WebM com alfa não tem transparência no Safari**, e o app
+é instalado na tela de início do iPhone.
+
+- **As três moram DENTRO da folha do dia**, e não no nó da trilha. A folha é
+  `fixed inset-0 z-[60]` com fundo opaco e não fecha sozinha ao ganhar: no nó, a
+  estrela acendia atrás dela e se apagava em 2 s — a comemoração acontecia numa
+  tela que a paciente não estava vendo. O cartão "⭐ Estrelas de hoje", no pé da
+  folha, é literalmente o lugar que o dono descreveu.
+- **Nascem de `handleEarn`**, o único ponto em que uma atividade ACABOU de ser
+  feita — nunca de comparar contadores que chegam do servidor, que era o que
+  fazia a bolinha "completar" de novo numa tarefa terminada de manhã.
+- ⚠️ **`steps(n)` com `to: 100%·n/(n−1)` é para LAÇO, nunca para `forwards`.**
+  Com `forwards` o valor retido é o `to` literal, que fica FORA da folha: os
+  sprites simplesmente não apareciam. Uma tacada só precisa de
+  `steps(n, jump-none)` com `to: 100%`. ⚠️ E o eixo X precisa de **contagem de
+  iterações igual ao número de LINHAS** (`steps(6, jump-none) 4 forwards`), ou
+  só a primeira linha toca — foram 9 dos 24 quadros. O mesmo defeito estava na
+  animação do troféu, em produção (medido: `111.111% 120%` aos 5,6 s).
+- ⚠️ **`onFim` é `setTimeout`, não `onAnimationEnd`**: são DUAS animações no
+  mesmo elemento (X e Y), então o evento dispara duas vezes e a primeira chega
+  com a animação em um quarto do caminho.
+- **O check NÃO tem `onFim`**: o último quadro é o próprio check pousado, então
+  ele vira o estado final. A estrela e as cinco voltam ao desenho estático.
+- **Bancada:** `/preview-jogo?anim=check` · `?anim=estrela` · `?anim=cinco&feitos=5`.
+  Elas só nascem no instante do ganho, então conferir o desenho exigia fazer a
+  atividade numa conta de verdade e ainda acertar os dois segundos em que a
+  animação existe. `?anim=` implica `tela=jogos`.
+
 ### A aba das Amigas (ago/2026)
 
 Pedido do dono: o ícone de "adicionar amigos" substitui o calendário azul da
