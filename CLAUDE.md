@@ -470,6 +470,53 @@ em DIAS no corpo grande, alergias/medicações/risco/sangue, o que mudou desde a
   que entra no campo de achados — duas versões divergiriam, e ele leria uma e
   assinaria a outra.
 
+### O bebê bolha ocupou o canto da home, e virou a voz do app (ago/2026)
+
+Pedido do dono: "adicione no canto superior direito o bebê bolha; ele será o
+personagem que vai ficar falando as notificações, entre outras interações, e vai
+introduzir o app através de um tutorial no primeiro acesso".
+
+A personagem já existia inteira (`bolha.tsx`) — o que faltava era ONDE morar na
+tela principal e COMO falar. `mascote-da-home.tsx` é o lugar e a boca; nenhuma
+arte nova.
+
+- **O canto direito é o mesmo que a pílula do clima desocupou**, e ele cumpre a
+  régua que ela não cumpria: "numa tela cujo assunto é o bebê, o canto tinha de
+  dizer algo sobre ele, ou não dizer nada".
+- **Duas bolhas na mesma tela é o risco real da mudança** — se as duas lerem
+  como a mesma coisa, o app passa a ter dois filhos e o do canto fala. Três
+  coisas separam: **tamanho** (44px contra ~236px), **rosto** (a do centro tem
+  um FETO, sem olhos; esta pisca) e **lugar** (esta na fileira de ferramentas,
+  aquela sozinha no céu).
+- **Ficar quieto é metade do valor.** Sem recado ele não diz nada. Personagem
+  que fala toda vez que a tela abre vira ruído em três dias — e aí ninguém lê o
+  balão no dia em que ele tiver algo urgente.
+- **O emblema mostra o NÚMERO, não um ponto**: "tem coisa" obriga a abrir para
+  descobrir se vale a pena, e a pergunta que ela faz é quantos. Teto em `9+`,
+  que é limite de LARGURA no canto da tela.
+- ⚠️ **O ponto vermelho saiu do ☰.** Ele só quis dizer "há recado na central" a
+  vida inteira, e agora a central tem um anunciante com rosto. Dois avisos para
+  o mesmo fato lêem como assuntos diferentes ("o menu tem algo" · "a bolha tem
+  algo"). O acesso pelo ☰ **não** mudou.
+- **`fala` é a porta do tutorial**, e a precedência é regra testada: fala
+  explícita VENCE recado. Um personagem que muda de assunto no meio da frase não
+  ensina nada, e o recado continua lá quando ele terminar.
+- **A régua mora em `src/lib/fala-do-mascote.ts`**, longe do JSX: o componente
+  importa `bolha.tsx`, que importa cinco `.webp`, e um teste morreria no
+  primeiro `import`.
+- **O humor sai de `humorDaJornada`**, nunca de um `if` local — o portão de Modo
+  Cuidado mora dentro dela, e uma segunda régua faria carinha festiva aparecer
+  para quem perdeu a gestação.
+- ⚠️ **`w-max` no balão não é estética.** Um absoluto com `right` e sem `left`
+  decide a largura por shrink-to-fit contra o CONTAINER — 44px aqui. Sem
+  `w-max`, "Tenho 3 recados 💌" saía em três linhas com o emoji sozinho na
+  última; `max-w` não resolve, porque ele limita o teto e o problema era o piso.
+- **Bancada:** `/preview-home?w=20&notif=3`.
+  ⚠️ `quantos` lê o próprio campo antes de `notif`: o router serializa e
+  revalida, e na segunda passada `s.notif` já é o booleano `true` — `Number(true)`
+  é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
+  armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
+
 ### A aba Saúde da paciente ficou clínica (ago/2026)
 
 A aba se chamava Saúde e as duas ferramentas de automonitoramento com mais peso

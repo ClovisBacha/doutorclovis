@@ -1217,6 +1217,38 @@ button:active > .duo3d {
   }
 }
 
+/* ── O BALÃO DE FALA DO BEBÊ BOLHA ───────────────────────────────────
+   Ele NASCE do mascote, e não do nada: começa pequeno e ancorado no canto
+   superior direito (`transform-origin`), que é exatamente onde a personagem
+   está. Um balão que aparece por opacidade lê como aviso do sistema; um que
+   cresce a partir de quem falou lê como fala.
+
+   O passo de escala é curto (0,86 → 1) e o tempo também: é a entrada de um
+   elemento pequeno, e amplitude grande num objeto de 40px lê como salto. */
+@keyframes dcFalaEntra {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.dc-fala-entra {
+  transform-origin: top right;
+  animation: dcFalaEntra 260ms var(--ease-out-expo, ease-out) both;
+}
+/* Com "menos movimento" o balão APARECE, e não some: ele carrega o recado.
+   O que sai é o crescimento — fica só o esmaecer, que é o mínimo para o olho
+   perceber que algo novo entrou na tela. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-fala-entra {
+    animation: dcFalaEntra 1ms linear both;
+    transform: none !important;
+  }
+}
+
 /* ── A ALTURA DE UMA TELA, PARA O CÉU DA HOME ────────────────────────
    Duas declarações da MESMA propriedade, e isso é o recurso — não descuido.
    O motor que não conhece `lvh` fica com a primeira; o que conhece usa a

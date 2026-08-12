@@ -24,6 +24,8 @@ import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
 import { SkyLayers, gradientFor, periodFor } from "@/components/weather-sky";
 import { CeuDoDia, ceuPelaHora, ceuPeloSol } from "@/components/ceu-do-dia";
 import { CeuEfeitos } from "@/components/ceu-efeitos";
+import { MascoteDaHome } from "@/components/mascote-da-home";
+import { humorDaJornada } from "@/components/bolha";
 import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
@@ -782,6 +784,8 @@ export function AppHomeScreen({
   skyTheme = "v2",
   homeCity = null,
   temNaoLidas = false,
+  naoLidas = 0,
+  onOpenRecados,
   onOrigemLocal,
 }: {
   firstName: string;
@@ -806,8 +810,33 @@ export function AppHomeScreen({
    * médico nenhum. Ela via um rosto que não é o dela rotulado como o dela.
    */
   medico?: { nome: string; title?: string; specialty?: string; crm?: string } | null;
-  /** Acende o ponto vermelho na silhueta — há notificação por abrir. */
+  /**
+   * Há notificação por abrir.
+   *
+   * ⚠️ **O ponto saiu do ☰ e foi para o mascote** (ago/2026), e isso não é
+   * mudança de gosto: quando o bebê bolha virou a voz dos recados, um ponto no
+   * menu e outro no personagem seriam DOIS avisos para a mesma coisa — e o
+   * segundo pior resultado possível é a paciente lê-los como assuntos
+   * diferentes ("o menu tem algo" e "a bolha tem algo"). O acesso pelo ☰ não
+   * mudou: a central continua lá dentro.
+   */
   temNaoLidas?: boolean;
+  /**
+   * QUANTOS recados por abrir.
+   *
+   * O emblema mostra o número, e não um ponto. É o que separa "tem coisa" de
+   * "tem uma coisa": um ponto obriga a abrir para descobrir se vale a pena, e
+   * numa gestação de alto risco a pergunta que ela faz é quantos, não se.
+   */
+  naoLidas?: number;
+  /**
+   * Abre a central de recados DIRETO, sem passar pelo menu.
+   *
+   * É o toque do mascote. Sem isto ele cairia no `onOpenMenu` e a paciente
+   * teria de achar as notificações dentro da lista da conta — dois toques a
+   * mais para chegar no que o personagem acabou de anunciar.
+   */
+  onOpenRecados?: () => void;
   /**
    * Conta para fora DE ONDE veio a localização.
    *
@@ -844,6 +873,20 @@ export function AppHomeScreen({
 
   const h = agora ? agora.getHours() : 12;
   const isMadrugada = h < 5;
+  /**
+   * A CARA DO MASCOTE NA HOME.
+   *
+   * Passa pela MESMA régua da jornada (`humorDaJornada`), e não por um `if`
+   * escrito aqui: o portão de Modo Cuidado e a ordem de prioridade emocional
+   * moram lá dentro, e uma segunda régua divergiria no primeiro ajuste — com
+   * o sintoma aparecendo no pior lugar possível, que é uma carinha festiva
+   * para quem perdeu a gestação.
+   *
+   * A home não sabe se o dia foi fechado (isso é do Caminho), então o que ela
+   * informa é o que ela tem: a hora. De madrugada ele se espanta de bom; no
+   * resto do dia, sorri.
+   */
+  const humorDoMascote = humorDaJornada({ madrugada: isMadrugada, careMode });
   /** O tema pago da Loja. `v2` (as quatro cenas novas) é o padrão de todo mundo. */
   const ceuClassico = skyTheme === "v1";
   const period = periodFor(h);
@@ -1176,15 +1219,13 @@ export function AppHomeScreen({
                    preço no lugar errado. */
                 className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
               >
-                {/* O ponto fica encostado na borda do alvo, e não do ícone:
-                    dentro ele competiria com o traço e sumiria contra nuvem
-                    clara. O anel branco o descola do céu. */}
-                {temNaoLidas && (
-                  <span
-                    aria-hidden
-                    className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white/85"
-                  />
-                )}
+                {/* ⚠️ O PONTO VERMELHO SAIU DAQUI (ago/2026) e foi para o
+                    mascote, do outro lado da barra. Ele só quis dizer uma
+                    coisa a vida inteira — "há recado na central" —, e a central
+                    agora tem um anunciante com rosto, que mostra QUANTOS. Dois
+                    avisos para o mesmo fato competem entre si e, pior, lêem
+                    como assuntos diferentes: "o menu tem algo" e "a bolha tem
+                    algo". O acesso pelo ☰ não mudou. */}
                 {/* Sem a pastilha atrás, o traço passa a se separar do céu
                     sozinho — daí a sombra, que continua sendo a MESMA régua do
                     `topoEscuro`: branco sobre topo escuro, índigo sobre topo
@@ -1265,7 +1306,29 @@ export function AppHomeScreen({
 
                   O CLIMA em si NÃO saiu do produto: `useWeather` continua de
                   pé porque a chuva do céu (`SkyRain`) e o cartão de saudação
-                  da segunda dobra leem dele. O que saiu foi só o mostrador. */}
+                  da segunda dobra leem dele. O que saiu foi só o mostrador.
+
+                  ─── E QUEM MORA NELE AGORA (ago/2026) ────────────────────
+                  O BEBÊ BOLHA. Ele é a voz do app: avisa quantos recados
+                  existem, leva à central com um toque, e é por ele que o
+                  tutorial do primeiro acesso vai falar. Quando não há nada a
+                  dizer, fica quieto — que é o que faz a fala valer alguma coisa
+                  quando aparece. Ver `mascote-da-home.tsx`, inclusive para as
+                  três coisas que impedem a paciente de confundi-lo com a bolha
+                  do CENTRO, que é o bebê dela.
+
+                  Ele cumpre a régua que a pílula do clima não cumpria: o canto
+                  voltou a dizer algo, e o que ele diz é sobre ela. */}
+              <MascoteDaHome
+                humor={humorDoMascote}
+                /* `temNaoLidas` continua mandando no SE, e `naoLidas` só no
+                   QUANTOS. Quem passa só o booleano (a bancada, e qualquer
+                   chamador antigo) recebe 1 em vez de zero — senão o mascote
+                   ficaria mudo justamente quando o app disse que há recado. */
+                recados={temNaoLidas ? Math.max(1, naoLidas) : 0}
+                careMode={careMode}
+                onAbrir={onOpenRecados ?? onOpenMenu}
+              />
             </div>
 
             {isMadrugada && (

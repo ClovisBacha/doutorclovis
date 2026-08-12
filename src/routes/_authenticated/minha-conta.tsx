@@ -1709,6 +1709,11 @@ function MinhaContaPage() {
                     : null
                 }
                 temNaoLidas={naoLidas > 0}
+                naoLidas={naoLidas}
+                /* O mascote leva DIRETO à central, sem passar pelo menu: ele
+                   acabou de anunciar o recado, e fazer a paciente procurá-lo
+                   dentro da lista da conta desmentiria o anúncio. */
+                onOpenRecados={() => setNotifOpen(true)}
                 onOrigemLocal={setOrigemLocal}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}

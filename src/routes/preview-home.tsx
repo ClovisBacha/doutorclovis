@@ -26,7 +26,17 @@ export const Route = createFileRoute("/preview-home")({
   // passe — foi o que aconteceu.
   validateSearch: (s: Record<string, unknown>) => ({
     w: Number(s.w) || 19,
-    notif: s.notif === true || String(s.notif ?? "") === "1",
+    /* `?notif=1` acende o mascote com um recado; `?notif=3` com três. O
+       booleano decide SE ele fala e o número decide o que o emblema mostra —
+       foi para poder fotografar o "9+" sem inventar nove notificações.
+
+       ⚠️ `quantos` lê o PRÓPRIO campo antes de `notif`, e é obrigatório: o
+       router serializa e revalida, então na segunda passada `s.notif` já é o
+       booleano `true` — e `Number(true)` é **1**. Tirando `s.quantos` daqui,
+       `?notif=3` virava três na primeira renderização e um na seguinte. Mesma
+       armadilha que `preview-saude` documenta para `?w=`. */
+    notif: s.notif === true || Number(s.notif) > 0 || String(s.notif ?? "") === "1",
+    quantos: Math.max(0, Number(s.quantos ?? s.notif) || 0),
     // `?clima=1` liga a consulta real de clima (Belo Horizonte) — é a única
     // forma de fotografar o cartão de saudação, que só existe quando há
     // clima. Sem o parâmetro a bancada continua offline.
@@ -39,7 +49,7 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
-  const { w, notif, clima } = Route.useSearch();
+  const { w, notif, quantos, clima } = Route.useSearch();
   const { slot } = useSkyNow(null);
   const escuro = slot.dark;
   return (
@@ -62,6 +72,7 @@ function PreviewHome() {
           careMode={false}
           skyTheme="v2"
           temNaoLidas={notif}
+          naoLidas={quantos}
           homeCity={clima ? { nome: "Belo Horizonte", lat: -19.92, lon: -43.94 } : null}
         />
       </div>
