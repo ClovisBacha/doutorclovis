@@ -13,6 +13,25 @@
   }
 }
 
+/* Tela DEITADA — o celular virado, e só ele.
+ *
+ * 520px é escolhido para ficar entre os dois mundos, com folga dos dois lados:
+ * o menor iPhone EM PÉ tem 667 (SE) e o maior DEITADO tem 430 (Pro Max). Não
+ * dá para reaproveitar `short` (max-height 849) aqui: ele pega o SE em pé e o
+ * 15 Pro no Safari, que são justamente os casos que a composição já resolve.
+ *
+ * Existe por um defeito medido: em paisagem, a bolha é centrada na tela INTEIRA
+ * enquanto a barra de baixo come 117px do pé, e o vão que sobra para o número
+ * da semana fica em ~5px. Com `items-center`, o número transbordava para cima e
+ * caía EM CIMA do bebê (medido: 20px de sobreposição no 15 Pro deitado, 12px no
+ * SE). O manifesto pede `portrait-primary`, mas o iOS ignora orientação de
+ * manifesto — então o caso acontece de verdade, no navegador. */
+@custom-variant deitada {
+  @media (max-height: 520px) {
+    @slot;
+  }
+}
+
 /*
  * Design system definition.
  *

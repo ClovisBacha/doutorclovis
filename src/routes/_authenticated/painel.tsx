@@ -366,8 +366,17 @@ function PainelPage() {
    * verdade é uma falha de rede é a pior coisa que este painel pode dizer: o
    * médico fecha a tela tranquilo com uma emergência não lida do outro lado.
    */
-  /* Triagens de alerta das pacientes dele. A avaliação já era calculada e
-     gravada; faltava alguém do lado do médico ler. */
+  /* ⚠️ NÃO EXISTE MAIS UMA SEGUNDA LEITURA DAS TRIAGENS AQUI.
+     Havia: `loadTriagens` buscava `triage_logs` a cada abertura do painel,
+     guardava a lista em estado — e NENHUMA tela a desenhava. A única coisa que
+     sobrevivia da chamada era um sinalizador de falha que punha "alertas de
+     sintomas" na faixa de fontes com problema, avisando sobre um dado que
+     chegava inteiro pelo outro caminho.
+     `triage_logs` é uma das onze fontes de `clinical_events`, e a triagem
+     vermelha/amarela entra na fila por `eventosQuePedemOlhar` como episódio.
+     Duas leituras da mesma tabela é exatamente o que o contrato único existe
+     para evitar. Se um dia a triagem precisar de tela PRÓPRIA, ela nasce de
+     `clinical_events`, não de um segundo caminho. */
   /* Eventos clínicos fora de faixa — de TODAS as pacientes dele, das onze
      fontes. É o que transforma a fila de "coisas administrativas" em "coisas
      clínicas". */
@@ -378,19 +387,6 @@ function PainelPage() {
   const [abrirPaciente, setAbrirPaciente] = useState<string | null>(null);
   const [nomesPacientes, setNomesPacientes] = useState<Record<string, string>>({});
 
-  const [triagens, setTriagens] = useState<
-    {
-      id: string;
-      created_at: string;
-      user_id: string;
-      paciente: string | null;
-      level: string;
-      symptoms: string[];
-      systolic: number | null;
-      diastolic: number | null;
-    }[]
-  >([]);
-
   const [fonteFalhou, setFonteFalhou] = useState({
     sos: false,
     vinculos: false,
@@ -400,7 +396,6 @@ function PainelPage() {
        não lidas — que é exatamente o bug que a trava existe para impedir. */
     consultasEPerguntas: false,
     preConsultas: false,
-    triagens: false,
     eventos: false,
     /* O Engajamento não é fonte da FILA — não entra na faixa dela. Mora aqui
        porque é o mesmo vocabulário, e a aba usa este campo para avisar em vez
@@ -460,7 +455,6 @@ function PainelPage() {
       ultima = agora;
       load(true).catch(() => {});
       loadPreForms().catch(() => {});
-      loadTriagens().catch(() => {});
       loadEventosClinicos().catch(() => {});
     };
     const t = setInterval(() => {
@@ -722,20 +716,6 @@ function PainelPage() {
     }
   }
 
-  async function loadTriagens() {
-    try {
-      const tk = await token();
-      const { listarTriagens } = await import("@/lib/triage.functions");
-      const r = await listarTriagens({ data: { accessToken: tk, apenasAlerta: true, dias: 14 } });
-      if (r.ok) {
-        setTriagens(r.triagens);
-        setFonteFalhou((f) => ({ ...f, triagens: false }));
-      } else setFonteFalhou((f) => ({ ...f, triagens: true }));
-    } catch {
-      setFonteFalhou((f) => ({ ...f, triagens: true }));
-    }
-  }
-
   async function loadPreForms() {
     try {
       const tk = await token();
@@ -770,7 +750,6 @@ function PainelPage() {
        "nada esperando por você" com seis pré-consultas não lidas na caixa. É o
        mesmo bug que a fila existe para consertar, um nível abaixo. */
     loadPreForms().catch(() => {});
-    loadTriagens().catch(() => {});
     loadEventosClinicos().catch(() => {});
   }, []);
 
@@ -1241,7 +1220,6 @@ function PainelPage() {
               ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
               ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
               ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
-              ...(fonteFalhou.triagens ? ["alertas de sintomas"] : []),
               ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
             ]}
           />

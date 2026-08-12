@@ -1505,8 +1505,16 @@ export function AppHomeScreen({
              mais no item de baixo. Padding não é neutro num item flexível.
 
              `pointer-events-none` na camada e `auto` no botão: a camada cobre a
-             barra de topo, e sem isso ela engoliria o toque do menu. */
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+             barra de topo, e sem isso ela engoliria o toque do menu.
+
+             ⚠️ DEITADA a bolha se centra no espaço ACIMA da barra. Em pé ela é
+             centrada no hero inteiro — a composição medida e aprovada, e mexer
+             nela seria trocar o caso de todo dia pelo caso raro. Deitado,
+             porém, a barra come 117px do pé e o vão que sobrava para o número
+             da semana ficava em ~5px: com `items-center` o número transbordava
+             para CIMA e pousava em cima do bebê (medido: 20px de sobreposição
+             no 15 Pro, 12px no SE). Ver `deitada` em `styles.css`. */
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center deitada:bottom-[calc(var(--safe-bottom)+6rem)]">
               {/* Bebê protagonista dentro da bolha (o "ventre").
                 Toque abre a aba do Bebê com a semana detalhada — e pede a
                 sub-aba "semana" de propósito: a aba do Bebê agora abre numa
@@ -1599,10 +1607,16 @@ export function AppHomeScreen({
 
             O halo (`overArt`) volta junto e não é enfeite: aqui o fundo é a
             arte, e a do dia tem a faixa amarela do horizonte passando bem
-            atrás dos dígitos. */}
+            atrás dos dígitos.
+
+            ⚠️ O `top` acompanha o CENTRO DA BOLHA, e os dois têm de mudar
+            juntos. Em pé o centro é `50%` do hero; DEITADA a bolha se centra
+            no espaço acima da barra, então o centro desce para metade de
+            (100% − reserva). Mudar um sem o outro põe o número em cima do
+            bebê — que é exatamente o defeito que o `deitada:` conserta. */}
           {gest && baby && (
             <div
-              className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 flex items-center justify-center pt-[calc(min(60vw,19.5rem,38svh)/2)] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)]"
+              className="pointer-events-none absolute inset-x-0 bottom-0 top-1/2 flex items-center justify-center pt-[calc(min(60vw,19.5rem,38svh)/2)] pb-[calc(var(--safe-bottom)+6rem)] short:pb-[calc(var(--safe-bottom)+5.5rem)] deitada:top-[calc((100%-(var(--safe-bottom)+6rem))/2)]"
               style={overArt}
             >
               <div className="flex flex-col items-center">
