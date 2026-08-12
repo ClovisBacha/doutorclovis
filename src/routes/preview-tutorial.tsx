@@ -36,6 +36,9 @@ function PreviewTutorial() {
   const { nome, escura } = Route.useSearch();
   const [destaque, setDestaque] = useState<BottomSection | "sos" | null>(null);
   const [aberto, setAberto] = useState(true);
+  /* O passo mora aqui pelo mesmo motivo que mora na página real: quem desmonta
+     não pode ser quem lembra. */
+  const [passo, setPasso] = useState(0);
   return (
     <div
       className="fixed inset-0 z-[30] overflow-hidden"
@@ -47,7 +50,10 @@ function PreviewTutorial() {
     >
       {!aberto && (
         <button
-          onClick={() => setAberto(true)}
+          onClick={() => {
+            setPasso(0);
+            setAberto(true);
+          }}
           className="absolute left-1/2 top-24 -translate-x-1/2 rounded-full bg-white/90 px-5 py-2 text-sm font-semibold"
         >
           Rodar de novo
@@ -56,6 +62,8 @@ function PreviewTutorial() {
       {aberto && (
         <TutorialDaBolha
           nome={nome || null}
+          passo={passo}
+          onAvancar={() => setPasso((v) => v + 1)}
           onPasso={(d) => setDestaque(d as BottomSection | "sos" | null)}
           onFechar={() => setAberto(false)}
         />

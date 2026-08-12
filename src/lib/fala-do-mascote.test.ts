@@ -82,3 +82,33 @@ describe("um aviso só para o mesmo fato", () => {
     expect(shell).toContain("humorDaJornada({ madrugada: isMadrugada, careMode })");
   });
 });
+
+describe("o passo do tutorial não mora no componente que desmonta", () => {
+  const tut = readFileSync("src/components/tutorial-da-bolha.tsx", "utf8");
+  const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+
+  test("o índice é PROP, e não estado local", () => {
+    /* ⚠️ O defeito que o dono viu: a barra continua clicável durante a aula,
+       então tocar em "Jogo" troca a aba, tira a home do ar e DESMONTA o
+       tutorial. Com o índice em `useState` lá dentro, voltar para o Bebê
+       recomeçava do primeiro cartão. É o mesmo defeito do `sub` local do
+       `RegistrosHub`, e a mesma solução: o estado sobe para quem não
+       desmonta. */
+    expect(tut).not.toMatch(/useState\(0\)/);
+    expect(tut).toContain("passo: iPasso");
+    expect(conta).toContain("const [passoDoTutorial, setPassoDoTutorial] = useState(0)");
+  });
+
+  test("o passo também é guardado no aparelho", () => {
+    /* O estado na página resolve a ida e volta dentro do app; o storage
+       resolve fechar o app no meio da aula. */
+    expect(conta).toContain("chaveDoPassoDoTutorial");
+    expect(conta).toContain("lerPassoDoTutorial");
+  });
+
+  test("durante o tutorial o mascote do canto fica calado", () => {
+    /* Dois balões do mesmo personagem na mesma tela, um deles atrás do véu —
+       está na foto que o dono mandou. */
+    expect(conta).toContain("mascoteCalado={tutorialAberto}");
+  });
+});

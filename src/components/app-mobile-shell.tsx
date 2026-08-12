@@ -805,6 +805,7 @@ export function AppHomeScreen({
   homeCity = null,
   temNaoLidas = false,
   naoLidas = 0,
+  mascoteCalado = false,
   onOpenRecados,
   onOrigemLocal,
 }: {
@@ -849,6 +850,14 @@ export function AppHomeScreen({
    * numa gestação de alto risco a pergunta que ela faz é quantos, não se.
    */
   naoLidas?: number;
+  /**
+   * Segura o balão do mascote (o emblema continua).
+   *
+   * Hoje só o TUTORIAL liga isto: com ele aberto, o personagem do canto também
+   * falava, atrás do véu — dois balões do mesmo personagem dizendo coisas
+   * diferentes na mesma tela.
+   */
+  mascoteCalado?: boolean;
   /**
    * Abre a central de recados DIRETO, sem passar pelo menu.
    *
@@ -1372,6 +1381,7 @@ export function AppHomeScreen({
                    chamador antigo) recebe 1 em vez de zero — senão o mascote
                    ficaria mudo justamente quando o app disse que há recado. */
                 recados={temNaoLidas ? Math.max(1, naoLidas) : 0}
+                calado={mascoteCalado}
                 careMode={careMode}
                 onAbrir={onOpenRecados ?? onOpenMenu}
               />

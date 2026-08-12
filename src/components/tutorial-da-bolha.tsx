@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Bolha, type BolhaHandle } from "@/components/bolha";
 import { comNome, PASSOS_DO_TUTORIAL } from "@/lib/tutorial-do-mascote";
 
@@ -30,15 +30,33 @@ import { comNome, PASSOS_DO_TUTORIAL } from "@/lib/tutorial-do-mascote";
  *
  * Terminar e pular gravam a MESMA marca. Quem pulou não quer ver de novo, e o
  * caminho de rever existe: tocar no mascote no canto da home.
+ *
+ * ─── ⚠️ O PASSO NÃO MORA AQUI ───────────────────────────────────────────────
+ *
+ * `passo` é PROP, e isso é um conserto. A barra continua clicável durante a
+ * aula (ver acima), e tocar num item troca a aba — o que tira a home do ar e
+ * DESMONTA este componente. Com o índice em estado local, voltar para o Bebê
+ * remontava tudo do zero: a paciente tocava em "Jogo" no quinto cartão,
+ * voltava, e reencontrava a abertura. Foi o que o dono viu.
+ *
+ * Com o passo na tela de cima, o tutorial sobrevive à ida e volta e continua
+ * de onde parou. É o mesmo defeito que o `sub` local do `RegistrosHub` teve, e
+ * a mesma solução: o estado sobe para quem não desmonta.
  */
 
 export function TutorialDaBolha({
   nome,
+  passo: iPasso,
+  onAvancar,
   onPasso,
   onFechar,
 }: {
   /** Primeiro nome dela, para a abertura e o fecho. */
   nome?: string | null;
+  /** Índice do cartão atual. Mora na tela de cima — ver o bloco acima. */
+  passo: number;
+  /** Pede o próximo cartão. Quem guarda o número é quem chama. */
+  onAvancar: () => void;
   /**
    * Qual item da barra iluminar agora — a tela de cima repassa para o
    * `AppBottomNav`. `null` na abertura e no fecho.
@@ -47,8 +65,11 @@ export function TutorialDaBolha({
   /** Terminou ou pulou: os dois gravam a mesma marca. */
   onFechar: () => void;
 }) {
-  const [i, setI] = useState(0);
   const bolha = useRef<BolhaHandle>(null);
+  /* Um índice fora da faixa não pode virar tela em branco: o `localStorage`
+     guarda o passo, e uma versão futura com menos cartões o encontraria
+     apontando para o vazio. */
+  const i = Math.max(0, Math.min(PASSOS_DO_TUTORIAL.length - 1, iPasso));
   const passo = PASSOS_DO_TUTORIAL[i];
   const ultimo = i === PASSOS_DO_TUTORIAL.length - 1;
 
@@ -70,7 +91,7 @@ export function TutorialDaBolha({
       onFechar();
       return;
     }
-    setI((v) => v + 1);
+    onAvancar();
     /* Um cutucão por passo: é ele que faz o texto ter um dono. Sem isso, os
        sete cartões lêem como uma sequência de avisos do sistema. */
     bolha.current?.chamar();

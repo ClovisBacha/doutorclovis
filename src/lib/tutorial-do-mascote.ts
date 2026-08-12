@@ -118,3 +118,32 @@ export function comNome(texto: string, nome?: string | null): string {
 export function chaveDoTutorial(uid: string | null): string {
   return `dc-tutorial-bolha:${uid ?? "anon"}`;
 }
+
+/**
+ * Chave do PASSO em que ela parou.
+ *
+ * Separada da de cima porque as duas respondem perguntas diferentes: "já
+ * terminou?" e "onde estava?". Guardadas na mesma, um valor teria de significar
+ * as duas coisas — e o dia em que alguém lesse "1" como passo 1 em vez de
+ * "concluído" o tutorial voltaria do começo para quem já o tinha visto.
+ *
+ * ⚠️ Existe porque a barra continua clicável durante a aula: tocar num item
+ * troca a aba, desmonta o tutorial, e sem isto voltar para o Bebê recomeçava do
+ * primeiro cartão. Guardar em memória resolveria a ida e volta dentro do app;
+ * o `localStorage` resolve também fechar o app no meio.
+ */
+export function chaveDoPassoDoTutorial(uid: string | null): string {
+  return `dc-tutorial-bolha-passo:${uid ?? "anon"}`;
+}
+
+/** Lê o passo guardado, já preso na faixa válida. */
+export function lerPassoDoTutorial(uid: string | null): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const n = Number(localStorage.getItem(chaveDoPassoDoTutorial(uid)));
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(PASSOS_DO_TUTORIAL.length - 1, Math.floor(n)));
+  } catch {
+    return 0;
+  }
+}

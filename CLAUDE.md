@@ -532,9 +532,19 @@ texto enterrado em componente é um texto que ele não edita.
   (`dc-nav-destaque`). Um `clip-path` com furo precisaria ser recalculado toda
   vez que a barra encolhe ao rolar — e tutorial que aponta para o lugar errado
   é pior que nenhum.
-- **A barra continua clicável durante a aula.** Tocar num ícone encerra o
-  tutorial e leva até lá: prender a paciente em sete telas para poder usar o
-  app que ela acabou de instalar é a definição de tutorial ruim.
+- **A barra continua clicável durante a aula.** Tocar num ícone leva até lá:
+  prender a paciente em sete telas para poder usar o app que ela acabou de
+  instalar é a definição de tutorial ruim.
+- ⚠️ **E por isso o PASSO não mora no tutorial.** Tocar num item troca a aba,
+  tira a home do ar e DESMONTA o componente — com o índice em `useState` lá
+  dentro, voltar para o Bebê recomeçava do primeiro cartão (o dono viu). O
+  índice vive em `minha-conta` e é gravado em `chaveDoPassoDoTutorial`: o
+  estado da página resolve a ida e volta, o storage resolve fechar o app no
+  meio. Mesmo defeito do `sub` local do `RegistrosHub`, mesma solução.
+- **Durante o tutorial o mascote do canto fica CALADO** (`mascoteCalado`). Sem
+  isso ele falava a frase do dia por trás do véu: dois balões do mesmo
+  personagem na mesma tela, dizendo coisas diferentes. O emblema fica — ele é
+  informação, não fala.
 - **O tutorial espera o ritual de boas-vindas.** Duas telas cheias no primeiro
   minuto seriam dois tutoriais. Quem ainda vai ver o ritual encontra o tutorial
   na abertura seguinte, com o app já personalizado.

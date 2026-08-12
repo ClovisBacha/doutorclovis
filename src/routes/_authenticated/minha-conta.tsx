@@ -149,7 +149,11 @@ import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
 import { MenuDaConta } from "@/components/menu-conta";
 import { TutorialDaBolha } from "@/components/tutorial-da-bolha";
-import { chaveDoTutorial } from "@/lib/tutorial-do-mascote";
+import {
+  chaveDoPassoDoTutorial,
+  chaveDoTutorial,
+  lerPassoDoTutorial,
+} from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
 import {
   contarNaoLidas,
@@ -736,12 +740,32 @@ function MinhaContaPage() {
      está falando, e quem acende é o `AppBottomNav`. */
   const [tutorialAberto, setTutorialAberto] = useState(false);
   const [destaqueDaBarra, setDestaqueDaBarra] = useState<BottomSection | "sos" | null>(null);
+  /* ⚠️ O PASSO MORA AQUI, e não dentro do tutorial. A barra continua clicável
+     durante a aula: tocar em "Jogo" troca a aba, tira a home do ar e desmonta
+     o componente — e com o índice lá dentro, voltar recomeçava do primeiro
+     cartão. Foi o defeito que o dono viu. Guardado aqui ele sobrevive à ida e
+     volta; guardado também no `localStorage`, sobrevive a fechar o app. */
+  const [passoDoTutorial, setPassoDoTutorial] = useState(0);
+
+  function avancarTutorial() {
+    setPassoDoTutorial((v) => {
+      const proximo = v + 1;
+      try {
+        localStorage.setItem(chaveDoPassoDoTutorial(profile?.id ?? null), String(proximo));
+      } catch {
+        /* modo privado: continua funcionando dentro da sessão, que é o caso
+           que o dono relatou. */
+      }
+      return proximo;
+    });
+  }
 
   function fecharTutorial() {
     setTutorialAberto(false);
     setDestaqueDaBarra(null);
     try {
       localStorage.setItem(chaveDoTutorial(profile?.id ?? null), "1");
+      localStorage.removeItem(chaveDoPassoDoTutorial(profile?.id ?? null));
     } catch {
       /* modo privado: ele volta na próxima abertura. Chato, não quebra — e
          quem está em modo privado sabe que nada é lembrado. */
@@ -1242,7 +1266,11 @@ function MinhaContaPage() {
         } catch {
           /* modo privado: ele volta. Ver `fecharTutorial`. */
         }
-        if (!jaViu && (hasAnchor || dismissed)) setTutorialAberto(true);
+        if (!jaViu && (hasAnchor || dismissed)) {
+          /* Retoma de onde ela parou — inclusive depois de fechar o app. */
+          setPassoDoTutorial(lerPassoDoTutorial(u.user.id));
+          setTutorialAberto(true);
+        }
       }
     })();
   }, []);
@@ -1533,6 +1561,8 @@ function MinhaContaPage() {
       {tutorialAberto && mobileHome && !careMode && !showOnboarding && (
         <TutorialDaBolha
           nome={profile?.display_name ?? null}
+          passo={passoDoTutorial}
+          onAvancar={avancarTutorial}
           onPasso={(d) => setDestaqueDaBarra(d as BottomSection | "sos" | null)}
           onFechar={fecharTutorial}
         />
@@ -1790,6 +1820,8 @@ function MinhaContaPage() {
                    acabou de anunciar o recado, e fazer a paciente procurá-lo
                    dentro da lista da conta desmentiria o anúncio. */
                 onOpenRecados={() => setNotifOpen(true)}
+                /* Durante o tutorial ele fala pelo cartão, não pelo canto. */
+                mascoteCalado={tutorialAberto}
                 onOrigemLocal={setOrigemLocal}
                 babyTone={profile?.baby_skin_tone ?? 0}
                 careMode={careMode}

@@ -57,6 +57,7 @@ export function MascoteDaHome({
   fala,
   onAbrir,
   careMode = false,
+  calado = false,
   tamanho = 44,
 }: {
   humor?: Humor;
@@ -72,6 +73,18 @@ export function MascoteDaHome({
   fala?: FalaDoMascote | null;
   onAbrir?: () => void;
   careMode?: boolean;
+  /**
+   * Segura o balão — o emblema continua.
+   *
+   * ⚠️ Existe por um defeito que o dono fotografou: com o TUTORIAL aberto, o
+   * personagem do canto também estava falando ("Estou aqui do seu lado…") por
+   * trás do véu. Dois balões do mesmo personagem na mesma tela, dizendo coisas
+   * diferentes — e um deles atrás de um vidro escurecido.
+   *
+   * O emblema fica de propósito: ele é informação (há recado), não fala. Quem
+   * cala é a boca.
+   */
+  calado?: boolean;
   tamanho?: number;
 }) {
   const bolha = useRef<BolhaHandle>(null);
@@ -137,7 +150,7 @@ export function MascoteDaHome({
           palavra e "Tenho 3 recados 💌" saía em três linhas, com o emoji
           sozinho na última. `max-w` não resolvia: ele limita o teto, e o
           problema era o piso. */}
-      {oQueEleDiz && mostrarFala && (
+      {oQueEleDiz && mostrarFala && !calado && (
         <button
           type="button"
           onClick={onAbrir}
