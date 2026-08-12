@@ -82,45 +82,19 @@ function momentosDoDia(s: Record<string, boolean>): number {
  * ideia — e o emoji não tem versão vazia, então a estrela apagada saía cinza
  * suja em vez do contorno leve.
  */
-function StarMeter({
-  feitos,
-  px = 15,
-  animando = null,
-  onFimDaAnimacao,
-}: {
-  feitos: number;
-  px?: number;
-  /** Índice (0–4) da estrela que acabou de acender, ou `null`. */
-  animando?: number | null;
-  onFimDaAnimacao?: () => void;
-}) {
+function StarMeter({ feitos, px = 15 }: { feitos: number; px?: number }) {
+  /* Sem animação aqui: este placar aparece no NÓ DA TRILHA, e a conquista
+     acontece com a folha do dia aberta por cima. As duas comemorações moram
+     lá dentro — ver `WellnessScreen`. */
   return (
     <span
       className="inline-flex items-center gap-0.5 leading-none"
       role="img"
       aria-label={`${feitos} de ${TOTAL_DO_DIA} estrelas`}
     >
-      {Array.from({ length: TOTAL_DO_DIA }, (_, i) =>
-        i === animando ? (
-          /* O sprite é MAIOR que a estrela e recuado pela mesma margem: a
-             animação tem faíscas em volta que precisam de espaço, e sem o
-             recuo a fileira inteira saltaria de largura no instante em que uma
-             estrela acende. */
-          <SpriteDoJogo
-            key={i}
-            tipo="estrela"
-            tamanho={px * 2.2}
-            /* Margem por `style` e não por classe: o Tailwind varre o código
-               em busca de nomes de classe LITERAIS, e uma classe montada com
-               template literal simplesmente não é gerada — o recuo não
-               existiria e a fileira saltaria de largura assim mesmo. */
-            style={{ margin: `-${Math.round(px * 0.6)}px` }}
-            onFim={onFimDaAnimacao}
-          />
-        ) : (
-          <EstrelaDoDia key={i} acesa={i < feitos} tamanho={px} />
-        ),
-      )}
+      {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
+        <EstrelaDoDia key={i} acesa={i < feitos} tamanho={px} />
+      ))}
     </span>
   );
 }
@@ -1508,37 +1482,13 @@ export function GestacaoPath({
   // estado de outros dias abertos no sheet (dayTasks muda a cada openDay)
   const [todayTasks, setTodayTasks] = useState<Record<string, boolean>>({});
 
-  /* ─── AS ESTRELAS DO NÓ DE HOJE, ACENDENDO ───────────────────────────────
-     Pedido do dono: cada atividade concluída acende uma das cinco estrelas com
-     animação, e completar as cinco dispara a animação das cinco enfileiradas —
-     as duas no nó do dia em que ela está jogando.
-
-     O gatilho é a SUBIDA do contador, nunca o valor: com o valor, abrir a
-     trilha num dia já fechado acenderia a comemoração de novo, todo dia, para
-     sempre. `useRef` guarda quanto havia quando esta tela montou.
-
-     `estrelaNova` é o índice da que acabou de acender (0–4); `cincoAgora` é o
-     dia inteiro fechado. Os dois se apagam sozinhos quando o sprite termina. */
-  /* ⚠️ `hidratou` não é zelo: `todayTasks` nasce `{}` e só é preenchido pelo
-     `hydrateFromLocal()` do efeito de carregamento, que roda DEPOIS deste
-     gatilho. Sem a trava, a "primeira passada que só fotografa" fotografava
-     ZERO, e quando a hidratação chegava o contador saltava de 0 para o valor
-     real — uma subida. Resultado medido: abrir o Caminho num dia já fechado
-     disparava a comemoração das cinco estrelas sozinha, toda vez. */
-  const hidratou = useRef(false);
-  const momentosAntes = useRef<number | null>(null);
-  const [estrelaNova, setEstrelaNova] = useState<number | null>(null);
-  const [cincoAgora, setCincoAgora] = useState(false);
-  const momentosHoje = momentosDoDia(todayTasks);
-  useEffect(() => {
-    const antes = momentosAntes.current;
-    momentosAntes.current = momentosHoje;
-    /* Enquanto a hidratação não aconteceu, qualquer subida é dado chegando —
-       não conquista. */
-    if (!hidratou.current || antes === null || momentosHoje <= antes) return;
-    if (momentosHoje >= TOTAL_DO_DIA) setCincoAgora(true);
-    else setEstrelaNova(momentosHoje - 1);
-  }, [momentosHoje]);
+  /* O gatilho que ficava aqui — comparar `momentosDoDia(todayTasks)` entre
+     renderizações para acender a estrela no nó da trilha — SAIU. Ele tinha dois
+     defeitos que a revisão mediu: disparava sozinho quando a hidratação chegava
+     (o contador nasce em zero e sobe), e mesmo quando disparava certo a
+     animação acontecia ATRÁS da folha do dia, opaca, apagando-se antes de a
+     paciente voltar. As duas comemorações vivem agora dentro da folha, onde ela
+     está no instante da conquista. */
   const [showWelcome, setShowWelcome] = useState(false);
   // Incrementa quando o pull da nuvem hidrata o localStorage — filhos que leem
   // no mount (PosPartoJourney) usam como key para remontar com dados frescos
@@ -1618,17 +1568,7 @@ export function GestacaoPath({
       setBirth(lsGet<Birth | null>(LS.birth, null));
       setCelebrated(lsGet<boolean>(LS.celebrated, false));
       setJourneyStart(lsGet<JourneyStart | null>(LS.journeyStart, null));
-      const doDia = lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {});
-      setTodayTasks(doDia);
-      /* ⚠️ A BASE DO GATILHO É FIXADA AQUI, com o valor que ACABOU de ser
-         lido — e não por um sinalizador ligado antes do estado chegar.
-         `todayTasks` nasce `{}`, então uma comparação feita antes da hidratação
-         vê o contador saltar de 0 para o valor real e lê isso como conquista:
-         abrir o Caminho num dia já fechado disparava a comemoração das cinco
-         estrelas sozinha, toda vez. Com a base tomada da mesma leitura, a
-         subida só existe quando ela faz alguma coisa de verdade. */
-      momentosAntes.current = momentosDoDia(doDia);
-      hidratou.current = true;
+      setTodayTasks(lsGet<Record<string, boolean>>(LS.dayTasks(todayD), {}));
     };
 
     // Render imediato com o que o aparelho tem
@@ -3153,21 +3093,11 @@ export function GestacaoPath({
                     {/* As CINCO enfileiradas quando o dia fecha — só no nó de
                         hoje, e só no instante em que fecha. Depois dela, o
                         placar volta a ser o placar. */}
-                    {isToday && cincoAgora ? (
-                      <SpriteDoJogo
-                        tipo="cinco"
-                        tamanho={74}
-                        className="-my-6"
-                        onFim={() => setCincoAgora(false)}
-                      />
-                    ) : (
-                      <StarMeter
-                        feitos={done ? TOTAL_DO_DIA : feitosHoje}
-                        px={13}
-                        animando={isToday ? estrelaNova : null}
-                        onFimDaAnimacao={() => setEstrelaNova(null)}
-                      />
-                    )}
+                    {/* ⚠️ Sem animação AQUI. As duas comemorações moram na
+                        folha do dia, que é onde a paciente está no instante da
+                        conquista — na trilha elas tocavam atrás de uma tela
+                        opaca e se apagavam antes de ela voltar. */}
+                    <StarMeter feitos={done ? TOTAL_DO_DIA : feitosHoje} px={13} />
                   </div>
                 )}
               </button>
@@ -6479,6 +6409,11 @@ function WellnessScreen({
        Aqui não há ambiguidade — este é o único ponto do arquivo em que uma
        atividade acabou de ser feita. */
     setRecemFeito(key);
+    /* `halves` é a contagem ANTES deste ganho, então ela é o índice (0-based)
+       da estrela que acabou de acender. Ler o estado depois não serviria: ele
+       só sobe quando o servidor responde. */
+    if (halves + 1 >= TOTAL_DO_DIA) setCincoNovas(true);
+    else setEstrelaNova(halves);
     setTimeout(refresh, 500);
   }
 
@@ -6535,9 +6470,25 @@ function WellnessScreen({
     })),
   ];
 
-  /* Qual atividade acabou de ser feita — para a bolinha verde completar com
-     animação. Quem escreve é `handleEarn`, o instante real; ver lá. */
+  /* ─── AS TRÊS ANIMAÇÕES DE CONQUISTA, E POR QUE ELAS MORAM AQUI ──────────
+     Elas nasceram no nó da trilha, e a revisão mediu o óbvio depois de pronto:
+     a folha do dia é `fixed inset-0 z-[60]` com fundo OPACO e não fecha sozinha
+     ao ganhar. A estrela acendia atrás dela e se apagava em 2 s — a paciente
+     terminava a atividade e a comemoração acontecia numa tela que ela não
+     estava vendo.
+
+     Aqui ela está. E o cartão "⭐ Estrelas de hoje", no pé desta folha, é
+     literalmente o lugar que o dono descreveu: "lá embaixo tem as cinco
+     estrelas, e cada vez que a pessoa completar uma dessas, ela ganha ali uma
+     estrela".
+
+     Os três nascem de `handleEarn`, o único ponto do arquivo em que uma
+     atividade acabou de ser feita — e não de comparar contadores que chegam do
+     servidor, que foi o que fazia a bolinha "completar" de novo numa tarefa
+     terminada de manhã. */
   const [recemFeito, setRecemFeito] = useState<string | null>(null);
+  const [estrelaNova, setEstrelaNova] = useState<number | null>(null);
+  const [cincoNovas, setCincoNovas] = useState(false);
 
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
      Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a
@@ -7086,9 +7037,32 @@ function WellnessScreen({
                   role="img"
                   aria-label={`${halves} de ${TOTAL_DO_DIA} estrelas conquistadas`}
                 >
-                  {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
-                    <EstrelaDoDia key={i} acesa={i < halves} tamanho={38} />
-                  ))}
+                  {cincoNovas ? (
+                    /* As cinco enfileiradas ocupam a fileira inteira no
+                       instante em que o dia fecha. `-my-8` porque o sprite é
+                       quadrado e a arte final é uma faixa horizontal: sem o
+                       recuo, o cartão saltaria de altura. */
+                    <SpriteDoJogo
+                      tipo="cinco"
+                      tamanho={200}
+                      style={{ margin: "-2rem 0" }}
+                      onFim={() => setCincoNovas(false)}
+                    />
+                  ) : (
+                    Array.from({ length: TOTAL_DO_DIA }, (_, i) =>
+                      i === estrelaNova ? (
+                        <SpriteDoJogo
+                          key={i}
+                          tipo="estrela"
+                          tamanho={38 * 2.2}
+                          style={{ margin: "-23px" }}
+                          onFim={() => setEstrelaNova(null)}
+                        />
+                      ) : (
+                        <EstrelaDoDia key={i} acesa={i < halves} tamanho={38} />
+                      ),
+                    )
+                  )}
                 </div>
 
                 <p className="mt-3 text-center text-[13px]" style={{ color: tintaSec }}>
