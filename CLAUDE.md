@@ -169,6 +169,12 @@ Agora existe um contrato só: a view **`clinical_events`** une onze fontes em
 - **`security_invoker = true`**: a view respeita a RLS de quem consulta.
 - `clinical_acks` guarda o DESFECHO que o médico registra ("já cuidei"), não a
   leitura.
+- ⚠️ **Um contrato só quer dizer UMA LEITURA por fonte.** O painel ainda tinha
+  `listarTriagens`, um segundo caminho para `triage_logs`: buscava a cada
+  abertura, guardava a lista em estado e NENHUMA tela a desenhava — só o
+  sinalizador de falha sobrevivia, pondo "alertas de sintomas" na faixa de
+  fontes com problema sobre um dado que chegava inteiro por `clinical_events`.
+  Saiu (ago/2026). Se a triagem merecer tela própria, ela nasce da view.
 
 Leitura: `src/lib/clinical.functions.ts` (`eventosQuePedemOlhar`,
 `prontuarioDaPaciente`, `fichaClinica`, `registrarDesfecho`, `serieDe`).
@@ -485,12 +491,31 @@ arte nova.
   dizer algo sobre ele, ou não dizer nada".
 - **Duas bolhas na mesma tela é o risco real da mudança** — se as duas lerem
   como a mesma coisa, o app passa a ter dois filhos e o do canto fala. Três
-  coisas separam: **tamanho** (44px contra ~236px), **rosto** (a do centro tem
+  coisas separam: **tamanho** (88px contra ~236px), **rosto** (a do centro tem
   um FETO, sem olhos; esta pisca) e **lugar** (esta na fileira de ferramentas,
-  aquela sozinha no céu).
-- **Ficar quieto é metade do valor.** Sem recado ele não diz nada. Personagem
-  que fala toda vez que a tela abre vira ruído em três dias — e aí ninguém lê o
-  balão no dia em que ele tiver algo urgente.
+  aquela sozinha no céu). Ele **dobrou de 44 para 88px** a pedido do dono; o
+  que segura a leitura é a proporção continuar de quase 1 para 3.
+- **Ele NÃO fica mais quieto sem recado — ele conforta.** Pedido do dono na
+  mesma noite: sem notificação, o personagem escreve conforto e motivação, "e
+  também frases determinadas pela hora do dia e pelo clima". A régua está em
+  `src/lib/frases-do-mascote.ts`, e o que impede o ruído deixou de ser o
+  silêncio e passou a ser **uma frase por DIA** (`fraseDoDia` é determinística
+  no dia local). Um balão novo a cada toque em "Bebê" viraria letreiro.
+- ⚠️ **A frase é decidida UMA vez e congela.** O clima chega depois da primeira
+  pintura, e as frases de clima entram e saem do sorteio conforme ele: o balão
+  nascia com uma frase e trocava por outra sob os olhos de quem lia. A home
+  espera o clima por até 2,5 s (prazo, para quem está sem rede) e então
+  congela. O recado continua vencendo o conforto, mas por RENDER — some o
+  recado, volta a mesma frase, sem sortear outra.
+- **Três recortes, e os três existem por um defeito concreto:** `periodos` (a
+  faixa do dia), `horas` (⚠️ "já são quase onze" saía às 18h05, porque `noite`
+  vai das 18h à meia-noite) e `desde` (⚠️ "já sentiu o bebê hoje?" saía na 11ª
+  semana, quando ainda não há o que sentir — a pergunta diária vira "eu deveria
+  estar sentindo e não estou"). **Sem o dado, a frase com recorte NÃO entra**:
+  na dúvida, uma frase genérica.
+- **As cinco expressões entraram em uso** (`humorDaJornada`): dormindo à noite
+  sem pendência, surpresa de madrugada, orgulhosa (a piscadinha) quando há
+  recado, feliz no resto.
 - **O emblema mostra o NÚMERO, não um ponto**: "tem coisa" obriga a abrir para
   descobrir se vale a pena, e a pergunta que ela faz é quantos. Teto em `9+`,
   que é limite de LARGURA no canto da tela.
@@ -511,11 +536,42 @@ arte nova.
   decide a largura por shrink-to-fit contra o CONTAINER — 44px aqui. Sem
   `w-max`, "Tenho 3 recados 💌" saía em três linhas com o emoji sozinho na
   última; `max-w` não resolve, porque ele limita o teto e o problema era o piso.
-- **Bancada:** `/preview-home?w=20&notif=3`.
+- **Bancada:** `/preview-home?w=20&notif=3` (e `&clima=1` para ligar a consulta
+  real de clima, que é a única forma de fotografar as frases de tempo).
   ⚠️ `quantos` lê o próprio campo antes de `notif`: o router serializa e
   revalida, e na segunda passada `s.notif` já é o booleano `true` — `Number(true)`
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
+
+#### A caixa de entrada guarda sete dias, e o tutorial mora fora dela
+
+- **Lida some em 7 dias; NÃO lida nunca some.** Pedido do dono: "sempre ficará
+  guardado ali durante pelo menos 7 dias, depois elas somem (as que já foram
+  lidas)". O formato virou `id → INSTANTE` (`Map`), porque sem o instante não há
+  como saber quando os sete dias começam.
+- ⚠️ **A janela do STORAGE (meio ano) é muito maior que a de EXIBIÇÃO (7 dias)**,
+  e isso fecha um laço: quem esconde a lida é o carimbo — apagado o carimbo, a
+  notificação VOLTA, não lida, com ponto vermelho. Como as derivadas renascem do
+  estado da conta, ela voltaria para sempre.
+- ⚠️ **A conversão do formato antigo (lista de ids) GRAVA na hora.** Sem gravar,
+  `lerLidas` reconvertia a cada abertura com o instante daquele momento e o
+  relógio dos sete dias reiniciava para sempre.
+- **Abrir a caixa não é ler tudo**: quem marca é o toque em CADA item. Abrir e
+  ver cinco recados sem tempo de ler perdia o rastro dos cinco de uma vez.
+- ⚠️ **O texto da caixa vazia NÃO promete recado do médico.** Ele prometia, e não
+  era verdade: as enviadas ainda não existem, e recado de médico chega pela
+  conversa e por push. A paciente passaria a vir olhar uma caixa vazia esperando
+  o obstetra dela — e o silêncio de um obstetra de alto risco não é detalhe de
+  interface.
+- **O tutorial guarda o PASSO fora do componente** (`passoDoTutorial` em
+  `minha-conta`, e no `localStorage`): a barra continua clicável durante a aula,
+  então tocar em "Jogo" desmonta a home e, com o índice em estado local, voltar
+  recomeçava do primeiro cartão. Foi o defeito que o dono viu.
+- ⚠️ **E ele só abre onde a barra existe** (`ehCelular`, `matchMedia` no mesmo
+  corte do `md:hidden`). `mobileHome` é ESTADO; quem esconde a home e a barra num
+  monitor é CSS. No computador ele abria sobre uma tela sem barra, apontando
+  para ícones invisíveis, e no fim gravava "já viu" — quem entrou pelo
+  computador perdia o tutorial do celular para sempre.
 
 ### As três animações de conquista, e um troféu que sumia (ago/2026)
 
@@ -654,11 +710,19 @@ encontrava a pergunta, e não tinha como contar dali.
   digitou 1200 em vez de 120 precisa dele, e o painel do médico pinta a
   gravidade desses números — valor errado que não se pode apagar vira alarme
   falso no consultório.
-- **A ordem da grade é clínica**: Saúde · Alertas · Chutes · Contrações ·
-  Nutrição · Bem-estar. Alertas subiu para o segundo lugar porque é a tela que
-  decide se ela procura atendimento.
-- **Bancada:** `/preview-saude?w=20` (grávida, seis quadrados) · `?w=38` e sem
-  parâmetro (sete, com Saúde da mulher).
+- **Quatro ladrilhos, e não seis** — pedido do dono na mesma noite: "nessa tela
+  eu não quero que tenha as funções de alertas, e nem de bem-estar; tudo que é
+  do bem-estar está dentro da aba do jogo". Ele está certo sobre o Jogo: o
+  Caminho tem os quatro momentos do dia (`MovementBlock`, `MeditationBlock`,
+  `BondingBlock`, `GratitudeBlock`), então Meditar e Mexer já vivem lá, com
+  implementação própria. E os nove sintomas VERMELHOS continuam no SOS, que é o
+  primeiro botão da barra (`emergency-sheet`, sob "Procure atendimento agora se
+  sentir"). **A grade perdeu um atalho, não o conteúdo.**
+- **A ordem da grade é clínica**: Saúde · Chutes · Contrações · Nutrição (e
+  Saúde da mulher quando ela aparece). Primeiro "estou bem?" (números), depois
+  "e o bebê?" (chutes, contrações), e por fim o que se come.
+- **Bancada:** `/preview-saude?w=20` (grávida, quatro quadrados) · `?w=38` e sem
+  parâmetro (cinco, com Saúde da mulher).
   ⚠️ `validateSearch` usa `q.w == null` e **não** `=== undefined`: o router
   serializa e revalida, então na segunda passada chega `null` — e `Number(null)`
   é **0**. Com o `===`, abrir sem parâmetro terminava em `?w=0` e a grade
@@ -1309,6 +1373,17 @@ semanas — em `src/assets/bebes/semana-NN.webp`.
   (4–8 → 6 · 9–15 → 10 · 16–25 → 20 · 26–35 → 30 · 36–42 → 40). Empate para
   baixo não é detalhe: mostrar um bebê mais desenvolvido do que ele está
   antecipa marcos — cabelo, unhas, gordura — que ainda não existem.
+  A régua mora em **`src/lib/arte-do-bebe.ts`** (pura, testada) e não no
+  componente: `baby-illustration.tsx` abre com cinco `import` de `.webp` e um
+  teste morreria na primeira linha — mesma razão de `frases-do-mascote.ts`.
+- ⚠️ **A Jornada do Bebê pede a semana TÍPICA DO ESTÁGIO, nunca a semana real.**
+  As cinco artes não têm as bordas dos cinco estágios: na 27ª (fim do "Feto") a
+  arte mais próxima é a de 30, que é a do "Feto (reta final)" — a linha marcada
+  "você está aqui" e a de baixo mostravam O MESMO desenho, numa tela cujo
+  assunto inteiro é a mudança. Vale para 26–27 e para a 36.
+  `semanaTipicaDoEstagio` devolve o meio da faixa, que cai na arte daquele
+  estágio nos cinco casos; o teste cobra que as cinco linhas fiquem com cinco
+  desenhos distintos. A semana real continua no cabeçalho e no tamanho/peso.
 - **`tinta` é MEDIDA por arte** (58,6% · 64% · 81,3% · 71,1% · 91,4% do maior
   lado, α ≥ 128) e é ela que `escalaDoCorpo` divide. Sem isso a semana 36
   mostraria um bebê 56% maior que a 35 sem nada ter acontecido — o salto não
@@ -1331,6 +1406,24 @@ o fuso do contêiner (UTC) muda a cena.
 **O Céu Clássico (`sky_theme = "v1"`) continua de pé.** É item pago da Loja
 (150 🌱); as dez artes eram o tema padrão, este é a alternativa que alguém
 comprou. Apagá-la seria tirar da paciente uma coisa que ela pagou.
+
+⚠️ **E a moldura do iOS tem de seguir o tema dela.** No app instalado, o iOS não
+pinta a página fora da área segura: pinta o fundo do DOCUMENTO. A home escrevia
+ali a `corDeTopo` das cenas NOVAS mesmo no Clássico — duas paletas encostadas,
+com a emenda passando exatamente atrás do relógio do sistema, num tema pago.
+`corDeTopoClassica` (`weather-sky.tsx`) tira a cor do PRÓPRIO gradiente: uma
+segunda tabela divergiria na primeira troca de paleta.
+
+⚠️ **CELULAR DEITADO (`deitada:`, max-height 520px).** Em paisagem a bolha era
+centrada na tela inteira enquanto a barra de baixo reserva 117px do pé, e o vão
+para o número da semana ficava em ~5px: com `items-center` o número transbordava
+para CIMA e pousava em cima do bebê (medido: 20px de sobreposição no 15 Pro
+deitado, 12px no SE). O manifesto pede `portrait-primary`, mas **o iOS ignora
+orientação de manifesto**. Deitada, a bolha se centra no espaço ACIMA da barra e
+o `top` do número acompanha — **os dois descrevem o mesmo centro e mudam
+juntos**. Em pé nada muda: a composição medida é a de todo dia. O corte de 520px
+fica entre o menor iPhone em pé (SE, 667) e o maior deitado (Pro Max, 430) — e
+`short` (849) não serve, porque pega os dois casos que já estavam certos.
 
 ## Experiência "app de milhões" (IMPLEMENTADO — jul/2026)
 
