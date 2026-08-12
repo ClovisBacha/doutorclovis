@@ -82,16 +82,45 @@ function momentosDoDia(s: Record<string, boolean>): number {
  * ideia — e o emoji não tem versão vazia, então a estrela apagada saía cinza
  * suja em vez do contorno leve.
  */
-function StarMeter({ feitos, px = 15 }: { feitos: number; px?: number }) {
+function StarMeter({
+  feitos,
+  px = 15,
+  animando = null,
+  onFimDaAnimacao,
+}: {
+  feitos: number;
+  px?: number;
+  /** Índice (0–4) da estrela que acabou de acender, ou `null`. */
+  animando?: number | null;
+  onFimDaAnimacao?: () => void;
+}) {
   return (
     <span
       className="inline-flex items-center gap-0.5 leading-none"
       role="img"
       aria-label={`${feitos} de ${TOTAL_DO_DIA} estrelas`}
     >
-      {Array.from({ length: TOTAL_DO_DIA }, (_, i) => (
-        <EstrelaDoDia key={i} acesa={i < feitos} tamanho={px} />
-      ))}
+      {Array.from({ length: TOTAL_DO_DIA }, (_, i) =>
+        i === animando ? (
+          /* O sprite é MAIOR que a estrela e recuado pela mesma margem: a
+             animação tem faíscas em volta que precisam de espaço, e sem o
+             recuo a fileira inteira saltaria de largura no instante em que uma
+             estrela acende. */
+          <SpriteDoJogo
+            key={i}
+            tipo="estrela"
+            tamanho={px * 2.2}
+            /* Margem por `style` e não por classe: o Tailwind varre o código
+               em busca de nomes de classe LITERAIS, e uma classe montada com
+               template literal simplesmente não é gerada — o recuo não
+               existiria e a fileira saltaria de largura assim mesmo. */
+            style={{ margin: `-${Math.round(px * 0.6)}px` }}
+            onFim={onFimDaAnimacao}
+          />
+        ) : (
+          <EstrelaDoDia key={i} acesa={i < feitos} tamanho={px} />
+        ),
+      )}
     </span>
   );
 }
@@ -413,6 +442,7 @@ import {
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Bolha, humorDaJornada } from "@/components/bolha";
+import { SpriteDoJogo } from "@/components/sprites-do-jogo";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
 import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
 import { rotuloDeAmigas } from "@/lib/amigas";
@@ -1477,6 +1507,31 @@ export function GestacaoPath({
   // Estado dedicado do dia de HOJE: alimenta o anel segmentado sem vazar o
   // estado de outros dias abertos no sheet (dayTasks muda a cada openDay)
   const [todayTasks, setTodayTasks] = useState<Record<string, boolean>>({});
+
+  /* ─── AS ESTRELAS DO NÓ DE HOJE, ACENDENDO ───────────────────────────────
+     Pedido do dono: cada atividade concluída acende uma das cinco estrelas com
+     animação, e completar as cinco dispara a animação das cinco enfileiradas —
+     as duas no nó do dia em que ela está jogando.
+
+     O gatilho é a SUBIDA do contador, nunca o valor: com o valor, abrir a
+     trilha num dia já fechado acenderia a comemoração de novo, todo dia, para
+     sempre. `useRef` guarda quanto havia quando esta tela montou.
+
+     `estrelaNova` é o índice da que acabou de acender (0–4); `cincoAgora` é o
+     dia inteiro fechado. Os dois se apagam sozinhos quando o sprite termina. */
+  const momentosAntes = useRef<number | null>(null);
+  const [estrelaNova, setEstrelaNova] = useState<number | null>(null);
+  const [cincoAgora, setCincoAgora] = useState(false);
+  const momentosHoje = momentosDoDia(todayTasks);
+  useEffect(() => {
+    const antes = momentosAntes.current;
+    momentosAntes.current = momentosHoje;
+    /* Primeira passada só fotografa: sem isto, entrar na trilha com três
+       atividades prontas dispararia a animação da terceira. */
+    if (antes === null || momentosHoje <= antes) return;
+    if (momentosHoje >= TOTAL_DO_DIA) setCincoAgora(true);
+    else setEstrelaNova(momentosHoje - 1);
+  }, [momentosHoje]);
   const [showWelcome, setShowWelcome] = useState(false);
   // Incrementa quando o pull da nuvem hidrata o localStorage — filhos que leem
   // no mount (PosPartoJourney) usam como key para remontar com dados frescos
@@ -3078,7 +3133,24 @@ export function GestacaoPath({
                     viram ruído, e ainda por cima parecem cobrança. */}
                 {(isToday || done) && !careMode && (
                   <div className="mt-1.5 drop-shadow-sm">
-                    <StarMeter feitos={done ? TOTAL_DO_DIA : feitosHoje} px={13} />
+                    {/* As CINCO enfileiradas quando o dia fecha — só no nó de
+                        hoje, e só no instante em que fecha. Depois dela, o
+                        placar volta a ser o placar. */}
+                    {isToday && cincoAgora ? (
+                      <SpriteDoJogo
+                        tipo="cinco"
+                        tamanho={74}
+                        className="-my-6"
+                        onFim={() => setCincoAgora(false)}
+                      />
+                    ) : (
+                      <StarMeter
+                        feitos={done ? TOTAL_DO_DIA : feitosHoje}
+                        px={13}
+                        animando={isToday ? estrelaNova : null}
+                        onFimDaAnimacao={() => setEstrelaNova(null)}
+                      />
+                    )}
                   </div>
                 )}
               </button>
@@ -6435,6 +6507,35 @@ function WellnessScreen({
     })),
   ];
 
+  /* ─── QUAL ATIVIDADE ACABOU DE SER FEITA ─────────────────────────────────
+     Pedido do dono: a bolinha verde tem de COMPLETAR com animação quando ela
+     sai da meditação (ou de qualquer um dos cinco) tendo terminado.
+
+     O gatilho é a TRANSIÇÃO de não-feito para feito, e não o estado "feito" —
+     senão a folha do dia explodiria confete em cinco linhas toda vez que ela
+     abrisse a tela. `useRef` guarda o que já estava pronto quando esta tela
+     montou: assim, reabrir um dia inteiro concluído não anima nada, e concluir
+     o quinto anima só o quinto.
+
+     O contador de estrelas usa o MESMO gatilho: uma atividade = uma estrela,
+     e as duas animações nascem do mesmo instante. */
+  const feitosAntes = useRef<Set<string> | null>(null);
+  const [recemFeito, setRecemFeito] = useState<string | null>(null);
+  const feitosAgora = linhasDoDia
+    .filter((l) => l.feito)
+    .map((l) => l.key)
+    .join(",");
+  useEffect(() => {
+    const agora = new Set(feitosAgora ? feitosAgora.split(",") : []);
+    const antes = feitosAntes.current;
+    feitosAntes.current = agora;
+    /* Primeira passada: só fotografa o que já estava feito. Sem isto, abrir um
+       dia com três atividades prontas dispararia três animações de uma vez. */
+    if (antes === null) return;
+    const novo = [...agora].find((k) => !antes.has(k));
+    if (novo) setRecemFeito(novo);
+  }, [feitosAgora]);
+
   /* ─── O QUE O MASCOTE DIZ ────────────────────────────────────────────────
      Eram três textos fixos, um deles com 118 caracteres e cinco linhas — a
      primeira dobra inteira gasta na mesma frase todo dia. Agora são 36 frases
@@ -6871,20 +6972,29 @@ function WellnessScreen({
                     </span>
                     {!careMode && (
                       <span className="flex shrink-0 items-center gap-1.5">
-                        <span
-                          className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[12px] ${
-                            isDone ? "bg-emerald-400 text-white" : ""
-                          }`}
-                          style={
-                            isDone
-                              ? undefined
-                              : {
-                                  border: `1.5px dashed ${ceuEscuro ? "rgba(255,255,255,0.34)" : "rgba(160,130,160,0.4)"}`,
-                                }
-                          }
-                        >
-                          {isDone ? "✓" : ""}
-                        </span>
+                        {/* A BOLINHA VERDE, e a animação que a completa.
+                            Só na atividade que ACABOU de ser feita: o sprite
+                            para no último quadro, que é o próprio check
+                            pousado, então ele não precisa ser trocado de volta
+                            depois — vira o estado final. */}
+                        {recemFeito === a.key ? (
+                          <SpriteDoJogo tipo="check" tamanho={30} className="-m-0.5" />
+                        ) : (
+                          <span
+                            className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[12px] ${
+                              isDone ? "bg-emerald-400 text-white" : ""
+                            }`}
+                            style={
+                              isDone
+                                ? undefined
+                                : {
+                                    border: `1.5px dashed ${ceuEscuro ? "rgba(255,255,255,0.34)" : "rgba(160,130,160,0.4)"}`,
+                                  }
+                            }
+                          >
+                            {isDone ? "✓" : ""}
+                          </span>
+                        )}
                         <span className="tabular-nums text-[13.5px]" style={{ color: tintaSec }}>
                           {isDone ? "1/1" : "0/1"}
                         </span>

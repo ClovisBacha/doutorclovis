@@ -290,16 +290,24 @@ describe("a animação do troféu", () => {
     /* Sem `forwards` a propriedade volta ao início e o troféu SOME no instante
        em que a última estrela acende — o quadro que a comemoração inteira
        existe para mostrar. */
-    expect(css).toMatch(/dcTrofeuX 0\.83333s steps\(10\) 6 forwards/);
-    expect(css).toMatch(/dcTrofeuY 5s steps\(6\) 1 forwards/);
+    expect(css).toMatch(/dcTrofeuX 0\.83333s steps\(10, jump-none\) 6 forwards/);
+    expect(css).toMatch(/dcTrofeuY 5s steps\(6, jump-none\) 1 forwards/);
   });
 
-  test("o percurso fecha a grade 10×6", () => {
-    /* Para N colunas, `steps(N)` amostra em i/N — o percurso tem de ir a
-       100%·N/(N−1) para os pontos caírem em 0…100%. 10 colunas → 111.111%;
-       6 linhas → 120%. Errar engole o último quadro e repete o primeiro. */
-    expect(css).toContain("background-position-x: 111.1111%");
-    expect(css).toMatch(/dcTrofeuY[\s\S]*?background-position-y: 120%/);
+  test("o percurso fecha a grade 10×6 E PARA DENTRO DELA", () => {
+    /* ⚠️ Este teste travava o defeito em vez de pegá-lo.
+       A regra antiga — `to` em 100%·N/(N−1), 111,111% e 120% — vale para
+       animação em LAÇO, onde nada é segurado no fim. Com `forwards`, o valor
+       que fica é o `to` LITERAL, e ele está FORA da folha: `background-size:
+       1000% 600%` só aceita 0–100%. Medido no navegador, aos 5,6 s a posição
+       era `111.111% 120%` e o troféu estava invisível — meio segundo de
+       comemoração vazia, e o quadro final nunca parado.
+
+       `jump-none` reparte de 0% a 100% inclusive: os mesmos quadros durante a
+       animação, e o último quadro no fim. O teste passa a cobrar o que
+       importa: que o percurso TERMINE dentro da folha. */
+    expect(css).toContain("background-position-x: 100%");
+    expect(css).toMatch(/dcTrofeuY[\s\S]*?background-position-y: 100%/);
     expect(css).toContain("background-size: 1000% 600%");
   });
 

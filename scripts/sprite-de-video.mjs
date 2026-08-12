@@ -31,10 +31,10 @@
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const [, , ORIGEM, DESTINO, QUADROS_ARG, COLUNAS_ARG, LARGURA_ARG] = process.argv;
+const [, , ORIGEM, DESTINO, QUADROS_ARG, COLUNAS_ARG, LARGURA_ARG, ATE_ARG] = process.argv;
 if (!ORIGEM || !DESTINO) {
   console.error(
-    "uso: node scripts/sprite-de-video.mjs <video.webm> <destino.webp> [quadros] [colunas] [larguraDoQuadro]",
+    "uso: node scripts/sprite-de-video.mjs <video.webm> <destino.webp> [quadros] [colunas] [larguraDoQuadro] [segundosAteOndeAmostrar]",
   );
   process.exit(1);
 }
@@ -65,7 +65,7 @@ const p = await b.newPage();
 await p.setContent("<body></body>");
 
 const r = await p.evaluate(
-  async ({ dataUri, QUADROS, COLUNAS, LARGURA }) => {
+  async ({ dataUri, QUADROS, COLUNAS, LARGURA, ATE }) => {
     const v = document.createElement("video");
     v.src = dataUri;
     v.muted = true;
@@ -96,7 +96,16 @@ const r = await p.evaluate(
     for (let i = 0; i < QUADROS; i++) {
       await new Promise((ok) => {
         v.onseeked = ok;
-        v.currentTime = (v.duration * i) / QUADROS;
+        /* ─── ATÉ ONDE AMOSTRAR ────────────────────────────────────────
+           Sem isto o script reparte a duração INTEIRA, e uma animação que
+           acontece no primeiro segundo de um vídeo de três gasta dois terços
+           dos quadros repetindo a pose final. Foi o caso do check verde: 30
+           quadros, e 20 deles idênticos.
+
+           O `ATE` corta a amostragem onde o movimento acaba. O que vem depois
+           não se perde — a animação toca uma vez e PARA no último quadro
+           (`forwards`), que é exatamente a pose de repouso do vídeo. */
+        v.currentTime = ((ATE || v.duration) * i) / QUADROS;
       });
       const x = (i % COLUNAS) * LADO_X;
       const y = Math.floor(i / COLUNAS) * LADO_Y;
@@ -121,7 +130,7 @@ const r = await p.evaluate(
       pctTransparente: +((transp / (c.width * c.height)) * 100).toFixed(1),
     };
   },
-  { dataUri, QUADROS, COLUNAS, LARGURA },
+  { dataUri, QUADROS, COLUNAS, LARGURA, ATE: Number(ATE_ARG) || 0 },
 );
 await b.close();
 
@@ -138,7 +147,8 @@ const bytes = Buffer.from(r.webp.split(",")[1], "base64");
 writeFileSync(DESTINO, bytes);
 console.log(
   `✓ ${DESTINO}\n` +
-    `  origem  ${r.dur}s → ${QUADROS} quadros (${(QUADROS / r.dur).toFixed(1)} fps)\n` +
+    `  origem  ${r.dur}s → ${QUADROS} quadros em ${Number(ATE_ARG) || r.dur}s ` +
+    `(${(QUADROS / (Number(ATE_ARG) || r.dur)).toFixed(1)} fps)\n` +
     `  folha   ${r.w}×${r.h}, grade ${COLUNAS}×${r.linhas} de ${r.ladoX}×${r.ladoY}\n` +
     `  alfa    ${r.pctTransparente}% transparente\n` +
     `  peso    ${(bytes.length / 1024).toFixed(1)} KB`,

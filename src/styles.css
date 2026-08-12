@@ -1217,6 +1217,79 @@ button:active > .duo3d {
   }
 }
 
+/* ── AS TRÊS ANIMAÇÕES DO JOGO ───────────────────────────────────────
+   Check verde (atividade feita) · estrela (uma por atividade) · cinco
+   estrelas (o dia inteiro fechado).
+
+   ─── UMA RÉGUA PARA AS TRÊS ──────────────────────────────────────────
+   As três folhas saíram em 6×4 de propósito: assim o par de `@keyframes` é
+   um só, e o que muda entre elas é a IMAGEM e a DURAÇÃO. Três pares de
+   keyframes quase iguais divergiriam no primeiro ajuste — foi o que quase
+   aconteceu com a chama e o troféu.
+
+   ─── POR QUE FOLHA DE SPRITES, DE NOVO ───────────────────────────────
+   **WebM com alfa não tem transparência no motor do Safari**, e o app é
+   instalado na tela de início do iPhone. As três apareceriam dentro de um
+   retângulo preto, só nos iPhones — a categoria de defeito que nenhuma
+   máquina de desenvolvimento mostra.
+
+   ─── ⚠️ `jump-none`, E NÃO O `to` ESTICADO ───────────────────────────
+   A chama e o troféu usam `steps(6)` com o `to` em 120%: `steps` padrão
+   (`jump-end`) amostra em i/n, então 120% entrega 0/20/40/60/80/100 — os seis
+   quadros. Isso vale para animação em LAÇO.
+
+   Aqui não vale, e o defeito é invisível até alguém olhar: com `forwards`, o
+   valor que fica depois do fim é o `to` LITERAL — 120%. Com `background-size:
+   600%`, a faixa válida vai de 0% a 100%; em 120% a folha inteira sai da caixa
+   e o elemento fica VAZIO. Medido: `background-position: 120% 33.3333%` e nada
+   desenhado na tela.
+
+   `steps(n, jump-none)` reparte de 0% a 100% INCLUSIVE — 0/20/40/60/80/100 em
+   seis colunas —, então o último passo já é o último quadro, e é ele que o
+   `forwards` segura. O `to` volta a ser 100%, que é o que ele deveria ser numa
+   animação que para.
+
+   ─── E POR QUE `forwards`, E NÃO `infinite` ──────────────────────────
+   As três são CONQUISTA, não decoração: elas acontecem uma vez, no instante
+   em que a paciente fez alguma coisa. Em laço, o check verde ficaria
+   explodindo confete para sempre ao lado de uma tarefa que ela concluiu há
+   dez minutos. Param no último quadro — que, nas três, é justamente a pose
+   de repouso (o check pousado, a estrela cheia, as cinco enfileiradas). */
+@keyframes dcSpriteX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 100%;
+  }
+}
+@keyframes dcSpriteY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 100%;
+  }
+}
+.dc-sprite {
+  display: inline-block;
+  background-repeat: no-repeat;
+  /* 600% × 400% = a folha inteira medida em quadros. */
+  background-size: 600% 400%;
+  animation:
+    dcSpriteX var(--sprite-x) steps(6, jump-none) forwards,
+    dcSpriteY var(--sprite-dur) steps(4, jump-none) forwards;
+}
+/* Com "menos movimento" ela PULA para o último quadro em vez de sumir: o
+   quadro final é o estado (feito, estrela cheia), e some-lo apagaria a
+   informação junto com o movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-sprite {
+    animation: none;
+    background-position: 100% 100%;
+  }
+}
+
 /* ── O ITEM DA BARRA QUE O TUTORIAL ESTÁ EXPLICANDO ──────────────────
    Um anel que pulsa atrás do ícone. É `::before` e não uma borda: borda
    empurraria o conteúdo e faria a barra inteira dançar a cada passo.
@@ -1458,7 +1531,7 @@ button:active > .duo3d {
     background-position-x: 0%;
   }
   to {
-    background-position-x: 111.1111%;
+    background-position-x: 100%;
   }
 }
 @keyframes dcTrofeuY {
@@ -1466,7 +1539,7 @@ button:active > .duo3d {
     background-position-y: 0%;
   }
   to {
-    background-position-y: 120%;
+    background-position-y: 100%;
   }
 }
 
@@ -1480,12 +1553,24 @@ button:active > .duo3d {
 /* A ANIMAÇÃO: uma vez só, e PARA no último quadro.
    `forwards` é o que segura o troféu pronto na tela depois dos 5 s — sem ele a
    propriedade volta ao início e o troféu SOME no instante em que a última
-   estrela acende. X repete uma vez por linha (6×), Y desce uma vez só. */
+   estrela acende. X repete uma vez por linha (6×), Y desce uma vez só.
+
+   ⚠️ `jump-none`, E NÃO O `to` ESTICADO — o defeito que este comentário dizia
+   ter consertado e não consertava. `steps(n)` padrão (`jump-end`) com o `to` em
+   111,111%/120% entrega os quadros certos DURANTE a animação, mas o `forwards`
+   segura o `to` LITERAL, que está fora da folha (`background-size: 1000% 600%`
+   só aceita 0–100%). Medido no navegador: aos 5,6 s a posição era
+   `111.111% 120%` e o troféu estava INVISÍVEL — meio segundo de comemoração
+   vazia, e o quadro final, que é o que a tela existe para mostrar, nunca
+   aparecia parado.
+
+   `jump-none` reparte de 0% a 100% inclusive: os mesmos quadros durante, e o
+   último quadro no fim. */
 .dc-trofeu-anim {
   background-position: 0% 0%;
   animation:
-    dcTrofeuX 0.83333s steps(10) 6 forwards,
-    dcTrofeuY 5s steps(6) 1 forwards;
+    dcTrofeuX 0.83333s steps(10, jump-none) 6 forwards,
+    dcTrofeuY 5s steps(6, jump-none) 1 forwards;
 }
 
 /* O ÍCONE: o último quadro, parado. Não é laço de propósito — o quadro 0 da
