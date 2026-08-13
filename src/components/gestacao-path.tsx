@@ -81,6 +81,16 @@ import {
 } from "@/lib/gratidao";
 import { periodoDaHora, type Periodo } from "@/lib/frases-do-mascote";
 import {
+  cartaComNome,
+  cartaDoDia,
+  falaDaBolhaNaCarta,
+  fraseDeUltimaLeitura,
+  registrarLeitura,
+  ultimaLeitura,
+  type Carta,
+  type LeiturasDeCartas,
+} from "@/lib/cartas-do-bebe";
+import {
   LIMITE_BYTES,
   LIMITE_SEGUNDOS,
   gravar,
@@ -6696,152 +6706,44 @@ export function MeditationBlock({
 /* ══════════════════ Momento com o bebê — Cartas de 1 minuto ══════════════════
    Cartinhas de amor pra LER EM VOZ ALTA pro bebê (ele já reconhece a voz da
    mãe por volta da semana 25 — e o coraçãozinho acalma quando ela fala).
-   Uma carta por dia (rotação), leitura guiada linha a linha, ~1 minuto. */
+   Uma carta por dia (rotação, por fase da jornada), leitura guiada linha a
+   linha, ~1 minuto.
 
-const BONDING_LETTERS: { title: string; emoji: string; lines: string[] }[] = [
-  {
-    title: "Pra você, que eu ainda não vi",
-    emoji: "💛",
-    lines: [
-      "Oi, meu amor. Sou eu — a sua mãe.",
-      "A gente ainda não se viu, mas eu já te conheço de cor.",
-      "Sei quando você acorda, sei quando você dança aí dentro.",
-      "Todo dia eu invento o seu rostinho de um jeito novo.",
-      "E todos os jeitos são lindos, porque são você.",
-      "Cresce tranquilo, que aqui fora já existe um amor te esperando.",
-      "Um beijo, do tamanho do céu. 💛",
-    ],
-  },
-  {
-    title: "O dia em que soubemos de você",
-    emoji: "🌱",
-    lines: [
-      "Deixa eu te contar uma história: o dia em que você começou.",
-      "Foi um dia comum — e de repente virou o mais importante da minha vida.",
-      "Duas listras rosas, e o mundo inteiro mudou de cor.",
-      "Meu coração bateu tão forte que acho que você ouviu daí.",
-      "Eu ri, chorei, e liguei pra quem eu mais amo.",
-      "Desde aquele dia, tudo o que eu faço tem você dentro.",
-      "Essa é a nossa primeira história. Ainda vamos escrever mil. 🌱",
-    ],
-  },
-  {
-    title: "O mundo que te espera",
-    emoji: "🌍",
-    lines: [
-      "Meu bem, deixa eu te contar do mundo aqui fora.",
-      "Tem sol que esquenta o rosto e chuva que canta no telhado.",
-      "Tem cheiro de café de manhã e de terra molhada à tarde.",
-      "Tem gente que já te ama sem nunca ter te visto.",
-      "Tem música — ah, você vai amar música.",
-      "Não precisa ter pressa. Mas saiba: é bonito aqui.",
-      "E vai ficar mais bonito ainda quando você chegar. 🌍",
-    ],
-  },
-  {
-    title: "A sua casa",
-    emoji: "🏠",
-    lines: [
-      "Hoje eu quero te contar da sua casa.",
-      "Tem um cantinho que a gente arruma devagarinho pra você.",
-      "Cada roupinha dobrada é um 'te espero' silencioso.",
-      "As paredes já sabem o seu nome — eu falo dele todo dia.",
-      "Sua casa não é feita de tijolo, é feita de espera boa.",
-      "E o seu melhor lugar já está pronto faz tempo:",
-      "é aqui, no meu colo. 🏠",
-    ],
-  },
-  {
-    title: "Sua canção falada",
-    emoji: "🎵",
-    lines: [
-      "Dizem que a minha voz é a sua música preferida.",
-      "Então hoje eu vou te dar uma canção falada.",
-      "Você é o meu sol de todo dia, mesmo quando chove.",
-      "Você é o meu sonho mais corajoso.",
-      "Você é a melhor parte de todos os meus planos.",
-      "Guarda essa melodia aí no peito.",
-      "Quando você nascer, eu canto de novo — bem baixinho, no seu ouvido. 🎵",
-    ],
-  },
-  {
-    title: "Você é coragem",
-    emoji: "🦁",
-    lines: [
-      "Sabia que você já me deixou mais corajosa?",
-      "Antes de você, eu tinha medo de um monte de coisas.",
-      "Agora eu tenho força que eu nem sabia que existia.",
-      "É que amor grande faz a gente crescer por dentro.",
-      "Se um dia você tiver medo, lembra: coragem corre no seu sangue.",
-      "A gente já é um time, eu e você.",
-      "E time que se ama não se solta. 🦁",
-    ],
-  },
-  {
-    title: "O nosso primeiro passeio",
-    emoji: "🌳",
-    lines: [
-      "Fecha os olhinhos — deixa eu te levar num sonho.",
-      "No nosso primeiro passeio, vai ter sol peneirado entre as folhas.",
-      "Eu vou te mostrar o céu e você vai piscar, encantado.",
-      "Um cachorro vai latir longe, e eu vou dizer: 'olha, au-au!'",
-      "Você vai dormir no meio do passeio, e tudo bem.",
-      "O mundo pode esperar — eu vou estar ocupada te olhando.",
-      "Já estou com saudade desse dia que ainda não aconteceu. 🌳",
-    ],
-  },
-  {
-    title: "Obrigada por me escolher",
-    emoji: "🌷",
-    lines: [
-      "Hoje o recado é curto e é o mais verdadeiro de todos.",
-      "De todos os lugares do universo, você veio parar aqui.",
-      "Bem no meu colo, bem no meu peito, bem em mim.",
-      "Obrigada por me escolher pra ser a sua mãe.",
-      "Eu prometo errar tentando acertar, todos os dias.",
-      "E te amar sem instruções, sem medida e sem fim.",
-      "Você já é a melhor coisa que eu fiz. 🌷",
-    ],
-  },
-  {
-    title: "Pros dias difíceis",
-    emoji: "🌧️",
-    lines: [
-      "Meu amor, nem todo dia aqui fora é fácil — e tudo bem.",
-      "Hoje talvez a mamãe esteja cansada, e sabe o que me levanta?",
-      "Você. Um chutinho seu vale por dez xícaras de café.",
-      "Quando eu falo com você, o dia desamarra os nós.",
-      "Então fica aí, quietinho, sendo o meu melhor motivo.",
-      "A gente atravessa qualquer chuva juntos.",
-      "Depois dela, eu te mostro o arco-íris. 🌧️→🌈",
-    ],
-  },
-  {
-    title: "Até já, meu amor",
-    emoji: "💌",
-    lines: [
-      "Essa cartinha é só pra dizer: até já.",
-      "Cada dia que passa é um dia a menos pra eu te ver.",
-      "Eu conto as semanas como quem conta estrelas.",
-      "Você não tem ideia da festa que é você existir.",
-      "Termina de crescer com calma — capricha nesse coração.",
-      "Que aqui fora, o meu já é todo seu.",
-      "Até já, meu amor. Assinado: a mamãe. 💌",
-    ],
-  },
-];
+   ⚠️ O TEXTO MORA EM `src/lib/cartas-do-bebe.ts`, não mais aqui — mesma razão
+   de `gratidao.ts` e `frases-do-mascote.ts`. Foi de lá que saiu o defeito que
+   este arquivo tinha: dez cartas fixas, todas em tempo PRÉ-natal, lidas por
+   igual na gestação e no pós-parto (`BondingBlock` nunca recebia `posParto`).
+   Agora são trinta, separadas por fase — e as de pós-parto são as ÚNICAS que
+   entram na roda depois do parto. */
 
-function BondingBlock({
+/** Onde o rastro de leitura fica — viaja no `journey_state`, como `EX_NOTAS_KEY`. */
+const LEITURAS_CARTAS_KEY = "dc-path-cartas-lidas";
+
+export function BondingBlock({
   day,
+  semana,
+  posParto = false,
   babyName,
   canEarn,
   careMode = false,
   alreadyDone,
   onEarn,
   aoSair,
+  bancada,
 }: {
   day: number;
-  /** Entra na abertura da carta feita das gratidões dela. */
+  /** Semana gestacional — escolhe a fase da carta (t1/t2/t3). */
+  semana?: number;
+  /**
+   * ⚠️ SEM ISTO, A CARTA NÃO SABIA QUE O BEBÊ JÁ TINHA NASCIDO.
+   *
+   * As mesmas dez cartas — todas em tempo pré-natal — eram lidas na gestação
+   * e no pós-parto por igual, porque este componente nunca recebia a
+   * bandeira (`<Chosen posParto={...} />` já mandava o valor; ele só era
+   * ignorado). Ver `src/lib/cartas-do-bebe.ts`.
+   */
+  posParto?: boolean;
+  /** Entra na abertura da carta feita das gratidões dela, e nas 30 fixas. */
   babyName?: string | null;
   canEarn: boolean;
   careMode?: boolean;
@@ -6858,15 +6760,28 @@ function BondingBlock({
    * pediu para ver.
    */
   aoSair?: () => void;
+  /**
+   * ⚠️ SÓ A BANCADA (`/preview-bebe`).
+   *
+   * O rastro de leitura vem do `localStorage` dela, e a faixa do dia vem do
+   * relógio — as duas são impossíveis de fotografar sem forçar.
+   */
+  bancada?: {
+    periodo?: Periodo;
+    /** Formata "você leu esta carta há X", sem precisar ler duas vezes de verdade. */
+    fraseDeLeitura?: string;
+    fase?: "intro" | "active" | "done";
+  };
 }) {
   /**
    * ⚠️ A CARTA FEITA DAS GRATIDÕES DELA — e por que ela nasceu aqui.
    *
-   * São ONZE cartas escritas para 294 dias de jornada: cada uma se repete umas
-   * vinte e sete vezes ao longo da gestação. E do outro lado do app havia uma
-   * atividade guardando dezenas de frases dela que nenhuma tela mostrava de
-   * volta. As duas carências se resolvem uma à outra: o que ela agradeceu vira
-   * a carta que ela lê em voz alta para o bebê.
+   * São TRINTA cartas fixas (dez gerais + dez por fase da gestação + dez de
+   * pós-parto, ver `src/lib/cartas-do-bebe.ts`) para até 384 dias de jornada.
+   * E do outro lado do app havia uma atividade guardando dezenas de frases
+   * dela que nenhuma tela mostrava de volta. As duas carências se resolvem
+   * uma à outra: o que ela agradeceu vira a carta que ela lê em voz alta
+   * para o bebê.
    *
    * É a coisa que o Finch, o Presently e o Day One estruturalmente não podem
    * fazer — eles não têm um bebê do outro lado.
@@ -6884,15 +6799,54 @@ function BondingBlock({
     [careMode, minhasGratidoes, babyName],
   );
   const [lendoAsDelas, setLendoAsDelas] = useState(false);
-  const cartaDoDia = useMemo(() => BONDING_LETTERS[day % BONDING_LETTERS.length], [day]);
-  const carta = lendoAsDelas && cartaDelas ? cartaDelas : cartaDoDia;
+  /**
+   * ⚠️ A FASE DECIDE O TEMPO VERBAL — não só o assunto. `cartaDoDia` (a
+   * função, em `cartas-do-bebe.ts`) nunca deixa uma carta pré-natal cair no
+   * pós-parto: o poço de cartas do pós-parto só tem as marcadas `["pos"]`.
+   */
+  const cartaHoje: Carta = useMemo(
+    () => cartaComNome(cartaDoDia({ dia: day, semanas: semana, posParto }), babyName),
+    [day, semana, posParto, babyName],
+  );
+  const carta: { title: string; emoji: string; lines: string[] } =
+    lendoAsDelas && cartaDelas ? cartaDelas : cartaHoje;
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
+  const [phase, setPhase] = useState<"intro" | "active" | "done">(bancada?.fase ?? "intro");
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
   const [sound, setSound] = useState(true);
   const grantedRef = useRef(false);
   const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
+
+  /**
+   * ⚠️ O RASTRO DE LEITURA — 30 cartas pra até 384 dias ainda repetem, e sem
+   * isto a repetição era invisível: ela relia sem saber que estava relendo.
+   * Carrega só ao abrir (mesmo padrão de `EX_NOTAS_KEY`/`MED_LOG_KEY`).
+   */
+  const [leituras, setLeituras] = useState<LeiturasDeCartas>({});
+  useEffect(() => {
+    if (open) setLeituras(lsGet<LeiturasDeCartas>(LEITURAS_CARTAS_KEY, {}));
+  }, [open]);
+  const fraseDeLeitura =
+    bancada?.fraseDeLeitura ??
+    fraseDeUltimaLeitura(ultimaLeitura(leituras, cartaHoje.id), new Date());
+  useEffect(() => {
+    /* Grava só quando ela TERMINOU de ler a carta do dia (nunca a das
+       gratidões dela, que não tem `id` estável pra rastrear). Fora de
+       `canEarn`/`careMode` de propósito: é informação, não recompensa. */
+    if (phase !== "done" || lendoAsDelas) return;
+    setLeituras((prev) => {
+      const novo = registrarLeitura(prev, cartaHoje.id, new Date());
+      lsSet(LEITURAS_CARTAS_KEY, novo);
+      return novo;
+    });
+  }, [phase, lendoAsDelas, cartaHoje.id]);
+
+  /* ⚠️ O PORTA-VOZ NESTA TELA — era a única das quatro atividades sem ele. */
+  const periodoAtual = useMemo(
+    () => bancada?.periodo ?? periodoDaHora(new Date().getHours()),
+    [bancada?.periodo],
+  );
 
   useEffect(() => () => audioRef.current?.stop(), []);
 
@@ -7093,9 +7047,21 @@ function BondingBlock({
 
           {phase === "intro" && (
             <div className="relative flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-6xl" style={{ animation: "dc-float 3s ease-in-out infinite" }}>
-                💌
-              </span>
+              {/* ── O PORTA-VOZ ────────────────────────────────────────────
+                  Era o 💌 flutuante — decorativo, sem informação nenhuma. A
+                  bolha entrega o que era mudo: o rastro de leitura ("você leu
+                  esta carta há 2 semanas") e, na carta feita das gratidões
+                  dela, um convite próprio. */}
+              <BolhaComBalao
+                fala={falaDaBolhaNaCarta({
+                  tela: "intro",
+                  fraseDeLeitura,
+                  lendoAsDelas,
+                  periodo: periodoAtual,
+                })}
+                careMode={careMode}
+                tamanho={96}
+              />
               <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-rose-400">
                 {lendoAsDelas ? "Escrita por você" : "Carta de hoje"}
               </p>
@@ -7178,6 +7144,15 @@ function BondingBlock({
               <p className="mt-2 max-w-xs text-sm leading-relaxed text-rose-800/80">
                 Ele ouviu a sua voz — e, do jeitinho dele, guardou cada palavra. 💛
               </p>
+              {/* A bolha AQUI é só o acompanhamento — o "Beijo entregue" já é
+                  o clímax da tela, e repetir "ele ouviu sua voz" na boca dela
+                  seria eco. A fala dela é complementar, não o clímax. */}
+              <BolhaComBalao
+                fala={falaDaBolhaNaCarta({ tela: "done" })}
+                careMode={careMode}
+                comemorando
+                tamanho={72}
+              />
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!

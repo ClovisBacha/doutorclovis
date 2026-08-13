@@ -1968,6 +1968,71 @@ de abrir OUTRA atividade por acaso e notar um botão novo.
   atividades para trocar, o botão "Ver carta 💌" não aparece — só o texto do
   cartão, que é o que dava para conferir sem a árvore inteira do app.
 
+### O Bebê aprendeu que o parto já aconteceu (ago/2026)
+
+Auditoria das quatro atividades do jogo: depois do conserto da Gratidão (nota
+9,5), o Bebê era a que sobrava mais baixa — nota 6,0. O motivo não era
+estética: eram dez cartas fixas (`BONDING_LETTERS`, direto no componente),
+giro `day % 10`, todas em tempo PRÉ-natal — e `BondingBlock` nunca recebia
+`posParto`. `<Chosen posParto={ehPosParto} .../>` já mandava a bandeira; ela
+só era ignorada. Uma mãe com o bebê no colo lia em voz alta "a gente ainda
+não se viu" e "quando você nascer, eu canto de novo".
+
+O texto saiu do componente para `src/lib/cartas-do-bebe.ts` — mesma razão de
+`gratidao.ts` e `frases-do-mascote.ts`: é o que o dono relê e corrige, e
+texto enterrado num componente de dez mil linhas é texto que ninguém revisa.
+
+- ⚠️ **A FASE DECIDE O TEMPO VERBAL, e por isso o campo `fases` funciona ao
+  CONTRÁRIO do de `gratidao.ts`.** Lá, pergunta sem `fases` serve em qualquer
+  fase, INCLUSIVE pós-parto. Aqui isso incendiaria o defeito de novo — então
+  ausente = qualquer fase da GESTAÇÃO, e uma carta de pós-parto só entra na
+  roda se for marcada `["pos"]` explicitamente. `poolDaFase("pos")` filtra
+  por essa marca, nunca por omissão: **as dez cartas gerais (que valem a
+  gestação inteira) NUNCA aparecem no pós-parto**, porque são pré-natais por
+  natureza. Testado (`cartas-do-bebe.test.ts` corre regex contra as trinta
+  cartas: nenhuma de pós-parto pode conter "quando você nascer" ou variantes;
+  nenhuma de gestação pode conter "seu primeiro banho" ou variantes).
+- **Dez gerais + dez por trimestre (três em t1, três em t2, quatro em t3) +
+  dez de pós-parto = trinta**, pedido explícito do dono. O poço de cada fase
+  soma as gerais com as da fase (13 em t1/t2, 14 em t3); o do pós-parto é só
+  as dez marcadas. A rotação continua `dia % n` — nunca um passo fixo, mesma
+  razão de sempre (`perguntaDoDia`, a lista de manhã do mascote): um passo
+  que não é coprimo com o tamanho do poço repete sempre os mesmos itens.
+- **`faseDaGratidao` é REAPROVEITADA**, não reescrita: é a mesma pergunta
+  ("em que fase da jornada ela está?", corte em 14 e 28 semanas) que a
+  Gratidão já resolvia. Duas tabelas de corte divergiriam no primeiro ajuste
+  de uma delas — e teria sido exatamente esse tipo de segunda régua que
+  deixou o defeito do tempo verbal invisível por tanto tempo.
+- **O nome do bebê entra nas cartas fixas** (`{bebe}` → `cartaComNome`), e
+  cai em "meu amor" sem nome cadastrado — `babyName` já chegava no componente
+  e não era usado por nenhuma das dez originais.
+- **O rastro de leitura** (`LeiturasDeCartas`, chave `dc-path-cartas-lidas`,
+  mesmo padrão de `EX_NOTAS_KEY`/`MED_LOG_KEY`): sem ele, a repetição
+  inevitável (30 cartas para até 384 dias) era invisível — ela relia sem
+  saber que estava relendo. `registrarLeitura` grava o instante ANTES de
+  sobrescrever, e a frase que a tela mostra ("Você leu esta carta há 2
+  semanas") lê o valor ANTERIOR — gravar primeiro e ler depois mostraria
+  sempre "hoje". Só grava quando ela LÊ a carta do dia até o fim
+  (`phase === "done"`), nunca a carta feita das gratidões dela (que não tem
+  `id` estável), e fora de `canEarn`/`careMode` de propósito: é informação,
+  não recompensa — a bancada (`canEarn={false}`) precisava continuar
+  mostrando o rastro.
+- **A bolha entrou nesta tela** — era a única das quatro atividades sem o
+  porta-voz. Substitui o 💌 flutuante da abertura (decorativo, sem
+  informação) e fala o que era mudo: o rastro de leitura, ou um convite
+  sensível à hora do dia (madrugada/noite têm abertura própria, mesma régua
+  de `frases-do-mascote.ts`). ⚠️ **No final ela NÃO repete "ele ouviu sua
+  voz"** — o parágrafo do "Beijo entregue" já diz isso, e duplicar seria eco;
+  a fala da bolha ali é complementar ("Guardei esse minuto com você. 💛"),
+  pequena (72px, contra 96px na abertura), a mesma distinção de tamanho que
+  separa clímax de acompanhamento em outras telas do jogo.
+- **Bancada:** `/preview-bebe?w=20&dia=0&nome=Helena` (gestação) ·
+  `?pos=1&dia=3` (pós-parto — prova que nenhuma carta pré-natal aparece) ·
+  `?fase=done` (o fim) · `?leitura=1` (força o rastro) · `?periodo=noite`
+  (força a faixa do dia na fala da bolha). O rastro de leitura e a faixa do
+  dia são as duas coisas que dependiam de `localStorage`/relógio e por isso
+  eram impossíveis de fotografar sem a bancada.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,
