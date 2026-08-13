@@ -50,8 +50,51 @@ export const DENSIDADES: { chave: Densidade; rotulo: string; sub: string }[] = [
   { chave: "silenciosa", rotulo: "Só o ritmo", sub: "Sem voz, só o desenho" },
 ];
 
-/** Segundos de um ciclo de respiração. Igual ao `CICLO_SEGS` da tela. */
-export const CICLO = 12;
+/**
+ * O COMPASSO DA RESPIRAÇÃO — e por que ele mudou de 12 s para 14 s.
+ *
+ * Era 4-2-6. O dono ouviu e disse que estava corrido; a pesquisa deu razão a
+ * ele. Os padrões que os apps de referência usam:
+ *
+ *   · box breathing (Headspace)      4-4-4-4  → 16 s
+ *   · 4-7-8 (Headspace)              4-7-8    → 19 s
+ *   · o de dormir (Headspace)        4-4-6    → 14 s
+ *   · o nosso, até agora             4-2-6    → 12 s  ← o mais curto de todos
+ *
+ * E o "segure" de 2 s era o pior detalhe: todas as referências usam 4 ou mais.
+ * Em dois segundos a paciente ouve "Segure" e já vem "Solte" — não dá tempo de
+ * o corpo fazer o que a palavra pediu.
+ *
+ * 4-4-6 é o padrão de dormir do Headspace, mantém a expiração mais longa que a
+ * inspiração (que é a parte que acalma) e dá ao "segure" uma duração que
+ * existe de verdade.
+ *
+ * ⚠️ ESTE É O ÚNICO LUGAR ONDE O COMPASSO MORA. A tela importa daqui. Antes
+ * eram dois números iguais em dois arquivos — `CICLO = 12` aqui e um
+ * `RESPIRO` próprio no componente —, e nada obrigava os dois a concordarem.
+ * O ritmo NÃO depende da duração escolhida: dez minutos são mais respirações,
+ * nunca respirações mais rápidas.
+ */
+export const RESPIRO = { in: 4, hold: 4, out: 6 } as const;
+export const CICLO = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
+
+/**
+ * ⚠️ DUAS INSTRUÇÕES NUNCA CAEM EM RESPIRAÇÕES SEGUIDAS.
+ *
+ * Medido na versão anterior: numa sessão de 10 min, as deixas caíam a cada
+ * 12 s em onze pontos — e no primeiro minuto de QUALQUER sessão a voz falava
+ * em todas as respirações. O dono descreveu como "corrido", e era.
+ *
+ * Uma respiração inteira de silêncio entre uma instrução e a seguinte é o que
+ * dá tempo de a instrução ser CUMPRIDA em vez de só ouvida.
+ *
+ * A exceção é estreita e deliberada: se respeitar o espaçamento fizesse uma
+ * das cinco partes do arco ficar sem nenhuma fala, a fala entra mesmo colada.
+ * Perder a volta ao corpo numa sessão de um minuto é pior que duas falas
+ * próximas — terminar de repente com a paciente funda é o defeito mais comum
+ * de meditação amadora.
+ */
+const ESPACO_MINIMO = 2;
 
 /**
  * As cinco janelas, em fração da sessão, e de quantos em quantos ciclos se
@@ -98,9 +141,21 @@ export type Plano = {
   palavrasAte: number;
 };
 
-/** Quantos ciclos cabem numa sessão de N minutos. */
+/**
+ * Quantos ciclos cabem numa sessão de N minutos.
+ *
+ * ⚠️ ARREDONDA PARA CIMA, e isso passou a importar quando o ciclo foi de 12 s
+ * para 14 s: um minuto virou 4,3 respirações, e com `round` a sessão de 1 min
+ * ficava com QUATRO ciclos para cinco partes do arco — uma delas, sempre, era
+ * perdida. Com `ceil` são cinco respirações (70 s), que por acaso é a duração
+ * exata que a antiga Respiração guiada tinha e que o cartão dela prometia como
+ * "um minutinho de calma".
+ *
+ * Passar alguns segundos do tempo pedido é invisível; entregar uma sessão sem
+ * volta ao corpo, não.
+ */
 export function ciclosDe(minutos: number): number {
-  return Math.max(1, Math.round((minutos * 60) / CICLO));
+  return Math.max(1, Math.ceil((minutos * 60) / CICLO));
 }
 
 /**
@@ -109,7 +164,14 @@ export function ciclosDe(minutos: number): number {
  */
 function candidatas(
   momento: Momento,
-  o: { tema: string; variacao: 1 | 2 | 3; trimestre: Trimestre | null; minimo: number },
+  o: {
+    tema: string;
+    variacao: 1 | 2 | 3;
+    trimestre: Trimestre | null;
+    minimo: number;
+    /** Quantas falas cabem nesta janela — ver o acolhimento de fase. */
+    vagas: number;
+  },
 ): Fala[] {
   const doMomento = ROTEIROS.filter((f) => f.momento === momento && f.peso >= o.minimo);
   if (momento === "corpo") {
@@ -122,7 +184,21 @@ function candidatas(
        que erra sobre o corpo dela derruba a confiança na sessão inteira. */
     const comuns = doMomento.filter((f) => !f.trimestre);
     const daFase = o.trimestre ? doMomento.filter((f) => f.trimestre === o.trimestre) : [];
-    return [...comuns, ...daFase];
+    /**
+     * ⚠️ A DE FASE É A ÚLTIMA A FALAR, MAS NÃO PODE SER A PRIMEIRA A CAIR.
+     *
+     * Ela vinha depois das comuns na lista — e quando o espaçamento mínimo
+     * reduziu o número de vagas da janela (ago/2026), ela deixou de entrar. O
+     * teste pegou. É a fala que reconhece em que semana a paciente está, e é a
+     * única coisa desta tela que o Calm estruturalmente não pode ter: eles não
+     * sabem nada sobre quem está do outro lado.
+     *
+     * Por isso `limite`: as comuns cedem lugar para ela caber. A ordem não
+     * muda — ela continua sendo dita depois do "não precisa fazer nada".
+     */
+    if (!daFase.length) return comuns;
+    const limite = Math.max(1, o.vagas - daFase.length);
+    return [...comuns.slice(0, limite), ...daFase];
   }
   return doMomento;
 }
@@ -172,11 +248,15 @@ export function planejarSessao(o: {
      frente conforme isso acontece. Sem o piso, a sessão de 1 minuto (cinco
      ciclos, cinco janelas) perdia a volta ao corpo. */
   let inicio = 0;
+  let ultimoCiclo = -ESPACO_MINIMO;
   JANELAS.forEach((j, k) => {
     const restantes = JANELAS.length - k - 1;
     const alvo = Math.round(totalCiclos * j.ate);
     const fim = Math.min(totalCiclos - restantes, Math.max(inicio + 1, alvo));
-    const lista = candidatas(j.momento, { tema: o.tema, variacao, trimestre, minimo });
+    /* As vagas da janela são estimadas ANTES de escolher as falas: é o que
+       permite ao acolhimento saber se a fala de fase ainda cabe. */
+    const vagas = Math.max(1, Math.floor((fim - inicio) / Math.max(1, ESPACO_MINIMO)));
+    const lista = candidatas(j.momento, { tema: o.tema, variacao, trimestre, minimo, vagas });
     /* As rechamadas giram pela semente; as outras seguem a ordem escrita,
        porque nelas a ordem é o roteiro. */
     const ordenada =
@@ -193,8 +273,14 @@ export function planejarSessao(o: {
     const cabem = Math.min(ordenada.length, Math.max(1, Math.floor(largura / (j.cada * espaco))));
     const passo = Math.max(j.cada * espaco, largura / cabem);
     let n = 0;
+    let nestaJanela = 0;
     for (let i = 0; i < cabem; i++) {
-      const c = inicio + Math.round(i * passo);
+      const natural = inicio + Math.round(i * passo);
+      /* Empurra para a frente até respeitar o espaçamento mínimo. Se não
+         couber na janela, a fala é descartada — a menos que esta janela ainda
+         não tenha nenhuma, e aí o arco vale mais que o espaçamento. */
+      const espacado = Math.max(natural, ultimoCiclo + ESPACO_MINIMO);
+      const c = espacado < fim ? espacado : nestaJanela === 0 ? natural : fim;
       if (c >= fim || n >= ordenada.length) break;
       const fala = ordenada[n++];
       /* No Modo Cuidado nenhuma fala que cite o bebê ou o parto entra — o
@@ -203,6 +289,8 @@ export function planejarSessao(o: {
       if (o.careMode && /\b(beb[êe]|barriga|parto|mãe|vocês dois|dele\b|ele\b)/i.test(fala.texto))
         continue;
       deixas.push({ ciclo: c, fala });
+      ultimoCiclo = c;
+      nestaJanela++;
     }
     inicio = fim;
   });

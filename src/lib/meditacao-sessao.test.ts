@@ -8,6 +8,8 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  CICLO,
+  RESPIRO,
   ciclosDe,
   densidadeDeVoz,
   falaNoCiclo,
@@ -67,13 +69,20 @@ describe("o arco existe em qualquer duração", () => {
 });
 
 describe("a voz deixou de ser 5,5% da sessão", () => {
-  test("dez minutos guiados ficam entre 15% e 45% de voz", () => {
-    /* O padrão do gênero numa sessão guiada é de um terço a metade; abaixo de
-       15% volta a ser a tela muda que a auditoria encontrou, e acima de 45%
-       não sobra silêncio — que é o exercício. */
+  test("dez minutos guiados ficam entre 12% e 45% de voz", () => {
+    /* ⚠️ O PISO BAIXOU DE 15% PARA 12%, e não foi para o teste ficar verde.
+       O dono ouviu a sessão e disse que estava corrida; a medição deu razão a
+       ele (instruções em respirações seguidas, e a palavra do compasso por
+       cima delas). O espaçamento mínimo de uma respiração entre instruções
+       tirou seis falas de uma sessão de dez minutos — de 24 para 18 — e a
+       densidade caiu de ~20% para ~14%.
+
+       Continua sendo 2,6 vezes o que a auditoria mediu na versão original
+       (5,5%), que é o número que este teste existe para nunca mais permitir.
+       O teto segue em 45%: acima disso não sobra silêncio, que é o exercício. */
     const p = planejarSessao({ minutos: 10, tema: "Calma", semanas: 20 });
     const d = densidadeDeVoz(p);
-    expect(d).toBeGreaterThan(0.15);
+    expect(d).toBeGreaterThan(0.12);
     expect(d).toBeLessThan(0.45);
   });
 
@@ -219,12 +228,59 @@ describe("o Modo Cuidado alcança as falas, não só os temas", () => {
   });
 });
 
+describe("⚠️ o ritmo NÃO depende da duração escolhida", () => {
+  test("o compasso é o mesmo em 1 e em 10 minutos", () => {
+    /* Pedido do dono, em letras maiúsculas: "quando a gente aumenta ou diminui
+       o tempo, não é pra pessoa falar mais rápido, e não é pra bolha inspirar
+       e soltar mais rápido". O que muda com a duração é o NÚMERO de
+       respirações, nunca a duração de uma. */
+    expect(RESPIRO).toEqual({ in: 4, hold: 4, out: 6 });
+    expect(CICLO).toBe(14);
+    for (const minutos of DURACOES) {
+      const p = planejarSessao({ minutos, tema: "Calma", semanas: 20 });
+      expect({ minutos, seg: p.totalCiclos * CICLO }).toEqual({
+        minutos,
+        seg: ciclosDe(minutos) * 14,
+      });
+    }
+  });
+
+  test("o 'segure' deixou de ser mais curto que o pensamento", () => {
+    /* Eram 2 s: a paciente ouvia "Segure" e já vinha "Solte". Nenhuma
+       referência do gênero usa menos de 4 (box 4-4-4-4, 4-7-8, dormir 4-4-6). */
+    expect(RESPIRO.hold).toBeGreaterThanOrEqual(4);
+    /* E a expiração continua mais longa que a inspiração, que é a parte que
+       acalma. */
+    expect(RESPIRO.out).toBeGreaterThan(RESPIRO.in);
+  });
+
+  test("⚠️ duas instruções não caem em respirações seguidas", () => {
+    /* Medido antes: em dez minutos, onze pares de instruções colados, e no
+       primeiro minuto de qualquer sessão a voz falava em TODAS as
+       respirações. Uma respiração inteira de silêncio entre uma instrução e a
+       seguinte é o que dá tempo de a instrução ser cumprida, e não só ouvida.
+
+       A sessão de 1 minuto é a exceção conhecida: cinco respirações para as
+       cinco partes do arco não deixam folga, e perder a volta ao corpo é pior
+       que duas falas próximas. */
+    for (const minutos of [2, 5, 10]) {
+      const c = planejarSessao({ minutos, tema: "Calma", semanas: 20 }).deixas.map((d) => d.ciclo);
+      const menor = Math.min(...c.slice(1).map((v, i) => v - c[i]));
+      expect({ minutos, menor }).toEqual({ minutos, menor: 2 });
+    }
+  });
+});
+
 describe("as contas de ciclo batem com a tela", () => {
   test("os minutos viram o número de respirações que a tela usa", () => {
+    /* O ciclo passou de 12 s para 14 s (4-4-6), então os números mudaram — e
+       arredondam para CIMA: um minuto são cinco respirações (70 s), não
+       quatro. Ver `ciclosDe`. */
+    expect(CICLO).toBe(14);
     expect(ciclosDe(1)).toBe(5);
-    expect(ciclosDe(2)).toBe(10);
-    expect(ciclosDe(5)).toBe(25);
-    expect(ciclosDe(10)).toBe(50);
+    expect(ciclosDe(2)).toBe(9);
+    expect(ciclosDe(5)).toBe(22);
+    expect(ciclosDe(10)).toBe(43);
   });
 
   test("a busca por ciclo devolve a fala daquele ciclo", () => {

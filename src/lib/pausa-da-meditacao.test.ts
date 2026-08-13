@@ -127,7 +127,9 @@ describe("voltar", () => {
        com dois comportamentos. */
     expect(fn()).toContain("setRetomada((n) => n + 1)");
     expect(path).toContain("}, [etapa, voz, falaAgora?.id, pausada, retomada]);");
-    expect(path).toContain("}, [etapa, fase, voz, ciclo, plano?.palavrasAte, pausada, retomada]);");
+    expect(path).toContain(
+      "}, [etapa, fase, voz, ciclo, plano?.palavrasAte, pausada, retomada, falaAgora?.id]);",
+    );
   });
 
   test("sair e começar de novo sempre nascem despausados", () => {
@@ -163,7 +165,7 @@ describe("o que continua alcançável com o véu no ar", () => {
   test("o véu oferece continuar e, passado o minuto, encerrar guardando", () => {
     const veu = trecho('role="dialog"', "── 3. Fechamento");
     expect(veu).toContain("void retomarSessao()");
-    expect(veu).toContain("{ciclo >= 5 && (");
+    expect(veu).toContain("{ciclo >= UM_MINUTO && (");
     expect(veu).toContain("onClick={encerrarGuardando}");
   });
 
@@ -172,7 +174,7 @@ describe("o que continua alcançável com o véu no ar", () => {
        deslizava até a frase da sessão e até um SEGUNDO "Encerrar por aqui" —
        numa tela que diz estar parada. */
     expect(path).toContain("aria-hidden={pausada}");
-    expect(path).toContain("{ciclo >= 5 && !pausada && (");
+    expect(path).toContain("{ciclo >= UM_MINUTO && !pausada && (");
     expect(path).toContain('aria-modal="true"');
   });
 });
@@ -189,5 +191,27 @@ describe("o card do sistema", () => {
 
   test("o estado ▶︎/⏸ acompanha a pausa", () => {
     expect(path).toContain('estadoDaMidia(pausada ? "paused" : "playing");');
+  });
+});
+
+describe("⚠️ uma voz de cada vez", () => {
+  test("a palavra do compasso cala quando há instrução nesta respiração", () => {
+    /* Era o defeito que o dono ouviu: "as frases estão se sobrepondo, e parece
+       que algumas nem são lidas". Elas eram lidas — 191 de 191 têm áudio — mas
+       com "Inspire" tocando por cima. Medido: 11 das 24 instruções de uma
+       sessão de dez minutos, e TODAS as do primeiro minuto de qualquer sessão.
+
+       Dois canais existem para uma fala não CORTAR a outra; não para as duas
+       falarem juntas. */
+    const bloco = trecho("As três palavras da respiração", "async function finish()");
+    expect(bloco).toContain("if (falaAgora) return;");
+  });
+
+  test("o compasso vem de UMA fonte, e a tela não tem a sua", () => {
+    /* Eram dois números que precisavam concordar — `CICLO = 12` no planejador
+       e um `RESPIRO` próprio no componente — e nada obrigava isso. */
+    /* Fora da fatia do componente: o compasso é declarado antes dele. */
+    expect(arquivo).toContain("const CICLO_SEGS = CICLO;");
+    expect(arquivo).not.toContain("const RESPIRO = {");
   });
 });

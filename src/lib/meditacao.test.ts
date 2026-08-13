@@ -96,7 +96,11 @@ describe("o ✕ guarda a sessão", () => {
        em vez do botão pequeno do rodapé — sem estrela, sem minutos, sem dia de
        sequência. Dois botões que significam a mesma coisa, e o app cobrava
        dela saber a diferença. */
-    expect(path).toContain('if (etapa === "sessao" && ciclo >= 5) {');
+    /* ⚠️ O corte deixou de ser `5` cravado: com o ciclo de 14 s (era 12), cinco
+       respirações passaram a ser 70 s. `UM_MINUTO` é derivado do compasso, e
+       acompanha sozinho a próxima vez que ele mudar. */
+    expect(path).toContain('if (etapa === "sessao" && ciclo >= UM_MINUTO) {');
+    expect(path).toContain("const UM_MINUTO = Math.ceil(60 / CICLO_SEGS);");
     expect(path).toContain("encerrarGuardando();");
   });
 
@@ -111,7 +115,7 @@ describe("o ✕ guarda a sessão", () => {
   test("o corte é o mesmo dos dois botões", () => {
     /* 5 ciclos = um minuto redondo (o ciclo tem 12 s). Abaixo disso não houve
        sessão para guardar. */
-    expect(path).toContain("{ciclo >= 5 && (");
+    expect(path).toContain("{ciclo >= UM_MINUTO && (");
   });
 });
 

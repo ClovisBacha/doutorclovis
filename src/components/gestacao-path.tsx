@@ -33,7 +33,9 @@ import {
 } from "@/lib/voz";
 import { faixaDaFala } from "@/lib/voz-meditacao";
 import {
+  CICLO,
   DENSIDADES,
+  RESPIRO,
   falaNoCiclo,
   planejarSessao,
   type Densidade,
@@ -4772,8 +4774,17 @@ function registrarMeditacao(minutos: number, humor: string | null) {
    6. FECHAMENTO COM UMA PERGUNTA. "Como você está agora?" — devolve pra ela a
       diferença que os 5 minutos fizeram, que é a única prova que importa. */
 
-const RESPIRO = { in: 4, hold: 2, out: 6 } as const; // 12s por ciclo
-const CICLO_SEGS = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
+/* ⚠️ O COMPASSO VEM DE `meditacao-sessao.ts`, e não daqui.
+   Eram dois números que precisavam concordar — `CICLO = 12` lá e um `RESPIRO`
+   próprio aqui — e nada obrigava isso. O planejador conta ciclos; a tela os
+   desenha; um desencontro entre os dois faria a sessão terminar no lugar
+   errado sem ninguém entender por quê. Ver o comentário longo lá. */
+const CICLO_SEGS = CICLO;
+/* Respirações que fecham um minuto — o corte a partir do qual a sessão CONTA.
+   Era `5` cravado, que valia enquanto o ciclo tinha 12 s. */
+const UM_MINUTO = Math.ceil(60 / CICLO_SEGS);
+/* Quanto dura a amostra do som de fundo na tela de escolha. */
+const AMOSTRA_MS = 10_000;
 
 /* O 1 min entrou quando a Respiração foi absorvida aqui (ago/2026): ela durava
    70 segundos e o cartão dela prometia "um minutinho de calma". Sem este
@@ -5105,6 +5116,23 @@ function MeditationBlock({
   /* O som ESCOLHIDO agora, para ser lido depois de uma espera: a closure do
      toque guarda o de antes, e ela pode ter silenciado no meio. */
   const somRef = useRef<SoundscapeKey>("pad");
+  /**
+   * A AMOSTRA DE DEZ SEGUNDOS — pedido do dono.
+   *
+   * Antes ela escolhia o som de fundo às cegas: o nome e o emoji, e a primeira
+   * vez que ouvia chuva era com a sessão já correndo. Agora tocar no chip toca
+   * o som, e ele para sozinho — dá para folhear os quatro antes de decidir.
+   *
+   * ⚠️ É uma instância PRÓPRIA, nunca o `audioRef` da sessão. Se dividissem o
+   * mesmo objeto, o relógio da amostra pararia o som da meditação dez segundos
+   * depois de ela começar — e ninguém entenderia por quê.
+   *
+   * Dez segundos não é número redondo por acaso: é uma onda inteira do mar
+   * (o sweep tem período de 9 s) e vinte e três batidas do coração.
+   */
+  const amostraRef = useRef<Soundscape | null>(null);
+  const amostraTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [amostrando, setAmostrando] = useState<SoundscapeKey | null>(null);
 
   /* `Math.min` porque `temaIdx` pode ter sido escolhido com a lista cheia e o
      Modo Cuidado ser ligado depois — a lista encolhe debaixo do índice. */
@@ -5133,6 +5161,8 @@ function MeditationBlock({
   useEffect(
     () => () => {
       audioRef.current?.stop();
+      amostraRef.current?.stop();
+      if (amostraTimer.current) clearTimeout(amostraTimer.current);
       pararVoz();
     },
     [],
@@ -5405,6 +5435,21 @@ function MeditationBlock({
    */
   useEffect(() => {
     if (etapa !== "sessao" || pausada || !voz || !plano || ciclo >= plano.palavrasAte) return;
+    /**
+     * ⚠️ A PALAVRA CALA QUANDO HÁ INSTRUÇÃO NESTA RESPIRAÇÃO.
+     *
+     * Este era o defeito que o dono ouviu e descreveu como "as frases estão se
+     * sobrepondo, e parece que algumas nem são lidas". Elas ERAM lidas: 191 de
+     * 191 têm áudio. O que acontecia é que os dois canais tocavam ao mesmo
+     * tempo — a guia dizendo a instrução e o pulso dizendo "Inspire" por cima.
+     * Medido antes: 11 das 24 instruções de uma sessão de dez minutos saíam
+     * com uma palavra em cima, e no primeiro minuto de qualquer sessão isso
+     * acontecia em TODAS.
+     *
+     * Dois canais existem para uma fala não CORTAR a outra; não para as duas
+     * falarem juntas. Nesta respiração, quem fala é a instrução.
+     */
+    if (falaAgora) return;
     const palavra =
       fase === "in" ? RESPIRACAO.in : fase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
     tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
@@ -5413,7 +5458,7 @@ function MeditationBlock({
        a respiração recomeçaria muda. O mesmo gesto daria dois comportamentos
        conforme o instante em que ela tocou em pausar. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, fase, voz, ciclo, plano?.palavrasAte, pausada, retomada]);
+  }, [etapa, fase, voz, ciclo, plano?.palavrasAte, pausada, retomada, falaAgora?.id]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -5456,6 +5501,7 @@ function MeditationBlock({
        som e o resto do menu continuam onde estavam para quando ela quiser. */
     const mins = doPrograma?.minutos ?? minutos;
     const dens = doPrograma?.densidade ?? densidade;
+    pararAmostra();
     setEmPrograma(doPrograma ?? null);
     setCiclo(0);
     setMinutosFeitos(mins);
@@ -5630,7 +5676,7 @@ function MeditationBlock({
        dois botões que significam a mesma coisa.
        O corte é o mesmo do outro botão (5 ciclos = um minuto redondo): abaixo
        disso não houve sessão para guardar, e aí o ✕ continua sendo só sair. */
-    if (etapa === "sessao" && ciclo >= 5) {
+    if (etapa === "sessao" && ciclo >= UM_MINUTO) {
       audioRef.current?.stop();
       audioRef.current = null;
       pararVoz();
@@ -5640,6 +5686,7 @@ function MeditationBlock({
     audioRef.current?.stop();
     audioRef.current = null;
     pararVoz();
+    pararAmostra();
     setPausa(null);
     if (aoSair) return aoSair();
     setOpen(false);
@@ -5655,6 +5702,32 @@ function MeditationBlock({
    * véu — som tocando numa sessão que a tela diz estar parada.
    * A escolha é guardada; ela vale quando a sessão voltar.
    */
+  function pararAmostra() {
+    if (amostraTimer.current) clearTimeout(amostraTimer.current);
+    amostraTimer.current = null;
+    amostraRef.current?.stop();
+    amostraRef.current = null;
+    setAmostrando(null);
+  }
+
+  function ouvirAmostra(k: SoundscapeKey) {
+    const eraEste = amostrando === k;
+    pararAmostra();
+    /* Tocar de novo no mesmo chip desliga: quem já ouviu não precisa esperar
+       os dez segundos para escolher outro. */
+    if (eraEste || k === "silencio") return;
+    const s = createSoundscape(k);
+    amostraRef.current = s;
+    s.start();
+    setAmostrando(k);
+    amostraTimer.current = setTimeout(() => {
+      /* Desce o volume antes de cortar: `stop()` fecha o contexto no ato, e
+         corte seco é o oposto do que esta tela inteira existe para fazer. */
+      amostraRef.current?.setVolume(0.0001);
+      amostraTimer.current = setTimeout(pararAmostra, 400);
+    }, AMOSTRA_MS);
+  }
+
   function trocarSom(k: SoundscapeKey) {
     setSom(k);
     somRef.current = k;
@@ -5662,6 +5735,8 @@ function MeditationBlock({
       audioRef.current?.stop();
       audioRef.current = createSoundscape(k);
       audioRef.current.start();
+    } else if (etapa === "escolha") {
+      ouvirAmostra(k);
     }
   }
 
@@ -5958,16 +6033,31 @@ function MeditationBlock({
                       <button
                         key={s.key}
                         onClick={() => trocarSom(s.key)}
-                        className={`press rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
+                        className={`press flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
                           som === s.key
                             ? "bg-violet-500 text-white"
                             : "border border-violet-200 bg-white/70 text-violet-700"
                         }`}
                       >
-                        {s.emoji} {s.label}
+                        <span aria-hidden>{s.emoji}</span>
+                        {s.label}
+                        {amostrando === s.key && (
+                          <span className="flex items-end gap-[2px]" aria-hidden>
+                            {[0, 1, 2].map((i) => (
+                              <span
+                                key={i}
+                                className={`dc-onda w-[2px] rounded-full ${som === s.key ? "bg-white" : "bg-violet-400"}`}
+                                style={{ animationDelay: `${i * 0.18}s` }}
+                              />
+                            ))}
+                          </span>
+                        )}
                       </button>
                     ))}
                   </div>
+                  <p className="mt-1.5 text-[11px] text-violet-700/60">
+                    Toque para ouvir 10 segundos antes de escolher.
+                  </p>
 
                   {/* ── QUANTA VOZ ELA QUER ────────────────────────────────
                   Substitui o interruptor de liga/desliga. Ele era binário e
@@ -6169,7 +6259,7 @@ function MeditationBlock({
                   uma tela que ainda nem começou. Passado o minuto, a sessão
                   conta — quem parou aos 4 de 10 minutos meditou, e o app não
                   tem por que fingir que não. */}
-              {ciclo >= 5 && !pausada && (
+              {ciclo >= UM_MINUTO && !pausada && (
                 <button
                   onClick={encerrarGuardando}
                   className="press mt-8 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
@@ -6222,7 +6312,7 @@ function MeditationBlock({
                 >
                   Continuar
                 </button>
-                {ciclo >= 5 && (
+                {ciclo >= UM_MINUTO && (
                   <button
                     onClick={encerrarGuardando}
                     className="press mt-4 text-xs font-bold text-violet-500"

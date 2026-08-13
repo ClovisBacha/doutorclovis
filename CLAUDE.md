@@ -1718,3 +1718,39 @@ uma de 39 recebiam o mesmo trio. Régua e conteúdo agora em
   gravadas. Eles funcionam (os passos estão na tela) e `faixaDoMovimento`
   devolve `null` sem quebrar nada. A fila de gravação está travada em
   `voz.test.ts`: mover um id para `COM_VOZ_GRAVADA` é o que fecha a pendência.
+
+## O compasso da respiração, e uma voz de cada vez (ago/2026)
+
+O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,
+que "parece que algumas nem são lidas", e que o ritmo estava corrido. As três
+foram medidas antes de qualquer mudança.
+
+- **Todas as 191 falas têm áudio** — a impressão de "não lidas" tinha outra
+  causa: ⚠️ **os dois canais tocavam ao mesmo tempo**. Medido: 11 das 24
+  instruções de uma sessão de dez minutos saíam com "Inspire/Segure/Solte" por
+  cima, e no primeiro minuto de QUALQUER sessão isso acontecia em todas. Dois
+  canais existem para uma fala não CORTAR a outra; não para as duas falarem
+  juntas. Agora a palavra do compasso cala quando há instrução na respiração.
+- ⚠️ **Duas instruções não caem mais em respirações seguidas**
+  (`ESPACO_MINIMO`). Antes caíam a cada 14 s em onze pontos. A exceção é
+  estreita: se o espaçamento fizesse uma das cinco partes do arco ficar sem
+  fala, ela entra colada — perder a volta ao corpo é pior.
+- **O compasso passou de 4-2-6 (12 s) para 4-4-6 (14 s)**, que é o padrão de
+  dormir do Headspace. Os outros: box 4-4-4-4 (16 s) e 4-7-8 (19 s) — o nosso
+  era o mais curto de todos, e o "segure" de 2 s não dava tempo de o corpo
+  fazer o que a palavra pediu.
+- ⚠️ **O ritmo NÃO depende da duração escolhida**, e nunca dependeu: `RESPIRO`
+  é constante. O que mudava com a duração era a DENSIDADE das instruções, e era
+  isso que fazia a sessão de 1 min parecer acelerada. Há teste cobrando os dois.
+- ⚠️ **`ciclosDe` arredonda para CIMA.** Com 14 s, um minuto virou 4,3
+  respirações — e com `round` a sessão de 1 min perdia uma das cinco partes.
+  Com `ceil` são 70 s, que é a duração que a antiga Respiração guiada tinha.
+- **O compasso mora num lugar só** (`meditacao-sessao.ts`). Eram dois números
+  que precisavam concordar, e nada obrigava isso.
+- **O piso de densidade de voz caiu de 15% para 12%**, de propósito e
+  documentado: o espaçamento tirou seis falas de uma sessão de dez minutos.
+  Continua sendo 2,6× o que a auditoria mediu na versão original (5,5%).
+- **A amostra de 10 s do som de fundo**: tocar no chip toca o som e ele para
+  sozinho — dá para folhear os quatro antes de escolher. ⚠️ É uma instância
+  PRÓPRIA, nunca o `audioRef` da sessão: se dividissem o objeto, o relógio da
+  amostra pararia o som da meditação dez segundos depois de ela começar.
