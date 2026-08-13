@@ -398,7 +398,12 @@ export const MOVIMENTOS: Movimento[] = [
     parar: "Se o osso da frente doer durante — diminua a força pela metade; se ainda doer, pare.",
     secs: 50,
     alivia: ["pubis"],
-    fases: ["t2", "t3", "pos"],
+    /* ⚠️ t1 entrou depois, e por um buraco medido: "dor no osso da frente" é
+       oferecida na tela desde a primeira semana, e no primeiro trimestre não
+       havia UM movimento que a tratasse — a queixa era um botão que não fazia
+       nada. Isometria de adutor com travesseiro não tem contraindicação no t1;
+       o que faltava era a fase, não a segurança. */
+    fases: ["t1", "t2", "t3", "pos"],
     tipo: "mobilidade",
     chao: false,
   },
@@ -649,12 +654,166 @@ export function elegiveis(
   fase: Fase,
   semana: number | null | undefined,
   posParto: boolean,
+  /**
+   * Ela PEDIU para não descer ao chão — cama de hospital, repouso, sala do
+   * trabalho, tapete que não existe. Soma-se à regra automática abaixo; nunca
+   * a substitui, senão um "quero o chão" digitado numa tela desfaria o corte
+   * clínico de quem tem 39 semanas.
+   */
+  semChaoPedido = false,
 ): Movimento[] {
   const fases: Fase[] = fase === "parto" ? ["t3", "parto"] : [fase];
   /* Chão sai perto do fim e no pós-parto recente: levantar do chão com 39
      semanas, ou três dias depois de uma cesárea, é o esforço — não o alívio. */
-  const semChao = posParto || (semana != null && semana >= 37);
+  const semChao = semChaoPedido || posParto || (semana != null && semana >= 37);
   return MOVIMENTOS.filter((m) => m.fases.some((f) => fases.includes(f)) && (!semChao || !m.chao));
+}
+
+/**
+ * ⚠️ A SESSÃO É UMA DESCIDA SÓ — e este é o conserto do defeito mais grave
+ * que a auditoria mediu.
+ *
+ * A ordem de ESCOLHA (a queixa primeiro) não pode ser a ordem de EXECUÇÃO.
+ * Medido na versão anterior, numa sessão de dez minutos:
+ *
+ *   · 24 semanas → 12 movimentos, 10 trocas de posição, 6 idas e vindas ao chão
+ *   · 38 semanas → 11 movimentos,  9 trocas de posição, 7 idas e vindas ao chão
+ *
+ * O código orça **6 segundos** de troca. Sair do decúbito lateral para em pé
+ * com 38 semanas leva 20 a 30 — então o alongamento virava o intervalo entre
+ * os agachamentos, e o esforço da sessão passava a ser levantar do chão sete
+ * vezes. É o motivo pelo qual ela não voltaria amanhã.
+ *
+ * Agora a sequência anda num SENTIDO SÓ: em pé → parede → sentada → chão
+ * (borboleta, quatro apoios, deitada). Terminar deitada é melhor de propósito —
+ * o fim de uma sessão é onde o corpo relaxa, e ela pode ficar ali.
+ *
+ * ⚠️ E O SENTIDO PODE SER O INVERSO — foi o teste antigo que provou isto.
+ * Quem tem dor no púbis recebe dois movimentos de alívio, e os dois são
+ * DEITADA: descendo, a coisa que tira a dor dela chegava no quarto minuto,
+ * depois de rolar os ombros em pé. "Um sentido só" é o que evita o
+ * sobe-e-desce; começar por cima nunca foi a regra. Quando o alívio mora
+ * embaixo, a sessão SOBE: deitada → sentada → em pé, com a mesma transição
+ * única de nível, e a dor tratada no primeiro minuto.
+ *
+ * ⚠️ A ORDENAÇÃO É ESTÁVEL, e tem de continuar sendo: dentro do mesmo grupo,
+ * quem alivia a queixa dela continua vindo primeiro. E ela roda DEPOIS do
+ * corte por tempo — ordenar antes faria a sessão de dois minutos entregar o
+ * que estava na ponta da fila em vez do que alivia a dor.
+ */
+export const ORDEM_DAS_POSES: PoseKey[] = [
+  "pe",
+  "parede",
+  "sentada",
+  "borboleta",
+  "quatro",
+  "deitada",
+];
+
+/** A pose está no chão / deitada — o nível de baixo. */
+export function poseEmbaixo(pose: PoseKey): boolean {
+  return pose === "borboleta" || pose === "quatro" || pose === "deitada";
+}
+
+/**
+ * A VARREDURA: percorre os níveis numa direção só, começando por `inicio`.
+ *
+ * ⚠️ É CIRCULAR, e é isso que resolve o caso difícil. Dois blocos ordenados
+ * separadamente (o alívio e o resto) mediram TRÊS trocas de nível — desciam,
+ * voltavam ao topo e desciam de novo. Uma varredura que começa no nível do
+ * alívio e dá a volta passa por cada nível UMA vez: no máximo duas trocas, e
+ * uma quando o alívio já está numa ponta.
+ *
+ * A ordenação é estável: dentro do mesmo nível, quem trata a dor dela continua
+ * na frente, porque é essa a ordem em que a lista chega aqui.
+ */
+export function ordenarPorPosicao(
+  movimentos: Movimento[],
+  inicio = 0,
+  subindo = false,
+): Movimento[] {
+  const n = ORDEM_DAS_POSES.length;
+  const distancia = (pose: PoseKey) => {
+    const i = ORDEM_DAS_POSES.indexOf(pose);
+    return subindo ? (inicio - i + n) % n : (i - inicio + n) % n;
+  };
+  return movimentos
+    .map((m, i) => ({ m, i, d: distancia(m.pose) }))
+    .sort((a, b) => (a.d !== b.d ? a.d - b.d : a.i - b.i))
+    .map((x) => x.m);
+}
+
+/**
+ * O custo de transição da sequência: quantas vezes ela muda de pose, e quantas
+ * vezes SOBE OU DESCE DE NÍVEL.
+ *
+ * `niveis` é o número que importa — trocar de pose sentada para sentada não
+ * custa nada, e levantar do chão com 38 semanas custa meio minuto de esforço.
+ * Numa descida só, ele é 1.
+ */
+export function trocasDePosicao(seq: Movimento[]): { poses: number; niveis: number } {
+  const embaixo = (m: Movimento) =>
+    m.pose === "borboleta" || m.pose === "quatro" || m.pose === "deitada";
+  let poses = 0;
+  let niveis = 0;
+  for (let i = 1; i < seq.length; i++) {
+    if (seq[i].pose !== seq[i - 1].pose) poses++;
+    if (embaixo(seq[i]) !== embaixo(seq[i - 1])) niveis++;
+  }
+  return { poses, niveis };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O QUE FUNCIONOU PARA ELA — a resposta do fim escolhendo a sessão seguinte
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ A NOTA É POR QUEIXA, NUNCA POR MOVIMENTO SOZINHO.
+ *
+ * "Gato-camelo melhorou" só quer dizer alguma coisa sobre a LOMBAR dela. O
+ * mesmo movimento aparece em quatro queixas diferentes, e uma nota global
+ * carregaria a evidência de uma dor para outra que ela nem tinha.
+ */
+export type NotasDoCorpo = Record<string, number>;
+
+/** Até onde a nota anda para cada lado. */
+export const NOTA_LIMITE = 2;
+
+export function chaveDaNota(sintoma: Sintoma, id: string): string {
+  return `${sintoma}:${id}`;
+}
+
+/**
+ * O desfecho de uma sessão ajusta os movimentos que se propunham a aliviar
+ * AQUELA queixa.
+ *
+ * ⚠️ Três coisas que esta função NÃO faz, e cada uma tem um motivo:
+ *
+ *  1. **Não mexe no assoalho pélvico.** Ele entra por prevenção, não por dor —
+ *     ninguém sente alívio de assoalho pélvico no mesmo dia, e uma nota
+ *     negativa tiraria da sessão o exercício com melhor evidência da gestação
+ *     inteira por um resultado que ele nunca prometeu.
+ *  2. **Não tira nada do poço.** A nota só REORDENA. Um movimento que ela
+ *     marcou "piorou" três vezes desce para o fim da fila; nunca deixa de
+ *     existir, porque uma sessão ruim pode ter sido a noite mal dormida.
+ *  3. **"Igual" não é nota negativa.** Alongamento que não piorou nada não é
+ *     um erro — e punir o empate faria a fila girar por ruído.
+ */
+export function ajustarNotas(
+  notas: NotasDoCorpo,
+  seq: Movimento[],
+  sintoma: Sintoma | null,
+  desfecho: "Melhorou" | "Igual" | "Piorou",
+): NotasDoCorpo {
+  if (!sintoma || desfecho === "Igual") return notas;
+  const passo = desfecho === "Melhorou" ? 1 : -1;
+  const fora = { ...notas };
+  for (const m of seq) {
+    if (m.tipo === "assoalho" || !m.alivia.includes(sintoma)) continue;
+    const k = chaveDaNota(sintoma, m.id);
+    fora[k] = Math.max(-NOTA_LIMITE, Math.min(NOTA_LIMITE, (fora[k] ?? 0) + passo));
+  }
+  return fora;
 }
 
 /** Quantos movimentos cabem nos minutos pedidos (com 6 s de troca entre eles). */
@@ -689,10 +848,22 @@ export function sessaoDoDia(opts: {
   semana?: number | null;
   posParto?: boolean;
   sintoma?: Sintoma | null;
+  /** Ela pediu para não ir ao chão. Ver `elegiveis`. */
+  semChao?: boolean;
+  /** O que já funcionou para ela naquela queixa. Ver `ajustarNotas`. */
+  notas?: NotasDoCorpo;
 }): Movimento[] {
-  const { dia, minutos, semana = null, posParto = false, sintoma = null } = opts;
+  const {
+    dia,
+    minutos,
+    semana = null,
+    posParto = false,
+    sintoma = null,
+    semChao = false,
+    notas = {},
+  } = opts;
   const fase = fasePara(semana, posParto);
-  const pool = elegiveis(fase, semana, posParto);
+  const pool = elegiveis(fase, semana, posParto, semChao);
   if (!pool.length) return [];
 
   const escolhidos: Movimento[] = [];
@@ -700,7 +871,16 @@ export function sessaoDoDia(opts: {
     if (!escolhidos.some((x) => x.id === m.id)) escolhidos.push(m);
   };
 
-  if (sintoma) for (const m of pool.filter((m) => m.alivia.includes(sintoma))) usar(m);
+  if (sintoma) {
+    /* O que já aliviou ESTA queixa dela vem na frente. Ordenação estável: sem
+       nota nenhuma (a primeira vez, que é o caso de quase toda paciente), a
+       fila é exatamente a de antes — a ordem escrita no catálogo. */
+    const alivio = pool
+      .filter((m) => m.alivia.includes(sintoma))
+      .map((m, i) => ({ m, i, n: notas[chaveDaNota(sintoma, m.id)] ?? 0 }))
+      .sort((a, b) => (b.n !== a.n ? b.n - a.n : a.i - b.i));
+    for (const x of alivio) usar(x.m);
+  }
 
   if (minutos >= 5) {
     const assoalho = pool.filter((m) => m.tipo === "assoalho");
@@ -711,7 +891,35 @@ export function sessaoDoDia(opts: {
   const resto = pool.filter((m) => !escolhidos.some((x) => x.id === m.id));
   for (let k = 0; k < resto.length; k++) usar(resto[(dia + k) % resto.length]);
 
-  return escolhidos.slice(0, quantosCabem(escolhidos, minutos));
+  /* ⚠️ CORTA PRIMEIRO, ORDENA DEPOIS. O corte usa a ordem de ESCOLHA (a queixa
+     manda); a posição é só a ordem em que ela vai FAZER. Invertido, a sessão
+     de dois minutos entregaria a ponta da fila em vez do que alivia a dor. */
+  const dentro = escolhidos.slice(0, quantosCabem(escolhidos, minutos));
+
+  /**
+   * ⚠️ A VARREDURA COMEÇA NO NÍVEL DO ALÍVIO — e as duas tentativas anteriores
+   * ficam registradas porque cada uma quebrou de um jeito diferente.
+   *
+   * 1ª: ordenar tudo de cima para baixo. Com dor no PÚBIS (cujos dois
+   *     movimentos são deitada), o que tirava a dor dela chegava no quarto
+   *     minuto, depois de rolar os ombros em pé. O teste antigo derrubou.
+   * 2ª: inverter o sentido quando o alívio mora embaixo. Resolvia o púbis e
+   *     quebrava a AZIA, cujo alívio mora num nível do meio: qualquer sentido
+   *     único deixa preenchimento na frente dela.
+   * 3ª: dois blocos (alívio, resto), cada um ordenado. Media TRÊS trocas de
+   *     nível — descia, voltava ao topo e descia de novo.
+   *
+   * A varredura circular passa por cada nível uma vez, começando naquele em
+   * que o alívio está: a dor é tratada no primeiro minuto E o custo cai de
+   * sete idas e vindas para no máximo duas. Das duas direções escolhe-se a que
+   * troca menos; empate desce, porque descendo a sessão termina deitada, que é
+   * onde o corpo relaxa.
+   */
+  const primeiro = sintoma ? dentro.find((m) => m.alivia.includes(sintoma)) : undefined;
+  const inicio = primeiro ? ORDEM_DAS_POSES.indexOf(primeiro.pose) : 0;
+  const descendo = ordenarPorPosicao(dentro, inicio, false);
+  const subindo = ordenarPorPosicao(dentro, inicio, true);
+  return trocasDePosicao(subindo).niveis < trocasDePosicao(descendo).niveis ? subindo : descendo;
 }
 
 /** As durações oferecidas, no mesmo desenho da meditação. */

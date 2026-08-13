@@ -52,9 +52,13 @@ import {
   DURACOES_EXERCICIO,
   SINAIS_DE_PARADA,
   SINTOMAS,
+  ajustarNotas,
+  elegiveis,
+  fasePara,
   sessaoDoDia,
   type DuracaoExercicio,
   type Movimento,
+  type NotasDoCorpo,
   type Sintoma,
 } from "@/lib/exercicios";
 import {
@@ -4128,6 +4132,9 @@ function buzz(ms = 28) {
    A régua de qual movimento entra hoje (`sessaoDoDia`) mora lá também, pura e
    testada. Aqui ficou só o desenho da tela. */
 
+/** O que já aliviou cada queixa dela. Prefixo `dc-path-`: viaja no blob. */
+const EX_NOTAS_KEY = "dc-path-ex-notas";
+
 export function MovementBlock({
   day,
   semana,
@@ -4172,6 +4179,23 @@ export function MovementBlock({
   const [phase, setPhase] = useState<"escolha" | "active" | "reflexo" | "done">("escolha");
   const [sintoma, setSintoma] = useState<Sintoma | null>(null);
   const [minutos, setMinutos] = useState<DuracaoExercicio>(5);
+  /**
+   * "Hoje eu não desço ao chão" — cama de hospital, repouso, o tapete que não
+   * existe, a sala do trabalho. A régua já sabia tirar o chão sozinha (37ª
+   * semana, pós-parto); o que faltava era ela poder PEDIR.
+   */
+  const [semChao, setSemChao] = useState(false);
+  /**
+   * O QUE JÁ FUNCIONOU PARA ELA, por queixa. Ver `ajustarNotas`.
+   *
+   * A chave começa com `dc-path-`, então viaja no blob de `journey_state` e o
+   * que ela aprendeu sobre o próprio corpo acompanha o aparelho novo. A nota
+   * só REORDENA a fila — nunca tira um movimento do poço.
+   */
+  const [notas, setNotas] = useState<NotasDoCorpo>({});
+  useEffect(() => {
+    if (open) setNotas(lsGet<NotasDoCorpo>(EX_NOTAS_KEY, {}));
+  }, [open]);
   const [idx, setIdx] = useState(0);
   const [secs, setSecs] = useState(0);
   const [voz, setVoz] = useState(true);
@@ -4256,7 +4280,7 @@ export function MovementBlock({
   }
 
   function begin() {
-    const lista = sessaoDoDia({ dia: day, minutos, semana, posParto, sintoma });
+    const lista = sessaoDoDia({ dia: day, minutos, semana, posParto, sintoma, semChao, notas });
     if (!lista.length) return;
     setSeq(lista);
     setIdx(0);
@@ -4283,6 +4307,11 @@ export function MovementBlock({
   }
 
   const cur = seq[idx];
+  /* Há chão para tirar nesta fase? Ver o botão "Hoje eu não desço ao chão". */
+  const temChao = useMemo(
+    () => elegiveis(fasePara(semana, posParto), semana, posParto).some((m) => m.chao),
+    [semana, posParto],
+  );
 
   return (
     <>
@@ -4419,6 +4448,36 @@ export function MovementBlock({
                   </button>
                 ))}
               </div>
+
+              {/* ── SEM DESCER AO CHÃO ─────────────────────────────────────
+                  Só aparece quando há chão a tirar: a partir da 37ª semana e
+                  no pós-parto a régua já o tirou sozinha, e um botão que não
+                  muda nada ensina que os botões desta tela não valem. */}
+              {temChao && (
+                <button
+                  onClick={() => setSemChao((v) => !v)}
+                  aria-pressed={semChao}
+                  className={`press mt-3 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                    semChao
+                      ? "bg-emerald-500 text-white"
+                      : "border border-emerald-200 bg-white/70 text-emerald-900"
+                  }`}
+                >
+                  <span className="text-lg leading-none" aria-hidden>
+                    🛏️
+                  </span>
+                  <span className="flex-1">
+                    <span className="block text-[12.5px] font-bold leading-tight">
+                      Hoje eu não desço ao chão
+                    </span>
+                    <span
+                      className={`block text-[11px] leading-snug ${semChao ? "text-white/80" : "text-emerald-700/60"}`}
+                    >
+                      Cama, sofá ou de pé — sem tapete
+                    </span>
+                  </span>
+                </button>
+              )}
 
               {/* ── ⚠️ OS SINAIS DE PARADA ─────────────────────────────────
                   Não é "li e aceito": são os motivos pelos quais ela NÃO deve
@@ -4563,16 +4622,24 @@ export function MovementBlock({
                     Sobre o que você marcou no começo.
                   </p>
                   <div className="mt-6 grid w-full max-w-xs gap-2">
-                    {[
-                      { e: "😌", r: "Melhorou" },
-                      { e: "😐", r: "Igual" },
-                      { e: "😖", r: "Piorou" },
-                    ].map((o) => (
+                    {(
+                      [
+                        { e: "😌", r: "Melhorou" },
+                        { e: "😐", r: "Igual" },
+                        { e: "😖", r: "Piorou" },
+                      ] as const
+                    ).map((o) => (
                       <button
                         key={o.r}
                         onClick={() => {
                           setMelhorou(o.r);
                           void registrarExercicio(sintoma, o.r, minutos);
+                          /* ⚠️ A nota é dos movimentos DESTA sessão, e por
+                             isso ela é gravada aqui e não no fim: `seq` é o
+                             que ela acabou de fazer, e `close()` a limpa. */
+                          const novas = ajustarNotas(notas, seq, sintoma, o.r);
+                          setNotas(novas);
+                          lsSet(EX_NOTAS_KEY, novas);
                           setPhase("done");
                         }}
                         className="press flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white/75 px-4 py-3 text-left text-sm font-bold text-emerald-900"

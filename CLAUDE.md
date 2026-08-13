@@ -1719,6 +1719,58 @@ uma de 39 recebiam o mesmo trio. Régua e conteúdo agora em
   devolve `null` sem quebrar nada. A fila de gravação está travada em
   `voz.test.ts`: mover um id para `COM_VOZ_GRAVADA` é o que fecha a pendência.
 
+### A sessão virou uma varredura só (ago/2026)
+
+Auditoria de seis chapéus na aba. **Nota 6,5** — o conteúdo e a régua clínica
+valiam 8, a execução da SESSÃO valia 5. O número que decidiu:
+
+| sessão de 10 min | movimentos | trocas de pose | **sobe/desce de nível** |
+| ---------------- | ---------- | -------------- | ----------------------- |
+| 24 semanas       | 12         | 10             | **6**                   |
+| 38 semanas       | 11         | 9              | **7**                   |
+
+O código orça **6 segundos** de troca. Sair do decúbito lateral para em pé com
+38 semanas leva 20 a 30 — o alongamento virava o intervalo entre os
+agachamentos, e o esforço da sessão passava a ser levantar do chão sete vezes.
+Depois: **1** troca de nível em todas as 189 combinações medidas.
+
+- **A ordem de ESCOLHA não é a ordem de EXECUÇÃO.** A queixa continua mandando
+  em QUEM entra; a posição manda em QUANDO. E o corte por tempo roda ANTES da
+  ordenação — invertido, a sessão de dois minutos entregaria a ponta da fila em
+  vez do que alivia a dor.
+- ⚠️ **É uma VARREDURA CIRCULAR, e as três tentativas anteriores estão
+  registradas em `ordenarPorPosicao` porque cada uma quebrou diferente:**
+  ordenar tudo de cima para baixo jogava o alívio do PÚBIS (cujos movimentos
+  são todos deitada) para o quarto minuto; inverter o sentido quebrava a AZIA,
+  cujo alívio mora num nível do MEIO; e dois blocos ordenados em separado
+  mediram TRÊS trocas — desciam, voltavam ao topo e desciam de novo. A
+  varredura começa no nível do alívio e dá a volta: passa por cada nível uma
+  vez. Das duas direções vale a que troca menos; empate DESCE, porque descendo
+  a sessão termina deitada, que é onde o corpo relaxa.
+- **O invariante testado não é a ordem absoluta** (ela pode começar deitada e
+  terminar em pé) — é **uma pose, um bloco**. Sentar, deitar e sentar de novo
+  é como as três trocas apareciam.
+- **"Hoje eu não desço ao chão"** (`semChao`): cama de hospital, repouso, o
+  tapete que não existe. Só SOMA ao corte automático — não há como pedir o chão
+  de volta com 39 semanas —, e o botão **só aparece quando há chão a tirar**: da
+  37ª em diante a régua já o tirou, e um botão que não muda nada ensina que os
+  botões desta tela não valem.
+- **O desfecho escolhe a sessão seguinte** (`ajustarNotas`, chave
+  `dc-path-ex-notas`, viaja no `journey_state`). ⚠️ Três coisas que ela NÃO faz:
+  não mexe no **assoalho pélvico** (ele entra por prevenção, não por dor —
+  ninguém sente alívio de assoalho no mesmo dia, e uma nota negativa tiraria da
+  sessão o exercício com melhor evidência da gestação por um resultado que ele
+  nunca prometeu); **não tira nada do poço** (a nota só REORDENA, porque uma
+  sessão ruim pode ter sido a noite mal dormida); e **"igual" não é nota
+  negativa**. A nota é por QUEIXA (`lombar:gatocamelo`), nunca por movimento
+  solto: o mesmo movimento serve a quatro queixas, e uma nota global carregaria
+  a evidência de uma dor para outra que ela nem tinha.
+- ⚠️ **"Dor no osso da frente" era um botão que não fazia nada no 1º
+  trimestre.** Os dois movimentos que a tratam nasceram `t2+`, e o teste de
+  cobertura olhava o catálogo INTEIRO — a paciente vive numa fase só. Agora há
+  teste por fase, e a isometria de adutor com travesseiro ganhou `t1` (o que
+  faltava era a fase, não a segurança).
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,
@@ -1759,11 +1811,11 @@ foram medidas antes de qualquer mudança.
 
 O dono disse que os sons estavam ruins. A auditoria mediu, e ele tinha razão:
 
-| medida | chuva | mar | coração | pad |
-| --- | --- | --- | --- | --- |
-| fator de crista (antes → depois) | 4,25 → **8,30** | 6,49 → **9,89** | 8,37 → 7,73 | 1,91 → **2,94** |
-| auto-similaridade a 2 s | 0,997 → **−0,002** | 0,794 → **0,014** | 0,225 → 0,012 | 1,000 → **0,292** |
-| energia acima de 1 kHz | 92% → **61%** | 26% → 22% | 2% → 0,3% | — |
+| medida                           | chuva              | mar               | coração       | pad               |
+| -------------------------------- | ------------------ | ----------------- | ------------- | ----------------- |
+| fator de crista (antes → depois) | 4,25 → **8,30**    | 6,49 → **9,89**   | 8,37 → 7,73   | 1,91 → **2,94**   |
+| auto-similaridade a 2 s          | 0,997 → **−0,002** | 0,794 → **0,014** | 0,225 → 0,012 | 1,000 → **0,292** |
+| energia acima de 1 kHz           | 92% → **61%**      | 26% → 22%         | 2% → 0,3%     | —                 |
 
 O que cada número dizia:
 
