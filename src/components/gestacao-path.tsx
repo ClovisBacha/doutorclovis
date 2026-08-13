@@ -6113,8 +6113,20 @@ export function MeditationBlock({
           {/* ── 1. Escolha: tempo, necessidade, som ───────────────────────── */}
           {etapa === "escolha" && (
             <div className="flex-1 overflow-y-auto px-6 pb-10">
-              <h3 className="font-serif text-[26px] font-semibold text-violet-900">Meditar</h3>
-              <p className="mt-1 text-[13px] text-violet-800/70">
+              {/* ── O PORTA-VOZ ────────────────────────────────────────────
+                  Era a única das cinco atividades sem NENHUMA aparição da
+                  bolha na abertura — só a respiração silenciosa dela durante
+                  a sessão. Provisório em `humor="feliz"`: o dono ainda vai
+                  mandar uma arte própria de "meditando", e trocar o valor
+                  aqui é a única mudança que vai precisar quando ela chegar —
+                  nenhuma outra tela referencia esse humor. */}
+              <div className="flex justify-center">
+                <Bolha humor="feliz" tamanho={96} entrada="chega" careMode={careMode} />
+              </div>
+              <h3 className="mt-3 text-center font-serif text-[26px] font-semibold text-violet-900">
+                Meditar
+              </h3>
+              <p className="mt-1 text-center text-[13px] text-violet-800/70">
                 {seq > 0 ? (
                   <>
                     🔥 {seq} {seq === 1 ? "dia seguido" : "dias seguidos"}
@@ -8713,6 +8725,10 @@ function WellnessScreen({
                   missingHint={null}
                   showPremiumAd={lesson.showAd}
                   onEarn={onEarnLesson}
+                  /* Mesma prop que as outras quatro atividades já recebem —
+                     abre JÁ na tela cheia (a bolha "estudiosa" mora lá), em
+                     vez do cartão recolhido que exigia um segundo toque. */
+                  aoSair={() => setOpenKey(null)}
                 />
               )
             ) : (
@@ -9203,6 +9219,7 @@ function DailyQuizBlock({
   missingHint,
   showPremiumAd = false,
   onEarn,
+  aoSair,
 }: {
   quiz: DailyQuiz;
   emoji: string;
@@ -9217,12 +9234,25 @@ function DailyQuizBlock({
   /** Mostra o convite ao Premium ao terminar (só para quem é do plano grátis). */
   showPremiumAd?: boolean;
   onEarn: () => void;
+  /**
+   * ⚠️ FALTAVA — e era por isto que a bolha "estudiosa" parecia não existir.
+   *
+   * As outras quatro atividades do jogo (Bebê, Gratidão, Movimento, Meditar)
+   * recebem `aoSair` da lista e abrem JÁ na tela cheia — é o `!!aoSair` no
+   * `useState` de cada uma. A Aula nunca teve essa prop: tocar "Aula de
+   * hoje" na lista só trocava pra visão da Aula, que ainda mostrava o
+   * CARTÃO recolhido dela (ícone colorido pequeno, botão "Fazer a aula de
+   * hoje") — a bolha só aparecia depois de um SEGUNDO toque, que ninguém
+   * pediu pra dar. Era a única das cinco atividades pedindo dois toques
+   * pra chegar na tela cheia.
+   */
+  aoSair?: () => void;
 }) {
   const questions = quiz.questions;
   const tm = trimMeta(week);
   const total = questions.length;
 
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "quiz" | "done">("intro");
   const [qIndex, setQIndex] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswer[]>(() => questions.map(() => null));
@@ -9246,6 +9276,14 @@ function DailyQuizBlock({
     setQIndex(0);
     setAnswers(questions.map(() => null));
     setChecked(false);
+  }
+
+  /* Mesmo formato de `close()` no Bebê/Gratidão/Movimento: aberta pela
+     lista (`aoSair` presente), fechar volta pra lista de atividades, não
+     pro cartão recolhido que ninguém pediu pra ver. */
+  function close() {
+    if (aoSair) return aoSair();
+    setOpen(false);
   }
 
   function startQuiz() {
@@ -9344,7 +9382,7 @@ function DailyQuizBlock({
         >
           <div className="flex items-center gap-3 px-4 py-3">
             <button
-              onClick={() => setOpen(false)}
+              onClick={close}
               aria-label="Fechar"
               className="press text-2xl leading-none text-slate-400"
             >
@@ -9567,7 +9605,7 @@ function DailyQuizBlock({
             )}
             {phase === "done" && (
               <button
-                onClick={() => setOpen(false)}
+                onClick={close}
                 className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho

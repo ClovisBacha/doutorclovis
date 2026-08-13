@@ -2160,7 +2160,36 @@ NENHUMA aparição da bolha (nem abertura, nem fim).
   cortado.
 - **Bancada:** `/preview-bolha` (chip "exercicio") ·
   `/preview-jogo?tela=jogos&dia=139`, tocar em "Movimento" → abre direto na
-  tela de escolha (não tem intermediária, ao contrário da Aula).
+  tela de escolha.
+
+### A Aula pedia dois toques, e a Meditação não tinha bolha nenhuma (ago/2026)
+
+O dono testou no aparelho de verdade: o halter do Mexer apareceu, o boné da
+Aula não. As duas expressões estavam OK no código e no deploy — o problema
+era de CAMINHO, não de arte.
+
+- ⚠️ **`DailyQuizBlock` nunca recebia `aoSair`.** As outras quatro atividades
+  (Bebê, Gratidão, Movimento, Meditar) abrem `<Chosen aoSair={() =>
+setOpenKey(null)} .../>` — e cada uma tem `useState(!!aoSair)`, que já
+  nasce ABERTA na tela cheia quando vem da lista. A Aula é renderizada à
+  parte (`openKey === "aula"`, fora do `<Chosen>` genérico) e nunca ganhou
+  essa prop: tocar "Aula de hoje" só trocava pra visão da Aula, que ainda
+  mostrava o CARTÃO RECOLHIDO dela (ícone colorido, botão "Fazer a aula de
+  hoje") — a bolha só existe na tela cheia, um segundo toque adiante. Era a
+  única das cinco atividades pedindo dois toques pra chegar onde a bolha
+  mora. Testado (`img.bolha-corpo` aparece depois de UM toque só, igual às
+  outras quatro).
+- **Meditar ganhou a bolha que faltava** — era a única das cinco sem
+  NENHUMA aparição na abertura (só a respiração silenciosa dela durante a
+  sessão). Entrou em `humor="feliz"`, PROVISÓRIO: o dono vai mandar uma arte
+  de "meditando" própria, e a troca é uma linha só (nenhuma outra tela
+  referencia esse humor específico).
+- ⚠️ **Regra que passou a valer pra sempre**: toda atividade do jogo mostra
+  a bolha assim que abre — não é polimento de uma vez, é padrão. Uma
+  atividade nova sem bolha na abertura é a exceção que quebra a regra, e a
+  próxima a mexer aqui deve entrar já com ela.
+- **Bancada:** `/preview-jogo?tela=jogos&dia=139`, um toque em "Aula de
+  hoje" (antes precisava de dois) e um toque em "Meditar".
 
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
