@@ -328,7 +328,11 @@ describe("escrita no banco não pode falhar em silêncio", () => {
          janela para trás resolve — um `.update` que não é banco é sempre
          encadeado logo depois de quem o produziu. */
       const antes = linhas.slice(Math.max(0, i - 2), i + 1).join("\n");
-      if (/createHmac|createHash|cipher|decipher|hits\.delete/.test(antes)) return;
+      /* `porPaciente.delete` é o mesmo falso positivo de `hits.delete`: um
+         Map em memória (`nudgeGratidaoDaSemana`, filtrando quem está em Modo
+         Cuidado antes de mandar o push), não uma escrita no banco. */
+      if (/createHmac|createHash|cipher|decipher|hits\.delete|porPaciente\.delete/.test(antes))
+        return;
       n++;
     });
     return n;

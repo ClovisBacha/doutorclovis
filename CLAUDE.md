@@ -1878,6 +1878,66 @@ informações, ele é o nosso porta-voz do app". `BolhaComBalao`
   absoluto com `right` e sem `left`, cujo shrink-to-fit media contra um
   container de 44px. Aqui ele está no fluxo, no eixo da tela.
 
+### Marcos redondos, hora do dia, resumo de domingo, e o push que já existia (ago/2026)
+
+Quatro ideias criativas para chegar mais perto de 10, pedidas pelo dono depois
+da nota 8,5. Nenhuma gasta crédito; nenhuma pede SQL novo.
+
+- **Marcos redondos** (`MARCOS`, `marcoAtingido` em `gratidao.ts`): 10, 25, 50,
+  100, 200, 365. O contador subia sem festa nenhuma — "23 coisas boas" e "24
+  coisas boas" liam exatamente igual, enquanto o troféu, a chama e as cinco
+  estrelas do resto do jogo têm celebração própria. ⚠️ `marcoAtingido` compara
+  por IGUALDADE, e isso só é seguro porque `total` sobe exatamente +1 por
+  guardada — nunca pula. Quem já tinha mais gratidões que o primeiro marco
+  antes deste recurso existir simplesmente não vê aquele marco: não dá para
+  comemorar retroativamente uma travessia que já aconteceu em silêncio. A
+  festa reaproveita `nivelDaSequencia` (`celebrate.ts`) para escalar
+  confete/som/vibração pelo TAMANHO do marco — a mesma régua da chama, sem
+  inventar uma segunda tabela de "quão grande é a festa". O balão prioriza o
+  marco sobre a releitura (o cartão de reencontro continua embaixo do mesmo
+  jeito), e o número aparece GIGANTE na tela — a mesma distinção que a Aula já
+  faz com `<ConfettiBurst big={score === total} />`.
+- **A bolha muda de assunto pela hora do dia**, reaproveitando `Periodo` e
+  `periodoDaHora` de `frases-do-mascote.ts` — a mesma régua do mascote da
+  home, nunca uma segunda cópia. ⚠️ **A madrugada é tratada à parte, SEM o
+  contador**: é a mesma exceção que `humorDaJornada` já faz para a "surpresa"
+  da madrugada — quem está acordada às 3h numa gestação de risco não precisa
+  de mais ninguém contando número pra ela, precisa de companhia
+  ("Você está acordada bem cedo. Eu fico aqui, é só falar."). Manhã, tarde e
+  noite mudam só a abertura ("Bom dia!", "Antes de dormir —"); o contador
+  continua. **Dia difícil e primeira vez continuam vencendo o período** — as
+  duas já são a coisa mais importante a dizer naquele instante, e casar hora
+  do dia com elas só alongaria a frase à toa. Sem período informado, a frase é
+  byte a byte a de antes — nada quebrou para quem não passa o parâmetro.
+- **O resumo de domingo** (`gratidoesDaSemana`, `ehDomingoDeResumo` em
+  `gratidao.ts`; fase `"resumo"` em `GratitudeBlock`): nenhum app de gratidão
+  do mercado faz isto — todos empurram o PRÓXIMO registro, nenhum comemora os
+  que já existem. Aos domingos, com duas gratidões OU MAIS na janela corrida
+  dos últimos 7 dias, e só se ela AINDA NÃO ESCREVEU HOJE, a tela para antes
+  de pedir mais uma e mostra a semana inteira para ela escolher a favorita.
+  ⚠️ **Não persiste nada** — não existe coluna de "favorita", e inventar uma
+  seria migration por decoração; o valor do exercício é RELER, não o registro
+  da escolha. "Boa escolha 💛" é feedback puramente local (`useState`), some ao
+  fechar a folha. O mínimo é DOIS: escolher entre uma coisa só não é escolha,
+  é reler o que ela acabou de ver na tela de guardado.
+- **O push semanal já existia — a Gratidão entrou nele** (`push-weekly-tick.ts`,
+  `nudgeGratidaoDaSemana`): sem SQL novo, porque usa o MESMO cron que já roda
+  em produção e já está protegido. Stateless como `cobrarLacunasParadas` ao
+  lado — sem tabela de "já mandei", o controle é o dia da semana: só dispara
+  aos domingos, o mesmo dia do resumo dentro do app. ⚠️ **Nunca em Modo
+  Cuidado** — filtra por `care_mode` DEPOIS de somar por paciente, para não
+  varrer a base toda à toa. Reaproveita `PREFIXO_GRATIDAO` de `gratidao.ts` em
+  vez de reescrever `"Gratidão: "` à mão — duas cópias do mesmo prefixo
+  divergem no primeiro conserto, e aqui a divergência seria silenciosa: o cron
+  contaria zero gratidões, sem erro nenhum. Deep-link `/minha-conta?tab=Caminho`
+  — o mesmo rótulo exato que `mesada.functions.ts` já usa, porque `minha-conta`
+  ignora em silêncio um `?tab=` que não bate com `TABS`.
+- **Bancada:** `/preview-gratidao?tela=done&marco=50` (o marco) ·
+  `?tela=write&periodo=noite` (madrugada/manha/tarde/noite) ·
+  `?tela=resumo&n=5` (o resumo — o espaçamento das gratidões de exemplo cai
+  para 1 em 1 dia só nesta tela, porque o padrão de 6 em 6 dias é pensado para
+  a RELEITURA e deixaria a semana quase vazia).
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

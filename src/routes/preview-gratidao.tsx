@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GratitudeBlock } from "@/components/gestacao-path";
 import { PREFIXO_GRATIDAO } from "@/lib/gratidao";
+import type { Periodo } from "@/lib/frases-do-mascote";
 
 /**
  * Bancada da GRATIDÃO.
@@ -16,13 +17,17 @@ import { PREFIXO_GRATIDAO } from "@/lib/gratidao";
  * propósito: é o mesmo caminho do aparelho dela.
  *
  * Parâmetros:
- *   `?w=20`      semana gestacional — muda o grupo de perguntas
- *   `?pos=1`     pós-parto
- *   `?dia=3`     gira a pergunta do dia (é `dia % n`)
- *   `?n=12`      quantas gratidões fingir (0 = paciente nova)
- *   `?dificil=1` o dia em que ela marcou humor baixo
- *   `?luto=1`    Modo Cuidado
- *   `?tela=done` a tela de guardado, com a RELEITURA · `?tela=lista` a coleção
+ *   `?w=20`       semana gestacional — muda o grupo de perguntas
+ *   `?pos=1`      pós-parto
+ *   `?dia=3`      gira a pergunta do dia (é `dia % n`)
+ *   `?n=12`       quantas gratidões fingir (0 = paciente nova)
+ *   `?dificil=1`  o dia em que ela marcou humor baixo
+ *   `?luto=1`     Modo Cuidado
+ *   `?tela=done`  a tela de guardado, com a RELEITURA · `?tela=lista` a coleção
+ *                 · `?tela=resumo` o resumo de domingo
+ *   `?marco=50`   força o marco redondo na tela de guardado (com `?tela=done`)
+ *   `?periodo=noite` força a faixa do dia na tela de escrever — madrugada,
+ *                 manha, tarde ou noite. Sem ela, sai da hora real do relógio.
  */
 export const Route = createFileRoute("/preview-gratidao")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -38,9 +43,15 @@ export const Route = createFileRoute("/preview-gratidao")({
     luto: q.luto === true || String(q.luto ?? "") === "1",
     /* `?tela=done` é a que mais importa: a releitura só aparece depois de
        guardar, e guardar exige login. */
-    tela: (["write", "lista", "done"] as const).includes(String(q.tela ?? "") as never)
-      ? (String(q.tela) as "write" | "lista" | "done")
+    tela: (["write", "lista", "done", "resumo"] as const).includes(String(q.tela ?? "") as never)
+      ? (String(q.tela) as "write" | "lista" | "done" | "resumo")
       : ("write" as const),
+    marco: q.marco == null ? undefined : Number(q.marco),
+    periodo: (["madrugada", "manha", "tarde", "noite"] as const).includes(
+      String(q.periodo ?? "") as never,
+    )
+      ? (String(q.periodo) as Periodo)
+      : undefined,
   }),
   head: () => ({
     meta: [{ title: "Bancada da gratidão" }, { name: "robots", content: "noindex" }],
@@ -65,14 +76,18 @@ const EXEMPLOS = [
 ];
 
 function PreviewGratidao() {
-  const { w, dia, n, pos, dificil, luto, tela } = Route.useSearch();
+  const { w, dia, n, pos, dificil, luto, tela, marco, periodo } = Route.useSearch();
   const quantas = Math.max(0, Math.min(EXEMPLOS.length, n));
   const agora = Date.now();
+  /* ⚠️ O resumo de domingo só mostra o que caiu nos últimos 7 dias
+     (`gratidoesDaSemana`). O espaçamento padrão de 6 em 6 dias é pensado pra
+     RELEITURA (que recusa hoje e ontem, e prefere o que passou de 21 dias) —
+     com ele, só uma entrada cairia na semana. Pedindo `?tela=resumo`, o
+     espaçamento cai pra 1 em 1 dia, para o resumo ter o que mostrar. */
+  const intervaloDias = tela === "resumo" ? 1 : 6;
   const gratidoes = Array.from({ length: quantas }, (_, i) => ({
     texto: EXEMPLOS[i % EXEMPLOS.length],
-    /* Espalhadas de 6 em 6 dias: a mais nova tem seis dias, então a releitura
-       (que recusa hoje e ontem) sempre tem o que mostrar. */
-    quando: new Date(agora - (i + 1) * 6 * 86_400_000).toISOString(),
+    quando: new Date(agora - (i + 1) * intervaloDias * 86_400_000).toISOString(),
   }));
 
   return (
@@ -86,7 +101,7 @@ function PreviewGratidao() {
         alreadyDone={false}
         onEarn={() => {}}
         aoSair={() => history.back()}
-        bancada={{ gratidoes, total: quantas, diaDificil: dificil, fase: tela }}
+        bancada={{ gratidoes, total: quantas, diaDificil: dificil, fase: tela, marco, periodo }}
       />
       <p className="pointer-events-none fixed bottom-2 left-0 right-0 z-[60] text-center text-[10px] text-foreground/30">
         bancada · {PREFIXO_GRATIDAO.trim()} {quantas} guardadas

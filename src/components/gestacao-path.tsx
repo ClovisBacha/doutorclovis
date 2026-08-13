@@ -66,14 +66,18 @@ import {
   PREFIXO_GRATIDAO,
   cartaDasGratidoes,
   ehDiaDificil,
+  ehDomingoDeResumo,
   ehGratidao,
   falaDaBolha,
   gratidaoParaReler,
+  gratidoesDaSemana,
   haQuantoTempo,
+  marcoAtingido,
   perguntaDoDia,
   textoDaGratidao,
   type Gratidao,
 } from "@/lib/gratidao";
+import { periodoDaHora, type Periodo } from "@/lib/frases-do-mascote";
 import {
   LIMITE_BYTES,
   LIMITE_SEGUNDOS,
@@ -7098,14 +7102,24 @@ export function GratitudeBlock({
     /* A releitura mora na tela de GUARDADO, e chegar nela exige salvar no
        banco — ou seja, exige login. Sem isto, o pedaço mais importante da
        mudança continuaria impossível de olhar. */
-    fase?: "write" | "lista" | "done";
+    fase?: "write" | "lista" | "done" | "resumo";
+    /** Força o marco redondo na tela de guardado, sem precisar guardar 50 vezes. */
+    marco?: number;
+    /** Força a faixa do dia na tela de escrever, sem esperar a madrugada chegar. */
+    periodo?: Periodo;
   };
 }) {
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"write" | "lista" | "done">(bancada?.fase ?? "write");
+  const [phase, setPhase] = useState<"write" | "lista" | "done" | "resumo">(
+    bancada?.fase ?? "write",
+  );
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [reward, setReward] = useState<number | null>(null);
+  /** O marco redondo que ela ACABOU de bater — some ao sair da tela de guardado. */
+  const [marcoAtual, setMarcoAtual] = useState<number | null>(bancada?.marco ?? null);
+  /** Escolha ephemeral do resumo de domingo — nunca persistida, é só reflexão. */
+  const [favoritaEscolhida, setFavoritaEscolhida] = useState<string | null>(null);
   /**
    * O QUE ELA JÁ ESCREVEU — e é isto que a atividade não tinha.
    *
@@ -7178,15 +7192,21 @@ export function GratitudeBlock({
         ]);
         if (!vivo) return;
         const linhas = (minhas.data ?? []) as { content: string; created_at: string }[];
-        setGratidoes(
-          linhas
-            .filter((l) => ehGratidao(l.content))
-            .map((l) => ({ texto: textoDaGratidao(l.content), quando: l.created_at })),
-        );
+        const lidas = linhas
+          .filter((l) => ehGratidao(l.content))
+          .map((l) => ({ texto: textoDaGratidao(l.content), quando: l.created_at }));
+        setGratidoes(lidas);
         setTotal(minhas.count ?? linhas.length);
         setDiaDificil(
           ehDiaDificil(((hoje.data ?? []) as { mood: string | null }[]).map((h) => h.mood)),
         );
+        /* ── ⚠️ O RESUMO DE DOMINGO ────────────────────────────────────────
+           Só entra ANTES de escrever, e só quando ela ainda não escreveu
+           hoje: quem já registrou não precisa ser interrompida por uma tela
+           de reflexão no caminho de volta. Nenhum app de gratidão do mercado
+           para para olhar para trás antes de pedir o próximo registro. */
+        const semana = gratidoesDaSemana(lidas, new Date());
+        if (!alreadyDone && ehDomingoDeResumo(new Date(), semana)) setPhase("resumo");
       } catch {
         /* Sem rede a atividade continua inteira: ela escreve, e o que não dá
            é reler. Uma falha de leitura nunca pode impedir de registrar. */
@@ -7336,7 +7356,27 @@ export function GratitudeBlock({
          parecer quebrado. */
       const nova = { texto: text.trim(), quando: new Date().toISOString() };
       setGratidoes((antes) => [nova, ...antes]);
-      setTotal((quantas: number) => quantas + 1);
+      const novoTotal = total + 1;
+      setTotal(novoTotal);
+
+      /**
+       * ⚠️ OS MARCOS REDONDOS — festa própria, que a atividade não tinha.
+       *
+       * `marcoAtingido` só devolve algo quando `novoTotal` bate exatamente um
+       * dos degraus (10, 25, 50…). A celebração usa a MESMA escada de
+       * `nivelDaSequencia` que a chama já usa: quanto maior o marco, maior o
+       * confete — sem inventar uma segunda régua de "quão grande é a festa".
+       * Nunca em Modo Cuidado: celebração é alegria, e não pode aparecer pra
+       * quem está em luto.
+       */
+      const marco = marcoAtingido(novoTotal);
+      setMarcoAtual(marco);
+      if (marco && !careMode) {
+        const nivel = nivelDaSequencia(marco);
+        fireConfetti(nivel);
+        celebrateChime(nivel);
+        celebrateHaptic(nivel);
+      }
 
       /* Recompensa (uma por dia, como as outras atividades de bem-estar).
          A meia-estrela vem antes do servidor — ela escreveu, e isso já
@@ -7380,6 +7420,8 @@ export function GratitudeBlock({
 
   function close() {
     descartarGravacao();
+    setFavoritaEscolhida(null);
+    setMarcoAtual(bancada?.marco ?? null);
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("write");
@@ -7396,6 +7438,20 @@ export function GratitudeBlock({
   const paraReler = useMemo(
     () => gratidaoParaReler(gratidoes, new Date(), total),
     [gratidoes, total],
+  );
+
+  /** As gratidões dos últimos 7 dias — o que o resumo de domingo mostra. */
+  const semanaAtual = useMemo(() => gratidoesDaSemana(gratidoes, new Date()), [gratidoes]);
+
+  /**
+   * A faixa do dia, uma vez por abertura — não precisa reagir ao relógio: a
+   * tela vive minutos, não horas, e recalcular no meio dela trocaria a frase
+   * embaixo do dedo dela.
+   */
+  const periodoAtual = useMemo(
+    () => bancada?.periodo ?? periodoDaHora(new Date().getHours()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
   );
 
   return (
@@ -7435,7 +7491,54 @@ export function GratitudeBlock({
               ✕
             </button>
           </div>
-          {phase === "write" ? (
+          {phase === "resumo" ? (
+            <div className="flex flex-1 flex-col items-center overflow-y-auto px-8 pb-10 pt-2 text-center">
+              {/* ── ⚠️ O RESUMO DE DOMINGO ─────────────────────────────────
+                  Nenhum app de gratidão do mercado faz isto: todos empurram o
+                  PRÓXIMO registro, nenhum comemora os que já existem. Antes de
+                  pedir mais uma, a tela para e olha para trás.
+                  Escolher uma "favorita" aqui é decoração — não existe coluna
+                  pra isto, e não precisa existir: o valor é RELER, não a
+                  escolha em si (ver `ehDomingoDeResumo`). */}
+              <BolhaComBalao
+                fala={falaDaBolha({ tela: "resumo", total: semanaAtual.length })}
+                careMode={careMode}
+                tamanho={96}
+              />
+              <h3 className="mt-4 text-2xl font-extrabold leading-tight text-amber-900">
+                Antes de escrever, olha a sua semana
+              </h3>
+              <p className="mt-2 max-w-xs text-sm text-amber-800/80">
+                Não precisa escolher nada — é só pra reler. 💛
+              </p>
+              <div className="mt-5 grid w-full max-w-sm gap-2">
+                {semanaAtual.map((g) => (
+                  <button
+                    key={`${g.quando}-${g.texto.slice(0, 12)}`}
+                    onClick={() => setFavoritaEscolhida(g.texto)}
+                    className={`press rounded-2xl border px-4 py-3 text-left text-[13.5px] leading-snug transition-colors ${
+                      favoritaEscolhida === g.texto
+                        ? "border-amber-400 bg-amber-100 text-amber-900"
+                        : "border-amber-200 bg-white/80 text-amber-900"
+                    }`}
+                  >
+                    {g.texto}
+                  </button>
+                ))}
+              </div>
+              {favoritaEscolhida && (
+                <p className="dc-result-in mt-3 text-[13px] font-bold text-amber-700">
+                  Boa escolha 💛
+                </p>
+              )}
+              <button
+                onClick={() => setPhase("write")}
+                className="press mt-6 w-full max-w-sm rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+              >
+                {alreadyDone ? "Fechar" : "Escrever a de hoje"}
+              </button>
+            </div>
+          ) : phase === "write" ? (
             <div className="flex flex-1 flex-col items-center overflow-y-auto px-8 pb-10 pt-2 text-center">
               {/* ── O PORTA-VOZ ────────────────────────────────────────────
                   O emoji ✨ que ficava aqui não dizia nada. Quem apresenta a
@@ -7445,7 +7548,7 @@ export function GratitudeBlock({
                   é a pergunta, e dois textos dizendo o mesmo fariam da bolha
                   um enfeite. */}
               <BolhaComBalao
-                fala={falaDaBolha({ tela: "escrever", total, diaDificil })}
+                fala={falaDaBolha({ tela: "escrever", total, diaDificil, periodo: periodoAtual })}
                 careMode={careMode}
                 tamanho={96}
               />
@@ -7610,7 +7713,11 @@ export function GratitudeBlock({
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-6 text-center">
-              {!careMode && <ConfettiBurst />}
+              {/* ⚠️ O confete GRANDE só no marco redondo — é a mesma distinção
+                  que a Aula já faz (`big={score === total}`): o confete de
+                  todo dia continua do tamanho de sempre, e só cresce quando o
+                  número é mesmo especial. */}
+              {!careMode && <ConfettiBurst big={!!marcoAtual} />}
               {/* ⚠️ Aqui ele COMEMORA, e a cara vem de `humorDaJornada` —
                   nunca de um `if` local. É lá que mora o portão de Modo
                   Cuidado, e uma segunda régua faria carinha festiva aparecer
@@ -7618,11 +7725,26 @@ export function GratitudeBlock({
                   O "Guardado 💛" e o contador que ficavam em texto viraram
                   fala dele: era a mesma informação, sem voz nenhuma. */}
               <BolhaComBalao
-                fala={falaDaBolha({ tela: "guardado", total, temReleitura: !!paraReler })}
+                fala={falaDaBolha({
+                  tela: "guardado",
+                  total,
+                  temReleitura: !!paraReler,
+                  marco: marcoAtual,
+                })}
                 careMode={careMode}
                 comemorando
                 tamanho={120}
               />
+              {/* O NÚMERO GRANDE — só no marco. Nos dias comuns o contador já
+                  está na fala da bolha, e repeti-lo aqui em fonte gigante
+                  seria o mesmo ruído que tirou o link duplicado da tela de
+                  escrever. Um marco é diferente: é a exceção que merece o
+                  destaque visual que o dia comum não merece. */}
+              {marcoAtual && !careMode && (
+                <p className="dc-result-in mt-2 font-serif text-6xl font-black text-amber-500">
+                  {marcoAtual}
+                </p>
+              )}
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!

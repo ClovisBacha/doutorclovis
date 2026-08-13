@@ -96,7 +96,20 @@ async function handle(request: Request): Promise<Response> {
      */
     const medicosAvisados = await cobrarLacunasParadas();
 
-    return new Response(JSON.stringify({ ok: true, notified, medicosAvisados }), {
+    /* ─── E A GRATIDÃO, QUE NUNCA PUXOU NINGUÉM DE VOLTA ──────────────────
+     *
+     * A aba tinha releitura, contador, carta para o bebê — e nenhum gancho
+     * de retorno. O lembrete "de verdade" (por horário, todo dia) depende de
+     * SQL que só o dono roda; este não depende de nada novo, porque usa o
+     * MESMO cron que já está em produção e já está protegido.
+     *
+     * Aproveitado, e não duplicado: mesmo dia de disparo do resumo dentro do
+     * app (domingo), e stateless pela mesma razão das lacunas do médico — sem
+     * tabela de "já mandei", o controle é o dia da semana.
+     */
+    const gratidaoAvisadas = await nudgeGratidaoDaSemana();
+
+    return new Response(JSON.stringify({ ok: true, notified, medicosAvisados, gratidaoAvisadas }), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -180,6 +193,70 @@ async function cobrarLacunasParadas(): Promise<number> {
     if (res.sent > 0) avisados++;
   }
   return avisados;
+}
+
+/**
+ * "N coisas boas esta semana" — o gancho de retorno que a Gratidão não tinha.
+ *
+ * ⚠️ SÓ AOS DOMINGOS, e pela MESMA razão do resumo dentro do app (que também
+ * só existe aos domingos, com pelo menos duas gratidões da semana): domingo à
+ * noite é quando ela ainda pode reler antes de a semana virar página, e é o
+ * mesmo dia em que a tela dela já para pra olhar para trás.
+ *
+ * Stateless, como `cobrarLacunasParadas`: sem tabela de "já mandei", o
+ * controle é o dia da semana — cada paciente recebe no máximo um push por
+ * semana, porque o cron só entra nesta função uma vez por semana.
+ */
+async function nudgeGratidaoDaSemana(): Promise<number> {
+  /* Fuso de Brasília, e não do processo — é o mesmo defeito de três horas que
+     `cobrarLacunasParadas` já evita. */
+  const hojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  if (hojeBR.getDay() !== 0) return 0;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { sendPushToUser } = await import("@/lib/push.server");
+  const { PREFIXO_GRATIDAO } = await import("@/lib/gratidao");
+  const desde = new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+  const { data: rows, error } = await (supabaseAdmin as any)
+    .from("journal_entries")
+    .select("user_id")
+    .ilike("content", `${PREFIXO_GRATIDAO}%`)
+    .gte("created_at", desde)
+    .limit(5000);
+  if (error) {
+    console.error("[gratidão da semana] não consegui contar", error);
+    return 0;
+  }
+
+  const porPaciente = new Map<string, number>();
+  for (const r of (rows ?? []) as { user_id: string | null }[]) {
+    if (!r.user_id) continue;
+    porPaciente.set(r.user_id, (porPaciente.get(r.user_id) ?? 0) + 1);
+  }
+  if (!porPaciente.size) return 0;
+
+  /* ⚠️ NUNCA EM MODO CUIDADO — mesma régua de `celebrate.ts`: celebração é
+     alegria, e um push comemorando "coisas boas" não pode chegar a quem
+     perdeu a gestação. Consultada DEPOIS de somar, contra só quem escreveu:
+     ler `care_mode` de todo mundo seria varrer a base à toa. */
+  const { data: emLuto } = await (supabaseAdmin as any)
+    .from("patient_profiles")
+    .select("id")
+    .in("id", [...porPaciente.keys()])
+    .eq("care_mode", true);
+  for (const p of (emLuto ?? []) as { id: string }[]) porPaciente.delete(p.id);
+
+  let notificadas = 0;
+  for (const [userId, n] of porPaciente) {
+    const res = await sendPushToUser(userId, {
+      title: n === 1 ? "1 coisa boa esta semana 💛" : `${n} coisas boas esta semana 💛`,
+      body: "Quer reler o que você guardou?",
+      url: "/minha-conta?tab=Caminho",
+    });
+    if (res.sent > 0) notificadas++;
+  }
+  return notificadas;
 }
 
 export const Route = createFileRoute("/api/push-weekly-tick")({

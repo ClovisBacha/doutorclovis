@@ -36,6 +36,8 @@
  * a marcação é explícita desde o primeiro dia.
  */
 
+import { type Periodo } from "./frases-do-mascote";
+
 export type FaseGratidao = "t1" | "t2" | "t3" | "pos";
 
 export type Pergunta = {
@@ -476,6 +478,35 @@ export function gratidaoParaReler(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   O RESUMO DE DOMINGO
+
+   Nenhum app de gratidão do mercado faz isto: todos empurram o PRÓXIMO
+   registro, nenhum comemora os que já existem. Aos domingos, antes de pedir
+   mais uma, a tela para e olha para trás — ela escolhe qual da semana quer
+   guardar mais perto do coração. Não substitui a escrita do dia: é um passo
+   ANTES dela, e some sozinho se ela já escreveu hoje.
+
+   ⚠️ Não persiste nada. A "escolha" é só dela, na hora — não existe coluna de
+   favorita, e inventar uma so para isto seria migration por decoração. O
+   valor do exercício é o RELER, não o registro da escolha.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** As gratidões dos últimos 7 dias — janela corrida, não semana de calendário. */
+export function gratidoesDaSemana(lista: Gratidao[], agora: Date): Gratidao[] {
+  return lista.filter((g) => diasEntre(g.quando, agora) <= 6);
+}
+
+/**
+ * É domingo, e há gratidões de sobra para escolher entre elas?
+ *
+ * ⚠️ O MÍNIMO É DOIS. Escolher uma "favorita" entre uma coisa só não é
+ * escolha — é reler o que ela acabou de ver na tela de guardado.
+ */
+export function ehDomingoDeResumo(agora: Date, semana: Gratidao[]): boolean {
+  return agora.getDay() === 0 && semana.length >= 2;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    O BEBÊ BOLHA NESTA TELA
 
    Pedido do dono: "coloque o bebê bolha nessa tela também comunicando essas
@@ -496,7 +527,31 @@ export function gratidaoParaReler(
    não prometem clínica, e falam com uma pessoa.
    ══════════════════════════════════════════════════════════════════════════ */
 
-export type TelaDaGratidao = "escrever" | "guardado" | "lista";
+export type TelaDaGratidao = "escrever" | "guardado" | "lista" | "resumo";
+
+/**
+ * ⚠️ MARCOS REDONDOS — o contador subia sem festa nenhuma.
+ *
+ * O troféu, a chama e as cinco estrelas do resto do jogo têm celebração
+ * própria; esta atividade não tinha nenhuma, e "23 coisas boas" e "24 coisas
+ * boas" liam exatamente igual. Os degraus não são lineares — a distância
+ * cresce, para o próximo ainda surpreender (mesma forma de `nivelDaSequencia`,
+ * em `celebrate.ts`).
+ */
+export const MARCOS = [10, 25, 50, 100, 200, 365] as const;
+
+/**
+ * O marco que ELA ACABOU DE ATINGIR com este total — ou `null`.
+ *
+ * ⚠️ Funciona porque `total` sobe exatamente +1 por guardada, nunca pula:
+ * comparar por IGUALDADE é seguro aqui, e mais simples que testar uma faixa.
+ * Quem já tinha mais gratidões que o primeiro marco antes de este recurso
+ * existir simplesmente não vê aquele marco — não dá para comemorar
+ * retroativamente uma travessia que já aconteceu em silêncio.
+ */
+export function marcoAtingido(total: number): number | null {
+  return (MARCOS as readonly number[]).includes(total) ? total : null;
+}
 
 export function falaDaBolha(o: {
   tela: TelaDaGratidao;
@@ -505,6 +560,17 @@ export function falaDaBolha(o: {
   diaDificil?: boolean;
   /** Há uma gratidão antiga para reencontrar na tela de guardado? */
   temReleitura?: boolean;
+  /** Ela ACABOU de bater um número redondo com esta guardada. Ver `marcoAtingido`. */
+  marco?: number | null;
+  /**
+   * A faixa do dia (madrugada/manhã/tarde/noite — `frases-do-mascote.ts`).
+   *
+   * ⚠️ SÓ ENTRA NA TELA DE ESCREVER, e só no caso padrão (sem dia difícil, sem
+   * ser a primeira vez): as outras duas frases já são a coisa mais importante
+   * a dizer naquele instante, e casar hora do dia com "essa foi a primeira"
+   * deixaria a frase comprida sem ganhar nada.
+   */
+  periodo?: Periodo;
 }): string {
   const n = Math.max(0, Math.floor(o.total));
   const coisas = `${n} ${n === 1 ? "coisa boa" : "coisas boas"}`;
@@ -513,9 +579,18 @@ export function falaDaBolha(o: {
     return n === 1 ? "A coisa boa que você me contou." : `Tudo que você me contou até aqui.`;
   }
 
+  if (o.tela === "resumo") {
+    if (n === 0) return "Essa semana ainda não tem nada guardado.";
+    return `Essa semana você me contou ${coisas}.`;
+  }
+
   if (o.tela === "guardado") {
-    /* A releitura é a informação principal desta tela, e é ele quem apresenta:
-       o rótulo em caixa alta que fazia isso não tinha voz nenhuma. */
+    /* O marco vem PRIMEIRO — é a informação mais rara desta tela, e o cartão
+       de releitura continua aparecendo embaixo de qualquer jeito: os dois não
+       disputam o mesmo espaço. */
+    if (o.marco) return `Guardei 💛 Essa faz ${o.marco}. Número redondo!`;
+    /* A releitura é a segunda informação mais importante, e é ele quem
+       apresenta: o rótulo em caixa alta que fazia isso não tinha voz nenhuma. */
     if (o.temReleitura) return "Guardei 💛 E olha o que você me contou antes:";
     if (n <= 1) return "Guardei 💛 Essa foi a primeira.";
     return `Guardei 💛 Já são ${coisas} comigo.`;
@@ -529,6 +604,17 @@ export function falaDaBolha(o: {
   /* A primeira vez explica a mecânica, que é o que ninguém explicava: ela
      escrevia sem saber para onde ia. */
   if (n === 0) return "Me conta uma coisa boa? Eu guardo pra você.";
+
+  /* ── ⚠️ ELE MUDA DE ASSUNTO PELA HORA DO DIA ─────────────────────────────
+     A madrugada é tratada à parte, sem o contador: é a mesma exceção que
+     `humorDaJornada` faz para "surpresa" — quem está acordada às 3h numa
+     gestação de risco não precisa de mais ninguém contando número pra ela,
+     precisa de companhia. Nas outras três faixas o contador continua, só
+     com abertura diferente — a informação não se perde, o tom muda. */
+  if (o.periodo === "madrugada") return "Você está acordada bem cedo. Eu fico aqui, é só falar.";
+  if (o.periodo === "manha") return `Bom dia! Você já me contou ${coisas}.`;
+  if (o.periodo === "tarde") return `Boa tarde! Você já me contou ${coisas}.`;
+  if (o.periodo === "noite") return `Antes de dormir — você já me contou ${coisas}.`;
   return `Você já me contou ${coisas}.`;
 }
 

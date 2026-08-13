@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import {
   HUMORES_DIFICEIS,
   LINHAS_DA_CARTA,
+  MARCOS,
   MINIMO_PARA_CARTA,
   PERGUNTAS,
   PERGUNTAS_DIA_DIFICIL,
@@ -19,11 +20,14 @@ import {
   cartaDasGratidoes,
   diasEntre,
   ehDiaDificil,
+  ehDomingoDeResumo,
   ehGratidao,
   faseDaGratidao,
   gratidaoParaReler,
+  gratidoesDaSemana,
   haQuantoTempo,
   falaDaBolha,
+  marcoAtingido,
   perguntaDoDia,
   textoDaGratidao,
   type FaseGratidao,
@@ -397,7 +401,7 @@ describe("⚠️ o bebê bolha como porta-voz desta tela", () => {
 
   test("nenhuma fala cobra, e todas cabem num balão", () => {
     const proibido = /você não (escreveu|fez|veio)|faltou|devia|precisa (escrever|voltar)|há dias/i;
-    for (const tela of ["escrever", "guardado", "lista"] as TelaDaGratidao[]) {
+    for (const tela of ["escrever", "guardado", "lista", "resumo"] as TelaDaGratidao[]) {
       for (const total of [0, 1, 2, 17, 300]) {
         for (const temReleitura of [false, true]) {
           const f = falaDaBolha({ tela, total, temReleitura });
@@ -407,6 +411,25 @@ describe("⚠️ o bebê bolha como porta-voz desta tela", () => {
             ok: true,
           });
         }
+      }
+    }
+  });
+
+  test("⚠️ e cabem mesmo com marco ou período aplicados", () => {
+    const proibido = /você não (escreveu|fez|veio)|faltou|devia|precisa (escrever|voltar)|há dias/i;
+    for (const total of [10, 50, 100, 365]) {
+      const f = falaDaBolha({ tela: "guardado", total, marco: total });
+      expect({ total, ok: f.length > 8 && f.length <= 64 && !proibido.test(f) }).toEqual({
+        total,
+        ok: true,
+      });
+    }
+    for (const periodo of ["madrugada", "manha", "tarde", "noite"] as const) {
+      for (const total of [1, 300]) {
+        const f = falaDaBolha({ tela: "escrever", total, periodo });
+        expect({ periodo, total, ok: f.length > 8 && f.length <= 64 && !proibido.test(f) }).toEqual(
+          { periodo, total, ok: true },
+        );
       }
     }
   });
@@ -422,5 +445,107 @@ describe("⚠️ o bebê bolha como porta-voz desta tela", () => {
     expect(bloco).toContain("humorDaJornada({ comemorando, careMode })");
     expect(bloco).not.toMatch(/humor=\{"(comemorando|feliz|orgulhosa)"\}/);
     expect(bloco).toContain("careMode={careMode}");
+  });
+});
+
+describe("⚠️ os marcos redondos", () => {
+  test("só os números da lista contam como marco", () => {
+    for (const m of MARCOS) expect(marcoAtingido(m)).toBe(m);
+    for (const n of [9, 11, 24, 26, 49, 51, 99, 101, 0, 1]) expect(marcoAtingido(n)).toBe(null);
+  });
+
+  test("⚠️ os degraus crescem — não são lineares", () => {
+    /* Mesma forma de `nivelDaSequencia`: o salto precisa aumentar, senão o
+       próximo marco não surpreende mais que o anterior. */
+    const distancias = MARCOS.map((m, i) => (i === 0 ? m : m - MARCOS[i - 1]));
+    for (let i = 1; i < distancias.length; i++) {
+      expect(distancias[i]).toBeGreaterThanOrEqual(distancias[i - 1]);
+    }
+  });
+
+  test("o balão prioriza o marco sobre a releitura", () => {
+    /* O cartão de releitura continua aparecendo embaixo de qualquer jeito —
+       os dois não disputam o mesmo espaço na tela, só o balão. */
+    const f = falaDaBolha({ tela: "guardado", total: 50, marco: 50, temReleitura: true });
+    expect(f).toContain("50");
+    expect(f).not.toContain("antes");
+  });
+
+  test("sem marco, o comportamento de antes continua intacto", () => {
+    expect(falaDaBolha({ tela: "guardado", total: 12 })).not.toContain("redondo");
+  });
+});
+
+describe("⚠️ ele muda de assunto pela hora do dia", () => {
+  test("madrugada é tratada à parte — companhia, não contador", () => {
+    /* A mesma exceção que `humorDaJornada` faz para a "surpresa" da
+       madrugada: quem está acordada às 3h não precisa de mais ninguém
+       contando número pra ela. */
+    const f = falaDaBolha({ tela: "escrever", total: 12, periodo: "madrugada" });
+    expect(f).not.toContain("12");
+    expect(f.length).toBeGreaterThan(8);
+  });
+
+  test("manhã, tarde e noite mudam a abertura, mas o contador continua", () => {
+    for (const periodo of ["manha", "tarde", "noite"] as const) {
+      const f = falaDaBolha({ tela: "escrever", total: 7, periodo });
+      expect(f).toContain("7 coisas boas");
+    }
+  });
+
+  test("⚠️ sem período, a frase é exatamente a de antes — nada quebrou", () => {
+    expect(falaDaBolha({ tela: "escrever", total: 7 })).toBe("Você já me contou 7 coisas boas.");
+  });
+
+  test("dia difícil e primeira vez continuam vencendo o período", () => {
+    /* As duas já são a coisa mais importante a dizer naquele instante —
+       casar hora do dia com elas só alongaria a frase à toa. */
+    expect(falaDaBolha({ tela: "escrever", total: 5, diaDificil: true, periodo: "noite" })).toBe(
+      falaDaBolha({ tela: "escrever", total: 5, diaDificil: true }),
+    );
+    expect(falaDaBolha({ tela: "escrever", total: 0, periodo: "manha" })).toBe(
+      falaDaBolha({ tela: "escrever", total: 0 }),
+    );
+  });
+});
+
+describe("⚠️ o resumo de domingo", () => {
+  const domingo = new Date("2026-08-16T10:00:00-03:00"); // é domingo
+  const segunda = new Date("2026-08-17T10:00:00-03:00");
+  const dias = (base: Date, n: number) => new Date(base.getTime() - n * 86_400_000).toISOString();
+
+  test("as gratidões da semana são uma janela corrida de 7 dias", () => {
+    const lista: Gratidao[] = [
+      { texto: "hoje", quando: dias(domingo, 0) },
+      { texto: "seis dias atrás", quando: dias(domingo, 6) },
+      { texto: "sete dias atrás", quando: dias(domingo, 7) },
+    ];
+    const semana = gratidoesDaSemana(lista, domingo);
+    expect(semana.map((g) => g.texto)).toEqual(["hoje", "seis dias atrás"]);
+  });
+
+  test("só é domingo de resumo com duas gratidões OU MAIS na semana", () => {
+    const uma: Gratidao[] = [{ texto: "a", quando: dias(domingo, 1) }];
+    const duas: Gratidao[] = [...uma, { texto: "b", quando: dias(domingo, 2) }];
+    expect(ehDomingoDeResumo(domingo, uma)).toBe(false);
+    expect(ehDomingoDeResumo(domingo, duas)).toBe(true);
+  });
+
+  test("⚠️ nunca fora de domingo, mesmo com gratidões de sobra", () => {
+    const duas: Gratidao[] = [
+      { texto: "a", quando: dias(segunda, 1) },
+      { texto: "b", quando: dias(segunda, 2) },
+    ];
+    expect(ehDomingoDeResumo(segunda, duas)).toBe(false);
+  });
+
+  test("a fala do resumo conta a semana, não a gestação inteira", () => {
+    const f = falaDaBolha({ tela: "resumo", total: 3 });
+    expect(f).toContain("Essa semana");
+    expect(f).toContain("3 coisas boas");
+  });
+
+  test("semana vazia não quebra a fala", () => {
+    expect(falaDaBolha({ tela: "resumo", total: 0 }).length).toBeGreaterThan(8);
   });
 });
