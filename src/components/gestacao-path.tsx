@@ -7557,15 +7557,19 @@ export function GratitudeBlock({
               </button>
 
               {/* ── A COLEÇÃO ──────────────────────────────────────────────
-                  O número só sobe, e não é sequência: quem passou a noite no
-                  hospital não perde nada por não ter agradecido. */}
+                  ⚠️ O NÚMERO NÃO ESTÁ AQUI, e saiu por um motivo visto na
+                  bancada: o balão da bolha já diz "você já me contou 12
+                  coisas boas", e este link dizia o mesmo número quatro dedos
+                  abaixo. Se o porta-voz entrega a informação, o rótulo que a
+                  repetia é ruído — o link fica só com a AÇÃO.
+                  O contador em si continua sendo o que só sobe, e não uma
+                  sequência: quem passou a noite no hospital não perde nada. */}
               {total > 0 && (
                 <button
                   onClick={() => setPhase("lista")}
                   className="press mt-5 text-[13px] font-bold text-amber-700 underline decoration-amber-300 underline-offset-4"
                 >
-                  {total} {total === 1 ? "coisa boa" : "coisas boas"}{" "}
-                  {posParto ? "guardadas" : "nesta gestação"} · ver todas
+                  Ver todas
                 </button>
               )}
             </div>
