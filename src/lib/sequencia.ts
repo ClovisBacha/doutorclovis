@@ -119,13 +119,38 @@ export function diasComAlgumMomento(
  * cru a leria como UTC — em São Paulo, tudo antes das 21h viraria o dia
  * anterior, e a sequência quebraria sozinha todo fim de tarde.
  */
+export function numeroDoDia(iso: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000 : null;
+}
+
 export function sequenciaDeDatas(dias: readonly string[], hoje: Date = new Date()): number {
   const numeros: number[] = [];
   for (const s of dias) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
-    if (m) numeros.push(Date.UTC(+m[1], +m[2] - 1, +m[3]) / 86400000);
+    const n = numeroDoDia(s);
+    if (n !== null) numeros.push(n);
   }
   const hojeN = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate()) / 86400000;
+  return sequenciaDeDias(numeros, hojeN);
+}
+
+/**
+ * A MESMA sequência, para quem sabe o dia mas NÃO tem o relógio dela.
+ *
+ * O cron do lembrete roda em UTC e precisa da sequência no calendário DA
+ * PACIENTE: `sequenciaDeDatas` leria `getFullYear()` do servidor e mandaria
+ * "3 dias seguidos" para quem está em 4. Aqui o dia de hoje chega pronto, já
+ * calculado com o deslocamento dela (`diaDela`, em `lembrete-de-meditacao.ts`).
+ * A régua da sequência continua sendo uma só — é a mesma `sequenciaDeDias`.
+ */
+export function sequenciaAteODia(dias: readonly string[], hojeIso: string): number {
+  const hojeN = numeroDoDia(hojeIso);
+  if (hojeN === null) return 0;
+  const numeros: number[] = [];
+  for (const s of dias) {
+    const n = numeroDoDia(s);
+    if (n !== null) numeros.push(n);
+  }
   return sequenciaDeDias(numeros, hojeN);
 }
 

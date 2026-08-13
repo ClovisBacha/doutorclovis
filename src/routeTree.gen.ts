@@ -17,6 +17,7 @@ import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
 import { Route as PreviewTutorialRouteImport } from './routes/preview-tutorial'
 import { Route as PreviewSosRouteImport } from './routes/preview-sos'
+import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
@@ -60,6 +61,7 @@ import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhoo
 import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
+import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
 import { Route as ApiLembretesTickRouteImport } from './routes/api/lembretes-tick'
 import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -110,6 +112,11 @@ const PreviewTutorialRoute = PreviewTutorialRouteImport.update({
 const PreviewSosRoute = PreviewSosRouteImport.update({
   id: '/preview-sos',
   path: '/preview-sos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSonsRoute = PreviewSonsRouteImport.update({
+  id: '/preview-sons',
+  path: '/preview-sons',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
@@ -326,6 +333,11 @@ const ApiMpWebhookRoute = ApiMpWebhookRouteImport.update({
   path: '/api/mp-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeditacaoTickRoute = ApiMeditacaoTickRouteImport.update({
+  id: '/api/meditacao-tick',
+  path: '/api/meditacao-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLembretesTickRoute = ApiLembretesTickRouteImport.update({
   id: '/api/lembretes-tick',
   path: '/api/lembretes-tick',
@@ -415,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -432,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
+  '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -478,6 +492,7 @@ export interface FileRoutesByTo {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -495,6 +510,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
+  '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -543,6 +559,7 @@ export interface FileRoutesById {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
@@ -560,6 +577,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
+  '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
@@ -608,6 +626,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-sons'
     | '/preview-sos'
     | '/preview-tutorial'
     | '/primeira-consulta'
@@ -625,6 +644,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/instagram-webhook'
     | '/api/lembretes-tick'
+    | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -671,6 +691,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-sons'
     | '/preview-sos'
     | '/preview-tutorial'
     | '/primeira-consulta'
@@ -688,6 +709,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/instagram-webhook'
     | '/api/lembretes-tick'
+    | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -735,6 +757,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-sons'
     | '/preview-sos'
     | '/preview-tutorial'
     | '/primeira-consulta'
@@ -752,6 +775,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/instagram-webhook'
     | '/api/lembretes-tick'
+    | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
     | '/api/push-weekly-tick'
@@ -800,6 +824,7 @@ export interface RootRouteChildren {
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
+  PreviewSonsRoute: typeof PreviewSonsRoute
   PreviewSosRoute: typeof PreviewSosRoute
   PreviewTutorialRoute: typeof PreviewTutorialRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
@@ -814,6 +839,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiInstagramWebhookRoute: typeof ApiInstagramWebhookRoute
   ApiLembretesTickRoute: typeof ApiLembretesTickRoute
+  ApiMeditacaoTickRoute: typeof ApiMeditacaoTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
@@ -884,6 +910,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-sos'
       fullPath: '/preview-sos'
       preLoaderRoute: typeof PreviewSosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-sons': {
+      id: '/preview-sons'
+      path: '/preview-sons'
+      fullPath: '/preview-sons'
+      preLoaderRoute: typeof PreviewSonsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-saude': {
@@ -1187,6 +1220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMpWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/meditacao-tick': {
+      id: '/api/meditacao-tick'
+      path: '/api/meditacao-tick'
+      fullPath: '/api/meditacao-tick'
+      preLoaderRoute: typeof ApiMeditacaoTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/lembretes-tick': {
       id: '/api/lembretes-tick'
       path: '/api/lembretes-tick'
@@ -1316,6 +1356,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
+  PreviewSonsRoute: PreviewSonsRoute,
   PreviewSosRoute: PreviewSosRoute,
   PreviewTutorialRoute: PreviewTutorialRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
@@ -1330,6 +1371,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiInstagramWebhookRoute: ApiInstagramWebhookRoute,
   ApiLembretesTickRoute: ApiLembretesTickRoute,
+  ApiMeditacaoTickRoute: ApiMeditacaoTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,

@@ -447,6 +447,11 @@ import { brl as brlPromo } from "@/lib/promo";
 import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
 import type { PrecosDaPaciente } from "@/lib/promo.functions";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
+import { anunciarMidia, estadoDaMidia } from "@/lib/media-session";
+import { estaEscondida, podeRetomar } from "@/lib/pausa-da-sessao";
+import { fusoDoNavegador, horaLocal, paraGuardar } from "@/lib/lembrete-de-meditacao";
+import { subscribeToPush } from "@/lib/push";
+import { SonsParaDormir } from "@/components/sons-para-dormir";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -4807,6 +4812,76 @@ const COMO_ESTOU = [
  * valor neutro, sem ninguém perceber. O rótulo legível vai no `content`, que
  * fica com ela.
  */
+/**
+ * O LEMBRETE DIÁRIO — ler e gravar a hora que ela escolheu.
+ *
+ * Direto pela tabela dela, com a RLS de linha própria (`own profile update`),
+ * como `registrarHumorDaMeditacao` logo abaixo. A régua de fuso mora em
+ * `lembrete-de-meditacao.ts` e é a MESMA que o cron usa — duas contas de fuso
+ * para o mesmo horário é como elas divergem em três horas.
+ *
+ * ⚠️ Devolve `null` quando as colunas ainda não existem no banco (o
+ * `APLICAR_LEMBRETE_DE_MEDITACAO.sql` não foi rodado). A tela ESCONDE a linha
+ * nesse caso: um interruptor que não guarda nada é pior que interruptor nenhum.
+ */
+async function lerLembrete(): Promise<{ hora: string | null } | null> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user.id;
+    if (!uid) return null;
+    /* `as any` porque os tipos gerados do Supabase ainda não conhecem as
+       colunas novas — é o mesmo recuo que as outras colunas recém-criadas
+       usam neste repositório, e o `maybeSingle` já trata a ausência delas. */
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any)
+      .from("patient_profiles")
+      .select("med_reminder_utc_min, med_reminder_offset")
+      .eq("id", uid)
+      .maybeSingle();
+    if (error || !data) return null;
+    const linha = data as {
+      med_reminder_utc_min: number | null;
+      med_reminder_offset: number | null;
+    };
+    if (linha.med_reminder_utc_min == null) return { hora: null };
+    const offset = linha.med_reminder_offset ?? 0;
+    const hora = horaLocal(linha.med_reminder_utc_min, offset);
+    /* ⚠️ SE ELA MUDOU DE FUSO, o horário DELA é que manda: "nove da noite"
+       continua sendo nove da noite onde ela estiver. Regrava em silêncio. */
+    const agora = fusoDoNavegador();
+    if (offset !== agora) void gravarLembrete(hora);
+    return { hora };
+  } catch {
+    return null;
+  }
+}
+
+async function gravarLembrete(hora: string | null): Promise<boolean> {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user.id;
+    if (!uid) return false;
+    const valores =
+      hora === null
+        ? { med_reminder_utc_min: null }
+        : (() => {
+            const g = paraGuardar(hora, fusoDoNavegador());
+            return g ? { med_reminder_utc_min: g.utcMin, med_reminder_offset: g.offset } : null;
+          })();
+    if (!valores) return false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
+      .from("patient_profiles")
+      .update(valores)
+      .eq("id", uid);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 async function registrarHumorDaMeditacao(emoji: string, label: string, minutos: number) {
   try {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -4933,9 +5008,42 @@ function MeditationBlock({
   useEffect(() => {
     if (open) setProgFeitos(lsGet<number>(CHAVE_DO_PROGRAMA, 0));
   }, [open]);
+  useEffect(() => {
+    if (!open || careMode) return;
+    let vivo = true;
+    void lerLembrete().then((r) => {
+      if (vivo) setLembrete(r ?? false);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [open, careMode]);
   const diaAtualDoPrograma = careMode ? null : diaDoPrograma(progFeitos);
   const [ciclo, setCiclo] = useState(0);
   const [fase, setFase] = useState<"in" | "hold" | "out">("in");
+  /**
+   * PAUSA — e ela guarda POR QUE parou.
+   *
+   * Em dez minutos a campainha toca, o outro filho chama, o telefone vibra. Os
+   * três líderes do gênero pausam; aqui só havia sair. E o segundo motivo é
+   * mais grave que o primeiro: quando o app sai da tela (ela troca de app, ou
+   * bloqueia o aparelho), o iOS SUSPENDE o áudio sintetizado e congela os
+   * relógios da respiração. A sessão não morria de verdade — ficava parada,
+   * muda, e voltava sem som, sem nada dizer o que houve. Agora ela pausa de
+   * propósito e a tela conta qual dos dois foi.
+   */
+  const [pausa, setPausa] = useState<null | "toque" | "fundo">(null);
+  const pausada = pausa !== null;
+  /* Sobe a cada retomada. Serve de dependência para os dois efeitos de voz:
+     é o que faz a deixa deste ciclo ser dita de novo, já que nem `ciclo` nem
+     `fase` mudam necessariamente ao voltar. */
+  const [retomada, setRetomada] = useState(0);
+  /* Os sons soltos, sem sessão. Ver `sons-para-dormir.tsx`: mesma receita de
+     som, tocada de um arquivo — é o que sobrevive à tela bloqueada. */
+  const [sonsAbertos, setSonsAbertos] = useState(false);
+  /* `null` enquanto carrega, `false` quando o banco ainda não tem as colunas —
+     e aí a linha do lembrete nem aparece. */
+  const [lembrete, setLembrete] = useState<{ hora: string | null } | null | false>(null);
   const [humor, setHumor] = useState<string | null>(null);
   /* Quantos minutos ela DE FATO ficou. Igual a `minutos` quando a sessão vai
      até o fim, menor quando ela encerra antes — a tela de fim não pode dizer
@@ -4944,6 +5052,19 @@ function MeditationBlock({
   const [reward, setReward] = useState<number | null>(null);
   const grantedRef = useRef(false);
   const audioRef = useRef<Soundscape | null>(null);
+  /* O componente ainda está na tela? Lido DEPOIS de esperas — ver
+     `podeRetomar`. Um `setState` ou um `createSoundscape` depois do desmonte
+     é som sem dono. */
+  const vivaRef = useRef(true);
+  useEffect(() => {
+    vivaRef.current = true;
+    return () => {
+      vivaRef.current = false;
+    };
+  }, []);
+  /* O som ESCOLHIDO agora, para ser lido depois de uma espera: a closure do
+     toque guarda o de antes, e ela pode ter silenciado no meio. */
+  const somRef = useRef<SoundscapeKey>("pad");
 
   /* `Math.min` porque `temaIdx` pode ter sido escolhido com a lista cheia e o
      Modo Cuidado ser ligado depois — a lista encolhe debaixo do índice. */
@@ -4994,7 +5115,7 @@ function MeditationBlock({
   // Relógio da respiração: cada fase agenda a próxima. O ciclo fecha na
   // expiração — inspirar é o começo natural, expirar é o fim natural.
   useEffect(() => {
-    if (etapa !== "sessao") return;
+    if (etapa !== "sessao" || pausada) return;
     const dur = RESPIRO[fase];
     /* ⚠️ NÃO HÁ MAIS CONTADOR REGRESSIVO AQUI.
        Existia um `setInterval` de 1s escrevendo um número embaixo da bolha, e
@@ -5028,7 +5149,7 @@ function MeditationBlock({
     vibratePhase(fase, dur * 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, fase, ciclo]);
+  }, [etapa, fase, ciclo, pausada]);
 
   /**
    * ⚠️ A PRIMEIRA INSPIRAÇÃO PRECISA DE UM QUADRO PEQUENO ANTES DELA.
@@ -5052,7 +5173,11 @@ function MeditationBlock({
    */
   const [respiroPronto, setRespiroPronto] = useState(false);
   useEffect(() => {
-    if (etapa !== "sessao") {
+    /* A pausa cai aqui de propósito: a bolha desce ao repouso (sem transição,
+       porque `respiroMs` vai a zero) e, ao voltar, a mesma dança de dois
+       quadros faz a inspiração ter de onde crescer. É a MESMA máquina do
+       primeiro quadro da sessão — duas seriam duas chances de divergir. */
+    if (etapa !== "sessao" || pausada) {
       setRespiroPronto(false);
       return;
     }
@@ -5064,7 +5189,7 @@ function MeditationBlock({
       cancelAnimationFrame(a);
       cancelAnimationFrame(b);
     };
-  }, [etapa]);
+  }, [etapa, pausada]);
 
   /* A fase que o DESENHO usa. Igual à real, menos no primeiro quadro da
      sessão, em que ela é a expiração (bolha pequena, sem transição) para a
@@ -5082,9 +5207,75 @@ function MeditationBlock({
      Sem isto, o aparelho bloqueia em uns trinta segundos, o ciclo é suspenso e
      a sessão morre exatamente por a paciente ter feito o que pedimos. */
   useEffect(() => {
-    if (etapa !== "sessao") return;
+    /* Pausada, o bloqueio é LIBERADO: ela largou o celular na mesa de
+       cabeceira, e segurar a tela acesa numa sessão que não está correndo é
+       bateria gasta pelo app inteiro. */
+    if (etapa !== "sessao" || pausada) return;
     return manterTelaAcesa();
-  }, [etapa]);
+  }, [etapa, pausada]);
+
+  /**
+   * ⚠️ O APP SAIU DA TELA → A SESSÃO PARA, E DIZ QUE PAROU.
+   *
+   * O que acontecia antes, sem nada disto: o iOS suspende o `AudioContext` e
+   * congela `setTimeout` assim que a página fica escondida. A paciente
+   * respondia uma mensagem, voltava — e encontrava a bolha parada no meio de um
+   * "Inspire", sem som de fundo, sem voz, e sem nada explicando. A barra de
+   * progresso ficava onde estava. Parecia quebrado porque, funcionalmente,
+   * estava.
+   *
+   * Manter tocando não é opção nossa: som sintetizado no Web Audio não
+   * sobrevive à tela bloqueada em iPhone nenhum — quem sobrevive é arquivo
+   * tocando num `<audio>`, que é o caminho dos Sons para dormir. Então o certo
+   * é parar de propósito, guardar o lugar e esperar por ela.
+   *
+   * O `manterTelaAcesa` reduz a frequência disso (a tela não apaga sozinha),
+   * mas não cobre o botão de desligar nem o Modo de Baixo Consumo, que recusa
+   * o pedido de tela acesa.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || typeof document === "undefined") return;
+    const aoTrocar = () => {
+      if (document.hidden) pausarSessao("fundo");
+    };
+    document.addEventListener("visibilitychange", aoTrocar);
+    return () => document.removeEventListener("visibilitychange", aoTrocar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etapa, pausa]);
+
+  /**
+   * O CARD DO SISTEMA — o que aparece na tela bloqueada e no fone de ouvido.
+   *
+   * As ações passam por um `ref` de propósito: trocar os handlers a cada
+   * `pausa` faria o card piscar no sistema operacional a cada toque. O
+   * anúncio é montado uma vez por sessão; o que muda é só o estado (▶︎/⏸).
+   */
+  const acoesDaMidia = useRef<{ pausar: () => void; tocar: () => void }>({
+    pausar: () => {},
+    tocar: () => {},
+  });
+  /* Escrito num efeito, e não no corpo do render: num render concorrente que o
+     React descarte, os botões do sistema passariam a agir sobre um estado que
+     nunca foi comitado. */
+  useEffect(() => {
+    acoesDaMidia.current = {
+      pausar: () => pausarSessao("toque"),
+      tocar: () => void retomarSessao(),
+    };
+  });
+  useEffect(() => {
+    if (etapa !== "sessao") return;
+    return anunciarMidia({
+      titulo: `Meditar · ${med.theme}`,
+      aoPausar: () => acoesDaMidia.current.pausar(),
+      aoTocar: () => acoesDaMidia.current.tocar(),
+    });
+  }, [etapa, med.theme]);
+
+  useEffect(() => {
+    if (etapa !== "sessao") return;
+    estadoDaMidia(pausada ? "paused" : "playing");
+  }, [etapa, pausada]);
 
   /**
    * A FALA DA RESPIRAÇÃO ATUAL, no canal da guia.
@@ -5095,13 +5286,18 @@ function MeditationBlock({
    * nunca corta a outra, que era o motivo de existirem dois canais.
    */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz || !falaAgora) return;
+    if (etapa !== "sessao" || pausada || !voz || !falaAgora) return;
     const faixa = faixaDaFala(falaAgora.id);
     /* Sem arquivo, a tela segue escrevendo e a sessão anda em silêncio naquele
        trecho. Nunca com a voz errada, que seria pior. */
     if (faixa) tocarVoz(faixa, { canal: "guia" });
+    /* `retomada` está nas dependências para a deixa deste ciclo ser DITA DE
+       NOVO ao voltar: a pausa cortou a fala no meio e o texto dela continua na
+       tela. Sem isso, a frase ficaria escrita sem nunca ter sido falada — e
+       essa sincronia entre o que se lê e o que se ouve é o contrato desta
+       tela desde que o roteiro virou arquivo. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, voz, falaAgora?.id]);
+  }, [etapa, voz, falaAgora?.id, pausada, retomada]);
 
   /**
    * ⚠️ E A PRIMEIRA FALA É BUSCADA ENQUANTO ELA AINDA ESCOLHE.
@@ -5168,12 +5364,16 @@ function MeditationBlock({
    * "só o ritmo" vão até o fim: são o único guia que sobra.
    */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz || !plano || ciclo >= plano.palavrasAte) return;
+    if (etapa !== "sessao" || pausada || !voz || !plano || ciclo >= plano.palavrasAte) return;
     const palavra =
       fase === "in" ? RESPIRACAO.in : fase === "hold" ? RESPIRACAO.hold : RESPIRACAO.out;
     tocarVoz(palavra, { canal: "pulso", volume: 0.85 });
+    /* ⚠️ `retomada` nas deps: a volta força `fase` para "in", e se ela tivesse
+       pausado DURANTE a inspiração o valor não mudaria — o efeito não rodaria e
+       a respiração recomeçaria muda. O mesmo gesto daria dois comportamentos
+       conforme o instante em que ela tocou em pausar. */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [etapa, fase, voz, ciclo, plano?.palavrasAte]);
+  }, [etapa, fase, voz, ciclo, plano?.palavrasAte, pausada, retomada]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -5220,10 +5420,12 @@ function MeditationBlock({
     setCiclo(0);
     setMinutosFeitos(mins);
     setFase("in");
+    setPausa(null);
     setHumor(null);
     setReward(null);
     grantedRef.current = false;
     audioRef.current?.stop();
+    somRef.current = som;
     audioRef.current = createSoundscape(som);
     audioRef.current.start();
     /**
@@ -5295,9 +5497,87 @@ function MeditationBlock({
   function encerrarGuardando() {
     const feitos = Math.max(1, Math.round(((ciclo + 1) * CICLO_SEGS) / 60));
     setMinutosFeitos(feitos);
+    setPausa(null);
     setEtapa("reflexo");
     registrarMeditacao(feitos, null);
     finish();
+  }
+
+  /**
+   * O LEMBRETE DIÁRIO.
+   *
+   * ⚠️ Pedir permissão de notificação AQUI, e não antes: é o único instante em
+   * que a paciente acabou de dizer que quer ser avisada. Um pedido do sistema
+   * que aparece sem contexto é negado — e negado no iOS é para sempre, sem
+   * segunda chance dentro do app.
+   */
+  async function definirLembrete(hora: string | null) {
+    const antes = lembrete;
+    setLembrete({ hora });
+    if (hora) {
+      const p = await subscribeToPush();
+      if (!p.ok) {
+        toast("Ative as notificações do app para o lembrete chegar", { icon: "🔕" });
+      }
+    }
+    const ok = await gravarLembrete(hora);
+    if (!ok) {
+      setLembrete(antes);
+      toast.error("Não consegui guardar o lembrete");
+    }
+  }
+
+  function pausarSessao(motivo: "toque" | "fundo") {
+    if (etapa !== "sessao" || pausada) return;
+    setPausa(motivo);
+    audioRef.current?.pausar();
+    pararVoz();
+  }
+
+  /**
+   * VOLTA — e a respiração recomeça do INÍCIO da inspiração.
+   *
+   * Retomar no meio de uma expiração exigiria guardar quanto faltava da fase e
+   * fazer a bolha continuar de uma escala intermediária, que é justamente o
+   * quadro que transição de CSS não sabe animar (foi o defeito da primeira
+   * inspiração da sessão, medido em ago/2026). Recomeçar o ciclo custa no
+   * máximo doze segundos, e uma respiração inteira é melhor que meia.
+   * O `ciclo` NÃO volta: a barra de progresso continua honesta.
+   */
+  async function retomarSessao() {
+    const antes = { etapa, pausada, escondida: estaEscondida(), viva: vivaRef.current };
+    if (!podeRetomar(antes)) return;
+    const voltou = await (audioRef.current?.retomar() ?? Promise.resolve(true));
+    /**
+     * ⚠️ A MESMA PERGUNTA, DE NOVO — porque esperar é onde o mundo muda.
+     *
+     * Entre o toque e a resposta do navegador cabem: fechar a folha (e aí o
+     * recuo abaixo criaria som tocando num componente que já saiu da tela),
+     * a sessão acabar, e a paciente sair do app. Este último chega também pelo
+     * ▶︎ da tela bloqueada, que dispara COM a página escondida: despausar ali
+     * devolveria a sessão a um mundo onde o iOS congela os relógios — a bolha
+     * parada, muda, e agora sem o véu que explicava o porquê.
+     */
+    if (!podeRetomar({ ...antes, escondida: estaEscondida(), viva: vivaRef.current })) return;
+    /* Contexto suspenso pode recusar voltar sem um gesto novo — e este caminho
+       SEMPRE vem de um toque (o botão da tela ou o do card do sistema), então
+       recriar aqui é seguro e devolve o som. Sem isto ela voltaria para uma
+       sessão em silêncio, que é metade do defeito que a pausa veio consertar.
+       O som lido é o ATUAL (`somRef`), nunca o da closure do toque: ela pode
+       ter silenciado enquanto o contexto voltava. */
+    const somAgora = somRef.current;
+    if (!voltou && somAgora !== "silencio") {
+      audioRef.current?.stop();
+      audioRef.current = createSoundscape(somAgora);
+      audioRef.current.start();
+    }
+    setFase("in");
+    setPausa(null);
+    /* A fala e as palavras do compasso são refeitas: a deixa deste ciclo foi
+       cortada no meio pelo `pararVoz()`, e o texto dela continua na tela. Sem
+       isto a frase ficaria escrita sem nunca ter sido dita — e "Inspire" só
+       sairia quando a pausa tivesse caído fora da inspiração. */
+    setRetomada((n) => n + 1);
   }
 
   function close() {
@@ -5320,14 +5600,25 @@ function MeditationBlock({
     audioRef.current?.stop();
     audioRef.current = null;
     pararVoz();
+    setPausa(null);
     if (aoSair) return aoSair();
     setOpen(false);
     setEtapa("escolha");
   }
 
+  /**
+   * ⚠️ TROCAR O SOM PAUSADA NÃO PODE COMEÇAR A TOCAR.
+   *
+   * A faixa de cima fica acima do véu de propósito (o ✕ é a saída), então 🔊 e
+   * 🗣️ continuam alcançáveis com "Pausado" na tela. Sem este guarda, silenciar
+   * e religar durante a pausa trazia o pad de volta em volume cheio por cima do
+   * véu — som tocando numa sessão que a tela diz estar parada.
+   * A escolha é guardada; ela vale quando a sessão voltar.
+   */
   function trocarSom(k: SoundscapeKey) {
     setSom(k);
-    if (etapa === "sessao") {
+    somRef.current = k;
+    if (etapa === "sessao" && !pausada) {
       audioRef.current?.stop();
       audioRef.current = createSoundscape(k);
       audioRef.current.start();
@@ -5373,6 +5664,15 @@ function MeditationBlock({
         >
           {alreadyDone ? "Meditar de novo" : "Começar a meditar"}
         </button>
+        {/* O atalho fica AQUI, e não só dentro da meditação: quem acorda às
+            três da manhã não vai abrir uma sessão de dez minutos para chegar
+            ao som. */}
+        <button
+          onClick={() => setSonsAbertos(true)}
+          className="press mt-2 w-full text-center text-[12px] font-bold text-violet-600/80"
+        >
+          🌙 Só sons, para dormir
+        </button>
       </div>
 
       {open && (
@@ -5380,7 +5680,10 @@ function MeditationBlock({
           className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-violet-100 via-fuchsia-50 to-white"
           style={{ paddingTop: "var(--safe-top)" }}
         >
-          <div className="flex items-center px-4 py-3">
+          {/* A faixa de cima fica ACIMA do véu da pausa (`z-30` contra `z-20`):
+              o ✕ é a saída, e ele agora guarda a sessão em vez de descartá-la —
+              cobri-lo com o véu tiraria a saída de quem pausou justo para sair. */}
+          <div className="relative z-30 flex items-center px-4 py-3">
             <button
               onClick={close}
               aria-label="Fechar"
@@ -5394,7 +5697,9 @@ function MeditationBlock({
                   className="h-full rounded-full bg-violet-500"
                   style={{
                     width: `${((ciclo + 1) / totalCiclos) * 100}%`,
-                    transition: `width ${CICLO_SEGS}s linear`,
+                    /* Pausada, a barra congela onde está: uma barra que continua
+                       andando com a sessão parada é a tela mentindo. */
+                    transition: pausada ? "none" : `width ${CICLO_SEGS}s linear`,
                   }}
                 />
               </div>
@@ -5403,6 +5708,22 @@ function MeditationBlock({
             )}
             {etapa === "sessao" && (
               <div className="flex items-center gap-3">
+                {/* ⏸ DESENHADO, e não emoji: o de pausa sai com cor própria em
+                    cada sistema (a mesma lição do 📞 preto no iOS e do
+                    calendário da fita). Aqui ele tem de ser da cor da tela. */}
+                <button
+                  onClick={() => (pausada ? void retomarSessao() : pausarSessao("toque"))}
+                  aria-label={pausada ? "Continuar" : "Pausar"}
+                  className="press grid h-9 w-9 place-items-center rounded-full border border-violet-200 bg-white/70 text-violet-600"
+                >
+                  <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="currentColor">
+                    {pausada ? (
+                      <path d="M8 5.2v13.6L19 12z" />
+                    ) : (
+                      <path d="M6.6 4.8h3.7v14.4H6.6zM13.7 4.8h3.7v14.4h-3.7z" />
+                    )}
+                  </svg>
+                </button>
                 {
                   <button
                     onClick={alternarVoz}
@@ -5437,6 +5758,53 @@ function MeditationBlock({
                   "Alguns minutos só seus. Comece por onde der."
                 )}
               </p>
+
+              {/* ── O LEMBRETE DIÁRIO ─────────────────────────────────────
+                  Fica colado na sequência de propósito: são a mesma coisa —
+                  a chama diz quantos dias ela veio, e isto é o que a traz. É a
+                  metade do Headspace que faltava aqui.
+                  Some inteiro se as colunas ainda não existirem no banco: um
+                  interruptor que não guarda nada é pior que interruptor nenhum. */}
+              {lembrete && !careMode && (
+                <div className="mt-4 flex items-center gap-3 rounded-2xl border border-violet-200 bg-white/70 px-4 py-2.5">
+                  <span className="text-lg leading-none" aria-hidden>
+                    🔔
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-extrabold text-violet-900">Lembrar todo dia</p>
+                    <p className="text-[11px] leading-snug text-violet-700/70">
+                      {lembrete.hora
+                        ? "E fico quieto se você já tiver meditado"
+                        : "Um empurrãozinho na hora que você escolher"}
+                    </p>
+                  </div>
+                  {lembrete.hora ? (
+                    <>
+                      <input
+                        type="time"
+                        aria-label="Horário do lembrete"
+                        value={lembrete.hora}
+                        onChange={(e) => e.target.value && void definirLembrete(e.target.value)}
+                        className="rounded-xl border border-violet-200 bg-white px-2 py-1.5 text-sm font-extrabold text-violet-700"
+                      />
+                      <button
+                        onClick={() => void definirLembrete(null)}
+                        aria-label="Desligar lembrete"
+                        className="press text-lg leading-none text-violet-300"
+                      >
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => void definirLembrete("21:00")}
+                      className="press rounded-full bg-violet-500 px-4 py-1.5 text-xs font-extrabold text-white"
+                    >
+                      Ativar
+                    </button>
+                  )}
+                </div>
+              )}
 
               {/* ── OS SETE PRIMEIROS DIAS ────────────────────────────────
                   Enquanto o programa não acabou, a tela abre com UM cartão em
@@ -5603,6 +5971,28 @@ function MeditationBlock({
                   </div>
                 </>
               )}
+
+              {/* Sai do fluxo da sessão de propósito: não é uma escolha DESTA
+                  meditação, é outra coisa que ela pode querer em vez dela. */}
+              <button
+                onClick={() => setSonsAbertos(true)}
+                className="press mt-8 flex w-full items-center gap-3 rounded-2xl border border-violet-200 bg-white/70 px-4 py-3 text-left"
+              >
+                <span className="text-2xl leading-none" aria-hidden>
+                  🌙
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-extrabold text-violet-900">
+                    Só sons, para dormir
+                  </span>
+                  <span className="block text-[11px] text-violet-700/70">
+                    Chuva, mar ou o coração — com a tela apagada
+                  </span>
+                </span>
+                <span className="shrink-0 text-violet-400" aria-hidden>
+                  ›
+                </span>
+              </button>
             </div>
           )}
 
@@ -5623,9 +6013,18 @@ function MeditationBlock({
             </div>
           )}
 
-          {/* ── 2. Sessão: o círculo que respira ──────────────────────────── */}
+          {/* ── 2. Sessão: o círculo que respira ────────────────────────────
+              ⚠️ `aria-hidden` durante a pausa: o véu esconde o conteúdo do
+              dedo, e não do VoiceOver. Sem isto, quem navega por gestos
+              deslizava para além do véu e encontrava a frase da sessão e um
+              SEGUNDO "Encerrar por aqui" — o da sessão, que a tela diz estar
+              parada. `inert` faria as duas coisas de uma vez, mas ainda não
+              chega ao Safari que a maioria delas usa. */}
           {etapa === "sessao" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+            <div
+              aria-hidden={pausada}
+              className="flex flex-1 flex-col items-center justify-center px-8 text-center"
+            >
               <div className="relative flex h-56 w-56 items-center justify-center">
                 <div
                   className="dc-guiado absolute h-40 w-40 rounded-full bg-fuchsia-200/40 blur-2xl"
@@ -5704,7 +6103,7 @@ function MeditationBlock({
                   uma tela que ainda nem começou. Passado o minuto, a sessão
                   conta — quem parou aos 4 de 10 minutos meditou, e o app não
                   tem por que fingir que não. */}
-              {ciclo >= 5 && (
+              {ciclo >= 5 && !pausada && (
                 <button
                   onClick={encerrarGuardando}
                   className="press mt-8 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
@@ -5712,6 +6111,60 @@ function MeditationBlock({
                   Encerrar por aqui
                 </button>
               )}
+            </div>
+          )}
+
+          {/* ── O véu da pausa ────────────────────────────────────────────
+              Cobre a sessão, nunca a substitui: por baixo a bolha continua no
+              lugar, no repouso, e a barra de progresso congelada mostra onde
+              ela parou. Trocar a tela inteira faria a volta parecer uma sessão
+              nova.
+
+              ⚠️ O texto diz QUAL dos dois motivos foi. "O app saiu da tela"
+              responde a pergunta que a paciente faria ("por que parou?") antes
+              de ela desconfiar do aplicativo — que era exatamente o que
+              acontecia quando isto não existia e ela voltava para uma bolha
+              imóvel e muda. */}
+          {etapa === "sessao" && pausada && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Sessão pausada"
+              className="absolute inset-0 z-20 flex flex-col items-center justify-center px-8 text-center backdrop-blur-[2px]"
+            >
+              <div className="absolute inset-0 bg-violet-50/80" aria-hidden />
+              <div className="relative flex w-full flex-col items-center">
+                <span className="grid h-14 w-14 place-items-center rounded-full bg-violet-500/10 text-violet-500">
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
+                    <path d="M6.6 4.8h3.7v14.4H6.6zM13.7 4.8h3.7v14.4h-3.7z" />
+                  </svg>
+                </span>
+                <h3
+                  aria-live="assertive"
+                  className="mt-4 font-serif text-[24px] font-semibold text-violet-900"
+                >
+                  Pausado
+                </h3>
+                <p className="mt-1.5 max-w-xs text-[13px] leading-relaxed text-violet-800/75">
+                  {pausa === "fundo"
+                    ? "O app saiu da tela e a sessão parou aqui. Está tudo guardado."
+                    : "Sem pressa. Sua respiração espera por você."}
+                </p>
+                <button
+                  onClick={() => void retomarSessao()}
+                  className="press mt-7 w-full max-w-xs rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
+                >
+                  Continuar
+                </button>
+                {ciclo >= 5 && (
+                  <button
+                    onClick={encerrarGuardando}
+                    className="press mt-4 text-xs font-bold text-violet-500"
+                  >
+                    Encerrar por aqui
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -5795,6 +6248,10 @@ function MeditationBlock({
           )}
         </div>
       )}
+
+      {/* Fora da folha da meditação: ela abre os sons sem sessão nenhuma, e a
+          folha continua por baixo se ela veio de dentro. */}
+      {sonsAbertos && <SonsParaDormir aoFechar={() => setSonsAbertos(false)} />}
     </>
   );
 }

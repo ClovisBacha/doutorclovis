@@ -34,9 +34,22 @@ export type Soundscape = {
   stop: () => void;
   /** Volume mestre, 0..1. */
   setVolume: (v: number) => void;
+  /** Silencia guardando o estado — para a pausa da sessão e o aparelho bloqueado. */
+  pausar: () => void;
+  /**
+   * Volta a tocar. Devolve `false` quando o navegador recusou (contexto
+   * suspenso costuma exigir um gesto novo no iOS) — aí quem chamou recria.
+   */
+  retomar: () => Promise<boolean>;
 };
 
-const SILENCIO: Soundscape = { start: () => {}, stop: () => {}, setVolume: () => {} };
+const SILENCIO: Soundscape = {
+  start: () => {},
+  stop: () => {},
+  setVolume: () => {},
+  pausar: () => {},
+  retomar: async () => true,
+};
 
 /** 2s de ruído branco em loop — a matéria-prima de chuva, mar e útero. */
 function noiseBuffer(ctx: AudioContext): AudioBuffer {
@@ -54,6 +67,12 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   let master: GainNode | null = null;
   let heart: ReturnType<typeof setInterval> | null = null;
   let alvo = 0.28;
+  /* Guardados para a pausa: o batimento é o único som agendado por relógio de
+     fora do áudio, então é o único que precisa ser rearmado ao voltar. */
+  let bater: (() => void) | null = null;
+  let periodoDoCoracao = 0;
+  /** Suspensão adiada, para o volume ter tempo de descer. Ver `pausar()`. */
+  let adormecer: ReturnType<typeof setTimeout> | null = null;
 
   function start() {
     if (ctx) return;
@@ -73,10 +92,83 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
       if (kind === "pad") montarPad(ctx, master);
       else if (kind === "chuva") montarChuva(ctx, master);
       else if (kind === "mar") montarMar(ctx, master);
-      else if (kind === "coracao") heart = montarCoracao(ctx, master);
+      else if (kind === "coracao") {
+        const c = montarCoracao(ctx, master);
+        bater = c.bater;
+        periodoDoCoracao = c.periodoMs;
+        heart = setInterval(c.bater, c.periodoMs);
+      }
     } catch {
       /* sem áudio */
     }
+  }
+
+  /**
+   * ⚠️ PAUSAR PRECISA PARAR O RELÓGIO DO CORAÇÃO, não só suspender o áudio.
+   *
+   * Num contexto suspenso o `currentTime` CONGELA — e o `setInterval` continua
+   * correndo, agendando cada batida para o mesmo instante parado. Ao voltar,
+   * todas saem juntas: um estouro no ouvido de quem estava meditando. Suspender
+   * sem isto troca um defeito silencioso por um barulhento.
+   *
+   * O volume desce em 150 ms antes de suspender, e sobe em 600 ms ao voltar.
+   * `suspend()` corta no ato, e corte seco é o que o fade de entrada de 1,5 s
+   * existe para evitar — o mesmo botão não pode ter dois comportamentos.
+   */
+  function pausar() {
+    if (heart) clearInterval(heart);
+    heart = null;
+    const meu = ctx;
+    if (!meu || !master) return;
+    try {
+      master.gain.cancelScheduledValues(meu.currentTime);
+      master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), meu.currentTime);
+      master.gain.linearRampToValueAtTime(0.0001, meu.currentTime + 0.15);
+    } catch {
+      /* ignore */
+    }
+    if (adormecer) clearTimeout(adormecer);
+    adormecer = setTimeout(() => {
+      adormecer = null;
+      try {
+        void meu.suspend();
+      } catch {
+        /* ignore */
+      }
+    }, 200);
+  }
+
+  async function retomar(): Promise<boolean> {
+    const meu = ctx;
+    if (!meu) return false;
+    if (adormecer) {
+      clearTimeout(adormecer);
+      adormecer = null;
+    }
+    try {
+      await meu.resume();
+    } catch {
+      return false;
+    }
+    /**
+     * ⚠️ RECONFERE O CONTEXTO DEPOIS DO `await`.
+     *
+     * `stop()` pode ter rodado no meio — ela fechou a folha, ou trocou de som.
+     * Sem esta linha, `ctx.state` era lido de `null`, o TypeError subia pela
+     * promessa, e o recuo de quem chamou criava um `AudioContext` NOVO num
+     * componente que já tinha saído da tela: som tocando sem nenhum botão em
+     * lugar nenhum que o desligasse.
+     */
+    if (!ctx || ctx !== meu || meu.state !== "running") return false;
+    try {
+      master?.gain.cancelScheduledValues(meu.currentTime);
+      master?.gain.setValueAtTime(0.0001, meu.currentTime);
+      master?.gain.linearRampToValueAtTime(Math.max(0.0001, alvo), meu.currentTime + 0.6);
+    } catch {
+      /* ignore */
+    }
+    if (bater && !heart) heart = setInterval(bater, periodoDoCoracao);
+    return true;
   }
 
   function setVolume(v: number) {
@@ -93,6 +185,11 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   function stop() {
     if (heart) clearInterval(heart);
     heart = null;
+    bater = null;
+    /* Sem isto, a suspensão adiada acordaria depois do `close()` e chamaria
+       `suspend()` num contexto fechado. */
+    if (adormecer) clearTimeout(adormecer);
+    adormecer = null;
     try {
       ctx?.close();
     } catch {
@@ -102,7 +199,7 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
     master = null;
   }
 
-  return { start, stop, setVolume };
+  return { start, stop, setVolume, pausar, retomar };
 }
 
 /** Duas senoides graves em quinta — o mesmo pad que a respiração guiada usa. */
@@ -212,11 +309,12 @@ function montarCoracao(ctx: AudioContext, out: GainNode) {
 
   const periodo = 60 / 140; // ≈ 0,43 s
   function bater() {
-    if (ctx.state === "closed") return;
+    if (ctx.state !== "running") return;
     const t = ctx.currentTime + 0.02;
     toque(t, 62, 0.9, 0.16); // lub
     toque(t + 0.16, 54, 0.55, 0.13); // dub
   }
   bater();
-  return setInterval(bater, periodo * 1000);
+  /* Quem arma o relógio é quem sabe pausá-lo — ver `pausar()` lá em cima. */
+  return { bater, periodoMs: periodo * 1000 };
 }

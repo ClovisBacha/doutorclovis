@@ -1512,3 +1512,137 @@ instalar, e no Android padrão é justamente a robótica. Como os textos de
 meditação e respiração são fixos, o caminho é gerar os áudios uma vez e embarcar
 os arquivos — igual às ilustrações. Ganha qualidade, fica previsível e funciona
 offline.
+
+## A meditação sobreviveu à vida real (ago/2026)
+
+Cinco buracos que os apps grandes fecharam há anos e nós não. Nenhum deles é
+conteúdo — é mecânica, e por isso saiu sem gastar um crédito de áudio.
+
+### 1. O áudio ficou offline
+
+`public/sw.js` cacheava `js|css|woff2|svg|png|ico|jpg|webp`. O `.mp3` estava
+**fora** — os 16 MB de voz gravada dependiam de rede em toda sessão, e sem rede
+a tela andava muda. Baixar para ouvir offline é recurso PAGO no Calm e no
+Headspace.
+
+- ⚠️ **O `Range` é o que faz o Safari tocar.** O `<audio>` pede
+  `Range: bytes=0-`, e responder 200 com o arquivo inteiro faz o Safari
+  desistir da faixa EM SILÊNCIO — o mesmo sintoma de arquivo inexistente. E não
+  dá para guardar o 206 que a rede devolve: `cache.put` **lança** em resposta
+  parcial. Por isso o worker guarda o arquivo inteiro e fatia na hora
+  (`recorte`). Faixa múltipla (`bytes=0-50,100-150`) é o único caso em que ele
+  responde 200 — a RFC permite, e nenhum navegador pede isso para um mp3 de
+  150 KB tocado do começo ao fim.
+- **São DOIS caches, e isso é decisão.** `activate` apaga tudo que não é a
+  versão atual; com o áudio junto, subir de `v4` para `v5` por uma linha de CSS
+  jogaria fora 16 MB que continuam válidos (os nomes têm hash de conteúdo e não
+  mudam entre deploys). O áudio vive em `obstetricia-audio`, sem versão.
+- ⚠️ **`IMUTAVEL_RE` é `^/assets/`, a MESMA régua do servidor** (a Vercel já
+  carimba `immutable` nesse prefixo). A primeira versão tentava reconhecer o
+  hash (`-[A-Za-z0-9_-]{8,}`) e era pior: um `logo-consultorio.png` colocado em
+  `public/assets/` casaria e ficaria congelado PARA SEMPRE no aparelho da
+  paciente. Há teste cobrando que `public/assets/` não exista.
+- **Fila de download** (`emVoo`): o elemento de mídia sonda antes de tocar e o
+  `preparar()` de `voz.ts` pode já ter pedido o mesmo arquivo — sem a fila, os
+  dois baixavam.
+- **Confere o tipo antes de guardar**: um mp3 que não existe mais cai na função
+  de SSR e volta como PÁGINA. Como áudio não revalida, ela ficaria no lugar da
+  fala até a próxima troca de versão.
+- **Custo conhecido:** no primeiro toque de cada arquivo o worker baixa o
+  inteiro antes do primeiro byte (~3 s no link de 400 kbps do pior arquivo,
+  contra 0,97–1,80 s de antes). Quem paga é o `preparar()`, que busca a
+  primeira fala enquanto ela escolhe e a próxima com 2,5 s de antecedência.
+- **Teste:** `service-worker.test.ts` **executa** o worker com `self`, `caches`
+  e `fetch` de mentira. Seis mutações que passavam na primeira versão hoje
+  falham.
+
+### 2 e 3. Pausar — e o app saindo da tela
+
+Em dez minutos a campainha toca. Mas o defeito grave era outro: quando o app
+saía da tela, o iOS **suspendia** o áudio sintetizado e congelava os relógios.
+A sessão não morria — ficava parada, muda, e voltava sem som, sem nada dizer o
+que houve.
+
+- **Pausar guarda o MOTIVO** (`toque` | `fundo`), e o véu conta qual foi. "O app
+  saiu da tela e a sessão parou aqui" responde a pergunta que ela faria antes de
+  desconfiar do aplicativo.
+- ⚠️ **`podeRetomar` é conferida DUAS vezes** (`pausa-da-sessao.ts`), antes e
+  depois da espera do `AudioContext`. Entre o toque e a resposta cabem: fechar a
+  folha (e aí o recuo criava som tocando num componente que já saiu da tela,
+  sem nenhum botão que o desligasse), a sessão acabar, e sair do app — este
+  último chega pelo ▶︎ da tela bloqueada, que dispara COM a página escondida.
+- ⚠️ **`soundscapes.retomar()` reconfere o `ctx` depois do `await`.** `stop()`
+  pode ter zerado; lia-se `ctx.state` de `null`, o TypeError subia pela promessa
+  e quem chamou entendia "não voltou".
+- ⚠️ **Pausar PARA o relógio do coração.** Em contexto suspenso o `currentTime`
+  congela e o `setInterval` agendaria toda batida para o mesmo instante parado —
+  ao voltar sairiam todas juntas.
+- **A volta refaz a voz** (`retomada` nas deps dos dois efeitos): a deixa do
+  ciclo foi cortada no meio e o texto dela continua na tela; e "Inspire" só
+  sairia se a pausa tivesse caído fora da inspiração.
+- **A faixa de cima é `z-30`, o véu é `z-20`** — o ✕ continua alcançável (ele
+  hoje GUARDA a sessão). Por isso `trocarSom` não pode tocar pausada, e o
+  conteúdo por baixo leva `aria-hidden`: o véu esconde do dedo, não do VoiceOver.
+- **Testes:** `soundscapes.test.ts` roda o som com um `AudioContext` de mentira;
+  `pausa-da-meditacao.test.ts` usa `trecho()`, que ESTOURA se um marcador sumir
+  — a versão anterior ficava verde com o guarda do relógio apagado, porque a
+  mesma linha existia 370 linhas abaixo.
+
+### 5. O lembrete diário
+
+Sequência + empurrão no horário escolhido é a metade do Headspace que o Calm não
+tem. A chama existia desde o começo; o empurrão, não.
+
+- Régua pura em `src/lib/lembrete-de-meditacao.ts`; cron em
+  `/api/meditacao-tick` (`CRON_SECRET`, de hora em hora, janela de 70 min).
+- **O horário é guardado em minutos depois da meia-noite UTC**: o cron compara
+  com o próprio relógio, sem tabela de fuso. O deslocamento dela vai junto
+  porque saber que dia é hoje no quarto dela é outra pergunta.
+- ⚠️ **A repetição é contada em HORAS, nunca em dias do calendário.** Um
+  lembrete às 21h de São Paulo é 00:00 UTC: contando por dia, ele sairia às
+  23:55 (dia A) e de novo às 00:10 (dia B).
+- ⚠️ **`getTimezoneOffset()` tem o sinal trocado** — ler direto é o mesmo erro
+  de três horas que a agenda já teve.
+- **Quem já meditou hoje não é incomodada** (lê o `dc-path-med-log` do
+  `journey_state`). Blob em formato inesperado → manda; leitura que ERROU → não
+  manda.
+- **Grava o carimbo ANTES de mandar**, e a coluna é revogada do `authenticated`.
+- Nada no Modo Cuidado.
+- **Aplicar:** `supabase/APLICAR_LEMBRETE_DE_MEDITACAO.sql`. **Agendar:** cron
+  de hora em hora em `/api/meditacao-tick` (mesmo caminho do `lembretes-tick`).
+
+### 6. Sons para dormir
+
+Chuva, mar, coração e pad existiam há meses e só tocavam DENTRO de uma sessão.
+Quem acorda às três da manhã não abre dez minutos de meditação para chegar ao
+som. Tela em `sons-para-dormir.tsx`, régua em `som-continuo.ts`.
+
+- ⚠️ **NÃO é Web Audio.** O iOS suspende o `AudioContext` quando o aparelho
+  bloqueia: um player de dormir feito assim para no segundo em que ela apoia o
+  celular na mesa de cabeceira. O som é renderizado uma vez num
+  `OfflineAudioContext`, empacotado em **WAV** e tocado num `<audio loop>` — que
+  sobrevive à tela apagada e pendura o card na tela de bloqueio. Nenhum arquivo
+  novo no repositório.
+- **WAV e não MP3**: além de não haver codificador no navegador, **MP3 não fecha
+  o loop** (carrega silêncio de codificação nas pontas).
+- ⚠️ **A emenda é matemática, não crossfade.** O trecho é múltiplo EXATO de todo
+  período interno (por isso a chuva passou de 0,07 Hz para 1/15 Hz e a onda do
+  mar de 9 s para 10 s). E há **aquecimento descartado**, porque o filtro tem
+  memória: medido, sem ele o degrau na emenda do CORAÇÃO era 0,0443 — maior que
+  o maior degrau de qualquer outro ponto do arquivo. Com ele, 0,0001.
+  O aquecimento também é múltiplo dos períodos (candidatos são divisores de 30),
+  e é o menor que serve: 6 s no coração baixou o render de 812 ms para 315 ms.
+- ⚠️ **Medir a emenda por `decodeAudioData` NÃO funciona** — ele reamostra e
+  inventa um degrau nas bordas. Lê-se o WAV cru, e compara-se o degrau da emenda
+  com a DISTRIBUIÇÃO de degraus do próprio sinal.
+- **Pico normalizado em 0,89.** Medido antes: 1,10 na chuva — saturando. O
+  `soundscapes.ts` nunca teve isso porque toca a 0,28; aqui o arquivo é a saída
+  inteira, e no iPhone a página não controla volume nenhum.
+- ⚠️ **`destravar()` toca 50 ms de silêncio DENTRO do toque.** Renderizar leva
+  ~300 ms de `await`, e depois do `await` o gesto já passou: o `play()` volta
+  recusado e o player fica mudo sem erro visível.
+- **O elemento entra no documento**, invisível: é o elemento no documento que o
+  iOS reconhece como mídia da página.
+- **Esta tela NÃO pausa quando o app sai da frente** — o contrário da meditação,
+  de propósito. E não tem `manterTelaAcesa`: a tela deve apagar.
+- **Bancada:** `/preview-sons`.

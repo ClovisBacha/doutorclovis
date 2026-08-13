@@ -2997,3 +2997,29 @@ button:active > .duo3d {
     transform: scale(calc(1 + (var(--guiado-escala, 1) - 1) * 0.35)) !important;
   }
 }
+
+/* ══════════ Sons para dormir: as três barrinhas de "está tocando" ══════════
+   Sinal de que o som está no ar — a tela é escura e o ladrilho aceso pode não
+   bastar, principalmente se o celular estiver no silencioso. Anima ALTURA e
+   não escala: escalar deixaria as barras borradas no meio do movimento. */
+@keyframes dc-onda {
+  0%,
+  100% {
+    height: 5px;
+  }
+  50% {
+    height: 14px;
+  }
+}
+.dc-onda {
+  height: 5px;
+  animation: dc-onda 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Fica de pé, parada: apagá-la tiraria a única confirmação visual de que o
+     som está tocando de quem pediu menos movimento. */
+  .dc-onda {
+    animation: none;
+    height: 10px;
+  }
+}
