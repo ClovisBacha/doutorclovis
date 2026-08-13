@@ -477,7 +477,7 @@ import {
 } from "@/lib/daily-quizzes";
 import { gestChallenge, posChallenge } from "@/lib/daily-challenges";
 import { DOCTOR } from "@/lib/doctor.config";
-import { Bolha, ESCALA_RESPIRO, humorDaJornada } from "@/components/bolha";
+import { Bolha, ESCALA_RESPIRO, humorDaJornada, type Humor } from "@/components/bolha";
 import { SpriteDoJogo } from "@/components/sprites-do-jogo";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
 import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
@@ -4440,16 +4440,22 @@ export function MovementBlock({
                   cabelo, halter, bola de pilates: humor próprio
                   (`exercicio`), fora de `humorDaJornada` como `estudiosa`
                   já é — a pergunta aqui não é "que cara ela faz pela
-                  jornada", é "o que ela está fazendo agora". */}
+                  jornada", é "o que ela está fazendo agora".
+                  ⚠️ GRANDE, e FALANDO num balão — pedido do dono depois de
+                  ver a primeira versão pequena e muda: "ele que vai
+                  interagir com as pessoas". O texto que era parágrafo solto
+                  vira a fala dela; o título grande continua sendo o título. */}
               <div className="flex justify-center">
-                <Bolha humor="exercicio" tamanho={96} entrada="chega" careMode={careMode} />
+                <BolhaComBalao
+                  fala="Diga o que está incomodando, que eu monto a sequência pra você."
+                  humorFixo="exercicio"
+                  careMode={careMode}
+                  tamanho={168}
+                />
               </div>
-              <h3 className="mt-3 text-center font-serif text-[26px] font-semibold text-emerald-900">
+              <h3 className="mt-4 text-center font-serif text-[26px] font-semibold text-emerald-900">
                 Mexer o corpo
               </h3>
-              <p className="mt-1 text-center text-[13px] text-emerald-800/70">
-                Diga o que está incomodando e eu monto a sequência.
-              </p>
 
               {/* ── O QUE INCOMODA HOJE ────────────────────────────────────
                   A pergunta que faltava. Antes a sessão era `day % 9`: a
@@ -6116,26 +6122,31 @@ export function MeditationBlock({
               {/* ── O PORTA-VOZ ────────────────────────────────────────────
                   Era a única das cinco atividades sem NENHUMA aparição da
                   bolha na abertura — só a respiração silenciosa dela durante
-                  a sessão. Provisório em `humor="feliz"`: o dono ainda vai
-                  mandar uma arte própria de "meditando", e trocar o valor
-                  aqui é a única mudança que vai precisar quando ela chegar —
-                  nenhuma outra tela referencia esse humor. */}
+                  a sessão. Provisório em `humorFixo="feliz"`: o dono ainda
+                  vai mandar uma arte própria de "meditando", e trocar o
+                  valor aqui é a única mudança que vai precisar quando ela
+                  chegar — nenhuma outra tela referencia esse humor.
+                  ⚠️ GRANDE, e FALANDO num balão — pedido do dono: "ele que
+                  vai interagir com as pessoas". O texto que era parágrafo
+                  solto (com a sequência de dias, quando existe) vira a fala
+                  dela. */}
               <div className="flex justify-center">
-                <Bolha humor="feliz" tamanho={96} entrada="chega" careMode={careMode} />
+                <BolhaComBalao
+                  fala={
+                    seq > 0
+                      ? `🔥 ${seq} ${seq === 1 ? "dia seguido" : "dias seguidos"}${
+                          log.minutos > 0 ? ` · ${log.minutos} min no total` : ""
+                        }`
+                      : "Alguns minutos só seus. Comece por onde der."
+                  }
+                  humorFixo="feliz"
+                  careMode={careMode}
+                  tamanho={168}
+                />
               </div>
-              <h3 className="mt-3 text-center font-serif text-[26px] font-semibold text-violet-900">
+              <h3 className="mt-4 text-center font-serif text-[26px] font-semibold text-violet-900">
                 Meditar
               </h3>
-              <p className="mt-1 text-center text-[13px] text-violet-800/70">
-                {seq > 0 ? (
-                  <>
-                    🔥 {seq} {seq === 1 ? "dia seguido" : "dias seguidos"}
-                    {log.minutos > 0 ? ` · ${log.minutos} min no total` : ""}
-                  </>
-                ) : (
-                  "Alguns minutos só seus. Comece por onde der."
-                )}
-              </p>
 
               {/* ── O LEMBRETE DIÁRIO ─────────────────────────────────────
                   Fica colado na sequência de propósito: são a mesma coisa —
@@ -7116,7 +7127,7 @@ export function BondingBlock({
                   periodo: periodoAtual,
                 })}
                 careMode={careMode}
-                tamanho={96}
+                tamanho={168}
               />
               <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-rose-400">
                 {lendoAsDelas ? "Escrita por você" : "Carta de hoje"}
@@ -7309,14 +7320,27 @@ function BolhaComBalao({
   fala,
   careMode = false,
   comemorando = false,
+  humorFixo,
   tamanho = 96,
 }: {
   fala: string;
   careMode?: boolean;
   comemorando?: boolean;
+  /**
+   * ⚠️ SÓ PRA HUMORES QUE NÃO DEPENDEM DO ESTADO DA JORNADA — `estudiosa`,
+   * `exercicio` e afins, que respondem "o que ela está fazendo agora?", não
+   * "que cara ela faz pela jornada?" (essa pergunta é sempre de
+   * `humorDaJornada`, nunca escolhida aqui). NUNCA `"comemorando"` — quem
+   * decide festa é sempre a régua da jornada, e não este atalho.
+   *
+   * Ainda assim protegido: `Bolha` rebaixa `comemorando` pra `feliz` sozinha
+   * quando `careMode` está ligado, então mesmo um uso indevido não quebra o
+   * Modo Cuidado — mas a intenção deste campo é só identidade de atividade.
+   */
+  humorFixo?: Humor;
   tamanho?: number;
 }) {
-  const humor = humorDaJornada({ comemorando, careMode });
+  const humor = humorFixo ?? humorDaJornada({ comemorando, careMode });
   return (
     <div className="flex flex-col items-center">
       <Bolha humor={humor} tamanho={tamanho} careMode={careMode} />
@@ -7808,7 +7832,7 @@ export function GratitudeBlock({
               <BolhaComBalao
                 fala={falaDaBolha({ tela: "resumo", total: semanaAtual.length })}
                 careMode={careMode}
-                tamanho={96}
+                tamanho={168}
               />
               <h3 className="mt-4 text-2xl font-extrabold leading-tight text-amber-900">
                 Antes de escrever, olha a sua semana
@@ -7855,7 +7879,7 @@ export function GratitudeBlock({
               <BolhaComBalao
                 fala={falaDaBolha({ tela: "escrever", total, diaDificil, periodo: periodoAtual })}
                 careMode={careMode}
-                tamanho={96}
+                tamanho={168}
               />
               {/* ── A PERGUNTA DO DIA ──────────────────────────────────────
                   Era "O que foi bom hoje?" no dia 1 e no dia 280, com as
@@ -9406,8 +9430,19 @@ function DailyQuizBlock({
                       responde "que cara ela faz pelo estado da jornada?", e
                       aqui a pergunta é outra ("o que ela está fazendo
                       agora?"), mesmo padrão que o resultado do quiz já usa
-                      pra `comemorando`/`orgulhosa`/`feliz` por nota. */}
-                  <Bolha humor="estudiosa" tamanho={104} entrada="chega" careMode={careMode} />
+                      pra `comemorando`/`orgulhosa`/`feliz` por nota.
+                      ⚠️ GRANDE, e FALANDO num balão — pedido do dono: "ele
+                      que vai interagir com as pessoas". */}
+                  <BolhaComBalao
+                    fala={
+                      alreadyDone
+                        ? "Bora rever o que você já aprendeu?"
+                        : "Vamos aprender uma coisa nova hoje?"
+                    }
+                    humorFixo="estudiosa"
+                    careMode={careMode}
+                    tamanho={168}
+                  />
                   <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Aula de hoje · Semana {week}
                     {alreadyDone && <span className="ml-1 text-amber-500">· revisão</span>}

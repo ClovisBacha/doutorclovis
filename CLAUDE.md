@@ -2191,6 +2191,36 @@ setOpenKey(null)} .../>` — e cada uma tem `useState(!!aoSair)`, que já
 - **Bancada:** `/preview-jogo?tela=jogos&dia=139`, um toque em "Aula de
   hoje" (antes precisava de dois) e um toque em "Meditar".
 
+### A bolha cresceu e passou a falar em balão nas cinco abas (ago/2026)
+
+O dono viu no aparelho: a bolha do Mexer estava pequena e a frase embaixo
+dela era texto solto, não fala. "Ele que vai interagir com as pessoas."
+
+- **`BolhaComBalao` ganhou `humorFixo`** — até aqui ela SÓ aceitava o humor
+  de `humorDaJornada` (era a regra: nenhum ponto de uso escolhe a cara
+  dela). `estudiosa`/`exercicio`/o `feliz` provisório do Meditar são
+  identidade de ATIVIDADE, não estado da jornada — a mesma exceção que já
+  valia pro `<Bolha humor="estudiosa">` cru antes desta mudança, só que
+  agora com balão. ⚠️ **Nunca `"comemorando"` por aqui** — quem decide festa
+  continua sendo só `humorDaJornada` — e mesmo se alguém usasse errado, o
+  `Bolha` interno já rebaixa `comemorando` pra `feliz` sozinho no Modo
+  Cuidado, então o pior caso continua seguro.
+- **O parágrafo descritivo virou a FALA dela.** "Diga o que está
+  incomodando, que eu monto a sequência pra você" (Mexer), "Vamos aprender
+  uma coisa nova hoje?" (Aula, ou "Bora rever o que você já aprendeu?" na
+  revisão), a sequência de dias ou o convite padrão (Meditar) — texto que
+  antes era `<p>` descritivo agora sai da boca dela, em balão, do mesmo
+  jeito que Gratidão e Bebê já faziam.
+- **168px nas cinco abas** — o Mexer/Aula/Meditar novos já nasceram nesse
+  tamanho; Bebê e Gratidão (que já tinham bolha+balão de rounds anteriores)
+  subiram de 96 pra 168 pra não ficar menor que as três novas. Só a
+  abertura de cada atividade mudou — as telas secundárias (a lista de
+  cartas do Bebê, "Ver todas" da Gratidão, o resultado da Aula) mantêm o
+  tamanho próprio que já tinham, com a razão de cada uma documentada onde
+  está.
+- **Bancada:** `/preview-jogo?tela=jogos&dia=139`, um toque em cada uma das
+  cinco atividades.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,
