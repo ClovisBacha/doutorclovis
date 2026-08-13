@@ -67,6 +67,7 @@ import comemorando from "@/assets/bolha/comemorando.webp";
 import dormindo from "@/assets/bolha/dormindo.webp";
 import orgulhosa from "@/assets/bolha/orgulhosa.webp";
 import surpresa from "@/assets/bolha/surpresa.webp";
+import estudiosa from "@/assets/bolha/estudiosa.webp";
 
 /**
  * ─── "PREOCUPADA" SAIU (ago/2026) ───────────────────────────────────────────
@@ -80,14 +81,23 @@ import surpresa from "@/assets/bolha/surpresa.webp";
  * Quem some não é só a arte — é o gatilho. `sequenciaPerdida` saiu da
  * assinatura junto, senão sobraria um parâmetro que ninguém lê e o próximo a
  * mexer aqui acharia que ele ainda faz alguma coisa.
+ *
+ * ─── "ESTUDIOSA" ENTROU (ago/2026) ──────────────────────────────────────────
+ *
+ * Óculos, capelo e um livro aberto — pedida pelo dono para a Aula. Ela NÃO
+ * entra em `humorDaJornada`: as outras cinco respondem "que cara ela faz
+ * pelo estado da jornada?", e esta responde uma pergunta diferente ("o que
+ * ela está fazendo agora?"). Point de uso escolhe `humor="estudiosa"`
+ * direto — mesmo padrão que o placar da Aula já usava pra `comemorando` /
+ * `orgulhosa` / `feliz` no resultado do quiz, por nota, sem passar pela
+ * régua da jornada.
  */
-export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpresa";
+export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpresa" | "estudiosa";
 
 /**
  * ─── AS ARTES DO BEBÊ BOLHA (ago/2026) ──────────────────────────────────────
  *
- * As cinco são a personagem nova. A sexta, `preocupada`, foi removida — ver o
- * bloco acima.
+ * Seis expressões. A sétima, `preocupada`, foi removida — ver o bloco acima.
  *
  * ─── TODAS PARTEM DA MESMA ESFERA ───────────────────────────────────────────
  *
@@ -119,8 +129,24 @@ export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpre
  * quadriculado de transparência PINTADO dentro (artefato do gerador). Ele saiu
  * por preenchimento a partir das bordas, e não por "todo pixel claro vira
  * transparente" — este último furaria os reflexos brancos dentro da bolha.
+ *
+ * `estudiosa` veio do Drive do mesmo jeito — RGB sem alfa, fundo quase-branco
+ * — mas numa folha PRÓPRIA (1254×1254, sem as outras cinco do lado), então
+ * ganhou script dedicado: `scripts/bolha-do-drive.mjs` faz o mesmo recorte
+ * de fundo (porta de croma + rampa de brilho + conexão com a borda) e depois
+ * AJUSTA A ESFERA por mínimos quadrados na borda direita — a única sem capelo
+ * nem livro por cima — pra cair exatamente nos mesmos 663px/459×396 das
+ * outras cinco. Sem isso ela nasceria de um tamanho ou lugar diferente e a
+ * troca de humor pularia.
  */
-const ARTE: Record<Humor, string> = { feliz, comemorando, dormindo, orgulhosa, surpresa };
+const ARTE: Record<Humor, string> = {
+  feliz,
+  comemorando,
+  dormindo,
+  orgulhosa,
+  surpresa,
+  estudiosa,
+};
 
 /**
  * Que cara ela faz, a partir do estado da jornada.

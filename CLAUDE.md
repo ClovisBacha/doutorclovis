@@ -2070,6 +2070,50 @@ só falado, nunca mostrado. As três fecharam na mesma leva.
 - **Bancada:** `/preview-bebe?w=20&fase=lista` (o álbum da fase) ·
   `?pos=1&fase=lista` (o de pós-parto, agora com catorze).
 
+### A bolha ganhou uma sexta expressão, pra Aula (ago/2026)
+
+Pedido do dono: óculos, capelo e livro aberto — a "estudiosa" — no lugar do
+ícone colorido que só repetia o emoji do card fechado na abertura do quiz.
+Era a última das cinco atividades sem NENHUM porta-voz na tela de abertura.
+
+- ⚠️ **Ela NÃO passa por `humorDaJornada`.** As outras cinco respondem "que
+  cara ela faz pelo estado da jornada?" (comemorando, dia fechado, madrugada
+  etc.); a Aula já decidia o humor do resultado por NOTA
+  (`comemorando`/`orgulhosa`/`feliz`, sem tocar a régua da jornada) — a
+  estudiosa segue o mesmo padrão local, só que na ABERTURA em vez do
+  resultado. `humor="estudiosa"` direto no ponto de uso.
+- **A arte veio do Drive numa folha PRÓPRIA** (1254×1254, RGB sem alfa,
+  fundo quase-branco — boné de formatura, óculos, livro com coração
+  dourado), sem as outras cinco do lado. Isso pediu um script novo,
+  `scripts/bolha-do-drive.mjs`, porque o recorte de sheet 2×2
+  (`recortar-bolha.mjs`) não serve para uma imagem sozinha.
+  1. **Recorte de fundo**: mesmo algoritmo de `bebes/do-drive.mjs` — porta
+     de croma + rampa de brilho + conexão com a borda (flood fill), depois
+     des-premultiplica. Preserva os brancos ENCERRADOS (lente dos óculos,
+     página do livro) porque eles não alcançam a borda sem atravessar
+     contorno — a mesma lição do reflexo na testa do bebê.
+  2. **Encaixe na MESMA esfera das outras cinco** (663px de diâmetro,
+     centro 459×396 numa tela de 960×960 — sem isso a bolha muda de
+     tamanho ao trocar de humor). ⚠️ **Medir por bounding box simples não
+     funciona aqui**: boné (canto superior esquerdo) e livro (base) fazem
+     a caixa do "não-fundo" inteiro ser bem maior que a bolha em si. A
+     medida saiu de AJUSTE DE CÍRCULO por mínimos quadrados sobre a borda
+     DIREITA — a única sem acessório sobreposto do topo à base — numa
+     faixa vertical medida à mão (linha a linha, impressa no terminal): a
+     rejeição de outlier automática sozinha convergia pro círculo errado
+     (o brilho decorativo do lado direito, mais estreito, "vencia" a
+     bolha), porque ela precisa de uma maioria limpa de pontos pra
+     começar, e sem a faixa certa não tinha.
+- **Conferido por sobreposição**: um canvas desenha feliz.webp e
+  estudiosa.webp uma sobre a outra a 50% de opacidade, com um círculo
+  vermelho na esfera-alvo — a borda da bolha nova acompanha o círculo de
+  perto nos quatro lados. Visto também nos dois tamanhos que ela realmente
+  usa (76px na bancada de humores, 104px na abertura da Aula).
+- **Bancada:** `/preview-bolha` (chip "estudiosa" nas Ações, e a fileira de
+  Humores no fim) · `/preview-jogo?tela=jogos&dia=139`, tocar em "Aula de
+  hoje" → "Fazer a aula de hoje" (a única forma de ver o ícone de verdade,
+  porque a tela de abertura do quiz só existe depois de abrir a atividade).
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

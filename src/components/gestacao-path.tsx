@@ -9352,12 +9352,14 @@ function DailyQuizBlock({
             {phase === "intro" && (
               <div>
                 <div className="mt-2 flex flex-col items-center text-center">
-                  <div
-                    className="duo3d flex h-20 w-20 items-center justify-center rounded-3xl text-4xl"
-                    style={{ background: tm.main, "--lip": tm.lip } as React.CSSProperties}
-                  >
-                    {emoji}
-                  </div>
+                  {/* A bolha estudiosa — óculos, capelo, livro aberto — no
+                      lugar do ícone colorido que só repetia o emoji do card
+                      fechado. Não passa por `humorDaJornada`: essa régua
+                      responde "que cara ela faz pelo estado da jornada?", e
+                      aqui a pergunta é outra ("o que ela está fazendo
+                      agora?"), mesmo padrão que o resultado do quiz já usa
+                      pra `comemorando`/`orgulhosa`/`feliz` por nota. */}
+                  <Bolha humor="estudiosa" tamanho={104} entrada="chega" careMode={careMode} />
                   <p className="mt-4 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                     Aula de hoje · Semana {week}
                     {alreadyDone && <span className="ml-1 text-amber-500">· revisão</span>}
