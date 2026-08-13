@@ -1774,6 +1774,84 @@ se espalha por três níveis. Nenhuma passa de duas.
   teste por fase, e a isometria de adutor com travesseiro ganhou `t1` (o que
   faltava era a fase, não a segurança).
 
+## A Gratidão deixou de ser um `textarea` (ago/2026)
+
+Auditoria das cinco atividades do jogo: Aula 8,0 · Meditar 7,5 · Mexer 7,0 ·
+Bebê 6,0 · **Gratidão 5,0** — a única que perdia para aplicativo de graça
+(Presently, Five Minute Journal, Finch). Era um campo de texto, cinco
+fichinhas fixas e um título, do dia 1 ao dia 280. Régua e texto em
+`src/lib/gratidao.ts` (sem JSX, testado), pelas razões de sempre.
+
+- **A pergunta gira por FASE**: 16 universais + 6 por fase = 22 na roda, três
+  semanas até repetir. As fichinhas vêm com a pergunta — fichas fixas embaixo
+  de uma pergunta que muda dariam respostas que não respondem nada.
+  ⚠️ A rotação é `dia % n`, nunca um passo de 7: a lista da manhã do mascote
+  tinha 14 frases e mostrava duas, alternadas, para sempre.
+- ⚠️ **QUEM CITA O BEBÊ É MARCADO NO CAMPO `bebe`**, e nunca adivinhado do
+  texto. É a correção antecipada do defeito que a meditação tem: lá a regex
+  sobre a prosa corta 3–4 falas boas por sessão (o `\bele\b` pega o AR e o
+  DESENHO), e em "Só respirar" no luto derruba de 12 para 9 falas.
+- **O dia difícil tem pergunta PRÓPRIA** (`PERGUNTAS_DIA_DIFICIL`), disparada
+  pelo humor de HOJE no diário (`HUMORES_DIFICEIS` = os de valor 1 e 2 do
+  gráfico dela). Ela ESTREITA, não consola: há teste com regex proibindo "vai
+  passar", "está tudo bem", "lado positivo" — a mesma razão pela qual a
+  carinha `preocupada` saiu do mascote.
+- ⚠️ **A RELEITURA É ONDE ESTÁ A EVIDÊNCIA** do exercício: escrever ajuda,
+  RELER é o que muda o afeto depois. Guardávamos tudo em `journal_entries` e
+  nenhuma tela da atividade devolvia nada. `gratidaoParaReler` **nunca devolve
+  a de hoje nem a de ontem** (reler o que se acabou de escrever é eco) e
+  prefere o que já passou de 21 dias. Sem nada com três dias, a seção não
+  existe — melhor não ter do que repetir a frase de cima.
+- **O contador SÓ SOBE, e não é sequência.** "23 coisas boas nesta gestação"
+  sai do `count` da consulta (a lista é cortada em 200 e o número travaria
+  ali). Chama que zera puniria quem passou a noite no hospital.
+- **As gratidões viram CARTA para o bebê** (`cartaDasGratidoes`), lida em voz
+  alta na atividade Bebê. Resolve duas carências de uma vez: as 11 cartas se
+  repetiam a cada 11 dias, e o que ela escrevia não voltava para lugar nenhum.
+  ⚠️ As dez linhas saem espaçadas do PERÍODO INTEIRO, não as dez últimas (as
+  recentes dariam a última semana — isso é diário, não é a história de quem
+  cresceu junto), o texto é DELA sem uma palavra reescrita, e abaixo de oito
+  gratidões a carta não existe. Fora do Modo Cuidado, sem exceção.
+
+### Falar em vez de escrever, com transcrição (ago/2026)
+
+Pedido do dono. Escrever no celular às onze da noite com o bebê no colo é
+trabalho; falar não é. `src/lib/gravador.ts` + `/api/transcrever-diario`.
+
+- ⚠️ **O ÁUDIO NUNCA É GUARDADO** — vira texto e some com a função. Não há
+  balde, coluna nem URL. Mesma decisão que tirou o envio de exames do produto,
+  e aqui mais fácil: o que ela quer registrar é o texto.
+- ⚠️ **O que volta é RASCUNHO**, e cai no campo para ela conferir. A
+  transcrição erra nome, corta o fim da frase e inventa pontuação — salvar
+  direto poria no diário (que o médico lê no prontuário) palavras que ela não
+  disse. E ACRESCENTA ao que já estava digitado, nunca apaga.
+- ⚠️ **`audio/mp4` é o PRIMEIRO da lista de formatos**: é o único que o Safari
+  do iPhone grava. Uma lista começando em webm funciona em toda máquina de
+  desenvolvimento e falha no aparelho onde o app é instalado.
+- ⚠️ **`gravar()` roda DENTRO do toque**, sem `await` antes — `getUserMedia`
+  exige gesto do usuário no iOS, e depois de uma espera o gesto já passou. É a
+  mesma armadilha do `destravar()` dos sons para dormir.
+- **O botão só aparece onde o navegador grava** (`podeGravar`): microfone
+  desenhado numa tela que não grava promete e não cumpre.
+- **NÃO reaproveita `/api/transcribe`**, e as três razões estão no cabeçalho
+  do endpoint novo: aquele tem prompt CLÍNICO (devolveria "hoje o café estava
+  gostoso" como ficha médica), portão de PLANO PAGO (a maioria das pacientes
+  levaria 402) e teto de 20 MB (aqui é uma frase, lá é uma consulta).
+  Reaproveitados: sessão antes de tudo, limitador por IP, `inline_data` e a
+  MEDIÇÃO — aquele endpoint passou meses sendo o único de IA sem
+  `registrarUsoAgora`, e era o mais caro da base.
+- **Medido em `canal: "diario"`**, fora de `CANAIS_DA_COTA`: não come a
+  franquia clínica dela, mas aparece no custo da plataforma. Teto de 2 MB e
+  90 s, conferidos NO SERVIDOR — relógio de navegador em segundo plano é
+  estrangulado pelo sistema, e um corpo montado à mão nem passa pela tela.
+- **`temperature: 0` e "não resuma, não corrija"**: o modelo aqui é um
+  teclado, não um redator.
+- **Bancada:** `/preview-gratidao?w=20&n=12` · `?tela=done` (a releitura) ·
+  `?tela=lista` · `?dificil=1` · `?pos=1` · `?luto=1` · `?n=0` (paciente nova).
+  A releitura e o contador vêm do diário no servidor, então sem a bancada
+  conferir isso exigiria uma conta com semanas de uso — e é assim que uma tela
+  passa meses sem ninguém nunca ter olhado para ela.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

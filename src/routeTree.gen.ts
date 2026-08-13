@@ -24,6 +24,7 @@ import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
+import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
@@ -59,6 +60,7 @@ import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
 import { Route as ApiWaitlistTickRouteImport } from './routes/api/waitlist-tick'
 import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
+import { Route as ApiTranscreverDiarioRouteImport } from './routes/api/transcrever-diario'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
@@ -149,6 +151,11 @@ const PreviewJogoRoute = PreviewJogoRouteImport.update({
 const PreviewHomeRoute = PreviewHomeRouteImport.update({
   id: '/preview-home',
   path: '/preview-home',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewGratidaoRoute = PreviewGratidaoRouteImport.update({
+  id: '/preview-gratidao',
+  path: '/preview-gratidao',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewGradesRoute = PreviewGradesRouteImport.update({
@@ -325,6 +332,11 @@ const ApiTranscribeRoute = ApiTranscribeRouteImport.update({
   path: '/api/transcribe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTranscreverDiarioRoute = ApiTranscreverDiarioRouteImport.update({
+  id: '/api/transcrever-diario',
+  path: '/api/transcrever-diario',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe-webhook',
   path: '/api/stripe-webhook',
@@ -435,6 +447,7 @@ export interface FileRoutesByFullPath {
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
+  '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -464,6 +477,7 @@ export interface FileRoutesByFullPath {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -502,6 +516,7 @@ export interface FileRoutesByTo {
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
+  '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -531,6 +546,7 @@ export interface FileRoutesByTo {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -571,6 +587,7 @@ export interface FileRoutesById {
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
+  '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
@@ -600,6 +617,7 @@ export interface FileRoutesById {
   '/api/nutrition': typeof ApiNutritionRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
   '/api/transcribe': typeof ApiTranscribeRoute
   '/api/waitlist-tick': typeof ApiWaitlistTickRoute
   '/api/whatsapp': typeof ApiWhatsappRoute
@@ -640,6 +658,7 @@ export interface FileRouteTypes {
     | '/preview-conta'
     | '/preview-exercicio'
     | '/preview-grades'
+    | '/preview-gratidao'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -669,6 +688,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
+    | '/api/transcrever-diario'
     | '/api/transcribe'
     | '/api/waitlist-tick'
     | '/api/whatsapp'
@@ -707,6 +727,7 @@ export interface FileRouteTypes {
     | '/preview-conta'
     | '/preview-exercicio'
     | '/preview-grades'
+    | '/preview-gratidao'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -736,6 +757,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
+    | '/api/transcrever-diario'
     | '/api/transcribe'
     | '/api/waitlist-tick'
     | '/api/whatsapp'
@@ -775,6 +797,7 @@ export interface FileRouteTypes {
     | '/preview-conta'
     | '/preview-exercicio'
     | '/preview-grades'
+    | '/preview-gratidao'
     | '/preview-home'
     | '/preview-jogo'
     | '/preview-notificacoes'
@@ -804,6 +827,7 @@ export interface FileRouteTypes {
     | '/api/nutrition'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
+    | '/api/transcrever-diario'
     | '/api/transcribe'
     | '/api/waitlist-tick'
     | '/api/whatsapp'
@@ -844,6 +868,7 @@ export interface RootRouteChildren {
   PreviewContaRoute: typeof PreviewContaRoute
   PreviewExercicioRoute: typeof PreviewExercicioRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
+  PreviewGratidaoRoute: typeof PreviewGratidaoRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
@@ -870,6 +895,7 @@ export interface RootRouteChildren {
   ApiNutritionRoute: typeof ApiNutritionRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
+  ApiTranscreverDiarioRoute: typeof ApiTranscreverDiarioRoute
   ApiTranscribeRoute: typeof ApiTranscribeRoute
   ApiWaitlistTickRoute: typeof ApiWaitlistTickRoute
   ApiWhatsappRoute: typeof ApiWhatsappRoute
@@ -985,6 +1011,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-home'
       fullPath: '/preview-home'
       preLoaderRoute: typeof PreviewHomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-gratidao': {
+      id: '/preview-gratidao'
+      path: '/preview-gratidao'
+      fullPath: '/preview-gratidao'
+      preLoaderRoute: typeof PreviewGratidaoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-grades': {
@@ -1232,6 +1265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTranscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/transcrever-diario': {
+      id: '/api/transcrever-diario'
+      path: '/api/transcrever-diario'
+      fullPath: '/api/transcrever-diario'
+      preLoaderRoute: typeof ApiTranscreverDiarioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe-webhook': {
       id: '/api/stripe-webhook'
       path: '/api/stripe-webhook'
@@ -1392,6 +1432,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewContaRoute: PreviewContaRoute,
   PreviewExercicioRoute: PreviewExercicioRoute,
   PreviewGradesRoute: PreviewGradesRoute,
+  PreviewGratidaoRoute: PreviewGratidaoRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
@@ -1418,6 +1459,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiNutritionRoute: ApiNutritionRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
+  ApiTranscreverDiarioRoute: ApiTranscreverDiarioRoute,
   ApiTranscribeRoute: ApiTranscribeRoute,
   ApiWaitlistTickRoute: ApiWaitlistTickRoute,
   ApiWhatsappRoute: ApiWhatsappRoute,

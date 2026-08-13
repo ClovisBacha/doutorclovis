@@ -1226,6 +1226,23 @@ button:active > .duo3d {
 .dc-float {
   animation: dc-float 3.2s ease-in-out infinite;
 }
+/* O ponto que pisca enquanto o microfone está aberto.
+   ⚠️ Ele NÃO some com `prefers-reduced-motion` (ver o bloco abaixo): é o único
+   sinal na tela de que o microfone está ligado, e apagá-lo deixaria alguém
+   gravando sem saber. O que a preferência faz é parar a piscada, mantendo o
+   ponto aceso — a mesma decisão da chama da sequência. */
+@keyframes dc-rec-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.dc-rec-dot {
+  animation: dc-rec-dot 1.1s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .dc-quiz-in,
   .dc-q-slide,
@@ -1233,6 +1250,13 @@ button:active > .duo3d {
   .dc-result-in,
   .dc-float {
     animation: none !important;
+  }
+  /* ⚠️ O ponto de gravação PARA, mas fica ACESO. `animation: none` no
+     `.dc-float` esconde um enfeite; aqui esconderia a única indicação de que o
+     microfone está aberto. */
+  .dc-rec-dot {
+    animation: none !important;
+    opacity: 1 !important;
   }
 }
 

@@ -62,6 +62,26 @@ import {
   type Sintoma,
 } from "@/lib/exercicios";
 import {
+  HUMOR_GRATIDAO,
+  PREFIXO_GRATIDAO,
+  cartaDasGratidoes,
+  ehDiaDificil,
+  ehGratidao,
+  gratidaoParaReler,
+  haQuantoTempo,
+  perguntaDoDia,
+  textoDaGratidao,
+  type Gratidao,
+} from "@/lib/gratidao";
+import {
+  LIMITE_BYTES,
+  LIMITE_SEGUNDOS,
+  gravar,
+  podeGravar,
+  relogio,
+  type Gravacao,
+} from "@/lib/gravador";
+import {
   IconeCadeado,
   IconeAmigas,
   IconeChama,
@@ -6622,6 +6642,7 @@ const BONDING_LETTERS: { title: string; emoji: string; lines: string[] }[] = [
 
 function BondingBlock({
   day,
+  babyName,
   canEarn,
   careMode = false,
   alreadyDone,
@@ -6629,6 +6650,8 @@ function BondingBlock({
   aoSair,
 }: {
   day: number;
+  /** Entra na abertura da carta feita das gratidões dela. */
+  babyName?: string | null;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
@@ -6645,7 +6668,33 @@ function BondingBlock({
    */
   aoSair?: () => void;
 }) {
-  const carta = useMemo(() => BONDING_LETTERS[day % BONDING_LETTERS.length], [day]);
+  /**
+   * ⚠️ A CARTA FEITA DAS GRATIDÕES DELA — e por que ela nasceu aqui.
+   *
+   * São ONZE cartas escritas para 294 dias de jornada: cada uma se repete umas
+   * vinte e sete vezes ao longo da gestação. E do outro lado do app havia uma
+   * atividade guardando dezenas de frases dela que nenhuma tela mostrava de
+   * volta. As duas carências se resolvem uma à outra: o que ela agradeceu vira
+   * a carta que ela lê em voz alta para o bebê.
+   *
+   * É a coisa que o Finch, o Presently e o Day One estruturalmente não podem
+   * fazer — eles não têm um bebê do outro lado.
+   *
+   * ⚠️ Fora do Modo Cuidado, e sem exceção: a atividade inteira é ler para o
+   * bebê. E ela só existe a partir de oito gratidões (`MINIMO_PARA_CARTA`) —
+   * uma carta de três linhas seria um cartão de felicitação.
+   */
+  const [minhasGratidoes, setMinhasGratidoes] = useState<Gratidao[] | null>(null);
+  const cartaDelas = useMemo(
+    () =>
+      careMode || !minhasGratidoes
+        ? null
+        : cartaDasGratidoes(minhasGratidoes, { nomeDoBebe: babyName }),
+    [careMode, minhasGratidoes, babyName],
+  );
+  const [lendoAsDelas, setLendoAsDelas] = useState(false);
+  const cartaDoDia = useMemo(() => BONDING_LETTERS[day % BONDING_LETTERS.length], [day]);
+  const carta = lendoAsDelas && cartaDelas ? cartaDelas : cartaDoDia;
   const [open, setOpen] = useState(!!aoSair);
   const [phase, setPhase] = useState<"intro" | "active" | "done">("intro");
   const [idx, setIdx] = useState(0);
@@ -6655,6 +6704,38 @@ function BondingBlock({
   const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
 
   useEffect(() => () => audioRef.current?.stop(), []);
+
+  useEffect(() => {
+    if (!open || careMode) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user || !vivo) return;
+        const { data } = await (supabase as any)
+          .from("journal_entries")
+          .select("content,created_at")
+          .eq("user_id", u.user.id)
+          .ilike("content", `${PREFIXO_GRATIDAO}%`)
+          /* CRESCENTE: a carta conta a história na ordem em que aconteceu. */
+          .order("created_at", { ascending: true })
+          .limit(300);
+        if (!vivo) return;
+        setMinhasGratidoes(
+          ((data ?? []) as { content: string; created_at: string }[])
+            .filter((l) => ehGratidao(l.content))
+            .map((l) => ({ texto: textoDaGratidao(l.content), quando: l.created_at })),
+        );
+      } catch {
+        /* Sem rede, a carta do dia continua inteira — é ela que a atividade
+           sempre prometeu. A das gratidões é o extra. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [open, careMode]);
 
   /* Aqui havia um avanço automático a cada 10 segundos, e ele brigava com o
      enunciado da própria tela.
@@ -6825,14 +6906,23 @@ function BondingBlock({
                 💌
               </span>
               <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-rose-400">
-                Carta de hoje
+                {lendoAsDelas ? "Escrita por você" : "Carta de hoje"}
               </p>
               <h3 className="mt-1 font-serif text-3xl font-extrabold text-rose-900">
                 {carta.title} {carta.emoji}
               </h3>
               <p className="mt-4 max-w-xs text-sm leading-relaxed text-rose-800/80">
-                Encontre um lugar calmo, mão na barriga… e leia <strong>em voz alta</strong>,
-                devagar. A sua voz é o som preferido do bebê. 💛
+                {lendoAsDelas ? (
+                  <>
+                    Esta carta é feita das coisas boas que <strong>você mesma anotou</strong> na
+                    Gratidão, na ordem em que aconteceram. Leia em voz alta, devagar. 💛
+                  </>
+                ) : (
+                  <>
+                    Encontre um lugar calmo, mão na barriga… e leia <strong>em voz alta</strong>,
+                    devagar. A sua voz é o som preferido do bebê. 💛
+                  </>
+                )}
               </p>
               <button
                 onClick={begin}
@@ -6840,6 +6930,22 @@ function BondingBlock({
               >
                 Começar a ler 💗
               </button>
+              {/* ── A CARTA FEITA DAS GRATIDÕES DELA ────────────────────────
+                  Só aparece quando existe (oito ou mais guardadas). Um botão
+                  que abre uma carta de três linhas seria pior que não ter. */}
+              {cartaDelas && (
+                <button
+                  onClick={() => {
+                    setLendoAsDelas((v) => !v);
+                    setIdx(0);
+                  }}
+                  className="press mt-4 text-[13px] font-bold text-rose-600 underline decoration-rose-300 underline-offset-4"
+                >
+                  {lendoAsDelas
+                    ? "Ler a carta de hoje 💌"
+                    : `Ler as ${minhasGratidoes?.length ?? 0} coisas boas que você anotou ✨`}
+                </button>
+              )}
             </div>
           )}
 
@@ -6902,15 +7008,27 @@ function BondingBlock({
 
 /* ══════════════════ Gratidão do dia (vai pro diário) ══════════════════ */
 
-function GratitudeBlock({
+export function GratitudeBlock({
   day,
+  semana,
+  posParto = false,
   canEarn,
   careMode = false,
   alreadyDone,
   onEarn,
   aoSair,
+  bancada,
 }: {
   day: number;
+  /** Semana gestacional — escolhe o grupo de perguntas da fase. */
+  semana?: number;
+  /**
+   * ⚠️ No pós-parto `semana` vem do dia gestacional e NÃO quer dizer nada
+   * (`D` é a idade do bebê + 7). Por isso `faseDaGratidao` lê esta bandeira
+   * PRIMEIRO — é o mesmo defeito que a meditação ainda tem, onde uma mãe com
+   * um mês de bebê ouve o acolhimento de primeiro trimestre.
+   */
+  posParto?: boolean;
   canEarn: boolean;
   careMode?: boolean;
   alreadyDone: boolean;
@@ -6926,12 +7044,209 @@ function GratitudeBlock({
    * pediu para ver.
    */
   aoSair?: () => void;
+  /**
+   * ⚠️ SÓ A BANCADA (`/preview-gratidao`).
+   *
+   * A coleção e o dia difícil vêm do diário dela no servidor, então conferir a
+   * releitura, o contador e a lista exigiria uma conta com semanas de uso — e
+   * é assim que uma tela passa meses sem ninguém nunca ter olhado para ela.
+   * Com isto preenchido, a busca nem acontece.
+   */
+  bancada?: {
+    gratidoes: Gratidao[];
+    total: number;
+    diaDificil?: boolean;
+    /* A releitura mora na tela de GUARDADO, e chegar nela exige salvar no
+       banco — ou seja, exige login. Sem isto, o pedaço mais importante da
+       mudança continuaria impossível de olhar. */
+    fase?: "write" | "lista" | "done";
+  };
 }) {
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"write" | "done">("write");
+  const [phase, setPhase] = useState<"write" | "lista" | "done">(bancada?.fase ?? "write");
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
   const [reward, setReward] = useState<number | null>(null);
+  /**
+   * O QUE ELA JÁ ESCREVEU — e é isto que a atividade não tinha.
+   *
+   * Tudo ia para `journal_entries` e nenhuma tela desta atividade mostrava de
+   * volta. ⚠️ A releitura não é enfeite: escrever ajuda, RELER é o que muda o
+   * afeto depois. Guardávamos tudo e nunca devolvíamos nada.
+   */
+  const [gratidoes, setGratidoes] = useState<Gratidao[]>(bancada?.gratidoes ?? []);
+  /**
+   * O contador que SÓ SOBE.
+   *
+   * Vem do `count` da mesma consulta, e não do tamanho da lista — a lista é
+   * cortada em 200 e o número ficaria travado ali. E ele não é sequência de
+   * propósito: quem passou a noite no hospital não perde nada por não ter
+   * agradecido, e uma chama zerada aqui puniria exatamente quem menos deveria.
+   */
+  const [total, setTotal] = useState(bancada?.total ?? 0);
+  const [diaDificil, setDiaDificil] = useState(bancada?.diaDificil ?? false);
+  /* Gravação de voz. `podeGravar()` é lido uma vez: ele toca `navigator`, e o
+     servidor não tem nenhum — no SSR o botão simplesmente não existe. */
+  const [temMicrofone, setTemMicrofone] = useState(false);
+  const [gravando, setGravando] = useState(false);
+  const [segundos, setSegundos] = useState(0);
+  const [transcrevendo, setTranscrevendo] = useState(false);
+  const gravacaoRef = useRef<Gravacao | null>(null);
+
+  const pergunta = useMemo(
+    () => perguntaDoDia({ dia: day, semanas: semana, posParto, careMode, diaDificil }),
+    [day, semana, posParto, careMode, diaDificil],
+  );
+
+  useEffect(() => setTemMicrofone(podeGravar()), []);
+
+  /* O microfone não pode ficar aceso se a folha fechar no meio da gravação —
+     no celular isso deixa a bolinha vermelha no alto da tela, sem nada
+     gravando, até a aba morrer. */
+  useEffect(
+    () => () => {
+      gravacaoRef.current?.cancelar();
+      gravacaoRef.current = null;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!open || bancada) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user || !vivo) return;
+        const sb = supabase as any;
+        const [minhas, hoje] = await Promise.all([
+          sb
+            .from("journal_entries")
+            .select("content,created_at", { count: "exact" })
+            .eq("user_id", u.user.id)
+            .ilike("content", `${PREFIXO_GRATIDAO}%`)
+            .order("created_at", { ascending: false })
+            .limit(200),
+          /* O humor de HOJE decide o tom da pergunta. Só os de hoje: um dia
+             ruim da semana passada não muda o que ela lê agora. */
+          sb
+            .from("journal_entries")
+            .select("mood")
+            .eq("user_id", u.user.id)
+            .gte("created_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+            .limit(30),
+        ]);
+        if (!vivo) return;
+        const linhas = (minhas.data ?? []) as { content: string; created_at: string }[];
+        setGratidoes(
+          linhas
+            .filter((l) => ehGratidao(l.content))
+            .map((l) => ({ texto: textoDaGratidao(l.content), quando: l.created_at })),
+        );
+        setTotal(minhas.count ?? linhas.length);
+        setDiaDificil(
+          ehDiaDificil(((hoje.data ?? []) as { mood: string | null }[]).map((h) => h.mood)),
+        );
+      } catch {
+        /* Sem rede a atividade continua inteira: ela escreve, e o que não dá
+           é reler. Uma falha de leitura nunca pode impedir de registrar. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /* O relógio da gravação, e o corte automático em 90 s. */
+  useEffect(() => {
+    if (!gravando) return;
+    const t = setInterval(() => setSegundos((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [gravando]);
+  useEffect(() => {
+    if (gravando && segundos >= LIMITE_SEGUNDOS) void pararEEnviar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gravando, segundos]);
+
+  /**
+   * ⚠️ `gravar()` É CHAMADA DENTRO DO TOQUE, sem nenhum `await` antes.
+   *
+   * `getUserMedia` exige gesto do usuário no iOS, e depois de uma espera o
+   * gesto já passou — é a mesma armadilha do `destravar()` dos sons para
+   * dormir, que só aparece no aparelho.
+   */
+  async function comecarAGravar() {
+    if (gravando || transcrevendo) return;
+    try {
+      const g = await gravar();
+      gravacaoRef.current = g;
+      setSegundos(0);
+      setGravando(true);
+    } catch {
+      toast.error("Não consegui usar o microfone. Você pode escrever aqui embaixo. 💛");
+    }
+  }
+
+  async function pararEEnviar() {
+    const g = gravacaoRef.current;
+    gravacaoRef.current = null;
+    setGravando(false);
+    if (!g) return;
+    const blob = await g.parar();
+    if (blob.size < 1200) {
+      /* Um toque sem querer. Nada de erro vermelho por isso. */
+      return;
+    }
+    if (blob.size > LIMITE_BYTES) {
+      toast.error("O áudio ficou muito longo. Tente contar em menos tempo.");
+      return;
+    }
+    setTranscrevendo(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) {
+        toast.error("Sua sessão expirou. Entre de novo para usar o microfone.");
+        return;
+      }
+      const corpo = new FormData();
+      corpo.append("audio", new File([blob], "voz", { type: blob.type }));
+      const r = await fetch("/api/transcrever-diario", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: corpo,
+      });
+      const dados = (await r.json().catch(() => null)) as { ok?: boolean; texto?: string } | null;
+      if (!r.ok || !dados?.ok) {
+        toast.error("Não consegui transcrever agora. Você pode escrever aqui embaixo. 💛");
+        return;
+      }
+      const falado = (dados.texto ?? "").trim();
+      if (!falado) {
+        toast("Não consegui ouvir. Tente falar mais perto do celular.");
+        return;
+      }
+      /* ⚠️ O QUE VOLTA É RASCUNHO, e cai no campo PARA ELA CONFERIR. A
+         transcrição erra nome, corta o fim da frase e inventa pontuação —
+         guardar direto poria no diário (que o médico lê) palavras que ela não
+         escreveu. E ACRESCENTA ao que já estava lá: apagar o que ela digitou
+         antes de falar seria perder trabalho dela. */
+      setText((t) => (t.trim() ? `${t.trim()} ${falado}` : falado).slice(0, 300));
+    } catch {
+      toast.error("Não consegui transcrever agora. Você pode escrever aqui embaixo. 💛");
+    } finally {
+      setTranscrevendo(false);
+    }
+  }
+
+  function descartarGravacao() {
+    gravacaoRef.current?.cancelar();
+    gravacaoRef.current = null;
+    setGravando(false);
+  }
 
   async function save() {
     if (saving || text.trim().length < 2) return;
@@ -6955,7 +7270,11 @@ function GratitudeBlock({
         }
       )
         .from("journal_entries")
-        .insert({ user_id: u.user.id, content: `Gratidão: ${text.trim()}`, mood: "🙏" });
+        .insert({
+          user_id: u.user.id,
+          content: `${PREFIXO_GRATIDAO}${text.trim()}`,
+          mood: HUMOR_GRATIDAO,
+        });
 
       /**
        * O erro do insert precisa ser lido.
@@ -6970,6 +7289,15 @@ function GratitudeBlock({
         toast.error("Não consegui guardar agora. O texto continua aqui — tente de novo.");
         return;
       }
+
+      /* A coleção cresce na hora, sem uma segunda ida ao servidor. O `total` é
+         o número que a tela mostra ("23 coisas boas nesta gestação") e ele
+         precisa subir no mesmo instante em que ela guarda — recarregar para
+         ver o próprio registro entrar é o tipo de espera que faz o número
+         parecer quebrado. */
+      const nova = { texto: text.trim(), quando: new Date().toISOString() };
+      setGratidoes((antes) => [nova, ...antes]);
+      setTotal((quantas: number) => quantas + 1);
 
       /* Recompensa (uma por dia, como as outras atividades de bem-estar).
          A meia-estrela vem antes do servidor — ela escreveu, e isso já
@@ -7012,11 +7340,24 @@ function GratitudeBlock({
   }
 
   function close() {
+    descartarGravacao();
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("write");
     setText("");
   }
+
+  /**
+   * A gratidão que volta para ela na tela de guardado.
+   *
+   * A semente é o `total`, então a cada registro novo a que reaparece é outra
+   * — sem sorteio, que mudaria a frase debaixo dos olhos dela a cada
+   * re-renderização (o mesmo defeito que o balão do mascote teve com o clima).
+   */
+  const paraReler = useMemo(
+    () => gratidaoParaReler(gratidoes, new Date(), total),
+    [gratidoes, total],
+  );
 
   return (
     <>
@@ -7056,21 +7397,27 @@ function GratitudeBlock({
             </button>
           </div>
           {phase === "write" ? (
-            <div className="flex flex-1 flex-col items-center px-8 pt-6 text-center">
+            <div className="flex flex-1 flex-col items-center overflow-y-auto px-8 pb-10 pt-2 text-center">
               <span className="text-6xl">✨</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-amber-900">O que foi bom hoje?</h3>
+              {/* ── A PERGUNTA DO DIA ──────────────────────────────────────
+                  Era "O que foi bom hoje?" no dia 1 e no dia 280, com as
+                  mesmas cinco fichinhas. Agora gira por fase da gestação — e
+                  num dia em que ela marcou humor baixo, a pergunta muda de tom
+                  inteiro (ver `PERGUNTAS_DIA_DIFICIL`): estreita, sem dizer
+                  que vai passar. */}
+              <h3 className="mt-4 text-2xl font-extrabold leading-tight text-amber-900">
+                {pergunta.texto}
+              </h3>
               <p className="mt-2 max-w-xs text-sm text-amber-800/80">
-                Pode ser bem pequeno. Isso vai pro seu diário. 💛
+                {diaDificil
+                  ? "Pode ser mínimo. Isso fica no seu diário. 💛"
+                  : "Pode ser bem pequeno. Isso vai pro seu diário. 💛"}
               </p>
-              {/* Fichinhas de 1 toque — destravam a escrita nos dias cansados */}
+              {/* Fichinhas de 1 toque — destravam a escrita nos dias cansados.
+                  Elas seguem a pergunta: fichas fixas embaixo de uma pergunta
+                  que muda dariam respostas que não respondem nada. */}
               <div className="mt-4 flex max-w-sm flex-wrap justify-center gap-1.5">
-                {[
-                  "Meu bebê mexeu 🦶",
-                  "Um carinho que recebi 💕",
-                  "Uma boa notícia 📩",
-                  "Comi algo gostoso 🍓",
-                  "Descansei um pouquinho 😴",
-                ].map((chip) => (
+                {pergunta.fichas.map((chip) => (
                   <button
                     key={chip}
                     onClick={() =>
@@ -7086,34 +7433,165 @@ function GratitudeBlock({
                 value={text}
                 onChange={(e) => setText(e.target.value.slice(0, 300))}
                 rows={4}
-                placeholder="Hoje eu fiquei grata por…"
+                placeholder={gravando ? "Estou ouvindo…" : "Hoje eu fiquei grata por…"}
                 className="mt-3 w-full max-w-sm resize-none rounded-2xl border border-amber-200 bg-white p-3 text-sm outline-none focus:border-amber-400"
               />
+
+              {/* ── FALAR EM VEZ DE ESCREVER ───────────────────────────────
+                  Escrever no celular às onze da noite, com o bebê no colo, é
+                  trabalho; falar não é. O botão SÓ APARECE onde o navegador
+                  grava de verdade (`podeGravar`) — um microfone desenhado numa
+                  tela que não grava promete e não cumpre.
+                  ⚠️ O áudio não é guardado: vira texto e some. E o texto cai no
+                  campo acima PARA ELA CONFERIR, nunca direto no diário. */}
+              {temMicrofone && (
+                <div className="mt-3 w-full max-w-sm">
+                  {!gravando ? (
+                    <button
+                      onClick={comecarAGravar}
+                      disabled={transcrevendo}
+                      className="press flex w-full items-center justify-center gap-2 rounded-full border border-amber-300 bg-white/80 py-2.5 text-sm font-bold text-amber-700 disabled:opacity-50"
+                    >
+                      {transcrevendo ? (
+                        "Transcrevendo…"
+                      ) : (
+                        <>
+                          {/* Microfone DESENHADO: o emoji 🎤 sai preto no iOS —
+                              a mesma lição do 📞 da Central de Emergência. */}
+                          <svg
+                            viewBox="0 0 24 24"
+                            className="h-[17px] w-[17px]"
+                            fill="currentColor"
+                            aria-hidden
+                          >
+                            <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Z" />
+                            <path d="M17.5 11a.9.9 0 0 0-1.8 0 3.7 3.7 0 0 1-7.4 0 .9.9 0 0 0-1.8 0 5.5 5.5 0 0 0 4.6 5.4V19h-2a.9.9 0 0 0 0 1.8h5.8a.9.9 0 0 0 0-1.8h-2v-2.6a5.5 5.5 0 0 0 4.6-5.4Z" />
+                          </svg>
+                          Falar como foi o dia
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={pararEEnviar}
+                        className="press flex flex-1 items-center justify-center gap-2 rounded-full bg-rose-500 py-2.5 text-sm font-extrabold text-white"
+                      >
+                        <span
+                          className="dc-rec-dot h-2.5 w-2.5 rounded-full bg-white"
+                          aria-hidden
+                        />
+                        Gravando · {relogio(segundos)} · tocar para parar
+                      </button>
+                      <button
+                        onClick={descartarGravacao}
+                        aria-label="Descartar gravação"
+                        className="press rounded-full border border-amber-200 bg-white/80 px-3 py-2.5 text-sm font-bold text-amber-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-1.5 text-[11px] leading-snug text-amber-700/60">
+                    O áudio não fica guardado — vira texto aqui pra você conferir e mudar.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={save}
-                disabled={saving || text.trim().length < 2}
+                disabled={saving || transcrevendo || gravando || text.trim().length < 2}
                 className="press mt-4 w-full max-w-sm rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-40"
               >
                 Guardar
               </button>
+
+              {/* ── A COLEÇÃO ──────────────────────────────────────────────
+                  O número só sobe, e não é sequência: quem passou a noite no
+                  hospital não perde nada por não ter agradecido. */}
+              {total > 0 && (
+                <button
+                  onClick={() => setPhase("lista")}
+                  className="press mt-5 text-[13px] font-bold text-amber-700 underline decoration-amber-300 underline-offset-4"
+                >
+                  {total} {total === 1 ? "coisa boa" : "coisas boas"}{" "}
+                  {posParto ? "guardadas" : "nesta gestação"} · ver todas
+                </button>
+              )}
+            </div>
+          ) : phase === "lista" ? (
+            <div className="flex flex-1 flex-col overflow-y-auto px-6 pb-10">
+              <h3 className="text-center font-serif text-[24px] font-semibold text-amber-900">
+                Suas coisas boas
+              </h3>
+              <p className="mt-1 text-center text-[13px] text-amber-800/70">
+                {total} {total === 1 ? "guardada" : "guardadas"} até aqui 💛
+              </p>
+              <ul className="mt-5 grid gap-2">
+                {gratidoes.map((g) => (
+                  <li
+                    key={`${g.quando}-${g.texto.slice(0, 12)}`}
+                    className="rounded-2xl border border-amber-200/70 bg-white/80 px-4 py-3 text-left"
+                  >
+                    <p className="text-[13.5px] leading-snug text-amber-900">{g.texto}</p>
+                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600/80">
+                      {haQuantoTempo(g.quando, new Date())}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={() => setPhase("write")}
+                className="press mt-6 w-full max-w-xs self-center rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+              >
+                Escrever uma nova
+              </button>
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+            <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-6 text-center">
               {!careMode && <ConfettiBurst />}
               <span className="dc-result-in text-6xl">✨</span>
               <h3 className="mt-3 text-2xl font-extrabold text-amber-900">Guardado 💛</h3>
-              <p className="mt-1 text-sm text-amber-800/80">Anotei no seu diário.</p>
+              <p className="mt-1 text-sm text-amber-800/80">
+                {total > 1
+                  ? `${total} ${posParto ? "coisas boas guardadas" : "coisas boas nesta gestação"}.`
+                  : "Anotei no seu diário."}
+              </p>
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!
                 </div>
               )}
+
+              {/* ── ⚠️ O REENCONTRO ────────────────────────────────────────
+                  É aqui que o exercício passa a valer: escrever ajuda, RELER é
+                  o que muda o afeto depois. Nunca a de hoje nem a de ontem —
+                  reler o que se acabou de escrever é eco (ver
+                  `gratidaoParaReler`). Sem nada com três dias, a seção não
+                  existe: melhor não ter do que repetir a frase de cima. */}
+              {paraReler && (
+                <div className="mt-6 w-full max-w-xs rounded-2xl border border-amber-200 bg-white/80 px-4 py-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600">
+                    {haQuantoTempo(paraReler.quando, new Date())} você agradeceu por
+                  </p>
+                  <p className="mt-1 text-[14px] leading-snug text-amber-900">{paraReler.texto}</p>
+                </div>
+              )}
+
               <button
                 onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-7 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho
               </button>
+              {total > 1 && (
+                <button
+                  onClick={() => setPhase("lista")}
+                  className="press mt-3 text-[13px] font-bold text-amber-700 underline decoration-amber-300 underline-offset-4"
+                >
+                  Ver todas
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -7729,6 +8207,8 @@ function WellnessScreen({
                  bloco de Movimento lê — os outros ignoram a prop extra. */
               semana={Math.floor(day / 7)}
               posParto={ehPosParto}
+              /* Só a carta feita das gratidões dela o usa, na abertura. */
+              babyName={babyName}
               canEarn={canEarn}
               careMode={careMode}
               alreadyDone={done.has(activity.key)}
