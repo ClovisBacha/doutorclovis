@@ -452,6 +452,7 @@ import { estaEscondida, podeRetomar } from "@/lib/pausa-da-sessao";
 import { fusoDoNavegador, horaLocal, paraGuardar } from "@/lib/lembrete-de-meditacao";
 import { subscribeToPush } from "@/lib/push";
 import { SonsParaDormir } from "@/components/sons-para-dormir";
+import { SessaoDoCasal } from "@/components/sessao-do-casal";
 
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
@@ -5041,6 +5042,8 @@ function MeditationBlock({
   /* Os sons soltos, sem sessão. Ver `sons-para-dormir.tsx`: mesma receita de
      som, tocada de um arquivo — é o que sobrevive à tela bloqueada. */
   const [sonsAbertos, setSonsAbertos] = useState(false);
+  /* A prática para dois. Fora do Modo Cuidado: ela é preparação de parto. */
+  const [casalAberto, setCasalAberto] = useState(false);
   /* `null` enquanto carrega, `false` quando o banco ainda não tem as colunas —
      e aí a linha do lembrete nem aparece. */
   const [lembrete, setLembrete] = useState<{ hora: string | null } | null | false>(null);
@@ -5972,11 +5975,37 @@ function MeditationBlock({
                 </>
               )}
 
+              {/* ── PARA VOCÊS DOIS ───────────────────────────────────────
+                  Fica junto do "para dormir" porque as duas são coisas que ela
+                  pode querer EM VEZ da sessão de hoje — não configurações
+                  dela. Some no Modo Cuidado: é preparação de parto. */}
+              {!careMode && (
+                <button
+                  onClick={() => setCasalAberto(true)}
+                  className="press mt-8 flex w-full items-center gap-3 rounded-2xl border border-violet-200 bg-white/70 px-4 py-3 text-left"
+                >
+                  <span className="text-2xl leading-none" aria-hidden>
+                    🤲
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-extrabold text-violet-900">
+                      Para vocês dois
+                    </span>
+                    <span className="block text-[11px] text-violet-700/70">
+                      10 min com quem vai estar com você no parto
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-violet-400" aria-hidden>
+                    ›
+                  </span>
+                </button>
+              )}
+
               {/* Sai do fluxo da sessão de propósito: não é uma escolha DESTA
                   meditação, é outra coisa que ela pode querer em vez dela. */}
               <button
                 onClick={() => setSonsAbertos(true)}
-                className="press mt-8 flex w-full items-center gap-3 rounded-2xl border border-violet-200 bg-white/70 px-4 py-3 text-left"
+                className="press mt-3 flex w-full items-center gap-3 rounded-2xl border border-violet-200 bg-white/70 px-4 py-3 text-left"
               >
                 <span className="text-2xl leading-none" aria-hidden>
                   🌙
@@ -6252,6 +6281,7 @@ function MeditationBlock({
       {/* Fora da folha da meditação: ela abre os sons sem sessão nenhuma, e a
           folha continua por baixo se ela veio de dentro. */}
       {sonsAbertos && <SonsParaDormir aoFechar={() => setSonsAbertos(false)} />}
+      {casalAberto && <SessaoDoCasal aoSair={() => setCasalAberto(false)} />}
     </>
   );
 }

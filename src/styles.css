@@ -3023,3 +3023,27 @@ button:active > .duo3d {
     height: 10px;
   }
 }
+
+/* ══════════ Sessão do casal: as duas respirações que se encontram ══════════
+   A de trás entra com atraso e alcança a da frente — é o desenho da regra que
+   a voz dá ("quem manda no ritmo é ela"). Amplitude igual nas duas: o que as
+   separa é a fase, não o tamanho. */
+@keyframes dc-casal-respira {
+  0%,
+  100% {
+    transform: scale(0.9);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+}
+.dc-casal-respira {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dc-casal-respira 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-casal-respira {
+    animation: none;
+  }
+}

@@ -40,6 +40,8 @@ import {
   type Tocador,
 } from "@/lib/som-continuo";
 import { anunciarMidia, estadoDaMidia } from "@/lib/media-session";
+import { HISTORIAS, duracaoAproximada, type Historia } from "@/lib/historias-para-dormir";
+import { HistoriaDaNoite } from "@/components/historia-da-noite";
 
 const ROTULO: Record<SomKey, { nome: string; emoji: string; sub: string }> = {
   chuva: { nome: "Chuva", emoji: "🌧️", sub: "miúda, sem trovão" },
@@ -55,6 +57,8 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
   const [alvo, setAlvo] = useState<number | null>(null);
   const [restante, setRestante] = useState<number>(0);
   const [falhou, setFalhou] = useState(false);
+  /* A história tocando agora — ela toma a tela inteira. */
+  const [historia, setHistoria] = useState<Historia | null>(null);
   /**
    * Quem manda no rótulo é o ELEMENTO, não o nosso estado: a pausa pode vir do
    * card do sistema, do botão do fone, ou de uma chamada entrando.
@@ -83,6 +87,28 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
   }, []);
 
   useEffect(() => () => tocador.current?.parar(), []);
+
+  /**
+   * ⚠️ ABRIR A HISTÓRIA DESTRAVA O SOM, no mesmo toque.
+   *
+   * Quando a história acaba, o som contínuo entra sozinho no lugar da voz — e
+   * "sozinho" quer dizer SEM gesto nenhum, onze minutos depois. No iOS aquilo
+   * seria recusado. O destravamento tem de acontecer aqui, no toque em que ela
+   * escolhe a história, que é o último gesto que vai existir nesta noite.
+   */
+  function abrirHistoria(h: Historia) {
+    tocador.current?.destravar();
+    setHistoria(h);
+  }
+
+  /** A voz acabou: a chuva assume, com o mesmo temporizador que ela escolheu. */
+  const entregarAoSom = useCallback(async () => {
+    setHistoria(null);
+    const ok = await tocador.current?.tocar("chuva");
+    if (!ok) return;
+    setSom("chuva");
+    setAlvo(quandoDesligar(tempo, Date.now()));
+  }, [tempo]);
 
   async function escolher(k: SomKey) {
     if (carregando) return;
@@ -194,6 +220,16 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
     };
   }, []);
 
+  if (historia) {
+    return (
+      <HistoriaDaNoite
+        historia={historia}
+        aoTerminar={() => void entregarAoSom()}
+        aoSair={() => setHistoria(null)}
+      />
+    );
+  }
+
   return (
     <div
       className="dc-quiz-in fixed inset-0 z-50 flex flex-col bg-gradient-to-b from-[#141a34] via-[#1b2140] to-[#0e1226] text-white"
@@ -214,12 +250,46 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 pb-10">
-        <h3 className="font-serif text-[26px] font-semibold">Sons para dormir</h3>
+        <h3 className="font-serif text-[26px] font-semibold">Para dormir</h3>
         <p className="mt-1 text-[13px] leading-relaxed text-white/60">
           Pode apagar a tela e deixar o celular de lado — o som continua tocando.
         </p>
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        {/* ── HISTÓRIAS ────────────────────────────────────────────────────
+            Vêm ANTES dos sons porque é o que se procura acordada às três da
+            manhã: som ambiente acalma quem já está quase dormindo, história
+            ocupa a cabeça de quem está com a cabeça a mil. */}
+        <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
+          Histórias
+        </p>
+        <div className="mt-2 grid gap-2">
+          {HISTORIAS.map((h) => (
+            <button
+              key={h.chave}
+              onClick={() => abrirHistoria(h)}
+              className="press flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-left"
+            >
+              <span className="text-2xl leading-none" aria-hidden>
+                {h.emoji}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-extrabold">{h.titulo}</span>
+                <span className="block text-[11px] leading-snug text-white/50">
+                  {h.sub} · {duracaoAproximada(h)} min
+                </span>
+              </span>
+              <span className="shrink-0 text-white/30" aria-hidden>
+                ›
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-white/35">
+          Quando a história acaba, a chuva continua sozinha — o quarto não fica mudo de repente.
+        </p>
+
+        <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">Sons</p>
+        <div className="mt-2 grid grid-cols-2 gap-3">
           {SONS_CONTINUOS.map((k) => {
             const ativo = som === k;
             return (
