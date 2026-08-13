@@ -35,6 +35,7 @@ const HUMORES: Humor[] = [
   "surpresa",
   "estudiosa",
   "exercicio",
+  "apaixonado",
 ];
 
 function Preview() {

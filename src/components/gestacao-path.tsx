@@ -17,7 +17,7 @@ import {
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
-import { createBreathAudio, vibratePhase } from "@/lib/breath-audio";
+import { vibratePhase } from "@/lib/breath-audio";
 import {
   createSoundscape,
   SOUNDSCAPES,
@@ -4133,8 +4133,10 @@ function QuizIntro({
 
    Ela virou o tema "Só respirar" da meditação (`lines: []`), e o que ela tinha
    de melhor — a Bolha respirando no centro — foi para a sessão de lá.
-   `createBreathAudio` continua vivo: o Momento com o bebê e o marco de semana
-   usam. O que morreu foi a duplicata do relógio. */
+   `createBreathAudio` continua vivo em `minha-conta.tsx` (o marco de semana).
+   ⚠️ O Momento com o bebê usou por um tempo, mas trocou pra `createSoundscape`
+   quando ganhou escolha de som — dois motores de "som de fundo" no mesmo app
+   era o mesmo defeito que esta seção inteira existe para explicar. */
 
 /* Toque curto das viradas (mudança de movimento, próxima linha da carta).
    Passa pela ponte: `navigator.vibrate` não existe no iPhone, então isto era
@@ -6860,9 +6862,19 @@ export function BondingBlock({
   );
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
-  const [sound, setSound] = useState(true);
+  /**
+   * ⚠️ O SOM DE FUNDO PASSOU A SER ESCOLHIDO — pedido do dono: "na aba de
+   * momento com o bebê tem o áudio também mas a gente não consegue
+   * escolher". Era um único tom fixo (`createBreathAudio`, liga/desliga
+   * só); agora é o MESMO motor de som da Meditação (`createSoundscape` +
+   * `SOUNDSCAPES`) — dois lugares tocando o mesmo som seriam garantia de
+   * um dia divergirem, e ela já vem testada e com o problema de qualidade
+   * dos sons resolvido lá (ver `som-continuo.ts`).
+   */
+  const [som, setSom] = useState<SoundscapeKey>("pad");
+  const [somAberto, setSomAberto] = useState(false);
   const grantedRef = useRef(false);
-  const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
+  const audioRef = useRef<Soundscape | null>(null);
 
   /**
    * ⚠️ O RASTRO DE LEITURA — 34 cartas pra até 384 dias ainda repetem, e sem
@@ -6975,15 +6987,18 @@ export function BondingBlock({
     }
   }
 
+  /** Toca `som` do zero — mesmo preparo repetido por `begin()` e
+   *  `abrirDoAlbum()`, extraído porque as duas fazem exatamente isto. */
+  function comecarSom() {
+    if (som === "silencio") return;
+    audioRef.current = createSoundscape(som);
+    audioRef.current.start();
+  }
   function begin() {
     setIdx(0);
     setReward(null);
     grantedRef.current = false;
-    if (sound) {
-      audioRef.current = createBreathAudio();
-      audioRef.current.start();
-      audioRef.current.ambient();
-    }
+    comecarSom();
     setPhase("active");
   }
   /** Abrir uma carta ESCOLHIDA no álbum — mesmo preparo de `begin()`, mas
@@ -6994,11 +7009,7 @@ export function BondingBlock({
     setIdx(0);
     setReward(null);
     grantedRef.current = false;
-    if (sound) {
-      audioRef.current = createBreathAudio();
-      audioRef.current.start();
-      audioRef.current.ambient();
-    }
+    comecarSom();
     setPhase("active");
   }
   function close() {
@@ -7011,19 +7022,14 @@ export function BondingBlock({
        do álbum ficaria "presa" na próxima abertura. */
     setCartaEscolhida(null);
   }
-  function toggleSound() {
-    setSound((on) => {
-      const next = !on;
-      if (!next) {
-        audioRef.current?.stop();
-        audioRef.current = null;
-      } else if (phase === "active") {
-        audioRef.current = createBreathAudio();
-        audioRef.current.start();
-        audioRef.current.ambient();
-      }
-      return next;
-    });
+  /** Troca o som de fundo — mesmo formato de `trocarSom` na Meditação,
+   *  sem a etapa de "escolha" prévia: aqui é sempre DENTRO da leitura. */
+  function trocarSomDaCarta(k: SoundscapeKey) {
+    setSom(k);
+    if (phase !== "active") return;
+    audioRef.current?.stop();
+    audioRef.current = k === "silencio" ? null : createSoundscape(k);
+    audioRef.current?.start();
   }
 
   // Corações flutuando pro alto — o "clima" da carta (posições determinísticas).
@@ -7104,13 +7110,69 @@ export function BondingBlock({
               <span className="flex-1" />
             )}
             <button
-              onClick={toggleSound}
-              aria-label={sound ? "Desligar som" : "Ligar som"}
+              onClick={() => setSomAberto(true)}
+              aria-label="Trocar o som de fundo"
               className="press text-xl leading-none"
             >
-              {sound ? "🔊" : "🔇"}
+              {som === "silencio" ? "🔇" : "🔊"}
             </button>
           </div>
+
+          {/* ── O SOM DE FUNDO, ESCOLHIDO — mesmo sheet da Meditação, mesmo
+              motor (`createSoundscape`). Só abre durante a leitura: trocar
+              antes de começar não faz sentido, não há nada tocando ainda. */}
+          {phase === "active" && somAberto && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Trocar o som de fundo"
+              className="absolute inset-0 z-40 flex flex-col justify-end"
+            >
+              <button
+                aria-label="Fechar"
+                onClick={() => setSomAberto(false)}
+                className="absolute inset-0 bg-rose-900/30 backdrop-blur-[1px]"
+              />
+              <div
+                className="relative rounded-t-3xl bg-white px-6 pb-8 pt-5"
+                style={{ paddingBottom: "calc(2rem + var(--safe-bottom, 0px))" }}
+              >
+                <p className="text-center text-[11px] font-bold uppercase tracking-wider text-rose-500">
+                  Som de fundo
+                </p>
+                <div className="mt-4 grid gap-2">
+                  {SOUNDSCAPES.filter((s) => s.key !== "silencio").map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        trocarSomDaCarta(s.key);
+                        setSomAberto(false);
+                      }}
+                      className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                        som === s.key
+                          ? "bg-rose-500 text-white"
+                          : "border border-rose-200 bg-white/70 text-rose-900"
+                      }`}
+                    >
+                      <span className="text-xl leading-none" aria-hidden>
+                        {s.emoji}
+                      </span>
+                      <span className="text-sm font-extrabold">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => {
+                    trocarSomDaCarta("silencio");
+                    setSomAberto(false);
+                  }}
+                  className="press mt-4 w-full rounded-full border border-rose-200 bg-white/70 py-3 text-sm font-bold text-rose-600"
+                >
+                  🔇 Desligar som
+                </button>
+              </div>
+            </div>
+          )}
 
           {phase === "intro" && (
             <div className="relative flex flex-1 flex-col items-center justify-center px-8 text-center">
@@ -7118,7 +7180,12 @@ export function BondingBlock({
                   Era o 💌 flutuante — decorativo, sem informação nenhuma. A
                   bolha entrega o que era mudo: o rastro de leitura ("você leu
                   esta carta há 2 semanas") e, na carta feita das gratidões
-                  dela, um convite próprio. */}
+                  dela, um convite próprio.
+                  `humorFixo="apaixonado"` — pedido do dono: coração nos
+                  olhos, corações flutuando, pra atividade que é literalmente
+                  sobre amar o bebê. Sem isto caía no "feliz" padrão de
+                  `humorDaJornada` (nenhuma chamada aqui passa `comemorando`),
+                  a mesma cara genérica de qualquer tela. */}
               <BolhaComBalao
                 fala={falaDaBolhaNaCarta({
                   tela: "intro",
@@ -7126,6 +7193,7 @@ export function BondingBlock({
                   lendoAsDelas,
                   periodo: periodoAtual,
                 })}
+                humorFixo="apaixonado"
                 careMode={careMode}
                 tamanho={168}
               />

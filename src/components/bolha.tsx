@@ -69,6 +69,7 @@ import orgulhosa from "@/assets/bolha/orgulhosa.webp";
 import surpresa from "@/assets/bolha/surpresa.webp";
 import estudiosa from "@/assets/bolha/estudiosa.webp";
 import exercicio from "@/assets/bolha/exercicio.webp";
+import apaixonado from "@/assets/bolha/apaixonado.webp";
 
 /**
  * ─── "PREOCUPADA" SAIU (ago/2026) ───────────────────────────────────────────
@@ -83,15 +84,17 @@ import exercicio from "@/assets/bolha/exercicio.webp";
  * assinatura junto, senão sobraria um parâmetro que ninguém lê e o próximo a
  * mexer aqui acharia que ele ainda faz alguma coisa.
  *
- * ─── "ESTUDIOSA" E "EXERCÍCIO" ENTRARAM (ago/2026) ──────────────────────────
+ * ─── "ESTUDIOSA", "EXERCÍCIO" E "APAIXONADO" ENTRARAM (ago/2026) ────────────
  *
  * Óculos+capelo+livro pra Aula, faixa de cabelo+halter+bola de pilates pro
- * Mexer. NENHUMA das duas entra em `humorDaJornada`: as outras cinco
- * respondem "que cara ela faz pelo estado da jornada?", e estas respondem
- * uma pergunta diferente ("o que ela está fazendo agora?"). Ponto de uso
- * escolhe `humor="estudiosa"`/`humor="exercicio"` direto — mesmo padrão que
- * o placar da Aula já usava pra `comemorando`/`orgulhosa`/`feliz` no
- * resultado do quiz, por nota, sem passar pela régua da jornada.
+ * Mexer, coração-nos-olhos+corações flutuando pro Bebê. NENHUMA das três
+ * entra em `humorDaJornada`: as outras cinco respondem "que cara ela faz
+ * pelo estado da jornada?", e estas respondem uma pergunta diferente ("o
+ * que ela está fazendo agora?"). Ponto de uso escolhe `humor="estudiosa"`/
+ * `humor="exercicio"`/`humor="apaixonado"` direto (via `humorFixo` em
+ * `BolhaComBalao`) — mesmo padrão que o placar da Aula já usava pra
+ * `comemorando`/`orgulhosa`/`feliz` no resultado do quiz, por nota, sem
+ * passar pela régua da jornada.
  */
 export type Humor =
   | "feliz"
@@ -100,12 +103,13 @@ export type Humor =
   | "orgulhosa"
   | "surpresa"
   | "estudiosa"
-  | "exercicio";
+  | "exercicio"
+  | "apaixonado";
 
 /**
  * ─── AS ARTES DO BEBÊ BOLHA (ago/2026) ──────────────────────────────────────
  *
- * Sete expressões. A oitava, `preocupada`, foi removida — ver o bloco acima.
+ * Oito expressões. A nona, `preocupada`, foi removida — ver o bloco acima.
  *
  * ─── TODAS PARTEM DA MESMA ESFERA ───────────────────────────────────────────
  *
@@ -138,20 +142,27 @@ export type Humor =
  * por preenchimento a partir das bordas, e não por "todo pixel claro vira
  * transparente" — este último furaria os reflexos brancos dentro da bolha.
  *
- * `estudiosa` e `exercicio` vieram do Drive do mesmo jeito — RGB sem alfa,
- * fundo quase-branco —, cada uma na sua folha PRÓPRIA (sem as outras do
- * lado), então ganharam script dedicado: `scripts/bolha-do-drive.mjs` faz o
- * mesmo recorte de fundo (porta de croma + rampa de brilho + conexão com a
- * borda), isola o MAIOR componente conexo (descarta brilhos e bolhinhas
- * soltas no fundo sozinho) e AJUSTA A ESFERA por mínimos quadrados sobre a
- * maior faixa vertical em que a largura do componente cresce sem saltos —
- * a faixa onde nenhum acessório grudado (capelo, halter, bola de pilates)
- * está alargando a silhueta. Cai nos mesmos 459×396, mas nem sempre nos
- * mesmos 663px: quando os extras são grandes demais pra caber na tela de
- * 960 no tamanho exato (o halter e a bola de `exercicio` sozinhos já
- * ocupam 92% da largura da arte original), a escala CEDE o mínimo
- * necessário pra nada cortar — mesma regra que já valia, à mão, pro chapéu
- * de festa do `comemorando` e o ZZZ do `dormindo`.
+ * `estudiosa`, `exercicio` e `apaixonado` vieram do Drive, cada uma na sua
+ * folha PRÓPRIA (sem as outras do lado), então ganharam script dedicado:
+ * `scripts/bolha-do-drive.mjs` isola o MAIOR componente conexo (descarta
+ * brilhos e bolhinhas soltas no fundo sozinho) e AJUSTA A ESFERA por
+ * mínimos quadrados sobre a maior faixa vertical em que a largura do
+ * componente cresce sem saltos — a faixa onde nenhum acessório grudado
+ * (capelo, halter, bola de pilates, corações) está alargando a silhueta.
+ * Cai nos mesmos 459×396, mas nem sempre nos mesmos 663px: quando os
+ * extras são grandes demais pra caber na tela de 960 no tamanho exato (o
+ * halter e a bola de `exercicio` sozinhos já ocupam 92% da largura da arte
+ * original; os corações de `apaixonado` nos dois lados, 94%), a escala
+ * CEDE o mínimo necessário pra nada cortar — mesma regra que já valia, à
+ * mão, pro chapéu de festa do `comemorando` e o ZZZ do `dormindo`.
+ *
+ * ⚠️ NEM TODA ARTE DO DRIVE CHEGA SEM ALFA. `estudiosa` e `exercicio`
+ * vieram em RGB, fundo quase-branco, e precisaram do recorte de fundo
+ * (porta de croma + rampa de brilho + conexão com a borda) antes de
+ * ajustar a esfera. `apaixonado` já chegou com alfa de verdade — o script
+ * detecta isso sozinho (`temAlfaReal`, o mesmo teste de
+ * `bebes/do-drive.mjs`) e PULA o recorte: reestimar transparência por cima
+ * de uma que já é real trocaria uma verdade por uma aproximação pior.
  */
 const ARTE: Record<Humor, string> = {
   feliz,
@@ -161,6 +172,7 @@ const ARTE: Record<Humor, string> = {
   surpresa,
   estudiosa,
   exercicio,
+  apaixonado,
 };
 
 /**

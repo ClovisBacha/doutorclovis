@@ -2221,6 +2221,45 @@ dela era texto solto, não fala. "Ele que vai interagir com as pessoas."
 - **Bancada:** `/preview-jogo?tela=jogos&dia=139`, um toque em cada uma das
   cinco atividades.
 
+### A oitava expressão (apaixonado), e o Bebê ganhou escolha de som (ago/2026)
+
+Pedido do dono: coração-nos-olhos pro Momento com o bebê — "todas as
+páginas têm que ter o bebê bolha quando entrar" continua valendo, e esta é
+a primeira vez que uma atividade ganha uma expressão sua ANTES de precisar
+de uma provisória (diferente do `humorFixo="feliz"` que a Meditação ainda
+usa).
+
+- **A arte já chegou com alfa de verdade** — diferente de `estudiosa` e
+  `exercicio` (RGB, fundo quase-branco). `scripts/bolha-do-drive.mjs`
+  ganhou a mesma checagem de `bebes/do-drive.mjs` (`temAlfaReal`, canal que
+  varia de verdade) e PULA o recorte de fundo quando ela já existe —
+  reestimar transparência por cima de uma real trocaria uma verdade por uma
+  aproximação pior. O resto do script (isolar o maior componente, ajustar a
+  esfera na faixa sem salto) funciona igual: os corações nos dois lados
+  ocupam 94% da largura da arte original, e a escala cedeu (0,66) pra nada
+  cortar.
+- **Só a abertura do Bebê usa `humorFixo="apaixonado"`.** O "done" (fim da
+  leitura) continua em `comemorando` — é o mesmo sinal de "você terminou"
+  que Aula, Gratidão e o resto do jogo usam; trocar por `apaixonado` ali
+  quebraria essa consistência sem ganhar nada.
+- **O som de fundo passou a ser ESCOLHA, não liga/desliga.** Pedido do
+  dono: "na aba de momento com o bebê tem o áudio também mas a gente não
+  consegue escolher". Era `createBreathAudio` — um tom fixo (174 Hz +
+  quinta), próprio desta tela, com um switch binário. Trocou pro MESMO
+  motor da Meditação (`createSoundscape`/`SOUNDSCAPES`): dois lugares
+  tocando "som de fundo" com dois motores diferentes era garantia de um dia
+  divergirem, e a Meditação já tinha resolvido o problema de qualidade dos
+  sons (`som-continuo.ts`) que valia a pena herdar de graça.
+  ⚠️ `createBreathAudio` **não morreu** — `minha-conta.tsx` ainda usa pro
+  marco de semana. Só o Bebê trocou de motor.
+- **O ícone abre um sheet**, não alterna direto — mesmo padrão que a
+  Meditação já tem (`somNaSessaoAberto`): tocar mostra as quatro opções +
+  "Desligar som", em vez de ciclar um estado escondido que ninguém vê antes
+  de escolher.
+- **Bancada:** `/preview-bolha` (chip "apaixonado") ·
+  `/preview-jogo?tela=jogos&dia=139` → "Momento com o bebê" → "Começar a
+  ler" → ícone de som no topo da tela.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

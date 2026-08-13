@@ -7,7 +7,11 @@
  *
  *  1. RECORTE DE FUNDO — mesmo algoritmo de `scripts/bebes/do-drive.mjs`
  *     (porta de croma + rampa de brilho + conexão com a borda, então
- *     des-premultiplica). A arte chega em RGB sem alfa, fundo quase-branco.
+ *     des-premultiplica). Só roda quando a origem NÃO tem alfa de verdade
+ *     (a maioria chega em RGB, fundo quase-branco) — quando já vem recortada
+ *     (canal alfa variando de verdade, não só cheio de 255), o passo inteiro
+ *     é pulado: reestimar transparência por cima de uma que já é real troca
+ *     uma verdade por uma aproximação pior.
  *
  *  2. SÓ O COMPONENTE PRINCIPAL — cada arte vem cercada de confete, brilhos e
  *     bolhinhas de decoração soltas no fundo. Rotular componentes conexos (4
@@ -73,6 +77,20 @@ const saida = await page.evaluate(
     const px = original.data;
     const N = W * H;
 
+    /* ⚠️ ALFA DE VERDADE É ALFA QUE VARIA — mesma checagem de
+       `bebes/do-drive.mjs`. Um canal cheio de 255 é o mesmo que não ter
+       canal. Quando a arte já chega recortada (algumas do Drive vêm assim,
+       outras não — não dá pra supor), o passo 1 inteiro é pulado: rodar a
+       porta de croma+brilho por cima de um alfa que já é real jogaria fora
+       a transparência de verdade e trocaria por uma pior, estimada. */
+    let temAlfaReal = false;
+    for (let i = 3; i < px.length; i += 4) {
+      if (px[i] < 250) {
+        temAlfaReal = true;
+        break;
+      }
+    }
+
     /* ── 1. RECORTE DE FUNDO (mesmo algoritmo de bebes/do-drive.mjs) ────── */
     const B = [px[0], px[1], px[2]];
     const alfa = new Float32Array(N);
@@ -114,7 +132,7 @@ const saida = await page.evaluate(
       if (y < H - 1) poe(k + W);
     }
     let fundoNeutro = 0;
-    for (let k = 0; k < N; k++) {
+    for (let k = 0; k < N && !temAlfaReal; k++) {
       const i = k * 4;
       const a = alcanca[k] ? alfa[k] : 1;
       if (a >= 0.999) {
@@ -312,6 +330,7 @@ const saida = await page.evaluate(
     return {
       W,
       H,
+      temAlfaReal,
       fracaoTransparente: +(fundoNeutro / N).toFixed(3),
       faixaUsada: { y0: faixa[0]?.y, y1: faixa[faixa.length - 1]?.y, pontos: pts.length },
       medida: { cx: circulo.cx, cy: circulo.cy, diametro },
@@ -335,6 +354,7 @@ console.log(
     {
       arquivo: DESTINO,
       origem: `${saida.W}×${saida.H}`,
+      recorteDeFundo: saida.temAlfaReal ? "pulado — já tinha alfa de verdade" : "aplicado",
       transparente: `${Math.round(saida.fracaoTransparente * 100)}%`,
       faixaUsada: saida.faixaUsada,
       esferaMedida: saida.medida,
