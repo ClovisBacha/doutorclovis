@@ -129,6 +129,25 @@ describe("o que ele nunca diz", () => {
     for (const f of FRASES) expect(f.texto).not.toMatch(proibido);
   });
 
+  test("⚠️ nenhuma frase PRESSUPÕE que o dia está ruim", () => {
+    /* A frase do dia é sorteada pelo DIA, não pelo estado dela: um consolo
+       cai numa terça comum, às 6h51, sem nada ter acontecido. Aí ele faz uma
+       de duas coisas, as duas ruins — ou vira ruído, ou faz a paciente achar
+       que o app SABE de alguma coisa, que num app de alto risco é a leitura
+       mais assustadora possível.
+
+       O dono abriu o app e leu "Não existe jeito certo de viver um dia
+       difícil"; a pergunta dele foi a certa: qual o objetivo dela?
+
+       Conforto com GATILHO continua valendo: na madrugada a hora é a
+       evidência, e no Modo Cuidado o motivo é conhecido. O que não pode é
+       inventar o motivo. */
+    const pressupoe =
+      /dia dif[íi]cil|dia ruim|s[óo] der para|mal consegu|aguentar|d[ée] conta de tudo/i;
+    const semGatilho = FRASES.filter((f) => !f.periodos?.includes("madrugada"));
+    expect(semGatilho.filter((f) => pressupoe.test(f.texto)).map((f) => f.texto)).toEqual([]);
+  });
+
   test("no luto, nenhuma frase fala de bebê, semana ou jogo", () => {
     const luto = FRASES.filter((f) => f.noLuto);
     expect(luto.length).toBeGreaterThan(4);

@@ -184,12 +184,35 @@ export const FRASES: FraseDoMascote[] = [
     noLuto: true,
   },
 
-  // ── Conforto, a qualquer hora ───────────────────────────────────────────
-  { texto: "Dia difícil? Não precisa dar conta de tudo hoje 💛", noLuto: true },
+  /* ── Conforto, a qualquer hora ─────────────────────────────────────────
+     ⚠️ CONFORTO PRECISA DE MOTIVO, e este bloco não tem nenhum.
+
+     Saíram três frases daqui (ago/2026), a pedido do dono, que abriu o app
+     numa manhã comum e leu "Não existe jeito certo de viver um dia difícil".
+     A pergunta dele foi a certa: qual o objetivo dela?
+
+     A frase do dia é sorteada pelo DIA, não pelo estado dela — então uma frase
+     de consolo cai numa terça qualquer, às 6h51, sem nada ter acontecido. E aí
+     ela faz uma de duas coisas, as duas ruins: ou soa como ruído (a paciente
+     lê e não entende do que o app está falando), ou soa como se o app SOUBESSE
+     de alguma coisa — o que, num app de gestação de alto risco, é a leitura
+     mais assustadora possível.
+
+     As três saíram por PRESSUPOR o dia ruim sem evidência nenhuma:
+       · "Não existe jeito certo de viver um dia difícil." — afirma.
+       · "Dia difícil? Não precisa dar conta de tudo hoje" — pergunta, mas
+         planta a ideia do mesmo jeito.
+       · "Se hoje só der para respirar, já está ótimo." — pressupõe que ela
+         mal está dando conta.
+
+     O que FICA é o conforto que não depende de o dia estar ruim: presença e
+     reconhecimento. E o conforto com gatilho continua existindo onde ele tem
+     evidência — na madrugada, onde a HORA é a evidência ("acordada a essa
+     hora?"), e no Modo Cuidado, onde o motivo é conhecido. */
   { texto: "Você está fazendo mais do que imagina{nome} 💛", noLuto: true },
-  { texto: "Se hoje só der para respirar, já está ótimo.", noLuto: true },
   { texto: "Estou aqui do seu lado, no cantinho da tela. Sempre 💛", noLuto: true },
-  { texto: "Não existe jeito certo de viver um dia difícil.", noLuto: true },
+  { texto: "Passei aqui só para dizer oi 💛", noLuto: true },
+  { texto: "Nada de novo por aqui — o que é uma boa notícia 🌿", noLuto: true },
 
   // ── Com o tempo lá fora ─────────────────────────────────────────────────
   { texto: "Chuva lá fora 🌧️ Dia perfeito para uma meditação sem pressa.", tempo: "chuva" },
