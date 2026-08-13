@@ -28,6 +28,9 @@ import type { Periodo } from "@/lib/frases-do-mascote";
  *   `?marco=50`   força o marco redondo na tela de guardado (com `?tela=done`)
  *   `?periodo=noite` força a faixa do dia na tela de escrever — madrugada,
  *                 manha, tarde ou noite. Sem ela, sai da hora real do relógio.
+ *   `?carta=1`    força o anúncio da carta (com `?tela=done`). ⚠️ Sem lista de
+ *                 atividades para trocar, o botão "Ver carta 💌" some — a
+ *                 bancada mostra só o texto do cartão.
  */
 export const Route = createFileRoute("/preview-gratidao")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -52,6 +55,7 @@ export const Route = createFileRoute("/preview-gratidao")({
     )
       ? (String(q.periodo) as Periodo)
       : undefined,
+    carta: q.carta === true || String(q.carta ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada da gratidão" }, { name: "robots", content: "noindex" }],
@@ -76,7 +80,7 @@ const EXEMPLOS = [
 ];
 
 function PreviewGratidao() {
-  const { w, dia, n, pos, dificil, luto, tela, marco, periodo } = Route.useSearch();
+  const { w, dia, n, pos, dificil, luto, tela, marco, periodo, carta } = Route.useSearch();
   const quantas = Math.max(0, Math.min(EXEMPLOS.length, n));
   const agora = Date.now();
   /* ⚠️ O resumo de domingo só mostra o que caiu nos últimos 7 dias
@@ -101,7 +105,15 @@ function PreviewGratidao() {
         alreadyDone={false}
         onEarn={() => {}}
         aoSair={() => history.back()}
-        bancada={{ gratidoes, total: quantas, diaDificil: dificil, fase: tela, marco, periodo }}
+        bancada={{
+          gratidoes,
+          total: quantas,
+          diaDificil: dificil,
+          fase: tela,
+          marco,
+          periodo,
+          cartaNova: carta,
+        }}
       />
       <p className="pointer-events-none fixed bottom-2 left-0 right-0 z-[60] text-center text-[10px] text-foreground/30">
         bancada · {PREFIXO_GRATIDAO.trim()} {quantas} guardadas

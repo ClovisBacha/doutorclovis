@@ -17,6 +17,7 @@ import {
   PERGUNTAS,
   PERGUNTAS_DIA_DIFICIL,
   PREFIXO_GRATIDAO,
+  cartaAcabouDeNascer,
   cartaDasGratidoes,
   diasEntre,
   ehDiaDificil,
@@ -547,5 +548,55 @@ describe("⚠️ o resumo de domingo", () => {
 
   test("semana vazia não quebra a fala", () => {
     expect(falaDaBolha({ tela: "resumo", total: 0 }).length).toBeGreaterThan(8);
+  });
+});
+
+describe("⚠️ a carta deixou de ficar escondida", () => {
+  test("nasce exatamente na oitava — nunca antes, nunca duas vezes", () => {
+    for (let n = 0; n < 12; n++) {
+      expect({ n, nasceu: cartaAcabouDeNascer(n) }).toEqual({
+        n,
+        nasceu: n === MINIMO_PARA_CARTA,
+      });
+    }
+  });
+
+  test("quem já tinha mais que o mínimo antes deste recurso não vê o anúncio retroativo", () => {
+    /* Mesmo raciocínio de `marcoAtingido`: comparar por igualdade só funciona
+       porque o total sobe +1 por guardada — não dá pra comemorar uma
+       travessia que já aconteceu em silêncio. */
+    expect(cartaAcabouDeNascer(50)).toBe(false);
+    expect(cartaAcabouDeNascer(9)).toBe(false);
+  });
+});
+
+describe("⚠️ a tela anuncia a carta, e nunca no luto", () => {
+  const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+  const bloco = fonte.slice(
+    fonte.indexOf("export function GratitudeBlock("),
+    fonte.indexOf('/** Motor dos "jogos do dia"'),
+  );
+
+  test("o cartão só nasce no instante certo — `cartaAcabouDeNascer`, não um cálculo local", () => {
+    expect(bloco).toContain("cartaAcabouDeNascer(novoTotal)");
+    expect(bloco).toContain("setCartaNova(!careMode && cartaAcabouDeNascer(novoTotal))");
+  });
+
+  test("⚠️ o RENDER confere `!careMode` de novo — a bancada prova por quê", () => {
+    /* `save()` já não deixa `cartaNova` nascer `true` no luto — mas a
+       bancada (`?carta=1&luto=1`) força o estado direto, por cima desse
+       portão, e foi assim que o cartão apareceu numa captura de tela em
+       Modo Cuidado. A checagem no render é o que fecha esse caminho. */
+    expect(bloco).toContain("{cartaNova && !careMode && (");
+  });
+
+  test("o link persistente não duplica o anúncio, e some no luto", () => {
+    expect(bloco).toContain(
+      "{!cartaNova && total >= MINIMO_PARA_CARTA && aoIrParaBebe && !careMode && (",
+    );
+  });
+
+  test("o botão só existe quando há para onde ir — a bancada não quebra sem ele", () => {
+    expect(bloco).toContain("{aoIrParaBebe && (");
   });
 });

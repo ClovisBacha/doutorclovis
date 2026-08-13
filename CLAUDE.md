@@ -1938,6 +1938,36 @@ da nota 8,5. Nenhuma gasta crédito; nenhuma pede SQL novo.
   para 1 em 1 dia só nesta tela, porque o padrão de 6 em 6 dias é pensado para
   a RELEITURA e deixaria a semana quase vazia).
 
+### A carta deixou de ficar escondida (ago/2026)
+
+Ela só existia dentro da atividade Bebê, na abertura — quem escreve na
+Gratidão nunca ficava sabendo que aquilo virava carta. A descoberta dependia
+de abrir OUTRA atividade por acaso e notar um botão novo.
+
+- **`cartaAcabouDeNascer`** (`gratidao.ts`) marca o instante exato em que a
+  carta passa a existir — a MESMA lógica de `marcoAtingido` (compara por
+  IGUALDADE, e só é seguro porque `total` sobe +1 por guardada, nunca pula).
+  Nesse instante, a tela de guardado mostra um cartão — cor rosa da atividade
+  Bebê, não o amarelo daqui, porque é ela quem recebe a visita — com "Ver
+  carta 💌", que abre a atividade Bebê direto (`aoIrParaBebe`, uma prop nova
+  só em `GratitudeBlock`, no mesmo padrão que `babyName` já usa só em
+  `BondingBlock` — as quatro atividades passam pelo MESMO `<Chosen>` genérico,
+  e cada uma ignora o que não é dela).
+- **Depois do instante exato, um link discreto continua** ("💌 Ver a carta pro
+  bebê", perto de "Ver todas"): quem chegou a 8 num celular e volta a
+  escrever no outro precisa achar a carta de novo, e a descoberta não pode
+  depender de estar exatamente naquele dia.
+- ⚠️ **`!careMode` é conferido DUAS VEZES** — em `save()`, antes de
+  `cartaNova` nascer `true`, e de novo no RENDER do cartão. A bancada
+  (`?carta=1&luto=1`) prova por que a segunda checagem importa: ela força o
+  estado direto, por cima do portão de `save()`, e foi assim que o cartão
+  apareceu para o Modo Cuidado numa captura de tela — a mesma classe de
+  defeito que a régua de `humorDaJornada` existe para evitar em toda a
+  personagem.
+- **Bancada:** `/preview-gratidao?tela=done&carta=1&n=8`. Sem lista de
+  atividades para trocar, o botão "Ver carta 💌" não aparece — só o texto do
+  cartão, que é o que dava para conferir sem a árvore inteira do app.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

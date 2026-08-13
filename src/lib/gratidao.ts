@@ -628,6 +628,24 @@ export const MINIMO_PARA_CARTA = 8;
 /** Quantas linhas dela entram — a carta é para LER EM VOZ ALTA. */
 export const LINHAS_DA_CARTA = 10;
 
+/**
+ * ⚠️ A CARTA NASCIA ESCONDIDA — e este é o conserto disso.
+ *
+ * Ela só aparecia dentro da atividade Bebê, na abertura. Quem escreve na
+ * Gratidão nunca ficava sabendo que aquilo virava carta — a descoberta
+ * dependia de ela abrir OUTRA atividade por acaso e notar um botão novo.
+ *
+ * `cartaAcabouDeNascer` marca o instante exato em que a carta passa a
+ * existir — a MESMA lógica de `marcoAtingido` (funciona porque `total` sobe
+ * +1 por guardada, nunca pula: comparar por igualdade é seguro). É esse
+ * instante que a tela de guardado anuncia, uma vez só; depois disso um link
+ * discreto continua disponível, para a descoberta não depender de estar
+ * exatamente na oitava.
+ */
+export function cartaAcabouDeNascer(total: number): boolean {
+  return total === MINIMO_PARA_CARTA;
+}
+
 /** Onde uma linha comprida é cortada, para caber numa respiração. */
 const LIMITE_DA_LINHA = 90;
 

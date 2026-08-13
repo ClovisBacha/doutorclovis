@@ -63,7 +63,9 @@ import {
 } from "@/lib/exercicios";
 import {
   HUMOR_GRATIDAO,
+  MINIMO_PARA_CARTA,
   PREFIXO_GRATIDAO,
+  cartaAcabouDeNascer,
   cartaDasGratidoes,
   ehDiaDificil,
   ehDomingoDeResumo,
@@ -7244,6 +7246,7 @@ export function GratitudeBlock({
   alreadyDone,
   onEarn,
   aoSair,
+  aoIrParaBebe,
   bancada,
 }: {
   day: number;
@@ -7272,6 +7275,14 @@ export function GratitudeBlock({
    */
   aoSair?: () => void;
   /**
+   * ⚠️ O QUE FECHA "A CARTA ESCONDIDA" — a carta só existia dentro da
+   * atividade Bebê, e quem escreve na Gratidão nunca ficava sabendo que
+   * aquilo virava carta. Presente quando o jogo do dia tem as duas
+   * atividades (é o caso normal); ausente na bancada, que não tem lista de
+   * atividades para trocar — lá o botão simplesmente não aparece.
+   */
+  aoIrParaBebe?: () => void;
+  /**
    * ⚠️ SÓ A BANCADA (`/preview-gratidao`).
    *
    * A coleção e o dia difícil vêm do diário dela no servidor, então conferir a
@@ -7291,6 +7302,8 @@ export function GratitudeBlock({
     marco?: number;
     /** Força a faixa do dia na tela de escrever, sem esperar a madrugada chegar. */
     periodo?: Periodo;
+    /** Força o anúncio da carta, sem precisar guardar 8 vezes. */
+    cartaNova?: boolean;
   };
 }) {
   const [open, setOpen] = useState(!!aoSair);
@@ -7302,6 +7315,8 @@ export function GratitudeBlock({
   const [reward, setReward] = useState<number | null>(null);
   /** O marco redondo que ela ACABOU de bater — some ao sair da tela de guardado. */
   const [marcoAtual, setMarcoAtual] = useState<number | null>(bancada?.marco ?? null);
+  /** A carta para o bebê ACABOU de nascer com esta guardada — ver `cartaAcabouDeNascer`. */
+  const [cartaNova, setCartaNova] = useState(bancada?.cartaNova ?? false);
   /** Escolha ephemeral do resumo de domingo — nunca persistida, é só reflexão. */
   const [favoritaEscolhida, setFavoritaEscolhida] = useState<string | null>(null);
   /**
@@ -7562,6 +7577,16 @@ export function GratitudeBlock({
         celebrateHaptic(nivel);
       }
 
+      /**
+       * ⚠️ A CARTA NASCE AQUI — e é anunciada só UMA vez, no instante exato.
+       *
+       * `cartaAcabouDeNascer` compara por igualdade (o mesmo truque de
+       * `marcoAtingido`: `total` sobe +1 por guardada, nunca pula). Nunca em
+       * Modo Cuidado: a carta é "ler pro bebê", e não existe isso pra quem
+       * está de luto — a atividade Bebê inteira já se comporta assim.
+       */
+      setCartaNova(!careMode && cartaAcabouDeNascer(novoTotal));
+
       /* Recompensa (uma por dia, como as outras atividades de bem-estar).
          A meia-estrela vem antes do servidor — ela escreveu, e isso já
          aconteceu, então rede caída não pode apagar o progresso dela.
@@ -7606,6 +7631,7 @@ export function GratitudeBlock({
     descartarGravacao();
     setFavoritaEscolhida(null);
     setMarcoAtual(bancada?.marco ?? null);
+    setCartaNova(bancada?.cartaNova ?? false);
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("write");
@@ -7953,6 +7979,37 @@ export function GratitudeBlock({
                 </div>
               )}
 
+              {/* ── ⚠️ A CARTA DEIXOU DE FICAR ESCONDIDA ────────────────────
+                  Ela só existia dentro da atividade Bebê, e quem escreve na
+                  Gratidão nunca ficava sabendo que aquilo virava carta — a
+                  descoberta dependia de abrir OUTRA atividade por acaso. Este
+                  cartão aparece UMA vez, no instante exato em que a carta
+                  passa a existir (`cartaAcabouDeNascer`, a oitava guardada) —
+                  é a cor rosa da atividade Bebê, não o amarelo daqui, porque é
+                  ela quem recebe a visita.
+                  ⚠️ `!careMode` é CONFERIDO DE NOVO aqui, embora `save()` já
+                  não deixe `cartaNova` nascer `true` no luto: a bancada força
+                  o estado direto (`?carta=1&luto=1`), passando por cima
+                  desse portão — e foi assim que o cartão apareceu para o
+                  Modo Cuidado numa captura de tela. Uma segunda checagem
+                  redundante é mais barata que um segundo caminho até este
+                  estado. */}
+              {cartaNova && !careMode && (
+                <div className="mt-4 w-full max-w-xs rounded-2xl border border-rose-200 bg-rose-50/80 px-4 py-3 text-center">
+                  <p className="text-[13.5px] leading-snug text-rose-900">
+                    Agora já dá pra fazer uma carta pro bebê com tudo isso que você me contou.
+                  </p>
+                  {aoIrParaBebe && (
+                    <button
+                      onClick={aoIrParaBebe}
+                      className="press mt-2.5 w-full rounded-full bg-rose-500 py-2 text-[13px] font-extrabold text-white"
+                    >
+                      Ver carta 💌
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button
                 onClick={close}
                 className="press mt-7 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
@@ -7965,6 +8022,21 @@ export function GratitudeBlock({
                   className="press mt-3 text-[13px] font-bold text-amber-700 underline decoration-amber-300 underline-offset-4"
                 >
                   Ver todas
+                </button>
+              )}
+              {/* ── O LINK PERSISTENTE ───────────────────────────────────────
+                  Fora do instante exato da oitava, a descoberta não pode
+                  depender de estar bem naquele dia — quem chegou a 8 num
+                  celular e volta a escrever no outro precisa achar a carta de
+                  novo. Só aparece quando ela existe (`MINIMO_PARA_CARTA`) E
+                  quando NÃO é o anúncio de agora (senão duplicaria o botão
+                  acima). */}
+              {!cartaNova && total >= MINIMO_PARA_CARTA && aoIrParaBebe && !careMode && (
+                <button
+                  onClick={aoIrParaBebe}
+                  className="press mt-3 text-[13px] font-bold text-rose-600 underline decoration-rose-300 underline-offset-4"
+                >
+                  💌 Ver a carta pro bebê
                 </button>
               )}
             </div>
@@ -8589,6 +8661,10 @@ function WellnessScreen({
               alreadyDone={done.has(activity.key)}
               onEarn={() => handleEarn(activity.key)}
               aoSair={() => setOpenKey(null)}
+              /* Só a Gratidão usa — é o que fecha "a carta escondida": abre
+                 a atividade Bebê direto da tela de guardado, no instante em
+                 que a carta feita das gratidões passa a existir. */
+              aoIrParaBebe={() => setOpenKey("bonding")}
             />
           </div>
         ) : (
