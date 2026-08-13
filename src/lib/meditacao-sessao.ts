@@ -59,15 +59,21 @@ export const DENSIDADES: { chave: Densidade; rotulo: string; sub: string }[] = [
  *   · box breathing (Headspace)      4-4-4-4  → 16 s
  *   · 4-7-8 (Headspace)              4-7-8    → 19 s
  *   · o de dormir (Headspace)        4-4-6    → 14 s
- *   · o nosso, até agora             4-2-6    → 12 s  ← o mais curto de todos
+ *   · o nosso, no começo             4-2-6    → 12 s  ← o mais curto de todos
  *
- * E o "segure" de 2 s era o pior detalhe: todas as referências usam 4 ou mais.
- * Em dois segundos a paciente ouve "Segure" e já vem "Solte" — não dá tempo de
- * o corpo fazer o que a palavra pediu.
+ * Passou primeiro para 4-4-6 (14 s) e, no pedido seguinte do dono ("aumente
+ * para 16 ou 19"), para **4-4-8 = 16 s**.
  *
- * 4-4-6 é o padrão de dormir do Headspace, mantém a expiração mais longa que a
- * inspiração (que é a parte que acalma) e dá ao "segure" uma duração que
- * existe de verdade.
+ * ⚠️ POR QUE 16 E NÃO 19. Dezenove seria o 4-7-8, e o que faz dele 19 é uma
+ * APNEIA DE SETE SEGUNDOS. Prender o ar sete segundos é desconfortável para
+ * quem está começando, e na gestação avançada — com o diafragma empurrado para
+ * cima pelo útero e a reserva de oxigênio menor — é a parte do exercício que
+ * uma gestante abandona primeiro. O que faz o exercício acalmar não é a pausa:
+ * é a EXPIRAÇÃO LONGA, que é quem aciona o vago. Então os dois segundos a mais
+ * foram todos para o "solte": 4-4-8 tem a expiração com o DOBRO da inspiração,
+ * chega aos 16 s pedidos, e não pede que ninguém segure o ar.
+ *
+ * (Se um dia for para ir a 19, é uma linha: `{ in: 4, hold: 7, out: 8 }`.)
  *
  * ⚠️ ESTE É O ÚNICO LUGAR ONDE O COMPASSO MORA. A tela importa daqui. Antes
  * eram dois números iguais em dois arquivos — `CICLO = 12` aqui e um
@@ -75,7 +81,7 @@ export const DENSIDADES: { chave: Densidade; rotulo: string; sub: string }[] = [
  * O ritmo NÃO depende da duração escolhida: dez minutos são mais respirações,
  * nunca respirações mais rápidas.
  */
-export const RESPIRO = { in: 4, hold: 4, out: 6 } as const;
+export const RESPIRO = { in: 4, hold: 4, out: 8 } as const;
 export const CICLO = RESPIRO.in + RESPIRO.hold + RESPIRO.out;
 
 /**
@@ -244,13 +250,36 @@ export function planejarSessao(o: {
      controle que não faz nada ensina que os controles desta tela não valem. */
   const espaco = densidade === "pouca" ? 2 : 1;
 
-  /* ⚠️ Cada janela recebe pelo menos um ciclo, e as fronteiras andam para a
-     frente conforme isso acontece. Sem o piso, a sessão de 1 minuto (cinco
-     ciclos, cinco janelas) perdia a volta ao corpo. */
+  /**
+   * ⚠️ QUANDO NÃO CABEM AS CINCO PARTES, AS DO MEIO CAEM PRIMEIRO.
+   *
+   * Com o compasso em 16 s, um minuto são quatro respirações — e cinco janelas
+   * não cabem em quatro ciclos. A repartição antiga resolvia isso espremendo a
+   * PRIMEIRA janela até zero, e o resultado media assim: a sessão de 1 min
+   * abria em "deixe o ar entrar pelo nariz", sem acolhimento nenhum. Começar
+   * sem receber ninguém é o mesmo defeito, pelo outro lado, de terminar de
+   * repente.
+   *
+   * O acolhimento e a volta são as duas pontas do arco e ficam até o fim; o
+   * que sai, na ordem, é o silêncio e depois a ancoragem.
+   */
+  const ORDEM_DE_CORTE: Momento[] = ["silencio", "ancoragem", "corpo"];
+  let janelas = JANELAS;
+  for (const cortar of ORDEM_DE_CORTE) {
+    if (janelas.length <= totalCiclos) break;
+    janelas = janelas.filter((j) => j.momento !== cortar);
+  }
+  /* As frações são renormalizadas: sem isso, tirar o silêncio deixaria um vão
+     morto entre o corpo e a volta. */
+  if (janelas.length < JANELAS.length) {
+    const passoJanela = 1 / janelas.length;
+    janelas = janelas.map((j, i) => ({ ...j, ate: (i + 1) * passoJanela }));
+  }
+
   let inicio = 0;
   let ultimoCiclo = -ESPACO_MINIMO;
-  JANELAS.forEach((j, k) => {
-    const restantes = JANELAS.length - k - 1;
+  janelas.forEach((j, k) => {
+    const restantes = janelas.length - k - 1;
     const alvo = Math.round(totalCiclos * j.ate);
     const fim = Math.min(totalCiclos - restantes, Math.max(inicio + 1, alvo));
     /* As vagas da janela são estimadas ANTES de escolher as falas: é o que

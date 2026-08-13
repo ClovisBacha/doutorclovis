@@ -8,16 +8,20 @@
  * começar não acalma ninguém. Ruído filtrado toca no primeiro frame, funciona
  * offline, não pesa no bundle e não tem licença pra pagar.
  *
- * Todos os quatro saem do MESMO gerador de ruído; o que muda é o filtro. Chuva
- * é ruído agudo; mar é o mesmo ruído com o corte varrendo devagar (é isso que
- * o ouvido lê como "onda indo e voltando"); coração é o batimento por cima de
- * um ruído grave e abafado — o som que o bebê de fato escuta lá dentro.
+ * ⚠️ AS RECEITAS NÃO MORAM MAIS AQUI. Elas foram para `som-continuo.ts` quando
+ * os sons foram refeitos (ago/2026): chuva ganhou GOTAS, mar ganhou a quebra
+ * da onda, o ruído virou rosa e o laço passou de 2 s para 10 s. Este arquivo
+ * ficou só com o que é do AO VIVO — o contexto, o volume, a pausa e o
+ * agendamento por janelas. O som é o mesmo dos Sons para dormir, e é o mesmo
+ * porque é o mesmo código.
  *
  * Tudo é guardado por try/catch: navegador sem Web Audio simplesmente fica em
  * silêncio, a tela nunca quebra.
  */
 
-export type SoundscapeKey = "silencio" | "chuva" | "mar" | "coracao" | "pad";
+import { montar, type SomKey } from "./som-continuo";
+
+export type SoundscapeKey = "silencio" | SomKey;
 
 export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string }[] = [
   { key: "pad", label: "Pad calmo", emoji: "🎵" },
@@ -51,17 +55,34 @@ const SILENCIO: Soundscape = {
   retomar: async () => true,
 };
 
-/** 2s de ruído branco em loop — a matéria-prima de chuva, mar e útero. */
-function noiseBuffer(ctx: AudioContext): AudioBuffer {
-  const len = ctx.sampleRate * 2;
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-  return buf;
-}
+/**
+ * ⚠️ AS RECEITAS SAÍRAM DAQUI (ago/2026) — e foram para `som-continuo.ts`.
+ *
+ * Eram duas cópias do mesmo som: uma aqui, ao vivo, e outra lá, renderizada
+ * para os Sons para dormir. Quando o dono disse que os sons estavam ruins e a
+ * auditoria mostrou por quê (chuva sem gota, mar sem quebra, laço de 2 s
+ * audível a 0,997 de auto-similaridade), consertar em dois lugares seria
+ * garantir que um dia eles divergiriam.
+ *
+ * `montar()` agora serve aos dois: ela aceita qualquer `BaseAudioContext`, o
+ * que inclui o `OfflineAudioContext` do render e o `AudioContext` ao vivo.
+ * A única diferença é COMO os eventos são agendados — offline escreve todos de
+ * uma vez, ao vivo pede a próxima janela de tempos em tempos.
+ */
+
+/**
+ * Quanto tempo de eventos se agenda por vez, ao vivo.
+ *
+ * Vinte segundos, remarcados a cada cinco: gotas e ondas são eventos com hora
+ * marcada, e um `AudioContext` só aceita agendamento no futuro. Sem a janela,
+ * a chuva pararia de pingar assim que a primeira leva acabasse.
+ */
+const JANELA_SEGS = 20;
 
 export function createSoundscape(kind: SoundscapeKey): Soundscape {
   if (kind === "silencio" || typeof window === "undefined") return SILENCIO;
+  /* A partir daqui é um dos quatro sons de verdade. */
+  const som: SomKey = kind;
 
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
@@ -69,10 +90,19 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   let alvo = 0.28;
   /* Guardados para a pausa: o batimento é o único som agendado por relógio de
      fora do áudio, então é o único que precisa ser rearmado ao voltar. */
-  let bater: (() => void) | null = null;
-  let periodoDoCoracao = 0;
+  /* Até quando os eventos já foram agendados. */
+  let proximaJanela = 0;
   /** Suspensão adiada, para o volume ter tempo de descer. Ver `pausar()`. */
   let adormecer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Empurra a fronteira dos eventos para a frente enquanto o som toca. */
+  function agendarJanelas() {
+    if (!ctx || !master || ctx.state !== "running") return;
+    while (proximaJanela < ctx.currentTime + JANELA_SEGS) {
+      montar(ctx, som, master, JANELA_SEGS, proximaJanela, false);
+      proximaJanela += JANELA_SEGS;
+    }
+  }
 
   function start() {
     if (ctx) return;
@@ -89,15 +119,11 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
       // pra fazer o contrário disso.
       master.gain.linearRampToValueAtTime(alvo, ctx.currentTime + 1.5);
 
-      if (kind === "pad") montarPad(ctx, master);
-      else if (kind === "chuva") montarChuva(ctx, master);
-      else if (kind === "mar") montarMar(ctx, master);
-      else if (kind === "coracao") {
-        const c = montarCoracao(ctx, master);
-        bater = c.bater;
-        periodoDoCoracao = c.periodoMs;
-        heart = setInterval(c.bater, c.periodoMs);
-      }
+      /* A base (ruído, filtros, osciladores) nasce uma vez; os eventos vêm
+         por janela — ver `JANELA_SEGS`. */
+      montar(ctx, som, master, JANELA_SEGS, ctx.currentTime, true);
+      proximaJanela = ctx.currentTime + JANELA_SEGS;
+      heart = setInterval(agendarJanelas, 5000);
     } catch {
       /* sem áudio */
     }
@@ -167,7 +193,7 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
     } catch {
       /* ignore */
     }
-    if (bater && !heart) heart = setInterval(bater, periodoDoCoracao);
+    if (!heart) heart = setInterval(agendarJanelas, 5000);
     return true;
   }
 
@@ -185,7 +211,6 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   function stop() {
     if (heart) clearInterval(heart);
     heart = null;
-    bater = null;
     /* Sem isto, a suspensão adiada acordaria depois do `close()` e chamaria
        `suspend()` num contexto fechado. */
     if (adormecer) clearTimeout(adormecer);
@@ -200,121 +225,4 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   }
 
   return { start, stop, setVolume, pausar, retomar };
-}
-
-/** Duas senoides graves em quinta — o mesmo pad que a respiração guiada usa. */
-function montarPad(ctx: AudioContext, out: GainNode) {
-  const g = ctx.createGain();
-  g.gain.value = 0.5;
-  g.connect(out);
-  for (const f of [174, 261]) {
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.value = f;
-    o.connect(g);
-    o.start();
-  }
-}
-
-/** Ruído com o grave cortado + um leve balanço de volume = chuva miúda. */
-function montarChuva(ctx: AudioContext, out: GainNode) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx);
-  src.loop = true;
-
-  const hp = ctx.createBiquadFilter();
-  hp.type = "highpass";
-  hp.frequency.value = 900;
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 6500;
-
-  const g = ctx.createGain();
-  g.gain.value = 0.5;
-
-  // Respiração lenta do volume: chuva real nunca é uma parede constante.
-  const lfo = ctx.createOscillator();
-  lfo.frequency.value = 0.07;
-  const lfoG = ctx.createGain();
-  lfoG.gain.value = 0.12;
-  lfo.connect(lfoG).connect(g.gain);
-  lfo.start();
-
-  src.connect(hp).connect(lp).connect(g).connect(out);
-  src.start();
-}
-
-/** O MESMO ruído, mas com o corte varrendo devagar — o ouvido lê como onda. */
-function montarMar(ctx: AudioContext, out: GainNode) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx);
-  src.loop = true;
-
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 520;
-  lp.Q.value = 0.8;
-
-  // Varredura de ~9s: é a duração de uma onda quebrando e voltando.
-  const sweep = ctx.createOscillator();
-  sweep.frequency.value = 1 / 9;
-  const sweepG = ctx.createGain();
-  sweepG.gain.value = 380;
-  sweep.connect(sweepG).connect(lp.frequency);
-  sweep.start();
-
-  const g = ctx.createGain();
-  g.gain.value = 0.75;
-  const vol = ctx.createOscillator();
-  vol.frequency.value = 1 / 9;
-  const volG = ctx.createGain();
-  volG.gain.value = 0.3;
-  vol.connect(volG).connect(g.gain);
-  vol.start();
-
-  src.connect(lp).connect(g).connect(out);
-  src.start();
-}
-
-/**
- * Útero: ruído grave e abafado (o "shhh" que o bebê ouve o tempo todo) com o
- * batimento por cima, a 140 bpm — a frequência cardíaca fetal típica. Cada
- * batida é "lub-dub": dois toques, o segundo mais curto e mais baixo.
- */
-function montarCoracao(ctx: AudioContext, out: GainNode) {
-  const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx);
-  src.loop = true;
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 320;
-  const shh = ctx.createGain();
-  shh.gain.value = 0.45;
-  src.connect(lp).connect(shh).connect(out);
-  src.start();
-
-  function toque(t: number, f0: number, pico: number, dur: number) {
-    const o = ctx.createOscillator();
-    o.type = "sine";
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(Math.max(20, f0 * 0.45), t + dur);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(pico, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g).connect(out);
-    o.start(t);
-    o.stop(t + dur + 0.05);
-  }
-
-  const periodo = 60 / 140; // ≈ 0,43 s
-  function bater() {
-    if (ctx.state !== "running") return;
-    const t = ctx.currentTime + 0.02;
-    toque(t, 62, 0.9, 0.16); // lub
-    toque(t + 0.16, 54, 0.55, 0.13); // dub
-  }
-  bater();
-  /* Quem arma o relógio é quem sabe pausá-lo — ver `pausar()` lá em cima. */
-  return { bater, periodoMs: periodo * 1000 };
 }

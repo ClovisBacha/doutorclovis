@@ -1754,3 +1754,65 @@ foram medidas antes de qualquer mudança.
   sozinho — dá para folhear os quatro antes de escolher. ⚠️ É uma instância
   PRÓPRIA, nunca o `audioRef` da sessão: se dividissem o objeto, o relógio da
   amostra pararia o som da meditação dez segundos depois de ela começar.
+
+## Os sons foram refeitos, com medição (ago/2026)
+
+O dono disse que os sons estavam ruins. A auditoria mediu, e ele tinha razão:
+
+| medida | chuva | mar | coração | pad |
+| --- | --- | --- | --- | --- |
+| fator de crista (antes → depois) | 4,25 → **8,30** | 6,49 → **9,89** | 8,37 → 7,73 | 1,91 → **2,94** |
+| auto-similaridade a 2 s | 0,997 → **−0,002** | 0,794 → **0,014** | 0,225 → 0,012 | 1,000 → **0,292** |
+| energia acima de 1 kHz | 92% → **61%** | 26% → 22% | 2% → 0,3% | — |
+
+O que cada número dizia:
+
+- **Chuva com zero transientes e 92% da energia acima de 1 kHz** é chiado de TV,
+  não chuva. Chuva é feita de GOTAS — milhares de impactos individuais.
+- ⚠️ **Auto-similaridade de 0,997 a dois segundos**: o sinal era 99,7% idêntico
+  a si mesmo dois segundos depois. Era o laço de 2 s do ruído, e o ouvido o
+  reconhece em menos de um minuto. Agora o laço tem 10 s (6 no coração, cujo
+  "shhh" é cortado em 320 Hz e não precisa de tanto).
+- **Mar com 63% abaixo de 125 Hz e nenhum transiente** é ronco. Onda tem
+  quebra: estouro largo, espuma decaindo, e a sucção (o corte SOBE enquanto o
+  volume desce).
+- **Pad com crista 1,91** é tom morto. São quatro vozes desafinadas em 0,6 Hz —
+  o batimento entre elas é o que o ouvido lê como respiração do som.
+
+Três correções de base: **ruído ROSA** (energia igual por oitava, que é como
+soa tudo que a natureza faz) no lugar do branco, o laço 5× mais longo, e
+**eventos** (gota, quebra) em vez de só filtros.
+
+- ⚠️ **CURTOSE É A MÉTRICA ERRADA PARA CHUVA.** Passei uma rodada tentando subir
+  a curtose do envelope, e ela mede ESPARSIDADE: o coração dá 15,6 porque é
+  silêncio-silêncio-batida. Chuva é densa por natureza e nunca pontua alto
+  nisso. O que mede chuva é a CRISTA e a razão envelope-máximo/mediano.
+- ⚠️ **Três gotas por segundo, não doze.** A primeira tentativa pôs doze, e elas
+  se sobrepõem (cada uma dura 25–70 ms) voltando a formar a cama contínua que
+  vieram consertar.
+- **Uma receita só** (`montar()` em `som-continuo.ts`), usada pelo render dos
+  Sons para dormir E pelo som ao vivo da meditação. Eram duas cópias; consertar
+  em dois lugares é garantir que um dia divergem. Ao vivo, os eventos são
+  agendados por janelas de 20 s (`JANELA_SEGS`) — um `AudioContext` só aceita
+  agendamento no futuro, e sem a janela a chuva pararia de pingar.
+- **A amostra do som passou de 10 s para 5 s**, a pedido do dono: dez faziam
+  folhear os quatro custar quase um minuto, e a decisão acontece nos primeiros
+  dois segundos.
+
+### O compasso foi a 16 s (4-4-8)
+
+Pedido do dono: "aumente para 16 ou 19".
+
+⚠️ **16 e não 19, e a razão é clínica.** Dezenove seria o 4-7-8, e o que faz
+dele 19 é uma **apneia de sete segundos** — desconfortável para quem está
+começando e, na gestação avançada (diafragma empurrado para cima, reserva de
+oxigênio menor), é a parte que a gestante abandona primeiro. O que acalma não é
+a pausa: é a EXPIRAÇÃO LONGA, que aciona o vago. Então os dois segundos a mais
+foram todos para o "solte" — 4-4-8 tem a expiração com o dobro da inspiração.
+Ir a 19 é uma linha: `{ in: 4, hold: 7, out: 8 }`.
+
+⚠️ **Com 16 s, um minuto são quatro respirações — e cinco partes não cabem em
+quatro.** A repartição antiga espremia a PRIMEIRA janela até zero, e a sessão
+de 1 min abria em "deixe o ar entrar pelo nariz", sem acolhimento nenhum.
+Agora, quando não cabem as cinco, caem as do MEIO (silêncio, depois ancoragem):
+o acolhimento e a volta são as duas pontas do arco e ficam até o fim.

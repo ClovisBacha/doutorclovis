@@ -4783,8 +4783,10 @@ const CICLO_SEGS = CICLO;
 /* Respirações que fecham um minuto — o corte a partir do qual a sessão CONTA.
    Era `5` cravado, que valia enquanto o ciclo tinha 12 s. */
 const UM_MINUTO = Math.ceil(60 / CICLO_SEGS);
-/* Quanto dura a amostra do som de fundo na tela de escolha. */
-const AMOSTRA_MS = 10_000;
+/* Quanto dura a amostra do som de fundo na tela de escolha.
+   Cinco segundos, a pedido do dono: dez faziam folhear os quatro custar quase
+   um minuto, e a decisão ("gosto ou não gosto") acontece nos primeiros dois. */
+const AMOSTRA_MS = 5_000;
 
 /* O 1 min entrou quando a Respiração foi absorvida aqui (ago/2026): ela durava
    70 segundos e o cartão dela prometia "um minutinho de calma". Sem este
@@ -6056,7 +6058,7 @@ function MeditationBlock({
                     ))}
                   </div>
                   <p className="mt-1.5 text-[11px] text-violet-700/60">
-                    Toque para ouvir 10 segundos antes de escolher.
+                    Toque para ouvir 5 segundos antes de escolher.
                   </p>
 
                   {/* ── QUANTA VOZ ELA QUER ────────────────────────────────

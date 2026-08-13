@@ -31,11 +31,8 @@ const TEMAS = [
 ];
 
 describe("o arco existe em qualquer duração", () => {
-  test("as cinco partes aparecem, até na sessão de um minuto", () => {
-    /* ⚠️ Cinco ciclos e cinco janelas: sem o piso de um ciclo por janela, a
-       sessão curta perdia a volta ao corpo. Terminar de repente com a paciente
-       funda é o defeito mais comum de meditação amadora. */
-    for (const minutos of DURACOES) {
+  test("as cinco partes aparecem de 2 minutos para cima", () => {
+    for (const minutos of [2, 5, 10]) {
       const p = planejarSessao({ minutos, tema: "Calma", semanas: 20 });
       const momentos = new Set(p.deixas.map((d) => d.fala.momento));
       expect({ minutos, tem: [...momentos].sort() }).toEqual({
@@ -43,6 +40,19 @@ describe("o arco existe em qualquer duração", () => {
         tem: ["acolhimento", "ancoragem", "corpo", "silencio", "volta"],
       });
     }
+  });
+
+  test("⚠️ na de 1 minuto, o que cai é o MEIO — nunca as pontas", () => {
+    /* Com o compasso em 16 s, um minuto são quatro respirações, e cinco partes
+       não cabem em quatro. A repartição antiga espremia a PRIMEIRA janela até
+       zero, e a sessão abria em "deixe o ar entrar pelo nariz" — sem receber
+       ninguém. Começar sem acolhimento é o mesmo defeito, pelo outro lado, de
+       terminar de repente. */
+    const p = planejarSessao({ minutos: 1, tema: "Calma", semanas: 20 });
+    const momentos = p.deixas.map((d) => d.fala.momento);
+    expect(momentos[0]).toBe("acolhimento");
+    expect(momentos[momentos.length - 1]).toBe("volta");
+    expect(momentos).not.toContain("silencio");
   });
 
   test("a sessão abre acolhendo e fecha voltando ao corpo", () => {
@@ -234,13 +244,19 @@ describe("⚠️ o ritmo NÃO depende da duração escolhida", () => {
        o tempo, não é pra pessoa falar mais rápido, e não é pra bolha inspirar
        e soltar mais rápido". O que muda com a duração é o NÚMERO de
        respirações, nunca a duração de uma. */
-    expect(RESPIRO).toEqual({ in: 4, hold: 4, out: 6 });
-    expect(CICLO).toBe(14);
+    /* ⚠️ 4-4-8, e não 4-7-8. O dono pediu "16 ou 19"; 19 seria o 4-7-8, e o
+       que faz dele 19 é uma apneia de sete segundos — a parte que uma gestante
+       de terceiro trimestre abandona primeiro, e que não é o que acalma. Os
+       dois segundos a mais foram todos para a expiração, que é quem aciona o
+       vago: solte tem agora o DOBRO de inspire. */
+    expect(RESPIRO).toEqual({ in: 4, hold: 4, out: 8 });
+    expect(CICLO).toBe(16);
+    expect(RESPIRO.out).toBe(RESPIRO.in * 2);
     for (const minutos of DURACOES) {
       const p = planejarSessao({ minutos, tema: "Calma", semanas: 20 });
       expect({ minutos, seg: p.totalCiclos * CICLO }).toEqual({
         minutos,
-        seg: ciclosDe(minutos) * 14,
+        seg: ciclosDe(minutos) * 16,
       });
     }
   });
@@ -263,7 +279,10 @@ describe("⚠️ o ritmo NÃO depende da duração escolhida", () => {
        A sessão de 1 minuto é a exceção conhecida: cinco respirações para as
        cinco partes do arco não deixam folga, e perder a volta ao corpo é pior
        que duas falas próximas. */
-    for (const minutos of [2, 5, 10]) {
+    /* De 5 minutos para cima há folga para o espaçamento inteiro. Em 1 e 2
+       minutos as janelas têm um ciclo cada, e aí o arco vale mais — ver a
+       exceção documentada em `ESPACO_MINIMO`. */
+    for (const minutos of [5, 10]) {
       const c = planejarSessao({ minutos, tema: "Calma", semanas: 20 }).deixas.map((d) => d.ciclo);
       const menor = Math.min(...c.slice(1).map((v, i) => v - c[i]));
       expect({ minutos, menor }).toEqual({ minutos, menor: 2 });
@@ -273,14 +292,12 @@ describe("⚠️ o ritmo NÃO depende da duração escolhida", () => {
 
 describe("as contas de ciclo batem com a tela", () => {
   test("os minutos viram o número de respirações que a tela usa", () => {
-    /* O ciclo passou de 12 s para 14 s (4-4-6), então os números mudaram — e
-       arredondam para CIMA: um minuto são cinco respirações (70 s), não
-       quatro. Ver `ciclosDe`. */
-    expect(CICLO).toBe(14);
-    expect(ciclosDe(1)).toBe(5);
-    expect(ciclosDe(2)).toBe(9);
-    expect(ciclosDe(5)).toBe(22);
-    expect(ciclosDe(10)).toBe(43);
+    /* O ciclo passou de 12 s para 16 s (4-4-8), e arredonda para CIMA. */
+    expect(CICLO).toBe(16);
+    expect(ciclosDe(1)).toBe(4);
+    expect(ciclosDe(2)).toBe(8);
+    expect(ciclosDe(5)).toBe(19);
+    expect(ciclosDe(10)).toBe(38);
   });
 
   test("a busca por ciclo devolve a fala daquele ciclo", () => {

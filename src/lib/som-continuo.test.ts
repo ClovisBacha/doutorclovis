@@ -76,11 +76,14 @@ describe("⚠️ a emenda do loop", () => {
 
   test("o aquecimento é o MENOR que serve — ele custa render", () => {
     /* Com 30 s para todos, o coração levava 812 ms para ficar pronto; com 6 s,
-       315 ms. É o tempo que ela espera olhando "preparando…". */
+       315 ms. É o tempo que ela espera olhando "preparando…".
+       ⚠️ O laço de ruído passou de 2 s para 10 s (ver `ruidoSegs`), e isso
+       empurra o aquecimento junto — o do coração fica em 6 porque o laço dele
+       é 6, e o da chuva em 10 porque o LFO virou 1/10 Hz. */
     expect(aquecimentoDe("coracao")).toBe(6);
     expect(aquecimentoDe("mar")).toBe(10);
     expect(aquecimentoDe("pad")).toBe(5);
-    expect(aquecimentoDe("chuva")).toBe(30); // o LFO de 1/15 Hz não deixa menos
+    expect(aquecimentoDe("chuva")).toBe(10);
   });
 
   test("o coração fecha em batidas inteiras", () => {

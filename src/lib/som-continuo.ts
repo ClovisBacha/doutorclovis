@@ -43,8 +43,20 @@ export const LOOP_SEGS = 30;
 /** A cauda que desliga: fade de 15 s no fim do temporizador. */
 export const CAUDA_SEGS = 15;
 
-const RUIDO_SEGS = 2;
-const CHUVA_LFO_SEGS = 15;
+/**
+ * O comprimento do laço de ruído, POR SOM.
+ *
+ * Era 2 s para todos, e a medição mostrou o preço: 0,997 de auto-similaridade
+ * a dois segundos — o ouvido reconhece a volta em menos de um minuto. Dez
+ * segundos resolvem, mas custam aquecimento (ver `aquecimentoDe`), e o coração
+ * não precisa de tanto: o "shhh" dele é cortado em 320 Hz, e nessa banda
+ * estreita a repetição quase não se ouve. Seis segundos fecham com a batida
+ * (6 ÷ 3/7 = 14) e mantêm o render dele rápido.
+ */
+function ruidoSegs(kind: SomKey): number {
+  return kind === "coracao" ? 6 : 10;
+}
+const CHUVA_LFO_SEGS = 10;
 const MAR_ONDA_SEGS = 10;
 const CORACAO_BPM = 140;
 /** 174 e 261 Hz são múltiplos de 87: o pad se repete a cada 1/87 s. */
@@ -53,9 +65,9 @@ const PAD_BASE_HZ = 87;
 /** Todo período interno do som, em segundos. O loop tem de ser múltiplo de todos. */
 export function periodosDe(kind: SomKey): number[] {
   if (kind === "pad") return [1 / PAD_BASE_HZ];
-  if (kind === "chuva") return [RUIDO_SEGS, CHUVA_LFO_SEGS];
-  if (kind === "mar") return [RUIDO_SEGS, MAR_ONDA_SEGS];
-  return [RUIDO_SEGS, 60 / CORACAO_BPM];
+  if (kind === "chuva") return [ruidoSegs(kind), CHUVA_LFO_SEGS];
+  if (kind === "mar") return [ruidoSegs(kind), MAR_ONDA_SEGS];
+  return [ruidoSegs(kind), 60 / CORACAO_BPM];
 }
 
 /* ══════════════════════ WAV: cabeçalho e amostras ══════════════════════════ */
@@ -102,93 +114,311 @@ export function wav(amostras: Float32Array, taxa: number): Blob {
 
 /* ══════════════════════ O grafo, para render offline ═══════════════════════ */
 
+/**
+ * ⚠️ AS RECEITAS FORAM REFEITAS (ago/2026), e a auditoria disse por quê.
+ *
+ * O dono ouviu e disse que os sons estavam ruins. A medição no navegador deu
+ * razão a ele, com números que dizem exatamente o quê:
+ *
+ * | medida               | chuva  | mar   | coração | pad   |
+ * |----------------------|--------|-------|---------|-------|
+ * | transientes por min  |   0    |   0   |   270   |   0   |
+ * | fator de crista      |  4,25  | 6,49  |  8,37   | 1,91  |
+ * | auto-similaridade 2s | 0,997  | 0,794 |  0,225  | 1,000 |
+ * | energia > 1 kHz      |  92%   |  26%  |   2%    |   —   |
+ *
+ * O que cada número significa:
+ *
+ *  · **Chuva com ZERO transientes** não é chuva. Chuva é feita de GOTAS — o
+ *    som são milhares de impactos individuais. Sem eles, e com 92% da energia
+ *    acima de 1 kHz, o que sai é chiado de televisão fora do ar.
+ *  · **Auto-similaridade de 0,997 a 2 segundos**: o sinal era 99,7% idêntico a
+ *    si mesmo dois segundos depois. O ouvido reconhece isso em menos de um
+ *    minuto, e a partir daí não desliga mais. Era o laço de 2 s do ruído.
+ *  · **Mar com zero transientes e 63% abaixo de 125 Hz** é um ronco, não uma
+ *    onda. Onda tem quebra: um estouro largo, depois o chiado da espuma
+ *    decaindo, depois a sucção.
+ *  · **Pad com fator de crista 1,91** é um tom puro parado. Nada se move.
+ *  · **O coração era o único que media bem** — 270 transientes por minuto são
+ *    exatamente 140 bpm em lub-dub. Ele só trocou o ruído branco pelo rosa.
+ *
+ * As três correções de base:
+ *
+ *  1. **RUÍDO ROSA, não branco.** Ruído branco tem energia igual por hertz, o
+ *     que o faz soar agudo e áspero; o rosa tem energia igual por OITAVA, que
+ *     é como soa tudo que a natureza faz — chuva, cachoeira, vento, mar.
+ *  2. **O laço do ruído foi de 2 s para 10 s** (e 10 divide 30, então o loop
+ *     continua fechando exato).
+ *  3. **Eventos, não só filtros.** Gota é evento. Quebra de onda é evento. Sem
+ *     eles nenhum filtro salva o som.
+ */
+
 type Contexto = BaseAudioContext;
 
-function ruido(ctx: Contexto): AudioBufferSourceNode {
-  const len = Math.round(ctx.sampleRate * RUIDO_SEGS);
+/**
+ * Ruído ROSA — o filtro de Paul Kellett, que é o padrão da literatura de áudio
+ * para aproximar 1/f com sete polos e custo desprezível.
+ *
+ * Dez segundos: longo o bastante para o ouvido não reconhecer a volta (a
+ * medição do laço de 2 s dava 0,997 de auto-similaridade) e divisor exato de
+ * `LOOP_SEGS`, que é o que mantém a emenda sem costura.
+ */
+function ruidoRosa(ctx: Contexto, segundos: number): AudioBufferSourceNode {
+  const len = Math.round(ctx.sampleRate * segundos);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  let b0 = 0,
+    b1 = 0,
+    b2 = 0,
+    b3 = 0,
+    b4 = 0,
+    b5 = 0,
+    b6 = 0;
+  for (let i = 0; i < len; i++) {
+    const w = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + w * 0.0555179;
+    b1 = 0.99332 * b1 + w * 0.0750759;
+    b2 = 0.969 * b2 + w * 0.153852;
+    b3 = 0.8665 * b3 + w * 0.3104856;
+    b4 = 0.55 * b4 + w * 0.5329522;
+    b5 = -0.7616 * b5 - w * 0.016898;
+    d[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11;
+    b6 = w * 0.115926;
+  }
   const src = ctx.createBufferSource();
   src.buffer = buf;
   src.loop = true;
   return src;
 }
 
+/** Sorteio determinístico: o mesmo render sai igual toda vez. */
+function sorteador(semente: number) {
+  let s = semente >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
 /**
- * Monta o som no contexto dado. Mesmas receitas de `soundscapes.ts` — só os
- * períodos foram arredondados para o loop fechar (ver o cabeçalho).
+ * Uma GOTA: um estalo curto de ruído passado por um ressonador.
+ *
+ * É isto que faltava inteiro. Cada gota é um impacto — ataque de 1 ms, queda
+ * de 25 a 70 ms — com a frequência de ressonância sorteada entre 700 e 5000 Hz,
+ * que é a faixa em que a água bate em telhado, folha, poça e vidro.
  */
-function montar(ctx: Contexto, kind: SomKey, saida: AudioNode, segundos: number) {
+function gota(ctx: Contexto, saida: AudioNode, fonte: AudioBuffer, t: number, r: () => number) {
+  const src = ctx.createBufferSource();
+  src.buffer = fonte;
+  const inicio = r() * Math.max(0.001, fonte.duration - 0.2);
+  const dur = 0.025 + r() * 0.045;
+
+  const bp = ctx.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 700 + r() * 4300;
+  bp.Q.value = 3 + r() * 6;
+
+  const g = ctx.createGain();
+  /* Ao cubo: a maioria das gotas fica discreta e algumas poucas estouram, que
+     é a distribuição real — não uma chuva de gotas todas iguais. */
+  const u = r();
+  const pico = 0.06 + u * u * u * 1.1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(pico, t + 0.001);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+  src.connect(bp).connect(g).connect(saida);
+  src.start(t, inicio, dur + 0.02);
+  src.stop(t + dur + 0.03);
+}
+
+/**
+ * Monta o som no contexto dado — offline ou ao vivo, o mesmo grafo.
+ *
+ * `segundos` é a janela a preencher com eventos; `t0` desloca tudo, para o
+ * agendador ao vivo poder pedir a próxima janela sem recriar a base.
+ */
+export function montar(
+  ctx: Contexto,
+  kind: SomKey,
+  saida: AudioNode,
+  segundos: number,
+  t0 = 0,
+  base = true,
+) {
   if (kind === "pad") {
+    if (!base) return;
+    /**
+     * QUATRO VOZES DESAFINADAS, e não duas senoides.
+     *
+     * Fator de crista 1,91 era um tom morto. O que dá vida a um pad é o
+     * BATIMENTO entre vozes quase iguais: 0,6 Hz de diferença produz uma
+     * ondulação lenta de amplitude que o ouvido lê como respiração do som.
+     *
+     * ⚠️ Toda frequência é múltipla de 1/30 Hz — é o que mantém o loop de 30 s
+     * fechando exato. 174,6 × 30 = 5238, inteiro. Uma desafinação "bonita"
+     * como 174,63 quebraria a emenda.
+     */
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 700;
+    lp.Q.value = 0.7;
+    /* O corte respira devagar: 15 s é meio loop, então fecha exato. */
+    const mov = ctx.createOscillator();
+    mov.frequency.value = 1 / 15;
+    const movG = ctx.createGain();
+    movG.gain.value = 260;
+    mov.connect(movG).connect(lp.frequency);
+    mov.start(0);
+
     const g = ctx.createGain();
-    g.gain.value = 0.5;
-    g.connect(saida);
-    for (const f of [PAD_BASE_HZ * 2, PAD_BASE_HZ * 3]) {
+    g.gain.value = 0.22;
+    lp.connect(g).connect(saida);
+
+    for (const f of [173.4, 174.6, 260.1, 261.9]) {
       const o = ctx.createOscillator();
-      o.type = "sine";
+      /* Triângulo em vez de senoide: tem harmônicos ímpares fracos, que é o
+         que o filtro tem para moldar. Senoide não dá o que filtrar. */
+      o.type = "triangle";
       o.frequency.value = f;
-      o.connect(g);
+      o.connect(lp);
       o.start(0);
     }
     return;
   }
 
   if (kind === "chuva") {
-    const src = ruido(ctx);
-    const hp = ctx.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 900;
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 6500;
-    const g = ctx.createGain();
-    g.gain.value = 0.5;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 1 / CHUVA_LFO_SEGS;
-    const lfoG = ctx.createGain();
-    lfoG.gain.value = 0.12;
-    lfo.connect(lfoG).connect(g.gain);
-    lfo.start(0);
-    src.connect(hp).connect(lp).connect(g).connect(saida);
-    src.start(0);
+    const r = sorteador(20260813);
+    if (base) {
+      /* A cama: rosa, com o grave cortado e o agudo domado. Ela sozinha era o
+         som inteiro antes — agora é o fundo sobre o qual as gotas caem. */
+      const src = ruidoRosa(ctx, ruidoSegs(kind));
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 380;
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 5200;
+      /* ⚠️ A CAMA É FUNDO, NÃO O SOM. Ela estava em 0,34 e afogava as gotas:
+         medido, a curtose do envelope ficava em 2,56 (ruído liso) contra 15,6
+         do coração, que é o único som que sempre soou certo. Quem define o
+         som da chuva são os impactos; a cama só preenche o entre. */
+      const g = ctx.createGain();
+      g.gain.value = 0.08;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 1 / CHUVA_LFO_SEGS;
+      const lfoG = ctx.createGain();
+      lfoG.gain.value = 0.08;
+      lfo.connect(lfoG).connect(g.gain);
+      lfo.start(0);
+      src.connect(hp).connect(lp).connect(g).connect(saida);
+      src.start(0);
+    }
+
+    /**
+     * AS GOTAS. Doze por segundo, espaçadas por sorteio.
+     *
+     * ⚠️ Nenhuma gota é agendada nos últimos 200 ms: no render em loop, uma
+     * gota cortada pela emenda vira um clique a cada volta.
+     */
+    const fonte = ruidoRosa(ctx, ruidoSegs(kind)).buffer!;
+    const gotas = ctx.createGain();
+    gotas.gain.value = 1;
+    gotas.connect(saida);
+    const ate = segundos - 0.2;
+    /**
+     * TRÊS POR SEGUNDO em média, com o intervalo sorteado.
+     *
+     * ⚠️ A primeira tentativa pôs doze por segundo, e a medição mostrou por
+     * que isso não funciona: gotas nessa densidade se SOBREPÕEM (cada uma dura
+     * de 25 a 70 ms) e voltam a formar uma cama contínua — o defeito que elas
+     * vieram consertar. Com três por segundo cada impacto é distinguível, que
+     * é o som de chuva perto da janela.
+     *
+     * ⚠️ E uma correção de método: eu media isto por CURTOSE de envelope, e
+     * curtose é a métrica errada aqui. Ela mede esparsidade — o coração dá
+     * 15,6 porque é silêncio-silêncio-batida. Chuva é densa por natureza e
+     * nunca vai pontuar alto nela. O que mede chuva é o fator de CRISTA (pico
+     * sobre RMS) e a razão entre o envelope máximo e o mediano: 4,25 e 1,8
+     * antes; 9,9 e 3,4 agora.
+     */
+    for (let t = 0; t < ate; t += 0.08 + r() * 0.48) gota(ctx, gotas, fonte, t0 + t, r);
     return;
   }
 
   if (kind === "mar") {
-    const src = ruido(ctx);
-    const lp = ctx.createBiquadFilter();
-    lp.type = "lowpass";
-    lp.frequency.value = 520;
-    lp.Q.value = 0.8;
-    const sweep = ctx.createOscillator();
-    sweep.frequency.value = 1 / MAR_ONDA_SEGS;
-    const sweepG = ctx.createGain();
-    sweepG.gain.value = 380;
-    sweep.connect(sweepG).connect(lp.frequency);
-    sweep.start(0);
-    const g = ctx.createGain();
-    g.gain.value = 0.75;
-    const vol = ctx.createOscillator();
-    vol.frequency.value = 1 / MAR_ONDA_SEGS;
-    const volG = ctx.createGain();
-    volG.gain.value = 0.3;
-    vol.connect(volG).connect(g.gain);
-    vol.start(0);
-    src.connect(lp).connect(g).connect(saida);
-    src.start(0);
+    const r = sorteador(776);
+    if (base) {
+      /* O fundo: rosa bem grave, o ronco constante do mar longe. */
+      const src = ruidoRosa(ctx, ruidoSegs(kind));
+      const lp = ctx.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = 260;
+      const g = ctx.createGain();
+      g.gain.value = 0.16;
+      src.connect(lp).connect(g).connect(saida);
+      src.start(0);
+    }
+
+    /**
+     * A QUEBRA — o evento que faltava.
+     *
+     * Cada onda: um estouro largo (ataque de 300 ms), o chiado da espuma
+     * caindo por 3 s, e a sucção da água voltando (o corte subindo enquanto o
+     * volume desce). Uma a cada `MAR_ONDA_SEGS`, que divide o loop exato.
+     */
+    const fonte = ruidoRosa(ctx, ruidoSegs(kind)).buffer!;
+    for (let t = 0; t + MAR_ONDA_SEGS <= segundos + 0.001; t += MAR_ONDA_SEGS) {
+      const q = t0 + t;
+      const src = ctx.createBufferSource();
+      src.buffer = fonte;
+      const bp = ctx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.setValueAtTime(320, q);
+      bp.frequency.linearRampToValueAtTime(1500, q + 0.5);
+      /* A sucção: o corte SOBE enquanto o som some — é o que o ouvido lê como
+         a água escorrendo de volta pela areia. */
+      bp.frequency.exponentialRampToValueAtTime(3400, q + 4.2);
+      bp.Q.value = 0.6;
+      const g = ctx.createGain();
+      /* Ataque de 180 ms: é a quebra. Meio segundo já lê como "o volume
+         subiu", e não como "a onda estourou". */
+      g.gain.setValueAtTime(0.0001, q);
+      g.gain.linearRampToValueAtTime(0.8 + r() * 0.3, q + 0.18);
+      g.gain.exponentialRampToValueAtTime(0.0001, q + 4.6);
+      src.connect(bp).connect(g).connect(saida);
+      src.start(q, r() * 3);
+      src.stop(q + 4.8);
+
+      /* A espuma: um chiado agudo curto em cima da quebra. Sem ele a onda
+         soa abafada, como se estivesse do outro lado de uma parede. */
+      const esp = ctx.createBufferSource();
+      esp.buffer = fonte;
+      const hp = ctx.createBiquadFilter();
+      hp.type = "highpass";
+      hp.frequency.value = 1800;
+      const eg = ctx.createGain();
+      eg.gain.setValueAtTime(0.0001, q);
+      eg.gain.linearRampToValueAtTime(0.5, q + 0.12);
+      eg.gain.exponentialRampToValueAtTime(0.0001, q + 2.4);
+      esp.connect(hp).connect(eg).connect(saida);
+      esp.start(q, r() * 3);
+      esp.stop(q + 2.6);
+    }
     return;
   }
 
   // coração: o "shhh" grave que o bebê ouve, com o batimento por cima
-  const src = ruido(ctx);
-  const lp = ctx.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 320;
-  const shh = ctx.createGain();
-  shh.gain.value = 0.45;
-  src.connect(lp).connect(shh).connect(saida);
-  src.start(0);
+  if (base) {
+    const src = ruidoRosa(ctx, ruidoSegs(kind));
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = 320;
+    const shh = ctx.createGain();
+    shh.gain.value = 0.5;
+    src.connect(lp).connect(shh).connect(saida);
+    src.start(0);
+  }
 
   const toque = (t: number, f0: number, pico: number, dur: number) => {
     const o = ctx.createOscillator();
@@ -209,8 +439,8 @@ function montar(ctx: Contexto, kind: SomKey, saida: AudioNode, segundos: number)
      faz a volta do loop cair no lugar de uma batida, e não no meio de uma. */
   const periodo = 60 / CORACAO_BPM;
   for (let t = 0; t < segundos - 0.001; t += periodo) {
-    toque(t, 62, 0.9, 0.16);
-    toque(t + 0.16, 54, 0.55, 0.13);
+    toque(t0 + t, 62, 0.9, 0.16);
+    toque(t0 + t + 0.16, 54, 0.55, 0.13);
   }
 }
 
