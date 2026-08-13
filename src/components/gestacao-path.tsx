@@ -67,6 +67,7 @@ import {
   cartaDasGratidoes,
   ehDiaDificil,
   ehGratidao,
+  falaDaBolha,
   gratidaoParaReler,
   haQuantoTempo,
   perguntaDoDia,
@@ -7006,6 +7007,44 @@ function BondingBlock({
   );
 }
 
+/**
+ * O BEBÊ BOLHA FALANDO NUMA TELA DE ATIVIDADE.
+ *
+ * Pedido do dono: "ele é o nosso porta-voz do app". Na home ele mora num canto
+ * e o balão pende para a esquerda; aqui ele está no EIXO da tela, então o
+ * balão é centrado embaixo e o problema de shrink-to-fit que obrigou o `w-max`
+ * lá não existe — o container aqui tem a largura da tela, não 44px.
+ *
+ * ⚠️ O HUMOR NÃO É ESCOLHIDO AQUI. `humorDaJornada` é quem sabe: o portão de
+ * Modo Cuidado mora dentro dela, e uma carinha decidida por `if` local faria
+ * festa na tela de quem perdeu a gestação. Este componente só diz o que está
+ * acontecendo (`comemorando`) e deixa ela decidir a cara.
+ */
+function BolhaComBalao({
+  fala,
+  careMode = false,
+  comemorando = false,
+  tamanho = 96,
+}: {
+  fala: string;
+  careMode?: boolean;
+  comemorando?: boolean;
+  tamanho?: number;
+}) {
+  const humor = humorDaJornada({ comemorando, careMode });
+  return (
+    <div className="flex flex-col items-center">
+      <Bolha humor={humor} tamanho={tamanho} careMode={careMode} />
+      {/* `dc-result-in` e não uma animação própria: é a mesma entrada que o
+          resto das telas de resultado usa, e ela respeita
+          `prefers-reduced-motion` no bloco que já existe. */}
+      <p className="dc-result-in mt-2 max-w-[17rem] rounded-2xl border border-amber-200 bg-white/85 px-3.5 py-2 text-[13px] font-medium leading-snug text-amber-900 shadow-[0_6px_16px_-10px_rgba(180,120,20,0.5)]">
+        {fala}
+      </p>
+    </div>
+  );
+}
+
 /* ══════════════════ Gratidão do dia (vai pro diário) ══════════════════ */
 
 export function GratitudeBlock({
@@ -7398,7 +7437,18 @@ export function GratitudeBlock({
           </div>
           {phase === "write" ? (
             <div className="flex flex-1 flex-col items-center overflow-y-auto px-8 pb-10 pt-2 text-center">
-              <span className="text-6xl">✨</span>
+              {/* ── O PORTA-VOZ ────────────────────────────────────────────
+                  O emoji ✨ que ficava aqui não dizia nada. Quem apresenta a
+                  tela agora é a personagem do app — e o que ela entrega é o
+                  que era rótulo seco: quantas ela já guardou, e o reencontro
+                  na tela seguinte. Ela NÃO repete a pergunta: o título grande
+                  é a pergunta, e dois textos dizendo o mesmo fariam da bolha
+                  um enfeite. */}
+              <BolhaComBalao
+                fala={falaDaBolha({ tela: "escrever", total, diaDificil })}
+                careMode={careMode}
+                tamanho={96}
+              />
               {/* ── A PERGUNTA DO DIA ──────────────────────────────────────
                   Era "O que foi bom hoje?" no dia 1 e no dia 280, com as
                   mesmas cinco fichinhas. Agora gira por fase da gestação — e
@@ -7521,7 +7571,14 @@ export function GratitudeBlock({
             </div>
           ) : phase === "lista" ? (
             <div className="flex flex-1 flex-col overflow-y-auto px-6 pb-10">
-              <h3 className="text-center font-serif text-[24px] font-semibold text-amber-900">
+              <div className="self-center">
+                <BolhaComBalao
+                  fala={falaDaBolha({ tela: "lista", total })}
+                  careMode={careMode}
+                  tamanho={72}
+                />
+              </div>
+              <h3 className="mt-3 text-center font-serif text-[24px] font-semibold text-amber-900">
                 Suas coisas boas
               </h3>
               <p className="mt-1 text-center text-[13px] text-amber-800/70">
@@ -7550,13 +7607,18 @@ export function GratitudeBlock({
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center overflow-y-auto px-8 py-6 text-center">
               {!careMode && <ConfettiBurst />}
-              <span className="dc-result-in text-6xl">✨</span>
-              <h3 className="mt-3 text-2xl font-extrabold text-amber-900">Guardado 💛</h3>
-              <p className="mt-1 text-sm text-amber-800/80">
-                {total > 1
-                  ? `${total} ${posParto ? "coisas boas guardadas" : "coisas boas nesta gestação"}.`
-                  : "Anotei no seu diário."}
-              </p>
+              {/* ⚠️ Aqui ele COMEMORA, e a cara vem de `humorDaJornada` —
+                  nunca de um `if` local. É lá que mora o portão de Modo
+                  Cuidado, e uma segunda régua faria carinha festiva aparecer
+                  para quem perdeu a gestação.
+                  O "Guardado 💛" e o contador que ficavam em texto viraram
+                  fala dele: era a mesma informação, sem voz nenhuma. */}
+              <BolhaComBalao
+                fala={falaDaBolha({ tela: "guardado", total, temReleitura: !!paraReler })}
+                careMode={careMode}
+                comemorando
+                tamanho={120}
+              />
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
                   +{reward} 🌱 Sementinhas!
@@ -7568,13 +7630,16 @@ export function GratitudeBlock({
                   o que muda o afeto depois. Nunca a de hoje nem a de ontem —
                   reler o que se acabou de escrever é eco (ver
                   `gratidaoParaReler`). Sem nada com três dias, a seção não
-                  existe: melhor não ter do que repetir a frase de cima. */}
+                  existe: melhor não ter do que repetir a frase de cima.
+                  Quem ANUNCIA é a bolha, logo acima; aqui fica só a frase
+                  dela, com a distância — o rótulo em caixa alta que fazia a
+                  apresentação não tinha voz nenhuma. */}
               {paraReler && (
-                <div className="mt-6 w-full max-w-xs rounded-2xl border border-amber-200 bg-white/80 px-4 py-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-amber-600">
-                    {haQuantoTempo(paraReler.quando, new Date())} você agradeceu por
+                <div className="mt-4 w-full max-w-xs rounded-2xl border border-amber-200 bg-white/80 px-4 py-3">
+                  <p className="text-[15px] leading-snug text-amber-900">“{paraReler.texto}”</p>
+                  <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600">
+                    {haQuantoTempo(paraReler.quando, new Date())}
                   </p>
-                  <p className="mt-1 text-[14px] leading-snug text-amber-900">{paraReler.texto}</p>
                 </div>
               )}
 

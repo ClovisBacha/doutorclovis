@@ -23,9 +23,11 @@ import {
   faseDaGratidao,
   gratidaoParaReler,
   haQuantoTempo,
+  falaDaBolha,
   perguntaDoDia,
   textoDaGratidao,
   type FaseGratidao,
+  type TelaDaGratidao,
   type Gratidao,
 } from "./gratidao";
 
@@ -343,5 +345,82 @@ describe("a tela usa a régua — e não uma segunda cópia dela", () => {
     expect(bonding.replace(/\s+/g, " ")).toContain("careMode || !minhasGratidoes ? null");
     /* CRESCENTE: a carta conta a história na ordem em que aconteceu. */
     expect(bonding).toContain('.order("created_at", { ascending: true })');
+  });
+});
+
+describe("⚠️ o bebê bolha como porta-voz desta tela", () => {
+  test("ele NÃO repete a pergunta do dia", () => {
+    /* A pergunta é o título grande. Dois textos dizendo a mesma coisa fariam
+       da personagem um enfeite — e ela é a voz do app. */
+    const perguntas = new Set([...PERGUNTAS, ...PERGUNTAS_DIA_DIFICIL].map((p) => p.texto));
+    for (const tela of ["escrever", "guardado", "lista"] as TelaDaGratidao[]) {
+      for (const total of [0, 1, 5, 42]) {
+        for (const dificil of [false, true]) {
+          const f = falaDaBolha({ tela, total, diaDificil: dificil });
+          expect({ tela, total, repete: perguntas.has(f) }).toEqual({
+            tela,
+            total,
+            repete: false,
+          });
+        }
+      }
+    }
+  });
+
+  test("ele entrega o CONTADOR, que era rótulo seco", () => {
+    expect(falaDaBolha({ tela: "escrever", total: 12 })).toContain("12 coisas boas");
+    expect(falaDaBolha({ tela: "escrever", total: 1 })).toContain("1 coisa boa");
+    expect(falaDaBolha({ tela: "guardado", total: 13 })).toContain("13 coisas boas");
+  });
+
+  test("a primeira vez explica pra onde vai — ninguém explicava", () => {
+    expect(falaDaBolha({ tela: "escrever", total: 0 })).toContain("guardo");
+    expect(falaDaBolha({ tela: "guardado", total: 1 })).toContain("primeira");
+  });
+
+  test("⚠️ ele ANUNCIA a releitura quando ela existe, e cala quando não", () => {
+    const com = falaDaBolha({ tela: "guardado", total: 9, temReleitura: true });
+    const sem = falaDaBolha({ tela: "guardado", total: 9, temReleitura: false });
+    expect(com).toContain("me contou antes");
+    expect(sem).not.toContain("me contou antes");
+  });
+
+  test("⚠️ no dia difícil ele diminui o pedido — nunca consola", () => {
+    /* Consolo é o que faz alguém fechar o app num dia ruim, e é a mesma razão
+       pela qual a carinha `preocupada` saiu da personagem. */
+    const f = falaDaBolha({ tela: "escrever", total: 8, diaDificil: true });
+    expect(f).toContain("pequeno");
+    expect(
+      /vai passar|est[áa] tudo bem|fique (calma|tranquila)|lado positivo|amanhã melhora/i.test(f),
+    ).toBe(false);
+  });
+
+  test("nenhuma fala cobra, e todas cabem num balão", () => {
+    const proibido = /você não (escreveu|fez|veio)|faltou|devia|precisa (escrever|voltar)|há dias/i;
+    for (const tela of ["escrever", "guardado", "lista"] as TelaDaGratidao[]) {
+      for (const total of [0, 1, 2, 17, 300]) {
+        for (const temReleitura of [false, true]) {
+          const f = falaDaBolha({ tela, total, temReleitura });
+          expect({ tela, total, ok: f.length > 8 && f.length <= 64 && !proibido.test(f) }).toEqual({
+            tela,
+            total,
+            ok: true,
+          });
+        }
+      }
+    }
+  });
+
+  test("⚠️ a CARA sai de `humorDaJornada`, nunca de um if local", () => {
+    /* É lá que mora o portão de Modo Cuidado. Uma segunda régua faria carinha
+       festiva aparecer na tela de quem perdeu a gestação. */
+    const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+    const bloco = fonte.slice(
+      fonte.indexOf("function BolhaComBalao("),
+      fonte.indexOf("/* ══════════════════ Gratidão do dia"),
+    );
+    expect(bloco).toContain("humorDaJornada({ comemorando, careMode })");
+    expect(bloco).not.toMatch(/humor=\{"(comemorando|feliz|orgulhosa)"\}/);
+    expect(bloco).toContain("careMode={careMode}");
   });
 });

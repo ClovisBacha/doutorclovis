@@ -1852,6 +1852,32 @@ trabalho; falar não é. `src/lib/gravador.ts` + `/api/transcrever-diario`.
   conferir isso exigiria uma conta com semanas de uso — e é assim que uma tela
   passa meses sem ninguém nunca ter olhado para ela.
 
+### E o bebê bolha virou o porta-voz desta tela também (ago/2026)
+
+Pedido do dono: "coloque o bebê bolha nessa tela também comunicando essas
+informações, ele é o nosso porta-voz do app". `BolhaComBalao`
+(`gestacao-path.tsx`) + `falaDaBolha` (`gratidao.ts`, testado).
+
+- **Ele NÃO repete a pergunta do dia** — há teste. A pergunta é o título
+  grande; um balão dizendo o mesmo daria dois textos disputando o olho e a
+  personagem viraria enfeite. O que ele entrega é o que era **rótulo seco**: o
+  contador ("você já me contou 12 coisas boas") e a apresentação da releitura
+  ("Guardei 💛 E olha o que você me contou antes:"), que antes era uma etiqueta
+  em caixa alta sem voz nenhuma.
+- ⚠️ **A CARA sai de `humorDaJornada`, nunca de um `if` local** — é lá que mora
+  o portão de Modo Cuidado. Medido na bancada: `?tela=done` desenha
+  `comemorando.webp`; `?tela=done&luto=1` desenha `feliz.webp`. Uma segunda
+  régua faria festa na tela de quem perdeu a gestação.
+- **No dia difícil ele diminui o pedido, não consola**: "Hoje pode ser bem
+  pequeno. Eu guardo do mesmo jeito." Há teste proibindo "vai passar" e "está
+  tudo bem" — a mesma razão pela qual a carinha `preocupada` saiu da
+  personagem.
+- **Na primeira vez ele explica a mecânica** ("Me conta uma coisa boa? Eu
+  guardo pra você"): ninguém dizia para onde o texto ia.
+- O balão aqui é centrado e **não precisa de `w-max`**: aquele defeito é de um
+  absoluto com `right` e sem `left`, cujo shrink-to-fit media contra um
+  container de 44px. Aqui ele está no fluxo, no eixo da tela.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

@@ -476,6 +476,63 @@ export function gratidaoParaReler(
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   O BEBÊ BOLHA NESTA TELA
+
+   Pedido do dono: "coloque o bebê bolha nessa tela também comunicando essas
+   informações, ele é o nosso porta-voz do app".
+
+   ⚠️ ELE NÃO REPETE A PERGUNTA. A pergunta do dia é o título grande da tela;
+   um balão dizendo a mesma coisa daria dois textos disputando o olho, e a
+   personagem viraria enfeite. O que ele entrega é o que HOJE é rótulo seco: o
+   contador ("você já me contou 12 coisas boas") e a releitura ("olha o que
+   você me contou há um mês") — informação que um porta-voz dá e uma etiqueta
+   em caixa alta não.
+
+   ⚠️ E ELE NÃO DECIDE A PRÓPRIA CARA. O humor sai de `humorDaJornada`
+   (`bolha.tsx`), que é onde mora o portão de Modo Cuidado — uma segunda régua
+   local faria carinha festiva aparecer para quem perdeu a gestação.
+
+   As frases seguem as mesmas quatro regras do resto: nunca cobram, convidam,
+   não prometem clínica, e falam com uma pessoa.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type TelaDaGratidao = "escrever" | "guardado" | "lista";
+
+export function falaDaBolha(o: {
+  tela: TelaDaGratidao;
+  /** Quantas ela já guardou — CONTANDO a que acabou de guardar. */
+  total: number;
+  diaDificil?: boolean;
+  /** Há uma gratidão antiga para reencontrar na tela de guardado? */
+  temReleitura?: boolean;
+}): string {
+  const n = Math.max(0, Math.floor(o.total));
+  const coisas = `${n} ${n === 1 ? "coisa boa" : "coisas boas"}`;
+
+  if (o.tela === "lista") {
+    return n === 1 ? "A coisa boa que você me contou." : `Tudo que você me contou até aqui.`;
+  }
+
+  if (o.tela === "guardado") {
+    /* A releitura é a informação principal desta tela, e é ele quem apresenta:
+       o rótulo em caixa alta que fazia isso não tinha voz nenhuma. */
+    if (o.temReleitura) return "Guardei 💛 E olha o que você me contou antes:";
+    if (n <= 1) return "Guardei 💛 Essa foi a primeira.";
+    return `Guardei 💛 Já são ${coisas} comigo.`;
+  }
+
+  /* ── A tela de escrever ────────────────────────────────────────────────
+     ⚠️ No dia difícil ele NÃO consola e NÃO minimiza — ele diminui o pedido.
+     "Vai passar" e "está tudo bem" são o que faz alguém fechar o app, e é a
+     mesma razão pela qual a carinha `preocupada` saiu da personagem. */
+  if (o.diaDificil) return "Hoje pode ser bem pequeno. Eu guardo do mesmo jeito.";
+  /* A primeira vez explica a mecânica, que é o que ninguém explicava: ela
+     escrevia sem saber para onde ia. */
+  if (n === 0) return "Me conta uma coisa boa? Eu guardo pra você.";
+  return `Você já me contou ${coisas}.`;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    A CARTA QUE SAI DAS GRATIDÕES
    ══════════════════════════════════════════════════════════════════════════ */
 
