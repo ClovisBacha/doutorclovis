@@ -1732,7 +1732,10 @@ valiam 8, a execução da SESSÃO valia 5. O número que decidiu:
 O código orça **6 segundos** de troca. Sair do decúbito lateral para em pé com
 38 semanas leva 20 a 30 — o alongamento virava o intervalo entre os
 agachamentos, e o esforço da sessão passava a ser levantar do chão sete vezes.
-Depois: **1** troca de nível em todas as 189 combinações medidas.
+
+Depois, nas 189 combinações de fase × duração × queixa: **49 sessões com zero
+trocas, 133 com uma, 7 com duas** — e as sete são todas a CIÁTICA, cujo alívio
+se espalha por três níveis. Nenhuma passa de duas.
 
 - **A ordem de ESCOLHA não é a ordem de EXECUÇÃO.** A queixa continua mandando
   em QUEM entra; a posição manda em QUANDO. E o corte por tempo roda ANTES da
