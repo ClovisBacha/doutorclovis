@@ -45,7 +45,16 @@ import {
   PROGRAMA,
   type DiaDoPrograma,
 } from "@/lib/meditacao-programa";
-import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
+import { FiguraMovimento } from "@/components/figura-movimento";
+import {
+  DURACOES_EXERCICIO,
+  SINAIS_DE_PARADA,
+  SINTOMAS,
+  sessaoDoDia,
+  type DuracaoExercicio,
+  type Movimento,
+  type Sintoma,
+} from "@/lib/exercicios";
 import {
   IconeCadeado,
   IconeAmigas,
@@ -4109,204 +4118,15 @@ function buzz(ms = 28) {
  * `pose` + `id` escolhem qual desenho de linha animado demonstra o movimento
  * (`figura-movimento.tsx`).
  */
-type Movimento = {
-  id: string;
-  pose: PoseKey;
-  emoji: string;
-  name: string;
-  cue: string;
-  passos: string[];
-  sentir: string;
-  parar: string;
-  secs: number;
-};
+/* ─── OS MOVIMENTOS SAÍRAM DAQUI (ago/2026) ───────────────────────────────
+   Nove movimentos girando por `day % 9` viraram vinte e cinco, com sintoma,
+   fase e tipo — e foram para `src/lib/exercicios.ts` pela mesma razão das
+   frases do mascote: é texto CLÍNICO, é o que o dono relê e corrige, e texto
+   enterrado num componente de nove mil linhas é texto que ninguém revisa.
+   A régua de qual movimento entra hoje (`sessaoDoDia`) mora lá também, pura e
+   testada. Aqui ficou só o desenho da tela. */
 
-const MOVIMENTOS: Movimento[] = [
-  {
-    id: "ombros",
-    pose: "pe",
-    emoji: "💆",
-    name: "Rolar os ombros",
-    cue: "Gire os ombros para trás, devagar e amplo.",
-    passos: [
-      "Fique em pé ou sentada, pés afastados na largura do quadril.",
-      "Solte os braços ao lado do corpo, sem travar os cotovelos.",
-      "Suba os ombros na direção das orelhas, leve-os para trás e desça.",
-      "Cada volta deve levar uns 4 segundos — quanto mais lento, melhor.",
-    ],
-    sentir: "Um alívio entre o pescoço e as escápulas.",
-    parar: "Se der pontada no ombro ou formigar o braço.",
-    secs: 30,
-  },
-  {
-    id: "pescoco",
-    pose: "sentada",
-    emoji: "🙆",
-    name: "Alongar o pescoço",
-    cue: "Incline a orelha em direção ao ombro; troque de lado sem forçar.",
-    passos: [
-      "Sente-se com as costas apoiadas e os dois pés no chão.",
-      "Deixe o ombro direito pesado, como se ele puxasse o chão.",
-      "Incline a orelha esquerda ao ombro esquerdo, sem girar o rosto.",
-      "Fique 15 segundos respirando e troque de lado.",
-    ],
-    sentir: "Um estica suave na lateral do pescoço, nunca na garganta.",
-    parar: "Se der tontura ou formigamento nas mãos.",
-    secs: 30,
-  },
-  {
-    id: "gatocamelo",
-    pose: "quatro",
-    emoji: "🐈",
-    name: "Gato-camelo suave",
-    cue: "De quatro apoios, arredonde a coluna e volte ao neutro com a respiração.",
-    passos: [
-      "De quatro apoios: mãos abaixo dos ombros, joelhos abaixo do quadril.",
-      "Se o joelho incomodar, dobre uma toalha embaixo dele.",
-      "Ao SOLTAR o ar, arredonde as costas e leve o queixo ao peito.",
-      "Ao PUXAR o ar, volte a coluna ao neutro — sem afundar a lombar.",
-      "Uma ida e volta por respiração.",
-    ],
-    sentir: "A lombar abrindo e aliviando.",
-    parar: "Se doer o punho — apoie nos punhos fechados ou pare.",
-    secs: 40,
-  },
-  {
-    id: "quadril",
-    pose: "borboleta",
-    emoji: "🦋",
-    name: "Abertura de quadril",
-    cue: "Sentada, solas dos pés juntas, deixe os joelhos caírem suaves.",
-    passos: [
-      "Sente-se no chão ou na cama com as solas dos pés encostadas.",
-      "Apoie as costas numa parede se for mais confortável.",
-      "Segure os tornozelos e deixe os joelhos caírem pelo próprio peso.",
-      "Não empurre os joelhos para baixo com as mãos.",
-    ],
-    sentir: "Um alongamento na parte interna das coxas.",
-    parar: "Se doer a virilha ou o osso da frente do púbis.",
-    secs: 30,
-  },
-  {
-    id: "tornozelo",
-    pose: "sentada",
-    emoji: "🦶",
-    name: "Círculos de tornozelo",
-    cue: "Desenhe círculos lentos com o pé — ajuda a circulação e o inchaço.",
-    passos: [
-      "Sentada, estenda uma perna e apoie o calcanhar no chão ou num banquinho.",
-      "Desenhe círculos lentos com o pé: 10 para cada lado.",
-      "Troque de pé e repita.",
-      "Termine puxando a ponta do pé na direção do joelho por 5 segundos.",
-    ],
-    sentir: "A panturrilha trabalhando e o pé mais leve.",
-    parar: "Se uma panturrilha doer sozinha, quente ou muito inchada — avise o médico.",
-    secs: 30,
-  },
-  {
-    id: "pelve",
-    pose: "pe",
-    emoji: "🧍",
-    name: "Inclinação pélvica em pé",
-    cue: "Em pé, gire a bacia para frente e para trás, bem devagar.",
-    passos: [
-      "Em pé, encoste as costas numa parede com os pés a um palmo dela.",
-      "Puxe o ar e relaxe o corpo.",
-      "Ao soltar o ar, gire a bacia para cima e cole a lombar na parede.",
-      "Solte devagar e repita no ritmo da respiração.",
-    ],
-    sentir: "A lombar se soltando e o abdômen ativando de leve.",
-    parar: "Se sentir contração ou dor que não passa ao parar.",
-    secs: 30,
-  },
-  {
-    id: "bracos",
-    pose: "pe",
-    emoji: "🙌",
-    name: "Alongar os braços pro alto",
-    cue: "Entrelace os dedos, vire as palmas pra cima e estique — respira fundo.",
-    passos: [
-      "Em pé ou sentada, entrelace os dedos à frente do peito.",
-      "Vire as palmas para fora e estenda os braços.",
-      "Suba os braços acima da cabeça enquanto puxa o ar.",
-      "Desça devagar soltando o ar. Repita 5 vezes.",
-    ],
-    sentir: "As costelas e as laterais do tronco abrindo — alívio pra azia.",
-    parar: "Se ficar tonta ao levantar os braços: desça e sente-se.",
-    secs: 30,
-  },
-  {
-    id: "torcao",
-    pose: "sentada",
-    emoji: "🪑",
-    name: "Torção suave sentada",
-    cue: "Sentada, gire o tronco devagar pra um lado, depois pro outro.",
-    passos: [
-      "Sente-se na beira da cadeira com os pés apoiados no chão.",
-      "Mão direita no encosto, mão esquerda na coxa direita.",
-      "Gire a partir do meio das costas, mantendo a barriga apontada pra frente.",
-      "Fique 15 segundos respirando e troque de lado.",
-    ],
-    sentir: "A coluna girando — nunca um aperto na barriga.",
-    parar: "Se a barriga apertar ou a respiração embolar.",
-    secs: 30,
-  },
-  {
-    id: "balanco",
-    pose: "quatro",
-    emoji: "🐾",
-    name: "Balanço em quatro apoios",
-    cue: "Leve o quadril pra trás e volte — alivia as costas e ajuda o encaixe.",
-    passos: [
-      "De quatro apoios, mãos abaixo dos ombros.",
-      "Leve o quadril pra trás, na direção dos calcanhares, até onde for confortável.",
-      "Volte devagar à posição inicial.",
-      "Vá e volte no ritmo da respiração.",
-    ],
-    sentir: "A lombar descomprimindo.",
-    parar: "Se o punho ou o joelho doerem.",
-    secs: 40,
-  },
-];
-
-/**
- * Movimentos que NÃO servem para todo mundo.
- *
- * Quatro apoios e borboleta no chão são seguros e até úteis em boa parte da
- * gestação, mas deixam de ser em dois momentos:
- *
- *  · No PÓS-PARTO recente. A rotação antiga não sabia disso, e uma mulher com
- *    três dias de puérpera recebia gato-camelo em quatro apoios — três dias
- *    depois de uma cesárea, se tiver sido cesárea.
- *  · No FIM da gestação, quando a sínfise púbica dói, abrir o quadril sentada
- *    no chão e ficar de quatro deixam de ser alívio e viram esforço.
- *
- * Não é uma regra de conduta clínica: é o mínimo de bom senso para não
- * oferecer o movimento errado no dia errado. Quem decide o que ela pode fazer
- * continua sendo o obstetra dela.
- */
-const CHAO = new Set(["gatocamelo", "balanco", "quadril"]);
-
-/**
- * Os 3 movimentos do dia.
- *
- * `semana` é opcional só porque o pós-parto chama sem ela — mas quando vem, é
- * ela que decide quais movimentos entram no sorteio. Antes a função recebia
- * apenas o dia e girava os nove por `day % 9`: uma gestante de 6 semanas e
- * outra de 40 recebiam exatamente o mesmo trio, e a semana estava disponível
- * no escopo de quem chamava, sem ser passada.
- */
-function movimentosForDay(day: number, semana?: number, posParto = false): Movimento[] {
-  const elegiveis =
-    posParto || (semana != null && semana >= 37)
-      ? MOVIMENTOS.filter((m) => !CHAO.has(m.id))
-      : MOVIMENTOS;
-  // Sobram 6 movimentos no filtro — ainda dá os 3 do dia sem repetir.
-  const start = day % elegiveis.length;
-  return [0, 1, 2].map((k) => elegiveis[(start + k) % elegiveis.length]);
-}
-
-function MovementBlock({
+export function MovementBlock({
   day,
   semana,
   posParto = false,
@@ -4337,17 +4157,29 @@ function MovementBlock({
    */
   aoSair?: () => void;
 }) {
-  const seq = useMemo(() => movimentosForDay(day, semana, posParto), [day, semana, posParto]);
+  /**
+   * ⚠️ A TELINHA DE ABERTURA VOLTOU — e voltou por um motivo clínico.
+   *
+   * Ela tinha sido removida por "só repetir o nome do card". Estava certo
+   * enquanto a sessão era sempre a mesma; deixou de estar quando ela passou a
+   * ter uma PERGUNTA que muda tudo: o que está incomodando hoje. Ninguém abre
+   * um app de alongamento porque é terça — abre porque a lombar travou, porque
+   * a câimbra acordou de madrugada, porque a azia não deixa deitar.
+   */
   const [open, setOpen] = useState(!!aoSair);
-  // Aberto pela lista, o exercício começa NO exercício. A telinha "Movimento
-  // do dia / Começar" só repetia o nome do card que ela acabou de tocar; o
-  // aviso médico que morava nela virou uma linha fixa no topo da tela.
-  const [phase, setPhase] = useState<"intro" | "active" | "done">(aoSair ? "active" : "intro");
+  const [phase, setPhase] = useState<"escolha" | "active" | "reflexo" | "done">("escolha");
+  const [sintoma, setSintoma] = useState<Sintoma | null>(null);
+  const [minutos, setMinutos] = useState<DuracaoExercicio>(5);
   const [idx, setIdx] = useState(0);
-  const [secs, setSecs] = useState(aoSair ? seq[0].secs : 0);
+  const [secs, setSecs] = useState(0);
   const [voz, setVoz] = useState(true);
+  const [pausado, setPausado] = useState(false);
+  const [melhorou, setMelhorou] = useState<string | null>(null);
   const [reward, setReward] = useState<number | null>(null);
   const grantedRef = useRef(false);
+  /* A sequência nasce no clique de começar, e não do render: derivada, ela
+     mudaria debaixo dela ao trocar de sintoma no meio do exercício. */
+  const [seq, setSeq] = useState<Movimento[]>([]);
 
   /* A voz desta tela é arquivo nosso, então o botão aparece sempre. Antes ele
      sumia em quem não tinha voz pt-BR instalada no aparelho — no Android, muita
@@ -4358,17 +4190,21 @@ function MovementBlock({
   // olhar para o próprio corpo em vez de para o celular, que é justamente o
   // que um exercício pede e um texto na tela impede.
   useEffect(() => {
-    if (phase !== "active" || !voz || !seq[idx]) return;
+    if (phase !== "active" || pausado || !voz || !seq[idx]) return;
+    /* Movimento sem faixa gravada anda em silêncio, e isso é degradação
+       aceitável: os passos estão escritos na tela. Nunca com a voz errada. */
     const faixa = faixaDoMovimento(seq[idx].id);
     if (faixa) tocarVoz(faixa, { canal: "guia" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, idx, voz]);
+  }, [phase, idx, voz, pausado]);
 
   useEffect(() => {
-    if (phase !== "active") return;
+    /* Pausado o relógio para de verdade — mesma régua da meditação, e pelo
+       mesmo motivo: em cinco minutos de exercício a campainha toca. */
+    if (phase !== "active" || pausado) return;
     if (secs <= 0) {
       if (idx + 1 >= seq.length) {
-        setPhase("done");
+        setPhase("reflexo");
         finish();
       } else {
         setIdx(idx + 1);
@@ -4377,10 +4213,10 @@ function MovementBlock({
       }
       return;
     }
-    const t = setTimeout(() => setSecs((s) => s - 1), 1000);
+    const t = setTimeout(() => setSecs((s: number) => s - 1), 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, secs, idx]);
+  }, [phase, secs, idx, pausado]);
 
   async function finish() {
     if (grantedRef.current || !canEarn || careMode) return;
@@ -4418,18 +4254,24 @@ function MovementBlock({
   }
 
   function begin() {
+    const lista = sessaoDoDia({ dia: day, minutos, semana, posParto, sintoma });
+    if (!lista.length) return;
+    setSeq(lista);
     setIdx(0);
-    setSecs(seq[0].secs);
+    setSecs(lista[0].secs);
     setReward(null);
+    setMelhorou(null);
+    setPausado(false);
     grantedRef.current = false;
     setPhase("active");
     buzz();
   }
   function close() {
     pararVoz();
+    setPausado(false);
     if (aoSair) return aoSair();
     setOpen(false);
-    setPhase("intro");
+    setPhase("escolha");
   }
   function alternarVoz() {
     setVoz((v) => {
@@ -4448,14 +4290,14 @@ function MovementBlock({
           <div className="flex-1">
             <p className="text-sm font-extrabold text-emerald-800">Movimento do dia</p>
             <p className="text-xs text-emerald-700/80">
-              3 movimentos leves e seguros {alreadyDone ? "· feito hoje ✓" : ""}
+              Escolha o que está incomodando {alreadyDone ? "· feito hoje ✓" : ""}
             </p>
           </div>
         </div>
         <button
           onClick={() => {
             setOpen(true);
-            setPhase("intro");
+            setPhase("escolha");
           }}
           className="press mt-3 w-full rounded-full bg-emerald-500 py-2.5 text-sm font-extrabold text-white"
         >
@@ -4484,13 +4326,30 @@ function MovementBlock({
               <span className="flex-1" />
             )}
             {phase === "active" ? (
-              <button
-                onClick={alternarVoz}
-                aria-label={voz ? "Desligar voz" : "Ligar voz"}
-                className={`press text-lg leading-none ${voz ? "" : "opacity-40 grayscale"}`}
-              >
-                🗣️
-              </button>
+              <div className="flex items-center gap-3">
+                {/* ⏸ desenhado, e não emoji: emoji tem cor própria em cada
+                    sistema — a mesma lição do 📞 preto no iOS. */}
+                <button
+                  onClick={() => setPausado((v) => !v)}
+                  aria-label={pausado ? "Continuar" : "Pausar"}
+                  className="press grid h-9 w-9 place-items-center rounded-full border border-emerald-200 bg-white/70 text-emerald-600"
+                >
+                  <svg viewBox="0 0 24 24" className="h-[15px] w-[15px]" fill="currentColor">
+                    {pausado ? (
+                      <path d="M8 5.2v13.6L19 12z" />
+                    ) : (
+                      <path d="M6.6 4.8h3.7v14.4H6.6zM13.7 4.8h3.7v14.4h-3.7z" />
+                    )}
+                  </svg>
+                </button>
+                <button
+                  onClick={alternarVoz}
+                  aria-label={voz ? "Desligar voz" : "Ligar voz"}
+                  className={`press text-lg leading-none ${voz ? "" : "opacity-40 grayscale"}`}
+                >
+                  🗣️
+                </button>
+              </div>
             ) : (
               <span className="w-6" />
             )}
@@ -4504,22 +4363,98 @@ function MovementBlock({
             </p>
           )}
 
-          {phase === "intro" && (
-            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
-              <span className="text-6xl">🤸</span>
-              <h3 className="mt-4 text-2xl font-extrabold text-emerald-900">Movimento do dia</h3>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-emerald-800/80">
-                3 movimentos suaves pra soltar o corpo. Vá no seu ritmo e pare se sentir qualquer
-                desconforto.
+          {phase === "escolha" && (
+            <div className="flex-1 overflow-y-auto px-6 pb-10">
+              <h3 className="font-serif text-[26px] font-semibold text-emerald-900">
+                Mexer o corpo
+              </h3>
+              <p className="mt-1 text-[13px] text-emerald-800/70">
+                Diga o que está incomodando e eu monto a sequência.
               </p>
-              <p className="mt-2 max-w-xs text-[11px] text-emerald-700/70">
-                Confirme com seu médico se algum movimento não é indicado pra você.
+
+              {/* ── O QUE INCOMODA HOJE ────────────────────────────────────
+                  A pergunta que faltava. Antes a sessão era `day % 9`: a
+                  mulher com ciática recebia "rolar os ombros" porque era
+                  terça. */}
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                O que está incomodando?
               </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {SINTOMAS.map((x) => (
+                  <button
+                    key={x.chave}
+                    onClick={() => setSintoma(sintoma === x.chave ? null : x.chave)}
+                    aria-pressed={sintoma === x.chave}
+                    className={`press flex items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-colors ${
+                      sintoma === x.chave
+                        ? "bg-emerald-500 text-white"
+                        : "border border-emerald-200 bg-white/70 text-emerald-900"
+                    }`}
+                  >
+                    <span className="text-lg leading-none" aria-hidden>
+                      {x.emoji}
+                    </span>
+                    <span className="text-[12.5px] font-bold leading-tight">{x.rotulo}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                De quanto tempo você tem?
+              </p>
+              <div className="mt-2 flex gap-2">
+                {DURACOES_EXERCICIO.map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMinutos(m)}
+                    className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
+                      minutos === m
+                        ? "bg-emerald-500 text-white"
+                        : "border border-emerald-200 bg-white/70 text-emerald-700"
+                    }`}
+                  >
+                    {m} min
+                  </button>
+                ))}
+              </div>
+
+              {/* ── ⚠️ OS SINAIS DE PARADA ─────────────────────────────────
+                  Não é "li e aceito": são os motivos pelos quais ela NÃO deve
+                  se exercitar hoje, e todos pedem contato com o obstetra em
+                  vez de alongamento. Fica ANTES, porque depois não serve. */}
+              <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
+                <p className="text-[12px] font-extrabold text-amber-900">
+                  Hoje não é dia de exercício se você tiver:
+                </p>
+                <ul className="mt-1.5 grid gap-1">
+                  {SINAIS_DE_PARADA.map((sinal) => (
+                    <li key={sinal} className="text-[12px] leading-snug text-amber-900/85">
+                      · {sinal}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-[11.5px] leading-snug text-amber-900/70">
+                  Qualquer um deles: fale com seu médico agora, pelo SOS ou pela conversa.
+                </p>
+              </div>
+
+              <p className="mt-4 text-[11px] leading-relaxed text-emerald-700/60">
+                Nada aqui substitui a orientação do seu obstetra. Se ele já disse que algum
+                movimento não serve pra você, pule esse.
+              </p>
+            </div>
+          )}
+
+          {phase === "escolha" && (
+            <div
+              className="border-t border-emerald-200/60 bg-white/70 px-6 pb-5 pt-3 backdrop-blur"
+              style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom, 0px))" }}
+            >
               <button
                 onClick={begin}
-                className="press mt-8 rounded-full bg-emerald-500 px-8 py-3 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white"
               >
-                Começar
+                Começar · {minutos} min
               </button>
             </div>
           )}
@@ -4542,7 +4477,9 @@ function MovementBlock({
                     strokeLinecap="round"
                     strokeDasharray={2 * Math.PI * 45}
                     strokeDashoffset={(1 - secs / cur.secs) * 2 * Math.PI * 45}
-                    style={{ transition: "stroke-dashoffset 1s linear" }}
+                    /* Pausado, o anel congela: um anel que continua andando
+                       com o relógio parado é a tela mentindo. */
+                    style={{ transition: pausado ? "none" : "stroke-dashoffset 1s linear" }}
                   />
                 </svg>
                 <FiguraMovimento pose={cur.pose} anim={cur.id} className="text-emerald-700" />
@@ -4604,13 +4541,74 @@ function MovementBlock({
               </button>
             </div>
           )}
+          {/* ── ⚠️ MELHOROU? ──────────────────────────────────────────────
+              A pergunta que transforma alongamento em informação clínica. A
+              paciente responde em um toque, e a resposta vai para o diário
+              dela com a queixa que ela escolheu no começo — então o médico
+              abre o prontuário e vê "lombar: melhorou" oito vezes seguidas, ou
+              "não mudou" oito vezes, que é uma conversa completamente outra.
+              Só aparece quando ela DISSE o que incomodava: sem queixa, não há
+              o que comparar. */}
+          {phase === "reflexo" && (
+            <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
+              <span className="text-5xl">🤸</span>
+              <h3 className="mt-4 font-serif text-[24px] font-semibold text-emerald-900">
+                {sintoma ? "E agora, como está?" : "Terminou!"}
+              </h3>
+              {sintoma ? (
+                <>
+                  <p className="mt-1.5 text-[13px] text-emerald-800/70">
+                    Sobre o que você marcou no começo.
+                  </p>
+                  <div className="mt-6 grid w-full max-w-xs gap-2">
+                    {[
+                      { e: "😌", r: "Melhorou" },
+                      { e: "😐", r: "Igual" },
+                      { e: "😖", r: "Piorou" },
+                    ].map((o) => (
+                      <button
+                        key={o.r}
+                        onClick={() => {
+                          setMelhorou(o.r);
+                          void registrarExercicio(sintoma, o.r, minutos);
+                          setPhase("done");
+                        }}
+                        className="press flex items-center gap-3 rounded-2xl border border-emerald-200 bg-white/75 px-4 py-3 text-left text-sm font-bold text-emerald-900"
+                      >
+                        <span className="text-xl leading-none">{o.e}</span>
+                        {o.r}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setPhase("done")}
+                    className="press mt-5 text-xs font-bold text-emerald-600"
+                  >
+                    Pular
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setPhase("done")}
+                  className="press mt-8 w-full max-w-xs rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white"
+                >
+                  Continuar
+                </button>
+              )}
+            </div>
+          )}
+
           {phase === "done" && (
             <div className="flex flex-1 flex-col items-center justify-center px-8 text-center">
               {!careMode && <ConfettiBurst />}
               <span className="dc-result-in text-6xl">💪</span>
               <h3 className="mt-3 text-2xl font-extrabold text-emerald-900">Corpo soltinho! 🎉</h3>
-              <p className="mt-1 text-sm text-emerald-800/80">
-                Você cuidou de você e do bebê hoje.
+              <p className="mt-1 max-w-xs text-sm text-emerald-800/80">
+                {melhorou === "Piorou"
+                  ? "Anotei. Se piorar de novo, conte na próxima consulta — isso é informação, não frescura."
+                  : melhorou === "Melhorou"
+                    ? "Anotei que melhorou. Repetir nos próximos dias costuma segurar o alívio."
+                    : "Você cuidou de você e do bebê hoje."}
               </p>
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
@@ -4880,6 +4878,45 @@ async function gravarLembrete(hora: string | null): Promise<boolean> {
     return !error;
   } catch {
     return false;
+  }
+}
+
+/**
+ * O DESFECHO DO EXERCÍCIO — e por que ele vale mais que a estrelinha.
+ *
+ * "Lombar: melhorou" repetido oito vezes e "lombar: igual" repetido oito vezes
+ * são duas conversas clínicas completamente diferentes, e nenhuma delas
+ * existia antes: a paciente alongava e o app registrava só que ela tinha
+ * alongado. Isto entra no diário dela e, por ele, na linha do tempo que o
+ * médico abre na consulta.
+ *
+ * ⚠️ SEM `mood`. A tabela é a mesma do diário, e o campo `mood` alimenta o
+ * gráfico de humor dela e o bloco de humor do cérebro da IA. "Piorou" aqui é
+ * sobre uma DOR NAS COSTAS, não sobre como ela está se sentindo — carimbar
+ * isso como humor faria a curva emocional dela despencar por causa de uma
+ * lombalgia.
+ */
+async function registrarExercicio(sintoma: string, desfecho: string, minutos: number) {
+  try {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) return;
+    const rotulo = SINTOMAS.find((x) => x.chave === sintoma)?.rotulo ?? sintoma;
+    await (
+      supabase as unknown as {
+        from: (t: string) => {
+          insert: (v: Record<string, unknown>) => Promise<{ error: unknown }>;
+        };
+      }
+    )
+      .from("journal_entries")
+      .insert({
+        user_id: u.user.id,
+        content: `Exercício de ${minutos} min · ${rotulo}: ${desfecho.toLowerCase()}`,
+      });
+  } catch {
+    /* Mesma razão do registro da meditação: falhar em silêncio é melhor que
+       uma mensagem vermelha no fim de uma atividade que ela concluiu. */
   }
 }
 

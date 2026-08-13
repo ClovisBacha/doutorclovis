@@ -25,6 +25,7 @@ import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notifi
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
+import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
@@ -153,6 +154,11 @@ const PreviewHomeRoute = PreviewHomeRouteImport.update({
 const PreviewGradesRoute = PreviewGradesRouteImport.update({
   id: '/preview-grades',
   path: '/preview-grades',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewExercicioRoute = PreviewExercicioRouteImport.update({
+  id: '/preview-exercicio',
+  path: '/preview-exercicio',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewContaRoute = PreviewContaRouteImport.update({
@@ -427,6 +433,7 @@ export interface FileRoutesByFullPath {
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
@@ -493,6 +500,7 @@ export interface FileRoutesByTo {
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
@@ -561,6 +569,7 @@ export interface FileRoutesById {
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-home': typeof PreviewHomeRoute
   '/preview-jogo': typeof PreviewJogoRoute
@@ -629,6 +638,7 @@ export interface FileRouteTypes {
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
@@ -695,6 +705,7 @@ export interface FileRouteTypes {
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
@@ -762,6 +773,7 @@ export interface FileRouteTypes {
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-conta'
+    | '/preview-exercicio'
     | '/preview-grades'
     | '/preview-home'
     | '/preview-jogo'
@@ -830,6 +842,7 @@ export interface RootRouteChildren {
   PreviewCasalRoute: typeof PreviewCasalRoute
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewContaRoute: typeof PreviewContaRoute
+  PreviewExercicioRoute: typeof PreviewExercicioRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
@@ -979,6 +992,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-grades'
       fullPath: '/preview-grades'
       preLoaderRoute: typeof PreviewGradesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-exercicio': {
+      id: '/preview-exercicio'
+      path: '/preview-exercicio'
+      fullPath: '/preview-exercicio'
+      preLoaderRoute: typeof PreviewExercicioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-conta': {
@@ -1370,6 +1390,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewCasalRoute: PreviewCasalRoute,
   PreviewChatRoute: PreviewChatRoute,
   PreviewContaRoute: PreviewContaRoute,
+  PreviewExercicioRoute: PreviewExercicioRoute,
   PreviewGradesRoute: PreviewGradesRoute,
   PreviewHomeRoute: PreviewHomeRoute,
   PreviewJogoRoute: PreviewJogoRoute,

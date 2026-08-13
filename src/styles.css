@@ -3047,3 +3047,86 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ══════════ Movimentos novos: deitada de lado e de frente para a parede ═════
+   Mesma gramática dos `dc-mv-` que já existiam — amplitude pequena, ciclo
+   longo, e tudo para em `prefers-reduced-motion`. O desenho ensina o que o
+   texto não ensina: "bem embaixo, na base da coluna" é ambíguo escrito e
+   óbvio visto. */
+@keyframes dc-mv-respira {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+@keyframes dc-mv-fecha {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+}
+@keyframes dc-mv-joelhopeito {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-22deg);
+  }
+}
+@keyframes dc-mv-eleva {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes dc-mv-aperta {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.78);
+  }
+}
+@keyframes dc-mv-agacha {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(14px);
+  }
+}
+@keyframes dc-mv-costelas {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(6px) rotate(-3deg);
+  }
+}
+@keyframes dc-mv-panturrilha {
+  0%,
+  100% {
+    transform: skewX(0deg);
+  }
+  50% {
+    transform: skewX(-5deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="dc-mv-"] {
+    animation: none !important;
+  }
+}

@@ -15,20 +15,36 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { faixaDoMovimento, movimentosComFaixa, RESPIRACAO } from "./voz";
+import { MOVIMENTOS } from "./exercicios";
 
 const RAIZ = process.cwd();
 
-function movimentosDoComponente(): Set<string> {
-  const s = readFileSync(join(RAIZ, "src", "components", "gestacao-path.tsx"), "utf8");
-  const bloco = s.slice(
-    s.indexOf("const MOVIMENTOS: Movimento[] = ["),
-    // Âncora no CÓDIGO, não num comentário: a primeira versão terminava a
-    // fatia num texto de comentário, e bastou reescrevê-lo para o teste varrer
-    // o arquivo inteiro e achar `id:` de outras coisas.
-    s.indexOf("function movimentosForDay"),
-  );
-  return new Set([...bloco.matchAll(/id:\s*"([^"]+)"/g)].map((m) => m[1]));
+/* Os movimentos saíram do componente para `lib/exercicios.ts` (ago/2026) — o
+   teste segue a mudança em vez de continuar lendo um bloco que não existe. */
+function todosOsMovimentos(): Set<string> {
+  return new Set(MOVIMENTOS.map((m) => m.id));
 }
+
+/**
+ * ⚠️ OS NOVE PRIMEIROS, e só eles, têm voz gravada hoje.
+ *
+ * Os dezesseis movimentos novos (assoalho pélvico, ciática, púbis, preparação
+ * de parto, pós-parto) nasceram sem faixa: eles rodam em SILÊNCIO, com os
+ * passos escritos na tela, e `faixaDoMovimento` devolve `null` sem quebrar
+ * nada. É degradação aceitável e temporária — mas é para ser vista, e não para
+ * ser esquecida. Esta lista é a fila de gravação.
+ */
+const COM_VOZ_GRAVADA = [
+  "ombros",
+  "pescoco",
+  "gatocamelo",
+  "quadril",
+  "tornozelo",
+  "pelve",
+  "bracos",
+  "torcao",
+  "balanco",
+];
 
 describe("as três palavras da respiração", () => {
   test("existem e são arquivos distintos", () => {
@@ -38,16 +54,42 @@ describe("as três palavras da respiração", () => {
   });
 });
 
-describe("os nove movimentos", () => {
-  test("todo movimento tem faixa", () => {
-    const ids = movimentosDoComponente();
-    expect(ids.size).toBeGreaterThan(0);
-    expect([...ids].filter((i) => faixaDoMovimento(i) === null)).toEqual([]);
+describe("a voz dos movimentos", () => {
+  test("os nove com voz gravada continuam com voz", () => {
+    /* Perder uma destas é perder crédito já gasto, e em silêncio. */
+    expect(COM_VOZ_GRAVADA.filter((i) => faixaDoMovimento(i) === null)).toEqual([]);
   });
 
   test("nenhuma faixa de movimento órfã", () => {
-    const ids = movimentosDoComponente();
+    /* Faixa sem movimento é arquivo que ninguém toca — e ninguém percebe. */
+    const ids = todosOsMovimentos();
     expect(movimentosComFaixa().filter((i) => !ids.has(i))).toEqual([]);
+  });
+
+  test("⚠️ a fila de gravação: quais movimentos ainda rodam mudos", () => {
+    /* Este teste NÃO falha por haver movimento mudo — ele falha se a lista
+       mudar sem alguém olhar. Quando as faixas forem gravadas, mova o id para
+       `COM_VOZ_GRAVADA` e apague-o daqui. */
+    const mudos = [...todosOsMovimentos()].filter((i) => faixaDoMovimento(i) === null);
+    expect(mudos.sort()).toEqual(
+      [
+        "agachamento-parede",
+        "assoalho-lento",
+        "assoalho-rapido",
+        "assoalho-soltar",
+        "ativar-transverso",
+        "circulos-bola",
+        "costelas-parede",
+        "joelho-ao-peito",
+        "panturrilha-parede",
+        "pernas-elevadas",
+        "piriforme",
+        "punho-dedos",
+        "respirar-para-baixo",
+        "respiracao-diafragma",
+        "travesseiro-entre-joelhos",
+      ].sort(),
+    );
   });
 });
 

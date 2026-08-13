@@ -17,7 +17,10 @@
  * com prefixo `dc-mv-` e todas param em `prefers-reduced-motion`.
  */
 
-export type PoseKey = "pe" | "sentada" | "borboleta" | "quatro";
+/* O tipo mora em `lib/exercicios.ts`, junto dos movimentos que o usam: era
+   ele quem obrigava um arquivo de dados a importar de um componente. */
+export type { PoseKey } from "@/lib/exercicios";
+import type { PoseKey } from "@/lib/exercicios";
 
 /** Traço comum a tudo: fino, redondo nas pontas, herda a cor do container. */
 const T = {
@@ -61,7 +64,9 @@ export function FiguraMovimento({
   // Quatro apoios é uma figura DEITADA: no mesmo quadro em pé ela sobraria em
   // cima e embaixo e encolheria pela metade. Cada orientação tem seu quadro, e
   // o tamanho vem daqui — quem chama só diz a cor.
-  const deitada = pose === "quatro";
+  /* Duas orientações, dois quadros: numa figura deitada o quadro em pé
+     sobraria em cima e embaixo e encolheria o desenho pela metade. */
+  const deitada = pose === "quatro" || pose === "deitada";
   return (
     <svg
       viewBox={deitada ? "12 20 130 90" : "0 0 120 150"}
@@ -73,6 +78,8 @@ export function FiguraMovimento({
       {pose === "pe" ? <EmPe anim={anim} /> : null}
       {pose === "sentada" ? <Sentada anim={anim} /> : null}
       {pose === "borboleta" ? <Borboleta anim={anim} /> : null}
+      {pose === "deitada" ? <Deitada anim={anim} /> : null}
+      {pose === "parede" ? <Parede anim={anim} /> : null}
     </svg>
   );
 }
@@ -220,5 +227,121 @@ function Quatro({ anim }: { anim: string }) {
       {membros}
       <path d="M20 104 L134 104" {...T} strokeWidth={2.4} opacity={0.35} />
     </g>
+  );
+}
+
+/* ── Deitada de lado ────────────────────────────────────────────────────────
+   A posição em que se aprende assoalho pélvico, e a única segura para deitar
+   depois da 20ª semana. O travesseiro entre os joelhos não é enfeite: ele
+   aparece em três dos movimentos que usam esta pose. */
+function Deitada({ anim }: { anim: string }) {
+  const respira = anim === "respiracao-diafragma" || anim === "assoalho-soltar";
+  const fecha = anim === "assoalho-lento" || anim === "ativar-transverso";
+  const joelho = anim === "joelho-ao-peito";
+  const aperta = anim === "travesseiro-entre-joelhos";
+  const eleva = anim === "pernas-elevadas";
+
+  return (
+    <g>
+      {/* Travesseiro sob a cabeça — ela está apoiada, não caída. */}
+      <path d="M18 52 L38 52" {...T} strokeWidth={2.4} opacity={0.35} />
+      <circle cx={30} cy={44} r={11} {...T} />
+      <path d="M41 46 L52 48" {...T} />
+      {/* Tronco com a barriga voltada para baixo-frente. */}
+      <g
+        style={
+          respira || fecha
+            ? {
+                animation: `dc-mv-${fecha ? "fecha" : "respira"} 5s ease-in-out infinite`,
+                transformOrigin: "76px 56px",
+              }
+            : undefined
+        }
+      >
+        <path d="M52 48 C68 44 88 46 100 52" {...T} />
+        <ellipse cx={74} cy={64} rx={19} ry={13} {...T} />
+      </g>
+      {/* Pernas dobradas, uma sobre a outra. */}
+      <g
+        style={
+          joelho
+            ? {
+                animation: "dc-mv-joelhopeito 5s ease-in-out infinite",
+                transformOrigin: "100px 54px",
+              }
+            : eleva
+              ? { animation: "dc-mv-eleva 6s ease-in-out infinite", transformOrigin: "100px 54px" }
+              : undefined
+        }
+      >
+        <path d="M100 52 L118 62 L104 76" {...T} />
+      </g>
+      <path d="M100 56 L120 70 L106 84" {...T} />
+      {/* Travesseiro entre os joelhos: some quando não é o assunto. */}
+      {(aperta || joelho || respira) && (
+        <ellipse
+          cx={117}
+          cy={70}
+          rx={7}
+          ry={5}
+          {...T}
+          strokeWidth={2.2}
+          opacity={aperta ? 0.85 : 0.35}
+          style={
+            aperta
+              ? { animation: "dc-mv-aperta 4s ease-in-out infinite", transformOrigin: "117px 70px" }
+              : undefined
+          }
+        />
+      )}
+      <path d="M14 92 L136 92" {...T} strokeWidth={2.4} opacity={0.35} />
+    </g>
+  );
+}
+
+/* ── De frente para a parede ────────────────────────────────────────────────
+   Panturrilha, costelas e agachamento apoiado: os três precisam da parede
+   desenhada, senão a figura parece empurrando o ar. */
+function Parede({ anim }: { anim: string }) {
+  const desce = anim === "agachamento-parede";
+  const alonga = anim === "panturrilha-parede";
+  const costelas = anim === "costelas-parede";
+
+  return (
+    <>
+      {/* A parede — traço grosso à esquerda, para o corpo ter contra o quê. */}
+      <path d="M18 8 L18 144" {...T} strokeWidth={3.6} opacity={0.4} />
+      <g
+        style={
+          desce
+            ? { animation: "dc-mv-agacha 5s ease-in-out infinite" }
+            : costelas
+              ? { animation: "dc-mv-costelas 5s ease-in-out infinite" }
+              : undefined
+        }
+      >
+        <Cabeca />
+        <TroncoFrente />
+        <path d="M44 50 L76 50" {...T} />
+        {/* Braços para a parede. */}
+        <path d="M44 50 L30 40 L22 34" {...T} />
+        <path d="M76 50 L58 38 L26 30" {...T} />
+      </g>
+      <g
+        style={
+          alonga
+            ? {
+                animation: "dc-mv-panturrilha 5s ease-in-out infinite",
+                transformOrigin: "60px 96px",
+              }
+            : undefined
+        }
+      >
+        <path d="M48 96 L72 96" {...T} />
+        <path d="M52 96 L44 120 L44 140" {...T} />
+        <path d="M68 96 L84 118 L92 140" {...T} />
+      </g>
+      <path d="M24 144 L108 144" {...T} strokeWidth={2.2} opacity={0.35} />
+    </>
   );
 }

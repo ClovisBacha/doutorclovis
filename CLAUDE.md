@@ -1646,3 +1646,75 @@ som. Tela em `sons-para-dormir.tsx`, régua em `som-continuo.ts`.
 - **Esta tela NÃO pausa quando o app sai da frente** — o contrário da meditação,
   de propósito. E não tem `manterTelaAcesa`: a tela deve apagar.
 - **Bancada:** `/preview-sons`.
+
+## A noite ganhou conteúdo próprio (ago/2026)
+
+Duas **histórias para dormir** e uma **sessão para o casal**: 65 mp3, 14min53s,
+38,70 créditos, na mesma voz de tudo que fala no app.
+
+### Histórias (`historias-para-dormir.ts` + `historia-da-noite.tsx`)
+
+- **Blocos, não arquivo único.** O silêncio entre eles CRESCE de 3 s a 16 s
+  (`pausaDepoisDo`) — é isso que faz a voz se afastar, e é a diferença entre
+  uma história para dormir e um audiolivro lido devagar. Em blocos, a primeira
+  fala toca em segundos e regravar uma frase ruim custa UM bloco.
+- **Nenhuma pergunta** (pergunta convoca a cabeça a responder), **o texto não
+  aparece na tela** (ler acorda), e a tela **escurece sozinha em 20 s** — com o
+  toque REARMANDO o relógio, senão o primeiro toque acende a tela pelo resto da
+  noite. Narração a **0,92× com `preservesPitch`**: a Isabella lê a ~150 ppm, e
+  o gênero vive entre 100 e 130.
+- ⚠️ **A história termina entregando ao SOM**, não ao silêncio. Onze minutos de
+  voz que simplesmente param deixam o quarto mudo de repente. Por isso
+  `abrirHistoria` chama `destravar()` no MESMO toque: a entrega acontece sem
+  gesto nenhum, e no iOS ela seria recusada.
+- **As duas atravessam o Modo Cuidado** — não citam bebê nem gestação. É o
+  único conteúdo do app que serve a quem perdeu a gestação sem ressalva, e a
+  noite de quem está de luto é exatamente uma noite ruim.
+
+### Casal (`sessao-do-casal.ts` + `sessao-do-casal.tsx`)
+
+- É **preparação de parto** disfarçada de exercício a dois: seguir o ritmo dela,
+  a pressão no sacro, e a palavra combinada.
+- **Todo bloco diz A QUEM fala** (`alvo`, em cor própria e letra grande) com um
+  **desenho** mostrando onde a mão vai. Num aparelho só, não saber de quem é a
+  vez é o defeito clássico do gênero.
+- ⚠️ **Nenhuma fala pede que alguém SINTA nada** — há teste com regex. "Sintam
+  a energia entre vocês" é o que faz um casal adulto fechar o app.
+- ⚠️ **O acompanhante nunca tem gênero.** Pode ser o pai, a companheira, a mãe
+  ou a irmã. A conferência antes de gastar crédito pegou dois "a mão dele" meus.
+- O bloco de silêncio central tem **60 s: a duração de uma contração**.
+
+## A aba de exercícios deixou de ser `day % 9` (ago/2026)
+
+Eram nove movimentos, três por dia, ~100 segundos. Uma gestante de 8 semanas e
+uma de 39 recebiam o mesmo trio. Régua e conteúdo agora em
+`src/lib/exercicios.ts` (sem JSX, testado).
+
+- **A pergunta mudou.** Ninguém abre um app de alongamento porque é terça —
+  abre porque a lombar travou. A sessão começa em **"o que está incomodando?"**
+  (oito queixas), e o que alivia AQUILO vem primeiro. Há teste cobrando que
+  toda queixa oferecida tenha ao menos dois movimentos: ele reprovou "dor no
+  osso da frente", que tinha um só.
+- ⚠️ **Faltava o assoalho pélvico** — o exercício com melhor evidência da
+  gestação inteira, e nenhum dos nove era ele. São três, porque são três
+  habilidades: segurar, responder rápido, e SOLTAR (esta é a que ninguém ensina
+  e a que o parto pede). Ele entra em TODA sessão de 5 min ou mais **mesmo sem
+  ela pedir**: ninguém acorda com dor no assoalho pélvico, ele previne o que
+  ainda não dói.
+- **Preparação de parto a partir da 36ª** — e a fase `parto` **acrescenta** à
+  t3, não substitui: uma fase que trocasse a lista faria a mulher de 38 semanas
+  perder o alívio de lombar justamente quando ele mais dói.
+- **25 movimentos**, com `alivia` / `fases` / `tipo` / `chao`. Duas poses novas
+  (`deitada`, `parede`) porque oito dos novos ficariam sem desenho.
+- **Duração escolhida** (2/5/10 min) e **pausa** — mesma régua da meditação: o
+  relógio para e o anel congela junto (medido no navegador: 38 s → 38 s).
+- ⚠️ **Os sinais de parada aparecem ANTES**, e não como "li e aceito": sem
+  caixa de marcar, porque uma caixa vira toque automático na terceira vez.
+- ⚠️ **O desfecho vai para o diário SEM `mood`.** "Piorou" aqui é sobre uma dor
+  nas costas; carimbar como humor faria a curva emocional dela despencar por
+  causa de uma lombalgia. `registrarExercicio` grava só `content`.
+- **Bancada:** `/preview-exercicio?w=24` · `?w=38` (parto) · `?pos=1`.
+- ⚠️ **Os 16 movimentos novos ainda rodam MUDOS** — as faixas de voz não foram
+  gravadas. Eles funcionam (os passos estão na tela) e `faixaDoMovimento`
+  devolve `null` sem quebrar nada. A fila de gravação está travada em
+  `voz.test.ts`: mover um id para `COM_VOZ_GRAVADA` é o que fecha a pendência.
