@@ -1974,6 +1974,72 @@ foram medidas antes de qualquer mudança.
   PRÓPRIA, nunca o `audioRef` da sessão: se dividissem o objeto, o relógio da
   amostra pararia o som da meditação dez segundos depois de ela começar.
 
+## A frase de fechamento passou a terminar de tocar (ago/2026)
+
+O dono relatou: uma frase apareceu na tela ("Vamos voltar devagar. Comece
+mexendo os dedos das mãos.") e não foi falada. `volta-1.mp3` existe e está
+correto — o defeito era de TIMING, não de arquivo faltando.
+
+- ⚠️ **A CAUSA:** `planejarSessao` garante "cada janela recebe pelo menos um
+  ciclo", e para sessões de 1, 2 e 5 minutos a janela `volta` só tem espaço
+  para UM ciclo — que é literalmente o ÚLTIMO da sessão inteira (medido
+  rodando o planejador de verdade). O relógio da respiração termina a sessão
+  no segundo exato em que aquele ciclo acaba, e o efeito "cala a voz ao sair
+  da sessão" cortava os DOIS canais (`guia` e `pulso`) nesse instante — sem
+  dar à fala de fechamento a chance de terminar, numa rede mais lenta ou só
+  pela variação normal de quando o áudio termina de carregar.
+- ⚠️ **O CONSERTO É NO RUNTIME, NÃO NO PLANO.** Alongar `totalCiclos` quebraria
+  um teste deliberado ("o compasso é o mesmo em 1 e em 10 minutos" —
+  `meditacao-sessao.test.ts`): a duração é `ciclosDe(minutos) * CICLO`, e
+  nada mais. Reduzir o espaço da janela `volta` para reservar um ciclo de
+  folga arriscava ESPREMER a fala de fechamento a zero nas sessões mais
+  curtas — pior que o defeito original. A correção certa foi separar os dois
+  canais: ao sair da sessão, só o `pulso` (as três palavras do compasso) é
+  cortado na hora; o `guia` — a fala em si — termina sozinho. `tocar()` já
+  para o canal anterior antes de tocar o próximo, então não há vazamento: a
+  próxima fala guiada silencia esta sozinha quando chegar a vez dela.
+- **Bancada:** `/preview-meditacao` (e `?w=` para a semana, `?luto=1` para o
+  Modo Cuidado). `MeditationBlock` não busca nada do servidor para desenhar a
+  sessão — o plano é montado no cliente —, então dá pra abrir a sessão
+  inteira, do relógio ao sheet de sons, sem conta nenhuma. Foi assim que o
+  defeito pôde ser reproduzido e confirmado: sem a bancada, teria sido
+  medir às cegas.
+
+### A tela da sessão, quatro pedidos numa noite (ago/2026)
+
+- ⚠️ **"Encerrar por aqui" saiu — dos DOIS lugares onde existia** (a sessão
+  ativa e o véu de pausa). Pedido do dono: "se a pessoa quiser sair é só
+  clicar no X". Os dois botões faziam EXATAMENTE a mesma coisa que o ✕ já
+  fazia (`encerrarGuardando`, guardando a sessão a partir de um minuto) — e o
+  app cobrava dela saber a diferença entre dois caminhos para o mesmo lugar.
+  O ✕ fica ACIMA do véu de pausa (`z-30` contra `z-20`), então continua
+  alcançável enquanto ela está parada.
+- **"Calma · 2 min restantes" saiu**, e um contador foi para o lado da barra
+  de progresso — pedido do dono: "a barra já mostra a evolução". Formato
+  "3m" enquanto falta um minuto ou mais; "59s", "58s"... segundo a segundo só
+  depois disso.
+  ⚠️ **É FLOOR, não CEIL** — e a diferença apareceu na primeira sessão
+  testada ao vivo: `ciclosDe` arredonda o total para CIMA em ciclos inteiros
+  (3 min viram 3min12s de verdade), e com CEIL o contador abria em "4m"
+  enquanto ela tinha tocado em "3 min". Floor abre no número que ela
+  escolheu.
+  ⚠️ **NÃO É o contador regressivo que já saiu daqui uma vez** — aquele
+  contava por FASE da respiração (4→1, depois 2→1, depois 6→1: três máximos
+  diferentes por ciclo) e foi removido por isso. Este conta a SESSÃO INTEIRA
+  por relógio de verdade (`Date.now()`), nunca reseta a cada respiração, e
+  congela durante a pausa como a barra já fazia — a pausa desconta do
+  relógio (`inicioSessaoRef` salta para a frente pelo tempo pausado), senão
+  dez minutos atendendo a campainha descontariam dez minutos do contador.
+- **O ícone da voz virou SVG desenhado** — pedido do dono: "mude o emoji, ele
+  está muito feio". Um balão de fala com duas linhas por dentro, mesma
+  lógica do 📞 preto no iOS: emoji renderiza diferente em cada sistema.
+- **O ícone de som abre um sheet dentro da sessão**, em vez de alternar
+  direto entre o som escolhido e o silêncio. Pedido do dono: "que a pessoa
+  consiga abrir uma aba com os sons disponíveis para mudar dentro do
+  exercício". Lista `SOUNDSCAPES` (sem o item "silêncio", que virou o botão
+  "Desligar som" no final da lista, separado dos chips de trilha para não
+  se confundir com mais uma escolha de som).
+
 ## Os sons foram refeitos, com medição (ago/2026)
 
 O dono disse que os sons estavam ruins. A auditoria mediu, e ele tinha razão:

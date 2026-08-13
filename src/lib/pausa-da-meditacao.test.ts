@@ -37,6 +37,17 @@ function trecho(de: string, ate: string): string {
   return path.slice(i, j);
 }
 
+/* A mesma coisa, mas no ARQUIVO INTEIRO — para o que mora FORA da fatia do
+   componente (`formatarRestante` é módulo-level, declarada antes de
+   `MeditationBlock`). */
+function trechoArquivo(de: string, ate: string): string {
+  const i = arquivo.indexOf(de);
+  if (i < 0) throw new Error(`marcador sumiu do fonte: ${de}`);
+  const j = arquivo.indexOf(ate, i + de.length);
+  if (j < 0) throw new Error(`marcador sumiu do fonte: ${ate}`);
+  return arquivo.slice(i, j);
+}
+
 describe("a sessão para de verdade", () => {
   test("o relógio da respiração não corre pausado", () => {
     /* Sem isto a sessão continuaria respirando por trás do véu: ela voltaria
@@ -162,19 +173,20 @@ describe("o que continua alcançável com o véu no ar", () => {
     expect(fn).toContain("somRef.current = k;");
   });
 
-  test("o véu oferece continuar e, passado o minuto, encerrar guardando", () => {
-    const veu = trecho('role="dialog"', "── 3. Fechamento");
+  test("⚠️ o véu oferece SÓ continuar — 'Encerrar por aqui' saiu daqui também", () => {
+    /* Pedido do dono: o ✕ é o único caminho para sair. Ele fica ACIMA do véu
+       (`z-30` contra o `z-20` deste diálogo — ver o teste abaixo), então
+       continua alcançável durante a pausa; um segundo botão aqui dentro
+       seria o mesmo caminho duplicado que já saiu da tela ativa. */
+    const veu = trecho('role="dialog"', "── O SHEET DE SONS");
     expect(veu).toContain("void retomarSessao()");
-    expect(veu).toContain("{ciclo >= UM_MINUTO && (");
-    expect(veu).toContain("onClick={encerrarGuardando}");
+    expect(veu).not.toMatch(/>\s*Encerrar por aqui\s*</);
   });
 
   test("⚠️ o leitor de tela não atravessa o véu", () => {
     /* O véu esconde do dedo, não do VoiceOver: sem isto, quem navega por gestos
-       deslizava até a frase da sessão e até um SEGUNDO "Encerrar por aqui" —
-       numa tela que diz estar parada. */
+       deslizava até a frase da sessão que a tela diz estar parada. */
     expect(path).toContain("aria-hidden={pausada}");
-    expect(path).toContain("{ciclo >= UM_MINUTO && !pausada && (");
     expect(path).toContain('aria-modal="true"');
   });
 });
@@ -213,5 +225,98 @@ describe("⚠️ uma voz de cada vez", () => {
     /* Fora da fatia do componente: o compasso é declarado antes dele. */
     expect(arquivo).toContain("const CICLO_SEGS = CICLO;");
     expect(arquivo).not.toContain("const RESPIRO = {");
+  });
+});
+
+describe("⚠️ a última frase do arco termina de tocar", () => {
+  /* Sessões curtas (1, 2, 5 min) só têm UM ciclo de sobra para a janela
+     `volta` — e ele é literalmente o último ciclo da sessão. A fala de
+     fechamento ("Vamos voltar devagar...") tocava, e o relógio terminava a
+     sessão no segundo exato em que o ciclo acabava — cortando o canal antes
+     de a frase ter tido a chance de ser ouvida por inteiro. */
+  test("só o canal PULSO é cortado na hora — o GUIA termina sozinho", () => {
+    const bloco = trecho('if (etapa !== "sessao") {', "if (!voz) pararVoz();\n  }, [etapa, voz]);");
+    expect(bloco).toContain('pararVoz("pulso");');
+    /* E não pode existir um `pararVoz()` sem canal ANTES do `return` — isso
+       cortaria o guia de novo, anulando o conserto. */
+    expect(bloco.slice(0, bloco.indexOf("return;"))).not.toMatch(/pararVoz\(\)/);
+  });
+
+  test("o alongamento não mexeu em `totalCiclos` — a duração continua exata", () => {
+    /* A correção é de RUNTIME, não do plano: alongar `totalCiclos` quebraria
+       "o compasso é o mesmo em 1 e em 10 minutos" (testado em
+       meditacao-sessao.test.ts) — a duração é `ciclosDe(minutos) * CICLO`, e
+       nada mais. */
+    expect(path).not.toMatch(/totalCiclos\s*\+\s*1/);
+  });
+});
+
+describe("⚠️ o contador ao lado da barra — pedido do dono", () => {
+  const contador = trechoArquivo("function formatarRestante(", "\n}\n\n/* O 1 min entrou");
+
+  test("abre no número que ela ESCOLHEU, não no total arredondado do plano", () => {
+    /* `ciclosDe` arredonda o total para CIMA em ciclos inteiros: 3 min viram
+       3min12s de verdade. Com CEIL o contador abria em "4m" — testado ao
+       vivo na bancada, `/preview-meditacao`, sessão de 3 min do programa.
+       FLOOR é o que faz o número bater com o botão que ela tocou. */
+    expect(contador).toContain("Math.floor(seg / 60)");
+    expect(contador).not.toContain("Math.ceil(seg / 60)");
+  });
+
+  test("vira segundo a segundo só abaixo de 1 minuto", () => {
+    expect(contador).toContain("if (seg <= 59)");
+  });
+
+  test("⚠️ é RELÓGIO DE VERDADE — não é o contador regressivo que já saiu daqui", () => {
+    /* Aquele contava por FASE da respiração (4→1, 2→1, 6→1) e foi removido
+       porque não tinha um único máximo. Este conta a SESSÃO inteira, por
+       `Date.now()`, e não reseta a cada respiração — não é o mesmo defeito
+       voltando por outra porta. */
+    const relogio = trecho("O CONTADOR AO LADO DA BARRA", "// Relido a cada troca de etapa");
+    expect(relogio).toContain("inicioSessaoRef.current");
+    expect(relogio).toContain("setInterval(atualizar, 1000)");
+  });
+
+  test("congela durante a pausa, como a barra de progresso", () => {
+    const relogio = trecho("O CONTADOR AO LADO DA BARRA", "// Relido a cada troca de etapa");
+    expect(relogio).toContain('if (etapa !== "sessao" || pausada) return;');
+  });
+
+  test("⚠️ a pausa não conta como tempo de sessão — o relógio salta na volta", () => {
+    /* Sem isto, dez minutos pausada na campainha descontariam dez minutos do
+       contador, e "3m" viraria "1m" só de ela ter ido atender a porta. */
+    const volta = trecho("async function retomarSessao()", "function close()");
+    expect(volta).toContain("inicioSessaoRef.current += Date.now() - pausadoDesdeRef.current");
+  });
+});
+
+describe("⚠️ o sheet de sons dentro da sessão", () => {
+  test("o ícone de som abre o sheet — não alterna mais direto", () => {
+    /* Pedido do dono: "que a pessoa consiga abrir uma aba com os sons
+       disponíveis para mudar dentro do exercício". */
+    expect(path).toContain("onClick={() => setSomNaSessaoAberto(true)}");
+    expect(path).not.toContain(
+      'onClick={() => trocarSom(som === "silencio" ? "pad" : "silencio")}',
+    );
+  });
+
+  test("lista os sons de SOUNDSCAPES, e o silêncio vira 'Desligar' no final", () => {
+    const sheet = trecho("── O SHEET DE SONS", "── 3. Fechamento");
+    expect(sheet).toContain('SOUNDSCAPES.filter((s) => s.key !== "silencio")');
+    expect(sheet).toContain('trocarSom("silencio")');
+    expect(sheet).toContain("Desligar som");
+  });
+});
+
+describe("⚠️ o emoji da voz virou ícone desenhado", () => {
+  test("🗣️ NÃO é mais RENDERIZADO — só sobra em comentário, contando a história", () => {
+    /* Pedido do dono: "mude o emoji da fala do lado do som, ele está muito
+       feio". Emoji renderiza diferente em cada sistema — a mesma lição do
+       📞 preto no iOS. O emoji ainda aparece em PROSA (este comentário, e o
+       do próprio componente) — a régua é sobre o que a tela DESENHA. */
+    const faixa = trecho('className="relative z-30 flex items-center px-4 py-3"', "── 1. Escolha");
+    expect(faixa).not.toMatch(/>\s*🗣️\s*</);
+    expect(faixa).toContain("onClick={alternarVoz}");
+    expect(faixa).toContain('<rect x="3.5" y="4" width="17" height="11" rx="3" />');
   });
 });

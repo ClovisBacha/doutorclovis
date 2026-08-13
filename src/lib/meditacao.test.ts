@@ -104,18 +104,23 @@ describe("o ✕ guarda a sessão", () => {
     expect(path).toContain("encerrarGuardando();");
   });
 
-  test("é o MESMO caminho do botão 'Encerrar por aqui'", () => {
-    /* Duas cópias divergiriam no primeiro conserto — e a divergência seria
-       invisível, porque as duas telas parecem iguais. */
+  test("⚠️ 'Encerrar por aqui' saiu — o ✕ é o ÚNICO caminho, de propósito", () => {
+    /* Pedido do dono: "não quero que tenha a opção de encerrar por aqui, se
+       a pessoa quiser sair é só clicar no X". Os dois botões faziam
+       EXATAMENTE a mesma coisa (chamavam `encerrarGuardando`), e o app
+       cobrava dela saber a diferença entre dois caminhos para o mesmo lugar
+       — cobrança que a existência de um SEGUNDO caminho é a própria causa.
+       ⚠️ O texto ainda aparece em COMENTÁRIOS, contando essa história — a
+       régua aqui é sobre BOTÃO RENDERIZADO, não sobre a frase existir em
+       prosa. */
+    expect(path).not.toMatch(/>\s*Encerrar por aqui\s*</);
+    expect(path).not.toContain("onClick={encerrarGuardando}");
+    /* `encerrarGuardando` continua existindo — só não tem mais botão próprio.
+       O ÚNICO chamador é `close()`, e `registrarMeditacao(feitos, null)`
+       dentro dela só pode aparecer UMA vez: uma segunda cópia seria um
+       segundo caminho voltando pela porta dos fundos. */
     expect(path).toContain("function encerrarGuardando()");
-    expect(path).toContain("onClick={encerrarGuardando}");
     expect((path.match(/registrarMeditacao\(feitos, null\)/g) ?? []).length).toBe(1);
-  });
-
-  test("o corte é o mesmo dos dois botões", () => {
-    /* 5 ciclos = um minuto redondo (o ciclo tem 12 s). Abaixo disso não houve
-       sessão para guardar. */
-    expect(path).toContain("{ciclo >= UM_MINUTO && (");
   });
 });
 

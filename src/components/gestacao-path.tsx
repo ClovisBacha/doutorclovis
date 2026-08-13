@@ -4880,6 +4880,25 @@ const UM_MINUTO = Math.ceil(60 / CICLO_SEGS);
    um minuto, e a decisão ("gosto ou não gosto") acontece nos primeiros dois. */
 const AMOSTRA_MS = 5_000;
 
+/**
+ * "3m" enquanto falta um minuto inteiro ou mais; "59s", "58s"... só depois
+ * que passa a faltar menos de um minuto — pedido do dono, ao lado da barra de
+ * progresso. Um número só, sem "min restantes": a barra já mostra a
+ * evolução, o número é só a contagem que ela pediu para acompanhar.
+ */
+function formatarRestante(seg: number | null): string {
+  if (seg == null) return "";
+  if (seg <= 59) return `${Math.max(0, seg)}s`;
+  /* ⚠️ FLOOR, NÃO CEIL — e a diferença apareceu na primeira sessão testada.
+     `ciclosDe` arredonda o total para CIMA em ciclos inteiros: uma sessão de
+     "3 min" dura de verdade 3min12s (192 s). Com ceil, o número ABRIA em
+     "4m" — a paciente escolheu 3 e a tela dizia outra coisa. Floor abre
+     exatamente no número que ela tocou, e só perde precisão no MEIO da
+     contagem (mostra "2m" um pouco antes dos 2:00 exatos) — o oposto do
+     defeito, que era abrir errado. */
+  return `${Math.max(1, Math.floor(seg / 60))}m`;
+}
+
 /* O 1 min entrou quando a Respiração foi absorvida aqui (ago/2026): ela durava
    70 segundos e o cartão dela prometia "um minutinho de calma". Sem este
    degrau, quem só tinha um minuto perdia o exercício inteiro.
@@ -5079,7 +5098,7 @@ const FALA_DO_FECHAMENTO: Record<string, string> = {
   "Ainda ansiosa": "fe-ansiosa",
 };
 
-function MeditationBlock({
+export function MeditationBlock({
   day,
   canEarn,
   careMode = false,
@@ -5211,6 +5230,29 @@ function MeditationBlock({
      toque guarda o de antes, e ela pode ter silenciado no meio. */
   const somRef = useRef<SoundscapeKey>("pad");
   /**
+   * O CONTADOR REGRESSIVO DA SESSÃO — pedido do dono, para ficar ao lado da
+   * barra de progresso.
+   *
+   * ⚠️ NÃO É O CONTADOR QUE JÁ FOI TIRADO DAQUI UMA VEZ. Existia um
+   * `setInterval` por RESPIRAÇÃO, contando "segundos restantes desta fase" —
+   * 4→1, depois 2→1, depois 6→1 — três máximos diferentes por ciclo, e por
+   * isso ele saiu (ver o relógio da respiração, logo abaixo). Este é outro:
+   * conta o tempo restante da SESSÃO INTEIRA, em relógio de verdade, e por
+   * isso pode andar de segundo em segundo sem herdar aquele defeito — não
+   * reseta a cada respiração, só desce.
+   *
+   * Andar por RELÓGIO (`Date.now()`), e não por `ciclo × CICLO_SEGS`, é o que
+   * permite mostrar segundo a segundo no último minuto ("59s", "58s"...) sem
+   * esperar a virada do próximo ciclo de 16s para atualizar.
+   */
+  const inicioSessaoRef = useRef<number | null>(null);
+  /** Quando a pausa atual começou — para descontar do relógio ao voltar. */
+  const pausadoDesdeRef = useRef<number | null>(null);
+  const [restanteSeg, setRestanteSeg] = useState<number | null>(null);
+  /* O sheet de sons DENTRO da sessão — pedido do dono: tocar no ícone de som
+     não alterna mais direto, abre as opções. */
+  const [somNaSessaoAberto, setSomNaSessaoAberto] = useState(false);
+  /**
    * A AMOSTRA DE DEZ SEGUNDOS — pedido do dono.
    *
    * Antes ela escolhia o som de fundo às cegas: o nome e o emoji, e a primeira
@@ -5237,6 +5279,31 @@ function MeditationBlock({
      cinco minutos que estavam escolhidos na tela — e a fala de volta ao corpo
      cairia no meio. */
   const totalCiclos = plano?.totalCiclos ?? Math.round((minutos * 60) / CICLO_SEGS);
+
+  /**
+   * O CONTADOR AO LADO DA BARRA — ticando por RELÓGIO, não por ciclo.
+   *
+   * ⚠️ Congela sozinho durante a pausa: a condição de saída (`pausada`) faz o
+   * efeito não reagendar o próprio intervalo, e o número visto por último
+   * fica na tela — a mesma promessa que a barra de progresso já faz
+   * ("uma barra que continua andando com a sessão parada é a tela
+   * mentindo"). Ao voltar, `retomarSessao` já adiantou `inicioSessaoRef` pelo
+   * tempo pausado, então o primeiro tick pós-pausa acerta o número sem salto.
+   */
+  useEffect(() => {
+    if (etapa !== "sessao" || pausada) return;
+    const totalSeg = totalCiclos * CICLO_SEGS;
+    const atualizar = () => {
+      const inicio = inicioSessaoRef.current;
+      if (inicio == null) return;
+      const decorrido = (Date.now() - inicio) / 1000;
+      setRestanteSeg(Math.max(0, Math.round(totalSeg - decorrido)));
+    };
+    atualizar();
+    const t = setInterval(atualizar, 1000);
+    return () => clearInterval(t);
+  }, [etapa, pausada, totalCiclos]);
+
   // Relido a cada troca de etapa de propósito: quando a sessão termina ela
   // acabou de gravar o dia de hoje, e a tela de fim precisa mostrar a sequência
   // JÁ contando com a sessão que a paciente terminou agora.
@@ -5361,9 +5428,34 @@ function MeditationBlock({
   const faseVisual: "in" | "hold" | "out" = respiroPronto ? fase : "out";
   const respiroMs = respiroPronto ? RESPIRO[fase] * 1000 : 0;
 
-  /* Cala a voz ao sair da sessão e quando ela desliga no meio. */
+  /**
+   * ⚠️ A ÚLTIMA FRASE DO ARCO PODE OCUPAR O CICLO FINAL — e por isso não
+   * pode ser cortada no instante em que ele acaba.
+   *
+   * `planejarSessao` garante "cada janela recebe pelo menos um ciclo", e para
+   * sessões curtas (1, 2 e 5 min) a janela `volta` só tem espaço para UM
+   * ciclo — que é literalmente o último da sessão inteira. A frase de
+   * fechamento ("Vamos voltar devagar...") toca no início desse ciclo, e o
+   * relógio da respiração termina a sessão no segundo exato em que o ciclo
+   * acaba. Numa rede mais lenta, ou só pela variação normal de quando o áudio
+   * termina de carregar, a frase podia estar tocando ainda — e cortar no
+   * instante certo era a diferença entre "não paro no meio" e "ela nunca
+   * ouviu por inteiro".
+   *
+   * A correção é no RUNTIME, não no plano: alongar a sessão em `totalCiclos`
+   * quebraria "o compasso é o mesmo em 1 e em 10 minutos" (testado — a
+   * duração é `ciclosDe(minutos) * CICLO`, e ponto). Em vez disso, só o
+   * canal `pulso` (as três palavras do compasso) é cortado na hora; o `guia`
+   * — a fala em si — termina sozinho. `tocar()` já para o canal anterior
+   * antes de tocar o próximo, então não há vazamento: a próxima sessão, ou a
+   * próxima fala guiada, silencia esta sozinha quando chegar a vez dela.
+   */
   useEffect(() => {
-    if (etapa !== "sessao" || !voz) pararVoz();
+    if (etapa !== "sessao") {
+      pararVoz("pulso");
+      return;
+    }
+    if (!voz) pararVoz();
   }, [etapa, voz]);
 
   /* Tela acesa durante a meditação. É a atividade mais longa do app — até dez
@@ -5608,6 +5700,11 @@ function MeditationBlock({
     somRef.current = som;
     audioRef.current = createSoundscape(som);
     audioRef.current.start();
+    /* O relógio da sessão nasce aqui, junto com tudo o mais — ver o
+       contador ao lado da barra de progresso. */
+    inicioSessaoRef.current = Date.now();
+    pausadoDesdeRef.current = null;
+    setRestanteSeg(null);
     /**
      * O PLANO NASCE AQUI, no clique — e a primeira fala toca junto.
      *
@@ -5710,6 +5807,7 @@ function MeditationBlock({
   function pausarSessao(motivo: "toque" | "fundo") {
     if (etapa !== "sessao" || pausada) return;
     setPausa(motivo);
+    pausadoDesdeRef.current = Date.now();
     audioRef.current?.pausar();
     pararVoz();
   }
@@ -5753,6 +5851,13 @@ function MeditationBlock({
     }
     setFase("in");
     setPausa(null);
+    /* O relógio da sessão SALTA para a frente pelo tempo que ficou pausada —
+       sem isto, o contador contaria o tempo de pausa como se ela tivesse
+       continuado respirando, e "3m" viraria "1m" na volta do banheiro. */
+    if (inicioSessaoRef.current != null && pausadoDesdeRef.current != null) {
+      inicioSessaoRef.current += Date.now() - pausadoDesdeRef.current;
+    }
+    pausadoDesdeRef.current = null;
     /* A fala e as palavras do compasso são refeitas: a deixa deste ciclo foi
        cortada no meio pelo `pararVoz()`, e o texto dela continua na tela. Sem
        isto a frase ficaria escrita sem nunca ter sido dita — e "Inspire" só
@@ -5915,6 +6020,17 @@ function MeditationBlock({
             ) : (
               <span className="flex-1" />
             )}
+            {/* O NÚMERO AO LADO DA BARRA — pedido do dono, no lugar de "Calma ·
+                2 min restantes" embaixo da frase. A barra já mostra a
+                evolução; isto é só a contagem que ela pediu para acompanhar,
+                sem repetir o tema nem a palavra "restantes". `tabular-nums`
+                trava a largura: sem isso "9s" para "10s" empurra o ícone de
+                pausa um pixel para o lado a cada troca de dígito. */}
+            {etapa === "sessao" && (
+              <span className="mr-2 text-[12px] font-bold tabular-nums text-violet-500/80">
+                {formatarRestante(restanteSeg)}
+              </span>
+            )}
             {etapa === "sessao" && (
               <div className="flex items-center gap-3">
                 {/* ⏸ DESENHADO, e não emoji: o de pausa sai com cor própria em
@@ -5933,18 +6049,36 @@ function MeditationBlock({
                     )}
                   </svg>
                 </button>
-                {
-                  <button
-                    onClick={alternarVoz}
-                    aria-label={voz ? "Desligar voz" : "Ligar voz"}
-                    className={`press text-lg leading-none ${voz ? "" : "opacity-40 grayscale"}`}
-                  >
-                    🗣️
-                  </button>
-                }
+                {/* ⚠️ ÍCONE DESENHADO, e não mais o emoji 🗣️ — pedido do dono
+                    ("está muito feio"). Um balão de fala com duas linhas por
+                    dentro: a mesma ideia do emoji (voz narrando um texto),
+                    sem a renderização inconsistente de emoji entre sistemas
+                    (a mesma lição do 📞 preto no iOS). */}
                 <button
-                  onClick={() => trocarSom(som === "silencio" ? "pad" : "silencio")}
-                  aria-label={som === "silencio" ? "Ligar som" : "Desligar som"}
+                  onClick={alternarVoz}
+                  aria-label={voz ? "Desligar voz" : "Ligar voz"}
+                  className={`press ${voz ? "text-violet-600" : "text-violet-300"}`}
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-[18px] w-[18px]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="3.5" y="4" width="17" height="11" rx="3" />
+                    <path d="M7.5 15v3.6l3.6-3.6" />
+                    <path d="M8 8.3h8M8 11.3h5" />
+                  </svg>
+                </button>
+                {/* ⚠️ NÃO ALTERNA MAIS DIRETO — abre as opções. Pedido do dono:
+                    "que a pessoa consiga abrir uma aba com os sons
+                    disponíveis para mudar dentro do exercício". */}
+                <button
+                  onClick={() => setSomNaSessaoAberto(true)}
+                  aria-label="Trocar o som de fundo"
                   className="press text-xl leading-none"
                 >
                   {som === "silencio" ? "🔇" : "🔊"}
@@ -6266,10 +6400,9 @@ function MeditationBlock({
           {/* ── 2. Sessão: o círculo que respira ────────────────────────────
               ⚠️ `aria-hidden` durante a pausa: o véu esconde o conteúdo do
               dedo, e não do VoiceOver. Sem isto, quem navega por gestos
-              deslizava para além do véu e encontrava a frase da sessão e um
-              SEGUNDO "Encerrar por aqui" — o da sessão, que a tela diz estar
-              parada. `inert` faria as duas coisas de uma vez, mas ainda não
-              chega ao Safari que a maioria delas usa. */}
+              deslizava para além do véu e encontrava a frase da sessão, que a
+              tela diz estar parada. `inert` faria as duas coisas de uma vez,
+              mas ainda não chega ao Safari que a maioria delas usa. */}
           {etapa === "sessao" && (
             <div
               aria-hidden={pausada}
@@ -6336,31 +6469,21 @@ function MeditationBlock({
                 {frase ?? "Só respire."}
               </p>
 
-              <p className="mt-2 text-[11px] font-bold uppercase tracking-wider text-violet-400">
-                {med.theme} · {Math.max(0, Math.ceil(((totalCiclos - ciclo) * CICLO_SEGS) / 60))}{" "}
-                min restantes
-              </p>
+              {/* ⚠️ O "CALMA · X MIN RESTANTES" SAIU DAQUI — pedido do dono: a
+                  barra de progresso já mostra a evolução, e o contador que a
+                  substituiu mora ao lado dela, no topo (ver
+                  `formatarRestante`). Duas contagens da mesma coisa, em dois
+                  lugares da tela, era a mesma repetição que já tinha saído do
+                  link da Gratidão — a informação sobrando, não faltando. */}
 
-              {/* Encerrar antes da hora — a saída que a versão de sete frases
-                  tinha no "Continuar →" e que o ritmo da respiração tirou:
-                  lá ela podia adiantar as frases e chegar ao fim; aqui o
-                  relógio manda.
-
-                  Só aparece depois de cinco respirações completas — um minuto
-                  redondo, porque o ciclo é de 12s — e de propósito:
-                  antes disso não houve sessão para encerrar, e um botão de
-                  encerrar visível desde o primeiro segundo convida a sair de
-                  uma tela que ainda nem começou. Passado o minuto, a sessão
-                  conta — quem parou aos 4 de 10 minutos meditou, e o app não
-                  tem por que fingir que não. */}
-              {ciclo >= UM_MINUTO && !pausada && (
-                <button
-                  onClick={encerrarGuardando}
-                  className="press mt-8 rounded-full border border-violet-200 bg-white/70 px-6 py-2 text-xs font-bold text-violet-500 backdrop-blur"
-                >
-                  Encerrar por aqui
-                </button>
-              )}
+              {/* ⚠️ "ENCERRAR POR AQUI" SAIU — pedido do dono: "se a pessoa
+                  quiser sair é só clicar no X". O ✕ já GUARDA a sessão
+                  (`close()`, ver o comentário lá) desde que ela passe de um
+                  minuto — os dois botões faziam exatamente a mesma coisa, um
+                  no canto e um aqui embaixo, e o app cobrava dela saber a
+                  diferença entre dois botões que significam a mesma coisa.
+                  Um caminho só para "eu quero parar" é mais fácil de achar
+                  do que dois que levam ao mesmo lugar. */}
             </div>
           )}
 
@@ -6406,14 +6529,75 @@ function MeditationBlock({
                 >
                   Continuar
                 </button>
-                {ciclo >= UM_MINUTO && (
-                  <button
-                    onClick={encerrarGuardando}
-                    className="press mt-4 text-xs font-bold text-violet-500"
-                  >
-                    Encerrar por aqui
-                  </button>
-                )}
+                {/* "Encerrar por aqui" saiu — o ✕ da faixa de cima continua
+                    alcançável durante a pausa (`z-30` contra o `z-20` deste
+                    véu) e já guarda a sessão. */}
+              </div>
+            </div>
+          )}
+
+          {/* ── O SHEET DE SONS, DENTRO DA SESSÃO ───────────────────────────
+              Pedido do dono: tocar no ícone de som abre as opções para trocar
+              SEM sair do exercício, com "desligar" no final. Antes o ícone
+              alternava direto entre o som escolhido e o silêncio — quem
+              estava ouvindo chuva e queria mar tinha de silenciar primeiro
+              para depois reabrir o menu de escolha, que só existe na tela de
+              ANTES de começar.
+              ⚠️ `trocarSom` já troca o som AO VIVO quando `etapa === "sessao"`
+              (ver a função): o sheet só precisa chamá-la, a troca acontece na
+              hora, sem esperar ela fechar o painel. */}
+          {etapa === "sessao" && somNaSessaoAberto && (
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Trocar o som de fundo"
+              className="absolute inset-0 z-40 flex flex-col justify-end"
+            >
+              <button
+                aria-label="Fechar"
+                onClick={() => setSomNaSessaoAberto(false)}
+                className="absolute inset-0 bg-violet-900/30 backdrop-blur-[1px]"
+              />
+              <div
+                className="relative rounded-t-3xl bg-white px-6 pb-8 pt-5"
+                style={{ paddingBottom: "calc(2rem + var(--safe-bottom, 0px))" }}
+              >
+                <p className="text-center text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                  Som de fundo
+                </p>
+                <div className="mt-4 grid gap-2">
+                  {SOUNDSCAPES.filter((s) => s.key !== "silencio").map((s) => (
+                    <button
+                      key={s.key}
+                      onClick={() => {
+                        trocarSom(s.key);
+                        setSomNaSessaoAberto(false);
+                      }}
+                      className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                        som === s.key
+                          ? "bg-violet-500 text-white"
+                          : "border border-violet-200 bg-white/70 text-violet-900"
+                      }`}
+                    >
+                      <span className="text-xl leading-none" aria-hidden>
+                        {s.emoji}
+                      </span>
+                      <span className="text-sm font-extrabold">{s.label}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* "No final a opção de desligar" — separada dos chips de som,
+                    para não se confundir com mais uma escolha de trilha: é o
+                    fim da lista, não mais uma faixa. */}
+                <button
+                  onClick={() => {
+                    trocarSom("silencio");
+                    setSomNaSessaoAberto(false);
+                  }}
+                  className="press mt-4 w-full rounded-full border border-violet-200 bg-white/70 py-3 text-sm font-bold text-violet-600"
+                >
+                  🔇 Desligar som
+                </button>
               </div>
             </div>
           )}
