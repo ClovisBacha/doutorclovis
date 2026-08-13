@@ -39,6 +39,12 @@ import {
   type Densidade,
   type Plano,
 } from "@/lib/meditacao-sessao";
+import {
+  CHAVE_DO_PROGRAMA,
+  diaDoPrograma,
+  PROGRAMA,
+  type DiaDoPrograma,
+} from "@/lib/meditacao-programa";
 import { FiguraMovimento, type PoseKey } from "@/components/figura-movimento";
 import {
   IconeCadeado,
@@ -4907,6 +4913,27 @@ function MeditationBlock({
    * defeito que o balão do mascote teve com o clima.
    */
   const [plano, setPlano] = useState<Plano | null>(null);
+  /**
+   * OS SETE PRIMEIROS DIAS.
+   *
+   * `progFeitos` é a CONTAGEM de dias do programa concluídos — nunca uma data.
+   * É o que mantém o programa independente do calendário: ela some uma semana
+   * e volta no dia onde parou, com a chama zerada (isso é honesto, ela não
+   * veio) mas sem perder o que já aprendeu. Ver o cabeçalho de
+   * `meditacao-programa.ts`.
+   *
+   * A chave começa com `dc-path-`, então viaja no `journey_state` e o programa
+   * continua no outro aparelho.
+   */
+  const [progFeitos, setProgFeitos] = useState(0);
+  /* Ela pode ter tocado em "ou escolha você mesma": aí o cartão sai do caminho
+     nesta abertura, sem marcar nada como feito. */
+  const [menuAberto, setMenuAberto] = useState(false);
+  const [emPrograma, setEmPrograma] = useState<DiaDoPrograma | null>(null);
+  useEffect(() => {
+    if (open) setProgFeitos(lsGet<number>(CHAVE_DO_PROGRAMA, 0));
+  }, [open]);
+  const diaAtualDoPrograma = careMode ? null : diaDoPrograma(progFeitos);
   const [ciclo, setCiclo] = useState(0);
   const [fase, setFase] = useState<"in" | "hold" | "out">("in");
   const [humor, setHumor] = useState<string | null>(null);
@@ -4921,7 +4948,12 @@ function MeditationBlock({
   /* `Math.min` porque `temaIdx` pode ter sido escolhido com a lista cheia e o
      Modo Cuidado ser ligado depois — a lista encolhe debaixo do índice. */
   const med = temas[Math.min(temaIdx, temas.length - 1)];
-  const totalCiclos = Math.round((minutos * 60) / CICLO_SEGS);
+  /* ⚠️ O NÚMERO DE CICLOS VEM DO PLANO, e não do `minutos` do menu.
+     O dia do programa manda na própria duração (3, 5, 7 ou 10 min). Lendo o
+     `minutos` do seletor, a sessão de três minutos do Dia 1 rodaria com os
+     cinco minutos que estavam escolhidos na tela — e a fala de volta ao corpo
+     cairia no meio. */
+  const totalCiclos = plano?.totalCiclos ?? Math.round((minutos * 60) / CICLO_SEGS);
   // Relido a cada troca de etapa de propósito: quando a sessão termina ela
   // acabou de gravar o dia de hoje, e a tela de fim precisa mostrar a sequência
   // JÁ contando com a sessão que a paciente terminou agora.
@@ -4979,7 +5011,10 @@ function MeditationBlock({
       else if (fase === "hold") setFase("out");
       else if (ciclo + 1 >= totalCiclos) {
         setEtapa("reflexo");
-        registrarMeditacao(minutos, null);
+        /* Os minutos são os do PLANO — o dia do programa manda na duração, e
+           `minutos` é o que estava no seletor do menu. */
+        registrarMeditacao(Math.round((totalCiclos * CICLO_SEGS) / 60), null);
+        concluirDiaDoPrograma();
         finish();
       } else {
         setCiclo((c) => c + 1);
@@ -5175,9 +5210,15 @@ function MeditationBlock({
     }
   }
 
-  function begin() {
+  function begin(doPrograma?: DiaDoPrograma) {
+    /* O dia do programa manda na duração e na densidade: quem está aprendendo
+       não escolhe, e é isso que o programa existe para poupar dela. O tema, o
+       som e o resto do menu continuam onde estavam para quando ela quiser. */
+    const mins = doPrograma?.minutos ?? minutos;
+    const dens = doPrograma?.densidade ?? densidade;
+    setEmPrograma(doPrograma ?? null);
     setCiclo(0);
-    setMinutosFeitos(minutos);
+    setMinutosFeitos(mins);
     setFase("in");
     setHumor(null);
     setReward(null);
@@ -5200,14 +5241,14 @@ function MeditationBlock({
      * plano. Com vinte no poço, ela medita duas semanas sem repetir uma frase.
      */
     const p = planejarSessao({
-      minutos,
-      tema: med.theme,
+      minutos: mins,
+      tema: doPrograma?.tema ?? med.theme,
       /* A leitura do tema gira com os dias meditados: a segunda sessão de
          "Calma" não é a primeira de novo. É a resposta direta à queixa nº 2
          dos usuários de Calm e Headspace — repetição de conteúdo. */
       variacao: (((log.dias?.length ?? 0) % 3) + 1) as 1 | 2 | 3,
       semanas: Math.floor(day / 7),
-      densidade,
+      densidade: dens,
       careMode,
       semente: log.minutos ?? 0,
     });
@@ -5234,6 +5275,23 @@ function MeditationBlock({
    * É o mesmo caminho do botão "Encerrar por aqui", extraído para poder ser
    * chamado também pelo ✕ — ver `close()`.
    */
+  /**
+   * O DIA DO PROGRAMA SÓ AVANÇA QUANDO ELA CHEGA AO FIM.
+   *
+   * ⚠️ E "o fim" aqui é o fim de verdade, não o botão de encerrar: sair aos
+   * dois minutos de uma sessão de sete guarda os minutos e a chama (isso ela
+   * fez), mas não conta como o Dia 5 aprendido. Contar meia sessão empurraria
+   * a paciente para o dia seguinte sem o que ele pressupõe — e o Dia 6 abre
+   * dizendo "hoje a gente treina o que serve fora daqui", o que só faz sentido
+   * depois do silêncio do 5.
+   */
+  function concluirDiaDoPrograma() {
+    if (!emPrograma) return;
+    const novo = Math.max(progFeitos, emPrograma.dia);
+    setProgFeitos(novo);
+    lsSet(CHAVE_DO_PROGRAMA, novo);
+  }
+
   function encerrarGuardando() {
     const feitos = Math.max(1, Math.round(((ciclo + 1) * CICLO_SEGS) / 60));
     setMinutosFeitos(feitos);
@@ -5380,133 +5438,184 @@ function MeditationBlock({
                 )}
               </p>
 
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
-                De quanto tempo você tem?
-              </p>
-              <div className="mt-2 flex gap-2">
-                {DURACOES.map((m) => (
+              {/* ── OS SETE PRIMEIROS DIAS ────────────────────────────────
+                  Enquanto o programa não acabou, a tela abre com UM cartão em
+                  vez de quatro perguntas. Para quem nunca meditou, "o que você
+                  precisa agora?" é uma pergunta difícil — ela não sabe, e é
+                  por não saber que está aqui. Quatro decisões viram quatro
+                  chances de fechar o app.
+                  ⚠️ O menu não some: ele desce. Tocar em "ou escolha você
+                  mesma" abre exatamente a tela de sempre, inteira. */}
+              {diaAtualDoPrograma && !menuAberto && (
+                <>
+                  <div className="mt-6 rounded-3xl bg-violet-500 p-5 text-white">
+                    <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-white/80">
+                      Dia {diaAtualDoPrograma.dia} de {PROGRAMA.length}
+                    </p>
+                    <p className="mt-1.5 font-serif text-[21px] leading-tight">
+                      {diaAtualDoPrograma.titulo}
+                    </p>
+                    <p className="mt-1 text-[12.5px] text-white/85">{diaAtualDoPrograma.sub}</p>
+                    <div className="mt-3.5 flex gap-1.5" aria-hidden>
+                      {PROGRAMA.map((d) => (
+                        <span
+                          key={d.dia}
+                          className={`h-1.5 flex-1 rounded-full ${
+                            d.dia <= progFeitos ? "bg-white" : "bg-white/30"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => begin(diaAtualDoPrograma)}
+                      className="press mt-4 w-full rounded-full bg-white py-3 text-sm font-extrabold text-violet-600"
+                    >
+                      Começar
+                    </button>
+                  </div>
                   <button
-                    key={m}
-                    onClick={() => setMinutos(m)}
-                    className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
-                      minutos === m
-                        ? "bg-violet-500 text-white"
-                        : "border border-violet-200 bg-white/70 text-violet-700"
-                    }`}
+                    onClick={() => setMenuAberto(true)}
+                    className="press mt-3 flex w-full items-center justify-between border-t border-dashed border-violet-200 pt-3 text-[13px] text-violet-700/75"
                   >
-                    {m} min
+                    <span>Ou escolha você mesma</span>
+                    <span aria-hidden>⌄</span>
                   </button>
-                ))}
-              </div>
+                </>
+              )}
 
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
-                O que você precisa agora?
-              </p>
-              <div className="mt-2 grid gap-2">
-                {temas.map((m, i) => (
-                  <button
-                    key={m.theme}
-                    onClick={() => setTemaIdx(i)}
-                    className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
-                      temaIdx === i
-                        ? "bg-violet-500 text-white"
-                        : "border border-violet-200 bg-white/70 text-violet-900"
-                    }`}
-                  >
-                    <span className="text-2xl leading-none">{m.emoji}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-extrabold">{m.need}</span>
-                      <span
-                        className={`block text-[11px] ${temaIdx === i ? "text-white/75" : "text-violet-700/70"}`}
-                      >
-                        {m.theme}
-                      </span>
-                    </span>
-                    {i === sugerida && (
-                      <span
-                        className={`shrink-0 rounded-full px-2 py-[3px] text-[9.5px] font-bold ${
-                          temaIdx === i ? "bg-white/25 text-white" : "bg-violet-100 text-violet-700"
+              {(!diaAtualDoPrograma || menuAberto) && (
+                <>
+                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                    De quanto tempo você tem?
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    {DURACOES.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => setMinutos(m)}
+                        className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
+                          minutos === m
+                            ? "bg-violet-500 text-white"
+                            : "border border-violet-200 bg-white/70 text-violet-700"
                         }`}
                       >
-                        Do dia
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
+                        {m} min
+                      </button>
+                    ))}
+                  </div>
 
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
-                Som de fundo
-              </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {SOUNDSCAPES.map((s) => (
-                  <button
-                    key={s.key}
-                    onClick={() => trocarSom(s.key)}
-                    className={`press rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
-                      som === s.key
-                        ? "bg-violet-500 text-white"
-                        : "border border-violet-200 bg-white/70 text-violet-700"
-                    }`}
-                  >
-                    {s.emoji} {s.label}
-                  </button>
-                ))}
-              </div>
+                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                    O que você precisa agora?
+                  </p>
+                  <div className="mt-2 grid gap-2">
+                    {temas.map((m, i) => (
+                      <button
+                        key={m.theme}
+                        onClick={() => setTemaIdx(i)}
+                        className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                          temaIdx === i
+                            ? "bg-violet-500 text-white"
+                            : "border border-violet-200 bg-white/70 text-violet-900"
+                        }`}
+                      >
+                        <span className="text-2xl leading-none">{m.emoji}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-extrabold">{m.need}</span>
+                          <span
+                            className={`block text-[11px] ${temaIdx === i ? "text-white/75" : "text-violet-700/70"}`}
+                          >
+                            {m.theme}
+                          </span>
+                        </span>
+                        {i === sugerida && (
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-[3px] text-[9.5px] font-bold ${
+                              temaIdx === i
+                                ? "bg-white/25 text-white"
+                                : "bg-violet-100 text-violet-700"
+                            }`}
+                          >
+                            Do dia
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
 
-              {/* ── QUANTA VOZ ELA QUER ────────────────────────────────
+                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                    Som de fundo
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {SOUNDSCAPES.map((s) => (
+                      <button
+                        key={s.key}
+                        onClick={() => trocarSom(s.key)}
+                        className={`press rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
+                          som === s.key
+                            ? "bg-violet-500 text-white"
+                            : "border border-violet-200 bg-white/70 text-violet-700"
+                        }`}
+                      >
+                        {s.emoji} {s.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* ── QUANTA VOZ ELA QUER ────────────────────────────────
                   Substitui o interruptor de liga/desliga. Ele era binário e
                   caro: quem queria silêncio desligava a voz inteira e perdia
                   junto o acolhimento e a volta ao corpo — as duas partes que
                   mais importam para quem está começando. Três degraus é o que
                   o Headspace oferece (guiada, semi-guiada, não guiada), e é uma
                   das razões de ele ser o melhor app para iniciante. */}
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
-                Quanta voz você quer?
-              </p>
-              <div className="mt-2 grid gap-2">
-                {DENSIDADES.map((d) => (
-                  <button
-                    key={d.chave}
-                    onClick={() => {
-                      setDensidade(d.chave);
-                      /* "Só o ritmo" ainda usa as três palavras da respiração,
+                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                    Quanta voz você quer?
+                  </p>
+                  <div className="mt-2 grid gap-2">
+                    {DENSIDADES.map((d) => (
+                      <button
+                        key={d.chave}
+                        onClick={() => {
+                          setDensidade(d.chave);
+                          /* "Só o ritmo" ainda usa as três palavras da respiração,
                          então a voz continua ligada — o que muda é o quanto
                          ela fala. Só o desligamento manual cala tudo. */
-                      setVoz(true);
-                    }}
-                    className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
-                      densidade === d.chave
-                        ? "bg-violet-500 text-white"
-                        : "border border-violet-200 bg-white/70 text-violet-900"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-extrabold">{d.rotulo}</span>
-                      <span
-                        className={`block text-[11px] ${
-                          densidade === d.chave ? "text-white/75" : "text-violet-700/70"
+                          setVoz(true);
+                        }}
+                        className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                          densidade === d.chave
+                            ? "bg-violet-500 text-white"
+                            : "border border-violet-200 bg-white/70 text-violet-900"
                         }`}
                       >
-                        {d.sub}
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-extrabold">{d.rotulo}</span>
+                          <span
+                            className={`block text-[11px] ${
+                              densidade === d.chave ? "text-white/75" : "text-violet-700/70"
+                            }`}
+                          >
+                            {d.sub}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
           {/* O botão fica FIXO no rodapé: a lista de necessidades tem sete
               itens e empurrava o "Começar" para fora da tela — quem escolhia o
               primeiro tema tinha que rolar até o fim pra poder começar. */}
-          {etapa === "escolha" && (
+          {etapa === "escolha" && (!diaAtualDoPrograma || menuAberto) && (
             <div
               className="border-t border-violet-200/60 bg-white/70 px-6 pb-5 pt-3 backdrop-blur"
               style={{ paddingBottom: "calc(1.25rem + var(--safe-bottom, 0px))" }}
             >
               <button
-                onClick={begin}
+                onClick={() => begin()}
                 className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
               >
                 Começar · {minutos} min

@@ -33,6 +33,8 @@
  * obriga a regravar aquele arquivo — e só aquele.
  */
 
+import { FALAS_DO_PROGRAMA } from "./meditacao-programa";
+
 /** Fase da gestação. O 3 começa na 28ª semana. */
 export type Trimestre = 1 | 2 | 3;
 
@@ -1258,12 +1260,20 @@ const FECHAMENTO_FALAS: Fala[] = [
   },
 ];
 
-/** O banco inteiro. É desta lista que sai o custo em créditos e os arquivos. */
+/**
+ * O banco inteiro. É desta lista que sai o custo em créditos e os arquivos.
+ *
+ * As falas do PROGRAMA entram aqui porque são áudio como qualquer outra — o
+ * que muda nelas é só o `tema` (`prog-1` … `prog-7`), que faz `planejarSessao`
+ * montar o dia do programa reaproveitando acolhimento, ancoragem, rechamadas e
+ * volta ao corpo deste mesmo banco. Ver `meditacao-programa.ts`.
+ */
 export const ROTEIROS: Fala[] = [
   ...ACOLHIMENTO,
   ...FASE,
   ...ANCORAGEM,
   ...CORPO,
+  ...FALAS_DO_PROGRAMA,
   ...SILENCIO,
   ...VOLTA,
   ...FECHAMENTO_FALAS,
