@@ -5,9 +5,9 @@ import type { Periodo } from "@/lib/frases-do-mascote";
 /**
  * Bancada do BEBÊ (a carta de 1 minuto).
  *
- * A tela vive atrás do login, e duas coisas que mudaram nela são impossíveis
- * de fotografar sem forçar: o rastro de leitura (`localStorage`) e a faixa do
- * dia (o relógio). Com a bancada, dá pra olhar as 30 cartas por fase — inclusive
+ * A tela vive atrás do login, e coisas que mudaram nela são impossíveis de
+ * fotografar sem forçar: o rastro de leitura (`localStorage`) e a faixa do
+ * dia (o relógio). Com a bancada, dá pra olhar as 34 cartas por fase — inclusive
  * a virada mais importante: gestação × pós-parto NUNCA compartilham cartas.
  *
  * Parâmetros:
@@ -17,7 +17,8 @@ import type { Periodo } from "@/lib/frases-do-mascote";
  *   `?nome=Helena` nome do bebê — some o `{bebe}` das cartas. Sem parâmetro,
  *                  cai no padrão "meu amor".
  *   `?luto=1`      Modo Cuidado
- *   `?fase=done`   abre já no final (senão começa em `intro`)
+ *   `?fase=done`   abre já no final · `?fase=lista` abre no álbum (senão
+ *                  começa em `intro`)
  *   `?periodo=noite` força a faixa do dia na fala da bolha
  *   `?leitura=1`   força "Você leu esta carta há 2 semanas." na tela de abertura
  */
@@ -31,8 +32,8 @@ export const Route = createFileRoute("/preview-bebe")({
     pos: q.pos === true || String(q.pos ?? "") === "1",
     nome: q.nome == null ? "" : String(q.nome),
     luto: q.luto === true || String(q.luto ?? "") === "1",
-    fase: (["intro", "active", "done"] as const).includes(String(q.fase ?? "") as never)
-      ? (String(q.fase) as "intro" | "active" | "done")
+    fase: (["intro", "active", "done", "lista"] as const).includes(String(q.fase ?? "") as never)
+      ? (String(q.fase) as "intro" | "active" | "done" | "lista")
       : ("intro" as const),
     periodo: (["madrugada", "manha", "tarde", "noite"] as const).includes(
       String(q.periodo ?? "") as never,

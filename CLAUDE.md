@@ -2028,10 +2028,47 @@ texto enterrado num componente de dez mil linhas é texto que ninguém revisa.
   separa clímax de acompanhamento em outras telas do jogo.
 - **Bancada:** `/preview-bebe?w=20&dia=0&nome=Helena` (gestação) ·
   `?pos=1&dia=3` (pós-parto — prova que nenhuma carta pré-natal aparece) ·
-  `?fase=done` (o fim) · `?leitura=1` (força o rastro) · `?periodo=noite`
-  (força a faixa do dia na fala da bolha). O rastro de leitura e a faixa do
-  dia são as duas coisas que dependiam de `localStorage`/relógio e por isso
-  eram impossíveis de fotografar sem a bancada.
+  `?fase=done` (o fim) · `?fase=lista` (o álbum) · `?leitura=1` (força o
+  rastro) · `?periodo=noite` (força a faixa do dia na fala da bolha). O
+  rastro de leitura e a faixa do dia são as duas coisas que dependiam de
+  `localStorage`/relógio e por isso eram impossíveis de fotografar sem a
+  bancada.
+
+### O álbum, e o pós-parto empatou com a reta final (ago/2026)
+
+Nota 9 tinha três pontas soltas: sem "ver todas", o poço de pós-parto (dez
+cartas pra noventa dias) mais raso que o de gestação, e o rastro de leitura
+só falado, nunca mostrado. As três fecharam na mesma leva.
+
+- **Pós-parto ganhou quatro cartas** (soluços, o bebê reconhecendo a mãe, o
+  primeiro passeio, os detalhes físicos) — de dez para catorze, empatando
+  com t3, o poço mais denso da gestação. Total do banco: **trinta e quatro**.
+- **`poolDeHoje`** (`cartas-do-bebe.ts`) embrulha `faseDaGratidao` +
+  `poolDaFase` numa chamada só — é a MESMA pergunta que `cartaDoDia` já
+  fazia pra escolher a carta do dia, só que devolvendo o poço inteiro. O
+  álbum (`phase === "lista"`) lê daqui: nunca duplica o corte de semanas, e
+  nunca mistura fase — a mesma garantia contra vazar carta pré-natal pro
+  pós-parto vale pro álbum inteiro, não só pra carta de hoje.
+- **Tocar numa carta do álbum abre a leitura pautada DELA**, não um resumo:
+  `abrirDoAlbum` é o mesmo preparo de `begin()` (zera o índice, arma a
+  recompensa, liga o som ambiente) só que pulando a tela de intro — ela já
+  decidiu o que ler ao tocar no título. `cartaEscolhida` guarda a carta
+  personalizada; `close()` zera de novo, senão reabrir a atividade no dia
+  seguinte ficaria "presa" na última escolhida do álbum em vez de mostrar a
+  de hoje.
+- ⚠️ **A legenda do álbum NÃO é `fraseDeUltimaLeitura`.** Escrevi assim
+  primeiro e o teste ao vivo (ler uma carta, voltar pro álbum) pegou: essa
+  função devolve `null` pra leituras de HOJE de propósito — é o que impede a
+  bolha de cutucar "lê de novo" o que ela acabou de ler, na tela de abertura.
+  Reaproveitada na legenda da LISTA, o mesmo `null` lia como "Ainda não
+  lida" pra uma carta fechada trinta segundos antes — mentira no lugar
+  errado. A legenda usa `haQuantoTempo` direto (que devolve "hoje" nesse
+  caso): inventário mostra o que aconteceu, nudge evita repetir o óbvio —
+  são funções diferentes por serem PERGUNTAS diferentes, não a mesma
+  pergunta em dois textos. Testado com uma leitura de ponta a ponta
+  (`cartas-do-bebe.test.ts` lê o trecho da fonte e recusa o uso errado).
+- **Bancada:** `/preview-bebe?w=20&fase=lista` (o álbum da fase) ·
+  `?pos=1&fase=lista` (o de pós-parto, agora com catorze).
 
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 

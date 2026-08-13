@@ -85,6 +85,7 @@ import {
   cartaDoDia,
   falaDaBolhaNaCarta,
   fraseDeUltimaLeitura,
+  poolDeHoje,
   registrarLeitura,
   ultimaLeitura,
   type Carta,
@@ -6770,7 +6771,7 @@ export function BondingBlock({
     periodo?: Periodo;
     /** Formata "você leu esta carta há X", sem precisar ler duas vezes de verdade. */
     fraseDeLeitura?: string;
-    fase?: "intro" | "active" | "done";
+    fase?: "intro" | "active" | "done" | "lista";
   };
 }) {
   /**
@@ -6808,10 +6809,22 @@ export function BondingBlock({
     () => cartaComNome(cartaDoDia({ dia: day, semanas: semana, posParto }), babyName),
     [day, semana, posParto, babyName],
   );
+  /** O poço da fase ATUAL — é o que "Ver todas as cartas" navega. Nunca
+   *  mistura fase: o mesmo corte que escolhe a carta de hoje escolhe o álbum. */
+  const pool: Carta[] = useMemo(
+    () => poolDeHoje({ semanas: semana, posParto }),
+    [semana, posParto],
+  );
+  /** Presente quando ela escolheu uma carta no álbum — sempre já
+   *  personalizada (mesmo formato de `cartaHoje`). `null` = lê a de hoje. */
+  const [cartaEscolhida, setCartaEscolhida] = useState<Carta | null>(null);
+  const cartaAtiva: Carta = cartaEscolhida ?? cartaHoje;
   const carta: { title: string; emoji: string; lines: string[] } =
-    lendoAsDelas && cartaDelas ? cartaDelas : cartaHoje;
+    lendoAsDelas && cartaDelas ? cartaDelas : cartaAtiva;
   const [open, setOpen] = useState(!!aoSair);
-  const [phase, setPhase] = useState<"intro" | "active" | "done">(bancada?.fase ?? "intro");
+  const [phase, setPhase] = useState<"intro" | "active" | "done" | "lista">(
+    bancada?.fase ?? "intro",
+  );
   const [idx, setIdx] = useState(0);
   const [reward, setReward] = useState<number | null>(null);
   const [sound, setSound] = useState(true);
@@ -6819,7 +6832,7 @@ export function BondingBlock({
   const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
 
   /**
-   * ⚠️ O RASTRO DE LEITURA — 30 cartas pra até 384 dias ainda repetem, e sem
+   * ⚠️ O RASTRO DE LEITURA — 34 cartas pra até 384 dias ainda repetem, e sem
    * isto a repetição era invisível: ela relia sem saber que estava relendo.
    * Carrega só ao abrir (mesmo padrão de `EX_NOTAS_KEY`/`MED_LOG_KEY`).
    */
@@ -6827,20 +6840,23 @@ export function BondingBlock({
   useEffect(() => {
     if (open) setLeituras(lsGet<LeiturasDeCartas>(LEITURAS_CARTAS_KEY, {}));
   }, [open]);
+  /* Só a tela de abertura usa — é sobre a carta de HOJE, não sobre qualquer
+     carta que o álbum abrir (`cartaAtiva` pode ser uma escolhida por ela). */
   const fraseDeLeitura =
     bancada?.fraseDeLeitura ??
     fraseDeUltimaLeitura(ultimaLeitura(leituras, cartaHoje.id), new Date());
   useEffect(() => {
-    /* Grava só quando ela TERMINOU de ler a carta do dia (nunca a das
-       gratidões dela, que não tem `id` estável pra rastrear). Fora de
-       `canEarn`/`careMode` de propósito: é informação, não recompensa. */
+    /* Grava sobre a carta que ela DE FATO terminou (hoje ou escolhida no
+       álbum) — nunca a das gratidões dela, que não tem `id` estável pra
+       rastrear. Fora de `canEarn`/`careMode` de propósito: é informação,
+       não recompensa. */
     if (phase !== "done" || lendoAsDelas) return;
     setLeituras((prev) => {
-      const novo = registrarLeitura(prev, cartaHoje.id, new Date());
+      const novo = registrarLeitura(prev, cartaAtiva.id, new Date());
       lsSet(LEITURAS_CARTAS_KEY, novo);
       return novo;
     });
-  }, [phase, lendoAsDelas, cartaHoje.id]);
+  }, [phase, lendoAsDelas, cartaAtiva.id]);
 
   /* ⚠️ O PORTA-VOZ NESTA TELA — era a única das quatro atividades sem ele. */
   const periodoAtual = useMemo(
@@ -6937,12 +6953,30 @@ export function BondingBlock({
     }
     setPhase("active");
   }
+  /** Abrir uma carta ESCOLHIDA no álbum — mesmo preparo de `begin()`, mas
+   *  pulando a tela de intro: ela já decidiu o que ler ao tocar no título. */
+  function abrirDoAlbum(c: Carta) {
+    setCartaEscolhida(c);
+    setLendoAsDelas(false);
+    setIdx(0);
+    setReward(null);
+    grantedRef.current = false;
+    if (sound) {
+      audioRef.current = createBreathAudio();
+      audioRef.current.start();
+      audioRef.current.ambient();
+    }
+    setPhase("active");
+  }
   function close() {
     audioRef.current?.stop();
     audioRef.current = null;
     if (aoSair) return aoSair();
     setOpen(false);
     setPhase("intro");
+    /* Reabrir a atividade volta pra carta de HOJE — sem isto, uma leitura
+       do álbum ficaria "presa" na próxima abertura. */
+    setCartaEscolhida(null);
   }
   function toggleSound() {
     setSound((on) => {
@@ -7103,6 +7137,70 @@ export function BondingBlock({
                     : `Ler as ${minhasGratidoes?.length ?? 0} coisas boas que você anotou ✨`}
                 </button>
               )}
+              {/* ── O ÁLBUM ──────────────────────────────────────────────
+                  Sem isto, cada carta some no dia seguinte — não dava pra
+                  reabrir a de ontem, nem folhear as outras da fase. */}
+              {!lendoAsDelas && (
+                <button
+                  onClick={() => setPhase("lista")}
+                  className="press mt-4 text-[13px] font-bold text-rose-600 underline decoration-rose-300 underline-offset-4"
+                >
+                  📖 Ver todas as cartas
+                </button>
+              )}
+            </div>
+          )}
+
+          {phase === "lista" && (
+            <div className="relative flex flex-1 flex-col overflow-y-auto px-6 pb-10">
+              <button
+                onClick={() => setPhase("intro")}
+                className="press mt-2 self-start text-[13px] font-bold text-rose-600"
+              >
+                ‹ Voltar
+              </button>
+              <div className="mt-2 flex flex-col items-center text-center">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-rose-400">
+                  Suas cartas
+                </p>
+                <h3 className="mt-1 font-serif text-2xl font-extrabold text-rose-900">
+                  {pool.length} {pool.length === 1 ? "carta" : "cartas"} nesta fase
+                </h3>
+                <p className="mt-1 max-w-xs text-[12px] leading-snug text-rose-700/70">
+                  Toque numa carta pra ler de novo, no seu ritmo. 💛
+                </p>
+              </div>
+              <ul className="mt-5 grid gap-2">
+                {pool.map((c) => {
+                  const p = cartaComNome(c, babyName);
+                  /* ⚠️ NÃO É `fraseDeUltimaLeitura` — aquela some no dia da
+                     leitura de propósito (evita a bolha cutucar "lê nessa
+                     mesma que você acabou de ler"). Aqui o trabalho é
+                     inventário, não nudge: quem acabou de ler precisa VER que
+                     leu. `haQuantoTempo` devolve "hoje" nesse caso — é a
+                     única diferença entre os dois usos. */
+                  const quando = ultimaLeitura(leituras, c.id);
+                  const rotulo = quando
+                    ? `Lida ${haQuantoTempo(quando, new Date())}`
+                    : "Ainda não lida";
+                  return (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => abrirDoAlbum(p)}
+                        className="press flex w-full items-center gap-3 rounded-2xl border border-rose-200/70 bg-white/80 px-4 py-3 text-left"
+                      >
+                        <span className="text-2xl">{p.emoji}</span>
+                        <span className="flex-1">
+                          <span className="block text-[13.5px] font-bold text-rose-900">
+                            {p.title}
+                          </span>
+                          <span className="block text-[11px] text-rose-600/70">{rotulo}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
 

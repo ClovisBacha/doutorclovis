@@ -501,6 +501,65 @@ const POS: Carta[] = [
       "Temos a vida inteira pela frente, você e eu. 💗",
     ],
   },
+  /* ── As quatro que faltavam — o poço de pós-parto tinha dez cartas pra
+     noventa dias (12 semanas de vida), quase o dobro da repetição do poço
+     mais raso da gestação. Agora empata com t3 (catorze). */
+  {
+    id: "pos-soluco",
+    title: "Seus soluços",
+    emoji: "🫧",
+    fases: ["pos"],
+    lines: [
+      "{bebe}, hoje você teve soluço de novo, e eu quase ri de tanta ternura.",
+      "Um corpinho tão pequeno fazendo um barulhinho tão grande.",
+      "Eu fico ali do seu lado, só esperando passar, com a mão no seu peito.",
+      "São essas coisinhas bobas que eu não sabia que iam me derreter tanto.",
+      "Você ainda está aprendendo a habitar esse corpo novo — e eu aprendendo a cuidar dele.",
+      "Soluça à vontade. Eu fico aqui. 🫧",
+    ],
+  },
+  {
+    id: "pos-reconhece",
+    title: "O jeito que você me reconhece",
+    emoji: "👀",
+    fases: ["pos"],
+    lines: [
+      "{bebe}, hoje eu entrei no quarto e você virou a cabecinha na minha direção.",
+      "Não sei dizer se foi o cheiro, o som dos meus passos, ou a minha voz — mas você sabia que era eu.",
+      "Isso me deixou sem chão, do jeito bom.",
+      "Depois de tanto tempo eu sendo a única que te conhecia, agora você também está me conhecendo.",
+      "É a coisa mais bonita: a gente virando familiar um pro outro, aos poucos.",
+      "Continua me procurando. Eu sempre vou estar por perto. 👀",
+    ],
+  },
+  {
+    id: "pos-passeio",
+    title: "Nosso primeiro passeio de verdade",
+    emoji: "🚼",
+    fases: ["pos"],
+    lines: [
+      "{bebe}, hoje a gente saiu de casa pela primeira vez só nós dois.",
+      "Eu chequei a bolsa três vezes, ajeitei seu casaquinho, e saímos devagar.",
+      "Você dormiu o caminho inteiro, sem fazer ideia da aventura que aquilo era pra mim.",
+      "O mundo lá fora parecia diferente com você no meu colo.",
+      "Não foi longe, nem durou muito — mas foi o nosso primeiro passeio de verdade.",
+      "Ainda vamos ter tantos outros. 🚼",
+    ],
+  },
+  {
+    id: "pos-detalhes",
+    title: "Seu jeitinho, em detalhes",
+    emoji: "💇",
+    fases: ["pos"],
+    lines: [
+      "{bebe}, hoje eu fiquei um tempão só olhando os detalhes seus que eu nunca tinha reparado.",
+      "O jeito que o seu cabelo cresce torto de um lado, as suas sobrancelhas quase invisíveis, o formato da sua orelha.",
+      "Nenhum livro me preparou pra essa vontade de decorar cada detalhezinho seu.",
+      "Você é feito de tantas coisinhas pequenas que se juntam pra formar exatamente você.",
+      "E eu quero conhecer cada uma delas, com calma.",
+      "Já estou apaixonada por todas. 💇",
+    ],
+  },
 ];
 
 export const CARTAS: Carta[] = [...GERAIS, ...T1, ...T2, ...T3, ...POS];
@@ -521,6 +580,16 @@ export function poolDaFase(fase: FaseCarta): Carta[] {
 }
 
 /**
+ * O poço da fase EM QUE ELA ESTÁ agora — a mesma pergunta que `cartaDoDia`
+ * já respondia, só que devolvendo o poço inteiro em vez de uma carta. É o
+ * que a tela "Ver todas as cartas" precisa: navegar o álbum sem nunca
+ * misturar cartas de outra fase (e sem duplicar o corte de semanas).
+ */
+export function poolDeHoje(o: { semanas?: number | null; posParto?: boolean }): Carta[] {
+  return poolDaFase(faseDaGratidao(o.semanas, o.posParto ?? false));
+}
+
+/**
  * A carta de hoje.
  *
  * ⚠️ A ROTAÇÃO É `dia % n`, nunca um passo fixo — mesma razão de sempre
@@ -534,8 +603,7 @@ export function cartaDoDia(o: {
   semanas?: number | null;
   posParto?: boolean;
 }): Carta {
-  const fase = faseDaGratidao(o.semanas, o.posParto ?? false);
-  const pool = poolDaFase(fase);
+  const pool = poolDeHoje(o);
   const dia = Math.abs(Math.floor(o.dia));
   return pool[dia % pool.length];
 }

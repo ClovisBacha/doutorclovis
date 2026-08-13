@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   CARTAS,
   poolDaFase,
+  poolDeHoje,
   cartaDoDia,
   comNome,
   cartaComNome,
@@ -12,8 +14,8 @@ import {
 } from "./cartas-do-bebe";
 
 describe("o banco de cartas", () => {
-  test("são trinta", () => {
-    expect(CARTAS.length).toBe(30);
+  test("são trinta e quatro", () => {
+    expect(CARTAS.length).toBe(34);
   });
 
   test("ids são únicos", () => {
@@ -98,10 +100,19 @@ describe("poolDaFase", () => {
     expect(poolDaFase("t3").length).toBe(14);
   });
 
-  test("pos: só as dez marcadas — nada geral, nada de t1/t2/t3", () => {
+  test("pos: as catorze marcadas — mesma densidade de t3", () => {
     const pool = poolDaFase("pos");
-    expect(pool.length).toBe(10);
+    expect(pool.length).toBe(14);
     expect(pool.every((c) => c.fases?.length === 1 && c.fases[0] === "pos")).toBe(true);
+  });
+});
+
+describe("poolDeHoje", () => {
+  test("resolve a fase a partir das semanas, igual cartaDoDia", () => {
+    expect(poolDeHoje({ semanas: 8 })).toEqual(poolDaFase("t1"));
+    expect(poolDeHoje({ semanas: 20 })).toEqual(poolDaFase("t2"));
+    expect(poolDeHoje({ semanas: 32 })).toEqual(poolDaFase("t3"));
+    expect(poolDeHoje({ posParto: true })).toEqual(poolDaFase("pos"));
   });
 });
 
@@ -229,5 +240,21 @@ describe("falaDaBolhaNaCarta", () => {
       expect(f).not.toMatch(/você (não|deveria|precisa)/i);
       expect(f).not.toMatch(/vai passar|está tudo bem/i);
     }
+  });
+});
+
+describe("⚠️ o álbum não pode esconder a leitura de hoje", () => {
+  test("a legenda da lista usa haQuantoTempo, não fraseDeUltimaLeitura", () => {
+    /* `fraseDeUltimaLeitura` devolve null pra leituras de HOJE — correto pra
+       fala da bolha (não faz sentido cutucar "lê de novo" o que ela acabou de
+       ler), errado pra legenda do álbum: quem acabou de ler precisa VER que
+       leu, e "Ainda não lida" logo abaixo do título de uma carta que ela
+       fechou há trinta segundos é uma mentira. */
+    const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+    const ancora = fonte.indexOf("{pool.map((c) => {");
+    expect(ancora).toBeGreaterThan(-1);
+    const bloco = fonte.slice(ancora, ancora + 1500);
+    expect(bloco).toContain("haQuantoTempo(quando");
+    expect(bloco).not.toContain("fraseDeUltimaLeitura(ultimaLeitura(leituras, c.id)");
   });
 });
