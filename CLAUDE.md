@@ -2114,6 +2114,54 @@ Era a última das cinco atividades sem NENHUM porta-voz na tela de abertura.
   hoje" → "Fazer a aula de hoje" (a única forma de ver o ícone de verdade,
   porque a tela de abertura do quiz só existe depois de abrir a atividade).
 
+### A sétima expressão (exercício), e o script aprendeu sozinho (ago/2026)
+
+Pedido do dono: faixa de cabelo, halter e bola de pilates — "exercício" —
+na abertura do Mexer, que era a ÚLTIMA das cinco atividades do jogo sem
+NENHUMA aparição da bolha (nem abertura, nem fim).
+
+- **`humor="exercicio"` direto no ponto de uso**, mesmo padrão de
+  `estudiosa`: não passa por `humorDaJornada` porque a pergunta aqui não é
+  "que cara ela faz pela jornada", é "o que ela está fazendo agora".
+  Colocada na tela de ESCOLHA (`phase === "escolha"`, onde ela pergunta "o
+  que está incomodando?") — é o mesmo lugar onde `estudiosa` entrou na
+  Aula, a abertura, não o resultado.
+- ⚠️ **`scripts/bolha-do-drive.mjs` precisou de dois reforços** — a arte de
+  `exercicio` tem acessórios grudados nos DOIS lados (halter à esquerda,
+  bola de pilates à direita), e a faixa vertical fixa que serviu pra
+  `estudiosa` (uma medida à mão, específica daquela arte) não existia
+  aqui.
+  1. **Componentes conexos**: antes de ajustar o círculo, o script rotula a
+     máscara de alfa por 4-vizinhos e fica só com o MAIOR componente. Os
+     brilhos, faíscas e bolhinhas soltas ao redor da bolha (que antes
+     precisavam de uma faixa vertical escolhida à mão pra ficarem de fora)
+     agora saem sozinhos — são componentes pequenos e separados. Isto NÃO
+     separa halter/bola: eles encostam na bolha e continuam no mesmo
+     componente que ela.
+  2. **Faixa limpa por DETECÇÃO, não por medida manual**: o script varre a
+     largura do componente principal linha a linha e acha a maior
+     sequência contígua em que a largura muda pouco de uma linha pra
+     outra — é exatamente aí que nenhum acessório grudado está alargando
+     a silhueta naquela altura. Pra `exercicio` isso achou sozinho a faixa
+     y=270–635 (o hemisfério de cima, entre a faixa de cabelo e onde
+     halter/bola começam a contar); o valor bateu com uma conta manual de
+     conferência quase pixel a pixel (609,6/582,7/696,3 medido à mão contra
+     609,6/583,0/696,4 do script).
+- ⚠️ **A escala teve que CEDER pra caber** — é a primeira vez que isso
+  acontece por script, e a regra já existia em prosa desde as artes
+  originais ("bolha um tico menor é melhor que chapéu cortado ao meio"),
+  só nunca tinha sido CALCULADA: o halter e a bola sozinhos ocupam 92% da
+  largura da arte original (1254px), bem mais que qualquer acessório
+  anterior. Escalando pra bater o diâmetro exato (663px), os dois
+  estourariam os 960px da tela. O script agora mede o bounding box do
+  componente PRINCIPAL inteiro (não só da esfera) nos quatro lados e reduz
+  a escala até ele caber, com 2% de folga — a bolha de `exercicio` saiu uns
+  15% menor que as outras seis, e é um tico menor, não um acessório
+  cortado.
+- **Bancada:** `/preview-bolha` (chip "exercicio") ·
+  `/preview-jogo?tela=jogos&dia=139`, tocar em "Movimento" → abre direto na
+  tela de escolha (não tem intermediária, ao contrário da Aula).
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

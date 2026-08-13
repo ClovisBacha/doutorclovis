@@ -68,6 +68,7 @@ import dormindo from "@/assets/bolha/dormindo.webp";
 import orgulhosa from "@/assets/bolha/orgulhosa.webp";
 import surpresa from "@/assets/bolha/surpresa.webp";
 import estudiosa from "@/assets/bolha/estudiosa.webp";
+import exercicio from "@/assets/bolha/exercicio.webp";
 
 /**
  * ─── "PREOCUPADA" SAIU (ago/2026) ───────────────────────────────────────────
@@ -82,22 +83,29 @@ import estudiosa from "@/assets/bolha/estudiosa.webp";
  * assinatura junto, senão sobraria um parâmetro que ninguém lê e o próximo a
  * mexer aqui acharia que ele ainda faz alguma coisa.
  *
- * ─── "ESTUDIOSA" ENTROU (ago/2026) ──────────────────────────────────────────
+ * ─── "ESTUDIOSA" E "EXERCÍCIO" ENTRARAM (ago/2026) ──────────────────────────
  *
- * Óculos, capelo e um livro aberto — pedida pelo dono para a Aula. Ela NÃO
- * entra em `humorDaJornada`: as outras cinco respondem "que cara ela faz
- * pelo estado da jornada?", e esta responde uma pergunta diferente ("o que
- * ela está fazendo agora?"). Point de uso escolhe `humor="estudiosa"`
- * direto — mesmo padrão que o placar da Aula já usava pra `comemorando` /
- * `orgulhosa` / `feliz` no resultado do quiz, por nota, sem passar pela
- * régua da jornada.
+ * Óculos+capelo+livro pra Aula, faixa de cabelo+halter+bola de pilates pro
+ * Mexer. NENHUMA das duas entra em `humorDaJornada`: as outras cinco
+ * respondem "que cara ela faz pelo estado da jornada?", e estas respondem
+ * uma pergunta diferente ("o que ela está fazendo agora?"). Ponto de uso
+ * escolhe `humor="estudiosa"`/`humor="exercicio"` direto — mesmo padrão que
+ * o placar da Aula já usava pra `comemorando`/`orgulhosa`/`feliz` no
+ * resultado do quiz, por nota, sem passar pela régua da jornada.
  */
-export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpresa" | "estudiosa";
+export type Humor =
+  | "feliz"
+  | "comemorando"
+  | "dormindo"
+  | "orgulhosa"
+  | "surpresa"
+  | "estudiosa"
+  | "exercicio";
 
 /**
  * ─── AS ARTES DO BEBÊ BOLHA (ago/2026) ──────────────────────────────────────
  *
- * Seis expressões. A sétima, `preocupada`, foi removida — ver o bloco acima.
+ * Sete expressões. A oitava, `preocupada`, foi removida — ver o bloco acima.
  *
  * ─── TODAS PARTEM DA MESMA ESFERA ───────────────────────────────────────────
  *
@@ -130,14 +138,20 @@ export type Humor = "feliz" | "comemorando" | "dormindo" | "orgulhosa" | "surpre
  * por preenchimento a partir das bordas, e não por "todo pixel claro vira
  * transparente" — este último furaria os reflexos brancos dentro da bolha.
  *
- * `estudiosa` veio do Drive do mesmo jeito — RGB sem alfa, fundo quase-branco
- * — mas numa folha PRÓPRIA (1254×1254, sem as outras cinco do lado), então
- * ganhou script dedicado: `scripts/bolha-do-drive.mjs` faz o mesmo recorte
- * de fundo (porta de croma + rampa de brilho + conexão com a borda) e depois
- * AJUSTA A ESFERA por mínimos quadrados na borda direita — a única sem capelo
- * nem livro por cima — pra cair exatamente nos mesmos 663px/459×396 das
- * outras cinco. Sem isso ela nasceria de um tamanho ou lugar diferente e a
- * troca de humor pularia.
+ * `estudiosa` e `exercicio` vieram do Drive do mesmo jeito — RGB sem alfa,
+ * fundo quase-branco —, cada uma na sua folha PRÓPRIA (sem as outras do
+ * lado), então ganharam script dedicado: `scripts/bolha-do-drive.mjs` faz o
+ * mesmo recorte de fundo (porta de croma + rampa de brilho + conexão com a
+ * borda), isola o MAIOR componente conexo (descarta brilhos e bolhinhas
+ * soltas no fundo sozinho) e AJUSTA A ESFERA por mínimos quadrados sobre a
+ * maior faixa vertical em que a largura do componente cresce sem saltos —
+ * a faixa onde nenhum acessório grudado (capelo, halter, bola de pilates)
+ * está alargando a silhueta. Cai nos mesmos 459×396, mas nem sempre nos
+ * mesmos 663px: quando os extras são grandes demais pra caber na tela de
+ * 960 no tamanho exato (o halter e a bola de `exercicio` sozinhos já
+ * ocupam 92% da largura da arte original), a escala CEDE o mínimo
+ * necessário pra nada cortar — mesma regra que já valia, à mão, pro chapéu
+ * de festa do `comemorando` e o ZZZ do `dormindo`.
  */
 const ARTE: Record<Humor, string> = {
   feliz,
@@ -146,6 +160,7 @@ const ARTE: Record<Humor, string> = {
   orgulhosa,
   surpresa,
   estudiosa,
+  exercicio,
 };
 
 /**

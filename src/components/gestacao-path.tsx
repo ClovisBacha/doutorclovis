@@ -4434,10 +4434,20 @@ export function MovementBlock({
 
           {phase === "escolha" && (
             <div className="flex-1 overflow-y-auto px-6 pb-10">
-              <h3 className="font-serif text-[26px] font-semibold text-emerald-900">
+              {/* ── O PORTA-VOZ ────────────────────────────────────────────
+                  Era a única das cinco atividades do jogo sem NENHUMA
+                  aparição da bolha — nem na abertura, nem no fim. Faixa de
+                  cabelo, halter, bola de pilates: humor próprio
+                  (`exercicio`), fora de `humorDaJornada` como `estudiosa`
+                  já é — a pergunta aqui não é "que cara ela faz pela
+                  jornada", é "o que ela está fazendo agora". */}
+              <div className="flex justify-center">
+                <Bolha humor="exercicio" tamanho={96} entrada="chega" careMode={careMode} />
+              </div>
+              <h3 className="mt-3 text-center font-serif text-[26px] font-semibold text-emerald-900">
                 Mexer o corpo
               </h3>
-              <p className="mt-1 text-[13px] text-emerald-800/70">
+              <p className="mt-1 text-center text-[13px] text-emerald-800/70">
                 Diga o que está incomodando e eu monto a sequência.
               </p>
 

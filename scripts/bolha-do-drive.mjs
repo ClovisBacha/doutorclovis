@@ -3,21 +3,31 @@
  *
  *   node scripts/bolha-do-drive.mjs <origem.png> <nome-do-humor>
  *
- * Duas etapas, cada uma medida:
+ * Três etapas, cada uma medida:
  *
  *  1. RECORTE DE FUNDO — mesmo algoritmo de `scripts/bebes/do-drive.mjs`
  *     (porta de croma + rampa de brilho + conexão com a borda, então
  *     des-premultiplica). A arte chega em RGB sem alfa, fundo quase-branco.
  *
- *  2. ENCAIXE NA MESMA ESFERA — as cinco expressões vivas (`bolha.tsx`)
- *     partem todas de uma esfera de 663px de diâmetro centrada em 459×396
- *     numa tela de 960×960; é isso que impede a bolha de mudar de tamanho ao
- *     trocar de humor. A esfera da arte nova é medida por AJUSTE DE CÍRCULO
- *     na borda direita (livre de boné/livro), com REJEIÇÃO DE OUTLIER: um
- *     brilho ou confete que fique mais à direita que a bolha naquela altura
- *     vence a busca ingênua por "pixel opaco mais à direita da linha" — o
- *     ajuste roda três vezes, descartando a cada volta os pontos que mais
- *     destoam do círculo até então, o que os afasta do resultado final.
+ *  2. SÓ O COMPONENTE PRINCIPAL — cada arte vem cercada de confete, brilhos e
+ *     bolhinhas de decoração soltas no fundo. Rotular componentes conexos (4
+ *     vizinhos) e manter só o maior descarta essas ilhas automaticamente,
+ *     sem precisar nomear cada uma. ⚠️ Isso NÃO separa acessórios que
+ *     ENCOSTAM na bolha (boné, halter, bola de pilates) — eles continuam
+ *     ligados ao componente principal, e é para isso que serve o passo 3.
+ *
+ *  3. ENCAIXE NA MESMA ESFERA — as expressões vivas (`bolha.tsx`) partem
+ *     todas de uma esfera de 663px de diâmetro centrada em 459×396 numa tela
+ *     de 960×960; é isso que impede a bolha de mudar de tamanho ao trocar de
+ *     humor. A esfera da arte nova sai de um AJUSTE DE CÍRCULO sobre a maior
+ *     FAIXA VERTICAL CONTÍNUA em que a largura do componente principal cresce
+ *     suavemente — sem saltos —, medida automaticamente por diferença entre
+ *     linhas consecutivas. É a mesma pergunta que "onde a bolha aparece sem
+ *     acessório grudado" respondia à mão para a primeira expressão, só que
+ *     sem exigir que alguém abra a imagem numa grade pra descobrir a faixa:
+ *     um halter ou uma bola de pilates encostados na bolha fazem a largura
+ *     do componente saltar de repente (o acessório é um objeto à parte, com
+ *     sua própria curvatura), e é exatamente esse salto que corta a faixa.
  */
 import { chromium } from "playwright";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -31,13 +41,19 @@ const DESTINO = `src/assets/bolha/${NOME}.webp`;
 
 /** A esfera-alvo, medida em feliz.webp com o mesmo método (ver commit). */
 const ALVO = { diametro: 663, cx: 459, cy: 396 };
+/** Passo da varredura de linhas, em pixels da origem (~1250px de lado). */
+const PASSO = 5;
+/** Salto de largura, entre duas linhas consecutivas do passo, que denuncia
+ *  "saiu da bolha e entrou no acessório". Folgado o bastante pra curvatura
+ *  normal de um círculo de raio ~300-450px não disparar falso positivo. */
+const SALTO_MAXIMO = 20;
 
 const uri = `data:image/png;base64,${readFileSync(ORIGEM).toString("base64")}`;
 const nav = await chromium.launch();
 const page = await nav.newPage();
 
 const saida = await page.evaluate(
-  async ([uri, ALVO]) => {
+  async ([uri, ALVO, PASSO, SALTO_MAXIMO]) => {
     const img = new Image();
     img.src = uri;
     await img.decode();
@@ -117,25 +133,99 @@ const saida = await page.evaluate(
     }
     g0.putImageData(original, 0, 0);
 
-    /* ── 2. AJUSTE DE CÍRCULO NA BORDA DIREITA, COM REJEIÇÃO DE OUTLIER ──── */
+    /* ── 2. SÓ O COMPONENTE PRINCIPAL ─────────────────────────────────────
+       Rotula por 4-vizinhos sobre o alfa recortado (>128 = tinta) e fica só
+       com o maior — brilhos, confetes e bolhinhas soltas no fundo são
+       componentes pequenos e separados, e saem sozinhos daqui. */
     const depois = g0.getImageData(0, 0, W, H).data;
-    let pts = [];
-    for (let y = 0; y < H; y++) {
-      let x1 = -1;
-      for (let x = W - 1; x >= 0; x--) {
-        if (depois[(y * W + x) * 4 + 3] > 128) {
-          x1 = x;
-          break;
+    const opaco = new Uint8Array(N);
+    for (let k = 0; k < N; k++) opaco[k] = depois[k * 4 + 3] > 128 ? 1 : 0;
+
+    const rotulo = new Int32Array(N).fill(-1);
+    let maiorId = -1,
+      maiorCont = 0;
+    const pilha = new Int32Array(N);
+    for (let k0 = 0; k0 < N; k0++) {
+      if (!opaco[k0] || rotulo[k0] >= 0) continue;
+      const id = k0; // usa o próprio índice inicial como id, evita array de comps
+      let topo = 0;
+      pilha[topo++] = k0;
+      rotulo[k0] = id;
+      let cont = 0;
+      while (topo > 0) {
+        const k = pilha[--topo];
+        cont++;
+        const x = k % W;
+        if (x > 0 && opaco[k - 1] && rotulo[k - 1] < 0) {
+          rotulo[k - 1] = id;
+          pilha[topo++] = k - 1;
+        }
+        if (x < W - 1 && opaco[k + 1] && rotulo[k + 1] < 0) {
+          rotulo[k + 1] = id;
+          pilha[topo++] = k + 1;
+        }
+        if (k - W >= 0 && opaco[k - W] && rotulo[k - W] < 0) {
+          rotulo[k - W] = id;
+          pilha[topo++] = k - W;
+        }
+        if (k + W < N && opaco[k + W] && rotulo[k + W] < 0) {
+          rotulo[k + W] = id;
+          pilha[topo++] = k + W;
         }
       }
-      if (x1 >= 0) pts.push({ y, x: x1 });
+      if (cont > maiorCont) {
+        maiorCont = cont;
+        maiorId = id;
+      }
     }
-    // A faixa central foi medida à mão (bolha-medir.mjs, perfil linha a
-    // linha): fora dela sobra confete/brilho mais à direita que a própria
-    // bolha, e a rejeição de outlier sozinha convergia pro círculo errado —
-    // ela precisa de uma maioria limpa pra começar, e sem isto não tinha.
-    const FAIXA_LIMPA = { y0: 350, y1: 595 };
-    pts = pts.filter((p) => p.y >= FAIXA_LIMPA.y0 && p.y <= FAIXA_LIMPA.y1);
+
+    /* ── 3. FAIXA CONTÍNUA SEM SALTO + AJUSTE DE CÍRCULO ─────────────────── */
+    const linhas = [];
+    for (let y = 0; y < H; y += PASSO) {
+      let x0 = -1,
+        x1 = -1;
+      const base = y * W;
+      for (let x = 0; x < W; x++) {
+        if (rotulo[base + x] === maiorId) {
+          if (x0 < 0) x0 = x;
+          x1 = x;
+        }
+      }
+      linhas.push({ y, x0, x1, largura: x0 < 0 ? 0 : x1 - x0 + 1 });
+    }
+
+    // maior sequência contígua (no PASSO) onde a largura muda pouco de uma
+    // linha pra próxima — é aí que não há acessório grudado naquela altura.
+    let melhorIni = -1,
+      melhorFim = -1,
+      melhorTam = 0;
+    let iniAtual = -1;
+    for (let i = 0; i < linhas.length; i++) {
+      const valida = linhas[i].largura > 0;
+      const continuaSemSalto =
+        valida &&
+        i > 0 &&
+        linhas[i - 1].largura > 0 &&
+        linhas[i].y - linhas[i - 1].y === PASSO &&
+        Math.abs(linhas[i].largura - linhas[i - 1].largura) <= SALTO_MAXIMO;
+      if (valida && (iniAtual < 0 || !continuaSemSalto)) iniAtual = i;
+      if (valida) {
+        const tam = i - iniAtual + 1;
+        if (tam > melhorTam) {
+          melhorTam = tam;
+          melhorIni = iniAtual;
+          melhorFim = i;
+        }
+      } else {
+        iniAtual = -1;
+      }
+    }
+    const faixa = linhas.slice(melhorIni, melhorFim + 1);
+    const pts = [];
+    for (const l of faixa) {
+      pts.push({ x: l.x0, y: l.y });
+      pts.push({ x: l.x1, y: l.y });
+    }
 
     function ajustar(pontos) {
       const S = [
@@ -174,21 +264,42 @@ const saida = await page.evaluate(
       return { cx, cy, r };
     }
 
-    let circulo = ajustar(pts);
-    for (let volta = 0; volta < 3; volta++) {
-      const comResiduo = pts.map((p) => ({
-        ...p,
-        residuo: Math.abs(Math.sqrt((p.x - circulo.cx) ** 2 + (p.y - circulo.cy) ** 2) - circulo.r),
-      }));
-      comResiduo.sort((a, b) => a.residuo - b.residuo);
-      // mantém os 70% mais próximos do círculo da rodada anterior.
-      pts = comResiduo.slice(0, Math.ceil(comResiduo.length * 0.7));
-      circulo = ajustar(pts);
-    }
+    const circulo = ajustar(pts);
     const diametro = 2 * circulo.r;
 
-    /* ── 3. ESCALA E DESLOCA PRA ESFERA-ALVO ─────────────────────────────── */
-    const escala = ALVO.diametro / diametro;
+    /* ── 4. ESCALA E DESLOCA PRA ESFERA-ALVO ─────────────────────────────── *
+     * ⚠️ A ESCALA CEDE QUANDO OS EXTRAS NÃO CABEM — mesma regra já registrada
+     * em `bolha.tsx` pro chapéu de festa do `comemorando` e o ZZZ do
+     * `dormindo`: "bolha um tico menor é melhor que acessório cortado ao
+     * meio". Sem isto, halteres e bolas de pilates bem maiores que qualquer
+     * acessório anterior estourariam a tela de 960 depois de escalados pra
+     * bater o diâmetro exato. O teto sai do bounding box do componente
+     * PRINCIPAL inteiro (não só da esfera) — inclui todo acessório grudado
+     * na bolha — testado nos quatro lados (a bolha raramente fica no centro
+     * geométrico do próprio componente). */
+    let escala = ALVO.diametro / diametro;
+    let x0Comp = Infinity,
+      x1Comp = -Infinity,
+      y0Comp = Infinity,
+      y1Comp = -Infinity;
+    for (let k = 0; k < N; k++) {
+      if (rotulo[k] !== maiorId) continue;
+      const x = k % W,
+        y = (k - x) / W;
+      if (x < x0Comp) x0Comp = x;
+      if (x > x1Comp) x1Comp = x;
+      if (y < y0Comp) y0Comp = y;
+      if (y > y1Comp) y1Comp = y;
+    }
+    const tetoEscala = Math.min(
+      ALVO.cx / (circulo.cx - x0Comp),
+      (960 - ALVO.cx) / (x1Comp - circulo.cx),
+      ALVO.cy / (circulo.cy - y0Comp),
+      (960 - ALVO.cy) / (y1Comp - circulo.cy),
+    );
+    const cedeu = tetoEscala < escala;
+    if (cedeu) escala = tetoEscala * 0.98; // 2% de folga, não encosta na borda
+
     const offX = ALVO.cx - circulo.cx * escala;
     const offY = ALVO.cy - circulo.cy * escala;
 
@@ -202,14 +313,17 @@ const saida = await page.evaluate(
       W,
       H,
       fracaoTransparente: +(fundoNeutro / N).toFixed(3),
-      medida: { cx: circulo.cx, cy: circulo.cy, diametro, pontosUsados: pts.length },
+      faixaUsada: { y0: faixa[0]?.y, y1: faixa[faixa.length - 1]?.y, pontos: pts.length },
+      medida: { cx: circulo.cx, cy: circulo.cy, diametro },
+      componentePrincipal: { x0: x0Comp, x1: x1Comp, y0: y0Comp, y1: y1Comp },
       escala,
+      escalaCedeu: cedeu,
       offX,
       offY,
       webp,
     };
   },
-  [uri, ALVO],
+  [uri, ALVO, PASSO, SALTO_MAXIMO],
 );
 
 await nav.close();
@@ -222,8 +336,11 @@ console.log(
       arquivo: DESTINO,
       origem: `${saida.W}×${saida.H}`,
       transparente: `${Math.round(saida.fracaoTransparente * 100)}%`,
+      faixaUsada: saida.faixaUsada,
       esferaMedida: saida.medida,
+      componentePrincipal: saida.componentePrincipal,
       escala: +saida.escala.toFixed(4),
+      escalaCedeuPraCaberOsExtras: saida.escalaCedeu,
       kb: Math.round(bytes.length / 1024),
     },
     null,
