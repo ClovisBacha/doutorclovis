@@ -27,6 +27,7 @@ import {
   type CantinhoType,
 } from "./cantinho";
 import { TRILHA_SKINS } from "./trilha-skins";
+import { CONJUNTOS } from "./conjuntos";
 
 const pagos = CANTINHO_ITEMS.filter((i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID);
 
@@ -190,6 +191,47 @@ describe("⚠️ dois itens nunca têm o mesmo emoji", () => {
       (i) => `${i.emoji}: ${i.id} × ${enfeites.get(i.emoji)}`,
     );
     expect(colisoes).toEqual([]);
+  });
+});
+
+describe("⚠️ nenhum emoji é novo demais para o aparelho dela", () => {
+  /* ─── O DEFEITO QUE ESTE TESTE EXISTE PARA PEGAR ────────────────────────
+     Emoji que o sistema não conhece vira TOFU — um retângulo vazio. E ele é
+     invisível aqui: a máquina de desenvolvimento tem a fonte completa, o
+     Chromium tem a fonte completa, e a foto do Playwright sai perfeita. Quem
+     vê o quadradinho é a paciente com um iPhone de quatro anos, na loja, no
+     lugar do item que ela ia comprar.
+
+     É a mesma família da lição do WebM com alfa: defeito que nenhuma máquina
+     de desenvolvimento mostra.
+
+     ─── O TETO, E DE ONDE ELE VEM ─────────────────────────────────────────
+     U+1FAE7 é o 🫧 (Bolhinhas de sabão), do Unicode 14 — iOS 15.4, de março de
+     2022. O catálogo JÁ estava nesse teto antes da ampliação de ago/2026:
+     🪷 (Bolinhas Lótus) e 🫖 (Chá quentinho) são da mesma leva, e nasceram
+     muito antes.
+
+     Acima disto, no bloco 1FAxx, começa o Unicode 15 (🪼 água-viva, 🪽 asa,
+     🫩) — que exige iOS 16.4, e foi por isso que a água-viva ficou de fora da
+     ampliação, apesar de ser um desenho ótimo.
+
+     ⚠️ Subir este número não é errado — é uma DECISÃO, e ela se toma olhando
+     num aparelho antigo de verdade, nunca aqui. */
+  const TETO = 0x1fae7;
+
+  test("todo emoji do catálogo cabe no teto declarado", () => {
+    const altos = CANTINHO_ITEMS.filter((i) =>
+      [...i.emoji].some((c) => c.codePointAt(0)! > TETO),
+    ).map((i) => `${i.id} ${i.emoji}`);
+    expect(altos).toEqual([]);
+  });
+
+  test("e os selos dos conjuntos também", () => {
+    /* Eles aparecem na mesma prateleira, no mesmo tamanho. */
+    const altos = CONJUNTOS.filter((c) => [...c.emoji].some((x) => x.codePointAt(0)! > TETO)).map(
+      (c) => `${c.id} ${c.emoji}`,
+    );
+    expect(altos).toEqual([]);
   });
 });
 
