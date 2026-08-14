@@ -653,41 +653,48 @@ function seedDecor(ids: string[], height: number, offset: number): PlacedDecor[]
  * 26vw), só que um nível abaixo.
  */
 function ClimaNoAr({ ids }: { ids: string[] }) {
-  const ativos = useMemo(() => climasAtivos(ids), [ids]);
-  if (ativos.length === 0) return null;
+  /* ⚠️ A CHAVE DO `useMemo` É A STRING, e não o array.
+     Quem chama monta `visiblePlaced.map((p) => p.id)`, que é um array NOVO a
+     cada render — e a trilha renderiza muito (arrastar um enfeite dispara
+     dezenas de renders por segundo). Com o array como dependência o `useMemo`
+     nunca acerta, e as 42 partículas eram recalculadas em todos eles. */
+  const chave = ids.join(",");
+  const particulas = useMemo(
+    () => climasAtivos(chave ? chave.split(",") : []).flatMap((id) => particulasDe(id)),
+    [chave],
+  );
+  if (particulas.length === 0) return null;
   return (
     <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
       <div className="sticky top-0 h-[100svh] w-full overflow-hidden rounded-2xl">
-        {ativos.flatMap((id) =>
-          particulasDe(id).map((q) => (
-            <span
-              key={q.k}
-              className="dc-clima select-none leading-none"
-              style={
-                {
-                  left: `${q.esquerda}%`,
-                  fontSize: `${q.tamanho}rem`,
-                  "--dc-percurso": q.sentido === "cai" ? "dcClimaCai" : "dcClimaSobe",
-                  "--dc-dur": `${q.duracao}s`,
-                  "--dc-atraso": `${q.atraso}s`,
-                  "--dc-op": q.opacidade,
-                  "--dc-giro": `${q.giro}deg`,
-                  "--dc-deriva": `${q.deriva}vw`,
-                  /* Uma tela, e com folga: `svh` é a tela com TODAS as barras
+        {particulas.map((q) => (
+          <span
+            key={q.k}
+            className="dc-clima select-none leading-none"
+            style={
+              {
+                left: `${q.esquerda}%`,
+                fontSize: `${q.tamanho}rem`,
+                "--dc-percurso": q.sentido === "cai" ? "dcClimaCai" : "dcClimaSobe",
+                "--dc-dur": `${q.duracao}s`,
+                "--dc-atraso": `${q.atraso}s`,
+                "--dc-op": q.opacidade,
+                "--dc-giro": `${q.giro}deg`,
+                "--dc-deriva": `${q.deriva}vw`,
+                /* Uma tela, e com folga: `svh` é a tela com TODAS as barras
                      à mostra, então a partícula desaparece pela borda de baixo
                      em qualquer iOS. (`dvh` mudaria enquanto ela rola e faria
                      a queda dar um pulo.) */
-                  "--dc-fim": "calc(100svh + 4rem)",
-                  /* Onde ela para com `prefers-reduced-motion`: espalhada pela
+                "--dc-fim": "calc(100svh + 4rem)",
+                /* Onde ela para com `prefers-reduced-motion`: espalhada pela
                      tela, e não empilhada numa linha só. */
-                  "--dc-parada": `${(hashStr(q.k) % 88) + 6}svh`,
-                } as React.CSSProperties
-              }
-            >
-              {q.emoji}
-            </span>
-          )),
-        )}
+                "--dc-parada": `${(hashStr(q.k) % 88) + 6}svh`,
+              } as React.CSSProperties
+            }
+          >
+            {q.emoji}
+          </span>
+        ))}
       </div>
     </div>
   );
