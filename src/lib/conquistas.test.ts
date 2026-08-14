@@ -128,19 +128,24 @@ describe("⚠️ a raridade tem régua, não gosto", () => {
       sequencia: ["sequencia_7", "sequencia_30"],
       cantinho: ["cantinho_1", "cantinho_10"],
     };
+    /* ⚠️ A CHAVE ENTRA NO VALOR COMPARADO, e não numa mensagem de erro: o
+       `expect` daqui (`src/types/bun-test.d.ts`) recebe UM argumento só, e sem
+       isso um degrau errado falharia dizendo apenas `"raro" !== "epico"` — sem
+       dizer QUAL dos 39. Comparar `"aula_50=raro"` com `"aula_50=epico"` diz
+       tudo na primeira linha do erro. */
     for (const [assunto, degraus] of Object.entries(ESCADAS)) {
       for (const k of degraus) {
-        expect(conquistaPorChave(k), `${assunto}: ${k} não existe`).toBeDefined();
+        expect(conquistaPorChave(k) ? k : `${assunto}: ${k} NÃO EXISTE`).toBe(k);
       }
       const topo = degraus[degraus.length - 1];
       const abaixo = degraus.slice(0, -1);
       /* O topo é épico — exceto nas escadas curtas (2 degraus), onde o topo
          ainda é repetição sustentada e não marco de meses. */
       if (degraus.length >= 3) {
-        expect(conquistaPorChave(topo)!.raridade, `topo de ${assunto}`).toBe("epico");
+        expect(`${topo}=${conquistaPorChave(topo)!.raridade}`).toBe(`${topo}=epico`);
       }
       for (const k of abaixo) {
-        expect(conquistaPorChave(k)!.raridade, `${k} não pode ser épico`).not.toBe("epico");
+        expect(`${k}=${conquistaPorChave(k)!.raridade}`).not.toBe(`${k}=epico`);
       }
     }
   });
@@ -265,7 +270,7 @@ describe("⚠️ as conquistas da Escola do Bebê apontam pra aula do dia", () =
        As CHAVES ficam: apagá-las tiraria a medalha de quem já a tivesse, e o
        app não pode tirar de volta o que deu. */
     for (const k of ["first_course", "course_5", "course_complete"]) {
-      expect(conquistaPorChave(k)).toBeDefined();
+      expect(conquistaPorChave(k) ? k : `${k} sumiu`).toBe(k);
     }
   });
 
