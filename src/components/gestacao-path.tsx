@@ -1634,6 +1634,14 @@ export function GestacaoPath({
   const savedRef = useRef<string>("");
   // Espelho de `arranging` p/ o efeito de hidratação não depender do estado.
   const arrangingRef = useRef(false);
+  /* Espelho de `placed`, pelo mesmo motivo: o efeito que espalha item novo
+     precisa saber QUANTOS já estão na trilha, e ele não tem `placed` nas deps
+     (teria: espalhar → mudar `placed` → espalhar de novo). Ler o valor do
+     fecho traria o de um render antigo, e a conta do teto sairia errada. */
+  const placedRef = useRef<PlacedDecor[]>([]);
+  /* Um aviso de trilha cheia por visita. Sem isto, quem tem 120 enfeites
+     receberia o mesmo toast toda vez que abrisse o Caminho. */
+  const avisouCheiaRef = useRef(false);
   const dragRef = useRef<{
     k: string;
     mode: "move" | "size";
@@ -1959,6 +1967,7 @@ export function GestacaoPath({
   }, [hydratedAt]);
 
   arrangingRef.current = arranging;
+  placedRef.current = placed;
 
   // Cada sessão de Arrumar começa com o Desfazer zerado: ele desfaz o que ela
   // acabou de fazer, nunca algo de uma visita anterior que ela nem lembra.
@@ -1974,13 +1983,50 @@ export function GestacaoPath({
      ter pedido é justamente o tipo de tela que assusta. O botão Arrumar da
      própria trilha continua sendo a porta. */
 
+  /* ⚠️ O ITEM QUE ELA ACABOU DE COMPRAR SUMIA EM SILÊNCIO.
+     A versão anterior era `[...prev, ...seedDecor(fresh)].slice(0, DECOR_MAX)`
+     e marcava TODOS os `fresh` como vistos na mesma linha. Com a trilha cheia
+     (120 sprites, e cada item vale duas cópias), o `slice` jogava fora
+     exatamente os que acabaram de nascer — e como o id já estava em `seen`,
+     eles nunca mais eram espalhados. Ela pagava 340 🌱 no Pavão e ele não
+     aparecia em lugar nenhum.
+
+     Nunca foi hipotético: 74 itens já davam 148 sprites, mais que o teto. Com
+     111 é o dobro dele.
+
+     Agora só é marcado como visto o que COUBE, então o item espera a vaga em
+     vez de se perder — e ela é avisada de que a trilha está cheia, com o
+     caminho para resolver. O corte é por ITEM (duas cópias, ou uma se for
+     `especial`), nunca por sprite: meio item na trilha é um enfeite que
+     aparece de um lado só.
+
+     ⚠️ `placed` NÃO entra nas deps de propósito — espalhar muda `placed`, que
+     dispararia espalhar de novo. Quem esvazia vaga tirando um enfeite está no
+     modo Arrumar, com a bandeja aberta e o item ali para tocar; e na abertura
+     seguinte do Caminho o que sobrou entra sozinho. */
   useEffect(() => {
     if (!decorReady || height <= 0) return;
     const fresh = seedables.filter((id) => !seenRef.current.includes(id));
     if (fresh.length === 0) return;
-    seenRef.current = [...seenRef.current, ...fresh];
-    setPlaced((prev) => [...prev, ...seedDecor(fresh, height, prev.length)].slice(0, DECOR_MAX));
-  }, [seedables, decorReady, height]);
+
+    let espaco = DECOR_MAX - placedRef.current.length;
+    const cabem: string[] = [];
+    for (const id of fresh) {
+      const custo = CANTINHO_BY_ID[id]?.type === "especial" ? 1 : 2;
+      if (custo > espaco) break;
+      espaco -= custo;
+      cabem.push(id);
+    }
+
+    if (cabem.length < fresh.length && !avisouCheiaRef.current && !careMode) {
+      avisouCheiaRef.current = true;
+      toast(`A trilha está cheia (${DECOR_MAX} enfeites). Os novos esperam no ✏️ Arrumar.`);
+    }
+    if (cabem.length === 0) return;
+
+    seenRef.current = [...seenRef.current, ...cabem];
+    setPlaced((prev) => [...prev, ...seedDecor(cabem, height, prev.length)].slice(0, DECOR_MAX));
+  }, [seedables, decorReady, height, careMode]);
 
   // Salva com folga: arrastar dispara dezenas de updates por segundo e não vale
   // escrever (e sincronizar) a cada pixel.
