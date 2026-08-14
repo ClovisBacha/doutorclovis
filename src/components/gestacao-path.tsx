@@ -17,6 +17,8 @@ import {
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, fundoBgFor } from "@/lib/cantinho";
 import { climasAtivos, particulasDe } from "@/lib/clima-do-cantinho";
+import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
+import { escadaDeTrofeus, proximoDesbloqueio } from "@/lib/trofeus";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
@@ -316,6 +318,118 @@ function AvisoDePresente({
             className="w-full rounded-full py-2.5 text-sm font-semibold text-slate-500"
           >
             Agora não
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * O QUE É UM TROFÉU, E O QUE ELE ABRE.
+ *
+ * ─── O DEFEITO ──────────────────────────────────────────────────────────────
+ *
+ * Auditoria da gamificação, ago/2026. O troféu na fita do topo era um número
+ * roxo com o `title` "Figurinhas coletadas" — texto de quando ele contava
+ * figurinhas de álbum, e mentira desde que passou a contar dias de cinco
+ * estrelas. Nada na tela dizia o que era, como se ganhava, nem que ele
+ * destranca três itens da loja.
+ *
+ * E `proximoDesbloqueio` / `escadaDeTrofeus` (`trofeus.ts`) existiam, com
+ * teste, e **nenhum chamador**: a escada estava escrita e nunca foi mostrada
+ * a ninguém. Uma meta que o jogo não conta é uma meta que não existe.
+ *
+ * ⚠️ A folha NÃO cobra e NÃO usa "bloqueado". Diz "faltam 4 🏆", que dá o que
+ * fazer a seguir — a mesma régua da vitrine do Cantinho, e o oposto de
+ * "bloqueado", que só informa que ela não pode.
+ */
+function FolhaDosTrofeus({
+  trofeus,
+  onFechar,
+  onIrAoCantinho,
+}: {
+  trofeus: number;
+  onFechar: () => void;
+  onIrAoCantinho?: () => void;
+}) {
+  const escada = escadaDeTrofeus();
+  const proximo = proximoDesbloqueio(trofeus);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Seus troféus"
+      className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center"
+      style={{ background: "rgba(38,20,40,0.44)", backdropFilter: "blur(3px)" }}
+      onClick={onFechar}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[380px] rounded-t-[28px] bg-white p-6 pb-8 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[28px] sm:pb-6"
+      >
+        <p className="flex items-center justify-center gap-2 text-center">
+          <TrofeuIcone />
+          <span className="text-[34px] font-black leading-none text-violet-500">{trofeus}</span>
+        </p>
+        <p className="mt-1 text-center font-serif text-[20px] leading-tight text-slate-800">
+          {trofeus === 1 ? "troféu" : "troféus"}
+        </p>
+        <p className="mt-2 text-center text-sm leading-relaxed text-slate-500">
+          Você ganha um a cada dia em que faz <strong>as quatro atividades</strong> do Caminho.
+        </p>
+
+        <div className="mt-5 space-y-2">
+          {escada.map((d) => {
+            const item = CANTINHO_BY_ID[d.itemId];
+            if (!item) return null;
+            const faltam = Math.max(0, d.trofeus - trofeus);
+            return (
+              <div
+                key={d.itemId}
+                className={`flex items-center gap-3 rounded-2xl border p-3 ${
+                  faltam === 0 ? "border-violet-200 bg-violet-50" : "border-slate-200 bg-slate-50"
+                }`}
+              >
+                <span className={`text-2xl ${faltam > 0 ? "opacity-40 grayscale" : ""}`}>
+                  {item.emoji}
+                </span>
+                <span className="flex-1 text-sm font-semibold text-slate-700">{item.name}</span>
+                <span
+                  className={`text-xs font-bold ${
+                    faltam === 0 ? "text-violet-600" : "text-slate-500"
+                  }`}
+                >
+                  {faltam === 0 ? "liberado ✓" : `faltam ${faltam} 🏆`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sem próximo desbloqueio o número vira placar, e está tudo bem —
+            inventar uma quarta meta que não existe seria pior. */}
+        {proximo && (
+          <p className="mt-4 text-center text-xs text-slate-400">
+            Faltam {proximo.trofeus - trofeus}{" "}
+            {proximo.trofeus - trofeus === 1 ? "dia completo" : "dias completos"} para o próximo.
+          </p>
+        )}
+
+        <div className="mt-5 flex flex-col gap-2">
+          {onIrAoCantinho && (
+            <button
+              onClick={onIrAoCantinho}
+              className="press w-full rounded-full bg-violet-500 py-3 text-sm font-bold text-white"
+            >
+              Ver no Cantinho
+            </button>
+          )}
+          <button
+            onClick={onFechar}
+            className="w-full rounded-full py-2.5 text-sm font-semibold text-slate-500"
+          >
+            Fechar
           </button>
         </div>
       </div>
@@ -1355,6 +1469,9 @@ export function GestacaoPath({
   const [trofeus, setTrofeus] = useState(bancada?.trofeus ?? 0);
   /* O troféu que ela acabou de ganhar, esperando a comemoração aparecer. */
   const [trofeuNovo, setTrofeuNovo] = useState<number | null>(bancada?.trofeuNovo ?? null);
+  /* A folha que explica o que é o troféu e o que ele abre — ver
+     `FolhaDosTrofeus`. Abre pelo toque na fita do topo. */
+  const [trofeusAbertos, setTrofeusAbertos] = useState(false);
   /* Quantas amigas — o número que a fita mostra no lugar do calendário.
      Consulta própria e leve (`contarAmigas`), e não a lista inteira: a fita
      abre em toda visita ao Caminho, e a lista calcula chama e troféus de cada
@@ -1478,6 +1595,39 @@ export function GestacaoPath({
         if (w.ok && w.presente && !lsGet(chaveDoPresente(w.presente.quando), false)) {
           setPresente(w.presente);
         }
+        /* ── O BÔNUS DAS CINCO ESTRELAS QUE A REDE ENGOLIU ────────────────
+           `grantDayStarsBonus` é chamada UMA vez, no instante em que o dia
+           fecha, dentro de um `try/catch` que engole erro. Rede oscilando,
+           sessão expirada ou app fechado antes da resposta, e os 20 🌱 nunca
+           são gravados — sem rastro, sem erro na tela e **sem segunda
+           tentativa**, porque `!doneDays.includes(D)` já marcou o dia como
+           fechado no aparelho e aquele bloco nunca mais roda.
+
+           É o mesmo defeito que já custou o contador de troféus (o `day_stars`
+           era o RECIBO, e a contagem passou a ler a PROVA, as linhas
+           `wellness:`). Aqui a cobrança é do dinheiro em si, então a correção
+           é tentar de novo na abertura seguinte.
+
+           ⚠️ É seguro repetir por construção, e não por sorte: o servidor
+           dedupa por `day_stars:<ciclo>:<dia>` E reconfere as quatro linhas de
+           bem-estar no ledger antes de pagar. Chamar sem ter fechado o dia
+           devolve `granted: 0` e não grava nada.
+
+           ⚠️ Lê o `localStorage` direto, e não o estado `doneDays`: este efeito
+           roda no mount com deps `[]`, e `doneDays` só é preenchido por outro
+           efeito depois — o fecho capturaria uma lista vazia e a recuperação
+           nunca tentaria nada. O ontem entra porque o servidor aceita ±1 dia,
+           e quem fecha o dia às onze da noite é justamente quem tem mais
+           chance de perder a resposta. */
+        for (const d of [todayD, todayD - 1]) {
+          if (d < 7 || !lsGet<number[]>(LS.doneDays, []).includes(d)) continue;
+          const atrasado = await grantDayStarsBonus({ data: { accessToken: token, day: d } });
+          if (atrasado.ok && atrasado.granted > 0) {
+            creditarSementinhas(atrasado.granted);
+            toast.success(`⭐ +${atrasado.granted} 🌱 das 5 estrelas`);
+          }
+        }
+
         // Itens comprados decoram o Caminho.
         const c = await getCantinho({ data: { accessToken: token } });
         if (c.ok) {
@@ -1491,6 +1641,13 @@ export function GestacaoPath({
       }
     })();
   }, []);
+
+  /* O saldo sobe na hora, com o que o servidor concedeu. A régua e o porquê
+     estão em `src/lib/evento-sementinhas.ts`.
+
+     ⚠️ `s == null` fica `null`: em Modo Cuidado a barra de moeda não existe, e
+     um ganho não pode ser o que a faz aparecer. */
+  useEffect(() => ouvirSementinhas((n) => setSaldo((s) => (s == null ? s : s + n))), []);
 
   // Lazy init: evita flash da tela errada no primeiro render (rota é ssr:false)
   const [birth, setBirth] = useState<Birth | null>(() => lsGet<Birth | null>(LS.birth, null));
@@ -1891,8 +2048,10 @@ export function GestacaoPath({
               const r = await grantDayStarsBonus({
                 data: { accessToken: s.session.access_token, day: D },
               });
-              if (r.ok && r.granted > 0) toast.success(`⭐ 5 estrelas! +${r.granted} 🌱`);
-              else toast.success("⭐ As 5 estrelas do dia!");
+              if (r.ok && r.granted > 0) {
+                toast.success(`⭐ 5 estrelas! +${r.granted} 🌱`);
+                creditarSementinhas(r.granted);
+              } else toast.success("⭐ As 5 estrelas do dia!");
 
               /* O TROFÉU.
                  A comemoração acontece AQUI, e não numa comparação de números.
@@ -2536,16 +2695,30 @@ export function GestacaoPath({
           </span>
         </button>
         <div className="h-6 w-px bg-slate-200" />
-        <div className="flex items-center gap-1.5" title="Figurinhas coletadas">
-          {/* O TROFÉU CONTA DIAS DE CINCO ESTRELAS, e não mais figurinhas de
-              álbum da semana. O dono viu "8" com três conquistas e disse a
-              coisa certa: não significava nada. O número vem do SERVIDOR
-              (linhas `day_stars:` do ledger), que é o mesmo que destranca item
-              da loja — dois números diferentes para a mesma palavra seria o
-              defeito antigo de volta. */}
+        {/* ⚠️ ERA UMA `div` COM `title="Figurinhas coletadas"`, e as duas
+            coisas estavam erradas.
+
+            O texto era de quando o troféu contava figurinhas de álbum — ficou
+            para trás quando ele passou a contar dias de cinco estrelas, e um
+            `title` que mente é pior que nenhum. E `div` porque não havia o que
+            tocar: o número não explicava o que era, como se ganhava, nem que
+            destrava três itens da loja. Agora abre a escada
+            (`FolhaDosTrofeus`), que é onde `proximoDesbloqueio` finalmente tem
+            um chamador — a função existia, tinha teste, e nunca foi mostrada a
+            ninguém.
+
+            O número em si vem do SERVIDOR (linhas `day_stars:` do ledger), o
+            mesmo que destranca item na loja: dois números diferentes para a
+            mesma palavra seria o defeito antigo de volta. */}
+        <button
+          type="button"
+          onClick={() => setTrofeusAbertos(true)}
+          className="press flex items-center gap-1.5"
+          aria-label={`${trofeus} ${trofeus === 1 ? "troféu" : "troféus"} — ver o que eles abrem`}
+        >
           <TrofeuIcone />
           <span className="text-lg font-extrabold text-violet-500">{trofeus}</span>
-        </div>
+        </button>
         {saldo != null && (
           <>
             <div className="h-6 w-px bg-slate-200" />
@@ -2609,6 +2782,24 @@ export function GestacaoPath({
           quem mais pagaria esse pedágio. */}
       {trofeuNovo != null && (
         <TrofeuConquistado numero={trofeuNovo} aoFechar={() => setTrofeuNovo(null)} />
+      )}
+
+      {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
+          na ordem do DOM porque as duas são `fixed`: se as duas estivessem no
+          ar, a que a paciente acabou de conquistar tem de ficar por cima. */}
+      {trofeusAbertos && (
+        <FolhaDosTrofeus
+          trofeus={trofeus}
+          onFechar={() => setTrofeusAbertos(false)}
+          onIrAoCantinho={
+            onOpenShop
+              ? () => {
+                  setTrofeusAbertos(false);
+                  onOpenShop();
+                }
+              : undefined
+          }
+        />
       )}
 
       {/* O ANÚNCIO DO PRESENTE. Fora do bloco acima de propósito: aquele some
@@ -3401,7 +3592,10 @@ function LessonSheet({
         const r = await grantLessonReward({
           data: { accessToken: token, week: m.week, correct: finalCorrect },
         });
-        if (r.ok) setReward(r.granted);
+        if (r.ok) {
+          setReward(r.granted);
+          creditarSementinhas(r.granted);
+        }
       }
     } catch {
       /* recompensa é secundária */
@@ -4266,7 +4460,10 @@ export function MovementBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok && r.granted > 0) setReward(r.granted);
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        creditarSementinhas(r.granted);
+      }
     } catch {
       /* recompensa é secundária */
     }
@@ -5659,7 +5856,10 @@ export function MeditationBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok && r.granted > 0) setReward(r.granted);
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        creditarSementinhas(r.granted);
+      }
     } catch {
       /* recompensa é secundária */
     }
@@ -6934,7 +7134,10 @@ export function BondingBlock({
       // Meia estrela acende sempre que o servidor confirmou a atividade (r.ok).
       // `granted` pode vir 0 quando a recompensa do dia já tinha sido paga —
       // isso não pode apagar o progresso da estrela.
-      if (r.ok && r.granted > 0) setReward(r.granted);
+      if (r.ok && r.granted > 0) {
+        setReward(r.granted);
+        creditarSementinhas(r.granted);
+      }
     } catch {
       /* recompensa é secundária */
     }
@@ -7756,7 +7959,10 @@ export function GratitudeBlock({
           const r = await grantWellnessReward({
             data: { accessToken: token, day, activity: "gratitude" },
           });
-          if (r.ok && r.granted > 0) setReward(r.granted);
+          if (r.ok && r.granted > 0) {
+            setReward(r.granted);
+            creditarSementinhas(r.granted);
+          }
         }
       }
       setPhase("done");
@@ -9386,7 +9592,10 @@ function DailyQuizBlock({
       const token = s.session?.access_token;
       if (!token) return;
       const r = await grantDailyQuizReward({ data: { accessToken: token, day, correct } });
-      if (r.ok) setReward(r.granted);
+      if (r.ok) {
+        setReward(r.granted);
+        creditarSementinhas(r.granted);
+      }
     } catch {
       /* recompensa é secundária */
     }

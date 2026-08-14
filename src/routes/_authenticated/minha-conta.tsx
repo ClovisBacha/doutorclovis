@@ -55,6 +55,7 @@ import { createBreathAudio } from "@/lib/breath-audio";
 import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
+import { ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
 import { apagarMinhasConversas } from "@/lib/conta.functions";
@@ -699,6 +700,39 @@ function MinhaContaPage() {
   const [milestoneWeek, setMilestoneWeek] = useState<number | null>(null);
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  /* ── ⚠️ AS CONQUISTAS DO JOGO NUNCA ERAM CONCEDIDAS ────────────────────
+     `triggerAchievementsCheck` rodava em cinco lugares: quatro telas de
+     REGISTRO (pressão, chutes, diário, pergunta ao médico) e a própria aba
+     Conquistas. O Caminho não chamava em lugar nenhum — e é lá que ela medita,
+     escreve a gratidão, lê a carta ao bebê, fecha o dia e ganha troféu.
+
+     Ou seja: as conquistas de meditação, gratidão, carta, exercício e troféu,
+     mais o marco semanal de 25 🌱 e os dois de trimestre, só chegavam quando
+     ela por acaso abria a aba Conquistas ou registrava uma pressão. Quem só
+     jogasse não recebia nada disso — e o jogo é a parte do app desenhada para
+     ser aberta todo dia.
+
+     O gatilho é o mesmo recado que faz o saldo subir: "o servidor acabou de
+     conceder Sementinhas" é, por definição, o instante em que uma conquista
+     pode ter mudado de estado.
+
+     ⚠️ Com espera de 1,5 s: fechar o dia dispara quatro concessões seguidas
+     (uma por atividade) mais o bônus, e sem isso seriam cinco varreduras
+     completas do ledger em poucos segundos, cada uma repetindo o trabalho da
+     anterior. A checagem é idempotente (dedupe por chave), então adiar não
+     perde nada. */
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const parar = ouvirSementinhas(() => {
+      if (t) clearTimeout(t);
+      t = setTimeout(triggerAchievementsCheck, 1500);
+    });
+    return () => {
+      if (t) clearTimeout(t);
+      parar();
+    };
+  }, []);
 
   // Puxar-para-atualizar: recarrega o perfil e remonta o conteúdo da aba atual
   // (que refaz seus próprios fetches). Soft refresh, sem reload da página.
