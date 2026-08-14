@@ -115,6 +115,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
+import { RARIDADES } from "@/lib/conquistas";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
   CANTINHO_ITEMS,
@@ -15642,19 +15643,37 @@ function SilencioDoCuidado({ onNavigate }: { onNavigate?: (t: Tab) => void }) {
   );
 }
 
-function ConquistasTab({
+export function ConquistasTab({
   careMode = false,
   onNavigate,
+  bancada,
 }: {
   careMode?: boolean;
   onNavigate?: (t: Tab) => void;
+  /**
+   * ⚠️ SÓ A BANCADA (`/preview-conquistas`).
+   *
+   * A tela busca do servidor e concede na hora — conferir a moldura de
+   * raridade numa conta de verdade exigiria desbloquear uma épica, que leva
+   * meses. Foi por telas assim serem impossíveis de olhar que a aba passou
+   * tanto tempo com dezoito conquistas de um app que já tinha o dobro.
+   */
+  bancada?: { desbloqueadas: string[] };
 }) {
-  const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>(
+    bancada
+      ? bancada.desbloqueadas.map((k) => ({
+          achievement_key: k,
+          unlocked_at: "2026-08-01T12:00:00.000Z",
+        }))
+      : [],
+  );
+  const [loading, setLoading] = useState(!bancada);
   const [newBadges, setNewBadges] = useState<string[]>([]);
-  const [saldo, setSaldo] = useState<number | null>(null);
+  const [saldo, setSaldo] = useState<number | null>(bancada ? 125 : null);
 
   useEffect(() => {
+    if (bancada) return;
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session?.access_token) {
@@ -15717,6 +15736,7 @@ function ConquistasTab({
       }
       setLoading(false);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
@@ -15824,29 +15844,41 @@ function ConquistasTab({
                 const isUnlocked = unlockedKeys.has(def.key);
                 const unlockedAt = unlocked.find((u) => u.achievement_key === def.key)?.unlocked_at;
                 const isNew = newBadges.includes(def.key);
+                const rar = RARIDADES[def.raridade];
                 return (
                   <div
                     key={def.key}
                     className={`rounded-2xl border p-4 text-center transition-all ${
-                      isNew
-                        ? "border-primary/25 bg-primary/8 shadow-md"
-                        : isUnlocked
-                          ? "border-primary/30 bg-primary/5"
-                          : "border-border bg-secondary/20 opacity-50"
-                    }`}
+                      /* ⚠️ O ANEL DE RARIDADE SÓ PINTA O QUE ELA JÁ TEM.
+                         Bloqueada continua cinza-neutra e apagada, de
+                         propósito: um anel dourado numa conquista que ela
+                         ainda não alcançou vira vitrine do que falta, e a
+                         aba inteira passaria a medir ausência. A raridade é
+                         informação sobre o que ela CONQUISTOU. O rótulo
+                         abaixo continua dizendo qual é, sempre — quem quiser
+                         saber o que vale a pena perseguir consegue ler. */
+                      isUnlocked ? rar.anel : "border-border bg-secondary/20 opacity-50"
+                    } ${isNew ? "shadow-md" : ""}`}
                   >
                     <div className={`text-3xl mb-2 ${!isUnlocked && "grayscale"}`}>{def.emoji}</div>
                     <p className="text-xs font-semibold">{def.title}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
                       {def.description}
                     </p>
+                    <p
+                      className={`mt-1.5 text-[10px] font-bold uppercase tracking-wide ${
+                        isUnlocked ? rar.texto : "text-muted-foreground/60"
+                      }`}
+                    >
+                      {rar.label} · {rar.sementinhas} 🌱
+                    </p>
                     {isUnlocked && unlockedAt && (
-                      <p className="mt-1.5 text-xs text-primary">
+                      <p className="mt-1 text-xs text-primary">
                         {new Date(unlockedAt).toLocaleDateString("pt-BR")}
                       </p>
                     )}
                     {!isUnlocked && (
-                      <p className="mt-1.5 text-xs text-muted-foreground">🔒 bloqueada</p>
+                      <p className="mt-1 text-xs text-muted-foreground">🔒 bloqueada</p>
                     )}
                   </div>
                 );

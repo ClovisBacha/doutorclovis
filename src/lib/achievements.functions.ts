@@ -2,164 +2,35 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
 import { computeGestation } from "@/lib/gestacao";
-import { grantSementinhas, SEMENTINHAS, BIG_ACHIEVEMENTS } from "@/lib/sementinhas.functions";
+import { grantSementinhas, SEMENTINHAS } from "@/lib/sementinhas.functions";
 import { isCareModeActive } from "@/lib/care-mode.functions";
+import {
+  ATIVIDADES_DO_DIA,
+  CONQUISTAS,
+  aulasRespondidas,
+  conquistaPorChave,
+  maiorSequencia,
+  sementinhasDaRaridade,
+  vezesQueFez,
+  type ConquistaDef,
+} from "@/lib/conquistas";
+import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
 
-export type AchievementDef = {
-  key: string;
-  title: string;
-  description: string;
-  emoji: string;
-  category: "saude" | "diario" | "bebe" | "educacao" | "familia";
-  /**
-   * Só acontece DEPOIS do parto.
-   *
-   * Cinco das dezoito são assim, e sem marcá-las a gestante via "3 de 18" com
-   * um anel de progresso que nunca chegava perto de 100% — o teto real dela é
-   * 13. Não havia nenhuma indicação disso na tela: parecia que ela estava
-   * falhando em conquistas que ainda nem eram possíveis.
-   */
-  posParto?: true;
-};
-
-/** As que só existem depois do parto — usado para separar na tela. */
-export function ehPosParto(key: string): boolean {
-  return ACHIEVEMENT_DEFS.some((d) => d.key === key && d.posParto);
-}
-
-export const ACHIEVEMENT_DEFS: AchievementDef[] = [
-  {
-    key: "first_login",
-    title: "Bem-vinda!",
-    description: "Criou sua conta no portal",
-    emoji: "🌟",
-    category: "bebe",
-  },
-  {
-    key: "profile_complete",
-    title: "Perfil Completo",
-    description: "Preencheu todas as informações do perfil",
-    emoji: "✅",
-    category: "bebe",
-  },
-  {
-    key: "first_health_log",
-    title: "Saúde em Dia",
-    description: "Registrou o primeiro dado de saúde",
-    emoji: "❤️",
-    category: "saude",
-  },
-  {
-    key: "health_7_days",
-    title: "Semana Saudável",
-    description: "7 registros de saúde realizados",
-    emoji: "💪",
-    category: "saude",
-  },
-  {
-    key: "first_journal",
-    title: "Memória Afetiva",
-    description: "Escreveu o primeiro diário",
-    emoji: "📝",
-    category: "diario",
-  },
-  {
-    key: "journal_10",
-    title: "Escritora Dedicada",
-    description: "10 entradas no diário da gestação",
-    emoji: "📔",
-    category: "diario",
-  },
-  {
-    key: "first_kicks",
-    title: "Primeiros Chutes!",
-    description: "Registrou a primeira sessão de movimentos",
-    emoji: "👟",
-    category: "bebe",
-  },
-  {
-    key: "kicks_10",
-    title: "Bebê Ativo",
-    description: "10 sessões de contagem de chutes",
-    emoji: "⚽",
-    category: "bebe",
-  },
-  {
-    key: "first_course",
-    title: "Escola Aberta",
-    description: "Completou o primeiro módulo da Escola do Bebê",
-    emoji: "🎓",
-    category: "educacao",
-  },
-  {
-    key: "course_5",
-    title: "Aluna Dedicada",
-    description: "Completou 5 módulos da Escola do Bebê",
-    emoji: "🏅",
-    category: "educacao",
-  },
-  {
-    key: "course_complete",
-    title: "Mamãe Preparada!",
-    description: "Completou todos os 12 módulos da Escola do Bebê",
-    emoji: "🏆",
-    category: "educacao",
-  },
-  {
-    key: "companion_invited",
-    title: "Família Unida",
-    description: "Convidou um acompanhante para o portal",
-    emoji: "💑",
-    category: "familia",
-  },
-  {
-    key: "album_post",
-    title: "Memórias Registradas",
-    description: "Adicionou a primeira foto ao álbum da família",
-    emoji: "📸",
-    category: "familia",
-  },
-  {
-    key: "prenatal_done",
-    title: "Pré-natal Concluído!",
-    description: "Checklist completo — parabéns!",
-    emoji: "🥇",
-    category: "bebe",
-  },
-  // ── Pós-parto ──────────────────────────────────────────────
-  {
-    key: "first_breastfeeding",
-    title: "Primeira Mamada",
-    description: "Registrou a primeira amamentação",
-    emoji: "🤱",
-    category: "bebe",
-    posParto: true,
-  },
-  {
-    key: "first_baby_weight",
-    title: "Crescendo!",
-    description: "Registrou o primeiro peso do bebê",
-    emoji: "⚖️",
-    category: "saude",
-    posParto: true,
-  },
-  {
-    key: "first_vaccine",
-    title: "Protegido",
-    description: "Primeira vacina do bebê registrada",
-    emoji: "💉",
-    category: "saude",
-    posParto: true,
-  },
-  {
-    key: "first_baby_milestone",
-    title: "Primeiro Marco",
-    description: "Registrou o primeiro marco do bebê",
-    emoji: "🌟",
-    category: "bebe",
-    posParto: true,
-  },
-];
+/**
+ * ⚠️ O CATÁLOGO MUDOU DE CASA (ago/2026) — foi para `src/lib/conquistas.ts`.
+ *
+ * Ele é lido pela TELA (que desenha os cartões) e pelo SERVIDOR (que concede).
+ * Morando aqui, junto das server functions, a tela arrastava `typedDb`,
+ * `computeGestation` e `grantSementinhas` para o pacote do navegador só para
+ * saber o título de um emblema.
+ *
+ * Lá ele também ganhou RARIDADE (comum/raro/épico) e recompensa por
+ * dificuldade, a pedido do dono. Os nomes antigos continuam exportados daqui
+ * para não quebrar quem já os importava.
+ */
+export type AchievementDef = ConquistaDef;
+export const ACHIEVEMENT_DEFS = CONQUISTAS;
+export { ehPosParto } from "@/lib/conquistas";
 
 export const getMyAchievements = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
@@ -214,6 +85,12 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       ];
       if (fields.every(Boolean)) toAward.push("profile_complete");
     }
+
+    /* O ciclo — a chave que separa esta gestação da anterior. É a MESMA
+       expressão que `loadCycleAndGestation` usa em `sementinhas.functions.ts`
+       para montar as `dedupe_key`; ela precisa bater exatamente, senão a
+       contagem procura por um ciclo que nunca foi gravado e devolve zero. */
+    const cicloAtual = profile?.lmp_date ?? profile?.reference_date ?? profile?.birth_date ?? "x";
 
     const { count: healthCount } = await db
       .from("health_logs")
@@ -285,6 +162,69 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
       .eq("user_id", uid);
     if ((milestoneCount ?? 0) >= 1) toAward.push("first_baby_milestone");
 
+    /* ── AS CONQUISTAS DO JOGO, PROVADAS PELO LEDGER ────────────────────────
+       Uma consulta só traz todas as chaves; as contagens saem de funções
+       PURAS (`conquistas.ts`), que é o que permite testá-las sem banco.
+
+       ⚠️ São RETROATIVAS por construção: as linhas já existem desde que o
+       Caminho existe, então quem já meditou trinta vezes ganha na próxima
+       abertura do app, sem migration nenhuma.
+
+       ⚠️ E o ciclo recorta tudo — sem ele, a segunda gestação de uma paciente
+       nasceria com as conquistas da primeira já dadas, e ela abriria a aba
+       sem nada para conquistar. */
+    const { data: ledgerRows } = await db
+      .from("sementinhas_ledger")
+      .select("dedupe_key")
+      .eq("user_id", uid);
+    const chaves = ((ledgerRows ?? []) as { dedupe_key: string | null }[]).map((r) => r.dedupe_key);
+
+    const meditou = vezesQueFez(chaves, "meditation", cicloAtual);
+    if (meditou >= 1) toAward.push("medita_1");
+    if (meditou >= 10) toAward.push("medita_10");
+    if (meditou >= 30) toAward.push("medita_30");
+
+    const agradeceu = vezesQueFez(chaves, "gratitude", cicloAtual);
+    if (agradeceu >= 1) toAward.push("gratidao_1");
+    if (agradeceu >= 10) toAward.push("gratidao_10");
+    if (agradeceu >= 50) toAward.push("gratidao_50");
+
+    const leuCarta = vezesQueFez(chaves, "bonding", cicloAtual);
+    if (leuCarta >= 1) toAward.push("carta_1");
+    if (leuCarta >= 10) toAward.push("carta_10");
+    if (leuCarta >= 30) toAward.push("carta_30");
+
+    const mexeu = vezesQueFez(chaves, "movement", cicloAtual);
+    if (mexeu >= 1) toAward.push("exercicio_1");
+    if (mexeu >= 10) toAward.push("exercicio_10");
+    if (mexeu >= 30) toAward.push("exercicio_30");
+
+    const aulas = aulasRespondidas(chaves, cicloAtual);
+    if (aulas >= 10) toAward.push("aula_10");
+    if (aulas >= 50) toAward.push("aula_50");
+
+    /* Dias fechados. A MESMA função que o troféu do topo do Caminho usa —
+       duas contagens para a palavra "dia fechado" divergiriam no primeiro
+       conserto, e aí o número do topo e a medalha diriam coisas diferentes. */
+    const diasFechados = trofeusDasChaves(
+      chaves.filter((k) => (k ?? "").startsWith(PREFIXO_ATIVIDADE)),
+      ATIVIDADES_DO_DIA,
+    );
+    if (diasFechados >= 1) toAward.push("trofeu_1");
+    if (diasFechados >= 10) toAward.push("trofeu_10");
+    if (diasFechados >= 30) toAward.push("trofeu_30");
+
+    const sequencia = maiorSequencia(chaves, cicloAtual);
+    if (sequencia >= 7) toAward.push("sequencia_7");
+    if (sequencia >= 30) toAward.push("sequencia_30");
+
+    const { count: itensDoCantinho } = await db
+      .from("cantinho_items")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", uid);
+    if ((itensDoCantinho ?? 0) >= 1) toAward.push("cantinho_1");
+    if ((itensDoCantinho ?? 0) >= 10) toAward.push("cantinho_10");
+
     // Chaves já desbloqueadas antes desta checagem, para detectar as novas
     // (permite que os pontos de ação exibam um toast de "nova conquista").
     const { data: existingRows } = await db
@@ -312,17 +252,24 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     // Tudo idempotente (dedupe_key), então rodar a cada checagem se auto-corrige
     // sem conceder em dobro. Ganho só por ação/educação/marco — nunca por
     // resultado clínico.
+    /* ⚠️ A RECOMPENSA SAI DA RARIDADE, e não mais de uma lista de exceções.
+       Antes eram dois valores (`achievementBig` para duas chaves cravadas num
+       `Set`, `achievementDefault` para todo o resto) — o que significava que
+       "primeira mamada" e "10 sessões de chutes" pagavam igual. Pedido do
+       dono: mais dificuldade, mais Sementinhas. A régua agora é a mesma que
+       pinta o anel do cartão, então o número e a cor nunca podem discordar.
+
+       Chave sem def conhecida cai no valor de `comum`: é o piso, e é o que
+       impede uma conquista nova de pagar 0 por esquecimento. */
     const titleByKey = new Map(ACHIEVEMENT_DEFS.map((d) => [d.key, d.title]));
     const grants: { amount: number; reason: string; dedupeKey: string }[] = toAward.map((key) => ({
-      amount: BIG_ACHIEVEMENTS.has(key)
-        ? SEMENTINHAS.achievementBig
-        : SEMENTINHAS.achievementDefault,
+      amount: sementinhasDaRaridade(conquistaPorChave(key)?.raridade ?? "comum"),
       reason: `Conquista: ${titleByKey.get(key) ?? key}`,
       dedupeKey: `achievement:${key}`,
     }));
     // Marcos escopados à GESTAÇÃO/bebê atual (LMP/referência/nascimento) — senão,
     // numa 2ª gravidez os marcos já teriam sido "consumidos" na 1ª.
-    const cycle = profile?.lmp_date ?? profile?.reference_date ?? profile?.birth_date ?? "x";
+    const cycle = cicloAtual;
     if (profile?.birth_date) {
       // ── Pós-nascimento: para o ganho gestacional (que cresceria pra sempre)
       // e passa a recompensar a jornada do bebê. ──

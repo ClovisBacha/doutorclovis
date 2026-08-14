@@ -1458,6 +1458,87 @@ juntos**. Em pé nada muda: a composição medida é a de todo dia. O corte de 5
 fica entre o menor iPhone em pé (SE, 667) e o maior deitado (Pro Max, 430) — e
 `short` (849) não serve, porque pega os dois casos que já estavam certos.
 
+## As conquistas ganharam raridade — e passaram a conhecer o app (ago/2026)
+
+Pedido do dono: "verifique se as conquistas estão defasadas, acho que faltam
+algumas; onde tem níveis de raridade — comum (cinza em volta), raro (azul) e
+épico (dourado) — e cada conquista dá um pouco de semente: maior dificuldade,
+mais sementes."
+
+Estavam defasadas de um jeito específico: **eram 18, e nenhuma sabia da metade
+do app**. Meditação com sequência, gratidão com marcos, cartas pro bebê,
+exercício por queixa, dias de cinco estrelas, chama de dias seguidos, o
+Cantinho — tudo isso entrou depois, e a aba de conquistas nunca soube. Dava
+para meditar trinta dias seguidos sem que ela reparasse que você existia.
+
+Hoje são **39** (`src/lib/conquistas.ts`).
+
+### A raridade precisa de régua, ou vira gosto
+
+⚠️ "Achei que essa é épica" não sobrevive à segunda pessoa que mexe no
+arquivo, e o sintoma é a paciente ver duas conquistas de esforço parecido com
+molduras diferentes — e concluir, com razão, que o sistema é aleatório. A
+régua é sobre a NATUREZA do feito:
+
+| Raridade  | Critério                                        | 🌱  | Cor     |
+| --------- | ----------------------------------------------- | --- | ------- |
+| **comum** | primeira vez que faz algo — é descoberta        | 15  | cinza   |
+| **raro**  | repetição sustentada — voltou N vezes, é hábito | 40  | azul    |
+| **épico** | marco de meses, não dá pra apressar nem repetir | 120 | dourado |
+
+O teste aplica a régua ao catálogo: estreia nunca é épica, `_30`/`_50` nunca é
+comum. ⚠️ A primeira versão dessa regex usava `_complete$` e exigia que
+"preencher o perfil" fosse épica — sufixo genérico é o jeito rápido de um
+teste começar a mentir. Hoje é `course_complete` cravado.
+
+### A recompensa saiu da raridade, não de uma lista de exceções
+
+Antes eram dois valores: `achievementBig` (100) para duas chaves num `Set`
+e `achievementDefault` (20) para todo o resto — ou seja, "primeira mamada" e
+"10 sessões de chutes" pagavam igual. Agora o número sai da MESMA régua que
+pinta o anel, então cor e valor nunca podem discordar.
+
+⚠️ **A economia é testada.** Desbloquear tudo paga 1.830 🌱 (era 520). A loja
+inteira custa 10.969 🌱, então são ~17% do sink, diluídos em nove meses. O
+teste reprova se o total passar de três lojas grátis — existe para avisar no
+dia em que alguém acrescentar vinte épicas de uma vez.
+
+### As novas são provadas pelo LEDGER, e isso não é conveniência
+
+As linhas `wellness:<atividade>:<ciclo>:<dia>` são escritas só pelo servidor,
+no instante em que a atividade acontece — as mesmas que `trofeusDasChaves` já
+contava. Três consequências que nenhuma outra fonte daria:
+
+- valem **retroativamente** (quem já meditou 30 vezes ganha na próxima
+  abertura, sem migration nenhuma);
+- não dá pra forjar do navegador, então **podem valer Sementinhas**;
+- sobrevivem à troca de aparelho, porque não moram no `localStorage`.
+
+⚠️ **O `<ciclo>` recorta tudo.** Sem ele, a segunda gestação de uma paciente
+nasceria com as conquistas da primeira já dadas, e ela abriria a aba sem nada
+a conquistar. É a mesma expressão de `loadCycleAndGestation` — se divergir, a
+contagem procura um ciclo que nunca foi gravado e devolve zero.
+
+⚠️ **`maiorSequencia` é a MAIOR já feita, não a atual.** Conquista é marco:
+"você já conseguiu sete dias seguidos" é um fato que aconteceu, e tirá-la
+porque a sequência quebrou seria transformar conquista em cobrança. A chama do
+Caminho continua mostrando a sequência atual — são perguntas diferentes.
+
+### Duas coisas na tela
+
+- ⚠️ **O anel de raridade só pinta o que ela JÁ TEM.** Bloqueada continua
+  cinza-neutra e apagada: um anel dourado numa conquista inalcançada vira
+  vitrine do que falta, e a aba passaria a medir ausência. O rótulo
+  ("ÉPICO · 120 🌱") aparece sempre — quem quiser saber o que perseguir lê.
+- **O catálogo saiu de `achievements.functions.ts`** para `conquistas.ts`: a
+  tela arrastava `typedDb`, `computeGestation` e `grantSementinhas` pro pacote
+  do navegador só pra saber o título de um emblema. Os nomes antigos seguem
+  re-exportados.
+- **Bancada:** `/preview-conquistas?quantas=16` · `?tudo=1` (as três molduras)
+  · `?luto=1`. Sem ela, conferir uma moldura épica exigiria meditar trinta
+  vezes numa conta real — e foi por telas assim serem impossíveis de olhar que
+  a aba passou tanto tempo desatualizada.
+
 ## O app parou de baixar o jogo inteiro pra mostrar a consulta (ago/2026)
 
 O dono relatou, no aparelho: "alguns dados demoram mais pra carregar que
