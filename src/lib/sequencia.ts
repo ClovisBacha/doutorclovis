@@ -55,6 +55,117 @@
 export const DIAS_POR_PERDAO = 7;
 
 /**
+ * O TRECHO INTEIRO — dias contados, perdões gastos e saldo.
+ *
+ * ─── ⚠️ A PRIMEIRA VERSÃO DO PERDÃO NÃO PERDOAVA NADA ───────────────────────
+ *
+ * Ela andava para trás dia a dia e, ao achar um buraco, conferia o saldo contra
+ * `n` — o que já tinha sido ANDADO. Só que o buraco que importa é o mais
+ * recente, e nele `n` ainda vale 0 ou 1: `perdoados >= Math.floor(0/7)` é
+ * verdadeiro, e o laço quebrava.
+ *
+ * Medido com a função de verdade, paciente com 40 dias seguidos que perde UM:
+ *
+ *   sequenciaDeDias([1..40], 42)      → 0   (devia ser 40)
+ *   sequenciaDeDias([1..40, 42], 42)  → 1   (devia ser 41)
+ *
+ * Ou seja: o perdão funcionava só para buracos que já tinham sete dias
+ * contados DEPOIS deles — nunca para o dia que ela acabou de perder, que é
+ * literalmente o único caso para o qual a régua foi escrita (a noite no
+ * pronto-socorro). E a `FolhaDaChama` dizia por escrito "você pode ficar até 5
+ * dias de fora sem perder nada" enquanto a conta zerava.
+ *
+ * Os sete testes que eu tinha escrito punham o buraco 10+ dias atrás de hoje,
+ * então todos passavam. O caso do produto não tinha teste.
+ *
+ * ─── COMO FUNCIONA AGORA ────────────────────────────────────────────────────
+ *
+ * A régua deixou de ser "posso atravessar este buraco?" e passou a ser uma
+ * afirmação sobre o trecho inteiro:
+ *
+ *   **a sequência é o MAIOR trecho terminando em hoje (ou ontem) em que os
+ *   dias vazios são no máximo `floor(diasFeitos / 7)`, e nenhum vazio tem dois
+ *   dias seguidos.**
+ *
+ * Por isso a varredura primeiro junta os BLOCOS de dias feitos (separados por
+ * buracos de exatamente um dia) e só depois pergunta quantos blocos cabem no
+ * saldo. O saldo passa a ser conferido contra o total do trecho, que é o que
+ * a paciente entende por "minha sequência".
+ */
+type TrechoDaSequencia = {
+  /** Dias feitos dentro do trecho. É a sequência. */
+  dias: number;
+  /** Buracos de um dia atravessados. */
+  perdoesUsados: number;
+  /** `floor(dias / 7)` — quantos ela poderia ter gasto ao todo. */
+  saldo: number;
+};
+
+const TRECHO_VAZIO: TrechoDaSequencia = { dias: 0, perdoesUsados: 0, saldo: 0 };
+
+function trechoDaSequencia(dias: readonly number[], hoje: number): TrechoDaSequencia {
+  if (dias.length === 0) return TRECHO_VAZIO;
+  const feitos = new Set(dias);
+
+  /* Começa em hoje se hoje já está fechado; senão em ontem — sem isso, quem
+     tem 40 dias abre o app às 7 da manhã e vê zero. */
+  let d = feitos.has(hoje) ? hoje : hoje - 1;
+
+  /* Blocos contíguos de dias feitos, do mais recente para trás.
+     `pontesAntes` vale 1 quando o PRÓPRIO ponto de partida está vazio — ela
+     perdeu ontem e hoje ainda não fez nada. Nunca passa de 1: depois de
+     atravessar um vazio, o dia seguinte é feito por construção (foi ele que
+     autorizou a travessia). */
+  const blocos: number[] = [];
+  let pontesAntes = 0;
+  let atual = 0;
+  /* Teto de segurança: `dias` vem de armazenamento local que já chegou
+     corrompido nesta base, e sem o limite um blob com números negativos gira
+     para sempre e trava a aba. Cada passo consome um dia feito ou um vazio. */
+  const teto = feitos.size * 2 + 4;
+  for (let passos = 0; passos < teto; passos++) {
+    if (feitos.has(d)) {
+      atual++;
+      d--;
+      continue;
+    }
+    /* Dois vazios seguidos: ela sumiu de verdade, e aí a sequência acabou
+       mesmo. É o que impede o número de deixar de significar "eu vim quase
+       todo dia". */
+    if (!feitos.has(d - 1)) break;
+    if (atual > 0) {
+      blocos.push(atual);
+      atual = 0;
+    } else {
+      pontesAntes++;
+    }
+    d--;
+  }
+  if (atual > 0) blocos.push(atual);
+  if (blocos.length === 0) return TRECHO_VAZIO;
+
+  /* Quantos blocos cabem: levar `m` blocos custa `pontesAntes + (m - 1)`
+     perdões e rende a soma deles.
+
+     ⚠️ Percorre TODOS os m e fica com o maior que serve, em vez de parar no
+     primeiro que falha: o saldo cresce em degraus de sete, então um bloco
+     grande logo atrás pode pagar uma ponte que o bloco pequeno da frente não
+     pagava. Parar cedo devolveria um número menor que o próprio critério
+     admite — errar contra a paciente, e sem motivo. */
+  let total = 0;
+  let melhor = TRECHO_VAZIO;
+  for (let m = 1; m <= blocos.length; m++) {
+    total += blocos[m - 1];
+    const pontes = pontesAntes + (m - 1);
+    const saldo = Math.floor(total / DIAS_POR_PERDAO);
+    if (pontes <= saldo && total > melhor.dias) {
+      melhor = { dias: total, perdoesUsados: pontes, saldo };
+    }
+  }
+  return melhor;
+}
+
+/**
  * Quantos dias seguidos, terminando em `hoje` (ou em `hoje - 1`).
  *
  * `dias` são dias gestacionais (`D = semana * 7 + diaDaSemana`) já concluídos,
@@ -62,35 +173,20 @@ export const DIAS_POR_PERDAO = 7;
  * e vem como veio.
  */
 export function sequenciaDeDias(dias: readonly number[], hoje: number): number {
-  if (dias.length === 0) return 0;
-  const feitos = new Set(dias);
+  return trechoDaSequencia(dias, hoje).dias;
+}
 
-  /* Começa em hoje se hoje já está fechado; senão em ontem. Nunca antes: um dia
-     em branco no meio quebra a sequência, que é o que a torna uma sequência. */
-  let d = feitos.has(hoje) ? hoje : hoje - 1;
-  let n = 0;
-  let perdoados = 0;
-  /* Teto de segurança. `dias` vem de armazenamento local que já chegou
-     corrompido nesta base; sem o limite, um blob com números negativos gira
-     para sempre e trava a aba em vez de mostrar um número errado.
-     O dobro (mais folga) porque agora cada passo pode ser um dia contado OU um
-     dia perdoado, e o perdão nunca passa de um sétimo dos contados. */
-  const teto = feitos.size * 2 + 2;
-  for (let passos = 0; passos < teto; passos++) {
-    if (feitos.has(d)) {
-      n++;
-      d--;
-      continue;
-    }
-    /* Buraco. Só atravessa se houver saldo de perdão E se o dia logo antes
-       estiver feito — perdoar um buraco sem saber o que vem depois dele
-       atravessaria dois dias vazios em duas voltas do laço, que é justamente o
-       "ela sumiu de verdade" que a régua não perdoa. */
-    if (perdoados >= Math.floor(n / DIAS_POR_PERDAO) || !feitos.has(d - 1)) break;
-    perdoados++;
-    d--;
-  }
-  return n;
+/**
+ * Quantos dias ela AINDA pode perder sem apagar a chama.
+ *
+ * ⚠️ Existe para a `FolhaDaChama` não ter uma segunda régua. A tela mostrava
+ * `Math.floor(streak / 7)` — o saldo TOTAL, ignorando o que já foi gasto — e
+ * prometia folga que a conta não daria. Aqui sai da mesma varredura que conta
+ * a sequência, então os dois números nunca podem discordar.
+ */
+export function perdoesRestantes(dias: readonly number[], hoje: number): number {
+  const t = trechoDaSequencia(dias, hoje);
+  return Math.max(0, t.saldo - t.perdoesUsados);
 }
 
 /**

@@ -19,7 +19,7 @@ import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, fundoBgFor } from "@/li
 import { climasAtivos, particulasDe } from "@/lib/clima-do-cantinho";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { escadaDeTrofeus, proximoDesbloqueio } from "@/lib/trofeus";
-import { DIAS_POR_PERDAO } from "@/lib/sequencia";
+import { perdoesRestantes } from "@/lib/sequencia";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
@@ -455,11 +455,26 @@ function FolhaDosTrofeus({
  * decisão, não por engano: ela fala do que acontece, nunca do que ela deixou
  * de fazer.
  */
-function FolhaDaChama({ streak, onFechar }: { streak: number; onFechar: () => void }) {
+function FolhaDaChama({
+  streak,
+  perdoes,
+  onFechar,
+}: {
+  streak: number;
+  /**
+   * Quantos dias ela AINDA pode perder — vem de `perdoesRestantes`, a MESMA
+   * varredura que conta a sequência.
+   *
+   * ⚠️ Era `Math.floor(streak / DIAS_POR_PERDAO)` calculado aqui dentro, e
+   * essa segunda régua mentia duas vezes: mostrava o saldo TOTAL ignorando os
+   * perdões já gastos, e vinha de uma contagem que, na versão original, nem
+   * perdoava o buraco mais recente. Uma tela que promete folga que a conta não
+   * dá é pior que uma tela que não fala do perdão.
+   */
+  perdoes: number;
+  onFechar: () => void;
+}) {
   const acesa = sequenciaAcesa(streak);
-  /* O saldo é o MESMO cálculo do `sequenciaDeDias` — `Math.floor(n / 7)`. Uma
-     segunda régua aqui faria a tela prometer um perdão que a contagem não dá. */
-  const perdoes = Math.floor(streak / DIAS_POR_PERDAO);
   return (
     <div
       role="dialog"
@@ -1898,13 +1913,32 @@ export function GestacaoPath({
      `todayTasks`/`dayTasks` entram nas dependências porque são eles que mudam
      quando ela marca um momento — sem isso a chama só acenderia no próximo
      carregamento da tela, que é justamente o instante em que ela quer ver. */
-  const streak = useMemo(
+  /* Os dias em que ela fez ALGUMA coisa, lidos UMA vez.
+     `entradasDoArmazem()` varre o `localStorage` inteiro, e a chama e o saldo
+     de perdão precisam exatamente da mesma lista — duas chamadas seriam duas
+     varreduras por render, e duas oportunidades de os dois números discordarem. */
+  const diasVindos = useMemo(
     () =>
-      bancada?.streak ??
-      (hasGest ? sequenciaDeDias(diasComAlgumMomento(entradasDoArmazem(), DIA_KEY), todayD) : 0),
+      /* ⚠️ A BANCADA FABRICA A LISTA, e não o número. `?streak=41` cravava
+         `streak` direto e deixava o saldo de perdão vir da jornada real (vazia),
+         então a folha da chama abria SEMPRE no texto de sequência curta — a
+         bancada mostrava um estado que o app nunca produz, que é o oposto do que
+         ela existe para fazer. Com a lista sintética, as duas funções de verdade
+         rodam e os dois números combinam. */
+      bancada?.streak != null
+        ? Array.from({ length: bancada.streak }, (_, i) => todayD - i)
+        : hasGest
+          ? diasComAlgumMomento(entradasDoArmazem(), DIA_KEY)
+          : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [doneDays, todayTasks, dayTasks, todayD, hasGest, bancada?.streak],
+    [doneDays, todayTasks, dayTasks, hasGest, todayD, bancada?.streak],
   );
+  const streak = useMemo(() => sequenciaDeDias(diasVindos, todayD), [diasVindos, todayD]);
+  /* Quantos dias ela AINDA pode perder — da MESMA lista e da MESMA varredura
+     (`perdoesRestantes`), nunca de um `floor(streak / 7)` refeito na tela. A
+     folha prometia o saldo TOTAL ignorando o que já tinha sido gasto, e
+     prometer folga que a conta não dá é pior que não falar do perdão. */
+  const folgas = useMemo(() => perdoesRestantes(diasVindos, todayD), [diasVindos, todayD]);
 
   // Caminho contínuo: todas as fases numa página só, como o Duolingo
   const { nodes, height } = useMemo(() => buildFullJourney(phases, todayD), [phases, todayD]);
@@ -2943,7 +2977,9 @@ export function GestacaoPath({
       {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
           na ordem do DOM porque as duas são `fixed`: se as duas estivessem no
           ar, a que a paciente acabou de conquistar tem de ficar por cima. */}
-      {chamaAberta && <FolhaDaChama streak={streak} onFechar={() => setChamaAberta(false)} />}
+      {chamaAberta && (
+        <FolhaDaChama streak={streak} perdoes={folgas} onFechar={() => setChamaAberta(false)} />
+      )}
 
       {trofeusAbertos && (
         <FolhaDosTrofeus

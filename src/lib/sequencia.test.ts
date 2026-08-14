@@ -11,6 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   diasComAlgumMomento,
+  perdoesRestantes,
   sequenciaAcesa,
   sequenciaDeDatas,
   sequenciaDeDias,
@@ -77,6 +78,65 @@ describe("⚠️ o perdão de um dia — e o que ele NÃO perdoa", () => {
        verdade é o de cima: o limite existe, mas é generoso de propósito.
        Aqui provamos só que ele EXISTE, com a sequência curta. */
     expect(sequenciaDeDias([100, 98], 100)).toBe(1);
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     ⚠️ O BURACO COLADO NO FIM — o caso do PRODUTO, e o que não tinha teste.
+
+     A primeira versão do perdão conferia o saldo contra os dias já ANDADOS.
+     No buraco mais recente esse número ainda é 0 ou 1, então o laço quebrava e
+     o perdão NUNCA valia para o dia que ela acabou de perder — que é o único
+     caso para o qual ele foi escrito.
+
+     Os sete testes acima punham o buraco 10+ dias atrás de hoje, e todos
+     passavam. Estes quatro são o cenário de verdade: a paciente com 40 dias
+     que passa UMA noite no pronto-socorro.
+     ═══════════════════════════════════════════════════════════════════════ */
+  describe("o buraco colado no fim", () => {
+    const d40 = seguidos(40, 40); // dias 1..40, todos feitos
+
+    test("perdeu ONTEM, e hoje ainda não fez nada", () => {
+      /* Medido na versão quebrada: 0. Ela abriria o app depois da internação e
+         veria a sequência de 40 dias apagada. */
+      expect(sequenciaDeDias(d40, 42)).toBe(40);
+    });
+
+    test("perdeu ontem e fez hoje — o dia de hoje soma", () => {
+      expect(sequenciaDeDias([...d40, 42], 42)).toBe(41);
+    });
+
+    test("e continua somando nos dias seguintes", () => {
+      expect(sequenciaDeDias([...d40, 42, 43], 43)).toBe(42);
+    });
+
+    test("⚠️ mas com sequência curta o buraco no fim ainda quebra", () => {
+      /* Três dias não compram perdão nenhum (`floor(3/7)` = 0), então perder
+         ontem zera — e está certo: recomeçar do três custa pouco. */
+      expect(sequenciaDeDias([1, 2, 3], 5)).toBe(0);
+    });
+  });
+
+  describe("perdoesRestantes é a MESMA conta que a tela mostra", () => {
+    const d40 = seguidos(40, 40);
+
+    test("sem buraco nenhum, o saldo está inteiro", () => {
+      /* `floor(40/7)` = 5, zero gastos. */
+      expect(perdoesRestantes(d40, 40)).toBe(5);
+    });
+
+    test("⚠️ depois de gastar um, sobra um a menos", () => {
+      /* A tela mostrava `floor(streak/7)` e ignorava o gasto: prometia 5 folgas
+         a quem só tinha 4. */
+      expect(perdoesRestantes([...d40, 42], 42)).toBe(5 - 1);
+    });
+
+    test("sequência curta não tem folga a prometer", () => {
+      expect(perdoesRestantes([1, 2, 3], 3)).toBe(0);
+    });
+
+    test("sem sequência, zero — e não negativo", () => {
+      expect(perdoesRestantes([], 100)).toBe(0);
+    });
   });
 
   test("perdoar não conta o dia perdido como feito", () => {
