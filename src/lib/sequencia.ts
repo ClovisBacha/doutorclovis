@@ -44,9 +44,12 @@
  *    proteção nenhuma; quem tem duzentos precisa muito. Assim o perdão cresce
  *    com o que há a perder, que é exatamente onde a punição doeria mais.
  *
- * O saldo é conferido contra o que já foi contado NESTE trecho (`n`), então
- * quem alterna um dia sim, um dia não nunca chega a lugar nenhum: no primeiro
- * buraco `n` vale 1, `floor(1/7)` é 0, e a conta para em 1. Há teste.
+ * Quem alterna um dia sim, um dia não nunca chega a lugar nenhum: um bloco de
+ * um dia só rende `floor(1/7)` = 0 de saldo, e a conta para em 1. Há teste.
+ *
+ * ⚠️ A PRIMEIRA VERSÃO DESTA REGRA NÃO PERDOAVA NADA, e esta prosa dizia o
+ * contrário com todas as letras. Ver `trechoDaSequencia`, logo abaixo: o
+ * defeito e a medição estão escritos lá.
  *
  * ⚠️ A mudança só faz sequência SUBIR, nunca descer — ninguém acorda com um
  * número menor do que o de ontem. Voltar atrás é trocar `DIAS_POR_PERDAO` por
