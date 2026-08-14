@@ -55,7 +55,7 @@ import { createBreathAudio } from "@/lib/breath-audio";
 import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
-import { ouvirSementinhas } from "@/lib/evento-sementinhas";
+import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
 import { apagarMinhasConversas } from "@/lib/conta.functions";
@@ -116,7 +116,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
-import { RARIDADES } from "@/lib/conquistas";
+import { RARIDADES, conquistaPorChave, sementinhasDaRaridade } from "@/lib/conquistas";
 import { conjuntosDoItem, conjuntosOrdenados } from "@/lib/conjuntos";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
@@ -661,8 +661,28 @@ function categoryOfTab(t: Tab): string {
 
 /**
  * Dispara a checagem de conquistas após uma ação premiável (fire-and-forget).
- * Exibe um toast para cada conquista recém-desbloqueada; falhas são silenciosas.
+ * Falhas são silenciosas.
+ *
+ * ⚠️ **TETO DE TRÊS TOASTS.** Um `for` sobre `newlyAwarded` era o que havia
+ * aqui, e ele nasceu num mundo em que a checagem só rodava depois de UMA ação
+ * (salvar uma pressão) e trazia uma conquista de cada vez. Duas coisas
+ * mudaram: a lista foi a 39, e o Caminho passou a chamar — então a primeira
+ * checagem de uma paciente que já joga há meses libera de uma vez tudo o que
+ * ela já tinha conquistado e nunca recebeu. Vinte toasts empilhados cobrem a
+ * tela inteira, e ela estava no meio de uma atividade.
+ *
+ * Três, e o resto vira uma linha só. O que ela perde é a lista; o que ela
+ * ganha continua igual, e a aba Conquistas mostra todas com calma.
+ *
+ * ⚠️ E o saldo sobe junto. As Sementinhas da conquista são concedidas no
+ * servidor, longe do Caminho — sem este aviso o número no alto da trilha só se
+ * corrigiria na próxima abertura, que é exatamente o defeito que
+ * `evento-sementinhas.ts` veio consertar. O valor sai de
+ * `sementinhasDaRaridade`, a MESMA régua que o servidor usa para pagar; uma
+ * segunda tabela aqui divergiria no primeiro ajuste de preço.
  */
+const TOASTS_DE_CONQUISTA = 3;
+
 function triggerAchievementsCheck() {
   supabase.auth
     .getSession()
@@ -674,10 +694,23 @@ function triggerAchievementsCheck() {
     .then((res) => {
       if (!res || !res.ok) return;
       if (res.careMode) return; // Modo Cuidado: sem comemorações.
-      for (const key of res.newlyAwarded ?? []) {
+      const novas = res.newlyAwarded ?? [];
+      if (novas.length === 0) return;
+
+      for (const key of novas.slice(0, TOASTS_DE_CONQUISTA)) {
         const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
         if (def) toast(`${def.emoji} Nova conquista desbloqueada: ${def.title}!`);
       }
+      const resto = novas.length - TOASTS_DE_CONQUISTA;
+      if (resto > 0) {
+        toast(`🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — veja na aba.`);
+      }
+
+      const ganho = novas.reduce(
+        (s, k) => s + sementinhasDaRaridade(conquistaPorChave(k)?.raridade ?? "comum"),
+        0,
+      );
+      creditarSementinhas(ganho);
     })
     .catch(() => {});
 }
@@ -16862,7 +16895,7 @@ function CantinhoTab({
    *
    * Sem `useMemo` de propósito — esta linha vem depois de um `return`
    * antecipado, e hook atrás de return quebra a ordem dos hooks entre
-   * renders. São 74 itens; ordenar a cada render custa menos que o risco.
+   * renders. São 111 itens; ordenar a cada render custa menos que o risco.
    */
   const shopItems = (() => {
     /* ⚠️ `CANTINHO_LOJA`, e não `CANTINHO_ITEMS`: quatro itens foram
@@ -17220,7 +17253,7 @@ function CantinhoTab({
                     </span>
                   </>
                 ) : locked ? (
-                  /* Era um <span> sem onClick: 38 dos 72 itens pagos são
+                  /* Era um <span> sem onClick: 38 dos 72 itens pagos eram
                      premium, e tocar em qualquer um deles não fazia nada.
                      Nem erro, nem explicação, nem caminho para assinar —
                      metade da loja era parede muda. Agora abre a oferta. */

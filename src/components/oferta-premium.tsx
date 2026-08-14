@@ -3,7 +3,8 @@
  * plano dela não alcança.
  *
  * Existia UM paywall no app, dentro do Caminho, e ele só falava de aula. A
- * loja do Cantinho não tinha nenhum: 38 dos 72 itens pagos são premium e o
+ * loja do Cantinho não tinha nenhum: 38 dos 72 itens pagos eram premium (à
+ * época; hoje são 94 de 111) e o
  * tile deles era um `<span>` sem `onClick`. Tocar não fazia absolutamente
  * nada — nem erro, nem explicação, nem caminho para assinar. Metade da loja
  * era parede muda, e a paciente não tinha como saber que aquilo tinha porta.
