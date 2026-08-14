@@ -2653,3 +2653,192 @@ quatro.** A repartição antiga espremia a PRIMEIRA janela até zero, e a sessã
 de 1 min abria em "deixe o ar entrar pelo nariz", sem acolhimento nenhum.
 Agora, quando não cabem as cinco, caem as do MEIO (silêncio, depois ancoragem):
 o acolhimento e a volta são as duas pontas do arco e ficam até o fim.
+
+## O Cantinho foi a 111 itens, e ganhou um tipo que não é adesivo (ago/2026)
+
+Pedido do dono: "veja todos os itens, se eles se complementam — por exemplo um
+item de emoji de golfinho e outro de um lago, dá pra juntar; faça uma varredura
+completa, veja quais não fazem sentido, classifique os melhores e os piores,
+retire os piores, coloque mais 50% de itens, e veja se conseguimos criar outro
+tipo de item".
+
+O que a varredura achou nos 74:
+
+- **Sete emojis repetidos**, e quatro deles eram o MESMO desenho vendido duas
+  vezes por preços diferentes: 🎈 por 100 (`ceu-balao-ar`) e por 200
+  (`especial-balao`); 🌈 por 150 e por 320; 💧 por 45 e por 300; 🌠 por 160 e
+  por 250. Não havia como a paciente saber o que estava comprando.
+- **Os dois itens MAIS CAROS prometiam comportamento no nome e não o tinham**:
+  "Árvore que cresce" (350 🌱) não crescia e "Ciclo dia/noite" (400 🌱) não
+  ciclava. "Chuva mansa" (200 🌱) era uma nuvem parada, e "Vaga-lumes" (220 🌱)
+  tinha por emoji uma **varinha mágica** 🪄.
+
+### `aposentado` — tirar da loja sem tirar de quem comprou
+
+Quatro itens saíram da VITRINE e de mais nada: continuam em `CANTINHO_ITEMS`,
+desenhando na trilha de quem os pagou, contando categoria para a Coroa.
+
+⚠️ **Apagar a linha faria o enfeite sumir do cantinho de quem o comprou**, e
+`CANTINHO_BY_ID[id]` devolver `undefined` — que é exatamente como um
+`DecorSprite` desaparece sem erro nenhum. É a mesma lição do
+`CANTINHO_COMPLETION_MIN`: o app não pode tirar de volta o que já deu.
+
+A loja lê `CANTINHO_LOJA` (ou `CANTINHO_ITEMS` filtrando por `owned`, para o
+item aposentado continuar aparecendo em "Meus itens"), e `buyCantinhoItem`
+recusa no SERVIDOR — vitrine é cliente, e um pedido montado à mão compraria o
+que saiu de circulação.
+
+### O tipo novo: `clima` ("No ar")
+
+Os dez tipos anteriores são todos a mesma coisa por baixo: uma figura POUSADA
+num (x, y) com uma animação curta em volta. `clima` não tem lugar — enquanto o
+item estiver no cantinho, a tela inteira ganha pétalas caindo, folhas girando,
+bolhas subindo. Régua em `src/lib/clima-do-cantinho.ts` (pura, testada).
+
+- **A régua "um tipo só existe se tiver comportamento próprio"** (a mesma que
+  criou Luzes e Águas) foi obedecida — e de quebra ele resolveu o que travava a
+  ampliação: as categorias de adesivo estão saturadas de emoji (não existe uma
+  sexta "luz" reconhecível a 24px que não seja 🔥, ⭐ ou 💡, que são a chama da
+  sequência, a estrela do dia e o "Você sabia?" da aula), e o ar estava vazio.
+  Pétala, folha, bolha, peninha, neve e poeira de estrela fazem PÉSSIMO adesivo
+  e ótimo ambiente.
+- ⚠️ **A camada é uma tela grudada no topo (`sticky`), nunca a trilha inteira.**
+  A primeira versão cobria a trilha toda e o navegador mediu: das 42 partículas,
+  **UMA** estava dentro da tela — a trilha de uma gestação tem ~27.000px, e as
+  outras 41 caíam a milhares de pixels dali. Depois: 31 a 33 na tela, e acompanha
+  a rolagem.
+- ⚠️ **O `overflow-hidden` vai na caixa STICKY**, nunca no invólucro de fora:
+  `overflow` num ancestral vira o contêiner de rolagem do `sticky` e a caixa
+  deixaria de acompanhar a tela — o defeito que ela veio consertar.
+- ⚠️ **`--dc-fim` é um comprimento (`calc(100svh + 4rem)`), nunca `100%`**: numa
+  `translate3d`, a porcentagem do eixo Y é da PRÓPRIA partícula, que tem 1rem.
+  Idem a deriva lateral, que por isso vem em `vw`.
+- **O atraso é NEGATIVO e vai até a duração inteira** — é o que faz a chuva já
+  estar caindo quando a tela abre. Com atraso positivo, as catorze pétalas
+  entram juntas e depois a tela fica vazia até a próxima volta.
+- **`prefers-reduced-motion` PARA, não esconde**: apagar faria a paciente achar
+  que o item que ela comprou não veio.
+- **O mapa é por ID DE ITEM, e não por tipo** (`CLIMA_POR_ITEM`), e é isso que
+  conserta `especial-chuva` e `especial-vagalume`: os dois continuam sendo
+  `especial` na loja (halo, tamanho, preço) e ganham o ar. Mover um deles para
+  o tipo `clima` faria quem só tinha aquele perder a categoria "especial" da
+  Coroa — há teste.
+
+### A árvore cresce e o ciclo cicla
+
+`escalaDaArvore(week)` é **MULTIPLICADOR** do tamanho que a paciente escolheu no
+modo Arrumar (0,70 a 1,30 entre a 4ª e a 40ª semana), nunca um tamanho absoluto:
+um absoluto apagaria a escolha dela toda vez que a semana virasse. Sem semana
+conhecida devolve **1**, e não o mínimo — uma muda inesperada lê como item
+quebrado.
+
+`faseDoDiaNoite(hora)` recebe a HORA LOCAL já extraída (0–23), nunca um `Date`:
+o teste não pode depender do fuso do contêiner, que é o mesmo erro de três horas
+que a agenda já pagou. ⚠️ **Nenhuma das quatro faces é emoji de item à venda** —
+o teste mudou o código uma vez, quando as faces eram 🌙 (a `ceu-lua`, 140 🌱) e
+☀️ (o `ceu-sol`, 120 🌱): a paciente veria na trilha o desenho exato de dois
+itens que ela não comprou. Hoje são 🌄 🌞 🌆 🌃.
+
+### ⚠️ OS 37 ITENS NOVOS SÃO TODOS PREMIUM
+
+Escrevi a leva com sete itens sem assinatura ("toda categoria merece uma porta
+grátis") e o teste da economia reprovou na hora:
+`economia-sementinhas.ts` fixa a loja grátis em **15 itens somando 704 🌱**,
+calibrados contra o ganho típico (35 🌱/dia) para a paciente zerá-la por volta
+do 15º dia e então **acumular moeda sem ter no que gastar** — que é a decisão de
+monetização do dono, escrita lá com todas as letras. Meus sete somariam 410 🌱 e
+empurrariam a parede para o 30º dia: eu teria desfeito a mecânica de conversão
+inteira enquanto "melhorava a loja".
+
+Item novo entra na prateleira PAGA. A Coroa continua alcançável sem assinar (dez
+categorias têm item grátis, e ela pede oito).
+
+### Seis conjuntos novos, e o bônus caiu para 12
+
+Beira do lago 🛶 · Recife 🤿 · Sem pressa 🐾 · Madrugada 🌉 · Chão de floresta 🪵 ·
+Cantinho de costura 🪡. **Nenhum conjunto publicado ganhou item** — um quinto
+item viraria o selo "4 de 4" de quem já fechou num "4 de 5". Item ANTIGO pode
+entrar em conjunto NOVO (a Borboleta mora no "Canteiro florido" e no "Sem
+pressa"): isso não desfaz nada.
+
+`BONUS_POR_ITEM` caiu de 15 para 12 porque com catorze conjuntos o total ia a
+795 🌱 — mais do que custa a loja grátis inteira, e aí o conjunto deixaria de ser
+reconhecimento e viraria a principal fonte de Sementinhas do jogo. O teto do
+teste passou a ser DERIVADO do catálogo, e não um 704 escrito à mão.
+
+## A gamificação: cinco defeitos que o jogo tinha (ago/2026)
+
+Varredura pedida pelo dono. Os cinco eram da mesma família — **o Caminho
+concedia e não contava a ninguém**.
+
+1. **O saldo não subia durante o dia.** `setSaldo` era chamado UMA vez, na
+   montagem. Ela fazia a aula (+18 🌱), as quatro atividades (+20 🌱) e o bônus
+   das cinco estrelas (+20 🌱), via os toasts de "+5 🌱", e o número no alto da
+   tela ficava igual a tarde inteira. **O contador É a recompensa**: um "+5" que
+   não move o número lê como erro do app.
+
+2. ⚠️ **As conquistas do jogo nunca eram concedidas.**
+   `checkAndAwardAchievements` rodava em cinco lugares: quatro telas de REGISTRO
+   e a aba Conquistas. O Caminho não chamava em lugar nenhum — e é lá que ela
+   medita, escreve a gratidão, lê a carta, fecha o dia e ganha troféu. As
+   conquistas de meditação, gratidão, carta, exercício e troféu, mais o marco
+   semanal de 25 🌱 e os dois de trimestre, só chegavam se ela por acaso abrisse
+   a aba Conquistas ou registrasse uma pressão.
+
+3. **O troféu não explicava nada.** Era um número roxo com
+   `title="Figurinhas coletadas"` — texto de quando ele contava figurinhas, e
+   mentira desde que passou a contar dias de cinco estrelas. E
+   `proximoDesbloqueio`/`escadaDeTrofeus` existiam, com teste, e **zero
+   chamadores**: a escada estava escrita e nunca foi mostrada a ninguém. Hoje o
+   número abre `FolhaDosTrofeus`, com "faltam 4 🏆" (que dá o que fazer) em vez
+   de "bloqueado" (que só informa que ela não pode).
+
+4. **O bônus das cinco estrelas sumia numa falha de rede.**
+   `grantDayStarsBonus` era chamada uma vez, num `try/catch` que engole — e
+   `!doneDays.includes(D)` já marcava o dia como fechado no aparelho, então
+   nunca havia segunda tentativa. Agora é reconferido na abertura seguinte (hoje
+   e ontem; o servidor aceita ±1 dia). Seguro por construção: ele dedupa pela
+   chave E reconfere as quatro linhas de bem-estar antes de pagar.
+
+5. **Um dia perdido zerava a sequência.** Ver abaixo.
+
+**O recado mora em `src/lib/evento-sementinhas.ts`**, arquivo próprio e sem
+imports: os seis pontos que concedem estão em componentes distintos e fundos de
+árvore diferentes, e uma prop por todos seria seis assinaturas novas e uma
+sétima esquecida no bloco seguinte. ⚠️ E **arquivo separado, não uma constante
+exportada de `gestacao-path.tsx`**: `minha-conta` carrega a trilha por `lazy()`,
+e um `import` estático de qualquer símbolo dela puxaria os 91 KB do módulo de
+volta ao pacote principal, desfazendo a divisão que a rodada de desempenho
+acabou de fazer.
+
+### A chama perdoa um dia
+
+Um único dia em branco zerava tudo. Numa gestação de alto risco isso não é rigor
+de jogo: é a paciente que passou a noite no pronto-socorro **perdendo quarenta
+dias por causa da internação** — o app transformando o pior dia dela no dia em
+que ele também a puniu.
+
+A régua (`DIAS_POR_PERDAO = 7`, em `sequencia.ts`): um dia perdido é perdoado, e
+ganha-se um perdão a cada sete dias já contados.
+
+- **Um dia, não dois**: se ela sumiu por dois dias seguidos a sequência acabou
+  mesmo, e dizer o contrário faria o número deixar de significar "eu vim quase
+  todo dia".
+- **Proporcional, não fixo**: quem tem três dias não precisa de proteção; quem
+  tem duzentos precisa muito. O perdão cresce com o que há a perder.
+- ⚠️ **O saldo é conferido contra o que já foi contado NESTE trecho**, então quem
+  alterna um dia sim, um dia não nunca sai de 1 (`floor(1/7)` é 0). Há teste,
+  e há teste para dois dias em branco quebrarem por mais longa que seja.
+- A mudança só faz a sequência SUBIR. Voltar atrás é trocar a constante por
+  `Infinity`.
+- As três contagens (gestação, pós-parto, meditação) já delegavam à mesma
+  função, então o perdão vale nas três sem uma linha a mais.
+
+⚠️ **E a chama passou a explicar isso** (`FolhaDaChama`, aberta pelo toque no
+número): **perdão que ninguém sabe que existe não acalma ninguém**. O saldo
+mostrado é o MESMO `floor(n/7)` da contagem — uma segunda régua prometeria um
+perdão que a conta não dá. Nenhuma frase cobra.
+
+**Bancada:** `/preview-jogo?trofeus=12` (a escada) · `?streak=41` e `?streak=3`
+(as duas versões do texto do perdão) ·
+`/preview-jogo?clima=clima-petalas,clima-folhas` (a camada No ar).
