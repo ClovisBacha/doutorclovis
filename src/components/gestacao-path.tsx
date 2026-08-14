@@ -19,6 +19,7 @@ import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, fundoBgFor } from "@/li
 import { climasAtivos, particulasDe } from "@/lib/clima-do-cantinho";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { escadaDeTrofeus, proximoDesbloqueio } from "@/lib/trofeus";
+import { DIAS_POR_PERDAO } from "@/lib/sequencia";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
@@ -432,6 +433,96 @@ function FolhaDosTrofeus({
             Fechar
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * O QUE É A CHAMA — e, principalmente, QUE ELA PERDOA UM DIA.
+ *
+ * A chama é o número que mais decide se a paciente volta amanhã, e era o único
+ * da fita sem uma linha explicando o que faz o número subir ou cair.
+ *
+ * ⚠️ E ficou urgente quando ela passou a perdoar um dia (ver `sequencia.ts`):
+ * o perdão existe justamente para a noite no pronto-socorro, e **perdão que
+ * ninguém sabe que existe não acalma ninguém**. A paciente internada precisa
+ * poder tocar no número e ler que ele não vai zerar — é o oposto de um app que
+ * escolhe o pior dia dela para também puni-la.
+ *
+ * ⚠️ Nenhuma frase cobra. Há teste com regex proibindo "você não fez" e
+ * "está tudo bem" nas frases do mascote, e esta tela obedece à mesma régua por
+ * decisão, não por engano: ela fala do que acontece, nunca do que ela deixou
+ * de fazer.
+ */
+function FolhaDaChama({ streak, onFechar }: { streak: number; onFechar: () => void }) {
+  const acesa = sequenciaAcesa(streak);
+  /* O saldo é o MESMO cálculo do `sequenciaDeDias` — `Math.floor(n / 7)`. Uma
+     segunda régua aqui faria a tela prometer um perdão que a contagem não dá. */
+  const perdoes = Math.floor(streak / DIAS_POR_PERDAO);
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Sua sequência"
+      className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center"
+      style={{ background: "rgba(38,20,40,0.44)", backdropFilter: "blur(3px)" }}
+      onClick={onFechar}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[380px] rounded-t-[28px] bg-white p-6 pb-8 shadow-[0_24px_60px_rgba(0,0,0,0.28)] sm:rounded-[28px] sm:pb-6"
+      >
+        <div className="flex items-center justify-center gap-2">
+          <ChamaDaSequencia acesa={acesa} tamanho={44} />
+          <span
+            className={`text-[34px] font-black leading-none ${
+              acesa ? "text-amber-500" : "text-slate-400"
+            }`}
+          >
+            {streak}
+          </span>
+        </div>
+        <p className="mt-1 text-center font-serif text-[20px] leading-tight text-slate-800">
+          {streak === 1 ? "dia seguido" : "dias seguidos"}
+        </p>
+
+        <div className="mt-4 space-y-3 text-sm leading-relaxed text-slate-600">
+          <p>
+            Um dia entra na conta quando você faz <strong>pelo menos uma</strong> das atividades do
+            Caminho. Não precisa fazer as quatro.
+          </p>
+          {/* O texto do perdão, que é o motivo desta tela existir. */}
+          <p className="rounded-2xl bg-amber-50 p-3 text-amber-900">
+            {perdoes > 0 ? (
+              <>
+                <strong>Um dia sem vir não apaga a chama.</strong> Do jeito que ela está hoje, você
+                pode ficar {perdoes === 1 ? "um dia" : `até ${perdoes} dias`} de fora — em dias
+                separados — sem perder nada.
+              </>
+            ) : (
+              <>
+                <strong>Um dia sem vir não apaga a chama</strong> — a partir de sete dias seguidos.
+                Antes disso ela ainda é curta, e recomeçar custa pouco.
+              </>
+            )}
+          </p>
+          <p>
+            Quanto mais longa a sequência, mais folga ela ganha: é um dia perdoado a cada sete que
+            você já fez. <strong>Dois dias seguidos de fora</strong>, aí sim ela recomeça.
+          </p>
+          <p className="text-xs text-slate-400">
+            A conta vira à meia-noite, mas o dia de hoje só começa a contar depois que você faz
+            alguma coisa — de manhã a chama continua com o número de ontem.
+          </p>
+        </div>
+
+        <button
+          onClick={onFechar}
+          className="press mt-5 w-full rounded-full bg-amber-500 py-3 text-sm font-bold text-white"
+        >
+          Entendi
+        </button>
       </div>
     </div>
   );
@@ -1472,6 +1563,8 @@ export function GestacaoPath({
   /* A folha que explica o que é o troféu e o que ele abre — ver
      `FolhaDosTrofeus`. Abre pelo toque na fita do topo. */
   const [trofeusAbertos, setTrofeusAbertos] = useState(false);
+  /* Idem para a chama — e nela o texto que mais importa é o do perdão. */
+  const [chamaAberta, setChamaAberta] = useState(false);
   /* Quantas amigas — o número que a fita mostra no lugar do calendário.
      Consulta própria e leve (`contarAmigas`), e não a lista inteira: a fita
      abre em toda visita ao Caminho, e a lista calcula chama e troféus de cada
@@ -2635,7 +2728,17 @@ export function GestacaoPath({
       >
         {!careMode && (
           <>
-            <div className="flex items-center gap-1.5" title="Dias seguidos completando o desafio">
+            {/* ⚠️ VIROU BOTÃO PELO MESMO MOTIVO DO TROFÉU, e com uma urgência
+                a mais: a chama passou a PERDOAR um dia (ver `sequencia.ts`),
+                e perdão que ninguém sabe que existe não acalma ninguém. A
+                paciente que passou a noite no hospital precisa poder tocar no
+                número e ler que ele não vai zerar. */}
+            <button
+              type="button"
+              onClick={() => setChamaAberta(true)}
+              aria-label={`${streak} ${streak === 1 ? "dia seguido" : "dias seguidos"} — ver como funciona`}
+              className="press flex items-center gap-1.5 rounded-full px-1 py-0.5"
+            >
               <ChamaDaSequencia acesa={sequenciaAcesa(streak)} tamanho={26} />
               <span
                 className={`text-lg font-extrabold ${
@@ -2647,7 +2750,7 @@ export function GestacaoPath({
               <span className="text-xs font-medium text-muted-foreground">
                 {streak === 1 ? "dia" : "dias"}
               </span>
-            </div>
+            </button>
             <div className="h-6 w-px bg-slate-200" />
           </>
         )}
@@ -2787,6 +2890,8 @@ export function GestacaoPath({
       {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
           na ordem do DOM porque as duas são `fixed`: se as duas estivessem no
           ar, a que a paciente acabou de conquistar tem de ficar por cima. */}
+      {chamaAberta && <FolhaDaChama streak={streak} onFechar={() => setChamaAberta(false)} />}
+
       {trofeusAbertos && (
         <FolhaDosTrofeus
           trofeus={trofeus}

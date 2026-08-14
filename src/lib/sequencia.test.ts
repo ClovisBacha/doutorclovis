@@ -162,9 +162,13 @@ describe("a chama pergunta ao arquivo, não ao componente", () => {
     expect(fonte).not.toMatch(/function sequenciaDeDias\(/);
   });
 
-  test("a chama acende nas duas trilhas", () => {
+  test("a chama acende nas duas trilhas — e na folha que a explica", () => {
     const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
-    expect([...fonte.matchAll(/<ChamaDaSequencia/g)]).toHaveLength(2);
+    /* Três: a fita da gestação, a do pós-parto e a `FolhaDaChama`, que abre ao
+       tocar no número. A terceira nasceu junto com o perdão de um dia — perdão
+       que ninguém sabe que existe não acalma ninguém, e a paciente internada
+       precisa poder tocar no número e ler que ele não vai zerar. */
+    expect([...fonte.matchAll(/<ChamaDaSequencia/g)]).toHaveLength(3);
     /* E ninguém escreveu `streak > 0` à mão para decidir se acende. */
     expect(fonte).not.toMatch(/streak > 0/);
   });
