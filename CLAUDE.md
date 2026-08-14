@@ -1539,6 +1539,81 @@ Caminho continua mostrando a sequência atual — são perguntas diferentes.
   vezes numa conta real — e foi por telas assim serem impossíveis de olhar que
   a aba passou tanto tempo desatualizada.
 
+### Os conjuntos: itens que se completam (ago/2026)
+
+Pedido do dono: "veja se os itens se sincronizam de maneira interessante, se
+eles se complementam — por exemplo um item de emoji de golfinho e outro de um
+lago, dá pra juntar".
+
+Ele viu o que estava lá: 🐬 golfinho, 🐚 concha, 🐠 peixinho e 🌊 fundo-mar já
+existiam, cada um sozinho na sua prateleira, sem nada no app dizendo que são a
+mesma praia. **Não existia mecânica de combinação nenhuma** — varredura do
+`src/` inteiro confirmou: nada lia dois ids do Cantinho juntos.
+
+Agora são 8 conjuntos (`src/lib/conjuntos.ts`), de 3 a 4 itens, todos montados
+com itens que JÁ existiam.
+
+- **Não é a Coroa da Coleção.** Aquela pede um item pago de CADA categoria —
+  é largura ("você passeou pelo cantinho inteiro"). O conjunto é profundidade:
+  quatro coisas que contam a mesma história. As duas convivem.
+- ⚠️ **O RISCO CLÍNICO É REAL, e o desenho tem três travas.** Conjunto é a
+  mecânica que mais empurra compra em jogo comercial ("faltam 2 pra
+  completar!"). Numa gestante de alto risco — sem dinheiro, sem disposição ou
+  internada — isso é cobrança com cara de enfeite. Então: (1) o conjunto não
+  se anuncia fora da prateleira dele; (2) não existe prazo; (3) a tela diz
+  "3 de 4", que é ESTADO, nunca "falta 1!", que é dívida.
+- ⚠️ **A ordem mostra os COMPLETOS primeiro.** "Quase lá" no topo é o padrão de
+  todo jogo comercial e é exatamente o que transforma a prateleira num
+  lembrete do que falta. Há teste.
+- ⚠️ **Conjunto publicado não muda de itens.** Mesma lei da Coroa: um quinto
+  item faria o selo virar "4 de 5" para quem já tinha fechado. Item novo entra
+  em conjunto NOVO.
+- ⚠️ **O emoji do conjunto não é o de NENHUM item** — a primeira versão usava
+  🌊 pro mar e 🕯️ pras luzes, e o teste pegou: a prateleira mostrava o mesmo
+  desenho duas vezes e o selo lia como cópia do item.
+- **O bônus é 15 🌱 por item** (45–60 por conjunto, 435 no total, menos que uma
+  loja grátis). Modesto de propósito: o prêmio é o RECONHECIMENTO. Se a
+  Sementinha fosse o motivo, o conjunto viraria planilha — e quem monta uma
+  cena bonita no cantinho não está fazendo planilha. Idempotente por
+  `conjunto:<id>`, pago na compra, com `try/catch` que ENGOLE: a compra já
+  aconteceu, e derrubá-la aqui diria "falha" sobre um item que já é dela.
+
+### ⚠️ Três conquistas eram impossíveis, e "7 registros" se fazia numa tarde
+
+Duas coisas que a auditoria noturna encontrou e que valem mais que qualquer
+item novo:
+
+**1. A Escola do Bebê está desconectada.** `first_course`, `course_5` e
+`course_complete` liam `course_progress`. Nada escreve nessa tabela:
+`completeLesson` só é chamada pelo `LessonSheet`, que só abre por um nó
+`kind: "lesson"` — e **o construtor da trilha não emite mais esse nó** (o tipo
+existe na linha 1002 de `gestacao-path.tsx`, o render na 2823, o emissor não
+existe; `EscolaBebêTab` tem zero chamadores). Eram três conquistas
+permanentemente impossíveis, uma delas ÉPICA (120 🌱), aparecendo como
+"🔒 bloqueada" para sempre numa grade que a paciente lê como "o que ainda dá
+pra fazer".
+
+⚠️ **As chaves ficaram.** Apagá-las tiraria a medalha de quem por acaso já a
+tivesse — o app não pode tirar de volta o que deu. O que mudou é PARA ONDE
+apontam: a aula do dia, que é o que ela de fato faz, tem 294 edições e já
+deixa rastro próprio no ledger. A escada virou 1 · 5 · 10 · 50 · 100, e o
+texto delas foi reescrito para dizer a verdade nova.
+
+**2. "Repetição sustentada" que se fazia numa tarde.** `health_7_days`,
+`journal_10` e `kicks_10` são de raridade `raro`, cujo critério declarado é
+"hábito, e hábito custa semanas" — e contavam LINHAS (`count: "exact"` sobre a
+tabela). Dava para fechar as três salvando dez vezes seguidas numa tarde. A
+régua e o código discordavam, e quem tinha razão era a régua. Agora contam
+DIAS DISTINTOS (`diasDistintos`), no fuso de São Paulo — ⚠️ por UTC, dois
+registros das 22h e 23h da mesma noite virariam dois dias, e a conquista de
+sete dias sairia em quatro noites.
+
+⚠️ **O teste desta régua já esteve errado DUAS vezes**, e as duas por adivinhar
+dificuldade pelo NOME da chave (`_complete$` pegou `profile_complete`;
+`_(30|50)$` reprovou `aula_50` quando a escada ganhou um degrau acima). Hoje as
+escadas são escritas à mão no teste: o topo de cada uma é o épico, e nenhum
+degrau abaixo pode ser.
+
 ## O app parou de baixar o jogo inteiro pra mostrar a consulta (ago/2026)
 
 O dono relatou, no aparelho: "alguns dados demoram mais pra carregar que

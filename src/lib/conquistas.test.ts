@@ -23,6 +23,7 @@ import {
   aulasRespondidas,
   conquistaPorChave,
   contarPorRaridade,
+  diasDistintos,
   ehPosParto,
   maiorSequencia,
   orcamentoDasConquistas,
@@ -102,14 +103,45 @@ describe("⚠️ a raridade tem régua, não gosto", () => {
       const estreia =
         /^(first_|medita_1$|gratidao_1$|carta_1$|exercicio_1$|trofeu_1$|cantinho_1$)/.test(c.key);
       if (estreia) expect(c.raridade).toBe("comum");
+    }
+  });
 
-      /* ⚠️ `course_complete` e não `_complete$`: a primeira versão desta
-         regex pegava `profile_complete` junto e exigia que "preencher o
-         perfil" fosse épica. Preencher o perfil é tarefa de dois minutos que
-         se faz uma vez — é comum, e o teste é que estava errado. Sufixo
-         genérico é o jeito rápido de um teste começar a mentir. */
-      const maratona = /_(30|50)$/.test(c.key) || c.key === "course_complete";
-      if (maratona) expect(c.raridade).toBe("epico");
+  test("⚠️ o topo de cada escada é épico, e só o topo", () => {
+    /* ─── ESTE TESTE JÁ ESTEVE ERRADO DUAS VEZES ────────────────────────────
+       1ª versão: `_complete$` — pegava `profile_complete` junto e exigia que
+          "preencher o perfil" fosse épica.
+       2ª versão: `_(30|50)$` — passou a reprovar `aula_50` no dia em que a
+          escada da aula ganhou um degrau acima dele (`course_complete`, 100).
+
+       As duas falhavam pelo mesmo motivo: adivinhar dificuldade pelo NOME da
+       chave. A régua de verdade é sobre a ESCADA — o degrau mais alto de cada
+       assunto é o épico, e nenhum degrau abaixo dele pode ser. Escrever as
+       escadas à mão custa cinco linhas e para de mentir quando um degrau
+       novo entra. */
+    const ESCADAS: Record<string, string[]> = {
+      aula: ["first_course", "course_5", "aula_10", "aula_50", "course_complete"],
+      meditacao: ["medita_1", "medita_10", "medita_30"],
+      gratidao: ["gratidao_1", "gratidao_10", "gratidao_50"],
+      carta: ["carta_1", "carta_10", "carta_30"],
+      exercicio: ["exercicio_1", "exercicio_10", "exercicio_30"],
+      trofeu: ["trofeu_1", "trofeu_10", "trofeu_30"],
+      sequencia: ["sequencia_7", "sequencia_30"],
+      cantinho: ["cantinho_1", "cantinho_10"],
+    };
+    for (const [assunto, degraus] of Object.entries(ESCADAS)) {
+      for (const k of degraus) {
+        expect(conquistaPorChave(k), `${assunto}: ${k} não existe`).toBeDefined();
+      }
+      const topo = degraus[degraus.length - 1];
+      const abaixo = degraus.slice(0, -1);
+      /* O topo é épico — exceto nas escadas curtas (2 degraus), onde o topo
+         ainda é repetição sustentada e não marco de meses. */
+      if (degraus.length >= 3) {
+        expect(conquistaPorChave(topo)!.raridade, `topo de ${assunto}`).toBe("epico");
+      }
+      for (const k of abaixo) {
+        expect(conquistaPorChave(k)!.raridade, `${k} não pode ser épico`).not.toBe("epico");
+      }
     }
   });
 
@@ -192,6 +224,67 @@ describe("vezesQueFez", () => {
 
   test("gasto na loja (dedupe_key nulo) não vira conquista", () => {
     expect(vezesQueFez([null, null, null], "meditation", CICLO)).toBe(0);
+  });
+});
+
+describe("⚠️ diasDistintos — 'repetição sustentada' que se faz numa tarde", () => {
+  test("dez registros no mesmo dia contam UM dia", () => {
+    /* O defeito exato que isto conserta: `health_7_days` e `journal_10` são
+       de raridade `raro` ("hábito custa semanas") e contavam LINHAS. Dava
+       para fechá-las salvando dez vezes seguidas numa tarde. */
+    const mesmaTarde = Array.from({ length: 10 }, (_, i) => `2026-03-07T1${i % 10}:00:00-03:00`);
+    expect(diasDistintos(mesmaTarde)).toBe(1);
+  });
+
+  test("dias diferentes contam separado", () => {
+    expect(diasDistintos(["2026-03-07T10:00:00-03:00", "2026-03-08T10:00:00-03:00"])).toBe(2);
+  });
+
+  test("⚠️ o dia é o de São Paulo, não o UTC", () => {
+    /* 22h de Brasília é 01h do dia seguinte em UTC. Contando por UTC, dois
+       registros da MESMA noite virariam dois dias — e a conquista de sete
+       dias sairia em quatro noites. */
+    const noite = "2026-03-07T22:00:00-03:00";
+    const maisTarde = "2026-03-07T23:30:00-03:00";
+    expect(diasDistintos([noite, maisTarde])).toBe(1);
+  });
+
+  test("nulo, vazio e data inválida não contam", () => {
+    expect(diasDistintos([null, undefined, "", "nao-e-data"])).toBe(0);
+  });
+
+  test("lista vazia é zero", () => {
+    expect(diasDistintos([])).toBe(0);
+  });
+});
+
+describe("⚠️ as conquistas da Escola do Bebê apontam pra aula do dia", () => {
+  test("as três chaves continuam existindo", () => {
+    /* Elas liam `course_progress`, e o nó que abriria a Escola não é mais
+       emitido pela trilha — eram três conquistas impossíveis, uma épica.
+       As CHAVES ficam: apagá-las tiraria a medalha de quem já a tivesse, e o
+       app não pode tirar de volta o que deu. */
+    for (const k of ["first_course", "course_5", "course_complete"]) {
+      expect(conquistaPorChave(k)).toBeDefined();
+    }
+  });
+
+  test("e o texto delas não promete mais a Escola", () => {
+    /* Descrição que fala de "módulos da Escola do Bebê" seria a mesma mentira
+       com outra fonte de dados. */
+    for (const k of ["first_course", "course_5", "course_complete"]) {
+      const d = conquistaPorChave(k)!.description.toLowerCase();
+      expect(d).not.toContain("módulo");
+      expect(d).not.toContain("escola do bebê");
+    }
+  });
+
+  test("a escada da aula tem UM épico só", () => {
+    /* 1 · 5 · 10 · 50 · 100. Dois dourados na mesma escada fariam o dourado
+       valer metade. */
+    const escada = ["first_course", "course_5", "aula_10", "aula_50", "course_complete"];
+    const epicos = escada.filter((k) => conquistaPorChave(k)?.raridade === "epico");
+    expect(epicos).toEqual(["course_complete"]);
   });
 });
 

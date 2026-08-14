@@ -214,10 +214,27 @@ export const CONQUISTAS: ConquistaDef[] = [
     category: "bebe",
     raridade: "raro",
   },
+  /* ── ⚠️ AS TRÊS DA "ESCOLA DO BEBÊ" APONTAVAM PRO VAZIO ─────────────────
+     Elas liam `course_progress`, e nada escreve nessa tabela: `completeLesson`
+     só é chamada pelo `LessonSheet`, que só abre por um nó `kind: "lesson"`
+     — e o construtor da trilha NÃO EMITE MAIS esse nó (o tipo existe na
+     linha 1002 de `gestacao-path.tsx`, o bloco de render na 2823, o emissor
+     não existe). `EscolaBebêTab` tem zero chamadores.
+
+     Ou seja: três conquistas permanentemente impossíveis, uma delas ÉPICA
+     (120 🌱), aparecendo como "🔒 bloqueada" para sempre numa grade que a
+     paciente lê como "o que ainda dá pra fazer".
+
+     ⚠️ AS CHAVES FICAM. Apagá-las tiraria a medalha de quem por acaso já a
+     tivesse — o app não pode tirar de volta o que deu (a mesma lei que a
+     Coroa da Coleção segue). O que muda é PARA ONDE elas apontam: a AULA DO
+     DIA, que é o que ela de fato faz, tem 294 edições e já deixa rastro
+     próprio no ledger (`dailyquiz:<ciclo>:<dia>`). O título e a descrição
+     foram reescritos para dizer a verdade nova. */
   {
     key: "first_course",
     title: "Escola Aberta",
-    description: "Completou o primeiro módulo da Escola do Bebê",
+    description: "Respondeu a primeira aula do dia",
     emoji: "🎓",
     category: "educacao",
     raridade: "comum",
@@ -225,7 +242,7 @@ export const CONQUISTAS: ConquistaDef[] = [
   {
     key: "course_5",
     title: "Aluna Dedicada",
-    description: "Completou 5 módulos da Escola do Bebê",
+    description: "5 aulas do dia respondidas",
     emoji: "🏅",
     category: "educacao",
     raridade: "raro",
@@ -233,11 +250,11 @@ export const CONQUISTAS: ConquistaDef[] = [
   {
     key: "course_complete",
     title: "Mamãe Preparada!",
-    description: "Completou todos os 12 módulos da Escola do Bebê",
+    description: "100 aulas do dia respondidas",
     emoji: "🏆",
+    /* Cem de 294. Meses de app aberto quase todo dia — não dá pra apressar
+       nem repetir, que é a definição de épico. */
     category: "educacao",
-    /* Doze módulos é a coisa mais longa que existe na Escola — não dá para
-       apressar nem repetir. É a definição de épico. */
     raridade: "epico",
   },
   {
@@ -282,7 +299,9 @@ export const CONQUISTAS: ConquistaDef[] = [
     description: "50 aulas do dia respondidas",
     emoji: "🎒",
     category: "educacao",
-    raridade: "epico",
+    /* Raro, e não épico: a escada da aula já termina em `course_complete`
+       (100). Dois épicos na mesma escada fariam o dourado valer metade. */
+    raridade: "raro",
   },
 
   // ── MEDITAÇÃO ───────────────────────────────────────────────────────────
@@ -546,6 +565,31 @@ export function vezesQueFez(
     const [, ativ, c, dia] = p;
     if (ativ !== atividade || c !== ciclo || !/^\d+$/.test(dia)) continue;
     dias.add(dia);
+  }
+  return dias.size;
+}
+
+/**
+ * Quantos DIAS DISTINTOS aparecem numa lista de instantes ISO.
+ *
+ * ⚠️ Existe porque "7 registros de saúde" e "10 entradas no diário" contavam
+ * LINHAS. Dava para desbloquear as duas — ambas de raridade `raro`, cujo
+ * critério declarado é *"repetição sustentada; é hábito, e hábito custa
+ * semanas"* — salvando dez vezes seguidas numa tarde. A régua e a
+ * implementação discordavam, e quem tinha razão era a régua.
+ *
+ * O dia é o LOCAL de São Paulo, e não o UTC: quem registra às 22h de Brasília
+ * está gravando 01h do dia seguinte em UTC, e dois registros da mesma noite
+ * contariam como dois dias. É o mesmo fuso que `todayKeySaoPaulo` usa para o
+ * check-in diário — duas noções de "dia" no mesmo app é como elas divergem.
+ */
+export function diasDistintos(instantes: readonly (string | null | undefined)[]): number {
+  const dias = new Set<string>();
+  for (const iso of instantes) {
+    if (!iso) continue;
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) continue;
+    dias.add(d.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }));
   }
   return dias.size;
 }

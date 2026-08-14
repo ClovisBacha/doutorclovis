@@ -116,6 +116,7 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { RARIDADES } from "@/lib/conquistas";
+import { conjuntosDoItem, conjuntosOrdenados } from "@/lib/conjuntos";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
   CANTINHO_ITEMS,
@@ -16987,6 +16988,54 @@ function CantinhoTab({
           )}
         </div>
       )}
+
+      {/* ── OS CONJUNTOS ────────────────────────────────────────────────────
+          Pedido do dono: "veja se os itens se complementam — um emoji de
+          golfinho e outro de um lago, dá pra juntar". Eles já se completavam;
+          o que faltava era o app dizer isso.
+
+          ⚠️ A PRATELEIRA VEM ANTES DA LOJA, mas mostra os COMPLETOS primeiro
+          (`conjuntosOrdenados`). A ordem oposta — "quase lá" no topo — é o
+          padrão de todo jogo comercial e é exatamente o que transforma a tela
+          num lembrete do que falta. Numa gestante de alto risco isso vira
+          cobrança com cara de enfeite.
+
+          ⚠️ E a contagem é "3 de 4", que é ESTADO. Nunca "falta 1!", que é
+          dívida. */}
+      <div className="mb-5">
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          Conjuntos
+        </p>
+        <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
+          {conjuntosOrdenados(ownedSet).map((p) => (
+            <div
+              key={p.conjunto.id}
+              className={`flex min-w-[9.5rem] shrink-0 flex-col rounded-2xl border px-3 py-2.5 ${
+                p.completo ? "border-emerald-300 bg-emerald-50" : "border-border bg-secondary/20"
+              }`}
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="text-lg leading-none" aria-hidden>
+                  {p.conjunto.emoji}
+                </span>
+                <span className="text-[12.5px] font-extrabold leading-tight">
+                  {p.conjunto.nome}
+                </span>
+              </div>
+              <span className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
+                {p.conjunto.descricao}
+              </span>
+              <span
+                className={`mt-1.5 text-[11px] font-bold ${
+                  p.completo ? "text-emerald-600" : "text-muted-foreground"
+                }`}
+              >
+                {p.completo ? "completo ✓" : `${p.tem} de ${p.total}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Loja de itens */}
       <div>

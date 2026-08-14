@@ -10,6 +10,12 @@ import {
   cantinhoCategoriasCompletas,
   isCantinhoCollectionComplete,
 } from "@/lib/cantinho";
+import {
+  CONJUNTO_POR_ID,
+  bonusDoConjunto,
+  chaveDoBonus,
+  conjuntosCompletos,
+} from "@/lib/conjuntos";
 
 /**
  * Itens grátis (preço 0) — sempre possuídos, não precisam de compra. O troféu
@@ -237,7 +243,56 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
            Texto de tela é para gente ler; decisão de código se toma por código. */
         return { ok: false as const, error: msg, motivo: r.error ?? null, balance: r.balance ?? 0 };
       }
-      return { ok: true as const, balance: r.balance ?? 0, itemId: item.id };
+      /* ── O BÔNUS DE CONJUNTO ────────────────────────────────────────────
+         Paga DEPOIS de a compra ter dado certo, e só aqui: é o único
+         momento em que a coleção dela pode ter mudado.
+
+         ⚠️ Idempotente por `conjunto:<id>` — a mesma trava de todo ganho do
+         app. Sem ela, uma recompra recusada ("já possui") vinda de outro
+         aparelho pagaria o conjunto de novo a cada sincronização.
+
+         ⚠️ E é `try/catch` que ENGOLE: a compra já aconteceu e o item já é
+         dela. Derrubar a resposta aqui faria a tela dizer "falha na compra"
+         de um item que está no cantinho — o pior dos dois mundos. O bônus se
+         auto-corrige na compra seguinte, porque a chave de dedupe não deixa
+         pagar duas vezes. */
+      let conjuntosFechados: string[] = [];
+      try {
+        const db = typedDb(supabaseAdmin);
+        const { data: agora } = await db
+          .from("cantinho_items")
+          .select("item_id")
+          .eq("user_id", uid);
+        const possui = new Set([
+          ...((agora ?? []) as { item_id: string }[]).map((x) => x.item_id),
+          ...FREE_ITEM_IDS,
+        ]);
+        const fechados = conjuntosCompletos(possui);
+        if (fechados.length > 0) {
+          const { grantSementinhas } = await import("@/lib/sementinhas.functions");
+          await grantSementinhas(
+            db,
+            uid,
+            fechados.map((cid) => ({
+              amount: bonusDoConjunto(CONJUNTO_POR_ID[cid]),
+              reason: `Conjunto completo: ${CONJUNTO_POR_ID[cid].nome}`,
+              dedupeKey: chaveDoBonus(cid),
+            })),
+          );
+          conjuntosFechados = fechados;
+        }
+      } catch (e) {
+        console.error("[cantinho] bônus de conjunto não pagou", uid, e);
+      }
+
+      return {
+        ok: true as const,
+        balance: r.balance ?? 0,
+        itemId: item.id,
+        /* Os conjuntos que ela JÁ tem fechados — a tela usa para saber se este
+           item acabou de fechar um, e comemorar. */
+        conjuntosFechados,
+      };
     } catch (e) {
       const m = (e as { message?: string })?.message ?? String(e);
       console.error("[buyCantinhoItem] exceção:", e);

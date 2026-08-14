@@ -9,6 +9,7 @@ import {
   CONQUISTAS,
   aulasRespondidas,
   conquistaPorChave,
+  diasDistintos,
   maiorSequencia,
   sementinhasDaRaridade,
   vezesQueFez,
@@ -92,34 +93,42 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
        contagem procura por um ciclo que nunca foi gravado e devolve zero. */
     const cicloAtual = profile?.lmp_date ?? profile?.reference_date ?? profile?.birth_date ?? "x";
 
-    const { count: healthCount } = await db
+    /* ── ⚠️ "7 REGISTROS" VIROU "7 DIAS" ────────────────────────────────────
+       As três abaixo são de raridade `raro`, cujo critério declarado em
+       `conquistas.ts` é literalmente "repetição sustentada — ela voltou N
+       vezes; é hábito, e hábito custa semanas". A implementação contava
+       LINHAS (`count: "exact"` sobre a tabela inteira): dava para fechar as
+       três salvando dez vezes numa tarde.
+
+       A régua e o código discordavam, e quem tinha razão era a régua — um
+       emblema azul de "Semana Saudável" ganho em quinze minutos ensina que a
+       cor não quer dizer nada.
+
+       O `first_` continua olhando se existe QUALQUER linha: a primeira vez é
+       a primeira vez, não precisa de dia distinto. */
+    const { data: healthRows } = await db
       .from("health_logs")
-      .select("*", { count: "exact", head: true })
+      .select("created_at")
       .eq("user_id", uid);
-    if ((healthCount ?? 0) >= 1) toAward.push("first_health_log");
-    if ((healthCount ?? 0) >= 7) toAward.push("health_7_days");
+    const healthLinhas = (healthRows ?? []) as { created_at: string | null }[];
+    if (healthLinhas.length >= 1) toAward.push("first_health_log");
+    if (diasDistintos(healthLinhas.map((r) => r.created_at)) >= 7) toAward.push("health_7_days");
 
-    const { count: journalCount } = await db
+    const { data: journalRows } = await db
       .from("journal_entries")
-      .select("*", { count: "exact", head: true })
+      .select("created_at")
       .eq("user_id", uid);
-    if ((journalCount ?? 0) >= 1) toAward.push("first_journal");
-    if ((journalCount ?? 0) >= 10) toAward.push("journal_10");
+    const journalLinhas = (journalRows ?? []) as { created_at: string | null }[];
+    if (journalLinhas.length >= 1) toAward.push("first_journal");
+    if (diasDistintos(journalLinhas.map((r) => r.created_at)) >= 10) toAward.push("journal_10");
 
-    const { count: kickCount } = await db
+    const { data: kickRows } = await db
       .from("kick_sessions")
-      .select("*", { count: "exact", head: true })
+      .select("created_at")
       .eq("user_id", uid);
-    if ((kickCount ?? 0) >= 1) toAward.push("first_kicks");
-    if ((kickCount ?? 0) >= 10) toAward.push("kicks_10");
-
-    const { count: courseCount } = await db
-      .from("course_progress")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", uid);
-    if ((courseCount ?? 0) >= 1) toAward.push("first_course");
-    if ((courseCount ?? 0) >= 5) toAward.push("course_5");
-    if ((courseCount ?? 0) >= 12) toAward.push("course_complete");
+    const kickLinhas = (kickRows ?? []) as { created_at: string | null }[];
+    if (kickLinhas.length >= 1) toAward.push("first_kicks");
+    if (diasDistintos(kickLinhas.map((r) => r.created_at)) >= 10) toAward.push("kicks_10");
 
     const { count: inviteCount } = await db
       .from("companion_invites")
@@ -200,8 +209,18 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     if (mexeu >= 30) toAward.push("exercicio_30");
 
     const aulas = aulasRespondidas(chaves, cicloAtual);
+    /* ⚠️ AS TRÊS DA "ESCOLA" AGORA APONTAM PRA AULA DO DIA.
+       Elas liam `course_progress`, e nada escreve nessa tabela: o nó
+       `kind: "lesson"` que abriria a Escola não é mais emitido pelo
+       construtor da trilha. Eram três conquistas permanentemente impossíveis,
+       uma delas ÉPICA, aparecendo como "🔒 bloqueada" para sempre.
+       As chaves ficam (ninguém perde o que já ganhou); o que mudou é a fonte,
+       e o texto delas foi reescrito em `conquistas.ts` para dizer a verdade. */
+    if (aulas >= 1) toAward.push("first_course");
+    if (aulas >= 5) toAward.push("course_5");
     if (aulas >= 10) toAward.push("aula_10");
     if (aulas >= 50) toAward.push("aula_50");
+    if (aulas >= 100) toAward.push("course_complete");
 
     /* Dias fechados. A MESMA função que o troféu do topo do Caminho usa —
        duas contagens para a palavra "dia fechado" divergiriam no primeiro
