@@ -27,6 +27,34 @@
  */
 
 /**
+ * ─── ⚠️ O PERDÃO, E POR QUE ELE É CLÍNICO ───────────────────────────────────
+ *
+ * Até agosto de 2026 um único dia em branco zerava tudo. Numa gestação de alto
+ * risco isso não é rigor de jogo: é a paciente que passou a noite no
+ * pronto-socorro perdendo 40 dias por causa da internação. O app teria
+ * transformado o pior dia dela no dia em que ele também a puniu.
+ *
+ * A régua: **um dia perdido é perdoado, e ganha-se um perdão a cada sete dias
+ * já contados.** As duas metades importam.
+ *
+ *  · **Um dia**, e não dois: se ela sumiu por dois dias seguidos, a sequência
+ *    acabou mesmo — e dizer o contrário seria o número deixar de significar
+ *    "eu vim quase todo dia".
+ *  · **Proporcional**, e não um perdão fixo: quem tem três dias não precisa de
+ *    proteção nenhuma; quem tem duzentos precisa muito. Assim o perdão cresce
+ *    com o que há a perder, que é exatamente onde a punição doeria mais.
+ *
+ * O saldo é conferido contra o que já foi contado NESTE trecho (`n`), então
+ * quem alterna um dia sim, um dia não nunca chega a lugar nenhum: no primeiro
+ * buraco `n` vale 1, `floor(1/7)` é 0, e a conta para em 1. Há teste.
+ *
+ * ⚠️ A mudança só faz sequência SUBIR, nunca descer — ninguém acorda com um
+ * número menor do que o de ontem. Voltar atrás é trocar `DIAS_POR_PERDAO` por
+ * `Infinity`.
+ */
+export const DIAS_POR_PERDAO = 7;
+
+/**
  * Quantos dias seguidos, terminando em `hoje` (ou em `hoje - 1`).
  *
  * `dias` são dias gestacionais (`D = semana * 7 + diaDaSemana`) já concluídos,
@@ -41,12 +69,25 @@ export function sequenciaDeDias(dias: readonly number[], hoje: number): number {
      em branco no meio quebra a sequência, que é o que a torna uma sequência. */
   let d = feitos.has(hoje) ? hoje : hoje - 1;
   let n = 0;
+  let perdoados = 0;
   /* Teto de segurança. `dias` vem de armazenamento local que já chegou
      corrompido nesta base; sem o limite, um blob com números negativos gira
-     para sempre e trava a aba em vez de mostrar um número errado. */
-  const teto = feitos.size;
-  while (feitos.has(d) && n < teto) {
-    n++;
+     para sempre e trava a aba em vez de mostrar um número errado.
+     O dobro (mais folga) porque agora cada passo pode ser um dia contado OU um
+     dia perdoado, e o perdão nunca passa de um sétimo dos contados. */
+  const teto = feitos.size * 2 + 2;
+  for (let passos = 0; passos < teto; passos++) {
+    if (feitos.has(d)) {
+      n++;
+      d--;
+      continue;
+    }
+    /* Buraco. Só atravessa se houver saldo de perdão E se o dia logo antes
+       estiver feito — perdoar um buraco sem saber o que vem depois dele
+       atravessaria dois dias vazios em duas voltas do laço, que é justamente o
+       "ela sumiu de verdade" que a régua não perdoa. */
+    if (perdoados >= Math.floor(n / DIAS_POR_PERDAO) || !feitos.has(d - 1)) break;
+    perdoados++;
     d--;
   }
   return n;

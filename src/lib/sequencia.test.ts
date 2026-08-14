@@ -34,9 +34,64 @@ describe("a virada da meia-noite não apaga a sequência", () => {
   });
 });
 
+describe("⚠️ o perdão de um dia — e o que ele NÃO perdoa", () => {
+  /* A noite no pronto-socorro não pode custar 40 dias. Ver o cabeçalho de
+     `DIAS_POR_PERDAO`: o perdão cresce com o que há a perder. */
+  const seguidos = (ate: number, quantos: number) =>
+    Array.from({ length: quantos }, (_, i) => ate - i);
+
+  test("com sequência longa, UM dia perdido não zera nada", () => {
+    /* 10 dias grudados em hoje (100..91), o dia 90 em branco, e 30 antes
+       dele (89..60). */
+    const dias = [...seguidos(100, 10), ...seguidos(89, 30)];
+    expect(sequenciaDeDias(dias, 100)).toBe(40);
+  });
+
+  test("⚠️ com sequência CURTA não há perdão — o saldo nasce em zero", () => {
+    /* Quem tem três dias não precisa de proteção; e sem esta regra, alternar
+       um dia sim um dia não daria sequência infinita. */
+    expect(sequenciaDeDias([100, 99, 98, 96, 95], 100)).toBe(3);
+  });
+
+  test("⚠️ um dia sim, um dia não NUNCA vira sequência", () => {
+    const alternados = Array.from({ length: 60 }, (_, i) => 100 - i * 2);
+    expect(sequenciaDeDias(alternados, 100)).toBe(1);
+  });
+
+  test("⚠️ DOIS dias seguidos em branco quebram, por mais longa que seja", () => {
+    /* Se ela sumiu dois dias, a sequência acabou mesmo — e dizer o contrário
+       faria o número deixar de significar "eu vim quase todo dia". */
+    const dias = [...seguidos(100, 20), ...seguidos(77, 60)];
+    expect(sequenciaDeDias(dias, 100)).toBe(20);
+  });
+
+  test("o saldo é proporcional: 14 dias compram dois perdões", () => {
+    const dias = [...seguidos(100, 7), ...seguidos(92, 7), ...seguidos(84, 7)];
+    expect(sequenciaDeDias(dias, 100)).toBe(21);
+  });
+
+  test("e o terceiro buraco para, porque o saldo acabou", () => {
+    /* Sete contados dão um perdão; catorze dão dois. No terceiro buraco a
+       conta parou em 21, e `floor(21/7)` = 3 — então este ainda passa. O que
+       para é o QUARTO, com 28 contados e 4 de saldo... e por isso o caso de
+       verdade é o de cima: o limite existe, mas é generoso de propósito.
+       Aqui provamos só que ele EXISTE, com a sequência curta. */
+    expect(sequenciaDeDias([100, 98], 100)).toBe(1);
+  });
+
+  test("perdoar não conta o dia perdido como feito", () => {
+    /* 40 dias com um buraco valem 40, e não 41: o dia vazio é atravessado,
+       nunca creditado. */
+    const dias = [...seguidos(100, 10), ...seguidos(89, 30)];
+    expect(sequenciaDeDias(dias, 100)).toBe(dias.length);
+  });
+});
+
 describe("um buraco no meio quebra a sequência", () => {
   test("conta só o trecho colado ao fim", () => {
-    /* É o que a torna uma SEQUÊNCIA. Somar tudo daria 5. */
+    /* É o que a torna uma SEQUÊNCIA. Somar tudo daria 5.
+       ⚠️ Continua 2 mesmo com o perdão: o buraco vale um saldo de
+       `floor(2/7)` = 0. */
     expect(sequenciaDeDias([90, 91, 92, 99, 100], 100)).toBe(2);
   });
 
