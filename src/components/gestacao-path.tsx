@@ -15,7 +15,8 @@ import {
   type PresenteRecebido,
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
-import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
+import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, fundoBgFor } from "@/lib/cantinho";
+import { climasAtivos, particulasDe } from "@/lib/clima-do-cantinho";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
@@ -422,8 +423,82 @@ function seedDecor(ids: string[], height: number, offset: number): PlacedDecor[]
   return out;
 }
 
+/**
+ * A camada "No ar" — as partículas do tipo `clima`.
+ *
+ * Fica ATRÁS de tudo (`z-0`) e nunca recebe toque: é ambiente, e um enfeite
+ * que rouba o dedo de quem ia abrir a aula do dia é um enfeite que atrapalha.
+ *
+ * ─── ⚠️ POR QUE `sticky`, E NÃO A TRILHA INTEIRA ────────────────────────────
+ *
+ * A primeira versão esticava a camada sobre a trilha toda (`absolute inset-0`)
+ * e mandava as partículas caírem a altura dela. Medido no navegador: das 42
+ * partículas, **UMA** estava dentro da tela — a trilha de uma gestação tem
+ * ~27.000px, então as outras 41 estavam caindo a milhares de pixels de
+ * distância, e a paciente veria uma pétala a cada quinze segundos.
+ *
+ * O ar é o que ela ESTÁ VENDO. A camada é uma caixa de UMA TELA (`100svh`)
+ * grudada no topo do viewport: ela acompanha a rolagem, e as catorze
+ * partículas de cada clima estão sempre todas em cena.
+ *
+ * ⚠️ O `overflow-hidden` vai na caixa STICKY, nunca no invólucro de fora:
+ * `overflow` num ancestral transforma esse ancestral no contêiner de rolagem
+ * do `sticky`, e a caixa deixaria de acompanhar a tela — que é exatamente o
+ * defeito que ela veio consertar. O corte continua existindo (a deriva vai a
+ * 26vw), só que um nível abaixo.
+ */
+function ClimaNoAr({ ids }: { ids: string[] }) {
+  const ativos = useMemo(() => climasAtivos(ids), [ids]);
+  if (ativos.length === 0) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden>
+      <div className="sticky top-0 h-[100svh] w-full overflow-hidden rounded-2xl">
+        {ativos.flatMap((id) =>
+          particulasDe(id).map((q) => (
+            <span
+              key={q.k}
+              className="dc-clima select-none leading-none"
+              style={
+                {
+                  left: `${q.esquerda}%`,
+                  fontSize: `${q.tamanho}rem`,
+                  "--dc-percurso": q.sentido === "cai" ? "dcClimaCai" : "dcClimaSobe",
+                  "--dc-dur": `${q.duracao}s`,
+                  "--dc-atraso": `${q.atraso}s`,
+                  "--dc-op": q.opacidade,
+                  "--dc-giro": `${q.giro}deg`,
+                  "--dc-deriva": `${q.deriva}vw`,
+                  /* Uma tela, e com folga: `svh` é a tela com TODAS as barras
+                     à mostra, então a partícula desaparece pela borda de baixo
+                     em qualquer iOS. (`dvh` mudaria enquanto ela rola e faria
+                     a queda dar um pulo.) */
+                  "--dc-fim": "calc(100svh + 4rem)",
+                  /* Onde ela para com `prefers-reduced-motion`: espalhada pela
+                     tela, e não empilhada numa linha só. */
+                  "--dc-parada": `${(hashStr(q.k) % 88) + 6}svh`,
+                } as React.CSSProperties
+              }
+            >
+              {q.emoji}
+            </span>
+          )),
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Um item decorando a trilha. Fora do modo Arrumar, só enfeita (sem cliques). */
-function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) {
+function DecorSprite({
+  p,
+  still = false,
+  week,
+}: {
+  p: PlacedDecor;
+  still?: boolean;
+  /** Semana gestacional — só a Árvore que cresce a usa. */
+  week?: number | null;
+}) {
   const item = CANTINHO_BY_ID[p.id];
   if (!item) return null;
   const h = hashStr(p.k);
@@ -457,13 +532,20 @@ function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) 
       <span
         className="relative inline-block leading-none"
         style={{
-          fontSize: `${(p.s * 2).toFixed(2)}rem`,
+          /* ⚠️ A Árvore que cresce multiplica o tamanho que a PACIENTE
+             escolheu (`escalaDaArvore`), nunca o substitui: um valor absoluto
+             apagaria a escolha dela toda vez que a semana virasse. Para todo o
+             resto o multiplicador é 1. */
+          fontSize: `${(p.s * 2 * (item.id === "especial-arvore" ? escalaDaArvore(week) : 1)).toFixed(2)}rem`,
           animation: still ? undefined : anim,
           animationDelay: delay,
           transformOrigin: item.type === "planta" ? "50% 90%" : "50% 50%",
         }}
       >
-        {item.emoji}
+        {/* O Ciclo dia/noite mostra a face da hora dela; todo o resto mostra o
+            emoji do catálogo. `getHours()` é local por definição — passar um
+            `Date` para a régua traria o fuso do servidor junto. */}
+        {item.id === "especial-dianoite" ? faseDoDiaNoite(new Date().getHours()) : item.emoji}
       </span>
     </>
   );
@@ -535,6 +617,15 @@ interface GestacaoPathProps {
     saldo?: number;
     halves?: number;
     enfeites?: string[];
+    /**
+     * Ids de itens do tipo `clima` para desenhar a camada "No ar" sem conta.
+     *
+     * Ela só existe quando a paciente COMPROU um deles e o pôs na trilha, e é
+     * assim que uma animação nova entra no app sem ninguém nunca ter olhado
+     * para ela rodando — a chama, o troféu e as três conquistas já custaram
+     * essa lição três vezes.
+     */
+    clima?: string[];
     /**
      * Liga UMA das três animações de conquista já na abertura da tela.
      *
@@ -2638,6 +2729,10 @@ export function GestacaoPath({
             aria-hidden
           />
         )}
+        {/* No ar — pétalas, folhas, bolhas. Atrás dos enfeites e da trilha, e
+            depois do cenário: é o AR entre o papel de parede e as coisas. */}
+        <ClimaNoAr ids={bancada?.clima ?? visiblePlaced.map((p) => p.id)} />
+
         {/* Os itens do tipo "céu" (nuvem, estrelinhas, sol, arco-íris, lua)
             NÃO têm mais faixa automática. Existia aqui um bloco `sticky` que
             os fazia derivar no alto da tela com `pointer-events-none`: a
@@ -2690,7 +2785,7 @@ export function GestacaoPath({
               {/* Nada se mexe enquanto ela arruma. Antes só o item SELECIONADO
                   ficava parado, então os outros continuavam andando debaixo do
                   dedo na hora de pegar — alvo móvel de 32px no celular. */}
-              <DecorSprite p={p} still={sel || arranging} />
+              <DecorSprite p={p} still={sel || arranging} week={currentWeek} />
               {sel && (
                 <>
                   <button
@@ -3717,8 +3812,10 @@ function QuizPaywall({
                     dia corrente — no servidor, não só na tela — então a aula de
                     ontem é releitura, e prometer que ela "faz" é prometer um
                     ganho que não vem. Entrou no lugar o benefício maior e que o
-                    texto escondia: 38 dos 74 enfeites do Cantinho e a Coroa da
-                    Coleção são exclusivos do premium, e nada disso era dito. */}
+                    texto escondia: 94 dos 111 enfeites do Cantinho e a Coroa da
+                    Coleção são exclusivos do premium, e nada disso era dito.
+                    (Eram 38 de 74 até a ampliação de ago/2026, que somou 37
+                    itens — todos premium, ver a regra 4 em `cantinho.ts`.) */}
                 No plano grátis você faz <strong>só a aula de hoje</strong>. Com o{" "}
                 <strong>Obstétrica Premium</strong> você <strong>revê todas as aulas</strong> que já
                 passaram e libera <strong>dezenas de enfeites exclusivos</strong> do seu Cantinho.

@@ -43,7 +43,22 @@ export type CantinhoType =
    */
   | "luz"
   /** Águas — sobem e descem com um balanço curto (`dcRipple`). */
-  | "agua";
+  | "agua"
+  /**
+   * No ar — o tipo NOVO (ago/2026), e o primeiro que não é adesivo.
+   *
+   * Todos os outros são uma figura POUSADA num ponto da trilha. Este é o AR do
+   * cantinho: enquanto ela o tiver na trilha, pétalas caem, folhas giram,
+   * bolhas sobem — sobre a tela inteira, sem lugar fixo. Ver
+   * `src/lib/clima-do-cantinho.ts`.
+   *
+   * ⚠️ Ele nasceu da mesma régua que criou Luzes e Águas: **um tipo só existe
+   * se tiver COMPORTAMENTO PRÓPRIO**. E resolveu de quebra o problema que
+   * travava a ampliação — as categorias de adesivo estão saturadas de emoji
+   * (não existe uma sexta "luz" reconhecível a 24px), enquanto o ar estava
+   * inteiro vazio.
+   */
+  | "clima";
 
 export type CantinhoItem = {
   id: string;
@@ -52,6 +67,21 @@ export type CantinhoItem = {
   price: number; // em Sementinhas
   type: CantinhoType;
   premium: boolean;
+  /**
+   * Saiu da LOJA, e só dela. Continua no catálogo, continua desenhando na
+   * trilha de quem já o comprou, continua contando para a Coroa.
+   *
+   * ⚠️ É a única forma honesta de "tirar o item ruim": apagar a linha faria o
+   * enfeite sumir do cantinho de quem o pagou, e `CANTINHO_BY_ID[id]` devolver
+   * `undefined` — que é exatamente como um `DecorSprite` desaparece sem erro
+   * nenhum. A mesma lição do `CANTINHO_COMPLETION_MIN`: o app não pode tirar
+   * de volta o que já deu.
+   *
+   * Quem sai daqui sai por um motivo escrito na linha, sempre um destes dois:
+   * o emoji é o MESMO de outro item (a paciente não tem como saber o que
+   * comprou), ou o nome promete um comportamento que o código não tem.
+   */
+  aposentado?: true;
 };
 
 export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
@@ -63,6 +93,7 @@ export const CANTINHO_CATEGORIES: { key: CantinhoType; label: string }[] = [
   { key: "planta", label: "Plantas" },
   { key: "luz", label: "Luzes" },
   { key: "agua", label: "Águas" },
+  { key: "clima", label: "No ar" },
   { key: "objeto", label: "Objetos" },
   { key: "bicho", label: "Bichinhos" },
   { key: "especial", label: "Especiais" },
@@ -194,17 +225,24 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: true,
   },
   {
+    /* APOSENTADO: 🎈 é o emoji do `ceu-balao-ar` (100 🌱). Dois tiles com o
+       MESMO desenho, em prateleiras diferentes, e este custava o dobro. */
     id: "especial-balao",
     name: "Balão de ar",
     emoji: "🎈",
     price: 200,
     type: "especial",
     premium: true,
+    aposentado: true,
   },
   {
+    /* O emoji era 🪄 — uma VARINHA MÁGICA num item chamado Vaga-lumes. 🫙 é o
+       pote, que é como se guarda vaga-lume desde sempre, e o brilho agora
+       existe de verdade: este item emite a névoa de `clima-poeira` na trilha
+       (ver `climaDeItem`). O nome parou de prometer o que o código não fazia. */
     id: "especial-vagalume",
-    name: "Vaga-lumes",
-    emoji: "🪄",
+    name: "Vaga-lumes no pote",
+    emoji: "🫙",
     price: 220,
     type: "especial",
     premium: true,
@@ -262,14 +300,20 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: true,
   },
   {
+    /* APOSENTADO: 💧 é o emoji da `agua-poca` (45 🌱). Uma gota chamada
+       "Cascata" por 300 🌱, ao lado da mesma gota por 45. */
     id: "especial-cascata",
     name: "Cascata",
     emoji: "💧",
     price: 300,
     type: "especial",
     premium: true,
+    aposentado: true,
   },
   {
+    /* CRESCE de verdade agora (`escalaDaArvore`): a semana gestacional manda
+       no tamanho, de muda a copa. Era o segundo item mais caro do catálogo
+       prometendo no NOME um comportamento que o código não tinha. */
     id: "especial-arvore",
     name: "Árvore que cresce",
     emoji: "🌳",
@@ -278,6 +322,9 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: true,
   },
   {
+    /* CICLA de verdade agora (`faseDaLua`): o emoji acompanha a hora do
+       relógio dela, 🌕 → 🌗 → 🌑 → 🌓. Mesmo caso da árvore, e este era o
+       item mais caro da loja. */
     id: "especial-dianoite",
     name: "Ciclo dia/noite",
     emoji: "🌗",
@@ -374,12 +421,17 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   { id: "luz-pisca", name: "Pisca-pisca", emoji: "🎇", price: 95, type: "luz", premium: true },
   { id: "luz-lanterna", name: "Lanterninha", emoji: "🔦", price: 110, type: "luz", premium: true },
   {
+    /* APOSENTADO: 🌠 é o emoji do cenário `fundo-estrelas` (250 🌱), e a
+       "cadente" não caía — ficava pendurada piscando como as outras luzes.
+       Quem quer estrela que atravessa o céu tem `clima-poeira`, que atravessa
+       mesmo. */
     id: "luz-estrela-cadente",
     name: "Estrela cadente",
     emoji: "🌠",
     price: 160,
     type: "luz",
     premium: true,
+    aposentado: true,
   },
 
   // ── Águas (+5) — categoria nova, animação `dcRipple` ───────────────────
@@ -509,6 +561,9 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: false,
   },
   {
+    /* CHOVE de verdade agora: este item emite a chuvinha de `clima` na trilha
+       (ver `climaDeItem`). Vendia "Chuva mansa" por 200 🌱 e entregava uma
+       nuvem parada. */
     id: "especial-chuva",
     name: "Chuva mansa",
     emoji: "🌧️",
@@ -517,11 +572,316 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     premium: true,
   },
   {
+    /* APOSENTADO: 🌈 é o emoji do `ceu-arcoiris` (150 🌱). "Duplo" não existe
+       em emoji nenhum — os dois tiles eram o mesmo desenho, com 170 🌱 de
+       diferença. */
     id: "especial-arcoiris-duplo",
     name: "Arco-íris duplo",
     emoji: "🌈",
     price: 320,
     type: "especial",
+    premium: true,
+    aposentado: true,
+  },
+
+  /* ══════════════════════════════════════════════════════════════════════
+     AMPLIAÇÃO DE +50% — ago/2026 (74 → 111)
+
+     Pedido do dono: "faça uma varredura completa dos itens, veja quais não
+     fazem sentido, classifique os melhores e os piores, retire os piores,
+     coloque mais 50% de itens, e veja se conseguimos criar outro tipo".
+
+     Quatro regras que a leva inteira obedece, e cada uma nasceu de um defeito
+     que a varredura encontrou nos 74:
+
+      1. **Emoji só entra se for INÉDITO no catálogo E fora dos oito selos de
+         conjunto.** Os 74 tinham sete emojis repetidos, e quatro deles eram o
+         mesmo desenho vendido duas vezes por preços diferentes — os quatro
+         `aposentado` desta rodada. O selo entra na conta porque
+         `conjuntos.test.ts` reprova selo igual a emoji de item.
+
+      2. **O nome não promete comportamento.** "Árvore que cresce" não crescia
+         e "Ciclo dia/noite" não ciclava — os dois itens MAIS CAROS da loja.
+         Nesta leva nada se chama pelo que faria; quem tem comportamento é o
+         tipo `clima`, e ele tem de verdade.
+
+      3. **Categoria publicada não ganha item de conjunto publicado.**
+         `conjuntos.ts` proíbe: somar um quinto item ao "Fundo do mar" viraria
+         o selo "4 de 4" de quem já fechou num "4 de 7". Os conjuntos novos
+         (Beira do lago, Recife, Sem pressa, Madrugada, Chão de floresta,
+         Cantinho de costura) são conjuntos NOVOS.
+
+      4. ⚠️ **OS 37 SÃO PREMIUM, TODOS.** Escrevi a leva com sete itens sem
+         assinatura ("toda categoria merece uma porta grátis") e o teste da
+         economia reprovou na hora: `economia-sementinhas.ts` fixa a loja
+         grátis em **15 itens somando 704 🌱**, calibrados contra o ganho
+         típico (35 🌱/dia) para a paciente zerá-la por volta do 15º dia e
+         então acumular moeda sem ter no que gastar — que é a decisão de
+         monetização do dono, escrita lá com todas as letras. Meus sete
+         somariam 410 🌱 e empurrariam a parede para o 30º dia: eu teria
+         desfeito a mecânica inteira enquanto "melhorava a loja".
+         Item novo entra na prateleira PAGA. Fica melhor até para o pedido
+         original — mais coisa do outro lado do muro é mais motivo para
+         assinar. A Coroa continua alcançável sem assinar: são dez categorias
+         com item grátis e ela pede oito.
+
+     ⚠️ Luzes ficou de fora, e é conclusão medida, não descuido: 🔥 é a chama
+     da sequência, ⭐ é a estrela do dia e 💡 é o "Você sabia?" da aula — três
+     ícones da própria interface. Pôr qualquer um à venda destruiria os dois
+     sentidos na mesma tela. O que sobrava (🎆) é gêmeo do 🎇 que já existe.
+     Cinco luzes boas valem mais que seis com uma inventada.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  // ── Águas (+7) ─────────────────────────────────────────────────────────
+  // Era a categoria com UMA porta grátis. Ganhou três, e ganhou água DOCE:
+  // sapinho, patinho e cisne pedem lago, e o lago não existia.
+  { id: "agua-sapinho", name: "Sapinho", emoji: "🐸", price: 55, type: "agua", premium: true },
+  {
+    id: "agua-caranguejo",
+    name: "Caranguejinho",
+    emoji: "🦀",
+    price: 75,
+    type: "agua",
+    premium: true,
+  },
+  { id: "agua-patinho", name: "Patinho", emoji: "🦆", price: 100, type: "agua", premium: true },
+  {
+    /* Pedido nominal do dono. É o que dá CHÃO ao mar: sem recife, peixinho e
+       golfinho boiam no vazio em vez de morar em algum lugar. */
+    id: "agua-coral",
+    name: "Recife de coral",
+    emoji: "🪸",
+    price: 130,
+    type: "agua",
+    premium: true,
+  },
+  { id: "agua-polvo", name: "Polvinho", emoji: "🐙", price: 160, type: "agua", premium: true },
+  { id: "agua-cisne", name: "Cisne", emoji: "🦢", price: 190, type: "agua", premium: true },
+  { id: "agua-foca", name: "Foquinha", emoji: "🦭", price: 210, type: "agua", premium: true },
+
+  // ── Cenários (+3) — os três com gradiente em CANTINHO_FUNDO_BG ─────────
+  {
+    /* Água doce. Sem ele, cisne, patinho e sapinho boiam sobre as Ondas do
+       mar, que são salgadas e azul-marinho. */
+    id: "fundo-lago",
+    name: "Beira do lago",
+    emoji: "🏞️",
+    price: 200,
+    type: "fundo",
+    premium: true,
+  },
+  {
+    id: "fundo-campo",
+    name: "Campo dourado",
+    emoji: "🌾",
+    price: 190,
+    type: "fundo",
+    premium: true,
+  },
+  {
+    id: "fundo-nuvens",
+    name: "Entre as nuvens",
+    emoji: "🌤️",
+    price: 200,
+    type: "fundo",
+    premium: true,
+  },
+
+  // ── Plantas (+5) ───────────────────────────────────────────────────────
+  // As sete de antes eram todas BAIXAS e todas flores ou folha pequena.
+  // Entram altura (palmeira), chão (cogumelo) e cheiro (hortelã).
+  { id: "planta-hortela", name: "Hortelã", emoji: "🌿", price: 35, type: "planta", premium: true },
+  { id: "planta-cacto", name: "Cactinho", emoji: "🌵", price: 40, type: "planta", premium: true },
+  {
+    id: "planta-cogumelo",
+    name: "Cogumelinho",
+    emoji: "🍄",
+    price: 65,
+    type: "planta",
+    premium: true,
+  },
+  { id: "planta-roseira", name: "Roseira", emoji: "🌹", price: 80, type: "planta", premium: true },
+  {
+    /* 110 e não 130: a categoria fechava em 90 (Bonsai), e o topo novo sobe um
+       degrau, não dois. Preço fora da curva faz a prateleira inteira parecer
+       cara. */
+    id: "planta-palmeira",
+    name: "Palmeirinha",
+    emoji: "🌴",
+    price: 110,
+    type: "planta",
+    premium: true,
+  },
+
+  // ── Bichinhos (+6) ─────────────────────────────────────────────────────
+  { id: "bicho-caracol", name: "Caracol", emoji: "🐌", price: 40, type: "bicho", premium: true },
+  {
+    /* Fecha o par com a Borboleta que já existe — a única dupla do catálogo em
+       que um item conta a história do outro. */
+    id: "bicho-lagarta",
+    name: "Lagartinha",
+    emoji: "🐛",
+    price: 65,
+    type: "bicho",
+    premium: true,
+  },
+  {
+    id: "bicho-esquilo",
+    name: "Esquilinho",
+    emoji: "🐿️",
+    price: 120,
+    type: "bicho",
+    premium: true,
+  },
+  { id: "bicho-ourico", name: "Ouriço", emoji: "🦔", price: 140, type: "bicho", premium: true },
+  { id: "bicho-ovelha", name: "Ovelhinha", emoji: "🐑", price: 150, type: "bicho", premium: true },
+  {
+    /* O bicho que fica acordado com ela. Para quem abre o app às três da
+       manhã, é o único item do cantinho que reconhece a madrugada — a mesma
+       hora que o mascote da home já trata como caso à parte. */
+    id: "bicho-coruja",
+    name: "Corujinha",
+    emoji: "🦉",
+    price: 190,
+    type: "bicho",
+    premium: true,
+  },
+
+  // ── Objetos (+5) — a categoria tinha 2 portas grátis em 10 ──────────────
+  {
+    id: "objeto-novelo",
+    name: "Novelo de linha",
+    emoji: "🧵",
+    price: 30,
+    type: "objeto",
+    premium: true,
+  },
+  {
+    id: "objeto-espelho",
+    name: "Espelhinho",
+    emoji: "🪞",
+    price: 75,
+    type: "objeto",
+    premium: true,
+  },
+  {
+    /* Os sons para dormir chegam nela sem acordar quem dorme do lado. */
+    id: "objeto-fones",
+    name: "Fones de dormir",
+    emoji: "🎧",
+    price: 85,
+    type: "objeto",
+    premium: true,
+  },
+  {
+    id: "objeto-quadrinho",
+    name: "Quadrinho",
+    emoji: "🖼️",
+    price: 90,
+    type: "objeto",
+    premium: true,
+  },
+  {
+    /* Uma dentro da outra é literalmente a imagem da gestação — e é a única
+       peça do catálogo que diz isso sem dizer nada sobre o parto. */
+    id: "objeto-matrioska",
+    name: "Matrioskas",
+    emoji: "🪆",
+    price: 130,
+    type: "objeto",
+    premium: true,
+  },
+
+  // ── Céu (+2) ───────────────────────────────────────────────────────────
+  {
+    id: "ceu-carpas",
+    name: "Carpas ao vento",
+    emoji: "🎏",
+    price: 130,
+    type: "ceu",
+    premium: true,
+  },
+  {
+    id: "ceu-fogos",
+    name: "Fogos de artifício",
+    emoji: "🎆",
+    price: 170,
+    type: "ceu",
+    premium: true,
+  },
+
+  // ── Especiais (+3) ─────────────────────────────────────────────────────
+  {
+    /* ⛄ (U+26C4) e não ☃️: o primeiro já é emoji por padrão; o segundo depende
+       do seletor de variação e sai preto e branco se alguém limpar o FE0F. */
+    id: "especial-inverno",
+    name: "Boneco de neve",
+    emoji: "⛄",
+    price: 190,
+    type: "especial",
+    premium: true,
+  },
+  {
+    id: "especial-carrossel",
+    name: "Carrossel",
+    emoji: "🎠",
+    price: 280,
+    type: "especial",
+    premium: true,
+  },
+  {
+    /* O item mais caro precisa ser o que a amiga comenta ao visitar o
+       Cantinho, e abrir a cauda é a única coisa do catálogo que é um
+       espetáculo em vez de um enfeite. */
+    id: "especial-pavao",
+    name: "Pavão",
+    emoji: "🦚",
+    price: 340,
+    type: "especial",
+    premium: true,
+  },
+
+  // ── No ar (+6) — O TIPO NOVO ───────────────────────────────────────────
+  /* Não é adesivo: é o AR da trilha. Enquanto o item estiver no cantinho, a
+     tela inteira ganha o que ele traz — pétalas descendo, folhas girando,
+     bolhas subindo. A régua (quantas partículas, por onde, em quanto tempo)
+     mora em `src/lib/clima-do-cantinho.ts`, testada e sem JSX.
+
+     ⚠️ Os seis são premium, como toda a leva — ver a regra 4 do cabeçalho da
+     ampliação. A categoria fica FORA do alcance de quem não assina, e isso é
+     de propósito: é a prateleira mais bonita da loja, e é a que dá vontade. */
+  {
+    id: "clima-petalas",
+    name: "Chuva de pétalas",
+    emoji: "💮",
+    price: 90,
+    type: "clima",
+    premium: true,
+  },
+  {
+    id: "clima-folhas",
+    name: "Folhas caindo",
+    emoji: "🍁",
+    price: 110,
+    type: "clima",
+    premium: true,
+  },
+  {
+    id: "clima-bolhas",
+    name: "Bolhinhas de sabão",
+    emoji: "🫧",
+    price: 130,
+    type: "clima",
+    premium: true,
+  },
+  { id: "clima-peninhas", name: "Peninhas", emoji: "🪶", price: 140, type: "clima", premium: true },
+  { id: "clima-neve", name: "Nevando", emoji: "🌨️", price: 170, type: "clima", premium: true },
+  {
+    id: "clima-poeira",
+    name: "Poeirinha de estrelas",
+    emoji: "💫",
+    price: 200,
+    type: "clima",
     premium: true,
   },
 
@@ -570,12 +930,26 @@ export const CANTINHO_COMPLETION_CATEGORIES: CantinhoType[] = [
 /**
  * Um id representativo por categoria — usado só pelo contador "X de Y" da
  * tela. O requisito de verdade é por CATEGORIA (ver a função abaixo).
+ *
+ * ⚠️ Ignora o que está `aposentado`: um representante que não está mais à
+ * venda apontaria a paciente para um tile que a loja não mostra.
  */
 export const CANTINHO_COMPLETION_REQUIRED: string[] = CANTINHO_COMPLETION_CATEGORIES.map(
   (t) =>
-    CANTINHO_ITEMS.find((i) => i.type === t && i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID)!
-      .id,
+    CANTINHO_ITEMS.find(
+      (i) => i.type === t && i.price > 0 && !i.aposentado && i.id !== CANTINHO_COMPLETIONIST_ID,
+    )!.id,
 );
+
+/**
+ * O que a LOJA mostra — tudo menos o que foi aposentado.
+ *
+ * ⚠️ `CANTINHO_ITEMS` continua sendo a lista inteira, e é ela que a trilha, o
+ * `CANTINHO_BY_ID` e a Coroa leem: o item aposentado some da vitrine e de
+ * lugar nenhum mais. Quem o comprou continua com ele desenhado no cantinho,
+ * contando categoria para a Coroa, exatamente como antes.
+ */
+export const CANTINHO_LOJA: CantinhoItem[] = CANTINHO_ITEMS.filter((i) => !i.aposentado);
 
 /**
  * Quantas categorias a Coroa exige.
@@ -625,6 +999,10 @@ export const CANTINHO_FUNDO_BG: Record<string, string> = {
   "fundo-lavanda": "linear-gradient(180deg,#f3eefc 0%,#d9c9f2 45%,#b9a3e3 100%)",
   "fundo-deserto": "linear-gradient(180deg,#ffd9a0 0%,#f2a765 45%,#c9714a 100%)",
   "fundo-neve": "linear-gradient(180deg,#eef5fb 0%,#d6e6f3 50%,#c2d6e8 100%)",
+  /* Água DOCE — verde-água, para não virar um segundo `fundo-mar` (azul). */
+  "fundo-lago": "linear-gradient(180deg,#eaf4ee 0%,#a8d5c6 45%,#6fa8a0 100%)",
+  "fundo-campo": "linear-gradient(180deg,#fdf6df 0%,#f0dfa4 45%,#d9b96a 100%)",
+  "fundo-nuvens": "linear-gradient(180deg,#dff0fd 0%,#f4fbff 45%,#cfe6f7 100%)",
 };
 
 /**
@@ -639,6 +1017,64 @@ const FUNDO_SIMPLES_TONS = [
   "linear-gradient(180deg,#f8f6f1 0%,#efeadf 100%)",
   "linear-gradient(180deg,#f2f8fb 0%,#e4eff5 100%)",
 ];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OS DOIS ITENS MAIS CAROS DA LOJA PASSARAM A FAZER O QUE O NOME DIZ
+
+   "Árvore que cresce" (350 🌱) não crescia e "Ciclo dia/noite" (400 🌱) não
+   ciclava: eram um 🌳 e um 🌗 parados como qualquer adesivo. A varredura de
+   ago/2026 achou os dois, e eles eram o 1º e o 2º item mais caros do catálogo.
+
+   Consertar valia mais que aposentar. Aposentar tiraria da loja duas peças
+   boas; isto entrega o que a paciente leu antes de pagar — e as duas funções
+   são puras, então o teste cobra o comportamento sem abrir navegador.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O quanto a Árvore que cresce está crescida, como MULTIPLICADOR do tamanho
+ * que a paciente escolheu no modo Arrumar.
+ *
+ * ⚠️ Multiplicador, e não um tamanho absoluto: ela pode ter posto a árvore
+ * grande ou pequena de propósito, e um valor absoluto apagaria essa escolha
+ * toda vez que a semana virasse. Aqui o que ela escolheu continua valendo — o
+ * que muda é a proporção dentro da própria escolha.
+ *
+ * Vai de 0,70 (muda) a 1,30 (copa) entre a 4ª e a 40ª semana. Sem semana
+ * conhecida devolve 1: a árvore fica do tamanho que ela pôs, que é o mesmo
+ * comportamento de qualquer outro item — nunca uma muda, que faria parecer
+ * que o item quebrou.
+ */
+export const ARVORE_MIN = 0.7;
+export const ARVORE_MAX = 1.3;
+
+export function escalaDaArvore(week: number | null | undefined): number {
+  if (!Number.isFinite(week as number)) return 1;
+  const w = Math.min(40, Math.max(4, week as number));
+  const t = (w - 4) / 36;
+  return ARVORE_MIN + t * (ARVORE_MAX - ARVORE_MIN);
+}
+
+/**
+ * A face do Ciclo dia/noite na hora dela.
+ *
+ * ⚠️ Recebe a HORA LOCAL já extraída (0–23) e não um `Date`, para o teste não
+ * depender do fuso do contêiner — o mesmo erro de três horas que a agenda já
+ * pagou aqui. Quem chama passa `new Date().getHours()`, que é local por
+ * definição.
+ *
+ * ⚠️ NENHUMA das quatro faces é o emoji de um item à venda, e o teste cobra
+ * isso. Um quadro da animação com o desenho de outro tile faria a paciente ler
+ * o Ciclo como o item que ela não comprou. Foi por essa régua que a face da
+ * noite deixou de ser 🌙 (é a `ceu-lua`, 140 🌱) e a do meio-dia deixou de ser
+ * ☀️ (é o `ceu-sol`, 120 🌱).
+ */
+export function faseDoDiaNoite(hora: number): string {
+  const h = Number.isFinite(hora) ? ((Math.floor(hora) % 24) + 24) % 24 : 0;
+  if (h >= 5 && h < 11) return "🌄";
+  if (h >= 11 && h < 17) return "🌞";
+  if (h >= 17 && h < 21) return "🌆";
+  return "🌃";
+}
 
 /**
  * Fundo aplicado no Caminho para um item `fundo`. O Fundo Suave (grátis) troca

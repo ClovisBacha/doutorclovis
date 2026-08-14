@@ -2107,6 +2107,70 @@ button:active > .duo3d {
   }
 }
 
+/* ── No ar: as partículas do tipo `clima` ────────────────────────────────
+   Ver `src/lib/clima-do-cantinho.ts` — a régua (quantas, quão rápido, para
+   onde) mora lá; aqui só o percurso.
+
+   ⚠️ O deslocamento vertical é `--dc-fim` (hoje `calc(100svh + 4rem)`), e
+   NUNCA `100%`: numa `translate3d`, a porcentagem do eixo Y é da PRÓPRIA
+   partícula — que tem 1rem. A pétala andaria dezesseis pixels e voltaria.
+
+   ⚠️ E a caixa que hospeda tudo isto é uma tela grudada no topo (`sticky`),
+   não a trilha inteira. A primeira versão passava aqui a altura real da
+   trilha, e o navegador mediu o resultado: de 42 partículas, UMA estava
+   dentro da tela. Ver `ClimaNoAr`.
+
+   ⚠️ A translação lateral em `%` também seria da própria partícula, então a
+   deriva vem em `vw` — que é a única unidade aqui que fala da largura certa. */
+@keyframes dcClimaCai {
+  from {
+    transform: translate3d(0, -3rem, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--dc-deriva, 0px), var(--dc-fim, 100vh), 0)
+      rotate(var(--dc-giro, 0deg));
+  }
+}
+@keyframes dcClimaSobe {
+  from {
+    transform: translate3d(0, var(--dc-fim, 100vh), 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--dc-deriva, 0px), -3rem, 0) rotate(var(--dc-giro, 0deg));
+  }
+}
+/* Nasce e morre transparente: partícula que some de repente na borda de baixo
+   lê como um elemento que foi apagado, e não como algo que passou. */
+@keyframes dcClimaFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  86% {
+    opacity: var(--dc-op, 0.8);
+  }
+}
+.dc-clima {
+  position: absolute;
+  top: 0;
+  will-change: transform;
+  animation:
+    var(--dc-percurso) var(--dc-dur) linear infinite,
+    dcClimaFade var(--dc-dur) linear infinite;
+  animation-delay: var(--dc-atraso), var(--dc-atraso);
+}
+/* ⚠️ PARA, não some. Quem pediu menos movimento continua vendo o item que
+   comprou — espalhado e imóvel. Esconder faria a paciente achar que a Chuva
+   de pétalas de 90 🌱 não veio. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-clima {
+    animation: none !important;
+    opacity: var(--dc-op, 0.8);
+    transform: translate3d(0, var(--dc-parada, 40vh), 0);
+  }
+}
+
 /* ── Folha que sobe (oferta do Premium, e o que mais vier) ───────────────
    Sobe a folha INTEIRA a partir de baixo, e não os 20px do `slideUp` já
    existente: uma folha que aparece a 20px do lugar final lê como um card

@@ -16831,7 +16831,14 @@ function CantinhoTab({
    * renders. São 74 itens; ordenar a cada render custa menos que o risco.
    */
   const shopItems = (() => {
-    const daCategoria = CANTINHO_ITEMS.filter((i) => cat === "all" || i.type === cat);
+    /* ⚠️ `CANTINHO_LOJA`, e não `CANTINHO_ITEMS`: quatro itens foram
+       aposentados (emoji igual ao de outro item, ou nome que prometia
+       comportamento inexistente) e saíram da VITRINE. Continuam no catálogo,
+       desenhando no cantinho de quem já os comprou — ver `aposentado` em
+       `cantinho.ts`. Quem tem um deles o vê em "Meus itens", logo acima. */
+    const daCategoria = CANTINHO_ITEMS.filter(
+      (i) => (cat === "all" || i.type === cat) && (!i.aposentado || owned.includes(i.id)),
+    );
     const peso = (i: (typeof CANTINHO_ITEMS)[number]) =>
       i.id === CANTINHO_COMPLETIONIST_ID ? 2 : !premium && i.premium ? 1 : 0;
     return [...daCategoria].sort(

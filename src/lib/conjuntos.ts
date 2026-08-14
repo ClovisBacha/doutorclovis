@@ -69,7 +69,24 @@ export type Conjunto = {
  * fosse o motivo, o conjunto viraria planilha — e quem monta uma cena bonita
  * no cantinho não está fazendo planilha.
  */
-export const BONUS_POR_ITEM = 15;
+export const BONUS_POR_ITEM = 12;
+/*
+ * ⚠️ Era 15, e caiu para 12 quando os conjuntos passaram de oito para catorze.
+ *
+ * O teto não é gosto: `economia-sementinhas.ts` fixa a loja grátis em 15 itens
+ * somando 704 🌱, e a ampliação de +50% não mexeu nesse número de propósito
+ * (todo item novo é premium). Com 15 por item, fechar os catorze pagaria
+ * 795 🌱 — mais do que custa a loja grátis inteira, e aí o conjunto deixaria
+ * de ser reconhecimento e viraria a principal fonte de Sementinhas do jogo.
+ *
+ * Ninguém perde nada: o ledger já pagou quem fechou conjunto antes disto, e
+ * `chaveDoBonus` não deixa pagar duas vezes. O que muda é só o valor dos
+ * próximos.
+ *
+ * E o teto tem folga apertada (636 de 704): o conjunto nº 15 provavelmente
+ * exige baixar de novo, e o teste reprova antes de o número entrar em
+ * produção.
+ */
 
 export function bonusDoConjunto(c: Conjunto): number {
   return c.itens.length * BONUS_POR_ITEM;
@@ -134,6 +151,67 @@ export const CONJUNTOS: Conjunto[] = [
     emoji: "🏡",
     descricao: "Os que passeiam pelo caminho quando ninguém está olhando.",
     itens: ["bicho-coelho", "bicho-gato", "bicho-raposa", "bicho-passaro"],
+  },
+
+  /* ══════════════════════════════════════════════════════════════════════
+     OS SEIS DA AMPLIAÇÃO — ago/2026
+
+     ⚠️ São conjuntos NOVOS, e nenhum dos oito acima ganhou item. Essa é a
+     regra do cabeçalho, e ela é o motivo de existirem seis em vez de somar os
+     37 itens novos aos conjuntos que já estavam no ar: acrescentar um quinto
+     item ao "Fundo do mar" viraria o selo de quem já o fechou num "4 de 5".
+
+     Item ANTIGO pode entrar em conjunto NOVO — isso não desfaz nada, só dá
+     uma segunda cena a uma peça que já é dela. É o que faz a Borboleta (que
+     está no "Canteiro florido") também morar no "Sem pressa" ao lado da
+     Lagartinha que acabou de nascer.
+     ══════════════════════════════════════════════════════════════════════ */
+  {
+    id: "lago",
+    nome: "Beira do lago",
+    emoji: "🛶",
+    descricao: "Água doce, e os três que moram nela.",
+    itens: ["fundo-lago", "agua-sapinho", "agua-patinho", "agua-cisne"],
+  },
+  {
+    id: "recife",
+    nome: "Recife",
+    emoji: "🤿",
+    descricao: "O coral no chão do mar, e quem se esconde nele.",
+    itens: ["agua-coral", "agua-caranguejo", "agua-polvo"],
+  },
+  {
+    id: "sem-pressa",
+    /* A única cena do catálogo em que um item conta a história do outro: a
+       lagarta e a borboleta são o mesmo bicho em dois momentos. */
+    nome: "Sem pressa",
+    emoji: "🐾",
+    descricao: "Os que levam o tempo que precisam — e um vira o outro.",
+    itens: ["bicho-caracol", "bicho-lagarta", "bicho-borboleta", "bicho-tartaruga"],
+  },
+  {
+    id: "madrugada",
+    nome: "Madrugada",
+    /* 🌉 e não 🌃: 🌃 virou a face NOTURNA do Ciclo dia/noite
+       (`faseDoDiaNoite`), e um selo com o mesmo desenho de um quadro de
+       animação que passa na trilha lê como o mesmo objeto. */
+    emoji: "🌉",
+    descricao: "Para as três da manhã: a lua, o lampião, os fones e quem fica acordado junto.",
+    itens: ["bicho-coruja", "objeto-fones", "luz-lampiao", "ceu-lua"],
+  },
+  {
+    id: "chao-de-floresta",
+    nome: "Chão de floresta",
+    emoji: "🪵",
+    descricao: "O que nasce rente ao chão depois da chuva, e quem mora lá embaixo.",
+    itens: ["planta-cogumelo", "planta-hortela", "bicho-ourico", "bicho-esquilo"],
+  },
+  {
+    id: "costura",
+    nome: "Cantinho de costura",
+    emoji: "🪡",
+    descricao: "O novelo, o espelho, o quadrinho na parede e as bonecas uma dentro da outra.",
+    itens: ["objeto-novelo", "objeto-espelho", "objeto-quadrinho", "objeto-matrioska"],
   },
 ];
 

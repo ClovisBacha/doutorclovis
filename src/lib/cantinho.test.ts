@@ -9,13 +9,20 @@
 
 import { describe, expect, test } from "bun:test";
 import {
+  ARVORE_MAX,
+  ARVORE_MIN,
+  CANTINHO_BY_ID,
   CANTINHO_CATEGORIES,
   CANTINHO_COMPLETION_CATEGORIES,
   CANTINHO_COMPLETION_MIN,
+  CANTINHO_COMPLETION_REQUIRED,
   CANTINHO_COMPLETIONIST_ID,
   CANTINHO_FUNDO_BG,
   CANTINHO_ITEMS,
+  CANTINHO_LOJA,
   cantinhoCategoriasCompletas,
+  escalaDaArvore,
+  faseDoDiaNoite,
   isCantinhoCollectionComplete,
   type CantinhoType,
 } from "./cantinho";
@@ -138,5 +145,148 @@ describe("a Coroa da Coleção é alcançável", () => {
     ];
     const colecaoAntiga = CATEGORIAS_ANTIGAS.map((t) => pagos.find((i) => i.type === t)!.id);
     expect(isCantinhoCollectionComplete(colecaoAntiga)).toBe(true);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A AMPLIAÇÃO DE +50% — ago/2026
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+describe("⚠️ dois itens nunca têm o mesmo emoji", () => {
+  /* O defeito que abriu a varredura: 🎈 era `ceu-balao-ar` (100 🌱) E
+     `especial-balao` (200 🌱). Dois tiles com o mesmo desenho, preços
+     diferentes, e nenhuma forma de a paciente saber o que estava comprando.
+     Eram sete pares assim.
+
+     A régua não é "zero repetição em todo o catálogo": `trilha` e `tema`
+     legitimamente repetem (🌱 é a pele Jardim e a Suculenta; 🌅 é o Céu
+     Clássico e o Campo ao amanhecer) e são prateleiras que não se encostam —
+     uma veste as bolinhas, a outra a home. A régua é sobre o que a paciente
+     vê LADO A LADO como enfeite: os tipos que viram adesivo na trilha. */
+  const ADESIVOS = ["ceu", "planta", "objeto", "bicho", "especial", "luz", "agua", "clima"];
+
+  /* ⚠️ A régua vale para a LOJA, não para o catálogo: os quatro `aposentado`
+     SÃO as colisões, e é por isso que eles saíram. Cobrar o catálogo inteiro
+     obrigaria a apagar as linhas — exatamente o que o mecanismo de aposentar
+     existe para evitar. */
+  test("nenhum emoji repetido entre os itens que viram enfeite", () => {
+    const vistos = new Map<string, string>();
+    const colisoes: string[] = [];
+    for (const i of CANTINHO_LOJA.filter((x) => ADESIVOS.includes(x.type))) {
+      const antes = vistos.get(i.emoji);
+      if (antes) colisoes.push(`${i.emoji}: ${antes} × ${i.id}`);
+      else vistos.set(i.emoji, i.id);
+    }
+    expect(colisoes).toEqual([]);
+  });
+
+  test("nem contra os cenários, que também mostram o emoji na loja", () => {
+    /* 🌠 era a `luz-estrela-cadente` (160) e o `fundo-estrelas` (250). Na
+       grade da loja os dois são o mesmo quadradinho. */
+    const enfeites = new Map(
+      CANTINHO_LOJA.filter((x) => ADESIVOS.includes(x.type)).map((i) => [i.emoji, i.id]),
+    );
+    const colisoes = CANTINHO_LOJA.filter((i) => i.type === "fundo" && enfeites.has(i.emoji)).map(
+      (i) => `${i.emoji}: ${i.id} × ${enfeites.get(i.emoji)}`,
+    );
+    expect(colisoes).toEqual([]);
+  });
+});
+
+describe("⚠️ aposentar tira da LOJA, e de mais nada", () => {
+  test("todo item aposentado continua no catálogo e resolvível por id", () => {
+    /* É o ponto inteiro: `CANTINHO_BY_ID[id]` devolver `undefined` é como um
+       `DecorSprite` some da trilha sem erro nenhum — a paciente perderia o
+       enfeite que pagou, em silêncio. */
+    for (const i of CANTINHO_ITEMS.filter((x) => x.aposentado)) {
+      expect(CANTINHO_BY_ID[i.id]?.id).toBe(i.id);
+    }
+  });
+
+  test("a loja não mostra nenhum aposentado", () => {
+    expect(CANTINHO_LOJA.some((i) => i.aposentado)).toBe(false);
+  });
+
+  test("e a loja é o catálogo menos exatamente os aposentados", () => {
+    const n = CANTINHO_ITEMS.filter((i) => i.aposentado).length;
+    expect(CANTINHO_LOJA.length).toBe(CANTINHO_ITEMS.length - n);
+    /* Se um dia este número for zero, alguém apagou as linhas em vez de
+       marcá-las — que é a coisa que este mecanismo existe para impedir. */
+    expect(n).toBeGreaterThan(0);
+  });
+
+  test("quem comprou um aposentado continua com a categoria dele na Coroa", () => {
+    const ap = CANTINHO_ITEMS.find((i) => i.aposentado)!;
+    expect(cantinhoCategoriasCompletas([ap.id])).toBe(1);
+  });
+
+  test("⚠️ nenhum representante da Coroa está aposentado", () => {
+    /* O contador "X de Y" apontaria para um tile que a loja não mostra. */
+    for (const id of CANTINHO_COMPLETION_REQUIRED) {
+      expect(CANTINHO_BY_ID[id].aposentado === true).toBe(false);
+    }
+  });
+});
+
+describe("a Árvore que cresce cresce mesmo", () => {
+  /* Ela vendia "Árvore que cresce" por 350 🌱 e era um 🌳 parado. */
+  test("mais semana, maior — e sempre", () => {
+    for (let w = 5; w <= 40; w++) {
+      expect(escalaDaArvore(w) > escalaDaArvore(w - 1)).toBe(true);
+    }
+  });
+
+  test("as pontas são as declaradas", () => {
+    expect(escalaDaArvore(4)).toBeCloseTo(ARVORE_MIN, 5);
+    expect(escalaDaArvore(40)).toBeCloseTo(ARVORE_MAX, 5);
+  });
+
+  test("fora da faixa não estoura nem encolhe mais", () => {
+    expect(escalaDaArvore(1)).toBeCloseTo(ARVORE_MIN, 5);
+    expect(escalaDaArvore(60)).toBeCloseTo(ARVORE_MAX, 5);
+  });
+
+  test("⚠️ sem semana a árvore fica do tamanho que ela pôs", () => {
+    /* Devolver `ARVORE_MIN` faria a árvore virar muda toda vez que a semana
+       não chegasse a tempo — e leria como item quebrado, não como broto. */
+    expect(escalaDaArvore(null)).toBe(1);
+    expect(escalaDaArvore(undefined)).toBe(1);
+    expect(escalaDaArvore(NaN)).toBe(1);
+  });
+
+  test("é MULTIPLICADOR: nunca zera nem inverte o tamanho escolhido", () => {
+    for (let w = 0; w <= 45; w++) expect(escalaDaArvore(w)).toBeGreaterThan(0.5);
+  });
+});
+
+describe("o Ciclo dia/noite cicla mesmo", () => {
+  test("as quatro faces aparecem ao longo das 24 horas", () => {
+    const faces = new Set(Array.from({ length: 24 }, (_, h) => faseDoDiaNoite(h)));
+    expect(faces.size).toBe(4);
+  });
+
+  test("de dia é dia, de noite é noite", () => {
+    expect(faseDoDiaNoite(13)).toBe("🌞");
+    expect(faseDoDiaNoite(2)).toBe("🌃");
+    expect(faseDoDiaNoite(23)).toBe("🌃");
+    expect(faseDoDiaNoite(7)).toBe("🌄");
+    expect(faseDoDiaNoite(19)).toBe("🌆");
+  });
+
+  test("⚠️ NENHUMA face é o emoji de um item à venda", () => {
+    /* Este teste já mudou o código uma vez: as faces eram 🌙 e ☀️, que são a
+       `ceu-lua` (140 🌱) e o `ceu-sol` (120 🌱). A paciente veria na trilha o
+       desenho exato de dois itens que ela não comprou. */
+    const naLoja = new Set(CANTINHO_LOJA.map((i) => i.emoji));
+    for (const f of new Set(Array.from({ length: 24 }, (_, h) => faseDoDiaNoite(h)))) {
+      expect(naLoja.has(f)).toBe(false);
+    }
+  });
+
+  test("hora inválida não estoura", () => {
+    expect(faseDoDiaNoite(-1)).toBe("🌃");
+    /* 99 % 24 = 3 — madrugada. A conta é a mesma de qualquer hora válida. */
+    expect(faseDoDiaNoite(99)).toBe("🌃");
+    expect(typeof faseDoDiaNoite(NaN)).toBe("string");
   });
 });

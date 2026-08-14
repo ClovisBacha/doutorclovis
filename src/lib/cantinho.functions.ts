@@ -164,6 +164,13 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
       }
       // Item grátis não passa pela compra — já é da paciente desde o início.
       if (item.price <= 0) return { ok: false as const, error: "Este item já é seu 💛" };
+      /* Aposentado só sai da vitrine — e a vitrine é o cliente. Sem esta
+         linha, um pedido montado à mão (ou uma aba aberta antes do deploy)
+         ainda compraria o item que saiu de circulação. Mesma régua do gate de
+         Premium e do de troféu: quem decide é o servidor. */
+      if (item.aposentado) {
+        return { ok: false as const, error: "Este item saiu da lojinha 🌙" };
+      }
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       // Gate de Premium no servidor: item premium só p/ assinante (nunca confia no cliente).
       if (item.premium) {

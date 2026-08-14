@@ -185,9 +185,19 @@ describe("o bônus", () => {
     /* O bônus é reconhecimento, não renda. Se fechar os conjuntos pagasse mais
        do que a loja inteira custa, a mecânica viraria a fonte principal de
        Sementinhas — e aí o cantinho deixaria de ser gasto e viraria
-       investimento, que é outro jogo. */
+       investimento, que é outro jogo.
+
+       ⚠️ O TETO É DERIVADO DO CATÁLOGO, e não um 704 escrito à mão. O número
+       cravado veio de uma contagem de agosto e mentiu no primeiro item novo:
+       a ampliação de +50% dobrou o que uma paciente sem assinatura consegue
+       comprar, e o teste teria reprovado conjuntos perfeitamente saudáveis
+       enquanto a proporção que ele existe para proteger só melhorava. */
+    const lojaGratis = CANTINHO_ITEMS.filter((i) => !i.premium && i.price > 0).reduce(
+      (s, i) => s + i.price,
+      0,
+    );
     const total = CONJUNTOS.reduce((s, c) => s + bonusDoConjunto(c), 0);
-    expect(total).toBeLessThan(704);
+    expect(total).toBeLessThan(lojaGratis);
   });
 });
 

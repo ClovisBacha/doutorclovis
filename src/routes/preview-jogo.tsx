@@ -78,6 +78,12 @@ export const Route = createFileRoute("/preview-jogo")({
       q.anim === "check" || q.anim === "estrela" || q.anim === "cinco"
         ? (q.anim as "check" | "estrela" | "cinco")
         : undefined,
+    /* `?clima=clima-petalas,clima-folhas` desenha a camada "No ar" (o tipo de
+       item novo) sem conta e sem compra. Ela só aparece quando a paciente
+       comprou um `clima` E o colocou na trilha, então sem isto o desenho só
+       se confere numa conta premium com o item pago — que é como uma animação
+       entra no app sem ninguém nunca ter olhado para ela rodando. */
+    clima: String(q.clima ?? ""),
   }),
   head: () => ({
     meta: [{ title: "Bancada do jogo" }, { name: "robots", content: "noindex" }],
@@ -101,7 +107,15 @@ function PreviewJogo() {
     trofeuNovo,
     amigas,
     anim,
+    clima,
   } = Route.useSearch();
+  /* Vírgula, e nunca repetição do parâmetro: o `validateSearch` devolve string
+     (o router serializa e revalida, e `q.clima` chega como string nas duas
+     passadas — a mesma armadilha que `?notif=` e `?w=` documentam aqui). */
+  const climaIds = clima
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   useEffect(() => {
     if (!pele) return;
     lsSet(SKIN_KEY, pele);
@@ -141,7 +155,8 @@ function PreviewJogo() {
           streak > 0 ||
           trofeus > 0 ||
           trofeuNovo > 0 ||
-          amigas > 0
+          amigas > 0 ||
+          climaIds.length > 0
             ? {
                 /* `?anim=` implica a tela das atividades: as três animações
                    moram dentro da folha do dia, e sem ela a bancada abriria a
@@ -152,6 +167,7 @@ function PreviewJogo() {
                 trofeus: trofeus > 0 ? trofeus : undefined,
                 trofeuNovo: trofeuNovo > 0 ? trofeuNovo : undefined,
                 amigas: amigas > 0 ? amigas : undefined,
+                clima: climaIds.length > 0 ? climaIds : undefined,
                 saldo: 125,
                 halves: feitos,
                 enfeites: ["🌻", "🧸", "🌙", "🦋", "🌿", "⭐", "🐣", "🌸", "🕯️"],
