@@ -2718,6 +2718,19 @@ bolhas subindo. Régua em `src/lib/clima-do-cantinho.ts` (pura, testada).
   entram juntas e depois a tela fica vazia até a próxima volta.
 - **`prefers-reduced-motion` PARA, não esconde**: apagar faria a paciente achar
   que o item que ela comprou não veio.
+- ⚠️ **A camada é alimentada pelo que ela POSSUI, nunca pelos sprites
+  espalhados.** Na primeira versão ela lia `visiblePlaced` — e o clima não tem
+  lugar, é a definição do tipo. Com a trilha cheia (120 sprites, cada item
+  não-`especial` custando dois), o item recém-comprado não era espalhado,
+  `climasAtivos` recebia uma lista sem ele e a camada renderizava `null`: ela
+  pagava 200 🌱 na Poeira de estrelas e NADA acontecia — o mesmo defeito que
+  "Chuva mansa" e "Vaga-lumes" tinham, reintroduzido pela porta dos fundos.
+  Hoje é `decor.filter(ehClima)`, com o portão do Modo Cuidado dentro.
+- ⚠️ **E o tipo `clima` NÃO vai para a bandeja do Arrumar.** Ele virava dois
+  adesivos parados (💮 🍁 🫧 🪶 🌨️ 💫), gastava duas das 120 vagas de `DECOR_MAX`,
+  e apagar esse adesivo esquisito apagava o clima comprado junto. Os layouts já
+  gravados também são filtrados. O corte é por TIPO — `especial-chuva` e
+  `especial-vagalume` continuam sendo adesivos de verdade, com halo.
 - **O mapa é por ID DE ITEM, e não por tipo** (`CLIMA_POR_ITEM`), e é isso que
   conserta `especial-chuva` e `especial-vagalume`: os dois continuam sendo
   `especial` na loja (halo, tamanho, preço) e ganham o ar. Mover um deles para
@@ -2802,6 +2815,17 @@ concedia e não contava a ninguém**.
 
 5. **Um dia perdido zerava a sequência.** Ver abaixo.
 
+⚠️ **UMA CONQUISTA SÓ É COMEMORADA E CREDITADA UMA VEZ POR SESSÃO**
+(`jaCelebradas`, em `minha-conta.tsx`). O ouvinte de `dc-sementinhas` agenda a
+checagem, e a checagem termina em `creditarSementinhas` — que dispara o mesmo
+evento. O que fechava o ciclo era só a expectativa de o `upsert` de
+`patient_achievements` gravar, e esse caminho de falha está ESCRITO em
+`achievements.functions.ts`, com um comentário admitindo que "na próxima
+checagem ela é nova de novo". Era inofensivo quando a próxima checagem era a
+próxima ação da paciente; depois que o Caminho passou a disparar, é 1,5 s
+depois, para sempre. A trava é local e não depende do banco: sem chave nova não
+há crédito, sem crédito não há evento, sem evento não há laço.
+
 **O recado mora em `src/lib/evento-sementinhas.ts`**, arquivo próprio e sem
 imports: os seis pontos que concedem estão em componentes distintos e fundos de
 árvore diferentes, e uma prop por todos seria seis assinaturas novas e uma
@@ -2826,18 +2850,52 @@ ganha-se um perdão a cada sete dias já contados.
   todo dia".
 - **Proporcional, não fixo**: quem tem três dias não precisa de proteção; quem
   tem duzentos precisa muito. O perdão cresce com o que há a perder.
-- ⚠️ **O saldo é conferido contra o que já foi contado NESTE trecho**, então quem
-  alterna um dia sim, um dia não nunca sai de 1 (`floor(1/7)` é 0). Há teste,
-  e há teste para dois dias em branco quebrarem por mais longa que seja.
+- **Quem alterna um dia sim, um dia não nunca sai de 1** (`floor(1/7)` é 0). Há
+  teste, e há teste para dois dias em branco quebrarem por mais longa que seja.
 - A mudança só faz a sequência SUBIR. Voltar atrás é trocar a constante por
   `Infinity`.
 - As três contagens (gestação, pós-parto, meditação) já delegavam à mesma
   função, então o perdão vale nas três sem uma linha a mais.
 
-⚠️ **E a chama passou a explicar isso** (`FolhaDaChama`, aberta pelo toque no
-número): **perdão que ninguém sabe que existe não acalma ninguém**. O saldo
-mostrado é o MESMO `floor(n/7)` da contagem — uma segunda régua prometeria um
-perdão que a conta não dá. Nenhuma frase cobra.
+#### ⚠️ A PRIMEIRA VERSÃO NÃO PERDOAVA NADA — e o texto desta seção mentia
+
+Escrito aqui na primeira redação: _"o saldo é conferido contra o que já foi
+contado NESTE trecho"_. Era verdade sobre o código, e era exatamente o defeito:
+o buraco que importa é o mais RECENTE, e nele o que já foi andado ainda vale 0.
+`perdoados >= Math.floor(0/7)` é verdadeiro, e o laço quebrava. Medido:
+
+```
+sequenciaDeDias([1..40], 42)      → 0    (devia ser 40)
+sequenciaDeDias([1..40, 42], 42)  → 1    (devia ser 41)
+```
+
+O perdão só valia para buracos com sete dias contados DEPOIS deles — nunca para
+a noite no pronto-socorro, que é o único caso para o qual ele foi escrito. E a
+`FolhaDaChama` dizia por escrito "você pode ficar até 5 dias de fora" enquanto a
+conta zerava: **prometer e não cumprir é pior que não falar do perdão**.
+
+Os sete testes da primeira versão punham o buraco 10+ dias atrás de hoje, e
+todos passavam. O caso do produto não tinha teste. Achado por uma revisão
+adversarial do diff, reproduzido antes de mexer numa linha.
+
+**A régua deixou de ser "posso atravessar este buraco?"** e virou uma afirmação
+sobre o trecho inteiro: _a sequência é o MAIOR trecho terminando em hoje (ou
+ontem) em que os vazios são no máximo `floor(diasFeitos / 7)`, sem dois vazios
+seguidos_. A varredura junta os BLOCOS de dias feitos e só depois pergunta
+quantos cabem no saldo — e percorre TODOS, porque o saldo cresce em degraus de
+sete e um bloco grande logo atrás pode pagar uma ponte que o pequeno da frente
+não pagava.
+
+⚠️ **E a chama explica isso** (`FolhaDaChama`, aberta pelo toque no número):
+**perdão que ninguém sabe que existe não acalma ninguém**. O número de folgas
+vem de `perdoesRestantes`, a MESMA varredura — a tela mostrava
+`Math.floor(streak / 7)`, o saldo TOTAL, ignorando o que já tinha sido gasto.
+Nenhuma frase cobra.
+
+⚠️ **A bancada fabrica a LISTA, não o número.** `?streak=41` cravava só o
+contador e deixava o saldo vir da jornada real (vazia), então a folha abria
+sempre no texto de sequência curta — a bancada mostrava um estado que o app
+nunca produz, que é o oposto do que ela existe para fazer.
 
 **Bancada:** `/preview-jogo?trofeus=12` (a escada) · `?streak=41` e `?streak=3`
 (as duas versões do texto do perdão) ·
