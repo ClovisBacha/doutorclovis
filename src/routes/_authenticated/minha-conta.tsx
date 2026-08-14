@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
+  Suspense,
+  lazy,
   useEffect,
   useLayoutEffect as useLayoutEffectReact,
   useMemo,
@@ -147,7 +149,23 @@ import { AmigasTab } from "@/components/amigas";
 import { searchDoctors as buscarDiretorio, type DirectoryDoctor } from "@/lib/doctors.functions";
 import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
-import { GestacaoPath, ensureInitialJourneyPull, lsGet, lsSet } from "@/components/gestacao-path";
+/**
+ * ⚠️ `GestacaoPath` É `lazy()`, e o motivo é medido.
+ *
+ * O componente do jogo é o maior do app: 892 KB crus / 264 KB comprimidos,
+ * contando o banco de aulas que morava dentro dele. Importado direto, ele
+ * descia junto com a tela de Minha Conta INTEIRA — para toda paciente, toda
+ * visita, mesmo quando ela só ia ver a próxima consulta e sair.
+ *
+ * `lsGet`/`lsSet`/`ensureInitialJourneyPull` vêm de `journey-sync` e não mais
+ * daqui: enquanto viessem do componente, o `lazy()` não separaria nada — o
+ * import estático de UMA função traz o módulo inteiro junto, e era exatamente
+ * isso que acontecia.
+ */
+const GestacaoPath = lazy(() =>
+  import("@/components/gestacao-path").then((m) => ({ default: m.GestacaoPath })),
+);
+import { ensureInitialJourneyPull, lsGet, lsSet } from "@/lib/journey-sync";
 import { Bolha } from "@/components/bolha";
 import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
@@ -1194,13 +1212,52 @@ function MinhaContaPage() {
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
+      /* ── ⚠️ QUATRO IDAS À REDE VIRARAM DUAS RODADAS (ago/2026) ────────────
+         A abertura do app fazia, EM SÉRIE: getUser → perfil → getSession +
+         checkIsAdmin → getMyDoctor. Quatro esperas encadeadas antes de a tela
+         liberar, cada uma somando a latência da anterior. Era metade do
+         "demora e parece estragado" que o dono relatou.
+
+         O que de fato depende de quê:
+           · o perfil precisa do `user.id` (vem do getUser)
+           · checkIsAdmin e getMyDoctor precisam do TOKEN (vem do getSession)
+           · o perfil e o papel NÃO dependem um do outro
+
+         Então são duas rodadas em vez de quatro esperas: primeiro
+         getUser+getSession juntos, depois perfil+papel juntos.
+
+         ⚠️ `getMyDoctor` passou a sair SEMPRE, e antes só saía quando o
+         `checkIsAdmin` dissesse que não é admin. É uma leitura, e o resultado
+         continua sendo IGNORADO para admin logo abaixo — a semântica de quem
+         vê o quê não mudou, só a hora do pedido. Trocar uma ida à rede em
+         série por uma leitura extra que o admin descarta é o negócio certo:
+         admin é raro e gestante é todo mundo. */
+      const [{ data: u }, { data: s }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase.auth.getSession(),
+      ]);
       if (!u.user) return;
-      const { data } = await (supabase as any)
-        .from("patient_profiles")
-        .select("*")
-        .eq("id", u.user.id)
-        .maybeSingle();
+      const token = s.session?.access_token;
+
+      const [perfilRes, papel] = await Promise.all([
+        (supabase as any).from("patient_profiles").select("*").eq("id", u.user.id).maybeSingle(),
+        (async () => {
+          if (!token) return null;
+          try {
+            const [admin, medico] = await Promise.all([
+              checkIsAdmin({ data: { accessToken: token } }),
+              /* `catch` PRÓPRIO: conta sem perfil de médico é o caso comum
+                 (é uma gestante), e sem isto o `Promise.all` derrubaria a
+                 resolução de papel inteira por causa do caminho normal. */
+              getMyDoctor({ data: { accessToken: token } }).catch(() => null),
+            ]);
+            return { admin, medico };
+          } catch {
+            return null;
+          }
+        })(),
+      ]);
+      const { data } = perfilRes as { data: any };
       setProfile(data);
       setUserId(u.user.id);
 
@@ -1236,10 +1293,12 @@ function MinhaContaPage() {
         }
       }
 
+      /* As duas respostas de papel já chegaram (saíram junto com o perfil).
+         Aqui só se APLICA — e na mesma ordem de antes, que é o que mantém a
+         regra de quem vê o quê idêntica. */
       try {
-        const { data: s } = await supabase.auth.getSession();
-        if (s.session?.access_token) {
-          const r = await checkIsAdmin({ data: { accessToken: s.session.access_token } });
+        if (papel) {
+          const r = papel.admin;
           setIsAdmin(r.isAdmin);
           if (r.isAdmin) roleIsPatient = false;
           // Médico cadastrado (ativo OU não) é médico — não usa o app da
@@ -1248,24 +1307,22 @@ function MinhaContaPage() {
           if (!r.isAdmin) {
             /* `getMyDoctor` é a segunda fonte: cobre as contas criadas antes
                da marca existir. A primeira fonte (o metadata) já rodou lá
-               acima, fora de qualquer chamada de rede. */
-            try {
-              const me = await getMyDoctor({ data: { accessToken: s.session.access_token } });
-              /* Linha em `doctors` E âncora gestacional = ela é as DUAS coisas.
-              
-                 Uma obstetra grávida existe, e antes ela perdia o próprio app
-                 no instante em que criava o perfil profissional: diário, chutes,
-                 álbum e jornada continuavam no banco e inalcançáveis por
-                 qualquer tela, sem nenhum caminho de volta dentro do produto —
-                 só SQL. A separação que o produto quer é entre CONTAS, não entre
-                 pessoas: quem tem gestação em curso continua com o app dela, e o
-                 painel segue aberto pelo menu. */
-              if (me.ok && me.doctor && !temAncoraGestacional) {
-                setIsDoctor(true);
-                roleIsPatient = false;
-              }
-            } catch {
-              /* sem perfil de médico → é gestante, segue no app */
+               acima, fora de qualquer chamada de rede.
+               `me` é null quando a chamada falhou ou não há perfil de médico —
+               os dois casos querem dizer "é gestante, segue no app". */
+            const me = papel.medico;
+            /* Linha em `doctors` E âncora gestacional = ela é as DUAS coisas.
+
+               Uma obstetra grávida existe, e antes ela perdia o próprio app
+               no instante em que criava o perfil profissional: diário, chutes,
+               álbum e jornada continuavam no banco e inalcançáveis por
+               qualquer tela, sem nenhum caminho de volta dentro do produto —
+               só SQL. A separação que o produto quer é entre CONTAS, não entre
+               pessoas: quem tem gestação em curso continua com o app dela, e o
+               painel segue aberto pelo menu. */
+            if (me?.ok && me.doctor && !temAncoraGestacional) {
+              setIsDoctor(true);
+              roleIsPatient = false;
             }
           }
         }
@@ -2062,14 +2119,28 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Caminho" && (
-                  <GestacaoPath
-                    profile={profile}
-                    gest={gest}
-                    quizPremium={!!profile?.quiz_premium}
-                    careMode={careMode}
-                    onOpenShop={() => goToTab("Recompensas")}
-                    onOpenAmigas={() => goToTab("Amigas")}
-                  />
+                  /* A espera é a BOLHA, não um spinner: ela é a personagem
+                     desta aba, e quem abriu o jogo reconhece quem a recebe.
+                     Um spinner genérico aqui leria como "o app travou". */
+                  <Suspense
+                    fallback={
+                      <div className="flex flex-col items-center py-20">
+                        <Bolha humor="feliz" tamanho={120} careMode={careMode} />
+                        <p className="mt-4 text-sm font-bold text-foreground/50">
+                          Abrindo o seu caminho…
+                        </p>
+                      </div>
+                    }
+                  >
+                    <GestacaoPath
+                      profile={profile}
+                      gest={gest}
+                      quizPremium={!!profile?.quiz_premium}
+                      careMode={careMode}
+                      onOpenShop={() => goToTab("Recompensas")}
+                      onOpenAmigas={() => goToTab("Amigas")}
+                    />
+                  </Suspense>
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

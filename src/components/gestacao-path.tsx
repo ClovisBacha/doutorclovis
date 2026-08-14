@@ -469,7 +469,8 @@ function DecorSprite({ p, still = false }: { p: PlacedDecor; still?: boolean }) 
   );
 }
 import {
-  quizForDay,
+  carregarQuizDoDia,
+  temQuizNoDia,
   quizEmojiForDay,
   isAnswerCorrect,
   isMultiQuestion,
@@ -804,228 +805,21 @@ function entradasDoArmazem(): [string, string | null][] {
   return fora;
 }
 
-export function lsGet<T>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-let warnedStorageBlocked = false;
-
-export function lsSet(key: string, value: unknown) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // Modo privado/cota cheia: o progresso local não está sendo salvo.
-    // Avisa UMA vez em vez de falhar em silêncio.
-    if (!warnedStorageBlocked) {
-      warnedStorageBlocked = true;
-      toast.error(
-        "Seu navegador está bloqueando o salvamento local — o progresso do dia pode se perder. Evite o modo anônimo.",
-      );
-    }
-  }
-  // A jornada pertence ao PERFIL da paciente, não ao aparelho: cada escrita
-  // agenda uma sincronização do estado completo para journey_state no Supabase
-  // (o localStorage vira cache offline). Debounce para agrupar toques rápidos.
-  scheduleJourneySync();
-}
-
-/* ── Sincronização da jornada com o perfil (journey_state) ─────────────────── */
-
-const JOURNEY_PREFIX = "dc-path-";
-const SYNC_MARKER = "dc-journey-synced-at"; // fora do prefixo: não entra no blob
-
-function collectJourneyBlob(): Record<string, unknown> {
-  const blob: Record<string, unknown> = {};
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (!k || !k.startsWith(JOURNEY_PREFIX)) continue;
-    try {
-      blob[k] = JSON.parse(localStorage.getItem(k) ?? "null");
-    } catch {
-      /* valor corrompido: fica de fora */
-    }
-  }
-  return blob;
-}
-
-let journeySyncTimer: ReturnType<typeof setTimeout> | null = null;
-
-// Barreira anti-corrida: NENHUM push acontece antes de o pull inicial do
-// perfil terminar — senão um toque rápido num aparelho novo empurraria o
-// blob zerado por cima da jornada real na nuvem (e o marcador bloquearia a
-// hidratação em seguida). Armada por ensureInitialJourneyPull; até lá, um push
-// espera de graça em Promise.resolve().
-let initialPullGate: Promise<unknown> = Promise.resolve();
-let gatePrimed = false;
-
-// Dispara o pull inicial da nuvem UMA vez por sessão e arma a barreira acima.
-// Precisa rodar antes do PRIMEIRO push — venha ele da aba Caminho (que monta
-// GestacaoPath) ou de abas irmãs (Sons/Quartinho) que também gravam chaves
-// dc-path- via lsSet sem passar pela Caminho. Num aparelho onde a jornada só
-// existe na nuvem, sem esse pull o push empurraria um blob incompleto por cima
-// da jornada real e o marcador ainda bloquearia a re-hidratação (P1).
-export function ensureInitialJourneyPull(): Promise<boolean> {
-  if (gatePrimed) return initialPullGate as Promise<boolean>;
-  gatePrimed = true;
-  const pullPromise = pullJourneyFromProfile();
-  initialPullGate = pullPromise.catch(() => false);
-  return pullPromise;
-}
-
-function scheduleJourneySync() {
-  if (typeof window === "undefined") return;
-  // Arma o pull inicial/barreira já na primeira escrita, qualquer que seja a
-  // aba — impede que Sons/Quartinho empurrem antes do pull inicial (P1).
-  ensureInitialJourneyPull();
-  if (journeySyncTimer) clearTimeout(journeySyncTimer);
-  journeySyncTimer = setTimeout(async () => {
-    try {
-      await initialPullGate; // espera o pull do mount (instantâneo se já resolvido)
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
-      // LWW de blob INTEIRO: dois aparelhos online no mesmo dia → o push mais
-      // tardio vence por completo (perda granular aceita pelo produto).
-      // updated_at é do SERVIDOR (trigger touch_journey_updated_at) para o
-      // relógio do aparelho não distorcer o last-write-wins.
-      const { data: row, error } = await (supabase as any)
-        .from("journey_state")
-        .upsert({ user_id: u.user.id, data: collectJourneyBlob() })
-        .select("updated_at")
-        .maybeSingle();
-      if (!error && row?.updated_at) {
-        localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
-      }
-    } catch {
-      /* offline / tabela ainda não aplicada: o localStorage segue como fonte */
-    }
-  }, 1500);
-}
-
-/* ── Merge granular na hidratação (evita reverter progresso não sincronizado) ──
- *
- * O blob inteiro é last-write-wins, mas os dados de PROGRESSO só crescem: dias
- * feitos, figurinhas, notas de lição e os checks de cada dia nunca "desfazem".
- * Se o aparelho fez um desafio offline e a nuvem (de outro aparelho) ficou mais
- * recente, um overwrite cego apagaria esse desafio. Por isso, no pull, esses
- * campos são UNIDOS (local ∪ nuvem); só o estado de fato mutável (nascimento,
- * início da jornada, check-in do dia) segue LWW com a nuvem vencendo. */
-
-const UNION_ARRAY_KEYS = new Set([
-  "dc-path-done-days",
-  "dc-path-pos-done-days",
-  "dc-path-stickers",
-  "dc-path-pos-stickers",
-]);
-
-function isPlainObject(v: unknown): v is Record<string, unknown> {
-  return typeof v === "object" && v !== null && !Array.isArray(v);
-}
-
-/** Combina o valor local com o da nuvem para uma chave da jornada. */
-export function mergeJourneyValue(key: string, local: unknown, cloud: unknown): unknown {
-  // Arrays append-only (dias feitos, figurinhas) → união ordenada.
-  if (UNION_ARRAY_KEYS.has(key)) {
-    if (Array.isArray(local) && Array.isArray(cloud)) {
-      return Array.from(new Set([...local, ...cloud])).sort((a, b) => a - b);
-    }
-    return cloud;
-  }
-  // Notas das lições (semana → nota 0–100) → maior nota vence.
-  if (key === "dc-path-lessons") {
-    if (isPlainObject(local) && isPlainObject(cloud)) {
-      const out: Record<string, unknown> = { ...cloud };
-      for (const [w, v] of Object.entries(local)) {
-        const cur = out[w];
-        if (typeof v === "number" && (typeof cur !== "number" || v > cur)) out[w] = v;
-      }
-      return out;
-    }
-    return cloud;
-  }
-  // Tarefas de cada dia (humor/desafio/leitura) → OR: uma vez feito, feito.
-  if (/^dc-path-(pos-)?day-\d+$/.test(key)) {
-    if (isPlainObject(local) && isPlainObject(cloud)) {
-      const out: Record<string, unknown> = { ...cloud };
-      for (const [t, v] of Object.entries(local)) if (v) out[t] = true;
-      return out;
-    }
-    return cloud;
-  }
-  // Demais chaves (nascimento, início, check-in, welcomed, premium-pending):
-  // mutáveis → a nuvem (mais recente) vence, como antes.
-  return cloud;
-}
-
-/**
- * Baixa a jornada do perfil e hidrata o localStorage quando a nuvem estiver
- * mais recente que a última sincronização deste aparelho. Faz merge granular
- * (união do progresso; LWW no estado mutável) e tenta de novo se a rede falhar
- * — num aparelho novo, o game não pode ficar "zerado" por uma falha de rede.
- * Retorna true quando hidratou/mesclou algo (o chamador re-lê os estados).
- */
-async function pullJourneyFromProfile(retries = 2): Promise<boolean> {
-  if (typeof window === "undefined") return false;
-  for (let attempt = 0; ; attempt++) {
-    try {
-      const { supabase } = await import("@/integrations/supabase/client");
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
-      const { data: row, error } = await (supabase as any)
-        .from("journey_state")
-        .select("data,updated_at")
-        .eq("user_id", u.user.id)
-        .maybeSingle();
-      if (error) throw error; // rede/servidor: tenta de novo
-      if (!row?.data) return false; // sem jornada na nuvem (não é erro)
-      const localMark = lsGet<string>(SYNC_MARKER, "");
-      if (localMark && localMark >= row.updated_at) return false; // já em dia
-      const cloudData = row.data as Record<string, unknown>;
-      const keys = new Set<string>();
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.startsWith(JOURNEY_PREFIX)) keys.add(k);
-      }
-      for (const k of Object.keys(cloudData)) if (k.startsWith(JOURNEY_PREFIX)) keys.add(k);
-      let localHadExtra = false; // o merge preservou algo que a nuvem não tinha?
-      for (const k of keys) {
-        const cloudHas = Object.prototype.hasOwnProperty.call(cloudData, k);
-        if (!cloudHas) {
-          localHadExtra = true; // chave só local: progresso não sincronizado
-          continue; // já está no localStorage — preserva
-        }
-        const localRaw = localStorage.getItem(k);
-        const localVal = localRaw != null ? safeParse(localRaw) : undefined;
-        const merged = mergeJourneyValue(k, localVal, cloudData[k]);
-        const mergedStr = JSON.stringify(merged);
-        if (mergedStr !== JSON.stringify(cloudData[k])) localHadExtra = true;
-        localStorage.setItem(k, mergedStr);
-      }
-      localStorage.setItem(SYNC_MARKER, JSON.stringify(row.updated_at));
-      // Se o merge manteve dados ausentes na nuvem, empurra de volta para ela
-      // convergir (senão o progresso ficaria só neste aparelho).
-      if (localHadExtra) scheduleJourneySync();
-      return true;
-    } catch {
-      if (attempt >= retries) return false;
-      await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
-    }
-  }
-}
-
-function safeParse(raw: string): unknown {
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return undefined;
-  }
-}
+/* ── O armazém local e a sincronização SAÍRAM daqui (ago/2026) ─────────────
+   Foram para `src/lib/journey-sync.ts`. Não era arrumação: `lsGet`, `lsSet` e
+   `ensureInitialJourneyPull` eram importados por outras telas, e enquanto
+   moravam neste arquivo elas arrastavam o chunk INTEIRO do Caminho junto —
+   264 KB comprimidos descendo com a Minha Conta mesmo para quem não abre o
+   jogo. Com elas fora, este componente pôde virar `lazy()`. */
+import {
+  lsGet,
+  lsSet,
+  ensureInitialJourneyPull,
+  pullInicialJaArmado,
+  pullJourneyFromProfile,
+} from "@/lib/journey-sync";
+/* Re-exportado para não quebrar quem já importava daqui. */
+export { lsGet, lsSet, ensureInitialJourneyPull, mergeJourneyValue } from "@/lib/journey-sync";
 
 function localDateStr(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1652,16 +1446,44 @@ export function GestacaoPath({
     // de piscar a jornada "zerada", avisa que está sincronizando.
     const localEmpty =
       lsGet<number[]>(LS.doneDays, []).length === 0 && !lsGet<unknown>(LS.journeyStart, null);
-    setSyncing(localEmpty && !gatePrimed);
+    setSyncing(localEmpty && !pullInicialJaArmado());
 
     (async () => {
-      // Nuvem PRIMEIRO: num aparelho novo, a jornada real vem do perfil —
-      // sem isso criaríamos uma jornada zerada por cima da verdadeira.
-      // A primeira montagem arma a barreira compartilhada (P1); remontagens
-      // seguintes (reabrir a aba) re-baixam para frescor cross-device.
-      const changed = gatePrimed
-        ? await pullJourneyFromProfile()
-        : await ensureInitialJourneyPull();
+      /* ── ⚠️ AS DUAS BUSCAS SAEM JUNTAS, MAS SE APLICAM EM ORDEM ────────────
+         `journey_state` e `course_progress` são tabelas diferentes e não
+         dependem uma da outra — esperar a primeira responder para só então
+         PEDIR a segunda somava duas idas à rede em série. Medido pelo dono
+         como "alguns dados demoram mais que outros".
+
+         O que NÃO pode inverter é a APLICAÇÃO: o merge das lições lê o
+         `localStorage` que o pull da jornada acabou de reescrever. Se ele
+         rodasse antes, mesclaria por cima do cache VELHO e regravaria — as
+         lições que só existiam na nuvem sumiriam do aparelho.
+
+         Então: dispara as duas ao mesmo tempo (rede em paralelo), consome na
+         ordem de sempre (jornada, depois lições). O ganho é a latência da
+         segunda; a ordem de escrita continua idêntica à de antes. */
+      const jornadaEmVoo = pullInicialJaArmado()
+        ? pullJourneyFromProfile()
+        : ensureInitialJourneyPull();
+
+      /* Só BUSCA — não escreve nada. A gravação acontece depois do pull. */
+      const licoesEmVoo = (async () => {
+        try {
+          const { supabase } = await import("@/integrations/supabase/client");
+          const { data: s } = await supabase.auth.getSession();
+          if (!s.session) return null;
+          const res = await getCourseProgress({
+            data: { accessToken: s.session.access_token },
+          });
+          return res.ok ? res.progress : null;
+        } catch {
+          /* offline: o cache local segue valendo */
+          return null;
+        }
+      })();
+
+      const changed = await jornadaEmVoo;
       if (cancelled) return;
       setSyncing(false);
       if (changed) {
@@ -1692,22 +1514,13 @@ export function GestacaoPath({
 
       // Progresso das lições: o servidor (course_progress) é a fonte da verdade —
       // mescla por cima do cache local e regrava para os próximos offline.
-      try {
-        const { supabase } = await import("@/integrations/supabase/client");
-        const { data: s } = await supabase.auth.getSession();
-        if (s.session && !cancelled) {
-          const res = await getCourseProgress({
-            data: { accessToken: s.session.access_token },
-          });
-          if (res.ok && !cancelled) {
-            const merged = { ...lsGet<Record<number, number>>(LS.lessons, {}) };
-            for (const row of res.progress) merged[row.module_week] = row.quiz_score;
-            setLessonsDone(merged);
-            lsSet(LS.lessons, merged);
-          }
-        }
-      } catch {
-        /* offline: o cache local segue valendo */
+      // A busca já saiu lá em cima; aqui só se colhe e aplica, DEPOIS do pull.
+      const progresso = await licoesEmVoo;
+      if (progresso && !cancelled) {
+        const merged = { ...lsGet<Record<number, number>>(LS.lessons, {}) };
+        for (const row of progresso) merged[row.module_week] = row.quiz_score;
+        setLessonsDone(merged);
+        lsSet(LS.lessons, merged);
       }
     })();
 
@@ -2056,6 +1869,36 @@ export function GestacaoPath({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bancada?.jogos]);
 
+  /**
+   * A AULA DO DIA — baixada sob demanda (ver `daily-quizzes.ts`).
+   *
+   * ⚠️ `undefined` (ainda descendo) e `null` (não existe aula neste dia) são
+   * estados DIFERENTES, e juntá-los era o defeito à espera: com um só, o
+   * primeiro render de QUALQUER dia mostraria "desafio do dia" por uma fração
+   * de segundo antes de a aula chegar — trocando o peso do pacote por um
+   * pisca-pisca de conteúdo errado, que é pior porque a paciente VÊ. Enquanto
+   * é `undefined` a tela diz que está abrindo a aula; só `null` cai no desafio.
+   */
+  const [quizDoDia, setQuizDoDia] = useState<DailyQuiz | null | undefined>(undefined);
+  useEffect(() => {
+    if (wellnessDay === null) return;
+    const D = wellnessDay;
+    if (!temQuizNoDia(D)) {
+      setQuizDoDia(null);
+      return;
+    }
+    let vivo = true;
+    setQuizDoDia(undefined);
+    void carregarQuizDoDia(D).then((q) => {
+      /* Trocar de dia no meio do download não pode deixar a aula do dia
+         anterior aparecer no lugar da certa. */
+      if (vivo) setQuizDoDia(q);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [wellnessDay]);
+
   function reallyOpenDay(D: number) {
     setDayTasks(dayTaskState(D));
     /* Vai DIRETO para as atividades do dia.
@@ -2076,7 +1919,10 @@ export function GestacaoPath({
     // ou revisão premium. Dia passado sem premium vai direto ao paywall —
     // sem prometer 1,3s de aula que não vem.
     const willHaveLesson = D === todayD || quizPremium;
-    if (quizForDay(D) && !reduced && willHaveLesson) {
+    /* `temQuizNoDia` e não o conteúdo: esta decisão acontece no toque, e
+       esperar 674 KB pra saber se a intro roda seria trocar um problema de
+       peso por um de latência. */
+    if (temQuizNoDia(D) && !reduced && willHaveLesson) {
       setIntro(D);
       return;
     }
@@ -3211,7 +3057,7 @@ export function GestacaoPath({
             const D = wellnessDay;
             const isT = D === todayD;
             const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
-            const q = quizForDay(D);
+            const q = quizDoDia;
             const st = wellnessDay === D ? dayTasks : dayTaskState(D);
             const chD = challengeForDay(D);
             const lessonDone = !!st.desafio || doneDays.includes(D);
@@ -3240,12 +3086,22 @@ export function GestacaoPath({
                         locked: !isT && !quizPremium,
                         showAd: isT && !quizPremium,
                       }
-                    : {
-                        kind: "challenge" as const,
-                        label: chD.label,
-                        emoji: chD.emoji,
-                        alreadyDone: lessonDone,
-                      }
+                    : q === undefined
+                      ? {
+                          /* Ainda descendo. Ver o comentário em
+                             `WellnessLesson`: o desafio NÃO serve de espera,
+                             ele apareceria e sumiria. */
+                          kind: "carregando" as const,
+                          emoji: quizEmojiForDay(D),
+                          week: wk,
+                          alreadyDone: lessonDone,
+                        }
+                      : {
+                          kind: "challenge" as const,
+                          label: chD.label,
+                          emoji: chD.emoji,
+                          alreadyDone: lessonDone,
+                        }
                 }
                 onEarn={(key) => {
                   markDayTask(D, `w_${key}`, true);
@@ -8334,7 +8190,17 @@ type WellnessLesson =
       locked: boolean;
       showAd: boolean;
     }
-  | { kind: "challenge"; label: string; emoji: string; alreadyDone: boolean };
+  | { kind: "challenge"; label: string; emoji: string; alreadyDone: boolean }
+  /**
+   * A aula existe neste dia, mas o conteúdo ainda está descendo (o banco de
+   * 674 KB virou `import()` dinâmico — ver `daily-quizzes.ts`).
+   *
+   * ⚠️ É um estado PRÓPRIO, e não "challenge" temporário: sem ele a tela
+   * mostraria o desafio do dia por uma fração de segundo e trocaria pela aula
+   * — um pisca de conteúdo errado, que é justamente o sintoma que a mudança de
+   * performance existe para tirar, não para criar.
+   */
+  | { kind: "carregando"; emoji: string; week: number; alreadyDone: boolean };
 
 /** Desafio simples do dia (quando não há quiz): confirmar que fez. */
 function ChallengeBlock({
@@ -8617,7 +8483,9 @@ function WellnessScreen({
           const espaco = corte.lastIndexOf(" ");
           return `${(espaco > 24 ? corte.slice(0, espaco) : corte).trimEnd()}…`;
         })()
-      : lesson.label || "O desafio de hoje";
+      : lesson.kind === "carregando"
+        ? "Aula de hoje"
+        : lesson.label || "O desafio de hoje";
 
   /* ─── AS SEIS LINHAS DO DIA ──────────────────────────────────────────────
      A aula voltou a ter porta, e voltou como LINHA da mesma lista — não como
@@ -8823,6 +8691,14 @@ function WellnessScreen({
                   aoSair={() => setOpenKey(null)}
                 />
               )
+            ) : lesson.kind === "carregando" ? (
+              /* A aula está descendo. Bolha + uma frase, e nada de botão: na
+                 segunda vez o banco já está em cache e a espera some, e um
+                 botão desabilitado aqui só daria a impressão de que travou. */
+              <div className="flex flex-col items-center py-10 text-center">
+                <Bolha humor="estudiosa" tamanho={120} careMode={careMode} />
+                <p className="mt-4 text-sm font-bold text-violet-900">Abrindo a aula de hoje…</p>
+              </div>
             ) : (
               <ChallengeBlock
                 label={lesson.label}

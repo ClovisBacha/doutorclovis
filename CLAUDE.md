@@ -1458,6 +1458,80 @@ juntos**. Em pé nada muda: a composição medida é a de todo dia. O corte de 5
 fica entre o menor iPhone em pé (SE, 667) e o maior deitado (Pro Max, 430) — e
 `short` (849) não serve, porque pega os dois casos que já estavam certos.
 
+## O app parou de baixar o jogo inteiro pra mostrar a consulta (ago/2026)
+
+O dono relatou, no aparelho: "alguns dados demoram mais pra carregar que
+outros, dá a sensação de que o app está estragado" e "às vezes puxa uma tela
+passada por um segundo". Três causas medidas, três correções.
+
+### 1. O banco de aulas saiu do pacote
+
+`daily-quizzes.data.json` tem 674 KB e era `import` estático — o Vite o
+embutia no chunk de `gestacao-path`. **Medido antes: 892 KB crus / 264 KB
+comprimidos.** As 294 aulas desciam inteiras para entregar UMA.
+
+- Virou `import()` dinâmico com a promessa em cache (`bancoEmVoo`). ⚠️ Guarda a
+  PROMESSA, não o resultado: dois toques rápidos chegam antes de o primeiro
+  `import()` resolver e baixariam duas vezes — mesma lição da fila `emVoo` do
+  service worker.
+- ⚠️ **`temQuizNoDia` é FAIXA, não conteúdo.** A tela precisa saber no TOQUE se
+  existe aula (é o que decide se a intro roda e se o dia abre com aula ou
+  desafio). Ler `Object.keys` do JSON traria o JSON de volta pro pacote e
+  desfaria a mudança inteira — então são duas constantes, e
+  `daily-quizzes.test.ts` as confere contra o arquivo real, inclusive cobrando
+  que não haja buraco no meio. Constante que descreve um arquivo é constante
+  que um dia diverge dele.
+- ⚠️ **`undefined` (baixando) e `null` (não tem aula hoje) são estados
+  DIFERENTES.** Juntá-los era o defeito à espera: a tela mostraria o desafio do
+  dia por uma fração de segundo antes de a aula chegar — trocando peso de
+  pacote por pisca de conteúdo errado, que é pior porque ela VÊ. Daí o
+  `kind: "carregando"` em `WellnessLesson`.
+
+### 2. `GestacaoPath` virou `lazy()`
+
+Ele descia junto com a tela de Minha Conta INTEIRA, para toda paciente, toda
+visita — mesmo quem só ia ver a próxima consulta e sair.
+
+- ⚠️ **O `lazy()` sozinho não separava nada.** `lsGet`, `lsSet` e
+  `ensureInitialJourneyPull` eram importados DELE por outras telas, e um import
+  estático de uma função traz o módulo inteiro junto. Foi preciso mover o
+  armazém local e a sincronização para `src/lib/journey-sync.ts` primeiro.
+  `gestacao-path` re-exporta os três para não quebrar quem já os importava.
+- ⚠️ `gatePrimed` virou `pullInicialJaArmado()` — uma FUNÇÃO. `export let`
+  congela o valor no import de quem lê, e o Caminho pergunta isso DEPOIS de a
+  barreira ser armada: exportando a variável ele leria `false` para sempre e
+  re-hidrataria a cada montagem.
+- A espera é a BOLHA, não um spinner: ela é a personagem desta aba, e um
+  spinner genérico lê como "travou".
+
+**Medido depois (gzip):** `gestacao-path` 264 → 91 KB, e o banco de aulas
+virou um chunk próprio de 148 KB que só desce ao abrir um dia. A abertura de
+Minha Conta caiu de ~662 KB para ~398 KB — **264 KB a menos, 40%.**
+
+### 3. Quatro idas à rede em série viraram duas rodadas
+
+- **Na abertura do app** (`minha-conta.tsx`): era getUser → perfil →
+  getSession+checkIsAdmin → getMyDoctor, cada espera somando a anterior. O
+  perfil precisa do `user.id`; `checkIsAdmin`/`getMyDoctor` precisam do token;
+  e perfil e papel **não dependem um do outro**. Agora: getUser+getSession
+  juntos, depois perfil+papel juntos.
+  ⚠️ `getMyDoctor` passou a sair SEMPRE (antes só quando não-admin). É uma
+  leitura, e o resultado continua ignorado para admin — a semântica de quem vê
+  o quê não mudou, só a hora do pedido. Admin é raro; gestante é todo mundo.
+- **No Caminho** (`gestacao-path.tsx`): `journey_state` e `course_progress` são
+  tabelas diferentes e não dependem uma da outra, mas a segunda só era PEDIDA
+  depois de a primeira responder.
+  ⚠️ **O que não pode inverter é a APLICAÇÃO**: o merge das lições lê o
+  `localStorage` que o pull da jornada acabou de reescrever — rodando antes,
+  mesclaria por cima do cache velho e regravaria, apagando do aparelho as
+  lições que só existiam na nuvem. Então dispara as duas juntas (rede em
+  paralelo) e consome na ordem de sempre.
+
+**O "flash de tela passada"** é o `hydrateFromLocal()` rodando duas vezes (o
+cache do aparelho primeiro, o merge da nuvem depois) — comportamento
+deliberado, mas que ficava sem explicação na tela. Continua de pé; o que ele
+espera hoje é bem mais curto.
+
 ## Experiência "app de milhões" (IMPLEMENTADO — jul/2026)
 
 - **Movimento**: primitivas `Reveal`/`Stagger`/`StaggerItem` em

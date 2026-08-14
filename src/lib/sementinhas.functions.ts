@@ -3,7 +3,7 @@ import { z } from "zod";
 import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/types.extended";
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
-import { quizForDay } from "@/lib/daily-quizzes";
+import { carregarQuizDoDia } from "@/lib/daily-quizzes";
 import { RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_MEDICO } from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
@@ -408,7 +408,10 @@ export const grantDailyQuizReward = createServerFn({ method: "POST" })
     const uid = u.user.id;
     if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
 
-    const quiz = quizForDay(data.day);
+    /* `await` porque o banco de aulas virou `import()` dinâmico (ver
+       daily-quizzes.ts). No servidor o arquivo é local — o custo é o primeiro
+       acesso do processo, não uma ida à rede. */
+    const quiz = await carregarQuizDoDia(data.day);
     if (!quiz || quiz.questions.length === 0) return { ok: true as const, granted: 0 };
     const correct = Math.max(0, Math.min(data.correct, quiz.questions.length));
 
