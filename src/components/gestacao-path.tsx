@@ -16,7 +16,7 @@ import {
 } from "@/lib/sementinhas.functions";
 import { getCantinho } from "@/lib/cantinho.functions";
 import { CANTINHO_BY_ID, escalaDaArvore, faseDoDiaNoite, fundoBgFor } from "@/lib/cantinho";
-import { climasAtivos, particulasDe } from "@/lib/clima-do-cantinho";
+import { climasAtivos, ehClima, particulasDe } from "@/lib/clima-do-cantinho";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { escadaDeTrofeus, proximoDesbloqueio } from "@/lib/trofeus";
 import { perdoesRestantes } from "@/lib/sequencia";
@@ -1964,7 +1964,13 @@ export function GestacaoPath({
           /* Tema veste o CÉU DA HOME, que nem é esta tela. Ele faltava nesta
              lista: quem comprava o Céu Clássico (150 🌱) ganhava de brinde um
              🌅 vagando pela trilha, como se fosse um enfeite. */
-          CANTINHO_BY_ID[id].type !== "tema",
+          CANTINHO_BY_ID[id].type !== "tema" &&
+          /* Clima é o AR da trilha, não um adesivo: ele não tem lugar, e por
+             isso não vai para a bandeja nem gasta duas vagas de `DECOR_MAX`.
+             Ver `climaDela`, logo abaixo. Os dois `especial` que EMITEM clima
+             (`especial-chuva`, `especial-vagalume`) continuam aqui — eles são
+             adesivos de verdade, com halo, e o ar vem de brinde. */
+          CANTINHO_BY_ID[id].type !== "clima",
       ),
     [decor],
   );
@@ -1981,10 +1987,32 @@ export function GestacaoPath({
   // trilha piscar vazia a cada abertura.
   const visiblePlaced = useMemo(() => {
     if (careMode) return [];
-    if (decor.length === 0) return placed;
+    /* ⚠️ O tipo `clima` NÃO vira adesivo. Ele é o AR da trilha, e um 💮 parado
+       num canto é exatamente o que `clima-do-cantinho.ts` diz que este tipo
+       existe para não ser. O filtro cobre também os layouts JÁ GRAVADOS antes
+       desta correção, que têm sprites de clima salvos no blob da jornada. */
+    const semClima = placed.filter((p) => CANTINHO_BY_ID[p.id]?.type !== "clima");
+    if (decor.length === 0) return semClima;
     const owned = new Set(decor);
-    return placed.filter((p) => owned.has(p.id));
+    return semClima.filter((p) => owned.has(p.id));
   }, [placed, decor, careMode]);
+
+  /* ─── O CLIMA VEM DO QUE ELA POSSUI, NUNCA DE ONDE ELE ESTÁ ──────────────
+     A camada No ar lia `visiblePlaced`, isto é, os sprites espalhados — e o
+     clima não tem lugar por definição do próprio tipo. A consequência era
+     grave e silenciosa: com a trilha cheia (120 sprites, e cada item custa
+     dois), o item novo não era espalhado, `climasAtivos` recebia uma lista sem
+     ele e a camada renderizava `null`. Ela pagava 200 🌱 na Poeira de estrelas
+     e NADA acontecia — o mesmo defeito que "Chuva mansa" e "Vaga-lumes" tinham
+     antes desta rodada, reintroduzido pela porta dos fundos.
+
+     `ehClima` (e não `type === "clima"`) porque `especial-chuva` e
+     `especial-vagalume` continuam sendo `especial` na loja — com halo, tamanho
+     e preço — e emitem pelo mesmo motor. */
+  const climaDela = useMemo(
+    () => (careMode ? [] : decor.filter((id) => ehClima(id))),
+    [decor, careMode],
+  );
 
   // Hidrata do storage no mount E de novo quando o pull da nuvem trouxer o
   // layout de outro aparelho (hydratedAt muda). Nunca no meio de um arrasto:
@@ -2309,20 +2337,40 @@ export function GestacaoPath({
    * pisca-pisca de conteúdo errado, que é pior porque a paciente VÊ. Enquanto
    * é `undefined` a tela diz que está abrindo a aula; só `null` cai no desafio.
    */
-  const [quizDoDia, setQuizDoDia] = useState<DailyQuiz | null | undefined>(undefined);
+  /**
+   * ⚠️ ELE CARREGA O DIA A QUE PERTENCE, e essa é a parte que faltava.
+   *
+   * O estado era um `DailyQuiz | null | undefined` sem carimbo, e o efeito faz
+   * `if (wellnessDay === null) return` — ou seja, FECHAR a folha não limpava
+   * nada. Ao abrir outro dia, o render acontece ANTES do efeito: `D` já é o
+   * dia novo e a aula ainda é a do dia anterior. O guarda `vivo` cobre só a
+   * corrida do download; não cobre o valor herdado.
+   *
+   * O sintoma é o mesmo que o par `undefined`/`null` foi criado para evitar,
+   * mas pior: em vez de piscar o desafio, pisca a AULA ERRADA — com
+   * `lesson.kind` já em `"quiz"`, portanto tocável. Um toque nessa janela
+   * abriria `DailyQuizBlock` com `day` de um dia e perguntas de outro, e o
+   * servidor pontuaria contra o gabarito do dia errado.
+   *
+   * Com o carimbo, o valor herdado de outro dia cai naturalmente em
+   * `undefined` — que é o estado correto ("ainda descendo") e já tem tela.
+   */
+  const [quizDoDia, setQuizDoDia] = useState<{ dia: number; quiz: DailyQuiz | null } | null>(null);
   useEffect(() => {
     if (wellnessDay === null) return;
     const D = wellnessDay;
     if (!temQuizNoDia(D)) {
-      setQuizDoDia(null);
+      setQuizDoDia({ dia: D, quiz: null });
       return;
     }
     let vivo = true;
-    setQuizDoDia(undefined);
+    /* Sem `setQuizDoDia(undefined)` aqui: quem decide se está descendo é o
+       carimbo não bater com `D`. E reabrir o MESMO dia mostra a aula na hora,
+       em vez de piscar "abrindo a aula" sobre um conteúdo que já está em mãos. */
     void carregarQuizDoDia(D).then((q) => {
       /* Trocar de dia no meio do download não pode deixar a aula do dia
          anterior aparecer no lugar da certa. */
-      if (vivo) setQuizDoDia(q);
+      if (vivo) setQuizDoDia({ dia: D, quiz: q });
     });
     return () => {
       vivo = false;
@@ -3116,7 +3164,7 @@ export function GestacaoPath({
         )}
         {/* No ar — pétalas, folhas, bolhas. Atrás dos enfeites e da trilha, e
             depois do cenário: é o AR entre o papel de parede e as coisas. */}
-        <ClimaNoAr ids={bancada?.clima ?? visiblePlaced.map((p) => p.id)} />
+        <ClimaNoAr ids={bancada?.clima ?? climaDela} />
 
         {/* Os itens do tipo "céu" (nuvem, estrelinhas, sol, arco-íris, lua)
             NÃO têm mais faixa automática. Existia aqui um bloco `sticky` que
@@ -3537,7 +3585,10 @@ export function GestacaoPath({
             const D = wellnessDay;
             const isT = D === todayD;
             const wk = Math.max(1, Math.min(42, Math.floor(D / 7)));
-            const q = quizDoDia;
+            /* ⚠️ Só vale se for a aula DESTE dia. Ver o carimbo em
+               `quizDoDia`: o valor herdado de outro dia tem de ler como
+               `undefined` ("ainda descendo"), nunca como a aula de agora. */
+            const q = quizDoDia?.dia === D ? quizDoDia.quiz : undefined;
             const st = wellnessDay === D ? dayTasks : dayTaskState(D);
             const chD = challengeForDay(D);
             const lessonDone = !!st.desafio || doneDays.includes(D);

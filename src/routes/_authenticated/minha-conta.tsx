@@ -683,6 +683,35 @@ function categoryOfTab(t: Tab): string {
  */
 const TOASTS_DE_CONQUISTA = 3;
 
+/**
+ * ⚠️ O QUE IMPEDE O LAÇO — e ele é REAL, não teórico.
+ *
+ * O ouvinte de `dc-sementinhas` agenda esta checagem; esta checagem termina em
+ * `creditarSementinhas`, que dispara `dc-sementinhas`. O que fecha o ciclo é a
+ * expectativa de que a próxima checagem devolva `newlyAwarded` vazio — e essa
+ * expectativa tem um caminho de falha ESCRITO no código: em
+ * `achievements.functions.ts`, o `upsert` de `patient_achievements` é seguido
+ * de `if (error) console.error(...)`, com um comentário admitindo que "na
+ * próxima checagem ela é nova de novo". A resposta continua trazendo a lista
+ * cheia.
+ *
+ * Isso era inofensivo enquanto a "próxima checagem" era a próxima ação da
+ * paciente (salvar uma pressão). Depois que o Caminho passou a disparar, a
+ * próxima checagem é 1,5 s depois, automática, para sempre: uma ida ao
+ * servidor a cada segundo e meio, com toasts, enquanto a tela estiver aberta.
+ *
+ * A trava é local e não depende do banco: uma conquista só é COMEMORADA e
+ * CREDITADA uma vez por sessão. Sem chave nova, não há crédito; sem crédito,
+ * não há evento; sem evento, não há laço. E o teto é o tamanho do catálogo.
+ *
+ * De quebra conserta o que o comentário de lá descreve: a mesma medalha
+ * aparecendo repetidamente quando a escrita falha.
+ *
+ * ⚠️ Vive FORA do componente de propósito — o ouvinte remonta a cada troca de
+ * aba, e um `useRef` reiniciaria a trava junto.
+ */
+const jaCelebradas = new Set<string>();
+
 function triggerAchievementsCheck() {
   supabase.auth
     .getSession()
@@ -694,8 +723,9 @@ function triggerAchievementsCheck() {
     .then((res) => {
       if (!res || !res.ok) return;
       if (res.careMode) return; // Modo Cuidado: sem comemorações.
-      const novas = res.newlyAwarded ?? [];
+      const novas = (res.newlyAwarded ?? []).filter((k) => !jaCelebradas.has(k));
       if (novas.length === 0) return;
+      for (const k of novas) jaCelebradas.add(k);
 
       for (const key of novas.slice(0, TOASTS_DE_CONQUISTA)) {
         const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);

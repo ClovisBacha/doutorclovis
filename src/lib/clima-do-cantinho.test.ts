@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   CLIMAS_NA_TELA,
   CLIMA_POR_ITEM,
@@ -57,6 +58,51 @@ describe("⚠️ o mapa e o catálogo concordam", () => {
     const climas = CANTINHO_LOJA.filter((i) => i.type === "clima");
     expect(climas.length).toBeGreaterThan(0);
     expect(climas.every((i) => i.premium)).toBe(true);
+  });
+});
+
+describe("⚠️ o clima vem do que ela POSSUI, nunca de onde ele está", () => {
+  /* ─── O DEFEITO QUE ESTE TESTE TRAVA ────────────────────────────────────
+     A camada No ar nasceu lendo `visiblePlaced` — os sprites espalhados pela
+     trilha. Mas o clima não tem lugar: é a definição do tipo.
+
+     A consequência era silenciosa e cara. Com a trilha cheia (120 sprites, e
+     cada item não-`especial` custa dois), o item recém-comprado não era
+     espalhado; `climasAtivos` recebia uma lista sem ele e a camada renderizava
+     `null`. A paciente pagava 200 🌱 na Poeira de estrelas e NADA acontecia —
+     exatamente o defeito que "Chuva mansa" e "Vaga-lumes" tinham antes desta
+     rodada, reintroduzido pela porta dos fundos.
+
+     Estes dois testes leem a FONTE porque o acoplamento mora no componente, e
+     `gestacao-path.tsx` importa cinco `.webp`: um teste que o importasse
+     morreria na primeira linha. */
+  const fonte = readFileSync("src/components/gestacao-path.tsx", "utf8");
+
+  test("a camada não é alimentada pelos sprites espalhados", () => {
+    expect(fonte).not.toMatch(/<ClimaNoAr[^>]*visiblePlaced/);
+    /* E vem da lista derivada de `decor` (o que ela comprou), com o portão do
+       Modo Cuidado dentro dela. */
+    expect(fonte).toMatch(/<ClimaNoAr ids=\{bancada\?\.clima \?\? climaDela\}/);
+    expect(fonte).toMatch(/careMode \? \[\] : decor\.filter\(\(id\) => ehClima\(id\)\)/);
+  });
+
+  test("e o tipo `clima` não entra na bandeja nem gasta vaga de enfeite", () => {
+    /* Se voltasse para `trayItems`, ele seria espalhado como adesivo (um 💮
+       parado num canto), consumiria duas das 120 vagas e sumiria do ar se ela
+       apagasse esse adesivo esquisito no modo Arrumar. */
+    expect(fonte).toMatch(/CANTINHO_BY_ID\[id\]\.type !== "clima"/);
+    /* E os sprites já GRAVADOS antes da correção também são descartados. */
+    expect(fonte).toMatch(/CANTINHO_BY_ID\[p\.id\]\?\.type !== "clima"/);
+  });
+
+  test("⚠️ mas os dois `especial` que emitem continuam sendo adesivos", () => {
+    /* `especial-chuva` e `especial-vagalume` têm halo, tamanho grande e preço
+       de `especial`. Tirá-los da bandeja apagaria o enfeite que ela comprou —
+       o filtro é por TIPO, e não por `ehClima`. */
+    for (const id of ["especial-chuva", "especial-vagalume"]) {
+      expect(CANTINHO_ITEMS.find((i) => i.id === id)?.type).toBe("especial");
+      expect(ehClima(id)).toBe(true);
+    }
   });
 });
 
