@@ -2548,6 +2548,139 @@ usa).
   `/preview-jogo?tela=jogos&dia=139` → "Momento com o bebê" → "Começar a
   ler" → ícone de som no topo da tela.
 
+## A economia ganhou uma nova loja, e as conquistas passaram a esperar o toque (ago/2026)
+
+Cinco pedidos do dono numa noite, na ordem em que ele os deu. Os cinco estão em
+`P1`…`P5` no histórico; o que segue é o que sobreviveu à auditoria de cada um.
+
+### P1 · O maior pacote deixou de comprar o catálogo inteiro
+
+O pacote de topo entrega 15.000 🌱 com o bônus, e o catálogo custava **14.894** —
+uma compra e não sobrava mais nada para querer. Os 90 itens pagos foram
+reajustados por FAIXA e por TIPO (trilha/especial/fundo/clima × 2,14; o resto ×
+1,56), e o catálogo foi a **28.979 🌱**: a mesma compra vale ~52%.
+
+- ⚠️ **A loja grátis NÃO se moveu**: 15 itens somando 704 🌱, a parede do 15º
+  dia intacta. O reajuste é sobre o que existe DEPOIS da parede.
+- **A âncora subiu de 200 para 260** e os catorze degraus baratos desceram para
+  a soma continuar 704. Com o premium indo a 1.000, uma âncora de 200 deixou de
+  ficar dentro da faixa que ela existe para ensinar.
+- ⚠️ **"Jogar perfeito" era medido no ritmo TÍPICO.** O teste tinha esse nome e
+  usava `GANHO_DIA_TIPICO` (35); perfeito é `GANHO_DIA_TETO` (68). No teto o
+  ganho orgânico da gestação passa de 81% do catálogo — o fim de jogo entrando
+  pela porta da paciente mais engajada em vez da que paga. Hoje há um teste para
+  cada um dos dois ritmos.
+- ⚠️ **PREÇO NÃO SE ESCREVE EM PROSA.** Uma varredura achou 8 lugares afirmando
+  valor que não existe mais, e o pior não era decorativo: `trofeus.ts`
+  justificava a escada de desbloqueio com "74 · 240 · 400 🌱" e os itens valem
+  65, 550 e 1.000 — a ordem sobreviveu, o argumento não. `loja-coerente.test.ts`
+  varre o `src/` casando «"Nome do item" … N 🌱» contra o catálogo.
+- **Nenhum conjunto passa de um sexto da jornada** (teste novo). O custo dos
+  conjuntos dobrou com o reajuste e o bônus ficou parado — a proporção caiu de
+  11% para 6,6% sem ninguém decidir. Importa porque `conjuntos.ts` declara que
+  conjunto é a mecânica que mais empurra compra, e as travas contra isso são de
+  desenho, não de preço.
+
+### P2 · A conquista não paga mais sozinha — ela espera o toque
+
+Pedido do dono: "a pessoa só vai conseguir pegar as sementinhas quando ela
+clicar na conquista, como o Duolingo faz". `grants` nasce vazio e
+`resgatarConquista` paga no toque.
+
+- **Nada foi devido a quem já usava o app.** A `dedupe_key` `achievement:<key>`
+  sempre existiu, e a versão antiga montava `grants` a partir de TODAS as
+  conquistas satisfeitas na checagem (não só as novas) — então o pagamento se
+  autocurava, e toda conquista desbloqueada tem a linha. Elas nascem "já
+  resgatadas", que é o certo: ela já recebeu.
+- ⚠️ **Falha ao LER o que já foi pago não pode virar "tudo por resgatar".**
+  `chavesResgatadas` engolia o erro e devolvia `[]` — uma consulta que falhasse
+  fazia as 39 conquistas voltarem a pulsar "Resgatar +120 🌱"; ela tocava, o
+  servidor respondia certíssimo (`repetido`) e o cartão virava uma data. Hoje
+  devolve `null`, e a tela distingue "nenhuma" de "não sei" (`semSaberPagas`).
+  Mesma régua de `contarTrofeus` ("falha ao contar RECUSA").
+- ⚠️ **O caminho repetido diz alguma coisa.** Todo o retorno visível vivia
+  dentro de `if (r.granted > 0)`; no repetido ela tocava um botão que prometia
+  moeda e a tela respondia com silêncio — que lê como app quebrado. Acontece de
+  verdade com dois aparelhos abertos.
+- **A trava de duplo toque é por CARTÃO**, não da grade: era `if
+  (resgatandoKey) return`, e tocar num segundo cartão sumia sem sinal.
+- ⚠️ **Mutação: 5 de 6 passavam verde**, incluindo o **Modo Cuidado
+  INVERTIDO** — a pior mutação que já passou nesta base, no teste que dizia
+  cobri-la (ele provava só que a string `isCareModeActive` existia). E as fatias
+  `slice(indexOf(...))` iam até o FIM do arquivo: a próxima função acrescentada
+  passaria a satisfazer os `toContain` sozinha. Refeitos e conferidos por
+  mutação, um a um.
+
+### P3 · A Loja de Sementinhas, com o layout do Drive
+
+Três pacotes (15.000 / 6.000 / 1.100 por R$ 99,90 / 59,90 / 14,90), o maior em
+cima com a fita "MELHOR VALOR". Abre pelo toque no saldo dentro do Caminho.
+
+- ⚠️ **O layout é funcional AGORA, com `IAP_ATIVO = false`.** A primeira versão
+  trocava os três cartões por uma caixa de aviso — ou seja, o layout que o dono
+  pediu não existiria até o app entrar na App Store. Hoje os cartões sempre
+  aparecem e só o BOTÃO muda: ele explica em vez de cobrar. Há teste, porque
+  essa é a afirmação central da tela e nada a travava.
+- ⚠️ **A ilustração do pacote grande estava DECAPITADA** — 65% da primeira linha
+  opaca, o topo do monte cortado reto. O script não tinha como saber: desenho
+  cortado tem exatamente a mesma fração de tinta de um inteiro. A trava nova
+  mede a **maior corrida contígua** na borda da caixa CRUA (antes de aparar) —
+  contar o total dava falso positivo com as faíscas decorativas, e medir a
+  aparada não responde nada, porque `apara()` encosta o enquadramento na tinta
+  por definição.
+- ⚠️ **A fita "MELHOR VALOR" da referência sai por GEOMETRIA, não por cor.** O
+  verde chapado sai fácil; as letras brancas têm uma rampa inteira de
+  antisserrilhado (medida: uma dúzia de tons entre o verde e o branco) que
+  nenhuma tolerância pega sem comer o saco, que é verde da mesma família. Some
+  o COMPONENTE conectado que toca o canto — o saco começa 65px para dentro e não
+  toca canto nenhum.
+- ⚠️ **Quatro contrastes reprovavam, e o pior era o PREÇO** (2,64:1, branco
+  sobre o cinza do botão desabilitado): o texto menos legível da tela era o
+  número que ela precisa ler, no estado que 100% das pacientes veem hoje.
+  Nenhum texto desta tela é "grande" pela WCAG (o maior é 17px; o corte é
+  18,66), então o mínimo é 4,5 — não 3.
+- ⚠️ **A tela mandava a paciente comprar "pela loja da Apple ou do Google"** num
+  app que não está em loja nenhuma. `ehNativo()` é falso para todas (o app é um
+  PWA), então o veredito caía em `canal_errado`. Com a compra desligada ela não
+  acontece em canal NENHUM — a ordem inverteu, e o "ainda não está pronta" vem
+  primeiro.
+- **`careMode` mora DENTRO da loja**, e não só nos dois chamadores: os dois já
+  fechavam a porta antes, mas isso é a segunda régua que o projeto proíbe desde
+  `humorDaJornada`.
+- **Bancada:** `/preview-loja-sementinhas?saldo=118`.
+
+### P4 · A ofensiva paga, e o presente só existe nas Amigas
+
+Ver a seção própria acima ("A ofensiva passou a pagar, e o presente mudou de
+casa"). O que a auditoria acrescentou:
+
+- ⚠️ **O 🎁 aparecia em quem ela NUNCA pode presentear.** A lista é o grafo de
+  indicação nos DOIS sentidos, mas `presentearAmiga` só aceita quem ELA trouxe.
+  Quem entrou pelo convite de alguém via o botão na linha de quem a trouxe e
+  levava "vocês precisam estar conectadas pelo convite" — falso: estão, pelo
+  lado oposto. `possoPresentear` vem do servidor.
+- ⚠️ **`jaPresenteada` sai do LEDGER**, não de um `Set` do componente. Trocar de
+  aba desmontava `AmigasTab` e os 🎁 voltavam ao normal para o servidor recusar
+  — o defeito que motivou tirar a porta antiga, sobrevivendo dentro da nova.
+- **O botão do PERFIL não tinha portão de Premium nenhum**, e o teste que dizia
+  cobrir isso provava só a linha da lista — enquanto o teste vizinho afirmava,
+  com `toBe(2)`, que existem duas portas.
+- ⚠️ **`ganho += BONUS` somava por fé.** `grantSementinhas` faz `upsert` com
+  `ignoreDuplicates` e engole falha num `console.error`: a perdedora de uma
+  corrida via "+10 🌱" e o saldo subindo sobre uma linha que não existe. Relê
+  depois de gravar, como `presentearAmiga` já fazia.
+- ⚠️ **A ofensiva só pagava a quem abrisse a aba Amigas.** Medido no desenho:
+  uma dupla de 7 dias cujo lado visita a aba uma vez por semana coletava 20 de
+  70 🌱 — e as duas metades recebiam valores diferentes pelo mesmo esforço, que
+  é o placar que a aba existe para não ser. O Caminho cobra junto do contador da
+  fita, de graça (já é uma ida ao servidor, e a função é idempotente).
+- **"Convidar" a 3,69:1 → 5,06.** O 🎁 de 36px → 44 (é o único controle do
+  recurso que o dono mandou trazer para cá).
+
+### P5 · As duas lojas
+
+Ver a seção própria abaixo. O que a auditoria acrescentou: esconder não bastava.
+
 ## As duas lojas pararam de se encostar (ago/2026)
 
 O app vende duas coisas de naturezas opostas, e elas viviam como duas pílulas da
