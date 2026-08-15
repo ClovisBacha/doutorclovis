@@ -543,6 +543,43 @@ arte nova.
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
 
+#### ⚠️ O convite das Amigas não convidava ninguém (ago/2026)
+
+O botão "Convidar" da aba mandava `${origin}/auth` — o link de LOGIN, puro,
+sem código de indicação.
+
+Não é detalhe de texto: **o grafo de amizade deste app É o de indicação**
+(`referred_by`, nos dois sentidos). A amiga que entrasse por aquele link criava
+a conta e nunca virava amiga dela — não aparecia na lista, não dava para formar
+dupla, não dava para presentear, e as 100 🌱 da indicação não eram pagas a
+ninguém. O botão da tela cujo assunto inteiro é trazer alguém era o único
+caminho do app que não trazia.
+
+E falhava em SILÊNCIO: as duas achariam que o app estava quebrado, semanas
+depois, sem nada a que apontar.
+
+- **`src/lib/indicacao.ts`** passou a ser o único lugar que monta o link, e o
+  `ReferralCard` do Cantinho (que montava certo, à mão) usa o mesmo. Duas
+  construções do mesmo link, e a que divergiu foi a mais nova — que é sempre
+  como isto acontece.
+- ⚠️ **`PARAM_INDICACAO` mora lá também.** `?amiga=` estava escrito na captura
+  (`__root.tsx`), na prosa de `referral.functions.ts` e nas telas: trocar o nome
+  em três lugares e esquecer o quarto quebraria a indicação inteira sem erro
+  nenhum — todo mundo continuaria funcionando e nenhuma amiga seria atribuída.
+- ⚠️ **Sem código, o convite NÃO SAI.** `linkDeIndicacao` devolve `null` e o
+  botão pede que ela tente de novo. Um convite sem indicação é indistinguível de
+  um bom para quem manda e para quem recebe; só o vínculo não acontece. E ela
+  só tem a atenção da amiga uma vez.
+- **O link aponta para a RAIZ, não para `/auth`.** O código é capturado em
+  qualquer página, e a raiz é a que apresenta o app a quem nunca ouviu falar
+  dele — mandar direto para o login pede que ela crie conta num produto que
+  ainda não viu.
+- **Vai o TEXTO para a área de transferência, não a URL crua.** Colado no
+  WhatsApp, um "https://..." sozinho não diz de quem veio nem o que é, e é aí
+  que a amiga decide se abre.
+- **Bancada:** `/preview-amigas?n=2&premium=1` e `?semcodigo=1` (o único jeito
+  de fotografar o estado sem código).
+
 #### A caixa de entrada guarda sete dias, e o tutorial mora fora dela
 
 - **Lida some em 7 dias; NÃO lida nunca some.** Pedido do dono: "sempre ficará

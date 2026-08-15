@@ -25,6 +25,7 @@ import type { DuplaNaTela } from "@/lib/amigas.functions";
  *   `?dias=12`         dias de chama da dupla
  *   `?premium=1`       liga o botão 🎁 na linha da amiga
  *   `?luto=1`          Modo Cuidado — a aba inteira se cala
+ *   `?semcodigo=1`     sem código de indicação (o "Convidar" explica e não manda)
  */
 export const Route = createFileRoute("/preview-amigas")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -35,6 +36,9 @@ export const Route = createFileRoute("/preview-amigas")({
     dupla: q.dupla == null ? "ativa" : String(q.dupla),
     dias: q.dias == null ? 12 : Number(q.dias),
     premium: q.premium == null ? false : Boolean(q.premium),
+    /* O código de indicação. Sem ele o "Convidar" explica em vez de mandar —
+       `?semcodigo=1` é a única forma de fotografar esse estado. */
+    codigo: q.semcodigo ? null : "ABC2345",
     luto: q.luto == null ? false : Boolean(q.luto),
   }),
   head: () => ({
@@ -48,7 +52,7 @@ export const Route = createFileRoute("/preview-amigas")({
 const NOMES = ["Marina Costa", "Juliana Alves", "Camila Souza", "Beatriz Lima", "Renata Dias"];
 
 function PreviewAmigas() {
-  const { n, dupla, dias, premium, luto } = Route.useSearch();
+  const { n, dupla, dias, premium, luto, codigo } = Route.useSearch();
 
   const amigas: PerfilDeAmiga[] = NOMES.slice(0, Math.max(0, Math.min(NOMES.length, n))).map(
     (nome, i) => ({
@@ -80,7 +84,7 @@ function PreviewAmigas() {
 
   return (
     <div className="mx-auto max-w-md p-4">
-      <AmigasTab careMode={luto} bancada={{ amigas, dupla: naTela, assinante: premium }} />
+      <AmigasTab careMode={luto} bancada={{ amigas, dupla: naTela, assinante: premium, codigo }} />
     </div>
   );
 }

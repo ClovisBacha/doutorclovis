@@ -143,6 +143,7 @@ import {
   type TestimonialStatus,
 } from "@/lib/testimonials.functions";
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
+import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -16974,19 +16975,29 @@ function ReferralCard() {
     })();
   }, []);
 
-  if (!loaded || !code) return null;
-
-  const link =
-    (typeof window !== "undefined" ? window.location.origin : "https://www.obstetrica.com.br") +
-    `/?amiga=${code}`;
-  const msg = `Estou usando o Obstétrica na minha gestação e amei 💛 Entra pelo meu link: ${link}`;
+  /* ⚠️ O MESMO construtor da aba das Amigas (`indicacao.ts`). As duas telas
+     montavam este link à mão, e a mais nova divergiu: o botão "Convidar" das
+     Amigas mandava `/auth` sem código nenhum, e a amiga que entrasse por ali
+     nunca virava amiga de ninguém. Duas construções do mesmo link é sempre
+     assim que acaba. */
+  const link = linkDeIndicacao(
+    code,
+    typeof window !== "undefined" ? window.location.origin : undefined,
+  );
+  /* Sem link não há cartão: ele existe para ser compartilhado, e um botão de
+     copiar que copia `null` é pior que a ausência do cartão. */
+  if (!loaded || !code || !link) return null;
+  const msg = mensagemDeConvite(link);
 
   async function copy() {
     try {
-      await navigator.clipboard.writeText(link);
+      /* O TEXTO INTEIRO, e não só a URL — é o mesmo que a aba das Amigas faz.
+         Colado no WhatsApp, um "https://..." sozinho não diz de quem veio nem
+         o que é, e é justamente aí que a amiga decide se abre. */
+      await navigator.clipboard.writeText(msg);
       toast.success("Link copiado! Manda pra sua amiga 💌");
     } catch {
-      toast("Copie o link: " + link);
+      toast("Copie o link: " + msg);
     }
   }
 

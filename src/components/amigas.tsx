@@ -8,6 +8,7 @@ import {
   PRESENTE_ENTRE_AMIGAS,
 } from "@/lib/economia-sementinhas";
 import { tempoNoApp, type EnfeitePosto, type PerfilDeAmiga } from "@/lib/amigas";
+import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { creditarSementinhas } from "@/lib/evento-sementinhas";
 import type { EstadoDaMesadaAmiga } from "@/lib/mesada-paciente.functions";
 import type { DuplaNaTela } from "@/lib/amigas.functions";
@@ -46,6 +47,9 @@ export type BancadaDasAmigas = {
   dupla: DuplaNaTela | null;
   /** `true` liga o botão 🎁 na linha da amiga (é o bolso do Premium). */
   assinante: boolean;
+  /** O código de indicação. Sem ele o botão "Convidar" explica em vez de
+      mandar um link que não liga ninguém a ninguém. */
+  codigo?: string | null;
 };
 
 export function AmigasTab({
@@ -77,6 +81,14 @@ export function AmigasTab({
   );
   const [enviando, setEnviando] = useState<string | null>(null);
   const [presenteadas, setPresenteadas] = useState<Set<string>>(new Set());
+  /* ─── ⚠️ O CÓDIGO DE INDICAÇÃO ────────────────────────────────────────
+     O botão "Convidar" mandava `${origin}/auth` — o link de login, PURO. O
+     grafo de amizade deste app É o de indicação, então a amiga que entrasse por
+     ali criava a conta e NUNCA virava amiga dela: não aparecia na lista, não
+     dava para formar dupla nem presentear, e as 100 🌱 não eram pagas a
+     ninguém. O botão da tela cujo assunto inteiro é trazer alguém era o único
+     caminho do app que não trazia. Ver `indicacao.ts`. */
+  const [codigo, setCodigo] = useState<string | null>(bancada?.codigo ?? null);
 
   /* ⚠️ Um BOOLEANO, não o objeto, nas listas de dependência. `bancada` é um
      literal remontado a cada render da rota de preview: usá-lo direto faria os
@@ -119,6 +131,23 @@ export function AmigasTab({
         if (r.ok) setMesada(r.mesada);
       } catch {
         /* sem bolso: a linha da amiga fica sem o botão, e mais nada muda */
+      }
+    })();
+  }, [ehBancada]);
+
+  /* O código de indicação, que é o que faz o convite valer. Consulta própria e
+     barata (`getReferral` lê uma coluna e a cria na primeira vez). */
+  useEffect(() => {
+    if (ehBancada) return;
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        const { getReferral } = await import("@/lib/referral.functions");
+        const r = await getReferral({ data: { accessToken: s.session.access_token } });
+        if (r.ok) setCodigo(r.code);
+      } catch {
+        /* sem código: o botão explica, em vez de mandar um convite quebrado */
       }
     })();
   }, [ehBancada]);
@@ -198,14 +227,25 @@ export function AmigasTab({
   /* Compartilhar o link de indicação. `navigator.share` no celular; sem ele,
      copia — nunca um botão que não faz nada. */
   async function convidar() {
-    const url = `${window.location.origin}/auth`;
-    const texto = "Vem cuidar da sua gestação comigo no Obstétrica 💛";
+    const url = linkDeIndicacao(codigo, window.location.origin);
+    /* ⚠️ SEM CÓDIGO, NÃO MANDA. Um convite sem indicação é indistinguível de um
+       bom — para quem manda e para quem recebe. A amiga entra, e o vínculo
+       simplesmente não acontece; a descoberta vem semanas depois, sem nada a
+       que apontar. Melhor pedir que ela tente de novo do que gastar o convite
+       dela num link que não liga ninguém a ninguém. */
+    if (!url) {
+      toast("Ainda estou preparando o seu link. Tente de novo em instantes.");
+      return;
+    }
+    const texto = mensagemDeConvite(url);
     try {
       if (navigator.share) {
         await navigator.share({ title: "Obstétrica", text: texto, url });
         return;
       }
-      await navigator.clipboard.writeText(`${texto} ${url}`);
+      /* O TEXTO INTEIRO na área de transferência, e não só o link: colado no
+         WhatsApp, "https://..." sozinho não diz de quem veio nem o que é. */
+      await navigator.clipboard.writeText(texto);
       toast.success("Link copiado 💌");
     } catch {
       /* ela cancelou o compartilhamento — não é erro, e não merece aviso */
