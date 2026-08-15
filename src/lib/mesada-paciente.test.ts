@@ -14,7 +14,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import {
   CUSTO_LOJA_GRATIS,
   MESADA_DA_ASSINANTE,
@@ -31,7 +31,12 @@ const semComentarios = (p: string) =>
     .replace(/^\s*\/\/.*$/gm, "");
 
 const fns = semComentarios("src/lib/mesada-paciente.functions.ts");
-const tela = semComentarios("src/components/presentear-amigas.tsx");
+/* ⚠️ A TELA MUDOU DE ARQUIVO (ago/2026). Era `presentear-amigas.tsx`, um cartão
+   dentro do Cantinho; hoje é a linha da amiga na aba Amigas, e o componente
+   antigo foi APAGADO. Pedido do dono: "tem outro lugar que você também consegue
+   dar sementinhas, mas a gente tem que tirar de onde está esse outro lugar. Vai
+   ser agora somente nas amizades." */
+const tela = semComentarios("src/components/amigas.tsx");
 const conta = semComentarios("src/routes/_authenticated/minha-conta.tsx");
 
 describe("1. o bolso não derruba a parede dos quinze dias", () => {
@@ -149,22 +154,46 @@ describe("5. Modo Cuidado vale para os dois lados", () => {
   });
 });
 
-describe("6. a tela existe e conta a mesma história", () => {
-  test("o cartão está montado no app da paciente", () => {
+describe("6. a tela existe, e há UMA porta só", () => {
+  test("a porta está montada na aba das Amigas", () => {
     /* `getMesada`/`presentearPaciente` do médico ficaram semanas sem chamador
        nenhum. Função sem botão é coluna gravada e nunca lida. */
-    expect(conta).toContain("<PresentearAmigas />");
-  });
-
-  test("e chama as duas funções do servidor", () => {
-    expect(tela).toContain("getMesadaDaAmiga");
     expect(tela).toContain("presentearAmiga");
+    expect(tela).toContain("getMesadaDaAmiga");
   });
 
-  test("some inteiro para quem não assina", () => {
-    /* Um cartão cinza com cadeado ensina que existe algo que ela não pode ter,
-       e a assinatura já tem vitrine própria — os 57 itens do Cantinho. */
-    expect(tela).toContain("!mesada?.assinante) return null");
+  test("⚠️ e ela é a ÚNICA — o Cantinho não presenteia mais ninguém", () => {
+    /**
+     * Pedido do dono, com todas as letras: "eu sei que tem outro lugar que
+     * você também consegue dar sementinhas, mas a gente tem que tirar de onde
+     * está esse outro lugar. Vai ser agora somente nas amizades."
+     *
+     * Duas portas para a mesma ação não é redundância inofensiva: a segunda
+     * vivia dentro do Cantinho — a aba de COMPRAR enfeite para si —, então a
+     * paciente encontrava a mecânica de presentear no lugar em que ela não
+     * está pensando em amiga nenhuma. E o `presenteadas` de uma tela não sabia
+     * do da outra: dar por uma e voltar pela outra mostrava o botão de novo,
+     * para o servidor recusar.
+     *
+     * Este teste é o que impede a segunda porta de renascer em qualquer tela
+     * que não seja a das Amigas.
+     */
+    expect(conta).not.toContain("PresentearAmigas");
+    expect(conta).not.toContain("presentearAmiga");
+
+    /* Varre o `src/` inteiro em vez de conferir só `minha-conta`: a porta que
+       saiu pode renascer em qualquer tela, e o pedido foi "somente nas
+       amizades", não "somente fora do Cantinho". */
+    const outras = readdirSync("src", { recursive: true, encoding: "utf8" })
+      .filter((p) => p.endsWith(".tsx") && !p.endsWith("amigas.tsx"))
+      .filter((p) => semComentarios(`src/${p}`).includes("presentearAmiga"));
+    expect(outras).toEqual([]);
+  });
+
+  test("o botão some inteiro para quem não assina", () => {
+    /* Um botão cinza com cadeado ensina que existe algo que ela não pode ter,
+       e a assinatura já tem vitrine própria — os itens do Cantinho. */
+    expect(tela).toContain("mesada?.assinante && (");
   });
 
   test("a recusa por Modo Cuidado NÃO conta nada sobre a amiga", () => {
@@ -184,19 +213,27 @@ describe("6. a tela existe e conta a mesma história", () => {
      *
      * O servidor precisa recusar; a tela não precisa explicar.
      */
-    const i = tela.indexOf('res.error === "modo_cuidado"');
-    expect(i).toBeGreaterThan(-1);
-    /* A janela do ramo, até o ternário seguinte. */
-    const ramo = tela.slice(i, tela.indexOf('res.error === "nao_indicada"', i));
+    /* ⚠️ São DUAS entradas para presentear dentro da aba — a linha da amiga na
+       lista e o botão dentro do perfil dela. As duas escrevem o próprio
+       ternário de recusa, então as duas precisam ser conferidas: cobrar só a
+       primeira deixaria a frase perigosa nascer livre na segunda. */
+    const pontos = [...tela.matchAll(/r\.error === "modo_cuidado"/g)].map((m) => m.index!);
+    expect(pontos.length).toBe(2);
 
-    /* Só o TEXTO que ela lê — a condição do ramo contém a palavra "cuidado"
-       por construção, e cobrar isso seria o teste batendo no próprio andaime
-       em vez de na frase. */
-    const frase = (ramo.match(/"([^"]{15,})"/) ?? ["", ""])[1].toLowerCase();
-    expect(frase.length).toBeGreaterThan(15);
-    expect(ramo).not.toContain("amiga.nome");
-    for (const palavra of ["delicado", "momento", "perda", "luto", "gesta"]) {
-      expect(frase).not.toContain(palavra);
+    for (const i of pontos) {
+      /* A janela do ramo, até o ternário seguinte. */
+      const ramo = tela.slice(i, tela.indexOf('r.error === "nao_indicada"', i));
+
+      /* Só o TEXTO que ela lê — a condição do ramo contém a palavra "cuidado"
+         por construção, e cobrar isso seria o teste batendo no próprio andaime
+         em vez de na frase. */
+      const frase = (ramo.match(/"([^"]{15,})"/) ?? ["", ""])[1].toLowerCase();
+      expect(frase.length).toBeGreaterThan(15);
+      expect(ramo).not.toContain("amiga.nome");
+      expect(ramo).not.toContain("perfil?.nome");
+      for (const palavra of ["delicado", "momento", "perda", "luto", "gesta"]) {
+        expect(frase).not.toContain(palavra);
+      }
     }
   });
 

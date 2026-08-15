@@ -28,6 +28,7 @@
  * está lá, como quem não entrou ainda.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { BONUS_DA_DUPLA } from "@/lib/economia-sementinhas";
 import { z } from "zod";
 import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
 import {
@@ -489,4 +490,119 @@ export const desfazerDupla = createServerFn({ method: "POST" })
       .eq("aceita", true);
     if (error) return { ok: false as const };
     return { ok: true as const };
+  });
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A OFENSIVA PAGA — o bônus que faltava
+
+   Pedido do dono, ago/2026: "a gente vai ter a aba que você consegue chamar as
+   amigas pra uma ofensiva, e dentro dessa ofensiva, se estiver completando,
+   vocês ganham mais sementinhas juntas".
+
+   Até aqui a dupla dava só a CHAMA compartilhada — nenhuma Sementinha. O
+   incentivo existia no desenho e não existia na carteira.
+
+   ⚠️ TRÊS DECISÕES QUE ESTE BÔNUS CARREGA:
+
+   1. **Só paga quando AS DUAS fecharam o dia.** É a definição de ofensiva, e é
+      o que faz o convite ter sentido: sozinha ela não alcança este ganho.
+
+   2. **NÃO é corrida: as duas têm direito ao MESMO dia.** A `dedupe_key` é do
+      PAR (`dupla:<menor>:<maior>:<dia>`) e a conferência é por `user_id` +
+      chave, então cada uma cobra a sua ao abrir a aba, sem uma tirar da outra.
+      Um bônus que fosse só de quem fecha por último transformaria a dupla numa
+      corrida — e a aba inteira existe para não ser placar.
+      ⚠️ Cada sessão paga SÓ a si mesma. Creditar a amiga a partir da minha
+      sessão poria Sementinhas na conta dela sem nenhuma tela dizendo de onde
+      vieram — é exatamente o defeito que o presente do médico teve por meses
+      ("saldo que sobe sozinho é indistinguível de bug").
+
+   3. ⚠️ **NÃO retroage.** Ele confere HOJE (e ontem, pelo mesmo perdão da
+      meia-noite que a chama tem), nunca a sequência inteira. Sem isso, ligar o
+      recurso pagaria de uma vez todos os dias que a dupla já tinha somado —
+      uma injeção de moeda que ninguém decidiu, na economia mais calibrada do
+      app.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* O valor mora em `economia-sementinhas.ts`, com todo número da economia —
+   ver a razão no comentário de lá. Aqui só se usa. */
+
+/** A chave do dia, por PAR — as duas pontas gravam a mesma, e cada uma a sua. */
+function chaveDoBonusDaDupla(menor: string, maior: string, dia: string): string {
+  return `dupla:${menor}:${maior}:${dia}`;
+}
+
+/**
+ * Confere os dois últimos dias e paga o que estiver fechado dos dois lados.
+ *
+ * Chamada quando a aba das Amigas abre. Idempotente pela `dedupe_key`, então
+ * abrir a aba dez vezes no mesmo dia paga uma.
+ *
+ * ⚠️ Dois dias e não um: quem fecha o dia às 23h50 e abre a aba no dia
+ * seguinte perderia o bônus de ontem para sempre. É o mesmo motivo pelo qual a
+ * recuperação do bônus das cinco estrelas olha hoje e ontem.
+ */
+export const cobrarBonusDaDupla = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const, ganho: 0 };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+
+      const dupla = await lerDupla(sb, eu);
+      if (!dupla || dupla.estado !== "ativa" || !dupla.amigaId) {
+        return { ok: true as const, ganho: 0 };
+      }
+      /* `lerDupla` já devolve `null` se a OUTRA estiver em Modo Cuidado. Falta
+         conferir a minha — o portão vale para os dois lados. */
+      if (await emLuto(sb, eu)) return { ok: true as const, ganho: 0 };
+
+      const linhas = await atividadesDe(sb, [eu, dupla.amigaId]);
+      const agrupado = porPaciente(linhas);
+      const minhas = diasDeAtividade(agrupado.get(eu) ?? []);
+      const dela = diasDeAtividade(agrupado.get(dupla.amigaId) ?? []);
+
+      const hoje = diaLocal(new Date());
+      const ontem = (() => {
+        const [a, m, d] = hoje.split("-").map(Number);
+        const t = new Date(Date.UTC(a, m - 1, d) - 86400000);
+        return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(
+          t.getUTCDate(),
+        ).padStart(2, "0")}`;
+      })();
+
+      const { parOrdenado } = await import("@/lib/amigas");
+      const { menor, maior } = parOrdenado(eu, dupla.amigaId);
+      const { typedDb } = await import("@/integrations/supabase/types.extended");
+      const { grantSementinhas } = await import("@/lib/sementinhas.functions");
+      const db = typedDb(supabaseAdmin);
+
+      let ganho = 0;
+      for (const dia of [hoje, ontem]) {
+        if (!minhas.has(dia) || !dela.has(dia)) continue;
+        const dedupeKey = chaveDoBonusDaDupla(menor, maior, dia);
+        const { data: paga } = await db
+          .from("sementinhas_ledger")
+          .select("amount")
+          .eq("user_id", eu)
+          .eq("dedupe_key", dedupeKey)
+          .maybeSingle();
+        if (paga) continue;
+        await grantSementinhas(db, eu, [
+          {
+            amount: BONUS_DA_DUPLA,
+            reason: `Ofensiva com ${dupla.nome ?? "sua amiga"} 🔥`,
+            dedupeKey,
+          },
+        ]);
+        ganho += BONUS_DA_DUPLA;
+      }
+      return { ok: true as const, ganho };
+    } catch {
+      /* `APLICAR_DUPLAS.sql` ainda não rodou, ou a rede caiu: o bônus é
+         secundário e a aba continua inteira sem ele. */
+      return { ok: false as const, ganho: 0 };
+    }
   });

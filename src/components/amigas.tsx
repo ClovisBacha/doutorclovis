@@ -2,8 +2,14 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { CANTINHO_BY_ID, fundoBgFor } from "@/lib/cantinho";
-import { PRESENTE_ENTRE_AMIGAS } from "@/lib/economia-sementinhas";
+import {
+  BONUS_DA_DUPLA,
+  MESADA_DA_ASSINANTE,
+  PRESENTE_ENTRE_AMIGAS,
+} from "@/lib/economia-sementinhas";
 import { tempoNoApp, type EnfeitePosto, type PerfilDeAmiga } from "@/lib/amigas";
+import { creditarSementinhas } from "@/lib/evento-sementinhas";
+import type { EstadoDaMesadaAmiga } from "@/lib/mesada-paciente.functions";
 import type { DuplaNaTela } from "@/lib/amigas.functions";
 import { ChamaDaSequencia } from "@/components/chama-sequencia";
 import { TrofeuIcone } from "@/components/trofeu";
@@ -26,13 +32,60 @@ import { TRILHA_SKINS } from "@/lib/trilha-skins";
  * A lista de amigas é o grafo de indicação nos dois sentidos — sem busca e sem
  * pedido de estranho, não há o que moderar.
  */
-export function AmigasTab({ careMode }: { careMode?: boolean }) {
-  const [amigas, setAmigas] = useState<PerfilDeAmiga[]>([]);
-  const [dupla, setDupla] = useState<DuplaNaTela | null>(null);
-  const [carregando, setCarregando] = useState(true);
+/**
+ * O estado que a BANCADA injeta.
+ *
+ * ⚠️ Ela fabrica o DADO, nunca o desenho: a lista, a dupla e o bolso entram
+ * pelos mesmos `useState` da produção, e daí para baixo é o componente de
+ * verdade. Uma bancada que cravasse números na tela mostraria um estado que o
+ * app nunca produz — foi exatamente assim que a folha da chama passou a
+ * fotografar um texto que ninguém via.
+ */
+export type BancadaDasAmigas = {
+  amigas: PerfilDeAmiga[];
+  dupla: DuplaNaTela | null;
+  /** `true` liga o botão 🎁 na linha da amiga (é o bolso do Premium). */
+  assinante: boolean;
+};
+
+export function AmigasTab({
+  careMode,
+  bancada,
+}: {
+  careMode?: boolean;
+  bancada?: BancadaDasAmigas;
+}) {
+  const [amigas, setAmigas] = useState<PerfilDeAmiga[]>(bancada?.amigas ?? []);
+  const [dupla, setDupla] = useState<DuplaNaTela | null>(bancada?.dupla ?? null);
+  const [carregando, setCarregando] = useState(!bancada);
   const [aberta, setAberta] = useState<string | null>(null);
+  /* ─── O PRESENTE MUDOU DE CASA (ago/2026) ─────────────────────────────
+     Pedido do dono: "vai ser agora somente nas amizades". Ele vivia num
+     cartão dentro do Cantinho (`PresentearAmigas`), que é a aba de COMPRAR
+     enfeite — dar Sementinhas a uma amiga não tem nada a ver com aquilo, e
+     quem quer presentear vai procurar onde as amigas estão. */
+  const [mesada, setMesada] = useState<EstadoDaMesadaAmiga | null>(
+    bancada
+      ? {
+          assinante: bancada.assinante,
+          total: MESADA_DA_ASSINANTE,
+          usado: 0,
+          restante: MESADA_DA_ASSINANTE,
+          sugerido: PRESENTE_ENTRE_AMIGAS,
+        }
+      : null,
+  );
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [presenteadas, setPresenteadas] = useState<Set<string>>(new Set());
+
+  /* ⚠️ Um BOOLEANO, não o objeto, nas listas de dependência. `bancada` é um
+     literal remontado a cada render da rota de preview: usá-lo direto faria os
+     três efeitos re-rodarem em toda pintura — inofensivo aqui (todos saem na
+     primeira linha), mas é assim que um efeito com rede dentro vira um laço. */
+  const ehBancada = !!bancada;
 
   const carregar = useCallback(async () => {
+    if (ehBancada) return;
     try {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session?.access_token) return;
@@ -47,11 +100,106 @@ export function AmigasTab({ careMode }: { careMode?: boolean }) {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [ehBancada]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /* O bolso de presentear. Sem assinatura ele não existe, e aí o botão de
+     presente simplesmente não aparece na linha da amiga. */
+  useEffect(() => {
+    if (ehBancada) return;
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        const { getMesadaDaAmiga } = await import("@/lib/mesada-paciente.functions");
+        const r = await getMesadaDaAmiga({ data: { accessToken: s.session.access_token } });
+        if (r.ok) setMesada(r.mesada);
+      } catch {
+        /* sem bolso: a linha da amiga fica sem o botão, e mais nada muda */
+      }
+    })();
+  }, [ehBancada]);
+
+  /* ─── A OFENSIVA PAGA ────────────────────────────────────────────────
+     Até ago/2026 a dupla dava só a chama compartilhada — nenhuma Sementinha.
+     O incentivo existia no desenho e não existia na carteira. `cobrarBonusDaDupla`
+     é idempotente e confere hoje e ontem, então abrir a aba dez vezes paga uma. */
+  useEffect(() => {
+    if (careMode || ehBancada) return;
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        if (!s.session?.access_token) return;
+        const { cobrarBonusDaDupla } = await import("@/lib/amigas.functions");
+        const r = await cobrarBonusDaDupla({ data: { accessToken: s.session.access_token } });
+        if (r.ok && r.ganho > 0) {
+          creditarSementinhas(r.ganho);
+          toast.success(`+${r.ganho} 🌱 da ofensiva com sua dupla 🔥`);
+        }
+      } catch {
+        /* o bônus é secundário; a aba continua inteira sem ele */
+      }
+    })();
+  }, [careMode, ehBancada]);
+
+  async function presentear(amiga: PerfilDeAmiga) {
+    if (enviando) return;
+    setEnviando(amiga.id);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { presentearAmiga } = await import("@/lib/mesada-paciente.functions");
+      const r = await presentearAmiga({
+        data: { accessToken: s.session.access_token, amigaId: amiga.id },
+      });
+      if (r.ok) {
+        setMesada(r.mesada);
+        setPresenteadas((v) => new Set(v).add(amiga.id));
+        toast.success(`${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${amiga.nome} 🌱💌`);
+        return;
+      }
+      /* Cada recusa com a sua frase: três delas são estados normais, não erros,
+         e "não foi possível" faria ela tentar de novo contra uma parede. */
+      toast(
+        r.error === "ja_presenteada"
+          ? `Você já presenteou ${amiga.nome} neste mês 💛`
+          : r.error === "mesada_esgotada"
+            ? "Seu bolso deste mês acabou. Ele volta na virada."
+            : r.error === "sem_premium"
+              ? "O bolso de presentear é do Premium."
+              : r.error === "modo_cuidado"
+                ? "Não é possível agora."
+                : r.error === "nao_indicada"
+                  ? "Vocês precisam estar conectadas pelo convite."
+                  : "Não foi possível enviar.",
+        { duration: 6000 },
+      );
+    } catch {
+      toast("Não foi possível enviar.");
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  /* Compartilhar o link de indicação. `navigator.share` no celular; sem ele,
+     copia — nunca um botão que não faz nada. */
+  async function convidar() {
+    const url = `${window.location.origin}/auth`;
+    const texto = "Vem cuidar da sua gestação comigo no Obstétrica 💛";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Obstétrica", text: texto, url });
+        return;
+      }
+      await navigator.clipboard.writeText(`${texto} ${url}`);
+      toast.success("Link copiado 💌");
+    } catch {
+      /* ela cancelou o compartilhamento — não é erro, e não merece aviso */
+    }
+  }
 
   /* Modo Cuidado: a aba inteira se cala, como a loja e o saldo. O servidor já
      devolve vazio; isto evita até o esqueleto piscar. */
@@ -72,19 +220,80 @@ export function AmigasTab({ careMode }: { careMode?: boolean }) {
   }
 
   return (
-    <div className="space-y-4">
-      <DuplaCard dupla={dupla} amigas={amigas} aoMudar={carregar} />
+    <div className="space-y-5">
+      {/* ── O HERÓI ───────────────────────────────────────────────────────
+          A bolha com o balão de fala, no layout que o dono desenhou. Não há
+          cabeçalho com "Amigas" e "Sair" como na imagem: esta é uma ABA dentro
+          da conta, que já tem cabeçalho e já tem sair — dois seriam um erro,
+          não uma fidelidade. */}
+      <div
+        className="relative overflow-hidden rounded-3xl p-4"
+        style={{ background: "linear-gradient(160deg,#eee7f9,#f2e8f8 55%,#fcf3fa)" }}
+      >
+        {CORACOES.map((c, i) => (
+          <span
+            key={i}
+            aria-hidden
+            className="pointer-events-none absolute select-none"
+            style={{ left: `${c.x}%`, top: `${c.y}%`, fontSize: c.s, opacity: c.o }}
+          >
+            💗
+          </span>
+        ))}
+        <div className="relative flex items-center gap-2">
+          <div className="shrink-0">
+            <Bolha tamanho={118} humor="feliz" careMode={false} />
+          </div>
+          {/* O balão. `rounded-bl-md` é o "bico" apontando para a bolha — o
+              mesmo truque do balão do mascote na home. */}
+          <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md bg-white/85 p-3.5 shadow-sm backdrop-blur">
+            <p className="font-serif text-[19px] leading-tight" style={{ color: "#512069" }}>
+              Amizade que faz bem 💗
+            </p>
+            <p className="mt-1.5 text-[13px] leading-snug text-slate-600">
+              Convide suas amigas, formem duplas e joguem juntas! Quanto mais conexão, mais
+              recompensas!
+            </p>
+          </div>
+        </div>
+      </div>
 
-      <div className="rounded-3xl border border-border bg-card p-5">
-        <p className="font-serif text-lg">Suas amigas</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quem você convidou para o app, e quem convidou você. Toque para visitar o Cantinho dela.
-        </p>
+      {/* ── DUPLAS FORMADAS ─────────────────────────────────────────────── */}
+      <section>
+        <h3 className="mb-2 flex items-center gap-2 px-1">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-full text-base"
+            style={{ background: "#f4e7fc" }}
+            aria-hidden
+          >
+            👯
+          </span>
+          <span className="font-serif text-lg">Duplas formadas</span>
+        </h3>
+        <DuplaCard dupla={dupla} amigas={amigas} aoMudar={carregar} />
+      </section>
+
+      {/* ── SUAS AMIGAS ─────────────────────────────────────────────────── */}
+      <section>
+        <h3 className="mb-2 flex items-center gap-2 px-1">
+          <span
+            className="flex h-8 w-8 items-center justify-center rounded-full text-base"
+            style={{ background: "#f4e7fc" }}
+            aria-hidden
+          >
+            {/* ⚠️ 👭 (um ponto de código), nunca 👩‍🤝‍👩 (sequência ZWJ). Medido: o
+                ZWJ desenha três bonecos e sai 3× mais largo que a bolinha de
+                32px, transbordando dos dois lados e comendo o `gap-2` — o
+                título lia "👩‍🤝‍👩Suas amigas", colado. */}
+            👭
+          </span>
+          <span className="font-serif text-lg">Suas amigas</span>
+        </h3>
 
         {amigas.length === 0 ? (
           /* Vazio que ENSINA o caminho. "Nenhuma amiga" só informaria a
              ausência, e a ausência ela já vê. */
-          <div className="mt-4 rounded-2xl border border-dashed border-border p-6 text-center">
+          <div className="rounded-3xl border border-dashed border-border p-6 text-center">
             <p className="text-4xl">👯</p>
             <p className="mt-2 text-sm font-semibold">Ainda não tem ninguém por aqui</p>
             <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
@@ -93,30 +302,104 @@ export function AmigasTab({ careMode }: { careMode?: boolean }) {
             </p>
           </div>
         ) : (
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+          <ul className="space-y-2">
             {amigas.map((a) => (
-              <li key={a.id}>
+              <li
+                key={a.id}
+                className="flex items-center gap-2 rounded-2xl bg-white p-2.5 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:bg-white/5"
+              >
                 <button
                   onClick={() => setAberta(a.id)}
-                  className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-background p-3 text-left"
+                  className="press flex min-w-0 flex-1 items-center gap-2.5 text-left"
                 >
-                  <Bolha tamanho={44} humor="feliz" flutua={false} />
+                  <Bolha tamanho={46} humor="feliz" flutua={false} />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold">{a.nome}</span>
-                    <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted-foreground">
-                      <ChamaDaSequencia acesa={a.sequencia > 0} tamanho={14} fonteAoLado={11} />
-                      {a.sequencia} · <TrofeuIcone tamanho={18} fonteAoLado={11} /> {a.trofeus}
+                    <span className="block truncate text-[15px] font-semibold">{a.nome}</span>
+                    {/* ⚠️ "no app há X", e não "Online"/"Há 2h" como na imagem:
+                        o app não guarda presença, e inventar um ponto verde
+                        seria mostrar um dado que não existe. `diasNoApp` é
+                        real e conta a mesma história — quem é de casa. */}
+                    <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                      {tempoNoApp(a.diasNoApp)}
                     </span>
                   </span>
                 </button>
+                <span
+                  className="flex shrink-0 items-center gap-1 rounded-full px-2.5 py-1 text-[13px] font-bold"
+                  style={{ background: "#f4e7fc", color: "#6b21a8" }}
+                  title="Troféus dela"
+                >
+                  <TrofeuIcone tamanho={16} /> {a.trofeus}
+                </span>
+                {/* O PRESENTE mora aqui agora — e só aqui. Ver o cabeçalho. */}
+                {mesada?.assinante && (
+                  <button
+                    onClick={() => presentear(a)}
+                    disabled={enviando !== null || presenteadas.has(a.id)}
+                    aria-label={`Dar ${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${a.nome}`}
+                    className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base disabled:opacity-40"
+                    style={{ background: presenteadas.has(a.id) ? "#e7f6ec" : "#fce7f3" }}
+                  >
+                    {presenteadas.has(a.id) ? "✓" : "🎁"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>
         )}
+      </section>
+
+      {/* ── CONVIDAR ────────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 rounded-3xl p-4" style={{ background: "#fcf1d5" }}>
+        <span
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl"
+          style={{ background: "#8b5cf6" }}
+          aria-hidden
+        >
+          🫶
+        </span>
+        {/* `leading-tight` não é enfeite: com a entrelinha padrão o título
+            quebrava em duas linhas bem separadas e a legenda em mais duas, e o
+            cartão virava um bloco de quatro linhas do lado de um botão de uma.
+            Medido em 393px — a largura que sobra aqui é ~145px, então o título
+            SEMPRE quebra; o que se ajusta é a entrelinha, não a quebra.
+
+            ⚠️ E ela vai em CADA `<p>`, nunca no pai. Medido: com a classe no
+            pai, o parágrafo computava 26,25px (15 × 1,75) — há uma regra base
+            de `p` no projeto, e regra de ELEMENTO vence valor herdado, por mais
+            específica que seja a classe de quem herda. */}
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-bold leading-tight text-slate-800">Convide mais amigas</p>
+          <p className="mt-1 text-[12.5px] leading-tight text-slate-600">
+            Vocês duas ganham Sementinhas 🌱
+          </p>
+        </div>
+        <button
+          onClick={convidar}
+          className="press shrink-0 rounded-full px-4 py-2 text-[14px] font-bold text-white"
+          style={{ background: "#e04f8f" }}
+        >
+          Convidar
+        </button>
       </div>
     </div>
   );
 }
+
+/**
+ * Os coraçõezinhos flutuando no herói.
+ *
+ * ⚠️ Posições CRAVADAS, não sorteadas: a tela é renderizada no servidor, e um
+ * `Math.random()` daria posições diferentes de cada lado — o React reclama de
+ * hidratação no console de todo mundo.
+ */
+const CORACOES = [
+  { x: 46, y: 4, s: 15, o: 0.55 },
+  { x: 33, y: 12, s: 22, o: 0.75 },
+  { x: 3, y: 58, s: 26, o: 0.6 },
+  { x: 88, y: 8, s: 13, o: 0.45 },
+  { x: 70, y: 72, s: 11, o: 0.4 },
+];
 
 /* ══════════════════════════ A DUPLA ══════════════════════════ */
 
@@ -184,7 +467,13 @@ function DuplaCard({
         <div className="min-w-0 flex-1">
           <p className="font-serif text-lg">Dupla de sequência</p>
           <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
-            Vocês duas seguram a mesma chama: o dia conta quando as duas aparecem.{" "}
+            Vocês duas seguram a mesma chama: o dia conta quando as duas aparecem, e vocês ganham{" "}
+            <strong className="font-semibold">+{BONUS_DA_DUPLA} 🌱 cada uma</strong>.{" "}
+            {/* ⚠️ O número sai da fonte única, nunca digitado — o servidor é
+                quem paga, e um texto divergente prometeria o que ele não dá.
+                Dito em voz alta porque o dono pediu ("vocês ganham mais
+                sementinhas juntas") e porque até ago/2026 a dupla não pagava
+                nada: o incentivo existia no desenho e não na carteira. */}
             {/* Dito em voz alta porque é o que separa isto de um placar — e é a
                 primeira coisa que alguém teme ao ler "dupla". */}
             <strong className="font-semibold">Ninguém perde nada</strong> se a outra não vier.

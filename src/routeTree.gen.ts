@@ -35,6 +35,7 @@ import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
+import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -210,6 +211,11 @@ const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
 const PreviewBebeRoute = PreviewBebeRouteImport.update({
   id: '/preview-bebe',
   path: '/preview-bebe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAmigasRoute = PreviewAmigasRouteImport.update({
+  id: '/preview-amigas',
+  path: '/preview-amigas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MuralRoute = MuralRouteImport.update({
@@ -465,6 +471,7 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -538,6 +545,7 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -613,6 +621,7 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -688,6 +697,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-amigas'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -761,6 +771,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-amigas'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -835,6 +846,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-amigas'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -910,6 +922,7 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewAmigasRoute: typeof PreviewAmigasRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
@@ -1140,6 +1153,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-bebe'
       fullPath: '/preview-bebe'
       preLoaderRoute: typeof PreviewBebeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-amigas': {
+      id: '/preview-amigas'
+      path: '/preview-amigas'
+      fullPath: '/preview-amigas'
+      preLoaderRoute: typeof PreviewAmigasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mural': {
@@ -1506,6 +1526,7 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewAmigasRoute: PreviewAmigasRoute,
   PreviewBebeRoute: PreviewBebeRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
   PreviewCasalRoute: PreviewCasalRoute,

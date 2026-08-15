@@ -23,6 +23,7 @@ import {
   sequenciaDaDupla,
   tempoNoApp,
 } from "./amigas";
+import { BONUS_DA_DUPLA, GANHO_DIA_TIPICO } from "./economia-sementinhas";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -343,5 +344,97 @@ describe("«no app há»", () => {
   test("depois de dois meses vira meses", () => {
     /* "no app há 143 dias" é um número que ninguém converte de cabeça. */
     expect(tempoNoApp(143)).toBe("no app há 5 meses");
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A OFENSIVA PAGA (ago/2026)
+
+   Pedido do dono: "a gente vai ter a aba que você consegue chamar as amigas
+   pra uma ofensiva, e dentro dessa ofensiva, se estiver completando vocês
+   ganham mais sementinhas juntas".
+
+   Até aqui a dupla dava só a chama compartilhada — nenhuma Sementinha. O
+   incentivo existia no desenho e não existia na carteira, que é a mesma
+   armadilha de `bonus-e-mesada.test.ts`: a economia tinha teste e a ENTREGA
+   não tinha nenhum.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("a ofensiva da dupla paga, e paga uma vez", () => {
+  const i = servidor.indexOf("export const cobrarBonusDaDupla");
+  const corpo = servidor.slice(i);
+
+  test("existe, e a aba a chama — função sem chamador é coluna nunca lida", () => {
+    expect(i).toBeGreaterThan(-1);
+    expect(semComentarios("src/components/amigas.tsx")).toContain("cobrarBonusDaDupla");
+  });
+
+  test("⚠️ só paga o dia em que AS DUAS apareceram", () => {
+    /* É a definição de ofensiva, e é o que faz o convite ter sentido: sozinha
+       ela não alcança este ganho. Sem o `&&`, a dupla viraria um bônus diário
+       para quem por acaso tem uma amiga cadastrada. */
+    expect(corpo).toContain("if (!minhas.has(dia) || !dela.has(dia)) continue;");
+  });
+
+  test("a chave é do PAR e carrega o DIA", () => {
+    /* Sem o dia, a dupla pagaria uma vez na vida. Sem o par ordenado, (A,B) e
+       (B,A) gravariam chaves diferentes e o mesmo dia pagaria duas vezes. */
+    expect(servidor).toContain("`dupla:${menor}:${maior}:${dia}`");
+    expect(corpo).toContain("parOrdenado(eu, dupla.amigaId)");
+  });
+
+  test("confere se já pagou ANTES de gravar", () => {
+    const checa = corpo.indexOf("if (paga) continue;");
+    const grava = corpo.indexOf("grantSementinhas(db, eu");
+    expect(checa).toBeGreaterThan(-1);
+    expect(checa).toBeLessThan(grava);
+  });
+
+  test("⚠️ NÃO retroage — olha hoje e ontem, nunca a sequência inteira", () => {
+    /* Ligar o recurso pagaria de uma vez todos os dias que a dupla já tinha
+       somado: uma injeção de moeda que ninguém decidiu, na economia mais
+       calibrada do app. Ontem entra pelo mesmo perdão da meia-noite que a
+       chama tem — quem fecha o dia às 23h50 e abre a aba no dia seguinte
+       perderia o bônus para sempre. */
+    expect(corpo).toContain("for (const dia of [hoje, ontem])");
+    expect(corpo).not.toContain("sequenciaDaDupla");
+  });
+
+  test("Modo Cuidado barra os DOIS lados", () => {
+    /* `lerDupla` já devolve null se a OUTRA estiver em luto; falta a minha. */
+    expect(corpo).toContain("if (await emLuto(sb, eu)) return");
+  });
+
+  test("e a condição SAI quando é verdade, não o contrário", () => {
+    /* A mutação mais grave que já passou verde nesta base foi inverter uma
+       condição destas: o app pagava Sementinhas SÓ para quem tinha perdido o
+       bebê. */
+    expect(corpo).not.toContain("!(await emLuto");
+  });
+
+  test("cada sessão paga SÓ a si mesma", () => {
+    /* Creditar a amiga a partir da minha sessão poria Sementinhas na conta
+       dela sem nenhuma tela dizendo de onde vieram — o defeito que o presente
+       do médico teve por meses. A `dedupe_key` é do par e a conferência é por
+       `user_id` + chave, então as duas têm direito ao mesmo dia sem uma tirar
+       da outra. */
+    expect(corpo).toContain("grantSementinhas(db, eu");
+    expect(corpo).toContain('.eq("user_id", eu)');
+    expect(corpo).not.toContain("grantSementinhas(db, dupla.amigaId");
+  });
+
+  test("a tela diz o número, e ele vem da fonte única", () => {
+    /* Um bônus que ninguém sabe que existe não convida ninguém para nada. E o
+       texto lê a MESMA constante que o servidor paga — digitado à mão, o dia
+       em que um dos dois mudar a tela prometeria o que o servidor não dá. */
+    const tela = semComentarios("src/components/amigas.tsx");
+    expect(tela).toContain("BONUS_DA_DUPLA");
+    expect(tela).not.toMatch(/\+10 🌱/);
+  });
+
+  test("⚠️ o valor não derruba a parede dos quinze dias", () => {
+    /* A loja grátis é calibrada contra o ganho típico para a parede cair por
+       volta do 15º dia — é a mecânica de conversão inteira. Uma torneira que
+       valesse meio dia de jogo a empurraria sem ninguém perceber. */
+    expect(BONUS_DA_DUPLA).toBeLessThan(GANHO_DIA_TIPICO / 2);
   });
 });

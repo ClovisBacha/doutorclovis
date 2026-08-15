@@ -358,6 +358,23 @@ export const MESADA_DA_ASSINANTE = 120;
 export const PRESENTE_ENTRE_AMIGAS = 40;
 
 /**
+ * Quanto cada uma leva por dia fechado EM DUPLA (a "ofensiva").
+ *
+ * ⚠️ Modesto de propósito. O ganho típico é 35 🌱/dia (`GANHO_DIA_TIPICO`) e a
+ * loja grátis (`CUSTO_LOJA_GRATIS`) é calibrada contra ele para a parede cair
+ * por volta do 15º dia — que é a mecânica de conversão inteira. Dez a mais,
+ * só para quem tem dupla ativa e só nos dias em que AS DUAS apareceram, mexe
+ * pouco nessa conta e ainda assim é sentido: é quase um terço de um dia.
+ *
+ * ⚠️ E ele mora AQUI, não em `amigas.functions.ts`, por dois motivos: todo
+ * número da economia mora neste arquivo (é o que permite os testes de teto
+ * somarem as torneiras todas), e a TELA precisa dizer o valor em voz alta —
+ * importar o módulo de server functions só para ler uma constante puxaria o
+ * servidor para dentro do pacote do navegador.
+ */
+export const BONUS_DA_DUPLA = 10;
+
+/**
  * O QUE ELA GANHA SEM TER FEITO NADA, no dia em que chega.
  *
  * ─── AS DUAS FUNÇÕES DESTE ARQUIVO DISCORDAVAM ──────────────────────────────

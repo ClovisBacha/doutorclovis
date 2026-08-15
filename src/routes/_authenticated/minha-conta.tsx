@@ -142,7 +142,6 @@ import {
   type TestimonialStatus,
 } from "@/lib/testimonials.functions";
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
-import { PresentearAmigas } from "@/components/presentear-amigas";
 import { AmigasTab } from "@/components/amigas";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -17168,11 +17167,15 @@ function CantinhoTab({
               <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />
               <TestimonialCard />
               <ReferralCard />
-              {/* O bolso de quem assina: presentear as amigas que ela trouxe.
-                  Vem DEPOIS do cartão de indicação de propósito — primeiro ela
-                  entende como trazer alguém, depois o que pode dar a quem
-                  trouxe. O cartão some sozinho para quem não assina. */}
-              <PresentearAmigas />
+              {/* ⚠️ O CARTÃO DE PRESENTEAR SAIU DAQUI (ago/2026).
+                  Pedido do dono: "eu sei que tem outro lugar que você também
+                  consegue dar sementinhas, mas a gente tem que tirar de onde
+                  está esse outro lugar. Vai ser agora somente nas amizades."
+                  Ele vivia aqui, dentro do Cantinho — a aba de COMPRAR enfeite
+                  para si. Duas portas para a mesma ação faziam a paciente
+                  descobrir a mecânica no lugar onde ela não pensa em amiga
+                  nenhuma. O bolso não mudou: `presentearAmiga` continua igual,
+                  e a porta é a linha da amiga na aba Amigas. */}
             </div>
           )}
         </div>

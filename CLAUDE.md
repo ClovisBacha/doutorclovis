@@ -1135,6 +1135,64 @@ dupla de sequência**.
   dele — `lerDupla` engole a falha e devolve `null`, então lista, perfil,
   Cantinho e presente funcionam antes de ele rodar.
 
+#### A ofensiva passou a pagar, e o presente mudou de casa (ago/2026)
+
+Pedido do dono, em três partes: o layout do Drive; "vai ter a opção de dar
+sementinhas pras amigas, dependendo do plano premium"; e "a gente vai ter a aba
+que você consegue chamar as amigas pra uma ofensiva, e dentro dessa ofensiva, se
+estiver completando, vocês ganham mais sementinhas juntas".
+
+- ⚠️ **A dupla NÃO pagava nada.** Ela dava a chama compartilhada e mais nada —
+  o incentivo existia no desenho e não existia na carteira. É a mesma armadilha
+  de `bonus-e-mesada.test.ts`: a economia tinha teste, a ENTREGA não tinha
+  nenhum. `cobrarBonusDaDupla` (`amigas.functions.ts`) paga `BONUS_DA_DUPLA`
+  por dia em que **as duas** fecharam.
+- **O valor mora em `economia-sementinhas.ts`**, com todo número da economia —
+  é o que permite os testes de teto somarem as torneiras todas. E a TELA diz o
+  número em voz alta lendo a MESMA constante: um bônus que ninguém sabe que
+  existe não convida ninguém para nada, e um texto digitado à mão prometeria o
+  que o servidor não dá. **10 🌱**, contra os 35 do ganho típico — mexe pouco na
+  parede dos quinze dias, e ainda assim é quase um terço de um dia.
+- ⚠️ **NÃO retroage.** Confere HOJE e ontem, nunca a sequência inteira (ontem
+  entra pelo mesmo perdão da meia-noite da chama). Sem isso, ligar o recurso
+  pagaria de uma vez todos os dias que a dupla já tinha somado — uma injeção de
+  moeda que ninguém decidiu, na economia mais calibrada do app.
+- ⚠️ **Cada sessão paga SÓ a si mesma.** A `dedupe_key` é do PAR
+  (`dupla:<menor>:<maior>:<dia>`) e a conferência é por `user_id` + chave, então
+  as duas têm direito ao mesmo dia sem uma tirar da outra — não é corrida.
+  Creditar a amiga a partir da minha sessão poria Sementinhas na conta dela sem
+  nenhuma tela dizendo de onde vieram, que é exatamente o defeito que o presente
+  do médico teve por meses ("saldo que sobe sozinho é indistinguível de bug").
+- ⚠️ **O PRESENTE SAIU DO CANTINHO.** Palavras do dono: "eu sei que tem outro
+  lugar que você também consegue dar sementinhas, mas a gente tem que tirar de
+  onde está esse outro lugar. Vai ser agora somente nas amizades."
+  `presentear-amigas.tsx` foi **apagado**; o 🎁 é a linha da amiga. Duas portas
+  para a mesma ação não era redundância inofensiva: a segunda vivia dentro da
+  aba de COMPRAR enfeite para si, então a paciente encontrava a mecânica no
+  lugar em que ela não está pensando em amiga nenhuma — e o `presenteadas` de
+  uma tela não sabia do da outra, então dar por uma e voltar pela outra mostrava
+  o botão de novo para o servidor recusar. `mesada-paciente.test.ts` varre o
+  `src/` inteiro: `presentearAmiga` só pode aparecer em `amigas.tsx`.
+- ⚠️ **`leading-tight` vai em CADA `<p>`, nunca no pai.** Medido: com a classe
+  no pai, o parágrafo computava 26,25px (15 × 1,75) — há regra base de `p` no
+  projeto, e **regra de ELEMENTO vence valor herdado**, por mais específica que
+  seja a classe de quem herda.
+- ⚠️ **👭 (um ponto de código), nunca 👩‍🤝‍👩 (sequência ZWJ).** Medido: o ZWJ
+  desenha três bonecos e sai 3× mais largo que a bolinha de 32px, transbordando
+  dos dois lados e comendo o `gap` — o título lia "👩‍🤝‍👩Suas amigas", colado.
+- **Sem migration**: tudo sai de `sementinhas_ledger` e de colunas que já
+  existem.
+- **Bancada:** `/preview-amigas?n=4&dupla=ativa&dias=12&premium=1` ·
+  `?n=0&dupla=sem` (o vazio que ensina) · `?dupla=convite-recebido` · `?luto=1`.
+  A aba depende de coisas que não se fabricam numa conta de teste — uma amiga
+  que entrou pelo convite DELA, uma dupla aceita dos dois lados e uma assinatura
+  —, então conferir o layout exigia duas contas reais e um convite aceito.
+  ⚠️ A bancada injeta o DADO nos mesmos `useState` da produção, nunca o desenho:
+  é a lição do `?streak=41` da folha da chama, que cravava o NÚMERO e deixava o
+  saldo vir de uma jornada vazia. E o guarda dos efeitos é um BOOLEANO
+  (`ehBancada`), não o objeto — literal remontado a cada render faz os efeitos
+  re-rodarem em toda pintura.
+
 ### A Central de Emergência segue o modelo do dono (ago/2026)
 
 A primeira dobra do SOS (`emergency-sheet.tsx`) foi refeita a partir de uma
