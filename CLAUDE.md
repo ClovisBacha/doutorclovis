@@ -2548,6 +2548,37 @@ usa).
   `/preview-jogo?tela=jogos&dia=139` → "Momento com o bebê" → "Começar a
   ler" → ícone de som no topo da tela.
 
+## As duas lojas pararam de se encostar (ago/2026)
+
+O app vende duas coisas de naturezas opostas, e elas viviam como duas pílulas da
+MESMA fita dentro de "Recompensas": o **Cantinho** vende enfeite por Sementinhas
+(moeda que ela ganha cuidando de si, sem dinheiro nenhum) e a **Loja** vende
+suplemento, conforto e enxoval por dinheiro de verdade.
+
+Pedido do dono, sem meio-termo: "a loja não é pra estar ali de maneira alguma;
+ela já está lá no perfil. A única aba que vai estar ali vai ser a de conquistas
+e a própria aba onde compra os jogos".
+
+- **A fita ficou com duas pílulas**: Meu Cantinho · Conquistas. Lado a lado, as
+  duas lojas liam como duas prateleiras da mesma coisa — e é assim que uma
+  paciente toca em "Loja" achando que vai gastar o que juntou e encontra um
+  carrinho de compras.
+- ⚠️ **Ela NÃO foi apagada — mudou de porta.** `MenuDaConta` já entrava direto
+  nela (`tab: "Recompensas"`, `subAba: "loja"`), e é esse o "está no perfil" do
+  pedido. Apagar o caminho apagaria a loja inteira do app da paciente, que é
+  outra decisão.
+- ⚠️ **`SubRec` ganhou `| "loja"` à mão**, fora de `RECOMPENSAS_SUBTABS`. É a
+  linha que some primeiro numa limpeza distraída: derivando o tipo só da lista,
+  `eSub("loja")` passa a devolver `false` e o `initialSub` do menu cai no
+  Cantinho **em silêncio** — a linha "Loja · Suplementos, conforto e enxoval"
+  abriria o jardim de enfeites, sem erro nenhum para investigar.
+- **Na Loja a fita não aparece** (`naLoja`): duas pílulas e NENHUMA acesa é como
+  uma tela quebrada se parece, e a fita é justamente o que o pedido mandou tirar
+  de perto dela. Quem chega ali veio do menu e sai por ele.
+- `src/lib/duas-lojas.test.ts` cobra as **duas metades ao mesmo tempo** — fora
+  da fita, e viva pelo menu. Uma sem a outra é o defeito de volta ou uma loja
+  inteira desaparecida.
+
 ## O compasso da respiração, e uma voz de cada vez (ago/2026)
 
 O dono ouviu a meditação e trouxe três coisas: que as frases se sobrepunham,

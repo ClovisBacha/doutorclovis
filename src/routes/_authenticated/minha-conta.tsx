@@ -15643,14 +15643,30 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
    Feature 16 — Conquistas
 ───────────────────────────────────────────────────────── */
 /**
- * Hub "Recompensas": junta o Cantinho (jardim/moeda), as Conquistas e a Loja
- * numa tela só com sub-abas. Começa no Cantinho (coração das recompensas), que
- * é pra onde o botão da lojinha do jogo aponta.
+ * Hub "Recompensas": o Cantinho (onde ela gasta Sementinhas) e as Conquistas.
+ * Começa no Cantinho, que é pra onde o botão da lojinha do jogo aponta.
+ *
+ * ─── ⚠️ A LOJA DE PRODUTOS SAIU DA FITA (ago/2026) ─────────────────────────
+ *
+ * Pedido do dono, sem meio-termo: "a loja não é pra estar ali de maneira
+ * alguma; ela já está lá no perfil. A única aba que vai estar ali vai ser a de
+ * conquistas e a própria aba onde compra os jogos".
+ *
+ * A razão é que são DUAS LOJAS com naturezas opostas encostadas uma na outra: o
+ * Cantinho vende enfeite por Sementinhas — moeda que ela ganha cuidando de si —,
+ * e a Loja vende suplemento, conforto e enxoval por DINHEIRO. Lado a lado, na
+ * mesma fita de pílulas, elas leem como duas prateleiras da mesma coisa; e é
+ * assim que uma paciente toca em "Loja" achando que vai gastar o que juntou e
+ * encontra um carrinho de compras de verdade.
+ *
+ * ⚠️ ELA NÃO SUMIU — saiu da FITA. `MenuDaConta` já entra direto nela
+ * (`tab: "Recompensas"`, `subAba: "loja"`), que é o "está no perfil" do pedido,
+ * e é por isso que a chave continua válida em `SubRec` e o bloco de render
+ * continua aqui. Apagar o caminho apagaria a loja inteira do app da paciente.
  */
 const RECOMPENSAS_SUBTABS = [
   { key: "cantinho", label: "Meu Cantinho" },
   { key: "conquistas", label: "Conquistas" },
-  { key: "loja", label: "Loja" },
 ] as const;
 
 function RecompensasHub({
@@ -15666,34 +15682,50 @@ function RecompensasHub({
   onNavigate?: (t: string) => void;
   skyTheme?: "v2" | "v1";
   onSkyChange?: (t: "v2" | "v1") => void;
-  /** O menu da conta entra por "Loja"; quem chega por outro caminho cai no
+  /** O menu da conta entra por "loja"; quem chega por outro caminho cai no
       Cantinho, como antes. */
   initialSub?: string | null;
 }) {
-  type SubRec = (typeof RECOMPENSAS_SUBTABS)[number]["key"];
-  const eSub = (v: unknown): v is SubRec => RECOMPENSAS_SUBTABS.some((x) => x.key === v);
+  /* ⚠️ `"loja"` entra no TIPO mas está fora de `RECOMPENSAS_SUBTABS`: ela é um
+     destino válido do hub e não é uma pílula da fita. Derivar o tipo só da
+     lista faria `initialSub="loja"` do menu da conta cair no Cantinho em
+     silêncio — a linha "Loja · Suplementos, conforto e enxoval" abriria o
+     jardim de enfeites. */
+  type SubRec = (typeof RECOMPENSAS_SUBTABS)[number]["key"] | "loja";
+  const eSub = (v: unknown): v is SubRec =>
+    v === "loja" || RECOMPENSAS_SUBTABS.some((x) => x.key === v);
   const [sub, setSub] = useState<SubRec>(eSub(initialSub) ? initialSub : "cantinho");
   useEffect(() => {
     if (eSub(initialSub)) setSub(initialSub);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSub]);
+
+  /* ⚠️ Na Loja a fita NÃO aparece. Com ela, a tela mostraria duas pílulas e
+     NENHUMA acesa — que é como uma tela quebrada se parece. E a fita é
+     justamente o que o dono mandou tirar de perto da loja de produtos: quem
+     chega aqui veio do menu da conta e sai por ele, como em qualquer outra aba
+     do app. */
+  const naLoja = sub === "loja";
+
   return (
     <div className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {RECOMPENSAS_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+      {!naLoja && (
+        <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+          {RECOMPENSAS_SUBTABS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSub(s.key)}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                sub === s.key
+                  ? "bg-primary text-primary-foreground"
+                  : "border border-border text-foreground/55 hover:text-foreground/80"
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
       <Fade key={sub}>
         {sub === "cantinho" && (
           <CantinhoTab
@@ -15704,7 +15736,7 @@ function RecompensasHub({
           />
         )}
         {sub === "conquistas" && <ConquistasTab careMode={careMode} onNavigate={onNavigate} />}
-        {sub === "loja" && <LojaTab gest={gest} />}
+        {naLoja && <LojaTab gest={gest} />}
       </Fade>
     </div>
   );
