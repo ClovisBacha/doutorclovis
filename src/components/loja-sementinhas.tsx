@@ -42,9 +42,9 @@ import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { ehNativo } from "@/lib/nativo";
 import { useVoltar } from "@/lib/use-voltar";
 import { Bolha } from "@/components/bolha";
-import pacoteGrande from "@/assets/pacotes/pacote-grande.png";
-import pacoteMedio from "@/assets/pacotes/pacote-medio.png";
-import pacotePequeno from "@/assets/pacotes/pacote-pequeno.png";
+import pacoteGrande from "@/assets/pacotes/pacote-grande.webp";
+import pacoteMedio from "@/assets/pacotes/pacote-medio.webp";
+import pacotePequeno from "@/assets/pacotes/pacote-pequeno.webp";
 
 /** Uma linha do extrato: o que entrou ou saiu, e quando. */
 type Lancamento = { amount: number; reason: string | null; created_at: string };

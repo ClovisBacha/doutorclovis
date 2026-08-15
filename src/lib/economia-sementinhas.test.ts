@@ -474,3 +474,51 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
     expect(CUSTO_LOJA_GRATIS).toBe(704);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ TODA TORNEIRA DIÁRIA PRECISA ESTAR NO MODELO
+
+   `BONUS_DA_DUPLA` (a ofensiva das Amigas) nasceu FORA de `diasParaZerarLoja` e
+   `saldoParado`. Uma auditoria mediu o estrago: o arranjo mais generoso caiu de
+   13 para 10 dias, e a prosa do `TETO_BLOCO_DE_BOAS_VINDAS` continuou afirmando
+   12 — a parede se moveu em silêncio, que é o modo de falha que este arquivo
+   inteiro existe para impedir.
+
+   Estes testes não congelam o valor: eles cobram um PISO. A caminhada pode
+   encurtar (é para isso que os presentes existem), mas não pode virar um fim de
+   semana — o laço "ganhei → gastei → mudou a minha tela" precisa de repetições
+   para ensinar alguma coisa.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("⚠️ a ofensiva da dupla entra na conta da parede", () => {
+  const maiorPresente = Math.max(...CLASSES_DE_PRESENTE.map((c) => c.quantidade));
+  const tudo = {
+    comMedico: true,
+    presenteDoMedico: maiorPresente,
+    presenteDeAmiga: PRESENTE_ENTRE_AMIGAS,
+  };
+
+  test("o modelo SABE da dupla — ligar a bandeira muda a resposta", () => {
+    /* Se estes dois derem o mesmo número, a torneira voltou a ser invisível. */
+    expect(diasParaZerarLoja({ ...tudo, comDupla: true })).toBeLessThan(
+      diasParaZerarLoja({ ...tudo, comDupla: false }),
+    );
+  });
+
+  test("e o saldo parado também", () => {
+    expect(saldoParado(20, { ...tudo, comDupla: true })).toBeGreaterThan(
+      saldoParado(20, { ...tudo, comDupla: false }),
+    );
+  });
+
+  test("⚠️ nem o arranjo mais generoso derruba a caminhada abaixo de 8 dias", () => {
+    /**
+     * Hoje dá 10. O piso é 8 porque abaixo disso a loja grátis vira um fim de
+     * semana: a paciente compra tudo antes de o app ter ensinado o laço, e a
+     * parede deixa de ser uma conquista para virar um susto.
+     *
+     * ⚠️ É no ritmo TÍPICO. No teto (68 🌱/dia) dá 6, e isso é aceitável — quem
+     * faz as cinco atividades todo dia durante uma semana merece.
+     */
+    expect(diasParaZerarLoja({ ...tudo, comDupla: true })).toBeGreaterThanOrEqual(8);
+  });
+});

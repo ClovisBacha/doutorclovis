@@ -56,6 +56,7 @@ import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
+import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
 import { apagarMinhasConversas } from "@/lib/conta.functions";
@@ -730,17 +731,37 @@ function triggerAchievementsCheck() {
     .then((res) => {
       if (!res || !res.ok) return;
       if (res.careMode) return; // Modo Cuidado: sem comemorações.
+
+      /* O emblema da fita. `resgatadas === null` é "não consegui ler" e vira
+         `null` aqui também — nunca 0, que afirmaria que não há nada, nem o
+         total, que prometeria moeda. Ver `evento-conquistas.ts`. */
+      publicarConquistasAResgatar(
+        res.resgatadas == null
+          ? null
+          : res.unlocked.filter((u) => !res.resgatadas!.includes(u.achievement_key)).length,
+      );
+
       const novas = (res.newlyAwarded ?? []).filter((k) => !jaCelebradas.has(k));
       if (novas.length === 0) return;
       for (const k of novas) jaCelebradas.add(k);
 
+      /* ⚠️ O AVISO PRECISA DIZER QUE HÁ PRÊMIO, E ONDE PEGAR.
+         Ele dizia só "Nova conquista desbloqueada: X!" — texto de quando o
+         prêmio caía sozinho. Com o resgate no toque, quem não abrir
+         Recompensas → Conquistas fica com as Sementinhas paradas e SEM SABER
+         que estão lá. No Duolingo, que é a referência do dono, o que produz a
+         visita é justamente o aviso de que tem algo a pegar. */
       for (const key of novas.slice(0, TOASTS_DE_CONQUISTA)) {
         const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
-        if (def) toast(`${def.emoji} Nova conquista desbloqueada: ${def.title}!`);
+        if (def) {
+          toast(`${def.emoji} ${def.title}! Toque nela em Conquistas para pegar suas Sementinhas.`);
+        }
       }
       const resto = novas.length - TOASTS_DE_CONQUISTA;
       if (resto > 0) {
-        toast(`🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — veja na aba.`);
+        toast(
+          `🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — as Sementinhas esperam o seu toque em Conquistas.`,
+        );
       }
 
       /* ⚠️ NÃO CREDITA MAIS AQUI. O prêmio da conquista deixou de ser
@@ -15722,6 +15743,19 @@ function RecompensasHub({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSub]);
 
+  /* ─── ⚠️ O EMBLEMA QUE FAZ ELA IR PEGAR ──────────────────────────────
+     O prêmio da conquista passou a esperar o toque dela (pedido do dono, "como
+     o Duolingo faz"). Mas no Duolingo o que produz a visita é o EMBLEMA — e
+     sem ele a mudança tem um custo silencioso: quem não abre esta aba por
+     conta própria fica com as Sementinhas paradas e sem saber que existem.
+     Trocar "recebe sem saber" por "não recebe e não sabe" é pior que o ponto
+     de partida.
+
+     ⚠️ `null` (não consegui ler) não vira 0 nem vira o total — não aparece
+     emblema nenhum. Ver `evento-conquistas.ts`. */
+  const [aResgatar, setAResgatar] = useState<number | null>(null);
+  useEffect(() => ouvirConquistasAResgatar(setAResgatar), []);
+
   return (
     <div className="space-y-5">
       <div className="scrollbar-hide flex gap-2 overflow-x-auto">
@@ -15736,6 +15770,19 @@ function RecompensasHub({
             }`}
           >
             {s.label}
+            {/* Só em Conquistas, e só quando há o que pegar. O número, e não um
+                pontinho: "tem coisa" obriga a abrir para descobrir se vale a
+                pena, e a pergunta que ela faz é QUANTAS. Teto em 9+, que é
+                limite de largura numa fita de celular — a mesma régua do
+                emblema do bebê bolha. */}
+            {s.key === "conquistas" && !careMode && aResgatar != null && aResgatar > 0 && (
+              <span
+                className="ml-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-emerald-700 px-1 py-0.5 text-[10px] font-black leading-none text-white tabular-nums"
+                aria-label={`${aResgatar} ${aResgatar === 1 ? "conquista" : "conquistas"} com Sementinhas para pegar`}
+              >
+                {aResgatar > 9 ? "9+" : aResgatar}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -15873,7 +15920,15 @@ export function ConquistasTab({
         toast.error(r.error);
         return;
       }
-      setResgatadas((antes) => new Set(antes).add(key));
+      setResgatadas((antes) => {
+        const depois = new Set(antes).add(key);
+        /* O emblema desce no MESMO instante do toque. Esperar a próxima
+           checagem faria o número ficar prometendo o que ela acabou de pegar. */
+        publicarConquistasAResgatar(
+          Math.max(0, unlocked.filter((u) => !depois.has(u.achievement_key)).length),
+        );
+        return depois;
+      });
       if (r.granted > 0) {
         creditarSementinhas(r.granted);
         setSaldo((v) => (v == null ? v : v + r.granted));
@@ -15911,6 +15966,13 @@ export function ConquistasTab({
            tratar como lista vazia poria prêmio em toda conquista da grade. */
         setSemSaberPagas(res.resgatadas == null);
         setResgatadas(new Set(res.resgatadas ?? []));
+        /* A aba tem a leitura mais fresca — republica para o emblema da fita
+           não ficar contando o que ela já pegou noutro aparelho. */
+        publicarConquistasAResgatar(
+          res.resgatadas == null
+            ? null
+            : res.unlocked.filter((u) => !res.resgatadas!.includes(u.achievement_key)).length,
+        );
         /* Quais conquistas ainda NÃO foram comemoradas para esta paciente.
            Antes a régua era "desbloqueada nos últimos 30 segundos", calculada
            ao montar esta aba, e ela errava dos dois lados:
@@ -16136,7 +16198,14 @@ export function ConquistasTab({
                       /* A data sai daqui de propósito: enquanto há prêmio a
                          pegar, a única coisa que o cartão precisa dizer é o
                          que fazer. A data volta assim que ela resgata. */
-                      <p className="mt-1.5 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-bold text-white">
+                      /* ⚠️ `emerald-700` e não `emerald-500`. Medido em pixel:
+                         branco sobre o 500 dá **2,54:1**, e 11px em negrito não
+                         é "texto grande" pela WCAG (o corte é 18,66px) — o
+                         mínimo é 4,5. Era o CTA central desta mudança inteira,
+                         e o mesmo defeito que a Loja de Sementinhas teve com o
+                         preço a 2,64:1: consertado numa tela e não na irmã. O
+                         700 dá 5,48:1 e continua verde. */
+                      <p className="mt-1.5 rounded-full bg-emerald-700 px-2 py-1 text-[11px] font-bold text-white">
                         {emVoo ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
                       </p>
                     ) : isUnlocked && unlockedAt ? (

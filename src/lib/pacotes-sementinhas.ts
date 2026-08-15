@@ -123,6 +123,16 @@ export function numeroBR(n: number): string {
  * ⚠️ O menor é o último da lista, não o primeiro: a ordem da tela é do maior
  * para o menor. Ler `PACOTES[0]` daria a vantagem contra o topo, que é sempre
  * negativa — e a tela mostraria "-67%" no cartão que ela deve querer.
+ *
+ * ⚠️ **HOJE ELA NÃO TEM CHAMADOR, e isso é deliberado — por enquanto.** A tela
+ * chegou a mostrar "rende +X% por real" e a linha SAIU: a referência do dono
+ * não tinha esse número, e o pedido foi "exatamente dessa forma". A função fica
+ * porque a escada de vantagem é a regra que os testes cobram (pacote maior
+ * nunca rende menos por real) e é ela que dá o número quando a linha voltar.
+ *
+ * O comentário acima descrevia um defeito de TELA — "a tela mostraria -67%" —
+ * numa função que nenhuma tela usa. Ficou registrado porque a armadilha
+ * (`PACOTES[0]` em vez do último) espera quem for ligá-la de volta.
  */
 export function vantagemSobreMenor(p: PacoteSementinhas): number {
   const base = porReal(PACOTES[PACOTES.length - 1]);

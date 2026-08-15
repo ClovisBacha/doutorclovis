@@ -345,8 +345,23 @@ export type ClasseDePresente = (typeof CLASSES_DE_PRESENTE)[number];
  * ─── A RÉGUA ────────────────────────────────────────────────────────────────
  *
  * Sozinha, a paciente típica leva 19 dias. O bloco pode encurtar essa caminhada
- * — é para isso que ele existe —, mas não pode cortá-la ao meio: o limite é
- * **12 dias no arranjo mais generoso possível**, que dá um teto de 241 🌱.
+ * — é para isso que ele existe —, mas não pode cortá-la ao meio: o teto do
+ * BLOCO (o que cai de uma vez no dia zero) é de 241 🌱, e sozinho ele leva a
+ * caminhada de 19 para **13 dias**.
+ *
+ * ⚠️ ESTE PARÁGRAFO DIZIA "12 DIAS NO ARRANJO MAIS GENEROSO POSSÍVEL", e
+ * deixou de ser verdade quando a ofensiva das Amigas nasceu: `BONUS_DA_DUPLA`
+ * é uma torneira DIÁRIA, e ela não entrava neste modelo. Medido depois de
+ * ligá-la: o arranjo mais generoso no ritmo típico caiu para **10 dias**.
+ *
+ * Dez está certo, e a razão é o que o número esconde: aquele caminho exige uma
+ * amiga que entrou pelo convite DELA, um convite de dupla aceito, e as DUAS
+ * fechando o mesmo dia, todo dia. É o arranjo mais raro do app e é exatamente
+ * o comportamento que o dono quis premiar — encurtar a caminhada dela em três
+ * dias é o preço, e a parede continua chegando dentro de duas semanas.
+ *
+ * O que NÃO pode acontecer de novo é a próxima torneira nascer fora do modelo:
+ * `CenarioDaLoja.comDupla` existe para isso, e há teste com PISO de dias.
  *
  * Os valores abaixo somam 240 no pior caso (100 + 100 + 40) e há teste que
  * recusa qualquer combinação que passe daqui. Mexer num deles para cima obriga
@@ -432,6 +447,20 @@ export type CenarioDaLoja = {
   presenteDeAmiga?: number;
   /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
   ganhoDiario?: number;
+  /**
+   * ⚠️ TEM DUPLA ATIVA (a "ofensiva" das Amigas)?
+   *
+   * `BONUS_DA_DUPLA` é uma torneira DIÁRIA, e ela nasceu fora deste modelo —
+   * uma auditoria mediu que o arranjo mais generoso caiu de 13 para 10 dias
+   * sem que nada aqui soubesse. Torneira que a simulação não enxerga é
+   * exatamente como a parede dos quinze dias se move em silêncio.
+   *
+   * Ela é a mais RARA do app (exige uma amiga que entrou pelo convite, um
+   * convite de dupla aceito, e as DUAS fechando o mesmo dia), e é justamente o
+   * comportamento que o dono quis premiar. O modelo não a julga — só passa a
+   * contá-la.
+   */
+  comDupla?: boolean;
 };
 
 /**
@@ -446,7 +475,10 @@ export function diasParaZerarLoja(opts: CenarioDaLoja): number {
   const alvo = CUSTO_LOJA_GRATIS - entradaDeGraca(opts);
   if (alvo <= 0) return 0;
 
-  const porDia = (opts.ganhoDiario ?? GANHO_DIA_TIPICO) + GANHO_SEMANAL / 7;
+  const porDia =
+    (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
+    GANHO_SEMANAL / 7 +
+    (opts.comDupla ? BONUS_DA_DUPLA : 0);
   if (porDia <= 0) return Infinity;
   return Math.ceil(alvo / porDia);
 }
@@ -460,7 +492,7 @@ export function diasParaZerarLoja(opts: CenarioDaLoja): number {
 export function saldoParado(dia: number, opts: CenarioDaLoja): number {
   const ganho =
     entradaDeGraca(opts) +
-    dia * (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
+    dia * ((opts.ganhoDiario ?? GANHO_DIA_TIPICO) + (opts.comDupla ? BONUS_DA_DUPLA : 0)) +
     Math.floor(dia / 7) * GANHO_SEMANAL +
     /* Os presentes se repetem a cada ciclo — o do dia 0 já entrou acima. */
     Math.floor(dia / 30) *

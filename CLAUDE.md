@@ -2696,18 +2696,24 @@ e a própria aba onde compra os jogos".
   duas lojas liam como duas prateleiras da mesma coisa — e é assim que uma
   paciente toca em "Loja" achando que vai gastar o que juntou e encontra um
   carrinho de compras.
-- ⚠️ **Ela NÃO foi apagada — mudou de porta.** `MenuDaConta` já entrava direto
-  nela (`tab: "Recompensas"`, `subAba: "loja"`), e é esse o "está no perfil" do
-  pedido. Apagar o caminho apagaria a loja inteira do app da paciente, que é
+- ⚠️ **Ela NÃO foi apagada — virou DESTINO PRÓPRIO** (`tab: "Loja"`, ao lado do
+  Perfil), com porta no celular (`MenuDaConta`) e no computador (a categoria
+  "Conta"). Apagar o caminho apagaria a loja inteira do app da paciente, que é
   outra decisão.
-- ⚠️ **`SubRec` ganhou `| "loja"` à mão**, fora de `RECOMPENSAS_SUBTABS`. É a
-  linha que some primeiro numa limpeza distraída: derivando o tipo só da lista,
-  `eSub("loja")` passa a devolver `false` e o `initialSub` do menu cai no
-  Cantinho **em silêncio** — a linha "Loja · Suplementos, conforto e enxoval"
-  abriria o jardim de enfeites, sem erro nenhum para investigar.
-- **Na Loja a fita não aparece** (`naLoja`): duas pílulas e NENHUMA acesa é como
-  uma tela quebrada se parece, e a fita é justamente o que o pedido mandou tirar
-  de perto dela. Quem chega ali veio do menu e sai por ele.
+- ⚠️ **A PRIMEIRA VERSÃO ESCONDEU EM VEZ DE MUDAR DE LUGAR, e custou dois
+  defeitos.** Ela virou uma sub-aba INVISÍVEL de "Recompensas", alcançada por
+  `initialSub="loja"` vindo do menu. Uma auditoria mediu:
+  1. **o computador ficou sem porta** — `MenuDaConta` inteiro vive dentro de um
+     `md:hidden`, então a pílula ERA a única entrada do desktop;
+  2. **a sub-aba grudava** — a fita de abas do desktop chamava `setTab` cru, que
+     não limpa `consultasSub`: toda visita a "Recompensas" reabria a Loja, e com
+     a fita escondida o Cantinho ficava inalcançável por ali.
+
+  E a corrente do menu até a tela tinha TRÊS elos no meio (repassar a sub-aba,
+  gravá-la, aceitá-la) que nenhum teste cobria — mutar qualquer um passava
+  verde. Destino próprio mata os dois defeitos e some com os três elos.
+- **A fita do desktop passou a navegar por `goToTab`**, e não por `setTab` — é
+  ele que limpa a sub-aba pedida. Vale para todos os hubs, não só para este.
 - `src/lib/duas-lojas.test.ts` cobra as **duas metades ao mesmo tempo** — fora
   da fita, e viva pelo menu. Uma sem a outra é o defeito de volta ou uma loja
   inteira desaparecida.

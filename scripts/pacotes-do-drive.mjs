@@ -27,6 +27,17 @@
  * A borda ganha uma rampa (não um corte seco) para não serrilhar sobre o
  * gradiente do cartão.
  *
+ * ⚠️ ELE GRAVA PNG, e o app usa WEBP. A `pngjs` é o que sabe fazer o recorte
+ * por inundação, e é ela que dita o formato de saída; a conversão é o passo
+ * seguinte, medida e com trava de alfa:
+ *
+ *   node scripts/pacotes-do-drive.mjs <referencia.png> src/assets/pacotes
+ *   node scripts/pacotes-para-webp.mjs src/assets/pacotes
+ *
+ * O segundo APAGA os PNG quando passa. 456 KB de PNG eram os três maiores
+ * arquivos de imagem do build; em WebP são 90 KB, com o alfa idêntico casa
+ * decimal a casa decimal e PSNR acima de 42 dB.
+ *
  * Uso:
  *   node scripts/pacotes-do-drive.mjs <referencia.png> <pasta-destino>
  */

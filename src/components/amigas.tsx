@@ -412,7 +412,10 @@ export function AmigasTab({
         </div>
         <button
           onClick={convidar}
-          className="press shrink-0 rounded-full px-4 py-2 text-[14px] font-bold text-white"
+          /* `min-h-11` = 44px, o alvo mínimo do HIG. Media 102×38: o botão que
+             a paciente precisa achar para trazer alguém, na tela cujo assunto
+             inteiro é trazer alguém. */
+          className="press min-h-11 shrink-0 rounded-full px-4 text-[14px] font-bold text-white"
           /* ⚠️ `#c9316f` e não o `#e04f8f` da referência: medido, o rosa
              original dá 3,69:1 com o branco. Texto de 14px em negrito NÃO é
              "texto grande" pela WCAG (o corte é 18,66px), então o mínimo é
@@ -535,7 +538,10 @@ function DuplaCard({
           <button
             onClick={() => chamar("desfazer")}
             disabled={ocupado}
-            className="shrink-0 rounded-full border border-border px-3 py-1.5 text-[11px] font-semibold text-muted-foreground"
+            /* 44px de altura, como o resto. Desfazer a dupla é uma ação que
+               ela toma UMA vez e precisa acertar — errar o alvo aqui e acertar
+               o "Desfazer" por engano é justamente o que não pode acontecer. */
+            className="min-h-11 shrink-0 rounded-full border border-border px-3 text-[11px] font-semibold text-muted-foreground"
           >
             Desfazer
           </button>
