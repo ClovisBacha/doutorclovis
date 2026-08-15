@@ -34,15 +34,32 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 
-/** As três caixas, medidas na referência de 853×1844. */
+/**
+ * As três caixas, MEDIDAS na referência de 853×1844.
+ *
+ * ⚠️ A DO GRANDE ESTAVA CORTANDO O DESENHO. Era `{x:95, y:800, w:320, h:278}`,
+ * e uma auditoria mediu o estrago: **203 dos 310 pixels da primeira linha eram
+ * opacos** (65% da largura), contra 9/299 no médio e 17/324 no pequeno. Ou
+ * seja, o topo do monte de sementinhas terminava em corte reto — no cartão da
+ * fita "MELHOR VALOR", que é o herói do layout que o dono pediu "exatamente
+ * dessa forma".
+ *
+ * A extensão real do desenho, medida (topo do monte, base da sombra, e as duas
+ * bordas laterais): **y 735–1049, x 74–403**. A caixa nova cobre isso com
+ * folga, e `apara()` devolve o enquadramento justo depois.
+ *
+ * ⚠️ A fita "MELHOR VALOR" da REFERÊNCIA entra nessa caixa — ela cruza o canto
+ * superior esquerdo do cartão. Ela não pode ser recortada junto (é desenhada em
+ * CSS, para acompanhar o cartão quando ele muda de largura), e por isso o
+ * recorte de fundo aprendeu a comê-la: ver `CORES_DE_FUNDO`.
+ */
 const CAIXAS = [
-  /* ⚠️ O saco começa em x=95 e não em x=42 de propósito: a fita diagonal
-     "MELHOR VALOR" ocupa o canto superior esquerdo do cartão e é desenhada em
-     CSS, não recortada — ela precisa acompanhar o cartão quando ele muda de
-     largura. */
-  { nome: "pacote-grande", x: 95, y: 800, w: 320, h: 278 },
-  { nome: "pacote-medio", x: 78, y: 1118, w: 305, h: 284 },
-  { nome: "pacote-pequeno", x: 116, y: 1462, w: 328, h: 302 },
+  { nome: "pacote-grande", x: 62, y: 722, w: 352, h: 336, fitaNoCanto: true },
+  { nome: "pacote-medio", x: 66, y: 1118, w: 320, h: 284 },
+  /* ⚠️ A do pequeno era LARGA DEMAIS (`w: 328`) e entrava no texto roxo
+     "1.100 sementinhas" à direita — a trava de borda pegou 10% da coluna
+     direita opaca. O frasquinho mede x 105–360, y 1460–1730. */
+  { nome: "pacote-pequeno", x: 100, y: 1444, w: 272, h: 302 },
 ];
 
 /** Claro e sem cor: candidato a fundo. */
@@ -64,6 +81,64 @@ function recorta(src, cx) {
     }
   }
   return out;
+}
+
+/**
+ * A FITA "MELHOR VALOR" DA REFERÊNCIA, e por que ela não sai por cor.
+ *
+ * Ela cruza o canto superior esquerdo do cartão do pacote grande, e qualquer
+ * caixa que contenha o saco inteiro contém um pedaço dela — o saco começa 65 px
+ * para dentro, mas a fita é uma faixa diagonal no canto. Recortá-la junto está
+ * fora de questão: a fita é desenhada em CSS, para acompanhar o cartão quando
+ * ele muda de largura.
+ *
+ * ⚠️ TIREI ELA POR COR PRIMEIRO, e não funcionou. O verde chapado
+ * (105,143,58) sai fácil, mas as LETRAS brancas por cima têm uma rampa inteira
+ * de antisserrilhado entre o verde e o branco — medido: 214,221,133 ·
+ * 170,191,141 · 129,159,92 · 152,176,114… uma dúzia de tons, cada um com dois
+ * ou três pixels. Nenhuma tolerância pega essa rampa sem começar a comer o
+ * saco, que é verde da mesma família.
+ *
+ * O que separa os dois com certeza é GEOMETRIA, não cor: a fita é um borrão
+ * conectado que encosta no canto, e o saco não encosta em canto nenhum (há
+ * fundo claro entre os dois). Então some o COMPONENTE inteiro que toca o canto
+ * — letras, antisserrilhado e sombra junto, sem precisar acertar tom nenhum.
+ *
+ * É a mesma ideia de `bolha-do-drive.mjs`, que fica só com o maior componente
+ * para descartar brilhos soltos. Aqui é o inverso: descarta-se um componente
+ * conhecido em vez de guardar o maior — as sementinhas soltas no chão são
+ * componentes próprios e precisam ficar.
+ */
+const CANTO_DA_FITA = 30;
+
+/** Apaga o borrão opaco que encosta no canto superior esquerdo. */
+function apagaFitaDoCanto(img) {
+  const { width: w, height: h, data } = img;
+  const opaco = (p) => data[(p << 2) + 3] > 8;
+  const visto = new Uint8Array(w * h);
+  const fila = [];
+  for (let y = 0; y < CANTO_DA_FITA; y++) {
+    for (let x = 0; x < CANTO_DA_FITA; x++) {
+      const p = y * w + x;
+      if (opaco(p) && !visto[p]) {
+        visto[p] = 1;
+        fila.push(p);
+      }
+    }
+  }
+  while (fila.length) {
+    const p = fila.pop();
+    data[(p << 2) + 3] = 0;
+    const x = p % w;
+    const vizinhos = [p - w, p + w];
+    if (x > 0) vizinhos.push(p - 1);
+    if (x < w - 1) vizinhos.push(p + 1);
+    for (const q of vizinhos) {
+      if (q < 0 || q >= w * h || visto[q] || !opaco(q)) continue;
+      visto[q] = 1;
+      fila.push(q);
+    }
+  }
 }
 
 /** Marca o fundo por inundação a partir das quatro bordas. */
@@ -164,21 +239,84 @@ if (src.width !== 853 || src.height !== 1844) {
 }
 mkdirSync(destino, { recursive: true });
 for (const cx of CAIXAS) {
-  const img = apara(
-    (() => {
-      const c = recorta(src, cx);
-      aplicaAlfa(c, fundoLigadoABorda(c));
-      return c;
-    })(),
-  );
+  /* ⚠️ ANTES de aparar — é a caixa CRUA que responde "o recorte cortou o
+     desenho?". Medir a aparada não responde nada: `apara()` encosta o
+     enquadramento na tinta por definição, então a primeira linha da imagem
+     aparada SEMPRE tem tinta. A primeira versão desta trava media a aparada e
+     reprovava o frasquinho por ele ter uma rolha de topo reto — um alarme sobre
+     o próprio andaime. */
+  const cru = (() => {
+    const c = recorta(src, cx);
+    aplicaAlfa(c, fundoLigadoABorda(c));
+    if (cx.fitaNoCanto) apagaFitaDoCanto(c);
+    return c;
+  })();
+  const img = apara(cru);
   const opacos = (() => {
     let n = 0;
     for (let p = 0; p < img.width * img.height; p++) if (img.data[(p << 2) + 3] > 200) n++;
     return n;
   })();
   const frac = opacos / (img.width * img.height);
+
+  /* ─── ⚠️ A TRAVA QUE FALTAVA: O DESENHO ENCOSTOU NA BORDA? ────────────────
+     O modo de falha de uma caixa medida à mão é CORTAR o desenho, e as duas
+     travas antigas (pouca tinta / quase tudo opaco) não veem isso: um desenho
+     decapitado tem exatamente a mesma fração de tinta de um inteiro.
+
+     Foi assim que o pacote grande ficou meses com 65% da primeira linha opaca
+     — o topo do monte de sementinhas terminando em corte reto no cartão da
+     fita "MELHOR VALOR". Uma auditoria mediu; o script não tinha como saber.
+
+     Os scripts irmãos têm a trava equivalente: `bebes/do-drive.mjs` aborta sem
+     alfa, `sprite-de-video.mjs` aborta com a grade incompleta. Este passa a
+     abortar quando o recorte toca o desenho.
+
+     O limite é 8% da borda CRUA, medido como a maior corrida contígua: com
+     folga na caixa o desenho não encosta em nada, e faísca decorativa não faz
+     traço. 65% de uma linha, que foi o que o pacote grande tinha, é um desenho
+     decapitado. */
+  const LIMITE_BORDA = 0.08;
+  /* ⚠️ A maior sequência CONTÍGUA, e não a contagem total. Um desenho cortado
+     deixa um traço longo e inteiriço na borda; os brilhos decorativos do cartão
+     deixam pontinhos espalhados. Contando o total, as faíscas do canto davam 7%
+     e reprovavam um recorte perfeito — alarme sobre o próprio andaime, de novo. */
+  const maiorCorrida = (n, opacoEm) => {
+    let melhor = 0;
+    let atual = 0;
+    for (let i = 0; i < n; i++) {
+      atual = opacoEm(i) ? atual + 1 : 0;
+      if (atual > melhor) melhor = atual;
+    }
+    return melhor / n;
+  };
+  const linha = (y) =>
+    maiorCorrida(cru.width, (x) => cru.data[((cru.width * y + x) << 2) + 3] > 200);
+  const coluna = (x) =>
+    maiorCorrida(cru.height, (y) => cru.data[((cru.width * y + x) << 2) + 3] > 200);
+  const bordas = {
+    topo: linha(0),
+    base: linha(cru.height - 1),
+    esquerda: coluna(0),
+    direita: coluna(cru.width - 1),
+  };
+  const cortadas = Object.entries(bordas).filter(([, v]) => v > LIMITE_BORDA);
+
   writeFileSync(join(destino, `${cx.nome}.png`), PNG.sync.write(img));
-  console.log(`${cx.nome}.png  ${img.width}×${img.height}  tinta ${(frac * 100).toFixed(1)}%`);
+  console.log(
+    `${cx.nome}.png  ${img.width}×${img.height}  tinta ${(frac * 100).toFixed(1)}%  ` +
+      `bordas ${Object.entries(bordas)
+        .map(([k, v]) => `${k} ${(v * 100).toFixed(0)}%`)
+        .join(" · ")}`,
+  );
   if (frac < 0.12) console.error(`  ⚠️ pouca tinta — o recorte pode ter comido o desenho.`);
   if (frac > 0.9) console.error(`  ⚠️ quase tudo opaco — o fundo pode não ter saído.`);
+  if (cortadas.length) {
+    console.error(
+      `  ⚠️ O DESENHO ESTÁ CORTADO em: ${cortadas
+        .map(([k, v]) => `${k} (${(v * 100).toFixed(0)}%)`)
+        .join(", ")}.\n` + `     Amplie a caixa de ${cx.nome} em CAIXAS e rode de novo.`,
+    );
+    process.exitCode = 1;
+  }
 }

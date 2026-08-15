@@ -184,16 +184,64 @@ describe("6. a tela existe, e há UMA porta só", () => {
     /* Varre o `src/` inteiro em vez de conferir só `minha-conta`: a porta que
        saiu pode renascer em qualquer tela, e o pedido foi "somente nas
        amizades", não "somente fora do Cantinho". */
+    /* ⚠️ Comparação EXATA, nunca `endsWith("amigas.tsx")`. O caminho do arquivo
+       que foi apagado é `components/presentear-amigas.tsx` — que termina em
+       "amigas.tsx". Com o sufixo, a varredura era cega justamente para o nome
+       da porta que ela existe para impedir de renascer. Provado: de
+       ["components/amigas.tsx", "components/presentear-amigas.tsx",
+        "components/minhas-amigas.tsx", "routes/amigas.tsx"] o filtro por
+       sufixo deixava passar UMA. */
     const outras = readdirSync("src", { recursive: true, encoding: "utf8" })
-      .filter((p) => p.endsWith(".tsx") && !p.endsWith("amigas.tsx"))
+      .filter((p) => p.endsWith(".tsx") && p !== "components/amigas.tsx")
       .filter((p) => semComentarios(`src/${p}`).includes("presentearAmiga"));
     expect(outras).toEqual([]);
   });
 
-  test("o botão some inteiro para quem não assina", () => {
-    /* Um botão cinza com cadeado ensina que existe algo que ela não pode ter,
-       e a assinatura já tem vitrine própria — os itens do Cantinho. */
-    expect(tela).toContain("mesada?.assinante && (");
+  test("⚠️ AS DUAS portas somem para quem não assina — não só a da lista", () => {
+    /**
+     * Um botão cinza com cadeado ensina que existe algo que ela não pode ter,
+     * e a assinatura já tem vitrine própria — os itens do Cantinho.
+     *
+     * ⚠️ E são DUAS entradas: a linha da amiga e o botão dentro do perfil dela.
+     * A versão anterior deste teste chamava-se "o botão some inteiro para quem
+     * não assina" e provava só `mesada?.assinante && (` — enquanto o teste
+     * vizinho afirmava, com `toBe(2)`, que existem duas. Ele sabia das duas e
+     * cobrava uma: o botão verde de largura inteira do perfil não tinha portão
+     * nenhum, e quem não assina o via e levava "o bolso é do Premium" do
+     * servidor.
+     */
+    expect(tela).toContain("mesada?.assinante && a.possoPresentear && (");
+    expect(tela).toContain("assinante && perfil.possoPresentear && (");
+  });
+
+  test("⚠️ e nenhuma das duas aparece em quem ela NÃO pode presentear", () => {
+    /**
+     * A lista é o grafo de indicação nos DOIS sentidos, mas `presentearAmiga`
+     * só aceita quem ELA indicou (`.eq("referred_by", uid)`). Sem este portão,
+     * a assinante que ENTROU pelo convite de alguém via o 🎁 na linha de quem a
+     * trouxe, tocava, e recebia "Vocês precisam estar conectadas pelo convite"
+     * — uma frase falsa, porque estão, só que pelo lado oposto. Atinge toda
+     * paciente que chegou por indicação, que é o caminho que a aba promove.
+     */
+    expect(fns).toContain('.eq("referred_by", uid)');
+    const usos = [...tela.matchAll(/possoPresentear/g)];
+    expect(usos.length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("⚠️ «já presenteada» vem do LEDGER, não da memória da tela", () => {
+    /**
+     * A primeira versão guardava isso num `Set` do componente. Trocar de aba
+     * desmonta `AmigasTab` e o `Set` zerava: os 🎁 voltavam ao normal para o
+     * servidor recusar com `ja_presenteada` — exatamente o defeito que motivou
+     * tirar a porta antiga do Cantinho, sobrevivendo dentro da porta nova.
+     *
+     * O `Set` continua existindo, e está certo: ele faz o ✓ aparecer no mesmo
+     * instante do toque. O que não pode é ser a ÚNICA fonte.
+     */
+    expect(tela).toContain("a.jaPresenteada || presenteadas.has(a.id)");
+    const servidor = semComentarios("src/lib/amigas.functions.ts");
+    expect(servidor).toContain("presenteadasNoCiclo");
+    expect(servidor).toContain("jaPresenteada:");
   });
 
   test("a recusa por Modo Cuidado NÃO conta nada sobre a amiga", () => {

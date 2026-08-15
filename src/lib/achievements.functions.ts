@@ -358,7 +358,14 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       unlocked: (rows ?? []) as { achievement_key: string; unlocked_at: string }[],
-      /** Quais já foram RESGATADAS — ver `chavesResgatadas`. */
+      /**
+       * Quais já foram RESGATADAS — ver `chavesResgatadas`.
+       *
+       * ⚠️ `null` é "não consegui ler", e é DIFERENTE de `[]` ("nenhuma
+       * resgatada ainda"). A tela precisa dos dois separados: com a lista
+       * vazia ela pinta tudo como pendente, e é exatamente isso que NÃO pode
+       * acontecer numa falha de leitura.
+       */
       resgatadas: await chavesResgatadas(db, uid),
       newlyAwarded,
       careMode,
@@ -380,14 +387,36 @@ export const PREFIXO_CONQUISTA = "achievement:";
  * prêmio automático antes desta mudança tem a linha, então a conquista aparece
  * como já resgatada — que é exatamente o certo. O app não vai pagar de novo
  * nem pedir que ela toque no que já recebeu.
+ *
+ * ─── ⚠️ FALHA DE LEITURA ERRA PARA O LADO DE «JÁ PAGA» ──────────────────────
+ *
+ * `null` diz "não sei", e os dois lados do não-sei têm custos MUITO diferentes:
+ *
+ *  · errando para "não paga", as 39 conquistas voltam a pulsar
+ *    "Resgatar +120 🌱" de uma vez. Ela toca, o servidor responde certíssimo
+ *    (`repetido: true`) e o cartão só vira uma data — o app promete moeda e
+ *    não entrega, que é a forma mais rápida de ensinar que os avisos daqui
+ *    não valem leitura;
+ *  · errando para "paga", um resgate legítimo espera a próxima abertura.
+ *
+ * É a mesma régua de `contarTrofeus` ("falha ao contar RECUSA") e do lembrete
+ * de pré-consulta ("falha ao ler trata como já respondeu"): na dúvida, não
+ * prometer.
+ *
+ * Quem decide o que fazer com o `null` é `resgatePendente` — a tela não pode
+ * confundir "sem conquista paga" (lista vazia) com "não consegui ler".
  */
-async function chavesResgatadas(db: ReturnType<typeof typedDb>, uid: string): Promise<string[]> {
-  const { data } = await db
+async function chavesResgatadas(
+  db: ReturnType<typeof typedDb>,
+  uid: string,
+): Promise<string[] | null> {
+  const { data, error } = await db
     .from("sementinhas_ledger")
     .select("dedupe_key")
     .eq("user_id", uid)
     .like("dedupe_key", `${PREFIXO_CONQUISTA}%`);
-  return ((data ?? []) as { dedupe_key: string | null }[])
+  if (error || !data) return null;
+  return (data as { dedupe_key: string | null }[])
     .map((r) => r.dedupe_key ?? "")
     .filter((k) => k.startsWith(PREFIXO_CONQUISTA))
     .map((k) => k.slice(PREFIXO_CONQUISTA.length));

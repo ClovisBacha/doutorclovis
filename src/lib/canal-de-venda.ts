@@ -94,6 +94,29 @@ export function podeComprar(produto: Produto, canal: Canal): Veredito {
   const esperado = CANAL_DE[produto];
   if (esperado === "qualquer") return { pode: true };
 
+  /* ─── ⚠️ A LOJA DESLIGADA VEM ANTES DO CANAL ERRADO ─────────────────────
+     Esta ordem era o inverso, e o resultado era uma instrução IMPOSSÍVEL de
+     cumprir: `ehNativo()` é falso para todas as pacientes de hoje (o app é um
+     PWA), então o veredito caía em `canal_errado` e a tela dizia "esta compra
+     acontece dentro do aplicativo, pela loja da Apple ou do Google" — logo
+     abaixo do título "A compra ainda não está aberta", e sobre um app que não
+     está em loja nenhuma. Quem lesse ia procurar na App Store e não ia achar.
+
+     O texto escrito para este momento (`iap_indisponivel`) só aparecia dentro
+     da casca nativa, que ninguém tem instalada.
+
+     E a ordem nova é a verdadeira: com a compra desligada, ela não acontece em
+     canal NENHUM. Dizer "vá para o outro canal" antes de dizer "ainda não está
+     pronta" é responder à pergunta errada. */
+  if (esperado === "app" && !IAP_ATIVO) {
+    return {
+      pode: false,
+      motivo: "iap_indisponivel",
+      texto:
+        "A compra pelo aplicativo ainda está sendo preparada. Assim que estiver pronta, ela aparece aqui — e o que você já ganhou jogando continua seu.",
+    };
+  }
+
   if (canal !== esperado) {
     return {
       pode: false,
@@ -102,18 +125,6 @@ export function podeComprar(produto: Produto, canal: Canal): Veredito {
         esperado === "site"
           ? "Os planos são contratados no site, no navegador — não pelo aplicativo. Entre em obstetrica.com.br com esta mesma conta."
           : "Esta compra acontece dentro do aplicativo, pela loja da Apple ou do Google.",
-    };
-  }
-
-  /* Canal certo, mas a loja ainda não está ligada. É o estado de hoje para a
-     paciente, e a mensagem precisa dizer que a culpa não é dela — nem sugerir
-     um caminho alternativo que a loja proibiria. */
-  if (esperado === "app" && !IAP_ATIVO) {
-    return {
-      pode: false,
-      motivo: "iap_indisponivel",
-      texto:
-        "A compra pelo aplicativo ainda está sendo preparada. Assim que estiver pronta, ela aparece aqui — e o que você já ganhou jogando continua seu.",
     };
   }
 

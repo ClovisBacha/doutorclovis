@@ -25,7 +25,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { CANTINHO_ITEMS } from "./cantinho";
 import { CURVA_GRATIS } from "./economia-sementinhas";
 
@@ -123,5 +123,53 @@ describe("3. a loja continua com o formato que a economia pressupõe", () => {
        último degrau da curva, e isso continua valendo em qualquer número. */
     const trofeuDosGratis = CURVA_GRATIS[CURVA_GRATIS.length - 1];
     expect(Math.max(...gratis.map((i) => i.price))).toBe(trofeuDosGratis);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ A PROSA QUE CITA PREÇO
+
+   O reajuste de ago/2026 mexeu em 90 itens, e uma auditoria depois encontrou
+   TREZE lugares no `src/` afirmando um preço que já não existia — dez deles
+   causados pelo próprio reajuste. Alguns eram narrativa histórica (tudo bem),
+   mas outros eram o ARGUMENTO de uma decisão: `trofeus.ts` justificava a escada
+   de desbloqueio com "Borboleta — 74 🌱 · Fim de tarde — 240 🌱 · Bolinhas —
+   400 🌱", e os três viraram 65, 550 e 1.000. A ordem sobreviveu; os números,
+   não. Quem lesse aquilo para decidir o próximo degrau decidiria sobre uma
+   loja que não existe.
+
+   Nenhuma revisão humana pega isso: a frase está sempre a centenas de linhas
+   do valor que descreve, e nada quebra quando ela envelhece.
+
+   Este teste varre o `src/` procurando o padrão «"Nome do Item" … N 🌱» e cobra
+   que N seja o preço real. É estreito de propósito — só dispara quando alguém
+   escreveu o nome E o preço juntos, que é exatamente a forma que envelhece.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("⚠️ nenhum comentário afirma um preço que o catálogo não tem", () => {
+  test("as citações «Nome (N 🌱)» batem com o preço real", () => {
+    const arquivos = readdirSync("src", { recursive: true, encoding: "utf8" }).filter(
+      (p) => p.endsWith(".ts") || p.endsWith(".tsx"),
+    );
+    const porNome = new Map(CANTINHO_ITEMS.map((i) => [i.name.toLowerCase(), i.price]));
+    const erradas: string[] = [];
+
+    for (const rel of arquivos) {
+      const texto = readFileSync(`src/${rel}`, "utf8");
+      /* «"Chuva mansa" por N 🌱» · «Borboleta — N 🌱» · «(Árvore que cresce,
+         N 🌱)». Até 40 caracteres entre o nome e o número: passar disso
+         começa a casar frases vizinhas que não têm relação. */
+      for (const m of texto.matchAll(
+        /["“(]?([A-ZÁÉÍÓÚÂÊÔÃÕÇ][^"”()\n]{2,34})["”)]?[^\n]{0,40}?\b(\d{2,4}) 🌱/g,
+      )) {
+        const nome = m[1]
+          .trim()
+          .replace(/[—–,-]\s*$/, "")
+          .toLowerCase();
+        const preco = porNome.get(nome);
+        if (preco === undefined || preco === Number(m[2])) continue;
+        erradas.push(`${rel}: "${m[1].trim()}" citado como ${m[2]} 🌱, mas custa ${preco}`);
+      }
+    }
+    expect(erradas).toEqual([]);
   });
 });

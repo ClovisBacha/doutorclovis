@@ -1602,9 +1602,31 @@ export function GestacaoPath({
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         if (!s.session?.access_token) return;
-        const { contarAmigas } = await import("@/lib/amigas.functions");
+        const { contarAmigas, cobrarBonusDaDupla } = await import("@/lib/amigas.functions");
         const r = await contarAmigas({ data: { accessToken: s.session.access_token } });
         if (r.ok) setAmigas(r.amigas);
+
+        /* ─── ⚠️ A OFENSIVA É COBRADA AQUI TAMBÉM ────────────────────────
+           O bônus da dupla nascia com UM chamador só: o efeito da aba das
+           Amigas. Mas quem fecha o dia fecha AQUI, no Caminho — e quem nunca
+           entra em Amigas simplesmente não recebia. Medido no desenho: uma
+           dupla com sete dias seguidos cujo lado visita a aba uma vez por
+           semana coletava 20 de 70 🌱, e a tela promete "+10 🌱 cada uma" em
+           negrito. Pior: as duas metades da mesma dupla recebiam valores
+           diferentes pelo mesmo esforço — que é o placar que a aba inteira
+           existe para não ser.
+
+           Sai de graça: já estamos numa ida ao servidor, a função é
+           idempotente pela `dedupe_key` e sai na primeira linha para quem não
+           tem dupla ativa. E o Modo Cuidado é conferido DENTRO dela, nos dois
+           lados — não há segundo portão a esquecer aqui. */
+        const b = await cobrarBonusDaDupla({ data: { accessToken: s.session.access_token } });
+        if (b.ok && b.ganho > 0) {
+          const { creditarSementinhas } = await import("@/lib/evento-sementinhas");
+          creditarSementinhas(b.ganho);
+          const { toast } = await import("sonner");
+          toast.success(`+${b.ganho} 🌱 da ofensiva com sua dupla 🔥`);
+        }
       } catch {
         /* fica em 0: a fita mostra o número honesto de quem não tem ninguém */
       }
@@ -1965,7 +1987,7 @@ export function GestacaoPath({
              boiando pela trilha como se fosse uma plantinha comprada. */
           CANTINHO_BY_ID[id].type !== "trilha" &&
           /* Tema veste o CÉU DA HOME, que nem é esta tela. Ele faltava nesta
-             lista: quem comprava o Céu Clássico (150 🌱) ganhava de brinde um
+             lista: quem comprava o Céu Clássico ganhava de brinde um
              🌅 vagando pela trilha, como se fosse um enfeite. */
           CANTINHO_BY_ID[id].type !== "tema" &&
           /* Clima é o AR da trilha, não um adesivo: ele não tem lugar, e por
@@ -1980,7 +2002,7 @@ export function GestacaoPath({
   /* TUDO se espalha sozinho, inclusive o céu.
      Antes o `ceu` era excluído daqui com o comentário "o céu já se vira
      sozinho lá em cima" — e não havia código nenhum fazendo isso. Quem
-     comprava Estrelinhas (40 🌱) ou Arco-íris (150 🌱) não via absolutamente
+     comprava Estrelinhas ou Arco-íris não via absolutamente
      nada até descobrir, por conta própria, o botão ✏️ de Arrumar e arrastar o
      item para o lugar. Cinco itens do catálogo eram dinheiro em troca de nada.
      `seedDecor` agora coloca os de céu na faixa do alto (ver lá). */
@@ -3040,7 +3062,14 @@ export function GestacaoPath({
       {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
           na ordem do DOM porque as duas são `fixed`: se as duas estivessem no
           ar, a que a paciente acabou de conquistar tem de ficar por cima. */}
-      {lojaAberta && <LojaSementinhas aberto onFechar={() => setLojaAberta(false)} saldo={saldo} />}
+      {lojaAberta && (
+        <LojaSementinhas
+          aberto
+          onFechar={() => setLojaAberta(false)}
+          saldo={saldo}
+          careMode={careMode}
+        />
+      )}
 
       {chamaAberta && (
         <FolhaDaChama streak={streak} perdoes={folgas} onFechar={() => setChamaAberta(false)} />

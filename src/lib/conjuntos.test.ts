@@ -30,6 +30,7 @@ import {
   progressoDoConjunto,
 } from "./conjuntos";
 import { CANTINHO_BY_ID, CANTINHO_ITEMS } from "./cantinho";
+import { GANHO_DIA_TIPICO } from "./economia-sementinhas";
 
 describe("⚠️ todo item citado existe de verdade", () => {
   test("nenhum id inválido", () => {
@@ -212,5 +213,52 @@ describe("conjuntosDoItem", () => {
 
   test("item que não existe não estoura", () => {
     expect(conjuntosDoItem("nao-existe")).toEqual([]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ O CUSTO DO CONJUNTO — o número que ninguém estava olhando
+
+   O teto testado acima é o do BÔNUS. O reajuste de preços de ago/2026 dobrou o
+   CUSTO dos conjuntos (5.758 → 9.583 🌱) sem que nada reprovasse, e a proporção
+   bônus/custo caiu de 11,0% para 6,6% de lado — ninguém decidiu isso.
+
+   Por que importa mais aqui do que num jogo comum: `conjuntos.ts` declara, com
+   todas as letras, que conjunto é a mecânica que mais empurra compra ("faltam 2
+   pra completar!") e que as três travas contra isso são de DESENHO — não se
+   anuncia fora da prateleira, não há prazo, e a tela diz "3 de 4" (estado) em
+   vez de "falta 1!" (dívida).
+
+   Dobrar a distância até fechar aumenta exatamente a pressão que essas travas
+   existem para conter, numa paciente que pode estar internada. O conjunto mais
+   caro passou de ~21 para ~39 dias de ganho típico.
+
+   Este teste não congela preço: ele cobra que o conjunto continue sendo uma
+   coisa que dá para querer dentro de uma gestação.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("⚠️ um conjunto cabe dentro de uma gestação", () => {
+  const custo = (c: (typeof CONJUNTOS)[number]) =>
+    c.itens.reduce((s, id) => s + (CANTINHO_BY_ID[id]?.price ?? 0), 0);
+
+  test("nenhum conjunto passa de um sexto da jornada em dias de ganho típico", () => {
+    /* 294 dias de gestação; um sexto são 49. Acima disso, "colecionar" deixa de
+       ser um objetivo e vira um projeto que compete com a gestação inteira —
+       e o pior é que ela não sabe disso quando começa. */
+    const TETO_DE_DIAS = 294 / 6;
+    for (const c of CONJUNTOS) {
+      const dias = custo(c) / GANHO_DIA_TIPICO;
+      expect(`${c.id} ${dias < TETO_DE_DIAS}`).toBe(`${c.id} true`);
+    }
+  });
+
+  test("e o bônus continua sendo reconhecimento — nunca o motivo", () => {
+    /* Se o bônus chegasse perto de pagar o próprio conjunto, a prateleira
+       viraria planilha: valeria a pena comprar itens que ela não quer só para
+       fechar. O prêmio é o RECONHECIMENTO, e o número tem de ficar pequeno o
+       bastante para isso ser óbvio. */
+    for (const c of CONJUNTOS) {
+      const proporcao = bonusDoConjunto(c) / custo(c);
+      expect(`${c.id} ${proporcao < 0.25}`).toBe(`${c.id} true`);
+    }
   });
 });

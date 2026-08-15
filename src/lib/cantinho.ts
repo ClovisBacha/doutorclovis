@@ -1056,7 +1056,7 @@ const FUNDO_SIMPLES_TONS = [
 /* ══════════════════════════════════════════════════════════════════════════
    OS DOIS ITENS MAIS CAROS DA LOJA PASSARAM A FAZER O QUE O NOME DIZ
 
-   "Árvore que cresce" (350 🌱) não crescia e "Ciclo dia/noite" (400 🌱) não
+   "Árvore que cresce" não crescia e "Ciclo dia/noite" não
    ciclava: eram um 🌳 e um 🌗 parados como qualquer adesivo. A varredura de
    ago/2026 achou os dois, e eles eram o 1º e o 2º item mais caros do catálogo.
 

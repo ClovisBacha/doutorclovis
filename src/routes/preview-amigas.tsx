@@ -59,6 +59,12 @@ function PreviewAmigas() {
       trofeus: 12 - i * 3,
       itens: 8 + i,
       diasNoApp: [43, 12, 1, 0, 143][i] ?? 30,
+      /* ⚠️ A TERCEIRA não pode ser presenteada, e a SEGUNDA já foi. São os dois
+         estados que o 🎁 tem além do normal, e nenhum deles aparece numa conta
+         de teste sem um convite aceito e um presente já enviado. Ver
+         `possoPresentear` e `jaPresenteada`. */
+      possoPresentear: i !== 2,
+      jaPresenteada: i === 1,
     }),
   );
 

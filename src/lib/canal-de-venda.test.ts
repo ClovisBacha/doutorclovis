@@ -59,10 +59,35 @@ describe("a compra da paciente nunca passa pelo Stripe", () => {
      tem de passar pela loja. O checkout do Stripe é, por definição, o canal
      "site" — então bloquear aqui é o que impede a compra de escapar. */
   test("Premium e Sementinhas são bloqueados no canal site", () => {
+    /* ⚠️ O que este teste garante é o BLOQUEIO (`pode === false`). O motivo
+       depende de a loja estar ligada, e as duas respostas são corretas:
+       · com IAP ligado, "canal_errado" — vá comprar no app;
+       · com IAP desligado, "iap_indisponivel" — ainda não dá em canal nenhum,
+         que é a verdade e é o que a paciente de hoje precisa ler.
+       A versão anterior cravava "canal_errado" e reprovava a correção que fez a
+       frase parar de mandar a paciente procurar o app numa loja onde ele não
+       está. Teste que cobra o TEXTO de um estado transitório vira âncora. */
     for (const p of ["premium_paciente", "sementinhas"] as Produto[]) {
       const v = podeComprar(p, "site");
       expect(v.pode).toBe(false);
-      if (!v.pode) expect(v.motivo).toBe("canal_errado");
+      if (!v.pode) expect(v.motivo).toBe(IAP_ATIVO ? "canal_errado" : "iap_indisponivel");
+    }
+  });
+
+  test("⚠️ e a paciente de HOJE nunca é mandada a uma loja onde o app não está", () => {
+    /**
+     * `ehNativo()` é falso para todas as pacientes de hoje (o app é um PWA),
+     * então o canal delas é "site". Com a ordem antiga, a tela dizia "esta
+     * compra acontece dentro do aplicativo, pela loja da Apple ou do Google"
+     * — logo abaixo de "A compra ainda não está aberta", e sobre um app que
+     * não está em loja nenhuma. Quem lesse ia procurar e não ia achar.
+     */
+    if (IAP_ATIVO) return;
+    const v = podeComprar("sementinhas", "site");
+    expect(v.pode).toBe(false);
+    if (!v.pode) {
+      expect(v.texto.toLowerCase()).not.toContain("apple");
+      expect(v.texto.toLowerCase()).not.toContain("google");
     }
   });
 });

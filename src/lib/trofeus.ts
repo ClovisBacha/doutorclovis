@@ -83,11 +83,17 @@ export const ATIVIDADES_POR_TROFEU = 4;
  * novo horizonte.
  */
 export const TROFEUS_PARA: Readonly<Record<string, number>> = {
-  /** Borboleta — 74 🌱, o mais barato dos três. */
+  /* ⚠️ SEM PREÇO ESCRITO AQUI. As três linhas diziam "Borboleta — 74 🌱",
+     "Fim de tarde no deserto — 240 🌱" e "Bolinhas Coração — 400 🌱"; o
+     reajuste de ago/2026 levou os itens a 65, 550 e 1.000 e a prosa ficou. Não
+     era narrativa histórica: os três números ERAM o argumento da escada ("a
+     escada segue o preço deles"), e o argumento passou a se apoiar em valores
+     que não existem mais. O preço mora em `cantinho.ts`, num lugar só. */
+  /** Borboleta — o mais barato dos três. */
   "bicho-borboleta": 10,
-  /** Fim de tarde no deserto — 240 🌱. */
+  /** Fim de tarde no deserto — o do meio. */
   "fundo-deserto": 20,
-  /** Bolinhas Coração — 400 🌱, o mais caro. */
+  /** Bolinhas Coração — o mais caro. */
   "trilha-coracao": 30,
 };
 

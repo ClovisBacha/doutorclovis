@@ -13,7 +13,11 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { CANTINHO_ITEMS } from "./cantinho";
+import { CONQUISTAS, orcamentoDasConquistas } from "./conquistas";
+import { CONJUNTOS, bonusDoConjunto } from "./conjuntos";
+import { PACOTES, totalDoPacote } from "./pacotes-sementinhas";
 import { SEMENTINHAS } from "./sementinhas.functions";
 import {
   BONUS_VINCULO_MEDICO,
@@ -360,10 +364,35 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
   );
   const catalogo = vendaveis.reduce((s, i) => s + i.price, 0);
 
-  /** O maior pacote da loja: 10.000 + 5.000 de bônus. */
-  const MAIOR_PACOTE = 15_000;
-  /** Gestação inteira no ritmo típico, com todas as conquistas e conjuntos. */
-  const ORGANICO_DA_GESTACAO = 294 * GANHO_DIA_TIPICO + 42 * GANHO_SEMANAL + 1_750 + 636 + 200;
+  /**
+   * O maior pacote da loja — DERIVADO, nunca digitado.
+   *
+   * ⚠️ Era `const MAIOR_PACOTE = 15_000;`, e isso é literalmente o pecado que
+   * este mesmo commit corrigiu em `loja-coerente.test.ts`: "constante que
+   * descreve um arquivo é constante que um dia diverge dele". Subir o bônus do
+   * Celeiro de 5.000 para 8.000 deixaria a trava apertada (40–60%) verde sobre
+   * um número morto.
+   */
+  const MAIOR_PACOTE = totalDoPacote(PACOTES[0]);
+
+  /**
+   * Gestação inteira, com todas as conquistas e conjuntos.
+   *
+   * ⚠️ `BONUS_VINCULO_MEDICO` derivado, e não um `+ 200` solto. O número
+   * escrito à mão nem batia: o bônus de vínculo é 100. Magic number dentro do
+   * modelo que sustenta o 48% é o jeito de a conta mentir sem ninguém ver.
+   */
+  /* Derivados dos catálogos: acrescentar uma conquista ou um conjunto passa a
+     mexer no modelo sozinho, em vez de deixá-lo desatualizado em silêncio. */
+  const TOTAL_DAS_CONQUISTAS = orcamentoDasConquistas(CONQUISTAS);
+  const BONUS_DOS_CONJUNTOS = CONJUNTOS.reduce((s, c) => s + bonusDoConjunto(c), 0);
+  const organicoAte = (porDia: number) =>
+    294 * porDia +
+    42 * GANHO_SEMANAL +
+    TOTAL_DAS_CONQUISTAS +
+    BONUS_DOS_CONJUNTOS +
+    BONUS_VINCULO_MEDICO;
+  const ORGANICO_DA_GESTACAO = organicoAte(GANHO_DIA_TIPICO);
 
   test("uma compra do maior pacote fica entre 40% e 60% do catálogo", () => {
     const fatia = MAIOR_PACOTE / catalogo;
@@ -371,16 +400,42 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
     expect(fatia).toBeLessThan(0.6);
   });
 
-  test("⚠️ e NÃO chega perto de comprar tudo — era 101% antes do reajuste", () => {
-    expect(MAIOR_PACOTE).toBeLessThan(catalogo * 0.75);
-  });
-
-  test("jogar a gestação inteira, perfeito, também não fecha sozinho", () => {
+  test("jogar a gestação inteira NO RITMO TÍPICO também não fecha sozinho", () => {
     /* Se fechasse, quem joga não teria motivo para comprar; e se ficasse longe
-       demais, a coleção viraria enfeite inalcançável para quem não paga. */
+       demais, a coleção viraria enfeite inalcançável para quem não paga.
+
+       ⚠️ O nome deste teste dizia "perfeito", e o modelo usa
+       `GANHO_DIA_TIPICO` (35). Perfeito é `GANHO_DIA_TETO` (68) — o próprio
+       arquivo o define como "check-in, aula respondida, as cinco atividades e
+       as três estrelas fechadas, TODO dia". Duas coisas diferentes com o mesmo
+       nome; o teste abaixo mede a outra. */
     const fatia = ORGANICO_DA_GESTACAO / catalogo;
     expect(fatia).toBeGreaterThan(0.35);
     expect(fatia).toBeLessThan(0.6);
+  });
+
+  test("⚠️ e NO TETO, jogando perfeito todo dia, a coleção ainda não fecha", () => {
+    /**
+     * ─── O FIM DE JOGO ENTRA PELA PORTA DA PACIENTE MAIS ENGAJADA ──────────
+     *
+     * Uma auditoria mediu: a 68 🌱/dia o ganho orgânico da gestação é ~81% do
+     * catálogo, e com UMA compra do maior pacote passa de 100% — sobrando
+     * milhares de Sementinhas sem nada para comprar. É exatamente o fim de jogo
+     * que o reajuste de preços existiu para impedir, chegando por quem mais
+     * usa o app em vez de por quem paga.
+     *
+     * O teto sozinho continua abaixo de 100%, e é isso que este teste trava. O
+     * que ele NÃO promete é que teto + compra caibam: quem joga perfeito nove
+     * meses E compra o pacote maior zera a coleção, e essa é uma decisão de
+     * produto (ela merece), não um defeito.
+     *
+     * ⚠️ Este caminho é RARO por construção — o teto exige as cinco atividades
+     * fechadas todo santo dia, numa gestação de alto risco. O teste existe para
+     * o dia em que alguém subir o ganho diário "só um pouquinho" e empurrar o
+     * caso típico para cá sem perceber.
+     */
+    const noTeto = organicoAte(GANHO_DIA_TETO) / catalogo;
+    expect(noTeto).toBeLessThan(1);
   });
 
   test("os dois caminhos juntos fecham — é esse o desenho", () => {
@@ -392,6 +447,23 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
        coleção ao alcance. */
     const juntos = (ORGANICO_DA_GESTACAO + MAIOR_PACOTE) / catalogo;
     expect(juntos).toBeGreaterThan(0.95);
+  });
+
+  test("⚠️ a prosa do cabeçalho não pode citar preço que já mudou", () => {
+    /**
+     * Duas correções seguidas mostraram o mesmo padrão: o número muda no
+     * `CURVA_GRATIS` e a prosa do topo do arquivo continua afirmando o antigo
+     * ("UM item caro (200 🌱)", "mediana 160, Q3 250"). O próprio parágrafo
+     * termina dizendo que "prosa confiante e errada nesta base é pior que prosa
+     * nenhuma" — e era ele o errado.
+     *
+     * Em vez de reescrever os números (que envelhecem de novo), o cabeçalho
+     * passou a apontar para as constantes. Este teste impede que voltem.
+     */
+    const fonte = readFileSync("src/lib/economia-sementinhas.ts", "utf8");
+    const cabecalho = fonte.slice(0, fonte.indexOf("export const ITENS_GRATIS"));
+    expect(cabecalho).not.toMatch(/\b200 🌱/);
+    expect(cabecalho).not.toMatch(/mediana \d/);
   });
 
   test("⚠️ a parede dos 15 dias NÃO se moveu: a loja grátis continua em 704", () => {

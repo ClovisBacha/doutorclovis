@@ -83,11 +83,15 @@ const MENU_CONTA: {
   {
     /* Era "Recompensas", e a linha prometia três coisas das quais duas já
        moram em outro lugar: as Sementinhas aparecem no Cantinho (dentro do
-       jogo) e as conquistas vão para lá também. Sobra a LOJA — e é o que a
-       linha passa a dizer, caindo direto nela em vez de na primeira sub-aba
-       do hub. */
-    tab: "Recompensas",
-    subAba: "loja",
+       jogo) e as conquistas vão para lá também. Sobrou a LOJA — e é o que a
+       linha diz.
+
+       ⚠️ E hoje ela aponta para um DESTINO PRÓPRIO (`tab: "Loja"`), sem
+       `subAba`. Antes era `tab: "Recompensas", subAba: "loja"`, o que fazia a
+       linha depender de três elos no meio do caminho (o `onNavegar` repassar a
+       sub-aba, o `goToTab` gravá-la, o hub aceitá-la) — e nenhum dos três
+       tinha teste. Um destino próprio não tem elo nenhum para quebrar. */
+    tab: "Loja",
     label: "Loja",
     sub: "Suplementos, conforto e enxoval",
     Icon: ShoppingBag,

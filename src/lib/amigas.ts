@@ -152,6 +152,28 @@ export type PerfilDeAmiga = {
   itens: number;
   /** Há quanto tempo ela está no app, em dias. */
   diasNoApp: number;
+  /**
+   * ⚠️ EU POSSO PRESENTEAR ESTA AMIGA?
+   *
+   * A lista é o grafo de indicação nos DOIS sentidos (quem eu trouxe **e** quem
+   * me trouxe), mas `presentearAmiga` só aceita quem EU indiquei
+   * (`.eq("referred_by", uid)`). Sem este campo, a assinante que ENTROU pelo
+   * convite de alguém via o 🎁 na linha de quem a trouxe, tocava, e recebia
+   * "Vocês precisam estar conectadas pelo convite" — uma frase falsa, porque
+   * estão, só que pelo lado oposto. Atinge toda paciente que chegou por
+   * indicação, que é justamente o caminho que a aba inteira promove.
+   */
+  possoPresentear: boolean;
+  /**
+   * Já ganhou presente meu NESTE ciclo — o servidor recusaria um segundo.
+   *
+   * ⚠️ Vem do LEDGER, não da memória da tela. A primeira versão guardava isso
+   * num `Set` do componente: bastava trocar de aba (que desmonta a aba) para os
+   * 🎁 voltarem ao normal e o servidor responder `ja_presenteada`. É a mesma
+   * lição já registrada para a mesada do médico — "o painel não esquece mais
+   * quem já recebeu" —, que se resolve derivando dos `dedupe_key`.
+   */
+  jaPresenteada: boolean;
 };
 
 /**

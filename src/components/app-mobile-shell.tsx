@@ -54,6 +54,12 @@ export type AppTab =
   | "Saúde da mulher"
   | "Médico"
   | "Chat IA"
+  /* A loja de PRODUTOS (suplemento, conforto, enxoval — por dinheiro). Era uma
+     sub-aba de "Recompensas", ao lado do Cantinho, que vende enfeite por
+     Sementinhas; virou destino próprio para as duas pararem de se confundir.
+     Não pertence a nenhuma seção da barra de baixo, de propósito: o caminho
+     dela é o menu ☰ no celular e a categoria "Conta" no computador. */
+  | "Loja"
   | "Perfil"
   | "Exames";
 

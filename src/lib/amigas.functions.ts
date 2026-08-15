@@ -74,8 +74,18 @@ async function saoAmigas(sb: any, eu: string, outra: string): Promise<boolean> {
   return minha.referred_by === outra || dela.referred_by === eu;
 }
 
-/** Os ids de todas as amigas — quem eu indiquei ∪ quem me indicou. */
-async function idsDasAmigas(sb: any, eu: string): Promise<string[]> {
+/**
+ * Os ids de todas as amigas — quem eu indiquei ∪ quem me indicou.
+ *
+ * ⚠️ Devolve as duas coisas: a UNIÃO (quem aparece na lista) e o subconjunto
+ * que EU trouxe. Só este último pode receber presente meu — `presentearAmiga`
+ * exige `.eq("referred_by", uid)` —, e sem separar os dois a tela desenhava o
+ * 🎁 na linha de quem me trouxe, para o servidor recusar com uma frase falsa.
+ */
+async function idsDasAmigas(
+  sb: any,
+  eu: string,
+): Promise<{ todas: string[]; trazidasPorMim: Set<string> }> {
   const { data: minha } = await sb
     .from("patient_profiles")
     .select("referred_by")
@@ -90,13 +100,53 @@ async function idsDasAmigas(sb: any, eu: string): Promise<string[]> {
   const ids = new Set<string>();
   const quemMeTrouxe = (minha as { referred_by?: string | null } | null)?.referred_by;
   if (quemMeTrouxe) ids.add(quemMeTrouxe);
-  for (const r of (trazidas ?? []) as { id: string }[]) ids.add(r.id);
+  const trazidasPorMim = new Set<string>();
+  for (const r of (trazidas ?? []) as { id: string }[]) {
+    ids.add(r.id);
+    trazidasPorMim.add(r.id);
+  }
   /* Filtro em vez de `ids.delete(eu)`: a catraca de "escrita no banco sem
      checagem de erro" (`travas-do-servidor.test.ts`) casa com `.delete(` por
      texto, e um `Set.delete` aqui entrava na conta como se fosse um DELETE de
      tabela. Inflar a dívida com falso positivo é pior que a linha extra —
      esconde a dívida real atrás de ruído. */
-  return [...ids].filter((id) => id !== eu);
+  return { todas: [...ids].filter((id) => id !== eu), trazidasPorMim };
+}
+
+/**
+ * QUEM JÁ GANHOU PRESENTE MEU NESTE CICLO.
+ *
+ * ⚠️ Sai do LEDGER, e não da memória da tela. A chave é
+ * `amiga:<eu>:<amiga>:<ciclo>` — a MESMA que `presentearAmiga` grava —, então
+ * não há duas verdades: o que a tela desenha é o que o servidor vai aceitar.
+ *
+ * Falha de leitura devolve conjunto VAZIO, e aqui isso é o lado seguro: o 🎁
+ * continua à mostra e, se ela tocar, o servidor recusa com a frase certa
+ * ("já presenteou neste mês"). O contrário — esconder por não ter conseguido
+ * ler — tiraria dela uma ação legítima sem explicar por quê.
+ */
+async function presenteadasNoCiclo(sb: any, eu: string): Promise<Set<string>> {
+  try {
+    const { inicioDoCiclo } = await import("@/lib/cota-ia.server");
+    const ciclo = inicioDoCiclo().toISOString().slice(0, 7);
+    const prefixo = `amiga:${eu}:`;
+    const { data, error } = await sb
+      .from("sementinhas_ledger")
+      .select("dedupe_key")
+      .eq("user_id", eu)
+      .like("dedupe_key", `${prefixo}%`)
+      .limit(1000);
+    if (error || !data) return new Set();
+    const fora = new Set<string>();
+    for (const r of data as { dedupe_key: string | null }[]) {
+      const k = r.dedupe_key ?? "";
+      if (!k.startsWith(prefixo) || !k.endsWith(`:${ciclo}`)) continue;
+      fora.add(k.slice(prefixo.length, k.length - ciclo.length - 1));
+    }
+    return fora;
+  } catch {
+    return new Set();
+  }
 }
 
 /** As linhas de bem-estar de várias pacientes, para chama e troféus. */
@@ -144,7 +194,7 @@ export const minhasAmigas = createServerFn({ method: "POST" })
       return { ok: true as const, careMode: true as const, amigas: [], dupla: null };
     }
 
-    const ids = await idsDasAmigas(sb, eu);
+    const { todas: ids, trazidasPorMim: trazidasIds } = await idsDasAmigas(sb, eu);
     if (ids.length === 0) {
       return { ok: true as const, careMode: false as const, amigas: [], dupla: null };
     }
@@ -165,6 +215,12 @@ export const minhasAmigas = createServerFn({ method: "POST" })
     const agrupado = porPaciente(linhas);
     const hoje = diaLocal(new Date());
 
+    /* ─── QUEM EU POSSO PRESENTEAR, E QUEM JÁ GANHOU ─────────────────────
+       Duas perguntas que a TELA não tem como responder sozinha, e que ela
+       precisava responder para não desenhar um 🎁 que o servidor recusa.
+       Ver `possoPresentear` e `jaPresenteada` em `PerfilDeAmiga`. */
+    const jaGanharam = await presenteadasNoCiclo(sb, eu);
+
     const amigas: PerfilDeAmiga[] = visiveis.map((p) => {
       const dela = agrupado.get(p.id) ?? [];
       return {
@@ -180,6 +236,8 @@ export const minhasAmigas = createServerFn({ method: "POST" })
         diasNoApp: p.created_at
           ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000))
           : 0,
+        possoPresentear: trazidasIds.has(p.id),
+        jaPresenteada: jaGanharam.has(p.id),
       };
     });
     /* Ordem: a chama mais alta primeiro. Não é placar — é a lista de quem está
@@ -212,7 +270,7 @@ export const contarAmigas = createServerFn({ method: "POST" })
     /* No luto a fita não mostra número nenhum, como não mostra saldo. */
     if (await emLuto(sb, eu)) return { ok: true as const, amigas: 0 };
 
-    const ids = await idsDasAmigas(sb, eu);
+    const { todas: ids } = await idsDasAmigas(sb, eu);
     if (ids.length === 0) return { ok: true as const, amigas: 0 };
     const { data: perfis } = await sb
       .from("patient_profiles")
@@ -246,7 +304,7 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
 
     const { data: p } = await sb
       .from("patient_profiles")
-      .select("id, display_name, baby_name, cantinho_fundo, created_at, journey_state")
+      .select("id, display_name, baby_name, cantinho_fundo, created_at, journey_state, referred_by")
       .eq("id", data.amigaId)
       .maybeSingle();
     if (!p) return { ok: false as const, error: "sem_vinculo" as const };
@@ -290,6 +348,12 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
       diasNoApp: p.created_at
         ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000))
         : 0,
+      /* ⚠️ As MESMAS duas perguntas da lista, respondidas aqui também: o botão
+         "Presentear" do perfil é a segunda porta, e uma porta que a lista já
+         sabe estar fechada não pode aparecer aberta ao lado. `possoPresentear`
+         é `referred_by = eu`, exatamente o que `presentearAmiga` exige. */
+      possoPresentear: (p.referred_by ?? null) === eu,
+      jaPresenteada: (await presenteadasNoCiclo(sb, eu)).has(p.id),
     };
 
     return {
@@ -597,7 +661,21 @@ export const cobrarBonusDaDupla = createServerFn({ method: "POST" })
             dedupeKey,
           },
         ]);
-        ganho += BONUS_DA_DUPLA;
+        /* ⚠️ CONFERE QUE GRAVOU, em vez de somar por fé.
+           `grantSementinhas` faz `upsert` com `ignoreDuplicates` e engole falha
+           num `console.error` — não lança e não devolve nada. Somando direto, a
+           perdedora de uma corrida entre duas abas (ou qualquer falha de
+           escrita) recebia `ganho: 10`, o toast "+10 🌱" e o saldo subindo na
+           tela sobre uma linha que não existe; no carregamento seguinte o
+           número voltava atrás sozinho, que é indistinguível de bug.
+           A irmã `presentearAmiga` relê pelo mesmo motivo. */
+        const { data: gravou } = await db
+          .from("sementinhas_ledger")
+          .select("amount")
+          .eq("user_id", eu)
+          .eq("dedupe_key", dedupeKey)
+          .maybeSingle();
+        if (gravou) ganho += BONUS_DA_DUPLA;
       }
       return { ok: true as const, ganho };
     } catch {

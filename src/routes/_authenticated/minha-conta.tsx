@@ -421,6 +421,12 @@ const TABS = [
   "Saúde da mulher",
   "Médico",
   "Chat IA",
+  /* ⚠️ A LOJA DE PRODUTOS É UM DESTINO PRÓPRIO (ago/2026), e não mais uma
+     sub-aba de "Recompensas". Ver `LojaTab`: ela vende suplemento, conforto e
+     enxoval por DINHEIRO, e vivia como terceira pílula ao lado do Cantinho,
+     que vende enfeite por Sementinhas. Fica ao lado do Perfil, que é onde o
+     dono disse que ela mora. */
+  "Loja",
   "Perfil",
 ] as const;
 type Tab = (typeof TABS)[number];
@@ -448,7 +454,11 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Conta",
-    tabs: ["Chat IA", "Perfil"],
+    /* ⚠️ A Loja entra AQUI, e não em "Aprender" (onde está Recompensas): é a
+       porta do COMPUTADOR para ela. No celular quem abre a loja é o menu ☰
+       (`MenuDaConta`), que não existe em `md:` — sem esta linha, tirar a
+       pílula da fita deixaria a loja inalcançável no desktop. */
+    tabs: ["Chat IA", "Loja", "Perfil"],
   },
 ];
 
@@ -2148,10 +2158,14 @@ function MinhaContaPage() {
                   return (
                     <button
                       key={t}
-                      onClick={() => {
-                        setTab(t);
-                        setMobileHome(false);
-                      }}
+                      /* ⚠️ `goToTab`, não `setTab` cru. Este botão fazia
+                         `setTab` + `setMobileHome(false)` e mais nada — em
+                         especial NÃO limpava `consultasSub`, que é a sub-aba
+                         pedida por quem navegou até aqui. Resultado medido: uma
+                         vez aberta uma sub-aba por deep link, toda visita
+                         seguinte àquele hub pelo desktop reabria a MESMA
+                         sub-aba, para sempre. `goToTab` limpa. */
+                      onClick={() => goToTab(t)}
                       className={`press flex-shrink-0 rounded-full px-3.5 py-2 text-sm transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
                         tab === t
                           ? `${cs.pill} font-semibold`
@@ -2287,6 +2301,9 @@ function MinhaContaPage() {
                     initialSub={consultasSub}
                   />
                 )}
+                {/* A loja de PRODUTOS (dinheiro), longe da de enfeites
+                    (Sementinhas) — ver o cabeçalho de `RECOMPENSAS_SUBTABS`. */}
+                {tab === "Loja" && <LojaTab gest={gest} careMode={careMode} onNavigate={goToTab} />}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
@@ -15659,10 +15676,21 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
  * assim que uma paciente toca em "Loja" achando que vai gastar o que juntou e
  * encontra um carrinho de compras de verdade.
  *
- * ⚠️ ELA NÃO SUMIU — saiu da FITA. `MenuDaConta` já entra direto nela
- * (`tab: "Recompensas"`, `subAba: "loja"`), que é o "está no perfil" do pedido,
- * e é por isso que a chave continua válida em `SubRec` e o bloco de render
- * continua aqui. Apagar o caminho apagaria a loja inteira do app da paciente.
+ * ⚠️ ELA NÃO SUMIU — VIROU DESTINO PRÓPRIO (`tab: "Loja"`, ao lado do Perfil),
+ * que é o "está no perfil" do pedido. `MenuDaConta` aponta para lá no celular e
+ * a categoria "Conta" a mostra no computador.
+ *
+ * ⚠️ A primeira versão a manteve como sub-aba escondida (`initialSub="loja"`,
+ * fita oculta) e isso trouxe DOIS defeitos que uma auditoria mediu:
+ *
+ *  1. **o computador ficava sem porta** — `MenuDaConta` vive dentro de um
+ *     `md:hidden`, então a pílula ERA a única entrada do desktop;
+ *  2. **a sub-aba grudava**: a fita de abas do desktop chamava `setTab` direto,
+ *     que não limpa `consultasSub` — toda visita a "Recompensas" reabria a
+ *     Loja, e com a fita escondida o Cantinho ficava inalcançável por ali.
+ *
+ * Destino próprio mata os dois de uma vez, e de quebra some com o `| "loja"`
+ * costurado à mão no tipo, que era a linha mais fácil de apagar sem querer.
  */
 const RECOMPENSAS_SUBTABS = [
   { key: "cantinho", label: "Meu Cantinho" },
@@ -15686,46 +15714,31 @@ function RecompensasHub({
       Cantinho, como antes. */
   initialSub?: string | null;
 }) {
-  /* ⚠️ `"loja"` entra no TIPO mas está fora de `RECOMPENSAS_SUBTABS`: ela é um
-     destino válido do hub e não é uma pílula da fita. Derivar o tipo só da
-     lista faria `initialSub="loja"` do menu da conta cair no Cantinho em
-     silêncio — a linha "Loja · Suplementos, conforto e enxoval" abriria o
-     jardim de enfeites. */
-  type SubRec = (typeof RECOMPENSAS_SUBTABS)[number]["key"] | "loja";
-  const eSub = (v: unknown): v is SubRec =>
-    v === "loja" || RECOMPENSAS_SUBTABS.some((x) => x.key === v);
+  type SubRec = (typeof RECOMPENSAS_SUBTABS)[number]["key"];
+  const eSub = (v: unknown): v is SubRec => RECOMPENSAS_SUBTABS.some((x) => x.key === v);
   const [sub, setSub] = useState<SubRec>(eSub(initialSub) ? initialSub : "cantinho");
   useEffect(() => {
     if (eSub(initialSub)) setSub(initialSub);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSub]);
 
-  /* ⚠️ Na Loja a fita NÃO aparece. Com ela, a tela mostraria duas pílulas e
-     NENHUMA acesa — que é como uma tela quebrada se parece. E a fita é
-     justamente o que o dono mandou tirar de perto da loja de produtos: quem
-     chega aqui veio do menu da conta e sai por ele, como em qualquer outra aba
-     do app. */
-  const naLoja = sub === "loja";
-
   return (
     <div className="space-y-5">
-      {!naLoja && (
-        <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-          {RECOMPENSAS_SUBTABS.map((s) => (
-            <button
-              key={s.key}
-              onClick={() => setSub(s.key)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-                sub === s.key
-                  ? "bg-primary text-primary-foreground"
-                  : "border border-border text-foreground/55 hover:text-foreground/80"
-              }`}
-            >
-              {s.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
+        {RECOMPENSAS_SUBTABS.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => setSub(s.key)}
+            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+              sub === s.key
+                ? "bg-primary text-primary-foreground"
+                : "border border-border text-foreground/55 hover:text-foreground/80"
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
       <Fade key={sub}>
         {sub === "cantinho" && (
           <CantinhoTab
@@ -15736,7 +15749,6 @@ function RecompensasHub({
           />
         )}
         {sub === "conquistas" && <ConquistasTab careMode={careMode} onNavigate={onNavigate} />}
-        {naLoja && <LojaTab gest={gest} />}
       </Fade>
     </div>
   );
@@ -15805,7 +15817,27 @@ export function ConquistasTab({
   /* Quais já foram PAGAS. Desbloqueada e fora deste conjunto = tem prêmio
      esperando o toque dela. Ver `resgatarConquista` no servidor. */
   const [resgatadas, setResgatadas] = useState<Set<string>>(new Set(bancada?.resgatadas ?? []));
-  const [resgatandoKey, setResgatandoKey] = useState<string | null>(null);
+  /**
+   * ⚠️ NÃO CONSEGUI LER quais já foram pagas.
+   *
+   * `resgatadas` vazio quer dizer "nenhuma ainda"; isto aqui quer dizer "não
+   * sei". Com o vazio, uma falha de leitura faria as 39 conquistas voltarem a
+   * pulsar "Resgatar +120 🌱" de uma vez — ela toca, o servidor responde
+   * certíssimo que já pagou, e o cartão vira uma data sem nada acontecer. O app
+   * prometendo moeda e não entregando é a forma mais rápida de ensinar que os
+   * avisos daqui não valem leitura. Na dúvida, não prometer.
+   */
+  const [semSaberPagas, setSemSaberPagas] = useState(false);
+  /**
+   * ⚠️ Um CONJUNTO, não uma chave só.
+   *
+   * Era `resgatandoKey: string | null` com `if (resgatandoKey) return`, que é
+   * uma trava GLOBAL: enquanto um cartão estava indo ao servidor, tocar em
+   * outro era descartado em silêncio. Quem sai do Modo Cuidado, ou quem
+   * acumulou vários, encontra justamente uma grade com muitos pendentes — e
+   * toque que some sem sinal lê como app travado.
+   */
+  const [resgatando, setResgatando] = useState<Set<string>>(new Set());
 
   /**
    * O TOQUE QUE PAGA.
@@ -15818,10 +15850,19 @@ export function ConquistasTab({
    * ⚠️ E a chave entra em `resgatadas` mesmo quando o servidor responde
    * `repetido` (a linha já existia): o objetivo do estado é "não há mais
    * prêmio aqui", e isso é verdade nos dois casos.
+   *
+   * ⚠️ O CAMINHO REPETIDO PRECISA DIZER ALGO. Todo o retorno visível (confete,
+   * som, toast) vivia dentro de `if (r.granted > 0)`, então no repetido ela
+   * tocava um botão que prometia `+40 🌱` e a tela respondia com silêncio — e
+   * silêncio depois de um toque lê como app quebrado, não como "isso já era
+   * seu". Acontece de verdade com dois aparelhos abertos ao mesmo tempo.
+   * Sem festa: não é conquista nova, é um esclarecimento.
    */
   async function resgatar(key: string) {
-    if (resgatandoKey) return;
-    setResgatandoKey(key);
+    /* Por CHAVE, nunca global: a trava protege este cartão de um toque duplo,
+       e não a grade inteira de ser usada. */
+    if (resgatando.has(key)) return;
+    setResgatando((v) => new Set(v).add(key));
     try {
       const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
@@ -15840,11 +15881,17 @@ export function ConquistasTab({
         celebrateChime(1);
         celebrateHaptic(1);
         toast.success(`+${r.granted} 🌱`);
+        return;
       }
+      if (r.repetido) toast("Essas Sementinhas já são suas 💛");
     } catch {
       toast.error("Não consegui resgatar agora.");
     } finally {
-      setResgatandoKey(null);
+      setResgatando((v) => {
+        const n = new Set(v);
+        n.delete(key);
+        return n;
+      });
     }
   }
 
@@ -15860,7 +15907,10 @@ export function ConquistasTab({
       const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
-        setResgatadas(new Set(res.resgatadas));
+        /* `null` = o servidor não conseguiu ler o ledger. Ver `semSaberPagas`:
+           tratar como lista vazia poria prêmio em toda conquista da grade. */
+        setSemSaberPagas(res.resgatadas == null);
+        setResgatadas(new Set(res.resgatadas ?? []));
         /* Quais conquistas ainda NÃO foram comemoradas para esta paciente.
            Antes a régua era "desbloqueada nos últimos 30 segundos", calculada
            ao montar esta aba, e ela errava dos dois lados:
@@ -16025,8 +16075,11 @@ export function ConquistasTab({
                 /* ⚠️ Desbloqueada e AINDA NÃO RESGATADA: o cartão vira botão.
                    Ver `resgatarConquista` — o prêmio deixou de cair sozinho e
                    passou a depender do toque dela, como no Duolingo. */
-                const aResgatar = isUnlocked && !resgatadas.has(def.key);
-                const resgatando = resgatandoKey === def.key;
+                /* ⚠️ `!semSaberPagas`: sem saber quais já foram pagas, NENHUMA
+                   vira botão. Ver o estado — a alternativa é a grade inteira
+                   prometendo moeda que o servidor (com razão) não vai dar. */
+                const aResgatar = isUnlocked && !semSaberPagas && !resgatadas.has(def.key);
+                const emVoo = resgatando.has(def.key);
                 return (
                   <div
                     key={def.key}
@@ -16084,7 +16137,7 @@ export function ConquistasTab({
                          pegar, a única coisa que o cartão precisa dizer é o
                          que fazer. A data volta assim que ela resgata. */
                       <p className="mt-1.5 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-bold text-white">
-                        {resgatando ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
+                        {emVoo ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
                       </p>
                     ) : isUnlocked && unlockedAt ? (
                       <p className="mt-1 text-xs text-primary">
@@ -17450,12 +17503,41 @@ function CantinhoTab({
         aberto={lojaSementinhas}
         onFechar={() => setLojaSementinhas(false)}
         saldo={saldo}
+        careMode={careMode}
       />
     </div>
   );
 }
 
-function LojaTab({ gest }: { gest: Gest }) {
+/**
+ * A LOJA DE PRODUTOS DE VERDADE — suplemento, conforto e enxoval, por dinheiro.
+ *
+ * ⚠️ ELA ERA A QUINTA TELA SEM MODO CUIDADO, e ninguém tinha reparado.
+ *
+ * O comentário de `SilencioDoCuidado` lista quatro telas que exibiam bebê para
+ * quem tinha acabado de perder a gestação, e diz "a loja mostrava Berço com
+ * preço" — mas aquela "loja" é o CANTINHO (`objeto-berco`, enfeite por
+ * Sementinhas). Esta aqui, que vende **Kit Enxoval Recém-nascido**,
+ * **Banheirinha Dobrável para Bebê**, **Sutiã de Amamentação** e **Almofada de
+ * Amamentação**, nunca recebeu `careMode` em nenhuma versão.
+ *
+ * E o caminho até ela é curto: a linha "Loja · Suplementos, conforto e enxoval"
+ * está no menu da conta, ao lado de tudo o mais — nada avisa o que tem dentro.
+ *
+ * Os suplementos continuariam fazendo sentido depois de uma perda (ferro para
+ * anemia, por exemplo). Não é motivo para deixar a tela de pé: isto aqui é uma
+ * lista de afiliados da Amazon, não é cuidado — não se perde clínica nenhuma
+ * calando-a, e o cuidado de verdade continua inteiro no resto do app.
+ */
+function LojaTab({
+  gest,
+  careMode,
+  onNavigate,
+}: {
+  gest: Gest;
+  careMode: boolean;
+  onNavigate?: (t: Tab) => void;
+}) {
   const [category, setCategory] = useState("all");
   const [weekFilter, setWeekFilter] = useState(true);
   const [selectedProduct, setSelectedProduct] = useState<ShopProduct | null>(null);
@@ -17477,6 +17559,9 @@ function LojaTab({ gest }: { gest: Gest }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  /* ⚠️ DEPOIS dos hooks, nunca antes: um `return` acima deles muda a ordem de
+     chamada entre renders e o React quebra. É por isso que o `careMode` das
+     outras quatro telas também aparece só aqui embaixo. */
   const filtered = CURATED_PRODUCTS.filter((p) => {
     if (category !== "all" && p.category !== category) return false;
     if (weekFilter && currentWeek !== null) {
@@ -17496,6 +17581,8 @@ function LojaTab({ gest }: { gest: Gest }) {
           return afterMin && beforeMax;
         }).slice(0, 2)
       : [];
+
+  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
 
   return (
     <div className="-mx-4 bg-white px-4 pb-8 pt-4 space-y-4">

@@ -184,6 +184,17 @@ export function AmigasTab({
     }
   }
 
+  /**
+   * Já ganhou presente meu neste ciclo?
+   *
+   * ⚠️ A verdade é a do SERVIDOR (`a.jaPresenteada`, derivada do ledger). O
+   * `Set` local só existe para o ✓ aparecer no mesmo instante do toque, antes
+   * de a lista ser recarregada — se ele fosse a única fonte, trocar de aba
+   * desmontaria a aba e os 🎁 voltariam ao normal para o servidor recusar. Foi
+   * esse exato defeito que motivou tirar a segunda porta do Cantinho.
+   */
+  const jaFoi = (a: PerfilDeAmiga) => a.jaPresenteada || presenteadas.has(a.id);
+
   /* Compartilhar o link de indicação. `navigator.share` no celular; sem ele,
      copia — nunca um botão que não faz nada. */
   async function convidar() {
@@ -216,7 +227,16 @@ export function AmigasTab({
   if (carregando) return <div className="skeleton h-64 rounded-3xl" />;
 
   if (aberta) {
-    return <PerfilDaAmigaTela amigaId={aberta} aoVoltar={() => setAberta(null)} />;
+    return (
+      <PerfilDaAmigaTela
+        amigaId={aberta}
+        aoVoltar={() => setAberta(null)}
+        /* O bolso vem da aba, que já o carregou — pedi-lo de novo aqui seria
+           uma segunda ida ao servidor para responder a mesma pergunta, e as
+           duas respostas poderiam discordar entre si. */
+        assinante={!!mesada?.assinante}
+      />
+    );
   }
 
   return (
@@ -331,16 +351,32 @@ export function AmigasTab({
                 >
                   <TrofeuIcone tamanho={16} /> {a.trofeus}
                 </span>
-                {/* O PRESENTE mora aqui agora — e só aqui. Ver o cabeçalho. */}
-                {mesada?.assinante && (
+                {/* O PRESENTE mora aqui agora — e só aqui. Ver o cabeçalho.
+
+                    ⚠️ TRÊS condições, e as três vêm de fora da tela:
+                    · `assinante` — o bolso é do Premium;
+                    · `possoPresentear` — a lista é o grafo nos DOIS sentidos,
+                      mas só se presenteia quem EU trouxe. Sem isto, quem entrou
+                      pelo convite de alguém via o 🎁 na linha de quem a trouxe
+                      e recebia "vocês precisam estar conectadas pelo convite",
+                      que é falso: estão, pelo lado oposto;
+                    · `jaPresenteada` — sai do LEDGER, não de um `Set` local que
+                      zerava ao trocar de aba. */}
+                {mesada?.assinante && a.possoPresentear && (
                   <button
                     onClick={() => presentear(a)}
-                    disabled={enviando !== null || presenteadas.has(a.id)}
-                    aria-label={`Dar ${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${a.nome}`}
-                    className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base disabled:opacity-40"
-                    style={{ background: presenteadas.has(a.id) ? "#e7f6ec" : "#fce7f3" }}
+                    disabled={enviando !== null || jaFoi(a)}
+                    aria-label={
+                      jaFoi(a)
+                        ? `${a.nome} já ganhou presente seu neste mês`
+                        : `Dar ${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${a.nome}`
+                    }
+                    /* 44px é o alvo mínimo do HIG, e este é o ÚNICO controle do
+                       recurso que o dono mandou trazer para cá — era 36. */
+                    className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-base disabled:opacity-40"
+                    style={{ background: jaFoi(a) ? "#e7f6ec" : "#fce7f3" }}
                   >
-                    {presenteadas.has(a.id) ? "✓" : "🎁"}
+                    {jaFoi(a) ? "✓" : "🎁"}
                   </button>
                 )}
               </li>
@@ -377,7 +413,12 @@ export function AmigasTab({
         <button
           onClick={convidar}
           className="press shrink-0 rounded-full px-4 py-2 text-[14px] font-bold text-white"
-          style={{ background: "#e04f8f" }}
+          /* ⚠️ `#c9316f` e não o `#e04f8f` da referência: medido, o rosa
+             original dá 3,69:1 com o branco. Texto de 14px em negrito NÃO é
+             "texto grande" pela WCAG (o corte é 18,66px), então o mínimo é
+             4,5:1 — este dá 5,06:1. É o botão que a paciente precisa achar
+             para trazer alguém, na tela cujo assunto inteiro é trazer alguém. */
+          style={{ background: "#c9316f" }}
         >
           Convidar
         </button>
@@ -569,7 +610,15 @@ type Cantinho = {
   postos: EnfeitePosto[];
 };
 
-function PerfilDaAmigaTela({ amigaId, aoVoltar }: { amigaId: string; aoVoltar: () => void }) {
+function PerfilDaAmigaTela({
+  amigaId,
+  aoVoltar,
+  assinante,
+}: {
+  amigaId: string;
+  aoVoltar: () => void;
+  assinante: boolean;
+}) {
   const [perfil, setPerfil] = useState<PerfilDeAmiga | null>(null);
   const [cantinho, setCantinho] = useState<Cantinho | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -742,20 +791,34 @@ function PerfilDaAmigaTela({ amigaId, aoVoltar }: { amigaId: string; aoVoltar: (
           </span>
         </div>
 
-        <button
-          onClick={presentear}
-          disabled={presenteando || presenteado}
-          className="press mt-5 w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
-        >
-          {presenteado
-            ? "Enviado ✓"
-            : presenteando
-              ? "Enviando…"
-              : `Presentear ${PRESENTE_ENTRE_AMIGAS} 🌱`}
-        </button>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Ela recebe um aviso com o seu nome ao abrir o Caminho.
-        </p>
+        {/* ⚠️ A SEGUNDA PORTA DO PRESENTE, e ela tinha de obedecer às MESMAS
+            três condições da linha da lista. Não obedecia a nenhuma: quem não
+            assina via este botão verde de largura inteira e levava "o bolso de
+            presentear é do Premium" do servidor; quem chegou pelo convite de
+            alguém via o botão na pessoa que a trouxe, que ela nunca pode
+            presentear; e quem já tinha presenteado neste mês via "Presentear"
+            de novo. Uma auditoria achou os três, e o teste que dizia cobrir o
+            primeiro provava só a linha da lista. */}
+        {assinante && perfil.possoPresentear && (
+          <>
+            <button
+              onClick={presentear}
+              disabled={presenteando || presenteado || perfil.jaPresenteada}
+              className="press mt-5 w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
+            >
+              {presenteado || perfil.jaPresenteada
+                ? "Enviado ✓"
+                : presenteando
+                  ? "Enviando…"
+                  : `Presentear ${PRESENTE_ENTRE_AMIGAS} 🌱`}
+            </button>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {presenteado || perfil.jaPresenteada
+                ? "Ela já ganhou um presente seu neste mês. O bolso volta na virada."
+                : "Ela recebe um aviso com o seu nome ao abrir o Caminho."}
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

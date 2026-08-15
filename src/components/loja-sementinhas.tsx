@@ -62,11 +62,19 @@ const PALETA = {
   heroi:
     "linear-gradient(180deg,#b0bbf6 0%,#b6cbf3 14%,#bdddee 26%,#bfdee4 36%,#8ead91 50%,#c8c598 62%,#7d9b72 74%,#607d4a 84%,#b6c8a1 93%,#dbe5cf 100%)",
   cartao: {
-    verde: { fundo: "linear-gradient(180deg,#f1f3d7,#f3f5dd 55%,#eff2df)", botao: "#5a8629" },
+    /* ⚠️ `#4c721f`, e não o `#5a8629` amostrado da referência. Medido: o verde
+       da imagem dá 4,31:1 com o branco do rótulo — abaixo dos 4,5 da WCAG para
+       texto que não é grande. Escurecer 8% do tom mantém a família de cor da
+       referência e leva a 5,62:1. O azul (6,18) e o roxo (7,74) já passavam,
+       então só este mudou: fidelidade à referência é o objetivo, mas um preço
+       que a paciente não consegue ler não é fidelidade a nada. */
+    verde: { fundo: "linear-gradient(180deg,#f1f3d7,#f3f5dd 55%,#eff2df)", botao: "#4c721f" },
     azul: { fundo: "linear-gradient(180deg,#ecedf8,#e8eaf9 55%,#d7ddf1)", botao: "#3261a6" },
     roxo: { fundo: "linear-gradient(180deg,#f4edf7,#f3ebf7 55%,#f9f8fa)", botao: "#614390" },
   },
-  fita: "#63822c",
+  /* Idem para a fita "MELHOR VALOR": `#63822c` dava 4,41:1 — reprova por pouco,
+     e ela carrega três palavras em caixa alta pequena. `#4f6a20` dá 6,15:1. */
+  fita: "#4f6a20",
 } as const;
 
 const ARTE: Record<string, string> = {
@@ -105,10 +113,23 @@ export function LojaSementinhas({
   aberto,
   onFechar,
   saldo,
+  careMode = false,
 }: {
   aberto: boolean;
   onFechar: () => void;
   saldo: number | null;
+  /**
+   * ⚠️ O PORTÃO MORA AQUI, e não só em quem abre a loja.
+   *
+   * Hoje os dois chamadores já fecham a porta antes — o Caminho deixa o saldo
+   * em `null` no luto e o botão nem existe; a aba de Recompensas devolve
+   * `SilencioDoCuidado`. Mas isso é uma SEGUNDA RÉGUA, exatamente o que o
+   * projeto proíbe em `humorDaJornada` e em `presenteRecente`: um terceiro
+   * chamador (um deep-link, um atalho novo na home) abriria uma vitrine de
+   * compra para quem acabou de perder a gestação, e ninguém precisaria ter
+   * errado nada — bastaria não saber da regra.
+   */
+  careMode?: boolean;
 }) {
   /* O botão de voltar do Android fecha a folha em vez de fechar o app.
      Ver `src/lib/voltar.ts`. */
@@ -157,7 +178,9 @@ export function LojaSementinhas({
     })();
   }, [aberto, extrato]);
 
-  if (!aberto) return null;
+  /* ⚠️ DEPOIS dos hooks (a ordem de chamada não pode mudar entre renders) e
+     JUNTO do `!aberto`: no Modo Cuidado esta tela simplesmente não existe. */
+  if (!aberto || careMode) return null;
 
   const veredito = podeComprarAqui("sementinhas", nativo);
   const podeComprar = veredito.pode;
@@ -382,8 +405,15 @@ export function LojaSementinhas({
                       className="press mt-2.5 w-full rounded-full py-2.5 text-[17px] font-extrabold text-white shadow-sm disabled:opacity-60"
                       /* Sem cor quando não dá para comprar: o botão continua
                            mostrando o preço (é o layout), mas para de parecer
-                           um botão que cobra. */
-                      style={{ background: podeComprar ? c.botao : "#9aa0a6" }}
+                           um botão que cobra.
+
+                           ⚠️ `#5f6368` e não `#9aa0a6`. O cinza claro dava
+                           **2,64:1** com o branco — o texto MENOS legível da
+                           tela inteira era justamente o PREÇO, e neste estado
+                           (a compra ainda não abriu) ele é o que 100% das
+                           pacientes veem. Cinza mais escuro continua lendo como
+                           "desligado" e leva a 6,05:1. */
+                      style={{ background: podeComprar ? c.botao : "#5f6368" }}
                     >
                       {indo === p.id ? "…" : precoBRL(p)}
                     </button>
@@ -447,7 +477,12 @@ export function LojaSementinhas({
           </div>
         )}
 
-        <p className="mx-auto mt-4 max-w-[24rem] text-center text-[11px] leading-relaxed text-slate-400">
+        {/* ⚠️ `slate-600` e não `slate-400`. Este parágrafo é o que traça o
+            limite ético do produto — "nenhuma aula, exame, alerta ou orientação
+            do seu médico depende delas" — e estava a **2,46:1**, o pior
+            contraste da tela. A frase que mais importa não pode ser a mais
+            apagada; `slate-600` dá 7,58:1 e continua discreta ao lado do resto. */}
+        <p className="mx-auto mt-4 max-w-[24rem] text-center text-[11px] leading-relaxed text-slate-600">
           Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula, exame, alerta ou orientação
           do seu médico depende delas.
         </p>

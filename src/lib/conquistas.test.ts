@@ -366,6 +366,20 @@ describe("⚠️ desbloquear e pagar são operações separadas", () => {
   const servidor = readFileSync("src/lib/achievements.functions.ts", "utf8");
   const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
 
+  /**
+   * ⚠️ O CORPO DE `resgatarConquista`, e não "daqui até o fim do arquivo".
+   *
+   * A primeira versão destes testes fatiava `servidor.slice(indexOf(...))` sem
+   * fim — a fatia ia até a última linha, então a PRÓXIMA função acrescentada
+   * ao arquivo passaria a satisfazer os `toContain` sozinha. Um teste que
+   * aprova pelo vizinho não testa nada.
+   */
+  const corpoDoResgate = (() => {
+    const i = servidor.indexOf("export const resgatarConquista");
+    const fim = servidor.indexOf("\nexport ", i + 10);
+    return servidor.slice(i, fim === -1 ? servidor.length : fim);
+  })();
+
   test("a checagem automática não monta mais prêmio de conquista", () => {
     /* Era `toAward.map(... dedupeKey: \`achievement:${key}\` ...)` alimentando
        `grants`. Se voltar, a conquista paga sozinha de novo e o botão de
@@ -379,22 +393,83 @@ describe("⚠️ desbloquear e pagar são operações separadas", () => {
   test("o resgate confere o DESBLOQUEIO antes de pagar", () => {
     /* Sem isto, qualquer chave no corpo do pedido viraria Sementinhas — o
        mesmo defeito que `contatoDaPaciente` teve no painel. */
-    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
-    expect(fn).toContain('.from("patient_achievements")');
-    expect(fn).toContain('.eq("achievement_key", data.key)');
-    expect(fn).toContain("Essa conquista ainda não é sua");
+    expect(corpoDoResgate).toContain('.from("patient_achievements")');
+    expect(corpoDoResgate).toContain('.eq("achievement_key", data.key)');
+    expect(corpoDoResgate).toContain("Essa conquista ainda não é sua");
   });
 
-  test("o resgate é idempotente, e repetir NÃO é erro", () => {
-    /* Devolver erro faria ela tocar de novo achando que não funcionou. */
-    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
-    expect(fn).toContain("repetido: true");
-    expect(fn).toContain("dedupeKey");
+  test("⚠️ o resgate é idempotente — e a DEDUPE é conferida antes de gravar", () => {
+    /**
+     * Devolver erro no repetido faria ela tocar de novo achando que não
+     * funcionou.
+     *
+     * ⚠️ E não basta a palavra "repetido" aparecer: uma mutação que APAGAVA a
+     * conferência (`if (paga) return ...`) passava verde, porque o teste antigo
+     * só procurava o texto `"repetido: true"` em algum lugar da função. Agora
+     * a ORDEM é cobrada — conferir antes de pagar —, que é o que impede o
+     * pagamento duplo.
+     */
+    expect(corpoDoResgate).toContain("repetido: true");
+    const confere = corpoDoResgate.indexOf("if (paga) return");
+    const paga = corpoDoResgate.indexOf("grantSementinhas(");
+    expect(confere).toBeGreaterThan(-1);
+    expect(paga).toBeGreaterThan(-1);
+    expect(confere).toBeLessThan(paga);
   });
 
-  test("⚠️ e o Modo Cuidado é conferido no resgate também", () => {
-    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
-    expect(fn).toContain("isCareModeActive");
+  test("⚠️ e o Modo Cuidado é conferido no resgate — SAINDO quando é verdade", () => {
+    /**
+     * ⚠️ A MUTAÇÃO MAIS GRAVE QUE JÁ PASSOU VERDE NESTA BASE foi inverter uma
+     * condição destas: o app pagando Sementinhas SÓ para quem tinha perdido o
+     * bebê. Este teste dizia cobrir exatamente essa pergunta e provava só que a
+     * string `isCareModeActive` existia na função — a versão negada
+     * (`if (!(await isCareModeActive(...)))`) passava.
+     */
+    expect(corpoDoResgate).toContain("if (await isCareModeActive(supabaseAdmin, uid)) {");
+    expect(corpoDoResgate).not.toContain("!(await isCareModeActive");
+  });
+
+  test("⚠️ e nenhuma outra função voltou a montar prêmio de conquista", () => {
+    /**
+     * A regex de `grants = toAward.map` é estreita de propósito e uma mutação
+     * escapou por ela: um `grants.push({ dedupeKey: \`achievement:...\` })` em
+     * qualquer ponto do arquivo repõe o pagamento automático com outra forma.
+     * O que importa é que o PREFIXO só seja escrito por quem resgata.
+     */
+    const foraDoResgate = servidor.replace(corpoDoResgate, "");
+    expect(foraDoResgate).not.toContain("PREFIXO_CONQUISTA}${");
+    expect(foraDoResgate).not.toMatch(/dedupeKey:\s*`achievement:/);
+  });
+
+  test("⚠️ falha ao LER o que já foi pago não vira «tudo por resgatar»", () => {
+    /**
+     * `chavesResgatadas` descartava o `error` e devolvia `[]`. Uma falha dessa
+     * consulta fazia as 39 conquistas voltarem a pulsar "Resgatar +120 🌱": ela
+     * tocava, o servidor respondia certíssimo (`repetido`), e o cartão virava
+     * uma data — o app prometendo moeda e não entregando.
+     *
+     * É a direção insegura da mesma régua que `contarTrofeus` ("falha ao contar
+     * RECUSA") e o lembrete de pré-consulta ("falha ao ler trata como já
+     * respondeu") já aplicam: na dúvida, não prometer.
+     */
+    expect(servidor).toContain("if (error || !data) return null;");
+    expect(tela).toContain("setSemSaberPagas(res.resgatadas == null)");
+    expect(tela).toContain("isUnlocked && !semSaberPagas && !resgatadas.has(def.key)");
+  });
+
+  test("⚠️ a trava de duplo toque é por CARTÃO, não da grade inteira", () => {
+    /* Era `if (resgatandoKey) return`: enquanto um cartão ia ao servidor, tocar
+       em outro sumia em silêncio. Quem sai do Modo Cuidado, ou quem acumulou
+       vários, encontra justamente uma grade com muitos pendentes. */
+    expect(tela).toContain("if (resgatando.has(key)) return;");
+  });
+
+  test("⚠️ o caminho REPETIDO diz alguma coisa", () => {
+    /* Todo o retorno visível vivia dentro de `if (r.granted > 0)`, então no
+       repetido ela tocava um botão que prometia `+40 🌱` e a tela respondia com
+       silêncio — que lê como app quebrado, não como "isso já era seu".
+       Acontece de verdade com dois aparelhos abertos ao mesmo tempo. */
+    expect(tela).toContain("if (r.repetido) toast(");
   });
 
   test("a tela não credita mais no ato do desbloqueio", () => {

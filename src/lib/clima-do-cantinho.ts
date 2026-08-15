@@ -79,8 +79,8 @@ export type ClimaSpec = {
 /**
  * ⚠️ A CHAVE NÃO É SÓ O ITEM DE `clima`.
  *
- * `especial-chuva` ("Chuva mansa", 200 🌱) e `especial-vagalume`
- * ("Vaga-lumes no pote", 220 🌱) vendiam um comportamento que o código não
+ * `especial-chuva` ("Chuva mansa") e `especial-vagalume`
+ * ("Vaga-lumes no pote") vendiam um comportamento que o código não
  * tinha: eram uma nuvem e uma varinha PARADAS. Em vez de aposentar os dois,
  * eles passaram a usar este mesmo motor — o nome deles finalmente descreve o
  * que acontece na tela.

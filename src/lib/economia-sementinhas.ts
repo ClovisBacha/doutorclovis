@@ -21,25 +21,32 @@
  * A curva nova é a que os jogos usam no primeiro mês, e ela faz duas coisas
  * diferentes com dois grupos de itens:
  *
- *  · **catorze itens baratos (5 a 20 🌱)** — vitória quase imediata, várias
- *    vezes por semana. É o que ensina o laço "ganhei → gastei → mudou a minha
- *    tela" nos primeiros minutos, quando ela ainda não tem motivo para voltar.
+ *  · **os catorze primeiros degraus da `CURVA_GRATIS`** — vitória quase
+ *    imediata, várias vezes por semana. É o que ensina o laço "ganhei → gastei
+ *    → mudou a minha tela" nos primeiros minutos, quando ela ainda não tem
+ *    motivo para voltar.
  *
- *  · **UM item caro (200 🌱)** — o troféu. Leva de cinco a oito dias juntando,
- *    e existe para ser perseguido.
+ *  · **UM item caro, o último degrau da curva** — o troféu. Leva de cinco a
+ *    oito dias juntando, e existe para ser perseguido.
  *
- * E o preço do troféu não é arbitrário: **200 🌱 fica no meio da faixa
- * premium** (mediana 160, Q3 250). É âncora de preço. Ela paga 200 por um item
- * que podia ter de graça, aprende no corpo quanto vale 200 — e quando abre a
- * loja premium o número já significa alguma coisa. Sem essa âncora, o preço
- * premium é só um número grande.
+ * E o preço do troféu não é arbitrário: ele fica **no meio da faixa premium**.
+ * É âncora de preço. Ela paga aquilo por um item que podia ter de graça,
+ * aprende no corpo quanto vale aquele número — e quando abre a loja premium o
+ * número já significa alguma coisa. Sem essa âncora, o preço premium é só um
+ * número grande. `loja-coerente.test.ts` cobra a âncora contra a mediana REAL
+ * do catálogo, e os dois lados são derivados.
  *
- * CORREÇÃO DE ROTA, registrada porque me enganou: escrevi aqui que 200 era a
- * MEDIANA exata do premium, e era — ANTES. Mover 27 itens baratos de grátis
- * para premium puxou a mediana para 160, e a afirmação virou falsa sem que
- * nenhum número mudasse de lugar. Foi o teste que pegou. A âncora continua
- * valendo (200 está entre a mediana e o Q3); o que não valia era a palavra
- * "mediana", e prosa confiante e errada nesta base é pior que prosa nenhuma.
+ * ⚠️ ESTE PARÁGRAFO JÁ MENTIU DUAS VEZES, e por isso não tem mais número
+ * nenhum escrito nele. Na primeira, "200 é a mediana do premium" era verdade e
+ * deixou de ser quando 27 itens mudaram de prateleira — sem nenhum número sair
+ * do lugar. Na segunda, o reajuste de preços levou a âncora a 260 e a mediana a
+ * 260, e a prosa continuou afirmando 200 e 160. As duas vezes a frase estava a
+ * oitenta linhas do valor que ela descrevia.
+ *
+ * A regra que sobrou: **preço não se escreve em prosa neste arquivo** — cita-se
+ * a constante. Há teste (`economia-sementinhas.test.ts`) recusando "N 🌱" e
+ * "mediana N" neste cabeçalho, porque prosa confiante e errada nesta base é
+ * pior que prosa nenhuma.
  *
  * ─── O PRESENTE DO MÉDICO ACELERA A PAREDE ──────────────────────────────────
  *
@@ -130,11 +137,11 @@ export const GANHO_SEMANAL = 25;
 /**
  * Bônus de vincular um médico — pago uma vez, por médico.
  *
- * Subiu de 100 para 200 junto com a correção do ganho diário. Com a loja em
- * 704 🌱 e um ganho típico de ~38 🌱/dia, cem Sementinhas valiam menos de três
- * dias — ou seja, o vínculo com o médico não mudava nada de perceptível, e o
- * bônus virava enfeite. Com 200 a diferença é de cinco dias (14 contra 19), que
- * é o que faz valer a pena pedir o código a ele.
+ * ⚠️ O texto aqui dizia "subiu de 100 para 200" — para uma constante que vale
+ * 100. Foi proposto subir e não subiu; a prosa ficou descrevendo a proposta.
+ * O que continua valendo é a RAZÃO: o bônus tem de mudar em dias visíveis de
+ * caminhada, senão vincular o médico não muda nada de perceptível e o bônus
+ * vira enfeite. `diasParaZerarLoja` mede isso, e é lá que a decisão se confere.
  */
 export const BONUS_VINCULO_MEDICO = 100;
 
@@ -260,8 +267,10 @@ export function recebidoPorPaciente(
  *
  * ─── OS VALORES SAEM DA LOJA, NÃO DO GOSTO ──────────────────────────────────
  *
- * A loja grátis inteira custa `CUSTO_LOJA_GRATIS` (704 🌱) e o item mais caro
- * dela é o troféu de 200 🌱.
+ * A loja grátis inteira custa `CUSTO_LOJA_GRATIS`, e o item mais caro dela é o
+ * troféu — o último degrau da `CURVA_GRATIS`. (Sem números escritos: ver a
+ * regra no cabeçalho. O troféu já mudou de preço uma vez e esta linha ficou
+ * dizendo o valor antigo.)
  *
  *   · Semente (50)  — um item barato na hora, ou meio dia de ganho típico.
  *   · Buquê (150)   — o suficiente para um item de faixa média sem esperar.
@@ -351,9 +360,15 @@ export const MESADA_DA_ASSINANTE = 120;
 /**
  * Quanto vai em cada presente entre amigas.
  *
- * Cem, e não os 50 do médico: ele presenteia dezenas de pacientes, ela
- * presenteia duas ou três amigas. Um presente pequeno demais entre pessoas que
- * se conhecem soa como não ter dado nada.
+ * MAIOR que o `PRESENTE_SUGERIDO` do médico: ele presenteia dezenas de
+ * pacientes, ela presenteia duas ou três amigas. Um presente pequeno demais
+ * entre pessoas que se conhecem soa como não ter dado nada.
+ *
+ * ⚠️ O texto dizia "Cem, e não os 50 do médico" para um valor que é 40 e um
+ * `PRESENTE_SUGERIDO` que é 30 — números de uma calibração anterior, deixados
+ * para trás quando os valores mudaram. A relação (este maior que o dele) é o
+ * que importa e é o que o teste cobra; os números não se escrevem de novo em
+ * prosa, justamente para não voltar a mentir.
  */
 export const PRESENTE_ENTRE_AMIGAS = 40;
 
