@@ -23,6 +23,8 @@ import type { DuplaNaTela } from "@/lib/amigas.functions";
  *   `?n=4`             quantas amigas na lista (0 mostra o vazio que ensina)
  *   `?dupla=ativa`     ativa · convite-recebido · convite-enviado · sem
  *   `?dias=12`         dias de chama da dupla
+ *   `?recorde=40`      a MAIOR sequência que elas já tiveram (a memória)
+ *   `?parada=9`        há quantos dias a outra não aparece (a pausa gentil)
  *   `?premium=1`       liga o botão 🎁 na linha da amiga
  *   `?luto=1`          Modo Cuidado — a aba inteira se cala
  *   `?semcodigo=1`     sem código de indicação (o "Convidar" explica e não manda)
@@ -35,6 +37,11 @@ export const Route = createFileRoute("/preview-amigas")({
     n: q.n == null ? 4 : Number(q.n),
     dupla: q.dupla == null ? "ativa" : String(q.dupla),
     dias: q.dias == null ? 12 : Number(q.dias),
+    /* A MAIOR sequência que a dupla já teve. Maior que `dias` mostra a
+       memória de uma chama que já quebrou. */
+    recorde: q.recorde == null ? 0 : Number(q.recorde),
+    /* Há quantos dias a outra não aparece — é o que aciona a pausa gentil. */
+    parada: q.parada == null ? 0 : Number(q.parada),
     premium: q.premium == null ? false : Boolean(q.premium),
     /* O código de indicação. Sem ele o "Convidar" explica em vez de mandar —
        `?semcodigo=1` é a única forma de fotografar esse estado. */
@@ -52,7 +59,7 @@ export const Route = createFileRoute("/preview-amigas")({
 const NOMES = ["Marina Costa", "Juliana Alves", "Camila Souza", "Beatriz Lima", "Renata Dias"];
 
 function PreviewAmigas() {
-  const { n, dupla, dias, premium, luto, codigo } = Route.useSearch();
+  const { n, dupla, dias, premium, luto, codigo, recorde, parada } = Route.useSearch();
 
   const amigas: PerfilDeAmiga[] = NOMES.slice(0, Math.max(0, Math.min(NOMES.length, n))).map(
     (nome, i) => ({
@@ -80,6 +87,11 @@ function PreviewAmigas() {
           amigaId: amigas[0]?.id ?? null,
           nome: amigas[0]?.nome ?? "Marina Costa",
           sequencia: dias,
+          /* A memória e a pausa. `?recorde=` e `?parada=` fotografam os dois
+             estados que só aparecem depois de semanas de uso real. */
+          recorde: Math.max(dias, recorde),
+          juntas: Math.max(dias, recorde) + 4,
+          paradaHa: parada,
         };
 
   return (

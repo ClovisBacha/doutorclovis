@@ -89,6 +89,12 @@ export function AmigasTab({
      ninguém. O botão da tela cujo assunto inteiro é trazer alguém era o único
      caminho do app que não trazia. Ver `indicacao.ts`. */
   const [codigo, setCodigo] = useState<string | null>(bancada?.codigo ?? null);
+  /* ─── SAIR DA AMIZADE ─────────────────────────────────────────────────
+     Guarda QUEM está sendo confirmada, não um booleano: com um booleano, abrir
+     a confirmação numa linha e tocar "Sim" noutra encerraria a amiga errada.
+     É a mesma decisão do ✕ do calendário do médico, que pede confirmação numa
+     mensagem à parte em vez de virar "tem certeza?" no lugar. */
+  const [saindoDe, setSaindoDe] = useState<PerfilDeAmiga | null>(null);
 
   /* ⚠️ Um BOOLEANO, não o objeto, nas listas de dependência. `bancada` é um
      literal remontado a cada render da rota de preview: usá-lo direto faria os
@@ -210,6 +216,32 @@ export function AmigasTab({
       toast("Não foi possível enviar.");
     } finally {
       setEnviando(null);
+    }
+  }
+
+  async function encerrar(amiga: PerfilDeAmiga) {
+    setSaindoDe(null);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { encerrarAmizade } = await import("@/lib/amigas.functions");
+      const r = await encerrarAmizade({
+        data: { accessToken: s.session.access_token, amigaId: amiga.id },
+      });
+      if (!r.ok) {
+        toast(
+          r.error === "sem_vinculo"
+            ? "Vocês já não estão conectadas."
+            : "Não foi possível agora. A saída precisa do SQL aplicado no banco.",
+          { duration: 6000 },
+        );
+        return;
+      }
+      /* Sem festa e sem drama: ela sai da lista, e é isso. */
+      toast(`${amiga.nome} não aparece mais aqui.`);
+      void carregar();
+    } catch {
+      toast("Não foi possível agora.");
     }
   }
 
@@ -419,11 +451,72 @@ export function AmigasTab({
                     {jaFoi(a) ? "✓" : "🎁"}
                   </button>
                 )}
+                {/* ─── SAIR ────────────────────────────────────────────────
+                    Discreto de propósito: é uma saída, não uma ação que o app
+                    sugere. Fica cinza, sem cor e sem emoji, ao lado de um 🎁
+                    rosa — quem procura acha, quem não procura não tropeça. */}
+                <button
+                  onClick={() => setSaindoDe(a)}
+                  aria-label={`Sair da amizade com ${a.nome}`}
+                  className="press flex h-11 w-8 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-muted-foreground/50"
+                >
+                  ⋯
+                </button>
               </li>
             ))}
           </ul>
         )}
       </section>
+
+      {/* ─── ⚠️ A CONFIRMAÇÃO DE SAIR ──────────────────────────────────────
+          Uma folha à parte, e não o botão virando "tem certeza?": o pedido do
+          dono no calendário foi explicitamente por uma mensagem separada, e a
+          razão vale aqui em dobro — é uma ação sobre uma PESSOA e não há
+          desfazer na tela.
+
+          O texto diz as três coisas que ela precisa saber para decidir, e
+          nenhuma a mais:
+           · o que acontece (some da lista, dos dois lados);
+           · o que NÃO acontece (ninguém é avisado — é o que faz isto ser uma
+             saída e não uma briga);
+           · e que as Sementinhas já dadas continuam de quem recebeu, porque a
+             pergunta "vou perder o que ganhei?" é a primeira que aparece. */}
+      {saindoDe && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center"
+          onClick={() => setSaindoDe(null)}
+        >
+          <div
+            role="dialog"
+            aria-label="Sair da amizade"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-float)]"
+          >
+            <p className="font-serif text-lg">Sair da amizade com {saindoDe.nome}?</p>
+            <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+              Vocês deixam de aparecer uma para a outra: sem Cantinho, sem dupla e sem presentes.{" "}
+              <strong className="font-semibold">Ela não é avisada.</strong> As Sementinhas que já
+              foram dadas continuam com quem recebeu.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={() => encerrar(saindoDe)}
+                className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+              >
+                Sair da amizade
+              </button>
+              {/* Ficar é o botão CHEIO e o primeiro para o polegar direito: a
+                  ação reversível é a que deve ser fácil de acertar. */}
+              <button
+                onClick={() => setSaindoDe(null)}
+                className="press min-h-11 flex-1 rounded-full bg-primary text-[13px] font-bold text-primary-foreground"
+              >
+                Ficar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── CONVIDAR ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 rounded-3xl p-4" style={{ background: "#fcf1d5" }}>
@@ -484,6 +577,16 @@ const CORACOES = [
   { x: 88, y: 8, s: 13, o: 0.45 },
   { x: 70, y: 72, s: 11, o: 0.4 },
 ];
+
+/**
+ * A partir de quantos dias sem a outra a tela reconhece a PAUSA.
+ *
+ * Quatro, e não dois: dois dias sem aparecer é um fim de semana, e anunciar
+ * pausa aí ensinaria que a dupla é frágil. Quatro já é uma ausência que a outra
+ * percebeu sozinha — e é aí que o silêncio da tela começa a ser lido como
+ * abandono.
+ */
+const DIAS_PARA_PAUSA = 4;
 
 /* ══════════════════════════ A DUPLA ══════════════════════════ */
 
@@ -570,10 +673,31 @@ function DuplaCard({
           <span className="min-w-0">
             <span className="block truncate text-sm font-semibold">com {dupla.nome}</span>
             <span className="text-[11px] text-muted-foreground">
-              {dupla.sequencia === 0
-                ? "a chama começa quando as duas aparecerem"
-                : `${dupla.sequencia} ${dupla.sequencia === 1 ? "dia" : "dias"} juntas`}
+              {dupla.sequencia > 0
+                ? `${dupla.sequencia} ${dupla.sequencia === 1 ? "dia" : "dias"} juntas`
+                : /* ⚠️ "a chama começa quando as duas aparecerem" é frase de
+                     dupla NOVA, e ela aparecia também numa dupla com 41 dias de
+                     história — dizendo "começa" para quem já tinha começado há
+                     meses. Com recorde, quem explica o zero é a memória logo
+                     abaixo e a pausa logo adiante; aqui não falta nada. */
+                  dupla.recorde > 0
+                  ? "a chama está esperando vocês duas"
+                  : "a chama começa quando as duas aparecerem"}
             </span>
+            {/* ─── A MEMÓRIA ────────────────────────────────────────────
+                `sequencia` zera quando a chama quebra, e deve mesmo — é o
+                número que acende o fogo. Mas uma dupla que segurou sessenta
+                dias e parou numa semana de internação ficava com ZERO, como se
+                nunca tivesse existido, e o vínculo é o ponto desta aba.
+
+                Só aparece quando o recorde é MAIOR que a chama de hoje: com os
+                dois iguais seria a mesma frase escrita duas vezes. */}
+            {dupla.recorde > dupla.sequencia && (
+              <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-300">
+                🏅 A melhor de vocês foi {dupla.recorde} dias seguidos
+                {dupla.juntas > dupla.recorde ? ` · ${dupla.juntas} dias juntas no total` : ""}
+              </span>
+            )}
           </span>
           <button
             onClick={() => chamar("desfazer")}
@@ -587,6 +711,31 @@ function DuplaCard({
           </button>
         </div>
       )}
+
+      {/* ─── ⚠️ A PAUSA, E O QUE ELA NUNCA DIZ ─────────────────────────────
+          Quando a chama está em zero e a outra não aparece há dias, a tela
+          calava — e o silêncio tem uma leitura só: "ela me abandonou".
+
+          O motivo mais provável de um sumiço longo numa gestação de alto risco
+          é justamente o que ninguém tem o direito de insinuar. Então o texto
+          diz o FATO (a chama está parada), tira a culpa das duas, e para por
+          aí. Nada de "ela está de licença", "ela está bem?" ou qualquer coisa
+          que convide a imaginar — o app não sabe, e adivinhar em voz alta é o
+          que o Modo Cuidado existe para impedir.
+
+          `DIAS_PARA_PAUSA` é 4 e não 2: dois dias sem aparecer é fim de semana.
+          Anunciar pausa aí ensinaria a paciente a achar que a dupla é frágil. */}
+      {estado === "ativa" &&
+        dupla &&
+        dupla.sequencia === 0 &&
+        dupla.paradaHa != null &&
+        dupla.paradaHa >= DIAS_PARA_PAUSA && (
+          <p className="mt-2 rounded-2xl bg-white/70 p-3 text-[12px] leading-snug text-muted-foreground dark:bg-white/5">
+            A chama de vocês está em pausa. <strong className="font-semibold">Está tudo bem</strong>{" "}
+            — ela volta a contar no dia em que as duas aparecerem, e nada do que vocês já fizeram se
+            perdeu.
+          </p>
+        )}
 
       {estado === "convite-recebido" && dupla && (
         <div className="mt-4 rounded-2xl bg-white/70 p-3 dark:bg-white/5">

@@ -229,5 +229,41 @@ export const presentearAmiga = createServerFn({ method: "POST" })
     const depois = await lerMesadaDaAmiga(sb, uid);
     if (!gravou) return { ok: false as const, error: "nao_gravou" as const, mesada: depois };
 
+    /* ─── ⚠️ E A AMIGA PRECISA SABER QUE FOI ELA ─────────────────────────
+       O presente gravava, o saldo dela subia, e NENHUMA tela dizia de onde
+       veio. É exatamente o defeito que o presente do MÉDICO teve por meses e
+       que está registrado no CLAUDE.md: "saldo que sobe sozinho é
+       indistinguível de bug" — e aqui é pior, porque o ponto inteiro do
+       presente entre amigas é o NOME de quem deu.
+
+       O `AvisoDePresente` do Caminho já sabe desenhar isto (ele lê
+       `RAZAO_PRESENTE_AMIGA` desde que nasceu); o que faltava era o empurrão
+       que a traz até lá.
+
+       ⚠️ DEPOIS do `if (!gravou)`, nunca antes: avisar de um presente que não
+       gravou é pior que não avisar. Mesma ordem do presente do médico.
+
+       Best-effort: o presente já é dela, e um push que não sai não desfaz
+       isso. E o Modo Cuidado dela já foi conferido lá em cima — confete para
+       quem acabou de perder a gestação é o que aquele portão existe para
+       impedir. */
+    try {
+      const { data: mim } = await sb
+        .from("patient_profiles")
+        .select("display_name")
+        .eq("id", uid)
+        .maybeSingle();
+      const nome =
+        ((mim?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Uma amiga";
+      const { sendPushToUser } = await import("@/lib/push.server");
+      await sendPushToUser(data.amigaId, {
+        title: `${nome} te mandou um presente 🌱`,
+        body: `${quanto} Sementinhas para o seu Cantinho.`,
+        url: "/minha-conta?tab=Caminho",
+      });
+    } catch {
+      /* best-effort */
+    }
+
     return { ok: true as const, mesada: depois, quantidade: quanto };
   });

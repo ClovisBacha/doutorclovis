@@ -543,6 +543,78 @@ arte nova.
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
 
+#### As Amigas passaram a chamar de volta (ago/2026)
+
+Seis mudanças pedidas pelo dono. As três primeiras fecham laços que estavam
+construídos e mudos; as três últimas dão história e saída ao vínculo.
+
+**1. O empurrão da ofensiva.** Quando UMA fecha o dia e a outra ainda não, a
+outra recebe push. É o mecanismo do Duolingo, e é o único que faz a dupla
+existir fora do app — sem ele, as duas só descobrem se abrirem a aba por conta
+própria. Sai de graça de dentro de `cobrarBonusDaDupla`, que já tem os dois
+conjuntos de dias em mãos.
+
+- ⚠️ **A direção importa**: avisa quem AINDA NÃO fechou. Invertido, vira
+  parabéns para quem já fez a parte dela.
+- ⚠️ **Um por par por dia** (`duplas.avisada_em`), e o carimbo vai ANTES do
+  envio. Este é o mesmo canal por onde chega o aviso de emergência: gastá-lo com
+  repetição ensina a ignorá-lo, e um push perdido é melhor que um push por
+  abertura de tela.
+- ⚠️ **O texto não cobra e não ameaça.** "Você vai perder a sequência" é o texto
+  de todo app de streak e aqui cairia numa gestante que pode estar internada. Há
+  teste com regex.
+
+**2. O presente avisa a amiga.** Ele gravava, o saldo dela subia, e nenhuma tela
+dizia de onde veio — o mesmo defeito que o presente do MÉDICO teve por meses, e
+aqui pior, porque o ponto inteiro do presente entre amigas é o NOME de quem deu.
+O `AvisoDePresente` do Caminho já sabia desenhar; faltava o empurrão que a traz.
+Depois do `if (!gravou)`, nunca antes.
+
+**3. A indicadora sabe que a amiga chegou.** As 100 🌱 caíam em silêncio. É o
+momento de maior afeto do recurso e passava em branco — e é o push que faz ela
+ABRIR a aba e encontrar a recém-chegada, que é onde a dupla e o presente vivem.
+
+**4. A memória da dupla.** `sequencia` zera quando a chama quebra, e deve mesmo.
+Mas uma dupla que segurou sessenta dias e parou numa semana de internação ficava
+com **zero**, como se nunca tivesse existido. `maiorSequenciaDaDupla` e
+`diasJuntas` (`amigas.ts`, puras) saem da mesma interseção de dias — **sem
+coluna nova e retroativas**. Só aparecem quando o recorde é maior que a chama de
+hoje, senão seria a mesma frase duas vezes.
+⚠️ E "a chama começa quando as duas aparecerem" virou "a chama está esperando
+vocês duas" quando há recorde: a primeira é frase de dupla NOVA, e aparecia numa
+dupla com 41 dias de história.
+
+**5. Uma amiga pode sair** (`encerrarAmizade`, `amizades_encerradas`).
+⚠️ **A INDICAÇÃO NÃO É APAGADA.** `referred_by = NULL` faria o app esquecer uma
+recompensa já paga — e, pior, `attributeReferral` só escreve quando o campo está
+nulo, então o vínculo poderia ser RECLAMADO DE NOVO por outro código, pagando
+duas vezes pela mesma amiga. A amizade sai de cena; o recibo fica.
+⚠️ **O efeito é dos DOIS lados**, e no servidor: esconder só de quem pediu
+deixaria a outra continuar convidando para dupla e presenteando — não é saída
+nenhuma. ⚠️ **E ninguém é avisado**: "Fulana te removeu" transforma um gesto
+privado numa briga. A dupla cai junto, senão a chama continuaria contando com
+alguém que sumiu da lista.
+
+**6. A pausa gentil.** Com a chama em zero e a outra sumida há 4+ dias, a tela
+calava — e o silêncio tem uma leitura só: "ela me abandonou".
+⚠️ **O texto diz o FATO e para aí.** O motivo mais provável de um sumiço longo
+numa gestação de alto risco é justamente o que ninguém tem o direito de
+insinuar: nada de "ela está de licença" ou "ela está bem?". Quatro dias e não
+dois, porque dois é fim de semana.
+
+⚠️ **A catraca de escritas sem checagem pegou uma armadilha que ela mesma já
+documenta**: `Set.delete` casa com `.delete(` por texto e entra na conta como
+DELETE de tabela. `idsDasAmigas` já usava filtro por essa razão, e eu reintroduzi
+o `.delete` no bloco novo — voltou a ser filtro.
+
+**Aplicar no Supabase:** `supabase/APLICAR_AMIZADES.sql` (idempotente). Sem ele,
+o aviso da ofensiva não sai e a saída da amizade recusa — o resto da aba
+continua inteiro.
+
+**Bancada:** `/preview-amigas?dias=0&recorde=41&parada=9` (memória + pausa) ·
+`?dias=12&recorde=41` (memória com chama viva) · o `⋯` na linha da amiga abre a
+folha de sair.
+
 #### ⚠️ O convite das Amigas não convidava ninguém (ago/2026)
 
 O botão "Convidar" da aba mandava `${origin}/auth` — o link de LOGIN, puro,

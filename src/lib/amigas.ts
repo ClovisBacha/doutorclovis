@@ -97,6 +97,84 @@ export function sequenciaDaDupla(
 }
 
 /**
+ * A MEMÓRIA DA DUPLA — o que elas já fizeram, e não só o que estão fazendo.
+ *
+ * ─── POR QUE ISTO EXISTE ────────────────────────────────────────────────────
+ *
+ * `sequenciaDaDupla` responde "quantos dias seguidos ATÉ HOJE", e é o número
+ * que acende a chama. Mas ele zera quando a chama quebra — e aí uma dupla que
+ * segurou sessenta dias juntas e parou numa semana de internação fica com
+ * **zero**, como se nunca tivesse existido.
+ *
+ * Num app de idioma isso é justo: o streak é o jogo. Aqui o vínculo é o ponto,
+ * e apagar o histórico dele no pior momento da vida de uma das duas é
+ * exatamente o oposto do que a aba existe para fazer.
+ *
+ * ⚠️ **É RETROATIVO e não pede coluna nenhuma**: sai da interseção dos dias que
+ * as duas já têm no ledger, que é o mesmo dado que a chama usa. Uma coluna
+ * `maior_sequencia` teria de ser mantida atualizada, e começaria zerada para
+ * todas as duplas que já existem.
+ */
+
+/** Quantos dias, no total, as duas apareceram no MESMO dia. */
+export function diasJuntas(minhas: ReadonlySet<string>, dela: ReadonlySet<string>): number {
+  let n = 0;
+  /* Percorre o MENOR dos dois conjuntos: a interseção é simétrica, e um
+     `for` sobre o maior custa o dobro sem mudar a resposta. */
+  const [a, b] = minhas.size <= dela.size ? [minhas, dela] : [dela, minhas];
+  for (const dia of a) if (b.has(dia)) n++;
+  return n;
+}
+
+/**
+ * A MAIOR sequência que a dupla já teve — inclusive uma que já quebrou.
+ *
+ * ⚠️ Ordena as datas em vez de andar dia a dia para trás: `sequenciaDaDupla`
+ * anda para trás a partir de hoje e por isso tem um teto de 400 iterações, mas
+ * aqui o começo é desconhecido. Ordenando, o custo é o do `sort` e a resposta
+ * é exata para qualquer histórico.
+ *
+ * Datas em `YYYY-MM-DD` ordenam corretamente como texto — é a razão de o app
+ * inteiro guardar o dia nesse formato.
+ */
+export function maiorSequenciaDaDupla(
+  minhas: ReadonlySet<string>,
+  dela: ReadonlySet<string>,
+): number {
+  const juntas: string[] = [];
+  const [a, b] = minhas.size <= dela.size ? [minhas, dela] : [dela, minhas];
+  for (const dia of a) if (b.has(dia)) juntas.push(dia);
+  if (juntas.length === 0) return 0;
+  juntas.sort();
+
+  let melhor = 1;
+  let atual = 1;
+  for (let i = 1; i < juntas.length; i++) {
+    atual = juntas[i] === recuar(juntas[i - 1], -1) ? atual + 1 : 1;
+    if (atual > melhor) melhor = atual;
+  }
+  return melhor;
+}
+
+/**
+ * Há quantos dias a OUTRA não aparece. `null` = ela nunca apareceu.
+ *
+ * ⚠️ Serve para a tela dizer que a chama está em PAUSA, e nunca para dizer por
+ * quê. A régua é a mesma do Modo Cuidado: o app pode mostrar que algo mudou de
+ * ritmo, jamais o motivo — "ela está internada" é informação clínica de outra
+ * pessoa, e nem o app sabe disso.
+ */
+export function diasSemAparecer(
+  dela: ReadonlySet<string>,
+  hoje: string,
+  limite = 400,
+): number | null {
+  if (dela.size === 0) return null;
+  for (let i = 0; i <= limite; i++) if (dela.has(recuar(hoje, i))) return i;
+  return limite;
+}
+
+/**
  * O par ORDENADO, como a tabela `duplas` guarda.
  *
  * (A,B) e (B,A) têm de virar a mesma linha, senão duas pacientes convidando

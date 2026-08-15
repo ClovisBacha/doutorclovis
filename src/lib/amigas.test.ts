@@ -22,6 +22,9 @@ import {
   saneiaEnfeites,
   sequenciaDaDupla,
   tempoNoApp,
+  diasJuntas,
+  maiorSequenciaDaDupla,
+  diasSemAparecer,
 } from "./amigas";
 import { BONUS_DA_DUPLA, GANHO_DIA_TIPICO } from "./economia-sementinhas";
 
@@ -436,5 +439,192 @@ describe("a ofensiva da dupla paga, e paga uma vez", () => {
        volta do 15º dia — é a mecânica de conversão inteira. Uma torneira que
        valesse meio dia de jogo a empurraria sem ninguém perceber. */
     expect(BONUS_DA_DUPLA).toBeLessThan(GANHO_DIA_TIPICO / 2);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A MEMÓRIA DA DUPLA
+
+   `sequenciaDaDupla` zera quando a chama quebra, e é isso que ela deve fazer —
+   é o número que acende o fogo. Mas uma dupla que segurou sessenta dias e parou
+   numa semana de internação ficava com ZERO, como se nunca tivesse existido.
+
+   Num app de idioma o streak É o jogo. Aqui o vínculo é o ponto, e apagar o
+   histórico dele no pior momento da vida de uma das duas é o oposto do que a
+   aba existe para fazer.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("a memória da dupla", () => {
+  const S = (...d: string[]) => new Set(d);
+
+  test("dias juntas conta a interseção, não a soma", () => {
+    const a = S("2026-03-01", "2026-03-02", "2026-03-05");
+    const b = S("2026-03-02", "2026-03-05", "2026-03-09");
+    expect(diasJuntas(a, b)).toBe(2);
+  });
+
+  test("é simétrica — a ordem dos conjuntos não muda a resposta", () => {
+    /* A implementação percorre o MENOR dos dois por desempenho; se isso
+       mudasse a resposta, o número dançaria conforme quem abre a tela. */
+    const a = S("2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04");
+    const b = S("2026-03-02", "2026-03-03");
+    expect(diasJuntas(a, b)).toBe(diasJuntas(b, a));
+    expect(maiorSequenciaDaDupla(a, b)).toBe(maiorSequenciaDaDupla(b, a));
+  });
+
+  test("⚠️ a MAIOR sequência sobrevive à quebra", () => {
+    /* Este é o caso inteiro: cinco dias seguidos, uma semana sumida, dois dias
+       de volta. A chama de hoje vale 2; a memória vale 5. */
+    const dias = ["2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05"];
+    const voltou = ["2026-03-13", "2026-03-14"];
+    const a = S(...dias, ...voltou);
+    const b = S(...dias, ...voltou);
+    expect(sequenciaDaDupla(a, b, "2026-03-14")).toBe(2);
+    expect(maiorSequenciaDaDupla(a, b)).toBe(5);
+  });
+
+  test("um dia só é sequência de um", () => {
+    expect(maiorSequenciaDaDupla(S("2026-03-07"), S("2026-03-07"))).toBe(1);
+  });
+
+  test("sem interseção, não há memória", () => {
+    expect(maiorSequenciaDaDupla(S("2026-03-01"), S("2026-03-02"))).toBe(0);
+    expect(diasJuntas(S("2026-03-01"), S("2026-03-02"))).toBe(0);
+  });
+
+  test("⚠️ a virada de mês é dia seguinte, não salto", () => {
+    /* Comparar texto acha que "2026-04-01" não segue "2026-03-31"; quem
+       responde isso é `recuar`, que anda pelo calendário em UTC. */
+    const a = S("2026-03-30", "2026-03-31", "2026-04-01");
+    expect(maiorSequenciaDaDupla(a, a)).toBe(3);
+  });
+
+  test("e a virada de ANO também", () => {
+    const a = S("2026-12-31", "2027-01-01");
+    expect(maiorSequenciaDaDupla(a, a)).toBe(2);
+  });
+
+  test("⚠️ a memória nunca é MENOR que a chama de hoje", () => {
+    /* A chama é um trecho do histórico; se a memória ficasse abaixo dela, a
+       tela mostraria "melhor: 3" ao lado de "hoje: 7". */
+    const dias = Array.from({ length: 9 }, (_, i) => `2026-03-${String(i + 1).padStart(2, "0")}`);
+    const a = S(...dias);
+    expect(maiorSequenciaDaDupla(a, a)).toBeGreaterThanOrEqual(
+      sequenciaDaDupla(a, a, "2026-03-09"),
+    );
+  });
+});
+
+describe("há quanto tempo a outra não aparece", () => {
+  const S = (...d: string[]) => new Set(d);
+
+  test("hoje é zero", () => {
+    expect(diasSemAparecer(S("2026-03-07"), "2026-03-07")).toBe(0);
+  });
+
+  test("ontem é um", () => {
+    expect(diasSemAparecer(S("2026-03-06"), "2026-03-07")).toBe(1);
+  });
+
+  test("⚠️ quem nunca apareceu devolve null, não um número grande", () => {
+    /* `null` é "não há o que dizer"; um número faria a tela anunciar uma pausa
+       para uma dupla que ainda não começou. */
+    expect(diasSemAparecer(S(), "2026-03-07")).toBe(null);
+  });
+
+  test("conta o dia MAIS RECENTE, não o primeiro", () => {
+    expect(diasSemAparecer(S("2026-01-01", "2026-03-05"), "2026-03-07")).toBe(2);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O EMPURRÃO DA OFENSIVA, E A SAÍDA DA AMIZADE
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("o aviso «a outra já fechou o dia»", () => {
+  const i = servidor.indexOf("async function avisarQueFecheiODia");
+  const corpo = servidor.slice(i, servidor.indexOf("\n}", i + 10));
+
+  test("existe, e a cobrança do bônus o chama", () => {
+    expect(i).toBeGreaterThan(-1);
+    expect(servidor).toContain("await avisarQueFecheiODia(sb,");
+  });
+
+  test("⚠️ a DIREÇÃO está certa: avisa quem AINDA NÃO fechou", () => {
+    /* Invertido, o aviso vira parabéns para quem já fez a parte dela — e
+       silêncio para quem o app precisava trazer de volta. */
+    expect(corpo).toContain("if (!ctx.minhas.has(ctx.hoje) || ctx.dela.has(ctx.hoje)) return;");
+  });
+
+  test("⚠️ UM por par por dia, e o carimbo vai ANTES do envio", () => {
+    /* Este é o mesmo canal por onde chega o aviso de emergência: gastá-lo com
+       repetição ensina a ignorá-lo. E um push perdido é melhor que um push por
+       abertura de tela — a mesma decisão dos lembretes de consulta. */
+    const carimbo = corpo.indexOf("avisada_em: ctx.hoje");
+    const envio = corpo.indexOf("sendPushToUser");
+    expect(carimbo).toBeGreaterThan(-1);
+    expect(envio).toBeGreaterThan(-1);
+    expect(carimbo).toBeLessThan(envio);
+  });
+
+  test("Modo Cuidado da outra barra o aviso", () => {
+    expect(corpo).toContain("if (await emLuto(sb, ctx.ela)) return;");
+    expect(corpo).not.toContain("!(await emLuto");
+  });
+
+  test("⚠️ o texto NÃO cobra nem ameaça", () => {
+    /* "Você vai perder a sequência" é o texto de todo app de streak, e aqui
+       cairia numa gestante que pode estar internada. A chama da dupla é um
+       bônus que aparece, nunca uma dívida que cobra. */
+    const frases = [...corpo.matchAll(/"([^"]{12,})"/g)].map((m) => m[1].toLowerCase());
+    for (const f of frases) {
+      for (const proibido of ["perder", "não deixe", "última chance", "acabando", "vai zerar"]) {
+        expect(`${proibido} em "${f}": ${f.includes(proibido)}`).toBe(
+          `${proibido} em "${f}": false`,
+        );
+      }
+    }
+  });
+});
+
+describe("sair da amizade", () => {
+  const i = servidor.indexOf("export const encerrarAmizade");
+  const corpo = servidor.slice(i);
+
+  test("⚠️ o vínculo é conferido ANTES de escrever", () => {
+    /* Sem isto, um uuid forjado separaria duas pacientes DESCONHECIDAS — a
+       linha é do par, e o efeito vale para os dois lados. */
+    const checa = corpo.indexOf("saoAmigas(sb, eu, data.amigaId)");
+    const grava = corpo.indexOf("amizades_encerradas");
+    expect(checa).toBeGreaterThan(-1);
+    expect(checa).toBeLessThan(grava);
+  });
+
+  test("⚠️ a INDICAÇÃO não é apagada", () => {
+    /**
+     * `referred_by = NULL` faria o app esquecer uma recompensa já paga — e,
+     * pior, `attributeReferral` só escreve quando o campo está nulo, então o
+     * vínculo poderia ser RECLAMADO DE NOVO por outro código, pagando duas
+     * vezes pela mesma amiga.
+     */
+    expect(corpo).not.toContain("referred_by: null");
+    expect(corpo).not.toContain("update({ referred_by");
+  });
+
+  test("o par é ordenado — encerrar é o mesmo fato dos dois lados", () => {
+    expect(corpo).toContain("parOrdenado(eu, data.amigaId)");
+  });
+
+  test("⚠️ e NINGUÉM é avisado", () => {
+    /* "Fulana te removeu" transforma um gesto privado numa briga. A outra
+       simplesmente deixa de ver, como no Modo Cuidado. */
+    expect(corpo).not.toContain("sendPushToUser");
+  });
+
+  test("a lista filtra os dois lados, no SERVIDOR", () => {
+    /* Filtrar na tela deixaria o nome e o Cantinho dela viajarem pela rede de
+       alguém de quem ela pediu distância. */
+    expect(servidor).toContain("encerradasCom(sb, eu)");
+    const j = servidor.indexOf("async function encerradasCom");
+    const leitor = servidor.slice(j, j + 900);
+    expect(leitor).toContain("l.menor === eu ? l.maior : l.menor");
   });
 });

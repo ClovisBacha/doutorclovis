@@ -34,7 +34,10 @@ import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
 import {
   diaLocal,
   diasDeAtividade,
+  diasJuntas,
+  diasSemAparecer,
   estadoDaDupla,
+  maiorSequenciaDaDupla,
   parOrdenado,
   saneiaEnfeites,
   sequenciaDaDupla,
@@ -105,12 +108,62 @@ async function idsDasAmigas(
     ids.add(r.id);
     trazidasPorMim.add(r.id);
   }
+
+  /* ─── ⚠️ AS AMIZADES ENCERRADAS SAEM AQUI ────────────────────────────
+     No SERVIDOR, e antes de qualquer leitura — é a mesma regra do Modo
+     Cuidado: filtrar na tela deixaria o nome e o Cantinho dela viajarem pela
+     rede de alguém de quem ela pediu distância.
+
+     E sai dos DOIS lados: a linha é do par, não de quem pediu. Uma saída que
+     só esconde de quem pediu deixa a outra continuar convidando para dupla e
+     presenteando — ou seja, não é saída nenhuma. */
+  /* ⚠️ FILTRO, e não `ids.delete(...)`. A catraca de "escrita no banco sem
+     checagem de erro" (`travas-do-servidor.test.ts`) casa com `.delete(` por
+     TEXTO, então um `Set.delete` entra na conta como se fosse um DELETE de
+     tabela — é a mesma armadilha que a linha logo abaixo já documenta, e eu
+     caí nela de novo ao escrever este bloco. */
+  const encerradas = await encerradasCom(sb, eu);
+  const vivas = [...ids].filter((id) => !encerradas.has(id));
+  const trazidasVivas = new Set([...trazidasPorMim].filter((id) => !encerradas.has(id)));
   /* Filtro em vez de `ids.delete(eu)`: a catraca de "escrita no banco sem
      checagem de erro" (`travas-do-servidor.test.ts`) casa com `.delete(` por
      texto, e um `Set.delete` aqui entrava na conta como se fosse um DELETE de
      tabela. Inflar a dívida com falso positivo é pior que a linha extra —
      esconde a dívida real atrás de ruído. */
-  return { todas: [...ids].filter((id) => id !== eu), trazidasPorMim };
+  return { todas: vivas.filter((id) => id !== eu), trazidasPorMim: trazidasVivas };
+}
+
+/**
+ * COM QUEM EU JÁ ENCERREI A AMIZADE.
+ *
+ * ⚠️ Falha de leitura devolve conjunto VAZIO, e aqui isso é o lado ERRADO por
+ * construção — sem a lista, a amiga encerrada reaparece. Não há como fazer
+ * melhor sem transformar uma falha de rede em "a aba inteira sumiu", que é
+ * pior: a paciente perderia todas as amigas por causa de uma consulta lenta.
+ *
+ * O que fecha o buraco não é este `catch`, é o SERVIDOR: `presentearAmiga` e
+ * `convidarDupla` conferem o vínculo por conta própria, então o pior caso é um
+ * nome reaparecendo na lista por uma abertura — não uma ação que atravessa.
+ *
+ * A tabela pode não existir (`APLICAR_AMIZADES.sql` é do dono): o `catch`
+ * cobre isso, e a aba continua inteira sem ela.
+ */
+async function encerradasCom(sb: any, eu: string): Promise<Set<string>> {
+  try {
+    const { data, error } = await sb
+      .from("amizades_encerradas")
+      .select("menor, maior")
+      .or(`menor.eq.${eu},maior.eq.${eu}`)
+      .limit(500);
+    if (error || !data) return new Set();
+    const fora = new Set<string>();
+    for (const l of data as { menor: string; maior: string }[]) {
+      fora.add(l.menor === eu ? l.maior : l.menor);
+    }
+    return fora;
+  } catch {
+    return new Set();
+  }
 }
 
 /**
@@ -387,6 +440,25 @@ export type DuplaNaTela = {
   nome: string | null;
   /** Dias seguidos em que as DUAS apareceram. Só quando `estado === "ativa"`. */
   sequencia: number;
+  /**
+   * A MAIOR sequência que elas já tiveram — inclusive uma já quebrada.
+   *
+   * `sequencia` zera quando a chama quebra, e deve mesmo. Mas uma dupla que
+   * segurou sessenta dias e parou numa semana de internação ficava com zero,
+   * como se nunca tivesse existido — e o vínculo é o ponto desta aba.
+   */
+  recorde: number;
+  /** Quantos dias, no total, as duas apareceram no mesmo dia. */
+  juntas: number;
+  /**
+   * Há quantos dias a OUTRA não aparece. `null` = ela nunca apareceu.
+   *
+   * ⚠️ A tela usa isto para dizer que a chama está em PAUSA, e NUNCA para
+   * dizer por quê. O app não sabe o motivo, e o motivo mais provável de um
+   * sumiço longo numa gestação de alto risco é o que ninguém tem o direito de
+   * insinuar.
+   */
+  paradaHa: number | null;
 };
 
 /**
@@ -423,20 +495,30 @@ async function lerDupla(sb: any, eu: string): Promise<DuplaNaTela | null> {
     if ((p as { care_mode?: boolean } | null)?.care_mode) return null;
 
     let sequencia = 0;
+    let recorde = 0;
+    let juntas = 0;
+    let paradaHa: number | null = null;
     if (estado === "ativa") {
       const linhasDoLedger = await atividadesDe(sb, [eu, outra]);
       const agrupado = porPaciente(linhasDoLedger);
-      sequencia = sequenciaDaDupla(
-        diasDeAtividade(agrupado.get(eu) ?? []),
-        diasDeAtividade(agrupado.get(outra) ?? []),
-        diaLocal(new Date()),
-      );
+      const minhas = diasDeAtividade(agrupado.get(eu) ?? []);
+      const dela = diasDeAtividade(agrupado.get(outra) ?? []);
+      const hoje = diaLocal(new Date());
+      sequencia = sequenciaDaDupla(minhas, dela, hoje);
+      /* A MEMÓRIA. Sai da mesma interseção, sem coluna nova e retroativa —
+         ver `maiorSequenciaDaDupla` em `amigas.ts`. */
+      recorde = maiorSequenciaDaDupla(minhas, dela);
+      juntas = diasJuntas(minhas, dela);
+      paradaHa = diasSemAparecer(dela, hoje);
     }
     return {
       estado,
       amigaId: outra,
       nome: ((p as { display_name?: string } | null)?.display_name ?? "").trim() || "Amiga",
       sequencia,
+      recorde,
+      juntas,
+      paradaHa,
     };
   } catch {
     /* `APLICAR_DUPLAS.sql` ainda não rodou: o resto da aba funciona. */
@@ -677,10 +759,167 @@ export const cobrarBonusDaDupla = createServerFn({ method: "POST" })
           .maybeSingle();
         if (gravou) ganho += BONUS_DA_DUPLA;
       }
+      /* ─── ⚠️ O EMPURRÃO QUE FAZ A DUPLA FUNCIONAR ────────────────────
+         Se EU fechei hoje e ELA ainda não, ela recebe um aviso. É o mecanismo
+         do Duolingo, e é o único que faz a dupla existir fora do app: sem ele,
+         as duas só descobrem que a outra apareceu se abrirem a aba por conta
+         própria — e aí a dupla não convida ninguém a voltar.
+
+         ⚠️ A DIREÇÃO IMPORTA. Avisar quem JÁ fechou seria parabéns; avisar
+         quem AINDA NÃO é convite. E só um por par por dia (`avisada_em`),
+         porque este é o mesmo canal por onde chega o aviso de emergência —
+         gastá-lo com repetição ensina a ignorá-lo. */
+      await avisarQueFecheiODia(sb, { eu, ela: dupla.amigaId, menor, maior, hoje, minhas, dela });
+
       return { ok: true as const, ganho };
     } catch {
       /* `APLICAR_DUPLAS.sql` ainda não rodou, ou a rede caiu: o bônus é
          secundário e a aba continua inteira sem ele. */
       return { ok: false as const, ganho: 0 };
+    }
+  });
+
+/**
+ * "A Marina já fechou o dia de vocês 🔥" — para quem ainda não fechou.
+ *
+ * ⚠️ TRÊS CONDIÇÕES, e as três existem por um motivo próprio:
+ *
+ *  1. **eu fechei e ela não.** Invertido, o aviso vira cobrança de quem já
+ *     fez a parte dela;
+ *  2. **ninguém avisou este par hoje** (`avisada_em`). O push é o mesmo canal
+ *     do aviso de emergência: repetição aqui custa a atenção lá;
+ *  3. **ela não está em Modo Cuidado.** `lerDupla` já devolveu `null` nesse
+ *     caso, então quem chega aqui passou pelo portão — mas o `emLuto` explícito
+ *     é barato e esta é a única função que MANDA alguma coisa para a outra.
+ *
+ * ⚠️ E O CARIMBO VAI ANTES DO ENVIO. Um push perdido é melhor que um push por
+ * abertura de tela: é a mesma decisão dos lembretes de consulta, escrita no
+ * mesmo lugar.
+ *
+ * Best-effort inteiro: o bônus já foi pago, e um aviso que não sai não pode
+ * desfazer isso.
+ */
+async function avisarQueFecheiODia(
+  sb: any,
+  ctx: {
+    eu: string;
+    ela: string;
+    menor: string;
+    maior: string;
+    hoje: string;
+    minhas: Set<string>;
+    dela: Set<string>;
+  },
+): Promise<void> {
+  try {
+    if (!ctx.minhas.has(ctx.hoje) || ctx.dela.has(ctx.hoje)) return;
+    if (await emLuto(sb, ctx.ela)) return;
+
+    /* Grava PRIMEIRO, e só manda se a escrita disser que hoje ainda não tinha
+       aviso. `neq` na condição faz a corrida entre dois crons/abas ser
+       resolvida pelo banco: a segunda não encontra linha para atualizar. */
+    const { data: marcou, error: erroDoCarimbo } = await sb
+      .from("duplas")
+      .update({ avisada_em: ctx.hoje })
+      .eq("menor", ctx.menor)
+      .eq("maior", ctx.maior)
+      .or(`avisada_em.is.null,avisada_em.neq.${ctx.hoje}`)
+      .select("id");
+    /* Erro aqui quase sempre é `APLICAR_AMIZADES.sql` não aplicado (coluna
+       inexistente). Sem carimbo não há como impedir a repetição, e um push por
+       abertura de tela é pior que push nenhum — então não manda. */
+    if (erroDoCarimbo || !marcou || marcou.length === 0) return;
+
+    const { data: mim } = await sb
+      .from("patient_profiles")
+      .select("display_name")
+      .eq("id", ctx.eu)
+      .maybeSingle();
+    const nome = ((mim?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Sua dupla";
+
+    const { sendPushToUser } = await import("@/lib/push.server");
+    await sendPushToUser(ctx.ela, {
+      title: `${nome} já fechou o dia de vocês 🔥`,
+      /* ⚠️ Não cobra e não ameaça. "Você vai perder a sequência" é o texto que
+         todo app de streak usa, e aqui ele cairia numa gestante que pode estar
+         internada. A chama da dupla é um bônus que aparece, nunca uma dívida
+         que cobra — está escrito no SQL da tabela. */
+      body: "Uma atividade sua e o dia conta para as duas.",
+      url: "/minha-conta?tab=Caminho",
+    });
+  } catch {
+    /* sem a coluna `avisada_em` (SQL não aplicado) ou sem push: segue sem aviso */
+  }
+}
+
+/* ══════════════════════════ SAIR DA AMIZADE ══════════════════════════
+
+   Até aqui não havia como desfazer um vínculo. O grafo é o da INDICAÇÃO, que é
+   fixada uma vez e nunca reescrita — e isso está certo: é ela que prova quem
+   trouxe quem e que pagou as 100 🌱. Mas "quem me trouxe para o app" e "com
+   quem eu quero jogar" são coisas diferentes, e a segunda pode mudar. A única
+   saída era apagar a conta.
+
+   ⚠️ A INDICAÇÃO NÃO É APAGADA. `referred_by = NULL` faria o app esquecer uma
+   recompensa já paga — e, pior, `attributeReferral` só escreve quando o campo
+   está nulo, então o vínculo poderia ser RECLAMADO DE NOVO por outro código,
+   pagando duas vezes pela mesma amiga. A amizade sai de cena; o recibo fica.
+
+   Ver `supabase/APLICAR_AMIZADES.sql`.
+   ══════════════════════════════════════════════════════════════════════ */
+export const encerrarAmizade = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), amigaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const, error: "sessao" as const };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+
+      /* ⚠️ O VÍNCULO É CONFERIDO ANTES DE ESCREVER. Sem isto, um uuid forjado
+         no corpo do pedido separaria duas pacientes DESCONHECIDAS — a linha é
+         do par, e o efeito vale para os dois lados. É o mesmo defeito que
+         `contatoDaPaciente` teve no painel do médico. */
+      if (!(await saoAmigas(sb, eu, data.amigaId))) {
+        return { ok: false as const, error: "sem_vinculo" as const };
+      }
+
+      const { parOrdenado } = await import("@/lib/amigas");
+      const { menor, maior } = parOrdenado(eu, data.amigaId);
+      const { error } = await sb
+        .from("amizades_encerradas")
+        .upsert(
+          { menor, maior, quem_pediu: eu },
+          { onConflict: "menor,maior", ignoreDuplicates: true },
+        );
+      if (error) return { ok: false as const, error: "falhou" as const };
+
+      /* A DUPLA CAI JUNTO. Deixá-la de pé faria a chama continuar contando com
+         alguém que não está mais na lista — e a tela mostraria o nome de quem
+         ela pediu para não ver mais. `desfazerDupla` já apaga a linha (marcar
+         "recusada" bloquearia o par para sempre pela chave única). */
+      try {
+        const { error: erroDaDupla } = await sb
+          .from("duplas")
+          .delete()
+          .eq("menor", menor)
+          .eq("maior", maior);
+        /* Não desfaz o encerramento: a amizade já saiu de cena e a dupla ficou
+           órfã de uma amiga que a lista não mostra mais. Registrar é o que
+           permite alguém investigar; abortar aqui desfaria a saída que ela
+           pediu por causa de um efeito colateral. */
+        if (erroDaDupla) console.error("[amizade] dupla não caiu junto", menor, maior, erroDaDupla);
+      } catch {
+        /* sem a tabela de duplas o resto continua valendo */
+      }
+
+      /* ⚠️ E NINGUÉM É AVISADO. "Fulana te removeu" transforma um gesto privado
+         numa briga; a outra simplesmente deixa de ver, como no Modo Cuidado.
+         Nenhum push aqui, de propósito. */
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const, error: "falhou" as const };
     }
   });

@@ -166,5 +166,42 @@ export const attributeReferral = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[referral] reward failed", e);
     }
+
+    /* ─── ⚠️ E A INDICADORA PRECISA SABER QUE A AMIGA CHEGOU ─────────────
+       As 100 🌱 caíam em silêncio: o saldo dela subia e nada dizia por quê.
+       Este é o momento de maior afeto do recurso inteiro — alguém aceitou o
+       convite dela — e ele passava em branco.
+
+       É a mesma lição do presente do médico ("saldo que sobe sozinho é
+       indistinguível de bug"), e aqui há um segundo motivo: o push é o que faz
+       ela ABRIR a aba das Amigas e encontrar a recém-chegada lá, que é onde a
+       dupla e o presente vivem. Sem ele, a amiga entra e as duas nunca se
+       encontram dentro do app.
+
+       ⚠️ Modo Cuidado: o `isCareModeActive` acima já barrou a moeda. O aviso
+       vai DENTRO do mesmo portão pela mesma razão — quem acabou de perder a
+       gestação não recebe festa nenhuma.
+
+       Best-effort: a atribuição já está fixada e não depende disto. */
+    try {
+      if (!(await isCareModeActive(supabaseAdmin, referrerId))) {
+        const { data: amiga } = await sb
+          .from("patient_profiles")
+          .select("display_name")
+          .eq("id", uid)
+          .maybeSingle();
+        const nome =
+          ((amiga?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Uma amiga";
+        const { sendPushToUser } = await import("@/lib/push.server");
+        await sendPushToUser(referrerId, {
+          title: `${nome} entrou pelo seu convite 💛`,
+          body: `Vocês já estão conectadas — e você ganhou ${REFERRAL_REWARD} Sementinhas.`,
+          url: "/minha-conta?tab=Amigas",
+        });
+      }
+    } catch (e) {
+      console.error("[referral] push failed", e);
+    }
+
     return { ok: true as const, attributed: true };
   });
