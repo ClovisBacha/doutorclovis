@@ -18,11 +18,31 @@
  * · Sem oferta relâmpago, sem contador, sem pacote "que some". Vender pressa
  *   para grávida de alto risco é o oposto do que este app é.
  *
- * ─── Sobre a escala ─────────────────────────────────────────────────────
+ * ─── ⚠️ TRÊS PACOTES, E OS NÚMEROS SÃO DO DONO (ago/2026) ───────────────
  *
- * O catálogo inteiro custa ~11.700 🌱 e o teto de ganho é ~70/dia. O pacote
- * grande (10.000) NÃO compra tudo — de propósito: um pacote que zera o jogo
- * mata o jogo.
+ * Eu tinha proposto cinco faixas, com uma de R$ 4,90 na entrada. O dono
+ * recusou as duas coisas, e tinha razão nas duas:
+ *
+ *  1. **Cinco é menu de jogo hardcore.** Clash of Clans tem seis faixas
+ *     porque caça quem gasta muito toda semana; Duolingo — que é o
+ *     comparável de verdade (assinatura + moeda ganha jogando + loja
+ *     cosmética) — roda com duas. A maioria das nossas pacientes vai abrir
+ *     uma loja de moeda pela primeira vez na vida.
+ *  2. **Abaixo de mil não parece compra.** Palavras dele: "quatrocentos e
+ *     cinquenta, cento e cinquenta sementinhas, a pessoa não compra nada".
+ *     Com o catálogo reajustado, 1.000 🌱 compram o item MAIS CARO da loja e
+ *     ainda sobra — é uma compra completa, não uma fração.
+ *
+ * ─── ⚠️ O BÔNUS É O QUE FAZ A ESCADA, E ELE TEM UM CUSTO ────────────────
+ *
+ * Cada pacote entrega `base + bonus`. O bônus cresce muito mais rápido que o
+ * preço (10% → 20% → 50%), e é ele que transforma o maior pacote no melhor
+ * negócio sem precisar de desconto nenhum.
+ *
+ * Foi o bônus do topo que obrigou o reajuste do catálogo: 15.000 🌱 numa
+ * compra só valiam 101% do catálogo de então (14.894 🌱). Ela compraria uma
+ * vez e não sobraria mais nada para querer. Hoje o catálogo custa ~29.000 e a
+ * mesma compra vale ~52% — ver o cabeçalho de `cantinho.ts`.
  *
  * ─── Onde se compra ─────────────────────────────────────────────────────
  *
@@ -35,54 +55,82 @@
 
 export type PacoteSementinhas = {
   id: string;
-  /** Quantas Sementinhas entram na carteira. */
-  quantidade: number;
+  /** O que ela paga — a base do pacote. */
+  base: number;
+  /** O que vem de brinde. Some com a base para dar o total. */
+  bonus: number;
   /** Preço em CENTAVOS — inteiro. Dinheiro em float é como se perde um real. */
   centavos: number;
   rotulo: string;
+  /**
+   * A cor do cartão na loja, do layout que o dono desenhou: o maior é verde
+   * (a cor da Sementinha), o do meio azul e o menor roxo.
+   */
+  cor: "verde" | "azul" | "roxo";
+  /** O da fita "MELHOR VALOR" — exatamente um, e é sempre o maior. */
+  destaque?: true;
 };
 
 /**
- * Os quatro pacotes. A âncora é o de 10.000 por R$ 249,00, definido pelo dono;
- * os outros três descem a partir dele.
+ * Os três, do maior para o menor — a MESMA ordem da tela.
  *
- * A escala é deliberadamente crescente em vantagem: quanto maior o pacote,
- * mais Sementinhas por real. É o padrão honesto — o contrário (pacote grande
- * com valor pior) é a pegadinha clássica de loja de jogo, e quem compra o
- * maior é justamente quem confiou mais.
+ * ⚠️ O maior vem primeiro de propósito. É a ordem do layout do dono, e ela
+ * também é a que os jogos usam: mostrar o topo antes faz o do meio parecer
+ * razoável. Inverter aqui inverteria a tela, porque ela renderiza na ordem
+ * desta lista.
  */
 export const PACOTES: PacoteSementinhas[] = [
-  { id: "sem-1000", quantidade: 1_000, centavos: 3_990, rotulo: "Punhado" },
-  { id: "sem-2000", quantidade: 2_000, centavos: 6_990, rotulo: "Saquinho" },
-  { id: "sem-5000", quantidade: 5_000, centavos: 13_990, rotulo: "Cesta" },
-  { id: "sem-10000", quantidade: 10_000, centavos: 24_900, rotulo: "Jardim inteiro" },
+  {
+    id: "sem-10000",
+    base: 10_000,
+    bonus: 5_000,
+    centavos: 9_990,
+    rotulo: "Celeiro",
+    cor: "verde",
+    destaque: true,
+  },
+  { id: "sem-5000", base: 5_000, bonus: 1_000, centavos: 5_990, rotulo: "Cesto", cor: "azul" },
+  { id: "sem-1000", base: 1_000, bonus: 100, centavos: 1_490, rotulo: "Saquinho", cor: "roxo" },
 ];
 
 export const PACOTE_POR_ID: Record<string, PacoteSementinhas> = Object.fromEntries(
   PACOTES.map((p) => [p.id, p]),
 );
 
-/** Sementinhas por real — a medida de vantagem do pacote. */
-export function porReal(p: PacoteSementinhas): number {
-  return p.quantidade / (p.centavos / 100);
+/** O que entra na carteira: base + bônus. É este o número grande do cartão. */
+export function totalDoPacote(p: PacoteSementinhas): number {
+  return p.base + p.bonus;
 }
 
-/** "R$ 249,00" — formatação única, para preço não divergir entre telas. */
+/** Sementinhas por real — a medida de vantagem do pacote. */
+export function porReal(p: PacoteSementinhas): number {
+  return totalDoPacote(p) / (p.centavos / 100);
+}
+
+/** "R$ 99,90" — formatação única, para preço não divergir entre telas. */
 export function precoBRL(p: PacoteSementinhas): string {
   return `R$ ${(p.centavos / 100).toFixed(2).replace(".", ",")}`;
 }
 
+/** "15.000" — separador de milhar, como no layout. */
+export function numeroBR(n: number): string {
+  return n.toLocaleString("pt-BR");
+}
+
 /**
- * Quanto o pacote rende a mais que o menor, em porcentagem — o "+61%" que a
- * tela mostra. Devolve 0 para o menor.
+ * Quanto o pacote rende a mais que o MENOR, em porcentagem.
+ *
+ * ⚠️ O menor é o último da lista, não o primeiro: a ordem da tela é do maior
+ * para o menor. Ler `PACOTES[0]` daria a vantagem contra o topo, que é sempre
+ * negativa — e a tela mostraria "-67%" no cartão que ela deve querer.
  */
 export function vantagemSobreMenor(p: PacoteSementinhas): number {
-  const base = porReal(PACOTES[0]);
+  const base = porReal(PACOTES[PACOTES.length - 1]);
   return Math.round((porReal(p) / base - 1) * 100);
 }
 
-/* A pergunta "esta compra pode acontecer aqui?" NÃO mora mais neste arquivo.
+/* A pergunta "esta compra pode acontecer aqui?" NÃO mora neste arquivo.
    Havia um `podeComprarAqui` aqui, e a mesma regra vivia noutras cinco telas
    com o texto escrito à mão em cada uma — foi assim que as portas da paciente
    e as do médico acabaram com comportamentos diferentes.
-   A regra e a frase moram agora em `canal-de-venda.ts`, uma vez só. */
+   A regra e a frase moram em `canal-de-venda.ts`, uma vez só. */

@@ -9,7 +9,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { PACOTE_POR_ID } from "@/lib/pacotes-sementinhas";
+import { PACOTE_POR_ID, numeroBR, totalDoPacote } from "@/lib/pacotes-sementinhas";
 
 /** URLs de volta do Checkout. Espelha o que billing.functions.ts faz. */
 function urlsDeRetorno(returnPath: string) {
@@ -71,7 +71,7 @@ export const createSementinhasCheckout = createServerFn({ method: "POST" })
         customerId:
           (existing as { stripe_customer_id?: string } | null)?.stripe_customer_id ?? null,
         sku: pacote.id,
-        nome: `${pacote.quantidade.toLocaleString("pt-BR")} Sementinhas`,
+        nome: `${numeroBR(totalDoPacote(pacote))} Sementinhas`,
         centavos: pacote.centavos,
         successUrl,
         cancelUrl,

@@ -6,34 +6,56 @@
  * Sementinhas por real que um menor, quem confiou e comprou o grande foi
  * penalizado por confiar. É a pegadinha clássica de loja de jogo, e é fácil
  * de introduzir sem querer ao mexer num preço só.
+ *
+ * ⚠️ ESTE ARQUIVO FOI REESCRITO em ago/2026, quando os quatro pacotes viraram
+ * TRÊS e cada um passou a ter `base` + `bonus` (o layout que o dono desenhou).
+ * A ordem também inverteu: a lista agora vai do MAIOR para o menor, porque é
+ * essa a ordem da tela — e os testes antigos afirmavam o contrário.
  */
 
 import { describe, expect, test } from "bun:test";
 import {
   PACOTES,
   PACOTE_POR_ID,
+  numeroBR,
   porReal,
   precoBRL,
+  totalDoPacote,
   vantagemSobreMenor,
 } from "./pacotes-sementinhas";
 
 describe("catálogo dos pacotes", () => {
-  test("os quatro pacotes pedidos existem", () => {
-    expect(PACOTES.map((p) => p.quantidade)).toEqual([1000, 2000, 5000, 10000]);
+  test("são TRÊS, com os números que o dono desenhou", () => {
+    /* Ele recusou cinco faixas ("acho que é demais") e recusou pacote abaixo
+       de mil ("a pessoa não compra nada"). Estes são os números da imagem. */
+    expect(PACOTES.map((p) => [p.base, p.bonus, p.centavos])).toEqual([
+      [10_000, 5_000, 9_990],
+      [5_000, 1_000, 5_990],
+      [1_000, 100, 1_490],
+    ]);
   });
 
-  test("o maior custa R$ 249,00 e dá 10.000", () => {
-    const maior = PACOTE_POR_ID["sem-10000"];
-    expect(maior.centavos).toBe(24900);
-    expect(maior.quantidade).toBe(10000);
-    expect(precoBRL(maior)).toBe("R$ 249,00");
+  test("o total é base + bônus, e é ele o número grande do cartão", () => {
+    expect(PACOTES.map(totalDoPacote)).toEqual([15_000, 6_000, 1_100]);
+  });
+
+  test("os preços saem formatados como na tela", () => {
+    expect(precoBRL(PACOTE_POR_ID["sem-10000"])).toBe("R$ 99,90");
+    expect(precoBRL(PACOTE_POR_ID["sem-5000"])).toBe("R$ 59,90");
+    expect(precoBRL(PACOTE_POR_ID["sem-1000"])).toBe("R$ 14,90");
+  });
+
+  test("os números levam separador de milhar", () => {
+    expect(numeroBR(15_000)).toBe("15.000");
+    expect(numeroBR(1_100)).toBe("1.100");
   });
 
   test("preço em centavos inteiros — nunca float de dinheiro", () => {
     for (const p of PACOTES) {
       expect(Number.isInteger(p.centavos)).toBe(true);
       expect(p.centavos).toBeGreaterThan(0);
-      expect(Number.isInteger(p.quantidade)).toBe(true);
+      expect(Number.isInteger(p.base)).toBe(true);
+      expect(Number.isInteger(p.bonus)).toBe(true);
     }
   });
 
@@ -41,40 +63,70 @@ describe("catálogo dos pacotes", () => {
     expect(new Set(PACOTES.map((p) => p.id)).size).toBe(PACOTES.length);
   });
 
-  test("listados do menor para o maior", () => {
+  test("⚠️ listados do MAIOR para o menor — a ordem da tela", () => {
+    /* A tela renderiza na ordem desta lista, e o layout do dono põe o maior em
+       cima. Inverter aqui inverteria a tela sem ninguém tocar no JSX. */
     for (let i = 1; i < PACOTES.length; i++) {
-      expect(PACOTES[i].quantidade).toBeGreaterThan(PACOTES[i - 1].quantidade);
-      expect(PACOTES[i].centavos).toBeGreaterThan(PACOTES[i - 1].centavos);
+      expect(totalDoPacote(PACOTES[i])).toBeLessThan(totalDoPacote(PACOTES[i - 1]));
+      expect(PACOTES[i].centavos).toBeLessThan(PACOTES[i - 1].centavos);
     }
+  });
+
+  test("exatamente um cartão tem a fita MELHOR VALOR, e é o maior", () => {
+    const comFita = PACOTES.filter((p) => p.destaque);
+    expect(comFita).toHaveLength(1);
+    expect(comFita[0].id).toBe(PACOTES[0].id);
+  });
+
+  test("as três cores do layout, uma por cartão", () => {
+    expect(PACOTES.map((p) => p.cor)).toEqual(["verde", "azul", "roxo"]);
   });
 });
 
 describe("a escala não pune quem compra o maior", () => {
   test("pacote maior sempre rende MAIS Sementinhas por real", () => {
+    /* A lista está em ordem decrescente, então o de índice menor rende mais. */
     for (let i = 1; i < PACOTES.length; i++) {
-      expect(porReal(PACOTES[i])).toBeGreaterThan(porReal(PACOTES[i - 1]));
+      expect(porReal(PACOTES[i - 1])).toBeGreaterThan(porReal(PACOTES[i]));
     }
+  });
+
+  test("o bônus é o que faz a escada — ele cresce mais rápido que o preço", () => {
+    const proporcao = PACOTES.map((p) => p.bonus / p.base);
+    for (let i = 1; i < proporcao.length; i++) {
+      expect(proporcao[i - 1]).toBeGreaterThan(proporcao[i]);
+    }
+    /* 50% no topo, 10% na entrada. */
+    expect(proporcao[0]).toBeCloseTo(0.5, 5);
+    expect(proporcao[proporcao.length - 1]).toBeCloseTo(0.1, 5);
   });
 
   test("a vantagem do maior sobre o menor é visível, não decorativa", () => {
     // Menos de 20% e o degrau não justifica o pacote grande existir.
-    expect(vantagemSobreMenor(PACOTES.at(-1)!)).toBeGreaterThanOrEqual(20);
-    expect(vantagemSobreMenor(PACOTES[0])).toBe(0);
+    expect(vantagemSobreMenor(PACOTES[0])).toBeGreaterThanOrEqual(20);
+    /* ⚠️ Zero para o MENOR, que é o ÚLTIMO da lista. Ler `PACOTES[0]` daria a
+       vantagem contra o topo — sempre negativa — e a tela mostraria "-67%" no
+       cartão que ela deve querer. */
+    expect(vantagemSobreMenor(PACOTES[PACOTES.length - 1])).toBe(0);
   });
 
-  test("nenhum pacote custa mais que R$ 249 (teto do dono)", () => {
-    for (const p of PACOTES) expect(p.centavos).toBeLessThanOrEqual(24900);
+  test("nenhum pacote passa de R$ 99,90", () => {
+    /* O teto que o dono escolheu, e que é também onde Clash of Clans trava a
+       faixa maior dele ($99,99) — parece ser o ponto em que qualquer app para. */
+    for (const p of PACOTES) expect(p.centavos).toBeLessThanOrEqual(9_990);
   });
 });
 
-describe("o pacote maior não zera o jogo", () => {
-  /* O catálogo do Cantinho custa ~11.700 🌱. Se o maior pacote comprasse tudo,
-     a compra encerraria o jogo em vez de encurtá-lo. */
-  test("10.000 não compra o catálogo inteiro", async () => {
+describe("⚠️ o pacote maior não zera o jogo", () => {
+  /* Foi ESTE teste que obrigou o reajuste do catálogo. O maior pacote entrega
+     15.000 🌱 com o bônus, e o catálogo custava 14.894 — ela compraria uma vez
+     e não sobraria mais nada para querer. Ver `cantinho.ts`. */
+  test("o maior pacote fica bem abaixo do catálogo inteiro", async () => {
     const { CANTINHO_ITEMS, CANTINHO_COMPLETIONIST_ID } = await import("./cantinho");
     const total = CANTINHO_ITEMS.filter(
-      (i) => i.price > 0 && i.id !== CANTINHO_COMPLETIONIST_ID,
+      (i) => i.price > 0 && !i.aposentado && i.id !== CANTINHO_COMPLETIONIST_ID,
     ).reduce((s, i) => s + i.price, 0);
-    expect(PACOTES.at(-1)!.quantidade).toBeLessThan(total);
+    const maior = totalDoPacote(PACOTES[0]);
+    expect(maior).toBeLessThan(total * 0.75);
   });
 });

@@ -20,6 +20,7 @@ import { climasAtivos, ehClima, particulasDe } from "@/lib/clima-do-cantinho";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { escadaDeTrofeus, proximoDesbloqueio } from "@/lib/trofeus";
 import { perdoesRestantes } from "@/lib/sequencia";
+import { LojaSementinhas } from "@/components/loja-sementinhas";
 import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
@@ -1587,6 +1588,8 @@ export function GestacaoPath({
   const [trofeusAbertos, setTrofeusAbertos] = useState(false);
   /* Idem para a chama — e nela o texto que mais importa é o do perdão. */
   const [chamaAberta, setChamaAberta] = useState(false);
+  /* A Loja de Sementinhas, aberta pelo toque no saldo da fita. */
+  const [lojaAberta, setLojaAberta] = useState(false);
   /* Quantas amigas — o número que a fita mostra no lugar do calendário.
      Consulta própria e leve (`contarAmigas`), e não a lista inteira: a fita
      abre em toda visita ao Caminho, e a lista calcula chama e troféus de cada
@@ -2960,13 +2963,25 @@ export function GestacaoPath({
         {saldo != null && (
           <>
             <div className="h-6 w-px bg-slate-200" />
-            <div className="flex items-center gap-1.5" title="Suas Sementinhas">
+            {/* ⚠️ VIROU BOTÃO (ago/2026), a pedido do dono: "quando a pessoa
+                clicar ali no número de sementinhas dela, vai abrir a nova
+                página de sementinhas".
+
+                Era o último dos quatro números da fita que não respondia a
+                nada — e o único cuja pergunta óbvia ("para que serve isto?")
+                tem uma tela inteira como resposta. */}
+            <button
+              type="button"
+              onClick={() => setLojaAberta(true)}
+              aria-label={`${saldo} Sementinhas — abrir a loja`}
+              className="press flex items-center gap-1.5 rounded-full px-1 py-0.5"
+            >
               {/* O broto é GLIFO, não imagem: ele já se apoia na mesma linha de
                   base dos algarismos por construção da fonte, e deslocá-lo o
                   tiraria de lá. */}
               <span className="text-xl leading-none">🌱</span>
               <span className="text-lg font-extrabold text-emerald-500">{saldo}</span>
-            </div>
+            </button>
           </>
         )}
       </div>
@@ -3025,6 +3040,8 @@ export function GestacaoPath({
       {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
           na ordem do DOM porque as duas são `fixed`: se as duas estivessem no
           ar, a que a paciente acabou de conquistar tem de ficar por cima. */}
+      {lojaAberta && <LojaSementinhas aberto onFechar={() => setLojaAberta(false)} saldo={saldo} />}
+
       {chamaAberta && (
         <FolhaDaChama streak={streak} perdoes={folgas} onFechar={() => setChamaAberta(false)} />
       )}

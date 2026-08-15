@@ -213,7 +213,7 @@ async function creditarSementinhas(session: {
      a moeda antes de receber o dinheiro. */
   if (session.payment_status && session.payment_status !== "paid") return;
 
-  const { PACOTE_POR_ID } = await import("@/lib/pacotes-sementinhas");
+  const { PACOTE_POR_ID, numeroBR, totalDoPacote } = await import("@/lib/pacotes-sementinhas");
   const pacote = PACOTE_POR_ID[sku];
   if (!pacote) {
     console.error("[sementinhas] sku fora do catálogo — nada creditado:", sku);
@@ -225,8 +225,11 @@ async function creditarSementinhas(session: {
   const { grantSementinhas } = await import("@/lib/sementinhas.functions");
   await grantSementinhas(typedDb(supabaseAdmin), userId, [
     {
-      amount: pacote.quantidade,
-      reason: `Pacote de ${pacote.quantidade.toLocaleString("pt-BR")} Sementinhas 🌱`,
+      /* ⚠️ O TOTAL, com o bônus dentro. É o número que o cartão mostrou e o
+         que ela acha que comprou — creditar só a base entregaria menos do que
+         a tela prometeu, no único lugar do app onde entra dinheiro. */
+      amount: totalDoPacote(pacote),
+      reason: `Pacote de ${numeroBR(totalDoPacote(pacote))} Sementinhas 🌱`,
       dedupeKey: `compra:${sessionId}`,
     },
   ]);

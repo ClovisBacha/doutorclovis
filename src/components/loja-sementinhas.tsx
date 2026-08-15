@@ -1,11 +1,27 @@
 /**
- * Folha dos pacotes de Sementinhas — abre ao tocar no saldo.
+ * A LOJA DE SEMENTINHAS — o layout que o dono desenhou.
  *
- * Duas coisas ficam ditas na tela, e as duas de propósito:
+ * Abre ao tocar no saldo, em qualquer lugar do app que mostre Sementinhas.
  *
- * 1. **Jogar continua rendendo.** O primeiro texto da folha diz quanto se
- *    ganha por dia jogando. Loja de moeda que esconde o caminho gratuito é a
- *    que faz a pessoa achar que comprar é a única saída.
+ * ─── O QUE VEM DA IMAGEM E O QUE VEM DO CÓDIGO ──────────────────────────────
+ *
+ * O dono mandou a tela inteira numa imagem e pediu que ficasse "exatamente
+ * dessa forma". A divisão que eu fiz:
+ *
+ * · **Recortado da imagem dele**: as três ilustrações (saco, pote, frasco).
+ *   São a única coisa que eu não consigo reproduzir. Saíram em PNG com fundo
+ *   transparente por `scripts/pacotes-do-drive.mjs`.
+ * · **Reconstruído em CSS**: todo o resto — cores, gradientes, fita, botões,
+ *   tipografia. Precisa ser código porque preço e saldo vêm do servidor, o
+ *   texto tem de ser lido por leitor de tela, e a tela roda de um iPhone SE a
+ *   um tablet.
+ *
+ * As cores foram MEDIDAS na referência, não estimadas — ver `PALETA`.
+ *
+ * ─── O QUE A TELA CONTINUA DIZENDO, E POR QUÊ ───────────────────────────────
+ *
+ * 1. **Jogar continua rendendo.** Loja de moeda que esconde o caminho gratuito
+ *    é a que faz a pessoa achar que comprar é a única saída.
  * 2. **A Sementinha não compra cuidado.** Nenhuma aula, exame, alerta ou
  *    conduta está atrás dela — só enfeite. Numa clínica de alto risco isso não
  *    é detalhe de copy, é o limite do negócio.
@@ -17,16 +33,73 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   PACOTES,
+  numeroBR,
   precoBRL,
-  vantagemSobreMenor,
+  totalDoPacote,
   type PacoteSementinhas,
 } from "@/lib/pacotes-sementinhas";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { ehNativo } from "@/lib/nativo";
 import { useVoltar } from "@/lib/use-voltar";
+import { Bolha } from "@/components/bolha";
+import pacoteGrande from "@/assets/pacotes/pacote-grande.png";
+import pacoteMedio from "@/assets/pacotes/pacote-medio.png";
+import pacotePequeno from "@/assets/pacotes/pacote-pequeno.png";
 
 /** Uma linha do extrato: o que entrou ou saiu, e quando. */
 type Lancamento = { amount: number; reason: string | null; created_at: string };
+
+/**
+ * As cores, amostradas pixel a pixel na referência do Drive.
+ *
+ * ⚠️ Medidas, não estimadas. O céu do herói, por exemplo, começa num lilás
+ * (#b0bbf6) que ninguém adivinharia olhando — chutar "azul claro" daria uma
+ * tela parecida e errada, que é o pior resultado possível quando o pedido foi
+ * "exatamente dessa forma".
+ */
+const PALETA = {
+  pagina: "#f7f7f8",
+  heroi:
+    "linear-gradient(180deg,#b0bbf6 0%,#b6cbf3 14%,#bdddee 26%,#bfdee4 36%,#8ead91 50%,#c8c598 62%,#7d9b72 74%,#607d4a 84%,#b6c8a1 93%,#dbe5cf 100%)",
+  cartao: {
+    verde: { fundo: "linear-gradient(180deg,#f1f3d7,#f3f5dd 55%,#eff2df)", botao: "#5a8629" },
+    azul: { fundo: "linear-gradient(180deg,#ecedf8,#e8eaf9 55%,#d7ddf1)", botao: "#3261a6" },
+    roxo: { fundo: "linear-gradient(180deg,#f4edf7,#f3ebf7 55%,#f9f8fa)", botao: "#614390" },
+  },
+  fita: "#63822c",
+} as const;
+
+const ARTE: Record<string, string> = {
+  "sem-10000": pacoteGrande,
+  "sem-5000": pacoteMedio,
+  "sem-1000": pacotePequeno,
+};
+
+/** O tom do NÚMERO grande de cada cartão — o botão é escuro demais para texto. */
+const TOM_NUMERO: Record<PacoteSementinhas["cor"], string> = {
+  verde: "#4a7222",
+  azul: "#2c5490",
+  roxo: "#553a80",
+};
+
+/**
+ * As faíscas do herói.
+ *
+ * ⚠️ Posições CRAVADAS, e não `Math.random()`: a tela é renderizada no
+ * servidor, e um sorteio daria posições diferentes no servidor e no cliente —
+ * o React reclama de hidratação no console de todo mundo. É a mesma lição das
+ * estrelas do céu da home.
+ */
+const FAISCAS = [
+  { x: 12, y: 18, s: 7, o: 0.75 },
+  { x: 31, y: 9, s: 4, o: 0.6 },
+  { x: 74, y: 13, s: 9, o: 0.8 },
+  { x: 88, y: 27, s: 5, o: 0.65 },
+  { x: 61, y: 6, s: 5, o: 0.55 },
+  { x: 22, y: 39, s: 5, o: 0.5 },
+  { x: 93, y: 47, s: 7, o: 0.6 },
+  { x: 8, y: 52, s: 4, o: 0.45 },
+];
 
 export function LojaSementinhas({
   aberto,
@@ -47,6 +120,7 @@ export function LojaSementinhas({
      e nunca sabia por quê. Uma moeda cujo saldo se move sem explicação é a
      receita para ela achar que perdeu alguma coisa. */
   const [extrato, setExtrato] = useState<Lancamento[] | null>(null);
+  const [verExtrato, setVerExtrato] = useState(false);
   /* `ehNativo()` lê um global do Capacitor, então só vale no cliente — no SSR
      ele devolveria `false` e a folha renderizaria o caminho errado por um
      frame. O `useState` inicial + efeito resolvem sem hidratação divergente. */
@@ -123,132 +197,260 @@ export function LojaSementinhas({
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
-      <button
-        aria-label="Fechar"
-        onClick={onFechar}
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Pacotes de Sementinhas"
-        className="dc-sheet-up relative max-h-[88vh] w-full overflow-y-auto rounded-t-3xl bg-card p-5 pb-[max(1.25rem,var(--safe-bottom))] shadow-2xl sm:max-w-md sm:rounded-3xl"
-      >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Loja de Sementinhas"
+      className="fixed inset-0 z-[70] overflow-y-auto"
+      style={{ background: PALETA.pagina }}
+    >
+      {/* ── HERÓI ──────────────────────────────────────────────────────── */}
+      <div className="relative overflow-hidden" style={{ background: PALETA.heroi }}>
+        {/* Véu claro: o jardim da referência é BORRADO, e sem isto o gradiente
+            fica saturado demais por baixo do texto escuro do título. */}
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 20% 30%, rgba(255,255,255,0.62), rgba(255,255,255,0.12) 60%, rgba(255,255,255,0) 100%)",
+          }}
+          aria-hidden
+        />
+        {FAISCAS.map((f, i) => (
+          <span
+            key={i}
+            className="pointer-events-none absolute rounded-full bg-white"
+            style={{
+              left: `${f.x}%`,
+              top: `${f.y}%`,
+              width: f.s,
+              height: f.s,
+              opacity: f.o,
+              filter: "blur(0.5px)",
+            }}
+            aria-hidden
+          />
+        ))}
 
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-serif text-xl text-foreground">Sementinhas</h2>
-          {saldo !== null && (
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold tabular-nums text-emerald-800">
-              🌱 {saldo}
-            </span>
-          )}
-        </div>
-
-        {/* O caminho gratuito vem PRIMEIRO. */}
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-          Você ganha Sementinhas todo dia jogando — check-in, aula, respiração, meditação e as três
-          estrelas do dia somam até <strong className="text-foreground">70 por dia</strong>. Os
-          pacotes abaixo são atalho pra quem quiser, nunca condição pra nada.
-        </p>
-
-        {podeComprar ? (
-          <div className="mt-4 space-y-2">
-            {PACOTES.map((p) => {
-              const bonus = vantagemSobreMenor(p);
-              const maior = p === PACOTES.at(-1);
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => comprar(p)}
-                  disabled={indo !== null}
-                  className={`press flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left disabled:opacity-60 ${
-                    maior ? "border-primary/40 bg-primary/6" : "border-border bg-background"
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block font-serif text-lg tabular-nums text-foreground">
-                      {p.quantidade.toLocaleString("pt-BR")} 🌱
-                    </span>
-                    <span className="block text-[11px] text-muted-foreground">
-                      {p.rotulo}
-                      {bonus > 0 && (
-                        <span className="ml-1.5 font-semibold text-emerald-700">
-                          +{bonus}% por real
-                        </span>
-                      )}
-                    </span>
-                  </span>
-                  <span className="shrink-0 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground">
-                    {indo === p.id ? "…" : precoBRL(p)}
-                  </span>
-                </button>
-              );
-            })}
+        <div
+          className="relative px-5 pb-6"
+          style={{ paddingTop: "max(0.9rem, var(--safe-top, 0.9rem))" }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <button
+              onClick={onFechar}
+              aria-label="Voltar"
+              className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/90 text-xl text-slate-700 shadow-md backdrop-blur"
+            >
+              ←
+            </button>
+            {saldo !== null && (
+              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
+                <span className="text-lg leading-none">🌱</span>
+                <span className="text-lg font-extrabold tabular-nums text-emerald-700">
+                  {numeroBR(saldo)}
+                </span>
+              </span>
+            )}
           </div>
-        ) : (
-          /* App nativo: Apple (3.1.1) e Google exigem que moeda virtual passe
-             pela loja deles. Abrir o Stripe aqui dentro reprova o app na
-             revisão — então a tela diz o motivo, em vez de oferecer um botão
-             que não deveria existir. */
-          <div className="mt-4 rounded-2xl border border-border bg-secondary/40 p-4">
-            <p className="text-sm font-semibold text-foreground">Ainda não dá para comprar aqui</p>
-            {/* Texto vindo de `canal-de-venda.ts`: a regra e a frase moram no
-                mesmo lugar, senão uma tela diverge da outra — que foi o que já
-                aconteceu quando cada uma tinha a sua cópia. */}
-            <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">
+
+          <div className="mt-3 flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <h1 className="font-serif text-[34px] font-bold leading-[1.05] text-slate-800 sm:text-[40px]">
+                Loja de
+                <br />
+                <span style={{ color: "#3f7a1f" }}>Sementinhas</span>
+              </h1>
+              <p className="mt-2 max-w-[18rem] text-[15px] leading-snug text-slate-700">
+                Use suas sementinhas para decorar e evoluir seu cenário!
+              </p>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur">
+                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+                  <path
+                    d="M12 2.6 5 5.4v5.3c0 4.4 2.9 8.5 7 9.7 4.1-1.2 7-5.3 7-9.7V5.4L12 2.6Z"
+                    fill="none"
+                    stroke="#3f7a1f"
+                    strokeWidth="1.7"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="m9 12 2.2 2.2L15.4 10"
+                    fill="none"
+                    stroke="#3f7a1f"
+                    strokeWidth="1.9"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span className="text-[13px] font-semibold text-slate-700">Compra 100% segura</span>
+              </span>
+            </div>
+            {/* A MESMA personagem do resto do app, e não um desenho novo: é ela
+                que fala em toda tela que precisa de uma voz. */}
+            <div className="shrink-0 -mb-1">
+              <Bolha tamanho={132} humor="feliz" careMode={false} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── OS TRÊS PACOTES ────────────────────────────────────────────── */}
+      <div className="px-4 pb-10 pt-5">
+        {/* ⚠️ OS CARTÕES APARECEM SEMPRE, mesmo com a compra indisponível.
+
+            A venda de moeda virtual só pode acontecer pela loja da Apple/Google
+            (`canal-de-venda.ts`), e o IAP ainda não está no ar. A versão
+            anterior desta tela trocava os três cartões por uma caixa de aviso —
+            ou seja, o layout que o dono desenhou simplesmente não existia até o
+            app ser publicado.
+
+            Esconder a vitrine também não protege ninguém: o que não pode
+            acontecer é COBRAR fora da loja, e isso continua barrado no botão.
+            O aviso vem uma vez, em cima, em vez de repetido em cada cartão. */}
+        {!podeComprar && (
+          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-[13px] font-semibold text-amber-900">
+              A compra ainda não está aberta
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800">
               {!veredito.pode && veredito.texto}
             </p>
-            <p className="mt-2 text-[13px] font-medium text-emerald-800">
+            <p className="mt-2 text-[12.5px] font-medium text-emerald-800">
               Jogando, você continua ganhando normalmente. 💛
             </p>
           </div>
         )}
-
-        {/* Extrato — de onde vieram as que ela já tem. */}
-        {extrato !== null && extrato.length > 0 && (
-          <div className="mt-5">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-              Últimas movimentações
-            </p>
-            <ul className="mt-2 divide-y divide-border/60 rounded-2xl border border-border bg-background">
-              {extrato.slice(0, 8).map((l, i) => (
-                <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
-                    {l.reason ?? "Movimentação"}
-                  </span>
-                  <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-                    {new Date(l.created_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                    })}
-                  </span>
+        <ul className="space-y-4">
+          {PACOTES.map((p) => {
+            const c = PALETA.cartao[p.cor];
+            const total = totalDoPacote(p);
+            return (
+              <li
+                key={p.id}
+                className="relative overflow-hidden rounded-[26px] shadow-[0_6px_18px_rgba(0,0,0,0.07)]"
+                style={{ background: c.fundo }}
+              >
+                {p.destaque && (
+                  /* A fita diagonal do canto. Ela é CSS e não parte do
+                       recorte: precisa acompanhar o cartão quando ele muda de
+                       largura, e o texto precisa ser texto. */
                   <span
-                    className={`shrink-0 text-[12px] font-bold tabular-nums ${
-                      l.amount >= 0 ? "text-emerald-600" : "text-muted-foreground"
-                    }`}
+                    className="pointer-events-none absolute -left-[52px] top-[26px] z-10 w-[168px] -rotate-45 py-1.5 text-center text-[11px] font-extrabold uppercase leading-tight tracking-wide text-white shadow-sm"
+                    style={{ background: PALETA.fita }}
                   >
-                    {l.amount >= 0 ? "+" : ""}
-                    {l.amount}
+                    Melhor
+                    <br />
+                    valor
                   </span>
-                </li>
-              ))}
-            </ul>
+                )}
+                <div className="flex items-center gap-1 p-3.5">
+                  <img
+                    src={ARTE[p.id]}
+                    alt=""
+                    aria-hidden
+                    className="h-[124px] w-[142px] shrink-0 object-contain sm:h-[142px] sm:w-[162px]"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="font-serif text-[34px] font-bold leading-none tabular-nums sm:text-[40px]"
+                      style={{ color: TOM_NUMERO[p.cor] }}
+                    >
+                      {numeroBR(total)}
+                    </p>
+                    <p
+                      className="mt-0.5 text-[15px] font-semibold"
+                      style={{ color: TOM_NUMERO[p.cor] }}
+                    >
+                      sementinhas
+                    </p>
+                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                      <span aria-hidden>🎁</span> Bônus: +{numeroBR(p.bonus)}
+                    </p>
+                    <p className="mt-2 border-t border-dashed border-black/10 pt-2 text-[12.5px] text-slate-600">
+                      <span aria-hidden>🌱</span> Total: {numeroBR(total)} sementinhas
+                    </p>
+                    <button
+                      onClick={() =>
+                        podeComprar ? comprar(p) : toast(veredito.pode ? "" : veredito.texto)
+                      }
+                      disabled={indo !== null}
+                      aria-label={
+                        podeComprar
+                          ? `Comprar ${numeroBR(total)} Sementinhas por ${precoBRL(p)}`
+                          : `${numeroBR(total)} Sementinhas por ${precoBRL(p)} — compra ainda não disponível`
+                      }
+                      className="press mt-2.5 w-full rounded-full py-2.5 text-[17px] font-extrabold text-white shadow-sm disabled:opacity-60"
+                      /* Sem cor quando não dá para comprar: o botão continua
+                           mostrando o preço (é o layout), mas para de parecer
+                           um botão que cobra. */
+                      style={{ background: podeComprar ? c.botao : "#9aa0a6" }}
+                    >
+                      {indo === p.id ? "…" : precoBRL(p)}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <p className="mx-auto mt-6 max-w-[22rem] text-center text-[13px] leading-snug text-slate-500">
+          As sementinhas te ajudam a criar um cenário único para o seu bebê!
+        </p>
+
+        {/* O caminho GRATUITO, dito por extenso. Loja de moeda que esconde
+            quanto se ganha jogando é a que faz a pessoa achar que comprar é a
+            única saída. */}
+        <p className="mx-auto mt-3 max-w-[24rem] rounded-2xl bg-emerald-50 px-4 py-3 text-center text-[12.5px] leading-relaxed text-emerald-900">
+          Você ganha Sementinhas todo dia jogando — check-in, aula, meditação e as estrelas do dia
+          somam até <strong>70 por dia</strong>. Os pacotes são atalho pra quem quiser, nunca
+          condição pra nada.
+        </p>
+
+        {/* Extrato — de onde vieram as que ela já tem. Recolhido: numa tela
+            cujo assunto é comprar, uma lista de movimentações rouba o olho do
+            que ela veio ver. */}
+        {extrato !== null && extrato.length > 0 && (
+          <div className="mx-auto mt-4 max-w-[24rem]">
+            <button
+              onClick={() => setVerExtrato((v) => !v)}
+              aria-expanded={verExtrato}
+              className="press w-full rounded-2xl border border-border bg-white px-4 py-2.5 text-[12.5px] font-semibold text-slate-600"
+            >
+              {verExtrato ? "Esconder" : "Ver"} minhas últimas movimentações
+            </button>
+            {verExtrato && (
+              <ul className="mt-2 divide-y divide-border/60 overflow-hidden rounded-2xl border border-border bg-white">
+                {extrato.slice(0, 8).map((l, i) => (
+                  <li key={i} className="flex items-center justify-between gap-3 px-3 py-2">
+                    <span className="min-w-0 flex-1 truncate text-[12px] text-foreground">
+                      {l.reason ?? "Movimentação"}
+                    </span>
+                    <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                      {new Date(l.created_at).toLocaleDateString("pt-BR", {
+                        day: "2-digit",
+                        month: "2-digit",
+                      })}
+                    </span>
+                    <span
+                      className={`shrink-0 text-[12px] font-bold tabular-nums ${
+                        l.amount >= 0 ? "text-emerald-600" : "text-muted-foreground"
+                      }`}
+                    >
+                      {l.amount >= 0 ? "+" : ""}
+                      {l.amount}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
-        <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
+        <p className="mx-auto mt-4 max-w-[24rem] text-center text-[11px] leading-relaxed text-slate-400">
           Sementinhas compram só enfeites do Meu Cantinho. Nenhuma aula, exame, alerta ou orientação
           do seu médico depende delas.
         </p>
-
-        <button
-          onClick={onFechar}
-          className="mt-3 w-full py-2 text-center text-xs font-medium text-muted-foreground"
-        >
-          Fechar
-        </button>
       </div>
     </div>
   );
