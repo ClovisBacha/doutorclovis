@@ -23,6 +23,7 @@ import {
   GANHO_DIA_MINIMO,
   GANHO_DIA_TETO,
   GANHO_DIA_TIPICO,
+  GANHO_SEMANAL,
   ITENS_GRATIS,
   PRESENTE_ENTRE_AMIGAS,
   PRESENTE_SUGERIDO,
@@ -324,5 +325,80 @@ describe("o BLOCO do dia 0 conta as três fontes — e nenhuma pode sumir", () =
     const bloco = BONUS_VINCULO_MEDICO + maior + PRESENTE_ENTRE_AMIGAS;
     expect(bloco).toBeLessThanOrEqual(TETO_BLOCO_DE_BOAS_VINDAS);
     expect(TETO_BLOCO_DE_BOAS_VINDAS - bloco).toBeLessThanOrEqual(10);
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ O TETO DO CATÁLOGO — A CONTA QUE O PACOTE MAIOR NÃO PODE VENCER
+
+   Pedido do dono, ago/2026: "a pessoa comprando dez mil sementinhas ela não
+   conseguiria comprar tudo no jogo... senão ia perder a graça".
+
+   O maior pacote entrega 15.000 🌱 (10.000 + 5.000 de bônus). Antes desta
+   calibragem o catálogo custava 14.894 — ou seja, UMA compra de R$ 99,90
+   entregava 101% de tudo. Ela abriria o app, compraria uma vez, e não sobraria
+   mais nada para querer.
+
+   O reajuste dobrou o preço dos itens ASPIRACIONAIS (peles da trilha,
+   especiais com halo, cenários, "no ar"), e não o da loja inteira: a curva
+   grátis continua somando exatamente 704 🌱, então a parede do 15º dia não se
+   moveu um dia. O que mudou é o que existe DEPOIS dela.
+
+   A régua que sai disso, e que este teste protege:
+
+     · uma compra do maior pacote ....... ~metade do catálogo
+     · nove meses jogando perfeito ...... ~metade do catálogo
+     · os dois juntos ................... o catálogo inteiro
+
+   Nenhum caminho sozinho fecha a coleção. É a mesma forma que o Fortnite usa
+   (lá "tudo" custa 178× o maior pacote); aqui, num app que dura nove meses e
+   não anos, a proporção é de ~2×.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
+  const vendaveis = CANTINHO_ITEMS.filter(
+    (i) => !i.aposentado && i.price > 0 && i.id !== "especial-colecao",
+  );
+  const catalogo = vendaveis.reduce((s, i) => s + i.price, 0);
+
+  /** O maior pacote da loja: 10.000 + 5.000 de bônus. */
+  const MAIOR_PACOTE = 15_000;
+  /** Gestação inteira no ritmo típico, com todas as conquistas e conjuntos. */
+  const ORGANICO_DA_GESTACAO = 294 * GANHO_DIA_TIPICO + 42 * GANHO_SEMANAL + 1_750 + 636 + 200;
+
+  test("uma compra do maior pacote fica entre 40% e 60% do catálogo", () => {
+    const fatia = MAIOR_PACOTE / catalogo;
+    expect(fatia).toBeGreaterThan(0.4);
+    expect(fatia).toBeLessThan(0.6);
+  });
+
+  test("⚠️ e NÃO chega perto de comprar tudo — era 101% antes do reajuste", () => {
+    expect(MAIOR_PACOTE).toBeLessThan(catalogo * 0.75);
+  });
+
+  test("jogar a gestação inteira, perfeito, também não fecha sozinho", () => {
+    /* Se fechasse, quem joga não teria motivo para comprar; e se ficasse longe
+       demais, a coleção viraria enfeite inalcançável para quem não paga. */
+    const fatia = ORGANICO_DA_GESTACAO / catalogo;
+    expect(fatia).toBeGreaterThan(0.35);
+    expect(fatia).toBeLessThan(0.6);
+  });
+
+  test("os dois caminhos juntos fecham — é esse o desenho", () => {
+    /* ⚠️ 95%, e não igualdade exata. Hoje a conta dá 99,8% (28.926 de 28.979),
+       e é tentador travar o fecho no número — mas isso seria cobrar uma
+       COINCIDÊNCIA: o primeiro item novo do catálogo derrubaria o teste sem
+       nada de errado ter acontecido. O que precisa continuar verdadeiro é a
+       forma: jogar a gestação inteira MAIS uma compra do maior pacote põe a
+       coleção ao alcance. */
+    const juntos = (ORGANICO_DA_GESTACAO + MAIOR_PACOTE) / catalogo;
+    expect(juntos).toBeGreaterThan(0.95);
+  });
+
+  test("⚠️ a parede dos 15 dias NÃO se moveu: a loja grátis continua em 704", () => {
+    /* O reajuste é sobre o que existe DEPOIS da parede. Mexer aqui mudaria a
+       mecânica de conversão, que é outra decisão e não esta. */
+    const gratis = CANTINHO_ITEMS.filter((i) => !i.premium && i.price > 0);
+    expect(gratis.reduce((s, i) => s + i.price, 0)).toBe(CUSTO_LOJA_GRATIS);
+    expect(CUSTO_LOJA_GRATIS).toBe(704);
   });
 });

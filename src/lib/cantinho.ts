@@ -19,6 +19,41 @@
  * nunca dinheiro real por item = sem pay-to-win). Item comprado fica pra sempre.
  *
  * O PREÇO é a fonte da verdade no servidor: a compra valida o preço daqui.
+ *
+ * ─── ⚠️ O REAJUSTE DE AGO/2026, E O QUE ELE PROTEGE ─────────────────────────
+ *
+ * Pedido do dono, depois do estudo da loja de Sementinhas: "a pessoa comprando
+ * dez mil sementinhas ela não conseguiria comprar tudo no jogo... senão ia
+ * perder a graça".
+ *
+ * Medido antes: o catálogo custava 14.894 🌱 e o maior pacote entrega 15.000
+ * (10.000 + 5.000 de bônus). Ou seja, UMA compra de R$ 99,90 valia 101% de
+ * tudo — ela compraria uma vez e não sobraria mais nada para querer, que é o
+ * fim do jogo e também o fim da segunda compra.
+ *
+ * O reajuste dobrou o preço dos itens ASPIRACIONAIS e não o da loja inteira:
+ *
+ *  · a régua é por FAIXA (quanto mais caro o item, maior o multiplicador) e
+ *    ganha +20% se o tipo for `trilha`, `especial`, `fundo` ou `clima` — os
+ *    quatro que mudam a tela inteira, e não um canto dela;
+ *  · plantas, luzes, bichos, objetos, céu e águas subiram pouco: é a coleção
+ *    do dia a dia, e ela precisa continuar cabendo no primeiro mês.
+ *
+ * ⚠️ **A LOJA GRÁTIS NÃO SE MOVEU.** Ela continua em 15 itens somando
+ * exatamente 704 🌱 — a parede do 15º dia é a mecânica de conversão inteira, e
+ * mexer nela seria outra decisão, não esta. O que mudou é o que existe DEPOIS
+ * da parede. (A ÂNCORA dentro da curva subiu de 200 para 260, com os catorze
+ * degraus abaixo descendo para compensar; ver `economia-sementinhas.ts`.)
+ *
+ * O resultado, travado por teste em `economia-sementinhas.test.ts`:
+ *
+ *     uma compra do maior pacote ....... 52% do catálogo
+ *     nove meses jogando perfeito ...... 48%
+ *     os dois juntos ................... ~100%
+ *
+ * Nenhum caminho sozinho fecha a coleção — e os três itens de troféu
+ * (`TROFEUS_PARA`) continuam fora de qualquer um deles, porque dinheiro não
+ * compra dia jogado.
  */
 
 /**
@@ -163,12 +198,12 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     type: "ceu",
     premium: false,
   },
-  { id: "ceu-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 70, type: "ceu", premium: false },
+  { id: "ceu-nuvem", name: "Nuvem fofa", emoji: "☁️", price: 60, type: "ceu", premium: false },
   {
     id: "planta-vaso",
     name: "Vaso de flores",
     emoji: "🪴",
-    price: 45,
+    price: 60,
     type: "planta",
     premium: true,
   },
@@ -176,7 +211,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "bicho-borboleta",
     name: "Borboleta",
     emoji: "🦋",
-    price: 74,
+    price: 65,
     type: "bicho",
     premium: false,
   },
@@ -184,7 +219,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-tapete",
     name: "Tapetinho fofo",
     emoji: "🧶",
-    price: 50,
+    price: 70,
     type: "objeto",
     premium: true,
   },
@@ -192,7 +227,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "planta-girassol",
     name: "Girassol",
     emoji: "🌻",
-    price: 60,
+    price: 80,
     type: "planta",
     premium: true,
   },
@@ -200,7 +235,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-luminaria",
     name: "Luminária",
     emoji: "🪔",
-    price: 60,
+    price: 80,
     type: "objeto",
     premium: true,
   },
@@ -208,19 +243,19 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-amanhecer",
     name: "Campo ao amanhecer",
     emoji: "🌅",
-    price: 30,
+    price: 26,
     type: "fundo",
     premium: false,
   },
 
   // ── Premium (20) — exige assinatura ────────────────────────────────
-  { id: "bicho-coelho", name: "Coelhinho", emoji: "🐰", price: 160, type: "bicho", premium: true },
-  { id: "bicho-gato", name: "Gatinho", emoji: "🐈", price: 180, type: "bicho", premium: true },
+  { id: "bicho-coelho", name: "Coelhinho", emoji: "🐰", price: 270, type: "bicho", premium: true },
+  { id: "bicho-gato", name: "Gatinho", emoji: "🐈", price: 310, type: "bicho", premium: true },
   {
     id: "bicho-passaro",
     name: "Passarinho cantante",
     emoji: "🐦",
-    price: 180,
+    price: 310,
     type: "bicho",
     premium: true,
   },
@@ -243,7 +278,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-vagalume",
     name: "Vaga-lumes no pote",
     emoji: "🫙",
-    price: 220,
+    price: 500,
     type: "especial",
     premium: true,
   },
@@ -251,7 +286,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-mobile",
     name: "Móbile de estrelas",
     emoji: "🎐",
-    price: 150,
+    price: 260,
     type: "objeto",
     premium: true,
   },
@@ -259,7 +294,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-poltrona",
     name: "Poltrona de amamentação",
     emoji: "🪑",
-    price: 200,
+    price: 340,
     type: "objeto",
     premium: true,
   },
@@ -267,27 +302,27 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-berco",
     name: "Berço (opcional)",
     emoji: "🛏️",
-    price: 250,
+    price: 480,
     type: "objeto",
     premium: true,
   },
-  { id: "ceu-sol", name: "Sol radiante", emoji: "☀️", price: 120, type: "ceu", premium: true },
-  { id: "ceu-arcoiris", name: "Arco-íris", emoji: "🌈", price: 150, type: "ceu", premium: true },
-  { id: "ceu-lua", name: "Lua e estrelas", emoji: "🌙", price: 140, type: "ceu", premium: true },
+  { id: "ceu-sol", name: "Sol radiante", emoji: "☀️", price: 180, type: "ceu", premium: true },
+  { id: "ceu-arcoiris", name: "Arco-íris", emoji: "🌈", price: 260, type: "ceu", premium: true },
+  { id: "ceu-lua", name: "Lua e estrelas", emoji: "🌙", price: 240, type: "ceu", premium: true },
   {
     id: "fundo-quartinho",
     name: "Quartinho aconchegante",
     emoji: "🧸",
-    price: 220,
+    price: 500,
     type: "fundo",
     premium: true,
   },
-  { id: "fundo-mar", name: "Ondas do mar", emoji: "🌊", price: 280, type: "fundo", premium: true },
+  { id: "fundo-mar", name: "Ondas do mar", emoji: "🌊", price: 650, type: "fundo", premium: true },
   {
     id: "fundo-estrelas",
     name: "Chuva de estrelas",
     emoji: "🌠",
-    price: 250,
+    price: 575,
     type: "fundo",
     premium: true,
   },
@@ -295,7 +330,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-aurora",
     name: "Aurora boreal",
     emoji: "🌌",
-    price: 300,
+    price: 675,
     type: "fundo",
     premium: true,
   },
@@ -317,7 +352,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-arvore",
     name: "Árvore que cresce",
     emoji: "🌳",
-    price: 350,
+    price: 875,
     type: "especial",
     premium: true,
   },
@@ -328,7 +363,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-dianoite",
     name: "Ciclo dia/noite",
     emoji: "🌗",
-    price: 400,
+    price: 1000,
     type: "especial",
     premium: true,
   },
@@ -336,11 +371,11 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-outono",
     name: "Outono",
     emoji: "🍂",
-    price: 160,
+    price: 330,
     type: "especial",
     premium: true,
   },
-  { id: "especial-natal", name: "Natal", emoji: "🎄", price: 180, type: "especial", premium: true },
+  { id: "especial-natal", name: "Natal", emoji: "🎄", price: 370, type: "especial", premium: true },
 
   /* ══════════════════════════════════════════════════════════════════════
      AMPLIAÇÃO — ago/2026
@@ -362,7 +397,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-lotus",
     name: "Bolinhas Lótus",
     emoji: "🪷",
-    price: 35,
+    price: 30,
     type: "trilha",
     premium: false,
   },
@@ -370,7 +405,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-origami",
     name: "Bolinhas Origami",
     emoji: "🐦‍⬛",
-    price: 320,
+    price: 800,
     type: "trilha",
     premium: true,
   },
@@ -378,7 +413,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-perolas",
     name: "Bolinhas Pérolas",
     emoji: "🦪",
-    price: 340,
+    price: 850,
     type: "trilha",
     premium: true,
   },
@@ -386,7 +421,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-constelacao",
     name: "Bolinhas Constelação",
     emoji: "✨",
-    price: 360,
+    price: 900,
     type: "trilha",
     premium: true,
   },
@@ -394,7 +429,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-cristais",
     name: "Bolinhas Cristais",
     emoji: "💎",
-    price: 360,
+    price: 900,
     type: "trilha",
     premium: true,
   },
@@ -402,7 +437,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-planetas",
     name: "Bolinhas Planetas",
     emoji: "🪐",
-    price: 380,
+    price: 950,
     type: "trilha",
     premium: true,
   },
@@ -410,16 +445,16 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "trilha-coracao",
     name: "Bolinhas Coração",
     emoji: "💗",
-    price: 400,
+    price: 1000,
     type: "trilha",
     premium: true,
   },
 
   // ── Luzes (+5) — categoria nova, animação `dcTwinkle` ──────────────────
-  { id: "luz-vela", name: "Velinha", emoji: "🕯️", price: 40, type: "luz", premium: false },
-  { id: "luz-lampiao", name: "Lampião", emoji: "🏮", price: 70, type: "luz", premium: true },
-  { id: "luz-pisca", name: "Pisca-pisca", emoji: "🎇", price: 95, type: "luz", premium: true },
-  { id: "luz-lanterna", name: "Lanterninha", emoji: "🔦", price: 110, type: "luz", premium: true },
+  { id: "luz-vela", name: "Velinha", emoji: "🕯️", price: 34, type: "luz", premium: false },
+  { id: "luz-lampiao", name: "Lampião", emoji: "🏮", price: 100, type: "luz", premium: true },
+  { id: "luz-pisca", name: "Pisca-pisca", emoji: "🎇", price: 140, type: "luz", premium: true },
+  { id: "luz-lanterna", name: "Lanterninha", emoji: "🔦", price: 160, type: "luz", premium: true },
   {
     /* APOSENTADO: 🌠 é o emoji do cenário `fundo-estrelas` (250 🌱), e a
        "cadente" não caía — ficava pendurada piscando como as outras luzes.
@@ -435,44 +470,44 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   },
 
   // ── Águas (+5) — categoria nova, animação `dcRipple` ───────────────────
-  { id: "agua-poca", name: "Pocinha", emoji: "💧", price: 45, type: "agua", premium: false },
-  { id: "agua-fonte", name: "Fontinha", emoji: "⛲", price: 90, type: "agua", premium: true },
-  { id: "agua-peixinho", name: "Peixinho", emoji: "🐠", price: 120, type: "agua", premium: true },
-  { id: "agua-concha", name: "Conchinha", emoji: "🐚", price: 140, type: "agua", premium: true },
-  { id: "agua-golfinho", name: "Golfinho", emoji: "🐬", price: 180, type: "agua", premium: true },
+  { id: "agua-poca", name: "Pocinha", emoji: "💧", price: 38, type: "agua", premium: false },
+  { id: "agua-fonte", name: "Fontinha", emoji: "⛲", price: 140, type: "agua", premium: true },
+  { id: "agua-peixinho", name: "Peixinho", emoji: "🐠", price: 180, type: "agua", premium: true },
+  { id: "agua-concha", name: "Conchinha", emoji: "🐚", price: 240, type: "agua", premium: true },
+  { id: "agua-golfinho", name: "Golfinho", emoji: "🐬", price: 310, type: "agua", premium: true },
 
   // ── Céu (+4) — agora eles APARECEM sozinhos, na faixa do alto ──────────
   {
     id: "ceu-passarinhos",
     name: "Bando de passarinhos",
     emoji: "🕊️",
-    price: 60,
+    price: 80,
     type: "ceu",
     premium: true,
   },
-  { id: "ceu-pipa", name: "Pipa", emoji: "🪁", price: 80, type: "ceu", premium: true },
-  { id: "ceu-balao-ar", name: "Balãozinho", emoji: "🎈", price: 100, type: "ceu", premium: true },
-  { id: "ceu-cometa", name: "Cometa", emoji: "☄️", price: 160, type: "ceu", premium: true },
+  { id: "ceu-pipa", name: "Pipa", emoji: "🪁", price: 120, type: "ceu", premium: true },
+  { id: "ceu-balao-ar", name: "Balãozinho", emoji: "🎈", price: 150, type: "ceu", premium: true },
+  { id: "ceu-cometa", name: "Cometa", emoji: "☄️", price: 270, type: "ceu", premium: true },
 
   // ── Plantas (+4) ───────────────────────────────────────────────────────
-  { id: "planta-trevo", name: "Trevo", emoji: "🍀", price: 50, type: "planta", premium: false },
-  { id: "planta-tulipa", name: "Tulipa", emoji: "🌷", price: 50, type: "planta", premium: true },
+  { id: "planta-trevo", name: "Trevo", emoji: "🍀", price: 42, type: "planta", premium: false },
+  { id: "planta-tulipa", name: "Tulipa", emoji: "🌷", price: 70, type: "planta", premium: true },
   {
     id: "planta-cerejeira",
     name: "Cerejeira",
     emoji: "🌸",
-    price: 75,
+    price: 110,
     type: "planta",
     premium: true,
   },
-  { id: "planta-bonsai", name: "Bonsai", emoji: "🎍", price: 90, type: "planta", premium: true },
+  { id: "planta-bonsai", name: "Bonsai", emoji: "🎍", price: 140, type: "planta", premium: true },
 
   // ── Objetos (+4) ───────────────────────────────────────────────────────
   {
     id: "objeto-livrinho",
     name: "Livrinho de história",
     emoji: "📖",
-    price: 60,
+    price: 52,
     type: "objeto",
     premium: false,
   },
@@ -480,7 +515,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-chaleira",
     name: "Chá quentinho",
     emoji: "🫖",
-    price: 55,
+    price: 80,
     type: "objeto",
     premium: true,
   },
@@ -488,7 +523,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-almofada",
     name: "Almofadinha",
     emoji: "🛋️",
-    price: 70,
+    price: 100,
     type: "objeto",
     premium: true,
   },
@@ -496,30 +531,30 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-caixinha",
     name: "Caixinha de música",
     emoji: "🎵",
-    price: 110,
+    price: 160,
     type: "objeto",
     premium: true,
   },
 
   // ── Bichinhos (+4) ─────────────────────────────────────────────────────
-  { id: "bicho-joaninha", name: "Joaninha", emoji: "🐞", price: 25, type: "bicho", premium: false },
-  { id: "bicho-abelha", name: "Abelhinha", emoji: "🐝", price: 55, type: "bicho", premium: true },
+  { id: "bicho-joaninha", name: "Joaninha", emoji: "🐞", price: 22, type: "bicho", premium: false },
+  { id: "bicho-abelha", name: "Abelhinha", emoji: "🐝", price: 80, type: "bicho", premium: true },
   {
     id: "bicho-tartaruga",
     name: "Tartaruguinha",
     emoji: "🐢",
-    price: 90,
+    price: 140,
     type: "bicho",
     premium: true,
   },
-  { id: "bicho-raposa", name: "Raposinha", emoji: "🦊", price: 200, type: "bicho", premium: true },
+  { id: "bicho-raposa", name: "Raposinha", emoji: "🦊", price: 340, type: "bicho", premium: true },
 
   // ── Cenários (+4) — cada um tem gradiente em CANTINHO_FUNDO_BG ─────────
   {
     id: "fundo-bosque",
     name: "Bosque tranquilo",
     emoji: "🌲",
-    price: 140,
+    price: 290,
     type: "fundo",
     premium: true,
   },
@@ -527,7 +562,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-lavanda",
     name: "Campo de lavanda",
     emoji: "💜",
-    price: 180,
+    price: 370,
     type: "fundo",
     premium: true,
   },
@@ -535,7 +570,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-deserto",
     name: "Fim de tarde no deserto",
     emoji: "🏜️",
-    price: 240,
+    price: 550,
     type: "fundo",
     premium: true,
   },
@@ -543,7 +578,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-neve",
     name: "Manhã de neve",
     emoji: "❄️",
-    price: 260,
+    price: 600,
     type: "fundo",
     premium: true,
   },
@@ -556,7 +591,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-primavera",
     name: "Primavera",
     emoji: "🌺",
-    price: 200,
+    price: 260,
     type: "especial",
     premium: false,
   },
@@ -567,7 +602,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-chuva",
     name: "Chuva mansa",
     emoji: "🌧️",
-    price: 200,
+    price: 410,
     type: "especial",
     premium: true,
   },
@@ -635,29 +670,29 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   // ── Águas (+7) ─────────────────────────────────────────────────────────
   // Era a categoria com UMA porta grátis. Ganhou três, e ganhou água DOCE:
   // sapinho, patinho e cisne pedem lago, e o lago não existia.
-  { id: "agua-sapinho", name: "Sapinho", emoji: "🐸", price: 55, type: "agua", premium: true },
+  { id: "agua-sapinho", name: "Sapinho", emoji: "🐸", price: 80, type: "agua", premium: true },
   {
     id: "agua-caranguejo",
     name: "Caranguejinho",
     emoji: "🦀",
-    price: 75,
+    price: 110,
     type: "agua",
     premium: true,
   },
-  { id: "agua-patinho", name: "Patinho", emoji: "🦆", price: 100, type: "agua", premium: true },
+  { id: "agua-patinho", name: "Patinho", emoji: "🦆", price: 150, type: "agua", premium: true },
   {
     /* Pedido nominal do dono. É o que dá CHÃO ao mar: sem recife, peixinho e
        golfinho boiam no vazio em vez de morar em algum lugar. */
     id: "agua-coral",
     name: "Recife de coral",
     emoji: "🪸",
-    price: 130,
+    price: 220,
     type: "agua",
     premium: true,
   },
-  { id: "agua-polvo", name: "Polvinho", emoji: "🐙", price: 160, type: "agua", premium: true },
-  { id: "agua-cisne", name: "Cisne", emoji: "🦢", price: 190, type: "agua", premium: true },
-  { id: "agua-foca", name: "Foquinha", emoji: "🦭", price: 210, type: "agua", premium: true },
+  { id: "agua-polvo", name: "Polvinho", emoji: "🐙", price: 270, type: "agua", premium: true },
+  { id: "agua-cisne", name: "Cisne", emoji: "🦢", price: 320, type: "agua", premium: true },
+  { id: "agua-foca", name: "Foquinha", emoji: "🦭", price: 400, type: "agua", premium: true },
 
   // ── Cenários (+3) — os três com gradiente em CANTINHO_FUNDO_BG ─────────
   {
@@ -666,7 +701,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-lago",
     name: "Beira do lago",
     emoji: "🏞️",
-    price: 200,
+    price: 410,
     type: "fundo",
     premium: true,
   },
@@ -674,7 +709,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-campo",
     name: "Campo dourado",
     emoji: "🌾",
-    price: 190,
+    price: 390,
     type: "fundo",
     premium: true,
   },
@@ -682,7 +717,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "fundo-nuvens",
     name: "Entre as nuvens",
     emoji: "🌤️",
-    price: 200,
+    price: 410,
     type: "fundo",
     premium: true,
   },
@@ -690,17 +725,17 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
   // ── Plantas (+5) ───────────────────────────────────────────────────────
   // As sete de antes eram todas BAIXAS e todas flores ou folha pequena.
   // Entram altura (palmeira), chão (cogumelo) e cheiro (hortelã).
-  { id: "planta-hortela", name: "Hortelã", emoji: "🌿", price: 35, type: "planta", premium: true },
-  { id: "planta-cacto", name: "Cactinho", emoji: "🌵", price: 40, type: "planta", premium: true },
+  { id: "planta-hortela", name: "Hortelã", emoji: "🌿", price: 50, type: "planta", premium: true },
+  { id: "planta-cacto", name: "Cactinho", emoji: "🌵", price: 60, type: "planta", premium: true },
   {
     id: "planta-cogumelo",
     name: "Cogumelinho",
     emoji: "🍄",
-    price: 65,
+    price: 100,
     type: "planta",
     premium: true,
   },
-  { id: "planta-roseira", name: "Roseira", emoji: "🌹", price: 80, type: "planta", premium: true },
+  { id: "planta-roseira", name: "Roseira", emoji: "🌹", price: 120, type: "planta", premium: true },
   {
     /* 110 e não 130: a categoria fechava em 90 (Bonsai), e o topo novo sobe um
        degrau, não dois. Preço fora da curva faz a prateleira inteira parecer
@@ -708,20 +743,20 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "planta-palmeira",
     name: "Palmeirinha",
     emoji: "🌴",
-    price: 110,
+    price: 160,
     type: "planta",
     premium: true,
   },
 
   // ── Bichinhos (+6) ─────────────────────────────────────────────────────
-  { id: "bicho-caracol", name: "Caracol", emoji: "🐌", price: 40, type: "bicho", premium: true },
+  { id: "bicho-caracol", name: "Caracol", emoji: "🐌", price: 60, type: "bicho", premium: true },
   {
     /* Fecha o par com a Borboleta que já existe — a única dupla do catálogo em
        que um item conta a história do outro. */
     id: "bicho-lagarta",
     name: "Lagartinha",
     emoji: "🐛",
-    price: 65,
+    price: 100,
     type: "bicho",
     premium: true,
   },
@@ -729,12 +764,12 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "bicho-esquilo",
     name: "Esquilinho",
     emoji: "🐿️",
-    price: 120,
+    price: 180,
     type: "bicho",
     premium: true,
   },
-  { id: "bicho-ourico", name: "Ouriço", emoji: "🦔", price: 140, type: "bicho", premium: true },
-  { id: "bicho-ovelha", name: "Ovelhinha", emoji: "🐑", price: 150, type: "bicho", premium: true },
+  { id: "bicho-ourico", name: "Ouriço", emoji: "🦔", price: 240, type: "bicho", premium: true },
+  { id: "bicho-ovelha", name: "Ovelhinha", emoji: "🐑", price: 260, type: "bicho", premium: true },
   {
     /* O bicho que fica acordado com ela. Para quem abre o app às três da
        manhã, é o único item do cantinho que reconhece a madrugada — a mesma
@@ -742,7 +777,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "bicho-coruja",
     name: "Corujinha",
     emoji: "🦉",
-    price: 190,
+    price: 320,
     type: "bicho",
     premium: true,
   },
@@ -752,7 +787,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-novelo",
     name: "Novelo de linha",
     emoji: "🧵",
-    price: 30,
+    price: 40,
     type: "objeto",
     premium: true,
   },
@@ -760,7 +795,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-espelho",
     name: "Espelhinho",
     emoji: "🪞",
-    price: 75,
+    price: 110,
     type: "objeto",
     premium: true,
   },
@@ -769,7 +804,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-fones",
     name: "Fones de dormir",
     emoji: "🎧",
-    price: 85,
+    price: 130,
     type: "objeto",
     premium: true,
   },
@@ -777,7 +812,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-quadrinho",
     name: "Quadrinho",
     emoji: "🖼️",
-    price: 90,
+    price: 140,
     type: "objeto",
     premium: true,
   },
@@ -787,7 +822,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "objeto-matrioska",
     name: "Matrioskas",
     emoji: "🪆",
-    price: 130,
+    price: 220,
     type: "objeto",
     premium: true,
   },
@@ -797,7 +832,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "ceu-carpas",
     name: "Carpas ao vento",
     emoji: "🎏",
-    price: 130,
+    price: 220,
     type: "ceu",
     premium: true,
   },
@@ -805,7 +840,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "ceu-fogos",
     name: "Fogos de artifício",
     emoji: "🎆",
-    price: 170,
+    price: 290,
     type: "ceu",
     premium: true,
   },
@@ -817,7 +852,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-inverno",
     name: "Boneco de neve",
     emoji: "⛄",
-    price: 190,
+    price: 390,
     type: "especial",
     premium: true,
   },
@@ -825,7 +860,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-carrossel",
     name: "Carrossel",
     emoji: "🎠",
-    price: 280,
+    price: 650,
     type: "especial",
     premium: true,
   },
@@ -836,7 +871,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "especial-pavao",
     name: "Pavão",
     emoji: "🦚",
-    price: 340,
+    price: 850,
     type: "especial",
     premium: true,
   },
@@ -854,7 +889,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "clima-petalas",
     name: "Chuva de pétalas",
     emoji: "💮",
-    price: 90,
+    price: 160,
     type: "clima",
     premium: true,
   },
@@ -862,7 +897,7 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "clima-folhas",
     name: "Folhas caindo",
     emoji: "🍁",
-    price: 110,
+    price: 200,
     type: "clima",
     premium: true,
   },
@@ -870,17 +905,17 @@ export const CANTINHO_ITEMS: CantinhoItem[] = [
     id: "clima-bolhas",
     name: "Bolhinhas de sabão",
     emoji: "🫧",
-    price: 130,
+    price: 270,
     type: "clima",
     premium: true,
   },
-  { id: "clima-peninhas", name: "Peninhas", emoji: "🪶", price: 140, type: "clima", premium: true },
-  { id: "clima-neve", name: "Nevando", emoji: "🌨️", price: 170, type: "clima", premium: true },
+  { id: "clima-peninhas", name: "Peninhas", emoji: "🪶", price: 290, type: "clima", premium: true },
+  { id: "clima-neve", name: "Nevando", emoji: "🌨️", price: 350, type: "clima", premium: true },
   {
     id: "clima-poeira",
     name: "Poeirinha de estrelas",
     emoji: "💫",
-    price: 200,
+    price: 410,
     type: "clima",
     premium: true,
   },

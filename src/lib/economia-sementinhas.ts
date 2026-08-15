@@ -72,10 +72,20 @@ export const ITENS_GRATIS = 15;
  * várias vezes na primeira semana.
  */
 export const CURVA_GRATIS = [
-  10, 12, 15, 18, 20, 25, 30, 35, 40, 45, 50, 60, 70, 74,
-  /* O troféu, no meio da faixa premium (mediana 160, Q3 250). Ver o cabeçalho:
-     é âncora de preço, não enfeite. */
-  200,
+  10, 12, 15, 18, 20, 22, 26, 30, 34, 38, 42, 52, 60, 65,
+  /* O troféu, no meio da faixa premium. Ver o cabeçalho: é âncora de preço,
+     não enfeite.
+
+     ⚠️ SUBIU DE 200 PARA 260, e os catorze degraus abaixo desceram para
+     compensar — a SOMA continua 704, então a parede do 15º dia não se moveu um
+     dia. O que mudou foi a leva de ago/2026 que dobrou o preço dos itens
+     aspiracionais: com o premium indo a 1.000, uma âncora de 200 deixou de
+     ficar dentro da faixa que ela existe para ensinar. Foi o teste que pegou.
+
+     De quebra a FORMA melhorou: o salto do último degrau grátis para o troféu
+     era de 2,7× (74 → 200) e agora é de 4× (65 → 260) — "muitos degraus
+     curtos, um salto no fim" é literalmente o que o cabeçalho pede. */
+  260,
 ] as const;
 
 /** O que custa comprar a loja grátis inteira. */

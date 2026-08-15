@@ -27,6 +27,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { CANTINHO_ITEMS } from "./cantinho";
+import { CURVA_GRATIS } from "./economia-sementinhas";
 
 const fonte = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
 const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
@@ -115,7 +116,12 @@ describe("3. a loja continua com o formato que a economia pressupõe", () => {
   });
 
   test("nenhum item grátis custa mais que o troféu da loja grátis", () => {
-    const maisCaro = Math.max(...gratis.map((i) => i.price));
-    expect(maisCaro).toBe(200);
+    /* ⚠️ O valor sai da CURVA, não de um número escrito à mão. Ele estava
+       cravado em 200 e virou mentira no dia em que a âncora subiu para 260 —
+       a mesma lição de "constante que descreve um arquivo é constante que um
+       dia diverge dele". O que o teste quer dizer é que o topo dos grátis é o
+       último degrau da curva, e isso continua valendo em qualquer número. */
+    const trofeuDosGratis = CURVA_GRATIS[CURVA_GRATIS.length - 1];
+    expect(Math.max(...gratis.map((i) => i.price))).toBe(trofeuDosGratis);
   });
 });
