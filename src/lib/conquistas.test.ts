@@ -15,6 +15,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   CONQUISTAS,
   RARIDADES,
@@ -344,5 +345,75 @@ describe("maiorSequencia", () => {
     expect([...ATIVIDADES_DO_DIA].sort()).toEqual(
       ["bonding", "gratitude", "meditation", "movement"].sort(),
     );
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚠️ A CONQUISTA NÃO PAGA SOZINHA — ela espera o toque
+
+   Pedido do dono, ago/2026: "a pessoa só vai pegar as sementinhas quando ela
+   clicar em cima daquela conquista. Hoje é o que o Duolingo faz".
+
+   O desbloqueio (linha em `patient_achievements`) e o pagamento (linha
+   `achievement:<chave>` no ledger) eram a MESMA operação. Separá-los é o que
+   transforma o prêmio num gesto dela — e é o gesto que faz abrir a aba, que é
+   onde as outras 38 conquistas estão à vista.
+
+   Estes testes leem a FONTE porque a régua mora nas server functions, e
+   importá-las num teste puxaria o cliente do Supabase junto.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe("⚠️ desbloquear e pagar são operações separadas", () => {
+  const servidor = readFileSync("src/lib/achievements.functions.ts", "utf8");
+  const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+
+  test("a checagem automática não monta mais prêmio de conquista", () => {
+    /* Era `toAward.map(... dedupeKey: \`achievement:${key}\` ...)` alimentando
+       `grants`. Se voltar, a conquista paga sozinha de novo e o botão de
+       resgate vira decoração sobre um prêmio já dado. */
+    expect(servidor).not.toMatch(/grants[^=]*=\s*toAward\.map/);
+    expect(servidor).toContain(
+      "const grants: { amount: number; reason: string; dedupeKey: string }[] = []",
+    );
+  });
+
+  test("o resgate confere o DESBLOQUEIO antes de pagar", () => {
+    /* Sem isto, qualquer chave no corpo do pedido viraria Sementinhas — o
+       mesmo defeito que `contatoDaPaciente` teve no painel. */
+    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
+    expect(fn).toContain('.from("patient_achievements")');
+    expect(fn).toContain('.eq("achievement_key", data.key)');
+    expect(fn).toContain("Essa conquista ainda não é sua");
+  });
+
+  test("o resgate é idempotente, e repetir NÃO é erro", () => {
+    /* Devolver erro faria ela tocar de novo achando que não funcionou. */
+    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
+    expect(fn).toContain("repetido: true");
+    expect(fn).toContain("dedupeKey");
+  });
+
+  test("⚠️ e o Modo Cuidado é conferido no resgate também", () => {
+    const fn = servidor.slice(servidor.indexOf("export const resgatarConquista"));
+    expect(fn).toContain("isCareModeActive");
+  });
+
+  test("a tela não credita mais no ato do desbloqueio", () => {
+    /* `triggerAchievementsCheck` creditava `sementinhasDaRaridade` de cada
+       chave nova. Com o pagamento no toque, isso mostraria o saldo subindo por
+       um prêmio que o servidor ainda não pagou — e ela chegaria à aba com o
+       botão pedindo o mesmo número. */
+    const trecho = tela.slice(
+      tela.indexOf("function triggerAchievementsCheck"),
+      tela.indexOf("function MinhaContaPage"),
+    );
+    expect(trecho).not.toContain("creditarSementinhas(ganho)");
+    expect(trecho).not.toContain("sementinhasDaRaridade");
+  });
+
+  test("e o cartão pendente é alcançável pelo teclado", () => {
+    /* Ele virou alvo de toque; num `div` sem `role`/`tabIndex` o teclado e o
+       VoiceOver não chegam nele. */
+    expect(tela).toContain('role={aResgatar ? "button" : undefined}');
+    expect(tela).toContain("tabIndex={aResgatar ? 0 : undefined}");
   });
 });

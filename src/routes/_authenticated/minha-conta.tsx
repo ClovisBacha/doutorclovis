@@ -116,7 +116,7 @@ import {
   ACHIEVEMENT_DEFS,
   type AchievementDef,
 } from "@/lib/achievements.functions";
-import { RARIDADES, conquistaPorChave, sementinhasDaRaridade } from "@/lib/conquistas";
+import { RARIDADES } from "@/lib/conquistas";
 import { conjuntosDoItem, conjuntosOrdenados } from "@/lib/conjuntos";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
@@ -674,12 +674,10 @@ function categoryOfTab(t: Tab): string {
  * Três, e o resto vira uma linha só. O que ela perde é a lista; o que ela
  * ganha continua igual, e a aba Conquistas mostra todas com calma.
  *
- * ⚠️ E o saldo sobe junto. As Sementinhas da conquista são concedidas no
- * servidor, longe do Caminho — sem este aviso o número no alto da trilha só se
- * corrigiria na próxima abertura, que é exatamente o defeito que
- * `evento-sementinhas.ts` veio consertar. O valor sai de
- * `sementinhasDaRaridade`, a MESMA régua que o servidor usa para pagar; uma
- * segunda tabela aqui divergiria no primeiro ajuste de preço.
+ * ⚠️ E ele NÃO credita mais Sementinhas. O prêmio da conquista passou a
+ * depender do toque dela na aba Conquistas (`resgatarConquista`), então
+ * creditar aqui mostraria o saldo subindo por um pagamento que o servidor
+ * ainda não fez.
  */
 const TOASTS_DE_CONQUISTA = 3;
 
@@ -736,11 +734,15 @@ function triggerAchievementsCheck() {
         toast(`🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — veja na aba.`);
       }
 
-      const ganho = novas.reduce(
-        (s, k) => s + sementinhasDaRaridade(conquistaPorChave(k)?.raridade ?? "comum"),
-        0,
-      );
-      creditarSementinhas(ganho);
+      /* ⚠️ NÃO CREDITA MAIS AQUI. O prêmio da conquista deixou de ser
+         automático e passou a depender do toque dela na aba Conquistas
+         (`resgatarConquista`). Creditar neste ponto mostraria o saldo subir por
+         um prêmio que o servidor ainda não pagou — e ela chegaria à aba com o
+         botão de resgate ainda pedindo o mesmo número, sem entender qual dos
+         dois está certo.
+
+         O toast fica: "desbloqueou" continua sendo notícia, e agora ele é
+         também o convite para ir buscar. */
     })
     .catch(() => {});
 }
@@ -15756,7 +15758,7 @@ export function ConquistasTab({
    * meses. Foi por telas assim serem impossíveis de olhar que a aba passou
    * tanto tempo com dezoito conquistas de um app que já tinha o dobro.
    */
-  bancada?: { desbloqueadas: string[] };
+  bancada?: { desbloqueadas: string[]; resgatadas?: string[] };
 }) {
   const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>(
     bancada
@@ -15769,6 +15771,51 @@ export function ConquistasTab({
   const [loading, setLoading] = useState(!bancada);
   const [newBadges, setNewBadges] = useState<string[]>([]);
   const [saldo, setSaldo] = useState<number | null>(bancada ? 125 : null);
+  /* Quais já foram PAGAS. Desbloqueada e fora deste conjunto = tem prêmio
+     esperando o toque dela. Ver `resgatarConquista` no servidor. */
+  const [resgatadas, setResgatadas] = useState<Set<string>>(new Set(bancada?.resgatadas ?? []));
+  const [resgatandoKey, setResgatandoKey] = useState<string | null>(null);
+
+  /**
+   * O TOQUE QUE PAGA.
+   *
+   * ⚠️ O saldo sobe pelo MESMO caminho de todo ganho do app
+   * (`creditarSementinhas`), e não por um `setSaldo` local: a barra do topo do
+   * Caminho ouve esse evento, e um segundo caminho faria os dois números
+   * discordarem — que é exatamente o defeito que o evento veio consertar.
+   *
+   * ⚠️ E a chave entra em `resgatadas` mesmo quando o servidor responde
+   * `repetido` (a linha já existia): o objetivo do estado é "não há mais
+   * prêmio aqui", e isso é verdade nos dois casos.
+   */
+  async function resgatar(key: string) {
+    if (resgatandoKey) return;
+    setResgatandoKey(key);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      if (!token) return;
+      const { resgatarConquista } = await import("@/lib/achievements.functions");
+      const r = await resgatarConquista({ data: { accessToken: token, key } });
+      if (!r.ok) {
+        toast.error(r.error);
+        return;
+      }
+      setResgatadas((antes) => new Set(antes).add(key));
+      if (r.granted > 0) {
+        creditarSementinhas(r.granted);
+        setSaldo((v) => (v == null ? v : v + r.granted));
+        fireConfetti(1);
+        celebrateChime(1);
+        celebrateHaptic(1);
+        toast.success(`+${r.granted} 🌱`);
+      }
+    } catch {
+      toast.error("Não consegui resgatar agora.");
+    } finally {
+      setResgatandoKey(null);
+    }
+  }
 
   useEffect(() => {
     if (bancada) return;
@@ -15782,6 +15829,7 @@ export function ConquistasTab({
       const res = await checkAndAwardAchievements({ data: { accessToken: token } });
       if (res.ok) {
         setUnlocked(res.unlocked);
+        setResgatadas(new Set(res.resgatadas));
         /* Quais conquistas ainda NÃO foram comemoradas para esta paciente.
            Antes a régua era "desbloqueada nos últimos 30 segundos", calculada
            ao montar esta aba, e ela errava dos dois lados:
@@ -15943,10 +15991,40 @@ export function ConquistasTab({
                 const unlockedAt = unlocked.find((u) => u.achievement_key === def.key)?.unlocked_at;
                 const isNew = newBadges.includes(def.key);
                 const rar = RARIDADES[def.raridade];
+                /* ⚠️ Desbloqueada e AINDA NÃO RESGATADA: o cartão vira botão.
+                   Ver `resgatarConquista` — o prêmio deixou de cair sozinho e
+                   passou a depender do toque dela, como no Duolingo. */
+                const aResgatar = isUnlocked && !resgatadas.has(def.key);
+                const resgatando = resgatandoKey === def.key;
                 return (
                   <div
                     key={def.key}
+                    role={aResgatar ? "button" : undefined}
+                    tabIndex={aResgatar ? 0 : undefined}
+                    aria-label={
+                      aResgatar
+                        ? `Resgatar ${rar.sementinhas} Sementinhas de ${def.title}`
+                        : undefined
+                    }
+                    onClick={aResgatar ? () => resgatar(def.key) : undefined}
+                    onKeyDown={
+                      aResgatar
+                        ? (e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              resgatar(def.key);
+                            }
+                          }
+                        : undefined
+                    }
                     className={`rounded-2xl border p-4 text-center transition-all ${
+                      aResgatar
+                        ? /* Pulsa e convida. É o único estado da grade que pede
+                             uma ação, e ele tem de se separar do resto à
+                             distância de um olhar. */
+                          "press cursor-pointer ring-2 ring-emerald-400 ring-offset-2 animate-pulse-slow "
+                        : ""
+                    }${
                       /* ⚠️ O ANEL DE RARIDADE SÓ PINTA O QUE ELA JÁ TEM.
                          Bloqueada continua cinza-neutra e apagada, de
                          propósito: um anel dourado numa conquista que ela
@@ -15970,11 +16048,18 @@ export function ConquistasTab({
                     >
                       {rar.label} · {rar.sementinhas} 🌱
                     </p>
-                    {isUnlocked && unlockedAt && (
+                    {aResgatar ? (
+                      /* A data sai daqui de propósito: enquanto há prêmio a
+                         pegar, a única coisa que o cartão precisa dizer é o
+                         que fazer. A data volta assim que ela resgata. */
+                      <p className="mt-1.5 rounded-full bg-emerald-500 px-2 py-1 text-[11px] font-bold text-white">
+                        {resgatando ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
+                      </p>
+                    ) : isUnlocked && unlockedAt ? (
                       <p className="mt-1 text-xs text-primary">
                         {new Date(unlockedAt).toLocaleDateString("pt-BR")}
                       </p>
-                    )}
+                    ) : null}
                     {!isUnlocked && (
                       <p className="mt-1 text-xs text-muted-foreground">🔒 bloqueada</p>
                     )}

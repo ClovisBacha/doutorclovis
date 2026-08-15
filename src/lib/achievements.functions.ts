@@ -280,12 +280,24 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
 
        Chave sem def conhecida cai no valor de `comum`: é o piso, e é o que
        impede uma conquista nova de pagar 0 por esquecimento. */
-    const titleByKey = new Map(ACHIEVEMENT_DEFS.map((d) => [d.key, d.title]));
-    const grants: { amount: number; reason: string; dedupeKey: string }[] = toAward.map((key) => ({
-      amount: sementinhasDaRaridade(conquistaPorChave(key)?.raridade ?? "comum"),
-      reason: `Conquista: ${titleByKey.get(key) ?? key}`,
-      dedupeKey: `achievement:${key}`,
-    }));
+    /* ─── ⚠️ A CONQUISTA NÃO PAGA MAIS SOZINHA ──────────────────────────────
+       Pedido do dono, ago/2026: "a pessoa só vai pegar as sementinhas quando
+       ela clicar em cima daquela conquista. Hoje é o que o Duolingo faz".
+
+       A concessão do prêmio saiu daqui e virou `resgatarConquista`. O que
+       continua acontecendo nesta função é o DESBLOQUEIO — a linha em
+       `patient_achievements`, que é o que faz o cartão acender.
+
+       Por que a mudança vale: o prêmio automático chegava como um número que
+       subia sozinho enquanto ela estava noutra tela. O toque transforma o
+       mesmo prêmio num gesto dela, e é ele que faz a paciente ABRIR a aba —
+       que é onde as outras 38 conquistas estão à vista.
+
+       ⚠️ Os MARCOS abaixo (semana, trimestre, nascimento, mês do bebê)
+       continuam automáticos, e é de propósito: não existe cartão para tocar,
+       ninguém "conquistou" a semana 22 — ela chegou. Prêmio sem gesto precisa
+       de um dono, e o dono deles é o calendário. */
+    const grants: { amount: number; reason: string; dedupeKey: string }[] = [];
     // Marcos escopados à GESTAÇÃO/bebê atual (LMP/referência/nascimento) — senão,
     // numa 2ª gravidez os marcos já teriam sido "consumidos" na 1ª.
     const cycle = cicloAtual;
@@ -346,7 +358,96 @@ export const checkAndAwardAchievements = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       unlocked: (rows ?? []) as { achievement_key: string; unlocked_at: string }[],
+      /** Quais já foram RESGATADAS — ver `chavesResgatadas`. */
+      resgatadas: await chavesResgatadas(db, uid),
       newlyAwarded,
       careMode,
     };
+  });
+
+/** Prefixo da linha do ledger que marca uma conquista como já paga. */
+export const PREFIXO_CONQUISTA = "achievement:";
+
+/**
+ * QUAIS CONQUISTAS JÁ FORAM PAGAS.
+ *
+ * ⚠️ A fonte é o LEDGER, e não uma coluna nova. A linha
+ * `achievement:<chave>` já existia — só mudou de MOMENTO: era escrita no
+ * desbloqueio, e agora é escrita no resgate. Nada de migration, e nada de dois
+ * lugares dizendo a mesma coisa.
+ *
+ * De quebra isso resolve sozinho o caso de quem já usava o app: quem recebeu o
+ * prêmio automático antes desta mudança tem a linha, então a conquista aparece
+ * como já resgatada — que é exatamente o certo. O app não vai pagar de novo
+ * nem pedir que ela toque no que já recebeu.
+ */
+async function chavesResgatadas(db: ReturnType<typeof typedDb>, uid: string): Promise<string[]> {
+  const { data } = await db
+    .from("sementinhas_ledger")
+    .select("dedupe_key")
+    .eq("user_id", uid)
+    .like("dedupe_key", `${PREFIXO_CONQUISTA}%`);
+  return ((data ?? []) as { dedupe_key: string | null }[])
+    .map((r) => r.dedupe_key ?? "")
+    .filter((k) => k.startsWith(PREFIXO_CONQUISTA))
+    .map((k) => k.slice(PREFIXO_CONQUISTA.length));
+}
+
+/**
+ * RESGATAR UMA CONQUISTA — o toque que paga.
+ *
+ * ⚠️ Confere o DESBLOQUEIO no banco antes de pagar. Sem essa linha, qualquer
+ * chave enviada no corpo do pedido viraria Sementinhas — o mesmo defeito que
+ * `contatoDaPaciente` teve no painel, e a razão de a compra do Cantinho
+ * revalidar o preço pelo catálogo do servidor.
+ *
+ * ⚠️ Idempotente pela `dedupe_key`, que é a única coisa entre um toque nervoso
+ * e dois pagamentos. Achar a linha já gravada NÃO é erro: é sucesso repetido,
+ * marcado com `repetido` para a tela não festejar duas vezes. Devolver erro
+ * aqui faria ela tocar DE NOVO achando que não funcionou.
+ */
+export const resgatarConquista = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), key: z.string().min(1).max(80) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
+      if (error || !u.user) return { ok: false as const, error: "Sua sessão expirou." };
+      const uid = u.user.id;
+      const db = typedDb(supabaseAdmin);
+
+      const def = conquistaPorChave(data.key);
+      if (!def) return { ok: false as const, error: "Conquista inexistente." };
+
+      /* Modo Cuidado: nada de comemoração nem de moeda. O mesmo portão da
+         loja, do saldo e das Amigas. */
+      if (await isCareModeActive(supabaseAdmin, uid)) {
+        return { ok: true as const, granted: 0, repetido: false };
+      }
+
+      const { data: linha } = await db
+        .from("patient_achievements")
+        .select("achievement_key")
+        .eq("user_id", uid)
+        .eq("achievement_key", data.key)
+        .maybeSingle();
+      if (!linha) return { ok: false as const, error: "Essa conquista ainda não é sua." };
+
+      const dedupeKey = `${PREFIXO_CONQUISTA}${data.key}`;
+      const { data: paga } = await db
+        .from("sementinhas_ledger")
+        .select("amount")
+        .eq("user_id", uid)
+        .eq("dedupe_key", dedupeKey)
+        .maybeSingle();
+      if (paga) return { ok: true as const, granted: 0, repetido: true };
+
+      const amount = sementinhasDaRaridade(def.raridade);
+      await grantSementinhas(db, uid, [{ amount, reason: `Conquista: ${def.title}`, dedupeKey }]);
+      return { ok: true as const, granted: amount, repetido: false };
+    } catch {
+      return { ok: false as const, error: "Não consegui resgatar agora." };
+    }
   });

@@ -2107,6 +2107,33 @@ button:active > .duo3d {
   }
 }
 
+/* ── O cartão de conquista que ainda tem prêmio a pegar ──────────────────
+   Um pulso lento e discreto. É o único estado da grade que PEDE uma ação, e
+   sem ele o cartão desbloqueado-mas-não-resgatado lê igual ao já resgatado —
+   o prêmio ficaria esperando para sempre, sem ninguém saber que está lá.
+
+   Lento (2,4 s) e de amplitude curta (opacidade 1 → 0,72): é uma grade que
+   pode ter dez cartões nesse estado ao mesmo tempo, e dez piscadas rápidas
+   viram alarme. */
+@keyframes dc-pulso-lento {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+.animate-pulse-slow {
+  animation: dc-pulso-lento 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* PARA, não some: o anel verde e o botão continuam dizendo o que fazer. */
+  .animate-pulse-slow {
+    animation: none;
+  }
+}
+
 /* ── No ar: as partículas do tipo `clima` ────────────────────────────────
    Ver `src/lib/clima-do-cantinho.ts` — a régua (quantas, quão rápido, para
    onde) mora lá; aqui só o percurso.
