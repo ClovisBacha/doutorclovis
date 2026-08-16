@@ -89,11 +89,23 @@ selo a mais é uma decisão de produto que ninguém tomou.
 ### Passo 4 — ⚠️ COMPARAR. Este passo não é opcional.
 
 ```bash
-bun run dev --host 127.0.0.1 --port 8080 &
+bun run dev --host 127.0.0.1 --port 8080 > /tmp/dev.log 2>&1 &
+sleep 12 && grep -E "Local:|Port .* is in use" /tmp/dev.log   # ⚠️ CONFIRA A PORTA
 
 node scripts/comparar-com-referencia.mjs <referencia.png> "<url-da-bancada>" \
   /tmp/lado-a-lado.png --seletor="<o elemento da tela>" --recorte=<y0>,<y1>
 ```
+
+⚠️ **CONFIRA A PORTA ANTES DE COMPARAR — não a suponha.** O Vite responde
+`Port 8080 is in use, trying another one...` e sobe em 8081 sem falhar.
+Aconteceu na sessão em que esta skill nasceu. Apontar para 8080 nesse caso dá um
+de dois desfechos, e o segundo é o perigoso:
+
+1. conexão recusada — chato, mas visível;
+2. **um servidor ANTIGO ainda vivo naquela porta** — e aí o relatório sai
+   inteiro, confiante e descrevendo código que você não escreveu. É a mesma
+   família de defeito que esta skill existe para impedir: uma verificação que
+   mente é pior que nenhuma.
 
 - `--seletor` fotografa só o componente. Sem ele a bancada traz cabeçalho e
   rodapé do site, e todo número vira ruído.
