@@ -36,7 +36,31 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 
-/** MEDIDO na referência de 853×1844. */
+/**
+ * ⚠️ O HERÓI COMEÇA EM y=155, E NÃO EM ZERO (ago/2026).
+ *
+ * A primeira versão recortava de y=0, e com isso levava junto os CONTROLES
+ * DESENHADOS da referência — o botão de voltar e a pílula de saldo que o
+ * ilustrador pintou (medidos: y 40..150). A tela desenhava os controles de
+ * verdade por cima, e o comentário de então dizia que eles "cobrem".
+ *
+ * Não cobriam. Medido no navegador: o botão pintado ia de 21,6 a 68,6 px
+ * dentro da arte e o real de 9,8 a 53,8 — sobrava uma meia-lua branca abaixo
+ * do botão real, e a mesma coisa sob a pílula. O dono viu no aparelho e
+ * descreveu exatamente isso: "o enquadramento está muito sobrepondo".
+ *
+ * Cobrir com precisão exigiria casar dois retângulos em todas as larguras de
+ * tela, e um erro de 2px reapareceria. Recortar resolve de uma vez: acima do
+ * título não há nada além de céu chapado (medido: nenhum pixel escuro entre
+ * y=105 e y=250; o título começa em ~255), então y=155 sai bem depois dos
+ * controles e bem antes do "Loja de".
+ *
+ * De quebra some a faixa da barra de status do mockup, que estava duplicando
+ * com a `--safe-top` que a tela agora reserva.
+ */
+const TOPO_DO_HEROI = 155;
+
+/** MEDIDO na referência de 853×1844: a grama acaba em y≈663. */
 const ALTURA_DO_HEROI = 666;
 
 /**
@@ -97,11 +121,15 @@ mkdirSync(destino, { recursive: true });
    ⚠️ E o texto do herói vira `alt`: quem usa leitor de tela não perde o
    título nem a frase só porque eles são pixels agora.
 
-   O botão de voltar e a pílula de saldo estão QUEIMADOS nesta arte (x 38..135
-   e x 646..813, y 47..149 — medidos). Não os apago: os controles de verdade
-   são desenhados exatamente por cima, e cobrem. Apagar exigiria inventar
-   jardim onde não há, e o resultado seria pior que a sobreposição. */
-const fundo = recorta(src, { x: 0, y: 0, w: src.width, h: ALTURA_DO_HEROI });
+   ⚠️ E OS CONTROLES QUEIMADOS FICARAM DE FORA DO RECORTE — ver
+   `TOPO_DO_HEROI`. A versão anterior os incluía e confiava nos controles de
+   verdade para cobri-los; medido, eles não cobriam. */
+const fundo = recorta(src, {
+  x: 0,
+  y: TOPO_DO_HEROI,
+  w: src.width,
+  h: ALTURA_DO_HEROI - TOPO_DO_HEROI,
+});
 writeFileSync(join(destino, "heroi-fundo.png"), PNG.sync.write(fundo));
 console.log(`heroi-fundo.png  ${fundo.width}×${fundo.height}  (herói inteiro, com título e bolha)`);
 

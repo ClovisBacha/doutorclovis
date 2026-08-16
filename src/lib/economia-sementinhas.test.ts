@@ -17,7 +17,7 @@ import { readFileSync } from "node:fs";
 import { CANTINHO_ITEMS } from "./cantinho";
 import { CONQUISTAS, orcamentoDasConquistas } from "./conquistas";
 import { CONJUNTOS, bonusDoConjunto } from "./conjuntos";
-import { PACOTES, totalDoPacote } from "./pacotes-sementinhas";
+import { PACOTES, gastavelDoPacote } from "./pacotes-sementinhas";
 import { SEMENTINHAS } from "./sementinhas.functions";
 import {
   BONUS_VINCULO_MEDICO,
@@ -369,11 +369,14 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
    *
    * ⚠️ Era `const MAIOR_PACOTE = 15_000;`, e isso é literalmente o pecado que
    * este mesmo commit corrigiu em `loja-coerente.test.ts`: "constante que
-   * descreve um arquivo é constante que um dia diverge dele". Subir o bônus do
-   * Celeiro de 5.000 para 8.000 deixaria a trava apertada (40–60%) verde sobre
-   * um número morto.
+   * descreve um arquivo é constante que um dia diverge dele".
+   *
+   * ⚠️ E é o GASTÁVEL, não o entregue: desde que o bônus virou bolso de
+   * presente (ago/2026), ele não compra um enfeite sequer. Somá-lo aqui diria
+   * que uma compra cobre 43% do catálogo quando ela cobre 35% — a trava
+   * ficaria verde sobre poder de compra imaginário.
    */
-  const MAIOR_PACOTE = totalDoPacote(PACOTES[0]);
+  const MAIOR_PACOTE = gastavelDoPacote(PACOTES[0]);
 
   /**
    * Gestação inteira, com todas as conquistas e conjuntos.
@@ -394,9 +397,27 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
     BONUS_VINCULO_MEDICO;
   const ORGANICO_DA_GESTACAO = organicoAte(GANHO_DIA_TIPICO);
 
-  test("uma compra do maior pacote fica entre 40% e 60% do catálogo", () => {
+  test("uma compra do maior pacote fica entre 30% e 60% do catálogo", () => {
+    /**
+     * ⚠️ O PISO CAIU DE 40% PARA 30%, e isso foi uma DECISÃO, não um teste
+     * afrouxado para ficar verde.
+     *
+     * O que mudou foi o produto: 2.500 do maior pacote saíram da carteira
+     * gastável e viraram bolso de presente (pedido do dono). O poder de compra
+     * de uma compra caiu de 15.000 para 10.000 — de ~52% para ~35% do
+     * catálogo — sem que uma linha de preço se movesse.
+     *
+     * E a direção é a BOA: a razão de existir desta faixa é impedir que uma
+     * compra só feche a coleção ("ela compraria uma vez e não sobraria mais
+     * nada para querer"). Sair de 52% para 35% afasta desse risco, não se
+     * aproxima. Quem continua guardando o outro lado é o teto de 60%.
+     *
+     * O piso não desapareceu porque ele também tem função: abaixo de ~30% o
+     * maior pacote deixaria de parecer uma compra que muda alguma coisa, e a
+     * loja passaria a vender frustração.
+     */
     const fatia = MAIOR_PACOTE / catalogo;
-    expect(fatia).toBeGreaterThan(0.4);
+    expect(fatia).toBeGreaterThan(0.3);
     expect(fatia).toBeLessThan(0.6);
   });
 
@@ -438,15 +459,35 @@ describe("⚠️ nem comprar nem jogar, sozinhos, fecham o catálogo", () => {
     expect(noTeto).toBeLessThan(1);
   });
 
-  test("os dois caminhos juntos fecham — é esse o desenho", () => {
-    /* ⚠️ 95%, e não igualdade exata. Hoje a conta dá 99,8% (28.926 de 28.979),
-       e é tentador travar o fecho no número — mas isso seria cobrar uma
-       COINCIDÊNCIA: o primeiro item novo do catálogo derrubaria o teste sem
-       nada de errado ter acontecido. O que precisa continuar verdadeiro é a
-       forma: jogar a gestação inteira MAIS uma compra do maior pacote põe a
-       coleção ao alcance. */
+  test("⚠️ jogar a gestação + UMA compra chega perto, e já NÃO fecha", () => {
+    /**
+     * ─── ESTE TESTE MUDOU DE AFIRMAÇÃO, E A MUDANÇA É O REGISTRO ───────────
+     *
+     * Ele se chamava "os dois caminhos juntos FECHAM — é esse o desenho", e
+     * cobrava > 95%. Era verdade: a conta dava 99,8% (28.926 de 28.979).
+     *
+     * Deixou de ser, e não por causa de preço nenhum: 2.500 do maior pacote
+     * saíram da carteira gastável e viraram bolso de presente (pedido do
+     * dono, ago/2026). A soma caiu para ~82%.
+     *
+     * ⚠️ BAIXAR O NÚMERO E MANTER O NOME "FECHAM" SERIA A MENTIRA MAIS BARATA
+     * DESTE ARQUIVO — um teste verde afirmando um desenho que o produto não
+     * tem mais. Então o que mudou foi a AFIRMAÇÃO: hoje o desenho é "chega
+     * perto", e fechar a coleção pede jogo acima do típico ou uma segunda
+     * compra.
+     *
+     * Isso não é um defeito — é a consequência direta e previsível de tirar
+     * poder de compra do maior pacote, e ela empurra na direção que o resto
+     * deste arquivo protege (que UMA compra não acabe o jogo). Mas é uma
+     * mudança de produto, e está escrita aqui para não passar por acidente.
+     *
+     * O piso continua sendo faixa e não igualdade: travar no valor de hoje
+     * cobraria uma coincidência, e o primeiro item novo do catálogo derrubaria
+     * o teste sem nada de errado ter acontecido.
+     */
     const juntos = (ORGANICO_DA_GESTACAO + MAIOR_PACOTE) / catalogo;
-    expect(juntos).toBeGreaterThan(0.95);
+    expect(juntos).toBeGreaterThan(0.75);
+    expect(juntos).toBeLessThan(0.95);
   });
 
   test("⚠️ a prosa do cabeçalho não pode citar preço que já mudou", () => {

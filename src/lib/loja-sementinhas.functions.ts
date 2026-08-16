@@ -9,7 +9,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { PACOTE_POR_ID, numeroBR, totalDoPacote } from "@/lib/pacotes-sementinhas";
+import { PACOTE_POR_ID, numeroBR } from "@/lib/pacotes-sementinhas";
 
 /** URLs de volta do Checkout. Espelha o que billing.functions.ts faz. */
 function urlsDeRetorno(returnPath: string) {
@@ -71,7 +71,13 @@ export const createSementinhasCheckout = createServerFn({ method: "POST" })
         customerId:
           (existing as { stripe_customer_id?: string } | null)?.stripe_customer_id ?? null,
         sku: pacote.id,
-        nome: `${numeroBR(totalDoPacote(pacote))} Sementinhas`,
+        /* ⚠️ A BASE, e o bônus DITO à parte — nunca a soma. Esta string vira
+           a linha do recibo do Stripe e do extrato do cartão de crédito dela.
+           "12.500 Sementinhas" num recibo prometeria 12.500 de poder de compra
+           por escrito, num documento que ela guarda. */
+        nome: `${numeroBR(pacote.base)} Sementinhas + ${numeroBR(
+          pacote.bonusParaPresentear,
+        )} de bônus para presentear`,
         centavos: pacote.centavos,
         successUrl,
         cancelUrl,

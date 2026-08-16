@@ -35,7 +35,7 @@ import {
   PACOTES,
   numeroBR,
   precoBRL,
-  totalDoPacote,
+  gastavelDoPacote,
   type PacoteSementinhas,
 } from "@/lib/pacotes-sementinhas";
 import { podeComprarAqui } from "@/lib/canal-de-venda";
@@ -75,6 +75,15 @@ const PALETA = {
   /* Idem para a fita "MELHOR VALOR": `#63822c` dava 4,41:1 — reprova por pouco,
      e ela carrega três palavras em caixa alta pequena. `#4f6a20` dá 6,15:1. */
   fita: "#4f6a20",
+  /* A faixa da área segura, acima do herói: a MÉDIA MEDIDA da primeira linha
+     da arte (y=155 da referência, o novo topo do recorte).
+
+     ⚠️ REMEDIR AO MEXER NO RECORTE. Esta cor já esteve em `#a8baf3`, que era a
+     primeira linha do recorte ANTIGO (y=0) — a faixa da barra de status do
+     mockup. Com o herói passando a começar em y=155, aquele tom ficou 25%
+     mais azul que o céu de verdade, e a emenda apareceria como uma listra
+     exatamente atrás do relógio do sistema. */
+  topoDaArte: "#c3d8e7",
 } as const;
 
 const ARTE: Record<string, string> = {
@@ -238,40 +247,92 @@ export function LojaSementinhas({
           ⚠️ O texto do herói vira `alt` — quem usa leitor de tela não perde o
           título nem a frase só porque eles são pixels agora.
 
-          ⚠️ E o botão de voltar e a pílula de saldo estão QUEIMADOS na arte
-          (medidos: x 38..135 e x 646..813 de 853). Os controles de verdade são
-          desenhados exatamente por cima e cobrem — apagá-los da imagem exigiria
-          inventar jardim onde não há. */}
-      <div className="relative">
-        <img
-          src={heroiDaLoja}
-          alt="Loja de Sementinhas — use suas sementinhas para decorar e evoluir seu cenário. Compra 100% segura."
-          /* `w-full h-auto`: a arte escala pela LARGURA e a altura acompanha,
-             então a composição fica idêntica em qualquer celular. `cover` numa
-             caixa de altura fixa cortaria as laterais no aparelho estreito. */
-          className="block w-full"
-          draggable={false}
-        />
-        {/* Os controles, por cima e nas MESMAS posições da arte — em % da
-            imagem, para acompanharem a escala em qualquer largura. */}
-        <div className="absolute inset-x-0 top-0 flex items-start justify-between px-[4.4%] pt-[2.5%]">
-          <button
-            onClick={onFechar}
-            aria-label="Voltar"
-            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-xl text-slate-700 shadow-md backdrop-blur"
-          >
-            ←
-          </button>
-          {saldo !== null && (
-            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-4 py-2 shadow-md backdrop-blur">
-              <span className="text-lg leading-none">🌱</span>
-              <span className="text-lg font-extrabold tabular-nums text-emerald-700">
-                {numeroBR(saldo)}
-              </span>
+          ⚠️ E OS CONTROLES DESENHADOS FORAM RECORTADOS FORA DA ARTE. Este
+          comentário dizia que os controles de verdade eram "desenhados
+          exatamente por cima e cobrem" o botão e a pílula que o ilustrador
+          pintou. NÃO COBRIAM: medido no navegador, o botão pintado ia de 21,6
+          a 68,6 px dentro da arte e o real de 9,8 a 53,8 — sobrava uma
+          meia-lua branca embaixo dele, e outra sob a pílula. O dono viu no
+          aparelho ("o enquadramento está muito sobrepondo").
+
+          Casar dois retângulos em toda largura de tela é frágil por natureza —
+          2px de erro e a meia-lua volta. `scripts/loja-heroi-do-drive.mjs`
+          passou a recortar a partir de y=155, abaixo dos controles pintados e
+          acima do título: some a duplicata, e some junto a faixa de barra de
+          status do mockup, que estava duplicando com a `--safe-top`. */}
+      {/* ─── ⚠️ A FAIXA DA ÁREA SEGURA ─────────────────────────────────────
+          Esta tela é `fixed inset-0` e NUNCA compensou a área segura: no app
+          instalado, o relógio e a bateria do iOS pousavam em cima do ← e da
+          pílula de saldo, e o título pintado do herói ficava por baixo deles.
+          O dono viu no aparelho — "está muito sobrepondo, a gente tem que dar
+          uma baixada nesses elementos".
+
+          ⚠️ E NO NAVEGADOR DE DESENVOLVIMENTO ISSO É INVISÍVEL:
+          `env(safe-area-inset-top)` vale zero ali, então a tela parece
+          perfeita em toda máquina em que se trabalha. É a mesma armadilha que
+          fez os pesos dos espaçadores da home terem de ser medidos com a área
+          segura INJETADA à mão.
+
+          A faixa empurra a arte para baixo em vez de recuar os controles: os
+          controles estão desenhados DENTRO da ilustração (é uma colagem), e
+          descê-los sozinhos os descolaria do lugar onde o ilustrador os pôs.
+
+          A cor é a MÉDIA MEDIDA da primeira linha da arte, para a emenda não
+          virar uma aresta — a mesma solução da `corDeBaixo` do céu da home. */}
+      {/* ─── ⚠️ A BARRA DOS CONTROLES, ACIMA DA ARTE ───────────────────────
+          Ela resolve DUAS coisas que se atrapalhavam.
+
+          1. A ÁREA SEGURA. Esta tela é `fixed inset-0` e nunca a compensou: no
+             app instalado, o relógio e a bateria do iOS pousavam em cima do ←
+             e da pílula de saldo. O dono viu no aparelho — "está muito
+             sobrepondo, a gente tem que dar uma baixada nesses elementos". ⚠️ E
+             no navegador de desenvolvimento isso é INVISÍVEL, porque
+             `env(safe-area-inset-top)` vale zero ali: a tela parece perfeita em
+             toda máquina em que se trabalha. Mesma armadilha que obrigou os
+             espaçadores da home a serem medidos com a área segura injetada.
+
+          2. O CÉU QUE ACABOU. Os controles flutuavam DENTRO da arte, e o
+             recorte novo (que tirou os controles pintados da referência —
+             ver `loja-heroi-do-drive.mjs`) deixou só ~48px de céu acima do
+             título. Um botão de 44px ali encostava em "Loja de".
+
+          ⚠️ A COR É A DA PRIMEIRA LINHA DA ARTE (medida), então a barra lê como
+          continuação do céu e não como uma tarja: os controles continuam
+          parecendo flutuar sobre o jardim, que é o desenho do dono. Remedir ao
+          mexer no recorte — a cor anterior era a da barra de status do mockup e
+          ficou 25% azul demais quando o topo mudou. */}
+      <div
+        className="flex items-start justify-between px-[4.4%] pb-2"
+        style={{ background: PALETA.topoDaArte, paddingTop: "calc(var(--safe-top) + 0.5rem)" }}
+      >
+        <button
+          onClick={onFechar}
+          aria-label="Voltar"
+          className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-xl text-slate-700 shadow-md backdrop-blur"
+        >
+          ←
+        </button>
+        {saldo !== null && (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-4 py-2 shadow-md backdrop-blur">
+            <span className="text-lg leading-none">🌱</span>
+            <span className="text-lg font-extrabold tabular-nums text-emerald-700">
+              {numeroBR(saldo)}
             </span>
-          )}
-        </div>
+          </span>
+        )}
       </div>
+
+      {/* A arte, sozinha e sem nada por cima — os controles moram na barra
+          acima. Sem sobreposição não há mais nada que precise de `relative`. */}
+      <img
+        src={heroiDaLoja}
+        alt="Loja de Sementinhas — use suas sementinhas para decorar e evoluir seu cenário. Compra 100% segura."
+        /* `w-full h-auto`: a arte escala pela LARGURA e a altura acompanha,
+           então a composição fica idêntica em qualquer celular. `cover` numa
+           caixa de altura fixa cortaria as laterais no aparelho estreito. */
+        className="block w-full"
+        draggable={false}
+      />
 
       {/* ── OS TRÊS PACOTES ────────────────────────────────────────────── */}
       <div className="px-4 pb-10 pt-5">
@@ -286,25 +347,25 @@ export function LojaSementinhas({
             Esconder a vitrine também não protege ninguém: o que não pode
             acontecer é COBRAR fora da loja, e isso continua barrado no botão.
             O aviso vem uma vez, em cima, em vez de repetido em cada cartão. */}
-        {/* ⚠️ UMA LINHA, e não a caixa de quatro parágrafos que estava aqui.
-            Ela ocupava um QUARTO da primeira tela — a referência do dono não
-            tem aviso nenhum, e o meu empurrava o primeiro cartão para fora da
-            dobra. A informação continua (a compra não abriu, e jogar continua
-            rendendo), e o texto longo mudou de lugar: vai no toque do botão,
-            que é quando ela de fato precisa dele. */}
-        {!podeComprar && (
-          <p className="mb-3 flex items-center gap-2 rounded-full bg-amber-50 px-3.5 py-2 text-[12.5px] leading-snug text-amber-900 ring-1 ring-amber-200">
-            <span aria-hidden>🌱</span>
-            <span>
-              A compra abre em breve — <strong className="font-semibold">jogando</strong>, você
-              continua ganhando.
-            </span>
-          </p>
-        )}
+        {/* ⚠️ O AVISO "a compra abre em breve" SAIU — pedido do dono. Ele já
+            tinha encolhido de uma caixa de quatro parágrafos para uma linha, e
+            agora sai de vez: a referência não tem aviso nenhum, e ele empurrava
+            o primeiro cartão para baixo numa tela que existe para mostrar
+            cartões.
+
+            ⚠️ A INFORMAÇÃO NÃO SE PERDEU, e é por isso que isto pode sair sem
+            enganar ninguém: `podeComprar` continua barrando o toque e o
+            `toast` continua explicando por extenso no momento em que ela tenta
+            comprar — que é quando ela de fato precisa da explicação. */}
         <ul className="space-y-3">
           {PACOTES.map((p) => {
             const c = PALETA.cartao[p.cor];
-            const total = totalDoPacote(p);
+            /* ⚠️ O NÚMERO GRANDE É O GASTÁVEL, e não a soma dos dois bolsos.
+               Ver `pacotes-sementinhas.ts`: o bônus só presenteia, então somar
+               prometeria poder de compra que não existe. Palavras do dono: "o
+               pacote mais caro vai dar dez mil sementinhas, e um bônus de duas
+               mil e quinhentas" — dois números, ditos separados. */
+            const gastavel = gastavelDoPacote(p);
             return (
               <li
                 key={p.id}
@@ -347,7 +408,7 @@ export function LojaSementinhas({
                       className="font-serif text-[34px] font-bold leading-none tabular-nums sm:text-[40px]"
                       style={{ color: TOM_NUMERO[p.cor] }}
                     >
-                      {numeroBR(total)}
+                      {numeroBR(gastavel)}
                     </p>
                     <p
                       className="mt-0.5 text-[15px] font-semibold"
@@ -355,21 +416,32 @@ export function LojaSementinhas({
                     >
                       sementinhas
                     </p>
-                    <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
-                      <span aria-hidden>🎁</span> Bônus: +{numeroBR(p.bonus)}
+                    {/* ⚠️ A PÍLULA DIZ PARA QUE SERVE, e não só o número.
+                        "Bônus: +2.500" ao lado de "10.000 sementinhas" é lido
+                        como 12.500 de saldo por qualquer pessoa — a soma
+                        acontece na cabeça de quem lê, mesmo sem estar escrita.
+                        O que impede isso é a frase, não o layout. */}
+                    <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/75 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                      <span aria-hidden>🎁</span> +{numeroBR(p.bonusParaPresentear)} para presentear
                     </p>
-                    <p className="mt-1.5 border-t border-dashed border-black/10 pt-1.5 text-[12.5px] text-slate-600">
-                      <span aria-hidden>🌱</span> Total: {numeroBR(total)} sementinhas
+                    <p className="mt-1.5 border-t border-dashed border-black/10 pt-1.5 text-[12px] leading-snug text-slate-600">
+                      {numeroBR(gastavel)} para o seu Cantinho · {numeroBR(p.bonusParaPresentear)}{" "}
+                      só para dar às suas amigas
                     </p>
                     <button
                       onClick={() =>
                         podeComprar ? comprar(p) : toast(veredito.pode ? "" : veredito.texto)
                       }
                       disabled={indo !== null}
+                      /* O leitor de tela recebe os DOIS bolsos, ditos como
+                         duas coisas — é a mesma regra do cartão, e quem não vê
+                         a tela depende inteiramente desta frase. */
                       aria-label={
-                        podeComprar
-                          ? `Comprar ${numeroBR(total)} Sementinhas por ${precoBRL(p)}`
-                          : `${numeroBR(total)} Sementinhas por ${precoBRL(p)} — compra ainda não disponível`
+                        (podeComprar ? "Comprar " : "") +
+                        `${numeroBR(gastavel)} Sementinhas mais ${numeroBR(
+                          p.bonusParaPresentear,
+                        )} de bônus para presentear amigas, por ${precoBRL(p)}` +
+                        (podeComprar ? "" : " — compra ainda não disponível")
                       }
                       className="press mt-2 w-full rounded-full py-2 text-[17px] font-extrabold text-white shadow-sm disabled:opacity-60"
                       /* Sem cor quando não dá para comprar: o botão continua
@@ -404,14 +476,16 @@ export function LojaSementinhas({
           As sementinhas te ajudam a criar um cenário único para o seu bebê!
         </p>
 
-        {/* O caminho GRATUITO, dito por extenso. Loja de moeda que esconde
-            quanto se ganha jogando é a que faz a pessoa achar que comprar é a
-            única saída. */}
-        <p className="mx-auto mt-3 max-w-[24rem] rounded-2xl bg-emerald-50 px-4 py-3 text-center text-[12.5px] leading-relaxed text-emerald-900">
-          Você ganha Sementinhas todo dia jogando — check-in, aula, meditação e as estrelas do dia
-          somam até <strong>70 por dia</strong>. Os pacotes são atalho pra quem quiser, nunca
-          condição pra nada.
-        </p>
+        {/* ⚠️ O BLOCO VERDE DO "caminho gratuito" SAIU — pedido do dono.
+            Ele dizia quanto se ganha jogando por dia, e a intenção era boa
+            (loja de moeda que esconde o caminho grátis é a que faz a pessoa
+            achar que comprar é a única saída).
+
+            O que segura a decisão de tirá-lo é o parágrafo que FICA, logo
+            abaixo: o limite ético do produto — "Sementinhas compram só
+            enfeites; nenhuma aula, exame, alerta ou orientação do seu médico
+            depende delas" — continua na tela, e é ele que impede a loja de
+            parecer que vende cuidado. Esse não sai. */}
 
         {/* Extrato — de onde vieram as que ela já tem. Recolhido: numa tela
             cujo assunto é comprar, uma lista de movimentações rouba o olho do

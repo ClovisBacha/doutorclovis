@@ -33,16 +33,33 @@
  *     Com o catálogo reajustado, 1.000 🌱 compram o item MAIS CARO da loja e
  *     ainda sobra — é uma compra completa, não uma fração.
  *
- * ─── ⚠️ O BÔNUS É O QUE FAZ A ESCADA, E ELE TEM UM CUSTO ────────────────
+ * ─── ⚠️ O BÔNUS É DE OUTRO BOLSO: ELE SÓ PRESENTEIA (ago/2026) ──────────
  *
- * Cada pacote entrega `base + bonus`. O bônus cresce muito mais rápido que o
- * preço (10% → 20% → 50%), e é ele que transforma o maior pacote no melhor
- * negócio sem precisar de desconto nenhum.
+ * Pedido do dono, e ele muda o SIGNIFICADO dos números, não só o valor: "esse
+ * bônus, ele só pode ser usado pra você dar outras sementinhas pras suas
+ * amizades, pras suas amigas, pra outras contas".
  *
- * Foi o bônus do topo que obrigou o reajuste do catálogo: 15.000 🌱 numa
- * compra só valiam 101% do catálogo de então (14.894 🌱). Ela compraria uma
- * vez e não sobraria mais nada para querer. Hoje o catálogo custa ~29.000 e a
- * mesma compra vale ~52% — ver o cabeçalho de `cantinho.ts`.
+ * Por isso o campo se chama `bonusParaPresentear` e não mais `bonus`. Renomear
+ * foi de propósito — era a única forma de obrigar cada lugar que o lia a ser
+ * relido, e o pior desfecho possível aqui seria alguém somar os dois bolsos
+ * sem reparar que agora são moedas diferentes.
+ *
+ * ⚠️ SOMAR OS DOIS É MENTIRA. `base` compra enfeite no Cantinho dela;
+ * `bonusParaPresentear` não compra NADA para ela — só vai para uma amiga. Um
+ * "Total: 12.500" no cartão prometeria 12.500 de poder de compra e entregaria
+ * 10.000, que é a categoria de erro mais cara que uma loja pode ter. Daí o
+ * número grande do cartão ser a BASE, e o bônus aparecer à parte, dizendo em
+ * voz alta para que serve.
+ *
+ * É o mesmo desenho da `MESADA_DA_ASSINANTE` (o bolso mensal do Premium, que
+ * ela também só pode dar) — o bônus comprado é aquele bolso, comprado.
+ *
+ * ⚠️ E ISSO REBAIXOU A FATIA DO CATÁLOGO, de propósito. Antes o topo entregava
+ * 15.000 gastáveis, ~52% do catálogo. Agora entrega 10.000 gastáveis, ~35%:
+ * quem compra o maior pacote continua tendo muito o que querer depois — que é
+ * exatamente o problema que o reajuste do catálogo veio resolver
+ * (15.000 valiam 101% do catálogo de então; ela comprava uma vez e acabava o
+ * jogo). Ver o cabeçalho de `cantinho.ts`.
  *
  * ─── Onde se compra ─────────────────────────────────────────────────────
  *
@@ -55,10 +72,16 @@
 
 export type PacoteSementinhas = {
   id: string;
-  /** O que ela paga — a base do pacote. */
+  /** O que cai na carteira DELA — o único bolso que compra enfeite. */
   base: number;
-  /** O que vem de brinde. Some com a base para dar o total. */
-  bonus: number;
+  /**
+   * ⚠️ O brinde, e ele é de OUTRO BOLSO: só serve para presentear amigas.
+   *
+   * NUNCA some com `base` para mostrar um "total" — são moedas diferentes, e
+   * o cartão prometeria poder de compra que não existe. O nome é longo por
+   * isso: `bonus` sozinho convida à soma.
+   */
+  bonusParaPresentear: number;
   /** Preço em CENTAVOS — inteiro. Dinheiro em float é como se perde um real. */
   centavos: number;
   rotulo: string;
@@ -83,28 +106,66 @@ export const PACOTES: PacoteSementinhas[] = [
   {
     id: "sem-10000",
     base: 10_000,
-    bonus: 5_000,
+    /* 2.500, e não os 5.000 de antes — número do dono. Ver o cabeçalho: com o
+       bônus virando bolso de presente, 5.000 seriam 125 presentes de 40 🌱
+       guardados numa conta que talvez tenha três amigas. */
+    bonusParaPresentear: 2_500,
     centavos: 9_990,
     rotulo: "Celeiro",
     cor: "verde",
     destaque: true,
   },
-  { id: "sem-5000", base: 5_000, bonus: 1_000, centavos: 5_990, rotulo: "Cesto", cor: "azul" },
-  { id: "sem-1000", base: 1_000, bonus: 100, centavos: 1_490, rotulo: "Saquinho", cor: "roxo" },
+  {
+    id: "sem-5000",
+    base: 5_000,
+    bonusParaPresentear: 1_000,
+    centavos: 5_990,
+    rotulo: "Cesto",
+    cor: "azul",
+  },
+  {
+    id: "sem-1000",
+    base: 1_000,
+    bonusParaPresentear: 100,
+    centavos: 1_490,
+    rotulo: "Saquinho",
+    cor: "roxo",
+  },
 ];
 
 export const PACOTE_POR_ID: Record<string, PacoteSementinhas> = Object.fromEntries(
   PACOTES.map((p) => [p.id, p]),
 );
 
-/** O que entra na carteira: base + bônus. É este o número grande do cartão. */
-export function totalDoPacote(p: PacoteSementinhas): number {
-  return p.base + p.bonus;
+/**
+ * ⚠️ TUDO que o pacote entrega — os DOIS bolsos somados.
+ *
+ * Serve para comparar pacotes entre si (`porReal`) e para mais nada. NÃO é o
+ * número grande do cartão, e não é o que ela pode gastar: metade dele, no
+ * topo, só sai da conta indo para uma amiga. Quem responde "quanto ela pode
+ * gastar" é `gastavelDoPacote`.
+ *
+ * O nome mudou de `totalDoPacote` para `totalEntregue` junto com a renomeação
+ * de `bonus`: "total do pacote" é exatamente a expressão que faz alguém
+ * escrevê-lo num cartão como se fosse saldo.
+ */
+export function totalEntregue(p: PacoteSementinhas): number {
+  return p.base + p.bonusParaPresentear;
+}
+
+/**
+ * O que ela pode GASTAR consigo — só a base.
+ *
+ * É este o número grande do cartão, e é este que entra na conta de "quanto do
+ * catálogo uma compra cobre": o bônus não compra um enfeite sequer.
+ */
+export function gastavelDoPacote(p: PacoteSementinhas): number {
+  return p.base;
 }
 
 /** Sementinhas por real — a medida de vantagem do pacote. */
 export function porReal(p: PacoteSementinhas): number {
-  return totalDoPacote(p) / (p.centavos / 100);
+  return totalEntregue(p) / (p.centavos / 100);
 }
 
 /** "R$ 99,90" — formatação única, para preço não divergir entre telas. */

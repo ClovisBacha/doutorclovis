@@ -2948,6 +2948,65 @@ cima com a fita "MELHOR VALOR". Abre pelo toque no saldo dentro do Caminho.
   `humorDaJornada`.
 - **Bancada:** `/preview-loja-sementinhas?saldo=118`.
 
+### O bônus da compra virou bolso de presente (ago/2026)
+
+Pedido do dono, no aparelho: "esse bônus, ele só pode ser usado pra você dar
+outras sementinhas pras suas amizades, pras suas amigas, pra outras contas".
+Mais os números: **10.000 + 2.500 · 5.000 + 1.000 · 1.000 + 100** (só o bônus
+do topo mudou — era 5.000).
+
+⚠️ **Isso muda o SIGNIFICADO dos números, não só o valor.** O campo `bonus`
+virou **`bonusParaPresentear`**, e a renomeação foi de propósito: era a única
+forma de obrigar cada leitor a ser relido. O pior desfecho aqui seria alguém
+somar os dois bolsos sem reparar que agora são moedas diferentes.
+
+- ⚠️ **SOMAR É MENTIRA, e por isso o número grande do cartão é a BASE.**
+  "Total: 12.500" prometeria 12.500 de poder de compra e entregaria 10.000 —
+  a categoria de erro mais cara que uma loja pode ter. `totalDoPacote` virou
+  `totalEntregue` (só serve para comparar pacotes) e nasceu `gastavelDoPacote`.
+- ⚠️ **A pílula diz PARA QUE SERVE, não só o número.** "+2.500" ao lado de
+  "10.000 sementinhas" é somado na cabeça de quem lê mesmo sem estar escrito;
+  quem impede isso é a frase, não o layout.
+- ⚠️ **O webhook credita DUAS linhas**, com `dedupeKey` diferentes derivadas da
+  mesma sessão (iguais, a segunda seria engolida como duplicata e o bônus nunca
+  existiria — falha silenciosa). O bônus vai por último: se a segunda falhar,
+  ela fica sem o bônus e não sem a base.
+- **A fatia do catálogo caiu de ~52% para ~35%**, e a direção é a boa: a razão
+  de a faixa existir é impedir que UMA compra feche a coleção. O piso do teste
+  desceu de 40% para 30% com essa justificativa escrita.
+- ⚠️ **E um teste MUDOU DE AFIRMAÇÃO.** "Os dois caminhos juntos FECHAM" era
+  verdade (99,8%); com 2.500 fora da carteira, a soma é ~82%. Baixar o número
+  mantendo o nome seria a mentira mais barata do arquivo — um teste verde
+  afirmando um desenho que o produto não tem mais. Hoje ele se chama "chega
+  perto, e já NÃO fecha", e fechar pede jogo acima do típico ou uma segunda
+  compra.
+
+**A tela também saiu de baixo da barra de status.** Ela é `fixed inset-0` e
+nunca compensou `--safe-top`: no app instalado o relógio do iOS pousava no ← e
+na pílula de saldo. ⚠️ **No navegador de desenvolvimento isso é INVISÍVEL** —
+`env(safe-area-inset-top)` vale zero ali —, a mesma armadilha que obrigou os
+espaçadores da home a serem medidos com a área segura injetada.
+
+⚠️ **E os controles PINTADOS da referência estavam duplicando.** O comentário
+antigo afirmava que os controles de verdade eram "desenhados exatamente por
+cima e cobrem". Não cobriam: medido, o botão pintado ia de 21,6 a 68,6px dentro
+da arte e o real de 9,8 a 53,8 — sobrava uma meia-lua branca sob ele e sob a
+pílula. Casar dois retângulos em toda largura de tela é frágil por natureza, e
+2px de erro trariam a meia-lua de volta; então o recorte passou a começar em
+**y=155** (`loja-heroi-do-drive.mjs`), abaixo dos controles pintados e acima do
+título — medido: nenhum pixel escuro entre y=105 e y=250. O herói caiu de
+116 KB para 64 KB (PSNR 42,5 dB), e os controles ganharam **barra própria** na
+cor da primeira linha da arte, que lê como continuação do céu.
+⚠️ **Remedir essa cor ao mexer no recorte**: ela era a da barra de status do
+mockup e ficou 25% azul demais quando o topo mudou.
+
+**Dois textos saíram, a pedido do dono:** o aviso "a compra abre em breve" (a
+informação continua — `podeComprar` barra o toque e o `toast` explica no
+momento em que ela tenta) e o bloco verde "você ganha Sementinhas todo dia
+jogando". ⚠️ **O parágrafo do limite ético FICA** — "Sementinhas compram só
+enfeites; nenhuma aula, exame, alerta ou orientação do seu médico depende
+delas". É ele que impede a loja de parecer que vende cuidado, e ele não sai.
+
 ### P4 · A ofensiva paga, e o presente só existe nas Amigas
 
 Ver a seção própria acima ("A ofensiva passou a pagar, e o presente mudou de

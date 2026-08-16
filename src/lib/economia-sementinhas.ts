@@ -182,6 +182,21 @@ export const RAZAO_PRESENTE_MEDICO = "presente-do-medico";
 export const RAZAO_PRESENTE_AMIGA = "presente-de-amiga";
 
 /**
+ * O BÔNUS COMPRADO — o bolso que SÓ PRESENTEIA (ago/2026).
+ *
+ * Pedido do dono: "esse bônus, ele só pode ser usado pra você dar outras
+ * sementinhas pras suas amizades". É o mesmo desenho da `MESADA_DA_ASSINANTE`,
+ * só que comprado em vez de mensal — e por isso precisa de razão PRÓPRIA no
+ * ledger: é ela que separa "isto entrou para presentear" de "isto entrou para
+ * ela gastar".
+ *
+ * ⚠️ Sem uma razão própria, a única forma de saber quanto do saldo é de
+ * presente seria olhar o texto livre da linha — e texto livre muda. A razão é
+ * a chave, como as duas acima.
+ */
+export const RAZAO_BONUS_COMPRADO = "bonus-comprado-presente";
+
+/**
  * A CHAVE DO PRESENTE DO MÉDICO — construtor e leitor, no mesmo lugar.
  *
  * `presente:<medico>:<paciente>:<token>`.

@@ -213,7 +213,7 @@ async function creditarSementinhas(session: {
      a moeda antes de receber o dinheiro. */
   if (session.payment_status && session.payment_status !== "paid") return;
 
-  const { PACOTE_POR_ID, numeroBR, totalDoPacote } = await import("@/lib/pacotes-sementinhas");
+  const { PACOTE_POR_ID, numeroBR } = await import("@/lib/pacotes-sementinhas");
   const pacote = PACOTE_POR_ID[sku];
   if (!pacote) {
     console.error("[sementinhas] sku fora do catálogo — nada creditado:", sku);
@@ -223,14 +223,36 @@ async function creditarSementinhas(session: {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { typedDb } = await import("@/integrations/supabase/types.extended");
   const { grantSementinhas } = await import("@/lib/sementinhas.functions");
+  const { RAZAO_BONUS_COMPRADO } = await import("@/lib/economia-sementinhas");
+
+  /* ─── ⚠️ DOIS CRÉDITOS, PORQUE SÃO DOIS BOLSOS (ago/2026) ────────────────
+     Isto era UM crédito de `base + bonus` na carteira gastável, e o comentário
+     de então dizia, com razão para a época, que creditar só a base entregaria
+     menos do que a tela prometeu.
+
+     O que mudou foi o produto: o bônus agora SÓ PRESENTEIA (pedido do dono).
+     Somá-lo à carteira daria a ela poder de compra que o cartão não prometeu —
+     no único lugar do app por onde entra dinheiro, que é onde um erro de saldo
+     não se corrige desligando um booleano.
+
+     ⚠️ As duas `dedupeKey` são DIFERENTES e derivam da mesma sessão. Fossem
+     iguais, o segundo crédito seria engolido como duplicata e o bônus nunca
+     existiria — falha silenciosa, do tipo que só aparece meses depois numa
+     reclamação de "comprei e não veio".
+
+     ⚠️ E o bônus vai por ÚLTIMO. `grantSementinhas` grava a lista em ordem; se
+     a segunda linha falhar, ela fica sem o BÔNUS e não sem a base — que é o
+     lado certo de errar, porque a base é o que ela veio comprar. */
   await grantSementinhas(typedDb(supabaseAdmin), userId, [
     {
-      /* ⚠️ O TOTAL, com o bônus dentro. É o número que o cartão mostrou e o
-         que ela acha que comprou — creditar só a base entregaria menos do que
-         a tela prometeu, no único lugar do app onde entra dinheiro. */
-      amount: totalDoPacote(pacote),
-      reason: `Pacote de ${numeroBR(totalDoPacote(pacote))} Sementinhas 🌱`,
+      amount: pacote.base,
+      reason: `Pacote de ${numeroBR(pacote.base)} Sementinhas 🌱`,
       dedupeKey: `compra:${sessionId}`,
+    },
+    {
+      amount: pacote.bonusParaPresentear,
+      reason: RAZAO_BONUS_COMPRADO,
+      dedupeKey: `compra-bonus:${sessionId}`,
     },
   ]);
 }
