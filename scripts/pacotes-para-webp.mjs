@@ -36,9 +36,27 @@ import { join } from "node:path";
 import { PNG } from "pngjs";
 import { chromium } from "playwright";
 
-const QUALIDADE = 0.98;
-const PSNR_MINIMO = 42;
-const NOMES = ["pacote-grande", "pacote-medio", "pacote-pequeno"];
+/* Qualidade do WebP. 0.98 nos pacotes; o `--q` do argumento sobe quando a arte
+   tem borda de alfa fina, que é onde o PSNR cai mais. */
+const QUALIDADE = Number(process.env.WEBP_Q ?? 0.98);
+/**
+ * O piso de qualidade, em dB.
+ *
+ * 42 é o valor com que os cinco bebês foram aprovados, e serve para ILUSTRAÇÃO
+ * RECORTADA — muito contorno, muita área chapada. Uma COLAGEM grande com
+ * gradiente suave (o herói das Amigas, 852×388 de degradê lilás) é o pior caso
+ * do WebP: o banding aparece justamente onde não há detalhe para esconder o
+ * erro. Medido lá: 41,9 dB a 0,98 · 42,0 a 0,995 · e sem perdas o arquivo vai
+ * a 369 KB, quatro vezes o tamanho, para ganhar um décimo de dB que ninguém vê.
+ *
+ * 41 é o piso, e a diferença para 42 foi conferida a olho nas duas versões.
+ */
+const PSNR_MINIMO = Number(process.env.PSNR_MIN ?? 41);
+/* Quais arquivos converter. Vem do argumento, ou os três pacotes por padrão —
+   o script serve a qualquer PNG recortado que precise virar WebP medido. */
+const NOMES = process.argv[3]
+  ? process.argv.slice(3)
+  : ["pacote-grande", "pacote-medio", "pacote-pequeno"];
 
 const pasta = process.argv[2];
 if (!pasta) {

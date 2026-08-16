@@ -51,9 +51,19 @@ describe("⚠️ os três cartões existem mesmo com a compra fechada", () => {
     expect(antes).not.toContain("veredito");
   });
 
-  test("só o BOTÃO muda — e ele explica em vez de cobrar", () => {
+  test("só o TOQUE muda — e ele explica em vez de cobrar", () => {
+    /**
+     * ⚠️ A COR NÃO MUDA MAIS. O botão ficava cinza (`#5f6368`) com a compra
+     * fechada, e isso era meu — "para de parecer um botão que cobra". Só que
+     * destruía o layout que o dono desenhou: o preço em cinza é a coisa mais
+     * apagada de uma tela que existe para mostrar preço, e a referência dele
+     * tem os três botões coloridos.
+     *
+     * O que impede a cobrança indevida nunca foi a cor: é `podeComprar`, que
+     * barra o toque e mostra o texto. É isso que este teste cobra.
+     */
     expect(tela).toContain("podeComprar ? comprar(p) :");
-    expect(tela).toContain("podeComprar ? c.botao :");
+    expect(tela).not.toContain("podeComprar ? c.botao :");
     /* O rótulo de acessibilidade conta o estado, senão quem usa leitor de tela
        ouve "comprar" num botão que não compra. */
     expect(tela).toContain("compra ainda não disponível");
@@ -126,14 +136,13 @@ describe("contraste do que a paciente lê", () => {
     const usados = [
       ...new Set([
         ...fundos,
-        /* Os dois que não vivem em `PALETA.cartao`: a fita e o cinza de
-           "ainda não dá para comprar". Escritos aqui porque são o alvo do
-           defeito, e um teste que só varre a paleta os perderia. */
+        /* A fita, que não vive em `PALETA.cartao`.
+           ⚠️ O cinza do botão desabilitado saiu da lista porque saiu da TELA:
+           o botão usa a cor do cartão em qualquer estado agora. */
         ...(tela.match(/fita: "(#[0-9a-f]{6})"/)?.slice(1) ?? []),
-        ...(tela.match(/podeComprar \? c\.botao : "(#[0-9a-f]{6})"/)?.slice(1) ?? []),
       ]),
     ];
-    expect(usados.length).toBeGreaterThanOrEqual(5);
+    expect(usados.length).toBeGreaterThanOrEqual(4);
     for (const hex of usados) {
       const r = razao("#ffffff", hex);
       expect(`${hex} ${r.toFixed(2)}`).toBe(`${hex} ${Math.max(r, 4.5).toFixed(2)}`);

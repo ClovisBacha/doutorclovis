@@ -41,7 +41,7 @@ import {
 import { podeComprarAqui } from "@/lib/canal-de-venda";
 import { ehNativo } from "@/lib/nativo";
 import { useVoltar } from "@/lib/use-voltar";
-import { Bolha } from "@/components/bolha";
+import heroiDaLoja from "@/assets/loja/heroi-fundo.webp";
 import pacoteGrande from "@/assets/pacotes/pacote-grande.webp";
 import pacoteMedio from "@/assets/pacotes/pacote-medio.webp";
 import pacotePequeno from "@/assets/pacotes/pacote-pequeno.webp";
@@ -90,24 +90,11 @@ const TOM_NUMERO: Record<PacoteSementinhas["cor"], string> = {
   roxo: "#553a80",
 };
 
-/**
- * As faíscas do herói.
- *
- * ⚠️ Posições CRAVADAS, e não `Math.random()`: a tela é renderizada no
- * servidor, e um sorteio daria posições diferentes no servidor e no cliente —
- * o React reclama de hidratação no console de todo mundo. É a mesma lição das
- * estrelas do céu da home.
- */
-const FAISCAS = [
-  { x: 12, y: 18, s: 7, o: 0.75 },
-  { x: 31, y: 9, s: 4, o: 0.6 },
-  { x: 74, y: 13, s: 9, o: 0.8 },
-  { x: 88, y: 27, s: 5, o: 0.65 },
-  { x: 61, y: 6, s: 5, o: 0.55 },
-  { x: 22, y: 39, s: 5, o: 0.5 },
-  { x: 93, y: 47, s: 7, o: 0.6 },
-  { x: 8, y: 52, s: 4, o: 0.45 },
-];
+/* ⚠️ `FAISCAS` E `Bolha` SAÍRAM DAQUI.
+   As faíscas eram `<span>` brancos borrados imitando o bokeh do jardim, e a
+   `Bolha` era a personagem `feliz` no lugar da bolha com broto. As duas viviam
+   sobre o gradiente que substituía a arte — com o herói virando colagem, o
+   bokeh e a bolha vêm pintados, no lugar exato em que o ilustrador os pôs. */
 
 export function LojaSementinhas({
   aberto,
@@ -227,93 +214,62 @@ export function LojaSementinhas({
       className="fixed inset-0 z-[70] overflow-y-auto"
       style={{ background: PALETA.pagina }}
     >
-      {/* ── HERÓI ──────────────────────────────────────────────────────── */}
-      <div className="relative overflow-hidden" style={{ background: PALETA.heroi }}>
-        {/* Véu claro: o jardim da referência é BORRADO, e sem isto o gradiente
-            fica saturado demais por baixo do texto escuro do título. */}
-        <div
-          className="pointer-events-none absolute inset-0"
-          style={{
-            background:
-              "radial-gradient(120% 80% at 20% 30%, rgba(255,255,255,0.62), rgba(255,255,255,0.12) 60%, rgba(255,255,255,0) 100%)",
-          }}
-          aria-hidden
+      {/* ── HERÓI ──────────────────────────────────────────────────────────
+          ⚠️ É UMA COLAGEM DA REFERÊNCIA, e isso é uma decisão, não preguiça.
+
+          A versão anterior reconstruía este herói em CSS: um `linear-gradient`
+          de onze paradas amostradas no lugar do jardim pintado, a bolha `feliz`
+          no lugar da bolha com broto, faíscas em `<span>` no lugar do bokeh. Era
+          fiel de cor e completamente diferente de resultado — o dono comparou as
+          duas telas e resumiu: "uma tem cara de feita aqui, a outra de
+          profissional".
+
+          A pergunta dele foi a certa: "você só não consegue colar ela, já que é
+          o mesmo modelo de proporção, e depois atribuir as funções?". Consegue.
+          Tudo neste herói é ESTÁTICO — jardim, título, frase, selo e bolha são
+          iguais para todas as pacientes, para sempre. Recompor em CSS cinco
+          peças que nunca mudam é trabalho para chegar num resultado pior.
+
+          ⚠️ E A LINHA DIVISÓRIA É O DADO. O saldo e os PREÇOS ficam em código:
+          um preço pintado numa imagem vira mentira no dia em que ele mudar, e
+          preço errado é o defeito mais caro que existe. Por isso os cartões
+          continuam montados, com as ilustrações recortadas.
+
+          ⚠️ O texto do herói vira `alt` — quem usa leitor de tela não perde o
+          título nem a frase só porque eles são pixels agora.
+
+          ⚠️ E o botão de voltar e a pílula de saldo estão QUEIMADOS na arte
+          (medidos: x 38..135 e x 646..813 de 853). Os controles de verdade são
+          desenhados exatamente por cima e cobrem — apagá-los da imagem exigiria
+          inventar jardim onde não há. */}
+      <div className="relative">
+        <img
+          src={heroiDaLoja}
+          alt="Loja de Sementinhas — use suas sementinhas para decorar e evoluir seu cenário. Compra 100% segura."
+          /* `w-full h-auto`: a arte escala pela LARGURA e a altura acompanha,
+             então a composição fica idêntica em qualquer celular. `cover` numa
+             caixa de altura fixa cortaria as laterais no aparelho estreito. */
+          className="block w-full"
+          draggable={false}
         />
-        {FAISCAS.map((f, i) => (
-          <span
-            key={i}
-            className="pointer-events-none absolute rounded-full bg-white"
-            style={{
-              left: `${f.x}%`,
-              top: `${f.y}%`,
-              width: f.s,
-              height: f.s,
-              opacity: f.o,
-              filter: "blur(0.5px)",
-            }}
-            aria-hidden
-          />
-        ))}
-
-        <div
-          className="relative px-5 pb-6"
-          style={{ paddingTop: "max(0.9rem, var(--safe-top, 0.9rem))" }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <button
-              onClick={onFechar}
-              aria-label="Voltar"
-              className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/90 text-xl text-slate-700 shadow-md backdrop-blur"
-            >
-              ←
-            </button>
-            {saldo !== null && (
-              <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/90 px-4 py-2 shadow-md backdrop-blur">
-                <span className="text-lg leading-none">🌱</span>
-                <span className="text-lg font-extrabold tabular-nums text-emerald-700">
-                  {numeroBR(saldo)}
-                </span>
+        {/* Os controles, por cima e nas MESMAS posições da arte — em % da
+            imagem, para acompanharem a escala em qualquer largura. */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between px-[4.4%] pt-[2.5%]">
+          <button
+            onClick={onFechar}
+            aria-label="Voltar"
+            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/95 text-xl text-slate-700 shadow-md backdrop-blur"
+          >
+            ←
+          </button>
+          {saldo !== null && (
+            <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-4 py-2 shadow-md backdrop-blur">
+              <span className="text-lg leading-none">🌱</span>
+              <span className="text-lg font-extrabold tabular-nums text-emerald-700">
+                {numeroBR(saldo)}
               </span>
-            )}
-          </div>
-
-          <div className="mt-3 flex items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h1 className="font-serif text-[34px] font-bold leading-[1.05] text-slate-800 sm:text-[40px]">
-                Loja de
-                <br />
-                <span style={{ color: "#3f7a1f" }}>Sementinhas</span>
-              </h1>
-              <p className="mt-2 max-w-[18rem] text-[15px] leading-snug text-slate-700">
-                Use suas sementinhas para decorar e evoluir seu cenário!
-              </p>
-              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur">
-                <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
-                  <path
-                    d="M12 2.6 5 5.4v5.3c0 4.4 2.9 8.5 7 9.7 4.1-1.2 7-5.3 7-9.7V5.4L12 2.6Z"
-                    fill="none"
-                    stroke="#3f7a1f"
-                    strokeWidth="1.7"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="m9 12 2.2 2.2L15.4 10"
-                    fill="none"
-                    stroke="#3f7a1f"
-                    strokeWidth="1.9"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-                <span className="text-[13px] font-semibold text-slate-700">Compra 100% segura</span>
-              </span>
-            </div>
-            {/* A MESMA personagem do resto do app, e não um desenho novo: é ela
-                que fala em toda tela que precisa de uma voz. */}
-            <div className="shrink-0 -mb-1">
-              <Bolha tamanho={132} humor="feliz" careMode={false} />
-            </div>
-          </div>
+            </span>
+          )}
         </div>
       </div>
 
@@ -330,20 +286,22 @@ export function LojaSementinhas({
             Esconder a vitrine também não protege ninguém: o que não pode
             acontecer é COBRAR fora da loja, e isso continua barrado no botão.
             O aviso vem uma vez, em cima, em vez de repetido em cada cartão. */}
+        {/* ⚠️ UMA LINHA, e não a caixa de quatro parágrafos que estava aqui.
+            Ela ocupava um QUARTO da primeira tela — a referência do dono não
+            tem aviso nenhum, e o meu empurrava o primeiro cartão para fora da
+            dobra. A informação continua (a compra não abriu, e jogar continua
+            rendendo), e o texto longo mudou de lugar: vai no toque do botão,
+            que é quando ela de fato precisa dele. */}
         {!podeComprar && (
-          <div className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-[13px] font-semibold text-amber-900">
-              A compra ainda não está aberta
-            </p>
-            <p className="mt-1 text-[12.5px] leading-relaxed text-amber-800">
-              {!veredito.pode && veredito.texto}
-            </p>
-            <p className="mt-2 text-[12.5px] font-medium text-emerald-800">
-              Jogando, você continua ganhando normalmente. 💛
-            </p>
-          </div>
+          <p className="mb-3 flex items-center gap-2 rounded-full bg-amber-50 px-3.5 py-2 text-[12.5px] leading-snug text-amber-900 ring-1 ring-amber-200">
+            <span aria-hidden>🌱</span>
+            <span>
+              A compra abre em breve — <strong className="font-semibold">jogando</strong>, você
+              continua ganhando.
+            </span>
+          </p>
         )}
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {PACOTES.map((p) => {
             const c = PALETA.cartao[p.cor];
             const total = totalDoPacote(p);
@@ -366,12 +324,23 @@ export function LojaSementinhas({
                     valor
                   </span>
                 )}
-                <div className="flex items-center gap-1 p-3.5">
+                {/* ⚠️ A ALTURA DO CARTÃO É MEDIDA CONTRA A REFERÊNCIA.
+                    Lá o cartão mede 769×410 (proporção 0,533); o meu estava em
+                    0,621 — 16% mais alto —, e o efeito era o primeiro cartão
+                    não caber na dobra junto com o herói. Ajustado no
+                    espaçamento, não na tipografia: os números grandes são o que
+                    dá a cara da tela. */}
+                <div className="flex items-center gap-1 p-3">
                   <img
                     src={ARTE[p.id]}
                     alt=""
                     aria-hidden
-                    className="h-[124px] w-[142px] shrink-0 object-contain sm:h-[142px] sm:w-[162px]"
+                    /* ⚠️ A LARGURA DA ILUSTRAÇÃO É O QUE DECIDE A ALTURA DO CARTÃO.
+                       Com 150px a coluna de texto ficava estreita e "Total:
+                       15.000 sementinhas" quebrava em DUAS linhas — 51px onde a
+                       referência gasta 26. Foi por aí que o cartão ficou 16%
+                       mais alto que ela, e não pelo espaçamento. */
+                    className="h-[112px] w-[128px] shrink-0 object-contain sm:h-[128px] sm:w-[148px]"
                   />
                   <div className="min-w-0 flex-1">
                     <p
@@ -386,10 +355,10 @@ export function LojaSementinhas({
                     >
                       sementinhas
                     </p>
-                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                    <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full bg-white/70 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
                       <span aria-hidden>🎁</span> Bônus: +{numeroBR(p.bonus)}
                     </p>
-                    <p className="mt-2 border-t border-dashed border-black/10 pt-2 text-[12.5px] text-slate-600">
+                    <p className="mt-1.5 border-t border-dashed border-black/10 pt-1.5 text-[12.5px] text-slate-600">
                       <span aria-hidden>🌱</span> Total: {numeroBR(total)} sementinhas
                     </p>
                     <button
@@ -402,7 +371,7 @@ export function LojaSementinhas({
                           ? `Comprar ${numeroBR(total)} Sementinhas por ${precoBRL(p)}`
                           : `${numeroBR(total)} Sementinhas por ${precoBRL(p)} — compra ainda não disponível`
                       }
-                      className="press mt-2.5 w-full rounded-full py-2.5 text-[17px] font-extrabold text-white shadow-sm disabled:opacity-60"
+                      className="press mt-2 w-full rounded-full py-2 text-[17px] font-extrabold text-white shadow-sm disabled:opacity-60"
                       /* Sem cor quando não dá para comprar: o botão continua
                            mostrando o preço (é o layout), mas para de parecer
                            um botão que cobra.
@@ -413,7 +382,14 @@ export function LojaSementinhas({
                            (a compra ainda não abriu) ele é o que 100% das
                            pacientes veem. Cinza mais escuro continua lendo como
                            "desligado" e leva a 6,05:1. */
-                      style={{ background: podeComprar ? c.botao : "#5f6368" }}
+                      /* ⚠️ A COR DO CARTÃO SEMPRE, mesmo com a compra fechada.
+                         O cinza era meu ("para de parecer um botão que cobra"),
+                         e ele destruía o layout que o dono desenhou — o preço
+                         em cinza é a coisa mais apagada de uma tela que existe
+                         para mostrar preço. O que impede a cobrança indevida
+                         não é a cor: é `podeComprar`, que continua barrando o
+                         toque e explicando. */
+                      style={{ background: c.botao }}
                     >
                       {indo === p.id ? "…" : precoBRL(p)}
                     </button>

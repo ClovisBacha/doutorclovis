@@ -29,23 +29,34 @@ import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { PNG } from "pngjs";
 
-/** As caixas, MEDIDAS na referência de 852×1846. */
-const CAIXAS = [
-  /* A bolha de olhos de coração. Nenhuma das oito expressões que o app já tem
-     é esta — ela é da referência, e é o elemento que mais define a tela. */
-  /* MEDIDA: a região saturada da bolha vai de x 95..379, y 190..569 (o croma
-     alto a separa do fundo pastel). A caixa abre 8px de folga e começa em
-     x=88 para não abocanhar o coração que flutua à esquerda, em x 60..115. */
-  { nome: "bolha-coracao", x: 88, y: 184, w: 300, h: 392 },
-  /* Os corações 3D. Três tamanhos, e o maior é o que pousa no balão. */
-  { nome: "coracao-grande", x: 735, y: 455, w: 90, h: 85 },
-  { nome: "coracao-medio", x: 35, y: 240, w: 80, h: 75 },
-  { nome: "coracao-pequeno", x: 380, y: 145, w: 45, h: 42 },
-  /* As bolhinhas iridescentes que acompanham a grande. */
-  /* A bolhinha iridescente é quase toda saturada — o aviso de "quase tudo
-     opaco" é esperado aqui e não indica recorte ruim. */
-  { nome: "bolhinha", x: 38, y: 478, w: 72, h: 72 },
-];
+/**
+ * ⚠️ O TOPO VIRA UMA COLAGEM SÓ, e não cinco recortes.
+ *
+ * A primeira tentativa extraiu bolha, três corações e a bolhinha em arquivos
+ * separados, para o CSS reposicionar cada um. Funciona, mas responde à pergunta
+ * errada: nada ali é DADO. O fundo, a bolha de olhos de coração, o balão com
+ * "Amizade que faz bem" e os corações são exatamente os mesmos para todas as
+ * pacientes, para sempre.
+ *
+ * Recompor em CSS cinco peças que nunca mudam é trabalho para chegar num
+ * resultado pior — e foi por esse caminho que a tela ficou "com cara de feita
+ * aqui". Um recorte só preserva a composição que o ilustrador fez: as
+ * distâncias, as sobreposições, a sombra do balão sobre o coração.
+ *
+ * ⚠️ A FAIXA COMEÇA EM y=190, abaixo do cabeçalho da referência ("Amigas", ⚙️,
+ * "Sair"). Aqueles são CONTROLES — a aba já tem os seus, funcionais, e colar
+ * uma segunda linha de botões desenhados seria dois cabeçalhos na mesma tela.
+ *
+ * E termina em y=578, onde começa o ícone de "Duplas formadas" (medido).
+ */
+const HEROI = { nome: "heroi", x: 0, y: 190, w: 852, h: 388 };
+
+/* ⚠️ OS CINCO RECORTES SEPARADOS SAÍRAM.
+   Bolha, três corações e a bolhinha viraram arquivos próprios na primeira
+   tentativa, para o CSS recompor. Com o herói inteiro virando colagem eles
+   deixaram de ter uso — e mantê-los seria arte duplicada no pacote, com o
+   risco de alguém um dia desenhar as duas de uma vez. */
+const CAIXAS = [];
 
 /** Claro e sem cor: candidato a fundo. */
 const BRILHO_FUNDO = 250;
@@ -174,6 +185,15 @@ const paradas = [0, 8, 16, 25, 33, 43, 54, 65, 76, 87, 100].map((pct) => {
 });
 console.log("\n/* o gradiente do fundo, amostrado da referência */");
 console.log(`linear-gradient(180deg, ${paradas.join(", ")})\n`);
+
+/* O herói sai OPACO e inteiro — é colagem, não elemento. */
+{
+  const h = recorta(src, HEROI);
+  writeFileSync(join(destino, `${HEROI.nome}.png`), PNG.sync.write(h));
+  console.log(
+    `${HEROI.nome}.png  ${h.width}×${h.height}  (bolha + balão + corações, como a arte fez)`,
+  );
+}
 
 for (const cx of CAIXAS) {
   const img = apara(
