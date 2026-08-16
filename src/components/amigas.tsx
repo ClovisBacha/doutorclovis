@@ -681,6 +681,45 @@ export function AmigasTab({
         </div>
       )}
 
+      {/* ─── ⚠️ O BOLSO DE PRESENTEAR, QUE NINGUÉM VIA ────────────────────
+          Pedido do dono: "que tal aquele bônus de sementes ser elegível
+          somente para enviar para uma amizade?"
+
+          A resposta é que ISSO JÁ EXISTE — `MESADA_DA_ASSINANTE`, Sementinhas
+          que a assinante só pode dar, nunca gastar consigo. O que faltava era
+          a tela: o bolso era invisível, então quem paga o Premium não sabia
+          que tinha um, e o único benefício visível da assinatura dentro desta
+          aba era um 🎁 sem explicação.
+
+          Um saldo que ela não sabe que tem não presenteia ninguém — é a mesma
+          família de defeito do presente que chegava sem aviso. */}
+      {mesada?.assinante && (
+        <div
+          className="flex items-center gap-3 rounded-3xl border p-3.5"
+          style={{ background: "#f3fbf4", borderColor: "#cdeacf" }}
+        >
+          <span
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl"
+            style={{ background: "#dff2e1" }}
+            aria-hidden
+          >
+            🎁
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[15px] font-bold leading-tight text-emerald-900">
+              {mesada.restante > 0
+                ? `Você tem ${mesada.restante} 🌱 para dar`
+                : "Seu bolso deste mês acabou"}
+            </p>
+            <p className="mt-1 text-[12.5px] leading-tight text-emerald-800/80">
+              {mesada.restante > 0
+                ? `São do Premium e só servem para presentear — ${PRESENTE_ENTRE_AMIGAS} por amiga, no 🎁 ao lado do nome dela.`
+                : "Ele enche de novo na virada do mês."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ─── ACHAR UMA AMIGA QUE JÁ USA O APP ──────────────────────────────
           O buraco que a aba tinha desde que nasceu: a indicação só liga quem
           entrou pelo link de alguém. Duas pacientes do mesmo obstetra que se

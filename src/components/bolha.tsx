@@ -451,9 +451,22 @@ export const Bolha = forwardRef<BolhaHandle, Props>(function Bolha(
 
   /* Respirando, o flutuar SAI: os dois transladam, e o compasso tem que mandar.
      Pulo e atenção também transladam, então tiram o flutuar enquanto duram. */
-  /* A arte de comemorar tem confete DESENHADO nela. No Modo Cuidado ela não
-     pode aparecer nem parada — não é a animação que ofende, é a imagem. */
-  const humorSeguro: Humor = careMode && humor === "comemorando" ? "feliz" : humor;
+  /* ─── AS EXPRESSÕES QUE NÃO PODEM APARECER NO LUTO ───────────────────────
+     A arte de comemorar tem confete DESENHADO nela: no Modo Cuidado ela não
+     pode aparecer nem parada — não é a animação que ofende, é a imagem.
+
+     ⚠️ E `apaixonado` (coração nos olhos) entrou na lista. Ela é usada com
+     `humorFixo` na abertura de "Momento com o bebê", e `humorFixo` pula
+     `humorJornada` — que é onde o portão de luto mora. Resultado medido: com o
+     Modo Cuidado ligado, a bolha aparecia de coração nos olhos sobre "Pra você,
+     que eu ainda não vi 💛".
+
+     O comentário do próprio `humorFixo` promete que "mesmo um uso indevido não
+     quebra o Modo Cuidado", e a promessa não cobria o único `humorFixo` numa
+     tela sobre o bebê. Agora cobre: quem decide o rebaixamento é ESTE
+     componente, que é por onde toda arte passa. */
+  const PROIBIDAS_NO_LUTO: readonly Humor[] = ["comemorando", "apaixonado"];
+  const humorSeguro: Humor = careMode && PROIBIDAS_NO_LUTO.includes(humor) ? "feliz" : humor;
 
   const respirando = !!respiro;
   const escala = respiro ? ESCALA[respiro.fase] : 1;

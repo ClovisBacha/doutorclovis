@@ -324,10 +324,33 @@ describe("MODO CUIDADO — no luto, festa e cobranca somem", () => {
 
   test("o portao mora no componente, nao no ponto de uso", () => {
     const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
-    /* Confiar no chamador ja falhou uma vez. Estas duas linhas sao o backstop:
-       a arte de comemorar rebaixada e o pulo engolido, dentro do componente. */
-    expect(fonte).toMatch(/careMode && humor === "comemorando"/);
+    /* Confiar no chamador ja falhou uma vez. Estas linhas sao o backstop: as
+       artes proibidas rebaixadas e o pulo engolido, dentro do componente.
+
+       ⚠️ A lista virou `PROIBIDAS_NO_LUTO` quando `apaixonado` entrou nela: a
+       arte de coracao nos olhos e usada com `humorFixo` na abertura de
+       "Momento com o bebe", e `humorFixo` pula `humorDaJornada` — que e onde o
+       portao de luto morava. Medido na bancada: com o luto ligado, a bolha
+       aparecia apaixonada sobre "Pra voce, que eu ainda nao vi". */
+    expect(fonte).toMatch(/PROIBIDAS_NO_LUTO/);
+    expect(fonte).toMatch(/careMode && PROIBIDAS_NO_LUTO\.includes\(humor\)/);
     expect(fonte).toMatch(/careMode && qual === "pulo"/);
+  });
+
+  test("⚠️ as duas artes que nao podem aparecer no luto estao na lista", () => {
+    /**
+     * `comemorando` tem confete DESENHADO nela; `apaixonado` e coracao nos
+     * olhos, e a unica tela que a usa e a do bebe. Nenhuma das duas tem versao
+     * suavizada — nao e a animacao que ofende, e a imagem.
+     */
+    const fonte = readFileSync(new URL("./bolha.tsx", import.meta.url), "utf8");
+    const i = fonte.indexOf("const PROIBIDAS_NO_LUTO");
+    /* ⚠️ Ate o `];` do literal, e nao ate o primeiro `]`: a ANOTACAO de tipo
+       (`readonly Humor[]`) vem antes do array e fechava a fatia num trecho
+       vazio — o teste olhava a declaracao, nao o conteudo. */
+    const lista = fonte.slice(i, fonte.indexOf("];", i));
+    expect(lista).toContain('"comemorando"');
+    expect(lista).toContain('"apaixonado"');
   });
 
   test("todo ponto de uso que pode comemorar passa careMode", () => {

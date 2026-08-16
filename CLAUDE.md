@@ -543,6 +543,88 @@ arte nova.
   é **1**, então `?notif=3` virava três e depois um. Terceira vez que esta
   armadilha aparece no repo (ver `preview-jogo` e `preview-saude`).
 
+#### Duas contas que já existem podem virar amigas (ago/2026)
+
+⚠️ **O buraco central da aba, e ele estava lá desde o primeiro dia.** O grafo
+era EXCLUSIVAMENTE o da indicação: para duas contas se enxergarem, uma tinha de
+mandar o link **antes de a outra existir**. Ficava de fora o caso mais comum —
+as duas já usam o app. Duas grávidas do mesmo obstetra que se conheceram na sala
+de espera e baixaram o app cada uma por conta própria não tinham caminho nenhum.
+
+E o pior: se a amiga já tinha sido indicada por outra pessoa, era **irreversível
+e silencioso** — `attributeReferral` devolve `attributed: false`, apaga o código
+do storage e não diz nada. As duas ficavam achando que o app estava quebrado.
+
+- **`convidarAmiga` resolve por CÓDIGO ou por E-MAIL**, com pedido + aceite
+  (`amizades`). O código é o `referral_code` que cada paciente já tem.
+- ⚠️ **NUNCA POR NOME.** Busca por nome transformaria a base de pacientes numa
+  lista navegável, e num app de gestação de alto risco esse é o dado que menos
+  pode vazar. O código é uma CAPACIDADE (32⁷ combinações, só se tem se a outra
+  der); o e-mail exige saber o e-mail, que é a prova que o WhatsApp pede.
+- ⚠️ **E o e-mail NUNCA revela se a conta existe** — a resposta é a mesma com e
+  sem acerto. Sem isso o campo vira um verificador de contas: dá para descobrir
+  se uma pessoa específica é paciente daqui, e isso é informação de saúde. O
+  código PODE revelar, e é o que o torna gostoso de usar.
+- **Teto de 20 convites/dia**, senão o campo de e-mail vira ferramenta de spam.
+- ⚠️ **`saoAmigas` passou a conhecer os DOIS grafos.** Ele é o portão de tudo
+  (perfil, Cantinho, dupla, presente): se só conhecesse a indicação, a amiga que
+  entrou por aceite apareceria na lista e seria recusada em todas as ações — uma
+  amiga de segunda classe, com botões que não funcionam. E `presentearAmiga`
+  parou de reescrever a régua por conta própria (`saoAmigasParaPresente`).
+- **Aplicar:** `supabase/APLICAR_AMIZADES_ENTRE_CONTAS.sql`.
+
+#### ⚠️ `jaPresenteada` era SEMPRE falso — o defeito reintroduzido por dentro
+
+`presenteadasNoCiclo` filtrava `.eq("user_id", eu)`, mas a linha do presente é
+gravada com o `user_id` de **quem recebe** (`grantSementinhas(db, amigaId, …)`).
+Nenhuma linha casava: o conjunto voltava vazio, o 🎁 reabilitava a cada visita e
+o servidor recusava com "você já presenteou Fulana neste mês".
+
+Era exatamente o defeito que a função foi escrita para consertar. E a irmã
+`lerMesadaDaAmiga` sempre leu certo — os dois leitores do mesmo dado
+discordavam entre si, sem que nenhum teste comparasse os dois lados. Agora há um.
+
+#### O bolso de presentear ficou visível
+
+Pedido do dono: "que tal aquele bônus de sementes ser elegível somente para
+enviar para uma amizade?". **Isso já existia** — `MESADA_DA_ASSINANTE`, 120 🌱
+que a assinante só pode DAR, nunca gastar consigo. O que faltava era a tela: o
+bolso era invisível, então quem paga o Premium não sabia que tinha um, e o único
+benefício visível da assinatura dentro da aba era um 🎁 sem explicação.
+
+Um saldo que ela não sabe que tem não presenteia ninguém.
+
+#### Cinco defeitos da aba de jogo, achados pela auditoria
+
+- ⚠️ **A bolha `apaixonado` atravessava o Modo Cuidado.** Ela é usada com
+  `humorFixo` na abertura de "Momento com o bebê", e `humorFixo` pula
+  `humorDaJornada` — que é onde o portão mora. Medido: com o luto ligado, a
+  bolha aparecia de coração nos olhos sobre "Pra você, que eu ainda não vi 💛".
+  O portão virou `PROIBIDAS_NO_LUTO`, dentro do componente por onde toda arte
+  passa.
+- ⚠️ **E a atividade inteira era alcançável no luto.** "Uma carta de 1 minuto
+  pra ler em voz alta pro bebê", na lista, para quem acabou de perder a
+  gestação. `cartaDasGratidoes` já era barrada; a carta do DIA não. As outras
+  três atividades ficam — elas cuidam DELA.
+- ⚠️ **`/preview-jogo` não tinha `?luto=`.** São 124 gates de `careMode` em
+  `gestacao-path.tsx` e nenhum era fotografável — as bancadas irmãs todas têm.
+  Foi por essa falta que os dois defeitos acima sobreviveram: o primeiro só
+  apareceu pela bancada do Bebê.
+- **O bônus de conjunto era pago e o saldo não se movia.** `balance` vinha do
+  RPC da compra, que roda ANTES do bônus. ⚠️ E somar a lista de conjuntos
+  completos seria pior: `conjuntosCompletos` devolve TODOS os fechados, não os
+  novos — quem já tem três receberia três bônus na tela a cada compra. Soma-se
+  só o que nasceu agora (`conjuntosNovos`/`bonusNovo`), e a tela comemora.
+- **`bancada.saldo` era prop morta**: a fita mostrava três itens em vez de
+  quatro, e a Loja de Sementinhas era inalcançável na bancada.
+- **A Escola do Bebê custava uma ida ao servidor por abertura.** `course_progress`
+  é escrita só por `completeLesson`, que só abre por um nó `kind: "lesson"` que o
+  construtor da trilha não emite desde que a Escola saiu do produto. A consulta
+  saiu; o cache local continua sendo lido.
+- **O `catch` do saldo engolia os enfeites.** "Secundário" descreve o saldo — não
+  a decoração que ela comprou nem os troféus. Uma falha na carteira pulava o
+  `getCantinho` inteiro, e a loja passava a dizer "faltam 10 🏆" a quem tem 30.
+
 #### As Amigas passaram a chamar de volta (ago/2026)
 
 Seis mudanças pedidas pelo dono. As três primeiras fecham laços que estavam

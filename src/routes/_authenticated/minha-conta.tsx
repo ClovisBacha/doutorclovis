@@ -118,7 +118,7 @@ import {
   type AchievementDef,
 } from "@/lib/achievements.functions";
 import { RARIDADES } from "@/lib/conquistas";
-import { conjuntosDoItem, conjuntosOrdenados } from "@/lib/conjuntos";
+import { CONJUNTO_POR_ID, conjuntosDoItem, conjuntosOrdenados } from "@/lib/conjuntos";
 import { claimDailyAndGetWallet } from "@/lib/sementinhas.functions";
 import {
   CANTINHO_ITEMS,
@@ -17229,7 +17229,28 @@ function CantinhoTab({
             ? [...next, CANTINHO_COMPLETIONIST_ID]
             : next;
         });
-        toast("Adicionado ao seu cantinho! 💛");
+        /* ─── ⚠️ O CONJUNTO FECHADO PRECISA SER DITO ────────────────────
+           `conjuntosFechados` existia com o comentário "a tela usa para saber
+           que este item fechou um, e comemorar" — e NENHUM leitor no repo. A
+           paciente fechava um conjunto, o servidor creditava 36–48 🌱, a
+           prateleira virava "completo ✓" e o app não dizia uma palavra.
+
+           `conjuntosNovos` são só os que fecharam NESTA compra (a lista
+           antiga trazia todos os já fechados), e `bonusNovo` é o que de fato
+           foi creditado agora. */
+        if (res.conjuntosNovos?.length) {
+          const nomes = res.conjuntosNovos
+            .map((cid) => CONJUNTO_POR_ID[cid]?.nome)
+            .filter(Boolean)
+            .join(" · ");
+          toast.success(`Conjunto completo: ${nomes}! +${res.bonusNovo} 🌱`, { duration: 7000 });
+          /* A mesma festa da conquista, e pelo mesmo motivo: fechar um
+             conjunto é a coisa mais rara que acontece no Cantinho. */
+          fireConfetti(1);
+          celebrateChime(1);
+        } else {
+          toast("Adicionado ao seu cantinho! 💛");
+        }
       } else {
         toast(res.error ?? "Não foi possível comprar");
         if (typeof res.balance === "number") setSaldo(res.balance);

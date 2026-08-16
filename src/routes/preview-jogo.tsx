@@ -25,6 +25,15 @@ export const Route = createFileRoute("/preview-jogo")({
   // fotografar a trilha com pele sem ter comprado o item numa conta real.
   validateSearch: (q: Record<string, unknown>) => ({
     tela: String(q.tela ?? ""),
+    /* ⚠️ O MODO CUIDADO NÃO ERA FOTOGRAFÁVEL AQUI. São 124 ocorrências de
+       `careMode` em `gestacao-path.tsx` — a chama sumindo da fita, o confete,
+       a camada de clima, a tela de nascimento, os toasts de figurinha — e a
+       bancada cravava `careMode={false}`. As bancadas irmãs (conquistas,
+       gratidão, bebê, meditação) todas têm `?luto=1`; justamente a trilha,
+       que é a que mais gates tem, era a única sem.
+       Foi por essa falta que a bolha `apaixonado` atravessou o luto por
+       semanas — o defeito só apareceu pela bancada do Bebê. */
+    luto: q.luto == null ? false : Boolean(q.luto),
     bebe: String(q.bebe ?? "Clovis"),
     pele: String(q.pele ?? ""),
     // `?dia=142` move a jornada de dia. Os três movimentos do dia giram por
@@ -94,6 +103,7 @@ export const Route = createFileRoute("/preview-jogo")({
 function PreviewJogo() {
   const {
     tela,
+    luto,
     bebe,
     pele,
     dia,
@@ -146,7 +156,7 @@ function PreviewJogo() {
          * uma visitante de verdade veria.
          */
         quizPremium={premium}
-        careMode={false}
+        careMode={luto}
         onOpenShop={() => {}}
         bancada={
           tela === "jogos" ||

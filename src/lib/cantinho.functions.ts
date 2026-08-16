@@ -264,6 +264,10 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
          auto-corrige na compra seguinte, porque a chave de dedupe não deixa
          pagar duas vezes. */
       let conjuntosFechados: string[] = [];
+      /* Os que fecharam AGORA — é o que a tela comemora, e é o que soma ao
+         saldo. Ver o bloco abaixo. */
+      let conjuntosNovos: string[] = [];
+      let bonusNovo = 0;
       try {
         const db = typedDb(supabaseAdmin);
         const { data: agora } = await db
@@ -276,6 +280,24 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
         ]);
         const fechados = conjuntosCompletos(possui);
         if (fechados.length > 0) {
+          /* ⚠️ QUAIS DELES JÁ FORAM PAGOS. `conjuntosCompletos` devolve TODOS
+             os fechados, não os que fecharam agora — quem já tem três
+             conjuntos recebe os três nesta lista em toda compra. O
+             `ignoreDuplicates` de `grantSementinhas` impede o pagamento duplo
+             no banco, mas quem quiser somar o bônus ao saldo da tela precisa
+             saber quais linhas NASCERAM aqui: somar a lista inteira mostraria
+             um número inflado que se corrige sozinho no recarregamento. */
+          const chaves = fechados.map((cid) => chaveDoBonus(cid));
+          const { data: jaPagos } = await db
+            .from("sementinhas_ledger")
+            .select("dedupe_key")
+            .eq("user_id", uid)
+            .in("dedupe_key", chaves);
+          const pagas = new Set(
+            ((jaPagos ?? []) as { dedupe_key: string | null }[]).map((l) => l.dedupe_key ?? ""),
+          );
+          const novos = fechados.filter((cid) => !pagas.has(chaveDoBonus(cid)));
+
           const { grantSementinhas } = await import("@/lib/sementinhas.functions");
           await grantSementinhas(
             db,
@@ -287,18 +309,43 @@ export const buyCantinhoItem = createServerFn({ method: "POST" })
             })),
           );
           conjuntosFechados = fechados;
+          bonusNovo = novos.reduce((t, cid) => t + bonusDoConjunto(CONJUNTO_POR_ID[cid]), 0);
+          conjuntosNovos = novos;
         }
       } catch (e) {
         console.error("[cantinho] bônus de conjunto não pagou", uid, e);
       }
 
+      /* ─── ⚠️ O SALDO É RELIDO DEPOIS DO BÔNUS ────────────────────────────
+         `r.balance` vem do RPC da COMPRA, que roda ANTES do bloco acima. Com
+         ele, a paciente fechava um conjunto, o servidor creditava 36–48 🌱, a
+         prateleira virava "completo ✓" e **o número na tela não se movia** — o
+         bônus só aparecia na próxima montagem, do nada.
+
+         É o defeito do presente do médico ao contrário ("saldo que sobe
+         sozinho é indistinguível de bug"), e aqui é pior: ela associa o número
+         parado à compra que acabou de fazer.
+
+         Falha na releitura devolve o saldo antigo, que é o lado seguro: um
+         número desatualizado por uma tela é melhor que um `0` afirmado. */
+      /* O saldo é a SOMA DO LEDGER (não há tabela de carteira — ver
+         `computeBalance`), então somar o que ACABOU de ser creditado é exato e
+         dispensa uma segunda consulta. `bonusNovo` é zero quando nenhum
+         conjunto fechou agora. */
+      const balance = (r.balance ?? 0) + bonusNovo;
+
       return {
         ok: true as const,
-        balance: r.balance ?? 0,
+        balance,
         itemId: item.id,
         /* Os conjuntos que ela JÁ tem fechados — a tela usa para saber se este
            item acabou de fechar um, e comemorar. */
         conjuntosFechados,
+        /* Os que fecharam NESTA compra, e quanto pagaram — é com isto que a
+           tela comemora e mostra o saldo novo. Sem eles, a paciente fechava um
+           conjunto, ganhava 36–48 🌱 e o número na tela não se movia. */
+        conjuntosNovos,
+        bonusNovo,
       };
     } catch (e) {
       const m = (e as { message?: string })?.message ?? String(e);

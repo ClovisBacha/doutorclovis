@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
 import { COURSE_MODULES, type CourseModule } from "@/lib/course-modules";
-import { getCourseProgress, markModuleComplete } from "@/lib/escola.functions";
+import { markModuleComplete } from "@/lib/escola.functions";
 import {
   claimDailyAndGetWallet,
   grantLessonReward,
@@ -1572,7 +1572,14 @@ export function GestacaoPath({
   const [journeyStart, setJourneyStart] = useState<JourneyStart | null>(null);
   const [stickers, setStickers] = useState<number[]>([]);
   const [doneDays, setDoneDays] = useState<number[]>([]);
-  const [saldo, setSaldo] = useState<number | null>(null);
+  /* ⚠️ `bancada?.saldo` ERA PROP MORTA. Ela é declarada no tipo e passada por
+     `preview-jogo.tsx`, e o estado nascia `null` ignorando-a. Medido: a fita
+     do topo mostrava TRÊS itens em vez de quatro (o de Sementinhas some com
+     `saldo == null`), o emblema do botão da loja sumia, e a Loja de
+     Sementinhas — que abre pelo toque nesse número — era inalcançável na
+     bancada. A afirmação do CLAUDE.md sobre a fita ("quatro itens dividindo a
+     tela de um celular") não tinha como ser conferida. */
+  const [saldo, setSaldo] = useState<number | null>(bancada?.saldo ?? null);
   /* O presente que o médico (ou a amiga) mandou e que ela ainda não viu.
      Ver `PresenteRecebido` em `sementinhas.functions.ts` para por que ele
      precisou existir: o saldo subia sozinho e nada dizia de onde tinha vindo. */
@@ -1775,17 +1782,34 @@ export function GestacaoPath({
             toast.success(`⭐ +${atrasado.granted} 🌱 das 5 estrelas`);
           }
         }
+      } catch {
+        /* saldo é secundário */
+      }
 
-        // Itens comprados decoram o Caminho.
-        const c = await getCantinho({ data: { accessToken: token } });
+      /* ─── ⚠️ O CANTINHO GANHOU `try` PRÓPRIO ──────────────────────────
+         Ele vivia dentro do bloco acima, sob um `catch` que dizia "saldo é
+         secundário". Secundário descreve o SALDO — não os enfeites que ela
+         comprou nem os troféus que ela conquistou. Qualquer falha em
+         `claimDailyAndGetWallet` (rede oscilando, sessão a expirar) pulava o
+         `getCantinho` inteiro: a trilha nascia SEM a decoração paga, e a loja
+         passava a dizer "faltam 10 🏆" a quem tem 30, sem uma palavra na tela.
+
+         Separados, uma falha não arrasta a outra. */
+      try {
+        const { supabase: sb2 } = await import("@/integrations/supabase/client");
+        const { data: s2 } = await sb2.auth.getSession();
+        const token2 = s2.session?.access_token;
+        if (!token2) return;
+        const c = await getCantinho({ data: { accessToken: token2 } });
         if (c.ok) {
           setDecor(c.owned.filter((id) => CANTINHO_BY_ID[id]?.type !== "fundo"));
-          // Cenário = o fundo EQUIPADO (escolhido na loja). O Fundo Suave grátis
-          // troca de tom pela semana gestacional.
+          /* Cenário = o fundo EQUIPADO (escolhido na loja). O Fundo Suave
+             grátis troca de tom pela semana gestacional. */
           setFundoBg(fundoBgFor(c.equippedFundo, currentWeek));
         }
       } catch {
-        /* saldo é secundário */
+        /* sem os enfeites a trilha continua andando — mas agora isso é uma
+           falha só, e não um efeito colateral da falha do saldo */
       }
     })();
   }, []);
@@ -1863,21 +1887,26 @@ export function GestacaoPath({
         ? pullJourneyFromProfile()
         : ensureInitialJourneyPull();
 
-      /* Só BUSCA — não escreve nada. A gravação acontece depois do pull. */
-      const licoesEmVoo = (async () => {
-        try {
-          const { supabase } = await import("@/integrations/supabase/client");
-          const { data: s } = await supabase.auth.getSession();
-          if (!s.session) return null;
-          const res = await getCourseProgress({
-            data: { accessToken: s.session.access_token },
-          });
-          return res.ok ? res.progress : null;
-        } catch {
-          /* offline: o cache local segue valendo */
-          return null;
-        }
-      })();
+      /* ⚠️ A CONSULTA DAS LIÇÕES SAIU — ELA BUSCAVA UMA TABELA QUE NINGUÉM
+         ESCREVE.
+
+         `course_progress` só é gravada por `completeLesson`, que só é chamada
+         pelo `LessonSheet`, que só abre por um nó `kind: "lesson"` — e o
+         construtor da trilha NÃO EMITE esse nó desde que a Escola do Bebê saiu
+         do produto. O tipo existe, o render existe, o emissor não.
+
+         Isso já tinha sido descoberto uma vez: as três conquistas da Escola
+         foram repontadas para a aula do dia justamente por serem impossíveis.
+         A UI e a CONSULTA ficaram — e ela custava uma ida ao servidor em TODA
+         abertura do Caminho, a tela mais visitada do app, para trazer sempre
+         uma lista vazia.
+
+         O cache local (`LS.lessons`) continua sendo lido: quem por acaso tiver
+         progresso antigo gravado no aparelho não perde nada. Só a viagem à rede
+         acabou. */
+      const licoesEmVoo = Promise.resolve(
+        null as { module_week: number; quiz_score: number }[] | null,
+      );
 
       const changed = await jornadaEmVoo;
       if (cancelled) return;
@@ -9053,7 +9082,27 @@ function WellnessScreen({
     setTimeout(refresh, 500);
   }
 
-  const activity = openKey ? WELLNESS_TYPES.find((a) => a.key === openKey) : null;
+  /* ⚠️ NO MODO CUIDADO, "MOMENTO COM O BEBÊ" SAI DA LISTA.
+     A descrição dela é "uma carta de 1 minuto pra ler em voz alta pro bebê", e
+     a bancada com `?luto=1` mostrou o cartão inteiro de pé para quem acabou de
+     perder a gestação. `cartaDasGratidoes` já era barrada lá dentro; a carta do
+     DIA não era, e o caminho para ela estava aberto.
+
+     É a mesma decisão de `SilencioDoCuidado` nas outras telas: não existe
+     versão suavizada de um convite para falar com o bebê. As outras três
+     (mexer, meditar, gratidão) ficam — elas cuidam DELA, que é do que ela
+     precisa.
+
+     ⚠️ E o filtro entra também em `activity`, não só na lista: `aoIrParaBebe`
+     abre a atividade por `setOpenKey("bonding")` sem passar pela lista. Hoje
+     esse botão já não aparece no luto (`cartaDasGratidoes` é barrada), mas uma
+     porta que depende de OUTRA tela lembrar da regra é a definição de portão
+     frágil. */
+  const atividadesDoDia = careMode
+    ? WELLNESS_TYPES.filter((a) => a.key !== "bonding")
+    : WELLNESS_TYPES;
+
+  const activity = openKey ? atividadesDoDia.find((a) => a.key === openKey) : null;
   const Chosen = activity?.Comp;
   const openMeta = openKey ? WELLNESS_META[openKey] : null;
   const lessonEmoji = lesson.emoji;
@@ -9101,7 +9150,7 @@ function WellnessScreen({
      nenhum para tocar. O assunto dá. */
   const linhasDoDia: { key: string; desc: string; feito: boolean }[] = [
     { key: "aula", desc: tituloAula, feito: aulaFeita },
-    ...WELLNESS_TYPES.map((a) => ({
+    ...atividadesDoDia.map((a) => ({
       key: a.key,
       desc: WELLNESS_META[a.key].desc,
       feito: done.has(a.key),
@@ -9162,7 +9211,9 @@ function WellnessScreen({
   // Os 6 cards: aula primeiro (o conteúdo do dia), depois os 5 de bem-estar.
   const cards: { key: string; emoji: string; done: boolean }[] = [
     { key: "aula", emoji: lessonEmoji || "📚", done: lesson.alreadyDone },
-    ...WELLNESS_TYPES.map((a) => ({ key: a.key, emoji: a.emoji, done: done.has(a.key) })),
+    /* O placar de estrelas segue a MESMA lista: com a atividade do bebê fora
+       no luto, um placar de cinco pontinhos cobraria uma que não existe. */
+    ...atividadesDoDia.map((a) => ({ key: a.key, emoji: a.emoji, done: done.has(a.key) })),
   ];
 
   return (
