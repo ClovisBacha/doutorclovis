@@ -109,6 +109,8 @@ export function AmigasTab({
      É a mesma decisão do ✕ do calendário do médico, que pede confirmação numa
      mensagem à parte em vez de virar "tem certeza?" no lugar. */
   const [saindoDe, setSaindoDe] = useState<PerfilDeAmiga | null>(null);
+  /** A amiga cuja folha de "quanto dar" está aberta. */
+  const [escolhendo, setEscolhendo] = useState<PerfilDeAmiga | null>(null);
   /* ─── O CONVITE ENTRE CONTAS QUE JÁ EXISTEM ───────────────────────────
      O buraco central da aba: a indicação só liga quem entrou pelo link de
      alguém, então duas pacientes que já usavam o app não tinham caminho
@@ -283,7 +285,10 @@ export function AmigasTab({
     })();
   }, [careMode, ehBancada]);
 
-  async function presentear(amiga: PerfilDeAmiga) {
+  /* ⚠️ O 🎁 ABRE A ESCOLHA, e não envia direto. Antes ele mandava 40 fixo no
+     primeiro toque — o presente saía sem ela decidir nada, e "quanto eu quero
+     dar" não existia como pergunta. */
+  async function presentear(amiga: PerfilDeAmiga, quanto: number) {
     if (enviando) return;
     setEnviando(amiga.id);
     try {
@@ -291,12 +296,13 @@ export function AmigasTab({
       if (!s.session?.access_token) return;
       const { presentearAmiga } = await import("@/lib/mesada-paciente.functions");
       const r = await presentearAmiga({
-        data: { accessToken: s.session.access_token, amigaId: amiga.id },
+        data: { accessToken: s.session.access_token, amigaId: amiga.id, quantidade: quanto },
       });
       if (r.ok) {
         setMesada(r.mesada);
         setPresenteadas((v) => new Set(v).add(amiga.id));
-        toast.success(`${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${amiga.nome} 🌱💌`);
+        setEscolhendo(null);
+        toast.success(`${quanto} Sementinhas para ${amiga.nome} 🌱💌`);
         return;
       }
       /* Cada recusa com a sua frase: três delas são estados normais, não erros,
@@ -421,6 +427,7 @@ export function AmigasTab({
              uma segunda ida ao servidor para responder a mesma pergunta, e as
              duas respostas poderiam discordar entre si. */
           assinante={!!mesada?.assinante}
+          restanteDoBolso={mesada?.restante ?? 0}
           /* ⚠️ A saída da amizade veio da LINHA para cá (ver a lista). Ela
              chega como callback, e não como uma segunda cópia do fluxo: quem
              confirma, encerra e recarrega continua sendo a aba — a folha de
@@ -654,7 +661,7 @@ export function AmigasTab({
                       zerava ao trocar de aba. */}
                 {mesada?.assinante && a.possoPresentear && (
                   <button
-                    onClick={() => presentear(a)}
+                    onClick={() => setEscolhendo(a)}
                     disabled={enviando !== null || jaFoi(a)}
                     aria-label={
                       jaFoi(a)
@@ -703,6 +710,14 @@ export function AmigasTab({
         amiga={saindoDe}
         aoFechar={() => setSaindoDe(null)}
         aoConfirmar={() => saindoDe && encerrar(saindoDe)}
+      />
+
+      <FolhaDePresente
+        amiga={escolhendo}
+        restante={mesada?.restante ?? 0}
+        enviando={enviando !== null}
+        aoFechar={() => setEscolhendo(null)}
+        aoEnviar={(quanto) => escolhendo && presentear(escolhendo, quanto)}
       />
 
       {/* ─── ⚠️ O BOLSO DE PRESENTEAR, QUE NINGUÉM VIA ────────────────────
@@ -862,6 +877,117 @@ export function AmigasTab({
         >
           Convidar <Chevron tamanho={15} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * ─── QUANTO ELA QUER DAR ────────────────────────────────────────────────────
+ *
+ * Pedido do dono: "a amizade ali ela pode escolher o quanto que ela dá".
+ *
+ * ⚠️ O SERVIDOR JÁ ACEITAVA `quantidade` E VALIDAVA CONTRA O BOLSO — o que
+ * faltava era só a tela, que mandava `PRESENTE_ENTRE_AMIGAS` fixo. Este
+ * componente não afrouxa trava nenhuma: o teto continua sendo
+ * `mesada.restante`, conferido no servidor, e daqui só sai um número.
+ *
+ * ⚠️ OS VALORES SÃO DEGRAUS, e não um campo livre. Um campo aberto obriga a
+ * paciente a inventar um número — e o presente entre amigas é um gesto, não uma
+ * transferência bancária. Os degraus saem do sugerido (`PRESENTE_ENTRE_AMIGAS`)
+ * para cima e para baixo, e os que não cabem no bolso dela nem aparecem: um
+ * botão que o servidor vai recusar é pior que um botão a menos.
+ *
+ * ⚠️ E O BOLSO INTEIRO ENTRA COMO ÚLTIMO DEGRAU quando sobra pouco. Sem isso,
+ * quem tem 25 🌱 no bolso não veria degrau nenhum (todos acima de 25) e o
+ * recurso simplesmente sumiria da tela sem explicação, com saldo disponível.
+ */
+function degraus(restante: number): number[] {
+  const base = [20, PRESENTE_ENTRE_AMIGAS, 80, 120];
+  const cabem = base.filter((v) => v <= restante);
+  /* O bolso inteiro, quando ele não é um degrau já listado. */
+  if (restante > 0 && !cabem.includes(restante)) cabem.push(restante);
+  return [...new Set(cabem)].sort((a, b) => a - b);
+}
+
+function FolhaDePresente({
+  amiga,
+  restante,
+  enviando,
+  aoFechar,
+  aoEnviar,
+}: {
+  amiga: { id: string; nome: string } | null;
+  restante: number;
+  enviando: boolean;
+  aoFechar: () => void;
+  aoEnviar: (quanto: number) => void;
+}) {
+  const opcoes = degraus(restante);
+  const [quanto, setQuanto] = useState<number>(
+    /* Abre no sugerido quando ele cabe; senão, no maior que cabe. */
+    opcoes.includes(PRESENTE_ENTRE_AMIGAS)
+      ? PRESENTE_ENTRE_AMIGAS
+      : (opcoes[opcoes.length - 1] ?? 0),
+  );
+  if (!amiga) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[70] flex items-end justify-center bg-black/40 p-4 backdrop-blur-sm sm:items-center"
+      onClick={aoFechar}
+    >
+      <div
+        role="dialog"
+        aria-label={`Presentear ${amiga.nome}`}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-sm rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-float)]"
+      >
+        <p className="font-serif text-lg">Quanto para {amiga.nome}?</p>
+        <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+          Você tem <strong className="font-semibold">{restante} 🌱</strong> no bolso do Premium
+          neste mês. Ele só serve para presentear.
+        </p>
+
+        {opcoes.length === 0 ? (
+          <p className="mt-4 text-[13px] text-muted-foreground">
+            Seu bolso deste mês acabou. Ele enche de novo na virada.
+          </p>
+        ) : (
+          <>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {opcoes.map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setQuanto(v)}
+                  aria-pressed={quanto === v}
+                  className={`press min-h-11 rounded-full px-4 text-[15px] font-bold transition-colors ${
+                    quanto === v
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border text-muted-foreground"
+                  }`}
+                >
+                  {v} 🌱
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={aoFechar}
+                className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+              >
+                Agora não
+              </button>
+              <button
+                onClick={() => aoEnviar(quanto)}
+                disabled={enviando || quanto <= 0}
+                className="press min-h-11 flex-1 rounded-full bg-primary text-[13px] font-bold text-primary-foreground disabled:opacity-50"
+              >
+                {enviando ? "Enviando…" : `Enviar ${quanto} 🌱`}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1476,12 +1602,17 @@ function PerfilDaAmigaTela({
   amigaId,
   aoVoltar,
   assinante,
+  restanteDoBolso,
   aoSairDaAmizade,
   bancada,
 }: {
   amigaId: string;
   aoVoltar: () => void;
   assinante: boolean;
+  /** Quanto sobra no bolso do Premium dela neste mês — o TETO da escolha.
+      Vem da aba, que já o carregou: pedi-lo de novo aqui seria uma segunda ida
+      ao servidor para a mesma pergunta, e as duas respostas poderiam discordar. */
+  restanteDoBolso: number;
   /** ⚠️ Veio da LINHA da lista para cá — ver o comentário lá. `null` quando a
       amiga não está na lista carregada (perfil aberto por deep-link, por
       exemplo): sem ela em mãos não há o que confirmar na folha. */
@@ -1507,6 +1638,9 @@ function PerfilDaAmigaTela({
   const [erro, setErro] = useState<string | null>(null);
   const [presenteando, setPresenteando] = useState(false);
   const [presenteado, setPresenteado] = useState(false);
+  /** A folha de "quanto dar" — a MESMA da lista, para as duas portas do
+      presente não divergirem no primeiro ajuste de degraus. */
+  const [escolhendo, setEscolhendo] = useState(false);
 
   useEffect(() => {
     /* A bancada já entrega tudo pronto — pedir ao servidor daria o erro de
@@ -1546,18 +1680,19 @@ function PerfilDaAmigaTela({
     })();
   }, [amigaId, bancada]);
 
-  async function presentear() {
+  async function presentear(quanto: number) {
     setPresenteando(true);
     try {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session?.access_token) return;
       const { presentearAmiga } = await import("@/lib/mesada-paciente.functions");
       const r = await presentearAmiga({
-        data: { accessToken: s.session.access_token, amigaId },
+        data: { accessToken: s.session.access_token, amigaId, quantidade: quanto },
       });
       if (r.ok) {
         setPresenteado(true);
-        toast.success(`${PRESENTE_ENTRE_AMIGAS} Sementinhas para ${perfil?.nome ?? "ela"} 🌱`);
+        setEscolhendo(false);
+        toast.success(`${quanto} Sementinhas para ${perfil?.nome ?? "ela"} 🌱`);
         return;
       }
       /* Cada recusa com frase própria: "não foi possível" faz tentar de novo
@@ -1707,7 +1842,7 @@ function PerfilDaAmigaTela({
         {assinante && perfil.possoPresentear && (
           <>
             <button
-              onClick={presentear}
+              onClick={() => setEscolhendo(true)}
               disabled={presenteando || presenteado || perfil.jaPresenteada}
               className="press mt-5 w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
@@ -1735,6 +1870,14 @@ function PerfilDaAmigaTela({
           ⚠️ FORA do cartão branco e no PÉ da tela, cinza e sem emoji: é uma
           saída, não uma ação que o app sugere. Quem procura acha; quem está
           passeando pelo Cantinho dela não tropeça. */}
+      <FolhaDePresente
+        amiga={escolhendo ? { id: amigaId, nome: perfil.nome } : null}
+        restante={restanteDoBolso}
+        enviando={presenteando}
+        aoFechar={() => setEscolhendo(false)}
+        aoEnviar={(quanto) => presentear(quanto)}
+      />
+
       {aoSairDaAmizade && (
         <button
           onClick={aoSairDaAmizade}

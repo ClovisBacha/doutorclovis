@@ -282,6 +282,63 @@ mediriam uma paciente que não existe.
 
 **Aplicar:** `supabase/APLICAR_INFLUENCIADORA.sql` (só `affiliates.email`).
 
+## O presente virou escolha, e a entrada ganhou o terceiro papel (ago/2026)
+
+### Ela escolhe quanto dá
+
+Pedido do dono: "a amizade ali ela pode escolher o quanto que ela dá".
+
+⚠️ **O servidor JÁ aceitava `quantidade` e já validava contra o bolso** — o que
+faltava era a tela, que mandava `PRESENTE_ENTRE_AMIGAS` fixo no primeiro toque.
+`FolhaDePresente` (`amigas.tsx`) não afrouxa trava nenhuma: o teto continua
+sendo `mesada.restante`, conferido em `presentearAmiga`.
+
+- **Degraus, não campo livre.** Campo aberto obriga a inventar um número, e
+  presente entre amigas é gesto, não transferência bancária.
+- ⚠️ **Degrau que não cabe no bolso nem aparece**, e **o bolso inteiro entra
+  como último degrau**: sem isso, quem tem 25 🌱 não veria degrau nenhum (todos
+  acima de 25) e o recurso sumiria da tela com saldo disponível.
+- **A folha é a MESMA nas duas portas** (lista e tela da amiga) — duas cópias
+  divergiriam no primeiro ajuste de degraus. A tela da amiga recebeu
+  `restanteDoBolso` da aba, que já o carregou.
+
+### `/auth` passou a ter três papéis
+
+Paciente · médico · **acompanhante**. A influenciadora fica de fora de propósito
+(decisão do dono: só no site — a tela dela é `/influenciadora`).
+
+⚠️ **O ACOMPANHANTE NÃO CRIA CONTA**, e isso é uma decisão tomada na ausência do
+dono. Ele perguntou se o acompanhante teria conta própria e saiu antes de
+responder; escolhi o mecanismo que **já existe** — a gestante gera um convite
+(`companion_invites`) e ele abre `/acompanhar/<token>`, sem senha. Inventar login
+de acompanhante significa tabela nova, RLS nova e uma decisão de privacidade
+(o que ele passa a ver, e por quanto tempo) que é dele. Se a resposta for "sim,
+conta própria", o botão já está no lugar certo para crescer.
+
+- **O campo aceita o LINK INTEIRO ou só o código**, e limpa query e fragmento:
+  quem recebe link no WhatsApp copia o link, e ele vem com `?utm_...` grudado.
+- ⚠️ **Nada é validado no cliente.** Quem confere o token é `getCompanionView`,
+  que já distingue "inválido" de "expirado" — uma segunda régua aqui diria
+  "código inválido" para convite que o servidor aceitaria.
+
+⚠️ **DUAS ARMADILHAS MEDIDAS, e as duas viraram teste:**
+
+1. **Eu quase quebrei o login do médico.** Ao excluir o acompanhante do
+   formulário, colapsei a condição num `role !== "medico"` solto — o que tira o
+   formulário de LOGIN dele e deixa o painel do consultório inalcançável. Só o
+   CADASTRO tem fluxo próprio. A forma certa é
+   `role !== "acompanhante" && (login || (signup && role !== "medico"))`, e
+   `perfis-do-auth.test.ts` cobra exatamente essa string.
+2. **`break-words` não basta para uma palavra longa num botão.**
+   `overflow-wrap: break-word` permite quebrar durante o layout mas **não reduz
+   a largura mínima** do elemento — num pai `items-center` (shrink-to-fit) o
+   rótulo continuava medindo "Acompanhante" inteiro e transbordava a 320px
+   (106px de texto numa caixa de 88). Quem conserta é **`w-full` no rótulo**;
+   `hyphens-auto` + `lang="pt-BR"` deixam a quebra bonita.
+
+⚠️ **E um comentário JSX não pode ser o segundo filho de `{cond && (…)}`** —
+custou um `TS1005` apontando para a linha do `<div>`, não para o comentário.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é

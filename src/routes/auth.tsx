@@ -47,7 +47,28 @@ function AuthPage() {
     isRecoveryLink ? "reset" : "login",
   );
   // Papel escolhido: define o destino pós-login e o fluxo de cadastro.
-  const [role, setRole] = useState<"paciente" | "medico">("paciente");
+  /**
+   * ⚠️ "acompanhante" NÃO É UM PAPEL DE LOGIN — e é por isso que ele está aqui.
+   *
+   * Paciente e médico criam CONTA. O acompanhante, no modelo que o app já tem,
+   * não cria: a gestante gera um convite (`companion_invites`) e manda o link;
+   * ele abre `/acompanhar/<token>` e vê o painel dela, sem senha e sem cadastro.
+   *
+   * Ele entra no seletor mesmo assim porque a pergunta que a pessoa faz ao
+   * abrir esta tela é "qual é o meu lugar aqui?", e antes disso ela só tinha
+   * duas respostas — o pai ou a companheira que chegasse aqui ficava sem
+   * caminho nenhum, ou criava uma conta de gestante por engano.
+   *
+   * ⚠️ DECISÃO TOMADA NA AUSÊNCIA DO DONO: ele perguntou se o acompanhante teria
+   * conta própria e saiu antes de responder. Escolhi o mecanismo que JÁ EXISTE,
+   * porque inventar login de acompanhante significa tabela nova, RLS nova e uma
+   * decisão de privacidade (o que ele passa a ver, e por quanto tempo) que é
+   * dele e não minha. Se a resposta for "sim, conta própria", esta tela é o
+   * lugar certo para crescer — o botão já está aqui.
+   */
+  const [role, setRole] = useState<"paciente" | "medico" | "acompanhante">("paciente");
+  /** O link ou código que a gestante mandou. */
+  const [convite, setConvite] = useState("");
   /* Se esta pessoa já começou um cadastro de médico neste aparelho, o seletor
      nasce em "médico".
 
@@ -275,6 +296,34 @@ function AuthPage() {
     setMsg(null);
   }
 
+  /**
+   * O TOKEN, de um link inteiro OU de um código solto.
+   *
+   * ⚠️ FORA DO COMPONENTE seria melhor, mas ela é usada por dois pontos daqui e
+   * não sai do arquivo — extraí-la para `lib/` só para poder testá-la separaria
+   * a régua da única tela que a usa. O que ela faz é pequeno e explícito:
+   * pega o último pedaço não vazio depois de `/acompanhar/`, ou o texto todo
+   * quando não há barra nenhuma.
+   *
+   * ⚠️ TIRA QUERY E FRAGMENTO. Link do WhatsApp costuma vir com `?` grudado, e
+   * um token com `?utm_source=...` no fim não bate com nenhuma linha da tabela.
+   */
+  function tokenDoConvite(cru: string): string {
+    const limpo = cru.trim().split(/[?#]/)[0].replace(/\/+$/, "");
+    if (!limpo) return "";
+    const partes = limpo.split("/").filter(Boolean);
+    return (partes[partes.length - 1] ?? "").replace(/[^A-Za-z0-9_-]/g, "");
+  }
+
+  function abrirConvite() {
+    const t = tokenDoConvite(convite);
+    if (t.length < 6) return;
+    /* Navegação DURA e não `navigate`: `/acompanhar/$token` é uma rota pública
+       fora da árvore autenticada, e ir por ela com a sessão meia-carregada
+       desta tela já produziu redirecionamento de volta para o login. */
+    window.location.href = `/acompanhar/${t}`;
+  }
+
   const title =
     mode === "login"
       ? "Acessar minha conta"
@@ -301,16 +350,32 @@ function AuthPage() {
             ? "Escolha uma nova senha para sua conta."
             : role === "medico"
               ? "Acesse o painel do seu consultório: pacientes, agenda e o seu Segundo Cérebro."
-              : "Acompanhe semana a semana o desenvolvimento do seu bebê, salve seu diário gestacional e muito mais."}
+              : /* ⚠️ O acompanhante tinha o texto da PACIENTE ("salve seu diário
+                   gestacional"), que promete a ele um app que não é dele. */
+                role === "acompanhante"
+                ? "Acompanhe a gestação de quem você ama pelo convite que ela te mandou — sem criar conta."
+                : "Acompanhe semana a semana o desenvolvimento do seu bebê, salve seu diário gestacional e muito mais."}
       </p>
 
-      {/* ── Papel: paciente ou médico (define destino e fluxo de cadastro) ── */}
+      {/* ── Papel: paciente, médico ou acompanhante ──────────────────────────
+          Os dois primeiros criam conta e definem destino; o terceiro abre o
+          convite (ver o bloco do acompanhante abaixo).
+
+          ⚠️ TRÊS COLUNAS, e o rótulo encolhe junto (`text-[13px]`): com o
+          tamanho anterior "Acompanhante" quebrava em duas linhas numa tela de
+          320px e desalinhava os três botões.
+
+          ⚠️ E ESTE COMENTÁRIO FICA FORA DO `{cond && (…)}`. Dentro, ele é um
+          SEGUNDO filho da expressão, onde só cabe um elemento — custou um
+          `TS1005: ')' expected` que aponta para a linha do `<div>`, não para o
+          comentário que o causou. */}
       {(mode === "login" || mode === "signup") && (
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="mt-5 grid grid-cols-3 gap-2">
           {(
             [
               { key: "paciente", emoji: "🤰", label: "Sou paciente" },
               { key: "medico", emoji: "🩺", label: "Sou médico(a)" },
+              { key: "acompanhante", emoji: "🫶", label: "Acompanhante" },
             ] as const
           ).map((r) => (
             <button
@@ -318,6 +383,9 @@ function AuthPage() {
               type="button"
               onClick={() => {
                 setRole(r.key);
+                /* Escolher acompanhante não guarda intenção nenhuma: ele não
+                   cria conta, então não há cadastro para o `INTENCAO_MEDICO`
+                   sobreviver até. */
                 /* Escolher "médico" aqui é o único sinal explícito que temos
                    antes de a conta existir. Guardado, ele sobrevive ao OAuth e
                    ao link de confirmação. Escolher "paciente" apaga. */
@@ -328,15 +396,93 @@ function AuthPage() {
                 });
               }}
               aria-pressed={role === r.key}
-              className={`rounded-2xl border px-4 py-3 text-sm font-semibold transition-all ${
+              /* ⚠️ COLUNA, e não emoji + texto na mesma linha. Medido em 393px:
+                 "🫶 Acompanhante" numa linha só ultrapassa a borda do terceiro
+                 botão — os outros dois quebram sozinhos ("Sou / paciente") e o
+                 terceiro não tinha onde quebrar. Empilhado, os três ficam da
+                 mesma altura e nenhum transborda, inclusive em 320px. */
+              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition-all ${
                 role === r.key
                   ? "border-primary bg-primary/10 text-primary shadow-[var(--shadow-soft)]"
                   : "border-border bg-card text-muted-foreground hover:border-primary/40"
               }`}
             >
-              {r.emoji} {r.label}
+              <span aria-hidden className="text-lg leading-none">
+                {r.emoji}
+              </span>
+              {/* ⚠️ `hyphens-auto` + `break-words` + `lang`. Medido: a 320px a
+                  caixa tem 88px e "Acompanhante" pede 106 — é uma palavra só,
+                  sem espaço onde quebrar, então ela transbordava a borda.
+                  Encolher a fonte até caber exigiria ~10px, pequeno demais para
+                  um controle. Com hifenização o navegador quebra em
+                  "Acom-panhante" e nada sai do botão.
+
+                  ⚠️ O `lang` é obrigatório: sem ele o navegador não sabe as
+                  regras de hifenização e `hyphens-auto` não faz nada. */}
+              {/* ⚠️ `w-full` É O QUE FAZ A QUEBRA FUNCIONAR, e não o
+                  `break-words` sozinho. `overflow-wrap: break-word` permite
+                  quebrar DURANTE o layout, mas não reduz a largura mínima do
+                  elemento — num pai `items-center` (shrink-to-fit) o span
+                  continuava medindo a palavra inteira e transbordava. Com
+                  `w-full` ele passa a ter a largura do botão, e aí a quebra
+                  acontece dentro dela. Medido a 320px. */}
+              <span lang="pt-BR" className="block w-full hyphens-auto break-words">
+                {r.label}
+              </span>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* ─── O CAMINHO DO ACOMPANHANTE ────────────────────────────────────
+          Sem senha, sem cadastro: ele cola o link que a gestante mandou.
+
+          ⚠️ ACEITA O LINK INTEIRO OU SÓ O CÓDIGO. Quem recebe um link no
+          WhatsApp copia o link — pedir que ele "extraia o código do final da
+          URL" é pedir um trabalho que o app sabe fazer sozinho, e é o tipo de
+          atrito que faz o pai desistir e devolver o celular.
+
+          ⚠️ E NÃO HÁ VALIDAÇÃO AQUI. Quem confere o token é `getCompanionView`,
+          no servidor, que já distingue "inválido" de "expirado". Uma segunda
+          checagem no cliente só poderia divergir dela — e diria "código
+          inválido" para um convite que o servidor aceitaria. */}
+      {(mode === "login" || mode === "signup") && role === "acompanhante" && (
+        <div className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <p className="text-4xl">🫶</p>
+          <h2 className="mt-3 font-serif text-xl">Você foi convidado a acompanhar</h2>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+            O acompanhante não precisa criar conta. A gestante gera um convite no app dela, em{" "}
+            <strong className="font-semibold">Acompanhante</strong>, e manda o link para você — é
+            ele que abre o seu painel.
+          </p>
+
+          <label htmlFor="convite" className="mt-5 block text-xs font-semibold text-foreground">
+            Cole o link ou o código do convite
+          </label>
+          <input
+            id="convite"
+            value={convite}
+            onChange={(e) => setConvite(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") abrirConvite();
+            }}
+            placeholder="obstetrica.com.br/acompanhar/…"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="mt-1.5 min-h-11 w-full rounded-full border border-border bg-background px-4 text-sm"
+          />
+          <button
+            onClick={abrirConvite}
+            disabled={tokenDoConvite(convite).length < 6}
+            className="press mt-3 min-h-11 w-full rounded-full bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-40"
+          >
+            Abrir o painel
+          </button>
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            Ainda não tem o link? Peça para ela abrir o app, ir em{" "}
+            <strong className="font-semibold">Acompanhante</strong> e tocar em convidar.
+          </p>
         </div>
       )}
 
@@ -478,129 +624,141 @@ function AuthPage() {
         </form>
       )}
 
-      {/* ── Login / Signup form ── */}
-      {(mode === "login" || (mode === "signup" && role !== "medico")) && (
-        <form
-          onSubmit={submit}
-          className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
-          noValidate
-        >
-          <GoogleButton role={role} />
-          <OrDivider />
-          {mode === "signup" && (
+      {/* ── Login / Signup form ──────────────────────────────────────────────
+          A regra tem DUAS partes, e elas são diferentes de propósito:
+
+          · `role !== "acompanhante"` — ele não tem conta, então nunca vê
+            formulário de senha. Sem esta parte ele via o bloco do convite E um
+            campo de e-mail logo abaixo, para uma conta que não existe.
+
+          · `(login || (signup && role !== "medico"))` — o médico LOGA por aqui,
+            como sempre; só o CADASTRO dele tem fluxo próprio (CRM, perfil).
+            ⚠️ Eu quase colapsei isto num `role !== "medico"` solto, o que
+            teria tirado o formulário de login do médico e deixado o painel
+            inalcançável para ele. */}
+      {role !== "acompanhante" &&
+        (mode === "login" || (mode === "signup" && role !== "medico")) && (
+          <form
+            onSubmit={submit}
+            className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+            noValidate
+          >
+            <GoogleButton role={role} />
+            <OrDivider />
+            {mode === "signup" && (
+              <div>
+                <label
+                  htmlFor="auth-name"
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                >
+                  Seu nome
+                </label>
+                <input
+                  id="auth-name"
+                  type="text"
+                  required
+                  autoComplete="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+              </div>
+            )}
             <div>
               <label
-                htmlFor="auth-name"
+                htmlFor="auth-email"
                 className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
               >
-                Seu nome
+                E-mail
               </label>
               <input
-                id="auth-name"
-                type="text"
+                id="auth-email"
+                type="email"
                 required
-                autoComplete="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                autoComplete={mode === "signup" ? "email" : "username"}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
               />
             </div>
-          )}
-          <div>
-            <label
-              htmlFor="auth-email"
-              className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-            >
-              E-mail
-            </label>
-            <input
-              id="auth-email"
-              type="email"
-              required
-              autoComplete={mode === "signup" ? "email" : "username"}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <label
-                htmlFor="auth-password"
-                className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-              >
-                Senha
-              </label>
-              {mode === "login" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode("forgot");
-                    setMsg(null);
-                  }}
-                  className="text-xs text-primary hover:underline"
+            <div>
+              <div className="flex items-center justify-between">
+                <label
+                  htmlFor="auth-password"
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
                 >
-                  Esqueci minha senha
-                </button>
+                  Senha
+                </label>
+                {mode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("forgot");
+                      setMsg(null);
+                    }}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Esqueci minha senha
+                  </button>
+                )}
+              </div>
+              <input
+                id="auth-password"
+                type="password"
+                required
+                minLength={6}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              />
+              {mode === "signup" && (
+                <p className="mt-1 text-xs text-muted-foreground">Mínimo de 6 caracteres.</p>
               )}
             </div>
-            <input
-              id="auth-password"
-              type="password"
-              required
-              minLength={6}
-              autoComplete={mode === "signup" ? "new-password" : "current-password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-            />
-            {mode === "signup" && (
-              <p className="mt-1 text-xs text-muted-foreground">Mínimo de 6 caracteres.</p>
+
+            {msg && (
+              <p
+                role="alert"
+                className={`rounded-lg px-3 py-2 text-sm ${
+                  msg.type === "success"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-destructive/10 text-destructive"
+                }`}
+              >
+                {msg.text}
+              </p>
             )}
-          </div>
 
-          {msg && (
-            <p
-              role="alert"
-              className={`rounded-lg px-3 py-2 text-sm ${
-                msg.type === "success"
-                  ? "bg-primary/10 text-primary"
-                  : "bg-destructive/10 text-destructive"
-              }`}
+            {showResend && (
+              <button
+                type="button"
+                onClick={handleResend}
+                disabled={resendLoading}
+                className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
+              >
+                {resendLoading ? "Enviando..." : "Reenviar e-mail de confirmação"}
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
             >
-              {msg.text}
-            </p>
-          )}
-
-          {showResend && (
+              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+            </button>
             <button
               type="button"
-              onClick={handleResend}
-              disabled={resendLoading}
-              className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
+              onClick={switchMode}
+              className="w-full text-center text-xs text-muted-foreground hover:text-primary transition-colors"
             >
-              {resendLoading ? "Enviando..." : "Reenviar e-mail de confirmação"}
+              {mode === "login"
+                ? "Não tem conta? Cadastre-se gratuitamente"
+                : "Já tem conta? Fazer login"}
             </button>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
-          >
-            {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
-          </button>
-          <button
-            type="button"
-            onClick={switchMode}
-            className="w-full text-center text-xs text-muted-foreground hover:text-primary transition-colors"
-          >
-            {mode === "login"
-              ? "Não tem conta? Cadastre-se gratuitamente"
-              : "Já tem conta? Fazer login"}
-          </button>
-        </form>
-      )}
+          </form>
+        )}
 
       <Link
         to="/"
