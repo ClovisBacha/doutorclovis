@@ -158,15 +158,25 @@ export const presentearAmiga = createServerFn({ method: "POST" })
        saldo próprio todo mês. */
     if (data.amigaId === uid) return { ok: false as const, error: "voce_mesma" as const };
 
-    /* 1. ELA INDICOU MESMO. `referred_by` é fixado uma vez e nunca reescrito
-          (ver `attributeReferral`), então não há como forjar a relação depois. */
-    const { data: amiga } = await sb
-      .from("patient_profiles")
-      .select("id")
-      .eq("id", data.amigaId)
-      .eq("referred_by", uid)
-      .maybeSingle();
-    if (!amiga) return { ok: false as const, error: "nao_indicada" as const };
+    /* 1. ELAS SÃO AMIGAS MESMO — pelos DOIS grafos.
+
+          `referred_by` é fixado uma vez e nunca reescrito (ver
+          `attributeReferral`), então não há como forjar a indicação depois. E
+          `amizades` (pedido + aceite entre contas que já existiam) é a segunda
+          porta, que exigiu o SIM da outra para existir.
+
+          ⚠️ A conferência era só `referred_by = uid` — quem eu indiquei. Isso
+          já produzia um defeito conhecido (o 🎁 aparecia para quem me trouxe e
+          o servidor recusava com uma frase falsa), e com o convite entre contas
+          existentes ele piorava: metade das amigas viraria amiga de segunda
+          classe, na lista mas impossível de presentear.
+
+          `saoAmigas` é a mesma régua que o perfil, o Cantinho e a dupla usam —
+          e ela já recusa quem encerrou a amizade. */
+    const { saoAmigasParaPresente } = await import("@/lib/amigas.functions");
+    if (!(await saoAmigasParaPresente(data.accessToken, data.amigaId))) {
+      return { ok: false as const, error: "nao_indicada" as const };
+    }
 
     /* 2. TETO, antes de escrever. */
     const mesada = await lerMesadaDaAmiga(sb, uid);
@@ -177,6 +187,14 @@ export const presentearAmiga = createServerFn({ method: "POST" })
 
     /* 3. Modo Cuidado — de quem RECEBE. */
     const { isCareModeActive } = await import("@/lib/care-mode.functions");
+    /* ⚠️ E O LUTO DE QUEM DÁ TAMBÉM. O cabeçalho deste arquivo declara o
+       portão "de nenhum lado", e só o lado de quem RECEBE estava conferido:
+       quem acabou de perder a gestação continuava com o bolso aberto e o 🎁
+       na tela. A aba inteira se cala para ela — o presente não podia ser a
+       exceção. */
+    if (await isCareModeActive(supabaseAdmin as never, uid)) {
+      return { ok: false as const, error: "modo_cuidado" as const };
+    }
     if (await isCareModeActive(supabaseAdmin as never, data.amigaId)) {
       return { ok: false as const, error: "modo_cuidado" as const };
     }

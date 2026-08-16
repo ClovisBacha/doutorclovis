@@ -50,6 +50,8 @@ export type BancadaDasAmigas = {
   /** O código de indicação. Sem ele o botão "Convidar" explica em vez de
       mandar um link que não liga ninguém a ninguém. */
   codigo?: string | null;
+  /** Pedidos de amizade recebidos — a seção só existe quando há algum. */
+  pedidos?: { id: string; nome: string; diasNoApp: number }[];
 };
 
 export function AmigasTab({
@@ -95,6 +97,16 @@ export function AmigasTab({
      É a mesma decisão do ✕ do calendário do médico, que pede confirmação numa
      mensagem à parte em vez de virar "tem certeza?" no lugar. */
   const [saindoDe, setSaindoDe] = useState<PerfilDeAmiga | null>(null);
+  /* ─── O CONVITE ENTRE CONTAS QUE JÁ EXISTEM ───────────────────────────
+     O buraco central da aba: a indicação só liga quem entrou pelo link de
+     alguém, então duas pacientes que já usavam o app não tinham caminho
+     nenhum. Ver `convidarAmiga` — resolve por CÓDIGO ou E-MAIL, nunca por
+     nome, e sempre com aceite da outra. */
+  const [termo, setTermo] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [pedidos, setPedidos] = useState<{ id: string; nome: string; diasNoApp: number }[]>(
+    bancada?.pedidos ?? [],
+  );
 
   /* ⚠️ Um BOOLEANO, não o objeto, nas listas de dependência. `bancada` é um
      literal remontado a cada render da rota de preview: usá-lo direto faria os
@@ -157,6 +169,85 @@ export function AmigasTab({
       }
     })();
   }, [ehBancada]);
+
+  /* Os pedidos de amizade que ela recebeu e ainda não respondeu. */
+  const carregarPedidos = useCallback(async () => {
+    if (ehBancada) return;
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { pedidosDeAmizade } = await import("@/lib/amigas.functions");
+      const r = await pedidosDeAmizade({ data: { accessToken: s.session.access_token } });
+      if (r.ok) setPedidos(r.pedidos);
+    } catch {
+      /* sem a tabela (SQL não aplicado) a seção some, e o resto continua */
+    }
+  }, [ehBancada]);
+  useEffect(() => {
+    void carregarPedidos();
+  }, [carregarPedidos]);
+
+  async function convidarPorTermo() {
+    const t = termo.trim();
+    if (!t || buscando) return;
+    setBuscando(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { convidarAmiga } = await import("@/lib/amigas.functions");
+      const r = await convidarAmiga({ data: { accessToken: s.session.access_token, termo: t } });
+      if (!r.ok) {
+        toast(
+          r.error === "nao_encontrada"
+            ? "Não achei esse código. Confira com ela — são 7 letras e números."
+            : r.error === "muitos_convites"
+              ? "Você já mandou muitos convites hoje. Tente de novo amanhã."
+              : r.error === "termo_curto"
+                ? "Digite o código completo ou o e-mail dela."
+                : r.error === "indisponivel"
+                  ? "Não é possível agora."
+                  : "Não foi possível. O convite precisa do SQL aplicado no banco.",
+          { duration: 6000 },
+        );
+        return;
+      }
+      setTermo("");
+      /* ⚠️ `achou === null` é o caminho do E-MAIL, e a frase é a MESMA com e
+         sem acerto: dizer "não existe conta com esse e-mail" transformaria o
+         campo num verificador de contas — dá para descobrir se uma pessoa
+         específica é paciente daqui, e isso é informação de saúde. */
+      toast.success(
+        r.achou && r.nome
+          ? `Convite enviado para ${r.nome} 💌`
+          : "Convite enviado! Se ela usa o app, vai ver o seu pedido.",
+        { duration: 6000 },
+      );
+    } catch {
+      toast("Não foi possível agora.");
+    } finally {
+      setBuscando(false);
+    }
+  }
+
+  async function responderPedido(amigaId: string, aceitar: boolean) {
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { responderAmizade } = await import("@/lib/amigas.functions");
+      const r = await responderAmizade({
+        data: { accessToken: s.session.access_token, amigaId, aceitar },
+      });
+      if (!r.ok) {
+        toast("Não foi possível agora.");
+        return;
+      }
+      if (aceitar) toast.success("Amizade formada 💛");
+      setPedidos((v) => v.filter((p) => p.id !== amigaId));
+      if (aceitar) void carregar();
+    } catch {
+      toast("Não foi possível agora.");
+    }
+  }
 
   /* ─── A OFENSIVA PAGA ────────────────────────────────────────────────
      Até ago/2026 a dupla dava só a chama compartilhada — nenhuma Sementinha.
@@ -280,7 +371,16 @@ export function AmigasTab({
       await navigator.clipboard.writeText(texto);
       toast.success("Link copiado 💌");
     } catch {
-      /* ela cancelou o compartilhamento — não é erro, e não merece aviso */
+      /* ⚠️ CANCELAR E FALHAR CHEGAM AQUI IGUAIS, e antes os dois eram tratados
+         como cancelamento. Uma recusa de `clipboard.writeText` (contexto
+         inseguro, permissão negada) ficava indistinguível de "ela desistiu": o
+         botão não fazia nada e não dizia nada, e o link não aparece como texto
+         em lugar nenhum desta aba.
+
+         Não dá para saber qual dos dois foi — então o recuo mostra o link, que
+         serve aos dois casos e não acusa ninguém de nada. É o mesmo recuo que
+         o cartão da aba Perfil sempre teve. */
+      toast(`Copie o seu link: ${url}`, { duration: 12000 });
     }
   }
 
@@ -349,6 +449,66 @@ export function AmigasTab({
           </div>
         </div>
       </div>
+
+      {/* ─── PEDIDOS RECEBIDOS ─────────────────────────────────────────────
+          Primeiro de tudo quando existe: é a única coisa da aba que espera uma
+          decisão dela, e é o que muda de um dia para o outro. Some quando não
+          há nenhum — uma seção vazia dizendo "nenhum pedido" só informa uma
+          ausência que ela já vê. */}
+      {pedidos.length > 0 && (
+        <section>
+          <h3 className="mb-2 flex items-center gap-2 px-1">
+            <span
+              className="flex h-8 w-8 items-center justify-center rounded-full text-base"
+              style={{ background: "#fce7f3" }}
+              aria-hidden
+            >
+              💌
+            </span>
+            <span className="font-serif text-lg">
+              {pedidos.length === 1
+                ? "Um pedido de amizade"
+                : `${pedidos.length} pedidos de amizade`}
+            </span>
+          </h3>
+          <ul className="space-y-2">
+            {pedidos.map((ped) => (
+              <li
+                key={ped.id}
+                className="rounded-2xl bg-white p-3 shadow-[0_1px_4px_rgba(0,0,0,0.05)] dark:bg-white/5"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Bolha tamanho={40} humor="feliz" flutua={false} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">{ped.nome}</span>
+                    <span className="mt-0.5 block text-[12px] text-muted-foreground">
+                      {tempoNoApp(ped.diasNoApp)}
+                    </span>
+                  </span>
+                </div>
+                <div className="mt-2.5 flex gap-2">
+                  <button
+                    onClick={() => responderPedido(ped.id, true)}
+                    className="press min-h-11 flex-1 rounded-full bg-primary text-[13px] font-bold text-primary-foreground"
+                  >
+                    Aceitar 💛
+                  </button>
+                  {/* "Agora não" e não "Recusar": ela pode mudar de ideia, e a
+                      linha é APAGADA na recusa (marcar "recusada" bloquearia o
+                      par para sempre pela chave única). E ninguém é avisado —
+                      recusa que notifica vira constrangimento. */}
+                  <button
+                    onClick={() => responderPedido(ped.id, false)}
+                    className="press min-h-11 flex-1 rounded-full border border-border text-[13px] font-semibold text-muted-foreground"
+                  >
+                    Agora não
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ── DUPLAS FORMADAS ─────────────────────────────────────────────── */}
       <section>
@@ -458,7 +618,10 @@ export function AmigasTab({
                 <button
                   onClick={() => setSaindoDe(a)}
                   aria-label={`Sair da amizade com ${a.nome}`}
-                  className="press flex h-11 w-8 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-muted-foreground/50"
+                  /* ⚠️ `w-11`, não `w-8`. Media 32×44 — a ação DESTRUTIVA era
+                     o alvo estreito, colada num 🎁 de 44×44. Discreta é a COR
+                     (cinza, sem emoji), nunca a área que o dedo acerta. */
+                  className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[15px] leading-none text-muted-foreground/50"
                 >
                   ⋯
                 </button>
@@ -517,6 +680,68 @@ export function AmigasTab({
           </div>
         </div>
       )}
+
+      {/* ─── ACHAR UMA AMIGA QUE JÁ USA O APP ──────────────────────────────
+          O buraco que a aba tinha desde que nasceu: a indicação só liga quem
+          entrou pelo link de alguém. Duas pacientes do mesmo obstetra que se
+          conheceram na sala de espera e baixaram o app cada uma por conta
+          própria não tinham caminho nenhum — e nada na tela explicava por quê.
+
+          ⚠️ CÓDIGO OU E-MAIL, NUNCA NOME. Busca por nome transformaria a base
+          de pacientes numa lista navegável, e num app de gestação de alto risco
+          esse é o dado que menos pode vazar. O código é uma capacidade (só se
+          tem se a outra der); o e-mail exige saber o e-mail. Ver
+          `convidarAmiga`. */}
+      <section className="rounded-3xl border border-border bg-card p-4">
+        <p className="font-serif text-lg">Já tem uma amiga no app?</p>
+        <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+          Peça o código dela (7 letras e números, no cartão de indicação) ou use o e-mail que ela
+          cadastrou. Ela recebe um pedido e escolhe se aceita.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <input
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void convidarPorTermo();
+            }}
+            placeholder="Código ou e-mail"
+            aria-label="Código de indicação ou e-mail da amiga"
+            /* `none` nos três: o código é maiúsculo e sem acento, e o teclado
+               do celular capitaliza e corrige sozinho — foi assim que um código
+               digitado certo virou um "não encontrei". O servidor normaliza de
+               qualquer jeito, mas o campo não pode brigar com ela enquanto ela
+               digita. */
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-[14px]"
+          />
+          <button
+            onClick={() => void convidarPorTermo()}
+            disabled={buscando || termo.trim().length < 3}
+            className="press min-h-11 shrink-0 rounded-full px-4 text-[14px] font-bold text-white disabled:opacity-40"
+            style={{ background: "#c9316f" }}
+          >
+            {/* ⚠️ "Enviar" e não "Convidar": o cartão amarelo logo abaixo tem
+                um botão "Convidar" que faz outra coisa (compartilha o LINK,
+                para quem ainda não tem conta). Dois botões com o mesmo rótulo
+                e comportamentos diferentes na mesma tela é como a paciente
+                aprende que os botões daqui não querem dizer nada. */}
+            {buscando ? "…" : "Enviar"}
+          </button>
+        </div>
+        {/* O código DELA, para mandar. Sem isto o campo pede uma coisa que ela
+            não sabe onde encontrar — e o cartão que mostra o código vive noutra
+            aba. */}
+        {codigo && (
+          <p className="mt-2.5 text-[12px] text-muted-foreground">
+            O seu código é{" "}
+            <strong className="font-mono font-bold tracking-wider text-foreground">{codigo}</strong>{" "}
+            — mande para ela te achar também.
+          </p>
+        )}
+      </section>
 
       {/* ── CONVIDAR ────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 rounded-3xl p-4" style={{ background: "#fcf1d5" }}>
@@ -746,14 +971,19 @@ function DuplaCard({
             <button
               onClick={() => chamar("aceitar", dupla.amigaId!)}
               disabled={ocupado}
-              className="press rounded-full bg-amber-500 px-4 py-1.5 text-xs font-bold text-white"
+              /* ⚠️ `amber-700` e 44px. Medido: branco sobre `amber-500` dá
+                 **2,15:1** — menos da metade do mínimo — num alvo de 100×30. É
+                 o botão que FORMA a dupla, e ele estava pior que o "Convidar"
+                 ao lado, cujo comentário explica que 3,69:1 foi corrigido para
+                 5,06. O 700 dá 5,02:1 e continua âmbar. */
+              className="press min-h-11 rounded-full bg-amber-700 px-4 text-xs font-bold text-white"
             >
               Aceitar 🔥
             </button>
             <button
               onClick={() => chamar("recusar", dupla.amigaId!)}
               disabled={ocupado}
-              className="rounded-full border border-border px-4 py-1.5 text-xs font-semibold text-muted-foreground"
+              className="min-h-11 rounded-full border border-border px-4 text-xs font-semibold text-muted-foreground"
             >
               Agora não
             </button>
@@ -761,10 +991,24 @@ function DuplaCard({
         </div>
       )}
 
+      {/* ⚠️ ESTE BLOCO NÃO TINHA BOTÃO NENHUM, e isso era uma armadilha
+          permanente: os chips de convidar só existem em `estado === "sem"`, e
+          `desfazerDupla` só apagava dupla ACEITA. Quem convidasse uma amiga
+          que nunca abre o app ficava sem dupla para sempre — sem poder
+          cancelar e sem poder convidar outra pessoa. */}
       {estado === "convite-enviado" && dupla && (
-        <p className="mt-4 rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground dark:bg-white/5">
-          Convite enviado para <strong>{dupla.nome}</strong>. Esperando ela aceitar.
-        </p>
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-white/70 p-3 dark:bg-white/5">
+          <p className="min-w-0 text-sm text-muted-foreground">
+            Convite enviado para <strong>{dupla.nome}</strong>. Esperando ela aceitar.
+          </p>
+          <button
+            onClick={() => chamar("desfazer")}
+            disabled={ocupado}
+            className="min-h-11 shrink-0 rounded-full border border-border px-3 text-[11px] font-semibold text-muted-foreground"
+          >
+            Cancelar
+          </button>
+        </div>
       )}
 
       {estado === "sem" &&
@@ -824,7 +1068,12 @@ function PerfilDaAmigaTela({
     (async () => {
       try {
         const { data: s } = await supabase.auth.getSession();
-        if (!s.session?.access_token) return;
+        if (!s.session?.access_token) {
+          /* Sem sessão o esqueleto giraria para sempre. Um erro nomeado é a
+             diferença entre "está carregando" e "não vai carregar". */
+          setErro("Não foi possível abrir este perfil.");
+          return;
+        }
         const { perfilDaAmiga } = await import("@/lib/amigas.functions");
         const r = await perfilDaAmiga({
           data: { accessToken: s.session.access_token, amigaId },
@@ -902,7 +1151,17 @@ function PerfilDaAmigaTela({
       </div>
     );
   }
-  if (!perfil || !cantinho) return <div className="skeleton h-72 rounded-3xl" />;
+  /* ⚠️ O ESQUELETO CARREGA O «← Amigas». Sem ele, um soluço de sessão prendia
+     a paciente num retângulo cinza sem saída: o `return` sem sessão (acima) não
+     seta `perfil` nem `erro`, e este ramo devolvia só a caixa vazia — a seta de
+     voltar ficava de fora. A espera pode durar; a saída não pode sumir. */
+  if (!perfil || !cantinho)
+    return (
+      <div>
+        {voltar}
+        <div className="skeleton h-72 rounded-3xl" />
+      </div>
+    );
 
   const fundo = fundoBgFor(cantinho.fundo) ?? "linear-gradient(180deg,#fff5f4,#ffdfd8)";
   /* A pele das bolinhas que ela equipou. Entra como uma bolinha ao lado do

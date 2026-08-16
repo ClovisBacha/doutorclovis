@@ -232,14 +232,42 @@ describe("nada clínico atravessa o perfil", () => {
 });
 
 describe("o Modo Cuidado tira a pessoa da aba, sem dizer por quê", () => {
-  test("ela some da lista NO SERVIDOR", () => {
+  /**
+   * ⚠️ ESTES TRÊS TESTES MENTIAM, e eram a regra mais sensível da aba.
+   *
+   * Uma auditoria mutou o servidor e mediu: `if (false && (await emLuto(...)))`
+   * em `perfilDaAmiga` passava com 97/97 verdes — ou seja, entregar o perfil e o
+   * Cantinho de quem acabou de perder a gestação passava no CI. Apagar o
+   * `filter(care_mode)` de `minhasAmigas` também passava, porque a MESMA string
+   * sobrevive em `contarAmigas`.
+   *
+   * A causa é sempre a mesma: `toContain` sobre o ARQUIVO INTEIRO responde "a
+   * string existe em algum lugar", que é uma pergunta diferente de "esta função
+   * obedece à regra". Cada teste passou a olhar o corpo da função de que fala.
+   */
+  const corpoDe = (nome: string) => {
+    const i = servidor.indexOf(nome);
+    if (i < 0) return "";
+    const fim = servidor.indexOf("\nexport ", i + 10);
+    return servidor.slice(i, fim === -1 ? servidor.length : fim);
+  };
+
+  test("ela some da lista NO SERVIDOR — dentro de `minhasAmigas`", () => {
     /* Filtrar na tela deixaria o nome viajar pela rede — e o simples sumiço da
-       lista já contaria à amiga o que aconteceu. */
-    expect(servidor).toContain("filter((p) => !p.care_mode)");
+       lista já contaria à amiga o que aconteceu.
+       ⚠️ No corpo da função, não no arquivo: a string vive também em
+       `contarAmigas`, e era ela que segurava o teste de pé. */
+    expect(corpoDe("export const minhasAmigas")).toContain("filter((p) => !p.care_mode)");
+    expect(corpoDe("export const contarAmigas")).toContain("filter((p) => !p.care_mode)");
   });
 
-  test("o perfil dela responde «indisponivel», e não o motivo", () => {
-    expect(servidor).toContain('error: "indisponivel"');
+  test("o perfil dela responde «indisponivel» — e o portão está ARMADO", () => {
+    const perfil = corpoDe("export const perfilDaAmiga");
+    expect(perfil).toContain('error: "indisponivel"');
+    /* A condição inteira, não a palavra solta: `if (false && (await emLuto(…)))`
+       contém "emLuto" e passava. */
+    expect(perfil).toContain("if (await emLuto(sb, data.amigaId))");
+    expect(perfil).not.toContain("!(await emLuto");
     expect(servidor).not.toContain("está em Modo Cuidado");
   });
 
@@ -586,8 +614,15 @@ describe("o aviso «a outra já fechou o dia»", () => {
 });
 
 describe("sair da amizade", () => {
+  /* ⚠️ O corpo vai até a PRÓXIMA declaração exportada, não até o fim do
+     arquivo. Com a fatia aberta, a primeira função acrescentada depois passa a
+     responder pelos `toContain`/`not.toContain` daqui — e foi exatamente o que
+     aconteceu: `convidarAmiga` nasceu abaixo, com push legítimo, e derrubou o
+     teste de "ninguém é avisado". Mesma armadilha que `conquistas.test.ts`
+     corrigiu hoje de manhã. */
   const i = servidor.indexOf("export const encerrarAmizade");
-  const corpo = servidor.slice(i);
+  const fim = servidor.indexOf("\nexport ", i + 10);
+  const corpo = servidor.slice(i, fim === -1 ? servidor.length : fim);
 
   test("⚠️ o vínculo é conferido ANTES de escrever", () => {
     /* Sem isto, um uuid forjado separaria duas pacientes DESCONHECIDAS — a

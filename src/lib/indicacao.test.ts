@@ -93,7 +93,11 @@ describe("⚠️ as DUAS telas usam o mesmo construtor", () => {
   test("sem código o convite NÃO sai", () => {
     /* Mandar assim gasta o convite dela — ela só tem a atenção da amiga uma
        vez — e o vínculo some sem deixar rastro. */
-    const i = amigas.indexOf("async function convidar");
+    /* ⚠️ `convidar()` com os parênteses: `indexOf("async function convidar")`
+       passou a casar com `convidarPorTermo`, que nasceu depois e vem antes no
+       arquivo. Prefixo compartilhado é a mesma fragilidade do `slice` sem fim
+       — o teste passa a olhar outra função sem ninguém notar. */
+    const i = amigas.indexOf("async function convidar()");
     const corpo = amigas.slice(i, i + 900);
     expect(corpo).toContain("if (!url)");
     expect(corpo).toContain("return;");

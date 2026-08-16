@@ -66,6 +66,12 @@ async function emLuto(sb: any, uid: string): Promise<boolean> {
  */
 async function saoAmigas(sb: any, eu: string, outra: string): Promise<boolean> {
   if (!outra || outra === eu) return false;
+
+  /* ⚠️ QUEM ENCERROU NÃO É AMIGA, e esta é a primeira pergunta — antes das
+     duas fontes. Sem isto, `perfilDaAmiga`, `convidarDupla` e o presente
+     continuariam atravessando uma saída que a lista já respeita. */
+  if ((await encerradasCom(sb, eu)).has(outra)) return false;
+
   const { data } = await sb
     .from("patient_profiles")
     .select("id, referred_by")
@@ -73,12 +79,18 @@ async function saoAmigas(sb: any, eu: string, outra: string): Promise<boolean> {
   const linhas = (data ?? []) as { id: string; referred_by: string | null }[];
   const minha = linhas.find((l) => l.id === eu);
   const dela = linhas.find((l) => l.id === outra);
-  if (!minha || !dela) return false;
-  return minha.referred_by === outra || dela.referred_by === eu;
+  if (minha && dela && (minha.referred_by === outra || dela.referred_by === eu)) return true;
+
+  /* ⚠️ O SEGUNDO GRAFO CONTA IGUAL. `saoAmigas` é o portão de TUDO (perfil,
+     Cantinho, dupla, presente): se ele só conhecesse a indicação, a amiga que
+     entrou por pedido+aceite apareceria na lista e seria recusada em todas as
+     ações — uma amiga de segunda classe, com botões que não funcionam. */
+  return (await amizadesAceitas(sb, eu)).has(outra);
 }
 
 /**
- * Os ids de todas as amigas — quem eu indiquei ∪ quem me indicou.
+ * Os ids de todas as amigas — quem eu indiquei ∪ quem me indicou ∪ quem
+ * ACEITOU um convite meu (ou de quem eu aceitei).
  *
  * ⚠️ Devolve as duas coisas: a UNIÃO (quem aparece na lista) e o subconjunto
  * que EU trouxe. Só este último pode receber presente meu — `presentearAmiga`
@@ -108,6 +120,13 @@ async function idsDasAmigas(
     ids.add(r.id);
     trazidasPorMim.add(r.id);
   }
+
+  /* ─── O SEGUNDO GRAFO ────────────────────────────────────────────────
+     A indicação liga quem entrou pelo link de alguém; ela não tem como ligar
+     duas contas que já existiam. `amizades` é o pedido+aceite entre contas
+     existentes, e as duas fontes somam — uma amiga pode ter chegado por
+     qualquer uma das duas portas, e da lista para baixo elas são iguais. */
+  for (const outra of await amizadesAceitas(sb, eu)) ids.add(outra);
 
   /* ─── ⚠️ AS AMIZADES ENCERRADAS SAEM AQUI ────────────────────────────
      No SERVIDOR, e antes de qualquer leitura — é a mesma regra do Modo
@@ -183,10 +202,22 @@ async function presenteadasNoCiclo(sb: any, eu: string): Promise<Set<string>> {
     const { inicioDoCiclo } = await import("@/lib/cota-ia.server");
     const ciclo = inicioDoCiclo().toISOString().slice(0, 7);
     const prefixo = `amiga:${eu}:`;
+    /* ⚠️ SEM `.eq("user_id", eu)` — E ESTE FILTRO ZERAVA A FUNÇÃO INTEIRA.
+       A linha do presente é gravada com `user_id` de quem RECEBE
+       (`grantSementinhas(db, data.amigaId, …)`), não de quem dá. Filtrando por
+       mim, nenhuma linha casava: o `Set` voltava sempre vazio, `jaPresenteada`
+       era sempre `false`, e o 🎁 reabilitava a cada visita para o servidor
+       recusar com "você já presenteou Fulana neste mês".
+
+       Ou seja: era exatamente o defeito que esta função foi escrita para
+       consertar, reintroduzido pelo lado de dentro. A irmã `lerMesadaDaAmiga`
+       sempre leu certo (ela não filtra `user_id`) — os dois leitores do mesmo
+       dado discordavam.
+
+       Quem recorta é o PREFIXO `amiga:<eu>:`, que já carrega o meu id. */
     const { data, error } = await sb
       .from("sementinhas_ledger")
       .select("dedupe_key")
-      .eq("user_id", eu)
       .like("dedupe_key", `${prefixo}%`)
       .limit(1000);
     if (error || !data) return new Set();
@@ -273,6 +304,7 @@ export const minhasAmigas = createServerFn({ method: "POST" })
        precisava responder para não desenhar um 🎁 que o servidor recusa.
        Ver `possoPresentear` e `jaPresenteada` em `PerfilDeAmiga`. */
     const jaGanharam = await presenteadasNoCiclo(sb, eu);
+    const aceitas = await amizadesAceitas(sb, eu);
 
     const amigas: PerfilDeAmiga[] = visiveis.map((p) => {
       const dela = agrupado.get(p.id) ?? [];
@@ -289,7 +321,12 @@ export const minhasAmigas = createServerFn({ method: "POST" })
         diasNoApp: p.created_at
           ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000))
           : 0,
-        possoPresentear: trazidasIds.has(p.id),
+        /* ⚠️ Os DOIS grafos. Era só `trazidasIds` (quem eu indiquei), e com o
+           convite entre contas existentes isso deixaria metade das amigas sem
+           o 🎁 — na lista, mas impossíveis de presentear. `presentearAmiga`
+           confere pela mesma régua (`saoAmigasParaPresente`), então a tela e o
+           servidor não podem discordar. */
+        possoPresentear: trazidasIds.has(p.id) || aceitas.has(p.id),
         jaPresenteada: jaGanharam.has(p.id),
       };
     });
@@ -344,6 +381,13 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
     if (!eu) return { ok: false as const, error: "sem_permissao" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
+
+    /* ⚠️ ESTA ERA A ÚNICA FUNÇÃO DA DUPLA SEM PORTÃO DE MODO CUIDADO.
+       `convidarDupla`, `lerDupla` e `cobrarBonusDaDupla` têm o seu; aqui
+       faltava, então quem entrou em luto ainda podia ACEITAR um convite
+       pendente e voltar a ter uma chama a segurar. O cabeçalho do arquivo diz
+       que a aba inteira se cala para quem está nele. */
+    if (await emLuto(sb, eu)) return { ok: false as const, error: "indisponivel" as const };
 
     /* O VÍNCULO ANTES DE TUDO. Sem esta linha, qualquer uuid no corpo do pedido
        devolveria o Cantinho e o perfil de qualquer paciente da plataforma. */
@@ -405,7 +449,7 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
          "Presentear" do perfil é a segunda porta, e uma porta que a lista já
          sabe estar fechada não pode aparecer aberta ao lado. `possoPresentear`
          é `referred_by = eu`, exatamente o que `presentearAmiga` exige. */
-      possoPresentear: (p.referred_by ?? null) === eu,
+      possoPresentear: (p.referred_by ?? null) === eu || (await amizadesAceitas(sb, eu)).has(p.id),
       jaPresenteada: (await presenteadasNoCiclo(sb, eu)).has(p.id),
     };
 
@@ -627,13 +671,23 @@ export const desfazerDupla = createServerFn({ method: "POST" })
     if (!eu) return { ok: false as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-    /* Erro conferido pelo mesmo motivo da recusa: desfazer que falha em
+    /* ⚠️ SEM `.eq("aceita", true)` — E ESSE FILTRO ERA UMA ARMADILHA
+       PERMANENTE.
+
+       Com ele, `desfazerDupla` só apagava dupla ACEITA. Quem convidasse uma
+       amiga que nunca abre o app ficava com um convite pendente para sempre:
+       a tela mostra "Esperando ela aceitar" SEM nenhum botão, e os chips de
+       convidar só aparecem em `estado === "sem"` — ou seja, ela não podia
+       desfazer nem convidar outra pessoa. A dupla, que é a mecânica mais
+       social da aba, ficava trancada por uma amiga que talvez nunca volte.
+
+       Apagar o convite pendente é seguro: `recusar` já apaga a linha pelo
+       mesmo motivo (marcar "recusada" bloquearia o par para sempre pela chave
+       única), e cancelar um convite que EU mandei não tira nada de ninguém.
+
+       Erro conferido pelo mesmo motivo da recusa: desfazer que falha em
        silêncio deixa as duas ainda em dupla, com a tela dizendo que não. */
-    const { error } = await sb
-      .from("duplas")
-      .delete()
-      .or(`menor.eq.${eu},maior.eq.${eu}`)
-      .eq("aceita", true);
+    const { error } = await sb.from("duplas").delete().or(`menor.eq.${eu},maior.eq.${eu}`);
     if (error) return { ok: false as const };
     return { ok: true as const };
   });
@@ -923,3 +977,324 @@ export const encerrarAmizade = createServerFn({ method: "POST" })
       return { ok: false as const, error: "falhou" as const };
     }
   });
+
+/* ══════════════════════ CONVITE ENTRE CONTAS QUE JÁ EXISTEM ══════════════════
+
+   ─── O BURACO ─────────────────────────────────────────────────────────────
+
+   O grafo de amizade era EXCLUSIVAMENTE o da indicação: para duas contas se
+   enxergarem, uma tinha de mandar o link ANTES de a outra existir. Ficava de
+   fora o caso mais comum — **as duas já usam o app**. Duas grávidas do mesmo
+   obstetra que se conheceram na sala de espera e baixaram o app cada uma por
+   conta própria não tinham caminho nenhum, e nada na tela explicava por quê.
+
+   ─── ⚠️ CÓDIGO OU E-MAIL. NUNCA NOME ──────────────────────────────────────
+
+   Busca por nome transformaria a base de pacientes numa lista navegável:
+   qualquer conta enumeraria grávidas por nome, e num app de gestação de alto
+   risco esse é o dado que menos pode vazar.
+
+   O código é uma CAPACIDADE (`referral_code`, 7 caracteres num alfabeto de 32
+   — 34 bilhões de combinações): só se tem se a outra tiver dado. O e-mail
+   exige saber o e-mail, que é a mesma prova que o WhatsApp pede.
+
+   ─── ⚠️ E O E-MAIL NUNCA REVELA SE A CONTA EXISTE ─────────────────────────
+
+   `achou` volta `null` no caminho do e-mail, com ou sem acerto. Sem isso o
+   campo vira um verificador de contas — dá para descobrir se uma pessoa
+   específica é paciente daqui, e isso é informação de saúde.
+
+   O código PODE revelar, e é o que o torna gostoso de usar: quem digita um
+   código só o tem porque a dona deu.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Quantos convites uma conta pode disparar por dia. */
+const CONVITES_POR_DIA = 20;
+
+/** As amizades ACEITAS entre contas existentes — o segundo grafo. */
+async function amizadesAceitas(sb: any, eu: string): Promise<Set<string>> {
+  try {
+    const { data, error } = await sb
+      .from("amizades")
+      .select("menor, maior, aceita")
+      .or(`menor.eq.${eu},maior.eq.${eu}`)
+      .eq("aceita", true)
+      .limit(500);
+    if (error || !data) return new Set();
+    const fora = new Set<string>();
+    for (const l of data as { menor: string; maior: string }[]) {
+      fora.add(l.menor === eu ? l.maior : l.menor);
+    }
+    return fora;
+  } catch {
+    /* `APLICAR_AMIZADES_ENTRE_CONTAS.sql` ainda não rodou: o grafo da
+       indicação continua valendo sozinho, como sempre valeu. */
+    return new Set();
+  }
+}
+
+export const convidarAmiga = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), termo: z.string().min(3).max(120) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const, error: "sessao" as const };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+
+      /* Modo Cuidado: quem está nele não convida ninguém, como não presenteia
+         e não aparece na lista das outras. */
+      if (await emLuto(sb, eu)) return { ok: false as const, error: "indisponivel" as const };
+
+      const bruto = data.termo.trim();
+      const porEmail = bruto.includes("@");
+
+      /* ⚠️ TETO DIÁRIO. Sem ele o campo de e-mail vira uma ferramenta de spam:
+         um roteiro dispara mil convites e mil pessoas recebem push de alguém
+         que elas não conhecem. Vinte é muito mais do que qualquer paciente
+         convida num dia e pouco para servir a um roteiro. */
+      const desde = new Date(Date.now() - 86400000).toISOString();
+      const { count } = await sb
+        .from("amizades")
+        .select("id", { count: "exact", head: true })
+        .eq("quem_convidou", eu)
+        .gte("criada_em", desde);
+      if ((count ?? 0) >= CONVITES_POR_DIA) {
+        return { ok: false as const, error: "muitos_convites" as const };
+      }
+
+      let alvo: string | null = null;
+      if (porEmail) {
+        /* O e-mail mora em `auth.users`, que só o servidor lê. */
+        const { data: lista } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const alvoEmail = bruto.toLowerCase();
+        alvo =
+          (lista?.users ?? []).find((u) => (u.email ?? "").toLowerCase() === alvoEmail)?.id ?? null;
+      } else {
+        const codigo = bruto
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .slice(0, 12);
+        if (codigo.length < 4) return { ok: false as const, error: "termo_curto" as const };
+        const { data: p } = await sb
+          .from("patient_profiles")
+          .select("id")
+          .eq("referral_code", codigo)
+          .maybeSingle();
+        alvo = (p as { id?: string } | null)?.id ?? null;
+      }
+
+      /* ⚠️ A RESPOSTA DO E-MAIL É A MESMA COM E SEM ACERTO. Ver o cabeçalho:
+         revelar aqui transformaria o campo num verificador de contas. */
+      const anonima = { ok: true as const, achou: null, nome: null as string | null };
+      if (!alvo || alvo === eu) {
+        if (porEmail) return anonima;
+        return { ok: false as const, error: "nao_encontrada" as const };
+      }
+
+      /* A outra em Modo Cuidado responde como quem não existe — nunca o
+         motivo. É a mesma régua de `perfilDaAmiga`. */
+      if (await emLuto(sb, alvo)) {
+        return porEmail ? anonima : { ok: false as const, error: "nao_encontrada" as const };
+      }
+
+      const { parOrdenado } = await import("@/lib/amigas");
+      const { menor, maior } = parOrdenado(eu, alvo);
+
+      /* Já encerraram? O convite não ressuscita a amizade por fora: a saída
+         some da lista dos dois lados e reabri-la é uma decisão de quem saiu. */
+      if ((await encerradasCom(sb, eu)).has(alvo)) {
+        return porEmail ? anonima : { ok: false as const, error: "nao_encontrada" as const };
+      }
+
+      const { error } = await sb
+        .from("amizades")
+        .upsert(
+          { menor, maior, quem_convidou: eu },
+          { onConflict: "menor,maior", ignoreDuplicates: true },
+        );
+      if (error) return { ok: false as const, error: "falhou" as const };
+
+      /* Avisa a convidada. Best-effort: o pedido já está gravado. */
+      try {
+        const { data: mim } = await sb
+          .from("patient_profiles")
+          .select("display_name")
+          .eq("id", eu)
+          .maybeSingle();
+        const nome =
+          ((mim?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Uma paciente";
+        const { sendPushToUser } = await import("@/lib/push.server");
+        await sendPushToUser(alvo, {
+          title: `${nome} quer ser sua amiga aqui 💛`,
+          body: "Aceite para visitarem o Cantinho uma da outra e jogarem juntas.",
+          url: "/minha-conta?tab=Amigas",
+        });
+      } catch {
+        /* best-effort */
+      }
+
+      if (porEmail) return anonima;
+      const { data: alvoPerfil } = await sb
+        .from("patient_profiles")
+        .select("display_name")
+        .eq("id", alvo)
+        .maybeSingle();
+      return {
+        ok: true as const,
+        achou: true,
+        nome: ((alvoPerfil?.display_name as string | null) ?? "").trim() || "Amiga",
+      };
+    } catch {
+      return { ok: false as const, error: "falhou" as const };
+    }
+  });
+
+/** Os pedidos de amizade que EU recebi e ainda não respondi. */
+export const pedidosDeAmizade = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const, pedidos: [] };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+      if (await emLuto(sb, eu)) return { ok: true as const, pedidos: [] };
+
+      const { data: linhas, error } = await sb
+        .from("amizades")
+        .select("menor, maior, quem_convidou, aceita")
+        .or(`menor.eq.${eu},maior.eq.${eu}`)
+        .eq("aceita", false)
+        .limit(100);
+      if (error || !linhas) return { ok: true as const, pedidos: [] };
+
+      /* Só os que EU recebi: quem convidou vê "esperando ela aceitar", e não um
+         botão "Aceitar" no próprio convite — é o mesmo defeito que os quatro
+         estados da dupla existem para evitar. */
+      const deles = (linhas as { menor: string; maior: string; quem_convidou: string }[]).filter(
+        (l) => l.quem_convidou !== eu,
+      );
+      if (deles.length === 0) return { ok: true as const, pedidos: [] };
+
+      const ids = deles.map((l) => (l.menor === eu ? l.maior : l.menor));
+      const { data: perfis } = await sb
+        .from("patient_profiles")
+        .select("id, display_name, care_mode, created_at")
+        .in("id", ids);
+
+      const pedidos = ((perfis ?? []) as any[])
+        /* Em Modo Cuidado ela some do pedido também, sem dizer por quê. */
+        .filter((p) => !p.care_mode)
+        .map((p) => ({
+          id: p.id as string,
+          nome: ((p.display_name as string | null) ?? "").trim() || "Uma paciente",
+          diasNoApp: p.created_at
+            ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000))
+            : 0,
+        }));
+      return { ok: true as const, pedidos };
+    } catch {
+      return { ok: true as const, pedidos: [] };
+    }
+  });
+
+export const responderAmizade = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        amigaId: z.string().uuid(),
+        aceitar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const, error: "sessao" as const };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+
+      const { parOrdenado } = await import("@/lib/amigas");
+      const { menor, maior } = parOrdenado(eu, data.amigaId);
+
+      /* ⚠️ SÓ A DESTINATÁRIA ACEITA. `quem_convidou.neq` é o que impede quem
+         mandou o convite de aceitá-lo sozinha — sem isso, o aceite é
+         decorativo e qualquer conta entra na lista de qualquer outra. */
+      if (data.aceitar) {
+        const { data: aceitou, error } = await sb
+          .from("amizades")
+          .update({ aceita: true, aceita_em: new Date().toISOString() })
+          .eq("menor", menor)
+          .eq("maior", maior)
+          .eq("aceita", false)
+          .neq("quem_convidou", eu)
+          .select("id");
+        if (error) return { ok: false as const, error: "falhou" as const };
+        if (!aceitou || aceitou.length === 0) {
+          return { ok: false as const, error: "sem_pedido" as const };
+        }
+
+        /* Avisa quem convidou — é o fecho do laço, e é o que a traz de volta
+           para encontrar a amiga nova na lista. */
+        try {
+          const { data: mim } = await sb
+            .from("patient_profiles")
+            .select("display_name")
+            .eq("id", eu)
+            .maybeSingle();
+          const nome = ((mim?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Ela";
+          const { sendPushToUser } = await import("@/lib/push.server");
+          await sendPushToUser(data.amigaId, {
+            title: `${nome} aceitou o seu convite 💛`,
+            body: "Vocês já podem visitar o Cantinho uma da outra.",
+            url: "/minha-conta?tab=Amigas",
+          });
+        } catch {
+          /* best-effort */
+        }
+        return { ok: true as const };
+      }
+
+      /* RECUSAR APAGA a linha, como na dupla: marcar "recusada" bloquearia o
+         par para sempre pela chave única, e uma recusa de hoje não pode
+         impedir um convite de daqui a seis meses.
+         ⚠️ E não avisa ninguém — recusa que notifica vira constrangimento. */
+      const { error: erroAoRecusar } = await sb
+        .from("amizades")
+        .delete()
+        .eq("menor", menor)
+        .eq("maior", maior)
+        .eq("aceita", false)
+        .neq("quem_convidou", eu);
+      if (erroAoRecusar) return { ok: false as const, error: "falhou" as const };
+      return { ok: true as const };
+    } catch {
+      return { ok: false as const, error: "falhou" as const };
+    }
+  });
+
+/**
+ * O portão de amizade, exposto para quem vive noutro arquivo.
+ *
+ * ⚠️ `saoAmigas` é `function` de módulo e a régua dos DOIS grafos mora nela.
+ * `presentearAmiga` conferia por conta própria (`referred_by = uid`) e por isso
+ * divergiu duas vezes: primeiro recusando quem me trouxe, depois recusaria
+ * todas as amizades criadas por pedido+aceite. Uma régua, um lugar.
+ *
+ * Recebe o TOKEN e resolve a sessão aqui dentro, em vez de aceitar um `uid` —
+ * um `uid` vindo do chamador seria uma porta para conferir a amizade de duas
+ * outras pessoas.
+ */
+export async function saoAmigasParaPresente(
+  accessToken: string,
+  amigaId: string,
+): Promise<boolean> {
+  const eu = await pacienteDaSessao(accessToken);
+  if (!eu) return false;
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return saoAmigas(supabaseAdmin as any, eu, amigaId);
+}

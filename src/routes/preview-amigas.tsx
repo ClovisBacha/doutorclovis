@@ -28,6 +28,7 @@ import type { DuplaNaTela } from "@/lib/amigas.functions";
  *   `?premium=1`       liga o botão 🎁 na linha da amiga
  *   `?luto=1`          Modo Cuidado — a aba inteira se cala
  *   `?semcodigo=1`     sem código de indicação (o "Convidar" explica e não manda)
+ *   `?pedidos=2`       pedidos de amizade recebidos (a seção some com zero)
  */
 export const Route = createFileRoute("/preview-amigas")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -42,6 +43,9 @@ export const Route = createFileRoute("/preview-amigas")({
     recorde: q.recorde == null ? 0 : Number(q.recorde),
     /* Há quantos dias a outra não aparece — é o que aciona a pausa gentil. */
     parada: q.parada == null ? 0 : Number(q.parada),
+    /* Pedidos de amizade recebidos — a seção só existe quando há algum, e num
+       ambiente de teste ninguém convida ninguém. */
+    pedidos: q.pedidos == null ? 0 : Number(q.pedidos),
     premium: q.premium == null ? false : Boolean(q.premium),
     /* O código de indicação. Sem ele o "Convidar" explica em vez de mandar —
        `?semcodigo=1` é a única forma de fotografar esse estado. */
@@ -59,7 +63,7 @@ export const Route = createFileRoute("/preview-amigas")({
 const NOMES = ["Marina Costa", "Juliana Alves", "Camila Souza", "Beatriz Lima", "Renata Dias"];
 
 function PreviewAmigas() {
-  const { n, dupla, dias, premium, luto, codigo, recorde, parada } = Route.useSearch();
+  const { n, dupla, dias, premium, luto, codigo, recorde, parada, pedidos } = Route.useSearch();
 
   const amigas: PerfilDeAmiga[] = NOMES.slice(0, Math.max(0, Math.min(NOMES.length, n))).map(
     (nome, i) => ({
@@ -96,7 +100,20 @@ function PreviewAmigas() {
 
   return (
     <div className="mx-auto max-w-md p-4">
-      <AmigasTab careMode={luto} bancada={{ amigas, dupla: naTela, assinante: premium, codigo }} />
+      <AmigasTab
+        careMode={luto}
+        bancada={{
+          amigas,
+          dupla: naTela,
+          assinante: premium,
+          codigo,
+          pedidos: NOMES.slice(0, Math.max(0, Math.min(3, pedidos))).map((nome, i) => ({
+            id: `pedido-${i}`,
+            nome,
+            diasNoApp: [2, 30, 91][i] ?? 5,
+          })),
+        }}
+      />
     </div>
   );
 }

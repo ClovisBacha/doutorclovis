@@ -81,11 +81,24 @@ describe("2. a hierarquia entre quem dá", () => {
 });
 
 describe("3. as quatro travas do servidor", () => {
-  test("só quem ela REALMENTE indicou", () => {
-    /* `referred_by` é fixado uma vez e nunca reescrito. Aceitar um id vindo do
-       cliente deixaria presentear qualquer pessoa do app. */
-    expect(fns).toContain('.eq("referred_by", uid)');
+  test("só quem é amiga MESMO — pelos dois grafos, e por uma régua só", () => {
+    /**
+     * A conferência era `.eq("referred_by", uid)` escrita aqui dentro: quem EU
+     * indiquei, e mais ninguém. Ela divergiu duas vezes da régua que o resto da
+     * aba usa:
+     *
+     *  · o 🎁 aparecia para quem me TROUXE (grafo nos dois sentidos) e o
+     *    servidor recusava com "vocês precisam estar conectadas" — falso;
+     *  · e com o convite entre contas existentes, metade das amigas viraria
+     *    amiga de segunda classe: na lista, impossível de presentear.
+     *
+     * Hoje é `saoAmigasParaPresente`, a MESMA régua do perfil, do Cantinho e da
+     * dupla — que conhece os dois grafos e já recusa quem encerrou a amizade.
+     */
+    expect(fns).toContain("saoAmigasParaPresente(data.accessToken, data.amigaId)");
     expect(fns).toContain('error: "nao_indicada"');
+    /* E a régua NÃO é reescrita aqui. */
+    expect(fns).not.toContain('.eq("referred_by", uid)');
   });
 
   test("nunca a si mesma — seria uma torneira mensal", () => {
@@ -223,7 +236,6 @@ describe("6. a tela existe, e há UMA porta só", () => {
      * — uma frase falsa, porque estão, só que pelo lado oposto. Atinge toda
      * paciente que chegou por indicação, que é o caminho que a aba promove.
      */
-    expect(fns).toContain('.eq("referred_by", uid)');
     const usos = [...tela.matchAll(/possoPresentear/g)];
     expect(usos.length).toBeGreaterThanOrEqual(2);
   });
@@ -299,5 +311,53 @@ describe("6. a tela existe, e há UMA porta só", () => {
   test("o valor do presente vem da fonte única, não digitado", () => {
     expect(tela).toContain("PRESENTE_ENTRE_AMIGAS");
     expect(tela).not.toMatch(/\b100 Sementinhas\b/);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ QUEM GRAVA E QUEM LÊ TÊM DE CONCORDAR
+
+   `presenteadasNoCiclo` (que decide se o 🎁 aparece) filtrava
+   `.eq("user_id", eu)`. Mas a linha do presente é gravada com o `user_id` de
+   quem RECEBE — `grantSementinhas(db, data.amigaId, …)`. Nenhuma linha casava:
+   a função voltava sempre vazia, `jaPresenteada` era sempre `false`, e o 🎁
+   reabilitava a cada visita para o servidor recusar com "você já presenteou
+   Fulana neste mês".
+
+   Era o defeito que a função foi escrita para consertar, reintroduzido pelo
+   lado de dentro — e nenhum teste pegou, porque todos olhavam a EXISTÊNCIA da
+   função, não a concordância entre os dois lados.
+
+   A irmã `lerMesadaDaAmiga` sempre leu certo (não filtra `user_id`), então os
+   dois leitores do mesmo dado discordavam entre si.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("7. o presente: quem grava e quem lê olham a mesma linha", () => {
+  const amigasFns = semComentarios("src/lib/amigas.functions.ts");
+
+  test("a linha é gravada na conta de QUEM RECEBE", () => {
+    expect(fns).toContain("grantSementinhas(typedDb(supabaseAdmin as never), data.amigaId, [");
+  });
+
+  test("⚠️ e o leitor do 🎁 NÃO filtra por quem dá", () => {
+    const i = amigasFns.indexOf("async function presenteadasNoCiclo");
+    const corpo = amigasFns.slice(i, amigasFns.indexOf("\n}", i + 10));
+    expect(corpo).toContain('.like("dedupe_key", `${prefixo}%`)');
+    expect(corpo).not.toContain('.eq("user_id", eu)');
+  });
+
+  test("o recorte é o PREFIXO, que já carrega o id de quem deu", () => {
+    /* `amiga:<eu>:<amiga>:<ciclo>` — sem o prefixo, a função leria os
+       presentes que TODO MUNDO deu, e o 🎁 sumiria para uma amiga que outra
+       pessoa presenteou. */
+    expect(amigasFns).toContain("const prefixo = `amiga:${eu}:`;");
+  });
+
+  test("e o outro leitor do mesmo dado concorda", () => {
+    /* `lerMesadaDaAmiga` soma o GASTO do ciclo e sempre leu certo. Se um dia
+       alguém "consertar" um dos dois isolado, eles divergem de novo. */
+    const i = fns.indexOf("export async function lerMesadaDaAmiga");
+    const corpo = fns.slice(i, i + 1200);
+    expect(corpo).toContain('.like("dedupe_key", `amiga:${uid}:%`)');
+    expect(corpo).not.toContain('.eq("user_id", uid)');
   });
 });
