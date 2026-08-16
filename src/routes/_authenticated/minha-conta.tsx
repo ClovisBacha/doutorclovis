@@ -56,6 +56,7 @@ import { shareMilestoneCard } from "@/lib/share-card";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
+import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
@@ -151,7 +152,12 @@ import { AmigasTab } from "@/components/amigas";
    nenhum médico recém-cadastrado aparecia. Duas buscas com regras diferentes
    para a mesma pergunta é uma a mais do que o app precisa. */
 import { searchDoctors as buscarDiretorio, type DirectoryDoctor } from "@/lib/doctors.functions";
-import { storedReferralCode, clearStoredReferralCode } from "@/routes/__root";
+import {
+  storedReferralCode,
+  clearStoredReferralCode,
+  storedAffiliateCode,
+  clearStoredAffiliateCode,
+} from "@/routes/__root";
 import { setCareMode } from "@/lib/care-mode.functions";
 /**
  * ⚠️ `GestacaoPath` É `lazy()`, e o motivo é medido.
@@ -1308,6 +1314,39 @@ function MinhaContaPage() {
     })();
   }, []);
 
+  /* ─── CÓDIGO DA INFLUENCIADORA ────────────────────────────────────────────
+     Mesmo desenho da indicação de amiga logo acima, e é de propósito que sejam
+     dois efeitos e não um: são COLUNAS diferentes (`ref_code` × `referred_by`),
+     bônus diferentes e destinatários diferentes — o da amiga paga quem indicou,
+     o da influenciadora paga quem CHEGOU. Ver `influenciadora.functions.ts`.
+
+     ⚠️ O código do navegador NÃO é limpo quando o servidor devolve `repetir`
+     (perfil ainda não criado, e-mail não confirmado): é justamente o caso em que
+     ele precisa sobreviver até a próxima abertura. */
+  useEffect(() => {
+    (async () => {
+      const codigo = storedAffiliateCode();
+      if (!codigo) return;
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      try {
+        const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
+        const r = await atribuirInfluenciadora({
+          data: { accessToken: s.session.access_token, codigo },
+        });
+        if (r.ok && !("repetir" in r && r.repetir)) clearStoredAffiliateCode();
+        if (r.ok && "atribuido" in r && r.atribuido && r.bonus > 0) {
+          toast.success(`Bem-vinda! Você começou com ${r.bonus} Sementinhas 🌱`);
+          /* O saldo do topo é lido por este evento — sem ele o número só
+             mudaria na próxima abertura, e o presente ficaria invisível. */
+          creditarSementinhas(r.bonus);
+        }
+      } catch {
+        /* tenta de novo na próxima visita */
+      }
+    })();
+  }, []);
+
   // Retorno do checkout do Stripe: o webhook libera o acesso em segundos.
   // Reconsulta o perfil até o premium refletir e avisa a paciente.
   useEffect(() => {
@@ -2394,6 +2433,29 @@ function OnboardingRitual({
   const [babyName, setBabyName] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /* ─── O CÓDIGO DA INFLUENCIADORA ────────────────────────────────────────────
+     Nasce PRÉ-PREENCHIDO quando ela veio por um link `?ref=` — é o "link
+     inteligente" do desenho. Quem baixou pela busca da loja digita.
+
+     ⚠️ `useState(() => …)` e não `useState(storedAffiliateCode())`: a segunda
+     forma LÊ o localStorage a cada render, e no SSR não há localStorage. A
+     função inicializadora roda uma vez, no cliente. */
+  const [codigoRef, setCodigoRef] = useState<string>(() => {
+    try {
+      return storedAffiliateCode() ?? "";
+    } catch {
+      return "";
+    }
+  });
+  /* Veio do link? Então o efeito da página já vai atribuir e creditar sozinho —
+     aqui o campo só CONFIRMA, e não pede ação nenhuma. */
+  const [veioDoLink] = useState<boolean>(() => {
+    try {
+      return !!storedAffiliateCode();
+    } catch {
+      return false;
+    }
+  });
 
   const next = () => setStep((s) => Math.min(ONBOARD_STEPS - 1, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
@@ -2470,6 +2532,42 @@ function OnboardingRitual({
         onClose(null);
         return;
       }
+
+      /* ─── O CÓDIGO DIGITADO À MÃO ─────────────────────────────────────────
+         Só quando ela NÃO veio do link: nesse caso o efeito da página já
+         atribuiu, e mandar de novo daqui seria uma segunda chamada para o
+         mesmo fato.
+
+         ⚠️ DEPOIS do perfil salvo, nunca antes: o servidor precisa da linha em
+         `patient_profiles` para escrever `ref_code`, e sem ela devolve
+         `repetir`. Invertido, o código válido dela seria descartado em
+         silêncio no primeiro acesso — que é justamente quando ele vale. */
+      const digitado = codigoRef.trim();
+      if (!veioDoLink && digitado.length >= 3) {
+        try {
+          const { data: s } = await supabase.auth.getSession();
+          if (s.session?.access_token) {
+            const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
+            const r = await atribuirInfluenciadora({
+              data: { accessToken: s.session.access_token, codigo: digitado },
+            });
+            if (r.ok && "invalido" in r && r.invalido) {
+              /* Dito em voz alta: ela digitou algo e nada aconteceu. Silêncio
+                 aqui faz a paciente achar que ganhou o bônus e procurá-lo
+                 depois. */
+              toast("Não encontrei esse código. Você pode tentar de novo no Perfil.", {
+                duration: 6000,
+              });
+            } else if (r.ok && "atribuido" in r && r.atribuido && r.bonus > 0) {
+              toast.success(`Você começou com ${r.bonus} Sementinhas 🌱`);
+              creditarSementinhas(r.bonus);
+            }
+          }
+        } catch {
+          /* o campo do Perfil continua aceitando depois */
+        }
+      }
+
       onClose(data as Profile);
     } finally {
       setSaving(false);
@@ -2630,6 +2728,51 @@ function OnboardingRitual({
                 ? "Seu acompanhamento já está calculado. A partir de agora o app se ajusta à sua semana de gestação."
                 : "Você pode informar a data da gestação quando quiser, lá no Perfil. Seu espaço está pronto."}
             </p>
+
+            {/* ─── CÓDIGO DA MÉDICA OU EMBAIXADORA ───────────────────────────
+                No ÚLTIMO passo, e não num passo próprio: é opcional, e um passo
+                inteiro para um campo que a maioria vai pular alonga o ritual de
+                boas-vindas de todo mundo por causa de uma minoria.
+
+                ⚠️ Vindo do link, ele NÃO pede ação: o efeito da página já
+                atribui e credita. Pedir que ela "confirme" um código que já
+                valeu é inventar um passo que só pode dar errado. */}
+            {veioDoLink ? (
+              <p
+                className="mx-auto mt-5 max-w-xs rounded-2xl px-3 py-2.5 text-[13px] font-semibold leading-snug"
+                style={{ background: "#e7f6ec", color: "#166534" }}
+              >
+                <span aria-hidden>🌱</span> Código{" "}
+                <strong className="font-mono tracking-wider">{codigoRef}</strong> aplicado —{" "}
+                {BONUS_INFLUENCIADORA} Sementinhas de boas-vindas!
+              </p>
+            ) : (
+              <div className="mx-auto mt-6 max-w-xs text-left">
+                <label
+                  htmlFor="codigo-ref"
+                  className="block text-[12px] font-semibold text-muted-foreground"
+                >
+                  Código da sua médica ou embaixadora (opcional)
+                </label>
+                <input
+                  id="codigo-ref"
+                  value={codigoRef}
+                  onChange={(e) => setCodigoRef(e.target.value)}
+                  placeholder="Ex.: MARIA"
+                  /* Os três desligados pela mesma razão do campo de convite das
+                     Amigas: o código é maiúsculo e sem acento, e o teclado do
+                     celular capitaliza e corrige sozinho. */
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="mt-1.5 min-h-11 w-full rounded-full border border-border bg-background px-4 text-[14px]"
+                />
+                <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
+                  Ganhe {BONUS_INFLUENCIADORA} Sementinhas 🌱 para começar. Dá para colocar depois,
+                  no Perfil.
+                </p>
+              </div>
+            )}
           </div>
         );
     }
@@ -16971,6 +17114,130 @@ function TestimonialCard() {
 }
 
 /**
+ * ─── A REDE DE SEGURANÇA DO CÓDIGO DE EMBAIXADORA ───────────────────────────
+ *
+ * Muita gente vê o Reels no computador ou numa conta secundária e depois abre a
+ * loja no celular e busca "Obstétrica" — sem clicar no link. Sem este campo, a
+ * influenciadora perde a indicação e a paciente perde o bônus, e nenhuma das
+ * duas fica sabendo por quê.
+ *
+ * ⚠️ A JANELA NÃO É DE 48 HORAS, e a escolha é deliberada. A proposta original
+ * dava 48h; o que decide de verdade é `ref_code` ainda estar vazio — a comissão
+ * prende na ASSINATURA PAGA, e a assinatura pode acontecer no dia 40. Um
+ * relógio de 48h recusaria uma indicação legítima e obrigaria a paciente a
+ * escrever para o suporte por causa de um campo de texto.
+ *
+ * O que o `.is("ref_code", null)` do servidor garante é o que importa: o
+ * primeiro código vence e ninguém rouba a indicação de ninguém depois.
+ *
+ * ⚠️ E O CARTÃO SOME quando ela já tem código. Um campo que aceita digitação e
+ * responde "você já tem" a cada tentativa é um campo que ensina a paciente a
+ * não confiar nos campos desta tela.
+ */
+function CodigoDaEmbaixadora() {
+  const [codigo, setCodigo] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  /* `null` = ainda não sei; `true`/`false` = já tem código ou não.
+     ⚠️ Três estados, e não um booleano: com `false` inicial o cartão PISCA na
+     tela de quem já tem código, no intervalo entre montar e a consulta voltar. */
+  const [jaTem, setJaTem] = useState<boolean | null>(null);
+
+  /* ⚠️ LÊ O PRÓPRIO `ref_code` em vez de receber o `profile` da página. Duas
+     razões: a aba onde ele mora não carrega o perfil (seria prop atravessando
+     três níveis), e o `profile` da página fica VELHO depois de o onboarding
+     atribuir — o cartão continuaria oferecendo um código que ela já usou. */
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: u } = await supabase.auth.getUser();
+        if (!u.user) return setJaTem(true); // sem sessão: não oferece nada
+        const { data } = await (supabase as any)
+          .from("patient_profiles")
+          .select("ref_code")
+          .eq("id", u.user.id)
+          .maybeSingle();
+        setJaTem(Boolean(data?.ref_code));
+      } catch {
+        /* falha de leitura → NÃO oferece. Errar para o lado de não mostrar é
+           chato; para o outro, ela digita um código que o servidor vai recusar
+           e a tela promete um bônus que não vem. */
+        setJaTem(true);
+      }
+    })();
+  }, []);
+
+  async function enviar() {
+    const limpo = codigo.trim();
+    if (limpo.length < 3) return;
+    setEnviando(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      if (!s.session?.access_token) return;
+      const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
+      const r = await atribuirInfluenciadora({
+        data: { accessToken: s.session.access_token, codigo: limpo },
+      });
+      if (r.ok && "atribuido" in r && r.atribuido) {
+        setJaTem(true);
+        if (r.bonus > 0) {
+          toast.success(`${r.bonus} Sementinhas de boas-vindas 🌱`);
+          creditarSementinhas(r.bonus);
+        }
+        return;
+      }
+      if (r.ok && "invalido" in r && r.invalido) {
+        toast("Não encontrei esse código. Confira com quem te indicou.", { duration: 6000 });
+        return;
+      }
+      if (r.ok && "jaTinha" in r && r.jaTinha) {
+        setJaTem(true);
+        return;
+      }
+      toast("Não foi possível agora. Tente de novo mais tarde.");
+    } catch {
+      toast("Não foi possível agora. Tente de novo mais tarde.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  if (jaTem !== false) return null;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-4">
+      <p className="text-sm font-bold">Veio pela indicação de alguém?</p>
+      <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+        Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
+        <strong className="font-semibold">{BONUS_INFLUENCIADORA} Sementinhas 🌱</strong>.
+      </p>
+      <div className="mt-3 flex gap-2">
+        <input
+          value={codigo}
+          onChange={(e) => setCodigo(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void enviar();
+          }}
+          placeholder="Ex.: MARIA"
+          aria-label="Código da médica ou embaixadora"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-[14px]"
+        />
+        <button
+          onClick={() => void enviar()}
+          disabled={enviando || codigo.trim().length < 3}
+          className="press min-h-11 shrink-0 rounded-full px-4 text-[14px] font-bold text-white disabled:opacity-40"
+          style={{ background: "#c9316f" }}
+        >
+          {enviando ? "…" : "Aplicar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Card "Indique uma amiga". Mostra o link pessoal da paciente; quando a amiga
  * entra pelo link e cria a conta, a indicadora ganha 100 🌱 (uma vez por amiga).
  */
@@ -17370,6 +17637,10 @@ function CantinhoTab({
               <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />
               <TestimonialCard />
               <ReferralCard />
+              {/* A rede de segurança: quem pulou o campo do onboarding, ou
+                  baixou pela busca da loja sem clicar no link, coloca o código
+                  aqui. Ver `CodigoDaEmbaixadora`. */}
+              <CodigoDaEmbaixadora />
               {/* ⚠️ O CARTÃO DE PRESENTEAR SAIU DAQUI (ago/2026).
                   Pedido do dono: "eu sei que tem outro lugar que você também
                   consegue dar sementinhas, mas a gente tem que tirar de onde

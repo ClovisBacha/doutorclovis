@@ -41,6 +41,7 @@ import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante
 import { Route as MitosRouteImport } from './routes/mitos'
 import { Route as MedicosRouteImport } from './routes/medicos'
 import { Route as LivesRouteImport } from './routes/lives'
+import { Route as InfluenciadoraRouteImport } from './routes/influenciadora'
 import { Route as HospitaisRouteImport } from './routes/hospitais'
 import { Route as GestacaoRouteImport } from './routes/gestacao'
 import { Route as ExperienciaRouteImport } from './routes/experiencia'
@@ -241,6 +242,11 @@ const MedicosRoute = MedicosRouteImport.update({
 const LivesRoute = LivesRouteImport.update({
   id: '/lives',
   path: '/lives',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InfluenciadoraRoute = InfluenciadoraRouteImport.update({
+  id: '/influenciadora',
+  path: '/influenciadora',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HospitaisRoute = HospitaisRouteImport.update({
@@ -466,6 +472,7 @@ export interface FileRoutesByFullPath {
   '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
+  '/influenciadora': typeof InfluenciadoraRoute
   '/lives': typeof LivesRoute
   '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
@@ -540,6 +547,7 @@ export interface FileRoutesByTo {
   '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
+  '/influenciadora': typeof InfluenciadoraRoute
   '/lives': typeof LivesRoute
   '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
@@ -616,6 +624,7 @@ export interface FileRoutesById {
   '/experiencia': typeof ExperienciaRoute
   '/gestacao': typeof GestacaoRoute
   '/hospitais': typeof HospitaisRoute
+  '/influenciadora': typeof InfluenciadoraRoute
   '/lives': typeof LivesRoute
   '/medicos': typeof MedicosRoute
   '/mitos': typeof MitosRoute
@@ -692,6 +701,7 @@ export interface FileRouteTypes {
     | '/experiencia'
     | '/gestacao'
     | '/hospitais'
+    | '/influenciadora'
     | '/lives'
     | '/medicos'
     | '/mitos'
@@ -766,6 +776,7 @@ export interface FileRouteTypes {
     | '/experiencia'
     | '/gestacao'
     | '/hospitais'
+    | '/influenciadora'
     | '/lives'
     | '/medicos'
     | '/mitos'
@@ -841,6 +852,7 @@ export interface FileRouteTypes {
     | '/experiencia'
     | '/gestacao'
     | '/hospitais'
+    | '/influenciadora'
     | '/lives'
     | '/medicos'
     | '/mitos'
@@ -917,6 +929,7 @@ export interface RootRouteChildren {
   ExperienciaRoute: typeof ExperienciaRoute
   GestacaoRoute: typeof GestacaoRoute
   HospitaisRoute: typeof HospitaisRoute
+  InfluenciadoraRoute: typeof InfluenciadoraRoute
   LivesRoute: typeof LivesRoute
   MedicosRoute: typeof MedicosRoute
   MitosRoute: typeof MitosRoute
@@ -1195,6 +1208,13 @@ declare module '@tanstack/react-router' {
       path: '/lives'
       fullPath: '/lives'
       preLoaderRoute: typeof LivesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/influenciadora': {
+      id: '/influenciadora'
+      path: '/influenciadora'
+      fullPath: '/influenciadora'
+      preLoaderRoute: typeof InfluenciadoraRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/hospitais': {
@@ -1521,6 +1541,7 @@ const rootRouteChildren: RootRouteChildren = {
   ExperienciaRoute: ExperienciaRoute,
   GestacaoRoute: GestacaoRoute,
   HospitaisRoute: HospitaisRoute,
+  InfluenciadoraRoute: InfluenciadoraRoute,
   LivesRoute: LivesRoute,
   MedicosRoute: MedicosRoute,
   MitosRoute: MitosRoute,

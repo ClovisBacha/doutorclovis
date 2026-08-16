@@ -146,6 +146,38 @@ export const GANHO_SEMANAL = 25;
 export const BONUS_VINCULO_MEDICO = 100;
 
 /**
+ * O QUE A GESTANTE GANHA POR CHEGAR PELO CÓDIGO DE UMA INFLUENCIADORA.
+ *
+ * ─── ⚠️ 150, E O NÚMERO FOI MEDIDO CONTRA A PAREDE ──────────────────────────
+ *
+ * A proposta do dono era 500. Medido com a régua deste arquivo
+ * (`CUSTO_LOJA_GRATIS` 704 🌱, `GANHO_DIA_TIPICO` + `GANHO_SEMANAL`/7 = 38,6/dia):
+ *
+ * | bônus | % da loja grátis | parede sem médico | com médico |
+ * | ----- | ---------------- | ----------------- | ---------- |
+ * | 0     | 0%               | 19 dias           | 16 dias    |
+ * | 100   | 14%              | 16 dias           | 14 dias    |
+ * | 150   | 21%              | **15 dias**       | 12 dias    |
+ * | 500   | 71%              | 6 dias            | 3 dias     |
+ *
+ * ⚠️ 500 ENTREGARIA 71% DA LOJA GRÁTIS NO CADASTRO e derrubaria a parede do
+ * 15º para o 6º dia. A parede é a mecânica de conversão inteira — é ela que faz
+ * a paciente acumular moeda sem ter no que gastar, que é a decisão de
+ * monetização escrita no cabeçalho deste arquivo. Um bônus de boas-vindas não
+ * pode desfazer o desenho que ele deveria alimentar.
+ *
+ * 150 é o MAIOR valor que mantém a parede no 15º dia no caso base, e ainda é
+ * 1,5× a indicação entre pacientes (`REFERRAL_REWARD`, 100) — soa como presente
+ * de verdade num Reels ("comece com 150 sementinhas grátis") sem virar uma
+ * categoria à parte.
+ *
+ * ⚠️ E ELE ENTRA EM `entradaDeGraca`, senão os testes de teto da economia
+ * passariam a medir uma paciente que não existe: quem chega por influenciadora
+ * começa com 150 a mais, e é esse o cenário que a régua tem de conseguir ver.
+ */
+export const BONUS_INFLUENCIADORA = 150;
+
+/**
  * A mesada do médico: quantas Sementinhas ele pode distribuir por mês.
  *
  * `mensagens contratadas × 3`. A razão não é arbitrária — ela se calibra
@@ -448,11 +480,14 @@ export function entradaDeGraca(opts: {
   presenteDoMedico?: number;
   /** O presente de uma amiga assinante, se houver. */
   presenteDeAmiga?: number;
+  /** Chegou pelo código de uma influenciadora — ver `BONUS_INFLUENCIADORA`. */
+  porInfluenciadora?: boolean;
 }): number {
   return (
     (opts.comMedico ? BONUS_VINCULO_MEDICO : 0) +
     (opts.comMedico ? (opts.presenteDoMedico ?? 0) : 0) +
-    (opts.presenteDeAmiga ?? 0)
+    (opts.presenteDeAmiga ?? 0) +
+    (opts.porInfluenciadora ? BONUS_INFLUENCIADORA : 0)
   );
 }
 
@@ -460,6 +495,7 @@ export type CenarioDaLoja = {
   comMedico: boolean;
   presenteDoMedico?: number;
   presenteDeAmiga?: number;
+  porInfluenciadora?: boolean;
   /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
   ganhoDiario?: number;
   /**

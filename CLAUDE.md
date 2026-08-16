@@ -224,6 +224,64 @@ resposta padrão do mercado — mas só compensa se as referências passarem a n
 no Figma. Hoje elas nascem como IMAGEM, e para imagem o que resolve é a colagem
 mais a comparação acima.
 
+## A influenciadora passou a existir do lado dela (ago/2026)
+
+Proposta do dono: modelo híbrido (link inteligente + código manual com bônus).
+A estrutura estava certa — e metade dela **já rodava**: `?ref=CODIGO` guardado
+90 dias, `ref_code` carimbado, metadata na Stripe, 50% por fatura paga em
+`affiliate_earnings`. Faltavam três coisas, e duas da proposta precisaram mudar.
+
+### ⚠️ O código NÃO pode morar em `referred_by`
+
+A proposta original gravava ali. `referred_by` **não é registro de origem — é o
+grafo de amizade**: `saoAmigas` decide quem enxerga o Cantinho de quem por
+`minha.referred_by === outra || dela.referred_by === eu`.
+
+Uma criadora com três mil seguidoras viraria **amiga de três mil gestantes**:
+na lista de Amigas de cada uma, com acesso ao Cantinho, dupla de sequência e
+presente. E como `referred_by` é fixado UMA VEZ, o código dela **queimaria** a
+indicação de uma amiga real — ou o contrário, conforme quem chegasse antes.
+
+Vai em `ref_code`, que já existia com índice. Há teste proibindo a string
+`referred_by` em `influenciadora.functions.ts`.
+
+### ⚠️ 500 🌱 quebrariam a mecânica de conversão — o valor é 150
+
+Medido com a régua do próprio app (704 🌱 de loja grátis, 38,6 🌱/dia):
+
+| bônus   | % da loja | parede sem médico | com médico |
+| ------- | --------- | ----------------- | ---------- |
+| 0       | 0%        | 19 dias           | 16 dias    |
+| **150** | **21%**   | **15 dias**       | 12 dias    |
+| 500     | 71%       | 6 dias            | 3 dias     |
+
+500 entregaria 71% da loja grátis no cadastro e derrubaria a parede do 15º para
+o 6º dia. A parede é a decisão de monetização inteira — um bônus de boas-vindas
+não pode desfazer o desenho que ele deveria alimentar. 150 é o maior valor que
+mantém a parede no 15º dia, e é 1,5× a indicação entre pacientes.
+
+`BONUS_INFLUENCIADORA` entra em `entradaDeGraca`: sem isso os testes de teto
+mediriam uma paciente que não existe.
+
+### O que passou a existir
+
+- **`ref_code` é escrito no CADASTRO**, não só no checkout. Antes, quem chegava
+  pela influenciadora e não assinava não existia para ela — o relatório contava
+  só quem pagou, e "quantas pessoas eu trouxe?" não tinha resposta.
+- **Campo no onboarding**, pré-preenchido pelo link. Vindo do link ele só
+  confirma (o efeito da página já atribuiu); digitado, é enviado DEPOIS de o
+  perfil salvar — o servidor precisa da linha em `patient_profiles`.
+- **Rede de segurança no Perfil** (`CodigoDaEmbaixadora`). ⚠️ **A janela NÃO é
+  de 48h**, ao contrário da proposta: o que decide é `ref_code` estar vazio, e a
+  comissão prende na assinatura, que pode acontecer no dia 40. O cartão SOME
+  quando ela já tem código.
+- **`/influenciadora`** — a tela dela, no site. ⚠️ Resolvida pelo **e-mail da
+  sessão**, nunca por um código vindo do cliente: bastaria trocar uma letra na
+  requisição para ler o faturamento de outra criadora. "Não é afiliada" é
+  `painel: null`, não erro — é o caso mais comum.
+
+**Aplicar:** `supabase/APLICAR_INFLUENCIADORA.sql` (só `affiliates.email`).
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é

@@ -282,6 +282,22 @@ export function storedReferralCode(): string | null {
   }
 }
 
+/**
+ * Limpa o código da influenciadora depois de atribuído.
+ *
+ * ⚠️ SÓ QUANDO O SERVIDOR CONFIRMA que não precisa repetir. Ele é o único
+ * rastro da indicação até a paciente confirmar o e-mail e o perfil existir —
+ * apagar antes disso faz a influenciadora perder a venda em silêncio, e a
+ * paciente perder o bônus sem nunca saber que havia um.
+ */
+export function clearStoredAffiliateCode(): void {
+  try {
+    localStorage.removeItem("obst_ref");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Limpa o código de indicação após a atribuição (evita re-tentar sempre). */
 export function clearStoredReferralCode(): void {
   try {
