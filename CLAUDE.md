@@ -191,6 +191,39 @@ A IA lê as medidas em `buildMedidasBlock` (`src/routes/api/chat.ts`): última
 pressão, última glicemia e até três registros alterados dos últimos 14 dias.
 Contexto, não conduta — o portão de cobertura do cérebro continua mandando.
 
+## ⚠️ TELA NOVA A PARTIR DE UMA REFERÊNCIA: use `/tela` (ago/2026)
+
+Pedido do dono depois de duas telas saírem "completamente diferentes e
+desconexas" da referência que ele desenhou: pesquisar o que existe para isso não
+se repetir.
+
+O que a pesquisa achou é que **a falha não era de capacidade, era de
+verificação** — e a própria documentação do Claude Code nomeia o defeito
+("trust-then-verify gap": _se você não consegue verificar, não entregue_) e
+prescreve o conserto: **fotografar o resultado e compará-lo com a referência,
+listando as diferenças, antes de dizer que acabou.** Eu nunca tinha feito isso.
+
+- **`.claude/skills/tela/SKILL.md`** é o processo, e ele abre com os quatro
+  erros concretos que criaram o problema (reconstruir arte em CSS · trocar dado
+  que falta por genérico em silêncio · nunca comparar lado a lado · acrescentar
+  o que ninguém pediu).
+- **`scripts/comparar-com-referencia.mjs`** é a verificação: monta a foto lado a
+  lado e imprime altura relativa, paleta dominante e tinta por faixa. ⚠️ Os
+  números apontam onde olhar; **não substituem olhar**.
+  - `--seletor=` fotografa só o componente. Sem ele a bancada traz cabeçalho e
+    rodapé do site e todo número vira ruído — a primeira execução acusou "3,33×
+    mais alta" comparando página inteira com componente.
+  - `--recorte=y0,y1` apara barra de status e navbar do mockup.
+  - **A área segura é injetada por padrão** (59px): o Chromium devolve zero em
+    `env(safe-area-inset-*)`, e foi por isso que os controles da Loja passaram
+    meses embaixo do relógio do iOS sem ninguém ver.
+
+**O conector do Figma existe e NÃO está instalado** (`get_design_context`,
+`get_screenshot`, `get_variable_defs`, `create_design_system_rules`). Ele é a
+resposta padrão do mercado — mas só compensa se as referências passarem a nascer
+no Figma. Hoje elas nascem como IMAGEM, e para imagem o que resolve é a colagem
+mais a comparação acima.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é
