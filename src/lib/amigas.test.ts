@@ -190,8 +190,19 @@ describe("o vínculo é conferido antes de toda leitura", () => {
     /* Sem isto, qualquer uuid no corpo do pedido devolveria o Cantinho e o
        perfil de qualquer paciente da plataforma. */
     const i = servidor.indexOf("export const perfilDaAmiga");
-    const corpo = servidor.slice(i, i + 1200);
+    expect(i).toBeGreaterThan(-1);
+    /* ⚠️ O CORTE É NO PRÓXIMO `export`, e não uma fatia de N caracteres.
+       Ele era `slice(i, i + 1200)`, e acrescentar duas colunas ao `select`
+       (`avatar_url`, `last_seen_at`) empurrou `cantinho_items` para fora da
+       janela: `indexOf` devolveu -1, e "algum número é menor que -1" reprovou
+       uma função que continuava certa. Um teste de segurança que quebra por
+       causa do TAMANHO do código ensina a próxima pessoa a aumentar o número
+       até passar — que é como ele deixaria de proteger qualquer coisa. */
+    const fim = servidor.indexOf("\nexport ", i + 1);
+    const corpo = servidor.slice(i, fim > i ? fim : undefined);
     expect(corpo).toContain("await saoAmigas(sb, eu, data.amigaId)");
+    /* A leitura do Cantinho tem de vir DEPOIS da conferência do vínculo. */
+    expect(corpo).toContain("cantinho_items");
     expect(corpo.indexOf("saoAmigas")).toBeLessThan(corpo.indexOf("cantinho_items"));
   });
 
@@ -661,5 +672,104 @@ describe("sair da amizade", () => {
     const j = servidor.indexOf("async function encerradasCom");
     const leitor = servidor.slice(j, j + 900);
     expect(leitor).toContain("l.menor === eu ? l.maior : l.menor");
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A TELA É COLAGEM PARA A ARTE, E CÓDIGO PARA O DADO.
+
+   Esta é a lição que custou uma rodada inteira. O dono comparou a aba com a
+   referência que ele mesmo desenhou e disse: "uma tem cara que foi feita aqui
+   no Cloud Code, a outra tem cara que realmente é de profissional". Estava
+   certo, e a causa não era layout: eu tinha RECONSTRUÍDO a arte em CSS — um
+   `linear-gradient` no lugar do fundo pintado, a bolha `feliz` que já existia
+   no lugar da bolha de olhos de coração, emoji 💗 no lugar dos corações
+   desenhados.
+
+   Gradiente não vira pintura e emoji não vira ícone. A regra que saiu disso:
+
+   · O que NUNCA muda (o herói inteiro) é uma imagem, colada como o
+     ilustrador a compôs — com as distâncias, as sobreposições e a sombra
+     dele.
+   · O que muda (nome, troféus, "há 2h", preço) fica em CÓDIGO. Um número
+     pintado numa imagem vira mentira no dia em que ele mudar.
+
+   Estes testes travam as duas metades. Sem eles, a próxima pessoa a mexer aqui
+   "melhora" o herói reconstruindo-o — e a tela volta ao que o dono recusou.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("a arte é colada; o dado é desenhado", () => {
+  /* ⚠️ SEM COMENTÁRIOS, como o `servidor` acima. O comentário de `UltimaVez`
+     EXPLICA por que a tela nunca escreve "Online" — e a primeira versão deste
+     teste reprovou por causa da própria explicação. Um teste que proíbe uma
+     palavra tem de olhar só o que o navegador vê. */
+  const tela = semComentarios("src/components/amigas.tsx");
+
+  test("o herói é a imagem da referência, e não um gradiente reconstruído", () => {
+    expect(tela).toContain('from "@/assets/amigas/heroi.webp"');
+    expect(tela).toContain("src={heroiDasAmigas}");
+  });
+
+  test("⚠️ e o texto dele vira `alt`, palavra por palavra", () => {
+    /* O título e a frase do balão são PIXELS agora. Sem o `alt`, quem usa
+       leitor de tela perde as duas frases que explicam a aba inteira. */
+    const i = tela.indexOf("src={heroiDasAmigas}");
+    const tag = tela.slice(Math.max(0, i - 500), i + 200);
+    expect(tag).toContain("Amizade que faz bem");
+    expect(tag).toContain("formem duplas e joguem juntas");
+  });
+
+  test("⚠️ nenhum número da tela está dentro da arte", () => {
+    /* A prova de que a linha divisória foi respeitada: troféus, sequência e
+       "há 2h" saem de variáveis, nunca de um desenho. */
+    expect(tela).toContain("<PilulaDeTrofeus quantos={a.trofeus} />");
+    expect(tela).toContain("ultimaVez(a.vistaEm)");
+  });
+
+  test("os ícones de seção são DESENHADOS, nunca emoji", () => {
+    /* Emoji tem cor e desenho próprios de cada sistema — 👭 sai duas mulheres
+       coloridas no iOS e dois bonecos planos no Android, e nenhum dos dois é o
+       glifo roxo da referência. Mesma lição do 📞 preto no iOS da Central de
+       Emergência e do calendário da fita. */
+    const i = tela.indexOf("function CabecalhoDaSecao");
+    const corpo = tela.slice(i, tela.indexOf("\nfunction ", i + 1));
+    expect(corpo).toContain("<IconePessoas />");
+    for (const emoji of ["👭", "👯", "👩‍🤝‍👩"]) expect(corpo).not.toContain(emoji);
+  });
+
+  test("⚠️ o avatar sem foto é a INICIAL, nunca a Bolha", () => {
+    /* A Bolha é a personagem do app, a mesma para todas — usá-la como avatar
+       é o defeito que o dono viu (uma lista em que todo mundo é igual)
+       reintroduzido com outro desenho. */
+    const i = tela.indexOf("function Avatar(");
+    const corpo = tela.slice(i, tela.indexOf("\nfunction ", i + 1));
+    expect(corpo).toContain("inicialDoNome(nome)");
+    expect(corpo).not.toContain("<Bolha");
+  });
+
+  test("⚠️ a lista NUNCA escreve «Online»", () => {
+    /* Presença ao vivo exige conexão persistente, que o app não tem. Ver
+       `ultimaVez`: numa aba onde uma amiga espera a outra, "ela está online e
+       não me respondeu" é uma conclusão que o app não pode induzir. */
+    expect(tela).not.toContain("Online");
+    expect(tela).not.toContain("Offline");
+  });
+
+  test("a folha de sair é UMA, para os dois lugares que a abrem", () => {
+    /* A lista e a tela da amiga abrem a mesma confirmação. Duas cópias do JSX
+       divergiriam no primeiro ajuste — e este texto é o que separa uma saída
+       de uma briga. */
+    expect(tela.match(/<FolhaDeSair/g)?.length).toBe(2);
+    expect(tela.match(/function FolhaDeSair/g)?.length).toBe(1);
+    /* E ela continua dizendo as três coisas que fazem isto ser uma saída.
+       ⚠️ O corte é no próximo `function`, e não no próximo `/**`: `tela` vem
+       sem comentários, então `indexOf("\n/**")` daria -1 e `slice(i, -1)`
+       devolveria o arquivo quase inteiro — o teste passaria com o texto
+       escrito em qualquer outro lugar. */
+    const i = tela.indexOf("function FolhaDeSair");
+    const fim = tela.indexOf("\nfunction ", i + 1);
+    expect(fim).toBeGreaterThan(i);
+    const corpo = tela.slice(i, fim);
+    expect(corpo).toContain("Ela não é avisada.");
+    expect(corpo).toContain("continuam com quem recebeu");
   });
 });

@@ -230,6 +230,10 @@ export type PerfilDeAmiga = {
   itens: number;
   /** Há quanto tempo ela está no app, em dias. */
   diasNoApp: number;
+  /** A foto de perfil. `null` = avatar com a inicial (ver `inicialDoNome`). */
+  avatarUrl: string | null;
+  /** Quando ela apareceu pela última vez, cru. A tela formata com `ultimaVez`. */
+  vistaEm: string | null;
   /**
    * ⚠️ EU POSSO PRESENTEAR ESTA AMIGA?
    *
@@ -253,6 +257,74 @@ export type PerfilDeAmiga = {
    */
   jaPresenteada: boolean;
 };
+
+/**
+ * "HÁ 2H", "HÁ 1 DIA" — quando a amiga apareceu pela última vez.
+ *
+ * ⚠️ NUNCA "ONLINE". A referência do dono mostra um ponto verde com "Online", e
+ * presença ao vivo exige conexão persistente, que o app não tem. Um ponto verde
+ * que na verdade quer dizer "abriu nos últimos cinco minutos" é o tipo de dado
+ * que parece exato e não é — e numa aba onde uma amiga espera a outra, "ela está
+ * online e não me respondeu" é uma conclusão que o app não pode induzir.
+ *
+ * ⚠️ E `null` devolve `null`, não "há muito tempo": quem nunca abriu desde que a
+ * coluna existe não tem última vez, e inventar uma seria afirmar um fato sobre o
+ * comportamento dela.
+ *
+ * "agora mesmo" cobre a primeira hora inteira — abaixo disso a precisão não
+ * serve para nada e começa a parecer vigilância.
+ */
+export function ultimaVez(quando: string | null | undefined, agora = new Date()): string | null {
+  if (!quando) return null;
+  const t = new Date(quando);
+  if (Number.isNaN(t.getTime())) return null;
+  const min = Math.floor((agora.getTime() - t.getTime()) / 60000);
+  /* Relógio do aparelho adiantado devolve minutos negativos: trata como agora,
+     nunca como "daqui a 3 horas". */
+  if (min < 60) return "agora mesmo";
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h}h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "ontem";
+  if (d < 30) return `há ${d} dias`;
+  const meses = Math.floor(d / 30);
+  return meses === 1 ? "há 1 mês" : `há ${meses} meses`;
+}
+
+/**
+ * As INICIAIS para o avatar de quem não subiu foto.
+ *
+ * Uma letra, e não duas: o círculo tem 44px e o nome que a paciente cadastra é
+ * quase sempre só o primeiro. Duas letras num círculo desse tamanho vira uma
+ * mancha.
+ */
+export function inicialDoNome(nome: string): string {
+  const limpo = (nome ?? "").trim();
+  return limpo ? limpo[0].toLocaleUpperCase("pt-BR") : "?";
+}
+
+/**
+ * A cor do avatar sem foto — DETERMINÍSTICA pelo id.
+ *
+ * ⚠️ Pelo id e não pelo nome: duas Marias teriam a mesma cor e a lista ficaria
+ * com dois círculos idênticos lado a lado. E determinística porque a tela é
+ * renderizada no servidor — `Math.random()` daria cores diferentes dos dois
+ * lados e o React reclamaria de hidratação.
+ */
+export const CORES_DE_AVATAR = [
+  "#e0b3d8",
+  "#b9c7ee",
+  "#f0c39a",
+  "#a8d5ba",
+  "#d6b8ea",
+  "#f2b8b8",
+] as const;
+
+export function corDoAvatar(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  return CORES_DE_AVATAR[h % CORES_DE_AVATAR.length];
+}
 
 /**
  * O CONTADOR DA FITA — o número que substituiu a palavra "Amigas".

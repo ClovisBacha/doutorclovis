@@ -285,7 +285,7 @@ export const minhasAmigas = createServerFn({ method: "POST" })
 
     const { data: perfis } = await sb
       .from("patient_profiles")
-      .select("id, display_name, baby_name, care_mode, created_at")
+      .select("id, display_name, baby_name, care_mode, created_at, avatar_url, last_seen_at")
       .in("id", ids);
 
     /* As em luto saem AQUI, e não na tela: um filtro de cliente deixaria o
@@ -326,6 +326,8 @@ export const minhasAmigas = createServerFn({ method: "POST" })
            o 🎁 — na lista, mas impossíveis de presentear. `presentearAmiga`
            confere pela mesma régua (`saoAmigasParaPresente`), então a tela e o
            servidor não podem discordar. */
+        avatarUrl: (p.avatar_url as string | null) ?? null,
+        vistaEm: (p.last_seen_at as string | null) ?? null,
         possoPresentear: trazidasIds.has(p.id) || aceitas.has(p.id),
         jaPresenteada: jaGanharam.has(p.id),
       };
@@ -401,7 +403,9 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
 
     const { data: p } = await sb
       .from("patient_profiles")
-      .select("id, display_name, baby_name, cantinho_fundo, created_at, journey_state, referred_by")
+      .select(
+        "id, display_name, baby_name, cantinho_fundo, created_at, journey_state, referred_by, avatar_url, last_seen_at",
+      )
       .eq("id", data.amigaId)
       .maybeSingle();
     if (!p) return { ok: false as const, error: "sem_vinculo" as const };
@@ -436,6 +440,8 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
       id: p.id,
       nome: (p.display_name ?? "").trim() || "Amiga",
       bebe: (p.baby_name ?? "").trim() || null,
+      avatarUrl: (p.avatar_url as string | null) ?? null,
+      vistaEm: (p.last_seen_at as string | null) ?? null,
       sequencia: chamaDe(linhas, hoje),
       trofeus: trofeusDasChaves(
         linhas.map((l) => l.dedupe_key),
@@ -1298,3 +1304,42 @@ export async function saoAmigasParaPresente(
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   return saoAmigas(supabaseAdmin as any, eu, amigaId);
 }
+
+/**
+ * CARIMBA QUE ELA APARECEU.
+ *
+ * ⚠️ NÃO É PRESENÇA AO VIVO, e a diferença importa: isto grava um instante
+ * quando o app abre, e a lista mostra "há 2h". Não existe ponto verde de
+ * "Online" — presença ao vivo exigiria conexão persistente, e um ponto que na
+ * verdade quer dizer "abriu nos últimos cinco minutos" induz a amiga a concluir
+ * "ela está online e não me respondeu".
+ *
+ * ⚠️ E ESCREVE NO MÁXIMO UMA VEZ POR HORA. Sem o corte, toda montagem da aba
+ * viraria um UPDATE — a tela remonta a cada troca de aba, e a granularidade que
+ * a lista mostra é de hora em hora de qualquer forma.
+ *
+ * Best-effort inteiro: é um enfeite social. Falhar aqui não pode atrapalhar
+ * nada, e por isso nem devolve erro.
+ */
+export const carimbarQueApareceu = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    try {
+      const eu = await pacienteDaSessao(data.accessToken);
+      if (!eu) return { ok: false as const };
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const sb = supabaseAdmin as any;
+      const limite = new Date(Date.now() - 3600_000).toISOString();
+      const { error } = await sb
+        .from("patient_profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", eu)
+        .or(`last_seen_at.is.null,last_seen_at.lt.${limite}`);
+      if (error) return { ok: false as const };
+      return { ok: true as const };
+    } catch {
+      /* coluna ainda não existe (SQL não aplicado): a lista mostra a linha sem
+         "há 2h", e mais nada muda */
+      return { ok: false as const };
+    }
+  });

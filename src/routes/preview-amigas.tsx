@@ -29,6 +29,7 @@ import type { DuplaNaTela } from "@/lib/amigas.functions";
  *   `?luto=1`          Modo Cuidado — a aba inteira se cala
  *   `?semcodigo=1`     sem código de indicação (o "Convidar" explica e não manda)
  *   `?pedidos=2`       pedidos de amizade recebidos (a seção some com zero)
+ *   `?foto=1`          amigas COM foto de perfil (o padrão é o avatar de inicial)
  */
 export const Route = createFileRoute("/preview-amigas")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -51,6 +52,9 @@ export const Route = createFileRoute("/preview-amigas")({
        `?semcodigo=1` é a única forma de fotografar esse estado. */
     codigo: q.semcodigo ? null : "ABC2345",
     luto: q.luto == null ? false : Boolean(q.luto),
+    /* Liga o avatar com FOTO. Sem isto, o ramo do `<img>` do `Avatar` não é
+       exercido por nenhuma foto da bancada. */
+    foto: q.foto == null ? false : Boolean(q.foto),
   }),
   head: () => ({
     meta: [{ title: "Bancada das Amigas" }, { name: "robots", content: "noindex" }],
@@ -62,8 +66,46 @@ export const Route = createFileRoute("/preview-amigas")({
    hidratação diferente dos dois lados. É o mesmo motivo dos CORACOES. */
 const NOMES = ["Marina Costa", "Juliana Alves", "Camila Souza", "Beatriz Lima", "Renata Dias"];
 
+/**
+ * Um "retrato" para o `?foto=1` — um SVG `data:` de duas cores, não a foto de
+ * ninguém.
+ *
+ * ⚠️ Nem arquivo no repositório, nem URL de serviço de fotos: o primeiro põe um
+ * rosto de pessoa real num diretório de teste, e o segundo faz a bancada
+ * depender da rede para desenhar (e vazar para fora quem a abriu). O que
+ * importa olhar aqui é o RECORTE em círculo e o tamanho, e para isso duas
+ * manchas de cor bastam.
+ */
+function retratoFalso(i: number): string {
+  const cores = ["#c98fb0", "#8fa8d6", "#d9a86c", "#7fb894", "#a98fd0"];
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">` +
+    `<rect width="64" height="64" fill="${cores[i % cores.length]}"/>` +
+    `<circle cx="32" cy="24" r="12" fill="#ffffff" opacity="0.85"/>` +
+    `<ellipse cx="32" cy="58" rx="20" ry="16" fill="#ffffff" opacity="0.85"/>` +
+    `</svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/**
+ * O Cantinho que a tela da amiga desenha na bancada.
+ *
+ * Enfeites que existem no catálogo de verdade (`CANTINHO_BY_ID` ignora id
+ * desconhecido em silêncio, e a moldura sairia vazia sem dizer por quê).
+ */
+const CANTINHO_DE_EXEMPLO = {
+  possui: ["ceu-lua", "ceu-sol"],
+  fundo: null,
+  skin: null,
+  postos: [
+    { id: "ceu-lua", x: 18, y: 120, s: 1 },
+    { id: "ceu-sol", x: 62, y: 380, s: 1.2 },
+  ],
+};
+
 function PreviewAmigas() {
-  const { n, dupla, dias, premium, luto, codigo, recorde, parada, pedidos } = Route.useSearch();
+  const { n, dupla, dias, premium, luto, codigo, recorde, parada, pedidos, foto } =
+    Route.useSearch();
 
   const amigas: PerfilDeAmiga[] = NOMES.slice(0, Math.max(0, Math.min(NOMES.length, n))).map(
     (nome, i) => ({
@@ -80,6 +122,19 @@ function PreviewAmigas() {
          `possoPresentear` e `jaPresenteada`. */
       possoPresentear: i !== 2,
       jaPresenteada: i === 1,
+      /* ⚠️ SEM FOTO por padrão: é justamente o avatar de INICIAL que precisa
+         ser olhado, porque é o que a maioria vai ver antes de subir uma — e
+         era o caso que a primeira versão da tela tratava como se não
+         existisse. `?foto=1` liga o outro caminho (o `<img>` recortado em
+         círculo), que sem a bancada só dá para ver numa conta com upload
+         feito. A imagem é gerada aqui mesmo, em SVG `data:` — nenhum pedido
+         de rede, e nenhum rosto de pessoa real num arquivo de teste. */
+      avatarUrl: foto ? retratoFalso(i) : null,
+      /* Escalonado, para as faixas de `ultimaVez` caírem numa foto só:
+         "agora mesmo", "há 3h", "ontem", "há 5 dias" e "há 1 mês". */
+      vistaEm: new Date(
+        Date.now() - [10 * 60e3, 3 * 3600e3, 26 * 3600e3, 5 * 86400e3, 40 * 86400e3][i],
+      ).toISOString(),
     }),
   );
 
@@ -112,6 +167,10 @@ function PreviewAmigas() {
             nome,
             diasNoApp: [2, 30, 91][i] ?? 5,
           })),
+          /* O Cantinho da amiga, para a TELA DELA abrir na bancada. Sem ele
+             ela parava em "não foi possível abrir este perfil" — e é lá que
+             mora o "Sair da amizade" desde que ele saiu da linha da lista. */
+          cantinho: CANTINHO_DE_EXEMPLO,
         }}
       />
     </div>

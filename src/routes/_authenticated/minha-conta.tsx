@@ -1371,6 +1371,23 @@ function MinhaContaPage() {
       if (!u.user) return;
       const token = s.session?.access_token;
 
+      /* ─── ⚠️ "ELA APARECEU" — sem isto, a aba das Amigas mente por omissão ──
+         `last_seen_at` é o que vira "há 2h" na lista de amigas. Se ninguém
+         carimbar, a coluna fica NULL para sempre, `ultimaVez` devolve `null`
+         e a linha de status que a tela desenha simplesmente nunca existe —
+         recurso construído inteiro e morto na produção, que é a mesma família
+         de defeito do presente do médico que chegava sem aviso.
+
+         ⚠️ SOLTO DE PROPÓSITO (sem `await` e com `catch` vazio): é um carimbo,
+         não um dado que a tela espera. Pendurá-lo no `Promise.all` acima faria
+         a abertura do app depender de uma escrita que não muda nada do que ela
+         vai ver. E o servidor já grava no máximo uma vez por hora. */
+      if (token) {
+        void import("@/lib/amigas.functions")
+          .then((m) => m.carimbarQueApareceu({ data: { accessToken: token } }))
+          .catch(() => {});
+      }
+
       const [perfilRes, papel] = await Promise.all([
         (supabase as any).from("patient_profiles").select("*").eq("id", u.user.id).maybeSingle(),
         (async () => {

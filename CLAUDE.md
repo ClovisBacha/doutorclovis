@@ -1326,6 +1326,114 @@ dupla de sequência**.
   dele — `lerDupla` engole a falha e devolve `null`, então lista, perfil,
   Cantinho e presente funcionam antes de ele rodar.
 
+#### ⚠️ A ARTE SE COLA; O DADO SE DESENHA (ago/2026)
+
+O dono mandou quatro imagens — duas do app como estava, duas da referência que
+ele desenhou — e a frase que abriu esta rodada: _"as duas abas estão
+completamente diferentes e desconexas com o que eu te pedi. Uma tem cara que foi
+feita aqui no Cloud Code, a outra tem cara que realmente é de profissional."_ E
+a pergunta que resolveu: _"você só não consegue colar ela, já que é o mesmo
+modelo de proporção, e depois só atribuir as funções?"_
+
+**Consegue. E a causa da diferença era uma escolha minha, não uma limitação.**
+
+Eu tinha RECONSTRUÍDO a arte em CSS: um `linear-gradient` de onze paradas no
+lugar do fundo pintado, a bolha `feliz` que já existia no lugar da bolha de
+olhos de coração, emoji 💗 no lugar dos corações desenhados. Gradiente não vira
+pintura e emoji não vira ícone — a distância entre as duas telas não era layout,
+era ARTE, e a arte estava no arquivo dele o tempo todo.
+
+A regra que saiu disso, e que vale para toda tela nova a partir daqui:
+
+| o que é                          | como entra                                  |
+| -------------------------------- | ------------------------------------------- |
+| **arte que nunca muda**          | UMA imagem, colada como o ilustrador compôs |
+| **dado** (nome, preço, contador) | código, sempre                              |
+
+- **Um recorte só, e não cinco.** A primeira extração tirou bolha, três corações
+  e a bolhinha em arquivos separados para o CSS recompor. Funciona e responde à
+  pergunta errada: nada ali é dado. Um recorte só preserva o que o ilustrador
+  fez — as distâncias, as sobreposições, a sombra do balão sobre o coração.
+- ⚠️ **A linha divisória é onde mora a verdade.** Preço pintado numa imagem vira
+  mentira no dia em que ele mudar, e preço errado é o defeito mais caro que
+  existe. Por isso o herói é colagem e a lista é código.
+- ⚠️ **E o texto do herói vira `alt`, palavra por palavra**: o título e a frase
+  do balão são pixels agora, e quem usa leitor de tela não pode perder as duas
+  frases que explicam a aba inteira.
+- **A colagem falha para vidro.** Recortar a bolha à parte não deu: ela é de
+  VIDRO — o interior dela É o fundo, visto através. A inundação por semelhança
+  de cor atravessa o contorno e come o miolo, e não há tolerância que separe
+  "céu" de "céu visto através de uma bolha". Com o herói inteiro virando
+  colagem, o problema desaparece.
+- **`scripts/amigas-do-drive.mjs`** extrai o herói (`src/assets/amigas/heroi.webp`,
+  87 KB, PSNR 42,0 dB) e imprime o gradiente do chão, AMOSTRADO linha a linha na
+  coluna x=840 (a mais limpa da imagem) — não estimado.
+
+**Os dois dados que faltavam, e que eu tinha trocado por genérico em silêncio.**
+A referência mostra foto e status em cada linha; a primeira versão pôs a mesma
+bolha para todas e nenhum status. O defeito que o dono viu — "uma lista em que
+todo mundo é igual" — não era desenho: eram dois dados.
+
+- ⚠️ **A FOTO JÁ EXISTIA, e eu quase construí uma segunda.** Escrevi um
+  `APLICAR_` inteiro com balde `avatares` e RLS por pasta antes de conferir:
+  `patient_profiles.avatar_url` está na PRIMEIRA migration do projeto, e o app
+  já a preenche em dois lugares (o campo de foto do Perfil e o ritual de
+  boas-vindas), como **data URL** (JPEG 256px reduzido no canvas). Um balde que
+  nada escreve é infraestrutura morta com política de segurança para manter. O
+  que faltava não era guardar a foto — era a aba LER a coluna.
+- **Sem foto, a INICIAL num círculo colorido** (`inicialDoNome`, `corDoAvatar` —
+  por id e não por nome, senão duas Marias saem idênticas lado a lado). **Nunca
+  a Bolha**: ela é a personagem do app, a mesma para todas, e usá-la como avatar
+  é o defeito original com outro desenho.
+- ⚠️ **A tela NUNCA escreve "Online"** (`ultimaVez`, e há teste). Presença ao
+  vivo exige conexão persistente, que o app não tem. Um ponto verde que na
+  verdade diz "abriu nos últimos 5 minutos" parece exato e não é — e numa aba
+  onde uma amiga espera a outra, "ela está online e não me respondeu" é uma
+  conclusão que o app não pode induzir. `NULL` também não vira "Offline": a
+  linha some e entra o "no app há X", que sempre existiu.
+- **`carimbarQueApareceu` é chamada na ABERTURA do app** (`minha-conta.tsx`,
+  solta, com `catch` vazio, no máximo uma gravação por hora). Sem essa linha o
+  `last_seen_at` ficaria NULL para sempre e a faixa de status inteira seria
+  código morto na produção — a mesma família do presente do médico que chegava
+  sem aviso.
+
+**Três medidas que decidiram o layout, e nenhuma delas era gosto:**
+
+- **`gap-1.5` na linha da amiga, e nome em 15px.** Medido em 393px: com `gap-2`
+  e 16px a coluna do nome dava 117,5px e "Marina Costa" pedia 119 — truncava por
+  DOIS pixels, e só na linha que tem o 🎁. E 15px não é concessão: na referência
+  de 852px o nome mede ~30px de caixa, que numa tela de 393 dá ~14px.
+- ⚠️ **O "Sair da amizade" saiu da linha e foi para a TELA DA AMIGA.** Ele era um
+  ⋯ de 44px no fim da linha, e a conta não fechava. Mudou para onde já
+  pertencia: sair de uma amizade é decisão sobre uma pessoa, não item de lista —
+  a mesma lição do receituário, que saiu de aba própria e passou a abrir dentro
+  do cartão da paciente já escolhida. `FolhaDeSair` virou componente, porque
+  agora há DOIS lugares que a abrem e duas cópias do JSX divergiriam no primeiro
+  ajuste — e este texto é o que separa uma saída de uma briga.
+- ⚠️ **E isso obrigou a bancada a alcançar a tela da amiga.** Ela pede perfil e
+  Cantinho ao servidor, então sem sessão mostrava "não foi possível abrir este
+  perfil": a bancada NUNCA tinha chegado lá. Passou despercebido enquanto a tela
+  só mostrava dados; no dia em que um CONTROLE mudou para ela, mudou-se um botão
+  para uma tela que ninguém consegue olhar sem duas contas reais e um convite
+  aceito — exatamente o que as bancadas existem para impedir. Daí a prop
+  `bancada` em `PerfilDaAmigaTela`, que continua fabricando só o DADO.
+- **A dupla ficou VERTICAL** (dois rostos, "Você + Fulana", pílula), como na
+  referência: na horizontal sobravam ~90px para o nome e saía "Você + M…". O
+  círculo "Você" leva `relative z-10` — sem isso o avatar da amiga, que vem
+  depois no DOM, cobria a ponta direita e a palavra saía cortada no "ê".
+- ⚠️ **Singular no app, plural na referência.** A imagem mostra três cartões de
+  dupla; o banco tem um índice parcial garantindo UMA dupla ativa por pessoa, e
+  isso é deliberado (duas viram placar de várias frentes). Colar três cartões
+  seria desenhar um estado que o banco recusa. **Fidelidade que contradiz o
+  produto não é fidelidade.**
+
+**Aplicar no Supabase:** `supabase/APLICAR_FOTO_E_ULTIMA_VEZ.sql` (só
+`last_seen_at` importa; a coluna da foto é rede para banco antigo).
+
+**Bancada:** `/preview-amigas?premium=1&foto=1&dupla=ativa&dias=41` (a tela
+cheia) · `?foto=1` liga o avatar com FOTO, que sem ela só se via numa conta com
+upload feito · `?n=0` o vazio que ensina · `?luto=1` o Modo Cuidado.
+
 #### A ofensiva passou a pagar, e o presente mudou de casa (ago/2026)
 
 Pedido do dono, em três partes: o layout do Drive; "vai ter a opção de dar
@@ -2794,7 +2902,7 @@ clicar na conquista, como o Duolingo faz". `grants` nasce vazio e
   moeda e a tela respondia com silêncio — que lê como app quebrado. Acontece de
   verdade com dois aparelhos abertos.
 - **A trava de duplo toque é por CARTÃO**, não da grade: era `if
-  (resgatandoKey) return`, e tocar num segundo cartão sumia sem sinal.
+(resgatandoKey) return`, e tocar num segundo cartão sumia sem sinal.
 - ⚠️ **Mutação: 5 de 6 passavam verde**, incluindo o **Modo Cuidado
   INVERTIDO** — a pior mutação que já passou nesta base, no teste que dizia
   cobri-la (ele provava só que a string `isCareModeActive` existia). E as fatias
@@ -2903,6 +3011,7 @@ e a própria aba onde compra os jogos".
   E a corrente do menu até a tela tinha TRÊS elos no meio (repassar a sub-aba,
   gravá-la, aceitá-la) que nenhum teste cobria — mutar qualquer um passava
   verde. Destino próprio mata os dois defeitos e some com os três elos.
+
 - **A fita do desktop passou a navegar por `goToTab`**, e não por `setTab` — é
   ele que limpa a sub-aba pedida. Vale para todos os hubs, não só para este.
 - `src/lib/duas-lojas.test.ts` cobra as **duas metades ao mesmo tempo** — fora
