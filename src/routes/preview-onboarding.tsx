@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { OnboardingRitual } from "@/routes/_authenticated/minha-conta";
+import { OnboardingRitual, CodigoDaEmbaixadora } from "@/routes/_authenticated/minha-conta";
 
 /**
  * Bancada do RITUAL DE BOAS-VINDAS.
@@ -21,10 +21,16 @@ import { OnboardingRitual } from "@/routes/_authenticated/minha-conta";
  * guardado no navegador. O corpo de cada tela, o salvamento e as regras
  * continuam sendo os da produção.
  *
+ * ⚠️ ELA COBRE AS DUAS PORTAS DO MESMO CÓDIGO, e por isso é uma bancada só: o
+ * campo do ritual e o cartão do Perfil (`CodigoDaEmbaixadora`) são a mesma
+ * funcionalidade em dois momentos, e o do Perfil vive dentro de uma aba que
+ * exige sessão — ele estava tão invisível quanto o do ritual.
+ *
  * Parâmetros:
  *   `?passo=4`        em qual passo abrir (o campo do código está no último)
  *   `?ref=MARIA`      simula ter chegado por um link de embaixadora
  *   `?nome=Ana`       o nome que veio do cadastro
+ *   `?tela=perfil`    mostra o cartão da rede de segurança, do Perfil
  */
 export const Route = createFileRoute("/preview-onboarding")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -34,6 +40,7 @@ export const Route = createFileRoute("/preview-onboarding")({
     passo: q.passo == null ? 4 : Number(q.passo),
     ref: q.ref == null ? "" : String(q.ref),
     nome: q.nome == null ? "Ana" : String(q.nome),
+    tela: q.tela == null ? "ritual" : String(q.tela),
   }),
   head: () => ({
     meta: [{ title: "Bancada do onboarding" }, { name: "robots", content: "noindex" }],
@@ -42,7 +49,7 @@ export const Route = createFileRoute("/preview-onboarding")({
 });
 
 function PreviewOnboarding() {
-  const { passo, ref, nome } = Route.useSearch();
+  const { passo, ref, nome, tela } = Route.useSearch();
   /* ⚠️ O ritual lê o código guardado na PRIMEIRA renderização
      (`useState(() => storedAffiliateCode())`), então o localStorage precisa
      estar escrito ANTES de ele montar — daí o `pronto`, que segura a montagem
@@ -66,6 +73,16 @@ function PreviewOnboarding() {
   }, [ref]);
 
   if (!pronto) return null;
+
+  /* O cartão do Perfil — a segunda porta do mesmo código. Ele se esconde sem
+     sessão (é o certo em produção), então a bancada o liga explicitamente. */
+  if (tela === "perfil") {
+    return (
+      <div className="mx-auto max-w-md p-4">
+        <CodigoDaEmbaixadora bancada />
+      </div>
+    );
+  }
 
   return (
     <OnboardingRitual

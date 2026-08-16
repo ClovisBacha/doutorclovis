@@ -351,6 +351,12 @@ influenciadora recebe ou não a indicação — escrito às cegas e entregue sem
 ninguém nunca ter olhado. É exatamente o defeito que a skill `/tela` existe para
 impedir, cometido no mesmo dia em que a skill foi escrita.
 
+⚠️ **E A MESMA BANCADA COBRE AS DUAS PORTAS DO CÓDIGO**: `?tela=perfil` mostra o
+cartão da rede de segurança (`CodigoDaEmbaixadora`), que vive dentro de uma aba
+que exige sessão e estava tão invisível quanto o campo do ritual. Ele se esconde
+sem sessão — comportamento certo em produção, e exatamente o que o tornava
+impossível de fotografar —, então a bancada o liga por prop.
+
 `/preview-onboarding?passo=4` mostra o campo; `&ref=MARIA` mostra o estado de
 quem chegou pelo link (confirmação verde, sem pedir ação). ⚠️ A bancada escreve
 o `localStorage` ANTES de montar o ritual e segura a montagem por um render — o

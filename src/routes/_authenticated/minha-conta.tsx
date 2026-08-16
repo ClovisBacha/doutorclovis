@@ -17148,7 +17148,7 @@ function TestimonialCard() {
  * responde "você já tem" a cada tentativa é um campo que ensina a paciente a
  * não confiar nos campos desta tela.
  */
-function CodigoDaEmbaixadora() {
+export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) {
   const [codigo, setCodigo] = useState("");
   const [enviando, setEnviando] = useState(false);
   /* `null` = ainda não sei; `true`/`false` = já tem código ou não.
@@ -17161,6 +17161,10 @@ function CodigoDaEmbaixadora() {
      três níveis), e o `profile` da página fica VELHO depois de o onboarding
      atribuir — o cartão continuaria oferecendo um código que ela já usou. */
   useEffect(() => {
+    /* ⚠️ A BANCADA PULA A CONSULTA. Sem sessão, `getUser` devolve nulo e o
+       cartão se esconde (`setJaTem(true)`) — que é o comportamento certo em
+       produção e o que tornava este componente impossível de fotografar. */
+    if (bancada) return setJaTem(false);
     (async () => {
       try {
         const { data: u } = await supabase.auth.getUser();
@@ -17178,7 +17182,7 @@ function CodigoDaEmbaixadora() {
         setJaTem(true);
       }
     })();
-  }, []);
+  }, [bancada]);
 
   async function enviar() {
     const limpo = codigo.trim();
