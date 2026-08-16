@@ -339,6 +339,25 @@ conta própria", o botão já está no lugar certo para crescer.
 ⚠️ **E um comentário JSX não pode ser o segundo filho de `{cond && (…)}`** —
 custou um `TS1005` apontando para a linha do `<div>`, não para o comentário.
 
+### ⚠️ O ritual de boas-vindas ganhou bancada, e ela faltava fazia tempo
+
+O `OnboardingRitual` só aparece para uma paciente recém-criada e SEM perfil, uma
+vez só: salvou, acabou. Enquanto ele pedia nome, DUM e foto, isso era um
+incômodo de revisão.
+
+**No dia em que ele ganhou o campo do código da embaixadora, virou outra coisa**:
+um controle no PRIMEIRO MINUTO de toda paciente nova — e que decide se uma
+influenciadora recebe ou não a indicação — escrito às cegas e entregue sem
+ninguém nunca ter olhado. É exatamente o defeito que a skill `/tela` existe para
+impedir, cometido no mesmo dia em que a skill foi escrita.
+
+`/preview-onboarding?passo=4` mostra o campo; `&ref=MARIA` mostra o estado de
+quem chegou pelo link (confirmação verde, sem pedir ação). ⚠️ A bancada escreve
+o `localStorage` ANTES de montar o ritual e segura a montagem por um render — o
+ritual lê o código na primeira renderização, então sem essa espera a bancada
+mostraria sempre o campo vazio, que é o único estado que ela não precisava
+provar.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é

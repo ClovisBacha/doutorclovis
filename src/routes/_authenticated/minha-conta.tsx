@@ -2416,14 +2416,28 @@ const ONBOARD_EASE = [0.16, 1, 0.3, 1] as const;
  * funciona mesmo com as migrations pendentes em produção. Tudo é opcional e
  * pode ser pulado; ao terminar, o app já abre personalizado.
  */
-function OnboardingRitual({
+export function OnboardingRitual({
   initialName,
   onClose,
+  passoInicial = 0,
 }: {
   initialName: string;
   onClose: (saved: Profile | null) => void;
+  /**
+   * ⚠️ SÓ PARA A BANCADA (`/preview-onboarding`).
+   *
+   * O ritual só aparece para uma paciente RECÉM-CRIADA e sem perfil — não há
+   * como abri-lo de novo depois. Enquanto ele só tinha nome, DUM e foto isso
+   * era um incômodo; no dia em que ganhou o campo do código da embaixadora,
+   * virou um controle no primeiro minuto de toda paciente nova que ninguém
+   * consegue olhar sem criar uma conta do zero.
+   *
+   * A bancada fabrica o PASSO, e nada mais: o corpo de cada tela, o salvamento
+   * e as regras continuam sendo os da produção.
+   */
+  passoInicial?: number;
 }) {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(passoInicial);
   const [name, setName] = useState(initialName);
   const [mode, setMode] = useState<"dum" | "us">("dum");
   const [lmp, setLmp] = useState("");

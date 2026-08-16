@@ -20,6 +20,7 @@ import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
+import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
@@ -137,6 +138,11 @@ const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
 const PreviewReguaRoute = PreviewReguaRouteImport.update({
   id: '/preview-regua',
   path: '/preview-regua',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewOnboardingRoute = PreviewOnboardingRouteImport.update({
+  id: '/preview-onboarding',
+  path: '/preview-onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
@@ -494,6 +500,7 @@ export interface FileRoutesByFullPath {
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
+  '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -569,6 +576,7 @@ export interface FileRoutesByTo {
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
+  '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -646,6 +654,7 @@ export interface FileRoutesById {
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
+  '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -723,6 +732,7 @@ export interface FileRouteTypes {
     | '/preview-meditacao'
     | '/preview-notificacoes'
     | '/preview-oferta'
+    | '/preview-onboarding'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -798,6 +808,7 @@ export interface FileRouteTypes {
     | '/preview-meditacao'
     | '/preview-notificacoes'
     | '/preview-oferta'
+    | '/preview-onboarding'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -874,6 +885,7 @@ export interface FileRouteTypes {
     | '/preview-meditacao'
     | '/preview-notificacoes'
     | '/preview-oferta'
+    | '/preview-onboarding'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -951,6 +963,7 @@ export interface RootRouteChildren {
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
+  PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
@@ -1061,6 +1074,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-regua'
       fullPath: '/preview-regua'
       preLoaderRoute: typeof PreviewReguaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-onboarding': {
+      id: '/preview-onboarding'
+      path: '/preview-onboarding'
+      fullPath: '/preview-onboarding'
+      preLoaderRoute: typeof PreviewOnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-oferta': {
@@ -1563,6 +1583,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
+  PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSonsRoute: PreviewSonsRoute,
