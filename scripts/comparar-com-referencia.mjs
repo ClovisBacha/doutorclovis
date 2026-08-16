@@ -83,10 +83,19 @@ const flags = new Set(process.argv.slice(2).filter((a) => a.startsWith("--")));
 const [referencia, url, saida = "/tmp/lado-a-lado.png"] = args;
 
 if (!referencia || !url) {
+  /* ⚠️ A AJUDA CITA `--seletor` E `--recorte`. A primeira versão listava só duas
+     opções secundárias, e são justamente essas duas que decidem se o relatório
+     diz a verdade — sem elas compara-se página inteira com componente e todo
+     número vira ruído. Ajuda que esconde a opção essencial é ajuda que ensina o
+     uso errado. */
   console.error(
-    "uso: node scripts/comparar-com-referencia.mjs <referencia.png> <url> [saida.png]\n" +
-      "     --sem-area-segura   não injeta a área segura do iPhone\n" +
-      "     --largura=393       largura em CSS px",
+    "uso: node scripts/comparar-com-referencia.mjs <referencia.png> <url> [saida.png]\n\n" +
+      '     --seletor=".minha-aba"  fotografa SÓ esse elemento (quase sempre necessário:\n' +
+      "                             sem ele a bancada traz cabeçalho e rodapé do site)\n" +
+      "     --recorte=190,1590      apara a referência entre estas linhas, tirando a\n" +
+      "                             barra de status e a navbar do mockup\n" +
+      "     --largura=393           largura de comparação em CSS px\n" +
+      "     --sem-area-segura       não injeta a área segura do iPhone (padrão: injeta)\n",
   );
   process.exit(1);
 }
@@ -236,7 +245,20 @@ function apara(img, y0, y1) {
   return out;
 }
 
-let refBruta = PNG.sync.read(readFileSync(referencia));
+/* ⚠️ Erro NOMEADO em vez do stack trace do Node. Um caminho digitado errado é o
+   erro mais comum deste script, e a primeira versão respondia com trinta linhas
+   de `ENOENT` — que ensina a pessoa a desconfiar da ferramenta, não do caminho. */
+let refBruta;
+try {
+  refBruta = PNG.sync.read(readFileSync(referencia));
+} catch (e) {
+  console.error(
+    `⚠️  não consegui ler a referência: ${referencia}\n` +
+      `    ${e.code === "ENOENT" ? "arquivo não encontrado" : String(e.message ?? e)}\n` +
+      "    (precisa ser PNG — se a referência veio em JPG/WEBP, converta antes)",
+  );
+  process.exit(1);
+}
 if (recorte?.length === 2) refBruta = apara(refBruta, recorte[0], recorte[1]);
 const ref = paraLargura(refBruta, largura);
 
