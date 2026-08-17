@@ -14,13 +14,17 @@ import { AssinaturaTab } from "@/components/assinatura-tab";
  * A bancada fabrica o DADO (a linha de assinatura), nunca o desenho.
  *
  * Parâmetros:
- *   `?estado=ativa`     ativa · loja · cancelada · gratuito
+ *   `?estado=loja`      ativa · loja · presente · cancelada · gratuito
  */
 export const Route = createFileRoute("/preview-assinatura")({
   validateSearch: (q: Record<string, unknown>) => ({
     /* ⚠️ `== null` e não `=== undefined`: o router serializa e revalida, e na
        segunda passada chega `null`. Oitava vez que isto aparece no repo. */
-    estado: q.estado == null ? "ativa" : String(q.estado),
+    /* ⚠️ O PADRÃO É `loja`, e não `ativa` (Stripe): é o caminho REAL da
+       paciente. `CANAL_DE.premium_paciente === "app"` — o Premium dela se
+       compra na loja; o Stripe é do médico, no site. Uma bancada que abre no
+       caso raro ensina o caso errado. */
+    estado: q.estado == null ? "loja" : String(q.estado),
   }),
   head: () => ({
     meta: [{ title: "Bancada da assinatura" }, { name: "robots", content: "noindex" }],
@@ -35,35 +39,45 @@ function PreviewAssinatura() {
   const bancada =
     estado === "gratuito"
       ? []
-      : estado === "loja"
+      : estado === "presente"
         ? [
             {
-              product: "premium",
-              plan: "mensal",
+              product: "quiz_premium",
+              plan: "convite_medico_1ano",
               status: "active",
-              source: "apple",
+              source: "convite",
               current_period_end: em30,
             },
           ]
-        : estado === "cancelada"
+        : estado === "loja"
           ? [
               {
                 product: "premium",
                 plan: "mensal",
-                status: "canceled",
-                source: "stripe",
+                status: "active",
+                source: "apple",
                 current_period_end: em30,
               },
             ]
-          : [
-              {
-                product: "premium",
-                plan: "mensal",
-                status: "active",
-                source: "stripe",
-                current_period_end: em30,
-              },
-            ];
+          : estado === "cancelada"
+            ? [
+                {
+                  product: "premium",
+                  plan: "mensal",
+                  status: "canceled",
+                  source: "stripe",
+                  current_period_end: em30,
+                },
+              ]
+            : [
+                {
+                  product: "premium",
+                  plan: "mensal",
+                  status: "active",
+                  source: "stripe",
+                  current_period_end: em30,
+                },
+              ];
 
   return (
     <div className="mx-auto max-w-md p-4">

@@ -437,13 +437,47 @@ navegador nem no Android, e num PWA instalado o link simplesmente não faria
 nada — sem erro nenhum. O `https` da Apple redireciona para a tela nativa no
 iPhone e continua sendo página útil em qualquer outro lugar.
 
-⚠️ **E isto aponta para uma mudança maior, que ainda não aconteceu:** hoje a
-assinatura é do Stripe. Pela diretriz **3.1.1**, conteúdo digital vendido dentro
-do app iOS tem de passar por IAP — quando o app for para a App Store, o fluxo
-inteiro de assinatura migra, e é para isso que `IAP_ATIVO` já existe desligado.
+### ⚠️ A PACIENTE NUNCA ASSINA PELO STRIPE — e a tela assumia o contrário
 
-**Bancadas:** `/preview-conta?pendente=1` · `/preview-assinatura?estado=ativa`
-(`loja` · `cancelada` · `gratuito`). ⚠️ A da assinatura **nasceu junto com a
+Confirmação do dono: **Stripe é só do site, e só o MÉDICO assina lá; a paciente
+assina pela App Store / Play Store.** `canal-de-venda.ts` já dizia exatamente
+isso (`CANAL_DE.premium_paciente === "app"`), e a tela que eu tinha acabado de
+fazer assumia o oposto.
+
+A régua era um booleano "é Stripe?" que tratava vazio como SIM. Errava de dois
+jeitos, e o segundo já existia em produção:
+
+1. **O padrão estava invertido.** Esta tela vive no app da PACIENTE — "não sei a
+   origem" tem de significar LOJA, nunca Stripe.
+2. **Faltava o `convite`.** O webhook grava `source: "convite"` para a paciente
+   que ganhou um ano de Premium pelo convite do médico
+   (`plan: "convite_medico_1ano"`). Ela não paga nada e não tem o que gerenciar
+   — e o botão do portal devolvia `sem_assinatura` para ela, um erro numa tela
+   que deveria explicar um presente.
+
+Virou `origemDaAssinatura` com três casos: **loja** (padrão) · **stripe** (só
+explícito) · **presente**.
+
+⚠️ **E o presente NÃO renova — ele vence.** O `status` dele é `active`, então a
+tela dizia "renova automaticamente em 16 de setembro" logo acima de "vale até 16
+de setembro": a mesma data descrita como cobrança e como fim, na mesma tela.
+
+⚠️ **A RÉGUA MORA EM `src/lib/assinatura.ts`, E ISSO CUSTOU UMA VOLTA.** Ela
+nasceu dentro de `assinatura-tab.tsx`; o teste a importava de lá, e importar do
+componente puxa `sonner`, que toca `document` ao carregar. O `bun test` inteiro
+caiu com `document.getElementsByTagName is not a function` e **nove testes de
+outros arquivos foram junto**. É a mesma lição de `buscar-paciente.ts`,
+`frases-do-mascote.ts` e `gratidao.ts`: **régua pura em `lib/`, componente só
+desenha.** Há teste cobrando que o componente não a defina.
+
+⚠️ **E isto aponta para uma mudança maior, que ainda não aconteceu:** hoje a
+assinatura da paciente é do Stripe apenas por herança. Pela diretriz **3.1.1**,
+conteúdo digital vendido dentro do app iOS passa por IAP — quando o app for para
+a loja, o fluxo migra, e é para isso que `IAP_ATIVO` já existe desligado.
+
+**Bancadas:** `/preview-conta?pendente=1` · `/preview-assinatura?estado=loja`
+(`presente` · `ativa` · `cancelada` · `gratuito`). ⚠️ O padrão dela é `loja`, e
+não `ativa`: bancada que abre no caso raro ensina o caso errado. ⚠️ A da assinatura **nasceu junto com a
 tela** — é a lição do dia aplicada na hora, depois de o campo do onboarding e o
 cartão do Perfil terem sido escritos às cegas e só ganharem bancada num remendo.
 

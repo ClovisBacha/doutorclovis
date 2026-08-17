@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { CreditCard, ExternalLink, ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+/* ⚠️ A régua vem de `lib/`, e não vive aqui: um teste que a importasse deste
+   arquivo puxaria o `sonner` junto, que toca `document` ao carregar e derruba o
+   `bun test` inteiro. Aconteceu — nove testes de outros arquivos caíram. */
+import { ASSINATURAS_DA_LOJA, lojaDaAssinatura, origemDaAssinatura } from "@/lib/assinatura";
 
 /**
  * MINHA ASSINATURA — a tela que não existia.
@@ -60,37 +64,6 @@ function dataLonga(iso: string | null | undefined): string | null {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
-}
-
-/**
- * O ENDEREÇO OFICIAL DE ASSINATURAS DA APPLE e da Google.
- *
- * ⚠️ LINK, E NÃO INSTRUÇÃO ESCRITA. A primeira versão desta tela dizia
- * "use Ajustes → Apple ID → Assinaturas" em texto — e mandar alguém navegar
- * quatro níveis de menu do sistema, de cabeça, é o mesmo tipo de atrito que faz
- * a paciente desistir e pedir estorno no cartão em vez de cancelar. A Apple
- * publica um endereço que abre a tela de assinaturas direto, e a Google também.
- *
- * ⚠️ E É `https://`, NUNCA `itms-apps://`. O esquema nativo não existe no
- * navegador nem no Android — num app instalado como PWA, um link `itms-apps`
- * simplesmente não faz nada, sem erro nenhum. O endereço `https` da Apple
- * redireciona para a tela nativa quando aberto no iPhone e continua sendo uma
- * página útil em qualquer outro lugar.
- */
-const ASSINATURAS_DA_LOJA = {
-  apple: "https://apps.apple.com/account/subscriptions",
-  google: "https://play.google.com/store/account/subscriptions",
-} as const;
-
-/**
- * ⚠️ SÓ O STRIPE ABRE PORTAL. Qualquer outra origem (`apple`, `google`, ou um
- * valor que ainda não existe) cai no texto que manda ela ao lugar certo — e o
- * `null`/vazio conta como Stripe porque é o que as assinaturas antigas têm
- * gravado, e são todas de checkout web.
- */
-function gerenciaNoStripe(source: string | null | undefined): boolean {
-  const s = (source ?? "").toLowerCase();
-  return s === "" || s === "stripe" || s === "site";
 }
 
 export function AssinaturaTab({
@@ -183,6 +156,7 @@ export function AssinaturaTab({
    * Um único booleano fazia dois trabalhos: "está pagando?" e "pode usar?".
    * Enquanto o período pago não vence, a resposta da segunda é sim.
    */
+  const origem = origemDaAssinatura(viva?.source);
   const fimDoPeriodo = viva?.current_period_end ? new Date(viva.current_period_end).getTime() : 0;
   const temAcesso = ativa || (fimDoPeriodo > Date.now() && viva?.status === "canceled");
   /** Nunca assinou — nem hoje, nem antes. Muda o que a tela tem a dizer. */
@@ -217,9 +191,18 @@ export function AssinaturaTab({
             que não vai. */}
         {renova && (
           <p className="mt-4 text-[13.5px] leading-snug text-muted-foreground">
-            {ativa ? (
+            {/* ⚠️ PRESENTE NÃO RENOVA — ELE VENCE. O `status` dele é `active`,
+                então esta linha dizia "renova automaticamente em 16 de
+                setembro" logo acima de "vale até 16 de setembro": a mesma data
+                descrita como cobrança e como fim, na mesma tela. Um ano dado
+                pelo médico acaba na data; não há cartão para renovar. */}
+            {ativa && origem !== "presente" ? (
               <>
                 Renova automaticamente em <strong className="font-semibold">{renova}</strong>.
+              </>
+            ) : origem === "presente" ? (
+              <>
+                Vale até <strong className="font-semibold">{renova}</strong>.
               </>
             ) : (
               <>
@@ -244,7 +227,7 @@ export function AssinaturaTab({
               querer voltar atrás — e o portal do Stripe reativa. Sem esta
               linha ela teria de assinar de novo do zero, ou escrever para o
               suporte. */}
-          {temAcesso && gerenciaNoStripe(viva?.source) && (
+          {temAcesso && origem === "stripe" && (
             <>
               <button
                 onClick={() => void abrirPortal()}
@@ -262,18 +245,16 @@ export function AssinaturaTab({
             </>
           )}
 
-          {/* ⚠️ ASSINATURA DA LOJA NÃO ABRE PORTAL — ver `gerenciaNoStripe`. */}
-          {temAcesso && !gerenciaNoStripe(viva?.source) && (
+          {/* ⚠️ ASSINATURA DA LOJA NÃO ABRE PORTAL — ver `origemDaAssinatura`.
+              Este é o caminho PADRÃO da paciente: o Premium dela se compra na
+              loja da Apple/Google (`CANAL_DE.premium_paciente === "app"`). */}
+          {temAcesso && origem === "loja" && (
             <>
               {/* ⚠️ POR REGRA DA APPLE/GOOGLE, SÓ A LOJA CANCELA. O app não tem
                   como fazer isso — e é por isso que aqui não há botão de
                   cancelar, e sim um caminho para onde ela consegue. */}
               <a
-                href={
-                  (viva?.source ?? "").toLowerCase().includes("google")
-                    ? ASSINATURAS_DA_LOJA.google
-                    : ASSINATURAS_DA_LOJA.apple
-                }
+                href={ASSINATURAS_DA_LOJA[lojaDaAssinatura(viva?.source)]}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-bold text-primary-foreground"
@@ -287,6 +268,19 @@ export function AssinaturaTab({
                 troca o pagamento ou se cancela.
               </p>
             </>
+          )}
+
+          {/* ─── O PRESENTE DO MÉDICO ────────────────────────────────────
+              `source: "convite"` — um ano de Premium dado pelo médico dela.
+              Não há o que gerenciar e não há o que cancelar: ela não paga
+              nada. O que ela precisa saber é DE ONDE veio e ATÉ QUANDO vale —
+              e a versão anterior mostrava um botão de portal que devolvia
+              erro. */}
+          {temAcesso && origem === "presente" && (
+            <p className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] leading-snug">
+              Este Premium foi um <strong className="font-semibold">presente do seu médico</strong>.
+              Você não paga nada por ele e não há nada para cancelar.
+            </p>
           )}
 
           {!temAcesso && onNavigate && (
@@ -311,7 +305,9 @@ export function AssinaturaTab({
             SEGUNDA frase fica sempre: é o limite ético do produto, e ela vale
             ainda mais para quem está decidindo se assina. */}
         <p className="text-[12.5px] leading-relaxed text-muted-foreground">
-          {ativa && "Cancelar é imediato e você mantém o acesso até o fim do período já pago. "}
+          {ativa &&
+            origem !== "presente" &&
+            "Cancelar é imediato e você mantém o acesso até o fim do período já pago. "}
           <strong className="font-semibold text-foreground">
             Nada do seu cuidado depende da assinatura
           </strong>{" "}
