@@ -6,17 +6,9 @@
  *
  * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
-import { useState, useEffect } from "react";
-import {
-  Baby,
-  ChevronRight,
-  Gamepad2,
-  LifeBuoy,
-  Heart,
-  Menu,
-  MessageCircle,
-  type LucideIcon,
-} from "lucide-react";
+import { useState, useEffect, type ComponentType } from "react";
+import { Baby, ChevronRight, Gamepad2, LifeBuoy, Heart, Menu } from "lucide-react";
+import { IconeAmigas } from "@/components/icones-jogo";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
@@ -54,6 +46,11 @@ export type AppTab =
   | "Saúde da mulher"
   | "Médico"
   | "Chat IA"
+  /* A COMUNIDADE — a aba que assumiu o lugar do Chat na barra de baixo. Ela
+     reúne o que já existia solto (Amigas, álbum, votação de nomes, o
+     acompanhante) e é onde as funções novas de convívio vão morar. */
+  | "Comunidade"
+  | "Amigas"
   /* A loja de PRODUTOS (suplemento, conforto, enxoval — por dinheiro). Era uma
      sub-aba de "Recompensas", ao lado do Cantinho, que vende enfeite por
      Sementinhas; virou destino próprio para as duas pararem de se confundir.
@@ -67,15 +64,29 @@ export type AppTab =
   | "Assinatura"
   | "Exames";
 
-// Barra de baixo enxuta (5 = Bebê + Jogo + Chat + Saúde + SOS). O "Bebê" é a
-// tela principal (imagem + infos + grade de atalhos pra tudo). Jogo e Chat são
-// destino de 1 toque; SOS continua como botão vermelho à parte (onEmergency).
-export type BottomSection = "home" | "jogo" | "chat" | "saude";
+/**
+ * Barra de baixo enxuta (5 = Bebê + Jogo + Comunidade + Saúde + SOS). O "Bebê" é
+ * a tela principal (imagem + infos + grade de atalhos pra tudo); SOS continua
+ * como botão vermelho à parte (onEmergency).
+ *
+ * ⚠️ **O CHAT SAIU DAQUI, e não foi arrumação.** Pedido do dono: "quanto mais eu
+ * for expandir isso, ele vai ser um elemento que não vai ter em todos os países;
+ * hoje a gente só está usando ele no Brasil". Um dos cinco lugares da barra —
+ * que é o mapa do app inteiro — estava reservado para a única função que não
+ * atravessa fronteira. Ele **não perdeu nada**: nenhuma funcionalidade do chat
+ * mudou, só a porta, que passou a ser o bebê bolha do alto da home. E a porta
+ * nova é melhor que a antiga: a bolha já era "a voz do app", então o lugar onde
+ * se conversa com ela é ela mesma.
+ *
+ * No lugar entrou a **Comunidade**, com o ícone que a fita do jogo já usa para
+ * as Amigas.
+ */
+export type BottomSection = "home" | "jogo" | "comunidade" | "saude";
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   jogo: ["Caminho"],
-  chat: ["Chat IA"],
+  comunidade: ["Comunidade", "Amigas"],
   saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
 };
 
@@ -352,15 +363,29 @@ function useWeather(
 
 // Cada ícone com sua cor própria (sempre colorido, não só quando ativo) — deixa
 // a barra mais divertida. `pill` é o fundo da mesma cor quando a aba está ativa.
+/**
+ * O ícone da barra.
+ *
+ * Era `LucideIcon` cravado. A Comunidade trouxe o primeiro ícone NOSSO para cá
+ * (`IconeAmigas`, o mesmo da fita do jogo — pedido do dono: "pega o nosso ícone
+ * que a gente tem lá na gamificação pras amigas e traz pra lá"), e ele é uma
+ * silhueta CHEIA: pinta com `fill`, não com `stroke`. Por isso a assinatura
+ * comum aceita `strokeWidth` e o nosso simplesmente o ignora — o contrário
+ * (dar a `icones-jogo.tsx` uma prop que ele não usa) espalharia a gambiarra
+ * por doze ícones para servir a um.
+ */
+type IconeDaBarra = ComponentType<{ className?: string; strokeWidth?: number }>;
+
 const NAV_ITEMS: {
   id: BottomSection;
-  Icon: LucideIcon;
+  Icon: IconeDaBarra;
   label: string;
   color: string;
   pill: string;
 }[] = [
   // Ordem visual pedida (após o SOS, que é renderizado antes): Saúde · Bebê ·
-  // Jogo · Chat. Com o SOS na frente fica: SOS · Saúde · Bebê · Jogo · Chat.
+  // Jogo · Comunidade. Com o SOS na frente fica: SOS · Saúde · Bebê · Jogo ·
+  // Comunidade.
   {
     id: "saude",
     Icon: Heart,
@@ -376,7 +401,13 @@ const NAV_ITEMS: {
     color: "text-fuchsia-500",
     pill: "bg-fuchsia-500/15",
   },
-  { id: "chat", Icon: MessageCircle, label: "Chat", color: "text-sky-500", pill: "bg-sky-500/15" },
+  {
+    id: "comunidade",
+    Icon: IconeAmigas,
+    label: "Comunidade",
+    color: "text-sky-500",
+    pill: "bg-sky-500/15",
+  },
 ];
 
 /** Item comum da barra: ícone de contorno na cor do site + rótulo embaixo. */
@@ -400,7 +431,7 @@ function NavItem({
       (vermelho = SOS), e os cinco tons já leem sobre o vidro escuro. */
   escura?: boolean;
   onClick: () => void;
-  Icon: LucideIcon;
+  Icon: IconeDaBarra;
 }) {
   return (
     <button
@@ -817,6 +848,7 @@ export function AppHomeScreen({
   naoLidas = 0,
   mascoteCalado = false,
   onOpenRecados,
+  onOpenChat,
   onOrigemLocal,
 }: {
   firstName: string;
@@ -876,6 +908,15 @@ export function AppHomeScreen({
    * mais para chegar no que o personagem acabou de anunciar.
    */
   onOpenRecados?: () => void;
+  /**
+   * Abre o CHAT — o toque no personagem.
+   *
+   * O chat saiu da barra de baixo (ver `BottomSection`) e a bolha virou a porta
+   * dele. Sem isto o toque no personagem cai no recuo antigo (recados → menu),
+   * que continua sendo o certo para quem não passa a prop: a bancada e qualquer
+   * tela que desenhe a home sem um chat atrás.
+   */
+  onOpenChat?: () => void;
   /**
    * Conta para fora DE ONDE veio a localização.
    *
@@ -1482,7 +1523,13 @@ export function AppHomeScreen({
                 recados={temNaoLidas ? Math.max(1, naoLidas) : 0}
                 calado={mascoteCalado}
                 careMode={careMode}
-                onAbrir={onOpenRecados ?? onOpenMenu}
+                /* O PERSONAGEM abre o chat; o BALÃO, quando está anunciando
+                   recado, abre a central. Quem decide é `oBalaoAbreOsRecados`,
+                   dentro do componente. Sem `onOpenChat` (bancada, telas sem
+                   chat atrás) o personagem volta ao destino antigo, para nunca
+                   virar um botão que não faz nada. */
+                onAbrir={onOpenChat ?? onOpenRecados ?? onOpenMenu}
+                onAbrirRecados={onOpenRecados ?? onOpenMenu}
               />
             </div>
 

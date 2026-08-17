@@ -64,7 +64,7 @@ async function emLuto(sb: any, uid: string): Promise<boolean> {
  * Lê os dois perfis numa consulta só e compara — mais barato que duas idas ao
  * banco e, o que importa mais, impossível de responder "sim" por metade.
  */
-async function saoAmigas(sb: any, eu: string, outra: string): Promise<boolean> {
+export async function saoAmigas(sb: any, eu: string, outra: string): Promise<boolean> {
   if (!outra || outra === eu) return false;
 
   /* ⚠️ QUEM ENCERROU NÃO É AMIGA, e esta é a primeira pergunta — antes das

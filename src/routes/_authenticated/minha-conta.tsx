@@ -146,6 +146,7 @@ import {
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
 import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
+import { ComunidadeTab } from "@/components/comunidade";
 import { AssinaturaTab } from "@/components/assinatura-tab";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -414,6 +415,17 @@ async function fetchAppointmentsCached(force = false): Promise<MyAppointment[]> 
 const TABS = [
   "Bebê",
   "Caminho",
+  /* ⚠️ A COMUNIDADE assumiu o lugar do Chat na barra de baixo (ago/2026).
+     Pedido do dono: o chat é a única função da barra que não atravessa
+     fronteira ("hoje a gente só está usando ele no Brasil"), e a barra é o mapa
+     do app. Ele não perdeu nada — a porta virou o bebê bolha do alto da home.
+
+     Esta aba REÚNE o que já existia solto: Amigas, o Álbum Familiar
+     (`/album/<token>`), a votação de nomes e o painel do acompanhante. Nenhum
+     dos quatro tinha porta no app; viviam cada um no seu link. "Amigas"
+     continua na lista porque é destino de verdade (a tela cheia de uma amiga),
+     só deixou de ser a única porta. */
+  "Comunidade",
   "Amigas",
   "Calendário",
   "Registros",
@@ -458,7 +470,10 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   },
   {
     label: "Família",
-    tabs: ["Acompanhante", "Amigas", "Pós-parto"],
+    /* A Comunidade primeiro: no computador, onde não existe barra de baixo,
+       esta é a ÚNICA porta dela. Acompanhante e Amigas continuam listadas
+       porque são destinos de verdade e alguém pode querer ir direto. */
+    tabs: ["Comunidade", "Acompanhante", "Amigas", "Pós-parto"],
   },
   {
     label: "Consultas",
@@ -1710,11 +1725,11 @@ function MinhaContaPage() {
       return;
     }
     setMobileHome(false);
-    // Jogo/Chat têm uma aba só e abrem DIRETO nela. Saúde tem seis: abre no
-    // hub, a grade de quadrados. (Bebê = home, tratado acima.)
+    // Jogo/Comunidade têm uma aba só e abrem DIRETO nela. Saúde tem seis: abre
+    // no hub, a grade de quadrados. (Bebê = home, tratado acima.)
     const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
       jogo: "Caminho",
-      chat: "Chat IA",
+      comunidade: "Comunidade",
       saude: "Saúde",
     };
     setTab(sectionMap[section]);
@@ -2143,6 +2158,9 @@ function MinhaContaPage() {
                    acabou de anunciar o recado, e fazer a paciente procurá-lo
                    dentro da lista da conta desmentiria o anúncio. */
                 onOpenRecados={() => setNotifOpen(true)}
+                /* O chat saiu da barra de baixo e a bolha virou a porta dele.
+                   Nenhuma funcionalidade do chat mudou — só quem o abre. */
+                onOpenChat={() => goToTab("Chat IA")}
                 /* Durante o tutorial ele fala pelo cartão, não pelo canto.
                    A MESMA condição que desenha o tutorial (`&& ehCelular`):
                    com só `tutorialAberto`, uma janela larga calava o mascote
@@ -2342,6 +2360,24 @@ function MinhaContaPage() {
                       onOpenAmigas={() => goToTab("Amigas")}
                     />
                   </Suspense>
+                )}
+                {tab === "Comunidade" && (
+                  <ComunidadeTab
+                    donaId={userId}
+                    careMode={careMode}
+                    /* As portas são ATALHOS: abrem a tela onde ela já mora.
+                       `subDestino` vai pelo mesmo caminho que o hub da Saúde
+                       usa para Chutes e Contrações. */
+                    onAbrir={(destino, sub) => {
+                      goToTab(destino as Tab);
+                      /* `consultasSub` é o estado ÚNICO de sub-tela que
+                         `BebeHub`, `RegistrosHub` e `ConsultasHub` já
+                         compartilham — o mesmo que o hub da Saúde usa para
+                         abrir Chutes direto. Depois do `goToTab`, que o
+                         limpa. */
+                      setConsultasSub(sub ?? null);
+                    }}
+                  />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

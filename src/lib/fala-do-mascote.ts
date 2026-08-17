@@ -58,6 +58,32 @@ export function oQueOMascoteDiz(
 }
 
 /**
+ * O toque no BALÃO abre a central de recados — ou faz o mesmo que o toque no
+ * personagem?
+ *
+ * Depende de quem está falando, e a pergunta só passou a existir agora.
+ *
+ * ⚠️ Antes, os dois toques iam para a central e não havia o que decidir. Hoje o
+ * toque no PERSONAGEM abre o chat (pedido do dono: o chat sai da barra de baixo
+ * e vira a boca da bolha, porque ele é a única coisa da barra que não atravessa
+ * fronteira — só existe em português). Com dois destinos, o balão precisa
+ * escolher, e escolher errado custa nos dois sentidos: um balão de conforto que
+ * abrisse a central levaria a paciente a uma tela vazia, e um balão de recado
+ * que abrisse o chat perderia justamente os recados que ele acabou de anunciar.
+ *
+ * A régua é a origem do texto. Quando o balão É o anúncio dos recados ("Tenho 3
+ * recados 💌"), ele promete um lugar e tocar nele leva lá. Quando quem fala é a
+ * frase do dia — conforto, clima, hora —, o balão não promete lugar nenhum, e o
+ * toque nele é o mesmo toque no personagem.
+ */
+export function oBalaoAbreOsRecados(
+  fala: FalaDoMascote | null | undefined,
+  recados: number,
+): boolean {
+  return !fala && falaDosRecados(recados) !== null;
+}
+
+/**
  * O que o emblema mostra.
  *
  * O teto em "9+" é de LARGURA: o emblema fica pendurado na borda de um

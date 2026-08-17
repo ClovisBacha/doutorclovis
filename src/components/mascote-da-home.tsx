@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Bolha, type BolhaHandle, type Humor } from "@/components/bolha";
-import { emblemaDeRecados, oQueOMascoteDiz, type FalaDoMascote } from "@/lib/fala-do-mascote";
+import {
+  emblemaDeRecados,
+  oBalaoAbreOsRecados,
+  oQueOMascoteDiz,
+  type FalaDoMascote,
+} from "@/lib/fala-do-mascote";
 
 /**
  * O BEBÊ BOLHA NO CANTO DA HOME — a voz do app.
@@ -56,6 +61,7 @@ export function MascoteDaHome({
   recados = 0,
   fala,
   onAbrir,
+  onAbrirRecados,
   careMode = false,
   calado = false,
   tamanho = 44,
@@ -71,7 +77,15 @@ export function MascoteDaHome({
    * um personagem que muda de assunto no meio da frase não ensina nada.
    */
   fala?: FalaDoMascote | null;
+  /** Toque no PERSONAGEM. Hoje é o chat — ver `oBalaoAbreOsRecados`. */
   onAbrir?: () => void;
+  /**
+   * Toque no BALÃO, e só quando o balão é o anúncio dos recados.
+   *
+   * Sem ele, o balão repete `onAbrir` — que é o certo para a frase do dia, que
+   * não promete lugar nenhum. Quem decide é `oBalaoAbreOsRecados`, testada.
+   */
+  onAbrirRecados?: () => void;
   careMode?: boolean;
   /**
    * Segura o balão — o emblema continua.
@@ -92,6 +106,8 @@ export function MascoteDaHome({
 
   const oQueEleDiz = oQueOMascoteDiz(fala, recados);
   const emblema = emblemaDeRecados(recados);
+  const aoTocarNoBalao =
+    oBalaoAbreOsRecados(fala, recados) && onAbrirRecados ? onAbrirRecados : onAbrir;
 
   /* O balão espera, e o personagem CUTUCA no mesmo instante em que fala.
      Sem o cutucão o balão aparece sozinho e lê como aviso de sistema; com ele,
@@ -115,7 +131,12 @@ export function MascoteDaHome({
       <button
         type="button"
         onClick={onAbrir}
-        aria-label={oQueEleDiz?.aria ?? "Falar com a bolha"}
+        /* O rótulo é FIXO, e antes acompanhava o balão (`oQueEleDiz.aria`).
+           Deixou de poder: o balão pode estar anunciando recados enquanto o
+           personagem abre o chat, e um leitor de tela anunciaria "Abrir 3
+           recados" num botão que abre outra coisa. Quem descreve o recado é o
+           balão, que é o botão que leva até ele. */
+        aria-label="Falar com a bolha"
         className="press relative flex items-center justify-center"
         style={{ width: tamanho, height: tamanho }}
       >
@@ -153,7 +174,7 @@ export function MascoteDaHome({
       {oQueEleDiz && mostrarFala && !calado && (
         <button
           type="button"
-          onClick={onAbrir}
+          onClick={aoTocarNoBalao}
           className="dc-fala-entra absolute right-0 top-[calc(100%+0.5rem)] w-max max-w-[min(66vw,17rem)] rounded-2xl rounded-tr-md border border-border bg-card px-3.5 py-2.5 text-left text-[13px] font-medium leading-snug text-foreground shadow-[var(--shadow-card)]"
         >
           {oQueEleDiz.texto}

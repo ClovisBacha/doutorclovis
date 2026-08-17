@@ -32,6 +32,7 @@ import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
+import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
@@ -199,6 +200,11 @@ const PreviewContaRoute = PreviewContaRouteImport.update({
 const PreviewConquistasRoute = PreviewConquistasRouteImport.update({
   id: '/preview-conquistas',
   path: '/preview-conquistas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewComunidadeRoute = PreviewComunidadeRouteImport.update({
+  id: '/preview-comunidade',
+  path: '/preview-comunidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewChatRoute = PreviewChatRouteImport.update({
@@ -496,6 +502,7 @@ export interface FileRoutesByFullPath {
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
@@ -573,6 +580,7 @@ export interface FileRoutesByTo {
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
@@ -652,6 +660,7 @@ export interface FileRoutesById {
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
+  '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
@@ -731,6 +740,7 @@ export interface FileRouteTypes {
     | '/preview-bolha'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-comunidade'
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-exercicio'
@@ -808,6 +818,7 @@ export interface FileRouteTypes {
     | '/preview-bolha'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-comunidade'
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-exercicio'
@@ -886,6 +897,7 @@ export interface FileRouteTypes {
     | '/preview-bolha'
     | '/preview-casal'
     | '/preview-chat'
+    | '/preview-comunidade'
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-exercicio'
@@ -965,6 +977,7 @@ export interface RootRouteChildren {
   PreviewBolhaRoute: typeof PreviewBolhaRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
   PreviewChatRoute: typeof PreviewChatRoute
+  PreviewComunidadeRoute: typeof PreviewComunidadeRoute
   PreviewConquistasRoute: typeof PreviewConquistasRoute
   PreviewContaRoute: typeof PreviewContaRoute
   PreviewExercicioRoute: typeof PreviewExercicioRoute
@@ -1171,6 +1184,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-conquistas'
       fullPath: '/preview-conquistas'
       preLoaderRoute: typeof PreviewConquistasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-comunidade': {
+      id: '/preview-comunidade'
+      path: '/preview-comunidade'
+      fullPath: '/preview-comunidade'
+      preLoaderRoute: typeof PreviewComunidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-chat': {
@@ -1593,6 +1613,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewBolhaRoute: PreviewBolhaRoute,
   PreviewCasalRoute: PreviewCasalRoute,
   PreviewChatRoute: PreviewChatRoute,
+  PreviewComunidadeRoute: PreviewComunidadeRoute,
   PreviewConquistasRoute: PreviewConquistasRoute,
   PreviewContaRoute: PreviewContaRoute,
   PreviewExercicioRoute: PreviewExercicioRoute,
