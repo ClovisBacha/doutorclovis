@@ -364,6 +364,67 @@ ritual lê o código na primeira renderização, então sem essa espera a bancad
 mostraria sempre o campo vazio, que é o único estado que ela não precisava
 provar.
 
+## A auditoria do menu ☰, e a tela que faltava (ago/2026)
+
+Pedido do dono: auditar tudo dentro do menu da área do bebê, nota por item.
+Deu **7,4** — a navegação estava bem resolvida (nenhum dos 8 destinos quebrado,
+nenhum alvo abaixo de 44px, contraste de 14 a 18:1). O problema era o que não
+estava lá.
+
+### ⚠️ NÃO HAVIA COMO CANCELAR A ASSINATURA
+
+`openBillingPortal` e `getMyBilling` estavam escritas em `billing.functions.ts`
+há meses. O ÚNICO chamador do portal era `painel.tsx` — o painel do **médico**.
+`getMyBilling` não tinha chamador nenhum.
+
+A paciente assinava, era cobrada todo mês, e o app não tinha tela dizendo quanto
+ela paga, quando renova nem como parar. É quebra de confiança (quem não acha
+como cancelar faz chargeback), risco de conformidade (o CDC espera cancelar tão
+fácil quanto contratar) e, com o IAP, item que a revisão da Apple cobra.
+
+`AssinaturaTab` fecha isso — **só UI, servidor já pronto**.
+
+- ⚠️ **A ORIGEM decide o botão.** `source` vindo da loja da Apple/Google não
+  abre no portal do Stripe; um botão que abre portal vazio faz ela concluir que
+  o app quebrou em vez de procurar no lugar certo. `null`/vazio conta como
+  Stripe — é o que as assinaturas antigas têm gravado.
+- ⚠️ **"TEM ACESSO" ≠ "ESTÁ PAGANDO"**, e a bancada pegou: uma assinatura
+  CANCELADA com período pago até setembro mostrava título "Plano gratuito" e,
+  logo abaixo, "seu acesso vai até 16 de setembro" — duas frases se
+  contradizendo na mesma tela. Um booleano fazia dois trabalhos.
+- ⚠️ **E separar os dois criou um beco sem saída** que também precisou de porta:
+  cancelada + com acesso ficava sem botão nenhum, e é exatamente quem pode
+  querer voltar atrás. Virou "Reativar assinatura", pelo mesmo portal.
+- **Quem nunca assinou não lê texto de cancelamento** — mas lê a frase do limite
+  ético ("nada do seu cuidado depende da assinatura"), que vale ainda mais para
+  quem está decidindo.
+
+### ⚠️ "Sair" ficava abaixo da dobra
+
+Medido com a área segura injetada: com a folha rolando inteira, num **iPhone SE
+(375×667)** saíam da vista Pós-parto, Painel e **Sair**; num 320px, também as
+Dúvidas. Sair do app exigia descobrir que a lista rolava.
+
+A folha virou **coluna com rodapé fixo**: só a lista rola, Painel e Sair vivem
+num irmão `shrink-0`. Medido depois nos três aparelhos: Sair sempre visível sem
+rolar, lista rolando, último item alcançável.
+
+### Três acertos menores
+
+- **A foto real no cabeçalho.** `avatar_url` estava preenchida (o mesmo campo
+  que a aba Amigas usa) e o menu desenhava um ícone genérico — era a única tela
+  que conhecia a pessoa e não a reconhecia.
+- **O ponto das Notificações saiu.** Ele e o contador apareciam pela MESMA
+  condição e diziam a mesma coisa; o número é estritamente mais informativo. O
+  ponto fica no Perfil, onde é a única informação possível.
+- **`?pendente=1` na bancada do menu.** O ponto do Perfil era um estado escrito
+  às cegas.
+
+**Bancadas:** `/preview-conta?pendente=1` · `/preview-assinatura?estado=ativa`
+(`loja` · `cancelada` · `gratuito`). ⚠️ A da assinatura **nasceu junto com a
+tela** — é a lição do dia aplicada na hora, depois de o campo do onboarding e o
+cartão do Perfil terem sido escritos às cegas e só ganharem bancada num remendo.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é

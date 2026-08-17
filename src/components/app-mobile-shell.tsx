@@ -61,6 +61,10 @@ export type AppTab =
      dela é o menu ☰ no celular e a categoria "Conta" no computador. */
   | "Loja"
   | "Perfil"
+  /* A assinatura da PACIENTE. Vive fora das seções da barra de baixo, como a
+     Loja: o caminho dela é o menu ☰ no celular e a categoria "Conta" no
+     computador. */
+  | "Assinatura"
   | "Exames";
 
 // Barra de baixo enxuta (5 = Bebê + Jogo + Chat + Saúde + SOS). O "Bebê" é a

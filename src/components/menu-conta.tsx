@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import {
   CalendarDays,
   CircleHelp,
+  CreditCard,
   Heart,
   Inbox,
   LayoutDashboard,
@@ -67,6 +68,16 @@ const MENU_CONTA: {
     Icon: UserRound,
   },
   {
+    /* ⚠️ LOGO DEPOIS DOS DADOS, e antes de tudo que é conteúdo. Dinheiro é o
+       assunto que a paciente mais precisa achar rápido quando procura — e o
+       que ela mais fica brava de não encontrar. Enterrá-lo no fim da lista é o
+       padrão escuro que faz gente pedir chargeback em vez de cancelar. */
+    tab: "Assinatura",
+    label: "Minha assinatura",
+    sub: "Plano, renovação e pagamento",
+    Icon: CreditCard,
+  },
+  {
     tab: "Consultas",
     label: "Consultas",
     sub: "Calendário, exames e marcos",
@@ -107,6 +118,7 @@ const MENU_CONTA: {
 export function MenuDaConta({
   nome,
   saudacao,
+  foto,
   gest,
   proximaConsulta,
   naoLidas,
@@ -120,6 +132,11 @@ export function MenuDaConta({
 }: {
   nome: string;
   saudacao: string;
+  /** A foto que ela já subiu (`patient_profiles.avatar_url`, uma data URL).
+      ⚠️ O cabeçalho desenhava um ícone genérico mesmo com a foto preenchida —
+      o mesmo campo que a aba Amigas usa para mostrar o rosto das amigas dela.
+      Era a única tela do app que conhecia a pessoa e não a reconhecia. */
+  foto?: string | null;
   gest: { weeks: number; days: number } | null;
   /** Vem da home: a linha "Próxima consulta · 12/08" morava no cartão do
       calendário. O cartão saiu da home; a informação não podia sair junto,
@@ -159,12 +176,31 @@ export function MenuDaConta({
         /* `max-h` + rolagem: com oito linhas o cartão passa da tela num
            iPhone SE, e um menu que vaza pela borda esconde justamente o
            último item — que aqui é "Sair". */
-        className="mt-[calc(3.5rem+var(--safe-top))] max-h-[calc(100dvh-8rem)] w-[86%] max-w-sm overflow-y-auto rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
+        /* ⚠️ COLUNA COM RODAPÉ FIXO, e não uma caixa que rola inteira.
+           Medido com a área segura injetada: com a folha rolando por completo,
+           num iPhone SE (375×667) ficavam FORA DA VISTA o Pós-parto, o Painel
+           e o **Sair** — e num 320px também as Dúvidas. Sair do app exigia
+           descobrir que a lista rolava.
+
+           Agora só a LISTA rola; Painel e Sair vivem num rodapé que não sai da
+           tela nunca. É a mesma razão pela qual a fila de trabalho do painel do
+           médico ficou fora da `div` que o app nativo esconde: um caminho de
+           saída que depende de rolagem é um caminho que alguém não encontra. */
+        className="mt-[calc(3.5rem+var(--safe-top))] flex max-h-[calc(100dvh-8rem)] w-[86%] max-w-sm flex-col overflow-hidden rounded-3xl border border-white/70 bg-card/95 p-2 shadow-[var(--shadow-float)] backdrop-blur-xl"
       >
-        <div className="flex items-center gap-3 px-4 pb-2 pt-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12 ring-1 ring-primary/20">
-            <UserRound className="h-[22px] w-[22px] text-primary" strokeWidth={1.9} />
-          </span>
+        <div className="flex shrink-0 items-center gap-3 px-4 pb-2 pt-3">
+          {foto ? (
+            <img
+              src={foto}
+              alt=""
+              className="h-11 w-11 shrink-0 rounded-full object-cover ring-1 ring-primary/20"
+              draggable={false}
+            />
+          ) : (
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12 ring-1 ring-primary/20">
+              <UserRound className="h-[22px] w-[22px] text-primary" strokeWidth={1.9} />
+            </span>
+          )}
           <div className="min-w-0">
             <p className="truncate font-serif text-lg leading-tight text-foreground">
               {saudacao}, {nome} 💛
@@ -177,21 +213,20 @@ export function MenuDaConta({
           </div>
         </div>
 
-        <div className="mt-1 space-y-0.5">
+        <div className="mt-1 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
           {/* Primeiro item da lista: é o que muda de um dia para o outro. O
               resto está sempre lá; só este tem novidade. */}
           <button
             onClick={onNotificacoes}
             className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-foreground transition-colors hover:bg-primary/8"
           >
-            <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+            {/* ⚠️ SEM PONTO NO ÍCONE. Ele e o contador da direita apareciam
+                pela MESMA condição (`naoLidas > 0`) e diziam a mesma coisa —
+                dois sinais para um fato só, e o número já é estritamente mais
+                informativo que o ponto. O ponto continua onde ele é a única
+                informação possível: a linha do Perfil, que não tem contagem. */}
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center">
               <Inbox className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
-              {naoLidas > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
-                />
-              )}
             </span>
             <span className="flex-1">Notificações</span>
             {naoLidas > 0 && (
@@ -253,7 +288,12 @@ export function MenuDaConta({
               </span>
             </button>
           )}
+        </div>
 
+        {/* ── O RODAPÉ QUE NUNCA ROLA ──────────────────────────────────────
+            Painel e Sair. Ver a classe da folha acima: são os dois destinos
+            que não podem depender de a paciente descobrir que a lista rola. */}
+        <div className="shrink-0">
           <div className="mx-4 my-1 h-px bg-border/60" />
 
           {mostrarPainel && (

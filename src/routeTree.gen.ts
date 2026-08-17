@@ -36,6 +36,7 @@ import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
+import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
 import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
@@ -218,6 +219,11 @@ const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
 const PreviewBebeRoute = PreviewBebeRouteImport.update({
   id: '/preview-bebe',
   path: '/preview-bebe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewAssinaturaRoute = PreviewAssinaturaRouteImport.update({
+  id: '/preview-assinatura',
+  path: '/preview-assinatura',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewAmigasRoute = PreviewAmigasRouteImport.update({
@@ -485,6 +491,7 @@ export interface FileRoutesByFullPath {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-amigas': typeof PreviewAmigasRoute
+  '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -561,6 +568,7 @@ export interface FileRoutesByTo {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-amigas': typeof PreviewAmigasRoute
+  '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -639,6 +647,7 @@ export interface FileRoutesById {
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
   '/preview-amigas': typeof PreviewAmigasRoute
+  '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -717,6 +726,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-amigas'
+    | '/preview-assinatura'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -793,6 +803,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-amigas'
+    | '/preview-assinatura'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -870,6 +881,7 @@ export interface FileRouteTypes {
     | '/modo-acompanhante'
     | '/mural'
     | '/preview-amigas'
+    | '/preview-assinatura'
     | '/preview-bebe'
     | '/preview-bolha'
     | '/preview-casal'
@@ -948,6 +960,7 @@ export interface RootRouteChildren {
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
   PreviewAmigasRoute: typeof PreviewAmigasRoute
+  PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
@@ -1186,6 +1199,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-bebe'
       fullPath: '/preview-bebe'
       preLoaderRoute: typeof PreviewBebeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-assinatura': {
+      id: '/preview-assinatura'
+      path: '/preview-assinatura'
+      fullPath: '/preview-assinatura'
+      preLoaderRoute: typeof PreviewAssinaturaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-amigas': {
@@ -1568,6 +1588,7 @@ const rootRouteChildren: RootRouteChildren = {
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
   PreviewAmigasRoute: PreviewAmigasRoute,
+  PreviewAssinaturaRoute: PreviewAssinaturaRoute,
   PreviewBebeRoute: PreviewBebeRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
   PreviewCasalRoute: PreviewCasalRoute,

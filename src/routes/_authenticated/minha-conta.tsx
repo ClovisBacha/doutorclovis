@@ -146,6 +146,7 @@ import {
 import { getReferral, attributeReferral } from "@/lib/referral.functions";
 import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
+import { AssinaturaTab } from "@/components/assinatura-tab";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
    alfabética que só devolvia nome e especialidade — e exigia selo, então
@@ -436,6 +437,13 @@ const TABS = [
      dono disse que ela mora. */
   "Loja",
   "Perfil",
+  /* ⚠️ A ASSINATURA DELA — e ela não existia (ago/2026).
+     `openBillingPortal` e `getMyBilling` estavam escritas em
+     `billing.functions.ts` há meses; o ÚNICO chamador do portal era o painel do
+     MÉDICO, e `getMyBilling` não tinha chamador nenhum. A paciente assinava,
+     era cobrada todo mês, e dentro do app não havia tela que dissesse quanto
+     ela paga, quando renova, nem como parar. */
+  "Assinatura",
 ] as const;
 type Tab = (typeof TABS)[number];
 
@@ -466,7 +474,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
        porta do COMPUTADOR para ela. No celular quem abre a loja é o menu ☰
        (`MenuDaConta`), que não existe em `md:` — sem esta linha, tirar a
        pílula da fita deixaria a loja inalcançável no desktop. */
-    tabs: ["Chat IA", "Loja", "Perfil"],
+    tabs: ["Chat IA", "Loja", "Assinatura", "Perfil"],
   },
 ];
 
@@ -2164,6 +2172,7 @@ function MinhaContaPage() {
                 <MenuDaConta
                   nome={firstName}
                   saudacao={dayGreeting()}
+                  foto={profile?.avatar_url ?? null}
                   gest={gest ? { weeks: gest.weeks, days: gest.days } : null}
                   proximaConsulta={
                     nextAppt ? `Próxima: ${nextAppt.dateLabel} · ${nextAppt.typeLabel}` : null
@@ -2382,6 +2391,7 @@ function MinhaContaPage() {
                 {/* A loja de PRODUTOS (dinheiro), longe da de enfeites
                     (Sementinhas) — ver o cabeçalho de `RECOMPENSAS_SUBTABS`. */}
                 {tab === "Loja" && <LojaTab gest={gest} careMode={careMode} onNavigate={goToTab} />}
+                {tab === "Assinatura" && <AssinaturaTab onNavigate={goToTab} />}
                 {tab === "Saúde da mulher" && <SaudeMulherHub />}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
