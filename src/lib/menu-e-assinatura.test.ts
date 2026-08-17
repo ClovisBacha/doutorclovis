@@ -48,8 +48,15 @@ describe("⚠️ a paciente consegue chegar na própria assinatura", () => {
     expect(corpo).toContain('"stripe"');
     /* `null`/vazio conta como Stripe: é o que as assinaturas antigas têm. */
     expect(corpo).toContain('s === ""');
-    expect(tela).toContain("Apple ID");
-    expect(tela).toContain("Play Store");
+    /* ⚠️ LINK, e não instrução escrita. A primeira versão mandava "use Ajustes
+       → Apple ID → Assinaturas" em texto: navegar quatro níveis de menu do
+       sistema de cabeça é o atrito que faz a paciente pedir estorno no cartão
+       em vez de cancelar. */
+    expect(tela).toContain("https://apps.apple.com/account/subscriptions");
+    expect(tela).toContain("https://play.google.com/store/account/subscriptions");
+    /* ⚠️ `https`, NUNCA `itms-apps`: o esquema nativo não existe no navegador,
+       e num PWA instalado o link simplesmente não faria nada, sem erro. */
+    expect(tela).not.toContain("itms-apps");
   });
 
   test('⚠️ "tem acesso" e "está pagando" são coisas diferentes', () => {

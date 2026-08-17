@@ -420,6 +420,28 @@ rolar, lista rolando, último item alcançável.
 - **`?pendente=1` na bancada do menu.** O ponto do Perfil era um estado escrito
   às cegas.
 
+### ⚠️ A loja do celular ganha LINK, não instrução
+
+Pergunta do dono: "na Apple o plano não deve cancelar dentro da aba de
+assinaturas?". Sim — e por regra da Apple/Google **o app não consegue cancelar**
+uma assinatura comprada pela loja. A primeira versão desta tela já detectava a
+origem, mas mandava "use Ajustes → Apple ID → Assinaturas" **em texto**. Navegar
+quatro níveis de menu do sistema de cabeça é o atrito que faz a paciente pedir
+estorno no cartão em vez de cancelar.
+
+Virou botão para o endereço oficial (`apps.apple.com/account/subscriptions` e o
+equivalente da Play Store).
+
+⚠️ **`https://`, NUNCA `itms-apps://`**: o esquema nativo não existe no
+navegador nem no Android, e num PWA instalado o link simplesmente não faria
+nada — sem erro nenhum. O `https` da Apple redireciona para a tela nativa no
+iPhone e continua sendo página útil em qualquer outro lugar.
+
+⚠️ **E isto aponta para uma mudança maior, que ainda não aconteceu:** hoje a
+assinatura é do Stripe. Pela diretriz **3.1.1**, conteúdo digital vendido dentro
+do app iOS tem de passar por IAP — quando o app for para a App Store, o fluxo
+inteiro de assinatura migra, e é para isso que `IAP_ATIVO` já existe desligado.
+
 **Bancadas:** `/preview-conta?pendente=1` · `/preview-assinatura?estado=ativa`
 (`loja` · `cancelada` · `gratuito`). ⚠️ A da assinatura **nasceu junto com a
 tela** — é a lição do dia aplicada na hora, depois de o campo do onboarding e o

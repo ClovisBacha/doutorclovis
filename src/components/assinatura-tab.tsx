@@ -63,6 +63,26 @@ function dataLonga(iso: string | null | undefined): string | null {
 }
 
 /**
+ * O ENDEREÇO OFICIAL DE ASSINATURAS DA APPLE e da Google.
+ *
+ * ⚠️ LINK, E NÃO INSTRUÇÃO ESCRITA. A primeira versão desta tela dizia
+ * "use Ajustes → Apple ID → Assinaturas" em texto — e mandar alguém navegar
+ * quatro níveis de menu do sistema, de cabeça, é o mesmo tipo de atrito que faz
+ * a paciente desistir e pedir estorno no cartão em vez de cancelar. A Apple
+ * publica um endereço que abre a tela de assinaturas direto, e a Google também.
+ *
+ * ⚠️ E É `https://`, NUNCA `itms-apps://`. O esquema nativo não existe no
+ * navegador nem no Android — num app instalado como PWA, um link `itms-apps`
+ * simplesmente não faz nada, sem erro nenhum. O endereço `https` da Apple
+ * redireciona para a tela nativa quando aberto no iPhone e continua sendo uma
+ * página útil em qualquer outro lugar.
+ */
+const ASSINATURAS_DA_LOJA = {
+  apple: "https://apps.apple.com/account/subscriptions",
+  google: "https://play.google.com/store/account/subscriptions",
+} as const;
+
+/**
  * ⚠️ SÓ O STRIPE ABRE PORTAL. Qualquer outra origem (`apple`, `google`, ou um
  * valor que ainda não existe) cai no texto que manda ela ao lugar certo — e o
  * `null`/vazio conta como Stripe porque é o que as assinaturas antigas têm
@@ -244,16 +264,29 @@ export function AssinaturaTab({
 
           {/* ⚠️ ASSINATURA DA LOJA NÃO ABRE PORTAL — ver `gerenciaNoStripe`. */}
           {temAcesso && !gerenciaNoStripe(viva?.source) && (
-            <p className="rounded-2xl bg-secondary/60 px-4 py-3 text-[13px] leading-snug">
-              Esta assinatura foi feita pela loja do seu celular. Para trocar o pagamento ou
-              cancelar, use{" "}
-              <strong className="font-semibold">
-                {(viva?.source ?? "").toLowerCase().includes("google")
-                  ? "Play Store → Assinaturas"
-                  : "Ajustes → Apple ID → Assinaturas"}
-              </strong>{" "}
-              — por regra da loja, só ela pode alterar.
-            </p>
+            <>
+              {/* ⚠️ POR REGRA DA APPLE/GOOGLE, SÓ A LOJA CANCELA. O app não tem
+                  como fazer isso — e é por isso que aqui não há botão de
+                  cancelar, e sim um caminho para onde ela consegue. */}
+              <a
+                href={
+                  (viva?.source ?? "").toLowerCase().includes("google")
+                    ? ASSINATURAS_DA_LOJA.google
+                    : ASSINATURAS_DA_LOJA.apple
+                }
+                target="_blank"
+                rel="noopener noreferrer"
+                className="press flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-primary text-sm font-bold text-primary-foreground"
+              >
+                Gerenciar na{" "}
+                {(viva?.source ?? "").toLowerCase().includes("google") ? "Play Store" : "App Store"}
+                <ExternalLink className="h-4 w-4" strokeWidth={2.2} />
+              </a>
+              <p className="mt-2 text-center text-[11.5px] leading-snug text-muted-foreground">
+                Esta assinatura foi feita pela loja do seu celular — por regra dela, é lá que se
+                troca o pagamento ou se cancela.
+              </p>
+            </>
           )}
 
           {!temAcesso && onNavigate && (
