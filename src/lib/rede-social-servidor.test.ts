@@ -235,7 +235,7 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são seis", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são sete", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -247,14 +247,25 @@ describe("higiene", () => {
     //  5. bloquear (o seguir)  — a linha viva ressuscitaria o vínculo depois
     //  6. salvarPost (tirar)   — desmarcar é desmarcar; um "salvo cancelado"
     //                            não é fato que alguém precise consultar
+    //  7. apagarStory          — o story some em 24 h de qualquer jeito;
+    //                            arquivar guardaria para sempre o que ela
+    //                            pediu para tirar do ar antes da hora
+    //
+    // ⚠️ O POST é a exceção e continua sendo: ele é ARQUIVADO, nunca apagado,
+    // porque as reações apontam para ele (o teste abaixo cobra isso).
     expect(corpoDe("deixarDeSeguir")).toContain(".delete(");
     expect(corpoDe("responderPedido")).toContain(".delete(");
     expect(corpoDe("reagir")).toContain(".delete(");
     expect((corpoDe("bloquear").match(/\.delete\(/g) ?? []).length).toBe(2);
 
     expect(corpoDe("salvarPost")).toContain(".delete(");
+    // E o do story é recortado pela AUTORA — sem isso um id qualquer apagaria
+    // o story de qualquer pessoa.
+    const st = corpoDe("apagarStory").replace(/\s+/g, " ");
+    expect(st).toContain(".delete(");
+    expect(st).toContain('.eq("autor_id", eu)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(6);
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(7);
   });
 
   test("⚠️ e o POST nunca é apagado, só arquivado", () => {
@@ -287,5 +298,20 @@ describe("o que a tela precisa saber vem do servidor, e não de um chute", () =>
     expect(c).toContain('.eq("seguido_id", eu)');
     expect(c).toContain('.eq("estado", "pendente")');
     expect(c).toContain('pendente: l.especie === "pediu_para_seguir" && pendentes.has(l.quem_id)');
+  });
+});
+
+describe("quem viu meu story", () => {
+  test("⚠️ a lista é da AUTORA, e a conferência vem ANTES da leitura", () => {
+    // Sem ela, um id de story sorteado devolveria o círculo social de qualquer
+    // pessoa da plataforma — o mesmo dado que fez a lista de seguidores não ser
+    // pública aqui.
+    const c = corpoDe("quemViuMeuStory").replace(/\s+/g, " ");
+    const dono = c.indexOf("autor_id !== eu");
+    const lista = c.indexOf('from("rede_stories_vistos")');
+    expect(dono).toBeGreaterThan(-1);
+    expect(lista).toBeGreaterThan(-1);
+    expect(dono).toBeLessThan(lista);
+    expect(c).toContain('motivo: "indisponivel"');
   });
 });

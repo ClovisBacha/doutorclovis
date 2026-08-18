@@ -1244,6 +1244,34 @@ export function RedeNoApp({
     }
   }
 
+  async function quemViu(storyId: string): Promise<PessoaNaLista[]> {
+    try {
+      const t = await token();
+      if (!t) return [];
+      const { quemViuMeuStory } = await import("@/lib/rede-social.functions");
+      const r = await quemViuMeuStory({ data: { accessToken: t, storyId } });
+      return r.ok ? r.gente : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function apagarStory(storyId: string) {
+    /* Fecha o visor na hora: continuar olhando o story que ela acabou de mandar
+       apagar é a tela contradizendo o gesto. */
+    setVendoStory(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { apagarStory: chamar } = await import("@/lib/rede-social.functions");
+      await chamar({ data: { accessToken: t, storyId } });
+    } catch {
+      /* Continua lá; a fileira mostra de novo na próxima abertura. */
+    } finally {
+      void carregarFeed();
+    }
+  }
+
   async function verStory(autorId: string) {
     const b = bolhas.find((x) => x.autorId === autorId);
     /* ⚠️ Tocar na MINHA bolinha sem story nenhum abre o seletor de foto, não
@@ -1284,7 +1312,14 @@ export function RedeNoApp({
 
   if (vendoStory) {
     return (
-      <VisorDeStory bolha={vendoStory} aoFechar={() => setVendoStory(null)} aoVer={marcarVisto} />
+      <VisorDeStory
+        bolha={vendoStory}
+        aoFechar={() => setVendoStory(null)}
+        aoVer={marcarVisto}
+        souEu={vendoStory.autorId === euId}
+        aoQuemViu={quemViu}
+        aoApagarStory={apagarStory}
+      />
     );
   }
 
@@ -1676,13 +1711,22 @@ export function VisorDeStory({
   bolha,
   aoFechar,
   aoVer,
+  souEu = false,
+  aoQuemViu,
+  aoApagarStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
   aoVer?: (storyId: string) => void;
+  /** É o meu story? Só então aparecem "visto por" e a lixeira. */
+  souEu?: boolean;
+  aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[]>;
+  aoApagarStory?: (storyId: string) => void;
 }) {
   const [i, setI] = useState(0);
   const [pausado, setPausado] = useState(false);
+  const [quemViu, setQuemViu] = useState<PessoaNaLista[] | null>(null);
+  const [confirmando, setConfirmando] = useState(false);
   const atual = bolha.stories[i];
 
   /* ⚠️ Marca como visto ao ENTRAR no story, não ao sair. Quem fecha o app no
@@ -1695,13 +1739,17 @@ export function VisorDeStory({
   /* O relógio que passa sozinho. Pausa enquanto o dedo está na tela — é o
      gesto que todo mundo já conhece de segurar para ler. */
   useEffect(() => {
-    if (pausado || !atual) return;
+    /* ⚠️ A folha de "visto por" e a confirmação PARAM o relógio. Sem isso o
+       story passa por baixo da folha e ela fecha a lista para ler a foto
+       seguinte — ou pior, a confirmação de apagar fica em pé sobre um story que
+       já não é o que ela mandou apagar. */
+    if (pausado || quemViu || confirmando || !atual) return;
     const t = setTimeout(() => {
       if (i + 1 < bolha.stories.length) setI(i + 1);
       else aoFechar();
     }, DURACAO_DO_STORY);
     return () => clearTimeout(t);
-  }, [i, pausado, atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [i, pausado, quemViu, confirmando, atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!atual) return null;
 
@@ -1721,7 +1769,7 @@ export function VisorDeStory({
                    sozinha e chegaria ao fim antes da foto trocar. */
                 animation:
                   n === i ? `dc-story-barra ${DURACAO_DO_STORY}ms linear forwards` : undefined,
-                animationPlayState: pausado ? "paused" : "running",
+                animationPlayState: pausado || quemViu || confirmando ? "paused" : "running",
               }}
             />
           </span>
@@ -1783,6 +1831,93 @@ export function VisorDeStory({
           className="absolute inset-y-0 right-0 w-2/3"
         />
       </div>
+
+      {/* ⚠️ O rodapé só existe no MEU story. No modelo é ali que mora "visto
+          por" — e é a única recompensa de publicar um: sem ele, publicar um
+          story é falar sozinha para uma parede que some em 24 h. */}
+      {souEu && atual && (
+        <div
+          className="flex items-center gap-3 px-4 py-3"
+          style={{ paddingBottom: "max(0.75rem, var(--safe-bottom))" }}
+        >
+          {aoQuemViu && (
+            <button
+              type="button"
+              onClick={async () => setQuemViu((await aoQuemViu(atual.id)) ?? [])}
+              className="press flex-1 text-left text-[13px] text-white/85"
+            >
+              👁 Ver quem viu
+            </button>
+          )}
+          {aoApagarStory && (
+            <button
+              type="button"
+              onClick={() => setConfirmando(true)}
+              aria-label="Apagar story"
+              className="press text-[15px] text-white/85"
+            >
+              🗑
+            </button>
+          )}
+        </div>
+      )}
+
+      {confirmando && (
+        <div className="absolute inset-x-0 bottom-0 z-10 rounded-t-3xl bg-card p-4">
+          <p className="text-[14px] leading-snug">
+            Apagar este story? Ele sairia sozinho em 24 horas.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              className="press flex-1 rounded-xl border border-border py-2 text-[14px]"
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmando(false);
+                if (atual) aoApagarStory?.(atual.id);
+              }}
+              className="press flex-1 rounded-xl bg-destructive py-2 text-[14px] font-semibold text-destructive-foreground"
+            >
+              Sim, apagar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {quemViu && (
+        <div className="absolute inset-x-0 bottom-0 z-10 max-h-[60%] overflow-y-auto rounded-t-3xl bg-card p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[15px] font-semibold">
+              {quemViu.length === 1 ? "1 pessoa viu" : `${quemViu.length} pessoas viram`}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setQuemViu(null)}
+              aria-label="Fechar"
+              className="press text-xl leading-none"
+            >
+              ×
+            </button>
+          </div>
+          {quemViu.length === 0 ? (
+            <p className="py-8 text-center text-[13px] text-muted-foreground">Ninguém viu ainda.</p>
+          ) : (
+            <ul className="mt-2">
+              {quemViu.map((g) => (
+                <li key={g.id} className="flex items-center gap-3 py-2">
+                  <Foto url={g.avatarUrl} nome={g.nome} lado={36} />
+                  <span className="min-w-0 flex-1 truncate text-[14px]">{g.nome}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
     </div>
   );
 }

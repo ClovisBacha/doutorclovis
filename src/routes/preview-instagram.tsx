@@ -15,6 +15,7 @@
  *   /preview-instagram?tela=lista   → a lista de seguidores
  *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
  *   /preview-instagram?tela=story   → o visor de story em tela cheia
+ *   /preview-instagram?tela=story&meu=1 → o MEU story (visto por + lixeira)
  *   /preview-instagram?tela=atividade → a aba do coração
  *   /preview-instagram?tela=novo    → a nova publicação (o que o ＋ abre)
  *   /preview-instagram?tela=salvos  → a coleção privada
@@ -276,7 +277,18 @@ function Bancada() {
         visto: false,
       })),
     };
-    return <VisorDeStory bolha={b} aoFechar={() => history.back()} />;
+    return (
+      <VisorDeStory
+        bolha={b}
+        aoFechar={() => history.back()}
+        /* ⚠️ O rodapé do "visto por" só existe no MEU story, e sem a bancada
+           conferir isso exigiria publicar um story numa conta de verdade e
+           conseguir que outra pessoa o visse dentro das 24 h. */
+        souEu={meu}
+        aoQuemViu={async () => GENTE}
+        aoApagarStory={() => alert("apagaria o story")}
+      />
+    );
   }
 
   if (tela === "post") {

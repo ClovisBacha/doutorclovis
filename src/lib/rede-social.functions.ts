@@ -1194,6 +1194,98 @@ export const marcarStoryVisto = createServerFn({ method: "POST" })
    SALVAR
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * QUEM VIU MEU STORY.
+ *
+ * ⚠️ **Só a AUTORA, e a conferência é a primeira coisa.** Sem ela, um id de
+ * story sorteado devolveria a lista de quem viu o story de qualquer pessoa da
+ * plataforma — e essa lista é o círculo social dela, o mesmo dado que fez a
+ * lista de seguidores não ser pública aqui.
+ *
+ * ⚠️ E ela NÃO é filtrada por Modo Cuidado nem por bloqueio, ao contrário da
+ * caixa de atividade. A diferença é o que a linha significa: lá é um gesto
+ * dirigido a ela ("Fulana reagiu"), aqui é o registro de que a foto DELA foi
+ * vista — esconder uma linha faria o número na tela discordar da lista logo
+ * abaixo dele, e ela contaria as duas.
+ */
+export const quemViuMeuStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), storyId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: story } = await sb
+      .from("rede_stories")
+      .select("id, autor_id")
+      .eq("id", data.storyId)
+      .maybeSingle();
+    if (!story || (story as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { data: linhas } = await sb
+      .from("rede_stories_vistos")
+      .select("quem_id, visto_em")
+      .eq("story_id", data.storyId)
+      .order("visto_em", { ascending: false })
+      .limit(200);
+
+    const ids = ((linhas ?? []) as { quem_id: string }[]).map((l) => l.quem_id);
+    const perfis = await perfisPorId(sb, ids);
+    const gente: PessoaNaLista[] = ids
+      .map((id) => {
+        const p = perfis.get(id);
+        if (!p) return null;
+        return {
+          id,
+          nome: (p.display_name ?? "").trim() || "Alguém",
+          bio: null,
+          avatarUrl: p.avatar_url ?? null,
+          sigo: null,
+          souEu: false,
+        };
+      })
+      .filter(Boolean) as PessoaNaLista[];
+
+    return { ok: true as const, gente };
+  });
+
+/**
+ * Apagar um story antes das 24 horas.
+ *
+ * ⚠️ Publicar sem poder apagar é o defeito que `apagarPost` tinha, e num story
+ * ele é pior: a foto sai sozinha em 24 h, então quem se arrependeu do que
+ * publicou fica olhando o relógio. O `eq("autor_id", eu)` é o portão — sem ele,
+ * um id qualquer apagaria o story de qualquer pessoa.
+ */
+export const apagarStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), storyId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* A linha some, e com ela as de `rede_stories_vistos` (ON DELETE CASCADE).
+       O arquivo continua no balde — é o mesmo caminho de `apagarPost`, e a
+       varredura de exclusão de conta é quem limpa o balde. */
+    const { error } = await sb
+      .from("rede_stories")
+      .delete()
+      .eq("id", data.storyId)
+      .eq("autor_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
 export const salvarPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
