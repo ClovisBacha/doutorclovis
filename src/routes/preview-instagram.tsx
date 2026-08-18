@@ -20,6 +20,7 @@
  *   /preview-instagram?tela=salvos  → a coleção privada
  *   /preview-instagram?tela=busca   → a busca de perfis
  */
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   EditarPerfil,
@@ -132,6 +133,11 @@ const STORIES: Story[] = [
   { id: "s5", nome: "Bruna", avatarUrl: null, novo: false },
 ];
 
+/** Fabrica mais uma página, com ids próprios — a bancada da rolagem infinita. */
+function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
+  return POSTS.slice(0, quantos).map((p) => ({ ...p, id: `${p.id}-pg${pagina}` }));
+}
+
 function Bancada() {
   const { tela, meu, vazio } = Route.useSearch();
 
@@ -145,6 +151,9 @@ function Bancada() {
     souEu: meu,
     meusSeguidores: meu ? 137 : null,
   };
+
+  const [extras, setExtras] = useState<PostNaTela[]>([]);
+  const [paginas, setPaginas] = useState(0);
 
   const GENTE: PessoaNaLista[] = [
     {
@@ -342,7 +351,7 @@ function Bancada() {
         />
       ) : (
         <TelaPrincipal
-          posts={vazio ? [] : POSTS.slice(0, 4)}
+          posts={vazio ? [] : [...POSTS.slice(0, 4), ...extras]}
           stories={vazio ? [] : STORIES}
           /* O terceiro post vem do algoritmo — é o que prova o rótulo
              "Sugerido para você", que é obrigatório quando o post não veio de
@@ -356,6 +365,14 @@ function Bancada() {
           aoBuscar={() => alert("busca")}
           aoAbrirAtividade={() => alert("atividade")}
           novasAtividades={vazio ? 0 : 3}
+          /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
+             uma conta de verdade levaria semanas para ter 21 publicações. Aqui
+             a sentinela entrega três páginas e então diz que acabou. */
+          temMais={!vazio && paginas < 3}
+          aoChegarNoFim={() => {
+            setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
+            setPaginas((n) => n + 1);
+          }}
         />
       )}
     </div>

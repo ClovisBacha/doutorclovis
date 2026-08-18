@@ -23,6 +23,7 @@ import {
   type Perfil,
   type TipoDeReacao,
   type Visibilidade,
+  haQuantoPublicou,
 } from "./rede-social";
 
 function perfil(p: Partial<Perfil> = {}): Perfil {
@@ -315,5 +316,42 @@ describe("redeDisponivel", () => {
   test("⚠️ some inteira no Modo Cuidado", () => {
     expect(redeDisponivel({ emCuidado: false })).toBe(true);
     expect(redeDisponivel({ emCuidado: true })).toBe(false);
+  });
+});
+
+describe("há quanto tempo foi publicado", () => {
+  /* Um instante cravado: a função recebe o `agora`, então nada aqui depende do
+     relógio da máquina que roda o teste. */
+  const AGORA = new Date("2026-08-18T12:00:00Z").getTime();
+  const atras = (seg: number) => new Date(AGORA - seg * 1000).toISOString();
+
+  test("a escada inteira", () => {
+    expect(haQuantoPublicou(atras(0), AGORA)).toBe("agora");
+    expect(haQuantoPublicou(atras(59), AGORA)).toBe("agora");
+    expect(haQuantoPublicou(atras(60), AGORA)).toBe("1 min");
+    expect(haQuantoPublicou(atras(59 * 60), AGORA)).toBe("59 min");
+    expect(haQuantoPublicou(atras(60 * 60), AGORA)).toBe("1 h");
+    expect(haQuantoPublicou(atras(23 * 3600), AGORA)).toBe("23 h");
+    expect(haQuantoPublicou(atras(24 * 3600), AGORA)).toBe("1 d");
+    expect(haQuantoPublicou(atras(6 * 24 * 3600), AGORA)).toBe("6 d");
+    expect(haQuantoPublicou(atras(7 * 24 * 3600), AGORA)).toBe("1 sem");
+    expect(haQuantoPublicou(atras(27 * 24 * 3600), AGORA)).toBe("3 sem");
+  });
+
+  test("⚠️ depois de quatro semanas vira DATA, e não 'meses'", () => {
+    // Um post de dois meses é de outro trimestre. "há 2 meses" obriga a
+    // paciente a fazer a conta de quando foi.
+    const velho = haQuantoPublicou(atras(40 * 24 * 3600), AGORA);
+    expect(velho).not.toContain("sem");
+    expect(velho).toMatch(/de (julho|agosto) de 2026/);
+  });
+
+  test("⚠️ futuro por relógio dessincronizado vira 'agora'", () => {
+    // "em -2 min" não é impreciso, é visivelmente quebrado.
+    expect(haQuantoPublicou(new Date(AGORA + 90_000).toISOString(), AGORA)).toBe("agora");
+  });
+
+  test("data inválida não desenha lixo", () => {
+    expect(haQuantoPublicou("nada disso", AGORA)).toBe("");
   });
 });

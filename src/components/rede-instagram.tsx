@@ -44,6 +44,7 @@ import {
 } from "@/lib/medidas-instagram";
 import {
   emojiDaReacao,
+  haQuantoPublicou,
   LIMITE_DA_BIO,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
@@ -443,6 +444,18 @@ export function PostInstagram({
           <span className="whitespace-pre-wrap">{post.texto}</span>
         </p>
       )}
+
+      {/* ⚠️ A HORA, embaixo da legenda — é onde o modelo a põe, e ela estava
+          faltando em TODO post. Sem ela, uma publicação de três semanas atrás
+          lê como notícia de hoje, e aqui as notícias têm data biológica: o
+          ultrassom de quem estava com 28 semanas naquela semana é outra frase
+          hoje, com 31. */}
+      {/* ⚠️ Sem caixa alta: "3 h" virava "3 H" e "18 de agosto de 2026" virava
+          um berro de duas linhas. O modelo mudou para minúscula anos atrás, e
+          em português a versão em caixa alta lê pior que em inglês. */}
+      <p className="px-4 pt-1 text-[11px] text-muted-foreground">
+        {haQuantoPublicou(post.criadoEm, Date.now())}
+      </p>
     </article>
   );
 }
@@ -465,6 +478,8 @@ export function TelaPrincipal({
   aoTocarStory,
   aoAbrirAtividade,
   novasAtividades = 0,
+  aoChegarNoFim,
+  temMais = false,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -492,8 +507,39 @@ export function TelaPrincipal({
   /** Quantas não vistas. O emblema mostra o NÚMERO, não um ponto — a pergunta
       que ela faz é quantas, não se há. Mesma régua do mascote da home. */
   novasAtividades?: number;
+  /**
+   * O fim da lista apareceu — hora de buscar as mais antigas.
+   *
+   * ⚠️ Quem se protege de chamar duas vezes é QUEM RECEBE: a sentinela pode
+   * entrar e sair da tela num tranco de rolagem, e o observador dispara nas
+   * duas vezes. A trava mora no contêiner, que é quem sabe se já há um pedido
+   * no ar.
+   */
+  aoChegarNoFim?: () => void;
+  /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
+  temMais?: boolean;
 }) {
   const doAlgoritmo = useMemo(() => new Set(sugeridos), [sugeridos]);
+  const fim = useRef<HTMLDivElement>(null);
+
+  /* ⚠️ A sentinela é um `IntersectionObserver`, e não um ouvinte de `scroll`:
+     a aba vive dentro de `minha-conta`, e quem rola pode ser a janela ou um
+     contêiner interno — um ouvinte de `scroll` precisaria saber qual, e erraria
+     no dia em que o invólucro mudasse. O observador não precisa saber. */
+  useEffect(() => {
+    const alvo = fim.current;
+    if (!alvo || !aoChegarNoFim || !temMais) return;
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((e) => e.isIntersecting)) aoChegarNoFim();
+      },
+      /* Uma tela de antecedência: a página seguinte chega antes de ela bater no
+         fundo, que é o que faz a rolagem parecer infinita em vez de emendada. */
+      { rootMargin: "600px" },
+    );
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [aoChegarNoFim, temMais, posts.length]);
 
   return (
     <div className="px-4">
@@ -570,6 +616,12 @@ export function TelaPrincipal({
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
+      )}
+
+      {temMais && (
+        <div ref={fim} className="py-6">
+          <div className="skeleton h-24 rounded-2xl" />
+        </div>
       )}
     </div>
   );
@@ -838,6 +890,12 @@ export function RedeNoApp({
   const [naoVistas, setNaoVistas] = useState(0);
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   const [carregando, setCarregando] = useState(true);
+  /** Cursor da página seguinte do feed. `null` = acabou. */
+  const [proximo, setProximo] = useState<string | null>(null);
+  /* ⚠️ `useRef` e não `useState`: a sentinela pode disparar duas vezes no mesmo
+     tranco de rolagem, e um estado só valeria no render seguinte — as duas
+     chamadas leriam `false` e a mesma página entraria duas vezes na lista. */
+  const buscandoMais = useRef(false);
   const arquivoDoStory = useRef<HTMLInputElement>(null);
 
   async function token() {
@@ -862,7 +920,10 @@ export function RedeNoApp({
            nasceria sempre sem número e a caixa só seria aberta por acaso. */
         mod.minhaAtividade({ data: { accessToken: t } }),
       ]);
-      if (r.ok) setPosts(r.posts);
+      if (r.ok) {
+        setPosts(r.posts);
+        setProximo(r.proximo);
+      }
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) setEuId(meu.perfil.id);
       if (at.ok) {
@@ -884,6 +945,30 @@ export function RedeNoApp({
     void carregarFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [careMode]);
+
+  async function maisAntigas() {
+    if (!proximo || buscandoMais.current) return;
+    buscandoMais.current = true;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuFeed } = await import("@/lib/rede-social.functions");
+      const r = await meuFeed({ data: { accessToken: t, antesDe: proximo } });
+      if (!r.ok) return;
+      /* ⚠️ Junta SEM REPETIR por id. A régua filtra depois de ler, então duas
+         páginas podem se sobrepor — e uma chave repetida no React derruba a
+         lista inteira, não só o item. */
+      setPosts((ps) => {
+        const vistos = new Set(ps.map((p) => p.id));
+        return [...ps, ...r.posts.filter((p) => !vistos.has(p.id))];
+      });
+      setProximo(r.proximo);
+    } catch {
+      /* Fica onde está; a sentinela tenta de novo na próxima rolagem. */
+    } finally {
+      buscandoMais.current = false;
+    }
+  }
 
   async function abrirPerfil(id: string) {
     setPerfil(null);
@@ -1336,6 +1421,8 @@ export function RedeNoApp({
         aoBuscar={() => setOnde({ t: "busca" })}
         aoAbrirAtividade={abrirAtividade}
         novasAtividades={naoVistas}
+        aoChegarNoFim={maisAntigas}
+        temMais={!!proximo}
         aoAbrirSecoes={onAbrirSecoes}
         aoTocarStory={verStory}
       />

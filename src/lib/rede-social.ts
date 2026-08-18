@@ -389,3 +389,47 @@ export function bloqueioDesfazSeguir(): boolean {
 export function redeDisponivel(p: Pick<Perfil, "emCuidado">): boolean {
   return !p.emCuidado;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   11 · QUANDO FOI PUBLICADO
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * "agora" · "3 min" · "5 h" · "2 d" · "3 sem" · "18 de agosto de 2026".
+ *
+ * ⚠️ **A hora não é enfeite, e a falta dela já é um defeito neste feed.** Sem
+ * ela, um post de três semanas atrás lê como notícia de hoje — e aqui as
+ * notícias têm data biológica: "fizemos o ultrassom" de uma gestante que
+ * naquela semana estava com 28 e hoje está com 31 é outra frase. É a única
+ * informação que o modelo põe em TODO post, e a nossa tela estava sem.
+ *
+ * ⚠️ **`agora` é PARÂMETRO**, nunca `Date.now()` lá dentro: teste que depende
+ * do relógio do contêiner é teste que falha às terças. Mesma decisão de
+ * `faseDoDiaNoite`, que recebe a hora local já extraída.
+ *
+ * ⚠️ **Passa de "sem" para a data cheia em 4 semanas**, e não segue para
+ * "meses". Um post de gestação com dois meses é de outro trimestre; "há 2
+ * meses" obriga a paciente a fazer a conta de quando foi, e a conta que ela
+ * quer fazer é com a semana dela.
+ */
+export function haQuantoPublicou(iso: string, agora: number): string {
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "";
+  /* Futuro por relógio dessincronizado vira "agora": "em -2 min" é pior que
+     impreciso, é visivelmente quebrado. */
+  const seg = Math.max(0, Math.round((agora - t) / 1000));
+  if (seg < 60) return "agora";
+  const min = Math.floor(seg / 60);
+  if (min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} h`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} d`;
+  const sem = Math.floor(d / 7);
+  if (sem < 4) return `${sem} sem`;
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
