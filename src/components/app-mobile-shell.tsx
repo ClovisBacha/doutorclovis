@@ -6,7 +6,7 @@
  *
  * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
-import { useState, useEffect, type ComponentType } from "react";
+import { useState, useEffect, useSyncExternalStore, type ComponentType } from "react";
 import { Baby, ChevronRight, Gamepad2, LifeBuoy, Heart, Menu } from "lucide-react";
 import { IconeAmigas } from "@/components/icones-jogo";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
@@ -23,6 +23,13 @@ import { babyForWeek } from "@/lib/gestacao";
 import { hapticTap } from "@/lib/haptics";
 import { barraDeStatus } from "@/lib/nativo";
 import { getApproxLocation } from "@/lib/local.functions";
+import {
+  assinarAtalhos,
+  atalhosDe,
+  oToqueAbreOsAtalhos,
+  type AtalhoDaAba,
+  type IconeDeAtalho,
+} from "@/lib/atalhos-da-aba";
 
 /* ================================================================
    Tipos
@@ -470,6 +477,153 @@ function NavItem({
   );
 }
 
+/**
+ * Os desenhos dos atalhos.
+ *
+ * ⚠️ Desenhados, nunca emoji — a mesma lição do 📞 preto no iOS e do 📅 com uma
+ * data dentro do glifo. Aqui pesa mais: são seis marcas na mesma nuvem, e um
+ * emoji colorido no meio de cinco traços monocromáticos lê como adesivo colado.
+ */
+function IconeDoAtalho({ nome }: { nome: IconeDeAtalho }) {
+  const comum = {
+    viewBox: "0 0 24 24",
+    "aria-hidden": true as const,
+    className: "h-[19px] w-[19px]",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.9,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (nome) {
+    case "buscar":
+      return (
+        <svg {...comum}>
+          <circle cx="10.6" cy="10.6" r="6.4" />
+          <path d="M15.4 15.4 20 20" />
+        </svg>
+      );
+    case "coracao":
+      return (
+        <svg {...comum}>
+          <path d="M12 20s-7.2-4.4-7.2-9.3A4.1 4.1 0 0 1 12 8.2a4.1 4.1 0 0 1 7.2 2.5C19.2 15.6 12 20 12 20z" />
+        </svg>
+      );
+    case "mais":
+      return (
+        <svg {...comum}>
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      );
+    case "pessoa":
+      return (
+        <svg {...comum}>
+          <circle cx="12" cy="8.4" r="3.6" />
+          <path d="M4.8 20c.8-3.4 3.7-5.6 7.2-5.6s6.4 2.2 7.2 5.6" />
+        </svg>
+      );
+    case "grade":
+      return (
+        <svg {...comum}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <path d="M4 12h16M12 4v16" />
+        </svg>
+      );
+    case "marcador":
+      return (
+        <svg {...comum}>
+          <path d="M6 3.6h12c.6 0 1 .4 1 1v15.6l-7-4.4-7 4.4V4.6c0-.6.4-1 1-1z" />
+        </svg>
+      );
+    case "engrenagem":
+      return (
+        <svg {...comum}>
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M12 3.4v2.2M12 18.4v2.2M20.6 12h-2.2M5.6 12H3.4M18.1 5.9l-1.6 1.6M7.5 16.5l-1.6 1.6M18.1 18.1l-1.6-1.6M7.5 7.5 5.9 5.9" />
+        </svg>
+      );
+  }
+}
+
+/**
+ * A NUVEM DE ATALHOS — as bolinhas que sobem do ícone da aba.
+ *
+ * ⚠️ **Ela abre para CIMA e encosta na direita**, porque é dali que nasce: o
+ * item da Comunidade é o último da barra. Uma nuvem centrada apontaria para o
+ * meio da barra, e o dedo procuraria o botão errado ao fechar.
+ *
+ * ⚠️ **O rótulo fica ao LADO, à esquerda da bolinha.** Embaixo, ele empurraria
+ * cada bolinha para longe da vizinha e a coluna sairia da tela num iPhone SE;
+ * e uma bolinha sem rótulo obriga a decorar seis desenhos.
+ *
+ * ⚠️ **O véu fecha ao toque e fica ABAIXO da barra** (`z-[39]` contra `z-40`):
+ * a barra continua clicável com a nuvem aberta, então tocar em "Saúde" leva
+ * para a Saúde em vez de só fechar o menu. Fechar e ficar no mesmo lugar é o
+ * comportamento que faz alguém tocar duas vezes.
+ */
+function NuvemDeAtalhos({
+  atalhos,
+  aoFechar,
+  escura,
+}: {
+  atalhos: AtalhoDaAba[];
+  aoFechar: () => void;
+  escura: boolean;
+}) {
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Fechar atalhos"
+        onClick={aoFechar}
+        className="pointer-events-auto fixed inset-0 z-[39] bg-black/25"
+      />
+      <ul
+        className="pointer-events-auto absolute bottom-full right-[5%] z-40 mb-3 flex flex-col items-end gap-2.5"
+        style={{ listStyle: "none" }}
+      >
+        {atalhos.map((a, n) => (
+          <li
+            key={a.id}
+            className="dc-atalho-sobe flex items-center gap-2"
+            /* A escada de atrasos é o que faz a nuvem "abrir" em vez de
+               aparecer. De baixo para cima: a mais próxima do dedo primeiro. */
+            style={{ animationDelay: `${(atalhos.length - 1 - n) * 32}ms` }}
+          >
+            <span
+              className={`rounded-full px-2.5 py-1 text-[12px] font-medium shadow-sm ${
+                escura ? "bg-white/90 text-neutral-900" : "bg-card text-foreground"
+              }`}
+            >
+              {a.rotulo}
+              {typeof a.emblema === "number" && a.emblema > 0 && (
+                <span className="ml-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                  {a.emblema > 9 ? "9+" : a.emblema}
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                hapticTap();
+                /* Fecha ANTES de agir: a ação troca de tela e desmonta a
+                   nuvem, e fechar depois seria escrever num componente que já
+                   saiu. */
+                aoFechar();
+                a.aoTocar();
+              }}
+              aria-label={a.rotulo}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.9)]"
+            >
+              <IconeDoAtalho nome={a.icone} />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 export function AppBottomNav({
   activeSection,
   onSelect,
@@ -504,6 +658,46 @@ export function AppBottomNav({
   // some com os rótulos; rolando para CIMA (procurando navegação) ela volta ao
   // tamanho cheio. Perto do topo fica sempre expandida.
   const [compact, setCompact] = useState(false);
+  /* Qual seção está com a nuvem aberta. `null` = fechada. */
+  const [nuvem, setNuvem] = useState<BottomSection | null>(null);
+
+  /* ⚠️ `useSyncExternalStore` e não `useState` + efeito: a tela publica os
+     atalhos no primeiro render dela, que pode acontecer DEPOIS do render da
+     barra. Com efeito, a barra ficaria uma pintura atrasada e o primeiro toque
+     depois de trocar de aba abriria a nuvem da aba anterior. */
+  const atalhos = useSyncExternalStore(
+    assinarAtalhos,
+    () => atalhosDe(activeSection),
+    () => [] as AtalhoDaAba[],
+  );
+
+  /**
+   * O toque num item da barra.
+   *
+   * ⚠️ Estando NA seção e havendo atalho publicado, ele abre a nuvem em vez de
+   * navegar — e é só nesse caso. A régua mora em `atalhos-da-aba.ts`, testada:
+   * escrita aqui, ela seria mais um `if` numa barra que já tem cinco.
+   */
+  const tocar = (id: BottomSection) => {
+    if (nuvem) {
+      /* Com a nuvem aberta, qualquer toque na barra fecha primeiro. Tocar no
+         MESMO item só fecha; tocar em outro fecha e vai. */
+      setNuvem(null);
+      if (id !== activeSection) onSelect(id);
+      return;
+    }
+    if (oToqueAbreOsAtalhos(id, activeSection, atalhos.length)) {
+      setNuvem(id);
+      return;
+    }
+    onSelect(id);
+  };
+
+  /* A nuvem não sobrevive à troca de aba: os atalhos de lá não valem aqui. */
+  useEffect(() => {
+    setNuvem(null);
+  }, [activeSection]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
     let lastY = window.scrollY;
@@ -602,7 +796,7 @@ export function AppBottomNav({
               key={id}
               onClick={() => {
                 hapticTap();
-                onSelect(id);
+                tocar(id);
               }}
               aria-current={activeSection === id ? "page" : undefined}
               aria-label={label}
@@ -645,12 +839,16 @@ export function AppBottomNav({
               active={activeSection === id}
               destacado={destaque === id}
               escura={escura}
-              onClick={() => onSelect(id)}
+              onClick={() => tocar(id)}
               Icon={Icon}
             />
           ),
         )}
       </div>
+
+      {nuvem && (
+        <NuvemDeAtalhos atalhos={atalhos} aoFechar={() => setNuvem(null)} escura={escura} />
+      )}
     </nav>
   );
 }

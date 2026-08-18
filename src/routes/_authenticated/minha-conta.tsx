@@ -2069,9 +2069,24 @@ function MinhaContaPage() {
 
           {/* ── Mobile top bar ─────────────────────────────────────
               Na home ela some: o herói imersivo tem a própria barra flutuante
-              sobre o céu (☰ + clima), e estas mesmas ações moram no ☰. */}
+              sobre o céu (☰ + clima), e estas mesmas ações moram no ☰.
+
+              ⚠️ **E no FEED ela some também** — pedido do dono, com a foto do
+              aparelho: "toda essa parte de cima deve sumir, não precisamos que
+              cada aba do app ocupe esse espaço que é precioso… o primeiro
+              elemento da aba será os stories, assim como no Instagram". Ali
+                eram DUAS barras empilhadas (esta e a da própria tela), e as duas
+              juntas comiam a primeira dobra inteira de um iPhone.
+
+              ⚠️ O que ela perde é a SETA e o "Sair", e as duas continuam
+              alcançáveis: a barra de baixo troca de aba a um toque (é ela que
+              faz o papel de voltar numa aba raiz), e "Sair" mora no ☰ e no
+              Perfil. Por isso a barra saiu SÓ do Feed, e não das outras abas:
+              nas telas filhas (Registros, Calendário) a seta é o único caminho
+              de volta, e `voltarDaBarra` tem três regras que existem por
+              defeito medido. */}
           <div
-            className={`${mobileHome ? "hidden" : "flex"} md:hidden items-center justify-between gap-2 mb-4`}
+            className={`${mobileHome || tab === "Feed" ? "hidden" : "flex"} md:hidden items-center justify-between gap-2 mb-4`}
           >
             {/* Voltar + nome da aba, juntos. O nome aparecia DUAS vezes em toda
                 tela — aqui e de novo logo abaixo, num cabeçalho próprio com a

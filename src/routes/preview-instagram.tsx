@@ -386,10 +386,6 @@ function Bancada() {
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
           aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
           aoApagar={() => alert("apagaria")}
-          aoPublicar={() => alert("publicar")}
-          aoBuscar={() => alert("busca")}
-          aoAbrirAtividade={() => alert("atividade")}
-          novasAtividades={vazio ? 0 : 3}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */

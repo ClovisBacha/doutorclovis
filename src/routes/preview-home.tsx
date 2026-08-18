@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { AppBottomNav, AppHomeScreen, useSkyNow } from "@/components/app-mobile-shell";
+import { publicarAtalhos } from "@/lib/atalhos-da-aba";
 
 /**
  * Bancada de design da HOME — renderiza o AppHomeScreen REAL com dados fixos
@@ -41,6 +43,11 @@ export const Route = createFileRoute("/preview-home")({
     // forma de fotografar o cartão de saudação, que só existe quando há
     // clima. Sem o parâmetro a bancada continua offline.
     clima: s.clima === true || String(s.clima ?? "") === "1",
+    /* `?atalhos=1` publica atalhos de mentira na seção da home, para dar para
+       fotografar a NUVEM DE BOLINHAS: ela só abre ao tocar de novo no ícone de
+       uma aba que publicou atalhos, e no app quem publica é o feed — atrás do
+       login. Sem isto, a nuvem seria mais uma tela que ninguém olhou. */
+    atalhos: s.atalhos === true || String(s.atalhos ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada da home" }, { name: "robots", content: "noindex" }],
@@ -49,9 +56,21 @@ export const Route = createFileRoute("/preview-home")({
 });
 
 function PreviewHome() {
-  const { w, notif, quantos, clima } = Route.useSearch();
+  const { w, notif, quantos, clima, atalhos } = Route.useSearch();
   const { slot } = useSkyNow(null);
   const escuro = slot.dark;
+
+  useEffect(() => {
+    if (!atalhos) return;
+    return publicarAtalhos("home", [
+      { id: "a", rotulo: "Buscar", icone: "buscar", aoTocar: () => {} },
+      { id: "b", rotulo: "Atividade", icone: "coracao", emblema: 3, aoTocar: () => {} },
+      { id: "c", rotulo: "Publicar", icone: "mais", aoTocar: () => {} },
+      { id: "d", rotulo: "Meu perfil", icone: "pessoa", aoTocar: () => {} },
+      { id: "e", rotulo: "Salvos", icone: "marcador", aoTocar: () => {} },
+      { id: "f", rotulo: "Chá de bebê, álbum…", icone: "grade", aoTocar: () => {} },
+    ]);
+  }, [atalhos]);
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
       {/* Repete a folga de rodapé que a página real aplica (a barra

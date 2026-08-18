@@ -88,10 +88,34 @@ describe("a barra de baixo", () => {
     // As configurações de perfil ficavam acima dele e empurravam as
     // publicações para baixo da dobra — o oposto do que "o feed é a primeira
     // tela" quer dizer. Hoje elas moram no hub, que é onde "meu perfil" mora.
-    const i = CONTA.indexOf('tab === "Feed"');
+    /* ⚠️ Procura o bloco de RENDER (`{tab === "Feed" && (`), não a primeira
+       aparição da string. A frase passou a existir também na condição que
+       ESCONDE a barra de cima, que vem antes no arquivo — e a janela de 260
+       caracteres caía no lugar errado, reprovando código correto. */
+    const i = CONTA.indexOf('{tab === "Feed" && (');
     expect(i).toBeGreaterThan(-1);
     const bloco = CONTA.slice(i, i + 260);
     expect(bloco).toContain("RedeNoApp");
     expect(bloco).not.toContain("ConfiguracoesDoPerfil");
+  });
+
+  test("⚠️ e a barra de cima do app NÃO aparece no Feed", () => {
+    // Pedido do dono, com a foto do aparelho: eram duas barras empilhadas
+    // (‹ Feed ⚙ Sair, e o cabeçalho da própria tela), e as duas juntas comiam
+    // a primeira dobra de um iPhone. O primeiro elemento da aba tem de ser a
+    // fileira de stories.
+    expect(CONTA).toContain('mobileHome || tab === "Feed" ? "hidden" : "flex"');
+  });
+
+  test("⚠️ as ações do feed viram as bolinhas da barra de baixo", () => {
+    // Elas não sumiram com o cabeçalho: publicar, buscar, atividade, perfil e
+    // salvos passaram a abrir no segundo toque no ícone da Comunidade.
+    const REDE = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    expect(REDE).toContain('publicarAtalhos("comunidade"');
+    for (const acao of ["Publicar", "Buscar", "Atividade", "Meu perfil", "Salvos"]) {
+      expect(REDE).toContain(`rotulo: "${acao}"`);
+    }
+    // E o cabeçalho da tela realmente saiu.
+    expect(REDE).not.toContain('<h1 className="text-lg font-semibold tracking-tight">Comunidade');
   });
 });

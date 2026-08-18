@@ -1377,6 +1377,33 @@ button:active > .duo3d {
   }
 }
 
+/* ── AS BOLINHAS DE ATALHO DA BARRA ──────────────────────────────────
+   Elas NASCEM do ícone da aba: começam pequenas, um pouco abaixo, e sobem.
+   O atraso em escada vem por `style` (de baixo para cima — a mais perto do
+   dedo primeiro), e é o que faz a nuvem "abrir" em vez de aparecer. */
+@keyframes dcAtalhoSobe {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.dc-atalho-sobe {
+  animation: dcAtalhoSobe 220ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  transform-origin: bottom right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-atalho-sobe {
+    /* PARA, não some: quem pediu menos movimento continua precisando dos
+       atalhos. Mesma decisão da chama da sequência. */
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
+
 /* ── O BALÃO DE FALA DO BEBÊ BOLHA ───────────────────────────────────
    Ele NASCE do mascote, e não do nada: começa pequeno e ancorado no canto
    superior direito (`transform-origin`), que é exatamente onde a personagem

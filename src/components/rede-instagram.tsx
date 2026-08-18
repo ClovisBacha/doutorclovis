@@ -56,6 +56,7 @@ import {
   type TipoDeReacao,
   type Visibilidade,
 } from "@/lib/rede-social";
+import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -474,12 +475,7 @@ export function TelaPrincipal({
   aoSalvar,
   aoApagar,
   aoAbrirPerfil,
-  aoPublicar,
-  aoBuscar,
-  aoAbrirSecoes,
   aoTocarStory,
-  aoAbrirAtividade,
-  novasAtividades = 0,
   aoChegarNoFim,
   temMais = false,
 }: {
@@ -501,24 +497,15 @@ export function TelaPrincipal({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
   aoAbrirPerfil?: (id: string) => void;
-  aoPublicar?: () => void;
-  aoBuscar?: () => void;
   /**
-   * As outras seções da Comunidade — chá de bebê, álbum, amigas, nome do bebê.
+   * Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story.
    *
-   * ⚠️ Elas saíram da primeira tela e viraram um botão porque o dono pediu que
-   * a aba abrisse no FEED. É a régua do Instagram, e ela está certa: uma aba
-   * social que abre num menu de seções cobra um toque a mais para chegar na
-   * única coisa que muda sozinha. O que estava ali continua a um toque, do
-   * outro lado do cabeçalho.
+   * ⚠️ As outras ações desta tela (publicar, buscar, atividade, perfil, as
+   * seções da Comunidade) NÃO são props daqui: elas viraram as bolinhas da
+   * barra de baixo, publicadas por `RedeNoApp`. Foi assim que o primeiro
+   * elemento da aba passou a ser a fileira de stories.
    */
-  aoAbrirSecoes?: () => void;
-  /** Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story. */
   aoTocarStory?: (autorId: string) => void;
-  aoAbrirAtividade?: () => void;
-  /** Quantas não vistas. O emblema mostra o NÚMERO, não um ponto — a pergunta
-      que ela faz é quantas, não se há. Mesma régua do mascote da home. */
-  novasAtividades?: number;
   /**
    * O fim da lista apareceu — hora de buscar as mais antigas.
    *
@@ -554,61 +541,16 @@ export function TelaPrincipal({
 
   return (
     <div className="px-4">
-      <header className="flex h-11 items-center justify-between">
-        <h1 className="text-lg font-semibold tracking-tight">Comunidade</h1>
-        {/* Ações à direita, como no modelo: publicar primeiro, seções depois. */}
-        <div className="flex items-center gap-3">
-          {aoBuscar && (
-            <button
-              type="button"
-              onClick={aoBuscar}
-              aria-label="Buscar pessoas"
-              className="press leading-none"
-            >
-              <IconeLupa />
-            </button>
-          )}
-          {aoAbrirAtividade && (
-            <button
-              type="button"
-              onClick={aoAbrirAtividade}
-              aria-label={novasAtividades > 0 ? `Atividade, ${novasAtividades} novas` : "Atividade"}
-              className="press relative text-xl leading-none"
-            >
-              ♡
-              {novasAtividades > 0 && (
-                <span
-                  aria-hidden
-                  className="absolute -right-1.5 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold leading-none text-white"
-                >
-                  {novasAtividades > 9 ? "9+" : novasAtividades}
-                </span>
-              )}
-            </button>
-          )}
-          {aoPublicar && (
-            <button
-              type="button"
-              onClick={aoPublicar}
-              aria-label="Publicar"
-              className="press text-2xl leading-none"
-            >
-              ＋
-            </button>
-          )}
-          {aoAbrirSecoes && (
-            <button
-              type="button"
-              onClick={aoAbrirSecoes}
-              aria-label="Outras seções da comunidade"
-              className="press text-xl leading-none"
-            >
-              ⊞
-            </button>
-          )}
-        </div>
-      </header>
+      {/* ⚠️ **NÃO HÁ CABEÇALHO AQUI, e a falta dele é o recurso.**
+          Pedido do dono, com a foto do aparelho: "toda essa parte de cima deve
+          sumir, não precisamos que cada aba ocupe esse espaço que é precioso…
+          o primeiro elemento da aba será os stories, assim como no Instagram".
 
+          Havia DUAS barras empilhadas antes desta linha — a do app (‹ Feed ⚙
+          Sair) e a desta tela (Comunidade 🔍 ♡ ＋ ⊞) —, e as duas juntas
+          comiam a primeira dobra inteira de um iPhone. As ações não sumiram:
+          viraram as bolinhas que sobem ao tocar de novo no ícone da Comunidade
+          na barra de baixo (`publicarAtalhos`, em `RedeNoApp`). */}
       <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
@@ -1501,6 +1443,59 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * OS ATALHOS DA ABA — as bolinhas que sobem da barra de baixo.
+   *
+   * ⚠️ Elas são o que o cabeçalho da tela deixou de ser. O feed abre agora nos
+   * stories, e as ações moram a um toque no ícone da Comunidade — pedido do
+   * dono: "as funções adicionais devem abrir quando a pessoa está na aba e toca
+   * no ícone de novo; aí abrem várias bolinhas pra cima".
+   *
+   * ⚠️ **Só quando ela está NO FEED.** Dentro de uma tela filha (o perfil de
+   * alguém, a busca, o compositor) as bolinhas ofereceriam "Publicar" por cima
+   * de uma tela que já é outra coisa — e o botão de fechar dela está ali do
+   * lado, na seta.
+   *
+   * ⚠️ E o `useEffect` depende do EMBLEMA (`naoVistas`): sem ele, o número de
+   * atividades novas congelaria no valor da montagem, e a bolinha diria "3"
+   * depois de ela ter lido as três.
+   */
+  useEffect(() => {
+    if (careMode || onde.t !== "feed") return;
+    const atalhos: AtalhoDaAba[] = [
+      { id: "buscar", rotulo: "Buscar", icone: "buscar", aoTocar: () => setOnde({ t: "busca" }) },
+      {
+        id: "atividade",
+        rotulo: "Atividade",
+        icone: "coracao",
+        emblema: naoVistas,
+        aoTocar: () => void abrirAtividade(),
+      },
+      { id: "publicar", rotulo: "Publicar", icone: "mais", aoTocar: () => setOnde({ t: "novo" }) },
+      {
+        id: "perfil",
+        rotulo: "Meu perfil",
+        icone: "pessoa",
+        aoTocar: () => {
+          if (euId) void abrirPerfil(euId);
+        },
+      },
+      { id: "salvos", rotulo: "Salvos", icone: "marcador", aoTocar: () => void abrirSalvos() },
+      ...(onAbrirSecoes
+        ? [
+            {
+              id: "secoes",
+              rotulo: "Chá de bebê, álbum…",
+              icone: "grade" as const,
+              aoTocar: onAbrirSecoes,
+            },
+          ]
+        : []),
+    ];
+    return publicarAtalhos("comunidade", atalhos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careMode, onde.t, naoVistas, euId, onAbrirSecoes]);
+
   if (careMode) return null;
 
   if (vendoStory) {
@@ -1645,16 +1640,11 @@ export function RedeNoApp({
         aoSalvar={guardar}
         aoApagar={apagar}
         aoAbrirPerfil={abrirPerfil}
-        aoPublicar={() => setOnde({ t: "novo" })}
-        aoBuscar={() => setOnde({ t: "busca" })}
-        aoAbrirAtividade={abrirAtividade}
-        novasAtividades={naoVistas}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
         sugestoes={sugestoes}
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
-        aoAbrirSecoes={onAbrirSecoes}
         aoTocarStory={verStory}
       />
     </>
