@@ -4192,3 +4192,100 @@ do fim tem dez colunas.
 
 **Bancadas:** `/preview-instagram` · `?tela=perfil&meu=1` · `?tela=editar` ·
 `?tela=lista` · `?tela=post` · `?tela=story` · `?tela=atividade` · `?vazio=1`.
+
+### As sete portas que não existiam, e a catraca que impede a próxima (ago/2026)
+
+A rede nasceu de trás para a frente — servidor, régua, telas — e ninguém tinha
+conferido se dava para CHEGAR nelas. Não dava: **sete funções de servidor
+prontas e testadas não tinham chamador nenhum no app.**
+
+- `publicarPost` — o compositor existia em `rede-social.tsx`, arquivo que o app
+  parou de renderizar quando o feed virou o modelo Instagram. Dava para ler o
+  feed e era impossível publicar.
+- `apagarPost` — nada, em lugar nenhum. Publicar sem poder apagar, num app onde
+  a publicação é sobre a gestação dela.
+- `responderPedido` — a pior. O perfil nasce FECHADO (`PERFIL_PUBLICO_PADRAO =
+false`), então **todo** seguir vira "pendente", e a única porta estava
+  enterrada numa seção de ajustes. A rede parava aí, por construção.
+- `salvarPost`/`meusSalvos`, `minhaAtividade`/`marcarAtividadeVista`,
+  `buscarPerfis`, `bloquear` — nenhuma tela chamava.
+
+É a mesma família de `proximoDesbloqueio`/`escadaDeTrofeus` (escritas, testadas,
+zero chamadores) e das três conquistas da Escola do Bebê que liam uma tabela que
+nada escrevia. **`src/lib/rede-tem-porta.test.ts` é a catraca**: toda função de
+servidor da rede tem de ser alcançável a partir do app. Bancada não conta — é
+justamente onde estas viviam. Três coisas que ela aprendeu na primeira hora:
+
+1. ⚠️ **Casa PALAVRA INTEIRA, nunca `includes`.** `bloquear` passava por
+   `bloquearPeriodo`, da grade de horários do médico.
+2. ⚠️ **Só nos arquivos que IMPORTAM o módulo.** Nome de função é palavra comum
+   em português — "bloquear" aparece em `entitlements.ts` e em meia dúzia de
+   comentários.
+3. ⚠️ **Tira os COMENTÁRIOS antes de procurar.** `publicarPost` voltou a passar
+   no instante em que escrevi, num comentário, que ele tinha ficado sem porta:
+   um teste que aceita a própria prosa fica verde exatamente quando o defeito
+   está documentado.
+
+O que ganhou porta: **＋ Nova publicação** (fotos a 1080 — o avatar é 512, aqui
+a foto ocupa a largura da tela —, legenda com contador e a camada À VISTA, com
+padrão no mais fechado: o erro possível é publicar para menos gente do que ela
+queria, nunca para mais) · **⋯ Apagar** com confirmação em mensagem separada, a
+mesma decisão do cancelar consulta · **marcador de salvar** (desenhado, porque
+🔖 é colorido em todo sistema) e a coleção privada em tela própria · **♡
+Atividade** com emblema, buscada JUNTO com o feed (o emblema é o que faz alguém
+tocar) e com **aceitar/recusar ali mesmo** · **🔍 Busca** com vazio que EXPLICA
+a régua ("só aparece quem deixou o perfil público" — senão procurar a irmã e não
+achar lê como app quebrado) · **Bloquear** dizendo antes o que faz.
+
+⚠️ `FeedDaRede`/`Publicar`/`CartaoDoPost` **saíram**: duas telas de publicar
+divergem no primeiro conserto. `ConfiguracoesDoPerfil` ficou — é o que a outra
+não faz (chave do perfil público, bio, fila de pedidos).
+
+⚠️ **`pendente` vem do SERVIDOR** (`minhaAtividade`), cruzando com
+`rede_seguidores`: a linha da atividade é gravada quando o pedido chega e nunca
+muda, então sem esse campo um pedido já aceito mostraria "Aceitar" para sempre —
+botão que promete uma ação e não faz nada, porque o `update` filtra por
+`estado = "pendente"` e não acha mais linha.
+
+⚠️ **`salvo` também vem do servidor**, de uma consulta recortada por
+`quem_id = eu`. Um `salvo` que viesse do post seria o mesmo para todo mundo — o
+marcador de uma acenderia na tela das outras.
+
+### A hora do post, o feed que continua, e o story que agora tem público
+
+- **A hora não existia em post nenhum.** É a única informação que o modelo põe
+  em TODOS, e aqui pesa mais: as notícias deste feed têm data biológica — "o
+  ultrassom de hoje" de quem estava com 28 semanas naquela semana é outra frase
+  hoje, com 31. `haQuantoPublicou` (`rede-social.ts`, pura) faz
+  agora→min→h→d→sem e depois de **quatro semanas vira DATA CHEIA**, sem passar
+  por "meses": um post de dois meses é de outro trimestre, e "há 2 meses"
+  obriga a paciente a fazer a conta de quando foi. ⚠️ `agora` é PARÂMETRO
+  (teste que depende do relógio do contêiner falha às terças), futuro por
+  relógio dessincronizado vira "agora", e **sem caixa alta** — "3 h" virava
+  "3 H".
+- **O feed parava no vigésimo.** `meuFeed` devolvia o cursor `proximo` desde o
+  primeiro dia e nenhuma tela o usava — servidor pronto sem porta que a catraca
+  NÃO pegaria, porque o nome da função é chamado; o que ninguém usava era o
+  retorno. Sentinela por `IntersectionObserver` (⚠️ não ouvinte de `scroll`: a
+  aba vive dentro de `minha-conta` e quem rola pode ser a janela ou um
+  contêiner interno), `rootMargin` de 600px, trava de pedido duplo em `useRef`
+  (⚠️ `useState` só valeria no render seguinte, e a sentinela dispara duas vezes
+  no mesmo tranco), e junção **sem repetir por id** — a régua filtra depois de
+  ler, duas páginas podem se sobrepor, e chave repetida derruba a lista inteira.
+- **"Visto por" e a lixeira do story.** Publicar um story sem saber se alguém
+  viu é falar sozinha para uma parede que some em 24 h. ⚠️ Em
+  `quemViuMeuStory` a conferência de dono vem ANTES da leitura, e o teste cobra
+  a ORDEM. ⚠️ E a lista **não** é filtrada por Modo Cuidado nem por bloqueio,
+  ao contrário da caixa de atividade: lá a linha é um gesto dirigido a ela,
+  aqui é o registro de que a foto DELA foi vista — esconder uma linha faria o
+  número discordar da lista logo abaixo. ⚠️ **A folha PARA o relógio** (o
+  `setTimeout` e a barrinha), senão o story passa por baixo dela.
+
+A catraca dos DELETE subiu de seis para **sete** (`apagarStory`), com o motivo
+escrito ao lado dos outros. O POST continua sendo a exceção: arquivado, nunca
+apagado, porque as reações apontam para ele.
+
+**Bancadas novas:** `/preview-instagram?tela=novo` · `?tela=salvos` ·
+`?tela=busca` · `?tela=story&meu=1`. E `/preview-rede` encolheu: virou só as
+configurações do perfil (a chave do público, a bio e a fila de pedidos), porque
+a do feed apontava para componentes que o app não abre mais.
