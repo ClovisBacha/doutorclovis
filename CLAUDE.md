@@ -4090,3 +4090,105 @@ mesma decisão que manteve `exam_files` de pé e o Álbum na Comunidade. O que s
 **Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (cria as quatro
 tabelas, duas colunas em `patient_profiles` e o balde privado `rede`).
 **Bancada:** `/preview-rede` · `?tela=perfil&pedidos=3` · `?vazio=1` · `?luto=1`.
+
+## O modelo Instagram, e o básico inteiro (ago/2026)
+
+Pedido do dono: "vamos copiar exatamente o modelo do Instagram — as dimensões,
+tudo tem que estar igual", e depois "faça uma varredura de tudo que é o básico e
+aplique", tirando reels e contas profissionais.
+
+Telas em `src/components/rede-instagram.tsx`; as medidas, com a origem de cada
+uma, em `src/lib/medidas-instagram.ts` (testado).
+
+### As medidas, MEDIDAS no navegador a 393px
+
+|                  |                                                          |
+| ---------------- | -------------------------------------------------------- |
+| bolinha de story | **72×72** (64 de foto + 2 de vão + 2 de anel, cada lado) |
+| grade            | 3 colunas, gap 2px                                       |
+| célula da grade  | 130×173 → razão **0,750 = 3:4 exato**                    |
+| post do feed     | 393×491 → razão **0,800 = 4:5 exato**                    |
+| avatar do perfil | 86px                                                     |
+
+⚠️ **A grade é 3:4, não quadrada.** Mudou em 2025. Quem construir 1:1 hoje faz
+um Instagram de 2024 e corta a foto vertical, que é a maioria.
+
+⚠️ **O post do feed tem TETO de 4:5.** Sem ele o `<img>` sai na altura natural,
+e a bancada mostrou fotos 3:4 virando posts de ~524px num aparelho de 393 — a
+pessoa rola a tela inteira e vê UM post. Com foto de celular em pé seria o
+dobro. Isso veio de OLHAR a tela, não de ler a especificação.
+
+⚠️ **Os números não saíram de decompilador nem de régua sobre print** — são as
+proporções publicadas mais a documentação de design. A ESTRUTURA e as PROPORÇÕES
+batem; um pixel de padding pode diferir. Para o encaixe fino: print do dono +
+`scripts/comparar-com-referencia.mjs`.
+
+### Três coisas NÃO copiadas, todas deliberadas
+
+1. ⚠️ **O degradê do anel.** Laranja-rosa-roxo é a marca deles e a coisa mais
+   reconhecível da interface — um app de gestação com aquele anel lê como
+   imitação. Copia-se a ESTRUTURA (anel aceso = tem coisa nova), que é convenção
+   e funciona porque todo mundo já sabe ler. Há teste recusando os cinco hex.
+2. ⚠️ **Quatro abas viram DUAS.** Eles têm quatro porque têm quatro TIPOS de
+   conteúdo; este app tem um. Três abas vazias ao lado de uma cheia não copiam o
+   Instagram — copiam a aparência dele e entregam a sensação de um app pela
+   metade. A segunda é "Do bebê".
+3. ⚠️ **Seguidores e seguindo não são públicos**, e a LISTA também não. No
+   Instagram qualquer um abre a lista de seguidores de um perfil público; aqui a
+   lista de quem acompanha uma gestante de alto risco é o CÍRCULO SOCIAL dela.
+   `NUMEROS_PUBLICOS` guarda a decisão, e o teste diz por quê.
+
+### Uma coisa que o Instagram NÃO faz e nós fazemos
+
+**"Sugerido para você"** é obrigatório no post que não veio de quem ela segue.
+Sem o rótulo, o feed mistura estranhos sem avisar — e num app de gestação de
+alto risco a pessoa precisa saber se está lendo uma amiga ou uma desconhecida
+antes de decidir o peso do que leu.
+
+### O básico, e as armadilhas de cada peça
+
+- **Stories.** ⚠️ A fileira já existia DESENHADA e era decorativa: anel aceso, e
+  tocar não fazia nada. `animationPlayState` pausa a barrinha JUNTO com o
+  `setTimeout` — sem isso o dedo para o relógio e a barra continua correndo,
+  chegando ao fim antes de a foto trocar, o que lê como travamento. Marca como
+  visto ao ENTRAR, não ao sair: quem fecha no meio já viu, e marcar na saída
+  deixaria o anel aceso para sempre em quem sempre fecha antes do fim.
+  `object-contain`, nunca `cover` — cortar as bordas engole o texto que a pessoa
+  escreveu na foto.
+- **Carrossel.** ⚠️ Rolagem NATIVA com `scroll-snap`, nunca `transform` por
+  estado: o deslizar tem inércia e resistência de borda que o sistema calcula, e
+  reimplementar dá sempre um arrasto que parece quase certo e nunca é. Os
+  pontinhos saem do `scrollLeft`, não de um índice — com índice próprio, arrastar
+  até a metade e soltar deixaria o ponto num lugar e a foto noutro. Se UMA foto
+  falhar ao subir, o post inteiro é recusado: quatro de cinco entregaria um
+  carrossel com buraco e ela não saberia qual sumiu.
+- **Editar perfil.** ⚠️ A foto só sobe se MUDOU — reenviar a mesma a cada
+  salvamento deixaria o arquivo antigo órfão no balde, e cem edições de bio
+  virariam cem fotos. E ela vai para o BALDE, não como data URL na coluna: o
+  avatar viaja em toda leitura de lista, e em base64 custa ~35% a mais em cada
+  linha. Depois de salvar, a tela RECARREGA do servidor — a foto volta como URL
+  assinada, e pintar a data URL deixaria a tela certa e o banco diferente.
+- **Salvar.** ⚠️ `meusSalvos` passa pela régua de visibilidade DE NOVO na
+  leitura: ela pode ter salvado e a autora ter fechado o perfil depois. Salvo é
+  marcador, não cópia — e marcador não sobrevive à decisão de quem escreveu.
+- **Atividade.** ⚠️ É TABELA e não view, porque uma view não teria onde guardar
+  o VISTO — e sem visto não há emblema, e sem emblema ninguém abre a aba. Índice
+  único sobre (dono, quem, espécie, post): sem ele, tirar e pôr a reação cinco
+  vezes encheria a caixa com cinco avisos e ela abriria achando que cinco pessoas
+  reagiram. ⚠️ **Abrir a aba marca TUDO**, ao contrário da central de recados
+  onde o toque em cada item é quem marca — lá são recados que podem exigir ação
+  dela, aqui são coraçõezinhos.
+
+### ⚠️ A aba abre no FEED, não no hub
+
+Pedido do dono: "essa é a primeira tela que tem que ter quando se entra na aba da
+comunidade". Uma aba social que abre num menu de seções cobra um toque a mais
+para chegar na única coisa que muda sozinha. O hub virou o botão ⊞ do cabeçalho.
+`comunidade.test.ts` trava o mapeamento.
+
+**Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` — o MESMO arquivo,
+que foi crescendo porque o dono ainda não o rodou. Oito tabelas, e a conferência
+do fim tem dez colunas.
+
+**Bancadas:** `/preview-instagram` · `?tela=perfil&meu=1` · `?tela=editar` ·
+`?tela=lista` · `?tela=post` · `?tela=story` · `?tela=atividade` · `?vazio=1`.
