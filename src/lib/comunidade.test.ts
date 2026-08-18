@@ -44,3 +44,25 @@ describe("portasDaComunidade", () => {
     expect(new Set(PORTAS.map((p) => p.key)).size).toBe(PORTAS.length);
   });
 });
+
+describe("a porta do chá de bebê", () => {
+  test("⚠️ vem PRIMEIRO — é a única que muda sozinha", () => {
+    // Uma amiga reserva e o número anda sem ela ter feito nada. As outras
+    // quatro são estáveis: quem já sabe onde fica o álbum não precisa vê-lo no
+    // topo todo dia.
+    expect(PORTAS[0].key).toBe("cha");
+  });
+
+  test("⚠️ some em Modo Cuidado, junto com o nome", () => {
+    // Mesma razão de tempo verbal: uma lista de presentes é preparo para a
+    // chegada, e oferecê-la a quem acabou de perder a gestação é o app não ter
+    // entendido o que aconteceu.
+    const chaves = portasDaComunidade({ careMode: true }).map((p) => p.key);
+    expect(chaves).not.toContain("cha");
+    expect(chaves).not.toContain("nome");
+    // E a rede de apoio continua de pé.
+    expect(chaves).toContain("amigas");
+    expect(chaves).toContain("acompanhante");
+    expect(chaves).toContain("album");
+  });
+});

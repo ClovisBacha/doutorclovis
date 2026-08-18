@@ -106,12 +106,24 @@ describe("ordemDeUrgencia", () => {
     expect(ordem[ordem.length - 1]).toBe("RN");
   });
 
-  test("⚠️ com tudo zerado, o primeiro NÃO é RN", () => {
-    // Todo mundo em fração 0 — o desempate é o tamanho MAIOR, porque na dúvida
-    // se empurra o que dura mais tempo.
+  test("⚠️ com tudo zerado, o primeiro é M — onde está o volume", () => {
+    // O desempate é pela MAIOR META, não pelo maior tamanho.
+    //
+    // A primeira versão desempatava por tamanho e a bancada mostrou o
+    // resultado: com a lista zerada, o primeiro cartão era XG — um tamanho que
+    // o bebê só usa depois de um ano, num chá que acontece na 32ª semana.
+    // Certo na letra, errado no espírito. A meta já É a régua de volume.
     const ordem = ordemDeUrgencia(saldoDeFraldas(metaDeFraldas(), {}));
-    expect(ordem[0]).not.toBe("RN");
-    expect(ordem[0]).toBe("XG");
+    expect(ordem[0]).toBe("M");
+    expect(ordem[1]).toBe("G");
+    expect(ordem).not.toContain(undefined);
+  });
+
+  test("⚠️ e RN nunca abre a lista", () => {
+    // É o erro universal do chá: a amiga toca no primeiro cartão e pronto.
+    for (const reservado of [{}, { M: 4 }, { M: 18, G: 12 }]) {
+      expect(ordemDeUrgencia(saldoDeFraldas(metaDeFraldas(), reservado))[0]).not.toBe("RN");
+    }
   });
 
   test("quem está mais longe da meta vem primeiro", () => {

@@ -51,6 +51,7 @@ export type AppTab =
      acompanhante) e é onde as funções novas de convívio vão morar. */
   | "Comunidade"
   | "Amigas"
+  | "Chá de bebê"
   /* A loja de PRODUTOS (suplemento, conforto, enxoval — por dinheiro). Era uma
      sub-aba de "Recompensas", ao lado do Cantinho, que vende enfeite por
      Sementinhas; virou destino próprio para as duas pararem de se confundir.
@@ -86,7 +87,7 @@ export type BottomSection = "home" | "jogo" | "comunidade" | "saude";
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   jogo: ["Caminho"],
-  comunidade: ["Comunidade", "Amigas"],
+  comunidade: ["Comunidade", "Amigas", "Chá de bebê"],
   saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
 };
 

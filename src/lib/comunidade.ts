@@ -30,11 +30,21 @@ export type PortaDaComunidade = {
 /**
  * As quatro portas, na ordem em que aparecem.
  *
- * A ordem é por PROXIMIDADE: primeiro as pessoas (amigas, acompanhante), depois
- * as coisas que se fazem com elas (álbum, nome). Uma grade que abrisse pelo
- * álbum apresentaria a aba como um lugar de arquivos.
+ * O CHÁ vem primeiro por ser a única que MUDA SOZINHA: uma amiga reserva e o
+ * número anda sem ela ter feito nada. As outras quatro são estáveis, e quem já
+ * sabe onde fica o álbum não precisa vê-lo no topo todo dia.
+ *
+ * Depois delas, a ordem é por PROXIMIDADE: primeiro as pessoas (amigas,
+ * acompanhante), depois as coisas que se fazem com elas (álbum, nome).
  */
 export const PORTAS: PortaDaComunidade[] = [
+  {
+    key: "cha",
+    label: "Chá de bebê",
+    sub: "Fraldas, cotas e a lista",
+    emoji: "🎁",
+    destino: "Chá de bebê",
+  },
   {
     key: "amigas",
     label: "Amigas",
@@ -88,5 +98,11 @@ export const PORTAS: PortaDaComunidade[] = [
  */
 export function portasDaComunidade({ careMode }: { careMode: boolean }): PortaDaComunidade[] {
   if (!careMode) return PORTAS;
-  return PORTAS.filter((p) => p.key !== "nome");
+  /* ⚠️ O CHÁ SAI JUNTO COM O NOME, e pelo mesmo motivo — tempo verbal. Uma
+     lista de presentes é um preparo para a chegada; oferecê-la a quem acabou
+     de perder a gestação é o app não ter entendido o que aconteceu.
+     E aqui o portão da tela é o MENOS importante dos três: o link já está na
+     mão de trinta pessoas, e quem o fecha de verdade é `listaViva`, no
+     servidor. Este só impede que ela esbarre na porta. */
+  return PORTAS.filter((p) => p.key !== "nome" && p.key !== "cha");
 }

@@ -20,6 +20,7 @@ import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
+import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
@@ -64,6 +65,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
 import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
@@ -140,6 +142,11 @@ const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
 const PreviewReguaRoute = PreviewReguaRouteImport.update({
   id: '/preview-regua',
   path: '/preview-regua',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewPresentesRoute = PreviewPresentesRouteImport.update({
+  id: '/preview-presentes',
+  path: '/preview-presentes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewOnboardingRoute = PreviewOnboardingRouteImport.update({
@@ -361,6 +368,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PresenteTokenRoute = PresenteTokenRouteImport.update({
+  id: '/presente/$token',
+  path: '/presente/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
   id: '/medicos_/google-callback',
   path: '/medicos/google-callback',
@@ -515,6 +527,7 @@ export interface FileRoutesByFullPath {
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
+  '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -546,6 +559,7 @@ export interface FileRoutesByFullPath {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
+  '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -593,6 +607,7 @@ export interface FileRoutesByTo {
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
+  '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -624,6 +639,7 @@ export interface FileRoutesByTo {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
+  '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -673,6 +689,7 @@ export interface FileRoutesById {
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
+  '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -704,6 +721,7 @@ export interface FileRoutesById {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
+  '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -753,6 +771,7 @@ export interface FileRouteTypes {
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
+    | '/preview-presentes'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -784,6 +803,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
+    | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -831,6 +851,7 @@ export interface FileRouteTypes {
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
+    | '/preview-presentes'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -862,6 +883,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
+    | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -910,6 +932,7 @@ export interface FileRouteTypes {
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
+    | '/preview-presentes'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -941,6 +964,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos_/cadastro'
     | '/medicos_/google-callback'
+    | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -990,6 +1014,7 @@ export interface RootRouteChildren {
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
+  PreviewPresentesRoute: typeof PreviewPresentesRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
@@ -1018,6 +1043,7 @@ export interface RootRouteChildren {
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
+  PresenteTokenRoute: typeof PresenteTokenRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
   ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
   ApiDoctorthinkTrainRoute: typeof ApiDoctorthinkTrainRoute
@@ -1100,6 +1126,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-regua'
       fullPath: '/preview-regua'
       preLoaderRoute: typeof PreviewReguaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-presentes': {
+      id: '/preview-presentes'
+      path: '/preview-presentes'
+      fullPath: '/preview-presentes'
+      preLoaderRoute: typeof PreviewPresentesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-onboarding': {
@@ -1410,6 +1443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/presente/$token': {
+      id: '/presente/$token'
+      path: '/presente/$token'
+      fullPath: '/presente/$token'
+      preLoaderRoute: typeof PresenteTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/medicos_/google-callback': {
       id: '/medicos_/google-callback'
       path: '/medicos/google-callback'
@@ -1626,6 +1666,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
+  PreviewPresentesRoute: PreviewPresentesRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSonsRoute: PreviewSonsRoute,
@@ -1654,6 +1695,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
+  PresenteTokenRoute: PresenteTokenRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
   ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,
   ApiDoctorthinkTrainRoute: ApiDoctorthinkTrainRoute,

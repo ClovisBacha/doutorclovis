@@ -204,16 +204,22 @@ export function saldoDeFraldas(
  * universal se reproduz inteiro — com um contador bonito por cima. A ordem é
  * por CARÊNCIA: quem está mais longe da meta aparece primeiro.
  *
- * Empate desce para o tamanho MAIOR: na dúvida, empurra o que dura mais tempo.
- * É a mesma direção da régua clínica de `arte-do-bebe` preferir a arte mais
- * nova no empate — na incerteza, escolha o lado que não antecipa.
+ * ⚠️ **O empate desce para a MAIOR META, e não para o maior tamanho.** A
+ * primeira versão desempatava por tamanho, e a bancada mostrou o resultado: com
+ * a lista zerada, o primeiro cartão era **XG** — um tamanho que o bebê só usa
+ * depois de um ano, aberto num chá que acontece na 32ª semana. Estava certo na
+ * letra ("na dúvida, empurra o que dura mais") e errado no espírito.
+ *
+ * A meta já É a régua de volume: M tem 18 pacotes porque M é 37% do ano. Ordenar
+ * por ela põe M e G na frente, que é exatamente a mensagem clínica que a lista
+ * existe para passar — e sem precisar de uma segunda tabela que um dia
+ * discordaria da primeira.
  */
 export function ordemDeUrgencia(saldos: SaldoDeFralda[]): TamanhoFralda[] {
-  const posicao = new Map(TAMANHOS.map((t, i) => [t, i]));
   return [...saldos]
     .sort((a, b) => {
       if (a.fracao !== b.fracao) return a.fracao - b.fracao;
-      return (posicao.get(b.tamanho) ?? 0) - (posicao.get(a.tamanho) ?? 0);
+      return b.meta - a.meta;
     })
     .map((s) => s.tamanho);
 }
