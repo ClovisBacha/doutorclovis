@@ -77,6 +77,53 @@ export type BancadaDaRede = {
    AS CONFIGURAÇÕES DO PERFIL
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * Uma chave do perfil.
+ *
+ * O switch é o MESMO da chave de perfil público (`role="switch"`, 44px de
+ * alvo) — três cópias do mesmo interruptor divergiriam no primeiro ajuste de
+ * acessibilidade.
+ */
+function ChaveDoPerfil({
+  titulo,
+  descricao,
+  ligada,
+  desabilitada,
+  aoTrocar,
+}: {
+  titulo: string;
+  descricao: string;
+  ligada: boolean;
+  desabilitada?: boolean;
+  aoTrocar: () => void;
+}) {
+  return (
+    <div className="mt-3 flex items-start justify-between gap-3 border-t border-border pt-3">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{titulo}</p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{descricao}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={ligada}
+        aria-label={titulo}
+        disabled={desabilitada}
+        onClick={aoTrocar}
+        className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+          ligada ? "bg-primary" : "bg-muted"
+        }`}
+      >
+        <span
+          className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+            ligada ? "translate-x-[22px]" : "translate-x-0.5"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export function ConfiguracoesDoPerfil({
   careMode = false,
   bancada,
@@ -117,7 +164,12 @@ export function ConfiguracoesDoPerfil({
 
   if (careMode || !perfil) return null;
 
-  async function salvar(mudanca: { publico?: boolean; bio?: string | null }) {
+  async function salvar(mudanca: {
+    publico?: boolean;
+    bio?: string | null;
+    mostrarSemana?: boolean;
+    mostrarBebe?: boolean;
+  }) {
     setSalvando(true);
     try {
       const s = await supabase.auth.getSession();
@@ -207,6 +259,48 @@ export function ConfiguracoesDoPerfil({
             />
           </button>
         </div>
+      </section>
+
+      {/* ─── O QUE O SEU PERFIL CONTA ────────────────────────────────────
+          ⚠️ DUAS chaves, e nunca uma. Uma só obrigaria quem quer publicar o
+          NOME do bebê a publicar junto a SEMANA, que é o dado clínico — são
+          duas decisões, por razões diferentes. As duas nascem desligadas, pela
+          mesma razão escrita em `perfil_publico`.
+
+          ⚠️ E o texto de cada uma diz o que aparece e para quem. A explicação é
+          a defesa: "não podemos expor a paciente sem ela saber" só é verdade se
+          ela puder ler, ali, o que ligar aquilo significa. */}
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <h3 className="font-semibold">O que o seu perfil conta</h3>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+          Hoje quem abre o seu perfil vê o seu nome, a sua foto, a sua descrição e o que você
+          publicou. Nada do seu acompanhamento — peso, pressão, exames, consultas — aparece para
+          ninguém, nunca.
+        </p>
+
+        <ChaveDoPerfil
+          titulo="Mostrar a semana da gestação"
+          descricao={
+            perfil.mostrarSemana
+              ? `Aparece "${perfil.seloSemana ?? "a sua semana"}" no seu perfil, e ela se atualiza sozinha toda semana.`
+              : "Um selo com a sua semana, que se atualiza sozinho. Fica visível para quem abre o seu perfil."
+          }
+          ligada={!!perfil.mostrarSemana}
+          desabilitada={salvando}
+          aoTrocar={() => salvar({ mostrarSemana: !perfil.mostrarSemana })}
+        />
+
+        <ChaveDoPerfil
+          titulo="Mostrar o nome do bebê"
+          descricao={
+            perfil.seloBebe
+              ? `Aparece "${perfil.seloBebe}" no seu perfil.`
+              : "O nome que você cadastrou no perfil do bebê. Sem nome cadastrado, nada aparece."
+          }
+          ligada={!!perfil.mostrarBebe}
+          desabilitada={salvando}
+          aoTrocar={() => salvar({ mostrarBebe: !perfil.mostrarBebe })}
+        />
       </section>
 
       {totalPedidos > 0 && (

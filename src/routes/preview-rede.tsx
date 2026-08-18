@@ -32,12 +32,18 @@ export const Route = createFileRoute("/preview-rede")({
 const PERFIL: PerfilNaTela = {
   id: "eu",
   nome: "Marina Costa",
-  bio: "Grávida da Helena 🎀 · 32 semanas",
+  /* Sem a semana na bio: ela agora sai do SELO, e escrevê-la aqui esconderia
+     o estado de "chave desligada". */
+  bio: "Grávida da Helena 🎀",
   avatarUrl: null,
   publico: true,
   meuVinculo: null,
   souEu: true,
   meusSeguidores: 137,
+  seloSemana: "32 semanas",
+  seloBebe: "Helena",
+  mostrarSemana: true,
+  mostrarBebe: true,
 };
 
 function Bancada() {

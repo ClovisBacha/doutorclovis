@@ -53,6 +53,29 @@ ALTER TABLE public.patient_profiles
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS bio text;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- O QUE O PERFIL CONTA DA GESTAÇÃO — duas chaves, e nunca uma.
+--
+-- Pedido do dono: "a ideia aqui é fornecer o básico como tempo de gestação da
+-- criança e nome; outras coisas são realmente sensíveis, e não podemos expor a
+-- paciente sem ela saber".
+--
+-- ⚠️ DUAS colunas e não uma: uma chave só obrigaria quem quer publicar o NOME
+-- do bebê a publicar junto a SEMANA, que é o dado clínico. São duas decisões,
+-- por razões diferentes.
+--
+-- ⚠️ DEFAULT false pela mesma razão escrita em `perfil_publico`: nascer ligado
+-- publicaria a idade gestacional de toda paciente que já tem perfil aberto,
+-- sem ela nunca ter pedido.
+--
+-- Nenhum índice: elas nunca recortam consulta — decoram a linha que a rede já
+-- lê em `perfisPorId`.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS mostrar_semana boolean NOT NULL DEFAULT false;
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS mostrar_bebe boolean NOT NULL DEFAULT false;
+
 -- A busca só varre quem abriu o perfil. Índice parcial: a tabela inteira é de
 -- gestantes, e a fração pública é minúscula (influenciadoras).
 CREATE INDEX IF NOT EXISTS patient_profiles_publicos
@@ -416,7 +439,7 @@ COMMENT ON TABLE public.rede_bloqueios IS
   'tabela nem recebe aviso.';
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- CONFERÊNCIA. As sete linhas têm que voltar `true`.
+-- CONFERÊNCIA. Todas as linhas têm que voltar `true`.
 -- ─────────────────────────────────────────────────────────────────────────────
 SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
@@ -439,4 +462,8 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name='rede_posts' AND column_name='imagens')                   AS carrossel_ok,
   EXISTS (SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='rede_atividade')               AS atividade_ok;
+          WHERE table_schema='public' AND table_name='rede_atividade')               AS atividade_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='patient_profiles' AND column_name='mostrar_semana')      AS selo_semana_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='patient_profiles' AND column_name='mostrar_bebe')        AS selo_bebe_ok;

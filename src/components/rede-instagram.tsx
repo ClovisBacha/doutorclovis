@@ -42,6 +42,7 @@ import {
   VAO_DO_ANEL,
   type AbaDoPerfil,
 } from "@/lib/medidas-instagram";
+import { PERSONAS, type Persona } from "@/lib/selo-do-perfil";
 import {
   emojiDaReacao,
   haQuantoPublicou,
@@ -731,6 +732,8 @@ export function TelaDePerfil({
   aoAbrirLista,
   aoAbrirSalvos,
   aoBloquear,
+  aoAbrirEspelho,
+  somenteLeitura = false,
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
@@ -752,9 +755,31 @@ export function TelaDePerfil({
   aoAbrirSalvos?: () => void;
   /** Só no perfil de terceiro. */
   aoBloquear?: () => void;
+  /** Abre "ver como os outros veem". Só no próprio perfil. */
+  aoAbrirEspelho?: () => void;
+  /**
+   * O ESPELHO: a tela desenha, e nada nela age.
+   *
+   * ⚠️ **O desligamento é feito AQUI, num lugar só, e não pelo chamador.** A
+   * prévia tem hoje cinco controles (seguir, abrir post, abrir lista, salvos,
+   * bloquear); o sexto que alguém acrescentar amanhã nasce LIGADO se quem
+   * desliga for o chamador — e um dos previstos, o "aplicar código de
+   * embaixadora", grava um campo que nunca é reescrito. Um toque numa tela que
+   * o app apresenta como inerte queimaria a indicação da médica dela, sem erro
+   * e sem volta.
+   */
+  somenteLeitura?: boolean;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
+
+  /* A trava do espelho: toda ação vira `undefined` de uma vez. */
+  const agir = <T,>(f: T | undefined): T | undefined => (somenteLeitura ? undefined : f);
+  const seguir = agir(aoSeguir);
+  const abrirPost = agir(aoAbrirPost);
+  const abrirLista = agir(aoAbrirLista);
+  const abrirSalvos = agir(aoAbrirSalvos);
+  const bloquear = agir(aoBloquear);
 
   /* Só os POSTS aparecem na grade; o "Do bebê" é a aba própria. */
   const naGrade = aba === "grade" ? posts : [];
@@ -786,12 +811,12 @@ export function TelaDePerfil({
         {/* No modelo, os salvos moram atrás do ☰ do próprio perfil. O ícone é
             o MESMO marcador do post — é o que liga o gesto ao lugar onde ele
             guarda. */}
-        {aoAbrirSalvos && (
-          <button type="button" onClick={aoAbrirSalvos} aria-label="Salvos" className="press">
+        {abrirSalvos && (
+          <button type="button" onClick={abrirSalvos} aria-label="Salvos" className="press">
             <IconeMarcador cheio={false} />
           </button>
         )}
-        {aoBloquear && (
+        {bloquear && (
           <button
             type="button"
             onClick={() => setConfirmandoBloqueio((v) => !v)}
@@ -807,7 +832,7 @@ export function TelaDePerfil({
           faz antes de fazer: desfaz o seguir nos dois sentidos e some com um
           do outro. Um "Bloquear" sem essa frase parece reversível — e é, mas
           o vínculo que ele desfez não volta sozinho. */}
-      {confirmandoBloqueio && aoBloquear && (
+      {confirmandoBloqueio && bloquear && (
         <div className="mx-4 mt-2 rounded-2xl border border-border bg-muted/40 p-3">
           <p className="text-[13px] leading-snug">
             Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
@@ -825,7 +850,7 @@ export function TelaDePerfil({
               type="button"
               onClick={() => {
                 setConfirmandoBloqueio(false);
-                aoBloquear();
+                bloquear();
               }}
               className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
             >
@@ -852,14 +877,10 @@ export function TelaDePerfil({
                 momento em que ela já está sendo medida clinicamente. */}
             {perfil.souEu && (
               <>
-                <button
-                  type="button"
-                  onClick={() => aoAbrirLista?.("seguidores")}
-                  className="press"
-                >
+                <button type="button" onClick={() => abrirLista?.("seguidores")} className="press">
                   <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
                 </button>
-                <button type="button" onClick={() => aoAbrirLista?.("seguindo")} className="press">
+                <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
                   <Numero valor={seguindo} rotulo="seguindo" />
                 </button>
               </>
@@ -867,11 +888,34 @@ export function TelaDePerfil({
           </div>
         </div>
 
+        {/* ⚠️ Os dois selos são PEÇAS SEPARADAS, porque as chaves são duas e uma
+            delas pode estar ligada sozinha. Uma string só ("Helena · 28
+            semanas") obrigaria a desmontá-la para desenhar o caso de uma chave
+            só — e é assim que nasce a vírgula solta no começo da linha.
+
+            ⚠️ E eles NÃO entram no cabeçalho do post: lá o carimbo seria a
+            semana de HOJE sobre um post de seis semanas atrás, que é o defeito
+            que `haQuantoPublicou` acabou de consertar. */}
+        {(perfil.seloSemana || perfil.seloBebe) && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {perfil.seloSemana && (
+              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[12px] font-semibold text-primary">
+                🤰 {perfil.seloSemana}
+              </span>
+            )}
+            {perfil.seloBebe && (
+              <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[12px] font-medium">
+                💛 {perfil.seloBebe}
+              </span>
+            )}
+          </div>
+        )}
+
         {perfil.bio && <p className="mt-3 text-[14px] leading-snug">{perfil.bio}</p>}
 
         <button
           type="button"
-          onClick={aoSeguir}
+          onClick={seguir}
           disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
           className={`press mt-3 w-full rounded-lg py-1.5 text-[14px] font-semibold ${
             perfil.meuVinculo || perfil.souEu
@@ -881,6 +925,21 @@ export function TelaDePerfil({
         >
           {rotuloDoBotao}
         </button>
+
+        {/* ⚠️ O espelho vive no PRÓPRIO perfil, e não numa tela de ajustes: a
+            pergunta que ele responde ("o que os outros veem?") só ocorre a
+            alguém que está olhando o próprio perfil. Escondido nos ajustes,
+            ele seria mais um controle que existe e ninguém acha — que é o
+            defeito que a catraca de portas foi escrita para pegar. */}
+        {aoAbrirEspelho && !somenteLeitura && (
+          <button
+            type="button"
+            onClick={aoAbrirEspelho}
+            className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+          >
+            👁 Ver como os outros veem
+          </button>
+        )}
       </div>
 
       {/* As abas, com o traço embaixo da ativa — a assinatura da tela deles. */}
@@ -905,7 +964,7 @@ export function TelaDePerfil({
         /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
            divergiriam na primeira vez que a proporção da célula mudasse, e ela
            já mudou uma vez (1:1 → 3:4, em 2025). */
-        <GradeDePosts posts={naGrade} vazio="Nenhuma publicação ainda." aoAbrirPost={aoAbrirPost} />
+        <GradeDePosts posts={naGrade} vazio="Nenhuma publicação ainda." aoAbrirPost={abrirPost} />
       ) : (
         <p className="py-16 text-center text-sm text-muted-foreground">
           Os marcos da gestação vão aparecer aqui 💛
@@ -949,7 +1008,8 @@ type Onde =
   | { t: "novo" }
   | { t: "atividade" }
   | { t: "salvos" }
-  | { t: "busca" };
+  | { t: "busca" }
+  | { t: "espelho" };
 
 export function RedeNoApp({
   careMode = false,
@@ -971,6 +1031,13 @@ export function RedeNoApp({
   const [naoVistas, setNaoVistas] = useState(0);
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
+  const [persona, setPersona] = useState<Persona>("estranha");
+  const [previa, setPrevia] = useState<{
+    perfil: PerfilNaTela | null;
+    posts: PostNaTela[];
+    trancado: boolean;
+    carregando: boolean;
+  }>({ perfil: null, posts: [], trancado: false, carregando: true });
   const [pessoas, setPessoas] = useState<PessoaNaLista[]>([]);
   const [carregando, setCarregando] = useState(true);
   /** Cursor da página seguinte do feed. `null` = acabou. */
@@ -1284,6 +1351,36 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * O espelho.
+   *
+   * ⚠️ Chama a MESMA `verPerfil` da tela real, com `comoVisitante` — nada é
+   * montado aqui. E `motivo: "trancado"` não é erro: é a resposta certa para a
+   * maioria das pacientes, cujo perfil nasce fechado.
+   */
+  async function verComo(p: Persona) {
+    setPersona(p);
+    setPrevia((v) => ({ ...v, carregando: true }));
+    try {
+      const t = await token();
+      if (!t || !euId) return;
+      const { verPerfil } = await import("@/lib/rede-social.functions");
+      const r = await verPerfil({ data: { accessToken: t, alvoId: euId, comoVisitante: p } });
+      if (r.ok) {
+        setPrevia({ perfil: r.perfil, posts: r.posts, trancado: false, carregando: false });
+      } else {
+        setPrevia({
+          perfil: null,
+          posts: [],
+          trancado: r.motivo === "trancado",
+          carregando: false,
+        });
+      }
+    } catch {
+      setPrevia({ perfil: null, posts: [], trancado: false, carregando: false });
+    }
+  }
+
   async function abrirSalvos() {
     setSalvos([]);
     setOnde({ t: "salvos" });
@@ -1520,6 +1617,20 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "espelho") {
+    return (
+      <EspelhoDoPerfil
+        persona={persona}
+        aoTrocarPersona={verComo}
+        perfil={previa.perfil}
+        posts={previa.posts}
+        trancado={previa.trancado}
+        carregando={previa.carregando}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+      />
+    );
+  }
+
   if (onde.t === "busca") {
     return (
       <TelaDeBusca
@@ -1596,6 +1707,14 @@ export function RedeNoApp({
         aoAbrirPost={abrirPost}
         aoAbrirLista={perfil.souEu ? abrirLista : undefined}
         aoAbrirSalvos={perfil.souEu ? abrirSalvos : undefined}
+        aoAbrirEspelho={
+          perfil.souEu
+            ? () => {
+                setOnde({ t: "espelho" });
+                void verComo(persona);
+              }
+            : undefined
+        }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
       />
     );
@@ -2605,6 +2724,111 @@ export function TelaDeBusca({
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O ESPELHO — "ver como os outros veem"
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A tela que responde "o que aparece de mim para quem?".
+ *
+ * Pedido do dono: "não podemos expor a paciente sem ela saber". Uma chave de
+ * privacidade sem esta tela é uma promessa; com ela, é uma verificação.
+ *
+ * ⚠️ **As personas são ABSTRATAS.** "Ver como a Marina me vê" seria um
+ * verificador de bloqueio e revelaria por tabela quem segue quem — e a lista de
+ * seguidores deste app não é pública de propósito.
+ *
+ * ⚠️ **E o perfil desenhado aqui vem do SERVIDOR, pela mesma função da tela
+ * real** (`verPerfil` com `comoVisitante`). Uma prévia montada no navegador
+ * afirmaria o que a paciente quer ouvir, e não o que o servidor entrega — que é
+ * o único jeito de esta tela ser pior que não existir.
+ */
+export function EspelhoDoPerfil({
+  persona,
+  aoTrocarPersona,
+  perfil,
+  posts,
+  trancado,
+  carregando,
+  aoVoltar,
+}: {
+  persona: Persona;
+  aoTrocarPersona: (p: Persona) => void;
+  perfil: PerfilNaTela | null;
+  posts: PostNaTela[];
+  /** A estranha bateu numa conta fechada. */
+  trancado: boolean;
+  carregando: boolean;
+  aoVoltar: () => void;
+}) {
+  const escolhida = PERSONAS.find((p) => p.chave === persona);
+
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 truncate text-[16px] font-semibold">Como os outros veem</h1>
+      </header>
+
+      <div className="border-b border-border px-4 pb-3">
+        <div className="flex gap-1.5">
+          {PERSONAS.map((p) => (
+            <button
+              key={p.chave}
+              type="button"
+              onClick={() => aoTrocarPersona(p.chave)}
+              className={`press flex-1 rounded-xl px-2 py-2 text-[12px] font-semibold ${
+                p.chave === persona ? "bg-primary text-primary-foreground" : "bg-muted/60"
+              }`}
+            >
+              {p.rotulo}
+            </button>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">{escolhida?.sub}</p>
+      </div>
+
+      {carregando ? (
+        <div className="space-y-2 p-4">
+          <div className="skeleton h-24 rounded-2xl" />
+          <div className="skeleton h-40 rounded-2xl" />
+        </div>
+      ) : trancado ? (
+        /* ⚠️ Este é o estado da MAIORIA das pacientes, e não um caso de borda:
+            o perfil nasce fechado. Dizer isso em voz alta é a informação mais
+            útil que a tela dá — a de que ela não está exposta a ninguém. */
+        <div className="px-6 py-16 text-center">
+          <p className="text-[15px] font-semibold">Ela não consegue abrir o seu perfil</p>
+          <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+            O seu perfil está fechado: só quem você aceitar consegue te acompanhar, e você não
+            aparece na busca de quem não te conhece.
+          </p>
+        </div>
+      ) : perfil ? (
+        /* A MESMA `TelaDePerfil` da tela real, em modo inerte. Uma segunda
+           montagem divergiria dela e passaria a mentir no primeiro conserto. */
+        <TelaDePerfil perfil={perfil} posts={posts} somenteLeitura />
+      ) : (
+        <p className="px-6 py-16 text-center text-[13px] text-muted-foreground">
+          Não consegui montar a prévia agora.
+        </p>
+      )}
+
+      <p className="px-6 pb-8 pt-2 text-center text-[12px] leading-snug text-muted-foreground">
+        Nada do seu acompanhamento aparece aqui para ninguém — peso, pressão, exames e consultas são
+        só seus e do seu médico.
+      </p>
     </div>
   );
 }

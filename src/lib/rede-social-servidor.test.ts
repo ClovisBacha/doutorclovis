@@ -192,12 +192,17 @@ describe("o que é dela", () => {
     expect(c).not.toContain(".delete(");
   });
 
-  test("⚠️ o contador de seguidores é `null` para terceiros", () => {
+  test("⚠️ o contador de seguidores é `null` para terceiros — e para o espelho", () => {
     // Não existe placar público de audiência: ele mede popularidade num
     // momento em que ela já está sendo medida clinicamente.
-    expect(corpoDe("verPerfil").replace(/\s+/g, " ")).toContain(
-      "meusSeguidores: data.alvoId === eu ? 0 : null",
-    );
+    //
+    // ⚠️ Este teste ficou VERMELHO quando o espelho nasceu, e a tentação era
+    // afrouxá-lo. A afirmação que ele guarda não mudou — só ganhou um caso: o
+    // número continua saindo apenas no MEU perfil, e agora nem nele quando a
+    // tela está fingindo ser a de uma visitante (senão a prévia mostraria à
+    // "estranha" um contador que ela nunca veria).
+    const c = corpoDe("verPerfil").replace(/\s+/g, " ");
+    expect(c).toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
     expect(corpoDe("buscarPerfis")).toContain("meusSeguidores: null");
   });
 
@@ -361,5 +366,60 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
     // ela segue a quem só abriu o feed.
     const retorno = C.slice(C.lastIndexOf("return {"));
     expect(retorno).not.toContain("elos");
+  });
+});
+
+describe("o espelho — 'ver como os outros veem'", () => {
+  const C = corpoDe("verPerfil").replace(/\s+/g, " ");
+
+  test("⚠️ a persona só vale sobre o PRÓPRIO perfil", () => {
+    // Sem esta condição o espelho vira um jeito de perguntar ao servidor "o que
+    // a Fulana esconde de mim?", que é o oposto do que ele existe para fazer.
+    expect(C).toContain("data.comoVisitante && data.alvoId === eu");
+  });
+
+  test("⚠️ o olho da prévia é o SENTINELA, nunca o meu id", () => {
+    // `podeVerPost` curto-circuita em `euId === post.autorId`: com o meu id
+    // TODO post passaria, inclusive os da camada `amigas`, e a tela afirmaria
+    // que uma seguidora vê o desabafo de terça. Sem erro e sem log.
+    expect(C).toContain("olharDe(persona)");
+    expect(C).toContain("montarPosts(sb, olho.euId,");
+    // E o contexto da prévia é FORJADO, não o meu.
+    expect(C).toContain("sigo: olho.sigoAtivo ?");
+    expect(C).toContain("bloqueio: new Set()");
+  });
+
+  test("⚠️ sob a prévia eu não sou eu", () => {
+    // Com `souEu` verdadeiro a tela desenharia "Editar perfil" e os controles
+    // da dona enquanto afirma ser a visão de uma estranha.
+    expect(C).toContain("souEu: persona ? false : data.alvoId === eu");
+  });
+
+  test("⚠️ a estranha bate na porta trancada, e isso não é erro", () => {
+    // É o estado da MAIORIA das pacientes: o perfil nasce fechado.
+    expect(C).toContain("personaAlcancaOPerfil(persona, !!a.perfil_publico)");
+    expect(C).toContain('motivo: "trancado" as const');
+  });
+
+  test("⚠️ o SELO passa pela mesma régua na prévia e na tela real", () => {
+    // Era o campo que uma prévia feita só sobre `podeVerPost` desenharia sem
+    // nunca ter filtrado: os selos são campos de `PerfilNaTela`, montados a
+    // partir do perfil, e não passam pelo filtro dos posts.
+    expect(C).toContain("await seloDe(a)");
+    expect(C).toContain("seloSemana: selo.semana");
+    expect(C).toContain("seloBebe: selo.bebe");
+    // E a régua é a de `lib/`, nunca reescrita aqui.
+    expect(CODIGO).not.toContain("function seloDoPerfil");
+    expect(FONTE).toContain('from "@/lib/selo-do-perfil"');
+  });
+
+  test("⚠️ a idade gestacional sai de `computeGestation`, a régua única", () => {
+    // Subtrair datas aqui faria a rede social discordar do consultório sobre a
+    // semana da mesma paciente.
+    const c = funcaoInterna("seloDe").replace(/\s+/g, " ");
+    expect(c).toContain("computeGestation({");
+    expect(c).toContain("nasceu: !!p?.birth_date");
+    expect(c).toContain("emCuidado: !!p?.care_mode");
+    expect(c).not.toMatch(/new Date\(.*86400000/);
   });
 });

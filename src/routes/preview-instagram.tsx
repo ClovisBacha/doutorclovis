@@ -20,6 +20,9 @@
  *   /preview-instagram?tela=novo    → a nova publicação (o que o ＋ abre)
  *   /preview-instagram?tela=salvos  → a coleção privada
  *   /preview-instagram?tela=busca   → a busca de perfis
+ *   /preview-instagram?tela=espelho → "ver como os outros veem" (o espelho)
+ *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
+ *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
  *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
  *
@@ -27,9 +30,11 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useState } from "react";
+import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   EditarPerfil,
+  EspelhoDoPerfil,
   ListaDeGente,
   NovoPost,
   TelaDeBusca,
@@ -60,6 +65,9 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
+    /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
+    selo: q.selo == null ? 1 : Number(q.selo),
+    trancado: q.trancado == null ? false : !!q.trancado,
   }),
 });
 
@@ -148,17 +156,30 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio, sugeridas } = Route.useSearch();
+  const { tela, meu, vazio, sugeridas, selo, trancado } = Route.useSearch();
+  const [persona, setPersona] = useState<Persona>("estranha");
 
   const perfil: PerfilNaTela = {
     id: meu ? "eu" : "marina",
     nome: meu ? "Marina Costa" : "Carol Andrade",
-    bio: meu ? "Grávida da Helena 🎀 · 32 semanas · Belo Horizonte" : "Mãe do Bento 🧸 · pós-parto",
+    /* ⚠️ A bio NÃO diz a semana, e isso não é detalhe da bancada: enquanto ela
+       dizia "· 32 semanas", desligar o selo continuava mostrando a semana na
+       tela e a bancada aprovava um recurso quebrado. Quem escreve a semana à
+       mão na bio é a paciente de hoje — o selo existe justamente para ela parar
+       de precisar. */
+    bio: meu ? "Grávida da Helena 🎀 · Belo Horizonte" : "Mãe do Bento 🧸 · pós-parto",
     avatarUrl: null,
     publico: true,
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
     meusSeguidores: meu ? 137 : null,
+    /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
+       liga os dois, e `?selo=2` liga SÓ o do bebê — que é o caso que prova que
+       uma chave sozinha não desenha a vírgula solta da outra. */
+    seloSemana: selo === 1 ? "32 semanas" : null,
+    seloBebe: selo === 1 || selo === 2 ? "Helena" : null,
+    mostrarSemana: selo === 1,
+    mostrarBebe: selo === 1 || selo === 2,
   };
 
   const semSugestoes = sugeridas === 0;
@@ -313,6 +334,25 @@ function Bancada() {
     );
   }
 
+  if (tela === "espelho") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <EspelhoDoPerfil
+          persona={persona}
+          aoTrocarPersona={setPersona}
+          /* A bancada troca a persona LOCALMENTE; no app quem responde é o
+             servidor, com `verPerfil({comoVisitante})`. O que se confere aqui é
+             o desenho: a fita das três, o estado trancado e a tela inerte. */
+          perfil={{ ...perfil, souEu: false, meusSeguidores: null, meuVinculo: null }}
+          posts={persona === "estranha" ? POSTS.slice(0, 2) : POSTS.slice(0, 5)}
+          trancado={trancado && persona === "estranha"}
+          carregando={false}
+          aoVoltar={() => history.back()}
+        />
+      </div>
+    );
+  }
+
   if (tela === "novo") {
     return (
       <div className="mx-auto max-w-md py-2">
@@ -368,6 +408,7 @@ function Bancada() {
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
           aoAbrirLista={meu ? (t) => alert(`abriria ${t}`) : undefined}
           aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
+          aoAbrirEspelho={meu ? () => alert("abriria o espelho") : undefined}
           aoBloquear={meu ? undefined : () => alert("bloquearia")}
         />
       ) : (

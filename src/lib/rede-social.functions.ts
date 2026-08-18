@@ -39,6 +39,7 @@ import {
   type EspecieDeAviso,
   type Visibilidade,
 } from "@/lib/rede-social";
+import { olharDe, personaAlcancaOPerfil, seloDoPerfil, type Persona } from "@/lib/selo-do-perfil";
 import {
   AUTORAS_CONSULTADAS,
   ordenarPessoas,
@@ -91,6 +92,18 @@ export type PerfilNaTela = {
   souEu: boolean;
   /** ⚠️ Só a DONA vê. Não existe contador público de seguidores — ver a régua. */
   meusSeguidores: number | null;
+  /**
+   * "28 semanas", ou `null` — a régua inteira mora em `selo-do-perfil.ts`.
+   *
+   * ⚠️ DOIS campos e não um: as chaves são independentes, e uma delas pode
+   * estar ligada sozinha. Uma string só ("Helena · 28 semanas") obrigaria a
+   * tela a desmontá-la para desenhar o caso de uma chave só.
+   */
+  seloSemana: string | null;
+  seloBebe: string | null;
+  /** As chaves, para a tela dela desenhar os interruptores no estado certo. */
+  mostrarSemana: boolean;
+  mostrarBebe: boolean;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -145,9 +158,43 @@ async function perfisPorId(sb: any, ids: string[]) {
   if (ids.length === 0) return new Map<string, any>();
   const { data } = await sb
     .from("patient_profiles")
-    .select("id, display_name, avatar_url, bio, perfil_publico, care_mode")
+    /* ⚠️ As colunas do SELO viajam junto, e não num select próprio: este é o
+       único lugar da rede que lê `patient_profiles`, e um segundo select
+       divergiria dele no primeiro conserto. São colunas escalares da linha que
+       já está sendo lida — não custam consulta a mais. */
+    .select(
+      "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
+        "baby_name, mostrar_semana, mostrar_bebe, " +
+        "lmp_date, reference_date, reference_weeks, reference_days, birth_date",
+    )
     .in("id", ids);
   return new Map(((data ?? []) as any[]).map((p) => [p.id, p]));
+}
+
+/**
+ * O selo de um perfil, a partir da linha que `perfisPorId` já leu.
+ *
+ * ⚠️ A idade gestacional sai de `computeGestation` — a régua ÚNICA do app, a
+ * mesma que o prontuário, as conquistas e a emergência usam. Subtrair datas
+ * aqui faria a rede social discordar do consultório sobre a semana da mesma
+ * paciente.
+ */
+async function seloDe(p: any) {
+  const { computeGestation } = await import("@/lib/gestacao");
+  const g = computeGestation({
+    lmp: p?.lmp_date ?? null,
+    referenceDate: p?.reference_date ?? null,
+    referenceWeeks: p?.reference_weeks ?? null,
+    referenceDays: p?.reference_days ?? null,
+  });
+  return seloDoPerfil({
+    totalDias: g?.totalDays ?? null,
+    nasceu: !!p?.birth_date,
+    emCuidado: !!p?.care_mode,
+    mostrarSemana: !!p?.mostrar_semana,
+    mostrarBebe: !!p?.mostrar_bebe,
+    nomeDoBebe: p?.baby_name ?? null,
+  });
 }
 
 /** Reações de vários posts, agrupadas. */
@@ -272,7 +319,11 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
     const [{ data: p }, { count: seguidores }, { data: pendentes }] = await Promise.all([
       sb
         .from("patient_profiles")
-        .select("display_name, avatar_url, bio, perfil_publico, care_mode")
+        .select(
+          "display_name, avatar_url, bio, perfil_publico, care_mode, " +
+            "baby_name, mostrar_semana, mostrar_bebe, " +
+            "lmp_date, reference_date, reference_weeks, reference_days, birth_date",
+        )
         .eq("id", eu)
         .maybeSingle(),
       sb
@@ -294,6 +345,8 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
       ((pendentes ?? []) as { seguidor_id: string }[]).map((x) => x.seguidor_id),
     );
 
+    const selo = await seloDe(p);
+
     return {
       ok: true as const,
       perfil: {
@@ -305,6 +358,12 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         meuVinculo: null,
         souEu: true,
         meusSeguidores: seguidores ?? 0,
+        /* A tela dela precisa do selo (para mostrar como ficou) E das chaves
+           (para os interruptores nascerem no estado certo). */
+        seloSemana: selo.semana,
+        seloBebe: selo.bebe,
+        mostrarSemana: !!(p as any)?.mostrar_semana,
+        mostrarBebe: !!(p as any)?.mostrar_bebe,
       } as PerfilNaTela,
       emCuidado: !!(p as any)?.care_mode,
       pedidos: ((pendentes ?? []) as { seguidor_id: string }[])
@@ -329,6 +388,10 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         publico: z.boolean().optional(),
+        /* As duas chaves do selo. Opcionais e independentes: o update é
+           parcial, então mandar uma não mexe na outra. */
+        mostrarSemana: z.boolean().optional(),
+        mostrarBebe: z.boolean().optional(),
         bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
         nome: z.string().max(60).optional(),
         /** Data URL. O cliente já corta o quadrado e reduz para 512px. */
@@ -372,6 +435,8 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       .from("patient_profiles")
       .update({
         ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),
+        ...(data.mostrarSemana !== undefined ? { mostrar_semana: data.mostrarSemana } : {}),
+        ...(data.mostrarBebe !== undefined ? { mostrar_bebe: data.mostrarBebe } : {}),
         ...(data.bio !== undefined ? { bio: data.bio } : {}),
         ...(data.nome !== undefined && data.nome.trim() ? { display_name: data.nome.trim() } : {}),
         ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
@@ -382,9 +447,36 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
   });
 
 /** O perfil de outra pessoa, com os posts que eu posso ver. */
+/**
+ * O PERFIL — e o ESPELHO.
+ *
+ * ─── "VER MEU PERFIL COMO VISITANTE" ───────────────────────────────────────
+ *
+ * Pedido do dono: "não podemos expor a paciente sem ela saber". O espelho é o
+ * que transforma isso de promessa em verificação: ela vê a MESMA tela que uma
+ * estranha, uma seguidora ou uma amiga veem.
+ *
+ * ⚠️ **É um MODO desta função, e não uma segunda montagem.** Uma tela de prévia
+ * que montasse o perfil por conta própria divergiria desta no primeiro
+ * conserto — e divergiria em silêncio, afirmando que uma visitante vê o que ela
+ * não vê (ou pior: escondendo o que ela vê). Tudo que a prévia mostra passa
+ * pelos MESMOS `podeVerPost`, `seloDe` e `montarPosts` da tela real.
+ *
+ * ⚠️ **E só funciona sobre o PRÓPRIO perfil.** `comoVisitante` com o id de
+ * outra pessoa é ignorado — senão o espelho vira um jeito de perguntar ao
+ * servidor "o que a Fulana esconde de mim?", que é o oposto do que ele existe
+ * para fazer.
+ */
 export const verPerfil = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), alvoId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        /** O espelho. Só vale quando `alvoId` sou eu. */
+        comoVisitante: z.enum(["estranha", "seguidora", "amiga"]).nullable().optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
@@ -397,11 +489,23 @@ export const verPerfil = createServerFn({ method: "POST" })
     const perfis = await perfisPorId(sb, [data.alvoId]);
     const a = perfis.get(data.alvoId);
 
+    /* ⚠️ A persona só vale sobre o meu próprio perfil — ver o cabeçalho. */
+    const persona: Persona | null =
+      data.comoVisitante && data.alvoId === eu ? (data.comoVisitante as Persona) : null;
+
     /* ⚠️ As três recusas devolvem o MESMO `indisponivel`: perfil inexistente,
        bloqueio e Modo Cuidado. Distinguir contaria à bloqueada que ela foi
        bloqueada, e contaria a perda de quem entrou em luto. */
     if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu)) {
       return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* ⚠️ Com o perfil FECHADO (o padrão de toda paciente), a estranha não
+       alcança nada — e o espelho tem de dizer isso em vez de desenhar um perfil
+       bonito que ninguém abre. É a informação mais útil que esta tela dá para a
+       maioria: a de que ela não está exposta a ninguém. */
+    if (persona && !personaAlcancaOPerfil(persona, !!a.perfil_publico)) {
+      return { ok: false as const, motivo: "trancado" as const };
     }
 
     const { data: vinculo } = await sb
@@ -419,7 +523,20 @@ export const verPerfil = createServerFn({ method: "POST" })
       .order("criado_em", { ascending: false })
       .limit(POSTS_POR_PAGINA);
 
-    const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+    /* ⚠️ O olho da prévia é um SENTINELA, nunca o meu id: `podeVerPost`
+       curto-circuita em `euId === post.autorId` ("a dona sempre vê os dela"), e
+       com o meu id TODO post passaria — inclusive os da camada `amigas`. A tela
+       afirmaria que uma seguidora vê o desabafo de terça, sem erro e sem log. */
+    const olho = persona ? olharDe(persona) : null;
+    const posts = olho
+      ? await montarPosts(sb, olho.euId, (brutos ?? []) as any[], {
+          sigo: olho.sigoAtivo ? new Set([data.alvoId]) : new Set(),
+          amigas: olho.somosAmigas ? new Set([data.alvoId]) : new Set(),
+          bloqueio: new Set(),
+        })
+      : await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+
+    const selo = await seloDe(a);
 
     const perfil: PerfilNaTela = {
       id: data.alvoId,
@@ -427,12 +544,27 @@ export const verPerfil = createServerFn({ method: "POST" })
       bio: a.bio ?? null,
       avatarUrl: a.avatar_url ?? null,
       publico: !!a.perfil_publico,
-      meuVinculo: ((vinculo as any)?.estado as "ativo" | "pendente") ?? null,
-      souEu: data.alvoId === eu,
+      /* Sob a prévia, o vínculo é o da PERSONA — senão a tela mostraria
+         "Editar perfil" no lugar de "Seguir" enquanto afirma ser a visão de
+         uma estranha. */
+      meuVinculo: persona
+        ? persona === "estranha"
+          ? null
+          : ("ativo" as const)
+        : (((vinculo as any)?.estado as "ativo" | "pendente") ?? null),
+      souEu: persona ? false : data.alvoId === eu,
       /* ⚠️ `null` para terceiros — não existe contador público de seguidores.
          Um placar de audiência num app de gestação de alto risco mede
          popularidade num momento em que ela já está sendo medida clinicamente. */
-      meusSeguidores: data.alvoId === eu ? 0 : null,
+      meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null,
+      /* ⚠️ Os selos passam pela MESMA régua na prévia e na tela real. Eles não
+         dependem de quem olha — dependem das chaves —, e é justamente por isso
+         que precisam estar aqui: era o campo que uma prévia feita só sobre
+         `podeVerPost` desenharia sem nunca ter filtrado. */
+      seloSemana: selo.semana,
+      seloBebe: selo.bebe,
+      mostrarSemana: !!a.mostrar_semana,
+      mostrarBebe: !!a.mostrar_bebe,
     };
 
     return { ok: true as const, perfil, posts: ordenarFeed(posts) };
