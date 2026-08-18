@@ -4289,3 +4289,68 @@ apagado, porque as reações apontam para ele.
 `?tela=busca` · `?tela=story&meu=1`. E `/preview-rede` encolheu: virou só as
 configurações do perfil (a chave do público, a bio e a fila de pedidos), porque
 a do feed apontava para componentes que o app não abre mais.
+
+### "Sugerido para você" — e a peça do modelo que ficou de fora (ago/2026)
+
+Pedido do dono depois de rodar o SQL: "faça mostrar sugeridos para você, pense e
+aplique o modelo do Instagram". O rótulo existia desde o começo e **nunca teve
+produtor**: o feed só continha quem ela segue.
+
+⚠️ **ENGAJAMENTO NÃO É SINAL AQUI. NENHUM.** É o que o Instagram usa acima de
+tudo, e é exatamente o que não pode ser usado numa comunidade de gestação de
+alto risco: **o post que gera mais reação numa base assim é o da EMERGÊNCIA** —
+o sangramento, o susto, a internação. Um ranqueamento que aprende engajamento
+aprende a pôr o pior dia de uma paciente como a primeira coisa que todas as
+outras veem, e a fazer isso com quem elas NÃO conhecem. O feed de quem ela segue
+já é cronológico por essa razão; a zona de sugestões seria a porta dos fundos
+dessa decisão. Há teste varrendo `sugestoes.ts` atrás de qualquer menção a
+reação.
+
+⚠️ **E NÃO ENTRA "MESMO MÉDICO".** `patient_profiles.doctor_id` está ali, daria
+um sinal ótimo e é **dado de saúde**. Montar grafo social a partir de com quem
+ela se trata é usar o prontuário para sugerir amizade — mesmo que a tela nunca
+diga o motivo, o efeito é esse.
+
+**O que entra:** elos em comum (quantas pessoas que eu sigo seguem aquela
+autora — o sinal de verdade do modelo) e recência dentro de cada faixa.
+⚠️ **Os elos ORDENAM e nunca vão à tela**: "seguida por Marina e mais 3"
+entregaria quem ela segue a quem só abriu o feed, e a lista de seguidores deste
+app não é pública de propósito. Há teste cobrando que `elosEmComum` não apareça
+no componente.
+
+**O arranjo é o "você está em dia"**, e não a interlaçada moderna: a zona só
+abre quando o feed de quem ela segue ACABOU, com o divisor no meio. Não é
+estética — misturar desconhecidas entre as pessoas que ela escolheu faz a
+paciente ler um relato duro sem saber de quem veio. Com o aviso, tudo abaixo
+dele tem procedência, e cada publicação ainda leva o rótulo.
+
+Régua em `src/lib/sugestoes.ts` (pura, 18 testes):
+
+- **perfil PÚBLICO e post PÚBLICO** — as duas camadas são separadas, e a
+  separação é o recurso (perfil aberto com post `amigas` é o caso normal).
+- Fora: quem ela segue, quem bloqueou ou a bloqueou, **quem já tem pedido
+  pendente dela** (sugerir quem ela acabou de pedir é o app esquecendo o que ela
+  fez), e ela mesma.
+- `podeAparecerNaBusca`, a **mesma régua da busca** — quem não pode ser achada
+  não pode ser sugerida, senão a sugestão vira a porta dos fundos da busca (e o
+  Modo Cuidado volta à tela pela lateral).
+- ⚠️ **Duas publicações por autora.** Sem o teto, uma pessoa pública que publica
+  muito enche a zona — e numa base pequena isso não lê como sugestão, lê como
+  "o app está me empurrando essa desconhecida".
+- ⚠️ **Trinta dias de validade**, e o corte é de gestação: quatro meses atrás é
+  OUTRO TRIMESTRE. O feed de quem ela segue não tem esse corte de propósito.
+- ⚠️ **Teto de 60 autoras na consulta** — limite de URL, não de gosto: o `in()`
+  do PostgREST vai na query string, e 400 uuids são ~15 KB de endereço.
+- ⚠️ O post é montado por **`montarPosts`**, nunca à mão: é ela que aplica
+  `podeVerPost`, assina as URLs e traz reações e salvos. E a ordem final é a da
+  RÉGUA — `ordenarFeed` aqui desfaria o ranqueamento em silêncio.
+
+**A fileira de pessoas sugeridas** é ordenada por elos e depois por quem
+apareceu por último no app — ⚠️ **nunca por audiência**, que transformaria a
+fileira num ranking de popularidade, a coisa que este app decidiu não ter. Na
+conta NOVA ela é a única coisa útil na tela, e por isso aparece mesmo sem
+divisor. ⚠️ O cartão **não some ao seguir**: sumir no toque tira da tela a única
+confirmação de que o toque funcionou, e ela toca de novo.
+
+**Bancada:** `/preview-instagram` (rolar até o fim) · `?vazio=1` (conta nova) ·
+`?sugeridas=0` (o feed sem a zona).
