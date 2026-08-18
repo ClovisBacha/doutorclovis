@@ -97,7 +97,7 @@ export async function saoAmigas(sb: any, eu: string, outra: string): Promise<boo
  * exige `.eq("referred_by", uid)` —, e sem separar os dois a tela desenhava o
  * 🎁 na linha de quem me trouxe, para o servidor recusar com uma frase falsa.
  */
-async function idsDasAmigas(
+export async function idsDasAmigas(
   sb: any,
   eu: string,
 ): Promise<{ todas: string[]; trazidasPorMim: Set<string> }> {

@@ -1,0 +1,793 @@
+/**
+ * A REDE SOCIAL — o lado do servidor.
+ *
+ * As réguas moram em `rede-social.ts`, testadas sem banco. Aqui fica o que
+ * exige o servidor: provar quem é quem, montar o contexto de visibilidade, e
+ * nunca devolver mais do que quem pergunta pode ver.
+ *
+ * ─── ⚠️ POR QUE A LEITURA NÃO É RLS ────────────────────────────────────────
+ *
+ * Saber se eu posso ver um post cruza QUATRO coisas: o Modo Cuidado do autor, o
+ * bloqueio nos dois sentidos, o seguir, e o grafo de amizade que já existe. Uma
+ * policy de RLS que fizesse isso duplicaria `podeVerPost` em SQL, e as duas
+ * divergiriam no primeiro conserto — com a divergência aparecendo como POST
+ * VAZANDO, não como erro. Aqui a régua é chamada uma vez, do TypeScript.
+ *
+ * ─── ⚠️ O CONTEXTO É CARREGADO UMA VEZ, NÃO POR POST ───────────────────────
+ *
+ * `contextoDe` lê de uma vez: quem eu sigo, quem me bloqueou, quem eu bloqueei
+ * e quem são minhas amigas. Perguntar isso por post faria um feed de vinte
+ * posts custar oitenta consultas — e o feed é a tela mais aberta do app.
+ */
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import {
+  aoSeguir,
+  LIMITE_DA_BIO,
+  LIMITE_DO_TEXTO,
+  MINIMO_DA_BUSCA,
+  normalizarBusca,
+  ordenarFeed,
+  podeAparecerNaBusca,
+  podeVerPost,
+  POSTS_POR_PAGINA,
+  postEhValido,
+  reacaoConhecida,
+  REACOES,
+  type ContagemDeReacoes,
+  type TipoDeReacao,
+  type Visibilidade,
+} from "@/lib/rede-social";
+
+export type PostNaTela = {
+  id: string;
+  autorId: string;
+  autorNome: string;
+  autorAvatar: string | null;
+  texto: string | null;
+  imagemUrl: string | null;
+  visibilidade: Visibilidade;
+  criadoEm: string;
+  reacoes: ContagemDeReacoes;
+  /** A minha, para o botão já nascer aceso. */
+  minhaReacao: TipoDeReacao | null;
+  souAAutora: boolean;
+};
+
+export type PerfilNaTela = {
+  id: string;
+  nome: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  publico: boolean;
+  /** `null` = não sigo. */
+  meuVinculo: "ativo" | "pendente" | null;
+  souEu: boolean;
+  /** ⚠️ Só a DONA vê. Não existe contador público de seguidores — ver a régua. */
+  meusSeguidores: number | null;
+};
+
+async function pacienteDaSessao(accessToken: string): Promise<string | null> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data } = await supabaseAdmin.auth.getUser(accessToken);
+  return data.user?.id ?? null;
+}
+
+/** Tudo que a visibilidade precisa, numa leva só. */
+type Contexto = {
+  sigo: Set<string>;
+  bloqueio: Set<string>;
+  amigas: Set<string>;
+};
+
+async function contextoDe(sb: any, eu: string): Promise<Contexto> {
+  const [{ data: seguindo }, { data: bloqMeus }, { data: bloqDeles }] = await Promise.all([
+    sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
+    sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
+    sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
+  ]);
+
+  /* ⚠️ O bloqueio entra nos DOIS sentidos no mesmo Set. Guardar só o meu
+     deixaria quem me bloqueou continuar aparecendo no meu feed — e a palavra
+     "bloquear" promete que nenhuma das duas vê a outra. */
+  const bloqueio = new Set<string>();
+  for (const b of (bloqMeus ?? []) as { bloqueado_id: string }[]) bloqueio.add(b.bloqueado_id);
+  for (const b of (bloqDeles ?? []) as { quem_id: string }[]) bloqueio.add(b.quem_id);
+
+  /* O grafo de amizade é o que JÁ EXISTE. Reusar `idsDasAmigas` em vez de
+     recriar: duas réguas de "quem é amiga" divergiriam, e aqui a divergência
+     apareceria como post da camada restrita vazando. */
+  let amigas = new Set<string>();
+  try {
+    const { idsDasAmigas } = await import("@/lib/amigas.functions");
+    const r = await idsDasAmigas(sb, eu);
+    amigas = r.todas instanceof Set ? r.todas : new Set(r.todas as string[]);
+  } catch {
+    /* Sem o grafo, a camada `amigas` fecha em vez de abrir. Errar para o lado
+       de não mostrar é a única direção segura numa régua de visibilidade. */
+  }
+
+  return {
+    sigo: new Set(((seguindo ?? []) as { seguido_id: string }[]).map((s) => s.seguido_id)),
+    bloqueio,
+    amigas,
+  };
+}
+
+/** Perfis por id, com o que a rede precisa. */
+async function perfisPorId(sb: any, ids: string[]) {
+  if (ids.length === 0) return new Map<string, any>();
+  const { data } = await sb
+    .from("patient_profiles")
+    .select("id, display_name, avatar_url, bio, perfil_publico, care_mode")
+    .in("id", ids);
+  return new Map(((data ?? []) as any[]).map((p) => [p.id, p]));
+}
+
+/** Reações de vários posts, agrupadas. */
+async function reacoesDe(sb: any, postIds: string[], eu: string) {
+  if (postIds.length === 0) {
+    return {
+      porPost: new Map<string, ContagemDeReacoes>(),
+      minhas: new Map<string, TipoDeReacao>(),
+    };
+  }
+  const { data } = await sb
+    .from("rede_reacoes")
+    .select("post_id, quem_id, tipo")
+    .in("post_id", postIds);
+
+  const porPost = new Map<string, ContagemDeReacoes>();
+  const minhas = new Map<string, TipoDeReacao>();
+  for (const r of (data ?? []) as { post_id: string; quem_id: string; tipo: TipoDeReacao }[]) {
+    const c = porPost.get(r.post_id) ?? {};
+    c[r.tipo] = (c[r.tipo] ?? 0) + 1;
+    porPost.set(r.post_id, c);
+    if (r.quem_id === eu) minhas.set(r.post_id, r.tipo);
+  }
+  return { porPost, minhas };
+}
+
+/** Monta os posts para a tela, já filtrados pela régua. */
+async function montarPosts(
+  sb: any,
+  eu: string,
+  brutos: any[],
+  ctx: Contexto,
+): Promise<PostNaTela[]> {
+  const autores = await perfisPorId(sb, [...new Set(brutos.map((p) => p.autor_id))]);
+
+  const visiveis = brutos.filter((p) => {
+    const a = autores.get(p.autor_id);
+    if (!a) return false;
+    return podeVerPost({
+      post: { autorId: p.autor_id, visibilidade: p.visibilidade },
+      euId: eu,
+      autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+      bloqueado: ctx.bloqueio.has(p.autor_id),
+      sigoAtivo: ctx.sigo.has(p.autor_id),
+      somosAmigas: ctx.amigas.has(p.autor_id),
+    });
+  });
+
+  const { porPost, minhas } = await reacoesDe(
+    sb,
+    visiveis.map((p) => p.id),
+    eu,
+  );
+
+  const { urlAssinada } = await import("@/lib/imagens.server");
+  return Promise.all(
+    visiveis.map(async (p) => {
+      const a = autores.get(p.autor_id);
+      return {
+        id: p.id,
+        autorId: p.autor_id,
+        autorNome: (a?.display_name ?? "").trim() || "Alguém",
+        autorAvatar: a?.avatar_url ?? null,
+        texto: p.texto ?? null,
+        imagemUrl: p.imagem_path ? await urlAssinada("rede", p.imagem_path, 3600) : null,
+        visibilidade: p.visibilidade,
+        criadoEm: p.criado_em,
+        reacoes: porPost.get(p.id) ?? {},
+        minhaReacao: minhas.get(p.id) ?? null,
+        souAAutora: p.autor_id === eu,
+      };
+    }),
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PERFIL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** As configurações do meu perfil social. */
+export const meuPerfilSocial = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const [{ data: p }, { count: seguidores }, { data: pendentes }] = await Promise.all([
+      sb
+        .from("patient_profiles")
+        .select("display_name, avatar_url, bio, perfil_publico, care_mode")
+        .eq("id", eu)
+        .maybeSingle(),
+      sb
+        .from("rede_seguidores")
+        .select("id", { count: "exact", head: true })
+        .eq("seguido_id", eu)
+        .eq("estado", "ativo"),
+      sb
+        .from("rede_seguidores")
+        .select("seguidor_id, criado_em")
+        .eq("seguido_id", eu)
+        .eq("estado", "pendente")
+        .order("criado_em", { ascending: false })
+        .limit(50),
+    ]);
+
+    const quemPediu = await perfisPorId(
+      sb,
+      ((pendentes ?? []) as { seguidor_id: string }[]).map((x) => x.seguidor_id),
+    );
+
+    return {
+      ok: true as const,
+      perfil: {
+        id: eu,
+        nome: ((p as any)?.display_name ?? "").trim() || "Você",
+        bio: (p as any)?.bio ?? null,
+        avatarUrl: (p as any)?.avatar_url ?? null,
+        publico: !!(p as any)?.perfil_publico,
+        meuVinculo: null,
+        souEu: true,
+        meusSeguidores: seguidores ?? 0,
+      } as PerfilNaTela,
+      emCuidado: !!(p as any)?.care_mode,
+      pedidos: ((pendentes ?? []) as { seguidor_id: string }[])
+        .map((x) => {
+          const q = quemPediu.get(x.seguidor_id);
+          /* Quem entrou em Modo Cuidado some da fila de pedidos, sem aviso. */
+          if (!q || q.care_mode) return null;
+          return {
+            id: x.seguidor_id,
+            nome: (q.display_name ?? "").trim() || "Alguém",
+            avatarUrl: q.avatar_url ?? null,
+          };
+        })
+        .filter(Boolean),
+    };
+  });
+
+/** Ligar/desligar o perfil público e escrever a bio. */
+export const salvarPerfilSocial = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        publico: z.boolean().optional(),
+        bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { error } = await sb
+      .from("patient_profiles")
+      .update({
+        ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),
+        ...(data.bio !== undefined ? { bio: data.bio } : {}),
+      })
+      .eq("id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/** O perfil de outra pessoa, com os posts que eu posso ver. */
+export const verPerfil = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), alvoId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+    const perfis = await perfisPorId(sb, [data.alvoId]);
+    const a = perfis.get(data.alvoId);
+
+    /* ⚠️ As três recusas devolvem o MESMO `indisponivel`: perfil inexistente,
+       bloqueio e Modo Cuidado. Distinguir contaria à bloqueada que ela foi
+       bloqueada, e contaria a perda de quem entrou em luto. */
+    if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu)) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { data: vinculo } = await sb
+      .from("rede_seguidores")
+      .select("estado")
+      .eq("seguidor_id", eu)
+      .eq("seguido_id", data.alvoId)
+      .maybeSingle();
+
+    const { data: brutos } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .eq("autor_id", data.alvoId)
+      .is("arquivado_em", null)
+      .order("criado_em", { ascending: false })
+      .limit(POSTS_POR_PAGINA);
+
+    const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+
+    const perfil: PerfilNaTela = {
+      id: data.alvoId,
+      nome: (a.display_name ?? "").trim() || "Alguém",
+      bio: a.bio ?? null,
+      avatarUrl: a.avatar_url ?? null,
+      publico: !!a.perfil_publico,
+      meuVinculo: ((vinculo as any)?.estado as "ativo" | "pendente") ?? null,
+      souEu: data.alvoId === eu,
+      /* ⚠️ `null` para terceiros — não existe contador público de seguidores.
+         Um placar de audiência num app de gestação de alto risco mede
+         popularidade num momento em que ela já está sendo medida clinicamente. */
+      meusSeguidores: data.alvoId === eu ? 0 : null,
+    };
+
+    return { ok: true as const, perfil, posts: ordenarFeed(posts) };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SEGUIR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const seguir = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), alvoId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+    const a = (await perfisPorId(sb, [data.alvoId])).get(data.alvoId);
+    if (!a) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const estado = aoSeguir({
+      euId: eu,
+      alvo: {
+        id: data.alvoId,
+        nome: a.display_name ?? "",
+        bio: null,
+        avatarUrl: null,
+        publico: !!a.perfil_publico,
+        emCuidado: !!a.care_mode,
+      },
+      fuiBloqueada: ctx.bloqueio.has(data.alvoId),
+    });
+    if (!estado) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb.from("rede_seguidores").upsert(
+      {
+        seguidor_id: eu,
+        seguido_id: data.alvoId,
+        estado,
+        aceito_em: estado === "ativo" ? new Date().toISOString() : null,
+      },
+      { onConflict: "seguidor_id,seguido_id" },
+    );
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    /* ⚠️ Só o PEDIDO manda push — reação e "começou a te seguir" não mandam.
+       O push deste app é o mesmo canal do aviso de emergência, e quem desliga
+       as notificações por causa de um coraçãozinho desliga o resto junto. */
+    if (estado === "pendente") {
+      try {
+        const { sendPushToUser } = await import("@/lib/push.server");
+        const meu = (await perfisPorId(sb, [eu])).get(eu);
+        await sendPushToUser(data.alvoId, {
+          title: "Novo pedido",
+          body: `${(meu?.display_name ?? "Alguém").trim()} quer te acompanhar`,
+          url: "/minha-conta?tab=Comunidade",
+        });
+      } catch {
+        /* Push é enfeite aqui: o pedido já está gravado e aparece na tela. */
+      }
+    }
+
+    return { ok: true as const, estado };
+  });
+
+export const deixarDeSeguir = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), alvoId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* Aqui o DELETE é o certo, e é a única exceção do arquivo: "deixei de
+       seguir" não é um fato que alguém precise consultar depois, e guardar a
+       linha faria a chave única impedir de seguir de novo. */
+    const { error } = await sb
+      .from("rede_seguidores")
+      .delete()
+      .eq("seguidor_id", eu)
+      .eq("seguido_id", data.alvoId);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/** Ela responde a um pedido de perfil privado. */
+export const responderPedido = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        seguidorId: z.string().uuid(),
+        aceitar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (data.aceitar) {
+      const { error } = await sb
+        .from("rede_seguidores")
+        .update({ estado: "ativo", aceito_em: new Date().toISOString() })
+        .eq("seguidor_id", data.seguidorId)
+        .eq("seguido_id", eu)
+        .eq("estado", "pendente");
+      if (error) return { ok: false as const, motivo: "banco" as const };
+    } else {
+      /* ⚠️ Recusar APAGA. Marcar "recusado" bloquearia o par para sempre pela
+         chave única, e quem pediu de novo depois de um mal-entendido nunca
+         mais conseguiria. Mesma decisão de `APLICAR_DUPLAS.sql`. */
+      const { error } = await sb
+        .from("rede_seguidores")
+        .delete()
+        .eq("seguidor_id", data.seguidorId)
+        .eq("seguido_id", eu)
+        .eq("estado", "pendente");
+      if (error) return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   POSTS E FEED
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const publicarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
+        /** Data URL. O cliente já reduz para 512px antes de mandar. */
+        imagem: z.string().max(1_500_000).nullable(),
+        visibilidade: z.enum(["publico", "seguidores", "amigas"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Modo Cuidado NÃO publica. O portão da tela some, mas um pedido montado
+       à mão não passa pela tela. */
+    const { data: meu } = await sb
+      .from("patient_profiles")
+      .select("care_mode")
+      .eq("id", eu)
+      .maybeSingle();
+    if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    if (!postEhValido({ texto: data.texto, temImagem: !!data.imagem })) {
+      return { ok: false as const, motivo: "vazio" as const };
+    }
+
+    let caminho: string | null = null;
+    if (data.imagem) {
+      const { guardarImagem } = await import("@/lib/imagens.server");
+      caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
+      /* Falhar aqui RECUSA o post inteiro. Publicar só o texto de um post que
+         ela montou com foto entregaria uma coisa diferente da que ela mandou,
+         e ela só descobriria olhando o feed. */
+      if (!caminho) return { ok: false as const, motivo: "imagem" as const };
+    }
+
+    const { data: post, error } = await sb
+      .from("rede_posts")
+      .insert({
+        autor_id: eu,
+        texto: data.texto?.trim() || null,
+        imagem_path: caminho,
+        visibilidade: data.visibilidade,
+      })
+      .select("id")
+      .single();
+    if (error || !post) return { ok: false as const, motivo: "banco" as const };
+
+    return { ok: true as const, postId: post.id };
+  });
+
+export const apagarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* Marca, não apaga: as reações apontam para o post, e um DELETE levaria
+       junto o registro de quem esteve ali. O `.eq("autor_id")` é o que impede
+       apagar post alheio — o id vem do cliente. */
+    const { error } = await sb
+      .from("rede_posts")
+      .update({ arquivado_em: new Date().toISOString() })
+      .eq("id", data.postId)
+      .eq("autor_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/** O feed: posts de quem eu sigo, das minhas amigas, e os meus. */
+export const meuFeed = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        antesDe: z.string().max(40).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+    const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
+      (id) => !ctx.bloqueio.has(id) || id === eu,
+    );
+
+    let q = sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .in("autor_id", de)
+      .is("arquivado_em", null)
+      .order("criado_em", { ascending: false })
+      /* Puxa mais do que cabe na página: a régua ainda vai FILTRAR (Modo
+         Cuidado, perfil fechado depois de publicar), e sem folga uma página
+         voltaria com três posts. */
+      .limit(POSTS_POR_PAGINA * 2);
+    if (data.antesDe) q = q.lt("criado_em", data.antesDe);
+
+    const { data: brutos } = await q;
+    const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+    const pagina = ordenarFeed(posts).slice(0, POSTS_POR_PAGINA);
+
+    return {
+      ok: true as const,
+      posts: pagina,
+      /* O cursor sai do ÚLTIMO da página, não do último bruto: senão a página
+         seguinte pularia os que a régua filtrou. */
+      proximo: pagina.length === POSTS_POR_PAGINA ? pagina[pagina.length - 1].criadoEm : null,
+    };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   REAÇÕES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const reagir = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        /** `null` tira a reação. */
+        tipo: z.string().max(20).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (data.tipo === null) {
+      /* Falhar em silêncio deixaria a reação lá: a tela apagaria o botão, o
+         banco manteria a linha, e a próxima abertura a traria de volta. */
+      const { error } = await sb
+        .from("rede_reacoes")
+        .delete()
+        .eq("post_id", data.postId)
+        .eq("quem_id", eu);
+      if (error) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const };
+    }
+
+    if (!reacaoConhecida(data.tipo)) return { ok: false as const, motivo: "tipo" as const };
+
+    /* ⚠️ REAGIR EXIGE PODER VER O POST, e essa conferência não é formalidade:
+       sem ela, um `postId` sorteado que respondesse 200 confirmaria a
+       existência de um post privado — vazamento pela porta dos fundos. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade")
+      .eq("id", data.postId)
+      .is("arquivado_em", null)
+      .maybeSingle();
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const ctx = await contextoDe(sb, eu);
+    const a = (await perfisPorId(sb, [(post as any).autor_id])).get((post as any).autor_id);
+    const pode =
+      !!a &&
+      podeVerPost({
+        post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
+        euId: eu,
+        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        bloqueado: ctx.bloqueio.has((post as any).autor_id),
+        sigoAtivo: ctx.sigo.has((post as any).autor_id),
+        somosAmigas: ctx.amigas.has((post as any).autor_id),
+      });
+    if (!pode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb
+      .from("rede_reacoes")
+      .upsert(
+        { post_id: data.postId, quem_id: eu, tipo: data.tipo },
+        { onConflict: "post_id,quem_id" },
+      );
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BLOQUEIO E DESCOBERTA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const bloquear = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        bloquear: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    if (eu === data.alvoId) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (!data.bloquear) {
+      await sb.from("rede_bloqueios").delete().eq("quem_id", eu).eq("bloqueado_id", data.alvoId);
+      return { ok: true as const };
+    }
+
+    /* ⚠️ **A ORDEM AQUI É A GARANTIA, e ela substitui um rollback.**
+       Bloquear são DUAS escritas — desfazer o seguir e gravar o bloqueio — e
+       não há transação entre elas. A primeira versão gravava o bloqueio antes
+       e desfazia o seguir depois, com um rollback no erro; mas um rollback é
+       mais uma escrita que pode falhar, e falhando ela deixa exatamente o
+       estado que veio evitar.
+
+       Desfazer o seguir PRIMEIRO torna o rollback desnecessário, porque os
+       dois estados intermediários passam a ser assimétricos:
+
+         · falha no seguir  → nada foi escrito. Ela vê o erro e tenta de novo.
+         · falha no bloqueio → ela deixou de seguir e não bloqueou. Chato, e
+           inofensivo: é o gesto MENOR, e ela vê o erro.
+
+       O estado que não pode existir — bloqueio gravado com a linha de seguir
+       viva, ressuscitando o vínculo no dia em que ela desbloquear — deixou de
+       ser alcançável. Meio bloqueio é pior que nenhum, porque ela acha que
+       está protegida. */
+    const { error: erroSeguir } = await sb
+      .from("rede_seguidores")
+      .delete()
+      .or(
+        `and(seguidor_id.eq.${eu},seguido_id.eq.${data.alvoId}),and(seguidor_id.eq.${data.alvoId},seguido_id.eq.${eu})`,
+      );
+    if (erroSeguir) return { ok: false as const, motivo: "banco" as const };
+
+    const { error } = await sb
+      .from("rede_bloqueios")
+      .upsert({ quem_id: eu, bloqueado_id: data.alvoId }, { onConflict: "quem_id,bloqueado_id" });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    return { ok: true as const };
+  });
+
+/** A busca — só perfil público. */
+export const buscarPerfis = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), termo: z.string().max(60) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const termo = normalizarBusca(data.termo);
+    if (termo.length < MINIMO_DA_BUSCA) return { ok: true as const, perfis: [] };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ `.eq("perfil_publico", true)` na CONSULTA, não num filtro depois: quem
+       não abriu o perfil não pode nem viajar pela rede. É o portão que preserva
+       o desenho original da aba — o grafo fechado por indicação. */
+    const { data: linhas } = await sb
+      .from("patient_profiles")
+      .select("id, display_name, avatar_url, bio, perfil_publico, care_mode")
+      .eq("perfil_publico", true)
+      .ilike("display_name", `%${data.termo.trim()}%`)
+      .limit(20);
+
+    const ctx = await contextoDe(sb, eu);
+    return {
+      ok: true as const,
+      perfis: ((linhas ?? []) as any[])
+        .filter(
+          (p) =>
+            p.id !== eu &&
+            !ctx.bloqueio.has(p.id) &&
+            podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: !!p.care_mode }),
+        )
+        .map((p) => ({
+          id: p.id,
+          nome: (p.display_name ?? "").trim() || "Alguém",
+          bio: p.bio ?? null,
+          avatarUrl: p.avatar_url ?? null,
+          publico: true,
+          meuVinculo: (ctx.sigo.has(p.id) ? "ativo" : null) as "ativo" | null,
+          souEu: false,
+          meusSeguidores: null,
+        })),
+    };
+  });
+
+/** O catálogo, para a tela não reescrever os emojis. */
+export const CATALOGO_DE_REACOES = REACOES;
