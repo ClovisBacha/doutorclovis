@@ -263,3 +263,29 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/from\("rede_posts"\)[\s\S]{0,120}\.delete\(/);
   });
 });
+
+describe("o que a tela precisa saber vem do servidor, e não de um chute", () => {
+  test("⚠️ `salvo` sai de uma consulta MINHA, não do post", () => {
+    // Um `salvo` que viesse do post seria o mesmo para todo mundo — o marcador
+    // de uma acenderia na tela das outras. A consulta é recortada por
+    // `quem_id = eu`, e é isso que torna a coleção privada.
+    const c = funcaoInterna("salvosDe").replace(/\s+/g, " ");
+    expect(c).toContain('from("rede_salvos")');
+    expect(c).toContain('.eq("quem_id", eu)');
+    expect(c).toContain('.in("post_id", postIds)');
+    // E o post recebe o valor DA CONSULTA, nunca um literal.
+    const m = funcaoInterna("montarPosts").replace(/\s+/g, " ");
+    expect(m).toContain("salvo: salvos.has(p.id)");
+    expect(m).not.toMatch(/salvo: (true|false)/);
+  });
+
+  test("⚠️ `pendente` exige pedido VIVO, e só em `pediu_para_seguir`", () => {
+    // Sem as duas metades, a caixa mostra "Aceitar" num pedido já aceito — um
+    // botão que promete uma ação e não faz nada, porque o `update` filtra por
+    // `estado = "pendente"` e não acha mais linha.
+    const c = corpoDe("minhaAtividade").replace(/\s+/g, " ");
+    expect(c).toContain('.eq("seguido_id", eu)');
+    expect(c).toContain('.eq("estado", "pendente")');
+    expect(c).toContain('pendente: l.especie === "pediu_para_seguir" && pendentes.has(l.quem_id)');
+  });
+});

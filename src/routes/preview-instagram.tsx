@@ -16,11 +16,17 @@
  *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
  *   /preview-instagram?tela=story   → o visor de story em tela cheia
  *   /preview-instagram?tela=atividade → a aba do coração
+ *   /preview-instagram?tela=novo    → a nova publicação (o que o ＋ abre)
+ *   /preview-instagram?tela=salvos  → a coleção privada
+ *   /preview-instagram?tela=busca   → a busca de perfis
  */
 import { createFileRoute } from "@tanstack/react-router";
 import {
   EditarPerfil,
   ListaDeGente,
+  NovoPost,
+  TelaDeBusca,
+  TelaDosSalvos,
   TelaDePerfil,
   TelaDoPost,
   TelaDeAtividade,
@@ -110,6 +116,9 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   reacoes: i === 0 ? { amei: 24, emocionei: 11, torcendo: 6 } : i % 3 === 0 ? { abraco: 4 } : {},
   minhaReacao: i === 0 ? "emocionei" : null,
   souAAutora: i === 3,
+  /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
+     apagado dos outros. Com todos apagados não haveria contraste. */
+  salvo: i === 1,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
@@ -185,6 +194,7 @@ function Bancada() {
         postCapa: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
         criadoEm: atras(12),
         visto: false,
+        pendente: false,
       },
       {
         id: "a2",
@@ -196,6 +206,10 @@ function Bancada() {
         postCapa: null,
         criadoEm: atras(90),
         visto: false,
+        /* ⚠️ O pedido AINDA DE PÉ é o único que ganha os dois botões — é ele
+           que prova a linha de aceitar/recusar. Os outros três provam o
+           contrário: pedido já respondido não mostra botão nenhum. */
+        pendente: true,
       },
       {
         id: "a3",
@@ -207,6 +221,7 @@ function Bancada() {
         postCapa: null,
         criadoEm: atras(600),
         visto: true,
+        pendente: false,
       },
       {
         id: "a4",
@@ -218,11 +233,16 @@ function Bancada() {
         postCapa: null,
         criadoEm: atras(2000),
         visto: true,
+        pendente: false,
       },
     ];
     return (
       <div className="mx-auto max-w-md py-2">
-        <TelaDeAtividade itens={vazio ? [] : itens} aoVoltar={() => history.back()} />
+        <TelaDeAtividade
+          itens={vazio ? [] : itens}
+          aoVoltar={() => history.back()}
+          aoResponder={(id, aceitar) => alert(`${aceitar ? "aceitaria" : "recusaria"} ${id}`)}
+        />
       </div>
     );
   }
@@ -253,7 +273,55 @@ function Bancada() {
   if (tela === "post") {
     return (
       <div className="mx-auto max-w-md py-2">
-        <TelaDoPost post={POSTS[0]} aoReagir={() => {}} aoVoltar={() => history.back()} />
+        <TelaDoPost
+          post={POSTS[0]}
+          aoReagir={() => {}}
+          aoSalvar={(v) => alert(v ? "guardaria" : "tiraria dos salvos")}
+          aoVoltar={() => history.back()}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "novo") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <NovoPost
+          aoFechar={() => history.back()}
+          aoPublicar={async (p) => {
+            alert(`publicaria: ${p.fotos.length} foto(s), ${p.visibilidade}\n${p.texto ?? ""}`);
+            return false; /* `false` mantém a tela aberta, para olhar de novo. */
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "salvos") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDosSalvos
+          posts={vazio ? [] : POSTS.slice(0, 5)}
+          aoVoltar={() => history.back()}
+          aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "busca") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDeBusca
+          aoVoltar={() => history.back()}
+          /* A busca de mentira responde a QUALQUER termo com três letras — o
+             que a bancada existe para mostrar é a espera, o vazio explicado e
+             a linha do resultado, não o `ilike` do servidor. */
+          aoBuscar={async (termo) =>
+            vazio ? [] : GENTE.slice(0, 3).map((g) => ({ ...g, nome: `${g.nome} (${termo})` }))
+          }
+          aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
+        />
       </div>
     );
   }
@@ -269,6 +337,8 @@ function Bancada() {
           aoSeguir={() => alert("seguir")}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
           aoAbrirLista={meu ? (t) => alert(`abriria ${t}`) : undefined}
+          aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
+          aoBloquear={meu ? undefined : () => alert("bloquearia")}
         />
       ) : (
         <TelaPrincipal
@@ -280,7 +350,10 @@ function Bancada() {
           sugeridos={["p2"]}
           aoReagir={() => {}}
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
+          aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
+          aoApagar={() => alert("apagaria")}
           aoPublicar={() => alert("publicar")}
+          aoBuscar={() => alert("busca")}
           aoAbrirAtividade={() => alert("atividade")}
           novasAtividades={vazio ? 0 : 3}
         />

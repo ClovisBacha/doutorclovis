@@ -45,10 +45,15 @@ import {
 import {
   emojiDaReacao,
   LIMITE_DA_BIO,
+  LIMITE_DO_TEXTO,
+  MINIMO_DA_BUSCA,
+  postEhValido,
   REACOES,
   textoDoAviso,
   totalDeReacoes,
+  VISIBILIDADES,
   type TipoDeReacao,
+  type Visibilidade,
 } from "@/lib/rede-social";
 import type {
   AtividadeNaTela,
@@ -233,19 +238,76 @@ function Carrossel({ urls }: { urls: string[] }) {
    O POST — no formato deles
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * O MARCADOR — desenhado, nunca 🔖.
+ *
+ * Mesma lição do 📞 da Central de Emergência e do 📅 da fita: emoji é um
+ * caractere que cada fabricante desenha do jeito dele, e este aqui precisa ter
+ * DOIS estados que se distingam de longe — vazio e cheio. O contorno com
+ * `fill="none"` e o cheio com `fill="currentColor"` são a mesma silhueta, então
+ * a troca não mexe no arranjo da linha.
+ */
+/**
+ * A lupa da busca — desenhada, e pela razão de sempre.
+ *
+ * ⚠️ 🔍 é emoji COLORIDO em todo sistema, e ela senta ao lado de duas marcas
+ * monocromáticas (o ♡ e o ＋). Medido na bancada: um ícone azul-e-cinza no meio
+ * de dois traços da cor do texto lê como adesivo colado ali, não como a
+ * terceira ação da mesma barra.
+ */
+function IconeLupa() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[21px] w-[21px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+    >
+      <circle cx="10.6" cy="10.6" r="6.4" />
+      <path d="M15.4 15.4 20 20" />
+    </svg>
+  );
+}
+
+function IconeMarcador({ cheio }: { cheio: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[22px] w-[22px]"
+      fill={cheio ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+    >
+      <path d="M6 3.6h12c.6 0 1 .4 1 1v15.6l-7-4.4-7 4.4V4.6c0-.6.4-1 1-1z" />
+    </svg>
+  );
+}
+
 export function PostInstagram({
   post,
   aoReagir,
   aoAbrirPerfil,
+  aoSalvar,
+  aoApagar,
   sugerido = false,
 }: {
   post: PostNaTela;
   aoReagir: (t: TipoDeReacao | null) => void;
   aoAbrirPerfil?: (id: string) => void;
+  /** Guardar/desguardar. Sem ele o marcador não aparece. */
+  aoSalvar?: (salvar: boolean) => void;
+  /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
+  aoApagar?: () => void;
   /** Veio do algoritmo, não de quem ela segue. */
   sugerido?: boolean;
 }) {
   const [escolhendo, setEscolhendo] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const total = totalDeReacoes(post.reacoes);
   /* Post antigo (anterior ao carrossel) tem `imagens` vazio e só
      `imagemUrl` — o recuo faz os dois terem a mesma forma aqui. */
@@ -275,7 +337,50 @@ export function PostInstagram({
             )}
           </span>
         </button>
+        {/* O ⋯ só no post DELA, e só quando há o que fazer com ele. No modelo
+            ele abre um menu com denúncia, silenciar e mais seis coisas; aqui
+            há uma ação só, e um menu de um item é um botão com uma etapa a
+            mais. */}
+        {post.souAAutora && aoApagar && (
+          <button
+            type="button"
+            onClick={() => setConfirmando(true)}
+            aria-label="Opções da publicação"
+            className="press shrink-0 px-1 text-lg leading-none text-muted-foreground"
+          >
+            ⋯
+          </button>
+        )}
       </header>
+
+      {/* ⚠️ A confirmação é uma MENSAGEM separada, e não o mesmo botão virando
+          "tem certeza?" — é a mesma decisão do cancelar consulta, pedida pelo
+          dono na época. Apagar publicação é irreversível: não há lixeira, e o
+          arquivo sai do balde. */}
+      {confirmando && (
+        <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
+          <p className="text-[13px] leading-snug">Apagar esta publicação?</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmando(false)}
+              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmando(false);
+                aoApagar?.();
+              }}
+              className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+            >
+              Sim, apagar
+            </button>
+          </div>
+        </div>
+      )}
 
       {post.imagemUrl && <Carrossel urls={fotos} />}
 
@@ -295,6 +400,20 @@ export function PostInstagram({
           <span className="text-[13px] font-semibold tabular-nums">
             {total} {total === 1 ? "reação" : "reações"}
           </span>
+        )}
+        {/* O marcador fica na PONTA DIREITA, separado das reações pelo vão que
+            sobra — é o arranjo deles, e ele diz uma coisa verdadeira: guardar é
+            gesto privado (ninguém vê, nem a autora), reagir é gesto social. */}
+        {aoSalvar && (
+          <button
+            type="button"
+            onClick={() => aoSalvar(!post.salvo)}
+            aria-label={post.salvo ? "Tirar dos salvos" : "Salvar"}
+            aria-pressed={post.salvo}
+            className="press ml-auto leading-none"
+          >
+            <IconeMarcador cheio={post.salvo} />
+          </button>
         )}
       </div>
 
@@ -337,8 +456,11 @@ export function TelaPrincipal({
   stories = [],
   sugeridos = [],
   aoReagir,
+  aoSalvar,
+  aoApagar,
   aoAbrirPerfil,
   aoPublicar,
+  aoBuscar,
   aoAbrirSecoes,
   aoTocarStory,
   aoAbrirAtividade,
@@ -349,8 +471,11 @@ export function TelaPrincipal({
   /** Ids dos posts que vieram do algoritmo, não de quem ela segue. */
   sugeridos?: string[];
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
+  aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  aoApagar?: (post: PostNaTela) => void;
   aoAbrirPerfil?: (id: string) => void;
   aoPublicar?: () => void;
+  aoBuscar?: () => void;
   /**
    * As outras seções da Comunidade — chá de bebê, álbum, amigas, nome do bebê.
    *
@@ -376,6 +501,16 @@ export function TelaPrincipal({
         <h1 className="text-lg font-semibold tracking-tight">Comunidade</h1>
         {/* Ações à direita, como no modelo: publicar primeiro, seções depois. */}
         <div className="flex items-center gap-3">
+          {aoBuscar && (
+            <button
+              type="button"
+              onClick={aoBuscar}
+              aria-label="Buscar pessoas"
+              className="press leading-none"
+            >
+              <IconeLupa />
+            </button>
+          )}
           {aoAbrirAtividade && (
             <button
               type="button"
@@ -430,6 +565,8 @@ export function TelaPrincipal({
             post={p}
             sugerido={doAlgoritmo.has(p.id)}
             aoReagir={(t) => aoReagir(p, t)}
+            aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
+            aoApagar={aoApagar && p.souAAutora ? () => aoApagar(p) : undefined}
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
@@ -459,6 +596,8 @@ export function TelaDePerfil({
   aoVoltar,
   aoAbrirPost,
   aoAbrirLista,
+  aoAbrirSalvos,
+  aoBloquear,
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
@@ -476,8 +615,13 @@ export function TelaDePerfil({
    * perfil. Só a dona abre as duas listas dela.
    */
   aoAbrirLista?: (tipo: "seguidores" | "seguindo") => void;
+  /** Só no próprio perfil — a coleção é privada e não existe a de ninguém. */
+  aoAbrirSalvos?: () => void;
+  /** Só no perfil de terceiro. */
+  aoBloquear?: () => void;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
+  const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
 
   /* Só os POSTS aparecem na grade; o "Do bebê" é a aba própria. */
   const naGrade = aba === "grade" ? posts : [];
@@ -506,7 +650,57 @@ export function TelaDePerfil({
           </button>
         )}
         <h1 className="min-w-0 flex-1 truncate text-[16px] font-semibold">{perfil.nome}</h1>
+        {/* No modelo, os salvos moram atrás do ☰ do próprio perfil. O ícone é
+            o MESMO marcador do post — é o que liga o gesto ao lugar onde ele
+            guarda. */}
+        {aoAbrirSalvos && (
+          <button type="button" onClick={aoAbrirSalvos} aria-label="Salvos" className="press">
+            <IconeMarcador cheio={false} />
+          </button>
+        )}
+        {aoBloquear && (
+          <button
+            type="button"
+            onClick={() => setConfirmandoBloqueio((v) => !v)}
+            aria-label="Opções deste perfil"
+            className="press px-1 text-lg leading-none text-muted-foreground"
+          >
+            ⋯
+          </button>
+        )}
       </header>
+
+      {/* ⚠️ Bloquear é o único gesto de SEGURANÇA desta tela, e ele diz o que
+          faz antes de fazer: desfaz o seguir nos dois sentidos e some com um
+          do outro. Um "Bloquear" sem essa frase parece reversível — e é, mas
+          o vínculo que ele desfez não volta sozinho. */}
+      {confirmandoBloqueio && aoBloquear && (
+        <div className="mx-4 mt-2 rounded-2xl border border-border bg-muted/40 p-3">
+          <p className="text-[13px] leading-snug">
+            Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
+            seguir.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setConfirmandoBloqueio(false)}
+              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+            >
+              Não
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoBloquear();
+              }}
+              className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+            >
+              Bloquear
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="px-4">
         {/* Avatar à esquerda, números à direita — o arranjo deles. */}
@@ -575,43 +769,10 @@ export function TelaDePerfil({
       </div>
 
       {aba === "grade" ? (
-        naGrade.length === 0 ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            Nenhuma publicação ainda.
-          </p>
-        ) : (
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: VAO_DA_GRADE }}
-          >
-            {naGrade.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => aoAbrirPost?.(p.id)}
-                /* ⚠️ `aspect-ratio` de 3:4, a proporção NOVA da grade. A antiga
-                   era quadrada, e mudou em 2025 — quem construir 1:1 hoje corta
-                   a foto vertical, que é a maioria. */
-                style={{ aspectRatio: String(RAZAO_DA_GRADE) }}
-                className="press relative overflow-hidden bg-muted/60"
-              >
-                {p.imagemUrl ? (
-                  <img
-                    src={p.imagemUrl}
-                    alt=""
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-                  /* Post só de texto na grade: mostra o texto, não um buraco. */
-                  <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
-                    {p.texto}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )
+        /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
+           divergiriam na primeira vez que a proporção da célula mudasse, e ela
+           já mudou uma vez (1:1 → 3:4, em 2025). */
+        <GradeDePosts posts={naGrade} vazio="Nenhuma publicação ainda." aoAbrirPost={aoAbrirPost} />
       ) : (
         <p className="py-16 text-center text-sm text-muted-foreground">
           Os marcos da gestação vão aparecer aqui 💛
@@ -651,7 +812,11 @@ type Onde =
   | { t: "perfil"; id: string }
   | { t: "editar" }
   | { t: "lista"; tipo: "seguidores" | "seguindo" }
-  | { t: "post"; id: string };
+  | { t: "post"; id: string }
+  | { t: "novo" }
+  | { t: "atividade" }
+  | { t: "salvos" }
+  | { t: "busca" };
 
 export function RedeNoApp({
   careMode = false,
@@ -669,6 +834,9 @@ export function RedeNoApp({
   const [bolhas, setBolhas] = useState<BolhaDeStory[]>([]);
   const [vendoStory, setVendoStory] = useState<BolhaDeStory | null>(null);
   const [euId, setEuId] = useState<string | null>(null);
+  const [avisos, setAvisos] = useState<AtividadeNaTela[]>([]);
+  const [naoVistas, setNaoVistas] = useState(0);
+  const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   const [carregando, setCarregando] = useState(true);
   const arquivoDoStory = useRef<HTMLInputElement>(null);
 
@@ -685,14 +853,22 @@ export function RedeNoApp({
       const mod = await import("@/lib/rede-social.functions");
       /* Feed e stories em PARALELO: são duas consultas independentes, e em
          série a fileira só apareceria depois de o feed inteiro chegar. */
-      const [r, st, meu] = await Promise.all([
+      const [r, st, meu, at] = await Promise.all([
         mod.meuFeed({ data: { accessToken: t } }),
         mod.storiesDoFeed({ data: { accessToken: t } }),
         mod.meuPerfilSocial({ data: { accessToken: t } }),
+        /* ⚠️ A atividade vem JUNTO, e não quando ela toca no ♡: o emblema é o
+           que faz alguém tocar. Buscando só na abertura da caixa, o coração
+           nasceria sempre sem número e a caixa só seria aberta por acaso. */
+        mod.minhaAtividade({ data: { accessToken: t } }),
       ]);
       if (r.ok) setPosts(r.posts);
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) setEuId(meu.perfil.id);
+      if (at.ok) {
+        setAvisos(at.itens);
+        setNaoVistas(at.novas);
+      }
     } catch {
       /* Feed vazio é melhor que erro: ela não veio buscar um erro. */
     } finally {
@@ -820,6 +996,157 @@ export function RedeNoApp({
     }
   }
 
+  async function publicar(p: {
+    texto: string | null;
+    fotos: string[];
+    visibilidade: Visibilidade;
+  }): Promise<boolean> {
+    try {
+      const t = await token();
+      if (!t) return false;
+      const { publicarPost } = await import("@/lib/rede-social.functions");
+      const r = await publicarPost({
+        data: {
+          accessToken: t,
+          texto: p.texto,
+          /* A PRIMEIRA vai em `imagem` e as demais em `extras` — é a forma do
+             servidor, que guardou a capa numa coluna própria desde antes de o
+             carrossel existir. */
+          imagem: p.fotos[0] ?? null,
+          extras: p.fotos.slice(1),
+          visibilidade: p.visibilidade,
+        },
+      });
+      if (!r.ok) return false;
+      /* Recarrega em vez de enfiar o post na lista: a URL da foto volta
+         ASSINADA do balde, e a data URL que subiu não é a que o feed mostra. */
+      await carregarFeed();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function apagar(post: PostNaTela) {
+    /* Some da tela na hora, das TRÊS listas: ela acabou de mandar apagar, e um
+       post que continua ali por meio segundo lê como "não apagou". */
+    setPosts((ps) => ps.filter((x) => x.id !== post.id));
+    setDoPerfil((ps) => ps.filter((x) => x.id !== post.id));
+    setSalvos((ps) => ps.filter((x) => x.id !== post.id));
+    if (onde.t === "post") setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { apagarPost } = await import("@/lib/rede-social.functions");
+      const r = await apagarPost({ data: { accessToken: t, postId: post.id } });
+      if (!r.ok) await carregarFeed();
+    } catch {
+      void carregarFeed();
+    }
+  }
+
+  async function guardar(post: PostNaTela, salvar: boolean) {
+    const aplicar = (ps: PostNaTela[]) =>
+      ps.map((x) => (x.id === post.id ? { ...x, salvo: salvar } : x));
+    setPosts(aplicar);
+    setDoPerfil(aplicar);
+    setOPost((x) => (x ? aplicar([x])[0] : x));
+    /* Tirar dos salvos com a lista aberta some da lista; guardar não a
+       preenche, porque a lista vem ordenada do servidor. */
+    if (!salvar) setSalvos((ps) => ps.filter((x) => x.id !== post.id));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { salvarPost } = await import("@/lib/rede-social.functions");
+      await salvarPost({ data: { accessToken: t, postId: post.id, salvar } });
+    } catch {
+      void carregarFeed();
+    }
+  }
+
+  async function abrirSalvos() {
+    setSalvos([]);
+    setOnde({ t: "salvos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusSalvos } = await import("@/lib/rede-social.functions");
+      const r = await meusSalvos({ data: { accessToken: t } });
+      if (r.ok) setSalvos(r.posts);
+    } catch {
+      /* Lista vazia; a tela já diz "você ainda não guardou nada". */
+    }
+  }
+
+  async function abrirAtividade() {
+    setOnde({ t: "atividade" });
+    /* ⚠️ O emblema zera JÁ, sem esperar o servidor: ela está olhando a caixa
+       neste instante, e um número que continua aceso enquanto ela lê é o
+       número deixando de significar. Se a gravação falhar, ele volta na
+       próxima abertura do app — e voltar é melhor que nunca ter zerado. */
+    setNaoVistas(0);
+    setAvisos((as) => as.map((a) => ({ ...a, visto: true })));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { marcarAtividadeVista } = await import("@/lib/rede-social.functions");
+      await marcarAtividadeVista({ data: { accessToken: t } });
+    } catch {
+      /* Fica não vista no banco; a próxima abertura mostra de novo. */
+    }
+  }
+
+  async function buscar(termo: string): Promise<PessoaNaLista[]> {
+    try {
+      const t = await token();
+      if (!t) return [];
+      const { buscarPerfis } = await import("@/lib/rede-social.functions");
+      const r = await buscarPerfis({ data: { accessToken: t, termo } });
+      if (!r.ok) return [];
+      return r.perfis.map((p) => ({
+        id: p.id,
+        nome: p.nome,
+        bio: p.bio,
+        avatarUrl: p.avatarUrl,
+        sigo: p.meuVinculo,
+        souEu: false,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async function bloquear(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { bloquear: chamar } = await import("@/lib/rede-social.functions");
+      const r = await chamar({ data: { accessToken: t, alvoId, bloquear: true } });
+      if (!r.ok) return;
+      /* Volta ao feed e recarrega: bloquear desfaz o seguir nos dois sentidos
+         e tira os posts dela da minha vista — ficar no perfil de quem acabei
+         de bloquear seria a tela contradizendo o gesto. */
+      setOnde({ t: "feed" });
+      await carregarFeed();
+    } catch {
+      /* O perfil continua como está; ela vê que nada mudou e tenta de novo. */
+    }
+  }
+
+  async function responder(seguidorId: string, aceitar: boolean) {
+    setAvisos((as) =>
+      as.filter((a) => !(a.especie === "pediu_para_seguir" && a.quemId === seguidorId)),
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { responderPedido } = await import("@/lib/rede-social.functions");
+      await responderPedido({ data: { accessToken: t, seguidorId, aceitar } });
+    } catch {
+      /* O pedido volta na próxima abertura. */
+    }
+  }
+
   async function publicarStory(dataUrl: string) {
     try {
       const t = await token();
@@ -876,6 +1203,47 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "novo") {
+    return (
+      <NovoPost
+        aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoPublicar={publicar}
+      />
+    );
+  }
+
+  if (onde.t === "busca") {
+    return (
+      <TelaDeBusca
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoBuscar={buscar}
+        aoAbrirPerfil={abrirPerfil}
+      />
+    );
+  }
+
+  if (onde.t === "salvos") {
+    return (
+      <TelaDosSalvos
+        posts={salvos}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
+  if (onde.t === "atividade") {
+    return (
+      <TelaDeAtividade
+        itens={avisos}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrirPerfil={abrirPerfil}
+        aoAbrirPost={abrirPost}
+        aoResponder={responder}
+      />
+    );
+  }
+
   if (onde.t === "editar" && perfil) {
     return (
       <EditarPerfil
@@ -902,6 +1270,8 @@ export function RedeNoApp({
       <TelaDoPost
         post={oPost}
         aoReagir={(t) => reagir(oPost, t)}
+        aoSalvar={(v) => guardar(oPost, v)}
+        aoApagar={oPost.souAAutora ? () => apagar(oPost) : undefined}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -917,6 +1287,8 @@ export function RedeNoApp({
         aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
         aoAbrirPost={abrirPost}
         aoAbrirLista={perfil.souEu ? abrirLista : undefined}
+        aoAbrirSalvos={perfil.souEu ? abrirSalvos : undefined}
+        aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
       />
     );
   }
@@ -957,7 +1329,13 @@ export function RedeNoApp({
         posts={posts}
         stories={fileira}
         aoReagir={reagir}
+        aoSalvar={guardar}
+        aoApagar={apagar}
         aoAbrirPerfil={abrirPerfil}
+        aoPublicar={() => setOnde({ t: "novo" })}
+        aoBuscar={() => setOnde({ t: "busca" })}
+        aoAbrirAtividade={abrirAtividade}
+        novasAtividades={naoVistas}
         aoAbrirSecoes={onAbrirSecoes}
         aoTocarStory={verStory}
       />
@@ -1164,11 +1542,15 @@ export function ListaDeGente({
 export function TelaDoPost({
   post,
   aoReagir,
+  aoSalvar,
+  aoApagar,
   aoVoltar,
   aoAbrirPerfil,
 }: {
   post: PostNaTela;
   aoReagir: (t: TipoDeReacao | null) => void;
+  aoSalvar?: (salvar: boolean) => void;
+  aoApagar?: () => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {
@@ -1185,7 +1567,13 @@ export function TelaDoPost({
         </button>
         <h1 className="text-[16px] font-semibold">Publicação</h1>
       </header>
-      <PostInstagram post={post} aoReagir={aoReagir} aoAbrirPerfil={aoAbrirPerfil} />
+      <PostInstagram
+        post={post}
+        aoReagir={aoReagir}
+        aoSalvar={aoSalvar}
+        aoApagar={aoApagar}
+        aoAbrirPerfil={aoAbrirPerfil}
+      />
     </div>
   );
 }
@@ -1321,11 +1709,21 @@ export function TelaDeAtividade({
   aoVoltar,
   aoAbrirPerfil,
   aoAbrirPost,
+  aoResponder,
 }: {
   itens: AtividadeNaTela[];
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
   aoAbrirPost?: (id: string) => void;
+  /**
+   * Aceitar ou recusar um pedido de seguir, aqui mesmo.
+   *
+   * ⚠️ É AQUI que o pedido é respondido, e não só nas configurações. O perfil
+   * nasce FECHADO (`PERFIL_PUBLICO_PADRAO = false`), então todo seguir vira um
+   * pedido — e enquanto a única porta esteve enterrada numa seção de ajustes,
+   * a rede inteira ficava parada esperando uma tela que ninguém abria.
+   */
+  aoResponder?: (seguidorId: string, aceitar: boolean) => void;
 }) {
   return (
     <div>
@@ -1368,6 +1766,26 @@ export function TelaDeAtividade({
                       paciente leria uma no aviso e outra na tela. */}
                   {textoDoAviso(a.especie, "").trim()}
                 </p>
+                {/* O pedido AINDA DE PÉ ganha os dois botões; o já respondido
+                    vira uma linha comum, sem botão que não faz nada. */}
+                {a.especie === "pediu_para_seguir" && a.pendente && aoResponder && (
+                  <span className="flex shrink-0 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => aoResponder(a.quemId, false)}
+                      className="press rounded-lg border border-border px-2.5 py-1.5 text-[12px]"
+                    >
+                      Agora não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => aoResponder(a.quemId, true)}
+                      className="press rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                    >
+                      Aceitar
+                    </button>
+                  </span>
+                )}
                 {a.postCapa && (
                   <button
                     type="button"
@@ -1378,6 +1796,403 @@ export function TelaDeAtividade({
                   </button>
                 )}
               </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   NOVA PUBLICAÇÃO — o que o ＋ abre
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Reduz a foto do POST antes de subir.
+ *
+ * ⚠️ 1080 e não 512, que é o lado do avatar. O avatar aparece num círculo de
+ * 44px; a foto do post ocupa a largura inteira da tela, e num iPhone de
+ * densidade 3 são ~1180 pixels reais — mandar 512 é entregar uma foto
+ * visivelmente mole justamente na peça que a tela existe para mostrar. A
+ * qualidade 0,8 mantém o data URL bem abaixo do teto de 1,5 MB do servidor.
+ *
+ * A proporção é PRESERVADA, ao contrário do avatar: o modelo aceita retrato,
+ * paisagem e quadrado, e recortar aqui decidiria pelo enquadramento dela.
+ */
+const LADO_DA_FOTO = 1080;
+async function prepararFotoDoPost(file: File): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, LADO_DA_FOTO / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.8);
+  } catch {
+    return null;
+  }
+}
+
+/** Teto de fotos por publicação — o mesmo do servidor (a primeira + nove). */
+const FOTOS_POR_POST = 10;
+
+export function NovoPost({
+  aoFechar,
+  aoPublicar,
+}: {
+  aoFechar: () => void;
+  /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
+  aoPublicar: (p: {
+    texto: string | null;
+    fotos: string[];
+    visibilidade: Visibilidade;
+  }) => Promise<boolean>;
+}) {
+  const [texto, setTexto] = useState("");
+  /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
+     outras" divergiria na hora de remover a primeira. */
+  const [fotos, setFotos] = useState<string[]>([]);
+  /* ⚠️ O padrão é o mais FECHADO. O erro possível aqui é publicar para menos
+     gente do que ela queria — nunca para mais. */
+  const [vis, setVis] = useState<Visibilidade>("amigas");
+  const [enviando, setEnviando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const arquivo = useRef<HTMLInputElement>(null);
+
+  /* ⚠️ A régua de "dá para publicar isto?" é a MESMA do servidor
+     (`postEhValido`). Uma segunda condição escrita aqui aceitaria o que o
+     servidor recusa, e ela levaria um erro depois de escrever o texto. */
+  const podeEnviar = postEhValido({ texto, temImagem: fotos.length > 0 }) && !enviando;
+
+  async function enviar() {
+    if (!podeEnviar) return;
+    setEnviando(true);
+    setErro(null);
+    const ok = await aoPublicar({
+      texto: texto.trim() || null,
+      fotos,
+      visibilidade: vis,
+    });
+    setEnviando(false);
+    if (ok) aoFechar();
+    else setErro("Não deu para publicar. Tente de novo.");
+  }
+
+  return (
+    <div>
+      {/* A barra de cima com "Compartilhar" à direita é a tela de legenda
+          deles, e ela resolve uma coisa: a ação de confirmar mora onde o
+          polegar já está, no alto, e não some quando o teclado sobe. */}
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoFechar}
+          aria-label="Fechar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Nova publicação</h1>
+        <button
+          type="button"
+          onClick={enviar}
+          disabled={!podeEnviar}
+          className="press text-[14px] font-semibold text-primary disabled:opacity-40"
+        >
+          {enviando ? "Publicando…" : "Compartilhar"}
+        </button>
+      </header>
+
+      <div className="px-4">
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DO_TEXTO))}
+          rows={4}
+          placeholder="Escreva uma legenda…"
+          className="w-full resize-none rounded-2xl border border-border bg-background px-3 py-2.5 text-[14px] leading-snug"
+        />
+        {/* O contador só aparece perto do fim: um número piscando a cada letra
+            desde a primeira transforma escrever num exercício de caber. */}
+        {texto.length > LIMITE_DO_TEXTO - 80 && (
+          <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+            {LIMITE_DO_TEXTO - texto.length}
+          </p>
+        )}
+
+        {fotos.length > 0 && (
+          <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {fotos.map((f, n) => (
+              <div key={n} className="relative shrink-0">
+                <img src={f} alt="" className="h-24 w-24 rounded-xl object-cover" />
+                {/* A PRIMEIRA leva o selo — sem ele ninguém sabe qual vai
+                    aparecer na grade do perfil. */}
+                {n === 0 && (
+                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-[10px] text-white">
+                    capa
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setFotos((fs) => fs.filter((_, k) => k !== n))}
+                  aria-label="Tirar esta foto"
+                  className="press absolute right-1 top-1 rounded-full bg-black/60 px-1.5 leading-none text-white"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ⚠️ A camada fica À VISTA, e não atrás de um menu. Escondida, ela
+            publica no padrão sem perceber — e num app de gestação a diferença
+            entre "as amigas" e "qualquer pessoa" é a diferença entre contar
+            uma notícia e publicá-la. */}
+        <div className="mt-3">
+          <p className="text-[12px] font-medium text-muted-foreground">Quem vai ver</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {VISIBILIDADES.map((v) => (
+              <button
+                key={v.chave}
+                type="button"
+                onClick={() => setVis(v.chave)}
+                className={`press rounded-full px-3 py-1.5 text-[13px] ${
+                  vis === v.chave ? "bg-primary/15 font-semibold text-primary" : "bg-muted/60"
+                }`}
+              >
+                {v.rotulo}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            {VISIBILIDADES.find((v) => v.chave === vis)?.sub}
+          </p>
+        </div>
+
+        <input
+          ref={arquivo}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            /* O teto é conferido AQUI e não só no servidor: recusar o post
+               inteiro depois de ela escolher onze fotos é pior que não deixar
+               escolher a décima primeira. */
+            if (fotos.length >= FOTOS_POR_POST) {
+              setErro(`No máximo ${FOTOS_POR_POST} fotos por publicação.`);
+              return;
+            }
+            const d = await prepararFotoDoPost(f);
+            if (!d) setErro("Não consegui ler essa imagem.");
+            else {
+              setErro(null);
+              setFotos((fs) => [...fs, d]);
+            }
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => arquivo.current?.click()}
+          className="press mt-3 w-full rounded-xl border border-border py-2 text-[14px] font-medium"
+        >
+          📷 {fotos.length > 0 ? `Adicionar outra (${fotos.length})` : "Adicionar foto"}
+        </button>
+
+        {erro && <p className="mt-2 text-[13px] text-destructive">{erro}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OS SALVOS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** A grade de três colunas — a mesma do perfil e a dos salvos. */
+export function GradeDePosts({
+  posts,
+  vazio,
+  aoAbrirPost,
+}: {
+  posts: PostNaTela[];
+  vazio: string;
+  aoAbrirPost?: (id: string) => void;
+}) {
+  if (posts.length === 0) {
+    return <p className="py-16 text-center text-sm text-muted-foreground">{vazio}</p>;
+  }
+  return (
+    <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: VAO_DA_GRADE }}>
+      {posts.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          onClick={() => aoAbrirPost?.(p.id)}
+          /* ⚠️ `aspect-ratio` de 3:4, a proporção NOVA da grade. A antiga era
+             quadrada, e mudou em 2025 — quem construir 1:1 hoje corta a foto
+             vertical, que é a maioria. */
+          style={{ aspectRatio: String(RAZAO_DA_GRADE) }}
+          className="press relative overflow-hidden bg-muted/60"
+        >
+          {p.imagemUrl ? (
+            <img src={p.imagemUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            /* Post só de texto na grade: mostra o texto, não um buraco. */
+            <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+              {p.texto}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TelaDosSalvos({
+  posts,
+  aoVoltar,
+  aoAbrirPost,
+}: {
+  posts: PostNaTela[];
+  aoVoltar: () => void;
+  aoAbrirPost?: (id: string) => void;
+}) {
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="text-[16px] font-semibold">Salvos</h1>
+      </header>
+      {/* ⚠️ O texto diz que ninguém vê esta lista, e isso não é enfeite: no
+          modelo, "salvo" é a única coleção privada de verdade, e quem não sabe
+          disso usa o marcador com o mesmo cuidado de uma curtida pública. */}
+      <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+        Só você vê o que guardou aqui — nem quem publicou fica sabendo.
+      </p>
+      {/* Sem padding lateral, como a grade do perfil: a célula da grade encosta
+          na borda no modelo, e uma das duas com respiro faria a mesma grade
+          parecer duas. */}
+      <GradeDePosts posts={posts} vazio="Você ainda não guardou nada." aoAbrirPost={aoAbrirPost} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A BUSCA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export function TelaDeBusca({
+  aoVoltar,
+  aoBuscar,
+  aoAbrirPerfil,
+}: {
+  aoVoltar: () => void;
+  aoBuscar: (termo: string) => Promise<PessoaNaLista[]>;
+  aoAbrirPerfil?: (id: string) => void;
+}) {
+  const [termo, setTermo] = useState("");
+  const [achados, setAchados] = useState<PessoaNaLista[]>([]);
+  const [buscando, setBuscando] = useState(false);
+  /* ⚠️ Descarta resposta ATRASADA: quem digita "ana" dispara três buscas, e a
+     de "an" pode voltar depois da de "ana". Mesma trava do `contatoDaPaciente`
+     no painel do médico. */
+  const daVez = useRef(0);
+
+  useEffect(() => {
+    const t = termo.trim();
+    if (t.length < MINIMO_DA_BUSCA) {
+      setAchados([]);
+      setBuscando(false);
+      return;
+    }
+    setBuscando(true);
+    const meu = ++daVez.current;
+    /* Espera meio segundo depois da última tecla: sem isso são cinco idas ao
+       servidor para escrever um nome de cinco letras. */
+    const id = setTimeout(async () => {
+      const r = await aoBuscar(t);
+      if (daVez.current !== meu) return;
+      setAchados(r);
+      setBuscando(false);
+    }, 450);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [termo]);
+
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <input
+          value={termo}
+          onChange={(e) => setTermo(e.target.value.slice(0, 60))}
+          placeholder="Buscar"
+          autoFocus
+          className="h-9 min-w-0 flex-1 rounded-xl bg-muted/60 px-3 text-[14px]"
+        />
+      </header>
+
+      {termo.trim().length > 0 && termo.trim().length < MINIMO_DA_BUSCA ? (
+        <p className="py-10 text-center text-[13px] text-muted-foreground">
+          Escreva pelo menos {MINIMO_DA_BUSCA} letras.
+        </p>
+      ) : buscando ? (
+        <div className="space-y-2 px-4 py-3">
+          <div className="skeleton h-12 rounded-xl" />
+          <div className="skeleton h-12 rounded-xl" />
+        </div>
+      ) : achados.length === 0 ? (
+        /* ⚠️ O vazio EXPLICA, e a explicação é a régua do produto: só quem
+           abriu o perfil aparece na busca. Sem isso, procurar a irmã e não
+           achar lê como app quebrado — quando na verdade a irmã está protegida
+           exatamente como escolheu. */
+        <p className="px-6 py-10 text-center text-[13px] leading-snug text-muted-foreground">
+          {termo.trim()
+            ? "Ninguém com esse nome por aqui. Só aparece na busca quem deixou o perfil público."
+            : "Procure por alguém que você já conhece."}
+        </p>
+      ) : (
+        <ul>
+          {achados.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => aoAbrirPerfil?.(p.id)}
+                className="press flex w-full items-center gap-3 px-4 py-2.5 text-left"
+              >
+                <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold leading-tight">
+                    {p.nome}
+                  </span>
+                  {p.bio && (
+                    <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                      {p.bio}
+                    </span>
+                  )}
+                </span>
+              </button>
             </li>
           ))}
         </ul>

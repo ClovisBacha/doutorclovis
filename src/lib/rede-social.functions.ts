@@ -62,6 +62,15 @@ export type PostNaTela = {
   /** A minha, para o botão já nascer aceso. */
   minhaReacao: TipoDeReacao | null;
   souAAutora: boolean;
+  /**
+   * Guardei este post?
+   *
+   * ⚠️ Vem do servidor junto com o post, e não de uma segunda consulta que a
+   * tela faria depois. Sem ele o marcador nasceria apagado em toda abertura e
+   * quem já tinha salvado salvaria de novo — o `upsert` aguenta, mas a tela
+   * estaria mentindo sobre o que ela já fez.
+   */
+  salvo: boolean;
 };
 
 export type PerfilNaTela = {
@@ -158,6 +167,17 @@ async function reacoesDe(sb: any, postIds: string[], eu: string) {
   return { porPost, minhas };
 }
 
+/** Quais destes eu já guardei. Uma consulta só, como a das reações. */
+async function salvosDe(sb: any, postIds: string[], eu: string): Promise<Set<string>> {
+  if (postIds.length === 0) return new Set();
+  const { data } = await sb
+    .from("rede_salvos")
+    .select("post_id")
+    .eq("quem_id", eu)
+    .in("post_id", postIds);
+  return new Set(((data ?? []) as { post_id: string }[]).map((l) => l.post_id));
+}
+
 /** Monta os posts para a tela, já filtrados pela régua. */
 async function montarPosts(
   sb: any,
@@ -180,11 +200,20 @@ async function montarPosts(
     });
   });
 
-  const { porPost, minhas } = await reacoesDe(
-    sb,
-    visiveis.map((p) => p.id),
-    eu,
-  );
+  /* Reações e salvos em PARALELO: duas consultas independentes, e em série a
+     segunda só sairia depois de a primeira voltar. */
+  const [{ porPost, minhas }, salvos] = await Promise.all([
+    reacoesDe(
+      sb,
+      visiveis.map((p) => p.id),
+      eu,
+    ),
+    salvosDe(
+      sb,
+      visiveis.map((p) => p.id),
+      eu,
+    ),
+  ]);
 
   const { urlAssinada } = await import("@/lib/imagens.server");
   return Promise.all(
@@ -213,6 +242,7 @@ async function montarPosts(
         reacoes: porPost.get(p.id) ?? {},
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
+        salvo: salvos.has(p.id),
       };
     }),
   );
@@ -1273,6 +1303,16 @@ export type AtividadeNaTela = {
   postCapa: string | null;
   criadoEm: string;
   visto: boolean;
+  /**
+   * O pedido de seguir ainda está DE PÉ?
+   *
+   * ⚠️ Só faz sentido em `pediu_para_seguir`, e existe porque a linha da
+   * atividade não sabe o desfecho: ela é gravada quando o pedido chega e nunca
+   * mais muda. Sem este campo, um pedido já aceito continuaria mostrando
+   * "Aceitar" para sempre — um botão que promete uma ação e não faz nada,
+   * porque o `update` filtra por `estado = "pendente"` e não acha mais linha.
+   */
+  pendente: boolean;
 };
 
 /**
@@ -1348,6 +1388,17 @@ export const minhaAtividade = createServerFn({ method: "POST" })
       }
     }
 
+    /* Quem ainda está esperando resposta. Uma consulta só, para todas as
+       linhas de pedido da caixa. */
+    const { data: esperando } = await sb
+      .from("rede_seguidores")
+      .select("seguidor_id")
+      .eq("seguido_id", eu)
+      .eq("estado", "pendente");
+    const pendentes = new Set(
+      ((esperando ?? []) as { seguidor_id: string }[]).map((l) => l.seguidor_id),
+    );
+
     const itens: AtividadeNaTela[] = brutas
       .map((l) => {
         const p = perfis.get(l.quem_id);
@@ -1366,6 +1417,7 @@ export const minhaAtividade = createServerFn({ method: "POST" })
           postCapa: l.post_id ? (capas.get(l.post_id) ?? null) : null,
           criadoEm: l.criado_em,
           visto: !!l.visto_em,
+          pendente: l.especie === "pediu_para_seguir" && pendentes.has(l.quem_id),
         };
       })
       .filter(Boolean) as AtividadeNaTela[];
