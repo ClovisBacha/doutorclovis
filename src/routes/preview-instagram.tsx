@@ -196,8 +196,15 @@ function Bancada() {
     /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
        liga os dois, e `?selo=2` liga SÓ o do bebê — que é o caso que prova que
        uma chave sozinha não desenha a vírgula solta da outra. */
-    seloSemana: selo === 1 ? "32 semanas" : null,
-    seloBebe: selo === 1 || selo === 2 ? "Helena" : null,
+    /* ⚠️ A Carol é PÓS-PARTO na bio ("Mãe do Bento 🧸"), e `semanaPublica`
+       recusa exatamente esse par: depois do parto a semana para. Sem este
+       recorte a bancada desenhava um estado que o servidor nunca devolve — a
+       terceira vez que ela mente nesta tela, e sempre do mesmo jeito. */
+    seloSemana: selo === 1 && meu ? "32 semanas" : null,
+    seloBebe: (selo === 1 || selo === 2) && meu ? "Helena" : "Bento",
+    /* A pílula do código: só no perfil de OUTRA pessoa (`?meu=1` some). */
+    codigoDeEmbaixadora: meu ? null : "MARINA10",
+    possoAplicarOCodigo: !meu,
     mostrarSemana: selo === 1,
     mostrarBebe: selo === 1 || selo === 2,
     /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
@@ -477,6 +484,9 @@ function Bancada() {
           aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
           aoAbrirEspelho={meu ? () => alert("abriria o espelho") : undefined}
           aoBloquear={meu ? undefined : () => alert("bloquearia")}
+          /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
+             bancada aprovaria a pílula sem o controle que é o ponto dela. */
+          aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}
         />
       ) : (
         <TelaPrincipal

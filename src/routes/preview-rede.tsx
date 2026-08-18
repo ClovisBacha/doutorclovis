@@ -42,6 +42,9 @@ const PERFIL: PerfilNaTela = {
   meusSeguidores: 137,
   seloSemana: "32 semanas",
   seloBebe: "Helena",
+  /* A pílula do código: só no perfil de OUTRA pessoa (`?meu=1` some). */
+  codigoDeEmbaixadora: null,
+  possoAplicarOCodigo: false,
   mostrarSemana: true,
   mostrarBebe: true,
   /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */

@@ -124,6 +124,23 @@ export type PerfilNaTela = {
    */
   seloSemana: string | null;
   seloBebe: string | null;
+  /**
+   * O código de embaixadora DESTA pessoa, quando ela é uma — e está ativa.
+   *
+   * ⚠️ É identidade COMERCIAL, e por isso pode ser pública: ela se cadastrou
+   * como afiliada para que o código circulasse. Nada de clínico vai junto.
+   */
+  codigoDeEmbaixadora: string | null;
+  /**
+   * Eu posso aplicar esse código?
+   *
+   * ⚠️ **Falso sob a PRÉVIA, sempre.** `ref_code` é gravado UMA VEZ e nunca
+   * reescrito, e o mesmo campo carrega o código da MÉDICA dela: um toque numa
+   * tela que o app apresenta como inerte queimaria a indicação para sempre, sem
+   * erro e sem volta. O `somenteLeitura` da tela já desliga o botão; isto é o
+   * cinto, porque a tela e o servidor discordarem aqui custa caro.
+   */
+  possoAplicarOCodigo: boolean;
   /** As chaves, para a tela dela desenhar os interruptores no estado certo. */
   mostrarSemana: boolean;
   mostrarBebe: boolean;
@@ -287,6 +304,45 @@ async function seloDe(p: any) {
      consentimento inteiro — passava com os 3.149 testes verdes, porque a única
      cobertura deste trecho era um `toContain` sobre o texto do fonte. */
   return seloDoPerfil(entradaDoSelo(p, g?.totalDays ?? null));
+}
+
+/**
+ * O código de embaixadora de um perfil — ou `null`.
+ *
+ * ⚠️ **Só o código ATIVO.** Um código desligado não atribui e não paga: mostrá-lo
+ * faria a visitante aplicar, ver "pronto" e nunca receber nada — e a criadora
+ * nunca receber a comissão. `atribuirInfluenciadora` já recusa; a tela não pode
+ * oferecer o que o servidor vai negar.
+ *
+ * ⚠️ O e-mail mora em `auth.users` e é lido só aqui, no servidor: ele é a chave
+ * que liga a paciente à linha de `affiliates`, e não vai para tela nenhuma.
+ */
+async function codigoDeEmbaixadora(sb: any, perfilId: string): Promise<string | null> {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.admin.getUserById(perfilId);
+    const email = u?.user?.email?.trim().toLowerCase();
+    if (!email) return null;
+    const { data: aff } = await sb
+      .from("affiliates")
+      .select("code, active")
+      .eq("email", email)
+      .maybeSingle();
+    return aff?.active ? ((aff.code as string) ?? null) : null;
+  } catch {
+    /* Sem a tabela (banco sem o SQL de afiliadas) ou sem e-mail: sem código.
+       O perfil continua inteiro — a pílula é que não aparece. */
+    return null;
+  }
+}
+
+/** Eu já tenho um código de indicação gravado? */
+async function tenhoRefCode(sb: any, eu: string): Promise<boolean> {
+  const { data } = await sb.from("patient_profiles").select("ref_code").eq("id", eu).maybeSingle();
+  /* ⚠️ Erro de leitura vale COMO SE tivesse: oferecer o botão sem saber faria
+     a paciente tocar e o servidor recusar em silêncio — e ela ficaria achando
+     que aplicou. Errar para o lado de não oferecer. */
+  return data ? !!(data as any).ref_code : true;
 }
 
 /** A semana do carimbo do story, da linha de perfil já lida. */
@@ -748,6 +804,13 @@ export const verPerfil = createServerFn({ method: "POST" })
        aba tem de mostrar o que a visitante veria. */
     const bebe = await bebeDe(a, !persona && data.alvoId === eu);
 
+    /* A pílula do código só faz sentido no perfil de OUTRA pessoa: no meu, ela
+       ofereceria que eu me indicasse. */
+    const codigo = data.alvoId === eu ? null : await codigoDeEmbaixadora(sb, data.alvoId);
+    /* ⚠️ `ref_code` é fixado UMA VEZ — quem já tem não pode aplicar outro, e a
+       tela precisa saber disso ANTES de oferecer o botão. */
+    const jaTenhoCodigo = await tenhoRefCode(sb, eu);
+
     const perfil: PerfilNaTela = {
       id: data.alvoId,
       nome: (a.display_name ?? "").trim() || "Alguém",
@@ -778,6 +841,9 @@ export const verPerfil = createServerFn({ method: "POST" })
          true` com `seloSemana: null` só acontece por três causas (o bebê
          nasceu, a DUM sumiu, passou de 42 semanas), e as três são informação
          que ninguém pediu para publicar. */
+      codigoDeEmbaixadora: codigo,
+      /* ⚠️ Nunca sob a prévia — ver o tipo. */
+      possoAplicarOCodigo: !persona && !!codigo && !jaTenhoCodigo && data.alvoId !== eu,
       mostrarSemana: !persona && data.alvoId === eu ? !!a.mostrar_semana : false,
       mostrarBebe: !persona && data.alvoId === eu ? !!a.mostrar_bebe : false,
       bebe,

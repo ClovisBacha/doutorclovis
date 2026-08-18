@@ -813,6 +813,7 @@ export function TelaDePerfil({
   aoAbrirSalvos,
   aoBloquear,
   aoAbrirEspelho,
+  aoAplicarCodigo,
   somenteLeitura = false,
 }: {
   perfil: PerfilNaTela;
@@ -837,6 +838,8 @@ export function TelaDePerfil({
   aoBloquear?: () => void;
   /** Abre "ver como os outros veem". Só no próprio perfil. */
   aoAbrirEspelho?: () => void;
+  /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
+  aoAplicarCodigo?: (codigo: string) => void;
   /**
    * O ESPELHO: a tela desenha, e nada nela age.
    *
@@ -852,6 +855,7 @@ export function TelaDePerfil({
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
+  const [confirmandoCodigo, setConfirmandoCodigo] = useState(false);
 
   /* A trava do espelho: toda ação vira `undefined` de uma vez. */
   const agir = <T,>(f: T | undefined): T | undefined => (somenteLeitura ? undefined : f);
@@ -1003,6 +1007,68 @@ export function TelaDePerfil({
         )}
 
         {perfil.bio && <p className="mt-3 text-[14px] leading-snug">{perfil.bio}</p>}
+
+        {/* ─── O CÓDIGO DA EMBAIXADORA ──────────────────────────────────────
+            ⚠️ **Nunca num toque só.** `ref_code` é gravado UMA VEZ e nunca
+            reescrito — e o MESMO campo carrega o código da médica dela. Um
+            toque curioso aqui queimaria a indicação da médica para sempre, sem
+            erro e sem volta, e nenhuma tela do app poderia desfazer.
+
+            Por isso a confirmação é uma MENSAGEM separada que diz o que o
+            toque faz — a mesma decisão do cancelar consulta e do apagar
+            publicação. */}
+        {perfil.codigoDeEmbaixadora && (
+          <div className="mt-3 rounded-2xl border border-border p-3">
+            <p className="text-[12px] text-muted-foreground">Código de embaixadora</p>
+            <p className="mt-0.5 font-mono text-[15px] font-semibold tracking-wide">
+              {perfil.codigoDeEmbaixadora}
+            </p>
+            {perfil.possoAplicarOCodigo && aoAplicarCodigo && !somenteLeitura && (
+              <>
+                {!confirmandoCodigo ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmandoCodigo(true)}
+                    className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[13px] font-semibold"
+                  >
+                    Usar este código
+                  </button>
+                ) : (
+                  <div className="mt-2 rounded-xl bg-muted/50 p-3">
+                    <p className="text-[13px] leading-snug">
+                      Usar o código{" "}
+                      <span className="font-semibold">{perfil.codigoDeEmbaixadora}</span> como quem
+                      te trouxe ao app? Você ganha 150 🌱 de boas-vindas.
+                    </p>
+                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                      Isso vale uma vez só e não dá para trocar depois — é o mesmo campo onde entra
+                      o código da sua médica, se ela te passou um.
+                    </p>
+                    <div className="mt-2.5 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmandoCodigo(false)}
+                        className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                      >
+                        Agora não
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmandoCodigo(false);
+                          aoAplicarCodigo(perfil.codigoDeEmbaixadora!);
+                        }}
+                        className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground"
+                      >
+                        Sim, usar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <button
           type="button"
@@ -1599,6 +1665,37 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * Aplica o código de embaixadora de um perfil.
+   *
+   * ⚠️ Quem confere tudo é `atribuirInfluenciadora`: e-mail confirmado, código
+   * ATIVO, e `ref_code` ainda nulo (com `.is("ref_code", null)` na condição do
+   * UPDATE, para o checkout não perder a corrida). A tela não repete nenhuma
+   * dessas réguas — uma segunda diria "pronto" sobre o que o servidor recusou.
+   */
+  async function aplicarCodigo(codigo: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
+      const r = await atribuirInfluenciadora({ data: { accessToken: t, codigo } });
+      const { toast } = await import("sonner");
+      if (r.ok && r.atribuido) {
+        toast.success(r.bonus ? `Pronto! +${r.bonus} 🌱 de boas-vindas` : "Pronto 💛");
+        /* Recarrega o perfil: a pílula some, porque agora eu tenho código. */
+        if (perfil) await abrirPerfil(perfil.id);
+      } else if (r.ok && (r as { jaTinha?: boolean }).jaTinha) {
+        toast.error("Você já tem um código guardado.");
+      } else if (r.ok && (r as { invalido?: boolean }).invalido) {
+        toast.error("Esse código não está mais ativo.");
+      } else {
+        toast.error("Não deu para usar o código agora.");
+      }
+    } catch {
+      /* Nada mudou; o botão continua lá. */
+    }
+  }
+
   async function bloquear(alvoId: string) {
     try {
       const t = await token();
@@ -1901,6 +1998,7 @@ export function RedeNoApp({
             : undefined
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
+        aoAplicarCodigo={aplicarCodigo}
       />
     );
   }

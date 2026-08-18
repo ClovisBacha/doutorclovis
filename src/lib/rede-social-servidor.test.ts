@@ -474,3 +474,50 @@ describe("o carimbo do story — Fase 3", () => {
     expect(c).not.toContain("mostrar_semana");
   });
 });
+
+describe("o código de embaixadora no perfil — Fase 5", () => {
+  const C = corpoDe("verPerfil").replace(/\s+/g, " ");
+
+  test("⚠️ NUNCA aplicável sob a prévia", () => {
+    // `ref_code` é gravado UMA VEZ e nunca reescrito, e o mesmo campo carrega o
+    // código da MÉDICA dela: um toque numa tela que o app apresenta como inerte
+    // queimaria a indicação para sempre, sem erro e sem volta.
+    expect(C).toContain(
+      "possoAplicarOCodigo: !persona && !!codigo && !jaTenhoCodigo && data.alvoId !== eu",
+    );
+  });
+
+  test("⚠️ e nunca no MEU próprio perfil", () => {
+    // No meu, a pílula ofereceria que eu me indicasse.
+    expect(C).toContain("data.alvoId === eu ? null : await codigoDeEmbaixadora(sb, data.alvoId)");
+  });
+
+  test("⚠️ só código ATIVO aparece", () => {
+    // Um código desligado não atribui e não paga: mostrá-lo faria a visitante
+    // aplicar, ver "pronto" e nunca receber nada.
+    const c = funcaoInterna("codigoDeEmbaixadora").replace(/\s+/g, " ");
+    expect(c).toContain('.select("code, active")');
+    expect(c).toContain("aff?.active ?");
+  });
+
+  test("⚠️ falha ao saber se já tenho código vale COMO SE tivesse", () => {
+    // Oferecer o botão sem saber faria a paciente tocar, o servidor recusar em
+    // silêncio, e ela ficar achando que aplicou.
+    const c = funcaoInterna("tenhoRefCode").replace(/\s+/g, " ");
+    expect(c).toContain("data ? !!(data as any).ref_code : true");
+  });
+
+  test("⚠️ a tela NÃO reescreve as réguas de `atribuirInfluenciadora`", () => {
+    // E-mail confirmado, código ativo e `ref_code` nulo são conferidos lá. Uma
+    // segunda régua na tela diria "pronto" sobre o que o servidor recusou.
+    /* ⚠️ SEM COMENTÁRIOS. A primeira versão deste teste ficou vermelha por
+       causa da minha própria prosa: o comentário de `aplicarCodigo` explica que
+       o servidor usa `.is("ref_code", null)` na condição do UPDATE, e o
+       `not.toContain` casou com a explicação. É a mesma lição da catraca de
+       portas, chegando pelo lado oposto — lá a prosa fazia o teste PASSAR. */
+    const tela = semComentarios(readFileSync("src/components/rede-instagram.tsx", "utf8"));
+    expect(tela).toContain("atribuirInfluenciadora");
+    expect(tela).not.toContain("email_confirmed_at");
+    expect(tela).not.toContain('.is("ref_code"');
+  });
+});
