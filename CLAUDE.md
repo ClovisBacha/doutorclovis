@@ -4354,3 +4354,165 @@ confirmação de que o toque funcionou, e ela toca de novo.
 
 **Bancada:** `/preview-instagram` (rolar até o fim) · `?vazio=1` (conta nova) ·
 `?sugeridas=0` (o feed sem a zona).
+
+## As dez funções sociais, em seis fases (ago/2026)
+
+Pedido do dono depois de aprovar as dez sugestões: "monte a ordem para
+aplicarmos de maneira que fique harmônica e usual no nosso site sem confusões,
+pense como um profissional de mapeamento de processo; depois rode um loop de
+agentes verificando cada etapa e se ela conecta com o resto do site".
+
+A ordem saiu de um mapeamento com 14 agentes (um por função, um de ordenação,
+três críticas adversariais), e **três achados mudaram o que eu ia fazer**:
+
+1. **O espelho tinha de ser um MODO de `verPerfil`, não uma segunda montagem.**
+   A prévia seria um modo de `podeVerPost` — mas o selo, a pílula do código e a
+   linha do bebê são campos de `PerfilNaTela`, montados a partir do `eu` REAL:
+   nunca passariam pelo filtro. A tela afirmaria, como visão de uma estranha,
+   três coisas que jamais filtrou.
+2. **O código de embaixadora saiu da fase 1.** Ele colhia consentimento no
+   começo e o gastava na fase 5, quando o mesmo `ref_code` vira canal de
+   presente de uma criadora.
+3. **A fase 1 é inerte para a paciente comum** (`perfil_publico` nasce falso), e
+   por isso o espelho diz isso em voz alta em vez de desenhar um perfil que
+   ninguém alcança.
+
+| Fase | O quê                                                 | SQL                         |
+| ---- | ----------------------------------------------------- | --------------------------- |
+| 1    | Espelho + duas chaves (semana, nome do bebê)          | 2 colunas                   |
+| 2    | A aba "Do bebê" deixa de prometer                     | —                           |
+| 3    | Carimbo da semana no story                            | 1 coluna                    |
+| 4    | Aula compartilhável + enquete no post                 | 2 colunas + 1 tabela        |
+| 5    | Influenciadora: código no perfil · presente · desafio | (parcial)                   |
+| 6    | Caixinha de perguntas                                 | pendente de decisão do dono |
+
+### ⚠️ A régua da semana pública, e a regra que ela reabre
+
+`src/lib/selo-do-perfil.ts` é a régua única. Ela **reabre** a proibição de
+`amigas.ts` ("nada clínico: sem semanas, sem DPP"), e a reabertura é declarada:
+a razão escrita lá **não é privacidade, é LUTO** — nas Amigas o perfil continua
+visível quando uma gestação termina mal, então o dado do corpo não pode estar
+lá. Na rede social o Modo Cuidado já torna o perfil inteiro `indisponivel`, e o
+selo some junto sem uma linha nova. Há teste cobrando que `amigas.functions.ts`
+continue sem `lmp_date`/`computeGestation`.
+
+A régua cala em cinco casos, e cada um é um defeito que existiria sem ele: Modo
+Cuidado · já nasceu (`computeGestation` conta para sempre — quem pariu na 39ª
+apareceria como "47 semanas") · sem DUM · acima de 42 semanas · chave desligada.
+⚠️ E "0 semanas" não é silêncio: a régua devolvia número onde promete calar.
+
+⚠️ **DUAS chaves, nunca uma.** Uma só obrigaria quem quer publicar o NOME do
+bebê a publicar junto a SEMANA, que é o dado clínico.
+
+⚠️ **O "hoje" é o de São Paulo, não o do contêiner.** O servidor roda em UTC;
+das 21h à meia-noite ele já está no dia seguinte, e num dia de cada sete isso é
+a virada de semana — o perfil dizia "28 semanas" e a home da mesma sessão dizia
+27, porque a home calcula no navegador dela.
+
+### ⚠️ `OLHO_DA_PREVIA` — o `===` que separava a prévia da mentira
+
+`podeVerPost` curto-circuita em `euId === post.autorId` ("a dona sempre vê os
+dela"). Montar a prévia com o MEU id faria TODO post passar — inclusive os da
+camada `amigas` — e a tela afirmaria que uma seguidora vê o desabafo de terça,
+sem erro e sem log. O sentinela é uma string que nunca casa com uuid.
+
+⚠️ E `somenteLeitura` desliga as ações **num lugar só**, dentro de
+`TelaDePerfil` — nunca pelo chamador. O sexto controle que alguém acrescentar
+amanhã nasce desligado; um dos previstos grava `ref_code`, que nunca é
+reescrito.
+
+### ⚠️ O portão de alcance não existia — e o espelho jurava que sim
+
+`verPerfil` **nunca** conferiu `perfil_publico`. Com o uuid em mãos — e ele
+viaja em toda reação, todo story visto, todo pedido de seguir — qualquer
+paciente autenticada abria qualquer perfil, fechado ou não. Enquanto o perfil
+tinha só nome, foto e bio era exposição pequena; a Fase 1 pôs ali a idade
+gestacional e o nome do bebê. E o espelho AFIRMAVA a tranca: a paciente lia "ela
+não consegue abrir o seu perfil" e ligava o selo confiando naquilo.
+
+**Uma tela de verificação que erra para o lado de "você está protegida" é pior
+que não existir.** Hoje `alcancaOPerfil` é uma régua só, chamada pelos dois
+caminhos.
+
+### ⚠️ O select novo quebrou a produção em silêncio
+
+As colunas nascem num `APLICAR_` que o dono roda à mão, e o deploy chega antes:
+`42703` derrubava `perfisPorId`, que devolvia um Map vazio — e `montarPosts`
+descarta todo post cujo autor não está no Map. Feed vazio, nenhum perfil
+abrindo, busca sem resultado, e `verPerfil` respondendo `indisponivel` para a
+própria dona. Sem erro na tela, sem log. **Todo select de coluna nova da rede
+tem recuo**, e o mesmo vale para `publicarStory` e `publicarPost` — sem eles,
+PUBLICAR pararia de funcionar para todo mundo, não só o recurso novo.
+
+### ⚠️ `aula.dia` era a semana disfarçada
+
+A Fase 4 ia anexar `{ dia, titulo }` ao post. O dia gestacional **é** a semana:
+`D = semana × 7 + diaDaSemana`. "Aula do dia 139" publica "estou de 19 semanas"
+para quem souber dividir por sete — **passando por cima da chave que a Fase 1
+criou exatamente para essa decisão ser dela**. Seria o pior tipo de vazamento: o
+que entra pela porta dos fundos de um recurso feito para fechar a da frente.
+
+Sobrou o TEMA (`bebê · corpo · nutrição · sinais · exames · vínculo · revisão`),
+que gira igual para todo mundo. A conversão dia→tema acontece no APARELHO dela
+(`aula-compartilhavel.ts`), e o número nunca sai.
+
+E continua fora: a NOTA (seria o placar público que a aba das Amigas gastou um
+arquivo inteiro para não ter) e enunciado, alternativas e gabarito (vazam
+conteúdo premium pelo `quizPremium`).
+
+### A enquete
+
+- ⚠️ **NÚMERO, nunca porcentagem.** "67%" são dois votos de três, e numa base
+  pequena a porcentagem transforma três pessoas numa maioria.
+- ⚠️ **Ninguém vê quem votou em quê — nem a autora.** No Instagram ela vê, e
+  esse é o dado que este app decidiu não expor (a mesma razão de `rede_salvos`
+  ser privado inclusive para a autora).
+- ⚠️ **O voto não se troca, e ela sabe ANTES.** A PK garante um por pessoa;
+  descobrir tocando é o tipo de surpresa que faz alguém desconfiar do app.
+  Colidir na PK é sucesso repetido, nunca erro.
+- ⚠️ `voto`/`enquete`/`rede_votos` entraram na lista de palavras proibidas de
+  `sugestoes.ts`: "mais votada" é "mais reagida" com outro nome.
+
+### O carimbo do story
+
+⚠️ **Sobreposição DERIVADA, nunca tinta no JPEG.** O banco guarda um booleano; a
+semana sai da régua na leitura. Queimado no pixel, o arquivo no balde ficaria
+com "28 semanas" para sempre.
+
+⚠️ **E ele NÃO passa pela chave do perfil, de propósito.** A aritmética é a
+mesma e os silêncios também; o que muda é o portão — a chave do perfil é
+permanente, o carimbo é por publicação e some em 24h. Amarrar os dois obrigaria
+quem quer mandar UMA foto com a semana a publicá-la no perfil para sempre.
+
+⚠️ E ele consertou um defeito que ninguém pediu: o story subia por
+`prepararAvatar` (512px QUADRADO, recorte central) num formato 9:16 exibido
+inteiro.
+
+### ⚠️ Meus próprios testes eram atravessáveis
+
+O agente encarregado de prová-lo rodou seis mutações no bloco do espelho e
+**todas passaram verdes** — inclusive cravar `mostrarSemana: true` no adaptador,
+que desliga o consentimento inteiro. Eram `toContain` sobre o texto do fonte.
+
+O conserto não foi escrever mais `toContain`: `entradaDoSelo` e
+`contextoDaPersona` saíram do servidor para `selo-do-perfil.ts`, onde são puros
+e testados por COMPORTAMENTO. **Régua pura é régua testável; adaptador escondido
+no servidor não é.**
+
+⚠️ E a prosa quebra teste nos DOIS sentidos: na catraca de portas um comentário
+meu fazia o teste PASSAR; no teste do código de embaixadora, um comentário meu o
+fazia FALHAR. Tira-se o comentário antes de procurar, sempre.
+
+### ⚠️ A bancada mentiu três vezes, sempre do mesmo jeito
+
+A bio de exemplo dizia "· 32 semanas" (desligar o selo continuava mostrando a
+semana); o espelho desenhava outra pessoa e "Seguir" nas três personas; e a
+Carol, "Mãe do Bento 🧸 · pós-parto", carregava selo de 32 semanas — o par
+exato que `semanaPublica` recusa. Bancada que aprova o que o servidor não
+produz é pior que bancada nenhuma.
+
+**Aplicar:** `supabase/APLICAR_REDE_SOCIAL.sql` (idempotente).
+**Bancadas:** `/preview-instagram?tela=espelho` · `?tela=espelho&trancado=1` ·
+`?tela=perfil&meu=1&selo=1` (os dois selos e a aba do bebê) · `&selo=2` (uma
+chave sozinha) · `&selo=0` · `?tela=conferir` (o carimbo) · `?tela=novo`
+(enquete e anexo da aula) · `?tela=perfil` (a pílula do código).
