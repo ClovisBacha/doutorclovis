@@ -1734,7 +1734,14 @@ function MinhaContaPage() {
     // no hub, a grade de quadrados. (Bebê = home, tratado acima.)
     const sectionMap: Record<Exclude<BottomSection, "home">, Tab> = {
       jogo: "Caminho",
-      comunidade: "Comunidade",
+      /* ⚠️ A barra abre o FEED, e não o hub de portas.
+         Pedido do dono: "essa é a primeira tela que tem que ter quando se
+         entra na aba da comunidade — a tela do feed, mostrando as
+         publicações". É a régua do Instagram e ela está certa: uma aba social
+         que abre num menu de seções faz a pessoa dar um toque a mais para
+         chegar na única coisa que muda sozinha. O hub continua alcançável
+         pelo botão ⊞ do cabeçalho do feed. */
+      comunidade: "Feed",
       saude: "Saúde",
     };
     setTab(sectionMap[section]);
@@ -2367,21 +2374,24 @@ function MinhaContaPage() {
                   </Suspense>
                 )}
                 {tab === "Comunidade" && (
-                  <ComunidadeTab
-                    careMode={careMode}
-                    /* As portas são ATALHOS: abrem a tela onde ela já mora.
-                       `subDestino` vai pelo mesmo caminho que o hub da Saúde
-                       usa para Chutes e Contrações. */
-                    onAbrir={(destino, sub) => {
-                      goToTab(destino as Tab);
-                      /* `consultasSub` é o estado ÚNICO de sub-tela que
-                         `BebeHub`, `RegistrosHub` e `ConsultasHub` já
-                         compartilham — o mesmo que o hub da Saúde usa para
-                         abrir Chutes direto. Depois do `goToTab`, que o
-                         limpa. */
-                      setConsultasSub(sub ?? null);
-                    }}
-                  />
+                  <div className="space-y-5">
+                    <ConfiguracoesDoPerfil careMode={careMode} />
+                    <ComunidadeTab
+                      careMode={careMode}
+                      /* As portas são ATALHOS: abrem a tela onde ela já mora.
+                         `subDestino` vai pelo mesmo caminho que o hub da Saúde
+                         usa para Chutes e Contrações. */
+                      onAbrir={(destino, sub) => {
+                        goToTab(destino as Tab);
+                        /* `consultasSub` é o estado ÚNICO de sub-tela que
+                           `BebeHub`, `RegistrosHub` e `ConsultasHub` já
+                           compartilham — o mesmo que o hub da Saúde usa para
+                           abrir Chutes direto. Depois do `goToTab`, que o
+                           limpa. */
+                        setConsultasSub(sub ?? null);
+                      }}
+                    />
+                  </div>
                 )}
                 {tab === "Chá de bebê" && <ChaDeBebe careMode={careMode} />}
                 {/* ⚠️ A tela do FEED é a do modelo Instagram (`RedeNoApp`), e
@@ -2391,10 +2401,7 @@ function MinhaContaPage() {
                     decisão de exposição que uma gestante de alto risco toma uma
                     vez e precisa achar sem procurar. */}
                 {tab === "Feed" && (
-                  <div className="space-y-5">
-                    <ConfiguracoesDoPerfil careMode={careMode} />
-                    <RedeNoApp careMode={careMode} />
-                  </div>
+                  <RedeNoApp careMode={careMode} onAbrirSecoes={() => goToTab("Comunidade")} />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

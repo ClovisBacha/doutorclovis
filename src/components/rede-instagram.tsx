@@ -275,6 +275,7 @@ export function TelaPrincipal({
   aoReagir,
   aoAbrirPerfil,
   aoPublicar,
+  aoAbrirSecoes,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -283,6 +284,16 @@ export function TelaPrincipal({
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoAbrirPerfil?: (id: string) => void;
   aoPublicar?: () => void;
+  /**
+   * As outras seções da Comunidade — chá de bebê, álbum, amigas, nome do bebê.
+   *
+   * ⚠️ Elas saíram da primeira tela e viraram um botão porque o dono pediu que
+   * a aba abrisse no FEED. É a régua do Instagram, e ela está certa: uma aba
+   * social que abre num menu de seções cobra um toque a mais para chegar na
+   * única coisa que muda sozinha. O que estava ali continua a um toque, do
+   * outro lado do cabeçalho.
+   */
+  aoAbrirSecoes?: () => void;
 }) {
   const doAlgoritmo = useMemo(() => new Set(sugeridos), [sugeridos]);
 
@@ -290,16 +301,29 @@ export function TelaPrincipal({
     <div className="px-4">
       <header className="flex h-11 items-center justify-between">
         <h1 className="text-lg font-semibold tracking-tight">Comunidade</h1>
-        {aoPublicar && (
-          <button
-            type="button"
-            onClick={aoPublicar}
-            aria-label="Publicar"
-            className="press text-2xl leading-none"
-          >
-            ＋
-          </button>
-        )}
+        {/* Ações à direita, como no modelo: publicar primeiro, seções depois. */}
+        <div className="flex items-center gap-3">
+          {aoPublicar && (
+            <button
+              type="button"
+              onClick={aoPublicar}
+              aria-label="Publicar"
+              className="press text-2xl leading-none"
+            >
+              ＋
+            </button>
+          )}
+          {aoAbrirSecoes && (
+            <button
+              type="button"
+              onClick={aoAbrirSecoes}
+              aria-label="Outras seções da comunidade"
+              className="press text-xl leading-none"
+            >
+              ⊞
+            </button>
+          )}
+        </div>
       </header>
 
       <FileiraDeStories stories={stories} />
@@ -498,7 +522,13 @@ export function TelaDePerfil({
  * `null` é o feed. Um router aqui seria um endereço novo por perfil, e a aba
  * inteira vive dentro de `minha-conta`, que já governa a navegação.
  */
-export function RedeNoApp({ careMode = false }: { careMode?: boolean }) {
+export function RedeNoApp({
+  careMode = false,
+  onAbrirSecoes,
+}: {
+  careMode?: boolean;
+  onAbrirSecoes?: () => void;
+}) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [abertoEm, setAbertoEm] = useState<string | null>(null);
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);

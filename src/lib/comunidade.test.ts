@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { PORTAS, portasDaComunidade } from "./comunidade";
 
 describe("portasDaComunidade", () => {
@@ -64,5 +65,33 @@ describe("a porta do chá de bebê", () => {
     expect(chaves).toContain("amigas");
     expect(chaves).toContain("acompanhante");
     expect(chaves).toContain("album");
+  });
+});
+
+describe("a barra de baixo", () => {
+  const CONTA = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  test("⚠️ tocar em Comunidade abre o FEED, não o hub de portas", () => {
+    // Pedido do dono: "essa é a primeira tela que tem que ter quando se entra
+    // na aba da comunidade — a tela do feed, mostrando as publicações".
+    //
+    // É a régua do Instagram, e ela está certa: uma aba social que abre num
+    // menu de seções cobra um toque a mais para chegar na única coisa que muda
+    // sozinha. O hub continua a um toque, no ⊞ do cabeçalho do feed.
+    expect(CONTA).toContain('comunidade: "Feed",');
+    expect(CONTA).not.toContain('comunidade: "Comunidade",');
+  });
+
+  test("⚠️ e a aba do Feed desenha SÓ o feed", () => {
+    // As configurações de perfil ficavam acima dele e empurravam as
+    // publicações para baixo da dobra — o oposto do que "o feed é a primeira
+    // tela" quer dizer. Hoje elas moram no hub, que é onde "meu perfil" mora.
+    const i = CONTA.indexOf('tab === "Feed"');
+    expect(i).toBeGreaterThan(-1);
+    const bloco = CONTA.slice(i, i + 260);
+    expect(bloco).toContain("RedeNoApp");
+    expect(bloco).not.toContain("ConfiguracoesDoPerfil");
   });
 });
