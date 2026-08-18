@@ -11,9 +11,20 @@
  *   /preview-instagram?tela=perfil  → o perfil de outra pessoa
  *   /preview-instagram?tela=perfil&meu=1 → o PRÓPRIO perfil (com os números)
  *   /preview-instagram?vazio=1      → quem chegou agora
+ *   /preview-instagram?tela=editar  → editar perfil (foto, nome, bio)
+ *   /preview-instagram?tela=lista   → a lista de seguidores
+ *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { TelaDePerfil, TelaPrincipal, type Story } from "@/components/rede-instagram";
+import {
+  EditarPerfil,
+  ListaDeGente,
+  TelaDePerfil,
+  TelaDoPost,
+  TelaPrincipal,
+  type PessoaNaLista,
+  type Story,
+} from "@/components/rede-instagram";
 import type { PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
 
 export const Route = createFileRoute("/preview-instagram")({
@@ -105,6 +116,48 @@ function Bancada() {
     meusSeguidores: meu ? 137 : null,
   };
 
+  const GENTE: PessoaNaLista[] = [
+    {
+      id: "g1",
+      nome: "Ana Paula Ribeiro",
+      bio: "Mãe do Théo 💙",
+      avatarUrl: null,
+      sigo: "ativo",
+      souEu: false,
+    },
+    { id: "g2", nome: "Tia Zezé", bio: null, avatarUrl: null, sigo: null, souEu: false },
+    { id: "g3", nome: "Bruna", bio: "34 semanas 🤍", avatarUrl: null, sigo: "ativo", souEu: false },
+  ];
+
+  if (tela === "editar") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <EditarPerfil perfil={perfil} aoSalvar={async () => true} aoFechar={() => history.back()} />
+      </div>
+    );
+  }
+
+  if (tela === "lista") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <ListaDeGente
+          titulo="Seguidores"
+          gente={vazio ? [] : GENTE}
+          aoVoltar={() => history.back()}
+          aoAbrirPerfil={(id) => alert(`abriria ${id}`)}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "post") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDoPost post={POSTS[0]} aoReagir={() => {}} aoVoltar={() => history.back()} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-md py-2">
       {tela === "perfil" ? (
@@ -115,6 +168,7 @@ function Bancada() {
           aoVoltar={() => history.back()}
           aoSeguir={() => alert("seguir")}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
+          aoAbrirLista={meu ? (t) => alert(`abriria ${t}`) : undefined}
         />
       ) : (
         <TelaPrincipal

@@ -25,7 +25,7 @@
  *  3. **Seguidores e seguindo não são públicos.** A única divergência de
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -42,7 +42,13 @@ import {
   VAO_DO_ANEL,
   type AbaDoPerfil,
 } from "@/lib/medidas-instagram";
-import { emojiDaReacao, REACOES, totalDeReacoes, type TipoDeReacao } from "@/lib/rede-social";
+import {
+  emojiDaReacao,
+  LIMITE_DA_BIO,
+  REACOES,
+  totalDeReacoes,
+  type TipoDeReacao,
+} from "@/lib/rede-social";
 import type { PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -367,6 +373,7 @@ export function TelaDePerfil({
   aoSeguir,
   aoVoltar,
   aoAbrirPost,
+  aoAbrirLista,
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
@@ -374,6 +381,16 @@ export function TelaDePerfil({
   aoSeguir?: () => void;
   aoVoltar?: () => void;
   aoAbrirPost?: (id: string) => void;
+  /**
+   * Tocar nos números abre a lista.
+   *
+   * ⚠️ `undefined` para perfil de terceiro, e isso é o portão: no Instagram
+   * qualquer um abre a lista de seguidores de um perfil público. Aqui não — a
+   * lista de quem acompanha uma gestante de alto risco é o CÍRCULO SOCIAL
+   * dela, e expô-la entrega de quem ela é próxima a quem só quis olhar um
+   * perfil. Só a dona abre as duas listas dela.
+   */
+  aoAbrirLista?: (tipo: "seguidores" | "seguindo") => void;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
 
@@ -423,8 +440,16 @@ export function TelaDePerfil({
                 momento em que ela já está sendo medida clinicamente. */}
             {perfil.souEu && (
               <>
-                <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
-                <Numero valor={seguindo} rotulo="seguindo" />
+                <button
+                  type="button"
+                  onClick={() => aoAbrirLista?.("seguidores")}
+                  className="press"
+                >
+                  <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
+                </button>
+                <button type="button" onClick={() => aoAbrirLista?.("seguindo")} className="press">
+                  <Numero valor={seguindo} rotulo="seguindo" />
+                </button>
               </>
             )}
           </div>
@@ -522,6 +547,27 @@ export function TelaDePerfil({
  * `null` é o feed. Um router aqui seria um endereço novo por perfil, e a aba
  * inteira vive dentro de `minha-conta`, que já governa a navegação.
  */
+/**
+ * A rede dentro do app — cinco telas e um estado.
+ *
+ * `onde` diz o que desenhar: o feed, um perfil, a edição do próprio perfil,
+ * uma lista de gente, ou um post sozinho. Um router aqui daria um endereço por
+ * tela, e a aba inteira vive dentro de `minha-conta`, que já governa a
+ * navegação.
+ *
+ * ⚠️ **A pilha é rasa de propósito: `voltar` sempre cai no feed ou no perfil
+ * anterior, nunca numa cadeia.** Uma pilha de verdade precisaria de histórico
+ * próprio, e o botão físico de voltar do Android já governa a aba — duas
+ * pilhas concorrentes é como a seta passa a levar para o lugar errado, que é
+ * o defeito que `voltarDaBarra` já teve de consertar três vezes neste app.
+ */
+type Onde =
+  | { t: "feed" }
+  | { t: "perfil"; id: string }
+  | { t: "editar" }
+  | { t: "lista"; tipo: "seguidores" | "seguindo" }
+  | { t: "post"; id: string };
+
 export function RedeNoApp({
   careMode = false,
   onAbrirSecoes,
@@ -530,9 +576,11 @@ export function RedeNoApp({
   onAbrirSecoes?: () => void;
 }) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
-  const [abertoEm, setAbertoEm] = useState<string | null>(null);
+  const [onde, setOnde] = useState<Onde>({ t: "feed" });
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
+  const [gente, setGente] = useState<PessoaNaLista[]>([]);
+  const [oPost, setOPost] = useState<PostNaTela | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   async function token() {
@@ -565,8 +613,8 @@ export function RedeNoApp({
   }, [careMode]);
 
   async function abrirPerfil(id: string) {
-    setAbertoEm(id);
     setPerfil(null);
+    setOnde({ t: "perfil", id });
     try {
       const t = await token();
       if (!t) return;
@@ -578,10 +626,39 @@ export function RedeNoApp({
       } else {
         /* `indisponivel` cobre bloqueio, Modo Cuidado e perfil inexistente com
            a mesma resposta — e a tela não conta qual foi. */
-        setAbertoEm(null);
+        setOnde({ t: "feed" });
       }
     } catch {
-      setAbertoEm(null);
+      setOnde({ t: "feed" });
+    }
+  }
+
+  async function abrirLista(tipo: "seguidores" | "seguindo") {
+    setGente([]);
+    setOnde({ t: "lista", tipo });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { listaDeGente } = await import("@/lib/rede-social.functions");
+      const r = await listaDeGente({ data: { accessToken: t, tipo } });
+      if (r.ok) setGente(r.gente);
+    } catch {
+      /* Lista vazia; a tela já diz "ninguém por aqui ainda". */
+    }
+  }
+
+  async function abrirPost(id: string) {
+    setOPost(null);
+    setOnde({ t: "post", id });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { verPost } = await import("@/lib/rede-social.functions");
+      const r = await verPost({ data: { accessToken: t, postId: id } });
+      if (r.ok) setOPost(r.post);
+      else setOnde({ t: "feed" });
+    } catch {
+      setOnde({ t: "feed" });
     }
   }
 
@@ -596,6 +673,7 @@ export function RedeNoApp({
       });
     setPosts(aplicar);
     setDoPerfil(aplicar);
+    setOPost((p) => (p ? aplicar([p])[0] : p));
     try {
       const t = await token();
       if (!t) return;
@@ -624,20 +702,307 @@ export function RedeNoApp({
     }
   }
 
+  async function salvarPerfil(m: {
+    nome?: string;
+    bio?: string | null;
+    avatar?: string | null;
+  }): Promise<boolean> {
+    try {
+      const t = await token();
+      if (!t) return false;
+      const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
+      const r = await salvarPerfilSocial({ data: { accessToken: t, ...m } });
+      if (!r.ok) return false;
+      /* Recarrega do servidor em vez de aplicar o que eu mandei: a foto volta
+         como URL ASSINADA do balde, e não como a data URL que subiu — pintar a
+         data URL aqui deixaria a tela certa e o banco diferente. */
+      if (perfil) await abrirPerfil(perfil.id);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   if (careMode) return null;
 
-  if (abertoEm && perfil) {
+  if (onde.t === "editar" && perfil) {
+    return (
+      <EditarPerfil
+        perfil={perfil}
+        aoSalvar={salvarPerfil}
+        aoFechar={() => setOnde({ t: "perfil", id: perfil.id })}
+      />
+    );
+  }
+
+  if (onde.t === "lista") {
+    return (
+      <ListaDeGente
+        titulo={onde.tipo === "seguidores" ? "Seguidores" : "Seguindo"}
+        gente={gente}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoAbrirPerfil={abrirPerfil}
+      />
+    );
+  }
+
+  if (onde.t === "post" && oPost) {
+    return (
+      <TelaDoPost
+        post={oPost}
+        aoReagir={(t) => reagir(oPost, t)}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoAbrirPerfil={abrirPerfil}
+      />
+    );
+  }
+
+  if (onde.t === "perfil" && perfil) {
     return (
       <TelaDePerfil
         perfil={perfil}
         posts={doPerfil}
-        aoVoltar={() => setAbertoEm(null)}
-        aoSeguir={seguir}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
+        aoAbrirPost={abrirPost}
+        aoAbrirLista={perfil.souEu ? abrirLista : undefined}
       />
     );
   }
 
   if (carregando) return <div className="skeleton h-80 rounded-2xl" />;
 
-  return <TelaPrincipal posts={posts} aoReagir={reagir} aoAbrirPerfil={abrirPerfil} />;
+  return (
+    <TelaPrincipal
+      posts={posts}
+      aoReagir={reagir}
+      aoAbrirPerfil={abrirPerfil}
+      aoAbrirSecoes={onAbrirSecoes}
+    />
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EDITAR PERFIL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Reduz a foto no celular. Mesmo lado do resto do app. */
+const LADO_DO_AVATAR = 512;
+async function prepararAvatar(file: File): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    /* Corta o QUADRADO CENTRAL antes de reduzir — o avatar é exibido em
+       círculo, e uma foto retangular esticada num círculo deforma o rosto. É o
+       mesmo recorte de `campo-foto.tsx`. */
+    const lado = Math.min(bitmap.width, bitmap.height);
+    const sx = (bitmap.width - lado) / 2;
+    const sy = (bitmap.height - lado) / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = LADO_DO_AVATAR;
+    canvas.height = LADO_DO_AVATAR;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, sx, sy, lado, lado, 0, 0, LADO_DO_AVATAR, LADO_DO_AVATAR);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch {
+    return null;
+  }
+}
+
+export function EditarPerfil({
+  perfil,
+  aoSalvar,
+  aoFechar,
+}: {
+  perfil: PerfilNaTela;
+  aoSalvar: (m: { nome?: string; bio?: string | null; avatar?: string | null }) => Promise<boolean>;
+  aoFechar: () => void;
+}) {
+  const [nome, setNome] = useState(perfil.nome);
+  const [bio, setBio] = useState(perfil.bio ?? "");
+  const [avatar, setAvatar] = useState<string | null>(perfil.avatarUrl);
+  const [salvando, setSalvando] = useState(false);
+  const arquivo = useRef<HTMLInputElement>(null);
+
+  async function salvar() {
+    if (salvando) return;
+    setSalvando(true);
+    const ok = await aoSalvar({
+      nome: nome.trim() || undefined,
+      bio: bio.trim() || null,
+      /* ⚠️ Só manda a foto se ela MUDOU. Reenviar a mesma URL a cada
+         salvamento subiria um arquivo novo no balde toda vez, e o antigo
+         ficaria órfão lá dentro — cem edições de bio viram cem fotos. */
+      avatar: avatar !== perfil.avatarUrl ? avatar : undefined,
+    });
+    setSalvando(false);
+    if (ok) aoFechar();
+  }
+
+  return (
+    <div>
+      <header className="flex h-11 items-center justify-between px-4">
+        <button type="button" onClick={aoFechar} className="press text-[15px]">
+          Cancelar
+        </button>
+        <h1 className="text-[16px] font-semibold">Editar perfil</h1>
+        <button
+          type="button"
+          onClick={salvar}
+          disabled={salvando}
+          className="press text-[15px] font-semibold text-primary disabled:opacity-50"
+        >
+          {salvando ? "…" : "Salvar"}
+        </button>
+      </header>
+
+      <div className="flex flex-col items-center gap-2 py-5">
+        <Foto url={avatar} nome={nome} lado={AVATAR_DO_PERFIL} />
+        <input
+          ref={arquivo}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            if (!f) return;
+            const d = await prepararAvatar(f);
+            if (d) setAvatar(d);
+            e.target.value = "";
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => arquivo.current?.click()}
+          className="press text-[14px] font-semibold text-primary"
+        >
+          Trocar foto
+        </button>
+      </div>
+
+      <div className="space-y-4 px-4">
+        <label className="block">
+          <span className="text-[12px] text-muted-foreground">Nome</span>
+          <input
+            value={nome}
+            onChange={(e) => setNome(e.target.value.slice(0, 60))}
+            className="mt-1 w-full border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
+          />
+        </label>
+        <label className="block">
+          <span className="text-[12px] text-muted-foreground">Bio</span>
+          <textarea
+            value={bio}
+            onChange={(e) => setBio(e.target.value.slice(0, LIMITE_DA_BIO))}
+            rows={2}
+            className="mt-1 w-full resize-none border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
+          />
+          <span className="mt-0.5 block text-right text-[11px] tabular-nums text-muted-foreground">
+            {bio.length}/{LIMITE_DA_BIO}
+          </span>
+        </label>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A LISTA DE GENTE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type PessoaNaLista = {
+  id: string;
+  nome: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  sigo: "ativo" | "pendente" | null;
+  souEu: boolean;
+};
+
+export function ListaDeGente({
+  titulo,
+  gente,
+  aoVoltar,
+  aoAbrirPerfil,
+}: {
+  titulo: string;
+  gente: PessoaNaLista[];
+  aoVoltar: () => void;
+  aoAbrirPerfil?: (id: string) => void;
+}) {
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="text-[16px] font-semibold">{titulo}</h1>
+      </header>
+      {gente.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">Ninguém por aqui ainda.</p>
+      ) : (
+        <ul>
+          {gente.map((p) => (
+            <li key={p.id}>
+              <button
+                type="button"
+                onClick={() => aoAbrirPerfil?.(p.id)}
+                className="press flex w-full items-center gap-3 px-4 py-2.5 text-left"
+              >
+                <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold leading-tight">
+                    {p.nome}
+                  </span>
+                  {p.bio && (
+                    <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                      {p.bio}
+                    </span>
+                  )}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O POST SOZINHO — o que a grade abre
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export function TelaDoPost({
+  post,
+  aoReagir,
+  aoVoltar,
+  aoAbrirPerfil,
+}: {
+  post: PostNaTela;
+  aoReagir: (t: TipoDeReacao | null) => void;
+  aoVoltar: () => void;
+  aoAbrirPerfil?: (id: string) => void;
+}) {
+  return (
+    <div className="px-4">
+      <header className="flex h-11 items-center gap-2">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="text-[16px] font-semibold">Publicação</h1>
+      </header>
+      <PostInstagram post={post} aoReagir={aoReagir} aoAbrirPerfil={aoAbrirPerfil} />
+    </div>
+  );
 }

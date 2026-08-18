@@ -272,6 +272,9 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         publico: z.boolean().optional(),
         bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
+        nome: z.string().max(60).optional(),
+        /** Data URL. O cliente já corta o quadrado e reduz para 512px. */
+        avatar: z.string().max(1_500_000).nullable().optional(),
       })
       .parse(i),
   )
@@ -282,11 +285,38 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
+    /* ⚠️ A foto vai para o balde `rede`, como as dos posts — e NÃO como data
+       URL na coluna. `avatar_url` já aceita data URL neste app (é assim que o
+       `campo-foto.tsx` grava), mas uma foto de perfil viaja em TODA leitura de
+       lista: `minhasAmigas`, a lista de seguidores, cada post do feed. Em base64
+       ela custa ~35% a mais e vai inteira em cada linha; como caminho no balde,
+       vai uma URL assinada. */
+    let avatarUrl: string | null | undefined = undefined;
+    if (data.avatar !== undefined) {
+      if (data.avatar === null) {
+        avatarUrl = null;
+      } else {
+        const { guardarImagem, urlAssinada } = await import("@/lib/imagens.server");
+        const caminho = await guardarImagem({
+          balde: "rede",
+          donoId: eu,
+          dataUrl: data.avatar,
+        });
+        if (!caminho) return { ok: false as const, motivo: "imagem" as const };
+        /* Validade longa: o avatar aparece em toda tela, e uma URL de 1h faria
+           a foto sumir no meio da sessão. Uma semana, e a próxima leitura
+           renova. */
+        avatarUrl = await urlAssinada("rede", caminho, 7 * 24 * 3600);
+      }
+    }
+
     const { error } = await sb
       .from("patient_profiles")
       .update({
         ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),
         ...(data.bio !== undefined ? { bio: data.bio } : {}),
+        ...(data.nome !== undefined && data.nome.trim() ? { display_name: data.nome.trim() } : {}),
+        ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
       })
       .eq("id", eu);
     if (error) return { ok: false as const, motivo: "banco" as const };
@@ -791,3 +821,116 @@ export const buscarPerfis = createServerFn({ method: "POST" })
 
 /** O catálogo, para a tela não reescrever os emojis. */
 export const CATALOGO_DE_REACOES = REACOES;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS LISTAS DE GENTE — seguidores e seguindo
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type PessoaNaLista = {
+  id: string;
+  nome: string;
+  bio: string | null;
+  avatarUrl: string | null;
+  /** Eu sigo esta pessoa? Para o botão da linha já nascer certo. */
+  sigo: "ativo" | "pendente" | null;
+  souEu: boolean;
+};
+
+/**
+ * Quem segue alguém, ou quem alguém segue.
+ *
+ * ⚠️ **Só a DONA vê as listas dela.** No Instagram qualquer um abre a lista de
+ * seguidores de um perfil público; aqui não, e é a mesma razão pela qual o
+ * contador não é público: a lista de quem acompanha uma gestante de alto risco
+ * é o círculo social dela, e expô-la a estranhos é entregar de quem ela é
+ * próxima para quem só quis olhar um perfil.
+ *
+ * A dona vê as duas listas — é informação dela sobre a rede dela, e é o que
+ * torna possível remover alguém que ela não quer mais por perto.
+ */
+export const listaDeGente = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        tipo: z.enum(["seguidores", "seguindo"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+
+    /* `seguidores` = quem tem `seguido_id = eu`; `seguindo` = o inverso. */
+    const coluna = data.tipo === "seguidores" ? "seguido_id" : "seguidor_id";
+    const outra = data.tipo === "seguidores" ? "seguidor_id" : "seguido_id";
+
+    const { data: linhas } = await sb
+      .from("rede_seguidores")
+      .select(`${outra}, criado_em`)
+      .eq(coluna, eu)
+      .eq("estado", "ativo")
+      .order("criado_em", { ascending: false })
+      .limit(200);
+
+    const ids = ((linhas ?? []) as any[]).map((l) => l[outra]).filter(Boolean);
+    const perfis = await perfisPorId(sb, ids);
+
+    const gente: PessoaNaLista[] = ids
+      .map((id: string) => {
+        const p = perfis.get(id);
+        /* ⚠️ Modo Cuidado e bloqueio somem da lista, sem anunciar — a mesma
+           régua de `minhasAmigas`. Quem entrou em luto não vira uma linha
+           faltando com explicação; vira uma linha que não está lá. */
+        if (!p || p.care_mode || ctx.bloqueio.has(id)) return null;
+        return {
+          id,
+          nome: (p.display_name ?? "").trim() || "Alguém",
+          bio: p.bio ?? null,
+          avatarUrl: p.avatar_url ?? null,
+          sigo: ctx.sigo.has(id) ? ("ativo" as const) : null,
+          souEu: id === eu,
+        };
+      })
+      .filter(Boolean) as PessoaNaLista[];
+
+    return { ok: true as const, gente };
+  });
+
+/**
+ * Um post só, para a tela que abre ao tocar na grade.
+ *
+ * ⚠️ Passa pela MESMA `podeVerPost` do feed. Sem isso, um id de post
+ * adivinhado devolveria conteúdo da camada restrita de qualquer pessoa — o
+ * caminho mais óbvio para vazar o que o feed protege.
+ */
+export const verPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: bruto } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .eq("id", data.postId)
+      .is("arquivado_em", null)
+      .maybeSingle();
+    if (!bruto) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const ctx = await contextoDe(sb, eu);
+    const [post] = await montarPosts(sb, eu, [bruto], ctx);
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    return { ok: true as const, post };
+  });
