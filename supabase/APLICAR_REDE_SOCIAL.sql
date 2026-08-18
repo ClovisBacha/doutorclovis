@@ -7,6 +7,10 @@
 -- Perfil · Seguir · Post · Visibilidade · Feed · Reações · Avisos · Descoberta
 -- · Bloqueio · Modo Cuidado.
 --
+-- Mais o que o básico do Instagram exige e que veio depois, no mesmo arquivo
+-- porque ele ainda não tinha sido rodado: STORIES (com o registro de quem
+-- viu), SALVOS e CARROSSEL.
+--
 -- As RÉGUAS moram em `src/lib/rede-social.ts`, testadas sem banco. Aqui ficam
 -- só as garantias que o banco tem de dar: um seguir por par, uma reação por
 -- pessoa por post, e ninguém escrevendo na linha de ninguém.
@@ -217,6 +221,117 @@ CREATE POLICY "Service manages rede_bloqueios" ON public.rede_bloqueios
   FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
 
 -- ═════════════════════════════════════════════════════════════════════════════
+-- STORIES — a foto que some em 24 horas.
+--
+-- ⚠️ **A FILEIRA DE BOLINHAS JÁ EXISTIA NA TELA e era decorativa.** Isso é pior
+-- que não ter: um anel aceso promete conteúdo novo, e tocar nele não fazia
+-- nada. Interface que promete e não cumpre é o defeito que este repositório
+-- mais persegue.
+--
+-- ⚠️ **O story é o formato de MENOR risco desta rede inteira**, e a pesquisa é
+-- clara sobre por quê: conteúdo que some tira o medo do escrutínio permanente,
+-- e é o único formato que a perda gestacional NÃO transforma em ruína — um
+-- status de 24h se apaga sozinho, ao contrário de uma grade de fotos de
+-- barriga que quem perdeu não consegue nem manter nem apagar.
+-- ═════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.rede_stories (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  autor_id    uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  imagem_path text NOT NULL,
+  texto       text,
+  criado_em   timestamptz NOT NULL DEFAULT now(),
+  -- ⚠️ A expiração é uma COLUNA, não `criado_em + interval` calculado na
+  -- consulta. Com o cálculo na leitura, mudar as 24h para 48h mudaria
+  -- retroativamente stories que já tinham sumido — e eles voltariam do nada
+  -- para quem já os tinha visto desaparecer.
+  expira_em   timestamptz NOT NULL DEFAULT (now() + interval '24 hours')
+);
+
+-- A consulta da fileira: stories vivos, dos que ela segue. Índice parcial
+-- sobre a expiração, que é o que mais recorta.
+CREATE INDEX IF NOT EXISTS rede_stories_vivos
+  ON public.rede_stories (autor_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS rede_stories_expira
+  ON public.rede_stories (expira_em);
+
+ALTER TABLE public.rede_stories ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Autora gerencia os próprios stories" ON public.rede_stories;
+CREATE POLICY "Autora gerencia os próprios stories" ON public.rede_stories
+  FOR ALL USING (auth.uid() = autor_id) WITH CHECK (auth.uid() = autor_id);
+
+DROP POLICY IF EXISTS "Service manages rede_stories" ON public.rede_stories;
+CREATE POLICY "Service manages rede_stories" ON public.rede_stories
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+-- Quem já viu — para o anel apagar.
+CREATE TABLE IF NOT EXISTS public.rede_stories_vistos (
+  story_id uuid NOT NULL REFERENCES public.rede_stories ON DELETE CASCADE,
+  quem_id  uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  visto_em timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (story_id, quem_id)
+);
+
+ALTER TABLE public.rede_stories_vistos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Vê o que ela mesma viu" ON public.rede_stories_vistos;
+CREATE POLICY "Vê o que ela mesma viu" ON public.rede_stories_vistos
+  FOR SELECT USING (auth.uid() = quem_id);
+
+DROP POLICY IF EXISTS "Service manages rede_stories_vistos" ON public.rede_stories_vistos;
+CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_vistos
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- SALVOS — o marcador de página.
+--
+-- É privado por natureza: no Instagram ninguém vê o que você salvou, e aqui
+-- menos ainda. O que uma gestante salva ("sinais de trabalho de parto", "o que
+-- levar pra maternidade") diz mais sobre o momento dela que qualquer post que
+-- ela publique.
+-- ═════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.rede_salvos (
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  post_id   uuid NOT NULL REFERENCES public.rede_posts ON DELETE CASCADE,
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (quem_id, post_id)
+);
+
+CREATE INDEX IF NOT EXISTS rede_salvos_de ON public.rede_salvos (quem_id, criado_em DESC);
+
+ALTER TABLE public.rede_salvos ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ SÓ ELA, inclusive para a autora do post: quem salvou o meu post não é da
+-- minha conta, e saber disso mudaria como eu leio quem me acompanha.
+DROP POLICY IF EXISTS "Vê só os próprios salvos" ON public.rede_salvos;
+CREATE POLICY "Vê só os próprios salvos" ON public.rede_salvos
+  FOR ALL USING (auth.uid() = quem_id) WITH CHECK (auth.uid() = quem_id);
+
+DROP POLICY IF EXISTS "Service manages rede_salvos" ON public.rede_salvos;
+CREATE POLICY "Service manages rede_salvos" ON public.rede_salvos
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- CARROSSEL — várias fotos num post.
+--
+-- ⚠️ Uma COLUNA de array em `rede_posts`, e não uma tabela filha. O carrossel
+-- do Instagram tem no máximo 10 fotos, sempre lidas juntas com o post e nunca
+-- consultadas sozinhas — uma tabela filha custaria um `join` em toda leitura
+-- do feed para guardar no máximo dez strings.
+--
+-- `imagem_path` continua sendo a PRIMEIRA foto, e não foi trocada por
+-- `imagens[0]`: todo código que já lê o post continua funcionando, e um post
+-- de foto única nunca precisa olhar o array.
+-- ═════════════════════════════════════════════════════════════════════════════
+ALTER TABLE public.rede_posts
+  ADD COLUMN IF NOT EXISTS imagens text[] NOT NULL DEFAULT '{}';
+
+ALTER TABLE public.rede_posts
+  DROP CONSTRAINT IF EXISTS carrossel_ate_dez;
+ALTER TABLE public.rede_posts
+  ADD CONSTRAINT carrossel_ate_dez CHECK (array_length(imagens, 1) IS NULL OR array_length(imagens, 1) <= 10);
+
+-- ═════════════════════════════════════════════════════════════════════════════
 -- O BALDE DAS FOTOS — privado, sem policy.
 --
 -- Mesmo desenho de `album`, `exames` e `presentes`: `public = false` e ZERO
@@ -257,4 +372,10 @@ SELECT
           WHERE table_schema='public' AND table_name='rede_bloqueios')              AS bloqueios_ok,
   EXISTS (SELECT 1 FROM pg_indexes
           WHERE schemaname='public' AND indexname='rede_reacoes_uma_por_pessoa')    AS uma_reacao_ok,
-  EXISTS (SELECT 1 FROM storage.buckets WHERE id='rede' AND public = false)         AS balde_ok;
+  EXISTS (SELECT 1 FROM storage.buckets WHERE id='rede' AND public = false)         AS balde_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_stories')                 AS stories_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_salvos')                  AS salvos_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='imagens')                   AS carrossel_ok;
