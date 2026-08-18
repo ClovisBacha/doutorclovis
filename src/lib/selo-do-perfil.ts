@@ -125,6 +125,78 @@ export function semanaPublica(e: EntradaDoSelo): string | null {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   A ABA "DO BEBÊ" — Fase 2
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O que a aba "Do bebê" mostra.
+ *
+ * ─── ELA JÁ EXISTIA, VAZIA, PROMETENDO ─────────────────────────────────────
+ *
+ * `ABAS_DO_PERFIL` tem duas abas desde o primeiro dia, e a segunda dizia "Os
+ * marcos da gestação vão aparecer aqui 💛" — para QUALQUER perfil, inclusive o
+ * de terceiro. Era a única promessa não paga da rede.
+ *
+ * ─── E ELA NÃO ACRESCENTA FATO NENHUM ──────────────────────────────────────
+ *
+ * ⚠️ **Tudo aqui é DERIVADO da semana**, e é isso que resolve a objeção de a
+ * chave `mostrar_semana` passar a governar duas coisas: quem sabe que ela está
+ * de 28 semanas já sabe que o bebê tem o tamanho de uma berinjela — é o mesmo
+ * fato em outras palavras, e a tabela é igual para toda gestante do mundo.
+ * Se um dia esta aba precisar de um dado que NÃO sai da semana, ele precisa de
+ * chave PRÓPRIA, e não desta.
+ *
+ * ⚠️ **NADA de marcos de exame.** `consultaForWeek` devolve "TOTG", "ultrassom
+ * morfológico", "hemograma" — a agenda clínica dela. Publicar isso num feed
+ * social seria transformar o perfil em prontuário, e é o oposto do que o dono
+ * pediu ("outras coisas são realmente sensíveis").
+ */
+/** A tabela do bebê começa aqui — antes disso não há o que mostrar. */
+export const SEMANA_COM_TABELA = 4;
+
+export type BebeNoPerfil = {
+  emoji: string;
+  fruta: string;
+  tamanho: string;
+  peso: string;
+  sobre: string;
+};
+
+export function bebeDoPerfil(
+  e: EntradaDoSelo,
+  opts: { souEu: boolean },
+  tabela: (semana: number) => { size: string; weight: string; fruit: string; desc: string } | null,
+  emoji: (semana: number) => string,
+): BebeNoPerfil | null {
+  /* ⚠️ Modo Cuidado cala inclusive para ELA. O resto do perfil dela continua
+     de pé (os posts são a memória dela), mas "seu bebê está do tamanho de uma
+     berinjela" no presente é exatamente o que o Modo Cuidado existe para não
+     dizer. */
+  if (e.emCuidado) return null;
+  if (e.nasceu) return null;
+  if (e.totalDias == null || e.totalDias < 0) return null;
+
+  /* ⚠️ Para TERCEIROS, a mesma chave da semana — porque é o mesmo fato. Para
+     ela, sempre: é a jornada dela, e a aba é o lugar onde ela a vê. */
+  if (!opts.souEu && !e.mostrarSemana) return null;
+
+  const semana = Math.floor(e.totalDias / 7);
+  /* ⚠️ A tabela do bebê começa na 4ª semana (`WEEK_MIN`), e `babyForWeek`
+     CLAMPA para ela — pedir a semana 2 devolveria os dados da 4 sem avisar. O
+     piso mora aqui para a aba calar em vez de mentir. */
+  if (semana < SEMANA_COM_TABELA) return null;
+  const dados = tabela(semana);
+  if (!dados) return null;
+  return {
+    emoji: emoji(semana),
+    fruta: dados.fruit,
+    tamanho: dados.size,
+    peso: dados.weight,
+    sobre: dados.desc,
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    O ESPELHO — "ver meu perfil como visitante"
    ══════════════════════════════════════════════════════════════════════════ */
 

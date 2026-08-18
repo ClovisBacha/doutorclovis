@@ -41,10 +41,12 @@ import {
 } from "@/lib/rede-social";
 import {
   alcancaOPerfil,
+  bebeDoPerfil,
   contextoDaPersona,
   entradaDoSelo,
   olharDe,
   seloDoPerfil,
+  type BebeNoPerfil,
   type Persona,
 } from "@/lib/selo-do-perfil";
 import {
@@ -111,6 +113,14 @@ export type PerfilNaTela = {
   /** As chaves, para a tela dela desenhar os interruptores no estado certo. */
   mostrarSemana: boolean;
   mostrarBebe: boolean;
+  /**
+   * A aba "Do bebê" — `null` quando não há o que mostrar.
+   *
+   * ⚠️ Tudo aqui é DERIVADO da semana, e por isso obedece à mesma chave: quem
+   * sabe que ela está de 28 semanas já sabe o tamanho do bebê. Um dado que não
+   * saia da semana precisa de chave própria.
+   */
+  bebe: BebeNoPerfil | null;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -252,6 +262,34 @@ async function seloDe(p: any) {
      consentimento inteiro — passava com os 3.149 testes verdes, porque a única
      cobertura deste trecho era um `toContain` sobre o texto do fonte. */
   return seloDoPerfil(entradaDoSelo(p, g?.totalDays ?? null));
+}
+
+/**
+ * A aba "Do bebê" — Fase 2.
+ *
+ * ⚠️ A tabela vem de `gestacao.ts` (`babyForWeek`/`fruitEmojiForWeek`), a mesma
+ * que a aba do Bebê da paciente já usa. Uma segunda tabela faria o perfil
+ * social dizer "berinjela" enquanto a home diz "abacaxi" na mesma semana.
+ */
+async function bebeDe(p: any, souEu: boolean) {
+  const { babyForWeek, computeGestation, fruitEmojiForWeek, WEEK_MAX, WEEK_MIN } =
+    await import("@/lib/gestacao");
+  const g = computeGestation({
+    lmp: p?.lmp_date ?? null,
+    referenceDate: p?.reference_date ?? null,
+    referenceWeeks: p?.reference_weeks ?? null,
+    referenceDays: p?.reference_days ?? null,
+    today: hojeEmSaoPaulo(),
+  });
+  return bebeDoPerfil(
+    entradaDoSelo(p, g?.totalDays ?? null),
+    { souEu },
+    /* ⚠️ Fora da faixa devolve `null` em vez de deixar `babyForWeek` CLAMPAR:
+       ele responde a semana 2 com os dados da 4 e a 50 com os da 40, sem
+       avisar — e a aba mostraria uma fruta que não é a dela. */
+    (semana) => (semana < WEEK_MIN || semana > WEEK_MAX ? null : babyForWeek(semana)),
+    fruitEmojiForWeek,
+  );
 }
 
 /** Reações de vários posts, agrupadas. */
@@ -421,6 +459,7 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         seloBebe: selo.bebe,
         mostrarSemana: !!(p as any)?.mostrar_semana,
         mostrarBebe: !!(p as any)?.mostrar_bebe,
+        bebe: await bebeDe(p, true),
       } as PerfilNaTela,
       emCuidado: !!(p as any)?.care_mode,
       pedidos: ((pendentes ?? []) as { seguidor_id: string }[])
@@ -613,6 +652,9 @@ export const verPerfil = createServerFn({ method: "POST" })
       : await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
 
     const selo = await seloDe(a);
+    /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
+       aba tem de mostrar o que a visitante veria. */
+    const bebe = await bebeDe(a, !persona && data.alvoId === eu);
 
     const perfil: PerfilNaTela = {
       id: data.alvoId,
@@ -646,6 +688,7 @@ export const verPerfil = createServerFn({ method: "POST" })
          que ninguém pediu para publicar. */
       mostrarSemana: !persona && data.alvoId === eu ? !!a.mostrar_semana : false,
       mostrarBebe: !persona && data.alvoId === eu ? !!a.mostrar_bebe : false,
+      bebe,
     };
 
     return { ok: true as const, perfil, posts: ordenarFeed(posts) };

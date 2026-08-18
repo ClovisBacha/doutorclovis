@@ -180,6 +180,17 @@ function Bancada() {
     seloBebe: selo === 1 || selo === 2 ? "Helena" : null,
     mostrarSemana: selo === 1,
     mostrarBebe: selo === 1 || selo === 2,
+    /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
+    bebe:
+      selo === 1
+        ? {
+            emoji: "🍆",
+            fruta: "Berinjela",
+            tamanho: "42,4 cm",
+            peso: "1,7 kg",
+            sobre: "Já reconhece a sua voz.",
+          }
+        : null,
   };
 
   const semSugestoes = sugeridas === 0;

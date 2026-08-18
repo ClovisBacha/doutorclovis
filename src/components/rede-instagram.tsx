@@ -976,9 +976,42 @@ export function TelaDePerfil({
            divergiriam na primeira vez que a proporção da célula mudasse, e ela
            já mudou uma vez (1:1 → 3:4, em 2025). */
         <GradeDePosts posts={naGrade} vazio="Nenhuma publicação ainda." aoAbrirPost={abrirPost} />
+      ) : perfil.bebe ? (
+        /* ⚠️ Esta aba existia VAZIA desde o primeiro dia, prometendo "os marcos
+            da gestação vão aparecer aqui 💛" — em qualquer perfil, inclusive o
+            de terceiro. Era a única promessa não paga da rede.
+
+            ⚠️ E o que entrou é tudo DERIVADO da semana: quem sabe que ela está
+            de 28 semanas já sabe o tamanho do bebê. É o mesmo fato em outras
+            palavras, e a tabela é igual para toda gestante — por isso obedece à
+            mesma chave, sem virar uma segunda decisão de privacidade.
+
+            ⚠️ NADA de marco de exame. `consultaForWeek` devolve TOTG,
+            morfológico e hemograma: a agenda clínica dela. */
+        <div className="px-4 py-6">
+          <div className="flex items-center gap-4">
+            <span aria-hidden className="text-5xl leading-none">
+              {perfil.bebe.emoji}
+            </span>
+            <div className="min-w-0">
+              <p className="text-[17px] font-semibold leading-tight">{perfil.bebe.fruta}</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+                {perfil.bebe.tamanho}
+                {perfil.bebe.peso && perfil.bebe.peso !== "—" ? ` · ${perfil.bebe.peso}` : ""}
+              </p>
+            </div>
+          </div>
+          <p className="mt-4 text-[14px] leading-snug">{perfil.bebe.sobre}</p>
+          <p className="mt-4 text-[12px] leading-snug text-muted-foreground">
+            O tamanho é uma média da semana — cada bebê cresce no ritmo dele.
+          </p>
+        </div>
       ) : (
-        <p className="py-16 text-center text-sm text-muted-foreground">
-          Os marcos da gestação vão aparecer aqui 💛
+        /* Sem semana pública, a aba não promete: ela diz o que é. */
+        <p className="px-8 py-16 text-center text-sm leading-snug text-muted-foreground">
+          {perfil.souEu
+            ? "Quando a data da sua última menstruação estiver no perfil, o tamanho do bebê aparece aqui 💛"
+            : "Esta pessoa não mostra a semana da gestação no perfil."}
         </p>
       )}
     </div>

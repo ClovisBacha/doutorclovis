@@ -44,6 +44,14 @@ const PERFIL: PerfilNaTela = {
   seloBebe: "Helena",
   mostrarSemana: true,
   mostrarBebe: true,
+  /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
+  bebe: {
+    emoji: "🍆",
+    fruta: "Berinjela",
+    tamanho: "42,4 cm",
+    peso: "1,7 kg",
+    sobre: "Já reconhece a sua voz.",
+  },
 };
 
 function Bancada() {

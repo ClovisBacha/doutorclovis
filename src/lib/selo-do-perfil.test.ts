@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
   alcancaOPerfil,
+  bebeDoPerfil,
   contextoDaPersona,
   entradaDoSelo,
   MOSTRAR_BEBE_PADRAO,
@@ -283,5 +284,54 @@ describe("o piso da semana", () => {
     expect(semanaPublica({ ...BASE, totalDias: 0 })).toBeNull();
     expect(semanaPublica({ ...BASE, totalDias: 6 })).toBeNull();
     expect(semanaPublica({ ...BASE, totalDias: 7 })).toBe("1 semana");
+  });
+});
+
+describe("a aba Do bebê", () => {
+  /* A tabela injetada, com a mesma forma de `babyForWeek`. */
+  const tabela = (semana: number) =>
+    semana < 4 || semana > 42
+      ? null
+      : { size: "42,4 cm", weight: "1,7 kg", fruit: "Berinjela", desc: "Já reconhece a sua voz." };
+  const emoji = () => "🍆";
+  const ver = (e: Partial<EntradaDoSelo>, souEu = false) =>
+    bebeDoPerfil({ ...BASE, ...e }, { souEu }, tabela, emoji);
+
+  test("com a semana pública, a visitante vê", () => {
+    expect(ver({})?.fruta).toBe("Berinjela");
+  });
+
+  test("⚠️ sem a semana pública, a visitante NÃO vê — é o mesmo fato", () => {
+    // Quem sabe que ela está de 28 semanas já sabe o tamanho do bebê: publicar
+    // um sem o outro seria a mesma decisão tomada duas vezes.
+    expect(ver({ mostrarSemana: false })).toBeNull();
+  });
+
+  test("⚠️ mas ELA sempre vê a própria aba", () => {
+    // É a jornada dela, e a aba é o lugar onde ela a vê.
+    expect(ver({ mostrarSemana: false }, true)?.fruta).toBe("Berinjela");
+  });
+
+  test("⚠️ Modo Cuidado cala inclusive para ela", () => {
+    // Os posts continuam (são a memória dela), mas "seu bebê está do tamanho de
+    // uma berinjela" no presente é o que o Modo Cuidado existe para não dizer.
+    expect(ver({ emCuidado: true }, true)).toBeNull();
+    expect(ver({ emCuidado: true })).toBeNull();
+  });
+
+  test("depois do parto, a aba para", () => {
+    expect(ver({ nasceu: true }, true)).toBeNull();
+  });
+
+  test("⚠️ fora da faixa da tabela, cala em vez de clampar", () => {
+    // `babyForWeek` responde a semana 2 com os dados da 4 e a 50 com os da 40,
+    // sem avisar — a aba mostraria uma fruta que não é a dela.
+    expect(ver({ totalDias: 2 * 7 }, true)).toBeNull();
+    expect(ver({ totalDias: 50 * 7 }, true)).toBeNull();
+    expect(ver({ totalDias: 4 * 7 }, true)?.fruta).toBe("Berinjela");
+  });
+
+  test("sem DUM, nada", () => {
+    expect(ver({ totalDias: null }, true)).toBeNull();
   });
 });
