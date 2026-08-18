@@ -94,10 +94,22 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Validate companion token → get patient_user_id
-    const { data: invite } = await supabaseAdmin
+    /* ⚠️ `album_token`, NUNCA `token`. Os dois vivem na mesma linha e têm
+       privilégios diferentes: `token` abre o painel do acompanhante E os SOS
+       dos últimos 30 minutos, com latitude e longitude
+       (`getRecentPanicByToken`). O link do álbum é o que ela manda para o
+       grupo da família — e numa influenciadora, para muito mais gente.
+
+       Isto já foi UM token só, e o comentário da criação do convite dizia com
+       todas as letras: "dá acesso ao painel do papai, álbum e alerta de
+       pânico". Era desenho conhecido; o que o tornou errado foi o álbum virar
+       link de circulação ampla. Ver APLICAR_SOS_SO_PARA_QUEM_DEVE.sql, que
+       REBAIXA o token antigo para `album_token` e sorteia um novo para o
+       acompanhante — assim todo link já espalhado para de abrir o SOS. */
+    const { data: invite } = await (supabaseAdmin as any)
       .from("companion_invites")
       .select("user_id, expires_at")
-      .eq("token", data.token)
+      .eq("album_token", data.token)
       .single();
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
@@ -158,10 +170,22 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: invite } = await supabaseAdmin
+    /* ⚠️ `album_token`, NUNCA `token`. Os dois vivem na mesma linha e têm
+       privilégios diferentes: `token` abre o painel do acompanhante E os SOS
+       dos últimos 30 minutos, com latitude e longitude
+       (`getRecentPanicByToken`). O link do álbum é o que ela manda para o
+       grupo da família — e numa influenciadora, para muito mais gente.
+
+       Isto já foi UM token só, e o comentário da criação do convite dizia com
+       todas as letras: "dá acesso ao painel do papai, álbum e alerta de
+       pânico". Era desenho conhecido; o que o tornou errado foi o álbum virar
+       link de circulação ampla. Ver APLICAR_SOS_SO_PARA_QUEM_DEVE.sql, que
+       REBAIXA o token antigo para `album_token` e sorteia um novo para o
+       acompanhante — assim todo link já espalhado para de abrir o SOS. */
+    const { data: invite } = await (supabaseAdmin as any)
       .from("companion_invites")
       .select("user_id, expires_at")
-      .eq("token", data.token)
+      .eq("album_token", data.token)
       .single();
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())

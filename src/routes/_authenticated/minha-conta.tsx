@@ -6763,11 +6763,17 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
     // álbum e alerta de pânico. Validade de 1 ano cobre gestação + pós-parto;
     // o backend já rejeita convites vencidos (expires_at) e o "Revogar" segue
     // sendo o controle imediato.
+    /* ⚠️ DOIS tokens, com privilégios diferentes, e nunca o mesmo valor.
+       `token` abre o painel do acompanhante e os SOS recentes — vai só para
+       quem ela designar. `album_token` abre SÓ o álbum, e é o que ela manda
+       para o grupo da família. Ver APLICAR_SOS_SO_PARA_QUEM_DEVE.sql. */
     const token = crypto.randomUUID().replace(/-/g, "");
+    const albumToken = crypto.randomUUID().replace(/-/g, "");
     const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     await (supabase as any).from("companion_invites").insert({
       user_id: u.user.id,
       token,
+      album_token: albumToken,
       companion_name: name || null,
       expires_at: expiresAt,
     });
@@ -14015,7 +14021,12 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         .limit(1);
       if (invites?.[0]?.token) {
         setInviteToken(invites[0].token);
-        setShareUrl(`${window.location.origin}/album/${invites[0].token}`);
+        /* ⚠️ `album_token`, e o recuo para `token` existe só para a linha que
+           ainda não passou pela rotação do SQL. Depois de rodá-lo, `album_token`
+           está sempre preenchido — e é ele que NÃO abre o SOS. */
+        setShareUrl(
+          `${window.location.origin}/album/${invites[0].album_token ?? invites[0].token}`,
+        );
       }
       setLoading(false);
     })();
