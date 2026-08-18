@@ -45,7 +45,16 @@ export type PostNaTela = {
   autorNome: string;
   autorAvatar: string | null;
   texto: string | null;
+  /** A PRIMEIRA foto — é ela que a grade e a prévia usam. */
   imagemUrl: string | null;
+  /**
+   * O carrossel inteiro, a primeira inclusa.
+   *
+   * ⚠️ Sempre preenchido quando há foto: um post de foto única é um carrossel
+   * de uma. A tela decide mostrar os pontinhos por `length > 1`, e nunca por
+   * um segundo campo booleano que um dia discordaria da lista.
+   */
+  imagens: string[];
   visibilidade: Visibilidade;
   criadoEm: string;
   reacoes: ContagemDeReacoes;
@@ -180,13 +189,24 @@ async function montarPosts(
   return Promise.all(
     visiveis.map(async (p) => {
       const a = autores.get(p.autor_id);
+      /* ⚠️ `imagem_path` é a primeira e `imagens` são as DEMAIS — a coluna
+         nasceu depois, e os posts antigos têm o array vazio. Juntar aqui é o
+         que faz o post antigo e o novo terem a mesma forma na tela; sem isso a
+         tela precisaria de um `if` para cada caso. */
+      const caminhos = [p.imagem_path, ...((p.imagens ?? []) as string[])].filter(
+        Boolean,
+      ) as string[];
+      const urls = (await Promise.all(caminhos.map((c) => urlAssinada("rede", c, 3600)))).filter(
+        Boolean,
+      ) as string[];
       return {
         id: p.id,
         autorId: p.autor_id,
         autorNome: (a?.display_name ?? "").trim() || "Alguém",
         autorAvatar: a?.avatar_url ?? null,
         texto: p.texto ?? null,
-        imagemUrl: p.imagem_path ? await urlAssinada("rede", p.imagem_path, 3600) : null,
+        imagemUrl: urls[0] ?? null,
+        imagens: urls,
         visibilidade: p.visibilidade,
         criadoEm: p.criado_em,
         reacoes: porPost.get(p.id) ?? {},
@@ -355,7 +375,7 @@ export const verPerfil = createServerFn({ method: "POST" })
 
     const { data: brutos } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
       .eq("autor_id", data.alvoId)
       .is("arquivado_em", null)
       .order("criado_em", { ascending: false })
@@ -520,6 +540,8 @@ export const publicarPost = createServerFn({ method: "POST" })
         texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
         /** Data URL. O cliente já reduz para 512px antes de mandar. */
         imagem: z.string().max(1_500_000).nullable(),
+        /** As DEMAIS do carrossel. Até nove — a primeira vai em `imagem`. */
+        extras: z.array(z.string().max(1_500_000)).max(9).optional(),
         visibilidade: z.enum(["publico", "seguidores", "amigas"]),
       })
       .parse(i),
@@ -545,6 +567,7 @@ export const publicarPost = createServerFn({ method: "POST" })
     }
 
     let caminho: string | null = null;
+    const extras: string[] = [];
     if (data.imagem) {
       const { guardarImagem } = await import("@/lib/imagens.server");
       caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
@@ -552,6 +575,15 @@ export const publicarPost = createServerFn({ method: "POST" })
          ela montou com foto entregaria uma coisa diferente da que ela mandou,
          e ela só descobriria olhando o feed. */
       if (!caminho) return { ok: false as const, motivo: "imagem" as const };
+
+      /* ⚠️ E o mesmo vale para as DEMAIS: se a terceira de cinco falhar, o post
+         inteiro é recusado. Publicar quatro de cinco entregaria um carrossel
+         com um buraco no meio, e ela não teria como saber qual sumiu. */
+      for (const extra of data.extras ?? []) {
+        const c = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: extra });
+        if (!c) return { ok: false as const, motivo: "imagem" as const };
+        extras.push(c);
+      }
     }
 
     const { data: post, error } = await sb
@@ -560,6 +592,7 @@ export const publicarPost = createServerFn({ method: "POST" })
         autor_id: eu,
         texto: data.texto?.trim() || null,
         imagem_path: caminho,
+        imagens: extras,
         visibilidade: data.visibilidade,
       })
       .select("id")
@@ -616,7 +649,7 @@ export const meuFeed = createServerFn({ method: "POST" })
 
     let q = sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
       .in("autor_id", de)
       .is("arquivado_em", null)
       .order("criado_em", { ascending: false })
@@ -922,7 +955,7 @@ export const verPost = createServerFn({ method: "POST" })
 
     const { data: bruto } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
       .eq("id", data.postId)
       .is("arquivado_em", null)
       .maybeSingle();
@@ -1192,7 +1225,7 @@ export const meusSalvos = createServerFn({ method: "POST" })
 
     const { data: brutos } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
       .in("id", ids)
       .is("arquivado_em", null);
 

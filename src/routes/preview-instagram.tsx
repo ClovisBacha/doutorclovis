@@ -86,6 +86,18 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
         ? "Ultrassom de hoje — a mãozinha no rosto bem na hora da foto"
         : null,
   imagemUrl: i === 5 ? null : foto(c[0], c[1], c[2]),
+  /* O post 2 é um CARROSSEL de três: é ele que prova os pontinhos e o
+     deslizar. Com um só, não haveria o que conferir. */
+  imagens:
+    i === 5
+      ? []
+      : i === 2
+        ? [
+            foto(c[0], c[1], c[2]),
+            foto(CORES[6][0], CORES[6][1], CORES[6][2]),
+            foto(CORES[8][0], CORES[8][1], CORES[8][2]),
+          ]
+        : [foto(c[0], c[1], c[2])],
   visibilidade: i === 3 ? "amigas" : "publico",
   criadoEm: atras(30 + i * 240),
   reacoes: i === 0 ? { amei: 24, emocionei: 11, torcendo: 6 } : i % 3 === 0 ? { abraco: 4 } : {},

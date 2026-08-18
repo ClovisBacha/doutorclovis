@@ -160,6 +160,70 @@ export function FileiraDeStories({
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   O CARROSSEL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Várias fotos num post.
+ *
+ * ⚠️ **Rolagem nativa com `scroll-snap`, e não um `transform` controlado por
+ * estado.** O deslizar do dedo tem inércia, resistência na borda e velocidade
+ * que o sistema calcula — reimplementar isso em JavaScript dá sempre um
+ * arrasto que parece quase certo e nunca é. O navegador já faz, e faz melhor.
+ *
+ * ⚠️ E os pontinhos saem do `scrollLeft`, não de um índice que o toque
+ * incrementa: com índice próprio, arrastar até a metade e soltar deixaria o
+ * ponto num lugar e a foto noutro.
+ */
+function Carrossel({ urls }: { urls: string[] }) {
+  const [i, setI] = useState(0);
+  const caixa = useRef<HTMLDivElement>(null);
+
+  if (urls.length === 0) return null;
+
+  return (
+    <div className="relative">
+      <div
+        ref={caixa}
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const n = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+          if (n !== i) setI(n);
+        }}
+        className="flex w-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ aspectRatio: String(RAZAO_DO_POST) }}
+      >
+        {urls.map((u, n) => (
+          <div key={n} className="w-full shrink-0 snap-center overflow-hidden bg-muted/40">
+            <img src={u} alt="" className="h-full w-full object-cover" loading="lazy" />
+          </div>
+        ))}
+      </div>
+
+      {urls.length > 1 && (
+        <>
+          {/* O contador no canto, como eles fazem — é o que diz de cara que
+              há mais de uma foto, antes de a pessoa tentar deslizar. */}
+          <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">
+            {i + 1}/{urls.length}
+          </span>
+          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
+            {urls.map((_, n) => (
+              <span
+                key={n}
+                className={`h-1.5 w-1.5 rounded-full transition-colors ${
+                  n === i ? "bg-primary" : "bg-foreground/25"
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    O POST — no formato deles
    ══════════════════════════════════════════════════════════════════════════ */
 
@@ -177,6 +241,9 @@ export function PostInstagram({
 }) {
   const [escolhendo, setEscolhendo] = useState(false);
   const total = totalDeReacoes(post.reacoes);
+  /* Post antigo (anterior ao carrossel) tem `imagens` vazio e só
+     `imagemUrl` — o recuo faz os dois terem a mesma forma aqui. */
+  const fotos = post.imagens?.length ? post.imagens : post.imagemUrl ? [post.imagemUrl] : [];
 
   return (
     <article className="-mx-4 border-b border-border pb-3">
@@ -204,22 +271,7 @@ export function PostInstagram({
         </button>
       </header>
 
-      {post.imagemUrl && (
-        /* ⚠️ TETO DE 4:5, e não a altura natural da foto.
-           O Instagram corta o post do feed nessa proporção, e a razão é
-           medida: sem teto, uma foto de celular em pé (9:16) vira um post de
-           ~700px num aparelho de 393 — a pessoa rola a tela inteira e vê UM
-           post. A bancada mostrou isso com fotos 3:4, que já ficaram altas
-           demais; com 9:16 seria o dobro.
-           `object-cover` corta o excedente pelo centro, que é o que eles
-           fazem. `RAZAO_DO_POST` é a proporção publicada, 1080×1350. */
-        <div
-          className="w-full overflow-hidden bg-muted/40"
-          style={{ aspectRatio: String(RAZAO_DO_POST) }}
-        >
-          <img src={post.imagemUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
-        </div>
-      )}
+      {post.imagemUrl && <Carrossel urls={fotos} />}
 
       {/* A linha de ações vem LOGO ABAIXO da imagem, antes da legenda — é a
           ordem deles, e ela existe porque a ação é o que a tela quer que

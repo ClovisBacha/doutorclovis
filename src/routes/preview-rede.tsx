@@ -44,6 +44,7 @@ const POSTS: PostNaTela[] = [
     autorAvatar: null,
     texto: "Ultrassom de hoje 🥹 ela colocou a mãozinha no rosto na hora exata da foto",
     imagemUrl: null,
+    imagens: [],
     visibilidade: "publico",
     criadoEm: atras(35),
     /* Contagem alta e variada: é o que prova o resumo com teto de três e o
@@ -59,6 +60,7 @@ const POSTS: PostNaTela[] = [
     autorAvatar: null,
     texto: "Noite difícil, mas passou. Obrigada quem mandou mensagem 💛",
     imagemUrl: null,
+    imagens: [],
     /* O post DELA, na camada restrita: é o único caso em que a etiqueta da
        camada aparece na tela, e a bancada existe para mostrar isso. */
     visibilidade: "amigas",
@@ -91,6 +93,7 @@ const POSTS: PostNaTela[] = [
           '<rect width="600" height="450" fill="url(#g)"/>' +
           '<text x="300" y="240" font-size="64" text-anchor="middle">🍼</text></svg>',
       ),
+    imagens: [],
     visibilidade: "seguidores",
     criadoEm: atras(1500),
     /* Sem reação nenhuma: prova que a linha de contagem some inteira em vez de

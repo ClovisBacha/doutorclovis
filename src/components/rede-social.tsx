@@ -206,12 +206,14 @@ export function CartaoDoPost({
 
 export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
   const [texto, setTexto] = useState("");
-  const [foto, setFoto] = useState<string | null>(null);
+  /* Uma LISTA, e a primeira é a capa. Um estado só para "a foto" e outro para
+     "as outras" divergiria na hora de remover a primeira. */
+  const [fotos, setFotos] = useState<string[]>([]);
   const [vis, setVis] = useState<Visibilidade>("amigas");
   const [enviando, setEnviando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
 
-  const podeEnviar = postEhValido({ texto, temImagem: !!foto }) && !enviando;
+  const podeEnviar = postEhValido({ texto, temImagem: fotos.length > 0 }) && !enviando;
 
   async function enviar() {
     if (!podeEnviar) return;
@@ -222,7 +224,13 @@ export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
       if (!token) return;
       const { publicarPost } = await import("@/lib/rede-social.functions");
       const r = await publicarPost({
-        data: { accessToken: token, texto: texto.trim() || null, imagem: foto, visibilidade: vis },
+        data: {
+          accessToken: token,
+          texto: texto.trim() || null,
+          imagem: fotos[0] ?? null,
+          extras: fotos.slice(1),
+          visibilidade: vis,
+        },
       });
       if (!r.ok) {
         toast.error(
@@ -233,7 +241,7 @@ export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
         return;
       }
       setTexto("");
-      setFoto(null);
+      setFotos([]);
       aoPublicar();
       toast.success("Publicado 💛");
     } catch {
@@ -253,17 +261,28 @@ export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
         className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-sm"
       />
 
-      {foto && (
-        <div className="relative mt-2">
-          <img src={foto} alt="" className="w-full rounded-2xl object-cover" />
-          <button
-            type="button"
-            onClick={() => setFoto(null)}
-            aria-label="Tirar a foto"
-            className="press absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-lg leading-none text-white"
-          >
-            ×
-          </button>
+      {fotos.length > 0 && (
+        /* Fila horizontal com as escolhidas. A PRIMEIRA leva o selo "capa" —
+           sem ele, ninguém saberia qual vai aparecer na grade do perfil. */
+        <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {fotos.map((f, n) => (
+            <div key={n} className="relative shrink-0">
+              <img src={f} alt="" className="h-24 w-24 rounded-xl object-cover" />
+              {n === 0 && (
+                <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-[10px] text-white">
+                  capa
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => setFotos((fs) => fs.filter((_, k) => k !== n))}
+                aria-label="Tirar esta foto"
+                className="press absolute right-1 top-1 rounded-full bg-black/60 px-1.5 leading-none text-white"
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -297,7 +316,11 @@ export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
             if (!f) return;
             const d = await prepararFoto(f);
             if (!d) toast.error("Não consegui ler essa imagem.");
-            else setFoto(d);
+            /* Teto de dez, como no original — e conferido AQUI, porque o
+               servidor recusa o post inteiro se passar, e recusar depois de
+               ela escolher onze é pior que não deixar escolher a décima
+               primeira. */ else if (fotos.length >= 10) toast.error("Dez fotos por publicação.");
+            else setFotos((fs) => [...fs, d]);
             e.target.value = "";
           }}
         />
@@ -306,7 +329,7 @@ export function Publicar({ aoPublicar }: { aoPublicar: () => void }) {
           onClick={() => arquivo.current?.click()}
           className="press rounded-xl border border-border px-3 py-2 text-sm"
         >
-          📷 Foto
+          📷 {fotos.length > 0 ? `Foto (${fotos.length})` : "Foto"}
         </button>
         <button
           type="button"
