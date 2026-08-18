@@ -3838,3 +3838,146 @@ parto é um jogo sobre o evento que ela mais teme.
 Está em `git log` (commit `1bcd571`) se um dia fizer sentido. O que ficou de
 útil: `diaEmNumero`/`diaEmTexto` (ler `YYYY-MM-DD` sem passar por `new Date`) e
 o padrão de conferir o vínculo com `saoAmigas`, hoje exportado.
+
+## O chá de bebê e a lista de presentes (ago/2026)
+
+Pedido do dono, depois de rejeitar o bolão: "vamos pensar em questões do chá do
+bebê, questão também de presentes que pode enviar". Das seis ideias que
+levantei, ele aprovou cinco (a rejeitada foi "presente que é trabalho —
+faxina, marmita, babá").
+
+⚠️ **AS CINCO NÃO SÃO CINCO RECURSOS. São um objeto e quatro propriedades
+dele:** fralda e cota são TIPOS de item; áudio e agendamento são campos da
+RESERVA; agradecimento é uma LEITURA das reservas. Como cinco recursos,
+virariam cinco tabelas, cinco telas e cinco portas — e a paciente teria de
+entender cinco coisas para usar uma. Como um objeto, são três tabelas e uma
+página pública por token, no molde de `/album/$token`.
+
+⚠️ **E NÃO HÁ DINHEIRO NA v1.** Reserva é PROMESSA, combinada por fora como
+num chá de verdade; o app conta, não cobra. Isso dispensa de uma vez merchant
+of record, endereço de entrega (que não existe em `patient_profiles` e é
+decisão de LGPD à parte), estorno — e a armadilha de `createOneTimeCheckout`
+cravar `metadata[product] = "sementinhas"`, que faria o webhook creditar moeda
+em vez de registrar presente.
+
+### As fraldas: o erro universal, quantificado
+
+| tamanho | dura          | % do volume do 1º ano |
+| ------- | ------------- | --------------------- |
+| RN      | 2–3 SEMANAS   | ~6 %                  |
+| P       | ~2 meses      | ~19 %                 |
+| M       | 3º ao 7º mês  | ~37 %                 |
+| G       | 8º ao 13º mês | ~29 %                 |
+
+**M e G são dois terços do ano e quase ninguém dá.** Chegam quando o chá acabou
+e a mãe paga sozinha, no mês em que a renda da casa caiu.
+
+- ⚠️ **`teto` é coluna SEPARADA de `meta`, e é o recurso inteiro.** `meta` é
+  "quanto eu quero"; `teto` é "acima disto o servidor RECUSA". RN tem teto 6
+  porque é o único tamanho que pode durar ZERO dias — 3,8 kg usa RN por dez
+  dias, 2,8 kg por dois meses, e não há como saber antes. Sem o teto, a lista
+  mostra "RN completo" e a próxima amiga reserva RN assim mesmo.
+- ⚠️ **`ordemDeUrgencia` desempata pela MAIOR META, não pelo maior tamanho.**
+  A primeira versão desempatava por tamanho, e a bancada mostrou o resultado
+  renderizado: com a lista zerada, o primeiro cartão era **XG** — um tamanho
+  que o bebê só usa depois de um ano, num chá que acontece na 32ª semana.
+  Certo na letra ("na dúvida, empurra o que dura mais"), errado no espírito. E
+  o teste passava, porque eu o tinha escrito para bater com a implementação.
+  Foi olhar a tela desenhada que pegou.
+- **A meta já É a régua de volume** (M tem 18 pacotes porque M é 37% do ano),
+  então ordenar por ela põe M e G na frente sem uma segunda tabela que um dia
+  discordaria da primeira.
+- O teste trava a soma das metas entre 1.200 e 1.600 fraldas: o chá cobre ~8
+  meses, não o ano.
+
+### As cotas
+
+⚠️ **R$ 1.200 ÷ 7 é o caso que quebra.** `Math.round(120000/7)` é 17143, e sete
+delas somam 120001 — um centavo a mais, todo chá, para sempre; para baixo, um a
+menos. A última cota absorve o resto, e o resto vai para a ÚLTIMA e não
+espalhado: espalhar deixaria as primeiras um centavo mais caras e a tela
+mostraria dois preços para a mesma cota.
+
+⚠️ **`sugerirCotas` nunca sugere cota abaixo de R$ 25.** "12x de R$ 8"
+transforma o carrinho numa vaquinha de trocado.
+
+### O token é PRÓPRIO, e essa é a decisão de segurança do recurso
+
+⚠️ `companion_invites.token` abre **três portas**: o álbum, o painel do
+acompanhante e — via `getRecentPanicByToken` — os SOS dos últimos 30 minutos,
+com latitude e longitude. Reusá-lo faria o link do chá de bebê, que ela manda
+para o grupo do trabalho, abrir junto o painel de emergência dela. O próprio
+comentário de `escola.functions.ts` já dizia quem tem esse token: "a cunhada, a
+vizinha, o grupo da família".
+
+⚠️ **E a RLS NÃO copia a de `companion_invites`**, que dá `SELECT` ao papel
+`anon` — um `anon` que possa varrer `presente_listas` lê a lista e o token de
+toda gestante da plataforma.
+
+Outras travas, todas testadas por mutação (`presentes-servidor.test.ts`):
+
+- `listaPorToken` nunca devolve `user_id` nem `quem_nome`. A amiga precisa
+  saber que o item está reservado, não POR QUEM — revelar cria comparação entre
+  as convidadas ("a Fulana deu o carrinho e eu dei fralda").
+- **A dona LÊ as reservas e NÃO escreve nelas.** Sem esse recorte, o navegador
+  dela governaria `revelar_em` (revelando hoje o presente marcado para a 36ª
+  semana) e `quantidade`.
+- **O saldo é `SUM` das reservas vivas, nunca uma coluna.** Contador
+  materializado vira "faltam 3 M" numa tela e "faltam 5 M" na outra na primeira
+  corrida. Mesma lição do troféu contar o LEDGER e não `doneDays`.
+- Colidir na `idem_key` é SUCESSO REPETIDO: devolver erro faria a amiga tentar
+  de novo com chave nova e aí sim reservar duas vezes.
+- Cancelar MARCA, arquivar RECUSA item com reserva, e nenhuma função chama
+  `.delete()`.
+
+⚠️ **DOIS TESTES MEUS ERAM FALSOS, e a mutação provou.** O de Modo Cuidado
+procurava as palavras `care_mode` e `return null` soltas no corpo — apagar a
+linha do portão passava verde, porque `care_mode` continua no `.select(...)` e
+`return null` na linha de cima. O de "o saldo é relido antes de decidir"
+comparava `indexOf` de duas strings, e um `jaReservado2 = 0` introduzido no
+meio passava verde. **Teste que procura palavra é teste que mente**: hoje o
+primeiro cobra a guarda inteira e o segundo amarra a CADEIA (a soma vem do
+select das vivas, e é esse identificador que as duas réguas recebem).
+
+### Modo Cuidado tem TRÊS portões, e o da tela é o menos importante
+
+Este é o recurso com o maior risco de Modo Cuidado do app, porque **o objeto
+vive FORA do aparelho dela**: o link já está na mão de trinta pessoas.
+
+1. `portasDaComunidade` tira a porta (junto com "Nome do bebê" — mesma razão de
+   tempo verbal: lista de presentes é preparo para a chegada).
+2. `ChaDeBebe` recusa desenhar.
+3. **`listaViva`, no servidor** — e é este que conta. Devolve o mesmo `null`
+   para "token inválido", "lista fechada" e "a dona está em Modo Cuidado".
+
+⚠️ **A página pública NÃO conta o que aconteceu.** Uma frase — "Esta lista não
+está disponível no momento" — e nada mais. Nem motivo, nem emoji de luto.
+Contar a perda dela para o grupo de WhatsApp da família inteira é o app tomando
+a decisão mais íntima que existe no lugar dela. E **nada é apagado**: se ela
+desligar o modo, tudo volta como estava.
+
+### O agradecimento
+
+⚠️ O texto é RASCUNHO e o app NUNCA manda — abre o WhatsApp com a mensagem
+escrita e quem aperta enviar é ela. Mesma decisão da transcrição do diário. E
+ele nunca inventa: "Obrigada pelo carrinho" para quem deu fralda destruiria o
+recurso na primeira vez.
+
+⚠️ `wa.me/?text=` vai **sem número**: o app não tem o telefone de quem deu (é
+terceiro sem conta) e um link com número errado mandaria o agradecimento da tia
+para outra pessoa.
+
+⚠️ **`agradecida` só é verdadeira quando TODAS as reservas da pessoa foram
+agradecidas.** Com um `||`, agradecer a fralda tiraria da fila quem também deu
+o carrinho.
+
+⚠️ **E o nome do bebê vai SEM ARTIGO.** "A Helena vai crescer sabendo" viraria
+"A Miguel". É exatamente a armadilha que o bolão tinha ("Quando o Helena
+nasce?"), reaparecendo num arquivo diferente no mesmo dia — o que prova que ela
+não é sobre aquele arquivo.
+
+**Aplicar no Supabase:** `supabase/APLICAR_CHA_DE_BEBE.sql` (idempotente; cria
+também o balde privado `presentes`).
+**Bancada:** `/preview-presentes` · `?rn=cheio` (o cartão completo e a ordem) ·
+`?cota=11` · `?vazio=1`. Sem ela, conferir o cartão de RN cheio exigiria montar
+um chá real e reservar seis pacotes com seis nomes diferentes.
