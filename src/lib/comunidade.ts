@@ -46,6 +46,13 @@ export const PORTAS: PortaDaComunidade[] = [
     destino: "Chá de bebê",
   },
   {
+    key: "feed",
+    label: "Feed",
+    sub: "O que as suas pessoas postaram",
+    emoji: "📷",
+    destino: "Feed",
+  },
+  {
     key: "amigas",
     label: "Amigas",
     sub: "Quem está com você",
@@ -103,6 +110,11 @@ export function portasDaComunidade({ careMode }: { careMode: boolean }): PortaDa
      de perder a gestação é o app não ter entendido o que aconteceu.
      E aqui o portão da tela é o MENOS importante dos três: o link já está na
      mão de trinta pessoas, e quem o fecha de verdade é `listaViva`, no
-     servidor. Este só impede que ela esbarre na porta. */
-  return PORTAS.filter((p) => p.key !== "nome" && p.key !== "cha");
+     servidor. Este só impede que ela esbarre na porta.
+
+     O FEED sai pelo mesmo motivo, e com o mesmo cuidado: os posts dela
+     continuam existindo e ela continua vendo os PRÓPRIOS (`podeVerPost`
+     devolve `true` para a autora mesmo em luto) — o que some é a rede em
+     volta, não a memória dela. */
+  return PORTAS.filter((p) => !["nome", "cha", "feed"].includes(p.key));
 }

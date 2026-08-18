@@ -148,6 +148,7 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
 import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
+import { ConfiguracoesDoPerfil, FeedDaRede } from "@/components/rede-social";
 import { AssinaturaTab } from "@/components/assinatura-tab";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -429,6 +430,7 @@ const TABS = [
   "Comunidade",
   "Amigas",
   "Chá de bebê",
+  "Feed",
   "Calendário",
   "Registros",
   "Saúde",
@@ -475,7 +477,7 @@ const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
     /* A Comunidade primeiro: no computador, onde não existe barra de baixo,
        esta é a ÚNICA porta dela. Acompanhante e Amigas continuam listadas
        porque são destinos de verdade e alguém pode querer ir direto. */
-    tabs: ["Comunidade", "Chá de bebê", "Acompanhante", "Amigas", "Pós-parto"],
+    tabs: ["Comunidade", "Feed", "Chá de bebê", "Acompanhante", "Amigas", "Pós-parto"],
   },
   {
     label: "Consultas",
@@ -2381,6 +2383,12 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Chá de bebê" && <ChaDeBebe careMode={careMode} />}
+                {tab === "Feed" && (
+                  <div className="space-y-5">
+                    <ConfiguracoesDoPerfil careMode={careMode} />
+                    <FeedDaRede careMode={careMode} />
+                  </div>
+                )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}
                 {(tab === "Calendário" || tab === "Consultas") && (

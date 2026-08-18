@@ -20,6 +20,7 @@ import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
+import { Route as PreviewRedeRouteImport } from './routes/preview-rede'
 import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
@@ -142,6 +143,11 @@ const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
 const PreviewReguaRoute = PreviewReguaRouteImport.update({
   id: '/preview-regua',
   path: '/preview-regua',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewRedeRoute = PreviewRedeRouteImport.update({
+  id: '/preview-rede',
+  path: '/preview-rede',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewPresentesRoute = PreviewPresentesRouteImport.update({
@@ -528,6 +534,7 @@ export interface FileRoutesByFullPath {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-rede': typeof PreviewRedeRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -608,6 +615,7 @@ export interface FileRoutesByTo {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-rede': typeof PreviewRedeRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -690,6 +698,7 @@ export interface FileRoutesById {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-rede': typeof PreviewRedeRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -772,6 +781,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-rede'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -852,6 +862,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-rede'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -933,6 +944,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-rede'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -1015,6 +1027,7 @@ export interface RootRouteChildren {
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
+  PreviewRedeRoute: typeof PreviewRedeRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
@@ -1126,6 +1139,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-regua'
       fullPath: '/preview-regua'
       preLoaderRoute: typeof PreviewReguaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-rede': {
+      id: '/preview-rede'
+      path: '/preview-rede'
+      fullPath: '/preview-rede'
+      preLoaderRoute: typeof PreviewRedeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-presentes': {
@@ -1667,6 +1687,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,
+  PreviewRedeRoute: PreviewRedeRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSonsRoute: PreviewSonsRoute,
