@@ -24,6 +24,13 @@ import {
   type TipoDeReacao,
   type Visibilidade,
   haQuantoPublicou,
+  aulaValida,
+  enqueteValida,
+  LIMITE_DA_OPCAO,
+  limparOpcoes,
+  rotuloDeVotos,
+  TEMAS_DA_AULA,
+  temaDoDia,
 } from "./rede-social";
 
 function perfil(p: Partial<Perfil> = {}): Perfil {
@@ -353,5 +360,68 @@ describe("há quanto tempo foi publicado", () => {
 
   test("data inválida não desenha lixo", () => {
     expect(haQuantoPublicou("nada disso", AGORA)).toBe("");
+  });
+});
+
+describe("a enquete do post", () => {
+  test("duas a quatro opções", () => {
+    expect(enqueteValida(["Sim", "Não"])).toBe(true);
+    expect(enqueteValida(["a", "b", "c", "d"])).toBe(true);
+    expect(enqueteValida(["Só uma"])).toBe(false);
+    expect(enqueteValida(["a", "b", "c", "d", "e"])).toBe(false);
+  });
+
+  test("⚠️ duas opções iguais não são uma enquete", () => {
+    // Com "sim" e "sim" o resultado é ininteligível, e post não se edita.
+    expect(enqueteValida(["Sim", "sim"])).toBe(false);
+    expect(enqueteValida(["Menino", "Menina"])).toBe(true);
+  });
+
+  test("vazias não contam", () => {
+    expect(enqueteValida(["Sim", "   "])).toBe(false);
+    expect(limparOpcoes([" Sim ", "", "Não", "  "])).toEqual(["Sim", "Não"]);
+  });
+
+  test("opção longa demais é recusada, e `limparOpcoes` corta antes", () => {
+    const longa = "x".repeat(LIMITE_DA_OPCAO + 5);
+    expect(enqueteValida(["ok", longa])).toBe(false);
+    expect(limparOpcoes(["ok", longa])[1].length).toBe(LIMITE_DA_OPCAO);
+  });
+
+  test("⚠️ o rótulo é NÚMERO, nunca porcentagem", () => {
+    // "67%" são dois votos de três: numa base pequena a porcentagem transforma
+    // três pessoas numa maioria.
+    expect(rotuloDeVotos(1)).toBe("1 voto");
+    expect(rotuloDeVotos(7)).toBe("7 votos");
+    expect(rotuloDeVotos(0)).toBe("0 votos");
+    expect(rotuloDeVotos(2)).not.toContain("%");
+  });
+});
+
+describe("a aula anexada", () => {
+  test("⚠️ o DIA não entra — ele é a semana dela disfarçada", () => {
+    // D = semana × 7 + diaDaSemana. "Aula do dia 139" é "estou de 19 semanas"
+    // para quem souber dividir por sete, e passaria por cima da chave
+    // `mostrar_semana`, que existe exatamente para essa decisão ser dela.
+    expect(aulaValida({ dia: 139, titulo: "Movimentos do bebê" })).toBe(false);
+    expect(aulaValida({ tema: "nutrição", dia: 139 })).toBe(true);
+    // E o tipo não tem onde guardar o dia: quem só passa o tema é válido.
+    expect(aulaValida({ tema: "nutrição" })).toBe(true);
+  });
+
+  test("só os sete temas conhecidos", () => {
+    for (const t of TEMAS_DA_AULA) expect(aulaValida({ tema: t })).toBe(true);
+    expect(aulaValida({ tema: "qualquer coisa" })).toBe(false);
+    expect(aulaValida({ tema: "" })).toBe(false);
+    expect(aulaValida(null)).toBe(false);
+  });
+
+  test("o tema gira de sete em sete, para todo mundo igual", () => {
+    expect(temaDoDia(0)).toBe("bebê");
+    expect(temaDoDia(2)).toBe("nutrição");
+    expect(temaDoDia(7)).toBe("bebê");
+    expect(temaDoDia(139)).toBe(temaDoDia(139 + 7));
+    // Negativo não estoura nem devolve `undefined`.
+    expect(TEMAS_DA_AULA).toContain(temaDoDia(-3));
   });
 });

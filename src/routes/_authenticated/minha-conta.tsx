@@ -150,6 +150,8 @@ import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
 import { ConfiguracoesDoPerfil } from "@/components/rede-social";
 import { RedeNoApp } from "@/components/rede-instagram";
+import { aulaDeHojeParaCompartilhar } from "@/lib/aula-compartilhavel";
+import type { AulaNoPost } from "@/lib/rede-social";
 import { AssinaturaTab } from "@/components/assinatura-tab";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -932,6 +934,16 @@ function MinhaContaPage() {
      cartão. Foi o defeito que o dono viu. Guardado aqui ele sobrevive à ida e
      volta; guardado também no `localStorage`, sobrevive a fechar o app. */
   const [passoDoTutorial, setPassoDoTutorial] = useState(0);
+
+  /* A aula que ela acabou de fazer, para o compositor da Comunidade oferecer. */
+  const [aulaDeHoje, setAulaDeHoje] = useState<AulaNoPost | null>(null);
+  useEffect(() => {
+    /* ⚠️ Relido a cada entrada no Feed, e não uma vez na montagem: ela faz a
+       aula no Caminho e vai para a Comunidade na MESMA sessão — lendo só na
+       montagem, o anexo só apareceria na próxima abertura do app. */
+    if (tab !== "Feed") return;
+    setAulaDeHoje(aulaDeHojeParaCompartilhar());
+  }, [tab]);
   /* ⚠️ QUEM ESCONDE A BARRA NO COMPUTADOR É CSS, NÃO ESTADO.
      `mobileHome` continua verdadeiro num monitor — a home e a barra somem por
      `md:hidden`. O tutorial abria por cima de uma tela sem barra nenhuma,
@@ -2416,7 +2428,16 @@ function MinhaContaPage() {
                     decisão de exposição que uma gestante de alto risco toma uma
                     vez e precisa achar sem procurar. */}
                 {tab === "Feed" && (
-                  <RedeNoApp careMode={careMode} onAbrirSecoes={() => goToTab("Comunidade")} />
+                  <RedeNoApp
+                    careMode={careMode}
+                    onAbrirSecoes={() => goToTab("Comunidade")}
+                    /* ⚠️ O bilhete que o Caminho deixou ao terminar a aula — lido
+                       AQUI, e não dentro do compositor, porque quem sabe quando
+                       a aba abriu é esta tela. Ler no compositor pegaria o
+                       estado de quando a Comunidade montou, e ela pode ter feito
+                       a aula depois disso, na mesma sessão. */
+                    aulaDeHoje={aulaDeHoje}
+                  />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

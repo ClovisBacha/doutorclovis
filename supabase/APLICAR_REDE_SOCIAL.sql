@@ -449,6 +449,60 @@ COMMENT ON TABLE public.rede_bloqueios IS
   'Guardado numa direção, efeito nos dois. Calado: a bloqueada nunca lê esta '
   'tabela nem recebe aviso.';
 
+-- ═════════════════════════════════════════════════════════════════════════════
+-- FASE 4 · A AULA E A ENQUETE DENTRO DO POST
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- A aula que ela acabou de fazer, anexada ao post.
+--
+-- ⚠️ Guarda o DIA e o TÍTULO, e mais nada. Não entra a nota (seria o placar
+-- público que a aba das Amigas gastou um arquivo inteiro para não ter), não
+-- entram enunciado, alternativas nem gabarito (vaza conteúdo premium pelo
+-- `quizPremium` e estraga a aula de quem está uma semana atrás).
+ALTER TABLE public.rede_posts ADD COLUMN IF NOT EXISTS aula jsonb;
+
+-- A enquete mora em ARRAY no próprio post, pela razão já escrita para
+-- `imagens`: são 2 a 4 strings curtas, sempre lidas junto com o post.
+ALTER TABLE public.rede_posts
+  ADD COLUMN IF NOT EXISTS enquete_opcoes text[] NOT NULL DEFAULT '{}';
+
+-- ⚠️ CHECK por DROP/ADD, e nunca `IF NOT EXISTS`: a tabela já existe em
+-- produção, e `ADD CONSTRAINT IF NOT EXISTS` não altera uma restrição
+-- existente — é a lição de `APLICAR_LEMBRETES`, cujo CHECK antigo recusava a
+-- espécie nova em silêncio.
+ALTER TABLE public.rede_posts DROP CONSTRAINT IF EXISTS enquete_de_2_a_4;
+ALTER TABLE public.rede_posts ADD CONSTRAINT enquete_de_2_a_4
+  CHECK (array_length(enquete_opcoes, 1) IS NULL
+         OR array_length(enquete_opcoes, 1) BETWEEN 2 AND 4);
+
+-- Um voto por pessoa por enquete — e a PK É a garantia, não um índice à parte.
+CREATE TABLE IF NOT EXISTS public.rede_votos (
+  post_id   uuid     NOT NULL REFERENCES public.rede_posts(id) ON DELETE CASCADE,
+  quem_id   uuid     NOT NULL REFERENCES auth.users(id)        ON DELETE CASCADE,
+  opcao     smallint NOT NULL CHECK (opcao BETWEEN 0 AND 3),
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, quem_id)
+);
+CREATE INDEX IF NOT EXISTS rede_votos_por_post ON public.rede_votos (post_id);
+
+ALTER TABLE public.rede_votos ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ Ela vê o PRÓPRIO voto, e mais nada. Nem a autora do post lê esta tabela:
+-- no Instagram a autora vê quem votou em quê, e esse é exatamente o dado que
+-- este app decidiu não expor — a mesma razão de `rede_salvos` ser privado
+-- "inclusive para a autora do post".
+DROP POLICY IF EXISTS "Vê o próprio voto" ON public.rede_votos;
+CREATE POLICY "Vê o próprio voto" ON public.rede_votos
+  FOR SELECT USING (auth.uid() = quem_id);
+
+DROP POLICY IF EXISTS "Service manages rede_votos" ON public.rede_votos;
+CREATE POLICY "Service manages rede_votos" ON public.rede_votos
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+COMMENT ON TABLE public.rede_votos IS
+  'Um voto por pessoa por enquete (a PK garante). Ninguém lê o voto de '
+  'ninguém — nem a autora do post.';
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CONFERÊNCIA. Todas as linhas têm que voltar `true`.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -479,4 +533,10 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name='patient_profiles' AND column_name='mostrar_bebe')        AS selo_bebe_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='rede_stories' AND column_name='carimbo_semana')          AS carimbo_ok;
+          WHERE table_name='rede_stories' AND column_name='carimbo_semana')          AS carimbo_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='enquete_opcoes')            AS enquete_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_votos')                   AS votos_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='aula')                      AS aula_ok;

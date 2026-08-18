@@ -107,7 +107,18 @@ describe("⚠️ o que NÃO pode virar sinal", () => {
     // da EMERGÊNCIA. Um ranqueamento que aprende engajamento põe o pior dia de
     // uma paciente como a primeira coisa que todas as outras veem.
     const codigo = semComentarios(FONTE);
-    for (const proibido of ["reacoes", "reacao", "totalDeReacoes", "curtidas", "popular"]) {
+    /* ⚠️ A lista cresce junto com o app: a enquete nasceu na Fase 4, e "mais
+       votada" é a mesma armadilha de "mais reagida" com outro nome. */
+    for (const proibido of [
+      "reacoes",
+      "reacao",
+      "totalDeReacoes",
+      "curtidas",
+      "popular",
+      "voto",
+      "enquete",
+      "rede_votos",
+    ]) {
       expect(codigo).not.toContain(proibido);
     }
     expect(codigo).not.toContain("rede_reacoes");

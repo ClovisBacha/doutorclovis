@@ -45,7 +45,13 @@ import {
 import { PERSONAS, type Persona } from "@/lib/selo-do-perfil";
 import {
   emojiDaReacao,
+  enqueteValida,
   haQuantoPublicou,
+  limparOpcoes,
+  LIMITE_DA_OPCAO,
+  OPCOES_MAX,
+  OPCOES_MIN,
+  rotuloDeVotos,
   LIMITE_DA_BIO,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
@@ -54,6 +60,7 @@ import {
   textoDoAviso,
   totalDeReacoes,
   VISIBILIDADES,
+  type AulaNoPost,
   type TipoDeReacao,
   type Visibilidade,
 } from "@/lib/rede-social";
@@ -297,6 +304,7 @@ export function PostInstagram({
   aoAbrirPerfil,
   aoSalvar,
   aoApagar,
+  aoVotar,
   sugerido = false,
 }: {
   post: PostNaTela;
@@ -306,6 +314,8 @@ export function PostInstagram({
   aoSalvar?: (salvar: boolean) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: () => void;
+  /** Votar na enquete. Sem ele as opções aparecem inertes. */
+  aoVotar?: (opcao: number) => void;
   /** Veio do algoritmo, não de quem ela segue. */
   sugerido?: boolean;
 }) {
@@ -440,6 +450,72 @@ export function PostInstagram({
         </div>
       )}
 
+      {/* ⚠️ A ENQUETE vem antes da legenda e depois das ações: é o único
+          elemento do post que PEDE alguma coisa de quem lê, e enterrá-la
+          embaixo do texto faria a maioria rolar direto. */}
+      {post.enquete && (
+        <div className="mt-1 space-y-1.5 px-4">
+          {post.enquete.opcoes.map((op, i) => {
+            const meu = post.enquete!.meuVoto;
+            const jaVotou = meu !== null;
+            const votos = post.enquete!.votos[i] ?? 0;
+            const total = post.enquete!.votos.reduce((a, b) => a + b, 0);
+            /* A barra é proporcional; o RÓTULO é número absoluto — "67%" são
+               dois votos de três, e numa base pequena a porcentagem transforma
+               três pessoas numa maioria. */
+            const fatia = total > 0 ? Math.round((votos / total) * 100) : 0;
+            return (
+              <button
+                key={i}
+                type="button"
+                disabled={jaVotou || !aoVotar}
+                onClick={() => aoVotar?.(i)}
+                className={`press relative block w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-[13px] ${
+                  meu === i ? "border-primary font-semibold" : "border-border"
+                } disabled:cursor-default`}
+              >
+                {jaVotou && (
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 left-0 bg-primary/12"
+                    style={{ width: `${fatia}%` }}
+                  />
+                )}
+                <span className="relative flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate">{op}</span>
+                  {jaVotou && (
+                    <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
+                      {rotuloDeVotos(votos)}
+                    </span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+          {post.enquete.meuVoto === null && (
+            /* ⚠️ Ela precisa saber ANTES que o voto não se troca — a PK do
+               banco garante um por pessoa, e descobrir isso tocando é o tipo de
+               surpresa que faz alguém desconfiar do app inteiro. */
+            <p className="pt-0.5 text-[11px] text-muted-foreground">
+              Toque para votar — o voto não muda depois.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ⚠️ A aula anexada mostra o TEMA, e nunca o dia: o dia gestacional é a
+          semana dela disfarçada (D = semana × 7 + diaDaSemana), e publicá-lo
+          passaria por cima da chave `mostrar_semana`. Nunca a nota, tampouco —
+          seria o placar público que a aba das Amigas gastou um arquivo inteiro
+          para não ter. */}
+      {post.aula && (
+        <div className="mx-4 mt-2 rounded-xl bg-muted/50 px-3 py-2">
+          <p className="text-[13px] font-medium leading-snug">
+            📚 Fiz a aula de hoje — sobre <span className="font-semibold">{post.aula.tema}</span>
+          </p>
+        </div>
+      )}
+
       {post.texto && (
         <p className="px-4 pt-1.5 text-[14px] leading-snug">
           <span className="font-semibold">{post.autorNome}</span>{" "}
@@ -475,6 +551,7 @@ export function TelaPrincipal({
   aoReagir,
   aoSalvar,
   aoApagar,
+  aoVotar,
   aoAbrirPerfil,
   aoTocarStory,
   aoChegarNoFim,
@@ -497,6 +574,7 @@ export function TelaPrincipal({
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
+  aoVotar?: (post: PostNaTela, opcao: number) => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
    * Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story.
@@ -566,6 +644,7 @@ export function TelaPrincipal({
             aoReagir={(t) => aoReagir(p, t)}
             aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
             aoApagar={aoApagar && p.souAAutora ? () => aoApagar(p) : undefined}
+            aoVotar={aoVotar ? (i) => aoVotar(p, i) : undefined}
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
@@ -607,6 +686,7 @@ export function TelaPrincipal({
                   sugerido
                   aoReagir={(t) => aoReagir(p, t)}
                   aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
+                  aoVotar={aoVotar ? (i) => aoVotar(p, i) : undefined}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
               ))}
@@ -1058,9 +1138,15 @@ type Onde =
 export function RedeNoApp({
   careMode = false,
   onAbrirSecoes,
+  aulaDeHoje,
 }: {
   careMode?: boolean;
   onAbrirSecoes?: () => void;
+  /**
+   * A aula que ela fez hoje, se fez — quem sabe disso é o Caminho, e ele passa
+   * por `minha-conta`. Sem ela, o compositor simplesmente não oferece o anexo.
+   */
+  aulaDeHoje?: AulaNoPost | null;
 }) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
@@ -1338,6 +1424,8 @@ export function RedeNoApp({
     texto: string | null;
     fotos: string[];
     visibilidade: Visibilidade;
+    enquete: string[];
+    aula: AulaNoPost | null;
   }): Promise<boolean> {
     try {
       const t = await token();
@@ -1353,6 +1441,8 @@ export function RedeNoApp({
           imagem: p.fotos[0] ?? null,
           extras: p.fotos.slice(1),
           visibilidade: p.visibilidade,
+          enquete: p.enquete,
+          aula: p.aula,
         },
       });
       if (!r.ok) return false;
@@ -1378,6 +1468,31 @@ export function RedeNoApp({
       const { apagarPost } = await import("@/lib/rede-social.functions");
       const r = await apagarPost({ data: { accessToken: t, postId: post.id } });
       if (!r.ok) await carregarFeed();
+    } catch {
+      void carregarFeed();
+    }
+  }
+
+  async function votar(post: PostNaTela, opcao: number) {
+    if (!post.enquete || post.enquete.meuVoto !== null) return;
+    /* Otimista: o voto é o gesto mais leve da tela, e esperar o servidor faz o
+       botão parecer travado. Se falhar, a próxima carga corrige. */
+    const aplicar = (ps: PostNaTela[]) =>
+      ps.map((x) => {
+        if (x.id !== post.id || !x.enquete) return x;
+        const votos = [...x.enquete.votos];
+        votos[opcao] = (votos[opcao] ?? 0) + 1;
+        return { ...x, enquete: { ...x.enquete, votos, meuVoto: opcao } };
+      });
+    setPosts(aplicar);
+    setDoPerfil(aplicar);
+    setSugestoes(aplicar);
+    setOPost((x) => (x ? aplicar([x])[0] : x));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { votar: chamar } = await import("@/lib/rede-social.functions");
+      await chamar({ data: { accessToken: t, postId: post.id, opcao } });
     } catch {
       void carregarFeed();
     }
@@ -1681,6 +1796,7 @@ export function RedeNoApp({
       <NovoPost
         aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoPublicar={publicar}
+        aulaDeHoje={aulaDeHoje}
       />
     );
   }
@@ -1758,6 +1874,7 @@ export function RedeNoApp({
         post={oPost}
         aoReagir={(t) => reagir(oPost, t)}
         aoSalvar={(v) => guardar(oPost, v)}
+        aoVotar={(i) => votar(oPost, i)}
         aoApagar={oPost.souAAutora ? () => apagar(oPost) : undefined}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
@@ -1828,6 +1945,7 @@ export function RedeNoApp({
         aoReagir={reagir}
         aoSalvar={guardar}
         aoApagar={apagar}
+        aoVotar={votar}
         aoAbrirPerfil={abrirPerfil}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
@@ -2041,6 +2159,7 @@ export function TelaDoPost({
   aoReagir,
   aoSalvar,
   aoApagar,
+  aoVotar,
   aoVoltar,
   aoAbrirPerfil,
 }: {
@@ -2048,6 +2167,7 @@ export function TelaDoPost({
   aoReagir: (t: TipoDeReacao | null) => void;
   aoSalvar?: (salvar: boolean) => void;
   aoApagar?: () => void;
+  aoVotar?: (opcao: number) => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {
@@ -2069,6 +2189,7 @@ export function TelaDoPost({
         aoReagir={aoReagir}
         aoSalvar={aoSalvar}
         aoApagar={aoApagar}
+        aoVotar={aoVotar}
         aoAbrirPerfil={aoAbrirPerfil}
       />
     </div>
@@ -2491,6 +2612,7 @@ const FOTOS_POR_POST = 10;
 export function NovoPost({
   aoFechar,
   aoPublicar,
+  aulaDeHoje,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -2498,7 +2620,17 @@ export function NovoPost({
     texto: string | null;
     fotos: string[];
     visibilidade: Visibilidade;
+    enquete: string[];
+    aula: AulaNoPost | null;
   }) => Promise<boolean>;
+  /**
+   * A aula que ela fez hoje, para anexar com um toque.
+   *
+   * ⚠️ Só o dia e o título chegam aqui: nota, enunciado e gabarito ficam de
+   * fora — o primeiro seria um placar público, os outros vazam conteúdo
+   * premium e estragam a aula de quem está uma semana atrás.
+   */
+  aulaDeHoje?: AulaNoPost | null;
 }) {
   const [texto, setTexto] = useState("");
   /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
@@ -2507,6 +2639,10 @@ export function NovoPost({
   /* ⚠️ O padrão é o mais FECHADO. O erro possível aqui é publicar para menos
      gente do que ela queria — nunca para mais. */
   const [vis, setVis] = useState<Visibilidade>("amigas");
+  /* `null` = sem enquete. Duas opções vazias é o estado inicial de quem abriu
+     a enquete e ainda não escreveu — e não uma enquete inválida na tela. */
+  const [opcoes, setOpcoes] = useState<string[] | null>(null);
+  const [comAula, setComAula] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -2514,7 +2650,14 @@ export function NovoPost({
   /* ⚠️ A régua de "dá para publicar isto?" é a MESMA do servidor
      (`postEhValido`). Uma segunda condição escrita aqui aceitaria o que o
      servidor recusa, e ela levaria um erro depois de escrever o texto. */
-  const podeEnviar = postEhValido({ texto, temImagem: fotos.length > 0 }) && !enviando;
+  /* ⚠️ A enquete conta como conteúdo — um post que é SÓ a enquete é legítimo
+     ("menino ou menina?" não precisa de foto nem de legenda). É a mesma régua
+     do servidor, e as duas concordam de propósito. */
+  const opcoesLimpas = limparOpcoes(opcoes ?? []);
+  const enqueteOk = opcoes === null || enqueteValida(opcoesLimpas);
+  const temConteudo =
+    postEhValido({ texto, temImagem: fotos.length > 0 }) || opcoesLimpas.length >= OPCOES_MIN;
+  const podeEnviar = temConteudo && enqueteOk && !enviando;
 
   async function enviar() {
     if (!podeEnviar) return;
@@ -2524,6 +2667,8 @@ export function NovoPost({
       texto: texto.trim() || null,
       fotos,
       visibilidade: vis,
+      enquete: opcoes ? opcoesLimpas : [],
+      aula: comAula ? (aulaDeHoje ?? null) : null,
     });
     setEnviando(false);
     if (ok) aoFechar();
@@ -2594,6 +2739,84 @@ export function NovoPost({
               </div>
             ))}
           </div>
+        )}
+
+        {/* ─── A ENQUETE ────────────────────────────────────────────────── */}
+        {opcoes === null ? (
+          <button
+            type="button"
+            onClick={() => setOpcoes(["", ""])}
+            className="press mt-3 w-full rounded-xl border border-border py-2 text-[14px] font-medium"
+          >
+            📊 Fazer uma enquete
+          </button>
+        ) : (
+          <div className="mt-3 rounded-2xl border border-border p-3">
+            <div className="flex items-center justify-between">
+              <p className="text-[13px] font-semibold">Enquete</p>
+              <button
+                type="button"
+                onClick={() => setOpcoes(null)}
+                className="press text-[12px] text-muted-foreground"
+              >
+                tirar
+              </button>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {opcoes.map((op, i) => (
+                <input
+                  key={i}
+                  value={op}
+                  onChange={(e) =>
+                    setOpcoes((os) =>
+                      (os ?? []).map((o, k) =>
+                        k === i ? e.target.value.slice(0, LIMITE_DA_OPCAO) : o,
+                      ),
+                    )
+                  }
+                  placeholder={`Opção ${i + 1}`}
+                  className="h-10 w-full rounded-xl border border-border bg-background px-3 text-[14px]"
+                />
+              ))}
+            </div>
+            {opcoes.length < OPCOES_MAX && (
+              <button
+                type="button"
+                onClick={() => setOpcoes((os) => [...(os ?? []), ""])}
+                className="press mt-2 text-[13px] font-medium text-primary"
+              >
+                + opção
+              </button>
+            )}
+            {/* ⚠️ O aviso do voto único aparece ANTES de publicar, e não só
+                para quem vota: quem cria a enquete precisa saber que não dá
+                para corrigir depois — post não se edita. */}
+            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+              Cada pessoa vota uma vez, e o voto não muda. Você vê só os números — nunca quem votou
+              em quê.
+            </p>
+            {!enqueteOk && opcoesLimpas.length > 0 && (
+              <p className="mt-1 text-[12px] text-destructive">
+                {opcoesLimpas.length < OPCOES_MIN
+                  ? `Escreva pelo menos ${OPCOES_MIN} opções.`
+                  : "As opções precisam ser diferentes entre si."}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ─── A AULA DE HOJE ───────────────────────────────────────────── */}
+        {aulaDeHoje && (
+          <button
+            type="button"
+            onClick={() => setComAula((v) => !v)}
+            aria-pressed={comAula}
+            className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+              comAula ? "border-primary bg-primary/10 text-primary" : "border-border"
+            }`}
+          >
+            📚 {comAula ? "Aula anexada" : "Anexar a aula de hoje"}
+          </button>
         )}
 
         {/* ⚠️ A camada fica À VISTA, e não atrás de um menu. Escondida, ela

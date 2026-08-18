@@ -31,9 +31,13 @@ import {
   podeAparecerNaBusca,
   podeVerPost,
   POSTS_POR_PAGINA,
+  aulaValida,
+  enqueteValida,
+  limparOpcoes,
   postEhValido,
   reacaoConhecida,
   REACOES,
+  type AulaNoPost,
   type ContagemDeReacoes,
   type TipoDeReacao,
   type EspecieDeAviso,
@@ -80,6 +84,15 @@ export type PostNaTela = {
   /** A minha, para o botão já nascer aceso. */
   minhaReacao: TipoDeReacao | null;
   souAAutora: boolean;
+  /** A enquete, ou `null`. Os votos são NÚMEROS — nunca quem votou. */
+  enquete: {
+    opcoes: string[];
+    votos: number[];
+    /** O índice em que EU votei, ou `null`. Só o meu. */
+    meuVoto: number | null;
+  } | null;
+  /** A aula que ela anexou — só dia e título. */
+  aula: AulaNoPost | null;
   /**
    * Guardei este post?
    *
@@ -192,6 +205,17 @@ async function perfisPorId(sb: any, ids: string[]) {
   const linhas = error ? await semAsColunasDoSelo(sb, ids) : ((data ?? []) as any[]);
   return new Map(linhas.map((p) => [p.id, p]));
 }
+
+/**
+ * As colunas que a rede lê de `rede_posts`.
+ *
+ * ⚠️ **Uma lista só, e é o que impede o recurso de sumir numa tela só.** Havia
+ * CINCO cópias desta lista (feed, perfil, sugestões, post avulso, salvos), e
+ * acrescentar uma coluna significava lembrar das cinco: esquecer uma fazia a
+ * enquete existir no feed e desaparecer na grade do perfil, sem erro nenhum.
+ */
+const COLUNAS_DO_POST =
+  "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, enquete_opcoes, aula";
 
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
@@ -330,6 +354,33 @@ async function reacoesDe(sb: any, postIds: string[], eu: string) {
   return { porPost, minhas };
 }
 
+/**
+ * Os votos de várias enquetes, agrupados.
+ *
+ * ⚠️ Devolve CONTAGEM por opção e o MEU voto — nunca a lista de quem votou. No
+ * Instagram a autora vê quem votou em quê, e esse é exatamente o dado que este
+ * app decidiu não expor (a mesma razão de `rede_salvos` ser privado inclusive
+ * para a autora do post).
+ */
+async function votosDe(sb: any, postIds: string[], eu: string) {
+  const vazio = { porPost: new Map<string, number[]>(), meus: new Map<string, number>() };
+  if (postIds.length === 0) return vazio;
+  const { data } = await sb
+    .from("rede_votos")
+    .select("post_id, quem_id, opcao")
+    .in("post_id", postIds);
+
+  const porPost = new Map<string, number[]>();
+  const meus = new Map<string, number>();
+  for (const v of (data ?? []) as { post_id: string; quem_id: string; opcao: number }[]) {
+    const c = porPost.get(v.post_id) ?? [0, 0, 0, 0];
+    if (v.opcao >= 0 && v.opcao < 4) c[v.opcao] += 1;
+    porPost.set(v.post_id, c);
+    if (v.quem_id === eu) meus.set(v.post_id, v.opcao);
+  }
+  return { porPost, meus };
+}
+
 /** Quais destes eu já guardei. Uma consulta só, como a das reações. */
 async function salvosDe(sb: any, postIds: string[], eu: string): Promise<Set<string>> {
   if (postIds.length === 0) return new Set();
@@ -365,13 +416,18 @@ async function montarPosts(
 
   /* Reações e salvos em PARALELO: duas consultas independentes, e em série a
      segunda só sairia depois de a primeira voltar. */
-  const [{ porPost, minhas }, salvos] = await Promise.all([
+  const [{ porPost, minhas }, salvos, votos] = await Promise.all([
     reacoesDe(
       sb,
       visiveis.map((p) => p.id),
       eu,
     ),
     salvosDe(
+      sb,
+      visiveis.map((p) => p.id),
+      eu,
+    ),
+    votosDe(
       sb,
       visiveis.map((p) => p.id),
       eu,
@@ -406,6 +462,19 @@ async function montarPosts(
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
         salvo: salvos.has(p.id),
+        /* ⚠️ A enquete só existe se houver opções: um array vazio (o padrão da
+           coluna) é "post sem enquete", nunca "enquete de zero opções". */
+        enquete: (p.enquete_opcoes ?? []).length
+          ? {
+              opcoes: p.enquete_opcoes as string[],
+              votos: (votos.porPost.get(p.id) ?? [0, 0, 0, 0]).slice(
+                0,
+                (p.enquete_opcoes as string[]).length,
+              ),
+              meuVoto: votos.meus.get(p.id) ?? null,
+            }
+          : null,
+        aula: aulaValida(p.aula) ? p.aula : null,
       };
     }),
   );
@@ -655,7 +724,7 @@ export const verPerfil = createServerFn({ method: "POST" })
 
     const { data: brutos } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .select(COLUNAS_DO_POST)
       .eq("autor_id", data.alvoId)
       .is("arquivado_em", null)
       .order("criado_em", { ascending: false })
@@ -872,6 +941,13 @@ export const publicarPost = createServerFn({ method: "POST" })
         /** As DEMAIS do carrossel. Até nove — a primeira vai em `imagem`. */
         extras: z.array(z.string().max(1_500_000)).max(9).optional(),
         visibilidade: z.enum(["publico", "seguidores", "amigas"]),
+        /** 2 a 4 opções curtas, ou nada. */
+        enquete: z.array(z.string().max(80)).max(6).optional(),
+        /** Só dia e título — ver `AulaNoPost`. */
+        aula: z
+          .object({ dia: z.number(), titulo: z.string().max(120) })
+          .nullable()
+          .optional(),
       })
       .parse(i),
   )
@@ -891,7 +967,15 @@ export const publicarPost = createServerFn({ method: "POST" })
       .maybeSingle();
     if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
 
-    if (!postEhValido({ texto: data.texto, temImagem: !!data.imagem })) {
+    /* ⚠️ A enquete conta como conteúdo: um post que é SÓ a enquete é legítimo
+       ("menino ou menina?" não precisa de foto nem de legenda), e sem isto ele
+       seria recusado como vazio. */
+    const opcoes = limparOpcoes(data.enquete ?? []);
+    const temEnquete = opcoes.length > 0;
+    if (temEnquete && !enqueteValida(opcoes)) {
+      return { ok: false as const, motivo: "enquete" as const };
+    }
+    if (!temEnquete && !postEhValido({ texto: data.texto, temImagem: !!data.imagem })) {
       return { ok: false as const, motivo: "vazio" as const };
     }
 
@@ -923,10 +1007,35 @@ export const publicarPost = createServerFn({ method: "POST" })
         imagem_path: caminho,
         imagens: extras,
         visibilidade: data.visibilidade,
+        enquete_opcoes: opcoes,
+        /* ⚠️ Passa pela mesma régua de leitura: um `aula` malformado vindo do
+           cliente não pode virar linha no banco que `aulaValida` depois
+           recusaria — o post ficaria com uma coluna que ninguém desenha. */
+        aula: data.aula && aulaValida(data.aula) ? data.aula : null,
       })
       .select("id")
       .single();
-    if (error || !post) return { ok: false as const, motivo: "banco" as const };
+
+    /* ⚠️ Recuo para banco sem `enquete_opcoes`/`aula`, como em `perfisPorId` e
+       `publicarStory`: o deploy chega antes do SQL, e sem isto PUBLICAR pararia
+       de funcionar para todo mundo — não só a enquete. */
+    if (error) {
+      console.warn("[rede] post sem enquete/aula — rode APLICAR_REDE_SOCIAL.sql");
+      const { data: p2, error: erro2 } = await sb
+        .from("rede_posts")
+        .insert({
+          autor_id: eu,
+          texto: data.texto?.trim() || null,
+          imagem_path: caminho,
+          imagens: extras,
+          visibilidade: data.visibilidade,
+        })
+        .select("id")
+        .single();
+      if (erro2 || !p2) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const, postId: p2.id };
+    }
+    if (!post) return { ok: false as const, motivo: "banco" as const };
 
     return { ok: true as const, postId: post.id };
   });
@@ -978,7 +1087,7 @@ export const meuFeed = createServerFn({ method: "POST" })
 
     let q = sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .select(COLUNAS_DO_POST)
       .in("autor_id", de)
       .is("arquivado_em", null)
       .order("criado_em", { ascending: false })
@@ -1106,7 +1215,7 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
 
     const { data: brutos } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .select(COLUNAS_DO_POST)
       .in("autor_id", ids)
       .eq("visibilidade", "publico")
       .is("arquivado_em", null)
@@ -1238,6 +1347,74 @@ export const reagir = createServerFn({ method: "POST" })
 /* ══════════════════════════════════════════════════════════════════════════
    BLOQUEIO E DESCOBERTA
    ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * VOTAR numa enquete.
+ *
+ * ⚠️ **Confere que eu podia VER o post antes de gravar**, pela mesma razão de
+ * `reagir`: sem isso, um `postId` sorteado que respondesse 200 confirmaria a
+ * existência de um post privado.
+ *
+ * ⚠️ **E o voto NÃO se troca.** A PK `(post_id, quem_id)` garante um por
+ * pessoa, e aqui o `insert` com `ignoreDuplicates` faz a segunda tentativa ser
+ * um não-evento silencioso: uma enquete cujo voto se troca vira um placar que
+ * muda de dono no último minuto, e quem já votou não tem por que voltar.
+ */
+export const votar = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        opcao: z.number().int().min(0).max(3),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade, enquete_opcoes")
+      .eq("id", data.postId)
+      .is("arquivado_em", null)
+      .maybeSingle();
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* A opção precisa existir NESTA enquete — não basta caber no CHECK. */
+    const opcoes = ((post as any).enquete_opcoes ?? []) as string[];
+    if (data.opcao >= opcoes.length) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const ctx = await contextoDe(sb, eu);
+    const a = (await perfisPorId(sb, [(post as any).autor_id])).get((post as any).autor_id);
+    const pode =
+      !!a &&
+      podeVerPost({
+        post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
+        euId: eu,
+        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        bloqueado: ctx.bloqueio.has((post as any).autor_id),
+        sigoAtivo: ctx.sigo.has((post as any).autor_id),
+        somosAmigas: ctx.amigas.has((post as any).autor_id),
+      });
+    if (!pode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb
+      .from("rede_votos")
+      .insert({ post_id: data.postId, quem_id: eu, opcao: data.opcao });
+    /* Colidir na PK é SUCESSO REPETIDO: ela já votou, e devolver erro faria a
+       tela pedir que tentasse de novo. Mesma decisão da `idem_key` do chá. */
+    if (error && !String(error.code ?? "").startsWith("23")) {
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });
 
 export const bloquear = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -1447,7 +1624,7 @@ export const verPost = createServerFn({ method: "POST" })
 
     const { data: bruto } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .select(COLUNAS_DO_POST)
       .eq("id", data.postId)
       .is("arquivado_em", null)
       .maybeSingle();
@@ -1837,7 +2014,7 @@ export const meusSalvos = createServerFn({ method: "POST" })
 
     const { data: brutos } = await sb
       .from("rede_posts")
-      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .select(COLUNAS_DO_POST)
       .in("id", ids)
       .is("arquivado_em", null);
 

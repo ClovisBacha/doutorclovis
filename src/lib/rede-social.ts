@@ -433,3 +433,107 @@ export function haQuantoPublicou(iso: string, agora: number): string {
     year: "numeric",
   });
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   12 · A ENQUETE E A AULA DENTRO DO POST — Fase 4
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Mínimo e máximo de opções. O CHECK do banco repete os dois. */
+export const OPCOES_MIN = 2;
+export const OPCOES_MAX = 4;
+/** Uma opção é um rótulo curto, não um parágrafo. */
+export const LIMITE_DA_OPCAO = 40;
+
+/**
+ * As opções que a paciente digitou viram a enquete — ou não viram.
+ *
+ * ⚠️ **Duas opções iguais não são uma enquete**, e o servidor precisa recusar
+ * antes de gravar: com "sim" e "sim" nas duas, o resultado é ininteligível e
+ * não há como corrigir depois (post não se edita).
+ */
+export function enqueteValida(opcoes: string[]): boolean {
+  const limpas = opcoes.map((o) => o.trim()).filter(Boolean);
+  if (limpas.length < OPCOES_MIN || limpas.length > OPCOES_MAX) return false;
+  if (limpas.some((o) => o.length > LIMITE_DA_OPCAO)) return false;
+  const distintas = new Set(limpas.map((o) => o.toLowerCase()));
+  return distintas.size === limpas.length;
+}
+
+/** Limpa o que veio da tela: apara, tira vazias e corta no teto. */
+export function limparOpcoes(opcoes: string[]): string[] {
+  return opcoes
+    .map((o) => o.trim().slice(0, LIMITE_DA_OPCAO))
+    .filter(Boolean)
+    .slice(0, OPCOES_MAX);
+}
+
+/**
+ * O que a tela mostra ao lado de cada opção.
+ *
+ * ⚠️ **NÚMERO, e nunca porcentagem.** "67%" são dois votos de três, e numa base
+ * pequena a porcentagem transforma três pessoas numa maioria — a mesma razão
+ * pela qual o contador do desafio em grupo não mostra fração. O número absoluto
+ * nunca mente sobre o tamanho da amostra.
+ */
+export function rotuloDeVotos(n: number): string {
+  return n === 1 ? "1 voto" : `${n} votos`;
+}
+
+/**
+ * A aula anexada a um post.
+ *
+ * ─── ⚠️ O DIA DA AULA É A SEMANA DELA DISFARÇADA ───────────────────────────
+ *
+ * A primeira versão deste tipo era `{ dia: number; titulo: string }`, e o
+ * `dia` é o dia gestacional: **D = semana × 7 + diaDaSemana**. Publicar "Aula
+ * do dia 139" é publicar "estou de 19 semanas" para quem souber dividir por
+ * sete — e passaria por cima da chave `mostrar_semana` da Fase 1, que existe
+ * exatamente para essa decisão ser dela.
+ *
+ * Seria o pior tipo de vazamento: o que entra pela porta dos fundos de um
+ * recurso construído para fechar a porta da frente.
+ *
+ * ─── O QUE SOBRA, E POR QUE BASTA ──────────────────────────────────────────
+ *
+ * O TEMA do dia, que gira a cada sete dias para toda gestante do app
+ * (`0 bebê · 1 corpo · 2 nutrição · 3 sinais · 4 exames · 5 vínculo ·
+ * 6 revisão`). Ele não diz a semana de ninguém, e é o que responde à pergunta
+ * de quem lê: "aula sobre o quê?".
+ *
+ * E continua fora: a NOTA (seria o placar público que a aba das Amigas gastou
+ * um arquivo inteiro para não ter, agora entre desconhecidas), e enunciado,
+ * alternativas e gabarito — que vazam conteúdo premium pelo `quizPremium` e
+ * estragam a aula de quem está uma semana atrás.
+ */
+export const TEMAS_DA_AULA = [
+  "bebê",
+  "corpo",
+  "nutrição",
+  "sinais",
+  "exames",
+  "vínculo",
+  "revisão",
+] as const;
+
+export type TemaDaAula = (typeof TEMAS_DA_AULA)[number];
+
+export type AulaNoPost = { tema: TemaDaAula };
+
+export function aulaValida(a: unknown): a is AulaNoPost {
+  if (!a || typeof a !== "object") return false;
+  const x = a as Record<string, unknown>;
+  return typeof x.tema === "string" && (TEMAS_DA_AULA as readonly string[]).includes(x.tema);
+}
+
+/**
+ * O tema a partir do dia gestacional.
+ *
+ * ⚠️ **A conversão acontece ANTES de sair do aparelho dela**, e o `dia` nunca
+ * chega ao servidor: é o que garante que a semana não viaje junto. O ritmo é o
+ * mesmo de `challengeForDay` — uma segunda tabela faria a aula de terça ser
+ * "nutrição" no Caminho e "sinais" no post.
+ */
+export function temaDoDia(dia: number): TemaDaAula {
+  const i = ((Math.floor(dia) % 7) + 7) % 7;
+  return TEMAS_DA_AULA[i];
+}

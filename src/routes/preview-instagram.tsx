@@ -142,6 +142,21 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
      apagado dos outros. Com todos apagados não haveria contraste. */
   salvo: i === 1,
+  /* ⚠️ O post 1 leva ENQUETE e o 6 leva AULA — separados de propósito: juntos,
+     não daria para ver que cada um desenha sozinho, e é exatamente aí que a
+     margem de um encosta no outro. O 1 já tem voto meu, o 7 ainda não: são os
+     dois estados da enquete (antes e depois de votar).
+
+     ⚠️ E o 1 está na primeira fatia (`slice(0, 4)`) de propósito: com a
+     enquete votada no post 4, ela caía fora do feed da bancada e ninguém via o
+     estado com resultado — a bancada mostrava só metade do recurso. */
+  enquete:
+    i === 1
+      ? { opcoes: ["Menino", "Menina"], votos: [12, 9], meuVoto: 0 }
+      : i === 7
+        ? { opcoes: ["Sim", "Não", "Ainda não sei"], votos: [0, 0, 0], meuVoto: null }
+        : null,
+  aula: i === 6 ? { tema: "nutrição" as const } : null,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
@@ -404,9 +419,14 @@ function Bancada() {
     return (
       <div className="mx-auto max-w-md py-2">
         <NovoPost
+          /* A aula de hoje, para o anexo aparecer na bancada. */
+          aulaDeHoje={{ tema: "nutrição" }}
           aoFechar={() => history.back()}
           aoPublicar={async (p) => {
-            alert(`publicaria: ${p.fotos.length} foto(s), ${p.visibilidade}\n${p.texto ?? ""}`);
+            alert(
+              `publicaria: ${p.fotos.length} foto(s), ${p.visibilidade}, ` +
+                `enquete [${p.enquete.join(" | ")}], aula ${p.aula ? p.aula.tema : "—"}\n${p.texto ?? ""}`,
+            );
             return false; /* `false` mantém a tela aberta, para olhar de novo. */
           }}
         />
@@ -473,6 +493,7 @@ function Bancada() {
           aoReagir={() => {}}
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
           aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
+          aoVotar={(_, i) => alert(`votaria na opção ${i}`)}
           aoApagar={() => alert("apagaria")}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui

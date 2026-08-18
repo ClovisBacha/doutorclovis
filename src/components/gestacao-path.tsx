@@ -112,6 +112,7 @@ import {
   IconeTrofeu,
 } from "@/components/icones-jogo";
 import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from "@/lib/celebrate";
+import { guardarAulaDeHoje } from "@/lib/aula-compartilhavel";
 
 /**
  * Comemora o bônus por VARIAR as atividades (a "sequência" da semana): confete
@@ -9946,6 +9947,14 @@ function DailyQuizBlock({
   function next() {
     if (qIndex + 1 >= total) {
       setPhase("done");
+      /* ⚠️ O bilhete para a Comunidade, e ele guarda o TEMA — nunca o dia.
+         O dia gestacional é a semana dela disfarçada (D = semana × 7 + dia), e
+         mandá-lo passaria por cima da chave `mostrar_semana` do perfil.
+
+         Fora do `if (canEarn …)` de propósito: quem revê a aula de hoje sem
+         ganhar Sementinha de novo continua podendo compartilhá-la. E fora do
+         Modo Cuidado, como tudo. */
+      if (!careMode) guardarAulaDeHoje(day);
       if (canEarn && !alreadyDone && !earnedRef.current) {
         earnedRef.current = true;
         setEarnedNow(true);
