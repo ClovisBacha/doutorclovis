@@ -39,6 +39,13 @@ import {
   type EspecieDeAviso,
   type Visibilidade,
 } from "@/lib/rede-social";
+import {
+  AUTORAS_CONSULTADAS,
+  ordenarPessoas,
+  ordenarSugestoes,
+  PESSOAS_SUGERIDAS,
+  SUGESTOES_POR_LEVA,
+} from "@/lib/sugestoes";
 
 export type PostNaTela = {
   id: string;
@@ -718,6 +725,162 @@ export const meuFeed = createServerFn({ method: "POST" })
 /* ══════════════════════════════════════════════════════════════════════════
    REAÇÕES
    ══════════════════════════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SUGERIDO PARA VOCÊ
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantas pessoas que EU sigo seguem cada uma destas.
+ *
+ * ⚠️ **Uma consulta só, e nunca uma por candidata.** Com uma por pessoa, uma
+ * zona de dez sugestões custaria dez idas ao banco — e a zona abre no fim de
+ * todo feed. A régua da ordem mora em `sugestoes.ts`; aqui é só a contagem.
+ */
+async function elosEmComum(sb: any, quemEuSigo: string[]): Promise<Map<string, number>> {
+  const elos = new Map<string, number>();
+  if (quemEuSigo.length === 0) return elos;
+  const { data } = await sb
+    .from("rede_seguidores")
+    .select("seguido_id")
+    .in("seguidor_id", quemEuSigo)
+    .eq("estado", "ativo")
+    .limit(2000);
+  for (const l of (data ?? []) as { seguido_id: string }[]) {
+    elos.set(l.seguido_id, (elos.get(l.seguido_id) ?? 0) + 1);
+  }
+  return elos;
+}
+
+/**
+ * A ZONA DE SUGESTÕES — publicações e pessoas que ela ainda não segue.
+ *
+ * ⚠️ **O pool é estreito de propósito, e são três filtros, não um.** Perfil
+ * PÚBLICO (a chave que diz, na tela dela, "qualquer pessoa no app pode te achar
+ * e te acompanhar"), publicação na camada PÚBLICO (as duas são separadas, e a
+ * separação é o recurso: perfil aberto com post `amigas` é o caso normal), e a
+ * régua `podeVerPost` por cima de tudo — uma régua só, sempre.
+ *
+ * ⚠️ **Não aparece quem ela já segue, nem quem tem pedido pendente.** Sugerir
+ * alguém para quem ela já mandou pedido é o app esquecendo o que ela acabou de
+ * fazer.
+ *
+ * ⚠️ **Modo Cuidado e bloqueio saem pelos dois lados**, como no feed. E ela
+ * nunca é sugerida para si mesma.
+ */
+export const sugestoesDoFeed = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+
+    /* Pedido pendente também tira da lista — ver o cabeçalho. */
+    const { data: pendentesMeus } = await sb
+      .from("rede_seguidores")
+      .select("seguido_id")
+      .eq("seguidor_id", eu)
+      .eq("estado", "pendente");
+    const jaPedi = new Set(
+      ((pendentesMeus ?? []) as { seguido_id: string }[]).map((l) => l.seguido_id),
+    );
+
+    const fora = (id: string) =>
+      id === eu || ctx.sigo.has(id) || ctx.bloqueio.has(id) || jaPedi.has(id);
+
+    /* As candidatas a autora: perfil público, fora do meu círculo, sem Modo
+       Cuidado. `podeAparecerNaBusca` é a MESMA régua da busca — quem não pode
+       ser encontrada também não pode ser sugerida, senão a sugestão vira a
+       porta dos fundos da busca. */
+    const { data: publicos } = await sb
+      .from("patient_profiles")
+      .select("id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at")
+      .eq("perfil_publico", true)
+      .limit(400);
+
+    const candidatas = ((publicos ?? []) as any[]).filter(
+      (p) =>
+        !fora(p.id) &&
+        podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: !!p.care_mode }),
+    );
+    if (candidatas.length === 0) {
+      return { ok: true as const, posts: [], sugeridos: [] as string[], pessoas: [] };
+    }
+
+    const elos = await elosEmComum(sb, [...ctx.sigo]);
+
+    /* O ranking das autoras sai UMA vez e serve às duas coisas: a fileira de
+       pessoas (as primeiras) e o recorte da consulta de publicações (todas). */
+    const ranking = ordenarPessoas(
+      candidatas.map((p) => ({
+        id: p.id,
+        elosEmComum: elos.get(p.id) ?? 0,
+        ultimaVez: p.last_seen_at ?? null,
+      })),
+      AUTORAS_CONSULTADAS,
+    );
+    const ids = ranking.map((p) => p.id);
+
+    const { data: brutos } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em")
+      .in("autor_id", ids)
+      .eq("visibilidade", "publico")
+      .is("arquivado_em", null)
+      .order("criado_em", { ascending: false })
+      /* Folga: a régua ainda filtra, e o teto por autora ainda poda. */
+      .limit(SUGESTOES_POR_LEVA * 6);
+
+    const escolhidas = ordenarSugestoes(
+      ((brutos ?? []) as any[]).map((p) => ({
+        postId: p.id,
+        autorId: p.autor_id,
+        criadoEm: p.criado_em,
+        elosEmComum: elos.get(p.autor_id) ?? 0,
+      })),
+      Date.now(),
+    );
+    const porId = new Map(((brutos ?? []) as any[]).map((p) => [p.id, p]));
+    /* ⚠️ `montarPosts` DE NOVO, e não um atalho: é ela que aplica `podeVerPost`,
+       assina as URLs das fotos e traz reações e salvos. Montar o post à mão aqui
+       seria a segunda régua de visibilidade do arquivo. */
+    const posts = await montarPosts(
+      sb,
+      eu,
+      escolhidas.map((c) => porId.get(c.postId)).filter(Boolean),
+      ctx,
+    );
+    /* A ORDEM da régua, não a do banco: `montarPosts` devolve na ordem que
+       recebeu, mas `ordenarFeed` (cronológica) desfaria o ranqueamento. */
+    const ordem = new Map(escolhidas.map((c, n) => [c.postId, n]));
+    posts.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
+
+    const pessoas = ranking.slice(0, PESSOAS_SUGERIDAS).map((p) => {
+      const perfil = candidatas.find((c) => c.id === p.id);
+      return {
+        id: p.id,
+        nome: (perfil?.display_name ?? "").trim() || "Alguém",
+        bio: perfil?.bio ?? null,
+        avatarUrl: perfil?.avatar_url ?? null,
+        /* ⚠️ `sigo` é sempre `null` aqui: quem eu sigo não entra no pool. E o
+           número de elos NÃO viaja para o cliente — ele ordenou, e acabou. */
+        sigo: null,
+        souEu: false,
+      } satisfies PessoaNaLista;
+    });
+
+    return {
+      ok: true as const,
+      posts,
+      /* Os ids que a tela precisa rotular "Sugerido para você". */
+      sugeridos: posts.map((p) => p.id),
+      pessoas,
+    };
+  });
 
 export const reagir = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>

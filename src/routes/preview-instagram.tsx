@@ -20,6 +20,11 @@
  *   /preview-instagram?tela=novo    → a nova publicação (o que o ＋ abre)
  *   /preview-instagram?tela=salvos  → a coleção privada
  *   /preview-instagram?tela=busca   → a busca de perfis
+ *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
+ *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
+ *
+ * ⚠️ A zona de sugestões ("Você está em dia" + pessoas + publicações) só abre
+ * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
@@ -52,6 +57,9 @@ export const Route = createFileRoute("/preview-instagram")({
     tela: q.tela == null ? "feed" : String(q.tela),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
+    /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
+       `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
+    sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
   }),
 });
 
@@ -140,7 +148,7 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio } = Route.useSearch();
+  const { tela, meu, vazio, sugeridas } = Route.useSearch();
 
   const perfil: PerfilNaTela = {
     id: meu ? "eu" : "marina",
@@ -153,6 +161,7 @@ function Bancada() {
     meusSeguidores: meu ? 137 : null,
   };
 
+  const semSugestoes = sugeridas === 0;
   const [extras, setExtras] = useState<PostNaTela[]>([]);
   const [paginas, setPaginas] = useState(0);
 
@@ -365,10 +374,14 @@ function Bancada() {
         <TelaPrincipal
           posts={vazio ? [] : [...POSTS.slice(0, 4), ...extras]}
           stories={vazio ? [] : STORIES}
-          /* O terceiro post vem do algoritmo — é o que prova o rótulo
-             "Sugerido para você", que é obrigatório quando o post não veio de
-             quem ela segue. */
-          sugeridos={["p2"]}
+          /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
+             acabou — por isso ela aparece na bancada quando `temMais` some, ou
+             seja, depois de rolar até o fim. `?sugeridas=0` mostra o feed sem
+             ela; `?vazio=1` mostra a conta nova, em que a fileira de pessoas é
+             a única coisa na tela. */
+          sugestoes={semSugestoes ? [] : POSTS.slice(5, 8)}
+          pessoas={semSugestoes ? [] : GENTE}
+          aoSeguirPessoa={(id) => console.log("seguiria", id)}
           aoReagir={() => {}}
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
           aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}

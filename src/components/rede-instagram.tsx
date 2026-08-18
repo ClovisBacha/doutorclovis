@@ -467,7 +467,9 @@ export function PostInstagram({
 export function TelaPrincipal({
   posts,
   stories = [],
-  sugeridos = [],
+  sugestoes = [],
+  pessoas = [],
+  aoSeguirPessoa,
   aoReagir,
   aoSalvar,
   aoApagar,
@@ -483,8 +485,18 @@ export function TelaPrincipal({
 }: {
   posts: PostNaTela[];
   stories?: Story[];
-  /** Ids dos posts que vieram do algoritmo, não de quem ela segue. */
-  sugeridos?: string[];
+  /**
+   * A ZONA DE SUGESTÕES — publicações de quem ela NÃO segue.
+   *
+   * ⚠️ Lista própria, e não ids misturados na de cima. É o que garante que
+   * estranhas nunca apareçam no meio das pessoas que ela escolheu: elas entram
+   * DEPOIS do aviso de "você está em dia", que é o modelo do Instagram e é o
+   * único arranjo em que "sugerido" significa alguma coisa.
+   */
+  sugestoes?: PostNaTela[];
+  /** Pessoas sugeridas, a fileira do modelo. */
+  pessoas?: PessoaNaLista[];
+  aoSeguirPessoa?: (id: string) => void;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
@@ -519,7 +531,6 @@ export function TelaPrincipal({
   /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
   temMais?: boolean;
 }) {
-  const doAlgoritmo = useMemo(() => new Set(sugeridos), [sugeridos]);
   const fim = useRef<HTMLDivElement>(null);
 
   /* ⚠️ A sentinela é um `IntersectionObserver`, e não um ouvinte de `scroll`:
@@ -600,7 +611,7 @@ export function TelaPrincipal({
 
       <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
 
-      {posts.length === 0 ? (
+      {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">
           Ainda não há nada por aqui 💛
         </p>
@@ -609,7 +620,6 @@ export function TelaPrincipal({
           <PostInstagram
             key={p.id}
             post={p}
-            sugerido={doAlgoritmo.has(p.id)}
             aoReagir={(t) => aoReagir(p, t)}
             aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
             aoApagar={aoApagar && p.souAAutora ? () => aoApagar(p) : undefined}
@@ -623,7 +633,136 @@ export function TelaPrincipal({
           <div className="skeleton h-24 rounded-2xl" />
         </div>
       )}
+
+      {/* ─── A ZONA DE SUGESTÕES ────────────────────────────────────────────
+          ⚠️ Ela só abre quando o feed de quem ela segue ACABOU (`!temMais`).
+          Este é o arranjo do "você está em dia" do Instagram, e aqui ele não é
+          estética: interlaçar desconhecidas no meio das pessoas que ela
+          escolheu, num app de gestação de alto risco, faz a paciente ler um
+          relato duro sem saber se veio de uma amiga ou de uma estranha. Com o
+          aviso no meio, tudo que está abaixo dele tem procedência. */}
+      {!temMais && (pessoas.length > 0 || sugestoes.length > 0) && (
+        <>
+          {posts.length > 0 && <EmDia />}
+
+          {pessoas.length > 0 && (
+            <FileiraDePessoas
+              pessoas={pessoas}
+              aoSeguir={aoSeguirPessoa}
+              aoAbrirPerfil={aoAbrirPerfil}
+            />
+          )}
+
+          {sugestoes.length > 0 && (
+            <>
+              <h2 className="px-0 pb-1 pt-4 text-[14px] font-semibold">Publicações sugeridas</h2>
+              {sugestoes.map((p) => (
+                <PostInstagram
+                  key={p.id}
+                  post={p}
+                  /* O rótulo é OBRIGATÓRIO — ver `PostInstagram`. */
+                  sugerido
+                  aoReagir={(t) => aoReagir(p, t)}
+                  aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
+                  aoAbrirPerfil={aoAbrirPerfil}
+                />
+              ))}
+            </>
+          )}
+        </>
+      )}
     </div>
+  );
+}
+
+/**
+ * "Você está em dia" — o divisor do modelo.
+ *
+ * Ele responde à pergunta que a paciente faria ao ver uma desconhecida no feed
+ * ("de onde veio isso?") ANTES de ela fazer a pergunta.
+ */
+function EmDia() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 border-b border-border py-8 text-center">
+      <span
+        aria-hidden
+        className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-foreground/70 text-xl"
+      >
+        ✓
+      </span>
+      <p className="text-[15px] font-semibold">Você está em dia</p>
+      <p className="max-w-[16rem] text-[13px] leading-snug text-muted-foreground">
+        Você viu tudo de quem acompanha. Daqui para baixo são pessoas que você ainda não segue.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * A fileira de pessoas sugeridas.
+ *
+ * ⚠️ **Nenhum cartão diz POR QUE aquela pessoa está ali.** O modelo escreve
+ * "seguida por fulana e mais 3", e aqui isso entregaria quem ela segue a quem
+ * só abriu o feed — a lista de seguidores deste app não é pública de propósito.
+ * O motivo ordena a fileira e fica no servidor.
+ */
+function FileiraDePessoas({
+  pessoas,
+  aoSeguir,
+  aoAbrirPerfil,
+}: {
+  pessoas: PessoaNaLista[];
+  aoSeguir?: (id: string) => void;
+  aoAbrirPerfil?: (id: string) => void;
+}) {
+  /* Quem ela acabou de seguir. ⚠️ O cartão NÃO some: sumir no toque tira da
+     tela a única confirmação de que o toque funcionou, e ela toca de novo. */
+  const [seguidas, setSeguidas] = useState<Set<string>>(new Set());
+
+  return (
+    <section className="border-b border-border py-4">
+      <h2 className="pb-2 text-[14px] font-semibold">Sugestões para você</h2>
+      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {pessoas.map((p) => {
+          const jaSegue = seguidas.has(p.id);
+          return (
+            <div
+              key={p.id}
+              className="flex w-[148px] shrink-0 flex-col items-center gap-1.5 rounded-2xl border border-border p-3"
+            >
+              <button type="button" onClick={() => aoAbrirPerfil?.(p.id)} className="press">
+                <Foto url={p.avatarUrl} nome={p.nome} lado={64} />
+              </button>
+              <p className="line-clamp-2 text-center text-[13px] font-semibold leading-tight">
+                {p.nome}
+              </p>
+              {p.bio && (
+                <p className="line-clamp-1 w-full text-center text-[11px] leading-tight text-muted-foreground">
+                  {p.bio}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setSeguidas((s) => new Set(s).add(p.id));
+                  aoSeguir?.(p.id);
+                }}
+                disabled={jaSegue}
+                /* ⚠️ `mt-auto` alinha os botões pelo PÉ do cartão. Os cartões
+                   já têm a mesma altura (o `flex` estica), mas quem tem bio e
+                   nome de duas linhas empurrava o botão para baixo do da
+                   vizinha — uma fileira de botões em degrau. */
+                className={`press mt-auto w-full rounded-lg py-1.5 text-[13px] font-semibold ${
+                  jaSegue ? "border border-border" : "bg-primary text-primary-foreground"
+                }`}
+              >
+                {jaSegue ? "Seguindo" : "Seguir"}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -889,6 +1028,8 @@ export function RedeNoApp({
   const [avisos, setAvisos] = useState<AtividadeNaTela[]>([]);
   const [naoVistas, setNaoVistas] = useState(0);
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
+  const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
+  const [pessoas, setPessoas] = useState<PessoaNaLista[]>([]);
   const [carregando, setCarregando] = useState(true);
   /** Cursor da página seguinte do feed. `null` = acabou. */
   const [proximo, setProximo] = useState<string | null>(null);
@@ -896,6 +1037,8 @@ export function RedeNoApp({
      tranco de rolagem, e um estado só valeria no render seguinte — as duas
      chamadas leriam `false` e a mesma página entraria duas vezes na lista. */
   const buscandoMais = useRef(false);
+  /** Já pedi as sugestões nesta visita? Ver `carregarSugestoes`. */
+  const sugestoesPedidas = useRef(false);
   const arquivoDoStory = useRef<HTMLInputElement>(null);
 
   async function token() {
@@ -945,6 +1088,56 @@ export function RedeNoApp({
     void carregarFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [careMode]);
+
+  /* O feed acabou (não há página seguinte) → a zona de sugestões pode nascer.
+     Também cobre a conta NOVA, em que o feed nasce vazio e `proximo` é `null`:
+     ali a fileira de pessoas é a única coisa útil na tela. */
+  useEffect(() => {
+    if (careMode || carregando || proximo) return;
+    void carregarSugestoes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careMode, carregando, proximo]);
+
+  /**
+   * A zona de sugestões.
+   *
+   * ⚠️ **Pedido à parte, e só quando o feed de quem ela segue acabou.** Junto
+   * com o feed, ela pagaria a consulta mais cara da tela em toda abertura — e
+   * quem tem muita gente para ler nunca chega no fim para vê-la. E uma vez só
+   * por visita: `carregadas` guarda o pedido feito, não o resultado, porque um
+   * resultado vazio é resposta legítima (base pequena, ela já segue todo mundo)
+   * e sem isso a tela pediria de novo a cada rolagem.
+   */
+  async function carregarSugestoes() {
+    if (sugestoesPedidas.current) return;
+    sugestoesPedidas.current = true;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { sugestoesDoFeed } = await import("@/lib/rede-social.functions");
+      const r = await sugestoesDoFeed({ data: { accessToken: t } });
+      if (!r.ok) return;
+      setSugestoes(r.posts);
+      setPessoas(r.pessoas);
+    } catch {
+      /* Sem sugestão a tela fica só com o feed dela, que é o estado normal de
+         quem já segue todo mundo. */
+    }
+  }
+
+  async function seguirPessoa(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { seguir: chamar } = await import("@/lib/rede-social.functions");
+      await chamar({ data: { accessToken: t, alvoId } });
+      /* ⚠️ NÃO recarrega o feed aqui. O post dela só passa a valer no próximo
+         carregamento, e refazer a lista embaixo do dedo tiraria da tela o que
+         ela estava lendo. A fileira já mostra "Seguindo". */
+    } catch {
+      /* O botão volta ao normal na próxima abertura. */
+    }
+  }
 
   async function maisAntigas() {
     if (!proximo || buscandoMais.current) return;
@@ -1458,6 +1651,9 @@ export function RedeNoApp({
         novasAtividades={naoVistas}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
+        sugestoes={sugestoes}
+        pessoas={pessoas}
+        aoSeguirPessoa={seguirPessoa}
         aoAbrirSecoes={onAbrirSecoes}
         aoTocarStory={verStory}
       />

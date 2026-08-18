@@ -315,3 +315,51 @@ describe("quem viu meu story", () => {
     expect(c).toContain('motivo: "indisponivel"');
   });
 });
+
+describe("sugerido para você — o pool é estreito, e o estreitamento é o recurso", () => {
+  const C = corpoDe("sugestoesDoFeed").replace(/\s+/g, " ");
+
+  test("⚠️ os DOIS filtros: perfil público E publicação pública", () => {
+    // As duas camadas são separadas de propósito — perfil aberto com post
+    // `amigas` é o caso normal. Sugerir por uma só entregaria a estranhos o
+    // post que ela escreveu para as amigas.
+    expect(C).toContain('.eq("perfil_publico", true)');
+    expect(C).toContain('.eq("visibilidade", "publico")');
+  });
+
+  test("⚠️ ninguém do círculo dela entra — nem quem ela já pediu para seguir", () => {
+    // Sugerir alguém para quem ela acabou de mandar pedido é o app esquecendo
+    // o que ela fez cinco minutos atrás.
+    expect(C).toContain("id === eu || ctx.sigo.has(id) || ctx.bloqueio.has(id) || jaPedi.has(id)");
+    expect(C).toContain('.eq("estado", "pendente")');
+  });
+
+  test("⚠️ quem não pode ser ACHADA não pode ser sugerida — a mesma régua da busca", () => {
+    // Sem isso a sugestão vira a porta dos fundos da busca, e o Modo Cuidado
+    // volta à tela de estranhas pela lateral.
+    expect(C).toContain("podeAparecerNaBusca({");
+    expect(C).toContain("emCuidado: !!p.care_mode");
+  });
+
+  test("⚠️ o post é montado por `montarPosts`, nunca à mão", () => {
+    // É ela que aplica `podeVerPost`, assina as URLs e traz reações e salvos.
+    // Montar aqui seria a segunda régua de visibilidade do arquivo.
+    expect(C).toContain("await montarPosts(");
+    expect(C).not.toContain("imagem_path: ");
+  });
+
+  test("⚠️ a ordem é a da RÉGUA, não a do banco", () => {
+    // `montarPosts` devolve na ordem que recebeu; qualquer reordenação
+    // cronológica aqui desfaria o ranqueamento inteiro em silêncio.
+    expect(C).toContain("ordenarSugestoes(");
+    expect(C).toContain("posts.sort(");
+    expect(C).not.toContain("ordenarFeed(posts)");
+  });
+
+  test("⚠️ o número de elos NÃO viaja para o cliente", () => {
+    // Ele ordena e acaba aqui. "Seguida por Marina e mais 3" entregaria quem
+    // ela segue a quem só abriu o feed.
+    const retorno = C.slice(C.lastIndexOf("return {"));
+    expect(retorno).not.toContain("elos");
+  });
+});
