@@ -3981,3 +3981,112 @@ também o balde privado `presentes`).
 **Bancada:** `/preview-presentes` · `?rn=cheio` (o cartão completo e a ordem) ·
 `?cota=11` · `?vazio=1`. Sem ela, conferir o cartão de RN cheio exigiria montar
 um chá real e reservar seis pacotes com seis nomes diferentes.
+
+## A rede social: as dez estruturas (ago/2026)
+
+Pedido do dono: "crie toda essa estrutura que existe de uma rede social, as dez
+estruturas principais — perfis públicos e privados, seguir, postar fotos,
+reações. Por enquanto vamos tirar os comentários."
+
+Perfil · Seguir · Post · Visibilidade · Feed · Reações · Avisos · Descoberta ·
+Bloqueio · Modo Cuidado. Régua em `src/lib/rede-social.ts` (34 testes), servidor
+em `rede-social.functions.ts` (22 travas, verificadas por mutação), telas em
+`src/components/rede-social.tsx`.
+
+### ⚠️ NÃO HÁ COMENTÁRIO, e o número que decidiu
+
+De **1.098 respostas com conselho** analisadas em fóruns de gestação, **20,9%
+estavam erradas ou enganosas e 5,5% eram potencialmente danosas** — dez mulheres
+que precisavam de avaliação urgente não foram encaminhadas a ninguém. E o grupo
+**não se autocorrige**: só 5,2% das mensagens ruins foram retificadas.
+
+Num app que carrega o nome do consultório, "comigo foi assim, não precisa ir ao
+pronto-socorro" é responsabilidade do médico. Reação dá quase toda a sensação de
+comunidade com uma fração do risco, e é **reversível**: dá para abrir texto
+depois. O contrário não dá.
+
+### As decisões que vão doer se forem desfeitas
+
+- ⚠️ **O perfil nasce PRIVADO.** O grafo desta aba nasceu fechado por indicação,
+  e é isso que a torna segura SEM MODERAÇÃO. Nascer público exporia milhares de
+  gestantes de alto risco por omissão, sem nunca terem pedido plateia.
+- ⚠️ **Seguir é o PRIMEIRO GRAFO ASSIMÉTRICO do app.** `amizades` e `duplas` usam
+  par ordenado (`menor < maior`) porque a relação é mútua; aqui **não se pode** —
+  (A segue B) e (B segue A) são duas linhas válidas, e copiar o par ordenado
+  faria "seguir de volta" apagar o seguir original.
+- ⚠️ **A visibilidade do POST é separada da do PERFIL**, e a separação é o
+  recurso: um perfil público com um post `amigas` é o caso NORMAL. A
+  influenciadora publica a ultrassom para o mundo e o desabafo de terça para as
+  seis pessoas que ela conhece. Sem camada, o post é dirigido a "todo mundo que
+  me segue" — que inclui a sogra e a chefe —, e é o motivo número um de as
+  pessoas não postarem nada (colapso de contexto).
+- ⚠️ **O feed é CRONOLÓGICO.** Um feed por "relevância" precisaria de engajamento
+  como sinal — e numa comunidade de gestação de alto risco o post que gera mais
+  reação é o da EMERGÊNCIA. Um algoritmo que aprende isso põe o susto de uma
+  paciente como primeira coisa que todas veem.
+- ⚠️ **As cinco reações são o vocabulário emocional do app**, e três do Facebook
+  seriam catastróficas: **😂** embaixo do relato de um sangramento é
+  indefensável; **😮** é ambíguo (metade lê "que lindo", metade "que horror"); e
+  **😢** lê como PENA, que é a coisa que ela menos quer receber. Ficaram
+  ❤️ 🙏 🥹 👏 🤗 — e `abraco` é a que faz o conjunto funcionar: sem ela, quem
+  posta uma coisa dura só recebe coração, que soa comemorativo no momento errado.
+- ⚠️ **UMA reação por pessoa por post**, trocável. É o que impede alguém de
+  encher um post com cinco emojis, o que num post sobre notícia difícil pareceria
+  deboche.
+- ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.** O push deste app
+  é o mesmo canal do aviso de emergência, e quem desliga as notificações por
+  causa de um coraçãozinho de madrugada desliga o resto junto. O pedido manda
+  porque PEDE uma ação dela.
+- ⚠️ **Não existe contador público de seguidores.** Ele mede popularidade num
+  momento em que ela já está sendo medida clinicamente. O contador de reações de
+  um POST fica, e a diferença não é de grau: reação num post é calor sobre uma
+  coisa específica; contagem de seguidores é um ranking de pessoas. No perfil que
+  os outros veem o campo é `null`, e o servidor nem o calcula.
+- ⚠️ **A busca só encontra perfil público**, e o filtro está na CONSULTA
+  (`.eq("perfil_publico", true)`), não num filtro depois. Quem não abriu o perfil
+  não pode nem viajar pela rede.
+- ⚠️ **O bloqueio é CALADO e de efeito DUPLO.** Guardado numa direção, lido nos
+  dois. Anunciar transforma a proteção num ato de confronto, e num app onde as
+  pessoas se conhecem da vida real isso piora a situação que o motivou.
+
+### Por que a leitura não é RLS
+
+Saber se eu posso ver um post cruza QUATRO coisas: Modo Cuidado do autor,
+bloqueio nos dois sentidos, o seguir, e o grafo de amizade que já existe. Uma
+policy que fizesse isso duplicaria `podeVerPost` em SQL, e as duas divergiriam no
+primeiro conserto — com a divergência aparecendo como **post vazando**, não como
+erro. E `contextoDe` carrega tudo de uma vez: perguntar por post faria um feed de
+vinte posts custar oitenta consultas.
+
+### ⚠️ A ORDEM DO BLOQUEIO substituiu um rollback
+
+Bloquear são DUAS escritas — desfazer o seguir e gravar o bloqueio — sem
+transação entre elas. A primeira versão gravava o bloqueio e desfazia o seguir
+depois, com rollback no erro. Mas **rollback é mais uma escrita que pode falhar,
+e falhando deixa exatamente o estado que veio evitar**.
+
+Desfazendo o seguir PRIMEIRO, os dois estados intermediários viram assimétricos:
+falha no primeiro não escreve nada; falha no segundo deixa ela tendo deixado de
+seguir sem bloquear — o gesto MENOR, com erro na tela. O estado que não pode
+existir (bloqueio de pé com o seguir vivo, ressuscitando o vínculo no dia do
+desbloqueio) deixou de ser alcançável. **Meio bloqueio é pior que nenhum, porque
+ela acha que está protegida.**
+
+E a mutação que INVERTIA a ordem passava verde, porque nenhuma asserção falava de
+ordem. Hoje há uma.
+
+### Modo Cuidado
+
+Some inteira, sem anunciar, sem apagar nada: o perfil não é encontrável, os posts
+não são visíveis, ela não aparece na busca, e quem já a seguia simplesmente para
+de ver posts novos — sem nenhuma mensagem. "Fulana saiu" contaria a perda dela
+para todo mundo que a seguia.
+
+⚠️ **E ela continua vendo os PRÓPRIOS posts** (`podeVerPost` devolve `true` para
+a autora mesmo em luto). Escondê-los dela seria o app apagar o bebê dela — a
+mesma decisão que manteve `exam_files` de pé e o Álbum na Comunidade. O que some
+é a rede em volta, não a memória dela.
+
+**Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (cria as quatro
+tabelas, duas colunas em `patient_profiles` e o balde privado `rede`).
+**Bancada:** `/preview-rede` · `?tela=perfil&pedidos=3` · `?vazio=1` · `?luto=1`.
