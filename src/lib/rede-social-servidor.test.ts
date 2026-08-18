@@ -382,11 +382,14 @@ describe("o espelho — 'ver como os outros veem'", () => {
     // `podeVerPost` curto-circuita em `euId === post.autorId`: com o meu id
     // TODO post passaria, inclusive os da camada `amigas`, e a tela afirmaria
     // que uma seguidora vê o desabafo de terça. Sem erro e sem log.
-    expect(C).toContain("olharDe(persona)");
-    expect(C).toContain("montarPosts(sb, olho.euId,");
-    // E o contexto da prévia é FORJADO, não o meu.
-    expect(C).toContain("sigo: olho.sigoAtivo ?");
-    expect(C).toContain("bloqueio: new Set()");
+    // ⚠️ A escolha do olho e o contexto forjado são PUROS agora
+    // (`contextoDaPersona`), e cobertos por comportamento em
+    // `selo-do-perfil.test.ts` — uma mutação que montasse a prévia da estranha
+    // com o meu id passava verde enquanto isto era só texto de fonte.
+    expect(C).toContain("contextoDaPersona(persona, data.alvoId)");
+    expect(C).toContain("montarPosts(sb, previa.euId,");
+    expect(C).toContain("sigo: previa.sigo");
+    expect(C).toContain("bloqueio: previa.bloqueio");
   });
 
   test("⚠️ sob a prévia eu não sou eu", () => {
@@ -395,10 +398,22 @@ describe("o espelho — 'ver como os outros veem'", () => {
     expect(C).toContain("souEu: persona ? false : data.alvoId === eu");
   });
 
-  test("⚠️ a estranha bate na porta trancada, e isso não é erro", () => {
-    // É o estado da MAIORIA das pacientes: o perfil nasce fechado.
-    expect(C).toContain("personaAlcancaOPerfil(persona, !!a.perfil_publico)");
-    expect(C).toContain('motivo: "trancado" as const');
+  test("⚠️ o portão de alcance vale para o VISITANTE DE VERDADE, não só para a prévia", () => {
+    // ⚠️ Este teste nasceu de um achado confirmado: `verPerfil` NUNCA conferia
+    // `perfil_publico`. Com o uuid em mãos — e ele viaja em toda reação, todo
+    // story visto, todo pedido de seguir — qualquer paciente abria qualquer
+    // perfil, fechado ou não. E o espelho AFIRMAVA a tranca que não existia:
+    // a paciente lia "ela não consegue abrir o seu perfil" e ligava o selo
+    // confiando naquilo.
+    expect(C).toContain("alcancaOPerfil({");
+    // O vínculo REAL entra quando não há persona — `olho` é null no caminho real.
+    expect(C).toContain("sigoAtivo: olho ? olho.sigoAtivo : vinculoAtivo");
+    expect(C).toContain("somosAmigas: olho ? olho.somosAmigas : ctx.amigas.has(data.alvoId)");
+    expect(C).toContain("if (!alcanca)");
+    // E a recusa do caminho real é a MESMA das outras: distinguir contaria à
+    // visitante que aquele perfil existe e está fechado.
+    expect(C).toContain('return persona ? { ok: false as const, motivo: "trancado" as const }');
+    expect(C).toContain(': { ok: false as const, motivo: "indisponivel" as const };');
   });
 
   test("⚠️ o SELO passa pela mesma régua na prévia e na tela real", () => {
@@ -418,8 +433,13 @@ describe("o espelho — 'ver como os outros veem'", () => {
     // semana da mesma paciente.
     const c = funcaoInterna("seloDe").replace(/\s+/g, " ");
     expect(c).toContain("computeGestation({");
-    expect(c).toContain("nasceu: !!p?.birth_date");
-    expect(c).toContain("emCuidado: !!p?.care_mode");
+    // ⚠️ E o "hoje" é o de SÃO PAULO, não o do contêiner: o servidor roda em
+    // UTC e, das 21h à meia-noite, já está no dia seguinte — num dia de cada
+    // sete isso é a virada de semana, e o perfil discordaria da home da mesma
+    // paciente, na mesma sessão.
+    expect(c).toContain("today: hojeEmSaoPaulo()");
+    // O mapeamento linha→entrada é puro e testado por comportamento.
+    expect(c).toContain("seloDoPerfil(entradaDoSelo(p,");
     expect(c).not.toMatch(/new Date\(.*86400000/);
   });
 });

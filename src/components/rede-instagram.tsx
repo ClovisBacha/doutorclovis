@@ -898,8 +898,19 @@ export function TelaDePerfil({
             que `haQuantoPublicou` acabou de consertar. */}
         {(perfil.seloSemana || perfil.seloBebe) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            {/* ⚠️ `text-primary` sobre `primary/12` media 3,87:1 — abaixo do piso
+                de 4,5 que este projeto já cobrou de si mesmo na Loja de
+                Sementinhas. 12px em peso 600 não é "texto grande" pela WCAG (o
+                corte é 18,66px), e este é justamente o número que a função
+                inteira existe para publicar: o texto menos legível da tela era o
+                único conteúdo novo dela.
+
+                ⚠️ E o comentário fica AQUI, fora do `{cond && (…)}` — dentro
+                dele, um comentário JSX vira o segundo filho da expressão e
+                custa um `TS1005` que aponta para a linha do `<span>`. Já está
+                escrito no CLAUDE.md, e eu caí nele de novo. */}
             {perfil.seloSemana && (
-              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[12px] font-semibold text-primary">
+              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[12px] font-semibold text-foreground">
                 🤰 {perfil.seloSemana}
               </span>
             )}

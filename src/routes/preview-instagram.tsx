@@ -343,7 +343,22 @@ function Bancada() {
           /* A bancada troca a persona LOCALMENTE; no app quem responde é o
              servidor, com `verPerfil({comoVisitante})`. O que se confere aqui é
              o desenho: a fita das três, o estado trancado e a tela inerte. */
-          perfil={{ ...perfil, souEu: false, meusSeguidores: null, meuVinculo: null }}
+          /* ⚠️ O espelho é sempre o MEU perfil, por definição — e o vínculo sai
+             da persona, como o servidor faz (`null` para a estranha, "ativo"
+             para as outras duas). A bancada desenhava outra pessoa, um
+             pós-parto com selo de 32 semanas (o par exato que `semanaPublica`
+             recusa) e "Seguir" nas três personas. É a mesma classe de defeito
+             que a bio chumbada tinha: a bancada aprovando o que o servidor não
+             produz. */
+          perfil={{
+            ...perfil,
+            /* O espelho é sempre o MEU perfil, então o nome é o meu. */
+            id: "eu",
+            nome: "Marina Costa",
+            souEu: false,
+            meusSeguidores: null,
+            meuVinculo: persona === "estranha" ? null : "ativo",
+          }}
           posts={persona === "estranha" ? POSTS.slice(0, 2) : POSTS.slice(0, 5)}
           trancado={trancado && persona === "estranha"}
           carregando={false}

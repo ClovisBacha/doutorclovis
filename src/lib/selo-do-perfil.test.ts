@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+  alcancaOPerfil,
+  contextoDaPersona,
+  entradaDoSelo,
   MOSTRAR_BEBE_PADRAO,
   MOSTRAR_SEMANA_PADRAO,
   OLHO_DA_PREVIA,
@@ -148,5 +151,137 @@ describe("⚠️ a regra das Amigas continua valendo LÁ", () => {
     for (const proibido of ["lmp_date", "due_date", "computeGestation", "semanaPublica"]) {
       expect(fns).not.toContain(proibido);
     }
+  });
+});
+
+describe("a linha do banco vira entrada — e é aqui que o consentimento vive", () => {
+  /* ⚠️ Estes testes existem por causa de uma mutação que passou VERDE na
+     verificação da Fase 1: cravar `mostrarSemana: true, mostrarBebe: true` no
+     adaptador dentro do servidor desligava o consentimento inteiro e os 3.149
+     testes continuavam passando — a única cobertura daquele trecho era um
+     `toContain` sobre o texto do fonte. */
+
+  test("⚠️ chave ausente vale FALSE, nunca true", () => {
+    // É o que faz um banco sem as colunas se comportar como "ela não ligou
+    // nada" — que é a verdade.
+    const e = entradaDoSelo({ baby_name: "Helena" }, 200);
+    expect(e.mostrarSemana).toBe(false);
+    expect(e.mostrarBebe).toBe(false);
+    expect(seloDoPerfil(e)).toEqual({ semana: null, bebe: null });
+  });
+
+  test("⚠️ e só o `true` literal liga — nem 1, nem 'sim'", () => {
+    const e = entradaDoSelo({ mostrar_semana: 1 as never, mostrar_bebe: "sim" as never }, 200);
+    expect(e.mostrarSemana).toBe(false);
+    expect(e.mostrarBebe).toBe(false);
+  });
+
+  test("a linha inteira ausente não estoura", () => {
+    expect(seloDoPerfil(entradaDoSelo(null, null))).toEqual({ semana: null, bebe: null });
+  });
+
+  test("os quatro sinais chegam íntegros", () => {
+    const e = entradaDoSelo(
+      {
+        care_mode: true,
+        birth_date: "2026-08-01",
+        baby_name: " Helena ",
+        mostrar_semana: true,
+        mostrar_bebe: true,
+      },
+      200,
+    );
+    expect(e).toEqual({
+      totalDias: 200,
+      nasceu: true,
+      emCuidado: true,
+      mostrarSemana: true,
+      mostrarBebe: true,
+      nomeDoBebe: " Helena ",
+    });
+  });
+});
+
+describe("o contexto da prévia", () => {
+  const ALVO = "11111111-1111-1111-1111-111111111111";
+
+  test("⚠️ a estranha não segue e não é amiga — e o olho não é o meu id", () => {
+    // A mutação que a verificação achou montava a prévia da estranha com o meu
+    // id, e nenhum teste ficava vermelho.
+    const c = contextoDaPersona("estranha", ALVO);
+    expect(c.euId).toBe(OLHO_DA_PREVIA);
+    expect(c.sigo.has(ALVO)).toBe(false);
+    expect(c.amigas.has(ALVO)).toBe(false);
+  });
+
+  test("a seguidora segue e não é amiga", () => {
+    const c = contextoDaPersona("seguidora", ALVO);
+    expect(c.sigo.has(ALVO)).toBe(true);
+    expect(c.amigas.has(ALVO)).toBe(false);
+  });
+
+  test("a amiga é as duas coisas", () => {
+    const c = contextoDaPersona("amiga", ALVO);
+    expect(c.sigo.has(ALVO)).toBe(true);
+    expect(c.amigas.has(ALVO)).toBe(true);
+  });
+
+  test("nenhuma persona nasce com bloqueio", () => {
+    for (const p of ["estranha", "seguidora", "amiga"] as const) {
+      expect(contextoDaPersona(p, ALVO).bloqueio.size).toBe(0);
+    }
+  });
+});
+
+describe("quem alcança o perfil — a régua dos DOIS lados", () => {
+  test("⚠️ perfil fechado: a estranha NÃO alcança", () => {
+    // Este é o furo que a verificação encontrou: `verPerfil` nunca conferia
+    // `perfil_publico`, e com o uuid em mãos qualquer paciente abria qualquer
+    // perfil — agora carregando semana e nome do bebê.
+    expect(
+      alcancaOPerfil({ perfilPublico: false, souEu: false, sigoAtivo: false, somosAmigas: false }),
+    ).toBe(false);
+  });
+
+  test("perfil aberto: qualquer uma alcança", () => {
+    expect(
+      alcancaOPerfil({ perfilPublico: true, souEu: false, sigoAtivo: false, somosAmigas: false }),
+    ).toBe(true);
+  });
+
+  test("fechar o perfil não expulsa quem já entrou", () => {
+    // Fechar é impedir gente NOVA. Quem já foi aceita, e a amiga que entrou
+    // pelo convite, continuam vendo.
+    expect(
+      alcancaOPerfil({ perfilPublico: false, souEu: false, sigoAtivo: true, somosAmigas: false }),
+    ).toBe(true);
+    expect(
+      alcancaOPerfil({ perfilPublico: false, souEu: false, sigoAtivo: false, somosAmigas: true }),
+    ).toBe(true);
+  });
+
+  test("a dona sempre alcança o próprio perfil, mesmo fechado", () => {
+    expect(
+      alcancaOPerfil({ perfilPublico: false, souEu: true, sigoAtivo: false, somosAmigas: false }),
+    ).toBe(true);
+  });
+
+  test("⚠️ o espelho usa a MESMA régua", () => {
+    // Enquanto eram duas, uma afirmava na tela a regra que a outra não aplicava
+    // no servidor.
+    expect(personaAlcancaOPerfil("estranha", false)).toBe(false);
+    expect(personaAlcancaOPerfil("seguidora", false)).toBe(true);
+    expect(personaAlcancaOPerfil("amiga", false)).toBe(true);
+    expect(personaAlcancaOPerfil("estranha", true)).toBe(true);
+  });
+});
+
+describe("o piso da semana", () => {
+  test("⚠️ '0 semanas' não é silêncio", () => {
+    // A régua promete calar quando não há o que dizer, e devolvia um número.
+    // A jornada do próprio app começa na semana 1.
+    expect(semanaPublica({ ...BASE, totalDias: 0 })).toBeNull();
+    expect(semanaPublica({ ...BASE, totalDias: 6 })).toBeNull();
+    expect(semanaPublica({ ...BASE, totalDias: 7 })).toBe("1 semana");
   });
 });

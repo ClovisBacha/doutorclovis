@@ -280,10 +280,18 @@ export function ConfiguracoesDoPerfil({
 
         <ChaveDoPerfil
           titulo="Mostrar a semana da gestação"
+          /* ⚠️ Chaveia pelo RESULTADO, e não pela chave — como o irmão do nome
+             do bebê, dois centímetros abaixo, sempre fez. Com a chave, toda
+             paciente que ligou o selo chegava ao parto e passava a ler
+             `Aparece "a sua semana" no seu perfil`: um marcador de posição
+             entre aspas, prometendo um selo que já não existe, numa tela cujo
+             pedido é justamente "não podemos expor a paciente sem ela saber". */
           descricao={
-            perfil.mostrarSemana
-              ? `Aparece "${perfil.seloSemana ?? "a sua semana"}" no seu perfil, e ela se atualiza sozinha toda semana.`
-              : "Um selo com a sua semana, que se atualiza sozinho. Fica visível para quem abre o seu perfil."
+            perfil.seloSemana
+              ? `Aparece "${perfil.seloSemana}" no seu perfil, e ela se atualiza sozinha toda semana.`
+              : perfil.mostrarSemana
+                ? "Ligado — mas hoje não há semana para mostrar (depois do parto, ou sem a data da última menstruação). Nada aparece no seu perfil."
+                : "Um selo com a sua semana, que se atualiza sozinho. Fica visível para quem abre o seu perfil."
           }
           ligada={!!perfil.mostrarSemana}
           desabilitada={salvando}

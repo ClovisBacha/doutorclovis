@@ -39,7 +39,14 @@ import {
   type EspecieDeAviso,
   type Visibilidade,
 } from "@/lib/rede-social";
-import { olharDe, personaAlcancaOPerfil, seloDoPerfil, type Persona } from "@/lib/selo-do-perfil";
+import {
+  alcancaOPerfil,
+  contextoDaPersona,
+  entradaDoSelo,
+  olharDe,
+  seloDoPerfil,
+  type Persona,
+} from "@/lib/selo-do-perfil";
 import {
   AUTORAS_CONSULTADAS,
   ordenarPessoas,
@@ -156,19 +163,45 @@ async function contextoDe(sb: any, eu: string): Promise<Contexto> {
 /** Perfis por id, com o que a rede precisa. */
 async function perfisPorId(sb: any, ids: string[]) {
   if (ids.length === 0) return new Map<string, any>();
-  const { data } = await sb
-    .from("patient_profiles")
-    /* ⚠️ As colunas do SELO viajam junto, e não num select próprio: este é o
-       único lugar da rede que lê `patient_profiles`, e um segundo select
-       divergiria dele no primeiro conserto. São colunas escalares da linha que
-       já está sendo lida — não custam consulta a mais. */
-    .select(
-      "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
-        "baby_name, mostrar_semana, mostrar_bebe, " +
-        "lmp_date, reference_date, reference_weeks, reference_days, birth_date",
-    )
-    .in("id", ids);
-  return new Map(((data ?? []) as any[]).map((p) => [p.id, p]));
+  const { data, error } = await sb.from("patient_profiles").select(COLUNAS_DO_PERFIL).in("id", ids);
+
+  /* ⚠️ **RECUO PARA BANCO SEM AS COLUNAS DO SELO.**
+     `mostrar_semana`/`mostrar_bebe` nascem num `APLICAR_` que o dono roda à
+     mão, e o deploy chega antes. Sem este recuo, o select inteiro falha com
+     `42703` e `perfisPorId` devolve um Map VAZIO — e como `montarPosts`
+     descarta todo post cujo autor não está no Map, a aba Comunidade inteira
+     fica preta em silêncio: feed vazio, nenhum perfil abre, busca sem
+     resultado, e `verPerfil` respondendo `indisponivel` para a própria dona,
+     que é a mesma palavra de "bloqueada" e "em luto".
+
+     É a mesma família do `pre_consultation_forms` que custou um pedido de
+     pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
+     tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
+     chaves valem `false` — que é o padrão delas de qualquer forma. */
+  const linhas = error ? await semAsColunasDoSelo(sb, ids) : ((data ?? []) as any[]);
+  return new Map(linhas.map((p) => [p.id, p]));
+}
+
+/** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
+const COLUNAS_DO_PERFIL =
+  "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
+  "baby_name, mostrar_semana, mostrar_bebe, " +
+  "lmp_date, reference_date, reference_weeks, reference_days, birth_date";
+
+const COLUNAS_SEM_SELO =
+  "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
+  "baby_name, lmp_date, reference_date, reference_weeks, reference_days, birth_date";
+
+async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
+  console.warn("[rede] sem mostrar_semana/mostrar_bebe — rode APLICAR_REDE_SOCIAL.sql");
+  const { data } = await sb.from("patient_profiles").select(COLUNAS_SEM_SELO).in("id", ids);
+  /* As chaves ausentes valem `false`: a paciente não pode ter ligado o que o
+     banco ainda não sabe guardar. */
+  return ((data ?? []) as any[]).map((p) => ({
+    ...p,
+    mostrar_semana: false,
+    mostrar_bebe: false,
+  }));
 }
 
 /**
@@ -179,6 +212,27 @@ async function perfisPorId(sb: any, ids: string[]) {
  * aqui faria a rede social discordar do consultório sobre a semana da mesma
  * paciente.
  */
+/**
+ * "Hoje" no fuso da paciente.
+ *
+ * A base inteira é brasileira, e o app já toma essa decisão em outros lugares
+ * (o cron do lembrete de meditação, a contagem de dias distintos das
+ * conquistas). Sem isto, a semana do perfil discorda da semana da home por
+ * três horas todo dia.
+ */
+function hojeEmSaoPaulo(): Date {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  /* Meio-dia, e não meia-noite: `computeGestation` monta a data da DUM com
+     `T00:00:00` local do processo, e comparar duas meias-noites de fusos
+     diferentes erra por um dia inteiro na direção errada. */
+  return new Date(`${partes}T12:00:00`);
+}
+
 async function seloDe(p: any) {
   const { computeGestation } = await import("@/lib/gestacao");
   const g = computeGestation({
@@ -186,15 +240,18 @@ async function seloDe(p: any) {
     referenceDate: p?.reference_date ?? null,
     referenceWeeks: p?.reference_weeks ?? null,
     referenceDays: p?.reference_days ?? null,
+    /* ⚠️ **O dia é o de SÃO PAULO, não o do contêiner.** O servidor roda em
+       UTC; das 21h à meia-noite ele já está no dia seguinte, e num dia de cada
+       sete isso é a virada de semana: o perfil mostraria "28 semanas" enquanto
+       a home da mesma paciente, na mesma sessão, mostra 27 em corpo gigante —
+       porque a home calcula no navegador dela. Medido pela verificação. */
+    today: hojeEmSaoPaulo(),
   });
-  return seloDoPerfil({
-    totalDias: g?.totalDays ?? null,
-    nasceu: !!p?.birth_date,
-    emCuidado: !!p?.care_mode,
-    mostrarSemana: !!p?.mostrar_semana,
-    mostrarBebe: !!p?.mostrar_bebe,
-    nomeDoBebe: p?.baby_name ?? null,
-  });
+  /* ⚠️ O mapeamento linha→entrada é PURO e mora em `selo-do-perfil.ts`: uma
+     mutação que cravava `mostrarSemana: true` aqui — desligando o
+     consentimento inteiro — passava com os 3.149 testes verdes, porque a única
+     cobertura deste trecho era um `toContain` sobre o texto do fonte. */
+  return seloDoPerfil(entradaDoSelo(p, g?.totalDays ?? null));
 }
 
 /** Reações de vários posts, agrupadas. */
@@ -316,16 +373,13 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const [{ data: p }, { count: seguidores }, { data: pendentes }] = await Promise.all([
-      sb
-        .from("patient_profiles")
-        .select(
-          "display_name, avatar_url, bio, perfil_publico, care_mode, " +
-            "baby_name, mostrar_semana, mostrar_bebe, " +
-            "lmp_date, reference_date, reference_weeks, reference_days, birth_date",
-        )
-        .eq("id", eu)
-        .maybeSingle(),
+    /* ⚠️ O perfil sai de `perfisPorId`, e não de um select próprio: era a
+       SEGUNDA leitura de `patient_profiles` deste arquivo, com a mesma lista de
+       colunas escrita à mão — e sem o recuo para banco sem as colunas do selo,
+       que é justamente o que deixaria ESTA tela (a que liga as chaves) sem
+       perfil nenhum. Uma leitura só, um recuo só. */
+    const [meus, { count: seguidores }, { data: pendentes }] = await Promise.all([
+      perfisPorId(sb, [eu]),
       sb
         .from("rede_seguidores")
         .select("id", { count: "exact", head: true })
@@ -339,6 +393,9 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         .order("criado_em", { ascending: false })
         .limit(50),
     ]);
+
+    const p = meus.get(eu);
+    if (!p) return { ok: false as const, motivo: "indisponivel" as const };
 
     const quemPediu = await perfisPorId(
       sb,
@@ -500,20 +557,39 @@ export const verPerfil = createServerFn({ method: "POST" })
       return { ok: false as const, motivo: "indisponivel" as const };
     }
 
-    /* ⚠️ Com o perfil FECHADO (o padrão de toda paciente), a estranha não
-       alcança nada — e o espelho tem de dizer isso em vez de desenhar um perfil
-       bonito que ninguém abre. É a informação mais útil que esta tela dá para a
-       maioria: a de que ela não está exposta a ninguém. */
-    if (persona && !personaAlcancaOPerfil(persona, !!a.perfil_publico)) {
-      return { ok: false as const, motivo: "trancado" as const };
-    }
-
     const { data: vinculo } = await sb
       .from("rede_seguidores")
       .select("estado")
       .eq("seguidor_id", eu)
       .eq("seguido_id", data.alvoId)
       .maybeSingle();
+
+    /* ⚠️ **O PORTÃO DE ALCANCE, e ele vale para o visitante DE VERDADE.**
+       Até a Fase 1 esta função nunca conferiu `perfil_publico`: com o uuid em
+       mãos — e ele viaja em toda reação, todo story visto, todo pedido de
+       seguir — qualquer paciente abria qualquer perfil, fechado ou não. A mesma
+       Fase 1 pôs ali a idade gestacional e o nome do bebê, e o espelho passou a
+       AFIRMAR uma tranca que não existia.
+
+       A recusa é o MESMO `indisponivel` de bloqueio e Modo Cuidado: distinguir
+       contaria à visitante que aquele perfil existe e está fechado. */
+    const vinculoAtivo = ((vinculo as any)?.estado ?? null) === "ativo";
+    const olho = persona ? olharDe(persona) : null;
+    const alcanca = alcancaOPerfil({
+      perfilPublico: !!a.perfil_publico,
+      souEu: persona ? false : data.alvoId === eu,
+      sigoAtivo: olho ? olho.sigoAtivo : vinculoAtivo,
+      somosAmigas: olho ? olho.somosAmigas : ctx.amigas.has(data.alvoId),
+    });
+    if (!alcanca) {
+      /* ⚠️ Só o ESPELHO distingue "trancado" de "indisponivel" — e ele só existe
+         sobre o meu próprio perfil, então a distinção nunca vaza para terceiros.
+         É o que permite a tela dizer "ela não consegue abrir" em vez de "não
+         consegui montar a prévia". */
+      return persona
+        ? { ok: false as const, motivo: "trancado" as const }
+        : { ok: false as const, motivo: "indisponivel" as const };
+    }
 
     const { data: brutos } = await sb
       .from("rede_posts")
@@ -527,12 +603,12 @@ export const verPerfil = createServerFn({ method: "POST" })
        curto-circuita em `euId === post.autorId` ("a dona sempre vê os dela"), e
        com o meu id TODO post passaria — inclusive os da camada `amigas`. A tela
        afirmaria que uma seguidora vê o desabafo de terça, sem erro e sem log. */
-    const olho = persona ? olharDe(persona) : null;
-    const posts = olho
-      ? await montarPosts(sb, olho.euId, (brutos ?? []) as any[], {
-          sigo: olho.sigoAtivo ? new Set([data.alvoId]) : new Set(),
-          amigas: olho.somosAmigas ? new Set([data.alvoId]) : new Set(),
-          bloqueio: new Set(),
+    const previa = persona ? contextoDaPersona(persona, data.alvoId) : null;
+    const posts = previa
+      ? await montarPosts(sb, previa.euId, (brutos ?? []) as any[], {
+          sigo: previa.sigo,
+          amigas: previa.amigas,
+          bloqueio: previa.bloqueio,
         })
       : await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
 
@@ -563,8 +639,13 @@ export const verPerfil = createServerFn({ method: "POST" })
          `podeVerPost` desenharia sem nunca ter filtrado. */
       seloSemana: selo.semana,
       seloBebe: selo.bebe,
-      mostrarSemana: !!a.mostrar_semana,
-      mostrarBebe: !!a.mostrar_bebe,
+      /* ⚠️ As chaves são DELA, e só ela as recebe — a mesma régua do
+         `meusSeguidores` logo acima. Num perfil de terceiro, `mostrarSemana:
+         true` com `seloSemana: null` só acontece por três causas (o bebê
+         nasceu, a DUM sumiu, passou de 42 semanas), e as três são informação
+         que ninguém pediu para publicar. */
+      mostrarSemana: !persona && data.alvoId === eu ? !!a.mostrar_semana : false,
+      mostrarBebe: !persona && data.alvoId === eu ? !!a.mostrar_bebe : false,
     };
 
     return { ok: true as const, perfil, posts: ordenarFeed(posts) };
