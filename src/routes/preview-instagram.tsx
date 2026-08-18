@@ -14,6 +14,7 @@
  *   /preview-instagram?tela=editar  → editar perfil (foto, nome, bio)
  *   /preview-instagram?tela=lista   → a lista de seguidores
  *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
+ *   /preview-instagram?tela=story   → o visor de story em tela cheia
  */
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -22,10 +23,11 @@ import {
   TelaDePerfil,
   TelaDoPost,
   TelaPrincipal,
+  VisorDeStory,
   type PessoaNaLista,
   type Story,
 } from "@/components/rede-instagram";
-import type { PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
+import type { BolhaDeStory, PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
 
 export const Route = createFileRoute("/preview-instagram")({
   component: Bancada,
@@ -148,6 +150,29 @@ function Bancada() {
         />
       </div>
     );
+  }
+
+  if (tela === "story") {
+    /* Três stories do mesmo autor: é o que prova as TRÊS barrinhas no topo,
+       a animação só na atual, e o avanço ao tocar na metade direita. Com um
+       só, a barra ocuparia a largura inteira e não haveria o que conferir. */
+    const b: BolhaDeStory = {
+      autorId: "marina",
+      autorNome: "Marina Costa",
+      autorAvatar: null,
+      novo: true,
+      stories: CORES.slice(0, 3).map((c, n) => ({
+        id: `st${n}`,
+        autorId: "marina",
+        autorNome: "Marina Costa",
+        autorAvatar: null,
+        imagemUrl: foto(c[0], c[1], c[2]),
+        texto: n === 1 ? "31 semanas hoje 🤍" : null,
+        criadoEm: atras(60 * (n + 1)),
+        visto: false,
+      })),
+    };
+    return <VisorDeStory bolha={b} aoFechar={() => history.back()} />;
   }
 
   if (tela === "post") {

@@ -934,3 +934,273 @@ export const verPost = createServerFn({ method: "POST" })
 
     return { ok: true as const, post };
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   STORIES — a foto que some em 24 horas
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type StoryNaTela = {
+  id: string;
+  autorId: string;
+  autorNome: string;
+  autorAvatar: string | null;
+  imagemUrl: string | null;
+  texto: string | null;
+  criadoEm: string;
+  visto: boolean;
+};
+
+/** Um autor e os stories vivos dele — é assim que a fileira desenha. */
+export type BolhaDeStory = {
+  autorId: string;
+  autorNome: string;
+  autorAvatar: string | null;
+  /** Algum ainda não visto? É o que acende o anel. */
+  novo: boolean;
+  stories: StoryNaTela[];
+};
+
+export const publicarStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        imagem: z.string().max(1_500_000),
+        texto: z.string().max(200).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* Modo Cuidado não publica — o mesmo portão de `publicarPost`, e pelo mesmo
+       motivo: um pedido montado à mão não passa pela tela. */
+    const { data: meu } = await sb
+      .from("patient_profiles")
+      .select("care_mode")
+      .eq("id", eu)
+      .maybeSingle();
+    if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { guardarImagem } = await import("@/lib/imagens.server");
+    const caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
+    if (!caminho) return { ok: false as const, motivo: "imagem" as const };
+
+    const { error } = await sb
+      .from("rede_stories")
+      .insert({ autor_id: eu, imagem_path: caminho, texto: data.texto });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * A fileira de bolinhas.
+ *
+ * ⚠️ **A MINHA vem primeiro, sempre — mesmo sem story.** É a bolinha do
+ * "adicionar", e o Instagram faz assim porque ela é o convite: sem ela na
+ * primeira posição, publicar um story vira uma função escondida.
+ *
+ * ⚠️ E os expirados NÃO são apagados aqui. A consulta filtra por `expira_em`;
+ * a linha morta fica no banco até alguém varrer. Apagar na leitura faria uma
+ * consulta de tela virar escrita, e uma tela que apaga dado é uma tela que
+ * apaga dado quando não devia.
+ */
+export const storiesDoFeed = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const ctx = await contextoDe(sb, eu);
+    const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
+      (id) => !ctx.bloqueio.has(id) || id === eu,
+    );
+
+    const agora = new Date().toISOString();
+    const { data: brutos } = await sb
+      .from("rede_stories")
+      .select("id, autor_id, imagem_path, texto, criado_em")
+      .in("autor_id", de)
+      .gt("expira_em", agora)
+      .order("criado_em", { ascending: true })
+      .limit(200);
+
+    const linhas = (brutos ?? []) as any[];
+    const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
+
+    const { data: vistos } = await sb
+      .from("rede_stories_vistos")
+      .select("story_id")
+      .eq("quem_id", eu)
+      .in(
+        "story_id",
+        linhas.map((l) => l.id),
+      );
+    const jaVi = new Set(((vistos ?? []) as { story_id: string }[]).map((v) => v.story_id));
+
+    const { urlAssinada } = await import("@/lib/imagens.server");
+    const porAutor = new Map<string, BolhaDeStory>();
+
+    for (const l of linhas) {
+      const p = perfis.get(l.autor_id);
+      /* Modo Cuidado tira os stories da fileira, como tira tudo o mais. */
+      if (!p || p.care_mode) continue;
+      const b: BolhaDeStory = porAutor.get(l.autor_id) ?? {
+        autorId: l.autor_id,
+        autorNome: (p.display_name ?? "").trim() || "Alguém",
+        autorAvatar: p.avatar_url ?? null,
+        novo: false,
+        stories: [],
+      };
+      const visto = jaVi.has(l.id);
+      b.novo = b.novo || !visto;
+      b.stories.push({
+        id: l.id,
+        autorId: l.autor_id,
+        autorNome: b.autorNome,
+        autorAvatar: b.autorAvatar,
+        imagemUrl: await urlAssinada("rede", l.imagem_path, 3600),
+        texto: l.texto ?? null,
+        criadoEm: l.criado_em,
+        visto,
+      });
+      porAutor.set(l.autor_id, b);
+    }
+
+    /* ⚠️ A ordem: EU primeiro, depois os NÃO VISTOS, depois o resto. É a régua
+       do Instagram, e ela é útil — quem tem coisa nova para mostrar fica onde
+       o polegar alcança sem rolar. */
+    const bolhas = [...porAutor.values()].sort((a, b) => {
+      if (a.autorId === eu) return -1;
+      if (b.autorId === eu) return 1;
+      if (a.novo !== b.novo) return a.novo ? -1 : 1;
+      return 0;
+    });
+
+    return { ok: true as const, bolhas };
+  });
+
+export const marcarStoryVisto = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), storyId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* `ignoreDuplicates`: ver o mesmo story duas vezes é o caso comum, e a
+       chave primária composta já recusa a segunda linha. */
+    const { error } = await sb
+      .from("rede_stories_vistos")
+      .upsert({ story_id: data.storyId, quem_id: eu }, { onConflict: "story_id,quem_id" });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SALVAR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export const salvarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        salvar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (!data.salvar) {
+      const { error } = await sb
+        .from("rede_salvos")
+        .delete()
+        .eq("quem_id", eu)
+        .eq("post_id", data.postId);
+      if (error) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const };
+    }
+
+    /* ⚠️ Salvar exige poder VER o post, pela mesma razão de `reagir`: sem a
+       conferência, um id sorteado que respondesse 200 confirmaria a existência
+       de um post privado. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade")
+      .eq("id", data.postId)
+      .is("arquivado_em", null)
+      .maybeSingle();
+    if (!post) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const ctx = await contextoDe(sb, eu);
+    const a = (await perfisPorId(sb, [(post as any).autor_id])).get((post as any).autor_id);
+    const pode =
+      !!a &&
+      podeVerPost({
+        post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
+        euId: eu,
+        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        bloqueado: ctx.bloqueio.has((post as any).autor_id),
+        sigoAtivo: ctx.sigo.has((post as any).autor_id),
+        somosAmigas: ctx.amigas.has((post as any).autor_id),
+      });
+    if (!pode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb
+      .from("rede_salvos")
+      .upsert({ quem_id: eu, post_id: data.postId }, { onConflict: "quem_id,post_id" });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/** Os posts que ela salvou. Ninguém mais vê esta lista — nem a autora deles. */
+export const meusSalvos = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: linhas } = await sb
+      .from("rede_salvos")
+      .select("post_id, criado_em")
+      .eq("quem_id", eu)
+      .order("criado_em", { ascending: false })
+      .limit(100);
+
+    const ids = ((linhas ?? []) as { post_id: string }[]).map((l) => l.post_id);
+    if (ids.length === 0) return { ok: true as const, posts: [] };
+
+    const { data: brutos } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, visibilidade, criado_em")
+      .in("id", ids)
+      .is("arquivado_em", null);
+
+    const ctx = await contextoDe(sb, eu);
+    /* ⚠️ Passa pela régua DE NOVO na leitura: ela pode ter salvado um post e a
+       autora ter fechado o perfil, entrado em Modo Cuidado ou bloqueado depois.
+       Salvo não é uma cópia — é um marcador, e o marcador não sobrevive à
+       decisão de quem escreveu. */
+    const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+    return { ok: true as const, posts: ordenarFeed(posts) };
+  });

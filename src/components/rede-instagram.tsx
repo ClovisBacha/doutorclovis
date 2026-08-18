@@ -49,7 +49,7 @@ import {
   totalDeReacoes,
   type TipoDeReacao,
 } from "@/lib/rede-social";
-import type { PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
+import type { BolhaDeStory, PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
 
 /* ══════════════════════════════════════════════════════════════════════════
    PEÇAS
@@ -282,6 +282,7 @@ export function TelaPrincipal({
   aoAbrirPerfil,
   aoPublicar,
   aoAbrirSecoes,
+  aoTocarStory,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -300,6 +301,8 @@ export function TelaPrincipal({
    * outro lado do cabeçalho.
    */
   aoAbrirSecoes?: () => void;
+  /** Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story. */
+  aoTocarStory?: (autorId: string) => void;
 }) {
   const doAlgoritmo = useMemo(() => new Set(sugeridos), [sugeridos]);
 
@@ -332,7 +335,7 @@ export function TelaPrincipal({
         </div>
       </header>
 
-      <FileiraDeStories stories={stories} />
+      <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
 
       {posts.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">
@@ -581,7 +584,11 @@ export function RedeNoApp({
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
   const [gente, setGente] = useState<PessoaNaLista[]>([]);
   const [oPost, setOPost] = useState<PostNaTela | null>(null);
+  const [bolhas, setBolhas] = useState<BolhaDeStory[]>([]);
+  const [vendoStory, setVendoStory] = useState<BolhaDeStory | null>(null);
+  const [euId, setEuId] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const arquivoDoStory = useRef<HTMLInputElement>(null);
 
   async function token() {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -593,9 +600,17 @@ export function RedeNoApp({
     try {
       const t = await token();
       if (!t) return;
-      const { meuFeed } = await import("@/lib/rede-social.functions");
-      const r = await meuFeed({ data: { accessToken: t } });
+      const mod = await import("@/lib/rede-social.functions");
+      /* Feed e stories em PARALELO: são duas consultas independentes, e em
+         série a fileira só apareceria depois de o feed inteiro chegar. */
+      const [r, st, meu] = await Promise.all([
+        mod.meuFeed({ data: { accessToken: t } }),
+        mod.storiesDoFeed({ data: { accessToken: t } }),
+        mod.meuPerfilSocial({ data: { accessToken: t } }),
+      ]);
       if (r.ok) setPosts(r.posts);
+      if (st.ok) setBolhas(st.bolhas);
+      if (meu.ok) setEuId(meu.perfil.id);
     } catch {
       /* Feed vazio é melhor que erro: ela não veio buscar um erro. */
     } finally {
@@ -723,7 +738,61 @@ export function RedeNoApp({
     }
   }
 
+  async function publicarStory(dataUrl: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { publicarStory: chamar } = await import("@/lib/rede-social.functions");
+      const r = await chamar({ data: { accessToken: t, imagem: dataUrl, texto: null } });
+      if (r.ok) void carregarFeed();
+    } catch {
+      /* A fileira não muda; ela tenta de novo. */
+    }
+  }
+
+  async function verStory(autorId: string) {
+    const b = bolhas.find((x) => x.autorId === autorId);
+    /* ⚠️ Tocar na MINHA bolinha sem story nenhum abre o seletor de foto, não
+       um visor vazio. É a bolinha do "adicionar", e é assim que publicar um
+       story deixa de ser função escondida. */
+    if (!b || b.stories.length === 0) {
+      if (autorId === euId) arquivoDoStory.current?.click();
+      return;
+    }
+    setVendoStory(b);
+  }
+
+  async function marcarVisto(storyId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { marcarStoryVisto } = await import("@/lib/rede-social.functions");
+      await marcarStoryVisto({ data: { accessToken: t, storyId } });
+      /* O anel apaga na hora, sem esperar recarga — quem acabou de ver não
+         deve encontrar o anel aceso ao fechar. */
+      setBolhas((bs) =>
+        bs.map((b) =>
+          b.stories.some((x) => x.id === storyId)
+            ? {
+                ...b,
+                stories: b.stories.map((x) => (x.id === storyId ? { ...x, visto: true } : x)),
+                novo: b.stories.some((x) => x.id !== storyId && !x.visto),
+              }
+            : b,
+        ),
+      );
+    } catch {
+      /* Não visto continua não visto; a próxima abertura corrige. */
+    }
+  }
+
   if (careMode) return null;
+
+  if (vendoStory) {
+    return (
+      <VisorDeStory bolha={vendoStory} aoFechar={() => setVendoStory(null)} aoVer={marcarVisto} />
+    );
+  }
 
   if (onde.t === "editar" && perfil) {
     return (
@@ -772,13 +841,45 @@ export function RedeNoApp({
 
   if (carregando) return <div className="skeleton h-80 rounded-2xl" />;
 
+  /* A MINHA bolinha entra sempre, mesmo sem story — é o convite para publicar.
+     Se o servidor já a devolveu (porque tenho story vivo), ela não é
+     duplicada. */
+  const fileira: Story[] = [
+    ...(euId && !bolhas.some((b) => b.autorId === euId)
+      ? [{ id: euId, nome: "Seu story", avatarUrl: perfil?.avatarUrl ?? null, novo: false }]
+      : []),
+    ...bolhas.map((b) => ({
+      id: b.autorId,
+      nome: b.autorId === euId ? "Seu story" : b.autorNome,
+      avatarUrl: b.autorAvatar,
+      novo: b.novo,
+    })),
+  ];
+
   return (
-    <TelaPrincipal
-      posts={posts}
-      aoReagir={reagir}
-      aoAbrirPerfil={abrirPerfil}
-      aoAbrirSecoes={onAbrirSecoes}
-    />
+    <>
+      <input
+        ref={arquivoDoStory}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          const d = await prepararAvatar(f);
+          if (d) void publicarStory(d);
+        }}
+      />
+      <TelaPrincipal
+        posts={posts}
+        stories={fileira}
+        aoReagir={reagir}
+        aoAbrirPerfil={abrirPerfil}
+        aoAbrirSecoes={onAbrirSecoes}
+        aoTocarStory={verStory}
+      />
+    </>
   );
 }
 
@@ -1003,6 +1104,128 @@ export function TelaDoPost({
         <h1 className="text-[16px] font-semibold">Publicação</h1>
       </header>
       <PostInstagram post={post} aoReagir={aoReagir} aoAbrirPerfil={aoAbrirPerfil} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O VISOR DE STORY — tela cheia
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/** Quanto cada story fica na tela antes de passar sozinho. */
+const DURACAO_DO_STORY = 5000;
+
+export function VisorDeStory({
+  bolha,
+  aoFechar,
+  aoVer,
+}: {
+  bolha: BolhaDeStory;
+  aoFechar: () => void;
+  aoVer?: (storyId: string) => void;
+}) {
+  const [i, setI] = useState(0);
+  const [pausado, setPausado] = useState(false);
+  const atual = bolha.stories[i];
+
+  /* ⚠️ Marca como visto ao ENTRAR no story, não ao sair. Quem fecha o app no
+     meio já viu aquele — e marcar na saída deixaria o anel aceso para sempre
+     em quem sempre fecha antes do fim, que é a maioria. */
+  useEffect(() => {
+    if (atual) aoVer?.(atual.id);
+  }, [atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* O relógio que passa sozinho. Pausa enquanto o dedo está na tela — é o
+     gesto que todo mundo já conhece de segurar para ler. */
+  useEffect(() => {
+    if (pausado || !atual) return;
+    const t = setTimeout(() => {
+      if (i + 1 < bolha.stories.length) setI(i + 1);
+      else aoFechar();
+    }, DURACAO_DO_STORY);
+    return () => clearTimeout(t);
+  }, [i, pausado, atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!atual) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-black">
+      {/* As barrinhas de progresso, uma por story — a assinatura do formato. */}
+      <div className="flex gap-1 px-2 pt-2" style={{ paddingTop: "max(0.5rem, var(--safe-top))" }}>
+        {bolha.stories.map((s, n) => (
+          <span key={s.id} className="h-0.5 flex-1 overflow-hidden rounded-full bg-white/30">
+            <span
+              className="block h-full bg-white"
+              style={{
+                width: n < i ? "100%" : n === i ? undefined : "0%",
+                /* A do ATUAL anima; as passadas ficam cheias e as futuras
+                   vazias. `animationPlayState` é o que faz o dedo pausar a
+                   barra junto com o relógio — sem isso a barra correria
+                   sozinha e chegaria ao fim antes da foto trocar. */
+                animation:
+                  n === i ? `dc-story-barra ${DURACAO_DO_STORY}ms linear forwards` : undefined,
+                animationPlayState: pausado ? "paused" : "running",
+              }}
+            />
+          </span>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Foto url={bolha.autorAvatar} nome={bolha.autorNome} lado={30} />
+        <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-white">
+          {bolha.autorNome}
+        </span>
+        <button
+          type="button"
+          onClick={aoFechar}
+          aria-label="Fechar"
+          className="press text-2xl leading-none text-white"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* A foto ocupa o resto. `object-contain` e não `cover`: um story é uma
+          composição inteira, e cortar as bordas engole texto que a pessoa
+          escreveu na foto. */}
+      <div className="relative min-h-0 flex-1">
+        {atual.imagemUrl && (
+          <img src={atual.imagemUrl} alt="" className="h-full w-full object-contain" />
+        )}
+        {atual.texto && (
+          <p className="absolute inset-x-0 bottom-8 px-6 text-center text-[16px] font-medium text-white drop-shadow-lg">
+            {atual.texto}
+          </p>
+        )}
+
+        {/* As duas metades invisíveis: esquerda volta, direita avança. Segurar
+            pausa. É o gesto do formato, e ele não tem rótulo em lugar nenhum
+            porque todo mundo já sabe. */}
+        <button
+          type="button"
+          aria-label="Anterior"
+          onPointerDown={() => setPausado(true)}
+          onPointerUp={() => {
+            setPausado(false);
+            if (i > 0) setI(i - 1);
+          }}
+          onPointerLeave={() => setPausado(false)}
+          className="absolute inset-y-0 left-0 w-1/3"
+        />
+        <button
+          type="button"
+          aria-label="Próximo"
+          onPointerDown={() => setPausado(true)}
+          onPointerUp={() => {
+            setPausado(false);
+            if (i + 1 < bolha.stories.length) setI(i + 1);
+            else aoFechar();
+          }}
+          onPointerLeave={() => setPausado(false)}
+          className="absolute inset-y-0 right-0 w-2/3"
+        />
+      </div>
     </div>
   );
 }

@@ -3245,3 +3245,17 @@ button:active > .duo3d {
     animation: none !important;
   }
 }
+
+/* ─── A BARRINHA DE PROGRESSO DO STORY ────────────────────────────────────
+   Uma passada só (`forwards`), e quem a pausa é `animationPlayState` no
+   próprio elemento — o dedo na tela pausa a barra e o relógio do `setTimeout`
+   juntos. Sem isso a barra correria sozinha e chegaria ao fim antes de a foto
+   trocar, o que lê como travamento. */
+@keyframes dc-story-barra {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}

@@ -235,7 +235,7 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são cinco", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são seis", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -245,12 +245,16 @@ describe("higiene", () => {
     //  3. reagir (tipo null)   — tirar a reação é tirar, não marcar como tirada
     //  4. bloquear (desfazer)  — idem: guardar impediria bloquear de novo
     //  5. bloquear (o seguir)  — a linha viva ressuscitaria o vínculo depois
+    //  6. salvarPost (tirar)   — desmarcar é desmarcar; um "salvo cancelado"
+    //                            não é fato que alguém precise consultar
     expect(corpoDe("deixarDeSeguir")).toContain(".delete(");
     expect(corpoDe("responderPedido")).toContain(".delete(");
     expect(corpoDe("reagir")).toContain(".delete(");
     expect((corpoDe("bloquear").match(/\.delete\(/g) ?? []).length).toBe(2);
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(5);
+    expect(corpoDe("salvarPost")).toContain(".delete(");
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(6);
   });
 
   test("⚠️ e o POST nunca é apagado, só arquivado", () => {
