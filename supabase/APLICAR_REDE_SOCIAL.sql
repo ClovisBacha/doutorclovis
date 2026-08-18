@@ -9,7 +9,7 @@
 --
 -- Mais o que o básico do Instagram exige e que veio depois, no mesmo arquivo
 -- porque ele ainda não tinha sido rodado: STORIES (com o registro de quem
--- viu), SALVOS e CARROSSEL.
+-- viu), SALVOS, CARROSSEL e ATIVIDADE.
 --
 -- As RÉGUAS moram em `src/lib/rede-social.ts`, testadas sem banco. Aqui ficam
 -- só as garantias que o banco tem de dar: um seguir por par, uma reação por
@@ -332,6 +332,65 @@ ALTER TABLE public.rede_posts
   ADD CONSTRAINT carrossel_ate_dez CHECK (array_length(imagens, 1) IS NULL OR array_length(imagens, 1) <= 10);
 
 -- ═════════════════════════════════════════════════════════════════════════════
+-- ATIVIDADE — a aba do coração.
+--
+-- Quem seguiu, quem pediu para seguir, quem reagiu. É a única tela da rede que
+-- responde "o que aconteceu comigo enquanto eu estava fora".
+--
+-- ⚠️ **É TABELA, e não uma view sobre `rede_reacoes` + `rede_seguidores`.**
+-- Uma view teria de ordenar duas fontes por data a cada abertura, e — o que
+-- importa mais — não teria onde guardar o VISTO. Sem o visto não há emblema,
+-- e sem emblema a aba não serve para nada: ninguém abre uma tela para
+-- descobrir se há algo nela.
+--
+-- ⚠️ E ela NÃO manda push. Só o pedido para seguir manda, e isso é decidido em
+-- `avisoMandaPush` (`rede-social.ts`), não aqui: o push deste app é o mesmo
+-- canal do aviso de emergência, e quem desliga as notificações por causa de um
+-- coraçãozinho de madrugada desliga o resto junto.
+-- ═════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.rede_atividade (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- De quem é a caixa.
+  dono_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  -- Quem fez.
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  especie   text NOT NULL CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu')),
+  -- Só em 'reagiu'. `ON DELETE CASCADE`: post apagado leva a linha junto —
+  -- uma atividade que aponta para o nada é uma linha que não abre nada.
+  post_id   uuid REFERENCES public.rede_posts ON DELETE CASCADE,
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  visto_em  timestamptz,
+  CONSTRAINT nao_avisa_a_si_mesma CHECK (dono_id <> quem_id)
+);
+
+-- A consulta da aba, e a do emblema (as não vistas).
+CREATE INDEX IF NOT EXISTS rede_atividade_caixa
+  ON public.rede_atividade (dono_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS rede_atividade_novas
+  ON public.rede_atividade (dono_id) WHERE visto_em IS NULL;
+
+-- ⚠️ Uma linha por (quem, espécie, post). Sem isto, tirar e pôr a reação cinco
+-- vezes encheria a caixa dela com cinco avisos da mesma pessoa sobre o mesmo
+-- post — e ela abriria a aba achando que cinco pessoas reagiram.
+CREATE UNIQUE INDEX IF NOT EXISTS rede_atividade_uma_por_gesto
+  ON public.rede_atividade (dono_id, quem_id, especie, coalesce(post_id, dono_id));
+
+ALTER TABLE public.rede_atividade ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Vê a própria caixa" ON public.rede_atividade;
+CREATE POLICY "Vê a própria caixa" ON public.rede_atividade
+  FOR SELECT USING (auth.uid() = dono_id);
+
+DROP POLICY IF EXISTS "Service manages rede_atividade" ON public.rede_atividade;
+CREATE POLICY "Service manages rede_atividade" ON public.rede_atividade
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+COMMENT ON TABLE public.rede_atividade IS
+  'A aba do coração. Tabela e não view porque precisa guardar o VISTO — sem '
+  'ele não há emblema, e sem emblema ninguém abre a aba. Uma linha por gesto '
+  '(índice único), para tirar e pôr a reação não encher a caixa.';
+
+-- ═════════════════════════════════════════════════════════════════════════════
 -- O BALDE DAS FOTOS — privado, sem policy.
 --
 -- Mesmo desenho de `album`, `exames` e `presentes`: `public = false` e ZERO
@@ -378,4 +437,6 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
           WHERE table_schema='public' AND table_name='rede_salvos')                  AS salvos_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='rede_posts' AND column_name='imagens')                   AS carrossel_ok;
+          WHERE table_name='rede_posts' AND column_name='imagens')                   AS carrossel_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_atividade')               AS atividade_ok;

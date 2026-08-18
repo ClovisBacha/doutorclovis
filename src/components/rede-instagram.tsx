@@ -46,10 +46,16 @@ import {
   emojiDaReacao,
   LIMITE_DA_BIO,
   REACOES,
+  textoDoAviso,
   totalDeReacoes,
   type TipoDeReacao,
 } from "@/lib/rede-social";
-import type { BolhaDeStory, PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
+import type {
+  AtividadeNaTela,
+  BolhaDeStory,
+  PerfilNaTela,
+  PostNaTela,
+} from "@/lib/rede-social.functions";
 
 /* ══════════════════════════════════════════════════════════════════════════
    PEÇAS
@@ -335,6 +341,8 @@ export function TelaPrincipal({
   aoPublicar,
   aoAbrirSecoes,
   aoTocarStory,
+  aoAbrirAtividade,
+  novasAtividades = 0,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -355,6 +363,10 @@ export function TelaPrincipal({
   aoAbrirSecoes?: () => void;
   /** Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story. */
   aoTocarStory?: (autorId: string) => void;
+  aoAbrirAtividade?: () => void;
+  /** Quantas não vistas. O emblema mostra o NÚMERO, não um ponto — a pergunta
+      que ela faz é quantas, não se há. Mesma régua do mascote da home. */
+  novasAtividades?: number;
 }) {
   const doAlgoritmo = useMemo(() => new Set(sugeridos), [sugeridos]);
 
@@ -364,6 +376,24 @@ export function TelaPrincipal({
         <h1 className="text-lg font-semibold tracking-tight">Comunidade</h1>
         {/* Ações à direita, como no modelo: publicar primeiro, seções depois. */}
         <div className="flex items-center gap-3">
+          {aoAbrirAtividade && (
+            <button
+              type="button"
+              onClick={aoAbrirAtividade}
+              aria-label={novasAtividades > 0 ? `Atividade, ${novasAtividades} novas` : "Atividade"}
+              className="press relative text-xl leading-none"
+            >
+              ♡
+              {novasAtividades > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -right-1.5 -top-1 flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold leading-none text-white"
+                >
+                  {novasAtividades > 9 ? "9+" : novasAtividades}
+                </span>
+              )}
+            </button>
+          )}
           {aoPublicar && (
             <button
               type="button"
@@ -1278,6 +1308,80 @@ export function VisorDeStory({
           className="absolute inset-y-0 right-0 w-2/3"
         />
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A ATIVIDADE — a aba do coração
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export function TelaDeAtividade({
+  itens,
+  aoVoltar,
+  aoAbrirPerfil,
+  aoAbrirPost,
+}: {
+  itens: AtividadeNaTela[];
+  aoVoltar: () => void;
+  aoAbrirPerfil?: (id: string) => void;
+  aoAbrirPost?: (id: string) => void;
+}) {
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="text-[16px] font-semibold">Atividade</h1>
+      </header>
+
+      {itens.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Quando alguém reagir ou começar a te acompanhar, aparece aqui 💛
+        </p>
+      ) : (
+        <ul>
+          {itens.map((a) => (
+            <li key={a.id}>
+              <div
+                className={`flex items-center gap-3 px-4 py-2.5 ${
+                  a.visto ? "" : "bg-primary/[0.06]"
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => aoAbrirPerfil?.(a.quemId)}
+                  className="press shrink-0"
+                >
+                  <Foto url={a.quemAvatar} nome={a.quemNome} lado={40} />
+                </button>
+                <p className="min-w-0 flex-1 text-[13px] leading-snug">
+                  <span className="font-semibold">{a.quemNome}</span>{" "}
+                  {/* O texto vem de `textoDoAviso`, a MESMA função que o push
+                      usa — duas redações da mesma frase divergiriam, e a
+                      paciente leria uma no aviso e outra na tela. */}
+                  {textoDoAviso(a.especie, "").trim()}
+                </p>
+                {a.postCapa && (
+                  <button
+                    type="button"
+                    onClick={() => a.postId && aoAbrirPost?.(a.postId)}
+                    className="press shrink-0"
+                  >
+                    <img src={a.postCapa} alt="" className="h-10 w-10 rounded object-cover" />
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

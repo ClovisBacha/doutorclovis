@@ -36,6 +36,7 @@ import {
   REACOES,
   type ContagemDeReacoes,
   type TipoDeReacao,
+  type EspecieDeAviso,
   type Visibilidade,
 } from "@/lib/rede-social";
 
@@ -447,6 +448,12 @@ export const seguir = createServerFn({ method: "POST" })
     /* ⚠️ Só o PEDIDO manda push — reação e "começou a te seguir" não mandam.
        O push deste app é o mesmo canal do aviso de emergência, e quem desliga
        as notificações por causa de um coraçãozinho desliga o resto junto. */
+    await registrarAtividade(sb, {
+      donoId: data.alvoId,
+      quemId: eu,
+      especie: estado === "ativo" ? "seguiu" : "pediu_para_seguir",
+    });
+
     if (estado === "pendente") {
       try {
         const { sendPushToUser } = await import("@/lib/push.server");
@@ -513,6 +520,12 @@ export const responderPedido = createServerFn({ method: "POST" })
         .eq("seguido_id", eu)
         .eq("estado", "pendente");
       if (error) return { ok: false as const, motivo: "banco" as const };
+      /* Quem pediu fica sabendo que foi aceita. */
+      await registrarAtividade(sb, {
+        donoId: data.seguidorId,
+        quemId: eu,
+        especie: "aceitou",
+      });
     } else {
       /* ⚠️ Recusar APAGA. Marcar "recusado" bloquearia o par para sempre pela
          chave única, e quem pediu de novo depois de um mal-entendido nunca
@@ -740,6 +753,13 @@ export const reagir = createServerFn({ method: "POST" })
         { onConflict: "post_id,quem_id" },
       );
     if (error) return { ok: false as const, motivo: "banco" as const };
+
+    await registrarAtividade(sb, {
+      donoId: (post as any).autor_id,
+      quemId: eu,
+      especie: "reagiu",
+      postId: data.postId,
+    });
     return { ok: true as const };
   });
 
@@ -1236,4 +1256,143 @@ export const meusSalvos = createServerFn({ method: "POST" })
        decisão de quem escreveu. */
     const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
     return { ok: true as const, posts: ordenarFeed(posts) };
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ATIVIDADE — a aba do coração
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type AtividadeNaTela = {
+  id: string;
+  especie: EspecieDeAviso;
+  quemId: string;
+  quemNome: string;
+  quemAvatar: string | null;
+  postId: string | null;
+  /** A capa do post, para a linha mostrar do que se trata. */
+  postCapa: string | null;
+  criadoEm: string;
+  visto: boolean;
+};
+
+/**
+ * Registra um gesto na caixa de alguém.
+ *
+ * ⚠️ **Engole o erro de propósito.** É enriquecimento: quem reagiu já reagiu, e
+ * derrubar a reação porque o aviso não gravou trocaria uma coisa que funciona
+ * por uma que não. É a mesma decisão de `try/catch` do bônus das cinco
+ * estrelas.
+ */
+async function registrarAtividade(
+  sb: any,
+  opts: { donoId: string; quemId: string; especie: EspecieDeAviso; postId?: string | null },
+) {
+  if (opts.donoId === opts.quemId) return;
+  try {
+    const { error } = await sb.from("rede_atividade").upsert(
+      {
+        dono_id: opts.donoId,
+        quem_id: opts.quemId,
+        especie: opts.especie,
+        post_id: opts.postId ?? null,
+      },
+      /* O índice único é sobre (dono, quem, espécie, post) — tirar e pôr a
+         reação cinco vezes não enche a caixa dela com cinco avisos. */
+      { onConflict: "dono_id,quem_id,especie,post_id", ignoreDuplicates: true },
+    );
+    /* ⚠️ NÃO derruba o gesto, mas também não some sem deixar rastro. A catraca
+       de `travas-do-servidor.test.ts` existe para forçar esta pergunta, e a
+       resposta aqui é a do meio: silêncio para a paciente (a reação dela já
+       valeu), registro para quem for investigar por que a caixa de alguém
+       está vazia. Silêncio TOTAL é o que a catraca proíbe. */
+    if (error) console.warn("[atividade] não gravou", error.code, error.message);
+  } catch (e) {
+    console.warn("[atividade] não gravou", e);
+  }
+}
+
+export const minhaAtividade = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: linhas } = await sb
+      .from("rede_atividade")
+      .select("id, quem_id, especie, post_id, criado_em, visto_em")
+      .eq("dono_id", eu)
+      .order("criado_em", { ascending: false })
+      .limit(80);
+
+    const brutas = (linhas ?? []) as any[];
+    const ctx = await contextoDe(sb, eu);
+    const perfis = await perfisPorId(sb, [...new Set(brutas.map((l) => l.quem_id))]);
+
+    /* As capas dos posts citados, para a linha mostrar do que se trata. */
+    const postIds = [...new Set(brutas.map((l) => l.post_id).filter(Boolean))] as string[];
+    const capas = new Map<string, string>();
+    if (postIds.length) {
+      const { data: ps } = await sb
+        .from("rede_posts")
+        .select("id, imagem_path")
+        .in("id", postIds)
+        .is("arquivado_em", null);
+      const { urlAssinada } = await import("@/lib/imagens.server");
+      for (const p of (ps ?? []) as any[]) {
+        if (!p.imagem_path) continue;
+        const u = await urlAssinada("rede", p.imagem_path, 3600);
+        if (u) capas.set(p.id, u);
+      }
+    }
+
+    const itens: AtividadeNaTela[] = brutas
+      .map((l) => {
+        const p = perfis.get(l.quem_id);
+        /* ⚠️ Modo Cuidado e bloqueio somem da caixa, sem anunciar. Uma linha
+           "Fulana reagiu" de quem entrou em luto contaria a perda dela pela
+           porta dos fundos — e uma de quem ela bloqueou traria a pessoa de
+           volta à tela justamente depois de ela ter pedido para não ver. */
+        if (!p || p.care_mode || ctx.bloqueio.has(l.quem_id)) return null;
+        return {
+          id: l.id,
+          especie: l.especie as EspecieDeAviso,
+          quemId: l.quem_id,
+          quemNome: (p.display_name ?? "").trim() || "Alguém",
+          quemAvatar: p.avatar_url ?? null,
+          postId: l.post_id ?? null,
+          postCapa: l.post_id ? (capas.get(l.post_id) ?? null) : null,
+          criadoEm: l.criado_em,
+          visto: !!l.visto_em,
+        };
+      })
+      .filter(Boolean) as AtividadeNaTela[];
+
+    return { ok: true as const, itens, novas: itens.filter((i) => !i.visto).length };
+  });
+
+/** Marca a caixa inteira como vista — é o que abre a aba faz. */
+export const marcarAtividadeVista = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Aqui abrir a aba MARCA TUDO, ao contrário da central de recados, em
+       que o toque em cada item é quem marca. A diferença é o que está em jogo:
+       lá são recados do app que podem exigir ação dela (uma pré-consulta, uma
+       vaga liberada), e perder o rastro de cinco de uma vez custa caro. Aqui
+       são coraçõezinhos — nada a fazer, nada a perder. */
+    const { error } = await sb
+      .from("rede_atividade")
+      .update({ visto_em: new Date().toISOString() })
+      .eq("dono_id", eu)
+      .is("visto_em", null);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
   });

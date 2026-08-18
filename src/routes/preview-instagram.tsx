@@ -15,6 +15,7 @@
  *   /preview-instagram?tela=lista   → a lista de seguidores
  *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
  *   /preview-instagram?tela=story   → o visor de story em tela cheia
+ *   /preview-instagram?tela=atividade → a aba do coração
  */
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -22,12 +23,18 @@ import {
   ListaDeGente,
   TelaDePerfil,
   TelaDoPost,
+  TelaDeAtividade,
   TelaPrincipal,
   VisorDeStory,
   type PessoaNaLista,
   type Story,
 } from "@/components/rede-instagram";
-import type { BolhaDeStory, PerfilNaTela, PostNaTela } from "@/lib/rede-social.functions";
+import type {
+  AtividadeNaTela,
+  BolhaDeStory,
+  PerfilNaTela,
+  PostNaTela,
+} from "@/lib/rede-social.functions";
 
 export const Route = createFileRoute("/preview-instagram")({
   component: Bancada,
@@ -164,6 +171,62 @@ function Bancada() {
     );
   }
 
+  if (tela === "atividade") {
+    /* As quatro espécies, e as duas primeiras NÃO VISTAS — é o contraste que
+       prova o fundo destacado da linha nova contra a já lida. */
+    const itens: AtividadeNaTela[] = [
+      {
+        id: "a1",
+        especie: "reagiu",
+        quemId: "q1",
+        quemNome: "Carol",
+        quemAvatar: null,
+        postId: "p0",
+        postCapa: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
+        criadoEm: atras(12),
+        visto: false,
+      },
+      {
+        id: "a2",
+        especie: "pediu_para_seguir",
+        quemId: "q2",
+        quemNome: "Ana Paula",
+        quemAvatar: null,
+        postId: null,
+        postCapa: null,
+        criadoEm: atras(90),
+        visto: false,
+      },
+      {
+        id: "a3",
+        especie: "seguiu",
+        quemId: "q3",
+        quemNome: "Tia Zezé",
+        quemAvatar: null,
+        postId: null,
+        postCapa: null,
+        criadoEm: atras(600),
+        visto: true,
+      },
+      {
+        id: "a4",
+        especie: "aceitou",
+        quemId: "q4",
+        quemNome: "Bruna",
+        quemAvatar: null,
+        postId: null,
+        postCapa: null,
+        criadoEm: atras(2000),
+        visto: true,
+      },
+    ];
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDeAtividade itens={vazio ? [] : itens} aoVoltar={() => history.back()} />
+      </div>
+    );
+  }
+
   if (tela === "story") {
     /* Três stories do mesmo autor: é o que prova as TRÊS barrinhas no topo,
        a animação só na atual, e o avanço ao tocar na metade direita. Com um
@@ -218,6 +281,8 @@ function Bancada() {
           aoReagir={() => {}}
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
           aoPublicar={() => alert("publicar")}
+          aoAbrirAtividade={() => alert("atividade")}
+          novasAtividades={vazio ? 0 : 3}
         />
       )}
     </div>
