@@ -1076,6 +1076,10 @@ export function RedeNoApp({
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   const [persona, setPersona] = useState<Persona>("estranha");
+  /** A foto escolhida, esperando a conferência antes de virar story. */
+  const [conferindoStory, setConferindoStory] = useState<string | null>(null);
+  /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
+  const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
   const [previa, setPrevia] = useState<{
     perfil: PerfilNaTela | null;
     posts: PostNaTela[];
@@ -1121,7 +1125,10 @@ export function RedeNoApp({
         setProximo(r.proximo);
       }
       if (st.ok) setBolhas(st.bolhas);
-      if (meu.ok) setEuId(meu.perfil.id);
+      if (meu.ok) {
+        setEuId(meu.perfil.id);
+        setSemanaDoCarimbo(meu.semanaDoCarimbo);
+      }
       if (at.ok) {
         setAvisos(at.itens);
         setNaoVistas(at.novas);
@@ -1508,12 +1515,15 @@ export function RedeNoApp({
     }
   }
 
-  async function publicarStory(dataUrl: string) {
+  async function publicarStory(dataUrl: string, carimbar: boolean) {
+    setConferindoStory(null);
     try {
       const t = await token();
       if (!t) return;
       const { publicarStory: chamar } = await import("@/lib/rede-social.functions");
-      const r = await chamar({ data: { accessToken: t, imagem: dataUrl, texto: null } });
+      const r = await chamar({
+        data: { accessToken: t, imagem: dataUrl, texto: null, carimbarSemana: carimbar },
+      });
       if (r.ok) void carregarFeed();
     } catch {
       /* A fileira não muda; ela tenta de novo. */
@@ -1638,6 +1648,20 @@ export function RedeNoApp({
   }, [careMode, onde.t, naoVistas, euId, onAbrirSecoes]);
 
   if (careMode) return null;
+
+  /* A conferência vem ANTES de tudo: ela é tela cheia e a escolha já foi feita. */
+  if (conferindoStory) {
+    return (
+      <ConferirStory
+        imagem={conferindoStory}
+        /* ⚠️ A semana vem do MEU perfil, que a tela já carregou — e `null`
+           quando não há o que carimbar (sem DUM, pós-parto, Modo Cuidado). */
+        semana={semanaDoCarimbo}
+        aoCancelar={() => setConferindoStory(null)}
+        aoPublicar={({ carimbar }) => void publicarStory(conferindoStory, carimbar)}
+      />
+    );
+  }
 
   if (vendoStory) {
     return (
@@ -1792,8 +1816,10 @@ export function RedeNoApp({
           const f = e.target.files?.[0];
           e.target.value = "";
           if (!f) return;
-          const d = await prepararAvatar(f);
-          if (d) void publicarStory(d);
+          /* ⚠️ `prepararFotoDoStory`, e não `prepararAvatar`: aquele corta um
+             QUADRADO de 512px no centro, e o story é 9:16 exibido inteiro. */
+          const d = await prepararFotoDoStory(f);
+          if (d) setConferindoStory(d);
         }}
       />
       <TelaPrincipal
@@ -2153,6 +2179,24 @@ export function VisorDeStory({
           </p>
         )}
 
+        {/* ⚠️ O carimbo é DERIVADO na leitura, nunca tinta no JPEG: o banco
+            guarda só um booleano. Queimado no pixel, ele sobreviveria à decisão
+            dela — o arquivo no balde ficaria com "28 semanas" para sempre, e o
+            app não teria como apagá-lo se ela entrasse em Modo Cuidado.
+
+            Ele mora ACIMA do texto (`bottom-20` contra `bottom-8`) para os dois
+            nunca se sobreporem: os dois são opcionais e podem coexistir.
+
+            ⚠️ E fica ancorado no CONTÊINER, ao contrário da tela de
+            conferência: aqui o visor é preto de ponta a ponta e a pílula sobre
+            a tarja continua legível — enquanto lá a tarja é a moldura do
+            editor, e o carimbo na moldura em vez de na foto era o defeito. */}
+        {atual.carimbo && (
+          <span className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-2 text-[15px] font-semibold text-white backdrop-blur-sm">
+            🤰 {atual.carimbo}
+          </span>
+        )}
+
         {/* As duas metades invisíveis: esquerda volta, direita avança. Segurar
             pausa. É o gesto do formato, e ele não tem rótulo em lugar nenhum
             porque todo mundo já sabe. */}
@@ -2396,6 +2440,39 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
   try {
     const bitmap = await createImageBitmap(file);
     const escala = Math.min(1, LADO_DA_FOTO / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.8);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reduz a foto do STORY.
+ *
+ * ⚠️ **Ela subia por `prepararAvatar`** — 512px QUADRADOS, com recorte central.
+ * Num formato 9:16 exibido com `object-contain`, isso é duas perdas ao mesmo
+ * tempo: a foto perde as pontas de cima e de baixo no recorte, e o que sobra é
+ * exibido em 512px numa tela que pede ~1080. A moldura da semana viria carimbar
+ * uma foto que já saía errada.
+ *
+ * Aqui não há recorte: a foto cabe inteira em 1080×1920, preservando a
+ * proporção dela — que é o que `object-contain` do visor espera.
+ */
+const LADO_DO_STORY = { largura: 1080, altura: 1920 };
+async function prepararFotoDoStory(file: File): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(
+      1,
+      LADO_DO_STORY.largura / bitmap.width,
+      LADO_DO_STORY.altura / bitmap.height,
+    );
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bitmap.width * escala);
     canvas.height = Math.round(bitmap.height * escala);
@@ -2873,6 +2950,122 @@ export function EspelhoDoPerfil({
         Nada do seu acompanhamento aparece aqui para ninguém — peso, pressão, exames e consultas são
         só seus e do seu médico.
       </p>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CONFERIR O STORY ANTES DE PUBLICAR — Fase 3
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A foto, a moldura da semana, e o botão de publicar.
+ *
+ * ─── POR QUE ELA VÊ ANTES ──────────────────────────────────────────────────
+ *
+ * Até aqui, escolher a foto PUBLICAVA — sem prévia, sem cancelar, sem nada.
+ * Com o carimbo isso deixou de ser aceitável: o app passaria a escrever a
+ * semana de gestação dela numa foto que ela nunca viu montada.
+ *
+ * ⚠️ **O carimbo é uma SOBREPOSIÇÃO, não tinta no JPEG.** Queimado no pixel,
+ * ele sobrevive à decisão dela: o arquivo no balde guarda "28 semanas" para
+ * sempre, e quem printou fica com a semana. Derivado, ele morre sozinho — a
+ * régua cala em Modo Cuidado, depois do parto e sem DUM.
+ *
+ * ⚠️ **E ele NÃO vem ligado.** Carimbar sozinho porque a chave do perfil está
+ * ligada seria o app decidindo o que vai na foto dela.
+ */
+export function ConferirStory({
+  imagem,
+  semana,
+  aoCancelar,
+  aoPublicar,
+}: {
+  /** Data URL da foto já reduzida. */
+  imagem: string;
+  /** "28 semanas", ou `null` quando não há o que carimbar. */
+  semana: string | null;
+  aoCancelar: () => void;
+  aoPublicar: (opts: { carimbar: boolean }) => void;
+}) {
+  const [carimbar, setCarimbar] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-black">
+      <header
+        className="flex h-12 shrink-0 items-center gap-2 px-4"
+        style={{ paddingTop: "var(--safe-top)" }}
+      >
+        <button
+          type="button"
+          onClick={aoCancelar}
+          aria-label="Cancelar"
+          className="press text-2xl leading-none text-white"
+        >
+          ×
+        </button>
+        <h1 className="min-w-0 flex-1 text-[15px] font-semibold text-white">Seu story</h1>
+      </header>
+
+      {/* `object-contain`, como o visor: um story é uma composição inteira, e
+          cortar as bordas engole o que a pessoa escreveu na foto. */}
+      {/* ⚠️ O carimbo pousa na FOTO, não no contêiner. Com `object-contain` a
+          foto não preenche a caixa, e um `absolute bottom-5` no contêiner
+          desenhava a pílula na tarja preta abaixo da imagem — a moldura ficava
+          fora da moldura. A caixa de dentro encolhe até a foto, e o carimbo se
+          posiciona contra ela. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center">
+        <div className="relative max-h-full">
+          <img src={imagem} alt="" className="block max-h-full w-auto object-contain" />
+          {carimbar && semana && (
+            <span className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-2 text-[15px] font-semibold text-white backdrop-blur-sm">
+              🤰 {semana}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div
+        className="shrink-0 space-y-3 px-4 pb-4 pt-3"
+        style={{ paddingBottom: "max(1rem, var(--safe-bottom))" }}
+      >
+        {semana ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={carimbar}
+            onClick={() => setCarimbar((v) => !v)}
+            className={`press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left ${
+              carimbar ? "bg-white text-black" : "bg-white/12 text-white"
+            }`}
+          >
+            <span className="text-[14px] font-semibold">🤰 {semana}</span>
+            <span className="text-[13px] opacity-70">
+              {carimbar ? "no story" : "tocar para pôr"}
+            </span>
+          </button>
+        ) : (
+          /* Sem semana não há carimbo, e a tela não finge que há: sem DUM,
+             depois do parto ou em Modo Cuidado, o controle simplesmente não
+             existe. */
+          <p className="text-center text-[12px] text-white/60">
+            Sem a data da última menstruação no perfil, não dá para carimbar a semana.
+          </p>
+        )}
+
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={() => {
+            setEnviando(true);
+            aoPublicar({ carimbar: carimbar && !!semana });
+          }}
+          className="press w-full rounded-2xl bg-white py-3 text-[15px] font-semibold text-black disabled:opacity-60"
+        >
+          {enviando ? "Publicando…" : "Publicar story"}
+        </button>
+      </div>
     </div>
   );
 }

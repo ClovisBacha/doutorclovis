@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import {
   alcancaOPerfil,
   bebeDoPerfil,
+  semanaParaCarimbo,
   contextoDaPersona,
   entradaDoSelo,
   MOSTRAR_BEBE_PADRAO,
@@ -333,5 +334,29 @@ describe("a aba Do bebê", () => {
 
   test("sem DUM, nada", () => {
     expect(ver({ totalDias: null }, true)).toBeNull();
+  });
+});
+
+describe("o carimbo do story", () => {
+  test("⚠️ NÃO depende da chave do perfil — o portão é outro", () => {
+    // Amarrar o carimbo à chave permanente obrigaria quem quer mandar UMA foto
+    // com a semana a publicá-la no perfil para sempre.
+    expect(semanaParaCarimbo({ ...BASE, mostrarSemana: false })).toBe("28 semanas");
+  });
+
+  test("mas a ARITMÉTICA é a mesma — as duas superfícies nunca discordam", () => {
+    for (const dias of [7, 100, 200, 294]) {
+      expect(semanaParaCarimbo({ ...BASE, totalDias: dias })).toBe(
+        semanaPublica({ ...BASE, totalDias: dias, mostrarSemana: true }),
+      );
+    }
+  });
+
+  test("⚠️ e os silêncios também: luto, pós-parto, sem DUM, acima do teto", () => {
+    // Eles moram na régua, então nenhuma tela precisa lembrar deles.
+    expect(semanaParaCarimbo({ ...BASE, emCuidado: true })).toBeNull();
+    expect(semanaParaCarimbo({ ...BASE, nasceu: true })).toBeNull();
+    expect(semanaParaCarimbo({ ...BASE, totalDias: null })).toBeNull();
+    expect(semanaParaCarimbo({ ...BASE, totalDias: 60 * 7 })).toBeNull();
   });
 });

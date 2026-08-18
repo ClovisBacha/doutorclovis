@@ -46,6 +46,7 @@ import {
   entradaDoSelo,
   olharDe,
   seloDoPerfil,
+  semanaParaCarimbo,
   type BebeNoPerfil,
   type Persona,
 } from "@/lib/selo-do-perfil";
@@ -264,6 +265,19 @@ async function seloDe(p: any) {
   return seloDoPerfil(entradaDoSelo(p, g?.totalDays ?? null));
 }
 
+/** A semana do carimbo do story, da linha de perfil já lida. */
+async function carimboDe(p: any): Promise<string | null> {
+  const { computeGestation } = await import("@/lib/gestacao");
+  const g = computeGestation({
+    lmp: p?.lmp_date ?? null,
+    referenceDate: p?.reference_date ?? null,
+    referenceWeeks: p?.reference_weeks ?? null,
+    referenceDays: p?.reference_days ?? null,
+    today: hojeEmSaoPaulo(),
+  });
+  return semanaParaCarimbo(entradaDoSelo(p, g?.totalDays ?? null));
+}
+
 /**
  * A aba "Do bebê" — Fase 2.
  *
@@ -462,6 +476,15 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         bebe: await bebeDe(p, true),
       } as PerfilNaTela,
       emCuidado: !!(p as any)?.care_mode,
+      /**
+       * A semana que ela PODE carimbar num story.
+       *
+       * ⚠️ Campo próprio, e não `perfil.seloSemana`: aquele é gated pela chave
+       * PERMANENTE do perfil, e o carimbo é escolha por publicação. Amarrar os
+       * dois obrigaria quem quer mandar uma foto com a semana a publicá-la no
+       * perfil para sempre. `null` quando não há o que carimbar.
+       */
+      semanaDoCarimbo: await carimboDe(p),
       pedidos: ((pendentes ?? []) as { seguidor_id: string }[])
         .map((x) => {
           const q = quemPediu.get(x.seguidor_id);
@@ -1450,6 +1473,16 @@ export type StoryNaTela = {
   texto: string | null;
   criadoEm: string;
   visto: boolean;
+  /**
+   * "28 semanas" no canto da foto, ou `null`.
+   *
+   * ⚠️ **DERIVADO na leitura, nunca guardado.** O banco tem só um booleano: a
+   * semana sai da régua no instante em que alguém abre o story. Guardar o
+   * texto faria a semana sobreviver à decisão dela — e uma paciente que entra
+   * em Modo Cuidado depois de publicar teria a semana pendurada num arquivo
+   * que o app não sabe mais apagar.
+   */
+  carimbo: string | null;
 };
 
 /** Um autor e os stories vivos dele — é assim que a fileira desenha. */
@@ -1469,6 +1502,8 @@ export const publicarStory = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         imagem: z.string().max(1_500_000),
         texto: z.string().max(200).nullable(),
+        /** A semana no canto da foto. Escolha POR PUBLICAÇÃO — ver a régua. */
+        carimbarSemana: z.boolean().optional(),
       })
       .parse(i),
   )
@@ -1492,10 +1527,23 @@ export const publicarStory = createServerFn({ method: "POST" })
     const caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
     if (!caminho) return { ok: false as const, motivo: "imagem" as const };
 
-    const { error } = await sb
-      .from("rede_stories")
-      .insert({ autor_id: eu, imagem_path: caminho, texto: data.texto });
-    if (error) return { ok: false as const, motivo: "banco" as const };
+    const { error } = await sb.from("rede_stories").insert({
+      autor_id: eu,
+      imagem_path: caminho,
+      texto: data.texto,
+      carimbo_semana: data.carimbarSemana === true,
+    });
+    /* ⚠️ Recuo para banco sem `carimbo_semana`, pela mesma razão de
+       `perfisPorId`: o deploy chega antes do SQL, e sem isto publicar um story
+       passaria a falhar INTEIRO — não só o carimbo. Sem a coluna, o story sai
+       sem carimbo, que é o padrão dela. */
+    if (error) {
+      console.warn("[rede] story sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
+      const { error: erro2 } = await sb
+        .from("rede_stories")
+        .insert({ autor_id: eu, imagem_path: caminho, texto: data.texto });
+      if (erro2) return { ok: false as const, motivo: "banco" as const };
+    }
     return { ok: true as const };
   });
 
@@ -1528,7 +1576,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     const agora = new Date().toISOString();
     const { data: brutos } = await sb
       .from("rede_stories")
-      .select("id, autor_id, imagem_path, texto, criado_em")
+      .select("id, autor_id, imagem_path, texto, criado_em, carimbo_semana")
       .in("autor_id", de)
       .gt("expira_em", agora)
       .order("criado_em", { ascending: true })
@@ -1572,6 +1620,9 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         texto: l.texto ?? null,
         criadoEm: l.criado_em,
         visto,
+        /* O carimbo nasce aqui, da régua, e só quando ela pediu naquele
+           story. Os silêncios (luto, pós-parto, sem DUM) vêm de graça. */
+        carimbo: l.carimbo_semana ? await carimboDe(p) : null,
       });
       porAutor.set(l.autor_id, b);
     }

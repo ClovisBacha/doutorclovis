@@ -443,3 +443,34 @@ describe("o espelho — 'ver como os outros veem'", () => {
     expect(c).not.toMatch(/new Date\(.*86400000/);
   });
 });
+
+describe("o carimbo do story — Fase 3", () => {
+  test("⚠️ a semana é DERIVADA na leitura, e o banco guarda só um booleano", () => {
+    // Guardar o texto (ou queimá-lo no JPEG) faria a semana sobreviver à
+    // decisão dela: o arquivo no balde ficaria com "28 semanas" para sempre, e
+    // uma paciente que entra em Modo Cuidado depois de publicar teria a semana
+    // pendurada num arquivo que o app não sabe mais desenhar.
+    const c = corpoDe("storiesDoFeed").replace(/\s+/g, " ");
+    expect(c).toContain("carimbo: l.carimbo_semana ? await carimboDe(p) : null");
+    const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
+    expect(pub).toContain("carimbo_semana: data.carimbarSemana === true");
+    // Nada de texto de semana indo para o banco.
+    expect(pub).not.toMatch(/semana: .*(semanas|seloSemana)/);
+  });
+
+  test("⚠️ publicar não quebra em banco sem a coluna", () => {
+    // O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
+    // falhar INTEIRO — não só o carimbo.
+    const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
+    expect(pub).toContain(".insert({ autor_id: eu, imagem_path: caminho, texto: data.texto })");
+  });
+
+  test("⚠️ o carimbo NÃO passa pela chave do perfil", () => {
+    // Amarrar os dois obrigaria quem quer mandar UMA foto com a semana a
+    // publicá-la no perfil para sempre. A régua (e os silêncios) é a mesma.
+    const c = funcaoInterna("carimboDe").replace(/\s+/g, " ");
+    expect(c).toContain("semanaParaCarimbo(entradaDoSelo(p,");
+    expect(c).toContain("today: hojeEmSaoPaulo()");
+    expect(c).not.toContain("mostrar_semana");
+  });
+});

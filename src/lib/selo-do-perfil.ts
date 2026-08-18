@@ -125,6 +125,36 @@ export function semanaPublica(e: EntradaDoSelo): string | null {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
+   O CARIMBO DO STORY — Fase 3
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A semana que vai no canto da foto do story.
+ *
+ * ⚠️ **A ARITMÉTICA É A MESMA do selo do perfil, e o PORTÃO é outro — de
+ * propósito.** As duas superfícies respondem "que semana aparece em público",
+ * então uma régua só faria as duas concordarem sempre. Mas o que as libera é
+ * diferente, e tem de ser:
+ *
+ *  · o selo do perfil é uma chave PERMANENTE: ela liga uma vez e a semana fica
+ *    lá, atualizando-se sozinha, para todo mundo que abrir o perfil;
+ *  · o carimbo é um ato POR PUBLICAÇÃO: ela vê a foto carimbada, decide, e
+ *    publica — e a foto some em 24 horas.
+ *
+ * Amarrar o carimbo à chave do perfil obrigaria quem quer mandar UMA foto com
+ * a semana a publicar a semana no perfil para sempre. O contrário — carimbar
+ * sozinho porque a chave está ligada — seria o app decidindo por ela o que vai
+ * na foto dela.
+ *
+ * Os SILÊNCIOS continuam sendo os mesmos, porque moram na régua: Modo Cuidado,
+ * depois do parto, sem DUM e acima de 42 semanas não carimbam nada, e nenhuma
+ * tela precisa lembrar disso.
+ */
+export function semanaParaCarimbo(e: EntradaDoSelo): string | null {
+  return semanaPublica({ ...e, mostrarSemana: true });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
    A ABA "DO BEBÊ" — Fase 2
    ══════════════════════════════════════════════════════════════════════════ */
 

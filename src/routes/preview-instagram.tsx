@@ -21,6 +21,9 @@
  *   /preview-instagram?tela=salvos  → a coleção privada
  *   /preview-instagram?tela=busca   → a busca de perfis
  *   /preview-instagram?tela=espelho → "ver como os outros veem" (o espelho)
+ *   /preview-instagram?tela=conferir → a conferência do story, com a moldura
+ *   /preview-instagram?tela=conferir&selo=0 → sem semana para carimbar
+ *   /preview-instagram?tela=story&carimbo=1 → o visor com a moldura
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -33,6 +36,7 @@ import { useState } from "react";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
+  ConferirStory,
   EditarPerfil,
   EspelhoDoPerfil,
   ListaDeGente,
@@ -68,6 +72,7 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
+    carimbo: q.carimbo == null ? false : !!q.carimbo,
   }),
 });
 
@@ -156,7 +161,7 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio, sugeridas, selo, trancado } = Route.useSearch();
+  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo } = Route.useSearch();
   const [persona, setPersona] = useState<Persona>("estranha");
 
   const perfil: PerfilNaTela = {
@@ -316,6 +321,9 @@ function Bancada() {
         texto: n === 1 ? "31 semanas hoje 🤍" : null,
         criadoEm: atras(60 * (n + 1)),
         visto: false,
+        /* Só o primeiro carimbado: é o contraste que prova que o carimbo é
+           por STORY, e não uma propriedade da conta. */
+        carimbo: carimbo && n === 0 ? "32 semanas" : null,
       })),
     };
     return (
@@ -342,6 +350,19 @@ function Bancada() {
           aoVoltar={() => history.back()}
         />
       </div>
+    );
+  }
+
+  if (tela === "conferir") {
+    return (
+      <ConferirStory
+        imagem={foto(CORES[4][0], CORES[4][1], CORES[4][2])}
+        /* `?selo=0` mostra o caso sem DUM/pós-parto/luto, em que não há o que
+           carimbar e o controle não existe. */
+        semana={selo === 0 ? null : "32 semanas"}
+        aoCancelar={() => history.back()}
+        aoPublicar={({ carimbar }) => alert(carimbar ? "publicaria COM carimbo" : "publicaria sem")}
+      />
     );
   }
 

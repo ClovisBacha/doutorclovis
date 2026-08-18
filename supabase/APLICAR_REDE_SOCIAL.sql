@@ -267,7 +267,18 @@ CREATE TABLE IF NOT EXISTS public.rede_stories (
   -- consulta. Com o cálculo na leitura, mudar as 24h para 48h mudaria
   -- retroativamente stories que já tinham sumido — e eles voltariam do nada
   -- para quem já os tinha visto desaparecer.
-  expira_em   timestamptz NOT NULL DEFAULT (now() + interval '24 hours')
+  expira_em   timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
+  -- ⚠️ O CARIMBO DA SEMANA É UM BOOLEANO, e a semana NÃO é guardada aqui.
+  --
+  -- Guardar o texto ("28 semanas") ou queimá-lo no pixel do JPEG faria a
+  -- semana sobreviver à decisão dela: o arquivo no balde guarda o carimbo para
+  -- sempre, e uma paciente que entra em Modo Cuidado depois de publicar teria
+  -- a semana pendurada num arquivo que o app não sabe mais desenhar.
+  --
+  -- Derivado, ele morre sozinho: a régua (`semanaParaCarimbo`) cala em Modo
+  -- Cuidado, depois do parto e sem DUM, e o story deixa de ser carimbado sem
+  -- uma linha de migração.
+  carimbo_semana boolean NOT NULL DEFAULT false
 );
 
 -- A consulta da fileira: stories vivos, dos que ela segue. Índice parcial
@@ -466,4 +477,6 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name='patient_profiles' AND column_name='mostrar_semana')      AS selo_semana_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='patient_profiles' AND column_name='mostrar_bebe')        AS selo_bebe_ok;
+          WHERE table_name='patient_profiles' AND column_name='mostrar_bebe')        AS selo_bebe_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_stories' AND column_name='carimbo_semana')          AS carimbo_ok;
