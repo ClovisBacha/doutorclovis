@@ -3822,59 +3822,19 @@ fotos são a memória do que houve, e escondê-las seria o app apagar o bebê de
 a mesma decisão que manteve `exam_files` de pé quando o envio de exames saiu do
 produto.
 
-### O bolão do nascimento
+### O bolão do nascimento — CONSTRUÍDO E REMOVIDO no mesmo dia
 
-A função nova, e a de melhor relação entre interação e trabalho por uma razão
-que nenhuma outra tem: **ela se AUTO-RELANÇA**. Álbum precisa de foto nova,
-votação de nome acaba quando o nome sai. O bolão tem um evento de resolução
-marcado — o nascimento — que traz a torcida inteira de volta no dia em que a mãe
-mais quer ser vista. E palpitar custa dez segundos.
+Cada pessoa da torcida palpitava dia, peso e hora do nascimento; a mãe
+registrava o parto e o app apontava quem chegou mais perto. Régua pura testada,
+SQL, servidor, tela e bancada — tudo pronto e verificado.
 
-- **Um palpite por pessoa, EDITÁVEL até o parto.** Travar no primeiro envio
-  parece mais justo e é pior: quem palpitou na 20ª semana não volta mais, porque
-  não tem o que fazer ali. A chave única `(dona_id, autor_id)` é o que faz
-  editar ser UPDATE e não uma segunda linha com a mesma tia no ranking.
-- **Todo mundo vê o palpite dos outros.** "Estraga" a justiça, e é o ponto: a
-  graça é a tia rir do cunhado que apostou 4,2 kg. Envelope fechado é mais justo
-  e não gera conversa nenhuma, que é a única coisa que o bolão existe para
-  gerar. Por isso a lista vem ANTES do formulário — ela é o convite.
-- **Só a mãe fecha.** Não há `donaId` no corpo de `registrarNascimento` de
-  propósito: um parâmetro ali seria convite para alguém "fechar" o bolão dos
-  outros.
-- ⚠️ **A hora é distância CIRCULAR.** 23h50 e 00h10 são vinte minutos, não
-  23h40 — bebê nasce de madrugada, e sem isso o palpite mais comum tiraria zero.
-- ⚠️ **Quem não palpita hora tira ZERO nela**, e não a nota cheia: senão essa
-  pessoa disputaria 160 contra os 200 dos outros, e o ranking compararia notas
-  de provas diferentes.
-- ⚠️ **`diaEmNumero` e `diaEmTexto` NUNCA passam por `new Date(iso)`.**
-  `new Date("2026-09-08")` é meia-noite UTC, e em São Paulo é o dia 7 às 21h —
-  toda data do bolão apareceria um dia adiantada. Mesma correção de
-  `sequenciaDeDatas`.
-- **As faixas plausíveis são generosas de PROPÓSITO** (500–7000 g): um prematuro
-  de 26 semanas pesando 900 g é a paciente DESTE app, não um caso improvável.
-  Uma faixa apertada no "normal" recusaria o palpite certo da avó.
-- ⚠️ **NÃO existe em Modo Cuidado** — uma lista de pessoas queridas apostando
-  alegremente numa data que não vai chegar é o pior artefato que este app
-  conseguiria produzir. O portão (`bolaoDisponivel`) é conferido no SERVIDOR,
-  antes de qualquer leitura: filtrar na tela deixaria os palpites viajando pela
-  rede. E o motivo NUNCA é dito — `indisponivel` cobre "não sou amiga", "ela
-  está em luto" e "ela não tem DPP" com a mesma resposta.
-- **Ver o bolão de outra pessoa passa por `saoAmigas`** — o MESMO portão do
-  perfil e do Cantinho, agora exportado em vez de recopiado. Ele carrega o nome
-  de todo mundo que palpitou, que é o círculo social de uma gestante.
+⚠️ **O dono olhou e não gostou** ("não gostei do bolão"), e ele saiu inteiro. A
+lição não é sobre o bolão: é que a aposta era MINHA. Eu escolhi a função de
+melhor relação entre interação e trabalho por um argumento de mecânica — ela se
+auto-relança no parto — e a mecânica estava certa e o produto não. Numa aba cujo
+assunto é a rede de apoio de uma gestante de alto risco, apostar na data do
+parto é um jogo sobre o evento que ela mais teme.
 
-**Dois defeitos que a bancada pegou**, e os dois eram invisíveis no código:
-
-- ⚠️ **"Quando o Helena nasce?"** — acertar o artigo exigiria saber o gênero do
-  bebê pelo nome, que é exatamente o que não dá para fazer. Nome próprio vai sem
-  artigo; "o bebê" o mantém porque é substantivo comum.
-- ⚠️ **Os nomes truncavam.** Numa linha só, o bloco de números é `shrink-0` e o
-  nome era o único que podia encolher: "Vó Ana" e "Marina" saíam como "V…" e
-  "M…" enquanto "10/09 · 3,400 kg · 09:05" ficava inteiro. Mesmo defeito das
-  linhas das Amigas, mesma lição — **quem cede largura é o dado, nunca o nome da
-  pessoa**. Virou linha de dois andares; medido zero truncamento em 393 e 320px.
-
-**Aplicar no Supabase:** `supabase/APLICAR_BOLAO.sql` (idempotente).
-**Bancada:** `/preview-comunidade` · `?fechado=1` (o pódio) · `?vazio=1` ·
-`?luto=1`. Sem ela, conferir o pódio exigiria uma gestação de verdade chegando
-ao fim com meia dúzia de amigas tendo palpitado antes.
+Está em `git log` (commit `1bcd571`) se um dia fizer sentido. O que ficou de
+útil: `diaEmNumero`/`diaEmTexto` (ler `YYYY-MM-DD` sem passar por `new Date`) e
+o padrão de conferir o vínculo com `saoAmigas`, hoje exportado.

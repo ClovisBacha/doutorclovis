@@ -2363,7 +2363,6 @@ function MinhaContaPage() {
                 )}
                 {tab === "Comunidade" && (
                   <ComunidadeTab
-                    donaId={userId}
                     careMode={careMode}
                     /* As portas são ATALHOS: abrem a tela onde ela já mora.
                        `subDestino` vai pelo mesmo caminho que o hub da Saúde
