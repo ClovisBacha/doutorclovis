@@ -28,6 +28,7 @@ import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notifi
 import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
 import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
+import { Route as PreviewInstagramRouteImport } from './routes/preview-instagram'
 import { Route as PreviewHomeRouteImport } from './routes/preview-home'
 import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
@@ -183,6 +184,11 @@ const PreviewLojaSementinhasRoute = PreviewLojaSementinhasRouteImport.update({
 const PreviewJogoRoute = PreviewJogoRouteImport.update({
   id: '/preview-jogo',
   path: '/preview-jogo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewInstagramRoute = PreviewInstagramRouteImport.update({
+  id: '/preview-instagram',
+  path: '/preview-instagram',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewHomeRoute = PreviewHomeRouteImport.update({
@@ -527,6 +533,7 @@ export interface FileRoutesByFullPath {
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
+  '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
@@ -608,6 +615,7 @@ export interface FileRoutesByTo {
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
+  '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
@@ -691,6 +699,7 @@ export interface FileRoutesById {
   '/preview-grades': typeof PreviewGradesRoute
   '/preview-gratidao': typeof PreviewGratidaoRoute
   '/preview-home': typeof PreviewHomeRoute
+  '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
@@ -774,6 +783,7 @@ export interface FileRouteTypes {
     | '/preview-grades'
     | '/preview-gratidao'
     | '/preview-home'
+    | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
@@ -855,6 +865,7 @@ export interface FileRouteTypes {
     | '/preview-grades'
     | '/preview-gratidao'
     | '/preview-home'
+    | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
@@ -937,6 +948,7 @@ export interface FileRouteTypes {
     | '/preview-grades'
     | '/preview-gratidao'
     | '/preview-home'
+    | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
@@ -1020,6 +1032,7 @@ export interface RootRouteChildren {
   PreviewGradesRoute: typeof PreviewGradesRoute
   PreviewGratidaoRoute: typeof PreviewGratidaoRoute
   PreviewHomeRoute: typeof PreviewHomeRoute
+  PreviewInstagramRoute: typeof PreviewInstagramRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewLojaSementinhasRoute: typeof PreviewLojaSementinhasRoute
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
@@ -1195,6 +1208,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-jogo'
       fullPath: '/preview-jogo'
       preLoaderRoute: typeof PreviewJogoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-instagram': {
+      id: '/preview-instagram'
+      path: '/preview-instagram'
+      fullPath: '/preview-instagram'
+      preLoaderRoute: typeof PreviewInstagramRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-home': {
@@ -1680,6 +1700,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewGradesRoute: PreviewGradesRoute,
   PreviewGratidaoRoute: PreviewGratidaoRoute,
   PreviewHomeRoute: PreviewHomeRoute,
+  PreviewInstagramRoute: PreviewInstagramRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewLojaSementinhasRoute: PreviewLojaSementinhasRoute,
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,

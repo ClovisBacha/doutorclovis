@@ -148,7 +148,8 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
 import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
-import { ConfiguracoesDoPerfil, FeedDaRede } from "@/components/rede-social";
+import { ConfiguracoesDoPerfil } from "@/components/rede-social";
+import { RedeNoApp } from "@/components/rede-instagram";
 import { AssinaturaTab } from "@/components/assinatura-tab";
 /* A busca do DIRETÓRIO, a mesma da página pública: ranqueada por plano, com
    cidade, tempo de experiência e selo. A busca que morava aqui era uma RPC
@@ -2383,10 +2384,16 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Chá de bebê" && <ChaDeBebe careMode={careMode} />}
+                {/* ⚠️ A tela do FEED é a do modelo Instagram (`RedeNoApp`), e
+                    as CONFIGURAÇÕES ficam acima dela — perfil público, bio e a
+                    fila de pedidos. Elas não são parte do modelo copiado: o
+                    Instagram as esconde num menu, e aqui o perfil público é uma
+                    decisão de exposição que uma gestante de alto risco toma uma
+                    vez e precisa achar sem procurar. */}
                 {tab === "Feed" && (
                   <div className="space-y-5">
                     <ConfiguracoesDoPerfil careMode={careMode} />
-                    <FeedDaRede careMode={careMode} />
+                    <RedeNoApp careMode={careMode} />
                   </div>
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
