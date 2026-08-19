@@ -3982,6 +3982,183 @@ também o balde privado `presentes`).
 `?cota=11` · `?vazio=1`. Sem ela, conferir o cartão de RN cheio exigiria montar
 um chá real e reservar seis pacotes com seis nomes diferentes.
 
+## "Bugado e lerdo na hora de clicar": quatro causas, todas medidas (ago/2026)
+
+Relato do dono, no aparelho. **Nada aqui foi deduzido** — deduzir a partir de
+screenshot já tinha custado três rodadas no dia anterior. O método foi sempre o
+mesmo: abrir num navegador, estrangular a CPU em 6× (que aproxima um celular
+real) e medir.
+
+### O que NÃO era, e ficou descartado com número
+
+| suspeita                  | medida                                                    |
+| ------------------------- | --------------------------------------------------------- |
+| o vidro da barra (`blur`) | 58 fps; desligar `backdrop-filter` e sombra: 58 / 57 / 58 |
+| defeito de tela           | **48 bancadas** varridas com o console à vista: 0 erros   |
+| resposta ao toque isolada | 34 ms para abrir as reações                               |
+
+⚠️ **A varredura das 48 bancadas é o hábito que faltava**, e ela nasceu do
+defeito do dia anterior: `/preview-home` reproduzia o laço da barra desde o
+commit que o criou, e ninguém tinha aberto. Vale repetir depois de qualquer
+leva grande — o script viveu no scratchpad, e o que importa é o método:
+abrir cada `/preview-*` num navegador e LER O CONSOLE.
+
+### 1 · O app baixava o chatbot do site para não mostrá-lo
+
+`__root.tsx` importava `ChatbotWidget` de forma ESTÁTICA. Ele já sabia se
+esconder em `/minha-conta` (`return null`) — e por isso parecia inofensivo.
+⚠️ **Esconder não é não baixar**: um import estático no root entra no chunk de
+ENTRADA, que toda página carrega antes de qualquer coisa aparecer. E ele
+arrasta `@ai-sdk/react`, `ai` e o `react-markdown` inteiro.
+
+|                   | antes       | depois               |
+| ----------------- | ----------- | -------------------- |
+| pacote de entrada | 1.181.019 B | **925.486 B**        |
+| comprimido        | 356.248 B   | **283.441 B** (−20%) |
+
+São **255 KB a menos de JavaScript para interpretar** em toda abertura — e é
+enquanto a linha principal está ocupada com isso que o toque não responde.
+
+⚠️ Ficaram **dois portões, por razões diferentes**: o de fora
+(`semChromePublico`, no root) decide se BAIXA; o de dentro (o `return null` do
+componente) decide se DESENHA, e continua sendo a fonte da verdade sobre onde
+ele aparece.
+
+### 2 · A trilha do Jogo remontava inteira na hidratação
+
+Único aviso das 48 bancadas. O diff que o próprio React imprime:
+
+```
++ left: "31.615223689149722%"   (o cliente calculou)
+- left: "31.6152%"              (o que voltou do atributo)
+```
+
+`50 + 26 * Math.sin(...)` devolve float de 17 dígitos; o navegador **arredonda**
+ao ler o atributo `style` de volta (a CSSOM não guarda dezessete casas). O React
+compara, vê que não bate e **descarta a árvore para redesenhá-la** — numa trilha
+de centenas de nós.
+
+`casaDaTrilha` arredonda para três casas: em porcentagem, numa tela de 393px,
+**0,004px**. ⚠️ Vale para toda posição calculada com `Math.sin`/`Math.cos` que
+vá parar num `style`.
+
+### 3 · O cartão do post redesenhava a lista inteira a cada reação
+
+**232 ms → 61 ms** (19 posts, 6×). `setPosts` já preservava a identidade de quem
+não mudou, mas a lista montava CINCO FECHOS por post
+(`aoReagir={(t) => aoReagir(p, t)}`) — então as props mudavam de identidade a
+cada pintura e `memo` nunca acertaria.
+
+Três partes, e nenhuma sozinha resolve:
+
+1. as ações recebem o POST (`aoReagir(post, tipo)`), para quem chama passar a
+   MESMA referência a todos os cartões — o portão de quem pode apagar/denunciar
+   mudou-se para dentro do cartão, que já tem `post.souAAutora`;
+2. `memo` no cartão;
+3. **`acoes`**, em `RedeNoApp`: objeto criado uma vez (`useMemo` vazio) cujos
+   métodos encaminham para a versão mais recente, guardada num `ref`.
+   Referência estável por fora, fecho fresco por dentro — sem `useCallback` em
+   cascata. ⚠️ O `ref` é reescrito no **corpo do render**, nunca num efeito:
+   efeito roda depois da pintura, e o toque no meio chamaria a versão anterior.
+
+### ⚠️ 4 · E DUAS MEDIÇÕES MINHAS FORAM FALSAS — a bancada mentia
+
+As duas pela mesma razão, e esta é a lição mais reaproveitável do dia.
+Estabilizei só `aoReagir` e o número não se mexeu (232 → 278). O motivo: a
+BANCADA continuava passando `aoAbrirPerfil`, `aoSalvar`, `aoVotar`, `aoApagar`
+e `aoDenunciar` como fechos inline, então o `memo` errava em todos os cartões
+de qualquer jeito.
+
+**Uma bancada que passa props num formato diferente do da produção mede um app
+que não existe.** É a irmã da regra que já estava escrita ("a bancada injeta o
+DADO nos mesmos `useState` da produção"): agora vale também para a FORMA das
+props. `preview-instagram` tem `acoesDaBancada` (um `useMemo` vazio) pela mesma
+razão que a produção tem `acoes`.
+
+⚠️ E a bancada **passou a guardar a reação**. Com `aoReagir={() => {}}` era
+impossível ver a mecânica inteira — o emoji pousando, o pulo, o resumo se
+reordenando. A tela desenhava e nunca respondia, que é o estado em que uma tela
+passa meses sem ninguém perceber que não funciona.
+
+### O que sobrou, e não foi feito
+
+`minha-conta.tsx` tem **20.367 linhas, 29 estados e zero memoização**: qualquer
+toque repinta a árvore inteira. É a maior peça estrutural que resta, e ficou
+parada de propósito — é cirurgia grande, e o dono precisa dizer se a lentidão
+sobreviveu às quatro correções acima antes de valer o risco.
+
+## As reações do feed: treze, com toque duplo (ago/2026)
+
+Pedido do dono: "adicione recursos de reação mais legais na imagem, como like
+clicando duas vezes, risada 😂, 😇🥹😍🥰😘🥳🤩😎😱😋😚☺️🙏… menos com cara de vibe
+code, mais com cara de app caro e profissional".
+
+**Treze**, na ordem em que se sentem: amor → carinho → emoção → apoio → festa →
+riso. ❤️ 😍 🥰 😘 🤗 🥹 ☺️ 😇 🙏 👏 🥳 🤩 😂
+
+- ⚠️ **😱 ficou de fora, e a razão é CLÍNICA**: embaixo do relato de um
+  sangramento ou de uma internação ele devolve pânico a quem está com medo — e
+  numa base de alto risco é justamente esse post que mais recebe reação.
+  😎 · 😋 · 😚 saíram por não terem trabalho próprio ao lado das treze.
+- ⚠️ **Sobre 😂, a ressalva fica registrada uma vez**: ela entra contra a
+  recomendação original (embaixo de um post sobre uma perda é indefensável), por
+  decisão explícita do dono, e é o primeiro item a sair se alguma paciente
+  reclamar. O teste que a proibia foi **reescrito, nunca apagado** — os outros
+  oito proibidos continuam, com a razão de cada um.
+- ⚠️ **NUNCA renomeie um `tipo`** (está gravado em `rede_reacoes`), e
+  **acrescentar um exige o SQL**: o CHECK lista os treze, com `ALTER`
+  idempotente, porque `CREATE TABLE IF NOT EXISTS` não toca em tabela existente.
+  Sem rodar, a reação nova é aceita pelo servidor e RECUSADA pelo banco — a tela
+  mostra e nada grava.
+
+**Toque duplo na foto = ❤️**, com o coração branco estourando no meio.
+
+- ⚠️ **SEMPRE dá, nunca TIRA.** Quem toca duas vezes está dizendo "gostei", não
+  "mudei de ideia". Alternando, tocar duas vezes num post já curtido apagaria a
+  reação com uma animação de coração — a tela mostrando o oposto do que acabou
+  de acontecer.
+- ⚠️ **Duas travas, porque a foto TAMBÉM desliza**: dedo que andou mais de 12px
+  é arrasto de carrossel, não toque; e o relógio zera ao disparar, para o
+  terceiro toque não formar um segundo par com o segundo.
+- ⚠️ **A chave do elemento muda a cada batida** — sem isso o segundo toque duplo
+  seguido não desenha coração nenhum, porque o CSS não recomeça sozinho.
+- `REACAO_DO_TOQUE_DUPLO` é `amei` e não uma décima quarta coisa: dois caminhos
+  para o mesmo gesto criariam duas contagens para ele.
+
+**A barra virou uma fileira que rola.** Eram treze pílulas "emoji + rótulo" em
+`flex-wrap` — três linhas de etiquetas, que leem como formulário. Treze alvos de
+44px somam 572px, mais que a largura de um iPhone, então ela rola de propósito.
+
+**O resumo mostra os emojis que o post DE FATO recebeu** (`principaisReacoes`,
+pura e testada). "12 reações" conta a mesma história para doze corações e doze
+risadas, que são notícias diferentes. ⚠️ Só devolve o que tem contagem maior que
+zero (treze em cinza fariam a ausência de reação ocupar espaço), e **o empate
+desempata pela ordem de `REACOES`** — sem desempate fixo o mesmo post troca de
+cara entre duas aberturas.
+
+**A enquete** virou pílula com barra que CRESCE (`scaleX`, no compositor — animar
+`width` repintaria a linha a cada quadro), ✓ na escolhida, e porcentagem **ao
+lado** do número absoluto: a porcentagem sozinha transforma três pessoas numa
+maioria, e o absoluto sozinho não diz a proporção.
+
+**Os dois corações são DESENHADOS.** 🤍 sai cinza no Android e quase invisível no
+escuro do iOS — mesma lição do 📞 e do 📅 —, e ele é o botão que a tela inteira
+existe para fazer alguém tocar.
+
+## A barra de baixo perdeu os nomes (ago/2026)
+
+Pedido do dono. Ícone de 22 → 27px, num lugar só (`ALTURA_ICONE`), e o
+espaçador invisível do botão do bebê lê a MESMA constante — senão ele desalinha
+dos vizinhos no primeiro ajuste.
+
+- ⚠️ **O bebê NÃO usa a tabela**, de propósito: ele é um círculo de 56px sobre a
+  borda da barra, e a distância entre ele e os outros é o que diz qual é o
+  destino principal. Crescer os dois juntos apagaria essa diferença.
+- ⚠️ **`min-h-[44px]` no botão.** Tirar o rótulo tirou 20px de altura; sem o
+  mínimo o alvo caía para ~35px. Medido depois: os cinco em 69×44.
+- O rótulo saiu da TELA, não do app — o `aria-label` continua dizendo "Saúde",
+  "Jogo", "Comunidade", e agora é a única fonte.
+
 ## ⚠️ O APP PAROU DE ABRIR: um array vazio novo a cada leitura (ago/2026)
 
 O dono, no aparelho: _"agora quando eu tento entrar no aplicativo aparece essa
