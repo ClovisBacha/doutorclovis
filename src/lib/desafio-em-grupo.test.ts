@@ -50,6 +50,17 @@ describe("o que conta como fechado", () => {
     expect(diasNaJanela(dias, "2026-08-24", "2026-08-30")).toBe(0);
   });
 
+  test("⚠️ as DUAS bordas contam — inclusive o domingo", () => {
+    /* Uma mutação passou verde trocando `d <= fim` por `d < fim`: o fixture não
+       tinha nenhum dia igual ao `fim`. `domingoDaSemana` e `vigente` testam as
+       bordas explicitamente; o contador não testava — e um desafio fechado NO
+       DOMINGO deixaria de contar, que é o dia em que ele mais fecha. */
+    expect(diasNaJanela(new Set(["2026-08-17"]), "2026-08-17", "2026-08-23")).toBe(1);
+    expect(diasNaJanela(new Set(["2026-08-23"]), "2026-08-17", "2026-08-23")).toBe(1);
+    expect(diasNaJanela(new Set(["2026-08-16"]), "2026-08-17", "2026-08-23")).toBe(0);
+    expect(diasNaJanela(new Set(["2026-08-24"]), "2026-08-17", "2026-08-23")).toBe(0);
+  });
+
   test("o alvo é atingido por igualdade, não só por excesso", () => {
     expect(fechou(3, 3)).toBe(true);
     expect(fechou(2, 3)).toBe(false);

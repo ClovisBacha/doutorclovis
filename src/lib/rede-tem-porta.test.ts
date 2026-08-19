@@ -39,7 +39,16 @@ import { join } from "node:path";
  * para fechar: cinco funções escritas, testadas e inalcançáveis, sem nada
  * ficando vermelho.
  */
-const FONTES = ["src/lib/rede-social.functions.ts", "src/lib/caixinha.functions.ts"];
+const FONTES = [
+  "src/lib/rede-social.functions.ts",
+  "src/lib/caixinha.functions.ts",
+  /* ⚠️ Os dois módulos da Fase 5 ficavam de fora, e o próprio comentário acima
+     diz que "um módulo novo fora desta lista é o buraco que a catraca existe
+     para fechar". As oito funções deles têm porta hoje — mas ter porta hoje é
+     exatamente o que era verdade das sete que a catraca nasceu para pegar. */
+  "src/lib/desafio-em-grupo.functions.ts",
+  "src/lib/influenciadora.functions.ts",
+];
 
 /** Onde o APP mora. Bancadas e testes ficam de fora — ver o cabeçalho. */
 const PASTAS = ["src/components", "src/routes", "src/lib"];
@@ -97,7 +106,8 @@ function funcoesDeServidor(): string[] {
 
 describe("toda função de servidor da rede tem porta no app", () => {
   const nomes = funcoesDeServidor();
-  const codigo = arquivosDoApp(FONTES.map(moduloDe))
+  const modulos = FONTES.map(moduloDe);
+  const codigo = arquivosDoApp(modulos)
     .map((f) => semComentarios(readFileSync(f, "utf8")))
     .join("\n");
 
@@ -116,7 +126,30 @@ describe("toda função de servidor da rede tem porta no app", () => {
          nenhuma: a palavra existe em `bloquearPeriodo`/`desbloquearPeriodo`,
          da grade de horários do médico, num arquivo que nada tem a ver com a
          rede. Um teste que casa pedaço de palavra encontra qualquer coisa. */
-      expect(new RegExp(`\\b${nome}\\b`).test(codigo)).toBe(true);
+      /* ⚠️ E não dentro de uma STRING: `const _morto = "apagarPost"` satisfazia
+         a borda de palavra. A chamada é sempre por `import()` dinâmico com
+         desestruturação, então o nome aparece como identificador. */
+      /* ⚠️ **Casa a DESESTRUTURAÇÃO de um `import()` do módulo**, e não o nome
+         solto. A borda de palavra sozinha aceitava duas coisas que não são
+         porta nenhuma: o nome dentro de uma string (`const _morto =
+         "apagarPost"`) e uma VARIÁVEL LOCAL homônima — medi as duas, e as duas
+         passavam verdes com a porta apagada.
+
+         A convenção deste repo é única e estável: toda chamada nasce de
+         `const { nome } = await import("@/lib/<modulo>")`, inclusive quando
+         renomeada (`{ publicarStory: chamar }`). É isso que se procura. */
+      const porDesestruturacao = modulos.some((mod) =>
+        new RegExp(
+          `\\{[^{}]*\\b${nome}\\b[^{}]*\\}\\s*=\\s*await import\\(\\s*["'\`][^"'\`]*${mod}`,
+        ).test(codigo),
+      );
+      /* ⚠️ A segunda forma legítima: guardar o módulo inteiro
+         (`const mod = await import(…)`) e chamar `mod.nome(...)`. Cinco funções
+         usam esta, dentro de `Promise.all`. Uma STRING nunca casa `.nome(`, e
+         uma variável local homônima também não — que é o que a borda de palavra
+         sozinha aceitava. */
+      const porAcesso = new RegExp(`\\.${nome}\\s*\\(`).test(codigo);
+      expect(porDesestruturacao || porAcesso).toBe(true);
     });
   }
 });
