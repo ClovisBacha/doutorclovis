@@ -4700,3 +4700,171 @@ verdade: 4,54 a 16,83.
 `&caixinha=0` a fechada) · `?tela=perfil` (o campo de perguntar, e os três
 desfechos digitando "to sangrando…", "estou com muita dor nas costas" e uma
 pergunta comum) · `?tela=perfil&caixinha=0`.
+
+## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
+
+Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta
+com o resto do site"_ e _"só parar depois de estarem com perfeição e aprovadas
+pelos agentes"_. Quatro auditorias em paralelo (vazamento · ponta a ponta ·
+testes que mentem · produto e luto), mais um workflow de 28 agentes.
+
+**A aba não estava pronta, e nada disso aparecia em teste, `tsc` ou tela.** Os
+3.313 testes passavam, o `tsc` estava limpo, e as bancadas mostravam telas
+bonitas. Todos os defeitos abaixo falhavam em SILÊNCIO.
+
+### O padrão, que vale mais que a lista
+
+Este projeto tinha catraca para **"existe chamador?"** e nenhuma para **"a
+chamada funciona?"**. Os piores achados são caminhos que nunca foram percorridos
+com dado real de ponta a ponta — e as bancadas ESCONDIAM justamente os estados
+que a produção sempre produz.
+
+### Os que derrubavam funções inteiras
+
+- ⚠️ **A ABA FICARIA PRETA NO DIA DO DEPLOY.** `COLUNAS_DO_POST` pede
+  `enquete_opcoes` e `aula` em CINCO leituras (feed, perfil, sugeridos, post
+  avulso, salvos), e as cinco descartavam o `error`. Num banco sem essas colunas
+  — o do dono agora — o `42703` devolve `data: null` nas cinco ao mesmo tempo.
+  `publicarPost` tinha recuo; a LEITURA não tinha. Toda leitura passa por
+  `postsCrus`.
+- ⚠️ **`carimbo_semana` NÃO PODIA SER CRIADA.** Ela nasceu dentro do
+  `CREATE TABLE IF NOT EXISTS`: num banco que já tinha `rede_stories`, o
+  `CREATE` é no-op e a coluna nunca nasce — e rodar o SQL de novo não conserta.
+  A conferência do fim relatava `carimbo_ok = false` sem que houvesse comando
+  capaz de mudar isso, e a fileira ficava com uma bolinha só, para sempre.
+- ⚠️ **A CAIXA ♡ NUNCA RECEBEU UMA LINHA.** `upsert` com
+  `onConflict: "dono_id,quem_id,especie,post_id"` contra um índice de EXPRESSÃO
+  (`coalesce(post_id, dono_id)`, assim de propósito porque cada NULL é distinto
+  no Postgres). `ON CONFLICT` não infere índice de expressão: `42P10`, engolido
+  num `console.warn`. Virou `insert` — quem dedupa é o índice, e `23505` é
+  sucesso repetido.
+- ⚠️ **PUBLICAR COM A AULA ANEXADA FALHAVA SEMPRE.** O validador pedia
+  `{ dia, titulo }` e o compositor manda `{ tema }`. O `.parse()` é do objeto
+  inteiro. Nem `tsc` nem teste viam: `inputValidator` recebe `unknown`.
+- ⚠️ **A CAMADA "TODO MUNDO" ERA A MAIS FECHADA DE TODAS.** `podeVerPost`
+  devolvia `autor.publico` sozinho, e o perfil NASCE privado — quem publicava em
+  "Qualquer pessoa no app" fazia um post que ninguém via, nem as amigas, enquanto
+  o mesmo texto em "Quem me segue" apareceria. Hoje há teste de MONOTONIA nas
+  oito combinações.
+
+### Os de vazamento
+
+- ⚠️ **`%` e `_` DO E-MAIL VIRAVAM CURINGAS.** `maria_silva@hotmail.com` casava
+  `maria.silva@hotmail.com` e abria faturamento, código e a lista de 200
+  indicadas de uma criadora. O repo JÁ tinha consertado isso inline em
+  `appointments.functions.ts`, com o comentário certo; três chamadas novas
+  nasceram sem. Virou `like-seguro.ts`, com catraca varrendo todo `.ilike(`.
+- ⚠️ **O BLOQUEIO FALHAVA ABERTO.** `data ?? []` transformava um timeout em
+  conjunto vazio, e como todo ponto de uso pergunta `has()` para ESCONDER, nada
+  era escondido. Três linhas abaixo, na mesma função, o grafo de amigas já
+  falhava fechado com o comentário certo ao lado. `conjuntoDeBloqueio` responde
+  `true` para todo mundo quando degradado — **seguro por construção**, inclusive
+  para o ponto de uso que alguém escrever amanhã.
+- ⚠️ **A AMIZADE ENCERRADA VOLTAVA A VER A CAMADA `amigas`.** A justificativa
+  escrita dizia que o servidor conferia de novo — verdade na aba Amigas, falsa
+  desde que a rede passou a consumir `idsDasAmigas`.
+- ⚠️ **A CAIXA ANÔNIMA IGNORAVA A PRIVACIDADE DO PERFIL.** `perguntar` não
+  conferia `alcancaOPerfil`. Fechar o perfil não fechava nada.
+- ⚠️ **A FOTO DE PERFIL DE TODA PACIENTE QUEBRARIA NO OITAVO DIA.** URL assinada
+  por 7 dias gravada na coluna, com um comentário dizendo "a próxima leitura
+  renova" — e nada renovava. E o dano não era da Comunidade: a aba Amigas lê a
+  MESMA coluna.
+
+### O que a régua clínica deixava passar
+
+Medido rodando `triarTexto` contra 32 frases que uma gestante escreveria:
+
+- **Ela não rodava em `publicarPost` nem em `publicarStory`** — protegia o canal
+  secundário e deixava a porta da frente aberta.
+- **A enquete era conduta clínica com PLACAR.** "[Vai pro PS · Espera passar ·
+  Liga pro médico]" faz catorze desconhecidas emitirem uma conduta obstétrica em
+  forma de maioria. `desafio-em-grupo` já tinha resolvido isso com catálogo
+  fechado; a enquete repetiu o erro que ele evitou.
+- ⚠️ **O `&&` era VAZIO**: `sinto` e `senti` estão nas DUAS listas, então a mesma
+  palavra satisfazia os dois lados — "senti muito amor quando vi o rostinho
+  dele" virava caso clínico.
+- ⚠️ **`posso`, `devo` e `é normal`** são as três aberturas mais comuns do
+  português, e mandavam "posso levar minha mãe na sala de parto?" ao consultório.
+- ⚠️ **Nenhuma variante natural de "comigo foi assim, não precisa ir" era pega**
+  — só a forma exata. "No meu caso eu não fui", "ficaria em casa", "melhor
+  esperar amanhã": todas publicáveis.
+- ⚠️ **Faltavam bandeiras que a paciente de verdade escreve**: pressão em NÚMEROS
+  ("15 por 10"; ninguém escreve "pressão alta"), movimento REDUZIDO e não só
+  ausente, "perdi líquido", vista estranha, ideação por eufemismo.
+
+O conserto separa **PEDIR** de **ENTREGAR** conduta — entregar é incondicional,
+pedir precisa do objeto certo — e usa duas sublistas (`SINTOMAS_DO_CORPO`,
+`COISAS_DE_CONDUTA`), com `TERMOS_CLINICOS` intacta porque ela é o contrato do
+chat. ⚠️ E `12/8` continua sendo data, não pressão.
+
+### Modo Cuidado
+
+- ⚠️ **A aba ficava EM BRANCO e sem saída.** `return null`, e o único caminho
+  para o hub era o atalho ⊞ que essa mesma tela publica. Ela tocava, via nada,
+  tocava de novo e nada subia — na semana em que menos tem paciência.
+- ⚠️ **E o portão do feed era só do CLIENTE.** As quatro leituras não conferiam
+  o `care_mode` de quem chama; o perfil chega depois de duas rodadas de rede, e
+  o feed voltando antes dava um FLASH do feed completo — ultrassons, selos de
+  "28 semanas", enquetes de nome.
+- ⚠️ **E era inferível na lista da criadora.** `minhasIndicadas` removia quem
+  entrou em luto — certo numa lista de milhares, errado numa de sete, onde o
+  SUMIÇO é a informação. A linha fica; o presente é que some, com um traço
+  neutro.
+
+### As promessas que a tela fazia e o código não cumpria
+
+- ⚠️ **"Fica registrada para a gente olhar"** — `denunciado_em` era gravada e
+  NENHUMA consulta a lia. Denúncia que não chega + bloqueio cego é o par mais
+  perigoso do recurso. Hoje há `FilaDeDenuncias` no Painel, e ela **não mostra
+  quem escreveu nem para o administrador**: o que ele precisa é o TEXTO e a
+  REINCIDÊNCIA.
+- ⚠️ **`parcial: true` tinha ZERO leitores** — a tela dizia "Salvo 💛" e acendia
+  a chave sobre nada.
+- ⚠️ **O consentimento não dizia o que acontece**: o código faz o primeiro nome
+  dela aparecer numa lista de terceiro, e as duas portas falavam só das 150 🌱.
+- **"0 seguidores"** era literal cravado, com a lista abrindo com doze pessoas.
+- **A bolinha "Seu story"** usava `perfil`, que é o ÚLTIMO PERFIL ABERTO.
+- **`reagir` e `guardar` esqueciam a lista `sugestoes`** — o servidor gravava e
+  a tela não mudava.
+
+### ⚠️ E DEZ ASSERÇÕES MINHAS MENTIAM
+
+Uma auditoria por mutação rodou **88 quebras** e **18 sobreviveram** — dez no
+arquivo que abria dizendo "todas foram conferidas por mutação". Os quatro
+mecanismos, todos já registrados no `caixinha.ts`:
+
+- `indexOf` devolve **−1** quando a linha é APAGADA, e `−1 < x` passa;
+- `slice(-1, x)` devolve **string vazia**, e `not.toContain` sobre vazio passa;
+- `indexOf("aceita_perguntas")` acha o `.select(...)`, nunca a guarda — então
+  **MOVER** a guarda passava;
+- `toContain('.eq("dona_id", eu)')` passa quando existe uma SEGUNDA ocorrência.
+
+**As mutações que resistiram foram, sem exceção, as comportamentais.** O
+conserto não foi escrever mais `toContain`: a decisão saiu do handler para
+`src/lib/caixinha.ts`, onde é pura. Sete mutações refeitas — inclusive as que
+apagam e movem guardas — e todas ficam vermelhas.
+
+⚠️ **E a catraca de portas tinha três buracos**, dois deles meus: não cobria os
+módulos da Fase 5; aceitava o nome dentro de uma STRING e uma VARIÁVEL LOCAL
+homônima; e **a minha primeira correção quebrou a catraca** — a regex que tirava
+strings não excluía `\n`, e como `codigo` é a junção de todos os arquivos, uma
+aspa desemparelhada em qualquer prosa deslocava o pareamento e comia
+identificadores. Quatro funções que TÊM porta ficaram vermelhas: uma trava
+contra falso positivo virou máquina de falso negativo.
+
+### O que ganhou capacidade
+
+- **Tirar um seguidor** sem bloquear (a única saída era nuclear), e é CALADO.
+- **Denunciar um post** — a caixinha tinha denúncia e o canal com MAIS alcance
+  não tinha.
+- **Teto por PESSOA** na caixinha (3/dia): o teto global não protege contra
+  assédio dirigido, e o precedente é o ask.fm.
+- **A emergência deixa rastro**: era o único dos três desfechos que não gravava
+  nada — a hierarquia estava invertida.
+
+**Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (agora com
+`aceita_perguntas`, `rede_perguntas`, `rede_posts.pergunta`, `resolvido_em` e o
+`ALTER` que finalmente cria `carimbo_semana`).
+**Bancadas novas:** `/preview-instagram?tela=caixinha` (`&perguntas=0`,
+`&caixinha=0`) · `?tela=lista&remover=0` · `?tela=perfil` (o campo de perguntar,
+e os três desfechos da triagem).
