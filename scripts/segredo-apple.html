@@ -1,5 +1,4 @@
-&lt;!-- Este arquivo é aberto DIRETO do disco (file://). Não há servidor, não há rede, e a chave
-privada não sai do seu computador. --&gt;
+<!-- Aberto DIRETO do disco (file://): sem servidor, sem rede. -->
 <meta charset="utf-8" />
 <title>Segredo do Entrar com a Apple</title>
 <style>
@@ -239,6 +238,17 @@ privada não sai do seu computador. --&gt;
       for (let i = 0; i < bruto.length; i++) der[i] = bruto.charCodeAt(i);
     } catch {
       return erro("O conteúdo do arquivo não é base64 válido.");
+    }
+
+    /* ⚠️ **O SAFARI NÃO EXPÕE O WEBCRYPTO EM `file://`.** Ele não considera um
+       arquivo local um contexto seguro, então `crypto.subtle` é `undefined` — e
+       a mensagem antiga ("o navegador não aceitou a chave") culpava a chave por
+       um problema que era do navegador. O dono perdeu uma volta com isso. */
+    if (!window.crypto || !window.crypto.subtle) {
+      return erro(
+        "Este navegador não libera o WebCrypto em arquivos abertos do disco — é o caso do " +
+          "Safari. Abra este mesmo arquivo no Chrome, que funciona.",
+      );
     }
 
     let chave;
