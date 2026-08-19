@@ -1292,11 +1292,38 @@ type PathNode =
  * dia existe no caminho — o que separa é o portão premium na aula, não o
  * desenho da trilha. O álbum da semana mudou de casa: mora na barra.
  */
+/**
+ * A CASA DECIMAL DA TRILHA — e por que ela existe.
+ *
+ * ⚠️ **Sem isto, o Jogo remonta a trilha INTEIRA no carregamento.**
+ *
+ * `50 + 26 * Math.sin(...)` devolve um float de 17 dígitos
+ * (`31.615223689149722%`). O servidor escreve esse número no atributo `style`;
+ * o navegador, ao ler o atributo de volta, **arredonda** — a CSSOM não guarda
+ * dezessete casas. Na hidratação o React compara o que o servidor mandou com o
+ * que o cliente calculou, vê `31.6152%` contra `31.615223689149722%`, conclui
+ * "não bate" e **descarta a árvore para redesenhá-la**.
+ *
+ * Medido em `/preview-jogo`: era esse o aviso
+ * "A tree hydrated but some attributes… didn't match", e ele saía numa trilha
+ * de centenas de nós — trabalho de linha principal na abertura de uma das
+ * cinco abas.
+ *
+ * Três casas em porcentagem, numa tela de 393px, são **0,004px**: abaixo de um
+ * pixel, abaixo de um pixel físico, e agora idêntico dos dois lados.
+ *
+ * ⚠️ Vale para toda posição calculada com `Math.sin`/`Math.cos` que vá parar
+ * num `style` — não só para estas duas.
+ */
+function casaDaTrilha(v: number): number {
+  return Math.round(v * 1000) / 1000;
+}
+
 function buildPhaseNodes(phase: Phase): { nodes: PathNode[]; height: number } {
   const nodes: PathNode[] = [];
   let y = 30;
   let row = 0;
-  const xOf = (r: number) => 50 + 27 * Math.sin((r * Math.PI) / 4);
+  const xOf = (r: number) => casaDaTrilha(50 + 27 * Math.sin((r * Math.PI) / 4));
 
   for (let w = phase.from; w <= phase.to; w++) {
     nodes.push({ kind: "week-header", week: w, y });
@@ -1345,7 +1372,7 @@ function buildFullJourney(
   let y = 8;
   let row = 0;
   let mascotIdx = 0;
-  const xOf = (r: number) => 50 + 26 * Math.sin((r * Math.PI) / 4);
+  const xOf = (r: number) => casaDaTrilha(50 + 26 * Math.sin((r * Math.PI) / 4));
 
   // Mascote grande ao lado do caminho (Duolingo), do lado oposto ao nó da linha
   const maybeMascot = (x: number, rowY: number, rowH: number) => {
