@@ -575,3 +575,31 @@ describe("⚠️ a régua clínica roda no CANAL PRINCIPAL", () => {
     expect(corpo).toContain("SOS");
   });
 });
+
+describe("⚠️ Modo Cuidado de QUEM LÊ, no servidor", () => {
+  test("as quatro leituras do feed conferem `euEmCuidado`", () => {
+    /* O único portão era a prop `careMode` da tela, derivada de um perfil que
+       chega DEPOIS de duas rodadas de rede. `carregarFeed()` dispara na
+       primeira renderização com `careMode === false`, então o feed voltando
+       antes do perfil dava um FLASH do feed completo — ultrassons, selos de
+       "28 semanas", enquetes de nome — para quem acabou de perder a gestação.
+       Todo o resto da aba respeita "o portão mora no servidor". */
+    for (const nome of ["meuFeed", "storiesDoFeed", "sugestoesDoFeed", "minhaAtividade"]) {
+      const c = corpoDe(nome).replace(/\s+/g, " ");
+      const gate = c.indexOf("await euEmCuidado(sb, eu)");
+      expect(gate).toBeGreaterThan(-1);
+      /* E ANTES de ler qualquer conteúdo. */
+      const leu = c.indexOf(".from(");
+      expect(leu === -1 || gate < leu).toBe(true);
+    }
+  });
+
+  test("⚠️ falha ao ler o `care_mode` conta como EM CUIDADO", () => {
+    /* A única direção segura: errar para um lado é um feed vazio por uma
+       abertura; para o outro, é a tela que o Modo Cuidado existe para impedir. */
+    const i = CODIGO.indexOf("async function euEmCuidado");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = CODIGO.slice(i, CODIGO.indexOf("\n}", i));
+    expect(corpo).toContain("if (error) return true;");
+  });
+});

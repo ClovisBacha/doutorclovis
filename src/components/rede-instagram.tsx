@@ -2199,7 +2199,27 @@ export function RedeNoApp({
    * depois de ela ter lido as três.
    */
   useEffect(() => {
-    if (careMode || onde.t !== "feed") return;
+    if (onde.t !== "feed") return;
+    /* ⚠️ **Em Modo Cuidado as bolinhas NÃO somem — elas encolhem.** Sumindo,
+       tocar de novo no ícone da Comunidade não fazia nada e o hub ficava
+       inalcançável; sobra a porta para o que `portasDaComunidade` mantém de
+       propósito (Amigas, Acompanhante, Álbum). Publicar, buscar, atividade,
+       perfil, salvos e caixinha ficam de fora — são a rede em volta. */
+    if (careMode) {
+      return publicarAtalhos(
+        "comunidade",
+        onAbrirSecoes
+          ? [
+              {
+                id: "secoes",
+                rotulo: "Amigas, álbum…",
+                icone: "grade" as const,
+                aoTocar: onAbrirSecoes,
+              },
+            ]
+          : [],
+      );
+    }
     const atalhos: AtalhoDaAba[] = [
       { id: "buscar", rotulo: "Buscar", icone: "buscar", aoTocar: () => setOnde({ t: "busca" }) },
       {
@@ -2245,7 +2265,36 @@ export function RedeNoApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [careMode, onde.t, naoVistas, naCaixa, euId, onAbrirSecoes]);
 
-  if (careMode) return null;
+  /* ⚠️ **`return null` DEIXAVA A ABA EM BRANCO, e sem saída.**
+     A barra de baixo abre "Feed", e o único caminho para o hub é o atalho ⊞ que
+     esta MESMA tela publica — e o efeito dos atalhos retorna cedo em Modo
+     Cuidado. Então a paciente que perdeu a gestação tocava em Comunidade (o
+     ícone continua aceso), via uma tela VAZIA, tocava de novo e nada subia. Ela
+     conclui que o app quebrou, na semana em que menos tem paciência para isso.
+
+     E `portasDaComunidade` mantém Amigas, Acompanhante e Álbum de propósito —
+     "tirá-las seria isolá-la no pior momento" —, então as três ficavam sem
+     porta nenhuma. O silêncio tem de ter uma porta. */
+  if (careMode) {
+    return (
+      <div className="px-4 py-10">
+        <div className="rounded-3xl border border-border bg-card p-8 text-center">
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            O feed está em pausa enquanto o Modo Cuidado estiver ligado.
+          </p>
+          {onAbrirSecoes && (
+            <button
+              type="button"
+              onClick={onAbrirSecoes}
+              className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
+            >
+              Ver Amigas, Álbum e Acompanhante
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   /* A conferência vem ANTES de tudo: ela é tela cheia e a escolha já foi feita. */
   if (conferindoStory) {

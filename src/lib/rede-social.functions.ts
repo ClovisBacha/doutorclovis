@@ -283,6 +283,34 @@ async function contarSeguindo(sb: any, eu: string): Promise<number> {
   return count ?? 0;
 }
 
+/**
+ * QUEM CHAMA ESTÁ EM MODO CUIDADO?
+ *
+ * ⚠️ **As quatro leituras do feed não perguntavam isso**, e o único portão era
+ * a prop `careMode` da tela — derivada de `profile?.care_mode`, que chega
+ * DEPOIS de duas rodadas de rede (o próprio CLAUDE.md documenta a ordem).
+ * `carregarFeed()` dispara na primeira renderização com `careMode === false`,
+ * então se o feed voltasse antes do perfil havia um FLASH do feed completo —
+ * ultrassons, selos de "28 semanas", enquetes de nome — para quem acabou de
+ * perder a gestação.
+ *
+ * Todo o resto da aba respeita "o portão mora no servidor". Este, que é o mais
+ * doloroso, não respeitava.
+ *
+ * ⚠️ Falha de leitura conta como EM CUIDADO. É a única direção segura: o custo
+ * de errar para um lado é um feed vazio por uma abertura; para o outro, é a
+ * tela que o Modo Cuidado inteiro existe para impedir.
+ */
+async function euEmCuidado(sb: any, eu: string): Promise<boolean> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select("care_mode")
+    .eq("id", eu)
+    .maybeSingle();
+  if (error) return true;
+  return !!(data as any)?.care_mode;
+}
+
 /** Perfis por id, com o que a rede precisa. */
 async function perfisPorId(sb: any, ids: string[]) {
   if (ids.length === 0) return new Map<string, any>();
@@ -1379,6 +1407,10 @@ export const meuFeed = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
+    /* ⚠️ O portão do Modo Cuidado de QUEM LÊ — ver `euEmCuidado`. */
+    if (await euEmCuidado(sb, eu)) {
+      return { ok: true as const, posts: [] as PostNaTela[], proximo: null };
+    }
     const ctx = await contextoDe(sb, eu);
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
       (id) => !ctx.bloqueio.has(id) || id === eu,
@@ -1462,6 +1494,10 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
+    /* Mesmo portão do feed — ver `euEmCuidado`. */
+    if (await euEmCuidado(sb, eu)) {
+      return { ok: true as const, posts: [] as PostNaTela[], pessoas: [] as PessoaNaLista[] };
+    }
     const ctx = await contextoDe(sb, eu);
 
     /* Pedido pendente também tira da lista — ver o cabeçalho. */
@@ -2049,6 +2085,8 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
+    /* Mesmo portão do feed — ver `euEmCuidado`. */
+    if (await euEmCuidado(sb, eu)) return { ok: true as const, bolhas: [] as BolhaDeStory[] };
     const ctx = await contextoDe(sb, eu);
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
       (id) => !ctx.bloqueio.has(id) || id === eu,
@@ -2424,6 +2462,12 @@ export const minhaAtividade = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
+
+    /* Mesmo portão do feed — ver `euEmCuidado`. A caixa ♡ é a rede em volta,
+       e ela para junto. */
+    if (await euEmCuidado(sb, eu)) {
+      return { ok: true as const, itens: [] as AtividadeNaTela[], novas: 0 };
+    }
 
     const { data: linhas } = await sb
       .from("rede_atividade")
