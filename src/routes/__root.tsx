@@ -19,6 +19,7 @@ import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
 import { PublicBottomNav } from "@/components/public-bottom-nav";
+import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -52,32 +53,6 @@ function NotFoundComponent() {
         </div>
       </div>
     </div>
-  );
-}
-
-/**
- * ISTO É UM PEDAÇO DO APP QUE NÃO EXISTE MAIS NO SERVIDOR?
- *
- * ⚠️ **É o defeito clássico de PWA instalado com deploy frequente**, e foi o que
- * o dono viu: a paciente tem a aba (ou o app) aberta com um `index-*.js` de uma
- * versão; sobe um deploy; ela toca em "Abrir meu app"; o router tenta um
- * `import()` do pedaço `/minha-conta-<hash>.js` daquela versão — e o arquivo já
- * não está no CDN. O `import()` REJEITA, e o que ela vê é "Algo deu errado".
- *
- * Nada no app dela está quebrado: o código é velho, só isso. O texto de cada
- * navegador é diferente, e por isso a lista é generosa — errar para o lado de
- * recarregar é inofensivo; errar para o outro deixa a paciente presa numa tela
- * de erro com o app perfeitamente funcional a um F5 de distância.
- */
-function ehPedacoQueSumiu(e: Error): boolean {
-  const t = `${e?.name ?? ""} ${e?.message ?? ""}`.toLowerCase();
-  return (
-    t.includes("dynamically imported module") ||
-    t.includes("importing a module script failed") ||
-    t.includes("failed to fetch dynamically") ||
-    t.includes("error loading dynamically") ||
-    t.includes("chunkloaderror") ||
-    (t.includes("import") && t.includes("failed"))
   );
 }
 
