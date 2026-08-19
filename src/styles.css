@@ -3286,3 +3286,119 @@ button:active > .duo3d {
     width: 100%;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS REAÇÕES DO FEED (ago/2026)
+
+   Pedido do dono: "adicione recursos de reação mais legais na imagem, como
+   like clicando duas vezes… pense em como melhorar isso, ficar mais
+   interativo, profissional e legal".
+
+   ⚠️ Toda animação daqui PARA em `prefers-reduced-motion`, nunca some: o
+   coração do toque duplo é a ÚNICA confirmação de que o gesto funcionou, e
+   apagá-lo deixaria a paciente tocando duas vezes de novo achando que falhou.
+   Sem movimento ele aparece e desaparece, sem crescer.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* O coração que estoura no meio da foto no toque duplo. */
+@keyframes dc-coracao-estoura {
+  0% {
+    transform: scale(0.2) rotate(-14deg);
+    opacity: 0;
+  }
+  18% {
+    transform: scale(1.25) rotate(-4deg);
+    opacity: 1;
+  }
+  38% {
+    transform: scale(0.92) rotate(0deg);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1.03) rotate(0deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.12) rotate(0deg);
+    opacity: 0;
+  }
+}
+.dc-coracao-estoura {
+  animation: dc-coracao-estoura 1000ms var(--ease-out-expo) forwards;
+}
+
+/* Cada emoji da barra entra de baixo, em escada. O atraso vai por
+   `--dc-atraso`, escrito no elemento — a escada é o que faz a barra parecer
+   uma coisa que ABRIU, e não um bloco que apareceu. */
+@keyframes dc-reacao-entra {
+  from {
+    transform: translateY(12px) scale(0.55);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.dc-reacao-entra {
+  animation: dc-reacao-entra 300ms var(--ease-spring) backwards;
+  animation-delay: var(--dc-atraso, 0ms);
+}
+
+/* O pulo de quem acabou de ser escolhida. */
+@keyframes dc-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.dc-pop {
+  animation: dc-pop 340ms var(--ease-spring);
+}
+
+/* A barra da enquete cresce até a fatia dela — `--dc-fatia` vem do elemento. */
+@keyframes dc-fatia-cresce {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.dc-fatia {
+  transform-origin: left center;
+  animation: dc-fatia-cresce 620ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-coracao-estoura {
+    /* Aparece e some, sem crescer — a confirmação continua existindo. */
+    animation: dc-coracao-estoura 1000ms linear forwards;
+    animation-name: dc-so-some;
+  }
+  @keyframes dc-so-some {
+    0%,
+    70% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: none;
+    }
+  }
+  .dc-reacao-entra,
+  .dc-pop,
+  .dc-fatia {
+    animation: none;
+  }
+}

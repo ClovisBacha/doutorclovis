@@ -58,6 +58,8 @@ import {
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
   postEhValido,
+  principaisReacoes,
+  REACAO_DO_TOQUE_DUPLO,
   REACOES,
   textoDoAviso,
   totalDeReacoes,
@@ -68,6 +70,7 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
+import { hapticTap } from "@/lib/haptics";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -199,16 +202,96 @@ export function FileiraDeStories({
  * incrementa: com índice próprio, arrastar até a metade e soltar deixaria o
  * ponto num lugar e a foto noutro.
  */
-function Carrossel({ urls }: { urls: string[] }) {
+/**
+ * O CORAÇÃO DO TOQUE DUPLO — desenhado, nunca ❤️.
+ *
+ * A mesma lição do 📞 preto no iOS e do 📅 com data dentro do glifo: emoji é um
+ * caractere que cada fabricante desenha do jeito dele. Este aqui precisa
+ * aparecer BRANCO sobre a foto, com sombra, e crescer — e um emoji herda a cor
+ * e o desenho do sistema, então em metade dos aparelhos ele sairia vermelho
+ * chapado no meio de uma ultrassom.
+ */
+function CoracaoDoToque() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-24 w-24 drop-shadow-[0_6px_18px_rgba(0,0,0,0.45)]"
+      fill="#ffffff"
+    >
+      <path d="M12 21s-7.5-4.7-9.6-9A5.6 5.6 0 0 1 12 6.1 5.6 5.6 0 0 1 21.6 12c-2.1 4.3-9.6 9-9.6 9z" />
+    </svg>
+  );
+}
+
+/**
+ * O CORAÇÃO VAZIO da linha de ações — o convite da tela.
+ *
+ * ⚠️ Era 🤍 (emoji). Ele sai CINZA no Android, quase invisível no modo escuro
+ * do iOS e com desenho diferente em cada fabricante — e este é o botão que a
+ * tela inteira existe para fazer alguém tocar. Contorno desenhado: mesma
+ * espessura do marcador de salvar, ao lado do qual ele vive.
+ */
+function CoracaoVazio() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[26px] w-[26px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 20.5s-7-4.4-9-8.4A5.2 5.2 0 0 1 12 6.6a5.2 5.2 0 0 1 9 5.5c-2 4-9 8.4-9 8.4z" />
+    </svg>
+  );
+}
+
+function Carrossel({ urls, aoToqueDuplo }: { urls: string[]; aoToqueDuplo?: () => void }) {
   const [i, setI] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
+  /* Muda a cada toque duplo: é a CHAVE do elemento, e trocar a chave é o que
+     reinicia a animação. Sem isso, o segundo toque duplo seguido não desenha
+     coração nenhum — o elemento já existe e o CSS não recomeça sozinho. */
+  const [batida, setBatida] = useState(0);
+  const desce = useRef({ x: 0, y: 0 });
+  const ultimo = useRef(0);
 
   if (urls.length === 0) return null;
+
+  /**
+   * ⚠️ **Duas travas, e as duas existem porque a foto TAMBÉM desliza.**
+   *
+   * 1. Se o dedo ANDOU mais de 12px entre descer e subir, foi arrasto de
+   *    carrossel — não conta como toque. Sem isso, deslizar duas fotos rápido
+   *    virava "amei" numa publicação que ela só estava folheando.
+   * 2. O relógio zera depois de disparar, para o TERCEIRO toque de uma
+   *    sequência não formar um segundo par com o segundo.
+   */
+  function aoSoltar(e: React.PointerEvent) {
+    if (!aoToqueDuplo) return;
+    const andou = Math.hypot(e.clientX - desce.current.x, e.clientY - desce.current.y);
+    if (andou > 12) return;
+    const agora = e.timeStamp;
+    if (ultimo.current && agora - ultimo.current < 320) {
+      ultimo.current = 0;
+      setBatida((n) => n + 1);
+      aoToqueDuplo();
+      return;
+    }
+    ultimo.current = agora;
+  }
 
   return (
     <div className="relative">
       <div
         ref={caixa}
+        onPointerDown={(e) => {
+          desce.current = { x: e.clientX, y: e.clientY };
+        }}
+        onPointerUp={aoSoltar}
         onScroll={(e) => {
           const el = e.currentTarget;
           const n = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
@@ -223,6 +306,18 @@ function Carrossel({ urls }: { urls: string[] }) {
           </div>
         ))}
       </div>
+
+      {/* ⚠️ `pointer-events-none`: ele nasce EM CIMA da foto, e sem isso o
+          próximo toque acertaria o coração em vez do carrossel — o duplo toque
+          deixaria de funcionar logo depois de funcionar uma vez. */}
+      {batida > 0 && (
+        <div
+          key={batida}
+          className="dc-coracao-estoura pointer-events-none absolute inset-0 grid place-items-center"
+        >
+          <CoracaoDoToque />
+        </div>
+      )}
 
       {urls.length > 1 && (
         <>
@@ -416,23 +511,67 @@ export function PostInstagram({
         </div>
       )}
 
-      {post.imagemUrl && <Carrossel urls={fotos} />}
+      {post.imagemUrl && (
+        <Carrossel
+          urls={fotos}
+          /* ⚠️ O toque duplo SEMPRE dá coração, e nunca TIRA. É assim no modelo,
+             e o motivo é o gesto: quem toca duas vezes está dizendo "gostei",
+             não "mudei de ideia". Se ele alternasse, tocar duas vezes num post
+             já curtido apagaria a reação com uma animação de coração — a tela
+             mostraria o oposto do que acabou de acontecer. */
+          aoToqueDuplo={() => {
+            hapticTap();
+            if (post.minhaReacao !== REACAO_DO_TOQUE_DUPLO) aoReagir(REACAO_DO_TOQUE_DUPLO);
+          }}
+        />
+      )}
 
       {/* A linha de ações vem LOGO ABAIXO da imagem, antes da legenda — é a
           ordem deles, e ela existe porque a ação é o que a tela quer que
           aconteça primeiro. */}
-      <div className="flex items-center gap-3 px-4 pt-2.5">
+      <div className="flex items-center gap-2.5 px-4 pt-2.5">
         <button
           type="button"
-          onClick={() => setEscolhendo((v) => !v)}
-          aria-label="Reagir"
-          className="press text-[22px] leading-none"
+          onClick={() => {
+            hapticTap();
+            setEscolhendo((v) => !v);
+          }}
+          aria-label={post.minhaReacao ? "Trocar a reação" : "Reagir"}
+          aria-expanded={escolhendo}
+          className="press grid h-11 w-11 -ml-2 place-items-center leading-none"
         >
-          {post.minhaReacao ? emojiDaReacao(post.minhaReacao) : "🤍"}
+          {post.minhaReacao ? (
+            /* Já reagiu: o emoji DELA, com o pulo de quem acabou de escolher. */
+            <span key={post.minhaReacao} className="dc-pop text-[26px] leading-none">
+              {emojiDaReacao(post.minhaReacao)}
+            </span>
+          ) : (
+            /* ⚠️ Vazio é um coração DESENHADO, e não 🤍. O emoji do coração
+               branco sai cinza no Android e quase invisível no modo escuro do
+               iOS — e ele é o convite da tela inteira. */
+            <CoracaoVazio />
+          )}
         </button>
         {total > 0 && (
-          <span className="text-[13px] font-semibold tabular-nums">
-            {total} {total === 1 ? "reação" : "reações"}
+          <span className="flex min-w-0 items-center gap-1.5">
+            {/* ⚠️ Os emojis que o post DE FATO recebeu, e não um número seco.
+                "12 reações" conta a mesma história para doze corações e doze
+                risadas, que são notícias diferentes. Régua em
+                `principaisReacoes`, testada — inclusive o desempate, que
+                precisa ser estável para o post não trocar de cara entre duas
+                aberturas. */}
+            <span aria-hidden className="flex -space-x-1.5 text-[15px] leading-none">
+              {principaisReacoes(post.reacoes).map((t) => (
+                <span
+                  key={t}
+                  className="grid h-[22px] w-[22px] place-items-center rounded-full bg-card ring-1 ring-border/70"
+                >
+                  {emojiDaReacao(t)}
+                </span>
+              ))}
+            </span>
+            <span className="text-[13px] font-semibold tabular-nums">{total}</span>
+            <span className="sr-only">{total === 1 ? "reação" : "reações"}</span>
           </span>
         )}
         {/* O marcador fica na PONTA DIREITA, separado das reações pelo vão que
@@ -451,23 +590,47 @@ export function PostInstagram({
         )}
       </div>
 
+      {/* ⚠️ UMA FILEIRA QUE ROLA, e não uma grade que quebra em linhas.
+          Eram treze pílulas com "emoji + rótulo" em `flex-wrap`: três linhas de
+          etiquetas, que leem como formulário. A fileira única é o formato que
+          todo mundo já conhece do iMessage e do WhatsApp — e treze alvos de
+          44px somam 572px, mais que a largura de um iPhone, então ela rola de
+          propósito. O rótulo virou `aria-label`: quem enxerga reconhece o
+          emoji, e quem não enxerga continua ouvindo "Que carinho". */}
       {escolhendo && (
-        <div className="flex flex-wrap gap-1.5 px-4 pt-2">
-          {REACOES.map((r) => (
-            <button
-              key={r.tipo}
-              type="button"
-              onClick={() => {
-                aoReagir(post.minhaReacao === r.tipo ? null : r.tipo);
-                setEscolhendo(false);
-              }}
-              className={`press rounded-full px-2.5 py-1 text-[13px] ${
-                post.minhaReacao === r.tipo ? "bg-primary/15 font-semibold" : "bg-muted/60"
-              }`}
-            >
-              {r.emoji} {r.rotulo}
-            </button>
-          ))}
+        <div className="px-3 pt-2">
+          <div
+            role="group"
+            aria-label="Escolha uma reação"
+            className="flex items-center gap-0.5 overflow-x-auto rounded-full border border-border/60 px-1.5 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{
+              background: "rgba(255,253,252,0.72)",
+              backdropFilter: "blur(14px) saturate(170%)",
+              WebkitBackdropFilter: "blur(14px) saturate(170%)",
+              boxShadow: "0 10px 26px -14px rgba(48,40,60,0.4)",
+            }}
+          >
+            {REACOES.map((r, n) => (
+              <button
+                key={r.tipo}
+                type="button"
+                aria-label={r.rotulo}
+                aria-pressed={post.minhaReacao === r.tipo}
+                onClick={() => {
+                  hapticTap();
+                  aoReagir(post.minhaReacao === r.tipo ? null : r.tipo);
+                  setEscolhendo(false);
+                }}
+                /* A escada é o que faz a barra parecer uma coisa que ABRIU. */
+                style={{ ["--dc-atraso" as string]: `${n * 22}ms` }}
+                className={`dc-reacao-entra press grid h-11 w-11 shrink-0 place-items-center rounded-full text-[25px] leading-none transition-transform ${
+                  post.minhaReacao === r.tipo ? "scale-110 bg-primary/15" : ""
+                }`}
+              >
+                {r.emoji}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -490,23 +653,64 @@ export function PostInstagram({
                 key={i}
                 type="button"
                 disabled={jaVotou || !aoVotar}
-                onClick={() => aoVotar?.(i)}
-                className={`press relative block w-full overflow-hidden rounded-xl border px-3 py-2 text-left text-[13px] ${
-                  meu === i ? "border-primary font-semibold" : "border-border"
+                onClick={() => {
+                  hapticTap();
+                  aoVotar?.(i);
+                }}
+                aria-pressed={meu === i}
+                /* ⚠️ `rounded-full` e altura de 40px, não um retângulo de
+                    borda fina. Empilhadas, três caixas retangulares idênticas
+                    leem como formulário — foi o que o dono viu na foto do
+                    aparelho ("cara de vibe code"). A pílula é a forma que o
+                    resto do app já usa para "toque aqui". */
+                className={`press relative block min-h-[40px] w-full overflow-hidden rounded-full border text-left text-[13px] transition-colors ${
+                  meu === i
+                    ? "border-primary/70 bg-primary/5 font-semibold"
+                    : jaVotou
+                      ? "border-border/70"
+                      : "border-border hover:border-primary/40"
                 } disabled:cursor-default`}
               >
                 {jaVotou && (
+                  /* A barra CRESCE até a fatia (`dc-fatia`, com `scaleX`), e
+                     não aparece pronta: é a animação que faz o resultado ser
+                     lido como resposta ao toque dela. `scaleX` roda no
+                     compositor — animar `width` repintaria a linha a cada
+                     quadro. */
                   <span
                     aria-hidden
-                    className="absolute inset-y-0 left-0 bg-primary/12"
-                    style={{ width: `${fatia}%` }}
+                    className="dc-fatia absolute inset-y-0 left-0 w-full rounded-full bg-primary/15"
+                    style={{ transform: `scaleX(${fatia / 100})` }}
                   />
                 )}
-                <span className="relative flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate">{op}</span>
+                <span className="relative flex items-center gap-2 px-3.5 py-2">
+                  <span className="min-w-0 flex-1 truncate">{op}</span>
+                  {meu === i && (
+                    /* O ✓ na escolhida — sem ele, "a minha" e "a mais votada"
+                       viram a mesma pílula quando coincidem. */
+                    <svg
+                      viewBox="0 0 24 24"
+                      aria-hidden
+                      className="h-4 w-4 shrink-0 text-primary"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={2.6}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="m5 12.5 4.5 4.5L19 7.5" />
+                    </svg>
+                  )}
                   {jaVotou && (
-                    <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                      {rotuloDeVotos(votos)}
+                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-muted-foreground">
+                      {fatia}%
+                      {/* ⚠️ A PORCENTAGEM e o NÚMERO, os dois. "67%" são dois
+                          votos de três, e numa base pequena a porcentagem
+                          sozinha transforma três pessoas numa maioria — foi
+                          por isso que o rótulo absoluto existia. Tirá-lo para
+                          pôr a porcentagem teria trocado um problema por
+                          outro; eles vivem juntos. */}
+                      <span className="ml-1 font-normal opacity-70">({rotuloDeVotos(votos)})</span>
                     </span>
                   )}
                 </span>

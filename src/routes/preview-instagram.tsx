@@ -62,6 +62,7 @@ import type {
   PerfilNaTela,
   PostNaTela,
 } from "@/lib/rede-social.functions";
+import type { TipoDeReacao } from "@/lib/rede-social";
 
 export const Route = createFileRoute("/preview-instagram")({
   component: Bancada,
@@ -274,6 +275,18 @@ function Bancada() {
   };
 
   const semSugestoes = sugeridas === 0;
+  /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
+  const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
+  const comReacoes = (ps: PostNaTela[]) =>
+    ps.map((p) => {
+      if (!(p.id in reacoes)) return p;
+      const nova = reacoes[p.id];
+      const c = { ...p.reacoes };
+      if (p.minhaReacao) c[p.minhaReacao] = Math.max(0, (c[p.minhaReacao] ?? 1) - 1);
+      if (nova) c[nova] = (c[nova] ?? 0) + 1;
+      return { ...p, reacoes: c, minhaReacao: nova };
+    });
+
   const [extras, setExtras] = useState<PostNaTela[]>([]);
   const [paginas, setPaginas] = useState(0);
 
@@ -606,17 +619,23 @@ function Bancada() {
         />
       ) : (
         <TelaPrincipal
-          posts={vazio ? [] : [...POSTS.slice(0, 4), ...extras]}
+          posts={vazio ? [] : comReacoes([...POSTS.slice(0, 4), ...extras])}
           stories={vazio ? [] : STORIES}
           /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
              acabou — por isso ela aparece na bancada quando `temMais` some, ou
              seja, depois de rolar até o fim. `?sugeridas=0` mostra o feed sem
              ela; `?vazio=1` mostra a conta nova, em que a fileira de pessoas é
              a única coisa na tela. */
-          sugestoes={semSugestoes ? [] : POSTS.slice(5, 8)}
+          sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
           pessoas={semSugestoes ? [] : GENTE}
           aoSeguirPessoa={(id) => console.log("seguiria", id)}
-          aoReagir={() => {}}
+          /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
+             `aoReagir={() => {}}` era impossível ver a mecânica INTEIRA — o
+             emoji escolhido pousando na linha, o pulo, o resumo se
+             reordenando, o toque duplo virando coração. A tela desenhava e
+             nunca respondia, que é o estado em que uma tela passa meses sem
+             ninguém perceber que ela não funciona. */
+          aoReagir={(post, tipo) => setReacoes((m) => ({ ...m, [post.id]: tipo }))}
           aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
           aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
           aoVotar={(_, i) => alert(`votaria na opção ${i}`)}

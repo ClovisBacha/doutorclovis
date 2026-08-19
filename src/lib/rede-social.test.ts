@@ -15,6 +15,8 @@ import {
   podeVerPost,
   postEhValido,
   REACOES,
+  REACAO_DO_TOQUE_DUPLO,
+  principaisReacoes,
   reacaoConhecida,
   textoDoAviso,
   totalDeReacoes,
@@ -212,10 +214,23 @@ describe("ordenarFeed", () => {
 /* ─── 6 · REAÇÕES ───────────────────────────────────────────────────────── */
 
 describe("as reações", () => {
-  test("⚠️ NENHUMA pode ser lida como julgamento", () => {
-    // 😂 embaixo do relato de um sangramento é indefensável. 😮 é ambíguo. 😢
-    // lê como PENA, que é a coisa que ela menos quer receber.
-    const proibidos = ["😂", "🤣", "😮", "😯", "😢", "😭", "😱", "👎", "🤔"];
+  test("⚠️ NENHUMA pode ser lida como julgamento, pena ou pânico", () => {
+    // A lista original proibia nove emojis. Oito continuam proibidos, e as
+    // razões não mudaram: 😮/😯 são AMBÍGUOS (metade lê "que lindo", metade
+    // "que horror"); 😢/😭 lêem como PENA, que é a coisa que ela menos quer
+    // receber; 👎/🤔 são julgamento; 🤣 é escárnio.
+    //
+    // ⚠️ **😱 é o que MAIS importa aqui, e é clínico**: embaixo do relato de um
+    // sangramento ou de uma internação ele devolve pânico a quem está com
+    // medo — e numa base de gestação de alto risco é justamente esse post que
+    // mais recebe reação.
+    //
+    // ⚠️ **😂 SAIU da lista de proibidos em ago/2026, por decisão do dono**
+    // ("adicione recursos de reação mais legais… risada 😂"). Fica registrado
+    // que ela entrou contra a recomendação original — 😂 embaixo de um post
+    // sobre uma perda é indefensável —, e que é o primeiro item a sair se
+    // alguma paciente reclamar.
+    const proibidos = ["🤣", "😮", "😯", "😢", "😭", "😱", "👎", "🤔"];
     for (const r of REACOES) expect(proibidos).not.toContain(r.emoji);
   });
 
@@ -225,9 +240,13 @@ describe("as reações", () => {
     expect(REACOES.some((r) => r.tipo === "abraco")).toBe(true);
   });
 
-  test("são poucas, e todas têm emoji e rótulo únicos", () => {
+  test("cabem na barra, e todas têm emoji e rótulo únicos", () => {
+    // O teto era SEIS, de quando a lista era um vocabulário curto. Hoje são
+    // treze, a pedido do dono — e o limite passou a ser de LARGURA, não de
+    // doutrina: a barra é uma fileira única num celular de 393px, e acima de
+    // dezesseis ela deixa de ser uma escolha e vira um teclado.
     expect(REACOES.length).toBeGreaterThanOrEqual(3);
-    expect(REACOES.length).toBeLessThanOrEqual(6);
+    expect(REACOES.length).toBeLessThanOrEqual(16);
     expect(new Set(REACOES.map((r) => r.emoji)).size).toBe(REACOES.length);
     expect(new Set(REACOES.map((r) => r.tipo)).size).toBe(REACOES.length);
     for (const r of REACOES) expect(r.rotulo.trim().length).toBeGreaterThan(0);
@@ -498,5 +517,44 @@ describe("⚠️ `publico` é a camada MAIS aberta, e não a mais fechada", () =
         somosAmigas: true,
       }),
     ).toBe(false);
+  });
+});
+
+/* ─── 6b · O RESUMO DAS REAÇÕES ─────────────────────────────────────────── */
+
+describe("principaisReacoes", () => {
+  test("ordena pela contagem, da maior para a menor", () => {
+    expect(principaisReacoes({ amei: 2, rindo: 9, torcendo: 5 })).toEqual([
+      "rindo",
+      "torcendo",
+      "amei",
+    ]);
+  });
+
+  test("⚠️ só devolve o que tem contagem — nunca a paleta inteira", () => {
+    // Treze emojis em cinza fariam a ausência de reação ocupar espaço.
+    expect(principaisReacoes({})).toEqual([]);
+    expect(principaisReacoes({ amei: 0, rindo: 3 })).toEqual(["rindo"]);
+  });
+
+  test("⚠️ o empate desempata pela ORDEM DE `REACOES`, e é estável", () => {
+    // Sem desempate fixo, o mesmo post troca de cara entre duas aberturas.
+    const c = { rindo: 4, amei: 4, beijo: 4 };
+    const uma = principaisReacoes(c);
+    expect(uma).toEqual(principaisReacoes(c));
+    const posicao = (t: string) => REACOES.findIndex((r) => r.tipo === t);
+    expect(posicao(uma[0])).toBeLessThan(posicao(uma[1]));
+    expect(posicao(uma[1])).toBeLessThan(posicao(uma[2]));
+  });
+
+  test("respeita o teto pedido", () => {
+    expect(principaisReacoes({ amei: 1, rindo: 2, beijo: 3, festa: 4 }, 2)).toHaveLength(2);
+    expect(principaisReacoes({ amei: 1 }, 0)).toEqual([]);
+  });
+
+  test("⚠️ o toque duplo cai no MESMO balde do coração da barra", () => {
+    // Dois caminhos para o mesmo gesto criariam duas contagens para ele.
+    expect(REACAO_DO_TOQUE_DUPLO).toBe("amei");
+    expect(REACOES.some((r) => r.tipo === REACAO_DO_TOQUE_DUPLO)).toBe(true);
   });
 });

@@ -217,7 +217,23 @@ export const POSTS_POR_PAGINA = 20;
    6 · REAÇÕES
    ══════════════════════════════════════════════════════════════════════════ */
 
-export type TipoDeReacao = "amei" | "torcendo" | "emocionei" | "forca" | "abraco";
+export type TipoDeReacao =
+  /* As cinco originais. NUNCA renomeie um `tipo` — ele está gravado em
+     `rede_reacoes`, e trocar a string apaga a reação de todo mundo. */
+  | "amei"
+  | "torcendo"
+  | "emocionei"
+  | "forca"
+  | "abraco"
+  /* As oito de ago/2026, pedidas pelo dono. */
+  | "apaixonei"
+  | "carinho"
+  | "beijo"
+  | "fofo"
+  | "anjo"
+  | "festa"
+  | "uau"
+  | "rindo";
 
 /**
  * ⚠️ **O CATÁLOGO DE REAÇÕES É O VOCABULÁRIO EMOCIONAL DO APP**, e escolher
@@ -239,13 +255,59 @@ export type TipoDeReacao = "amei" | "torcendo" | "emocionei" | "forca" | "abraco
  * posta uma coisa difícil só recebe coração, o que soa comemorativo no momento
  * errado.
  */
+/**
+ * O VOCABULÁRIO EMOCIONAL DO APP.
+ *
+ * Eram cinco; o dono pediu a lista larga, com a risada dentro
+ * ("adicione recursos de reação mais legais… risada 😂, 😇🥹😍🥰😘🥳🤩😎😱😋😚☺️🙏").
+ * São treze, na ordem em que se sentem: amor → carinho → emoção → apoio →
+ * festa → riso.
+ *
+ * ⚠️ **A ordem é a da BARRA, e ela importa.** O dedo vai ao começo: as
+ * primeiras são as que servem a qualquer notícia. A risada é a última porque
+ * ela é a única que pode cair mal — ver abaixo.
+ *
+ * ⚠️ **DUAS FICARAM DE FORA, e uma delas por razão clínica.** 😱 (susto) não
+ * entra: embaixo do relato de um sangramento ou de uma internação ela devolve
+ * pânico a quem está com medo, e é o post que mais recebe reação numa base
+ * assim. 😎 · 😋 · 😚 saíram por não terem trabalho próprio ao lado das treze.
+ *
+ * ⚠️ **E sobre a risada, uma ressalva registrada uma vez.** 😂 embaixo de um
+ * post sobre uma perda é indefensável, e foi por isso que ela não entrou na
+ * primeira versão. Ela entra agora porque o dono pediu, e porque a maior parte
+ * deste feed é bebê chutando e barriga crescendo — mas ela é o item que eu
+ * tiraria primeiro se alguma paciente reclamar, e é o único da lista com esse
+ * risco.
+ *
+ * ⚠️ **NUNCA renomeie um `tipo`** — ele está gravado no banco.
+ * ⚠️ **E acrescentar um item exige o SQL**: o CHECK de `rede_reacoes` lista os
+ * treze. Sem rodar `APLICAR_REDE_SOCIAL.sql` de novo, a reação nova é aceita
+ * pelo servidor e RECUSADA pelo banco — a tela mostra e o valor não grava.
+ */
 export const REACOES: { tipo: TipoDeReacao; emoji: string; rotulo: string }[] = [
   { tipo: "amei", emoji: "❤️", rotulo: "Amei" },
-  { tipo: "torcendo", emoji: "🙏", rotulo: "Torcendo" },
-  { tipo: "emocionei", emoji: "🥹", rotulo: "Me emocionei" },
-  { tipo: "forca", emoji: "👏", rotulo: "Força" },
+  { tipo: "apaixonei", emoji: "😍", rotulo: "Apaixonei" },
+  { tipo: "carinho", emoji: "🥰", rotulo: "Que carinho" },
+  { tipo: "beijo", emoji: "😘", rotulo: "Beijo" },
   { tipo: "abraco", emoji: "🤗", rotulo: "Abraço" },
+  { tipo: "emocionei", emoji: "🥹", rotulo: "Me emocionei" },
+  { tipo: "fofo", emoji: "☺️", rotulo: "Que fofo" },
+  { tipo: "anjo", emoji: "😇", rotulo: "Anjinho" },
+  { tipo: "torcendo", emoji: "🙏", rotulo: "Torcendo" },
+  { tipo: "forca", emoji: "👏", rotulo: "Força" },
+  { tipo: "festa", emoji: "🥳", rotulo: "Festa" },
+  { tipo: "uau", emoji: "🤩", rotulo: "Uau" },
+  { tipo: "rindo", emoji: "😂", rotulo: "Ri muito" },
 ];
+
+/**
+ * A reação do TOQUE DUPLO na foto — o gesto que todo mundo já traz de casa.
+ *
+ * ⚠️ É `amei` e não uma sexta coisa: o duplo toque tem de cair no MESMO balde
+ * do coração da barra, senão a mesma pessoa reagindo de dois jeitos criaria
+ * duas contagens para o mesmo gesto.
+ */
+export const REACAO_DO_TOQUE_DUPLO: TipoDeReacao = "amei";
 
 export function reacaoConhecida(t: string): t is TipoDeReacao {
   return REACOES.some((r) => r.tipo === t);
@@ -271,6 +333,31 @@ export type ContagemDeReacoes = Partial<Record<TipoDeReacao, number>>;
 /** Total de reações de um post. */
 export function totalDeReacoes(c: ContagemDeReacoes): number {
   return REACOES.reduce((s, r) => s + (c[r.tipo] ?? 0), 0);
+}
+
+/**
+ * As reações que o post de fato RECEBEU, da mais usada para a menos.
+ *
+ * A linha do post dizia "12 reações". Com treze emojis disponíveis, esse número
+ * deixou de responder a pergunta que se faz ao ler: **como** as pessoas
+ * reagiram. Doze corações e doze risadas são notícias diferentes, e o número
+ * sozinho conta a mesma história para as duas.
+ *
+ * ⚠️ **Devolve só o que tem contagem maior que zero.** Mostrar os treze em
+ * cinza faria a linha virar uma paleta — e transformaria a ausência de reação
+ * em algo que ocupa espaço na tela.
+ *
+ * ⚠️ **O desempate é a ORDEM DE `REACOES`, e não o alfabeto.** Duas reações com
+ * a mesma contagem precisam sair sempre na mesma ordem, senão o mesmo post
+ * troca de cara entre duas aberturas — e `REACOES` já está ordenada por como as
+ * emoções se sentem, que é uma ordem melhor que "amei antes de beijo".
+ */
+export function principaisReacoes(c: ContagemDeReacoes, quantas = 3): TipoDeReacao[] {
+  return REACOES.map((r, ordem) => ({ tipo: r.tipo, n: c[r.tipo] ?? 0, ordem }))
+    .filter((x) => x.n > 0)
+    .sort((a, b) => b.n - a.n || a.ordem - b.ordem)
+    .slice(0, Math.max(0, quantas))
+    .map((x) => x.tipo);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

@@ -158,9 +158,18 @@ CREATE TABLE IF NOT EXISTS public.rede_reacoes (
   id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   post_id   uuid NOT NULL REFERENCES public.rede_posts ON DELETE CASCADE,
   quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  tipo      text NOT NULL CHECK (tipo IN ('amei','torcendo','emocionei','forca','abraco')),
+  tipo      text NOT NULL CHECK (tipo IN ('amei','torcendo','emocionei','forca','abraco','apaixonei','carinho','beijo','fofo','anjo','festa','uau','rindo')),
   criado_em timestamptz NOT NULL DEFAULT now()
 );
+
+-- ⚠️ O CHECK ACIMA SÓ VALE PARA BANCO NOVO.
+-- `CREATE TABLE IF NOT EXISTS` não toca numa tabela que já existe — então num
+-- banco que já rodou a versão de cinco reações o CHECK antigo continuaria lá, e
+-- as oito novas seriam ACEITAS pelo servidor e RECUSADAS pelo banco: a paciente
+-- toca no 😂, a tela mostra, e nada grava. Este bloco reescreve a regra.
+ALTER TABLE public.rede_reacoes DROP CONSTRAINT IF EXISTS rede_reacoes_tipo_check;
+ALTER TABLE public.rede_reacoes ADD CONSTRAINT rede_reacoes_tipo_check
+  CHECK (tipo IN ('amei','torcendo','emocionei','forca','abraco','apaixonei','carinho','beijo','fofo','anjo','festa','uau','rindo'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS rede_reacoes_uma_por_pessoa
   ON public.rede_reacoes (post_id, quem_id);
