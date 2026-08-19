@@ -25,7 +25,7 @@
  *  3. **Seguidores e seguindo não são públicos.** A única divergência de
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -73,6 +73,14 @@ import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
+/* Import ESTÁTICO: `rascunho-do-post.ts` é régua pura — não toca em servidor,
+   em `document` nem em regex com lookbehind. É seguro no pacote da paciente. */
+import {
+  chaveDoRascunho,
+  lerRascunho,
+  paraGuardar,
+  type RascunhoDoPost,
+} from "@/lib/rascunho-do-post";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -1815,6 +1823,56 @@ export function RedeNoApp({
    * necessário. É foto de gestação, às vezes ultrassom.
    */
   /**
+   * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
+   *
+   * ⚠️ **Lido no ABRIR, e não a cada render**: o compositor reescreve o
+   * rascunho enquanto ela digita, e reler a cada pintura devolveria o que ela
+   * acabou de escrever como se fosse "um rascunho antigo".
+   */
+  const [rascunho, setRascunho] = useState<RascunhoDoPost | null>(null);
+
+  useEffect(() => {
+    if (onde.t !== "novo" || !euId) return;
+    try {
+      setRascunho(lerRascunho(localStorage.getItem(chaveDoRascunho(euId)), new Date()));
+    } catch {
+      setRascunho(null);
+    }
+    /* Só ao ENTRAR na tela: `euId` não muda dentro dela. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onde.t, euId]);
+
+  /**
+   * Guarda (ou apaga) o rascunho.
+   *
+   * ⚠️ **Estável (`useCallback` vazio)**: ela é dependência do efeito com atraso
+   * lá dentro do compositor, e uma referência nova a cada pintura reiniciaria o
+   * relógio de 700 ms a cada letra — ou seja, nunca gravaria.
+   *
+   * ⚠️ **E a cota é engolida em silêncio.** `setItem` estoura quando o
+   * armazenamento enche, e derrubar o compositor por causa de um rascunho seria
+   * trocar um conforto por um defeito.
+   */
+  const guardarRascunho = useCallback(
+    (r: Omit<RascunhoDoPost, "em"> | null) => {
+      if (!euId) return;
+      try {
+        const chave = chaveDoRascunho(euId);
+        if (!r) {
+          localStorage.removeItem(chave);
+          return;
+        }
+        const saida = paraGuardar(r, new Date());
+        if (saida.guardar) localStorage.setItem(chave, saida.texto);
+        else localStorage.removeItem(chave);
+      } catch {
+        /* sem armazenamento, ou cota cheia: o compositor segue funcionando */
+      }
+    },
+    [euId],
+  );
+
+  /**
    * Quem eu posso marcar — carregada UMA vez, ao abrir o compositor.
    *
    * ⚠️ `null` até responder, e por isso o botão só aparece depois: mostrar um
@@ -2816,6 +2874,8 @@ export function RedeNoApp({
       <NovoPost
         aoSugerirLegenda={sugerirLegenda}
         amigasParaMarcar={paraMarcar}
+        rascunho={rascunho}
+        aoMudarRascunho={guardarRascunho}
         aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoPublicar={publicar}
         aulaDeHoje={aulaDeHoje}
@@ -3764,6 +3824,8 @@ export function NovoPost({
   aulaDeHoje,
   aoSugerirLegenda,
   amigasParaMarcar,
+  rascunho,
+  aoMudarRascunho,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -3800,11 +3862,25 @@ export function NovoPost({
    * moderação. A régua e o porquê estão em `marcacoes.ts`.
    */
   amigasParaMarcar?: { id: string; nome: string; avatar: string | null }[] | null;
+  /**
+   * O rascunho guardado no aparelho, ou `null`.
+   *
+   * ⚠️ **A tela OFERECE, nunca preenche sozinha.** Encher o campo com um texto
+   * de três dias atrás no momento em que ela abre o compositor para postar
+   * outra coisa é como uma publicação sai errada. A régua e o porquê estão em
+   * `rascunho-do-post.ts`.
+   */
+  rascunho?: RascunhoDoPost | null;
+  /** Guarda o que ela está escrevendo. Quem escreve no aparelho é a tela de cima. */
+  aoMudarRascunho?: (r: Omit<RascunhoDoPost, "em"> | null) => void;
 }) {
   const [texto, setTexto] = useState("");
   const [sugestoes, setSugestoes] = useState<string[] | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
   const [escolhendoQuem, setEscolhendoQuem] = useState(false);
+  /* A faixa "você tinha um rascunho". Some ao recuperar ou ao descartar — e
+     `null` (o padrão) é "ainda não decidiu". */
+  const [ofereceu, setOfereceu] = useState(false);
   const [pensando, setPensando] = useState(false);
   /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
      outras" divergiria na hora de remover a primeira. */
@@ -3831,6 +3907,24 @@ export function NovoPost({
   const temConteudo =
     postEhValido({ texto, temImagem: fotos.length > 0 }) || opcoesLimpas.length >= OPCOES_MIN;
   const podeEnviar = temConteudo && enqueteOk && !enviando;
+
+  /* ⚠️ GUARDA COM ATRASO (700 ms). Sem isso, cada letra digitada seria uma
+     gravação no `localStorage` — que é SÍNCRONA e bloqueia a linha principal.
+     Num texto de trezentos caracteres seriam trezentas gravações, e o teclado
+     começa a engasgar antes do fim da frase. */
+  useEffect(() => {
+    if (!aoMudarRascunho) return;
+    const id = setTimeout(() => {
+      aoMudarRascunho({
+        texto,
+        visibilidade: vis,
+        enquete: opcoes,
+        comAula,
+        marcadas,
+      });
+    }, 700);
+    return () => clearTimeout(id);
+  }, [texto, vis, opcoes, comAula, marcadas, aoMudarRascunho]);
 
   async function pedirLegendas() {
     if (!aoSugerirLegenda || !fotos[0] || pensando) return;
@@ -3860,8 +3954,13 @@ export function NovoPost({
       marcadas,
     });
     setEnviando(false);
-    if (ok) aoFechar();
-    else setErro("Não deu para publicar. Tente de novo.");
+    if (ok) {
+      /* ⚠️ APAGA O RASCUNHO ANTES de fechar. Fechando primeiro, o efeito de
+         guardar ainda tem 700 ms de vida e regravaria o texto que acabou de ser
+         publicado — e ela reabriria o compositor com o post de novo dentro. */
+      aoMudarRascunho?.(null);
+      aoFechar();
+    } else setErro("Não deu para publicar. Tente de novo.");
   }
 
   return (
@@ -3890,6 +3989,43 @@ export function NovoPost({
       </header>
 
       <div className="px-4">
+        {/* ⚠️ OFERECE, e some assim que ela decide. Uma faixa que fica na tela
+            depois de recuperada vira ruído; uma que preenche sozinha publica o
+            texto errado. */}
+        {rascunho && !ofereceu && (
+          <div className="mb-2 flex items-center gap-2 rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2">
+            <p className="min-w-0 flex-1 text-[12px] leading-snug">
+              Você tinha começado a escrever aqui.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setTexto(rascunho.texto);
+                setVis(rascunho.visibilidade);
+                setOpcoes(rascunho.enquete);
+                setComAula(rascunho.comAula);
+                setMarcadas(rascunho.marcadas);
+                setOfereceu(true);
+              }}
+              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+            >
+              Recuperar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                /* Descartar apaga de verdade — senão a faixa volta na próxima
+                   abertura, oferecendo o que ela já recusou. */
+                aoMudarRascunho?.(null);
+                setOfereceu(true);
+              }}
+              aria-label="Descartar o rascunho"
+              className="press shrink-0 px-1 text-[16px] leading-none text-muted-foreground"
+            >
+              ×
+            </button>
+          </div>
+        )}
         <textarea
           value={texto}
           onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DO_TEXTO))}

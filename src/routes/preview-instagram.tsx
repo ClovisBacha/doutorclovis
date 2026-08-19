@@ -78,6 +78,7 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     legendas: q.legendas == null ? 1 : Number(q.legendas),
     amigas: q.amigas == null ? 1 : Number(q.amigas),
+    rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -224,6 +225,7 @@ function Bancada() {
     sugeridas,
     legendas,
     amigas,
+    rascunho,
     selo,
     trancado,
     carimbo,
@@ -302,6 +304,7 @@ function Bancada() {
   const semSugestoes = sugeridas === 0;
   const semLegendas = legendas === 0;
   const semAmigasParaMarcar = amigas === 0;
+  const comRascunho = rascunho !== 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -552,6 +555,23 @@ function Bancada() {
           /* ⚠️ A bancada precisa de amigas para o seletor existir — e sem elas
              o botão nem aparece, que é o comportamento certo e também o
              impossível de fotografar. `?amigas=0` mostra a conta nova. */
+          /* ⚠️ A BANCADA FABRICA O RASCUNHO. Sem isso a faixa "você tinha
+             começado a escrever aqui" só apareceria depois de digitar, fechar e
+             reabrir com sessão — e é justamente ela que precisa ser olhada.
+             `?rascunho=0` mostra o compositor limpo, que é o caso comum. */
+          rascunho={
+            comRascunho
+              ? {
+                  texto: "Consulta de hoje foi boa demais, ainda estou sorrindo",
+                  visibilidade: "amigas" as const,
+                  enquete: null,
+                  comAula: false,
+                  marcadas: ["marina"],
+                  em: new Date().toISOString(),
+                }
+              : null
+          }
+          aoMudarRascunho={() => {}}
           amigasParaMarcar={
             semAmigasParaMarcar
               ? []
