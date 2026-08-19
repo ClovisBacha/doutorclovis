@@ -4114,7 +4114,6 @@ export type PerguntaNaTela = {
   criadoEm: string;
   resposta: string | null;
   postId: string | null;
-  denunciada: boolean;
 };
 
 /**

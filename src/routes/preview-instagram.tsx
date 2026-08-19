@@ -522,7 +522,6 @@ function Bancada() {
         criadoEm: atras(40),
         resposta: null,
         postId: null,
-        denunciada: false,
       },
       {
         id: "q2",
@@ -530,7 +529,6 @@ function Bancada() {
         criadoEm: atras(60 * 5),
         resposta: null,
         postId: null,
-        denunciada: false,
       },
       {
         id: "q3",
@@ -538,7 +536,6 @@ function Bancada() {
         criadoEm: atras(60 * 26),
         resposta: "Fizemos sim! Foi pequenininho, só a família. Valeu muito a pena 🥹",
         postId: "p1",
-        denunciada: false,
       },
     ].slice(0, Math.max(0, perguntas));
 

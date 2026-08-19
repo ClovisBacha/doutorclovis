@@ -189,6 +189,26 @@ describe("⚠️ a pergunta clínica vai para o médico de QUEM PERGUNTOU", () =
   });
 });
 
+describe("⚠️ o que a caixa devolve é só o que ela PODE devolver", () => {
+  test("nenhum campo estruturalmente impossível", () => {
+    /* ⚠️ `denunciada` viveu no tipo e no servidor sem NUNCA poder ser
+       verdadeiro: `denunciarPergunta` grava `arquivado_em` junto com
+       `denunciado_em`, e `minhaCaixinha` filtra `.is("arquivado_em", null)` —
+       uma pergunta denunciada sai da caixa por definição. O campo prometia uma
+       informação que a consulta não pode produzir, e nenhuma tela o desenhava.
+       É a mesma família da régua sem chamador: não é código morto, é código
+       morto que parece contar alguma coisa. */
+    const c = corpoDe("minhaCaixinha");
+    expect(c).toContain('.is("arquivado_em", null)');
+    expect(c).not.toContain("denunciada");
+    const tipo = CODIGO.slice(
+      CODIGO.indexOf("export type PerguntaNaCaixa"),
+      CODIGO.indexOf("async function pacienteDaSessao"),
+    );
+    expect(tipo).not.toContain("denunciada");
+  });
+});
+
 describe("⚠️ nada é apagado", () => {
   test("o módulo não chama `.delete()` em `rede_perguntas`", () => {
     /* Arquivar e denunciar MARCAM: apagar faria "nunca perguntou" e "perguntou

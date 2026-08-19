@@ -1350,7 +1350,7 @@ export const publicarPost = createServerFn({ method: "POST" })
        `publicarStory`: o deploy chega antes do SQL, e sem isto PUBLICAR pararia
        de funcionar para todo mundo — não só a enquete. */
     if (error) {
-      console.warn("[rede] post sem enquete/aula — rode APLICAR_REDE_SOCIAL.sql");
+      console.warn("[rede] post sem enquete/aula/pergunta — rode APLICAR_REDE_SOCIAL.sql");
       const { data: p2, error: erro2 } = await sb
         .from("rede_posts")
         .insert({

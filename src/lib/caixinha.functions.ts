@@ -49,7 +49,6 @@ export type PerguntaNaCaixa = {
   resposta: string | null;
   /** O post que a resposta virou — para a tela levar até ele. */
   postId: string | null;
-  denunciada: boolean;
   /* ⚠️ Não há `quem`, `quemId`, `autor` nem `avatar`. Ver o cabeçalho. */
 };
 
@@ -145,7 +144,6 @@ export const minhaCaixinha = createServerFn({ method: "POST" })
       criadoEm: l.criado_em,
       resposta: l.resposta ?? null,
       postId: l.post_id ?? null,
-      denunciada: !!l.denunciado_em,
     }));
 
     return {
