@@ -1264,13 +1264,13 @@ export const publicarPost = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
 
     /* ⚠️ Modo Cuidado NÃO publica. O portão da tela some, mas um pedido montado
-       à mão não passa pela tela. */
-    const { data: meu } = await sb
-      .from("patient_profiles")
-      .select("care_mode")
-      .eq("id", eu)
-      .maybeSingle();
-    if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
+       à mão não passa pela tela.
+       ⚠️ **Pela `euEmCuidado`, que falha FECHADO.** A versão anterior lia a
+       coluna aqui e descartava o `error`: um timeout devolvia `data: null`,
+       `?.care_mode` virava `undefined`, e a paciente em luto PUBLICAVA. Um
+       portão que falha aberto é o mesmo que não existir — e este é o portão que
+       o Modo Cuidado inteiro existe para ter. */
+    if (await euEmCuidado(sb, eu)) return { ok: false as const, motivo: "indisponivel" as const };
 
     /* ⚠️ A enquete conta como conteúdo: um post que é SÓ a enquete é legítimo
        ("menino ou menina?" não precisa de foto nem de legenda), e sem isto ele
@@ -2022,13 +2022,9 @@ export const publicarStory = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
 
     /* Modo Cuidado não publica — o mesmo portão de `publicarPost`, e pelo mesmo
-       motivo: um pedido montado à mão não passa pela tela. */
-    const { data: meu } = await sb
-      .from("patient_profiles")
-      .select("care_mode")
-      .eq("id", eu)
-      .maybeSingle();
-    if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
+       motivo: um pedido montado à mão não passa pela tela. E pela MESMA função,
+       que falha fechado. */
+    if (await euEmCuidado(sb, eu)) return { ok: false as const, motivo: "indisponivel" as const };
 
     /* ⚠️ A MESMA régua do post — o story tem texto, e some em 24h, o que o
        torna MAIS atraente para quem quer dar conselho e não quer o registro. */

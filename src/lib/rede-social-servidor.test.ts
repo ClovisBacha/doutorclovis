@@ -124,10 +124,22 @@ describe("o bloqueio", () => {
 describe("Modo Cuidado", () => {
   test("⚠️ `publicarPost` tem a GUARDA, não só a palavra", () => {
     // O portão da tela some, mas um pedido montado à mão não passa pela tela.
-    const c = corpoDe("publicarPost").replace(/\s+/g, " ");
-    expect(c).toContain(
-      'if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };',
-    );
+    /* ⚠️ E pela `euEmCuidado`, que FALHA FECHADO. A versão anterior lia a
+       coluna aqui e descartava o `error`: um timeout devolvia `data: null`,
+       `?.care_mode` virava `undefined`, e a paciente em luto PUBLICAVA. Um
+       portão que falha aberto é o mesmo que não existir. */
+    for (const nome of ["publicarPost", "publicarStory"]) {
+      const c = corpoDe(nome).replace(/\s+/g, " ");
+      expect(c).toContain(
+        'if (await euEmCuidado(sb, eu)) return { ok: false as const, motivo: "indisponivel" as const };',
+      );
+      expect(c).not.toContain("(meu as any)?.care_mode");
+      /* E ANTES de qualquer escrita. */
+      const portao = c.indexOf("euEmCuidado");
+      const escreveu = c.indexOf(".insert(");
+      expect(portao).toBeGreaterThan(-1);
+      expect(escreveu).toBeGreaterThan(portao);
+    }
   });
 
   test("⚠️ `verPerfil` recusa com o MESMO motivo nos três casos", () => {

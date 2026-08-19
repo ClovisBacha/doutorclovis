@@ -343,8 +343,17 @@ export const responderPergunta = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
     const resposta = data.resposta.trim();
 
-    const [{ data: meu }, { data: pergunta }] = await Promise.all([
-      sb.from("patient_profiles").select("care_mode").eq("id", eu).maybeSingle(),
+    const [meu, { data: pergunta }] = await Promise.all([
+      /* ⚠️ Falha de leitura conta como EM CUIDADO — o portão que falha aberto é
+         o mesmo que não existir. */
+      (async () => {
+        const { data, error } = await sb
+          .from("patient_profiles")
+          .select("care_mode")
+          .eq("id", eu)
+          .maybeSingle();
+        return { care_mode: error ? true : !!(data as any)?.care_mode };
+      })(),
       /* ⚠️ O recorte por dona vem na LEITURA, e não só no `update` do fim: sem
          ele, a pergunta anônima de outra mulher era lida e o texto dela ia para
          o feed dentro do post desta paciente. */
