@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { PainelDaInfluenciadora } from "@/lib/influenciadora.functions";
+import { ATIVIDADES_DO_DESAFIO, DIAS_ALVO_PADRAO } from "@/lib/desafio-em-grupo";
+import { DESAFIO_DA_SEMANA } from "@/lib/economia-sementinhas";
 
 /**
  * O PAINEL DA EMBAIXADORA — no SITE, não no app.
@@ -263,6 +265,7 @@ export default function PainelDaEmbaixadora() {
       </div>
 
       <PresenteParaAsIndicadas />
+      <DesafioDaSemana />
 
       <p className="mt-8 text-center text-[11.5px] leading-relaxed text-muted-foreground">
         Os valores acima são o que já foi apurado das mensalidades pagas. O pagamento é combinado
@@ -379,6 +382,88 @@ function PresenteParaAsIndicadas() {
           nenhuma tela dizia de onde veio. */}
       <p className="mt-3 text-[12px] leading-snug text-muted-foreground">
         Quem receber vê o seu nome no app, na tela do Caminho.
+      </p>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O DESAFIO DA SEMANA — Fase 5
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A criadora propõe o desafio da semana.
+ *
+ * ⚠️ **De catálogo fechado.** Campo livre aqui é conselho de saúde de leiga
+ * distribuído em massa com o nome do consultório em volta. As opções são as
+ * quatro atividades de bem-estar que o app já grava — e são as MESMAS, senão o
+ * desafio nunca fecharia, porque nada escreveria aquela chave.
+ *
+ * ⚠️ E ela CONVIDA, não inscreve: quem entra é cada paciente, uma por uma. O
+ * `ref_code` foi tirado do grafo de amizade para uma criadora não virar amiga
+ * de três mil gestantes; inscrever automaticamente recriaria isso por fora.
+ */
+function DesafioDaSemana() {
+  const [atividade, setAtividade] = useState<string>(ATIVIDADES_DO_DESAFIO[0].chave);
+  const [estado, setEstado] = useState<"parado" | "enviando" | "pronto" | "erro">("parado");
+
+  async function propor() {
+    setEstado("enviando");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return setEstado("erro");
+      const { proporDesafio } = await import("@/lib/desafio-em-grupo.functions");
+      const r = await proporDesafio({ data: { accessToken: token, atividade } });
+      setEstado(r.ok ? "pronto" : "erro");
+    } catch {
+      setEstado("erro");
+    }
+  }
+
+  return (
+    <div className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <h2 className="font-serif text-xl">Desafio da semana</h2>
+      <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+        Proponha uma atividade para quem chegou pelo seu código. Quem entrar e fizer em{" "}
+        {DIAS_ALVO_PADRAO} dias da semana ganha {DESAFIO_DA_SEMANA} 🌱. Cada pessoa escolhe se
+        participa — e pode sair quando quiser.
+      </p>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {ATIVIDADES_DO_DESAFIO.map((a) => (
+          <button
+            key={a.chave}
+            type="button"
+            onClick={() => setAtividade(a.chave)}
+            className={`press rounded-full px-3 py-1.5 text-[13px] ${
+              atividade === a.chave ? "bg-primary/15 font-semibold text-primary" : "bg-muted/60"
+            }`}
+          >
+            {a.emoji} {a.rotulo}
+          </button>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={propor}
+        disabled={estado === "enviando" || estado === "pronto"}
+        className="press mt-3 w-full rounded-xl bg-primary py-2 text-[14px] font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {estado === "pronto"
+          ? "Desafio desta semana no ar ✓"
+          : estado === "enviando"
+            ? "Enviando…"
+            : "Propor para esta semana"}
+      </button>
+
+      {estado === "erro" && (
+        <p className="mt-2 text-[13px] text-destructive">Não deu para propor agora.</p>
+      )}
+      <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+        Você vê quantas fecharam, nunca quem — nem quem não fechou.
       </p>
     </div>
   );

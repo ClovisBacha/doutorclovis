@@ -28,6 +28,9 @@
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
  *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
+ *   /preview-instagram?desafio=fora → o convite do desafio (ainda não entrou)
+ *   /preview-instagram?desafio=meio → dentro, 1 de 3 dias
+ *   /preview-instagram?desafio=fim  → fechou, com o contador do grupo
  *
  * ⚠️ A zona de sugestões ("Você está em dia" + pessoas + publicações) só abre
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
@@ -73,6 +76,7 @@ export const Route = createFileRoute("/preview-instagram")({
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
     carimbo: q.carimbo == null ? false : !!q.carimbo,
+    desafio: q.desafio == null ? "" : String(q.desafio),
   }),
 });
 
@@ -176,7 +180,26 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo } = Route.useSearch();
+  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo, desafio } = Route.useSearch();
+
+  /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
+     de verdade propondo um desafio e uma paciente com o código dela. */
+  const oDesafio =
+    desafio === ""
+      ? null
+      : {
+          id: "d1",
+          atividade: "meditation" as const,
+          inicio: "2026-08-17",
+          fim: "2026-08-23",
+          diasAlvo: 3,
+          deQuem: "Marina",
+          souParticipante: desafio !== "fora",
+          meusDias: desafio === "fim" ? 3 : desafio === "meio" ? 1 : 0,
+          /* ⚠️ `null` abaixo de duas pessoas — é o estado que prova que a tela
+             não fala do grupo quando o grupo é ela sozinha. */
+          quantasFecharam: desafio === "fim" ? 7 : null,
+        };
   const [persona, setPersona] = useState<Persona>("estranha");
 
   const perfil: PerfilNaTela = {
@@ -508,6 +531,9 @@ function Bancada() {
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
+          desafio={oDesafio}
+          aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
+          aoIrParaOJogo={() => alert("iria para o Caminho")}
           temMais={!vazio && paginas < 3}
           aoChegarNoFim={() => {
             setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);

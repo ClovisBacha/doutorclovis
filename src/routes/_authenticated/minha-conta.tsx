@@ -2437,6 +2437,9 @@ function MinhaContaPage() {
                        estado de quando a Comunidade montou, e ela pode ter feito
                        a aula depois disso, na mesma sessão. */
                     aulaDeHoje={aulaDeHoje}
+                    /* O desafio acontece no Caminho: sem esta porta, o cartão
+                       convidaria para uma atividade sem dizer onde ela é. */
+                    onIrParaOJogo={() => goToTab("Caminho")}
                   />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}

@@ -503,6 +503,76 @@ COMMENT ON TABLE public.rede_votos IS
   'Um voto por pessoa por enquete (a PK garante). Ninguém lê o voto de '
   'ninguém — nem a autora do post.';
 
+-- ═════════════════════════════════════════════════════════════════════════════
+-- FASE 5 · O DESAFIO DA SEMANA EM GRUPO
+--
+-- ⚠️ OPT-IN, e é ele que impede o grupo compulsório. A tentação óbvia é juntar
+-- automaticamente todo mundo que carrega o `ref_code` da criadora — e não dá: o
+-- código foi TIRADO do grafo de amizade justamente para uma criadora não virar
+-- amiga de três mil gestantes, e `ref_code` é fixado UMA VEZ, então não haveria
+-- como sair. `desafio_participantes` guarda CONSENTIMENTO, não contagem.
+--
+-- ⚠️ E NÃO HÁ COLUNA DE "quantas fecharam". O contador é derivado de
+-- `sementinhas_ledger` (as linhas `wellness:`), como o troféu conta o ledger e
+-- não `doneDays`. Contador materializado vira "3 fecharam" numa tela e "5" na
+-- outra na primeira corrida.
+-- ═════════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS public.desafios_em_grupo (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- Junta por CÓDIGO, como `ref_code` e `affiliate_earnings` já fazem.
+  affiliate_code text NOT NULL,
+  -- ⚠️ De catálogo fechado (as quatro atividades de bem-estar do app), nunca
+  -- campo livre: texto livre aqui é conselho de saúde de leiga distribuído em
+  -- massa com o nome do consultório em volta.
+  atividade      text NOT NULL CHECK (atividade IN ('movement','meditation','bonding','gratitude')),
+  -- ⚠️ Guardados, nunca derivados: mudar a régua da semana não pode reescrever
+  -- o passado de um desafio que já aconteceu.
+  inicio         date NOT NULL,
+  fim            date NOT NULL,
+  dias_alvo      int  NOT NULL CHECK (dias_alvo BETWEEN 1 AND 7),
+  criado_em      timestamptz NOT NULL DEFAULT now(),
+  arquivado_em   timestamptz
+);
+
+-- Um desafio por criadora por semana. Duas seriam duas ofensivas concorrentes
+-- para a mesma pessoa, e o placar de várias frentes é o que a dupla das Amigas
+-- gastou um índice parcial para não ter.
+CREATE UNIQUE INDEX IF NOT EXISTS desafio_um_por_semana
+  ON public.desafios_em_grupo (affiliate_code, inicio);
+CREATE INDEX IF NOT EXISTS desafio_vigente ON public.desafios_em_grupo (inicio DESC);
+
+CREATE TABLE IF NOT EXISTS public.desafio_participantes (
+  desafio_id uuid NOT NULL REFERENCES public.desafios_em_grupo(id) ON DELETE CASCADE,
+  user_id    uuid NOT NULL REFERENCES auth.users(id)               ON DELETE CASCADE,
+  entrou_em  timestamptz NOT NULL DEFAULT now(),
+  -- Sair MARCA, nunca apaga: apagar faria "ela nunca entrou" e "ela saiu"
+  -- serem a mesma linha ausente, e a criadora veria o grupo encolher sem
+  -- entender por quê.
+  saiu_em    timestamptz,
+  PRIMARY KEY (desafio_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS desafio_de_quem ON public.desafio_participantes (user_id)
+  WHERE saiu_em IS NULL;
+
+ALTER TABLE public.desafios_em_grupo     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.desafio_participantes ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ Sem política para `anon` nem para `authenticated`: a leitura passa pelo
+-- servidor, como `APLICAR_REDE_SOCIAL` e `APLICAR_INFLUENCIADORA` já decidiram.
+-- `desafio_participantes` é lista de gente, e uma policy de LINHA não esconde
+-- coluna: dar SELECT ao authenticated entregaria quem participa de quê.
+DROP POLICY IF EXISTS "Service manages desafios" ON public.desafios_em_grupo;
+CREATE POLICY "Service manages desafios" ON public.desafios_em_grupo
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+DROP POLICY IF EXISTS "Service manages participantes" ON public.desafio_participantes;
+CREATE POLICY "Service manages participantes" ON public.desafio_participantes
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+COMMENT ON TABLE public.desafio_participantes IS
+  'CONSENTIMENTO, não contagem: a paciente entra e pode sair. Agrupar por '
+  'ref_code recriaria o grupo compulsório que o código existe para não criar.';
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CONFERÊNCIA. Todas as linhas têm que voltar `true`.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -539,4 +609,8 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
           WHERE table_schema='public' AND table_name='rede_votos')                   AS votos_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='rede_posts' AND column_name='aula')                      AS aula_ok;
+          WHERE table_name='rede_posts' AND column_name='aula')                      AS aula_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='desafios_em_grupo')            AS desafio_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='desafio_participantes')        AS participantes_ok;

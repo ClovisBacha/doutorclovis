@@ -43,6 +43,8 @@ import {
   type AbaDoPerfil,
 } from "@/lib/medidas-instagram";
 import { PERSONAS, type Persona } from "@/lib/selo-do-perfil";
+import { ATIVIDADES_DO_DESAFIO, fraseDoGrupo } from "@/lib/desafio-em-grupo";
+import type { DesafioNaTela } from "@/lib/desafio-em-grupo.functions";
 import {
   emojiDaReacao,
   enqueteValida,
@@ -556,6 +558,9 @@ export function TelaPrincipal({
   aoTocarStory,
   aoChegarNoFim,
   temMais = false,
+  desafio,
+  aoEntrarNoDesafio,
+  aoIrParaOJogo,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -596,6 +601,11 @@ export function TelaPrincipal({
   aoChegarNoFim?: () => void;
   /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
   temMais?: boolean;
+  /** O desafio da semana da criadora que a trouxe, se houver. */
+  desafio?: DesafioNaTela | null;
+  aoEntrarNoDesafio?: (entrar: boolean) => void;
+  /** Leva ao Caminho, onde a atividade acontece. */
+  aoIrParaOJogo?: () => void;
 }) {
   const fim = useRef<HTMLDivElement>(null);
 
@@ -630,6 +640,14 @@ export function TelaPrincipal({
           comiam a primeira dobra inteira de um iPhone. As ações não sumiram:
           viraram as bolinhas que sobem ao tocar de novo no ícone da Comunidade
           na barra de baixo (`publicarAtalhos`, em `RedeNoApp`). */}
+      {desafio && (
+        <CartaoDoDesafio
+          desafio={desafio}
+          aoEntrar={aoEntrarNoDesafio}
+          aoIrParaOJogo={aoIrParaOJogo}
+        />
+      )}
+
       <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
@@ -1204,10 +1222,13 @@ type Onde =
 export function RedeNoApp({
   careMode = false,
   onAbrirSecoes,
+  onIrParaOJogo,
   aulaDeHoje,
 }: {
   careMode?: boolean;
   onAbrirSecoes?: () => void;
+  /** Leva ao Caminho — é lá que a atividade do desafio acontece. */
+  onIrParaOJogo?: () => void;
   /**
    * A aula que ela fez hoje, se fez — quem sabe disso é o Caminho, e ele passa
    * por `minha-conta`. Sem ela, o compositor simplesmente não oferece o anexo.
@@ -1232,6 +1253,7 @@ export function RedeNoApp({
   const [conferindoStory, setConferindoStory] = useState<string | null>(null);
   /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
   const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
+  const [desafio, setDesafio] = useState<DesafioNaTela | null>(null);
   const [previa, setPrevia] = useState<{
     perfil: PerfilNaTela | null;
     posts: PostNaTela[];
@@ -1285,6 +1307,7 @@ export function RedeNoApp({
         setAvisos(at.itens);
         setNaoVistas(at.novas);
       }
+      void carregarDesafio();
     } catch {
       /* Feed vazio é melhor que erro: ela não veio buscar um erro. */
     } finally {
@@ -1320,6 +1343,44 @@ export function RedeNoApp({
    * resultado vazio é resposta legítima (base pequena, ela já segue todo mundo)
    * e sem isso a tela pediria de novo a cada rolagem.
    */
+  /**
+   * O desafio da semana, e o bônus.
+   *
+   * ⚠️ **A cobrança roda JUNTO com a leitura**, e é idempotente: a chave carrega
+   * o desafio e a pessoa, e `cobrarBonusDoDesafio` só paga o VIGENTE — ligar o
+   * recurso não retroage. É o mesmo desenho de `cobrarBonusDaDupla`, que passou
+   * meses só pagando quem abria a aba Amigas.
+   */
+  async function carregarDesafio() {
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/desafio-em-grupo.functions");
+      const [r] = await Promise.all([
+        mod.meuDesafioDaSemana({ data: { accessToken: t } }),
+        mod.cobrarBonusDoDesafio({ data: { accessToken: t } }).catch(() => null),
+      ]);
+      if (r.ok) setDesafio(r.desafio);
+    } catch {
+      /* Sem desafio a aba fica como estava. */
+    }
+  }
+
+  async function entrarNoDesafio(entrar: boolean) {
+    if (!desafio) return;
+    /* Otimista: o cartão responde na hora, e a próxima carga corrige. */
+    setDesafio({ ...desafio, souParticipante: entrar });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { entrarNoDesafio: chamar } = await import("@/lib/desafio-em-grupo.functions");
+      await chamar({ data: { accessToken: t, desafioId: desafio.id, entrar } });
+      await carregarDesafio();
+    } catch {
+      void carregarDesafio();
+    }
+  }
+
   async function carregarSugestoes() {
     if (sugestoesPedidas.current) return;
     sugestoesPedidas.current = true;
@@ -2047,6 +2108,9 @@ export function RedeNoApp({
         aoAbrirPerfil={abrirPerfil}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
+        desafio={desafio}
+        aoEntrarNoDesafio={entrarNoDesafio}
+        aoIrParaOJogo={onIrParaOJogo}
         sugestoes={sugestoes}
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
@@ -3388,5 +3452,98 @@ export function ConferirStory({
         </button>
       </div>
     </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O DESAFIO DA SEMANA — Fase 5
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O convite da criadora, no topo do feed.
+ *
+ * ⚠️ **Ela ENTRA — não é inscrita.** Agrupar automaticamente por `ref_code`
+ * recriaria por fora o grupo compulsório que o código foi tirado do grafo de
+ * amizade para não criar, e do qual não haveria como sair.
+ *
+ * ⚠️ **O contador é NÚMERO, e some abaixo de duas pessoas.** "3 de 300
+ * fecharam" diz ao grupo que quase ninguém veio; "1 fechou" é ela mesma se
+ * olhando no espelho. E nunca a lista de quem fechou — nem a de quem não.
+ *
+ * ⚠️ **E o texto não cobra.** É a mesma regra do empurrão da dupla: "você vai
+ * perder" é o texto de todo app de streak e aqui cairia numa gestante que pode
+ * estar internada.
+ */
+export function CartaoDoDesafio({
+  desafio,
+  aoEntrar,
+  aoIrParaOJogo,
+}: {
+  desafio: DesafioNaTela;
+  aoEntrar?: (entrar: boolean) => void;
+  aoIrParaOJogo?: () => void;
+}) {
+  const a = ATIVIDADES_DO_DESAFIO.find((x) => x.chave === desafio.atividade);
+  const fechei = desafio.meusDias >= desafio.diasAlvo;
+  const doGrupo = fraseDoGrupo(desafio.quantasFecharam ?? 0);
+
+  return (
+    <section className="-mx-4 mb-2 border-b border-border bg-primary/[0.04] px-4 py-3">
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-primary">
+        Desafio da semana
+      </p>
+      <p className="mt-1 text-[15px] font-semibold leading-snug">
+        {a?.emoji} {a?.rotulo} em {desafio.diasAlvo} dias
+      </p>
+      <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">
+        {desafio.deQuem} propôs para quem chegou pelo código dela.
+      </p>
+
+      {desafio.souParticipante ? (
+        <>
+          <p className="mt-2 text-[13px]">
+            {fechei ? (
+              <span className="font-semibold text-primary">Você fechou esta semana 💛</span>
+            ) : (
+              <>
+                Você já fez <strong className="font-semibold">{desafio.meusDias}</strong> de{" "}
+                {desafio.diasAlvo} dias.
+              </>
+            )}
+          </p>
+          {doGrupo && <p className="mt-0.5 text-[12px] text-muted-foreground">{doGrupo}</p>}
+          <div className="mt-2 flex gap-2">
+            {!fechei && aoIrParaOJogo && (
+              <button
+                type="button"
+                onClick={aoIrParaOJogo}
+                className="press flex-1 rounded-xl bg-primary py-2 text-[13px] font-semibold text-primary-foreground"
+              >
+                Fazer agora
+              </button>
+            )}
+            {aoEntrar && (
+              <button
+                type="button"
+                onClick={() => aoEntrar(false)}
+                className="press rounded-xl border border-border px-3 py-2 text-[13px]"
+              >
+                Sair
+              </button>
+            )}
+          </div>
+        </>
+      ) : (
+        aoEntrar && (
+          <button
+            type="button"
+            onClick={() => aoEntrar(true)}
+            className="press mt-2 w-full rounded-xl bg-primary py-2 text-[13px] font-semibold text-primary-foreground"
+          >
+            Entrar no desafio
+          </button>
+        )
+      )}
+    </section>
   );
 }
