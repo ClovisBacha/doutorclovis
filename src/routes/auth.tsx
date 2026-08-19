@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { checkIsAdmin } from "@/lib/admin.functions";
-import { GoogleButton, OrDivider } from "@/components/google-button";
+import { AppleButton, GoogleButton, OrDivider } from "@/components/google-button";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -497,6 +497,10 @@ function AuthPage() {
           </p>
           <div className="mt-5">
             <GoogleButton role="medico" label="Continuar com Google" />
+            {/* ⚠️ Requisito de loja, não escolha de layout — ver `AppleButton`. */}
+            <div className="mt-2">
+              <AppleButton role="medico" label="Continuar com a Apple" />
+            </div>
             <p className="mt-2 text-[11px] text-muted-foreground">
               Usar o Google já conecta seu e-mail — as teleconsultas caem na sua Agenda Google.
             </p>
@@ -644,6 +648,9 @@ function AuthPage() {
             noValidate
           >
             <GoogleButton role={role} />
+            <div className="mt-2">
+              <AppleButton role={role} />
+            </div>
             <OrDivider />
             {mode === "signup" && (
               <div>

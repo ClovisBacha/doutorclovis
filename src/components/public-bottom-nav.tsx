@@ -21,9 +21,15 @@ export function PublicBottomNav() {
      login, e esta barra pousava por cima do que elas fotografam — foi ela que
      cobriu a navbar na bancada do tutorial. São telas `noindex` de desenho:
      um convite para entrar no app não tem o que fazer ali. */
+  /* ⚠️ **`/auth` TAMBÉM**, e este era um defeito aberto documentado no
+     CLAUDE.md: a barra pousava por cima do botão "Entrar" da própria tela de
+     login. Medido em 393px — o flutuante cobre o submit inteiro. E o texto
+     piorava: "Entrar no app", em cima do formulário onde ela está tentando
+     exatamente isso, é o app oferecendo o que a tela já é. */
   if (
     location.pathname.startsWith("/minha-conta") ||
     location.pathname.startsWith("/painel") ||
+    location.pathname.startsWith("/auth") ||
     location.pathname.startsWith("/preview-")
   )
     return null;

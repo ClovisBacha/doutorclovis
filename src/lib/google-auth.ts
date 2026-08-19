@@ -13,6 +13,31 @@ import { supabase } from "@/integrations/supabase/client";
  * as URLs de redirect na allowlist do projeto.
  */
 export async function signInWithGoogle(role: "paciente" | "medico"): Promise<Error | null> {
+  return entrarComProvedor("google", role);
+}
+
+/**
+ * ENTRAR COM A CONTA DA APPLE.
+ *
+ * ⚠️ **Uma função só para os dois, e não uma cópia.** O que faz o Google
+ * funcionar aqui não é o nome do provedor: é a URL LIMPA (sem query string,
+ * senão a allowlist do Supabase recusa em silêncio e devolve a pessoa na home)
+ * e a intenção "sou médico" gravada no aparelho ANTES de sair. Uma segunda
+ * cópia perderia uma das duas na primeira manutenção — e o sintoma seria o
+ * médico entrando e aparecendo no app da gestante, sem erro nenhum na tela.
+ *
+ * ⚠️ **E ela é obrigatória, não enfeite.** Pela diretriz 4.8 da App Store, um
+ * app que oferece login social de terceiro tem de oferecer "Sign in with Apple"
+ * também. Sem isso, o app é recusado na revisão — e este app vai para a loja.
+ */
+export async function signInWithApple(role: "paciente" | "medico"): Promise<Error | null> {
+  return entrarComProvedor("apple", role);
+}
+
+async function entrarComProvedor(
+  provider: "google" | "apple",
+  role: "paciente" | "medico",
+): Promise<Error | null> {
   if (typeof window === "undefined") return null;
   const origin = window.location.origin;
   /* A intenção é gravada ANTES de sair para o Google: é o único momento em que
@@ -40,9 +65,6 @@ export async function signInWithGoogle(role: "paciente" | "medico"): Promise<Err
      está lá quando ele volta. Uma pista que não depende de configuração de
      terceiro é melhor que uma que depende. */
   const redirectTo = role === "medico" ? `${origin}/medicos/cadastro` : `${origin}/minha-conta`;
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: { redirectTo },
-  });
+  const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
   return error ?? null;
 }
