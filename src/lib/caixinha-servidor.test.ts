@@ -88,83 +88,74 @@ describe("⚠️ `quem_id` é guardado sempre e devolvido nunca", () => {
   });
 });
 
-describe("⚠️ a régua roda nos DOIS textos", () => {
-  test("na pergunta e na resposta", () => {
-    /* O texto perigoso é a RESPOSTA — foi ele que fechou os comentários. Uma
-       caixinha que triasse só a entrada publicaria "no seu lugar eu esperava"
-       com o nome do consultório em volta. */
-    expect(corpoDe("perguntar")).toContain("triarTexto(texto)");
-    expect(corpoDe("responderPergunta")).toContain("triarTexto(resposta)");
+describe("⚠️ o servidor DELEGA a decisão, e não a reescreve", () => {
+  test("`perguntar` e `responderPergunta` chamam a régua pura", () => {
+    /* Se um dia alguém reescrever a guarda inline, a régua passa a existir em
+       dois lugares e as duas divergem no primeiro conserto — com a divergência
+       aparecendo como pergunta clínica virando post público. O QUE cada guarda
+       faz é testado por comportamento em `caixinha.test.ts`; aqui só se cobra
+       que este arquivo não tenha uma segunda opinião. */
+    expect(corpoDe("perguntar")).toContain("decidirPergunta(");
+    expect(corpoDe("responderPergunta")).toContain("decidirResposta(");
+    expect(CODIGO).not.toMatch(/function decidirPergunta|function decidirResposta/);
+    /* E o texto da recusa vem de lá também. */
+    expect(corpoDe("perguntar")).toContain("recadoDoVeredicto(");
+    expect(corpoDe("responderPergunta")).toContain("recadoDaResposta(");
   });
 
-  test("⚠️ e a resposta só publica quando a régua devolve `publicavel`", () => {
-    const responder = corpoDe("responderPergunta");
-    /* Amarra a CADEIA: o valor que `triarTexto` produz é o mesmo que decide a
-       recusa, e a recusa acontece ANTES do insert em `rede_posts`. */
-    expect(responder).toMatch(/const desfecho = triarTexto\(resposta\)/);
-    expect(responder).toMatch(/if \(desfecho !== "publicavel"\)[\s\S]*?return \{ ok: false/);
-    expect(responder.indexOf('desfecho !== "publicavel"')).toBeLessThan(
-      responder.indexOf('.from("rede_posts")'),
-    );
+  test("⚠️ e os FATOS que ele passa são lidos do banco, não cravados", () => {
+    /* Uma régua pura perfeita alimentada com `bloqueadas: false` fixo não
+       protege ninguém. */
+    const p = corpoDe("perguntar").replace(/\s+/g, " ");
+    expect(p).not.toMatch(/bloqueadas: false|donaAceita: true|alcancoOPerfil: true/);
+    expect(p).toContain("alcancoOPerfil: alcancaOPerfil({");
+    expect(p).toContain("mandeiParaElaHoje:");
+  });
+
+  test("⚠️ falha ao ler o bloqueio conta como BLOQUEADAS", () => {
+    /* Mesma direção do `conjuntoDeBloqueio`: numa caixa anônima, errar para o
+       lado de aceitar é derrubar a única defesa que a dona tem. */
+    const p = corpoDe("perguntar").replace(/\s+/g, " ");
+    expect(p).toContain("const bloqueadas = !!erroBloqueio ||");
   });
 });
 
 describe("⚠️ a pergunta clínica vai para o médico de QUEM PERGUNTOU", () => {
   test("o `doctor_id` sai do perfil de `eu`, nunca do da dona", () => {
     const p = corpoDe("perguntar");
-    const trecho = p.slice(p.indexOf('desfecho === "clinica"'), p.indexOf("teto"));
+    const i = p.indexOf('.from("doctor_questions")');
+    expect(i).toBeGreaterThan(-1);
+    /* A janela é a montagem da linha, e ela começa na leitura do MEU perfil. */
+    const abre = p.lastIndexOf('.from("patient_profiles")', i);
+    expect(abre).toBeGreaterThan(-1);
+    const trecho = p.slice(abre, i + 300);
     expect(trecho).toContain('.eq("id", eu)');
-    /* ⚠️ O `.eq("id", data.donaId)` existe neste corpo (é a leitura da caixa),
-       então procurar a string solta não prova nada: o que prova é ele NÃO
-       aparecer dentro do trecho que monta a linha do médico. */
+    /* ⚠️ Procurar `data.donaId` solto não prova nada — ele aparece no corpo
+       inteiro. O que prova é ele não aparecer NESTE trecho, e a variável `dona`
+       (o perfil dela, que está em escopo) também não. */
     expect(trecho).not.toContain("data.donaId");
-    expect(trecho).toContain('.from("doctor_questions")');
+    expect(trecho).not.toMatch(/\bdona\b[^I]/);
     expect(trecho).toMatch(/user_id: eu/);
   });
 
   test("falhar ao gravar a dúvida clínica é ERRO, e não um envio de mentira", () => {
     const p = corpoDe("perguntar");
-    const trecho = p.slice(p.indexOf('.from("doctor_questions")'));
-    expect(trecho.slice(0, 400)).toMatch(/if \(error\) return \{ ok: false/);
-  });
-});
-
-describe("⚠️ a bandeira vermelha não vira linha na caixa", () => {
-  test("ela sai por cima, antes de qualquer escrita", () => {
-    /* Ninguém responde "estou sangrando" com um coraçãozinho, e deixar essa
-       frase esperando a boa vontade de outra paciente é o pior desfecho
-       possível desta tela. O caminho dela é a Central de Emergência. */
-    const p = corpoDe("perguntar");
-    expect(p.indexOf('desfecho === "emergencia"')).toBeLessThan(p.indexOf(".insert("));
-    const trecho = p.slice(p.indexOf('desfecho === "emergencia"'), p.indexOf('=== "clinica"'));
-    expect(trecho).not.toContain(".insert(");
-  });
-});
-
-describe("as três recusas de `perguntar`", () => {
-  const p = corpoDe("perguntar");
-
-  test("caixa fechada, Modo Cuidado e bloqueio recusam ANTES da triagem", () => {
-    /* Triar primeiro roteria para o médico uma dúvida escrita para uma caixa
-       que não existe — e a paciente receberia "mandei para o seu médico" por
-       um texto que ela mandou para outra pessoa. */
-    expect(p).toMatch(/care_mode \|\| !\(dona as any\)\.aceita_perguntas/);
-    expect(p.indexOf("aceita_perguntas")).toBeLessThan(p.indexOf("triarTexto"));
-    expect(p.indexOf("rede_bloqueios")).toBeLessThan(p.indexOf("triarTexto"));
+    const i = p.indexOf('.from("doctor_questions")');
+    expect(i).toBeGreaterThan(-1);
+    expect(p.slice(i, i + 500)).toMatch(/if \(erroFila\) return \{ ok: false/);
   });
 
-  test("⚠️ o bloqueio conta nos DOIS sentidos", () => {
-    /* Só o meu deixaria quem me bloqueou continuar me perguntando. */
-    const trecho = p.slice(p.indexOf("rede_bloqueios"), p.indexOf("triarTexto"));
-    expect(trecho).toContain("quem_id.eq.${eu}");
-    expect(trecho).toContain("quem_id.eq.${data.donaId}");
-  });
-
-  test("o teto diário conta o que ENTRA NA CAIXA", () => {
-    const trecho = p.slice(p.indexOf("PERGUNTAS_POR_DIA") - 400);
-    expect(trecho).toContain('.eq("quem_id", eu)');
-    expect(trecho).toContain('.gte("criado_em", inicioDoDia())');
-    expect(trecho).toMatch(/>= PERGUNTAS_POR_DIA[\s\S]*?motivo: "teto"/);
+  test("⚠️ a EMERGÊNCIA deixa rastro, e é o mais grave dos três", () => {
+    /* Antes ela não gravava NADA: o app detectava a bandeira vermelha, mostrava
+       um botão, e se ela fechasse a folha não sobrava registro nenhum de que a
+       frase existiu. A hierarquia estava invertida — `publicavel` persistia,
+       `clinica` persistia, e o mais grave era o único volátil. */
+    const p = corpoDe("perguntar").replace(/\s+/g, " ");
+    expect(p).toContain('const naCaixa = veredicto.desfecho === "publicavel"');
+    expect(p).toContain("arquivado_em: naCaixa ? null : agora");
+    /* E as duas não-publicáveis vão para a fila do médico dela. */
+    expect(p).toContain("if (!naCaixa) {");
+    expect(p).toContain('.from("doctor_questions")');
   });
 });
 

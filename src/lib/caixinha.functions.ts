@@ -30,13 +30,14 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { LIMITE_DA_PERGUNTA, type DesfechoDaPergunta } from "@/lib/pergunta-clinica";
 import {
-  LIMITE_DA_PERGUNTA,
-  PERGUNTAS_POR_DIA,
-  recadoDoDesfecho,
-  triarTexto,
-  type DesfechoDaPergunta,
-} from "@/lib/pergunta-clinica";
+  decidirPergunta,
+  decidirResposta,
+  recadoDaResposta,
+  recadoDoVeredicto,
+} from "@/lib/caixinha";
+import { alcancaOPerfil } from "@/lib/selo-do-perfil";
 import { LIMITE_DO_TEXTO } from "@/lib/rede-social";
 import { FUSO_DA_CLINICA } from "@/lib/disponibilidade";
 
@@ -183,82 +184,132 @@ export const perguntar = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
     if (!eu) return { ok: false as const, motivo: "sessao" as const };
-    if (eu === data.donaId) return { ok: false as const, motivo: "indisponivel" as const };
 
     const texto = data.texto.trim();
-    if (!texto) return { ok: false as const, motivo: "vazio" as const };
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    /* A caixa está aberta? E ela está em Modo Cuidado? As duas perguntas numa
-       leitura só. ⚠️ Conferido no SERVIDOR, sempre: o botão some da tela, e um
-       pedido montado à mão não passa pela tela. */
+    /* ⚠️ Tudo conferido no SERVIDOR: o botão some da tela, e um pedido montado
+       à mão não passa pela tela. */
     const { data: dona } = await sb
       .from("patient_profiles")
-      .select("aceita_perguntas, care_mode")
+      .select("aceita_perguntas, care_mode, perfil_publico")
       .eq("id", data.donaId)
       .maybeSingle();
-    if (!dona || (dona as any).care_mode || !(dona as any).aceita_perguntas) {
-      return { ok: false as const, motivo: "indisponivel" as const };
-    }
 
-    /* ⚠️ O bloqueio vale nos DOIS sentidos, como em `contextoDe`. Só o meu
-       deixaria quem me bloqueou continuar me perguntando — e "bloquear"
-       promete que nenhuma das duas alcança a outra. */
-    const { data: bloqueios } = await sb
+    /* ⚠️ O bloqueio vale nos DOIS sentidos, como em `contextoDe`. */
+    const { data: bloqueios, error: erroBloqueio } = await sb
       .from("rede_bloqueios")
       .select("quem_id")
       .or(
         `and(quem_id.eq.${eu},bloqueado_id.eq.${data.donaId}),` +
           `and(quem_id.eq.${data.donaId},bloqueado_id.eq.${eu})`,
       );
-    if ((bloqueios ?? []).length > 0) {
-      return { ok: false as const, motivo: "indisponivel" as const };
+    /* ⚠️ Falha de leitura conta como BLOQUEADAS — mesma direção do
+       `conjuntoDeBloqueio`. Numa caixa anônima, errar para o lado de aceitar é
+       derrubar a única defesa que a dona tem. */
+    const bloqueadas = !!erroBloqueio || (bloqueios ?? []).length > 0;
+
+    /* O alcance é a MESMA régua de `verPerfil`. */
+    const [sigo, amiga] = await Promise.all([
+      sb
+        .from("rede_seguidores")
+        .select("estado")
+        .eq("seguidor_id", eu)
+        .eq("seguido_id", data.donaId)
+        .maybeSingle(),
+      (async () => {
+        try {
+          const { saoAmigas } = await import("@/lib/amigas.functions");
+          return await saoAmigas(sb, eu, data.donaId);
+        } catch {
+          /* Sem o grafo, `amigas` fecha em vez de abrir. */
+          return false;
+        }
+      })(),
+    ]);
+
+    const desde = inicioDoDia();
+    const [{ count: hoje }, { count: paraEla }] = await Promise.all([
+      sb
+        .from("rede_perguntas")
+        .select("id", { count: "exact", head: true })
+        .eq("quem_id", eu)
+        .gte("criado_em", desde),
+      sb
+        .from("rede_perguntas")
+        .select("id", { count: "exact", head: true })
+        .eq("quem_id", eu)
+        .eq("dona_id", data.donaId)
+        .gte("criado_em", desde),
+    ]);
+
+    const veredicto = decidirPergunta(
+      {
+        souADona: eu === data.donaId,
+        donaExiste: !!dona,
+        donaEmCuidado: !!(dona as any)?.care_mode,
+        donaAceita: !!(dona as any)?.aceita_perguntas,
+        alcancoOPerfil: alcancaOPerfil({
+          perfilPublico: !!(dona as any)?.perfil_publico,
+          souEu: false,
+          sigoAtivo: ((sigo as any)?.data?.estado ?? null) === "ativo",
+          somosAmigas: !!amiga,
+        }),
+        bloqueadas,
+        mandeiHoje: hoje ?? 0,
+        mandeiParaElaHoje: paraEla ?? 0,
+      },
+      texto,
+    );
+
+    if (!veredicto.pode) {
+      return { ok: false as const, motivo: veredicto.motivo, recado: recadoDoVeredicto(veredicto) };
     }
 
-    const desfecho: DesfechoDaPergunta = triarTexto(texto);
+    const recado = recadoDoVeredicto(veredicto);
 
-    if (desfecho === "emergencia") {
-      return { ok: true as const, desfecho, recado: recadoDoDesfecho(desfecho) };
-    }
+    /* ⚠️ **TODA tentativa vira linha**, inclusive as que não chegam à caixa.
+       Antes, `emergencia` não gravava NADA: o app detectava uma bandeira
+       vermelha, mostrava um botão, e se ela fechasse a folha não sobrava
+       registro nenhum de que a frase existiu. A hierarquia estava invertida —
+       `publicavel` persistia, `clinica` persistia, e o mais grave dos três era o
+       único volátil.
+       ⚠️ E as duas não-publicáveis nascem ARQUIVADAS: a linha existe para o teto
+       e para quem for investigar, e a dona da caixa nunca a vê. */
+    const naCaixa = veredicto.desfecho === "publicavel";
+    const agora = new Date().toISOString();
+    const { error } = await sb.from("rede_perguntas").insert({
+      dona_id: data.donaId,
+      quem_id: eu,
+      texto,
+      desfecho: veredicto.desfecho,
+      arquivado_em: naCaixa ? null : agora,
+    });
+    if (error && naCaixa) return { ok: false as const, motivo: "banco" as const };
 
-    if (desfecho === "clinica") {
-      /* O médico DE QUEM PERGUNTOU. Sem vínculo a linha nasce com `null` e cai
-         na fila geral, que é o mesmo que a aba Dúvidas já faz. */
+    if (!naCaixa) {
+      /* O médico DE QUEM PERGUNTOU. ⚠️ Nunca o da dona da caixa: a pergunta é
+         sobre o corpo de quem escreveu, e mandá-la ao obstetra de outra pessoa é
+         entregar dado de saúde a um médico que não a acompanha. */
       const { data: meu } = await sb
         .from("patient_profiles")
         .select("doctor_id")
         .eq("id", eu)
         .maybeSingle();
-      const { error } = await sb
-        .from("doctor_questions")
-        .insert({ user_id: eu, question: texto, doctor_id: (meu as any)?.doctor_id ?? null });
+      const marca = veredicto.desfecho === "emergencia" ? "🚨 " : "";
+      const { error: erroFila } = await sb.from("doctor_questions").insert({
+        user_id: eu,
+        question: `${marca}${texto}`,
+        doctor_id: (meu as any)?.doctor_id ?? null,
+      });
       /* ⚠️ Falhar aqui é ERRO na tela, e não um "enviado 💛" mentiroso: ela
          acabou de escrever uma dúvida clínica e precisa saber que ninguém a
          recebeu. */
-      if (error) return { ok: false as const, motivo: "banco" as const };
-      return { ok: true as const, desfecho, recado: recadoDoDesfecho(desfecho) };
+      if (erroFila) return { ok: false as const, motivo: "banco" as const };
     }
 
-    /* ⚠️ O teto conta o que ENTRA NA CAIXA, e não toda tentativa. Sem ele o
-       campo vira ferramenta de spam contra uma pessoa que não pode responder
-       nem saber quem é. */
-    const { count } = await sb
-      .from("rede_perguntas")
-      .select("id", { count: "exact", head: true })
-      .eq("quem_id", eu)
-      .gte("criado_em", inicioDoDia());
-    if ((count ?? 0) >= PERGUNTAS_POR_DIA) {
-      return { ok: false as const, motivo: "teto" as const };
-    }
-
-    const { error } = await sb
-      .from("rede_perguntas")
-      .insert({ dona_id: data.donaId, quem_id: eu, texto, desfecho });
-    if (error) return { ok: false as const, motivo: "banco" as const };
-
-    return { ok: true as const, desfecho, recado: recadoDoDesfecho(desfecho) };
+    return { ok: true as const, desfecho: veredicto.desfecho, recado };
   });
 
 /**
@@ -290,37 +341,33 @@ export const responderPergunta = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
-
-    const { data: meu } = await sb
-      .from("patient_profiles")
-      .select("care_mode")
-      .eq("id", eu)
-      .maybeSingle();
-    if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
-
     const resposta = data.resposta.trim();
-    if (!resposta) return { ok: false as const, motivo: "vazio" as const };
 
-    const desfecho = triarTexto(resposta);
-    /* ⚠️ As DUAS saídas não-publicáveis recusam. `emergencia` na resposta é
-       ela contando o próprio susto para o feed — e isso é um post, escrito por
-       ela, com a régua do post; não uma resposta a uma pergunta alheia. */
-    if (desfecho !== "publicavel") {
-      return { ok: false as const, motivo: desfecho, recado: recadoDaResposta(desfecho) };
+    const [{ data: meu }, { data: pergunta }] = await Promise.all([
+      sb.from("patient_profiles").select("care_mode").eq("id", eu).maybeSingle(),
+      /* ⚠️ O recorte por dona vem na LEITURA, e não só no `update` do fim: sem
+         ele, a pergunta anônima de outra mulher era lida e o texto dela ia para
+         o feed dentro do post desta paciente. */
+      sb
+        .from("rede_perguntas")
+        .select("id, texto, resposta, arquivado_em, dona_id")
+        .eq("id", data.perguntaId)
+        .maybeSingle(),
+    ]);
+
+    const veredicto = decidirResposta(
+      {
+        souADona: !!pergunta && (pergunta as any).dona_id === eu,
+        euEmCuidado: !!(meu as any)?.care_mode,
+        perguntaExiste: !!pergunta,
+        jaRespondida: !!(pergunta as any)?.resposta,
+        arquivada: !!(pergunta as any)?.arquivado_em,
+      },
+      resposta,
+    );
+    if (!veredicto.pode) {
+      return { ok: false as const, motivo: veredicto.motivo, recado: recadoDaResposta(veredicto) };
     }
-
-    /* O `.eq("dona_id", eu)` é o que impede responder pergunta alheia — o id
-       vem do cliente. E `is("resposta", null)` impede a segunda resposta virar
-       um segundo post sobre a mesma pergunta. */
-    const { data: pergunta } = await sb
-      .from("rede_perguntas")
-      .select("id, texto, resposta")
-      .eq("id", data.perguntaId)
-      .eq("dona_id", eu)
-      .is("arquivado_em", null)
-      .maybeSingle();
-    if (!pergunta) return { ok: false as const, motivo: "indisponivel" as const };
-    if ((pergunta as any).resposta) return { ok: false as const, motivo: "respondida" as const };
 
     const { data: post, error: erroPost } = await sb
       .from("rede_posts")
@@ -333,9 +380,9 @@ export const responderPergunta = createServerFn({ method: "POST" })
       .select("id")
       .single();
 
-    /* ⚠️ Recuo para banco sem `pergunta`, como em `publicarPost`: o deploy
-       chega antes do SQL. A pergunta entra CITADA no próprio texto — perdê-la
-       deixaria uma resposta solta que ninguém entende. */
+    /* ⚠️ Recuo para banco sem `pergunta`, como em `publicarPost`: o deploy chega
+       antes do SQL. A pergunta entra CITADA no próprio texto — perdê-la deixaria
+       uma resposta solta que ninguém entende. */
     let postId: string | null = post?.id ?? null;
     if (erroPost || !postId) {
       console.warn("[caixinha] post sem `pergunta` — rode APLICAR_REDE_SOCIAL.sql");
@@ -352,9 +399,9 @@ export const responderPergunta = createServerFn({ method: "POST" })
       postId = p2.id;
     }
 
-    /* ⚠️ A marcação vem DEPOIS do post existir. Marcar antes deixaria a
-       pergunta fora da caixa com a resposta em lugar nenhum — e a caixa é
-       anônima, então não haveria a quem perguntar o que houve. */
+    /* ⚠️ A marcação vem DEPOIS do post existir. Marcar antes deixaria a pergunta
+       fora da caixa com a resposta em lugar nenhum — e a caixa é anônima, então
+       não haveria a quem perguntar o que houve. */
     const { error } = await sb
       .from("rede_perguntas")
       .update({ resposta, post_id: postId, respondido_em: new Date().toISOString() })
@@ -364,20 +411,6 @@ export const responderPergunta = createServerFn({ method: "POST" })
 
     return { ok: true as const, postId };
   });
-
-/**
- * O que a tela diz quando a RESPOSTA é recusada.
- *
- * ⚠️ Diferente de `recadoDoDesfecho`, que fala com quem PERGUNTOU. Aqui quem
- * lê é quem ia responder, e o recado precisa dizer o que fazer em vez disso —
- * senão ela reescreve a mesma frase com outras palavras até passar.
- */
-function recadoDaResposta(d: DesfechoDaPergunta): string {
-  if (d === "emergencia") {
-    return "Isso é assunto de atendimento agora — abra o SOS em vez de responder aqui.";
-  }
-  return "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela.";
-}
 
 /** Sair da caixa sem responder. Marca, nunca apaga — a denúncia precisa da linha. */
 export const arquivarPergunta = createServerFn({ method: "POST" })

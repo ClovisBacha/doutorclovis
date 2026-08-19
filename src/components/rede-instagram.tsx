@@ -1558,12 +1558,11 @@ export function RedeNoApp({
       const { perguntar } = await import("@/lib/caixinha.functions");
       const r = await perguntar({ data: { accessToken: t, donaId, texto } });
       if (!r.ok) {
+        /* ⚠️ O texto vem do SERVIDOR. Escrevê-lo aqui seria uma segunda régua:
+           ela diria "você já mandou bastante hoje" para um teto POR PESSOA, que
+           é outra coisa — e divergiria no primeiro ajuste. */
         const { toast } = await import("sonner");
-        toast.error(
-          r.motivo === "teto"
-            ? "Você já mandou bastante pergunta hoje. Amanhã dá de novo 💛"
-            : "Não deu para enviar agora. Tente de novo.",
-        );
+        toast.error(("recado" in r && r.recado) || "Não deu para enviar agora. Tente de novo.");
         return null;
       }
       return r.desfecho;
