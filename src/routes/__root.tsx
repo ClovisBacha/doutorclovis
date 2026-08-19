@@ -8,18 +8,43 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { ChatbotWidget } from "@/components/chatbot-widget";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
 import { PublicBottomNav } from "@/components/public-bottom-nav";
 import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
+
+/**
+ * ⚠️ O CHATBOT DO SITE SAIU DO PACOTE DE ENTRADA — e isso é a maior conta do app.
+ *
+ * Ele era `import` estático aqui, no `__root`. O componente já sabia se
+ * esconder em `/minha-conta` e `/painel` (`return null`), e por isso parecia
+ * inofensivo — mas **esconder não é não baixar**: um import estático no root
+ * entra no chunk de ENTRADA, que toda página carrega antes de qualquer coisa
+ * aparecer.
+ *
+ * E o que ele arrasta é pesado: `@ai-sdk/react`, `ai` e o `react-markdown`
+ * inteiro (unified + remark). Medido: o `index.js` tinha **1,18 MB / 356 KB
+ * comprimidos**, baixados, interpretados e EXECUTADOS antes de a paciente poder
+ * tocar em qualquer coisa. É esse trecho de linha do tempo em que o toque não
+ * responde — o "lerdo já na hora de clicar" que o dono relatou.
+ *
+ * Agora são DOIS portões, e eles existem por razões diferentes:
+ *   · o de FORA (`semChromePublico`) decide se o código é BAIXADO;
+ *   · o de DENTRO (o `return null` do próprio componente) decide se ele
+ *     DESENHA, e continua sendo a fonte da verdade sobre onde ele aparece.
+ * Tirar o de dentro deixaria o widget nascer numa rota nova do site sem
+ * ninguém decidir; tirar o de fora traz a conta de volta.
+ */
+const ChatbotWidget = lazy(() =>
+  import("@/components/chatbot-widget").then((m) => ({ default: m.ChatbotWidget })),
+);
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -462,9 +487,15 @@ function SiteShell() {
           <SiteFooter />
         </div>
       )}
-      <div className="chrome-publico print:hidden">
-        <ChatbotWidget />
-      </div>
+      {!semChromePublico && (
+        <div className="chrome-publico print:hidden">
+          {/* `fallback={null}`: o balão aparecer um instante depois é invisível
+              para quem chega ao site; o que se ganha é o app abrir sem ele. */}
+          <Suspense fallback={null}>
+            <ChatbotWidget />
+          </Suspense>
+        </div>
+      )}
       <div className="print:hidden">
         {/* O botão flutuante de WhatsApp saiu.
             Ele levava TODO visitante da plataforma para o número pessoal de um
