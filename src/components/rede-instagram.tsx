@@ -73,6 +73,12 @@ import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
+import {
+  chaveDaRetrospectiva,
+  ehDomingo,
+  fraseDaRetrospectiva,
+  type Retrospectiva,
+} from "@/lib/retrospectiva";
 /* Import ESTÁTICO: `rascunho-do-post.ts` é régua pura — não toca em servidor,
    em `document` nem em regex com lookbehind. É seguro no pacote da paciente. */
 import {
@@ -867,6 +873,73 @@ export const PostInstagram = memo(function PostInstagram({
    A TELA PRINCIPAL
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * O CARTÃO DA SEMANA — montado sozinho, aos domingos.
+ *
+ * ⚠️ **Dispensável, e o "já vi" é por DOMINGO** — dispensar o de hoje não pode
+ * esconder o da semana que vem.
+ *
+ * ⚠️ **Mosaico de até quatro fotos**, e a grade se adapta: uma foto ocupa tudo,
+ * duas ficam lado a lado, três ou quatro fecham o quadrado. Uma grade fixa de
+ * 2×2 com uma foto só deixaria três buracos cinza.
+ */
+export function CartaoDaSemana({
+  retro,
+  aoFechar,
+}: {
+  retro: Retrospectiva;
+  aoFechar: () => void;
+}) {
+  const n = retro.fotos.length;
+  return (
+    <section
+      className="dc-reacao-entra relative -mx-4 mb-2 overflow-hidden border-b border-border bg-gradient-to-b from-primary/8 to-transparent px-4 py-3"
+      aria-label="Sua semana"
+    >
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+            Sua semana
+          </p>
+          <p className="mt-0.5 text-[14px] leading-snug">{fraseDaRetrospectiva(retro)}</p>
+        </div>
+        <button
+          type="button"
+          onClick={aoFechar}
+          aria-label="Dispensar o resumo da semana"
+          className="press -mr-1 shrink-0 px-1.5 text-[18px] leading-none text-muted-foreground"
+        >
+          ×
+        </button>
+      </div>
+
+      {n > 0 && (
+        <div
+          className={`mt-2.5 grid gap-1 overflow-hidden rounded-2xl ${
+            n === 1 ? "grid-cols-1" : "grid-cols-2"
+          }`}
+        >
+          {retro.fotos.map((u, i) => (
+            <img
+              key={i}
+              src={u}
+              alt=""
+              loading="lazy"
+              className={`w-full object-cover ${
+                n === 1
+                  ? "aspect-[4/3]"
+                  : n === 3 && i === 0
+                    ? "row-span-2 h-full"
+                    : "aspect-square"
+              }`}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function TelaPrincipal({
   posts,
   stories = [],
@@ -880,6 +953,8 @@ export function TelaPrincipal({
   aoVotar,
   aoTirarMarcacao,
   aoVerQuemReagiu,
+  retro,
+  aoFecharRetro,
   aoAbrirPerfil,
   aoTocarStory,
   aoChegarNoFim,
@@ -912,6 +987,9 @@ export function TelaPrincipal({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
+  /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
+  retro?: Retrospectiva | null;
+  aoFecharRetro?: () => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
    * Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story.
@@ -981,6 +1059,12 @@ export function TelaPrincipal({
       )}
 
       <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
+
+      {/* ⚠️ DEPOIS dos stories e ANTES do primeiro post. Acima dos stories ele
+          empurraria a fileira para fora da primeira dobra — que é justamente o
+          arranjo que o dono pediu para corrigir ("o primeiro elemento da aba
+          será os stories"). */}
+      {retro && aoFecharRetro && <CartaoDaSemana retro={retro} aoFechar={aoFecharRetro} />}
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
         <p className="py-16 text-center text-sm text-muted-foreground">
@@ -1858,6 +1942,35 @@ export function RedeNoApp({
    * opcional e, sobretudo, fazer sair do aparelho mais imagem do que o
    * necessário. É foto de gestação, às vezes ultrassom.
    */
+  /* O resumo de domingo. `null` = não há (ou já foi dispensado). */
+  const [retro, setRetro] = useState<Retrospectiva | null>(null);
+
+  useEffect(() => {
+    if (!euId) return;
+    const agora = new Date();
+    /* ⚠️ O DIA DA SEMANA É CONFERIDO NO CLIENTE, e de propósito: "é domingo"
+       depende do fuso DELA, e o servidor roda em UTC. Um domingo calculado em
+       UTC mostraria o cartão no sábado à noite para quem está no Brasil. */
+    if (!ehDomingo(agora)) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const chave = chaveDaRetrospectiva(euId, agora);
+        if (localStorage.getItem(chave)) return;
+        const t = await token();
+        if (!t) return;
+        const { minhaSemana } = await import("@/lib/rede-social.functions");
+        const r = await minhaSemana({ data: { accessToken: t } });
+        if (vivo && r.ok) setRetro(r.retrospectiva);
+      } catch {
+        /* sem resumo é o caso comum — nada na tela */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [euId]);
+
   /* Quem reagiu ao post aberto na folha. `null` = folha fechada. */
   const [quemReagiu, setQuemReagiu] = useState<{
     postId: string;
@@ -3147,6 +3260,15 @@ export function RedeNoApp({
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
         aoTocarStory={verStory}
+        retro={retro}
+        aoFecharRetro={() => {
+          setRetro(null);
+          try {
+            if (euId) localStorage.setItem(chaveDaRetrospectiva(euId, new Date()), "1");
+          } catch {
+            /* sem armazenamento: ele volta na próxima abertura, e tudo bem */
+          }
+        }}
       />
       {/* ⚠️ FORA da `<TelaPrincipal>`: a folha é `fixed` e cobre a tela inteira,
           e dentro da lista ela herdaria o empilhamento do cartão. */}
@@ -3515,6 +3637,9 @@ export function TelaDoPost({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
+  /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
+  retro?: Retrospectiva | null;
+  aoFecharRetro?: () => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {

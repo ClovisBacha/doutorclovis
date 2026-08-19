@@ -80,6 +80,7 @@ export const Route = createFileRoute("/preview-instagram")({
     legendas: q.legendas == null ? 1 : Number(q.legendas),
     amigas: q.amigas == null ? 1 : Number(q.amigas),
     rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
+    retro: q.retro == null ? "" : String(q.retro),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -227,6 +228,7 @@ function Bancada() {
     legendas,
     amigas,
     rascunho,
+    retro,
     selo,
     trancado,
     carimbo,
@@ -307,6 +309,7 @@ function Bancada() {
   const semAmigasParaMarcar = amigas === 0;
   const comRascunho = rascunho !== 0;
   const [vendoQuemReagiu, setVendoQuemReagiu] = useState(false);
+  const retroModo = retro;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -748,6 +751,27 @@ function Bancada() {
           aoDenunciar={acoesDaBancada.denunciar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
+          /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
+             bancada, olhá-lo exigiria esperar o domingo certo com uma conta que
+             publicou naquela semana. `?retro=0` mostra o feed sem ele (o caso
+             de seis dias em sete), `?retro=1foto` prova a grade de uma foto só
+             e `?retro=vazia` o cartão sem foto, que é o da semana que só virou. */
+          retro={
+            retroModo === "0"
+              ? null
+              : {
+                  fotos:
+                    retroModo === "vazia"
+                      ? []
+                      : retroModo === "1foto"
+                        ? [foto(CORES[0][0], CORES[0][1], CORES[0][2])]
+                        : CORES.slice(0, 4).map((c) => foto(c[0], c[1], c[2])),
+                  publicacoes: retroModo === "vazia" ? 0 : 3,
+                  reacoes: retroModo === "vazia" ? 0 : 12,
+                  semanaQueVirou: 29,
+                }
+          }
+          aoFecharRetro={() => alert("dispensaria o resumo da semana")}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */

@@ -40,6 +40,7 @@ import {
   postEhValido,
   reacaoConhecida,
   emojiDaReacao,
+  totalDeReacoes,
   REACOES,
   type AulaNoPost,
   type ConjuntoDeBloqueio,
@@ -2490,6 +2491,80 @@ export const marcarStoryVisto = createServerFn({ method: "POST" })
  * mundo) discordar da lista logo abaixo — e um contador que não bate com a
  * lista é o tipo de coisa que faz a paciente desconfiar do app inteiro.
  */
+/**
+ * A RETROSPECTIVA DA SEMANA — o que o cartão de domingo precisa.
+ *
+ * ⚠️ **A régua mora em `retrospectiva.ts`, pura e testada**; aqui só se colhe o
+ * que ela pede. Decidir "tem retrospectiva?" no servidor e "o que ela diz?" na
+ * tela seria a mesma pergunta respondida em dois lugares.
+ *
+ * ⚠️ **A semana de SETE DIAS ATRÁS sai da mesma `computeGestation`**, com
+ * `today` recuado — nunca de "semanaAtual − 1". A conta ingênua erra quem
+ * corrigiu a DUM, quem tem data de referência de ultrassom, e quem passou do
+ * termo.
+ */
+export const minhaSemana = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const perfis = await perfisPorId(sb, [eu]);
+    const meu = perfis.get(eu);
+    /* ⚠️ Falha ao ler o perfil fecha: sem saber se ela está em Modo Cuidado, o
+       cartão mais festivo da aba não aparece. */
+    if (!meu || meu.care_mode) return { ok: true as const, retrospectiva: null };
+
+    const { computeGestation } = await import("@/lib/gestacao");
+    const agora = new Date();
+    const seteDiasAtras = new Date(agora.getTime() - 7 * 86_400_000);
+    const base = {
+      lmp: (meu as any).lmp_date ?? null,
+      referenceDate: (meu as any).reference_date ?? null,
+      referenceWeeks: (meu as any).reference_weeks ?? null,
+      referenceDays: (meu as any).reference_days ?? null,
+    };
+    const agoraG = computeGestation({ ...base, today: agora });
+    const antesG = computeGestation({ ...base, today: seteDiasAtras });
+
+    const brutos = await postsCrus(sb, (b: any) =>
+      b
+        .eq("autor_id", eu)
+        .is("arquivado_em", null)
+        .gte("criado_em", seteDiasAtras.toISOString())
+        .order("criado_em", { ascending: false })
+        .limit(30),
+    );
+
+    const ids = brutos.map((p: any) => p.id);
+    const { porPost } = await reacoesDe(sb, ids, eu);
+    const { urlAssinada } = await import("@/lib/imagens.server");
+    const { montarRetrospectiva } = await import("@/lib/retrospectiva");
+
+    const posts = await Promise.all(
+      brutos.map(async (p: any) => ({
+        id: p.id as string,
+        criadoEm: p.criado_em as string,
+        imagemUrl: p.imagem_path ? await urlAssinada("rede", p.imagem_path, 3600) : null,
+        reacoes: totalDeReacoes(porPost.get(p.id) ?? {}),
+      })),
+    );
+
+    return {
+      ok: true as const,
+      retrospectiva: montarRetrospectiva({
+        posts,
+        agora,
+        semanaAgora: agoraG ? agoraG.weeks : null,
+        semanaHaSeteDias: antesG ? antesG.weeks : null,
+        emCuidado: false,
+      }),
+    };
+  });
+
 export const quemReagiuAoPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
