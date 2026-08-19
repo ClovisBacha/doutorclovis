@@ -53,12 +53,16 @@ for (const [rotulo, valor] of [
   ["Key ID", key],
 ]) {
   if (!/^[A-Z0-9]{10}$/.test(valor)) {
-    console.error(`${rotulo} inválido: "${valor}" — são 10 caracteres (letras maiúsculas e números).`);
+    console.error(
+      `${rotulo} inválido: "${valor}" — são 10 caracteres (letras maiúsculas e números).`,
+    );
     process.exit(1);
   }
 }
 if (!servico.includes(".")) {
-  console.error(`Services ID inválido: "${servico}" — é o identificador em pontos, ex.: br.com.obstetrica.web.`);
+  console.error(
+    `Services ID inválido: "${servico}" — é o identificador em pontos, ex.: br.com.obstetrica.web.`,
+  );
   process.exit(1);
 }
 
@@ -74,7 +78,8 @@ if (!chave.includes("BEGIN PRIVATE KEY")) {
   process.exit(1);
 }
 
-const b64u = (o) => Buffer.from(typeof o === "string" ? o : JSON.stringify(o)).toString("base64url");
+const b64u = (o) =>
+  Buffer.from(typeof o === "string" ? o : JSON.stringify(o)).toString("base64url");
 
 const agora = Math.floor(Date.now() / 1000);
 /* Seis meses menos um dia: a Apple RECUSA exatamente 15777000 s (6 meses) por
@@ -99,4 +104,6 @@ const assinatura = assinador.sign({ key: chave, dsaEncoding: "ieee-p1363" }).toS
 console.log("\n─── COLE ISTO NO SUPABASE (Authentication → Providers → Apple → Secret Key) ───\n");
 console.log(`${cabecalho}.${corpo}.${assinatura}`);
 console.log(`\n─── E NO CAMPO "Client IDs", COLE: ${servico}`);
-console.log(`\n⚠️  VENCE EM ${new Date(vence * 1000).toLocaleDateString("pt-BR")} — marque na agenda e rode este script de novo antes disso.\n`);
+console.log(
+  `\n⚠️  VENCE EM ${new Date(vence * 1000).toLocaleDateString("pt-BR")} — marque na agenda e rode este script de novo antes disso.\n`,
+);
