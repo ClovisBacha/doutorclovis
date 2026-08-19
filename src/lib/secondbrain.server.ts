@@ -21,6 +21,11 @@
  * com os recursos habilitados (enabled true).
  */
 
+/* ⚠️ As duas listas MORAM em `pergunta-clinica.ts`, e não aqui. A caixinha de
+   perguntas da rede social precisa das mesmas: uma segunda cópia divergiria no
+   primeiro conserto, e a divergência apareceria como pergunta clínica virando
+   post público. Uma lista, dois usos. */
+import { BANDEIRA_VERMELHA, TERMOS_CLINICOS } from "@/lib/pergunta-clinica";
 import {
   assembleBrainBlock,
   normalizeGapQuestion,
@@ -314,22 +319,6 @@ export function isSuporteDoApp(question: string): boolean {
  * Por isso o caminho enxuto exige DOIS sinais: fala de app E não fala de corpo.
  * Na dúvida, é clínica.
  */
-const TERMOS_CLINICOS = new RegExp(
-  comFronteira(
-    [
-      /* `dor` SEM fronteira casava dentro de "aDORei" — e "adorei o app!" ia
-         para o caminho clínico completo: embedding, busca vetorial e uma
-         unidade da cota do médico, por um elogio. */
-      "dor(?:es)?|sang(?:r|u)[0-9a-zà-ÿ]*|c(?:ó|o)lica[0-9a-zà-ÿ]*|contra(?:ç|c)[0-9a-zà-ÿ]*|enjo[0-9a-zà-ÿ]*|n(?:á|a)usea[0-9a-zà-ÿ]*|v(?:ô|o)mit[0-9a-zà-ÿ]*|tontur[0-9a-zà-ÿ]*",
-      "press(?:ã|a)o|glicem[0-9a-zà-ÿ]*|diabet[0-9a-zà-ÿ]*|incha[0-9a-zà-ÿ]*|edema|febre|corrim[0-9a-zà-ÿ]*|secre(?:ç|c)[0-9a-zà-ÿ]*",
-      "beb(?:ê|e)|feto|mex(?:e|i|eu|em|endo)|chute[0-9a-zà-ÿ]*|movimento[0-9a-zà-ÿ]*|barriga|(?:ú|u)tero|placenta|l(?:í|i)quido",
-      "exame[0-9a-zà-ÿ]*|ultrassom|ultrasso[0-9a-zà-ÿ]*|resultado[0-9a-zà-ÿ]*|hemogram[0-9a-zà-ÿ]*|urina|parto|ces(?:á|a)re[0-9a-zà-ÿ]*|amamenta[0-9a-zà-ÿ]*",
-      "rem(?:é|e)dio[0-9a-zà-ÿ]*|medicament[0-9a-zà-ÿ]*|comprimido[0-9a-zà-ÿ]*|dose|tomar|s(?:í|i)ntoma[0-9a-zà-ÿ]*|sinto|senti|semana[0-9a-zà-ÿ]*",
-    ].join("|"),
-  ),
-  "i",
-);
-
 /**
  * É pergunta de suporte PURA — cabe à plataforma, não ao médico.
  *
@@ -370,41 +359,6 @@ const NOME_DE_TELA = new RegExp(
 const QUEIXA_DE_ATENDIMENTO = new RegExp(
   "(?:ningu(?:é|e)m|n(?:ã|a)o|nunca)\\s+(?:me\\s+|nos\\s+)?(?:respond|atend|retorn)[0-9a-zà-ÿ]*" +
     `|${comFronteira("sem resposta|sem retorno|nenhuma resposta")}`,
-  "i",
-);
-
-/**
- * BANDEIRAS VERMELHAS — vencem qualquer outra regra, sempre.
- *
- * `TERMOS_CLINICOS` é uma allowlist, e allowlist de vocabulário clínico é uma
- * lista que nunca fica pronta. Medido: 61 de 85 termos comuns eram invisíveis
- * — inclusive `aborto`, `pré-eclâmpsia`, `convulsão`, `desmaio`, `visão
- * embaçada`, `trombose`, `bolsa rota` e `depressão`.
- *
- * O custo disso não é ruído na fila: `ehSoSuporte` troca o system prompt por um
- * bot instruído a NÃO COMENTAR SINTOMAS. "o aplicativo não funciona e eu quero
- * morrer" era classificado como suporte técnico.
- *
- * Esta lista existe para que a palavra que ninguém lembrou não vire incidente.
- * Ela é curta de propósito — só o que, aparecendo, torna a conversa clínica
- * independentemente de tudo mais que esteja escrito junto.
- */
-const BANDEIRA_VERMELHA = new RegExp(
-  comFronteira(
-    [
-      "sangra\\w*|sangrando|hemorragi\\w*|aborto|abortei|natimort\\w*",
-      "perdi (?:o|a|meu|minha) (?:beb(?:ê|e)|gesta(?:ç|c)(?:ã|a)o|gravidez|filh\\w*)|perda gestacional",
-      "convuls(?:ã|a)\\w*|desmai\\w*|desmaiei|apagu(?:ei|ou)|conv(?:ú|u)ls\\w*",
-      "pr(?:é|e)[- ]?ecl(?:â|a)mps\\w*|ecl(?:â|a)mps\\w*|press(?:ã|a)o (?:alta|nas alturas)",
-      "vis(?:ã|a)o (?:embaçada|emba(?:ç|c)ada|turva|escura)|vendo (?:pontos|estrelas)",
-      "falta de ar|n(?:ã|a)o (?:consigo|estou conseguindo) respirar|sufoca\\w*|dispnei\\w*",
-      "trombos\\w*|emboli\\w*|infart\\w*|avc|derrame",
-      "bolsa (?:rompeu|estourou|rota)|perdendo l(?:í|i)quido|contra(?:ç|c)(?:õ|o)es fortes",
-      "beb(?:ê|e) n(?:ã|a)o (?:mexe|est(?:á|a) mexendo)|parou de mexer|n(?:ã|a)o sinto o beb",
-      "quero morrer|me matar|me machucar|tirar minha vida|acabar com tudo|suic(?:í|i)d\\w*",
-      "febre alta|39 graus|40 graus|convulsion\\w*|n(?:ã|a)o para de vomitar",
-    ].join("|"),
-  ),
   "i",
 );
 
