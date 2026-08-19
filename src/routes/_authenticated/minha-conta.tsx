@@ -2175,48 +2175,60 @@ function MinhaContaPage() {
                   só está certa enquanto o hero for o primeiro filho em fluxo.
                   Pôr o banner depois dele resolve sem tocar na régua do céu, e
                   ainda o coloca no fundo claro, que é onde moram os cartões. */}
-              <AppHomeScreen
-                firstName={firstName}
-                babyName={profile?.baby_name ?? null}
-                gest={gest}
-                onNavigate={mobileNavigate}
-                onOpenMenu={() => setHomeMenu(true)}
-                medico={
-                  meuMedico
-                    ? {
-                        nome: meuMedico.nome,
-                        title: meuMedico.title,
-                        specialty: meuMedico.specialty,
-                        crm: meuMedico.crm,
-                      }
-                    : null
-                }
-                temNaoLidas={naoLidas > 0}
-                naoLidas={naoLidas}
-                /* O mascote leva DIRETO à central, sem passar pelo menu: ele
+              {/* ⚠️ **A TELA DO BEBÊ FICAVA FORA DE QUALQUER PROTEÇÃO.** O
+                  `TabErrorBoundary` só envolve o conteúdo das ABAS, e esta é a
+                  primeira dobra do app — a que toda paciente vê ao abrir, e a
+                  que mais depende de dado real (semana, perfil, médico,
+                  recados, clima). Um `undefined` inesperado ali derrubava a
+                  rota INTEIRA e virava "Algo deu errado" em cima do app, sem
+                  nenhum caminho de volta.
+                  Com o portão, o pior caso passa a ser um cartão quebrado
+                  dentro de um app que abre — e o erro fica LEGÍVEL, que é o que
+                  faltava para achar este defeito. */}
+              <TabErrorBoundary tabName="tela inicial">
+                <AppHomeScreen
+                  firstName={firstName}
+                  babyName={profile?.baby_name ?? null}
+                  gest={gest}
+                  onNavigate={mobileNavigate}
+                  onOpenMenu={() => setHomeMenu(true)}
+                  medico={
+                    meuMedico
+                      ? {
+                          nome: meuMedico.nome,
+                          title: meuMedico.title,
+                          specialty: meuMedico.specialty,
+                          crm: meuMedico.crm,
+                        }
+                      : null
+                  }
+                  temNaoLidas={naoLidas > 0}
+                  naoLidas={naoLidas}
+                  /* O mascote leva DIRETO à central, sem passar pelo menu: ele
                    acabou de anunciar o recado, e fazer a paciente procurá-lo
                    dentro da lista da conta desmentiria o anúncio. */
-                onOpenRecados={() => setNotifOpen(true)}
-                /* O chat saiu da barra de baixo e a bolha virou a porta dele.
+                  onOpenRecados={() => setNotifOpen(true)}
+                  /* O chat saiu da barra de baixo e a bolha virou a porta dele.
                    Nenhuma funcionalidade do chat mudou — só quem o abre. */
-                onOpenChat={() => goToTab("Chat IA")}
-                /* Durante o tutorial ele fala pelo cartão, não pelo canto.
+                  onOpenChat={() => goToTab("Chat IA")}
+                  /* Durante o tutorial ele fala pelo cartão, não pelo canto.
                    A MESMA condição que desenha o tutorial (`&& ehCelular`):
                    com só `tutorialAberto`, uma janela larga calava o mascote
                    por causa de um tutorial que não está na tela. */
-                mascoteCalado={tutorialAberto && ehCelular}
-                onOrigemLocal={setOrigemLocal}
-                babyTone={profile?.baby_skin_tone ?? 0}
-                careMode={careMode}
-                skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
-                /* Só entra na cadeia se as TRÊS partes existirem: nome sem
+                  mascoteCalado={tutorialAberto && ehCelular}
+                  onOrigemLocal={setOrigemLocal}
+                  babyTone={profile?.baby_skin_tone ?? 0}
+                  careMode={careMode}
+                  skyTheme={profile?.sky_theme === "v1" ? "v1" : "v2"}
+                  /* Só entra na cadeia se as TRÊS partes existirem: nome sem
                    coordenada não serve para consultar clima nenhum. */
-                homeCity={
-                  profile?.home_city && profile.home_lat != null && profile.home_lon != null
-                    ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
-                    : null
-                }
-              />
+                  homeCity={
+                    profile?.home_city && profile.home_lat != null && profile.home_lon != null
+                      ? { nome: profile.home_city, lat: profile.home_lat, lon: profile.home_lon }
+                      : null
+                  }
+                />
+              </TabErrorBoundary>
               {careMode && (
                 <div className="mt-4">
                   <CareModeBanner onExit={() => toggleCareMode(false)} onNavigate={goToTab} />
