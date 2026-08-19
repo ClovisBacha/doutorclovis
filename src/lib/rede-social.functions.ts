@@ -105,6 +105,13 @@ export type PostNaTela = {
   /** Fui EU a marcada aqui? É o que acende o "tirar minha marcação". */
   souMarcada: boolean;
   /**
+   * "Então e agora": os dois rótulos de semana, ou `null`.
+   *
+   * ⚠️ **Derivado na leitura**, e respeitando a chave `mostrar_semana` DE HOJE —
+   * ver `entao-e-agora.ts`. A primeira foto do carrossel é o "então".
+   */
+  comparacao: { antes: string; agora: string } | null;
+  /**
    * A pergunta anônima que este post responde, ou `null`.
    *
    * ⚠️ **Ela viaja com o POST, e não só na caixinha dela.** O post vai para o
@@ -370,7 +377,7 @@ async function perfisPorId(sb: any, ids: string[]) {
  */
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
-  "enquete_opcoes, aula, pergunta";
+  "enquete_opcoes, aula, pergunta, comparacao_de";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -405,6 +412,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     enquete_opcoes: null,
     aula: null,
     pergunta: null,
+    comparacao_de: null,
   }));
 }
 
@@ -738,6 +746,50 @@ async function montarPosts(
     ),
   ]);
 
+  /* ─── OS CARIMBOS DO "ENTÃO E AGORA" ───────────────────────────────────
+     ⚠️ Uma consulta só para todos os posts comparados da página, e não uma por
+     post: um feed de vinte comparações custaria vinte idas ao banco. */
+  const comparacoes = new Map<string, { antes: string; agora: string }>();
+  {
+    const comCompar = visiveis.filter((p) => p.comparacao_de);
+    if (comCompar.length) {
+      try {
+        const { data: antigos } = await sb
+          .from("rede_posts")
+          .select("id, criado_em")
+          .in("id", [...new Set(comCompar.map((p) => p.comparacao_de as string))]);
+        const quando = new Map(
+          ((antigos ?? []) as { id: string; criado_em: string }[]).map((x) => [x.id, x.criado_em]),
+        );
+        const { computeGestation } = await import("@/lib/gestacao");
+        const { carimboDaComparacao } = await import("@/lib/entao-e-agora");
+        for (const p of comCompar) {
+          const a = autores.get(p.autor_id);
+          const antes = quando.get(p.comparacao_de as string);
+          if (!a || !antes) continue;
+          const base = {
+            lmp: a.lmp_date ?? null,
+            referenceDate: a.reference_date ?? null,
+            referenceWeeks: a.reference_weeks ?? null,
+            referenceDays: a.reference_days ?? null,
+          };
+          const c = carimboDaComparacao({
+            /* ⚠️ A semana de CADA FOTO sai da mesma `computeGestation`, com o
+               `today` na data daquele post — nunca de uma subtração de semanas
+               entre as duas datas. A conta ingênua erra quem corrigiu a DUM. */
+            semanaAntes: computeGestation({ ...base, today: new Date(antes) })?.weeks ?? null,
+            semanaAgora: computeGestation({ ...base, today: new Date(p.criado_em) })?.weeks ?? null,
+            mostrarSemana: !!a.mostrar_semana,
+          });
+          if (c) comparacoes.set(p.id, c);
+        }
+      } catch {
+        /* Sem os carimbos, a comparação vira um carrossel comum de duas fotos —
+           que é exatamente o desfecho certo. */
+      }
+    }
+  }
+
   const { urlAssinada } = await import("@/lib/imagens.server");
   return Promise.all(
     visiveis.map(async (p) => {
@@ -765,6 +817,7 @@ async function montarPosts(
         reacoes: porPost.get(p.id) ?? {},
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
+        comparacao: comparacoes.get(p.id) ?? null,
         marcadas: marcadas.get(p.id) ?? [],
         souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
         salvo: salvos.has(p.id),
@@ -1370,6 +1423,15 @@ export const publicarPost = createServerFn({ method: "POST" })
          * embaixo de uma foto que ela nunca viu.
          */
         marcadas: z.array(z.string().uuid()).max(20).optional(),
+        /**
+         * "Então e agora": o id de uma publicação ANTERIOR DELA, cuja foto vira
+         * a PRIMEIRA do carrossel.
+         *
+         * ⚠️ **A foto antiga NÃO é reenviada** — o post novo aponta para o mesmo
+         * arquivo no balde. Reenviar duplicaria ~300 KB por comparação e criaria
+         * uma segunda cópia que a exclusão de conta teria de aprender a varrer.
+         */
+        comparacaoCom: z.string().uuid().optional(),
       })
       .parse(i),
   )
@@ -1423,6 +1485,31 @@ export const publicarPost = createServerFn({ method: "POST" })
       return { ok: false as const, motivo: "vazio" as const };
     }
 
+    /* ─── "ENTÃO E AGORA" ──────────────────────────────────────────────────
+       ⚠️ **O post antigo tem de ser DELA**, conferido no banco. Sem isso, um id
+       no corpo do pedido puxaria a foto de qualquer paciente da plataforma para
+       dentro do carrossel dela — e a foto apareceria no feed sem que a dona
+       soubesse.
+
+       ⚠️ **E a foto antiga NÃO é reenviada**: o post novo aponta para o MESMO
+       caminho no balde. */
+    let entao: string | null = null;
+    let fotoDoEntao: string | null = null;
+    if (data.comparacaoCom) {
+      const { data: velho } = await sb
+        .from("rede_posts")
+        .select("id, autor_id, imagem_path")
+        .eq("id", data.comparacaoCom)
+        .maybeSingle();
+      if (velho && (velho as any).autor_id === eu && (velho as any).imagem_path) {
+        entao = (velho as any).id as string;
+        fotoDoEntao = (velho as any).imagem_path as string;
+      }
+      /* Não achou, não é dela ou não tem foto: publica como post comum. Recusar
+         a publicação inteira por causa de um enfeite seria perder o texto que
+         ela escreveu. */
+    }
+
     let caminho: string | null = null;
     const extras: string[] = [];
     if (data.imagem) {
@@ -1441,6 +1528,14 @@ export const publicarPost = createServerFn({ method: "POST" })
         if (!c) return { ok: false as const, motivo: "imagem" as const };
         extras.push(c);
       }
+    }
+
+    /* ⚠️ O "ENTÃO" É A PRIMEIRA FOTO, e a de agora vem depois. A ordem é a
+       leitura: quem desliza vê o antes e então o depois. Invertida, o carrossel
+       conta a história ao contrário. */
+    if (fotoDoEntao && caminho) {
+      extras.unshift(caminho);
+      caminho = fotoDoEntao;
     }
 
     const { data: post, error } = await sb

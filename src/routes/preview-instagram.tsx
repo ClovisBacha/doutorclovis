@@ -83,6 +83,7 @@ export const Route = createFileRoute("/preview-instagram")({
     rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
     retro: q.retro == null ? "" : String(q.retro),
     voto: q.voto == null ? 0 : Number(q.voto),
+    comparar: q.comparar == null ? 1 : Number(q.comparar),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -182,6 +183,9 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
           ? [{ id: "eu", nome: "Você" }]
           : [],
   souMarcada: i === 3,
+  /* O post 2 (o carrossel de três) vira a comparação: é ele que prova os dois
+     carimbos sobre as duas primeiras fotos. */
+  comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
      apagado dos outros. Com todos apagados não haveria contraste. */
   salvo: i === 1,
@@ -232,6 +236,7 @@ function Bancada() {
     rascunho,
     retro,
     voto,
+    comparar,
     selo,
     trancado,
     carimbo,
@@ -314,6 +319,7 @@ function Bancada() {
   const [vendoQuemReagiu, setVendoQuemReagiu] = useState(false);
   const retroModo = retro;
   const jaVotouNoStory = voto === 1;
+  const semComparar = comparar === 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -593,6 +599,19 @@ function Bancada() {
              começado a escrever aqui" só apareceria depois de digitar, fechar e
              reabrir com sessão — e é justamente ela que precisa ser olhada.
              `?rascunho=0` mostra o compositor limpo, que é o caso comum. */
+          /* ⚠️ Sem a bancada, olhar o "então e agora" exigiria uma conta com uma
+             publicação de mais de quatro semanas atrás COM foto — ou seja, um
+             mês de espera. `?comparar=0` mostra o compositor sem a opção, que é
+             o caso de toda conta nova. */
+          paraComparar={
+            semComparar
+              ? []
+              : CORES.slice(0, 4).map((c, i) => ({
+                  id: `antigo${i}`,
+                  imagemUrl: foto(c[0], c[1], c[2]),
+                  criadoEm: atras(60 * 24 * (40 + i * 10)),
+                }))
+          }
           rascunho={
             comRascunho
               ? {
@@ -633,7 +652,8 @@ function Bancada() {
             alert(
               `publicaria: ${p.fotos.length} foto(s), ${p.visibilidade}, ` +
                 `enquete [${p.enquete.join(" | ")}], aula ${p.aula ? p.aula.tema : "—"}, ` +
-                `marcadas [${p.marcadas.join(", ")}]\n${p.texto ?? ""}`,
+                `marcadas [${p.marcadas.join(", ")}], entao ${p.comparacaoCom ?? "—"}` +
+                `\n${p.texto ?? ""}`,
             );
             return false; /* `false` mantém a tela aberta, para olhar de novo. */
           }}

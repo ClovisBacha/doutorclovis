@@ -334,6 +334,22 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
 -- ela publique.
 -- ═════════════════════════════════════════════════════════════════════════════
 -- ─────────────────────────────────────────────────────────────────────────────
+-- "ENTÃO E AGORA" (ago/2026 — ideia 2)
+--
+-- ⚠️ GUARDA SÓ QUAL POST É O "ENTÃO". As duas semanas são DERIVADAS na leitura,
+-- pela mesma razão do carimbo do story: texto guardado sobrevive à decisão dela.
+-- Uma paciente que desliga `mostrar_semana` (ou entra em Modo Cuidado) depois de
+-- publicar teria a semana pendurada numa coluna que o app não sabe mais apagar.
+--
+-- ⚠️ E `ON DELETE SET NULL`, nunca CASCADE: apagar a publicação ANTIGA não pode
+-- apagar a comparação — ela vira um carrossel comum de duas fotos, que é o
+-- desfecho certo. Com CASCADE, apagar um post de quatro meses atrás derrubaria
+-- silenciosamente o post de ontem.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.rede_posts
+  ADD COLUMN IF NOT EXISTS comparacao_de uuid REFERENCES public.rede_posts(id) ON DELETE SET NULL;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- MARCAR QUEM ESTAVA JUNTO (ago/2026 — ideia 10)
 --
 -- ⚠️ A marcação NÃO amplia a visibilidade do post. Um post `amigas` marcado

@@ -265,7 +265,16 @@ function CoracaoVazio() {
   );
 }
 
-function Carrossel({ urls, aoToqueDuplo }: { urls: string[]; aoToqueDuplo?: () => void }) {
+function Carrossel({
+  urls,
+  aoToqueDuplo,
+  comparacao,
+}: {
+  urls: string[];
+  aoToqueDuplo?: () => void;
+  /** "Então e agora": os rótulos das DUAS primeiras fotos. */
+  comparacao?: { antes: string; agora: string } | null;
+}) {
   const [i, setI] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
   /* Muda a cada toque duplo: é a CHAVE do elemento, e trocar a chave é o que
@@ -317,8 +326,17 @@ function Carrossel({ urls, aoToqueDuplo }: { urls: string[]; aoToqueDuplo?: () =
         style={{ aspectRatio: String(RAZAO_DO_POST) }}
       >
         {urls.map((u, n) => (
-          <div key={n} className="w-full shrink-0 snap-center overflow-hidden bg-muted/40">
+          <div key={n} className="relative w-full shrink-0 snap-center overflow-hidden bg-muted/40">
             <img src={u} alt="" className="h-full w-full object-cover" loading="lazy" />
+            {/* ⚠️ O carimbo pousa DENTRO da foto, e não numa faixa em volta:
+                quem salva a imagem para mandar no WhatsApp leva a semana junto,
+                que é metade do valor do formato. E só nas DUAS primeiras — as
+                demais do carrossel não fazem parte da comparação. */}
+            {comparacao && n <= 1 && (
+              <span className="absolute bottom-3 left-3 rounded-full bg-black/55 px-3 py-1.5 text-[15px] font-bold text-white backdrop-blur-sm">
+                {n === 0 ? comparacao.antes : comparacao.agora}
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -581,6 +599,7 @@ export const PostInstagram = memo(function PostInstagram({
       {post.imagemUrl && (
         <Carrossel
           urls={fotos}
+          comparacao={post.comparacao}
           /* ⚠️ O toque duplo SEMPRE dá coração, e nunca TIRA. É assim no modelo,
              e o motivo é o gesto: quem toca duas vezes está dizendo "gostei",
              não "mudei de ideia". Se ele alternasse, tocar duas vezes num post
@@ -2035,6 +2054,46 @@ export function RedeNoApp({
   }
 
   /**
+   * As publicações antigas dela que servem de "então".
+   *
+   * ⚠️ Sai dos posts DO PERFIL DELA que já estão carregados quando dá, e da
+   * rede quando não dá — mas sempre pela régua de `entao-e-agora.ts`, nunca por
+   * um filtro escrito aqui.
+   */
+  const [paraComparar, setParaComparar] = useState<
+    { id: string; imagemUrl: string; criadoEm: string }[] | null
+  >(null);
+
+  useEffect(() => {
+    if (onde.t !== "novo" || !euId || paraComparar !== null) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { verPerfil } = await import("@/lib/rede-social.functions");
+        const r = await verPerfil({ data: { accessToken: t, alvoId: euId } });
+        if (!vivo) return;
+        if (!r.ok) return setParaComparar([]);
+        const { candidatosAoEntao } = await import("@/lib/entao-e-agora");
+        setParaComparar(
+          candidatosAoEntao(
+            r.posts.map((p) => ({ id: p.id, criadoEm: p.criadoEm, imagemUrl: p.imagemUrl })),
+            new Date(),
+          )
+            .filter((c) => !!c.imagemUrl)
+            .map((c) => ({ id: c.id, imagemUrl: c.imagemUrl as string, criadoEm: c.criadoEm })),
+        );
+      } catch {
+        if (vivo) setParaComparar([]);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, euId, paraComparar]);
+
+  /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
    *
    * ⚠️ **Lido no ABRIR, e não a cada render**: o compositor reescreve o
@@ -2608,6 +2667,8 @@ export function RedeNoApp({
   async function publicar(p: {
     /** Quem estava junto — o servidor confere cada id. */
     marcadas: string[];
+    /** O post antigo que vira a primeira foto do "então e agora". */
+    comparacaoCom: string | null;
     texto: string | null;
     fotos: string[];
     visibilidade: Visibilidade;
@@ -2631,6 +2692,7 @@ export function RedeNoApp({
           enquete: p.enquete,
           aula: p.aula,
           marcadas: p.marcadas,
+          comparacaoCom: p.comparacaoCom ?? undefined,
         },
       });
       if (!r.ok) {
@@ -3104,6 +3166,7 @@ export function RedeNoApp({
         amigasParaMarcar={paraMarcar}
         rascunho={rascunho}
         aoMudarRascunho={guardarRascunho}
+        paraComparar={paraComparar}
         aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoPublicar={publicar}
         aulaDeHoje={aulaDeHoje}
@@ -4303,6 +4366,7 @@ export function NovoPost({
   amigasParaMarcar,
   rascunho,
   aoMudarRascunho,
+  paraComparar,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -4314,6 +4378,8 @@ export function NovoPost({
     aula: AulaNoPost | null;
     /** Os ids de quem estava junto. O servidor confere cada um. */
     marcadas: string[];
+    /** O post antigo que vira a primeira foto, ou `null`. */
+    comparacaoCom: string | null;
   }) => Promise<boolean>;
   /**
    * A aula que ela fez hoje, para anexar com um toque.
@@ -4350,10 +4416,19 @@ export function NovoPost({
   rascunho?: RascunhoDoPost | null;
   /** Guarda o que ela está escrevendo. Quem escreve no aparelho é a tela de cima. */
   aoMudarRascunho?: (r: Omit<RascunhoDoPost, "em"> | null) => void;
+  /**
+   * As publicações antigas dela que servem como "então".
+   *
+   * ⚠️ Só as com foto e com pelo menos quatro semanas — a régua e o porquê
+   * estão em `entao-e-agora.ts`. `null` = ainda carregando; `[]` = não há.
+   */
+  paraComparar?: { id: string; imagemUrl: string; criadoEm: string }[] | null;
 }) {
   const [texto, setTexto] = useState("");
   const [sugestoes, setSugestoes] = useState<string[] | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
+  /** O id do post antigo escolhido como "então", ou `null`. */
+  const [entao, setEntao] = useState<string | null>(null);
   const [escolhendoQuem, setEscolhendoQuem] = useState(false);
   /* A faixa "você tinha um rascunho". Some ao recuperar ou ao descartar — e
      `null` (o padrão) é "ainda não decidiu". */
@@ -4429,6 +4504,7 @@ export function NovoPost({
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
       marcadas,
+      comparacaoCom: entao,
     });
     setEnviando(false);
     if (ok) {
@@ -4664,6 +4740,49 @@ export function NovoPost({
                       </button>
                     );
                   })}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ─── ENTÃO E AGORA ───────────────────────────────────────────────
+            ⚠️ Só aparece quando ela TEM uma publicação antiga com foto — e só
+            faz sentido junto com a foto de HOJE, que é a segunda metade da
+            comparação. Um botão sem as duas pontas prometeria o que não pode
+            entregar. */}
+        {paraComparar && paraComparar.length > 0 && fotos.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEntao((v) => (v ? null : (paraComparar[0]?.id ?? null)))}
+              aria-pressed={!!entao}
+              className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+                entao ? "border-primary bg-primary/10" : "border-border"
+              }`}
+            >
+              ↔️ Então e agora
+            </button>
+
+            {entao && (
+              <div className="mt-2 rounded-2xl border border-border p-2">
+                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                  Escolha a foto de antes. As semanas entram sozinhas.
+                </p>
+                <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {paraComparar.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setEntao(c.id)}
+                      aria-pressed={entao === c.id}
+                      className={`press shrink-0 overflow-hidden rounded-xl border-2 ${
+                        entao === c.id ? "border-primary" : "border-transparent"
+                      }`}
+                    >
+                      <img src={c.imagemUrl} alt="" className="h-20 w-20 object-cover" />
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
