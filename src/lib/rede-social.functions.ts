@@ -2470,7 +2470,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           "story_id",
           linhas.map((l) => l.id),
         );
-      for (const v of ((vs ?? []) as { story_id: string; quem_id: string; opcao: number }[])) {
+      for (const v of (vs ?? []) as { story_id: string; quem_id: string; opcao: number }[]) {
         const atual = votosPorStory.get(v.story_id) ?? [0, 0, 0, 0];
         if (v.opcao >= 0 && v.opcao < atual.length) atual[v.opcao] += 1;
         votosPorStory.set(v.story_id, atual);
