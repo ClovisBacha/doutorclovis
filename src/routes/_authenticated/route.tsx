@@ -87,6 +87,36 @@ function esperarSessaoDaUrl(): Promise<boolean> {
   });
 }
 
+/**
+ * Há um token guardado no aparelho, mesmo que a sessão ainda não tenha
+ * respondido?
+ *
+ * ⚠️ **ISTO EXISTE PARA MATAR UM PINGUE-PONGUE QUE EU CRIEI.** `/auth` faz o
+ * caminho inverso: se acha sessão, devolve a pessoa para `/minha-conta`. Então
+ * um `getSession()` LENTO (token expirado, renovação em curso) produzia:
+ * portão estoura o prazo → `/auth` → `/auth` espera sem prazo e acha a sessão →
+ * `/minha-conta` → portão estoura de novo. A tela piscando entre login e app.
+ *
+ * O disco responde na hora e sem rede: se o token está lá, ela ESTÁ logada —
+ * só não deu tempo de renovar. Deixá-la entrar é o certo, e não afrouxa nada:
+ * a primeira chamada ao servidor com token velho é recusada por
+ * `pacienteDaSessao`, e a tela trata isso como sessão expirada.
+ */
+function temTokenNoAparelho(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const k = localStorage.key(i) ?? "";
+      /* O supabase-js guarda em `sb-<ref>-auth-token`. */
+      if (k.startsWith("sb-") && k.endsWith("-auth-token") && localStorage.getItem(k)) return true;
+    }
+    return false;
+  } catch {
+    /* Modo privado ou cota: não dá para saber, e o prazo já decidiu. */
+    return false;
+  }
+}
+
 async function temSessao(): Promise<boolean> {
   try {
     /* ⚠️ A corrida é obrigatória mesmo com `getSession()` sendo local: em iOS,
@@ -99,7 +129,11 @@ async function temSessao(): Promise<boolean> {
     ]);
     if (agora) return true;
     /* Acabou de voltar do Google/Apple? Dá o prazo para a sessão nascer. */
-    return urlTrazLogin() ? await esperarSessaoDaUrl() : false;
+    if (urlTrazLogin()) return await esperarSessaoDaUrl();
+    /* O prazo estourou, mas o token está no disco: ela está logada e a
+       renovação é que demorou. Entrar é melhor que piscar entre login e app —
+       ver `temTokenNoAparelho`. */
+    return temTokenNoAparelho();
   } catch {
     return false;
   }
