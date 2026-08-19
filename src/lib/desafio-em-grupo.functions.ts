@@ -182,7 +182,7 @@ export const meuDesafioDaSemana = createServerFn({ method: "POST" })
     ]);
 
     const meusDias = await diasFeitos(sb, eu, (d as any).inicio, (d as any).fim);
-    const quantas = await quantasFecharamNoDesafio(sb, (d as any));
+    const quantas = await quantasFecharamNoDesafio(sb, d as any);
 
     return {
       ok: true as const,
