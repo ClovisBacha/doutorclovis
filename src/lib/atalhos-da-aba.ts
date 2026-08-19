@@ -34,6 +34,8 @@ export type IconeDeAtalho =
   | "pessoa"
   | "grade"
   | "marcador"
+  /** O balão de fala — a caixinha de perguntas. */
+  | "balao"
   | "engrenagem";
 
 export type AtalhoDaAba = {

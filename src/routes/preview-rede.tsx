@@ -47,6 +47,7 @@ const PERFIL: PerfilNaTela = {
   possoAplicarOCodigo: false,
   mostrarSemana: true,
   mostrarBebe: true,
+  aceitaPerguntas: true,
   /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
   bebe: {
     emoji: "🍆",

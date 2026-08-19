@@ -535,6 +535,15 @@ function IconeDoAtalho({ nome }: { nome: IconeDeAtalho }) {
           <path d="M6 3.6h12c.6 0 1 .4 1 1v15.6l-7-4.4-7 4.4V4.6c0-.6.4-1 1-1z" />
         </svg>
       );
+    case "balao":
+      /* ⚠️ Desenhado, e não 💬: o emoji tem cor própria em cada sistema, e
+         numa fileira de traços monocromáticos ele sai como a única mancha
+         colorida. Mesma lição do 📞 preto do iOS na Central de Emergência. */
+      return (
+        <svg {...comum}>
+          <path d="M20 12.6c0 3.6-3.6 6.5-8 6.5-.9 0-1.8-.1-2.6-.3L4.6 20.4l1.3-3.4C4.7 15.8 4 14.3 4 12.6 4 9 7.6 6.1 12 6.1s8 2.9 8 6.5z" />
+        </svg>
+      );
     case "engrenagem":
       return (
         <svg {...comum}>

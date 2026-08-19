@@ -2440,6 +2440,12 @@ function MinhaContaPage() {
                     /* O desafio acontece no Caminho: sem esta porta, o cartão
                        convidaria para uma atividade sem dizer onde ela é. */
                     onIrParaOJogo={() => goToTab("Caminho")}
+                    /* ⚠️ A MESMA folha do SOS da barra de baixo, e não uma
+                       segunda: a triagem da caixinha de perguntas pode achar
+                       bandeira vermelha no que alguém escreveu, e o que ela tem
+                       a oferecer nesse caso é o caminho que avisa o médico e o
+                       contato de emergência com localização. */
+                    onAbrirSOS={() => setEmergencyOpen(true)}
                   />
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}

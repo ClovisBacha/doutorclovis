@@ -32,12 +32,24 @@ import { join } from "node:path";
  * chama é exatamente a que a paciente nunca alcança.
  */
 
-const FONTE = "src/lib/rede-social.functions.ts";
+/**
+ * ⚠️ **É uma LISTA, e ela cresce junto com a aba.** `caixinha.functions.ts`
+ * nasceu num módulo próprio para `rede-social.functions.ts` parar de crescer —
+ * e um módulo novo fora desta lista é exatamente o buraco que a catraca existe
+ * para fechar: cinco funções escritas, testadas e inalcançáveis, sem nada
+ * ficando vermelho.
+ */
+const FONTES = ["src/lib/rede-social.functions.ts", "src/lib/caixinha.functions.ts"];
 
 /** Onde o APP mora. Bancadas e testes ficam de fora — ver o cabeçalho. */
 const PASTAS = ["src/components", "src/routes", "src/lib"];
 
-function arquivosDoApp(): string[] {
+/** O nome de módulo que aparece num `import()` — `src/lib/x.functions.ts` → `x.functions`. */
+function moduloDe(fonte: string): string {
+  return fonte.replace(/^src\/lib\//, "").replace(/\.ts$/, "");
+}
+
+function arquivosDoApp(modulos: string[]): string[] {
   const out: string[] = [];
   const anda = (dir: string) => {
     for (const nome of readdirSync(dir)) {
@@ -49,14 +61,15 @@ function arquivosDoApp(): string[] {
       if (!/\.(ts|tsx)$/.test(nome)) continue;
       if (nome.endsWith(".test.ts") || nome.endsWith(".test.tsx")) continue;
       if (nome.startsWith("preview-")) continue;
-      if (p === FONTE) continue;
+      if (FONTES.includes(p)) continue;
       /* ⚠️ **Só os arquivos que IMPORTAM o módulo da rede.**
          Com o repositório inteiro, o teste passa por homonímia: `bloquear` não
          tinha porta nenhuma no app e passava mesmo assim, porque a palavra
          aparece em `bloquearPeriodo` (grade de horários do médico), em
          `entitlements.ts` e em meia dúzia de comentários em português. Nome de
          função é palavra comum; o que não é comum é o import. */
-      if (!readFileSync(p, "utf8").includes("rede-social.functions")) continue;
+      const src = readFileSync(p, "utf8");
+      if (!modulos.some((m) => src.includes(m))) continue;
       out.push(p);
     }
   };
@@ -77,13 +90,14 @@ function semComentarios(src: string): string {
 }
 
 function funcoesDeServidor(): string[] {
-  const src = readFileSync(FONTE, "utf8");
-  return [...src.matchAll(/export const (\w+) = createServerFn/g)].map((m) => m[1]);
+  return FONTES.flatMap((f) =>
+    [...readFileSync(f, "utf8").matchAll(/export const (\w+) = createServerFn/g)].map((m) => m[1]),
+  );
 }
 
 describe("toda função de servidor da rede tem porta no app", () => {
   const nomes = funcoesDeServidor();
-  const codigo = arquivosDoApp()
+  const codigo = arquivosDoApp(FONTES.map(moduloDe))
     .map((f) => semComentarios(readFileSync(f, "utf8")))
     .join("\n");
 

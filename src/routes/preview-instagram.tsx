@@ -49,11 +49,14 @@ import {
   TelaDePerfil,
   TelaDoPost,
   TelaDeAtividade,
+  TelaDaCaixinha,
   TelaPrincipal,
   VisorDeStory,
+  type PerguntaNaTela,
   type PessoaNaLista,
   type Story,
 } from "@/components/rede-instagram";
+import { triarTexto } from "@/lib/pergunta-clinica";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -77,6 +80,12 @@ export const Route = createFileRoute("/preview-instagram")({
     trancado: q.trancado == null ? false : !!q.trancado,
     carimbo: q.carimbo == null ? false : !!q.carimbo,
     desafio: q.desafio == null ? "" : String(q.desafio),
+    /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
+       padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
+       não a ausência dele. `?caixinha=0` fecha. */
+    caixinha: q.caixinha == null ? 1 : Number(q.caixinha),
+    /* Quantas perguntas a caixa da dona tem, em `?tela=caixinha`. */
+    perguntas: q.perguntas == null ? 3 : Number(q.perguntas),
   }),
 });
 
@@ -180,7 +189,8 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo, desafio } = Route.useSearch();
+  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo, desafio, caixinha, perguntas } =
+    Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
      de verdade propondo um desafio e uma paciente com o código dela. */
@@ -230,6 +240,10 @@ function Bancada() {
     possoAplicarOCodigo: !meu,
     mostrarSemana: selo === 1,
     mostrarBebe: selo === 1 || selo === 2,
+    /* ⚠️ Ligada por padrão, e só no perfil de OUTRA pessoa a caixinha desenha
+       — no meu, o que existe é a caixa cheia, que é tela própria. `?caixinha=0`
+       fecha, que é o estado em que o botão some. */
+    aceitaPerguntas: caixinha !== 0,
     /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
     bebe:
       selo === 1
@@ -476,6 +490,61 @@ function Bancada() {
     );
   }
 
+  if (tela === "caixinha") {
+    /* ⚠️ A caixa da DONA. Ela é impossível de olhar numa conta de verdade sem
+       uma segunda pessoa disposta a escrever — e é justamente por isso que uma
+       tela dessas atravessa meses sem ninguém ver. `?perguntas=0` mostra o
+       vazio, `?caixinha=0` mostra a caixa fechada. */
+    const daCaixa: PerguntaNaTela[] = [
+      {
+        id: "q1",
+        texto: "Como você escolheu o nome da Helena? 💛",
+        criadoEm: atras(40),
+        resposta: null,
+        postId: null,
+        denunciada: false,
+      },
+      {
+        id: "q2",
+        texto: "Qual foi a parte mais difícil pra você até agora?",
+        criadoEm: atras(60 * 5),
+        resposta: null,
+        postId: null,
+        denunciada: false,
+      },
+      {
+        id: "q3",
+        texto: "Vocês fizeram chá de bebê? Tô pensando em fazer",
+        criadoEm: atras(60 * 26),
+        resposta: "Fizemos sim! Foi pequenininho, só a família. Valeu muito a pena 🥹",
+        postId: "p1",
+        denunciada: false,
+      },
+    ].slice(0, Math.max(0, perguntas));
+
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDaCaixinha
+          perguntas={daCaixa}
+          aceita={caixinha !== 0}
+          aoVoltar={() => history.back()}
+          aoAlternarCaixa={(v) => alert(v ? "abriria a caixa" : "fecharia a caixa")}
+          /* ⚠️ A bancada devolve a RECUSA quando o texto pede conduta — é o
+             único jeito de fotografar o recado do servidor sem escrever no
+             banco, e é o estado que a tela existe para acertar. */
+          aoResponder={async (_id, resposta) =>
+            triarTexto(resposta) === "publicavel"
+              ? null
+              : "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela."
+          }
+          aoArquivar={() => alert("tiraria da caixa")}
+          aoDenunciar={(_id, b) => alert(b ? "denunciaria e bloquearia" : "denunciaria")}
+          aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
+        />
+      </div>
+    );
+  }
+
   if (tela === "busca") {
     return (
       <div className="mx-auto max-w-md py-2">
@@ -510,6 +579,11 @@ function Bancada() {
           /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
              bancada aprovaria a pílula sem o controle que é o ponto dela. */
           aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}
+          /* ⚠️ A triagem é a MESMA função do servidor, e não um `alert`: o que
+             a bancada precisa mostrar são os TRÊS desfechos, e inventá-los aqui
+             faria a tela ensaiar um roteiro que a régua não produz. */
+          aoPerguntar={async (t) => triarTexto(t)}
+          aoAbrirSOS={() => alert("abriria a Central de Emergência")}
         />
       ) : (
         <TelaPrincipal

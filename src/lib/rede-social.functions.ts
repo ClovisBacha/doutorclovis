@@ -152,6 +152,15 @@ export type PerfilNaTela = {
    * saia da semana precisa de chave própria.
    */
   bebe: BebeNoPerfil | null;
+  /**
+   * A caixinha de perguntas está aberta?
+   *
+   * ⚠️ Vale para QUALQUER pessoa que abra o perfil, e não só para a dona —
+   * diferente de `mostrarSemana`/`mostrarBebe`, que são as chaves dela. Aqui o
+   * campo não é uma configuração exposta: é o botão "mandar uma pergunta"
+   * existir ou não, e sem ele a visitante não teria como saber que pode.
+   */
+  aceitaPerguntas: boolean;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -237,7 +246,7 @@ const COLUNAS_DO_POST =
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
-  "baby_name, mostrar_semana, mostrar_bebe, " +
+  "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date";
 
 const COLUNAS_SEM_SELO =
@@ -636,6 +645,8 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
            parcial, então mandar uma não mexe na outra. */
         mostrarSemana: z.boolean().optional(),
         mostrarBebe: z.boolean().optional(),
+        /* A caixinha. Opcional como as outras duas — o update é parcial. */
+        aceitaPerguntas: z.boolean().optional(),
         bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
         nome: z.string().max(60).optional(),
         /** Data URL. O cliente já corta o quadrado e reduz para 512px. */
@@ -675,19 +686,46 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       }
     }
 
+    /* O que existe em qualquer banco. */
+    const antigas = {
+      ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),
+      ...(data.bio !== undefined ? { bio: data.bio } : {}),
+      ...(data.nome !== undefined && data.nome.trim() ? { display_name: data.nome.trim() } : {}),
+      ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
+    };
+    /* As chaves que nasceram num `APLICAR_` que o dono roda à mão. */
+    const novas = {
+      ...(data.mostrarSemana !== undefined ? { mostrar_semana: data.mostrarSemana } : {}),
+      ...(data.mostrarBebe !== undefined ? { mostrar_bebe: data.mostrarBebe } : {}),
+      ...(data.aceitaPerguntas !== undefined ? { aceita_perguntas: data.aceitaPerguntas } : {}),
+    };
+
     const { error } = await sb
       .from("patient_profiles")
-      .update({
-        ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),
-        ...(data.mostrarSemana !== undefined ? { mostrar_semana: data.mostrarSemana } : {}),
-        ...(data.mostrarBebe !== undefined ? { mostrar_bebe: data.mostrarBebe } : {}),
-        ...(data.bio !== undefined ? { bio: data.bio } : {}),
-        ...(data.nome !== undefined && data.nome.trim() ? { display_name: data.nome.trim() } : {}),
-        ...(avatarUrl !== undefined ? { avatar_url: avatarUrl } : {}),
-      })
+      .update({ ...antigas, ...novas })
       .eq("id", eu);
-    if (error) return { ok: false as const, motivo: "banco" as const };
-    return { ok: true as const };
+
+    /* ⚠️ **RECUO PARA BANCO SEM AS COLUNAS NOVAS**, a mesma família de
+       `perfisPorId` e `publicarPost` — e aqui ele faltava. O deploy chega antes
+       do SQL, e sem isto um `42703` numa coluna de CHAVE derrubava o
+       salvamento INTEIRO: ela trocava a foto, mudava a bio, tocava em salvar e
+       recebia "não foi possível", sem nada na tela dizendo que o que quebrou
+       foi um interruptor que ela nem mexeu.
+
+       O recuo grava o que dá e devolve `ok`. ⚠️ Com `parcial: true`, para a
+       tela não afirmar que o interruptor pegou: um botão que volta ao estado
+       anterior é ruim, um botão que diz "salvo" e não salvou é pior. */
+    if (error) {
+      if (Object.keys(antigas).length === 0) {
+        console.warn("[rede] chaves do perfil sem coluna — rode APLICAR_REDE_SOCIAL.sql");
+        return { ok: false as const, motivo: "banco" as const };
+      }
+      const { error: erro2 } = await sb.from("patient_profiles").update(antigas).eq("id", eu);
+      if (erro2) return { ok: false as const, motivo: "banco" as const };
+      console.warn("[rede] chaves do perfil sem coluna — rode APLICAR_REDE_SOCIAL.sql");
+      return { ok: true as const, parcial: true as const };
+    }
+    return { ok: true as const, parcial: false as const };
   });
 
 /** O perfil de outra pessoa, com os posts que eu posso ver. */
@@ -847,6 +885,10 @@ export const verPerfil = createServerFn({ method: "POST" })
       mostrarSemana: !persona && data.alvoId === eu ? !!a.mostrar_semana : false,
       mostrarBebe: !persona && data.alvoId === eu ? !!a.mostrar_bebe : false,
       bebe,
+      /* ⚠️ Sob a PRÉVIA ele continua verdadeiro: a caixinha é exatamente o que
+         uma visitante vê, e escondê-la do espelho faria a prévia mentir sobre
+         a única porta que estranhos têm para escrever para ela. */
+      aceitaPerguntas: !!a.aceita_perguntas,
     };
 
     return { ok: true as const, perfil, posts: ordenarFeed(posts) };

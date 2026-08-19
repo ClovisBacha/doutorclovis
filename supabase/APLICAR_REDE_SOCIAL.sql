@@ -573,6 +573,84 @@ COMMENT ON TABLE public.desafio_participantes IS
   'CONSENTIMENTO, não contagem: a paciente entra e pode sair. Agrupar por '
   'ref_code recriaria o grupo compulsório que o código existe para não criar.';
 
+-- ═════════════════════════════════════════════════════════════════════════════
+-- FASE 6 · A CAIXINHA DE PERGUNTAS
+--
+-- ⚠️ É A FUNÇÃO MAIS ARRISCADA DA ABA, e a razão é a mesma que fechou os
+-- comentários: de 1.098 respostas com conselho em fóruns de gestação, 20,9%
+-- estavam erradas e 5,5% eram potencialmente danosas. A diferença é que aqui o
+-- texto perigoso é a RESPOSTA — quem responde é a paciente, e ela responde para
+-- todo mundo de uma vez.
+--
+-- O que segura isso não é uma tabela, é a régua (`src/lib/pergunta-clinica.ts`)
+-- rodando nos DOIS textos. O que a tabela guarda é o resto: quem perguntou (que
+-- a tela NUNCA vê), o desfecho da triagem, e o teto diário.
+-- ═════════════════════════════════════════════════════════════════════════════
+
+-- ⚠️ OPT-IN, e o padrão é NÃO. Uma caixa anônima aberta por omissão numa base
+-- de gestantes de alto risco é um canal de assédio que ninguém pediu. É a mesma
+-- decisão de `perfil_publico`, `mostrar_semana` e `mostrar_bebe`: o erro
+-- possível é a caixa não existir para quem a queria, nunca existir para quem
+-- não a queria.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS aceita_perguntas boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS public.rede_perguntas (
+  id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- De quem é a caixa (quem responde).
+  dona_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  -- ⚠️ QUEM PERGUNTOU. Guardado SEMPRE e devolvido à tela NUNCA.
+  --
+  -- A caixa é anônima para a dona — é isso que faz alguém perguntar. Mas sem
+  -- esta coluna não haveria como: rotear a pergunta clínica para o médico DE
+  -- QUEM PERGUNTOU, aplicar o teto diário, recusar quem foi bloqueada, e
+  -- bloquear a partir de uma pergunta. Anonimato na TELA, nunca no banco.
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  texto     text NOT NULL,
+  -- O que a régua decidiu: 'publicavel' | 'clinica' | 'emergencia'. Guardado
+  -- para a auditoria conseguir responder "quantas viraram caso clínico?" sem
+  -- reprocessar texto de paciente.
+  desfecho  text NOT NULL DEFAULT 'publicavel'
+            CHECK (desfecho IN ('publicavel','clinica','emergencia')),
+  -- A resposta dela. Passa pela MESMA régua antes de existir.
+  resposta  text,
+  -- O post que a resposta virou, quando virou.
+  post_id   uuid REFERENCES public.rede_posts ON DELETE SET NULL,
+  criado_em      timestamptz NOT NULL DEFAULT now(),
+  respondido_em  timestamptz,
+  -- Arquivar MARCA, nunca apaga: a denúncia precisa da linha, e apagar faria
+  -- "nunca perguntou" e "perguntou e eu escondi" serem a mesma ausência.
+  arquivado_em   timestamptz,
+  denunciado_em  timestamptz,
+  CONSTRAINT nao_pergunta_a_si_mesma CHECK (dona_id <> quem_id)
+);
+
+-- A caixa dela, e o teto diário de quem pergunta.
+CREATE INDEX IF NOT EXISTS rede_perguntas_caixa
+  ON public.rede_perguntas (dona_id, criado_em DESC);
+CREATE INDEX IF NOT EXISTS rede_perguntas_de_quem
+  ON public.rede_perguntas (quem_id, criado_em DESC);
+
+ALTER TABLE public.rede_perguntas ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ NENHUMA policy para `authenticated`, e aqui isso é mais importante que
+-- nas outras tabelas: uma policy de LINHA (`auth.uid() = dona_id`) daria à dona
+-- a linha INTEIRA — com `quem_id` dentro. RLS não esconde coluna. A leitura
+-- passa pelo servidor, que devolve a pergunta sem o autor.
+DROP POLICY IF EXISTS "Service manages rede_perguntas" ON public.rede_perguntas;
+CREATE POLICY "Service manages rede_perguntas" ON public.rede_perguntas
+  FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role');
+
+COMMENT ON COLUMN public.rede_perguntas.quem_id IS
+  'Anonimato na TELA, nunca no banco: sem esta coluna não há roteamento '
+  'clínico, teto diário, bloqueio nem denúncia. O servidor jamais a devolve.';
+
+-- A pergunta que a resposta responde. ⚠️ Guardada no POST e não só na linha da
+-- pergunta: o post viaja pelo feed inteiro, e ler a resposta sem a pergunta
+-- entregaria um texto solto que ninguém entende.
+ALTER TABLE public.rede_posts
+  ADD COLUMN IF NOT EXISTS pergunta text;
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- CONFERÊNCIA. Todas as linhas têm que voltar `true`.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -613,4 +691,10 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
           WHERE table_schema='public' AND table_name='desafios_em_grupo')            AS desafio_ok,
   EXISTS (SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='desafio_participantes')        AS participantes_ok;
+          WHERE table_schema='public' AND table_name='desafio_participantes')        AS participantes_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='patient_profiles' AND column_name='aceita_perguntas')    AS caixinha_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_perguntas')               AS perguntas_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='pergunta')                  AS resposta_ok;

@@ -66,6 +66,11 @@ import {
   type TipoDeReacao,
   type Visibilidade,
 } from "@/lib/rede-social";
+import {
+  LIMITE_DA_PERGUNTA,
+  recadoDoDesfecho,
+  type DesfechoDaPergunta,
+} from "@/lib/pergunta-clinica";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import type {
   AtividadeNaTela,
@@ -820,6 +825,134 @@ function Numero({ valor, rotulo }: { valor: number; rotulo: string }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   A CAIXINHA — o lado de quem PERGUNTA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O campo que vive no perfil de quem abriu a caixa.
+ *
+ * ⚠️ **Três estados, e o terceiro não é um aviso — é uma porta.** Bandeira
+ * vermelha não devolve "não posso responder isso": devolve o botão do SOS, que
+ * avisa o médico e o contato de emergência dela com localização. Uma tela que
+ * apenas recusasse deixaria quem escreveu "estou sangrando" sozinha, olhando um
+ * texto de erro.
+ */
+export function CaixinhaNoPerfil({
+  nome,
+  aoPerguntar,
+  aoAbrirSOS,
+  inerte = false,
+}: {
+  nome: string;
+  aoPerguntar?: (texto: string) => Promise<DesfechoDaPergunta | null>;
+  aoAbrirSOS?: () => void;
+  inerte?: boolean;
+}) {
+  const [aberta, setAberta] = useState(false);
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [desfecho, setDesfecho] = useState<DesfechoDaPergunta | null>(null);
+
+  const primeiroNome = nome.trim().split(/\s+/)[0] || nome;
+
+  if (!aberta) {
+    return (
+      <button
+        type="button"
+        onClick={() => !inerte && setAberta(true)}
+        className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+      >
+        💬 Mandar uma pergunta
+      </button>
+    );
+  }
+
+  if (desfecho) {
+    return (
+      <div className="mt-2 rounded-xl bg-muted/50 p-3">
+        <p className="text-[13px] leading-snug">{recadoDoDesfecho(desfecho)}</p>
+        {desfecho === "emergencia" && aoAbrirSOS && (
+          <button
+            type="button"
+            onClick={aoAbrirSOS}
+            className="press mt-2.5 w-full rounded-xl bg-destructive py-2 text-[14px] font-semibold text-destructive-foreground"
+          >
+            Abrir a Central de Emergência
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setDesfecho(null);
+            setTexto("");
+            setAberta(false);
+          }}
+          className="press mt-2 w-full rounded-xl border border-border py-1.5 text-[13px]"
+        >
+          Fechar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2 rounded-xl bg-muted/50 p-3">
+      <label htmlFor="dc-pergunta" className="text-[13px] font-semibold">
+        Perguntar para {primeiroNome}
+      </label>
+      {/* ⚠️ A tela DIZ que é anônima, e diz também o limite. As duas frases
+          existem por razões opostas: sem a primeira ninguém pergunta, e sem a
+          segunda a caixinha vira o lugar onde se pede conduta médica a uma
+          leiga — que é o que fechou os comentários deste app. */}
+      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+        Ela não vê quem perguntou. Para dúvidas do seu corpo, quem responde é o seu médico — mande
+        por aqui mesmo que eu levo até ele.
+      </p>
+      <textarea
+        id="dc-pergunta"
+        value={texto}
+        onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DA_PERGUNTA))}
+        rows={3}
+        placeholder="Sua pergunta…"
+        className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
+      />
+      <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+        {texto.length}/{LIMITE_DA_PERGUNTA}
+      </div>
+      <div className="mt-1.5 flex gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            setAberta(false);
+            setTexto("");
+          }}
+          className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+        >
+          Agora não
+        </button>
+        <button
+          type="button"
+          disabled={!texto.trim() || enviando || inerte || !aoPerguntar}
+          onClick={async () => {
+            if (!aoPerguntar) return;
+            setEnviando(true);
+            const d = await aoPerguntar(texto.trim());
+            setEnviando(false);
+            /* `null` é falha de envio: o `toast` do chamador já contou, e
+               manter o texto no campo é o que permite tentar de novo sem
+               reescrever. */
+            if (d) setDesfecho(d);
+          }}
+          className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {enviando ? "Enviando…" : "Enviar"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function TelaDePerfil({
   perfil,
   posts,
@@ -832,6 +965,8 @@ export function TelaDePerfil({
   aoBloquear,
   aoAbrirEspelho,
   aoAplicarCodigo,
+  aoPerguntar,
+  aoAbrirSOS,
   somenteLeitura = false,
 }: {
   perfil: PerfilNaTela;
@@ -859,6 +994,17 @@ export function TelaDePerfil({
   /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
   aoAplicarCodigo?: (codigo: string) => void;
   /**
+   * Manda uma pergunta para a caixinha dela. Devolve o desfecho da triagem, ou
+   * `null` quando não deu para enviar.
+   *
+   * ⚠️ **Quem tria é o SERVIDOR**, e a tela só desenha o que ele respondeu. Uma
+   * segunda régua aqui diria "mandei para o seu médico" sobre um texto que o
+   * servidor publicou — ou pior, publicaria um que ele teria roteado.
+   */
+  aoPerguntar?: (texto: string) => Promise<DesfechoDaPergunta | null>;
+  /** A Central de Emergência, para quando a triagem achar bandeira vermelha. */
+  aoAbrirSOS?: () => void;
+  /**
    * O ESPELHO: a tela desenha, e nada nela age.
    *
    * ⚠️ **O desligamento é feito AQUI, num lugar só, e não pelo chamador.** A
@@ -882,6 +1028,7 @@ export function TelaDePerfil({
   const abrirLista = agir(aoAbrirLista);
   const abrirSalvos = agir(aoAbrirSalvos);
   const bloquear = agir(aoBloquear);
+  const perguntar = agir(aoPerguntar);
 
   /* Só os POSTS aparecem na grade; o "Do bebê" é a aba própria. */
   const naGrade = aba === "grade" ? posts : [];
@@ -1101,6 +1248,19 @@ export function TelaDePerfil({
           {rotuloDoBotao}
         </button>
 
+        {/* ⚠️ A caixinha aparece a QUEM VISITA, nunca à dona — no perfil dela o
+            que existe é a caixa cheia, que mora no hub. E ela nasce do campo
+            que o servidor devolve: um botão desenhado por conta própria
+            prometeria uma caixa fechada. */}
+        {perfil.aceitaPerguntas && !perfil.souEu && (
+          <CaixinhaNoPerfil
+            nome={perfil.nome}
+            aoPerguntar={perguntar}
+            aoAbrirSOS={aoAbrirSOS}
+            inerte={somenteLeitura}
+          />
+        )}
+
         {/* ⚠️ O espelho vive no PRÓPRIO perfil, e não numa tela de ajustes: a
             pergunta que ele responde ("o que os outros veem?") só ocorre a
             alguém que está olhando o próprio perfil. Escondido nos ajustes,
@@ -1217,16 +1377,28 @@ type Onde =
   | { t: "atividade" }
   | { t: "salvos" }
   | { t: "busca" }
+  | { t: "caixinha" }
   | { t: "espelho" };
 
 export function RedeNoApp({
   careMode = false,
   onAbrirSecoes,
   onIrParaOJogo,
+  onAbrirSOS,
   aulaDeHoje,
 }: {
   careMode?: boolean;
   onAbrirSecoes?: () => void;
+  /**
+   * A Central de Emergência.
+   *
+   * ⚠️ **PROP, e não um evento global.** Quem governa a folha do SOS é
+   * `minha-conta`, e um `CustomEvent` criaria um segundo dono para o mesmo
+   * estado — o defeito que este app já pagou com `voltarDaBarra` e com o passo
+   * do tutorial. Sem a prop, a bandeira vermelha ainda mostra o recado; o que
+   * some é o botão.
+   */
+  onAbrirSOS?: () => void;
   /** Leva ao Caminho — é lá que a atividade do desafio acontece. */
   onIrParaOJogo?: () => void;
   /**
@@ -1254,6 +1426,12 @@ export function RedeNoApp({
   /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
   const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
   const [desafio, setDesafio] = useState<DesafioNaTela | null>(null);
+  /* A caixinha: as perguntas dela e a chave. `naCaixa` alimenta o emblema da
+     bolinha, e por isso é carregado JUNTO com o feed — um número que só
+     chegasse ao abrir a caixa nasceria sempre zerado, e ninguém abriria. */
+  const [perguntasDaCaixa, setPerguntasDaCaixa] = useState<PerguntaNaTela[]>([]);
+  const [caixaAberta, setCaixaAberta] = useState(false);
+  const [naCaixa, setNaCaixa] = useState(0);
   const [previa, setPrevia] = useState<{
     perfil: PerfilNaTela | null;
     posts: PostNaTela[];
@@ -1308,11 +1486,125 @@ export function RedeNoApp({
         setNaoVistas(at.novas);
       }
       void carregarDesafio();
+      void carregarCaixinha();
     } catch {
       /* Feed vazio é melhor que erro: ela não veio buscar um erro. */
     } finally {
       setCarregando(false);
     }
+  }
+
+  /**
+   * A CAIXINHA.
+   *
+   * ⚠️ Carregada JUNTO com o feed pelo mesmo motivo da atividade: o emblema é o
+   * que faz alguém abrir. Buscando só na abertura da caixa, a bolinha nasceria
+   * sempre sem número e a caixa só seria aberta por acaso — que é como uma
+   * pergunta fica dias sem resposta numa caixa cujo dono não sabe que ela tem
+   * algo dentro.
+   */
+  async function carregarCaixinha() {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { minhaCaixinha } = await import("@/lib/caixinha.functions");
+      const r = await minhaCaixinha({ data: { accessToken: t } });
+      if (!r.ok) return;
+      setPerguntasDaCaixa(r.perguntas);
+      setCaixaAberta(r.aceita);
+      setNaCaixa(r.novas);
+    } catch {
+      /* Sem a caixa ela perde a caixa, não a aba. */
+    }
+  }
+
+  async function alternarCaixa(aberta: boolean) {
+    const t = await token();
+    if (!t) return;
+    const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
+    const r = await salvarPerfilSocial({ data: { accessToken: t, aceitaPerguntas: aberta } });
+    if (!r.ok) {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para mudar agora. Tente de novo.");
+      return;
+    }
+    setCaixaAberta(aberta);
+  }
+
+  /**
+   * Perguntar para outra pessoa.
+   *
+   * ⚠️ **Devolve o desfecho do SERVIDOR, cru.** A tela desenha o recado a
+   * partir dele; decidir aqui qual das três coisas aconteceu seria uma segunda
+   * régua clínica no navegador, e ela discordaria da primeira no dia em que uma
+   * das listas mudasse.
+   */
+  async function perguntarPara(donaId: string, texto: string): Promise<DesfechoDaPergunta | null> {
+    try {
+      const t = await token();
+      if (!t) return null;
+      const { perguntar } = await import("@/lib/caixinha.functions");
+      const r = await perguntar({ data: { accessToken: t, donaId, texto } });
+      if (!r.ok) {
+        const { toast } = await import("sonner");
+        toast.error(
+          r.motivo === "teto"
+            ? "Você já mandou bastante pergunta hoje. Amanhã dá de novo 💛"
+            : "Não deu para enviar agora. Tente de novo.",
+        );
+        return null;
+      }
+      return r.desfecho;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Responder. `null` = publicou; string = a recusa, com o recado do servidor. */
+  async function responderDaCaixa(
+    id: string,
+    resposta: string,
+    visibilidade: Visibilidade,
+  ): Promise<string | null> {
+    try {
+      const t = await token();
+      if (!t) return "Sua sessão expirou. Entre de novo.";
+      const { responderPergunta } = await import("@/lib/caixinha.functions");
+      const r = await responderPergunta({
+        data: { accessToken: t, perguntaId: id, resposta, visibilidade },
+      });
+      if (!r.ok) {
+        return ("recado" in r && r.recado) || "Não deu para publicar agora. Tente de novo.";
+      }
+      /* A caixa e o FEED, os dois: a resposta virou post, e não vê-lo aparecer
+         faria ela publicar de novo. */
+      await carregarCaixinha();
+      void carregarFeed();
+      return null;
+    } catch {
+      return "Não deu para publicar agora. Tente de novo.";
+    }
+  }
+
+  async function arquivarDaCaixa(id: string) {
+    const t = await token();
+    if (!t) return;
+    const { arquivarPergunta } = await import("@/lib/caixinha.functions");
+    const r = await arquivarPergunta({ data: { accessToken: t, perguntaId: id } });
+    if (r.ok) await carregarCaixinha();
+  }
+
+  async function denunciarDaCaixa(id: string, bloquear: boolean) {
+    const t = await token();
+    if (!t) return;
+    const { denunciarPergunta } = await import("@/lib/caixinha.functions");
+    const r = await denunciarPergunta({ data: { accessToken: t, perguntaId: id, bloquear } });
+    const { toast } = await import("sonner");
+    /* ⚠️ O aviso NUNCA nomeia ninguém — a caixa é anônima, e um "bloqueamos
+       Fulana" aqui devolveria por texto o que o servidor recusou por campo. */
+    if (r.ok) toast.success(bloquear ? "Denunciada e bloqueada." : "Denunciada.");
+    else toast.error("Não deu para concluir agora. Tente de novo.");
+    await carregarCaixinha();
   }
 
   useEffect(() => {
@@ -1905,6 +2197,17 @@ export function RedeNoApp({
         },
       },
       { id: "salvos", rotulo: "Salvos", icone: "marcador", aoTocar: () => void abrirSalvos() },
+      {
+        id: "caixinha",
+        rotulo: "Caixinha",
+        icone: "balao",
+        /* ⚠️ O emblema conta as SEM RESPOSTA, e não o total: uma caixa com
+           quarenta perguntas já respondidas diria "40" para sempre, e o número
+           deixaria de significar trabalho. Mesma régua do contador da fita do
+           painel. */
+        emblema: naCaixa,
+        aoTocar: () => setOnde({ t: "caixinha" }),
+      },
       ...(onAbrirSecoes
         ? [
             {
@@ -1918,7 +2221,7 @@ export function RedeNoApp({
     ];
     return publicarAtalhos("comunidade", atalhos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [careMode, onde.t, naoVistas, euId, onAbrirSecoes]);
+  }, [careMode, onde.t, naoVistas, naCaixa, euId, onAbrirSecoes]);
 
   if (careMode) return null;
 
@@ -1993,6 +2296,21 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "caixinha") {
+    return (
+      <TelaDaCaixinha
+        perguntas={perguntasDaCaixa}
+        aceita={caixaAberta}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAlternarCaixa={(v) => void alternarCaixa(v)}
+        aoResponder={responderDaCaixa}
+        aoArquivar={(id) => void arquivarDaCaixa(id)}
+        aoDenunciar={(id, b) => void denunciarDaCaixa(id, b)}
+        aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
   if (onde.t === "atividade") {
     return (
       <TelaDeAtividade
@@ -2060,6 +2378,12 @@ export function RedeNoApp({
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
         aoAplicarCodigo={aplicarCodigo}
+        aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
+        /* ⚠️ Bandeira vermelha abre a Central de Emergência — a MESMA que a
+           barra de baixo abre, e nunca uma tela nova. Ela avisa o médico e o
+           contato dela com localização; um segundo caminho para "socorro"
+           divergiria dela no primeiro conserto. */
+        aoAbrirSOS={onAbrirSOS}
       />
     );
   }
@@ -3545,5 +3869,335 @@ export function CartaoDoDesafio({
         )
       )}
     </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A CAIXINHA — o lado de quem RESPONDE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type PerguntaNaTela = {
+  id: string;
+  texto: string;
+  criadoEm: string;
+  resposta: string | null;
+  postId: string | null;
+  denunciada: boolean;
+};
+
+/**
+ * A caixa dela.
+ *
+ * ⚠️ **Nenhuma linha tem rosto, nome ou inicial** — e isso não é economia de
+ * layout: é o recurso. A caixa ser anônima é o que faz alguém perguntar, e
+ * qualquer pista de identidade aqui (uma inicial, uma cor derivada do id, um
+ * "há 2 minutos" ao lado de quem acabou de seguir) devolve por dedução o que o
+ * servidor recusou devolver por campo.
+ *
+ * ⚠️ **E a hora é GROSSA de propósito** (`haQuantoPublicou`, que passa a data
+ * cheia depois de quatro semanas). Um carimbo de minuto exato numa caixa
+ * anônima é o suficiente para cruzar com quem estava online.
+ */
+export function TelaDaCaixinha({
+  perguntas,
+  aceita,
+  aoVoltar,
+  aoAlternarCaixa,
+  aoResponder,
+  aoArquivar,
+  aoDenunciar,
+  aoAbrirPost,
+}: {
+  perguntas: PerguntaNaTela[];
+  aceita: boolean;
+  aoVoltar?: () => void;
+  aoAlternarCaixa?: (aberta: boolean) => void;
+  /** Devolve o recado do servidor quando a resposta é recusada, ou `null`. */
+  aoResponder?: (id: string, resposta: string, v: Visibilidade) => Promise<string | null>;
+  aoArquivar?: (id: string) => void;
+  aoDenunciar?: (id: string, bloquear: boolean) => void;
+  aoAbrirPost?: (postId: string) => void;
+}) {
+  const [respondendo, setRespondendo] = useState<string | null>(null);
+  const [texto, setTexto] = useState("");
+  const [visibilidade, setVisibilidade] = useState<Visibilidade>("seguidores");
+  const [recado, setRecado] = useState<string | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const [menu, setMenu] = useState<string | null>(null);
+  const [denunciando, setDenunciando] = useState<string | null>(null);
+
+  const semResposta = perguntas.filter((p) => !p.resposta);
+  const respondidas = perguntas.filter((p) => p.resposta);
+
+  function fecharComposicao() {
+    setRespondendo(null);
+    setTexto("");
+    setRecado(null);
+  }
+
+  return (
+    <div className="pb-10">
+      <header className="flex h-11 items-center gap-2 px-4">
+        {aoVoltar && (
+          <button
+            type="button"
+            onClick={aoVoltar}
+            aria-label="Voltar"
+            className="press -ml-1 text-xl leading-none"
+          >
+            ‹
+          </button>
+        )}
+        <h1 className="min-w-0 flex-1 truncate text-[16px] font-semibold">Caixinha de perguntas</h1>
+      </header>
+
+      {/* ⚠️ O interruptor mora AQUI, e não numa tela de ajustes: quem quer
+          fechar a caixa está olhando para o que chegou nela. */}
+      <div className="mx-4 mt-1 rounded-2xl border border-border p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[14px] font-semibold">Aceitar perguntas</p>
+            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+              Quem abre o seu perfil pode te mandar uma pergunta sem se identificar. Você responde
+              quando quiser — e a resposta vira uma publicação sua.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={aceita}
+            aria-label="Aceitar perguntas"
+            onClick={() => aoAlternarCaixa?.(!aceita)}
+            className={`press mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
+              aceita ? "bg-primary" : "bg-muted-foreground/30"
+            }`}
+          >
+            <span
+              className={`block h-5 w-5 rounded-full bg-background transition-transform ${
+                aceita ? "translate-x-[22px]" : "translate-x-[2px]"
+              }`}
+            />
+          </button>
+        </div>
+        {/* ⚠️ Fechar a caixa NÃO apaga o que já chegou, e a tela diz isso: sem
+            a frase, quem fecha acha que perdeu as perguntas e não fecha. */}
+        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+          Fechando, ninguém manda perguntas novas — as que já chegaram continuam aqui.
+        </p>
+      </div>
+
+      {perguntas.length === 0 && (
+        <p className="mx-4 mt-6 text-center text-[13px] leading-snug text-muted-foreground">
+          {aceita
+            ? "Nenhuma pergunta ainda. Ela aparece aqui assim que alguém escrever."
+            : "A caixinha está fechada. Ligue acima para começar a receber."}
+        </p>
+      )}
+
+      {semResposta.length > 0 && (
+        <>
+          <h2 className="mx-4 mt-5 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Sem resposta
+          </h2>
+          <ul className="mt-1.5 flex flex-col gap-2 px-4">
+            {semResposta.map((p) => (
+              <li key={p.id} className="rounded-2xl border border-border p-3">
+                <p className="whitespace-pre-wrap text-[14px] leading-snug">{p.texto}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {haQuantoPublicou(p.criadoEm, Date.now())}
+                </p>
+
+                {respondendo === p.id ? (
+                  <div className="mt-2">
+                    <textarea
+                      value={texto}
+                      onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DO_TEXTO))}
+                      rows={3}
+                      placeholder="Sua resposta…"
+                      aria-label="Sua resposta"
+                      className="w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
+                    />
+                    <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+                      {texto.length}/{LIMITE_DO_TEXTO}
+                    </div>
+
+                    {/* A mesma camada do compositor — a resposta é um post. */}
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {VISIBILIDADES.map((v) => (
+                        <button
+                          key={v.chave}
+                          type="button"
+                          onClick={() => setVisibilidade(v.chave)}
+                          className={`press rounded-full px-2.5 py-1 text-[12px] ${
+                            visibilidade === v.chave
+                              ? "bg-primary text-primary-foreground"
+                              : "border border-border"
+                          }`}
+                        >
+                          {v.rotulo}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* ⚠️ O recado vem do SERVIDOR e não é reescrito aqui: ele é
+                        o único lugar que sabe por que a resposta foi recusada, e
+                        um texto local divergiria da régua no primeiro ajuste. */}
+                    {recado && (
+                      <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12px] leading-snug">
+                        {recado}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={fecharComposicao}
+                        className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!texto.trim() || enviando || !aoResponder}
+                        onClick={async () => {
+                          if (!aoResponder) return;
+                          setEnviando(true);
+                          const r = await aoResponder(p.id, texto.trim(), visibilidade);
+                          setEnviando(false);
+                          /* `null` = publicou. Qualquer string é a recusa, e o
+                             texto FICA no campo: ela precisa reescrever, não
+                             recomeçar. */
+                          if (r) setRecado(r);
+                          else fecharComposicao();
+                        }}
+                        className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {enviando ? "Publicando…" : "Publicar resposta"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fecharComposicao();
+                        setRespondendo(p.id);
+                        setMenu(null);
+                      }}
+                      className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground"
+                    >
+                      Responder
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMenu((m) => (m === p.id ? null : p.id))}
+                      aria-label="Opções desta pergunta"
+                      className="press rounded-xl border border-border px-3 text-[15px] leading-none text-muted-foreground"
+                    >
+                      ⋯
+                    </button>
+                  </div>
+                )}
+
+                {menu === p.id && denunciando !== p.id && (
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        aoArquivar?.(p.id);
+                      }}
+                      className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                    >
+                      Tirar da caixa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDenunciando(p.id)}
+                      className="press flex-1 rounded-xl border border-border py-1.5 text-[13px] text-destructive"
+                    >
+                      Denunciar
+                    </button>
+                  </div>
+                )}
+
+                {/* ⚠️ Denunciar e BLOQUEAR moram juntos porque a caixa é
+                    anônima: pedir que ela "descubra quem foi e bloqueie no
+                    perfil" é pedir o impossível, e sem esta porta a anonimidade
+                    viraria impunidade. Ela continua sem saber quem é — a tela
+                    não mostra nome nem inicial, nem antes nem depois. */}
+                {denunciando === p.id && (
+                  <div className="mt-2 rounded-xl bg-muted/60 p-3">
+                    <p className="text-[13px] leading-snug">
+                      Denunciar esta pergunta? Ela sai da sua caixa e fica registrada para a gente
+                      olhar.
+                    </p>
+                    <div className="mt-2 flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDenunciando(null);
+                          setMenu(null);
+                          aoDenunciar?.(p.id, true);
+                        }}
+                        className="press w-full rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+                      >
+                        Denunciar e bloquear quem escreveu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDenunciando(null);
+                          setMenu(null);
+                          aoDenunciar?.(p.id, false);
+                        }}
+                        className="press w-full rounded-xl border border-border py-1.5 text-[13px]"
+                      >
+                        Só denunciar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDenunciando(null)}
+                        className="press w-full rounded-xl py-1 text-[13px] text-muted-foreground"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {respondidas.length > 0 && (
+        <>
+          <h2 className="mx-4 mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Respondidas
+          </h2>
+          <ul className="mt-1.5 flex flex-col gap-2 px-4">
+            {respondidas.map((p) => (
+              <li key={p.id} className="rounded-2xl border border-border p-3">
+                <p className="whitespace-pre-wrap text-[13px] leading-snug text-muted-foreground">
+                  {p.texto}
+                </p>
+                <p className="mt-1.5 whitespace-pre-wrap text-[14px] leading-snug">{p.resposta}</p>
+                {p.postId && aoAbrirPost && (
+                  <button
+                    type="button"
+                    onClick={() => aoAbrirPost(p.postId!)}
+                    className="press mt-2 text-[13px] font-medium text-primary"
+                  >
+                    Ver a publicação
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
   );
 }
