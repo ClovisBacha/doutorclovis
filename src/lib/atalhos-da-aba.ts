@@ -57,6 +57,32 @@ export type AtalhoDaAba = {
 /** Qual seção da barra publicou o quê. */
 type Registro = Record<string, AtalhoDaAba[]>;
 
+/**
+ * A lista vazia — UMA, para sempre.
+ *
+ * ⚠️ **ISTO NÃO É ECONOMIA DE MEMÓRIA: É O QUE IMPEDE O APP DE NÃO ABRIR.**
+ *
+ * Quem lê este registro é `useSyncExternalStore`, e o contrato dele é que
+ * `getSnapshot` devolva a MESMA referência enquanto nada muda. `?? []` devolvia
+ * um array NOVO a cada leitura — e como o React relê o instantâneo depois de
+ * cada pintura e compara por `Object.is`, ele concluía "mudou" toda vez,
+ * repintava, relia, concluía "mudou"…
+ *
+ * Medido no navegador, em `/preview-home`: a barra estourava com
+ * `Maximum update depth exceeded` e o erro subia até a raiz da rota — ou seja,
+ * até a tela "Algo deu errado". A barra vive FORA de qualquer
+ * `TabErrorBoundary` (ela é a moldura do app, não o conteúdo de uma aba), então
+ * não havia nada entre o defeito e a paciente: o app inteiro parava de abrir.
+ *
+ * E o caso que estourava era o COMUM — a seção sem atalho publicado, que é toda
+ * aba fora da Comunidade, incluindo a home, que é onde o app abre.
+ *
+ * ⚠️ **`getServerSnapshot` precisa devolver ESTA MESMA constante**, e não um
+ * `[]` literal: ele é lido na hidratação, e um literal ali reproduz o laço no
+ * primeiro instante da abertura.
+ */
+export const SEM_ATALHOS: readonly AtalhoDaAba[] = Object.freeze([] as AtalhoDaAba[]);
+
 const registro: Registro = {};
 const ouvintes = new Set<() => void>();
 
@@ -82,9 +108,9 @@ export function publicarAtalhos(secao: string, atalhos: AtalhoDaAba[]): () => vo
   };
 }
 
-export function atalhosDe(secao: string | null | undefined): AtalhoDaAba[] {
-  if (!secao) return [];
-  return registro[secao] ?? [];
+export function atalhosDe(secao: string | null | undefined): readonly AtalhoDaAba[] {
+  if (!secao) return SEM_ATALHOS;
+  return registro[secao] ?? SEM_ATALHOS;
 }
 
 /** Assina mudanças. Devolve a função que cancela. */

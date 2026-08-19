@@ -3982,6 +3982,57 @@ também o balde privado `presentes`).
 `?cota=11` · `?vazio=1`. Sem ela, conferir o cartão de RN cheio exigiria montar
 um chá real e reservar seis pacotes com seis nomes diferentes.
 
+## ⚠️ O APP PAROU DE ABRIR: um array vazio novo a cada leitura (ago/2026)
+
+O dono, no aparelho: _"agora quando eu tento entrar no aplicativo aparece essa
+tela"_ — a de "Algo deu errado" —, e depois _"agora n está nem abrindo"_.
+
+**A causa foi medida no navegador, em `/preview-home`:**
+
+```
+The result of getServerSnapshot should be cached to avoid an infinite loop
+Error: Maximum update depth exceeded.
+Warning: Error in route match: __root__/
+```
+
+`atalhosDe` (o registro dos atalhos da barra de baixo) terminava em
+`registro[secao] ?? []`, e quem o lê é `useSyncExternalStore`. O contrato dele é
+que `getSnapshot` devolva a **mesma referência** enquanto nada muda: o React
+relê o instantâneo depois de cada pintura e compara por `Object.is`. Um `[]`
+literal é objeto novo toda vez — então "mudou" era sempre verdade, e a barra
+repintava em laço até o React estourar.
+
+⚠️ **E o caso que estourava era o COMUM.** Só a Comunidade publica atalhos; toda
+outra seção cai no `?? []` — inclusive a **home**, que é onde o app abre.
+
+⚠️ **A barra vive FORA de qualquer `TabErrorBoundary`** — ela é a moldura do
+app, não o conteúdo de uma aba. Não havia nada entre o defeito e a paciente: o
+erro subia até a raiz da rota, e a raiz é a tela "Algo deu errado". Foi por isso
+que envolver `AppHomeScreen` numa fronteira não resolveu nada — o `throw` nunca
+esteve lá dentro.
+
+- **`SEM_ATALHOS`** (uma lista congelada, exportada) substitui os dois literais:
+  o `??` da leitura **e** o `getServerSnapshot` da barra. ⚠️ O segundo é lido na
+  **hidratação** — um `[]` só ali reproduz o laço no primeiro instante da
+  abertura.
+- ⚠️ **O `tsc` NÃO cobra isto**: `() => []` é `never[]`, atribuível a
+  `readonly AtalhoDaAba[]`. Quem cobra são dois testes — o de identidade
+  (`atalhosDe(x) === atalhosDe(x)`, e a vazia é sempre `SEM_ATALHOS`) e um que
+  lê os três argumentos do `useSyncExternalStore` na barra e recusa `[]`. Os
+  três mutantes (o `??`, a seção nula e o `getServerSnapshot`) foram conferidos
+  em vermelho.
+- **A régua vale para o outro store também**: `hero-theme.ts` devolve um
+  **booleano**, e primitivo é estável por natureza. O perigo é só quando o
+  instantâneo é objeto ou array.
+
+⚠️ **E a lição de método é mais cara que o conserto.** Passei três rodadas
+deduzindo a causa a partir de screenshots — chunk que sumiu, régua clínica no
+pacote, recuo do service worker, o portão da rota. **Nenhuma era esta.** O que
+resolveu em minutos foi ABRIR A BANCADA NUM NAVEGADOR e ler o console: a
+`/preview-home` reproduzia o defeito desde o commit que o criou, e ninguém tinha
+olhado. É exatamente o que a skill `/tela` existe para dizer — _se você não
+consegue verificar, não entregue_ —, aplicada a defeito e não a layout.
+
 ## A rede social: as dez estruturas (ago/2026)
 
 Pedido do dono: "crie toda essa estrutura que existe de uma rede social, as dez

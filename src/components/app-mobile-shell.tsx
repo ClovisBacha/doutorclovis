@@ -26,6 +26,7 @@ import { getApproxLocation } from "@/lib/local.functions";
 import {
   assinarAtalhos,
   atalhosDe,
+  SEM_ATALHOS,
   oToqueAbreOsAtalhos,
   type AtalhoDaAba,
   type IconeDeAtalho,
@@ -575,7 +576,7 @@ function NuvemDeAtalhos({
   aoFechar,
   escura,
 }: {
-  atalhos: AtalhoDaAba[];
+  atalhos: readonly AtalhoDaAba[];
   aoFechar: () => void;
   escura: boolean;
 }) {
@@ -677,7 +678,11 @@ export function AppBottomNav({
   const atalhos = useSyncExternalStore(
     assinarAtalhos,
     () => atalhosDe(activeSection),
-    () => [] as AtalhoDaAba[],
+    /* ⚠️ `SEM_ATALHOS`, e NUNCA `[]`. Um literal aqui é referência nova a cada
+       leitura, e o React lê este instantâneo na hidratação: era assim que a
+       barra entrava em laço de repintura e derrubava o app inteiro. A razão
+       inteira está em `atalhos-da-aba.ts`. */
+    () => SEM_ATALHOS,
   );
 
   /**
