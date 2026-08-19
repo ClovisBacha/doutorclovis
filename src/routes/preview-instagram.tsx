@@ -56,7 +56,6 @@ import {
   type PessoaNaLista,
   type Story,
 } from "@/components/rede-instagram";
-import { triarTexto } from "@/lib/pergunta-clinica";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -550,7 +549,7 @@ function Bancada() {
              único jeito de fotografar o recado do servidor sem escrever no
              banco, e é o estado que a tela existe para acertar. */
           aoResponder={async (_id, resposta) =>
-            triarTexto(resposta) === "publicavel"
+            (await import("@/lib/pergunta-clinica")).triarTexto(resposta) === "publicavel"
               ? null
               : "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela."
           }
@@ -598,7 +597,11 @@ function Bancada() {
           /* ⚠️ A triagem é a MESMA função do servidor, e não um `alert`: o que
              a bancada precisa mostrar são os TRÊS desfechos, e inventá-los aqui
              faria a tela ensaiar um roteiro que a régua não produz. */
-          aoPerguntar={async (t) => triarTexto(t)}
+          /* ⚠️ `import()` DINÂMICO, e não estático: `pergunta-clinica.ts` tem
+             `(?<!` nas fronteiras, e um import estático o traria para o chunk
+             desta rota — que é como as regex clínicas foram parar no bundle da
+             paciente e derrubaram o app em Safari antigo. */
+          aoPerguntar={async (t) => (await import("@/lib/pergunta-clinica")).triarTexto(t)}
           aoAbrirSOS={() => alert("abriria a Central de Emergência")}
         />
       ) : (

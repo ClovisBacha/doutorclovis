@@ -66,11 +66,7 @@ import {
   type TipoDeReacao,
   type Visibilidade,
 } from "@/lib/rede-social";
-import {
-  LIMITE_DA_PERGUNTA,
-  recadoDoDesfecho,
-  type DesfechoDaPergunta,
-} from "@/lib/pergunta-clinica";
+import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import type {
   AtividadeNaTela,

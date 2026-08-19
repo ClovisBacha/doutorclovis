@@ -55,19 +55,88 @@ function NotFoundComponent() {
   );
 }
 
+/**
+ * ISTO É UM PEDAÇO DO APP QUE NÃO EXISTE MAIS NO SERVIDOR?
+ *
+ * ⚠️ **É o defeito clássico de PWA instalado com deploy frequente**, e foi o que
+ * o dono viu: a paciente tem a aba (ou o app) aberta com um `index-*.js` de uma
+ * versão; sobe um deploy; ela toca em "Abrir meu app"; o router tenta um
+ * `import()` do pedaço `/minha-conta-<hash>.js` daquela versão — e o arquivo já
+ * não está no CDN. O `import()` REJEITA, e o que ela vê é "Algo deu errado".
+ *
+ * Nada no app dela está quebrado: o código é velho, só isso. O texto de cada
+ * navegador é diferente, e por isso a lista é generosa — errar para o lado de
+ * recarregar é inofensivo; errar para o outro deixa a paciente presa numa tela
+ * de erro com o app perfeitamente funcional a um F5 de distância.
+ */
+function ehPedacoQueSumiu(e: Error): boolean {
+  const t = `${e?.name ?? ""} ${e?.message ?? ""}`.toLowerCase();
+  return (
+    t.includes("dynamically imported module") ||
+    t.includes("importing a module script failed") ||
+    t.includes("failed to fetch dynamically") ||
+    t.includes("error loading dynamically") ||
+    t.includes("chunkloaderror") ||
+    (t.includes("import") && t.includes("failed"))
+  );
+}
+
+/** Recarrega UMA vez por sessão — sem isto, um erro de rede vira laço de F5. */
+const CHAVE_RECARGA = "dc-recarreguei-por-pedaco-antigo";
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const { location } = useRouterState();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  /* ⚠️ **A recarga acontece SOZINHA**, e não atrás de um botão. Quem abriu o
+     app não tem por que saber o que é um "pedaço do aplicativo": para ela isso
+     é o app não abrir. Uma vez por sessão (`sessionStorage`), porque um erro de
+     rede de verdade viraria laço de recarga — e aí a tela de erro, que é o
+     último recurso, deixaria de aparecer. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !ehPedacoQueSumiu(error)) return;
+    try {
+      if (sessionStorage.getItem(CHAVE_RECARGA)) return;
+      sessionStorage.setItem(CHAVE_RECARGA, "1");
+    } catch {
+      /* modo privado: recarrega assim mesmo, uma vez — o `catch` só impede o
+         `sessionStorage` de derrubar a recuperação. */
+    }
+    window.location.reload();
+  }, [error]);
+
+  /**
+   * ⚠️ **QUEM ESTAVA NO APP NÃO É DEVOLVIDA AO SITE.**
+   *
+   * A saída era `href="/"` para todo mundo, e no app instalado isso é a pior
+   * coisa que a tela de erro pode fazer: a paciente toca em "voltar" e cai numa
+   * página institucional, com cabeçalho, rodapé e botão de "Criar minha conta" —
+   * como se o app tivesse desaparecido e ela fosse uma visitante. Pedido do
+   * dono, com todas as letras: "não é pra mais voltar para o site".
+   *
+   * Do app, a saída é o próprio app; se a sessão for o problema, `/auth` é quem
+   * resolve, e é para lá que `_authenticated` a mandaria de qualquer forma.
+   */
+  const noApp =
+    location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
+  const saida = noApp ? "/auth" : "/";
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="font-serif text-2xl text-foreground">Algo deu errado</h1>
+        <h1 className="font-serif text-2xl text-foreground">
+          {ehPedacoQueSumiu(error) ? "Atualizando o app…" : "Algo deu errado"}
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ocorreu um erro inesperado. Tente novamente ou volte para o início.
+          {ehPedacoQueSumiu(error)
+            ? "Saiu uma versão nova enquanto você estava aqui. Estou recarregando — se não voltar sozinho, toque em Tentar novamente."
+            : `Ocorreu um erro inesperado. Tente novamente${
+                noApp ? " ou entre de novo na sua conta." : " ou volte para o início."
+              }`}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -80,10 +149,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Tentar novamente
           </button>
           <a
-            href="/"
+            href={saida}
             className="inline-flex items-center justify-center rounded-full border border-border bg-background px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Ir para o início
+            {noApp ? "Entrar na minha conta" : "Ir para o início"}
           </a>
         </div>
       </div>

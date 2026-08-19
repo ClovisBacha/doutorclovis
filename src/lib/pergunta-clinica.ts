@@ -268,13 +268,22 @@ export function temTermoClinicoAlemDaAbertura(texto: string): boolean {
   return SINTOMAS_DO_CORPO.test(resto);
 }
 
-export type DesfechoDaPergunta =
-  /** Pode virar post: não pede conduta e não fala de corpo. */
-  | "publicavel"
-  /** Fala de corpo ou pede conduta — vai para o médico DE QUEM PERGUNTOU. */
-  | "clinica"
-  /** Bandeira vermelha — abre a Central de Emergência, agora. */
-  | "emergencia";
+/**
+ * ⚠️ **O TIPO E OS TEXTOS MORAM EM `caixinha-tela.ts`**, e não aqui.
+ *
+ * A tela precisava de um número e de uma função que devolve string; importou
+ * daqui, e arrastou as regex deste arquivo para o bundle do NAVEGADOR — com o
+ * `(?<!` de fronteira junto, que o Safari anterior ao 16.4 recusa com
+ * `SyntaxError` na carga do módulo. A rota inteira caía.
+ *
+ * Este arquivo é do SERVIDOR. O que a tela usa fica do lado dela.
+ */
+import type { DesfechoDaPergunta } from "@/lib/caixinha-tela";
+export type { DesfechoDaPergunta };
+export { LIMITE_DA_PERGUNTA, recadoDoDesfecho } from "@/lib/caixinha-tela";
+
+/** Teto diário de perguntas por pessoa. Sem ele, a caixa vira ferramenta de spam. */
+export const PERGUNTAS_POR_DIA = 10;
 
 /**
  * Para onde este texto vai.
@@ -317,26 +326,3 @@ export function triarTexto(texto: string): DesfechoDaPergunta {
 
   return "publicavel";
 }
-
-/**
- * O que a tela diz a quem escreveu.
- *
- * ⚠️ **Nunca o motivo detalhado.** Devolver "sua pergunta tem a palavra X"
- * ensina quais palavras passam, e quem quiser burlar precisa de duas tentativas.
- * A mensagem diz PARA ONDE foi, que é o que ela precisa saber.
- */
-export function recadoDoDesfecho(d: DesfechoDaPergunta): string {
-  if (d === "emergencia") {
-    return "Isso precisa de atendimento agora, não de uma resposta aqui.";
-  }
-  if (d === "clinica") {
-    return "Mandei a sua pergunta para o seu médico — é com ele que isso se resolve.";
-  }
-  return "Pergunta enviada 💛";
-}
-
-/** Teto diário de perguntas por pessoa. Sem ele, a caixa vira ferramenta de spam. */
-export const PERGUNTAS_POR_DIA = 10;
-
-/** Tamanho máximo. Uma caixinha é uma pergunta, não um desabafo. */
-export const LIMITE_DA_PERGUNTA = 280;
