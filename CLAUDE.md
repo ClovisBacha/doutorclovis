@@ -4516,3 +4516,187 @@ produz é pior que bancada nenhuma.
 `?tela=perfil&meu=1&selo=1` (os dois selos e a aba do bebê) · `&selo=2` (uma
 chave sozinha) · `&selo=0` · `?tela=conferir` (o carimbo) · `?tela=novo`
 (enquete e anexo da aula) · `?tela=perfil` (a pílula do código).
+
+### Fase 5 — a criadora ganhou o que dar, e o grupo ganhou uma semana
+
+Três peças, todas do lado da influenciadora, e as três brigaram com uma regra
+que já existia.
+
+**O código de embaixadora no perfil.** A pílula do código aparece no perfil de
+OUTRA pessoa (no meu ela ofereceria que eu me indicasse), e o botão só existe
+para quem ainda não tem `ref_code`. ⚠️ **Falso sob a PRÉVIA, sempre**: o campo é
+gravado UMA VEZ e nunca reescrito, e é o MESMO campo que carrega o código da
+médica dela — um toque numa tela que o app apresenta como inerte queimaria a
+indicação para sempre, sem erro e sem volta. O `somenteLeitura` do espelho já
+desliga o botão; `possoAplicarOCodigo: !persona && …` é o cinto, porque tela e
+servidor discordarem aqui custa caro.
+
+**A criadora presenteia quem ela trouxe** (`minhasIndicadas`,
+`presentearIndicada`). ⚠️ **A régua é `ref_code`, nunca `referred_by`** — a
+mesma decisão que criou o campo: `referred_by` é o grafo de AMIZADE, e uma
+criadora com três mil seguidoras viraria amiga de três mil gestantes.
+`MESADA_DA_INFLUENCIADORA` (300 🌱) e `PRESENTE_DA_INFLUENCIADORA` (30 🌱)
+moram em `economia-sementinhas.ts`, com todo número da economia — é o que
+permite os testes de teto somarem as torneiras todas. Medido com o
+`diasParaZerarLoja` de verdade: a parede cai de 19 para 18 dias sem médico, e
+de 16 para 15 com ele; o teto continua em 2.
+
+**O desafio da semana em grupo** (`desafio-em-grupo.ts`, puro e testado).
+
+- ⚠️ **OPT-IN, e é ele que impede o grupo compulsório.** A tentação óbvia é
+  juntar automaticamente quem tem o `ref_code` da criadora — e isso recria por
+  fora exatamente o grupo que o código foi tirado do grafo de amizade para não
+  criar. Pior: `ref_code` é fixado UMA VEZ, então não haveria como sair.
+  `desafio_participantes` guarda CONSENTIMENTO, não contagem, e sair MARCA.
+- ⚠️ **Três dias, não sete.** Sete significa "não faltar um dia", e a semana da
+  internação existe: um desafio que quebra na primeira noite no pronto-socorro
+  ensina a não participar.
+- ⚠️ **O contador é NÚMERO ABSOLUTO, nunca fração** — "3 de 300 fecharam" diz ao
+  grupo inteiro que quase ninguém veio. E abaixo de duas pessoas a tela não fala
+  do grupo: com uma só, o "1 fechou" é ela mesma se olhando no espelho.
+  **Nunca a lista de quem fechou** (seria a lista de seguidoras da criadora, que
+  este app decidiu não ter) — nem a de quem NÃO fechou, que seria pior.
+- ⚠️ **O título é de CATÁLOGO FECHADO** — as quatro atividades que o Caminho já
+  grava no ledger, e mais nenhuma. Campo livre aqui é conselho de saúde de leiga
+  distribuído em massa com o nome do consultório em volta. Há teste conferindo
+  que as quatro batem com `ATIVIDADES_DO_DIA` de `conquistas.ts`: uma quinta
+  seria um desafio que nunca fecha, porque nada escreve aquela chave.
+- ⚠️ **`domingoDaSemana` quase entrou com off-by-one**: `getUTCDay()` devolve 0
+  para domingo, e recuar `dia - 1` daria −1, jogando o domingo para a semana
+  seguinte. Há teste.
+- **O bônus não retroage** (confere hoje e ontem), a chave carrega o desafio E a
+  pessoa (duas criadoras podem propor na mesma semana), e a cobrança roda junto
+  com a leitura — o mesmo desenho de `cobrarBonusDaDupla`, que passou meses só
+  pagando quem abria a aba Amigas.
+
+### Fase 6 — a caixinha de perguntas, e a régua nos DOIS textos
+
+⚠️ **É a função mais arriscada da aba**, e pela mesma razão que fechou os
+comentários: de 1.098 respostas com conselho em fóruns de gestação, **20,9%
+estavam erradas e 5,5% eram potencialmente danosas**, e o grupo não se
+autocorrige (5,2% de retificação).
+
+A diferença é que aqui o texto perigoso é a **RESPOSTA**. `triarTexto`
+(`src/lib/pergunta-clinica.ts`) roda na pergunta E na resposta: uma caixinha que
+triasse só a entrada publicaria "no seu lugar eu esperava" com o nome do
+consultório em volta.
+
+**A régua saiu de `secondbrain.server.ts`** e virou módulo próprio — as duas
+listas (`BANDEIRA_VERMELHA`, `TERMOS_CLINICOS`) viviam dentro do roteador do
+chat, e uma segunda cópia divergiria no primeiro conserto, aparecendo como
+pergunta clínica virando post público. Uma lista, dois usos.
+
+⚠️ **O nome é "REDUZ risco", nunca "impede".** `TERMOS_CLINICOS` é allowlist, e
+allowlist de vocabulário clínico nunca fica pronta: medido no chat, **61 de 85
+termos comuns eram invisíveis** — inclusive `aborto`, `pré-eclâmpsia`,
+`convulsão`, `desmaio` e `bolsa rota`. Há teste proibindo o arquivo de se
+chamar de garantia.
+
+**Duas regras novas, e as duas nasceram de medição:**
+
+- ⚠️ **`PEDIDO_DE_CONDUTA` é FORMA, não vocabulário.** "Comigo foi assim, não
+  precisa ir ao pronto-socorro" não tem bandeira vermelha nenhuma e é a frase
+  mais perigosa que uma paciente pode escrever para outra. O padrão pega o
+  pedido ("posso tomar?") e a entrega ("não precisa ir"), e é conferido ANTES do
+  vocabulário — invertido, ela cairia em `publicavel`, porque não tem termo
+  clínico nenhum.
+- ⚠️ **`TERMOS_CLINICOS` sozinho NÃO roteia.** Medido: "vocês fizeram chá de
+  bebê?" ia para a fila do médico, porque `bebê` está na lista. Numa caixinha de
+  gestante, `bebê`, `barriga`, `parto` e `semana` são o ASSUNTO — rotear tudo
+  isso mataria o recurso e afogaria o consultório. Só roteia acompanhado de
+  `SINTOMA_EM_PRIMEIRA_PESSOA`: o que importa não é falar de corpo, é falar do
+  PRÓPRIO corpo agora.
+
+#### ⚠️ Anonimato na TELA, nunca no banco
+
+`rede_perguntas.quem_id` é gravado sempre e devolvido nunca. A caixa ser anônima
+para a dona é o que faz alguém perguntar; o servidor saber quem é permite as
+quatro coisas que a impedem de virar canal de assédio: rotear a dúvida clínica
+ao médico DE QUEM PERGUNTOU, o teto diário, recusar quem foi bloqueada, e
+bloquear a partir de uma pergunta.
+
+- **`minhaCaixinha` não LÊ a coluna.** Pedir e descartar no `.map()` funcionaria
+  hoje e falharia no dia em que alguém devolvesse a linha inteira por
+  conveniência. O que não é lido não vaza. Há catraca de CONTAGEM: só duas
+  funções do módulo podem tocar em `quem_id`.
+- ⚠️ **Sem policy de `authenticated` na tabela**, e aqui isso pesa mais que nas
+  outras: uma policy de LINHA (`auth.uid() = dona_id`) daria à dona a linha
+  INTEIRA, com o autor dentro. **RLS não esconde coluna.**
+- ⚠️ **E ela NÃO passa por `rede_atividade`.** A caixa do coração tem
+  `quem_id NOT NULL` e a tela dela RESOLVE O NOME de cada gesto — uma espécie
+  "perguntou" ali entregaria, na primeira renderização, exatamente o que a caixa
+  existe para não entregar. O emblema sai da contagem de não respondidas.
+- ⚠️ **Denunciar e BLOQUEAR moram juntos**, e é a única defesa possível: pedir
+  que ela "descubra quem foi e bloqueie no perfil" é pedir o impossível, e sem
+  essa porta a anonimidade viraria impunidade. Ela continua sem saber quem é — o
+  `toast` não nomeia ninguém, e o retorno é `{ ok: true }` pelado.
+
+#### Só o `publicavel` vira linha
+
+As outras duas saem por canais que já existem e são melhores:
+
+- **emergência** → a Central de Emergência, que avisa médico e contato dela com
+  localização. Ninguém responde "estou sangrando" com um coraçãozinho, e deixar
+  essa frase esperando a boa vontade de outra paciente é o pior desfecho
+  possível desta tela. ⚠️ A folha é a MESMA da barra de baixo, por PROP
+  (`onAbrirSOS`) e nunca por evento global: quem governa esse estado é
+  `minha-conta`, e um segundo dono é o defeito que `voltarDaBarra` já pagou.
+- **clínica** → `doctor_questions` com o `doctor_id` de QUEM PERGUNTOU. ⚠️ Nunca
+  o da dona da caixa: a pergunta é sobre o corpo de quem escreveu, e mandá-la ao
+  obstetra de outra pessoa é entregar dado de saúde a um médico que não a
+  acompanha. Falhar ao gravar é ERRO na tela, e não um "enviado 💛" mentiroso.
+
+**Opt-in, padrão NÃO** (`aceita_perguntas`): caixa anônima aberta por omissão
+numa base de gestantes de alto risco é um canal que ninguém pediu. É a mesma
+decisão de `perfil_publico`, `mostrar_semana` e `mostrar_bebe`. E **fechar não
+apaga o que já chegou** — a tela diz isso, senão quem fecha acha que perdeu as
+perguntas e não fecha.
+
+#### ⚠️ Um recuo que FALTAVA em `salvarPerfilSocial`
+
+Sem a coluna nova no banco, um `42703` derrubava o salvamento INTEIRO: ela
+trocava a foto, mudava a bio, tocava em salvar e recebia "não foi possível" —
+sem nada na tela dizendo que o que quebrou foi um interruptor que ela nem
+mexeu. Agora grava o que dá e devolve `parcial: true`, para a tela não afirmar
+que o interruptor pegou.
+
+#### A catraca de portas virou LISTA de módulos
+
+`caixinha.functions.ts` nasceu separado para `rede-social.functions.ts` parar de
+crescer — e um módulo novo fora da lista de `rede-tem-porta.test.ts` é
+exatamente o buraco que ela existe para fechar.
+
+#### Oito mutações, e dois defeitos do próprio teste
+
+Todas as oito ficaram vermelhas (caixa lendo `quem_id`, resposta sem triagem,
+médico da dona, erro virando caixa vazia, sem teto, arquivar sem `dona_id`,
+ordem do bloqueio invertida, emergência virando linha).
+
+⚠️ **E a primeira execução achou dois defeitos MEUS**, os dois da mesma família:
+um comentário meu com a palavra `quemId` reprovava um tipo que está correto, e
+o recorte de corpo (`até o próximo \nexport`) engolia o bloco de doc da função
+seguinte, acusando três funções tocando numa coluna onde só duas tocam. Quem
+conserta os dois é a mesma linha: **tira-se o comentário antes de procurar.**
+
+#### ⚠️ E o servidor de dev velho mentiu por meia hora
+
+O `⋯` da caixinha não abria o menu na bancada, sem erro nenhum no console. Não
+era o React: era um `vite` de uma sessão anterior ainda ocupando a porta, e o
+`bun run dev` novo tinha subido em outra ("Port 8080 is in use, trying another
+one") servindo módulo velho. `console.log` no render não aparecia porque aquele
+render não era o meu. **Antes de investigar um componente que "não responde",
+confira em que porta o servidor subiu.** E dê ~1,8 s depois do primeiro seletor:
+clique antes da hidratação se perde em silêncio.
+
+⚠️ **A primeira medição de contraste "aprovou" seis textos a 1,03:1.** O projeto
+escreve cor em `oklch`, e `getComputedStyle` devolve `oklch(...)` — um parser de
+regex lê 0.62/0.19/29 e chama de RGB. Converte-se pelo **canvas**
+(`ctx.fillStyle = cor` e lê o pixel), como o CLAUDE.md já registrava. Medido de
+verdade: 4,54 a 16,83.
+
+**Aplicar:** `supabase/APLICAR_REDE_SOCIAL.sql` (agora com `aceita_perguntas`,
+`rede_perguntas` e `rede_posts.pergunta`).
+**Bancadas:** `/preview-instagram?tela=caixinha` (`&perguntas=0` o vazio,
+`&caixinha=0` a fechada) · `?tela=perfil` (o campo de perguntar, e os três
+desfechos digitando "to sangrando…", "estou com muita dor nas costas" e uma
+pergunta comum) · `?tela=perfil&caixinha=0`.
