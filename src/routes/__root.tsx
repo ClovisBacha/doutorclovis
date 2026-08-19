@@ -100,6 +100,18 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
     location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
   const saida = noApp ? "/auth" : "/";
 
+  /* ⚠️ Nome + mensagem + PÁGINA, e a pilha por último. A página é o que diz
+     em qual tela aconteceu — sem ela, "TypeError: undefined" não localiza
+     nada. A pilha vem no fim porque em produção ela é minificada e vale
+     menos que as três primeiras linhas. */
+  const detalhe = [
+    `${error?.name ?? "Error"}: ${error?.message ?? "(sem mensagem)"}`,
+    `em ${location.pathname}`,
+    error?.stack ? `\n${error.stack}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="max-w-md text-center">
@@ -130,6 +142,39 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             {noApp ? "Entrar na minha conta" : "Ir para o início"}
           </a>
         </div>
+
+        {/* ⚠️ **O DETALHE DO ERRO PRECISA SER ALCANÇÁVEL, e não estava.**
+            A tela dizia "erro inesperado" e mandava o motivo para o
+            `console.error` — que num iPhone, dentro do app instalado, não
+            existe para ninguém. Três rodadas de conserto foram gastas
+            DEDUZINDO qual era o erro a partir de capturas de tela, porque a
+            única testemunha era a paciente e a tela não deixava ela contar.
+
+            Fica RECOLHIDO: quem abre o app não quer ler pilha de execução, e
+            um erro cru na cara de uma gestante é ruído assustador. Mas quem
+            precisa dele — ela mandando um print para o consultório, o médico
+            no painel — alcança em um toque. */}
+        <details className="mt-6 text-left">
+          <summary className="cursor-pointer text-center text-xs text-muted-foreground">
+            Ver detalhes do erro
+          </summary>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 text-[11px] leading-snug text-muted-foreground">
+            {detalhe}
+          </pre>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                void navigator.clipboard?.writeText(detalhe);
+              } catch {
+                /* sem área de transferência: o texto está aí para ler */
+              }
+            }}
+            className="mt-2 w-full rounded-full border border-border px-4 py-2 text-xs font-medium"
+          >
+            Copiar
+          </button>
+        </details>
       </div>
     </div>
   );
