@@ -1,5 +1,20 @@
 # Entrar com a Apple (paciente e médico)
 
+> ✅ **LIGADO E FUNCIONANDO desde 19/08/2026.** O login foi conferido numa aba
+> anônima em `www.obstetrica.com.br/auth` e o endpoint `/auth/v1/settings` do
+> projeto lista `apple` ao lado de `google` e `email`.
+>
+> |                 |                                       |
+> | --------------- | ------------------------------------- |
+> | **Team ID**     | `8PL2X9F9PV`                          |
+> | **Key ID**      | `LC326T8BHZ`                          |
+> | **Services ID** | `br.com.obstetrica.web`               |
+> | **App ID**      | `br.com.obstetrica.app`               |
+> | **Chave**       | `AuthKey_LC326T8BHZ.p8` (fora do Git) |
+>
+> ⏰ **O segredo vence por volta de 17/02/2027.** Nenhum destes valores é
+> credencial — o segredo é o `.p8` e o JWT gerado a partir dele.
+
 O botão **"Continuar com a Apple"** já está na tela de entrada (`/auth`), ao
 lado do Google, nas duas portas — paciente e médico. Enquanto o provedor não
 estiver ligado no Supabase ele mostra um aviso e o login por e-mail/senha
@@ -83,7 +98,21 @@ O **Key ID** é o pedaço do meio do nome do arquivo: `AuthKey_FGHIJ67890.p8` �
 ## 4. O segredo que o Supabase pede
 
 A Apple é o único provedor que não entrega um "client secret" pronto: ela dá a
-chave e espera um **JWT assinado**. Este repositório gera:
+chave e espera um **JWT assinado**. Há duas ferramentas, e as duas assinam
+localmente — a chave privada não sai da máquina:
+
+**No navegador** (`scripts/segredo-apple.html`) — foi a usada, e é a
+recomendada para quem não tem o repositório clonado. Baixe o arquivo e abra do
+disco; ele assina com o WebCrypto e não faz nenhuma chamada de rede.
+
+⚠️ **ABRA NO CHROME, NÃO NO SAFARI.** O Safari não considera um arquivo
+`file://` um contexto seguro e simplesmente não expõe `crypto.subtle` — e a
+primeira versão da página engolia isso num `try/catch` e acusava a CHAVE, o que
+custou uma volta procurando o problema no lugar errado. Hoje ela detecta e diz
+para trocar de navegador.
+
+**Na linha de comando** (`scripts/segredo-apple.mjs`), se o repositório estiver
+clonado:
 
 ```bash
 node scripts/segredo-apple.mjs \
@@ -93,7 +122,10 @@ node scripts/segredo-apple.mjs \
   --servico br.com.obstetrica.web
 ```
 
-Nada sai da sua máquina — a assinatura é feita ali, com `node:crypto`.
+⚠️ **A diferença entre as duas não é só de embalagem.** O WebCrypto devolve a
+assinatura CRUA (`r‖s`), que é o que o JWT pede; o Node devolve DER por padrão e
+precisa de `dsaEncoding: "ieee-p1363"`. Um JWT ES256 com assinatura DER é
+recusado sem explicação.
 
 ⚠️ **ESSE SEGREDO VENCE EM SEIS MESES**, por regra da Apple. No dia em que
 vencer, o "Continuar com a Apple" para de funcionar **sem aviso nenhum** — o
@@ -107,7 +139,14 @@ Apple**:
 
 - **Enable Sign in with Apple**: ligado.
 - **Client IDs**: `br.com.obstetrica.web` (o Services ID).
-- **Secret Key (for OAuth)**: o JWT que o script imprimiu.
+- **Secret Key (for OAuth)**: o JWT que a ferramenta gerou.
+
+⚠️ **CONFIRA OS DOIS CAMPOS ANTES DE SALVAR — o Chrome autopreenche.** Na
+configuração real, o navegador tinha posto o **e-mail do dono** em "Client IDs"
+e algo em "Secret Key" (os dois parecem campos de login para o gerenciador de
+senhas). Salvo assim, o resultado é `invalid_client` num campo que ninguém
+lembra de ter tocado. Clique em **Reveal** no segredo e leia o Client IDs antes
+de salvar.
 
 Salvar.
 
@@ -152,6 +191,16 @@ denuncia isso.
 ---
 
 ## Conferir
+
+⚠️ **Antes de abrir o navegador, dá para perguntar ao próprio Supabase** se o
+provedor subiu — o endpoint é público (pede só a chave anon):
+
+```bash
+curl -sS "https://zqmqbnwvrmeabnmaaxfr.supabase.co/auth/v1/settings" \
+  -H "apikey: <SUPABASE_PUBLISHABLE_KEY>" | grep -o '"apple":[a-z]*'
+```
+
+`"apple":true` quer dizer que a configuração foi aceita. Depois:
 
 1. Abra `/auth` numa aba anônima.
 2. **Continuar com a Apple** → a folha da Apple abre.
