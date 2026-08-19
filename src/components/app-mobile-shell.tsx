@@ -421,6 +421,25 @@ const NAV_ITEMS: {
 ];
 
 /** Item comum da barra: ícone de contorno na cor do site + rótulo embaixo. */
+/**
+ * O TAMANHO DO ÍCONE DA BARRA — e por que ele mora aqui.
+ *
+ * Sem o rótulo embaixo, o ícone passou a ser a ÚNICA coisa que identifica o
+ * destino: ele cresceu de 22 para 27px (e de 20 para 24 na barra encolhida).
+ *
+ * ⚠️ **O bebê NÃO usa esta tabela**, e é de propósito — pedido do dono: "não
+ * mude o do bebê, esse tem que ficar desse tamanho e tem que ser maior". Ele é
+ * um círculo de 56px sobre a borda da barra; a distância entre ele e os outros
+ * é o que diz qual é o destino principal. Crescer os dois juntos apagaria essa
+ * diferença, que é a informação mais importante da barra.
+ *
+ * ⚠️ **E o `min-h-[44px]` do botão não é folga — é o alvo.** Tirar o rótulo
+ * tirou 20px da altura de cada botão: sem o mínimo, o alvo do dedo caía para
+ * ~35px, abaixo dos 44 que a Apple exige e que a auditoria do menu já tinha
+ * cobrado. O que some é o texto, nunca a área que o dedo acerta.
+ */
+const ALTURA_ICONE = { normal: "h-[27px] w-[27px]", compacto: "h-6 w-6" } as const;
+
 function NavItem({
   label,
   color,
@@ -450,30 +469,22 @@ function NavItem({
         onClick();
       }}
       aria-current={active ? "page" : undefined}
+      /* ⚠️ O RÓTULO SAIU DA TELA, NÃO DO APP.
+         Pedido do dono: "tire os nomes embaixo dos ícones". Quem lê com
+         VoiceOver continua ouvindo "Saúde", "Jogo", "Comunidade" — é este
+         `aria-label` que diz, e ele é a única fonte agora. Apagá-lo junto
+         com o texto entregaria uma barra de cinco botões sem nome nenhum. */
       aria-label={label}
-      className={`relative flex min-w-0 flex-1 flex-col items-center py-1 ${
+      className={`relative flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center ${
         destacado ? "dc-nav-destaque" : ""
       }`}
     >
       <Icon
         className={`${color} transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
-          compact ? "h-5 w-5" : "h-[22px] w-[22px]"
+          compact ? ALTURA_ICONE.compacto : ALTURA_ICONE.normal
         } ${active ? "scale-110" : "scale-100"}`}
         strokeWidth={active ? 2.4 : 1.9}
       />
-      <span
-        className={`overflow-hidden text-[10px] transition-all duration-300 ${
-          compact ? "max-h-0 opacity-0" : "mt-1 max-h-4 opacity-100"
-        } ${
-          active
-            ? `${color} font-semibold`
-            : escura
-              ? "font-medium text-white/70"
-              : "font-medium text-muted-foreground"
-        }`}
-      >
-        {label}
-      </span>
     </button>
   );
 }
@@ -814,15 +825,15 @@ export function AppBottomNav({
               }}
               aria-current={activeSection === id ? "page" : undefined}
               aria-label={label}
-              className={`relative flex min-w-0 flex-1 flex-col items-center py-1 ${
+              className={`relative flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center ${
                 destaque === id ? "dc-nav-destaque" : ""
               }`}
             >
-              <span aria-hidden className={compact ? "h-5 w-5" : "h-[22px] w-[22px]"} />
-              <span
-                aria-hidden
-                className={`overflow-hidden text-[10px] ${compact ? "max-h-0" : "mt-1 max-h-4"}`}
-              />
+              {/* Espaçador invisível: reserva a altura de um item comum para a
+                  barra não crescer por causa do círculo, que vive metade
+                  fora dela. Acompanha `ALTURA_ICONE` — se ele ficar para trás,
+                  o bebê desalinha dos vizinhos. */}
+              <span aria-hidden className={compact ? ALTURA_ICONE.compacto : ALTURA_ICONE.normal} />
               <span
                 data-nav-center
                 className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-500 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
