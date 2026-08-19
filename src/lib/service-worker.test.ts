@@ -22,7 +22,12 @@ type Ouvintes = Record<string, (e: unknown) => void>;
 /** Cache API de mentira, com o mesmo contrato que o worker usa. */
 function montarCaches(cotaCheia = false) {
   const lojas = new Map<string, Map<string, Response>>();
-  const chave = (r: string | Request) => (typeof r === "string" ? new URL(r).href : r.url);
+  /* ⚠️ **Resolve RELATIVO contra a origem, como a Cache API de verdade.** O
+     dublê fazia `new URL(r)` cru e estourava em `caches.match("/")` — que é
+     exatamente a chamada que o worker faz no recuo de navegação. Um dublê mais
+     ESTRITO que a coisa real esconde o caminho que se quer testar, do mesmo
+     jeito que um mais permissivo aprova o que não funciona. */
+  const chave = (r: string | Request) => (typeof r === "string" ? new URL(r, ORIGEM).href : r.url);
   const loja = (nome: string) => {
     if (!lojas.has(nome)) lojas.set(nome, new Map());
     return lojas.get(nome)!;
@@ -358,5 +363,56 @@ describe("a lista de tipos", () => {
        à mão em `public/assets/` cairia nela e ficaria congelado PARA SEMPRE no
        aparelho da paciente: nem recarregar, nem reinstalar, resolveria. */
     expect(existsSync("public/assets")).toBe(false);
+  });
+});
+
+describe("⚠️ sem rede, o APP não vira o SITE", () => {
+  /* Rede caída, e a home JÁ no cache — que é o estado real de quem instalou o
+     app: o `install` precacheia "/". */
+  const semRede = async () => {
+    throw new TypeError("Failed to fetch");
+  };
+
+  test("navegação para `/minha-conta` offline devolve a folha própria", async () => {
+    /* O recuo era `caches.match("/")` para QUALQUER navegação: uma oscilação de
+       rede a caminho do app, dentro do app instalado, entregava a HOME
+       INSTITUCIONAL — cabeçalho, rodapé, "Criar minha conta". Do lado dela o
+       app não ficou offline: ele virou outra coisa. Foi o que o dono viu e
+       descreveu ("ele volta pra como se fosse uma aba do site"). */
+    const sw = carregar(semRede);
+    await sw.evento("install");
+    const res = await sw.pedir("/minha-conta", { mode: "navigate" });
+    expect(res).not.toBeNull();
+    expect(res!.status).toBe(503);
+    const html = await res!.text();
+    expect(html).toContain("Sem conexão");
+    /* ⚠️ E ela diz que nada se perdeu: sem essa frase, "sem conexão" numa tela
+       de gestação de alto risco lê como "seus registros sumiram". */
+    expect(html).toContain("nada se perdeu");
+  });
+
+  test("o painel do médico também", async () => {
+    const sw = carregar(semRede);
+    await sw.evento("install");
+    const res = await sw.pedir("/painel", { mode: "navigate" });
+    expect(res!.status).toBe(503);
+  });
+
+  test("⚠️ mas no SITE a home continua sendo o recuo certo", async () => {
+    /* Ali ela é a página que a pessoa esperava mesmo — o recuo só muda para
+       quem estava dentro do app. */
+    const sw = carregar(semRede);
+    await sw.evento("install");
+    const res = await sw.pedir("/gestacao", { mode: "navigate" });
+    expect(res!.status).toBe(200);
+    expect(await res!.text()).toBe("shell");
+  });
+
+  test("⚠️ a folha não depende de rede para existir", () => {
+    /* Um recuo que precisa buscar um arquivo não é recuo. */
+    const i = FONTE.indexOf("const FOLHA_SEM_REDE");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = FONTE.slice(i, FONTE.indexOf("`;", i));
+    expect(corpo).not.toMatch(/fetch\(|caches\./);
   });
 });

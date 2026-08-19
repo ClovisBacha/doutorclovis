@@ -43,6 +43,33 @@ const AUDIO_RE = /\.(mp3|m4a|aac|ogg|wav)(\?|$)/;
    divergem. Esta diz o mesmo que o cabeçalho HTTP — nem mais, nem menos. */
 const IMUTAVEL_RE = /^\/assets\//;
 
+/**
+ * A folha de "sem conexão" do APP.
+ *
+ * ⚠️ Escrita AQUI, e não buscada de um arquivo: ela existe justamente para o
+ * momento em que não há rede, e um recuo que precisa de rede não é recuo. Fica
+ * curta de propósito — é uma tela de espera, não uma página.
+ *
+ * A cor de fundo é a mesma `--background` do app em tema claro, para a
+ * transição não piscar branco.
+ */
+const FOLHA_SEM_REDE = `<!doctype html><html lang="pt-BR"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sem conexão — Obstétrica</title>
+<style>
+ body{margin:0;min-height:100dvh;display:flex;align-items:center;justify-content:center;
+ background:#fdf6f3;color:#2b2320;font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:24px}
+ .c{max-width:22rem;text-align:center}
+ h1{font-size:1.35rem;margin:0 0 .5rem}
+ p{margin:0 0 1.5rem;color:#6b5f5a;font-size:.95rem}
+ button{border:0;border-radius:999px;background:#a85c58;color:#fff;font-size:.95rem;
+ font-weight:600;padding:.75rem 1.75rem;min-height:44px}
+</style></head><body><div class="c">
+<h1>Sem conexão</h1>
+<p>O app precisa de internet para carregar. Seus registros estão salvos — nada se perdeu.</p>
+<button onclick="location.reload()">Tentar de novo</button>
+</div></body></html>`;
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -249,9 +276,32 @@ self.addEventListener("fetch", (event) => {
       );
     }
   } else if (request.mode === "navigate") {
-    // Network-first para navegação; fallback offline para shell
+    /* Network-first para navegação. O que muda é o FALLBACK.
+     *
+     * ⚠️ **SEM REDE, O APP VIRAVA O SITE.** O recuo era `caches.match("/")`
+     * para qualquer navegação — então uma oscilação de rede a caminho de
+     * `/minha-conta`, dentro do app instalado, entregava a HOME INSTITUCIONAL:
+     * cabeçalho, rodapé, "Criar minha conta". Do lado dela o app não ficou
+     * offline, ele virou outra coisa — e foi exatamente o que o dono viu e
+     * descreveu ("ele volta pra como se fosse uma aba do site").
+     *
+     * A home continua sendo o recuo certo para quem navegava NO SITE: ali ela
+     * é a página que a pessoa esperava mesmo.
+     *
+     * ⚠️ E o recuo do app NÃO é a home nem `/auth`: é uma folha própria, que
+     * diz o que houve e oferece tentar de novo. Servir `/auth` sem rede seria
+     * pedir login que não tem como acontecer, e ela concluiria que foi
+     * desconectada. */
+    const doApp = url.pathname.startsWith("/minha-conta") || url.pathname.startsWith("/painel");
     event.respondWith(
-      fetch(request).catch(() => caches.match("/").then((r) => r ?? Response.error())),
+      fetch(request).catch(() =>
+        doApp
+          ? new Response(FOLHA_SEM_REDE, {
+              status: 503,
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            })
+          : caches.match("/").then((r) => r ?? Response.error()),
+      ),
     );
   }
 });
