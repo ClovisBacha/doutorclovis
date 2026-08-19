@@ -20,6 +20,7 @@ import { CONJUNTOS, bonusDoConjunto } from "./conjuntos";
 import { PACOTES, gastavelDoPacote } from "./pacotes-sementinhas";
 import { SEMENTINHAS } from "./sementinhas.functions";
 import {
+  BONUS_INFLUENCIADORA,
   BONUS_VINCULO_MEDICO,
   CLASSES_DE_PRESENTE,
   CURVA_GRATIS,
@@ -29,6 +30,8 @@ import {
   GANHO_DIA_TIPICO,
   GANHO_SEMANAL,
   ITENS_GRATIS,
+  MESADA_DA_INFLUENCIADORA,
+  PRESENTE_DA_INFLUENCIADORA,
   PRESENTE_ENTRE_AMIGAS,
   PRESENTE_SUGERIDO,
   SEMENTINHAS_POR_MENSAGEM,
@@ -561,5 +564,63 @@ describe("⚠️ a ofensiva da dupla entra na conta da parede", () => {
      * faz as cinco atividades todo dia durante uma semana merece.
      */
     expect(diasParaZerarLoja({ ...tudo, comDupla: true })).toBeGreaterThanOrEqual(8);
+  });
+});
+
+describe("as torneiras da Fase 5 — desafio em grupo e presente da criadora", () => {
+  test("⚠️ a parede do 15º dia continua de pé no cenário com médico", () => {
+    // É o número que o CLAUDE.md registra como a decisão de monetização
+    // inteira, e as duas torneiras novas foram calibradas contra ele.
+    expect(diasParaZerarLoja({ comMedico: true, comDesafio: true })).toBe(15);
+  });
+
+  test("o desafio é SEMANAL, e por isso mexe pouco", () => {
+    // Diário, ele somaria com `BONUS_DA_DUPLA` na mesma paciente e a parede
+    // sairia do lugar sem ninguém decidir.
+    const sem = diasParaZerarLoja({ comMedico: false });
+    const com = diasParaZerarLoja({ comMedico: false, comDesafio: true });
+    expect(sem).toBe(19);
+    expect(com).toBe(18);
+    expect(sem - com).toBeLessThanOrEqual(2);
+  });
+
+  test("⚠️ o presente da criadora só conta para quem chegou pelo código dela", () => {
+    // Fora desse vínculo o presente não existe, e contá-lo mediria uma
+    // paciente que não existe.
+    const semVinculo = entradaDeGraca({
+      comMedico: false,
+      presenteDaInfluenciadora: PRESENTE_DA_INFLUENCIADORA,
+    });
+    expect(semVinculo).toBe(0);
+    const comVinculo = entradaDeGraca({
+      comMedico: false,
+      porInfluenciadora: true,
+      presenteDaInfluenciadora: PRESENTE_DA_INFLUENCIADORA,
+    });
+    expect(comVinculo).toBe(BONUS_INFLUENCIADORA + PRESENTE_DA_INFLUENCIADORA);
+  });
+
+  test("⚠️ o presente da criadora é MENOR que o menor do médico", () => {
+    // O que importa para a parede não é o bolso dela — é o teto por PESSOA.
+    expect(PRESENTE_DA_INFLUENCIADORA).toBeLessThan(50);
+    // E o bolso reparte: nenhuma indicada recebe mais de um por ciclo.
+    expect(MESADA_DA_INFLUENCIADORA / PRESENTE_DA_INFLUENCIADORA).toBeGreaterThanOrEqual(10);
+  });
+
+  test("⚠️ nem no teto as duas torneiras derrubam a parede para zero", () => {
+    // O arranjo mais generoso já era de 2 dias; as torneiras novas não podem
+    // torná-lo instantâneo, senão a loja grátis deixa de existir como desenho.
+    const teto = diasParaZerarLoja({
+      comMedico: true,
+      presenteDoMedico: 300,
+      presenteDeAmiga: 40,
+      porInfluenciadora: true,
+      presenteDaInfluenciadora: PRESENTE_DA_INFLUENCIADORA,
+      comDupla: true,
+      comDesafio: true,
+      ganhoDiario: GANHO_DIA_TETO,
+    });
+    expect(teto).toBeGreaterThan(0);
+    expect(teto).toBeLessThanOrEqual(3);
   });
 });

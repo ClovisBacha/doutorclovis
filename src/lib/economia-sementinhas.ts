@@ -452,6 +452,43 @@ export const PRESENTE_ENTRE_AMIGAS = 40;
 export const BONUS_DA_DUPLA = 10;
 
 /**
+ * O DESAFIO DA SEMANA EM GRUPO — 15 🌱, uma vez por semana fechada.
+ *
+ * ⚠️ **Por SEMANA, e nunca por dia.** `BONUS_DA_DUPLA` é diário porque a dupla é
+ * de duas pessoas fechando o mesmo dia; um desafio em grupo pagando por dia
+ * somaria 10 + 10 na mesma paciente e a parede sairia do lugar sem ninguém
+ * decidir. Por semana, ele é ~2,1 🌱/dia — metade de uma torneira diária
+ * pequena.
+ *
+ * ⚠️ E o valor foi MEDIDO com `diasParaZerarLoja`, não escolhido:
+ *
+ * | cenário      | hoje | com o desafio |
+ * | ------------ | ---- | ------------- |
+ * | sozinha      | 19 d | 18 d          |
+ * | com médico   | 16 d | **15 d**      |
+ * | teto         |  2 d |  2 d          |
+ *
+ * Quinze é o maior valor que mantém a parede no 15º dia no cenário com médico
+ * — que é o número que o CLAUDE.md registra como a decisão de monetização.
+ */
+export const DESAFIO_DA_SEMANA = 15;
+
+/**
+ * O BOLSO DA CRIADORA, e o que UMA paciente pode receber dela.
+ *
+ * ⚠️ O que importa para a parede não é o bolso — é o TETO POR PESSOA. Uma
+ * criadora com 300 🌱/mês espalha por dez indicadas; nenhuma delas recebe mais
+ * de 30 no ciclo, que é menos que o menor presente do médico (Semente, 50 🌱).
+ *
+ * ⚠️ E ele só alcança quem chegou pelo CÓDIGO dela (`ref_code`), que é vínculo
+ * verificado e é o mesmo grafo que já paga a comissão. O grafo de SEGUIR não
+ * serve: ele é assimétrico e unilateral, e seria a primeira torneira do app
+ * cujo destinatário se auto-elege.
+ */
+export const MESADA_DA_INFLUENCIADORA = 300;
+export const PRESENTE_DA_INFLUENCIADORA = 30;
+
+/**
  * O QUE ELA GANHA SEM TER FEITO NADA, no dia em que chega.
  *
  * ─── AS DUAS FUNÇÕES DESTE ARQUIVO DISCORDAVAM ──────────────────────────────
@@ -482,12 +519,18 @@ export function entradaDeGraca(opts: {
   presenteDeAmiga?: number;
   /** Chegou pelo código de uma influenciadora — ver `BONUS_INFLUENCIADORA`. */
   porInfluenciadora?: boolean;
+  /** A criadora presenteou (`PRESENTE_DA_INFLUENCIADORA`), no ciclo. */
+  presenteDaInfluenciadora?: number;
 }): number {
   return (
     (opts.comMedico ? BONUS_VINCULO_MEDICO : 0) +
     (opts.comMedico ? (opts.presenteDoMedico ?? 0) : 0) +
     (opts.presenteDeAmiga ?? 0) +
-    (opts.porInfluenciadora ? BONUS_INFLUENCIADORA : 0)
+    (opts.porInfluenciadora ? BONUS_INFLUENCIADORA : 0) +
+    /* ⚠️ Só quem chegou pelo código pode receber da criadora — o presente não
+       existe fora desse vínculo, e contá-lo sem ele mediria uma paciente que
+       não existe. */
+    (opts.porInfluenciadora ? (opts.presenteDaInfluenciadora ?? 0) : 0)
   );
 }
 
@@ -496,6 +539,15 @@ export type CenarioDaLoja = {
   presenteDoMedico?: number;
   presenteDeAmiga?: number;
   porInfluenciadora?: boolean;
+  presenteDaInfluenciadora?: number;
+  /**
+   * ⚠️ Está num desafio da semana em grupo?
+   *
+   * Torneira SEMANAL (`DESAFIO_DA_SEMANA`), e ela entra aqui pela mesma razão
+   * que `comDupla` entrou: torneira que a simulação não enxerga é como a
+   * parede dos quinze dias se move em silêncio.
+   */
+  comDesafio?: boolean;
   /** Quanto ela ganha por dia. O padrão é o TÍPICO — ver o bloco acima. */
   ganhoDiario?: number;
   /**
@@ -529,7 +581,8 @@ export function diasParaZerarLoja(opts: CenarioDaLoja): number {
   const porDia =
     (opts.ganhoDiario ?? GANHO_DIA_TIPICO) +
     GANHO_SEMANAL / 7 +
-    (opts.comDupla ? BONUS_DA_DUPLA : 0);
+    (opts.comDupla ? BONUS_DA_DUPLA : 0) +
+    (opts.comDesafio ? DESAFIO_DA_SEMANA / 7 : 0);
   if (porDia <= 0) return Infinity;
   return Math.ceil(alvo / porDia);
 }
@@ -544,7 +597,7 @@ export function saldoParado(dia: number, opts: CenarioDaLoja): number {
   const ganho =
     entradaDeGraca(opts) +
     dia * ((opts.ganhoDiario ?? GANHO_DIA_TIPICO) + (opts.comDupla ? BONUS_DA_DUPLA : 0)) +
-    Math.floor(dia / 7) * GANHO_SEMANAL +
+    Math.floor(dia / 7) * (GANHO_SEMANAL + (opts.comDesafio ? DESAFIO_DA_SEMANA : 0)) +
     /* Os presentes se repetem a cada ciclo — o do dia 0 já entrou acima. */
     Math.floor(dia / 30) *
       ((opts.comMedico ? (opts.presenteDoMedico ?? 0) : 0) + (opts.presenteDeAmiga ?? 0));
