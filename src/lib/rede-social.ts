@@ -247,8 +247,6 @@ export const REACOES: { tipo: TipoDeReacao; emoji: string; rotulo: string }[] = 
   { tipo: "abraco", emoji: "🤗", rotulo: "Abraço" },
 ];
 
-export const REACAO_PADRAO: TipoDeReacao = "amei";
-
 export function reacaoConhecida(t: string): t is TipoDeReacao {
   return REACOES.some((r) => r.tipo === t);
 }
@@ -273,19 +271,6 @@ export type ContagemDeReacoes = Partial<Record<TipoDeReacao, number>>;
 /** Total de reações de um post. */
 export function totalDeReacoes(c: ContagemDeReacoes): number {
   return REACOES.reduce((s, r) => s + (c[r.tipo] ?? 0), 0);
-}
-
-/**
- * Os emojis que aparecem na linha do post, em ordem de quantidade.
- *
- * Teto de três: a linha vive embaixo de cada post num celular, e cinco emojis
- * mais o número empurram o texto. Quem quiser o detalhe abre.
- */
-export function resumoDeReacoes(c: ContagemDeReacoes, teto = 3): string[] {
-  return REACOES.filter((r) => (c[r.tipo] ?? 0) > 0)
-    .sort((a, b) => (c[b.tipo] ?? 0) - (c[a.tipo] ?? 0))
-    .slice(0, teto)
-    .map((r) => r.emoji);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -357,47 +342,9 @@ export const MINIMO_DA_BUSCA = 3;
    9 · BLOQUEIO
    ══════════════════════════════════════════════════════════════════════════ */
 
-/**
- * ⚠️ **O BLOQUEIO É DE MÃO DUPLA NO EFEITO E CALADO NO AVISO.**
- *
- * Efeito duplo: se eu bloqueio alguém, nenhuma das duas vê a outra. Bloquear
- * "só de um lado" deixaria a bloqueada continuar lendo tudo que eu escrevo, o
- * que é o oposto do que a palavra promete.
- *
- * Calado: a bloqueada não recebe aviso e não vê mensagem de erro diferente —
- * o perfil simplesmente não existe para ela. Anunciar transforma o bloqueio num
- * ato de confronto, e num app onde as pessoas se conhecem da vida real isso
- * costuma piorar a situação que motivou o bloqueio.
- *
- * ⚠️ E bloquear DESFAZ o seguir nos dois sentidos. Sem isso a linha de seguir
- * fica viva e ressuscita o vínculo no dia em que o bloqueio for desfeito.
- */
-export function bloqueioDesfazSeguir(): boolean {
-  return true;
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    10 · MODO CUIDADO
    ══════════════════════════════════════════════════════════════════════════ */
-
-/**
- * O que a rede social faz quando ela liga o Modo Cuidado.
- *
- * ⚠️ **Some, sem anunciar, e sem apagar nada.** O perfil não é encontrável, os
- * posts não são visíveis para ninguém, ela não aparece na busca, e quem já a
- * seguia simplesmente para de ver posts novos — sem nenhuma mensagem dizendo
- * por quê. "Fulana saiu" contaria a perda dela para todo mundo que a seguia,
- * e essa é a decisão mais íntima que existe.
- *
- * ⚠️ E ela continua vendo os PRÓPRIOS posts. Escondê-los dela seria o app
- * apagar o bebê dela — a mesma decisão que manteve `exam_files` de pé quando o
- * envio de exames saiu do produto, e o Álbum de pé na Comunidade.
- *
- * As linhas ficam. Quando ela desligar, tudo volta como estava.
- */
-export function redeDisponivel(p: Pick<Perfil, "emCuidado">): boolean {
-  return !p.emCuidado;
-}
 
 /* ══════════════════════════════════════════════════════════════════════════
    11 · QUANDO FOI PUBLICADO

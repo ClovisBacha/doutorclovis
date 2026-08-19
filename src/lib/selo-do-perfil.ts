@@ -368,14 +368,3 @@ export function alcancaOPerfil(v: {
   if (v.sigoAtivo || v.somosAmigas) return true;
   return v.perfilPublico;
 }
-
-/** O mesmo, na linguagem do espelho. */
-export function personaAlcancaOPerfil(p: Persona, perfilPublico: boolean): boolean {
-  const olho = olharDe(p);
-  return alcancaOPerfil({
-    perfilPublico,
-    souEu: false,
-    sigoAtivo: olho.sigoAtivo,
-    somosAmigas: olho.somosAmigas,
-  });
-}

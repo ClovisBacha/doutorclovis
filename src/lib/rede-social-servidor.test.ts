@@ -184,8 +184,20 @@ describe("os avisos", () => {
     expect(corpoDe("reagir")).not.toContain("sendPushToUser");
     expect(corpoDe("publicarPost")).not.toContain("sendPushToUser");
     const c = corpoDe("seguir").replace(/\s+/g, " ");
-    expect(c).toContain('if (estado === "pendente") {');
-    expect(c.indexOf("sendPushToUser")).toBeGreaterThan(c.indexOf('if (estado === "pendente")'));
+    /* ⚠️ **Pela RÉGUA, e não por um `if` local.** `avisoMandaPush` existia com a
+       decisão escrita e ZERO chamadores, enquanto aqui morava um
+       `estado === "pendente"` que dizia a mesma coisa por acaso — duas réguas
+       para "isto merece push?", que divergem no primeiro aviso novo. O QUE ela
+       decide está testado por comportamento em `rede-social.test.ts`; aqui só se
+       cobra que o servidor não tenha uma segunda opinião. */
+    expect(c).toContain("if (avisoMandaPush(especie)) {");
+    expect(c).not.toContain('if (estado === "pendente") {');
+    expect(c.indexOf("sendPushToUser")).toBeGreaterThan(c.indexOf("avisoMandaPush(especie)"));
+    /* E a espécie que vai para o push é a MESMA que foi para a caixa — não uma
+       segunda derivação do estado. */
+    expect(c).toContain(
+      "await registrarAtividade(sb, { donoId: data.alvoId, quemId: eu, especie })",
+    );
   });
 });
 

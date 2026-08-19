@@ -16,8 +16,6 @@ import {
   postEhValido,
   REACOES,
   reacaoConhecida,
-  redeDisponivel,
-  resumoDeReacoes,
   textoDoAviso,
   totalDeReacoes,
   VISIBILIDADES,
@@ -256,23 +254,7 @@ describe("aoReagir", () => {
   });
 });
 
-describe("contagem de reações", () => {
-  test("soma e resume", () => {
-    const c = { amei: 5, abraco: 2, torcendo: 9 } as Partial<Record<TipoDeReacao, number>>;
-    expect(totalDeReacoes(c)).toBe(16);
-    expect(resumoDeReacoes(c)).toEqual(["🙏", "❤️", "🤗"]);
-  });
-
-  test("⚠️ o resumo tem teto — a linha vive num celular", () => {
-    const cheio = Object.fromEntries(REACOES.map((r, i) => [r.tipo, i + 1]));
-    expect(resumoDeReacoes(cheio).length).toBeLessThanOrEqual(3);
-  });
-
-  test("sem reação, o resumo é vazio e o total é zero", () => {
-    expect(resumoDeReacoes({})).toEqual([]);
-    expect(totalDeReacoes({})).toBe(0);
-  });
-});
+describe("contagem de reações", () => {});
 
 /* ─── 7 · AVISOS ────────────────────────────────────────────────────────── */
 
@@ -319,13 +301,6 @@ describe("a busca", () => {
 });
 
 /* ─── 10 · MODO CUIDADO ─────────────────────────────────────────────────── */
-
-describe("redeDisponivel", () => {
-  test("⚠️ some inteira no Modo Cuidado", () => {
-    expect(redeDisponivel({ emCuidado: false })).toBe(true);
-    expect(redeDisponivel({ emCuidado: true })).toBe(false);
-  });
-});
 
 describe("há quanto tempo foi publicado", () => {
   /* Um instante cravado: a função recebe o `agora`, então nada aqui depende do

@@ -24,6 +24,7 @@ import { trechoParaLike } from "@/lib/like-seguro";
 import { z } from "zod";
 import {
   aoSeguir,
+  avisoMandaPush,
   LIMITE_DA_BIO,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
@@ -1109,13 +1110,15 @@ export const seguir = createServerFn({ method: "POST" })
     /* ⚠️ Só o PEDIDO manda push — reação e "começou a te seguir" não mandam.
        O push deste app é o mesmo canal do aviso de emergência, e quem desliga
        as notificações por causa de um coraçãozinho desliga o resto junto. */
-    await registrarAtividade(sb, {
-      donoId: data.alvoId,
-      quemId: eu,
-      especie: estado === "ativo" ? "seguiu" : "pediu_para_seguir",
-    });
+    const especie = estado === "ativo" ? ("seguiu" as const) : ("pediu_para_seguir" as const);
+    await registrarAtividade(sb, { donoId: data.alvoId, quemId: eu, especie });
 
-    if (estado === "pendente") {
+    /* ⚠️ **Pela régua, e não por um `if` local.** `avisoMandaPush` existia com
+       a decisão escrita e ZERO chamadores, enquanto aqui morava um
+       `estado === "pendente"` que dizia a mesma coisa por acaso. Duas réguas
+       para "isto merece push?" divergem no primeiro aviso novo — e a divergência
+       gasta o canal por onde chega o aviso de emergência. */
+    if (avisoMandaPush(especie)) {
       try {
         const { sendPushToUser } = await import("@/lib/push.server");
         const meu = (await perfisPorId(sb, [eu])).get(eu);

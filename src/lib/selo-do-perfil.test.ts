@@ -10,7 +10,6 @@ import {
   MOSTRAR_SEMANA_PADRAO,
   OLHO_DA_PREVIA,
   olharDe,
-  personaAlcancaOPerfil,
   SEMANA_MAXIMA,
   seloDoPerfil,
   semanaPublica,
@@ -129,16 +128,6 @@ describe("o espelho", () => {
     for (const p of ["estranha", "seguidora", "amiga"] as const) {
       expect(olharDe(p).bloqueado).toBe(false);
     }
-  });
-
-  test("⚠️ com o perfil fechado, a ESTRANHA não alcança nada", () => {
-    // É a informação mais útil que a tela dá à maioria das pacientes: a de que
-    // elas não estão expostas a ninguém.
-    expect(personaAlcancaOPerfil("estranha", false)).toBe(false);
-    expect(personaAlcancaOPerfil("estranha", true)).toBe(true);
-    // Quem já foi aceita continua vendo, com o perfil aberto ou fechado.
-    expect(personaAlcancaOPerfil("seguidora", false)).toBe(true);
-    expect(personaAlcancaOPerfil("amiga", false)).toBe(true);
   });
 });
 
@@ -266,15 +255,6 @@ describe("quem alcança o perfil — a régua dos DOIS lados", () => {
     expect(
       alcancaOPerfil({ perfilPublico: false, souEu: true, sigoAtivo: false, somosAmigas: false }),
     ).toBe(true);
-  });
-
-  test("⚠️ o espelho usa a MESMA régua", () => {
-    // Enquanto eram duas, uma afirmava na tela a regra que a outra não aplicava
-    // no servidor.
-    expect(personaAlcancaOPerfil("estranha", false)).toBe(false);
-    expect(personaAlcancaOPerfil("seguidora", false)).toBe(true);
-    expect(personaAlcancaOPerfil("amiga", false)).toBe(true);
-    expect(personaAlcancaOPerfil("estranha", true)).toBe(true);
   });
 });
 
