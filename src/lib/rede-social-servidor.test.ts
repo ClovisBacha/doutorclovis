@@ -536,3 +536,42 @@ describe("o código de embaixadora no perfil — Fase 5", () => {
     expect(tela).not.toContain('.is("ref_code"');
   });
 });
+
+describe("⚠️ a régua clínica roda no CANAL PRINCIPAL", () => {
+  test("`publicarPost` tria o texto E cada opção da enquete", () => {
+    /* O raciocínio que fechou os comentários (20,9% erradas, 5,5% danosas) vale
+       palavra por palavra para um post — mesmo público, mesma tela, mesmo nome
+       de consultório em volta, e com MAIS alcance que um comentário teria.
+       A régua protegia a caixinha e deixava a porta da frente aberta: quem
+       quisesse dar o conselho perigoso não usava a caixinha, publicava. */
+    const c = corpoDe("publicarPost").replace(/\s+/g, " ");
+    expect(c).toContain("triarTexto");
+    expect(c).toContain('for (const trecho of [data.texto ?? "", ...opcoes])');
+    expect(c).toContain('desfecho !== "publicavel"');
+    /* E RECUSA antes de gravar — depois do insert seria um post publicado com
+       erro na tela. */
+    const triou = c.indexOf("triarTexto");
+    const gravou = c.indexOf('.from("rede_posts") .insert(');
+    expect(triou).toBeGreaterThan(-1);
+    expect(gravou).toBeGreaterThan(triou);
+  });
+
+  test("`publicarStory` também", () => {
+    /* O story some em 24h, o que o torna MAIS atraente para quem quer dar
+       conselho e não quer o registro. */
+    const c = corpoDe("publicarStory").replace(/\s+/g, " ");
+    expect(c).toContain("triarTexto");
+    expect(c).toContain('desfecho !== "publicavel"');
+  });
+
+  test("⚠️ o recado NÃO ensina qual palavra barrou", () => {
+    /* Devolver "sua publicação tem a palavra X" faz quem quiser burlar precisar
+       de duas tentativas. */
+    const r = semComentarios(FONTE);
+    const i = r.indexOf("function recadoDeConteudo");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = r.slice(i, r.indexOf("\n}", i));
+    expect(corpo).not.toMatch(/palavra|termo|cont(é|e)m|proibid/i);
+    expect(corpo).toContain("SOS");
+  });
+});

@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import {
   BANDEIRA_VERMELHA,
   LIMITE_DA_PERGUNTA,
+  ENTREGA_DE_CONDUTA,
   PEDIDO_DE_CONDUTA,
   PERGUNTAS_POR_DIA,
   recadoDoDesfecho,
   SINTOMA_EM_PRIMEIRA_PESSOA,
+  temTermoClinicoAlemDaAbertura,
   TERMOS_CLINICOS,
   triarTexto,
 } from "./pergunta-clinica";
@@ -34,7 +36,7 @@ describe("a bandeira vermelha vence tudo", () => {
   });
 });
 
-describe("⚠️ o PEDIDO DE CONDUTA — o caso que fechou os comentários", () => {
+describe("⚠️ a ENTREGA DE CONDUTA — o caso que fechou os comentários", () => {
   test('"comigo foi assim, não precisa ir ao pronto-socorro" não é publicável', () => {
     // Esta frase não tem bandeira vermelha NENHUMA e é a mais perigosa que uma
     // paciente pode escrever para outra. É forma, não vocabulário.
@@ -43,26 +45,113 @@ describe("⚠️ o PEDIDO DE CONDUTA — o caso que fechou os comentários", () 
     expect(triarTexto(t)).toBe("clinica");
   });
 
-  test("pega o pedido E a entrega", () => {
+  test("⚠️ e as VARIANTES NATURAIS dela, que passavam todas", () => {
+    /* Medido: a primeira régua pegava só a forma exata acima. Estas cinco são a
+       mesma frase parafraseada — as que uma gestante de verdade escreve — e
+       TODAS eram publicáveis. O padrão dominante é o relato de conduta na
+       primeira pessoa do passado, que é justamente o que soa mais confiável
+       para quem lê. */
     for (const t of [
-      "posso tomar dipirona?",
-      "devo ir ao hospital?",
-      "isso é normal?",
-      "no seu lugar eu esperava",
-      "não precisa ir não",
-      "fica em casa que passa",
+      "no meu caso eu não fui no hospital e deu tudo certo",
+      "eu deixei pra ir no dia seguinte e não deu nada",
+      "olha, eu ficaria em casa e observaria",
+      "melhor esperar amanhã, hospital de madrugada é péssimo",
+      "eu tive isso e passou sozinho, nem precisei de médico",
     ]) {
-      expect(triarTexto(t)).not.toBe("publicavel");
+      expect(BANDEIRA_VERMELHA.test(t)).toBe(false);
+      expect(triarTexto(t)).toBe("clinica");
     }
   });
 
-  test("⚠️ a ORDEM importa: conduta é conferida antes do vocabulário", () => {
-    // "não precisa ir ao pronto-socorro" não tem termo clínico nenhum:
-    // invertida, a régua a deixaria virar post público.
+  test("⚠️ a entrega é INCONDICIONAL — não precisa de termo clínico junto", () => {
+    // "não precisa ir" não tem vocabulário nenhum: exigindo termo clínico, ela
+    // viraria post público.
     const t = "não precisa ir";
     expect(TERMOS_CLINICOS.test(t)).toBe(false);
-    expect(PEDIDO_DE_CONDUTA.test(t)).toBe(true);
+    expect(ENTREGA_DE_CONDUTA.test(t)).toBe(true);
     expect(triarTexto(t)).toBe("clinica");
+  });
+
+  test("e o PEDIDO só roteia com o objeto certo", () => {
+    expect(triarTexto("posso tomar dipirona?")).toBe("clinica");
+    expect(triarTexto("devo ir ao hospital?")).toBe("clinica");
+    /* ⚠️ E o contrário: `posso`, `devo` e `é normal` são as três aberturas mais
+       comuns do português — numa CAIXINHA DE PERGUNTAS. Incondicionais, elas
+       mandavam estas ao consultório, que é como um recurso morre. */
+    expect(triarTexto("posso levar minha mãe na sala de parto?")).toBe("publicavel");
+    expect(triarTexto("é normal chorar assistindo comercial?")).toBe("publicavel");
+    expect(triarTexto("tenho que ir no mercado hoje, quem vai?")).toBe("publicavel");
+  });
+});
+
+describe("⚠️ as bandeiras que a primeira régua não tinha", () => {
+  test("a pressão em NÚMEROS, que é como se escreve", () => {
+    /* A lista tinha "pressão alta" por extenso, e ninguém escreve assim. */
+    expect(triarTexto("minha pressão deu 15 por 10 ontem, alguém já teve isso?")).toBe(
+      "emergencia",
+    );
+    expect(triarTexto("pa 150/100 hoje de manhã")).toBe("emergencia");
+  });
+
+  test("⚠️ e a DATA não vira pressão", () => {
+    /* `12/8` é data. O par só conta com a palavra `pressão` perto, ou escrito
+       com "por" por extenso — que é como se fala pressão e não como se escreve
+       data. */
+    expect(triarTexto("minha consulta é dia 12/8, quem mais tem nessa semana?")).toBe("publicavel");
+  });
+
+  test("movimento REDUZIDO, e não só ausente", () => {
+    /* O motivo obstétrico número um para ir ser monitorada — e a régua só
+       pegava "não mexe" e "parou de mexer". */
+    expect(triarTexto("meu bebê mexeu bem menos hoje que ontem")).toBe("emergencia");
+    expect(triarTexto("senti bem menos movimento hoje")).toBe("emergencia");
+  });
+
+  test("líquido, vista e ideação por eufemismo", () => {
+    expect(triarTexto("acho que perdi um pouco de líquido, molhou a calcinha")).toBe("emergencia");
+    expect(triarTexto("minha vista ficou meio estranha depois do almoço")).toBe("emergencia");
+    expect(triarTexto("penso em sumir")).toBe("emergencia");
+    expect(triarTexto("não quero mais viver")).toBe("emergencia");
+  });
+
+  test('⚠️ "não aguento mais" NÃO é bandeira, e isso é deliberado', () => {
+    /* É hipérbole cotidiana. Abrir a Central de Emergência nela ensinaria a
+       ignorar o alarme — que é o único jeito de o alarme deixar de funcionar. */
+    expect(triarTexto("não aguento mais essa azia")).not.toBe("emergencia");
+  });
+
+  test("o que pede médico sem ser emergência", () => {
+    /* Barriga endurecendo é conversa diária de terceiro trimestre: mandar cada
+       uma para a Central ensinaria a ignorar o alarme, e deixá-la virar post
+       deixaria "endureceu 10 vezes e não fui" circular. O meio-termo é o médico. */
+    expect(triarTexto("a barriga endureceu umas 6 vezes hoje, com 30 semanas")).toBe("clinica");
+    expect(triarTexto("quem tomou misoprostol em casa?")).toBe("clinica");
+    expect(triarTexto("chá de canela ajuda a entrar em trabalho de parto?")).toBe("clinica");
+    expect(triarTexto("meu exame de glicose deu 105 em jejum")).toBe("clinica");
+  });
+});
+
+describe("⚠️ o `&&` que era vazio", () => {
+  test("`sinto` e `senti` estão nas DUAS listas, e sozinhos não bastam", () => {
+    /* A mesma palavra satisfazia os dois lados da conjunção, então toda frase
+       com "sinto"/"senti" virava caso clínico — incluindo os dois posts mais
+       valiosos que este app pode receber. Medido. */
+    for (const t of [
+      "senti muito amor quando vi o rostinho dele",
+      "sinto que o tempo está passando rápido demais",
+      "estou com saudade de tomar cerveja kkk",
+    ]) {
+      expect(SINTOMA_EM_PRIMEIRA_PESSOA.test(t)).toBe(true);
+      expect(temTermoClinicoAlemDaAbertura(t)).toBe(false);
+      expect(triarTexto(t)).toBe("publicavel");
+    }
+  });
+
+  test("e o sintoma de verdade continua roteando", () => {
+    for (const t of ["estou com muita dor nas costas", "acordei com o pé inchado"]) {
+      expect(temTermoClinicoAlemDaAbertura(t)).toBe(true);
+      expect(triarTexto(t)).toBe("clinica");
+    }
   });
 });
 

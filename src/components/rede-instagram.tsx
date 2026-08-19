@@ -1876,7 +1876,18 @@ export function RedeNoApp({
           aula: p.aula,
         },
       });
-      if (!r.ok) return false;
+      if (!r.ok) {
+        /* ⚠️ **O recado da régua clínica precisa CHEGAR.** Sem ele, quem
+           escreveu "não precisa ir ao pronto-socorro" recebe um "não deu para
+           publicar" genérico, reescreve a mesma frase e tenta de novo para
+           sempre. O texto vem do SERVIDOR — decidir aqui por que foi recusado
+           seria uma segunda régua clínica no navegador. */
+        if ("recado" in r && r.recado) {
+          const { toast } = await import("sonner");
+          toast.error(r.recado, { duration: 7000 });
+        }
+        return false;
+      }
       /* Recarrega em vez de enfiar o post na lista: a URL da foto volta
          ASSINADA do balde, e a data URL que subiu não é a que o feed mostra. */
       await carregarFeed();

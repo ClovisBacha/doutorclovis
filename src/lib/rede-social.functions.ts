@@ -1178,6 +1178,21 @@ export const responderPedido = createServerFn({ method: "POST" })
    POSTS E FEED
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * O que a tela diz quando a régua clínica recusa um post, um story ou uma
+ * opção de enquete.
+ *
+ * ⚠️ **Diz o que fazer em vez disso, e NUNCA qual palavra barrou.** Devolver
+ * "sua publicação tem a palavra X" ensina a burlar em duas tentativas — e a
+ * frase de emergência precisa oferecer o caminho que serve, não uma recusa.
+ */
+function recadoDeConteudo(d: "clinica" | "emergencia"): string {
+  if (d === "emergencia") {
+    return "Isso é assunto de atendimento agora — abra o SOS em vez de publicar.";
+  }
+  return "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela.";
+}
+
 export const publicarPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -1232,7 +1247,29 @@ export const publicarPost = createServerFn({ method: "POST" })
     /* ⚠️ A enquete conta como conteúdo: um post que é SÓ a enquete é legítimo
        ("menino ou menina?" não precisa de foto nem de legenda), e sem isto ele
        seria recusado como vazio. */
+    /* ⚠️ **A RÉGUA CLÍNICA RODA AQUI, e ela não rodava.**
+       `pergunta-clinica.ts` protegia a caixinha e deixava o canal PRINCIPAL
+       aberto — mesmo público, mesma tela, mesmo nome de consultório em volta, e
+       com mais alcance que um comentário teria. Quem quisesse dar o conselho
+       perigoso não usava a caixinha: publicava. Pior: a resposta triada da
+       caixinha vira uma linha em `rede_posts`, a MESMA tabela que qualquer um
+       escrevia sem triagem nenhuma.
+
+       ⚠️ E vale para CADA OPÇÃO DA ENQUETE, não só para o texto. Uma enquete
+       "[Vai pro PS agora · Espera passar · Liga pro médico]" faz catorze
+       desconhecidas emitirem uma conduta obstétrica COM PLACAR — estritamente
+       pior que um comentário, que é a opinião de uma pessoa. `desafio-em-grupo`
+       já tinha tomado a decisão certa para o mesmo risco (catálogo fechado); a
+       enquete repetiu o erro que o desafio evitou. */
     const opcoes = limparOpcoes(data.enquete ?? []);
+    const { triarTexto } = await import("@/lib/pergunta-clinica");
+    for (const trecho of [data.texto ?? "", ...opcoes]) {
+      const desfecho = triarTexto(trecho);
+      if (desfecho !== "publicavel") {
+        return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
+      }
+    }
+
     const temEnquete = opcoes.length > 0;
     if (temEnquete && !enqueteValida(opcoes)) {
       return { ok: false as const, motivo: "enquete" as const };
@@ -1956,6 +1993,16 @@ export const publicarStory = createServerFn({ method: "POST" })
       .eq("id", eu)
       .maybeSingle();
     if ((meu as any)?.care_mode) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ A MESMA régua do post — o story tem texto, e some em 24h, o que o
+       torna MAIS atraente para quem quer dar conselho e não quer o registro. */
+    {
+      const { triarTexto } = await import("@/lib/pergunta-clinica");
+      const desfecho = triarTexto(data.texto ?? "");
+      if (desfecho !== "publicavel") {
+        return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
+      }
+    }
 
     const { guardarImagem } = await import("@/lib/imagens.server");
     const caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
