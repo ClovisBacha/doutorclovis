@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { paraLike } from "@/lib/like-seguro";
 import crypto from "node:crypto";
 
 /** Compara dois segredos em tempo constante (evita timing attack). */
@@ -221,7 +222,7 @@ async function nudgeGratidaoDaSemana(): Promise<number> {
   const { data: rows, error } = await (supabaseAdmin as any)
     .from("journal_entries")
     .select("user_id")
-    .ilike("content", `${PREFIXO_GRATIDAO}%`)
+    .ilike("content", `${paraLike(PREFIXO_GRATIDAO)}%`)
     .gte("created_at", desde)
     .limit(5000);
   if (error) {

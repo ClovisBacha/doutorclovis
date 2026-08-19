@@ -344,6 +344,14 @@ export const minhasAmigas = createServerFn({ method: "POST" })
         jaPresenteada: jaGanharam.has(p.id),
       };
     });
+    /* ⚠️ **O avatar da rede é URL ASSINADA, e ela VENCE.** `salvarPerfilSocial`
+       grava sete dias na coluna; no oitavo a foto responde 403 — e não só na
+       Comunidade: esta lista lê a MESMA coluna. `renovarUrlAssinada` devolve
+       data URL e link externo intactos, então quem gravou pelo `campo-foto` não
+       é tocada. */
+    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
+    for (const a of amigas) a.avatarUrl = await renovarUrlAssinada(a.avatarUrl);
+
     /* Ordem: a chama mais alta primeiro. Não é placar — é a lista de quem está
        ativa, que é quem faz sentido convidar para a dupla hoje. */
     amigas.sort((a, b) => b.sequencia - a.sequencia);
@@ -448,11 +456,13 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
     const decor = blob["dc-path-decor"] as { items?: unknown[] } | undefined;
     const skin = typeof blob["dc-path-skin"] === "string" ? (blob["dc-path-skin"] as string) : null;
 
+    /* Mesma renovação da lista — ver o comentário em `minhasAmigas`. */
+    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
     const perfil: PerfilDeAmiga = {
       id: p.id,
       nome: (p.display_name ?? "").trim() || "Amiga",
       bebe: (p.baby_name ?? "").trim() || null,
-      avatarUrl: (p.avatar_url as string | null) ?? null,
+      avatarUrl: await renovarUrlAssinada((p.avatar_url as string | null) ?? null),
       vistaEm: (p.last_seen_at as string | null) ?? null,
       sequencia: chamaDe(linhas, hoje),
       trofeus: trofeusDasChaves(

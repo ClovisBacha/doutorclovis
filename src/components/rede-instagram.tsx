@@ -970,7 +970,6 @@ export function CaixinhaNoPerfil({
 export function TelaDePerfil({
   perfil,
   posts,
-  seguindo = 0,
   aoSeguir,
   aoVoltar,
   aoAbrirPost,
@@ -985,7 +984,6 @@ export function TelaDePerfil({
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
-  seguindo?: number;
   aoSeguir?: () => void;
   aoVoltar?: () => void;
   aoAbrirPost?: (id: string) => void;
@@ -1144,7 +1142,7 @@ export function TelaDePerfil({
                   <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
                 </button>
                 <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
-                  <Numero valor={seguindo} rotulo="seguindo" />
+                  <Numero valor={perfil.euSigo ?? 0} rotulo="seguindo" />
                 </button>
               </>
             )}

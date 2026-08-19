@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { paraLike } from "@/lib/like-seguro";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { babyForWeek, fruitEmojiForWeek } from "@/lib/gestacao";
@@ -7406,7 +7407,7 @@ export function BondingBlock({
           .from("journal_entries")
           .select("content,created_at")
           .eq("user_id", u.user.id)
-          .ilike("content", `${PREFIXO_GRATIDAO}%`)
+          .ilike("content", `${paraLike(PREFIXO_GRATIDAO)}%`)
           /* CRESCENTE: a carta conta a história na ordem em que aconteceu. */
           .order("created_at", { ascending: true })
           .limit(300);
@@ -8050,7 +8051,7 @@ export function GratitudeBlock({
             .from("journal_entries")
             .select("content,created_at", { count: "exact" })
             .eq("user_id", u.user.id)
-            .ilike("content", `${PREFIXO_GRATIDAO}%`)
+            .ilike("content", `${paraLike(PREFIXO_GRATIDAO)}%`)
             .order("created_at", { ascending: false })
             .limit(200),
           /* O humor de HOJE decide o tom da pergunta. Só os de hoje: um dia

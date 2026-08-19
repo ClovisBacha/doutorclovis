@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { paraLike } from "@/lib/like-seguro";
 import { z } from "zod";
 
 /** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
@@ -226,7 +227,7 @@ export const getMyAppointments = createServerFn({ method: "POST" })
       // ilike mantém a insensibilidade a maiúsculas para linhas antigas, mas o
       // e-mail precisa ter %/_ escapados: sem isso viram curingas LIKE e uma
       // conta maria_jose@ leria as consultas de maria.jose@ (vazamento).
-      .ilike("patient_email", email.replace(/([\\%_])/g, "\\$1"))
+      .ilike("patient_email", paraLike(email))
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) {

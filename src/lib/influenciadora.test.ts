@@ -143,7 +143,15 @@ describe("⚠️ o painel dela é resolvido pela SESSÃO, nunca por um código d
        cadastrou com maiúscula abriria a tela e veria "você ainda não é
        embaixadora" com o painel dela existindo do outro lado. */
     expect(servidor).toContain("toLowerCase()");
-    expect(servidor).toContain('.ilike("email", email)');
+    /* ⚠️ **E o valor VAI ESCAPADO.** `.ilike("email", email)` cru fazia `%` e
+       `_` do e-mail virarem CURINGAS: uma conta `maria_silva@hotmail.com`
+       casava a linha de `maria.silva@hotmail.com` e abria o faturamento, o
+       código e a lista de até 200 indicadas dela. É o mesmo vazamento que
+       `appointments.functions.ts` já tinha consertado inline — e que três
+       chamadas novas de afiliada nasceram sem. Ver `like-seguro.ts`, que tem
+       catraca varrendo todo `.ilike(` do repo. */
+    expect(servidor).toContain('.ilike("email", paraLike(email))');
+    expect(servidor).not.toContain('.ilike("email", email)');
     const sql = readFileSync("supabase/APLICAR_INFLUENCIADORA.sql", "utf8");
     expect(sql).toContain("lower(email)");
   });

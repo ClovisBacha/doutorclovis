@@ -455,3 +455,73 @@ describe("⚠️ o conjunto de bloqueio falha FECHADO", () => {
     expect(b.has("bia")).toBe(true);
   });
 });
+
+describe("⚠️ `publico` é a camada MAIS aberta, e não a mais fechada", () => {
+  const post = { autorId: "marina", visibilidade: "publico" as const };
+  const base = { post, euId: "ana", bloqueado: false };
+
+  test("perfil FECHADO: quem segue e quem é amiga continuam vendo", () => {
+    /* O perfil NASCE privado. Sem o `||`, a paciente que nunca mexeu na chave
+       e publicou em "Todo mundo · Qualquer pessoa no app" fazia um post que
+       ninguém via — nem as amigas —, enquanto o MESMO texto em "Quem me segue"
+       apareceria. O rótulo prometia o contrário do que acontecia. */
+    const autor = { emCuidado: false, publico: false };
+    expect(podeVerPost({ ...base, autor, sigoAtivo: true, somosAmigas: false })).toBe(true);
+    expect(podeVerPost({ ...base, autor, sigoAtivo: false, somosAmigas: true })).toBe(true);
+  });
+
+  test("perfil FECHADO: a estranha continua de fora", () => {
+    /* A intenção original fica de pé: quem fechou o perfil depois de publicar
+       não passa a ser lida por quem nunca teve esse direito. */
+    expect(
+      podeVerPost({
+        ...base,
+        autor: { emCuidado: false, publico: false },
+        sigoAtivo: false,
+        somosAmigas: false,
+      }),
+    ).toBe(false);
+  });
+
+  test("⚠️ MONOTONIA: o que `seguidores` mostra, `publico` também mostra", () => {
+    /* É a propriedade que faltava, e a única que torna os três rótulos
+       honestos. Vale nas quatro combinações de vínculo, com o perfil nos dois
+       estados. */
+    for (const publico of [true, false]) {
+      for (const sigoAtivo of [true, false]) {
+        for (const somosAmigas of [true, false]) {
+          const autor = { emCuidado: false, publico };
+          const comSeguidores = podeVerPost({
+            ...base,
+            post: { autorId: "marina", visibilidade: "seguidores" },
+            autor,
+            sigoAtivo,
+            somosAmigas,
+          });
+          const comPublico = podeVerPost({ ...base, autor, sigoAtivo, somosAmigas });
+          if (comSeguidores) expect(comPublico).toBe(true);
+        }
+      }
+    }
+  });
+
+  test("e Modo Cuidado e bloqueio continuam vencendo", () => {
+    expect(
+      podeVerPost({
+        ...base,
+        autor: { emCuidado: true, publico: true },
+        sigoAtivo: true,
+        somosAmigas: true,
+      }),
+    ).toBe(false);
+    expect(
+      podeVerPost({
+        ...base,
+        autor: { emCuidado: false, publico: true },
+        bloqueado: true,
+        sigoAtivo: true,
+        somosAmigas: true,
+      }),
+    ).toBe(false);
+  });
+});

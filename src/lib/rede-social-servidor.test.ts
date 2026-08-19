@@ -210,7 +210,14 @@ describe("o que é dela", () => {
     // tela está fingindo ser a de uma visitante (senão a prévia mostraria à
     // "estranha" um contador que ela nunca veria).
     const c = corpoDe("verPerfil").replace(/\s+/g, " ");
-    expect(c).toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
+    /* ⚠️ O que importa é o `null` nos DOIS casos de terceiro (visitante e
+       espelho) — o número real só existe no ramo do meio. A asserção antiga
+       cravava o literal `0`, e por isso continuava verde sobre o defeito que
+       ela deveria ter pegado: o contador REAL nunca chegava à tela, e o perfil
+       dizia "0 seguidores" logo acima de uma lista com doze pessoas. */
+    expect(c).toMatch(/meusSeguidores: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
+    expect(c).not.toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
+    expect(c).toMatch(/euSigo: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
     expect(corpoDe("buscarPerfis")).toContain("meusSeguidores: null");
   });
 

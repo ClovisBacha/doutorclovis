@@ -328,3 +328,41 @@ export async function apagarPastaDoDono(balde: string, donoId: string): Promise<
     /* ver o comentário acima */
   }
 }
+
+/**
+ * RENOVA UMA URL ASSINADA QUE FOI GUARDADA NUMA COLUNA.
+ *
+ * ⚠️ **`avatar_url` guarda a URL, e URL assinada VENCE.** O avatar da rede era
+ * assinado por sete dias e gravado na coluna, com um comentário dizendo "a
+ * próxima leitura renova" — e nada renovava: `perfisPorId` lê a coluna e
+ * repassa. No oitavo dia a foto de perfil de toda paciente passa a responder
+ * 403, e não só na Comunidade: `minhasAmigas` lê a MESMA coluna, então a aba
+ * Amigas quebra junto. Um defeito de app inteiro, com data marcada, invisível
+ * em teste e em bancada.
+ *
+ * Aqui a promessa vira código. Recebe o que estiver na coluna e devolve algo
+ * que carrega hoje:
+ *
+ *  · **data URL** (o que `campo-foto.tsx` e o ritual de boas-vindas gravam) —
+ *    volta igual, não há o que assinar;
+ *  · **URL assinada nossa** — o caminho do objeto está DENTRO dela
+ *    (`/object/sign/<balde>/<caminho>?token=…`), então dá para assinar de novo
+ *    sem coluna nova e sem migração;
+ *  · **qualquer outra coisa** (link externo, `null`) — volta igual.
+ *
+ * ⚠️ E falhar ao renovar devolve a URL ANTIGA, nunca `null`: uma URL vencida
+ * ainda pode estar dentro da validade no cache do navegador dela, e trocar uma
+ * foto talvez-quebrada por um vazio garantido é piorar.
+ */
+export async function renovarUrlAssinada(
+  guardada: string | null | undefined,
+  segundos = VALIDADE_SEGUNDOS,
+): Promise<string | null> {
+  if (!guardada) return null;
+  if (guardada.startsWith("data:")) return guardada;
+  const m = guardada.match(/\/object\/sign\/([^/]+)\/([^?]+)/);
+  if (!m) return guardada;
+  const balde = decodeURIComponent(m[1]);
+  const caminho = decodeURIComponent(m[2]);
+  return (await urlAssinada(balde, caminho, segundos)) ?? guardada;
+}

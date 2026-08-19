@@ -8,6 +8,7 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
+import { paraLike, trechoParaLike } from "@/lib/like-seguro";
 import { z } from "zod";
 import { PLAN_RANK, normalizePlan, entitlementsFor } from "@/lib/entitlements";
 
@@ -687,8 +688,8 @@ export const searchDoctors = createServerFn({ method: "POST" })
          silêncio é pior que o erro que isso substituiu: ela filtra "São Paulo +
          doutorado" e recebe o diretório nacional achando que está filtrado. */
       if (!semFiltros) {
-        if (data.state) q = q.ilike("state", data.state);
-        if (data.city) q = q.ilike("city", `%${data.city}%`);
+        if (data.state) q = q.ilike("state", paraLike(data.state));
+        if (data.city) q = q.ilike("city", trechoParaLike(data.city));
         if (data.hasMasters) q = q.eq("has_masters", true);
         if (data.hasDoctorate) q = q.eq("has_doctorate", true);
         if (data.minExperience > 0) q = q.gte("years_experience", data.minExperience);

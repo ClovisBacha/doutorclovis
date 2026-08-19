@@ -20,6 +20,7 @@
  * posts custar oitenta consultas — e o feed é a tela mais aberta do app.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { trechoParaLike } from "@/lib/like-seguro";
 import { z } from "zod";
 import {
   aoSeguir,
@@ -176,6 +177,14 @@ export type PerfilNaTela = {
    * existir ou não, e sem ele a visitante não teria como saber que pode.
    */
   aceitaPerguntas: boolean;
+  /**
+   * Quantas pessoas EU acompanho — só no meu próprio perfil.
+   *
+   * ⚠️ Viaja com o perfil, e não como prop solta da tela: `seguindo` era uma
+   * prop de `TelaDePerfil` que NENHUM chamador de produção passava, então o
+   * número nascia `0` e a lista abria com doze pessoas embaixo dele.
+   */
+  euSigo: number | null;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -248,6 +257,32 @@ async function contextoDe(sb: any, eu: string): Promise<Contexto> {
   };
 }
 
+/**
+ * Quantas pessoas me acompanham.
+ *
+ * ⚠️ Só para a DONA — não existe contador público de seguidores neste app, e a
+ * razão está em `NUMEROS_PUBLICOS`: um placar de audiência mede popularidade
+ * num momento em que ela já está sendo medida clinicamente.
+ */
+async function contarSeguidores(sb: any, eu: string): Promise<number> {
+  const { count } = await sb
+    .from("rede_seguidores")
+    .select("seguidor_id", { count: "exact", head: true })
+    .eq("seguido_id", eu)
+    .eq("estado", "ativo");
+  return count ?? 0;
+}
+
+/** Quantas pessoas eu acompanho. */
+async function contarSeguindo(sb: any, eu: string): Promise<number> {
+  const { count } = await sb
+    .from("rede_seguidores")
+    .select("seguido_id", { count: "exact", head: true })
+    .eq("seguidor_id", eu)
+    .eq("estado", "ativo");
+  return count ?? 0;
+}
+
 /** Perfis por id, com o que a rede precisa. */
 async function perfisPorId(sb: any, ids: string[]) {
   if (ids.length === 0) return new Map<string, any>();
@@ -267,7 +302,17 @@ async function perfisPorId(sb: any, ids: string[]) {
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
   const linhas = error ? await semAsColunasDoSelo(sb, ids) : ((data ?? []) as any[]);
-  return new Map(linhas.map((p) => [p.id, p]));
+  /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
+     `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
+     falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
+     inteiro. Um ponto só, porque `perfisPorId` alimenta feed, perfil, busca,
+     stories, atividade e salvos — renovar em cada um deles seria seis lugares
+     para esquecer o sétimo. */
+  const { renovarUrlAssinada } = await import("@/lib/imagens.server");
+  const renovadas = await Promise.all(
+    linhas.map(async (p) => ({ ...p, avatar_url: await renovarUrlAssinada(p.avatar_url) })),
+  );
+  return new Map(renovadas.map((p) => [p.id, p]));
 }
 
 /**
@@ -958,7 +1003,10 @@ export const verPerfil = createServerFn({ method: "POST" })
       /* ⚠️ `null` para terceiros — não existe contador público de seguidores.
          Um placar de audiência num app de gestação de alto risco mede
          popularidade num momento em que ela já está sendo medida clinicamente. */
-      meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null,
+      /* ⚠️ Era `0` CRAVADO, e a tela dizia "0 seguidores" logo acima de uma
+         lista que abre com doze pessoas. O número existe em `meuPerfilSocial`
+         desde sempre e nunca chegava aqui. */
+      meusSeguidores: persona ? null : data.alvoId === eu ? await contarSeguidores(sb, eu) : null,
       /* ⚠️ Os selos passam pela MESMA régua na prévia e na tela real. Eles não
          dependem de quem olha — dependem das chaves —, e é justamente por isso
          que precisam estar aqui: era o campo que uma prévia feita só sobre
@@ -980,6 +1028,7 @@ export const verPerfil = createServerFn({ method: "POST" })
          uma visitante vê, e escondê-la do espelho faria a prévia mentir sobre
          a única porta que estranhos têm para escrever para ela. */
       aceitaPerguntas: !!a.aceita_perguntas,
+      euSigo: persona ? null : data.alvoId === eu ? await contarSeguindo(sb, eu) : null,
     };
 
     return { ok: true as const, perfil, posts: ordenarFeed(posts) };
@@ -1142,9 +1191,23 @@ export const publicarPost = createServerFn({ method: "POST" })
         visibilidade: z.enum(["publico", "seguidores", "amigas"]),
         /** 2 a 4 opções curtas, ou nada. */
         enquete: z.array(z.string().max(80)).max(6).optional(),
-        /** Só dia e título — ver `AulaNoPost`. */
+        /**
+         * ⚠️ **`{ tema }`, e NUNCA `{ dia }`** — e este validador dizia o
+         * contrário, o que quebrava publicar por completo.
+         *
+         * `AulaNoPost` é `{ tema }` desde que a régua decidiu que o dia
+         * gestacional (D = semana × 7 + diaDaSemana) não sai do aparelho dela;
+         * o compositor manda `{ tema }`; e o zod pedia `dia` obrigatório. O
+         * `.parse()` é do objeto INTEIRO, então quem tocasse em "📚 Anexar a
+         * aula de hoje" perdia a publicação inteira, com um "não deu para
+         * publicar" que se repetiria para sempre.
+         *
+         * Nem `tsc` nem teste viam: `inputValidator` recebe `unknown`, e o
+         * contrato de entrada era o único lugar do repo que ainda falava em
+         * `dia`. Agora a validação é a MESMA régua da leitura (`aulaValida`).
+         */
         aula: z
-          .object({ dia: z.number(), titulo: z.string().max(120) })
+          .object({ tema: z.string().max(40) })
           .nullable()
           .optional(),
       })
@@ -1692,7 +1755,7 @@ export const buscarPerfis = createServerFn({ method: "POST" })
       .from("patient_profiles")
       .select("id, display_name, avatar_url, bio, perfil_publico, care_mode")
       .eq("perfil_publico", true)
-      .ilike("display_name", `%${data.termo.trim()}%`)
+      .ilike("display_name", trechoParaLike(data.termo.trim()))
       .limit(20);
 
     const ctx = await contextoDe(sb, eu);

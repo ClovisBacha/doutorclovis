@@ -16,6 +16,7 @@
  * na primeira corrida.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { paraLike } from "@/lib/like-seguro";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
 import { grantSementinhas } from "@/lib/sementinhas.functions";
@@ -56,7 +57,7 @@ async function criadoraDaSessao(sb: any, supabaseAdmin: any, accessToken: string
     const { data } = await sb
       .from("affiliates")
       .select("code,name,active")
-      .ilike("email", email)
+      .ilike("email", paraLike(email))
       .maybeSingle();
     return data?.active ? (data as { code: string; name: string }) : null;
   } catch {

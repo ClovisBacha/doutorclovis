@@ -229,6 +229,7 @@ function Bancada() {
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
     meusSeguidores: meu ? 137 : null,
+    euSigo: meu ? 64 : null,
     /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
        liga os dois, e `?selo=2` liga SÓ o do bebê — que é o caso que prova que
        uma chave sozinha não desenha a vírgula solta da outra. */
@@ -571,7 +572,6 @@ function Bancada() {
         <TelaDePerfil
           perfil={perfil}
           posts={vazio ? [] : POSTS}
-          seguindo={64}
           aoVoltar={() => history.back()}
           aoSeguir={() => alert("seguir")}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}

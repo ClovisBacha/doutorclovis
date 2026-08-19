@@ -40,6 +40,7 @@ const PERFIL: PerfilNaTela = {
   meuVinculo: null,
   souEu: true,
   meusSeguidores: 137,
+  euSigo: 64,
   seloSemana: "32 semanas",
   seloBebe: "Helena",
   /* A pílula do código: só no perfil de OUTRA pessoa (`?meu=1` some). */

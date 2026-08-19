@@ -175,9 +175,18 @@ export function podeVerPost(opts: {
 
   if (post.visibilidade === "amigas") return opts.somosAmigas;
   if (post.visibilidade === "seguidores") return opts.sigoAtivo || opts.somosAmigas;
-  /* `publico` ainda exige o perfil estar aberto: ela pode ter fechado o perfil
-     depois de publicar, e a decisão nova manda sobre a antiga. */
-  return autor.publico;
+  /* `publico` exige o perfil estar aberto **OU** o vínculo que já bastaria na
+     camada de baixo.
+     ⚠️ **Sem o `||`, a camada mais ABERTA era a mais FECHADA de todas** — e não
+     num caso de canto: o perfil NASCE privado (`PERFIL_PUBLICO_PADRAO =
+     false`), então a paciente que nunca mexeu na chave e publicou em "Todo
+     mundo · Qualquer pessoa no app" fazia um post que ninguém via, nem as
+     amigas dela, enquanto o MESMO texto em "Quem me segue" apareceria. O rótulo
+     prometia o contrário do que acontecia, e o post sumia em silêncio.
+     A intenção original continua de pé — quem fechou o perfil depois de
+     publicar não passa a ser lida por estranhas —, porque `sigoAtivo` e
+     `somosAmigas` são exatamente quem já tinha esse direito. */
+  return autor.publico || opts.sigoAtivo || opts.somosAmigas;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
