@@ -1221,6 +1221,17 @@ export function TelaDePerfil({
                       Isso vale uma vez só e não dá para trocar depois — é o mesmo campo onde entra
                       o código da sua médica, se ela te passou um.
                     </p>
+                    {/* ⚠️ **O CONSENTIMENTO PRECISA DIZER O QUE ACONTECE.** O
+                        código faz o primeiro nome dela aparecer numa lista da
+                        criadora, e as duas telas que pediam o código falavam só
+                        das 150 🌱. Isso é "expor a paciente sem ela saber" — e o
+                        que fica exposto não é um nome qualquer: é "esta pessoa é
+                        paciente de um app de gestação de alto risco", que é dado
+                        de saúde por inferência. */}
+                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                      Quem te trouxe passa a ver o seu primeiro nome numa lista, para poder te
+                      presentear. Nada mais do seu acompanhamento aparece para ela.
+                    </p>
                     <div className="mt-2.5 flex gap-2">
                       <button
                         type="button"
@@ -1428,6 +1439,8 @@ export function RedeNoApp({
   const [bolhas, setBolhas] = useState<BolhaDeStory[]>([]);
   const [vendoStory, setVendoStory] = useState<BolhaDeStory | null>(null);
   const [euId, setEuId] = useState<string | null>(null);
+  /** A MINHA foto. Ver a fileira de stories — `perfil` é o último perfil ABERTO. */
+  const [meuAvatar, setMeuAvatar] = useState<string | null>(null);
   const [avisos, setAvisos] = useState<AtividadeNaTela[]>([]);
   const [naoVistas, setNaoVistas] = useState(0);
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
@@ -1491,6 +1504,7 @@ export function RedeNoApp({
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) {
         setEuId(meu.perfil.id);
+        setMeuAvatar(meu.perfil.avatarUrl ?? null);
         setSemanaDoCarimbo(meu.semanaDoCarimbo);
       }
       if (at.ok) {
@@ -1535,9 +1549,16 @@ export function RedeNoApp({
     if (!t) return;
     const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
     const r = await salvarPerfilSocial({ data: { accessToken: t, aceitaPerguntas: aberta } });
+    const { toast } = await import("sonner");
     if (!r.ok) {
-      const { toast } = await import("sonner");
       toast.error("Não deu para mudar agora. Tente de novo.");
+      return;
+    }
+    /* ⚠️ `parcial` = o banco não tem a coluna, e o recuo salvou só o resto.
+       Acender a chave aqui faria a tela afirmar que a caixa está aberta
+       enquanto o servidor recusa toda pergunta. */
+    if ("parcial" in r && r.parcial) {
+      toast.error("A caixinha ainda não está pronta no servidor.");
       return;
     }
     setCaixaAberta(aberta);
@@ -1800,6 +1821,12 @@ export function RedeNoApp({
       });
     setPosts(aplicar);
     setDoPerfil(aplicar);
+    /* ⚠️ **`sugestoes` é uma QUARTA lista, e ela era esquecida aqui e em
+       `guardar`.** `votar`, logo abaixo, lembra — e a divergência era invisível
+       na bancada, porque os handlers de mentira dela não têm estado. Na zona
+       "Publicações sugeridas" o servidor gravava e a tela não mudava: ela
+       tocava no coração e nada acontecia. */
+    setSugestoes(aplicar);
     setOPost((p) => (p ? aplicar([p])[0] : p));
     try {
       const t = await token();
@@ -2466,7 +2493,18 @@ export function RedeNoApp({
      duplicada. */
   const fileira: Story[] = [
     ...(euId && !bolhas.some((b) => b.autorId === euId)
-      ? [{ id: euId, nome: "Seu story", avatarUrl: perfil?.avatarUrl ?? null, novo: false }]
+      ? [
+          {
+            id: euId,
+            nome: "Seu story",
+            /* ⚠️ **`perfil` é o ÚLTIMO PERFIL ABERTO, e não o meu.** Ele não é
+               limpo no voltar, então abrir o perfil da Marina e voltar ao feed
+               deixava a primeira bolinha — a "Seu story" — com a foto dela.
+               `meuAvatar` é carregado por `meuPerfilSocial`, junto com o feed. */
+            avatarUrl: meuAvatar,
+            novo: false,
+          },
+        ]
       : []),
     ...bolhas.map((b) => ({
       id: b.autorId,

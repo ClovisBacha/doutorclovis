@@ -64,6 +64,7 @@ import {
   type AbaDaPaciente,
 } from "@/lib/abas-da-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
+import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
 import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
   ESTILO_SINAL,
@@ -1223,6 +1224,11 @@ function PainelPage() {
               ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
             ]}
           />
+
+          {/* ⚠️ A fila de denúncias da caixinha. Ela SÓ desenha quando há algo —
+              ver o cabeçalho do componente. E o lugar é este porque a fila de
+              trabalho é onde mora "o que ainda precisa dele". */}
+          <FilaDeDenuncias />
         </div>
       )}
 

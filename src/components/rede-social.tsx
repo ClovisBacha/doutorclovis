@@ -181,6 +181,17 @@ export function ConfiguracoesDoPerfil({
         toast.error("Não deu para salvar.");
         return;
       }
+      /* ⚠️ **`parcial` existe e ninguém lia.** Quando o banco ainda não tem a
+         coluna nova, o recuo do servidor grava o que dá e devolve
+         `parcial: true` — e a tela dizia "Salvo 💛" e acendia a chave sobre
+         nada. Ela reabria a aba e o interruptor estava desligado; pior, no
+         caso da caixinha a tela afirmava que a caixa estava aberta enquanto o
+         servidor recusava toda pergunta. Um botão que volta ao estado anterior
+         é ruim; um que diz "salvo" e não salvou é pior. */
+      if ("parcial" in r && r.parcial) {
+        toast.error("Salvei o que deu — os interruptores ainda não estão prontos no servidor.");
+        return;
+      }
       setPerfil((p) => (p ? { ...p, ...mudanca, bio: mudanca.bio ?? p.bio } : p));
       toast.success("Salvo 💛");
     } catch {

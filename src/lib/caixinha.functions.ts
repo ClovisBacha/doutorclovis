@@ -503,3 +503,106 @@ export const denunciarPergunta = createServerFn({ method: "POST" })
 
     return { ok: true as const };
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A FILA DE DENÚNCIAS — o lado que LÊ
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type DenunciaNaFila = {
+  id: string;
+  texto: string;
+  quando: string;
+  /** Quantas denúncias já pesam sobre quem escreveu esta. */
+  reincidencias: number;
+};
+
+/**
+ * ⚠️ **ESTA FUNÇÃO EXISTE PORQUE A TELA JÁ PROMETIA O QUE ELA FAZ.**
+ *
+ * `denunciarPergunta` gravava `denunciado_em` desde o primeiro dia, e uma
+ * varredura do `src/` inteiro não achou NENHUMA consulta que lesse a coluna.
+ * Enquanto isso a folha de confirmação dizia, com todas as letras: *"Ela sai da
+ * sua caixa e fica registrada para a gente olhar."*
+ *
+ * Era o par mais perigoso do recurso — denúncia que não chega + bloqueio cego.
+ * A paciente denuncia, acredita que alguém do consultório vai ver, ninguém vê, e
+ * a pessoa cria outra conta e volta amanhã. Ou a promessa sai da tela, ou o
+ * leitor existe; a promessa é a parte certa.
+ *
+ * ⚠️ **O `quem_id` NÃO sai daqui tampouco.** Nem para o administrador: o que
+ * ele precisa para agir é o TEXTO e a REINCIDÊNCIA ("três denúncias da mesma
+ * conta"), e um id na tela vira um nome na primeira vez que alguém o colar numa
+ * consulta. O que ele decidir fazer com a conta é decisão de plataforma, tomada
+ * com o dado na mão do servidor — não na tela.
+ */
+export const denunciasAbertas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+
+    const sb = supabaseAdmin as any;
+    const { data: linhas, error } = await sb
+      .from("rede_perguntas")
+      .select("id, texto, denunciado_em, quem_id")
+      .not("denunciado_em", "is", null)
+      .is("resolvido_em", null)
+      .order("denunciado_em", { ascending: false })
+      .limit(100);
+    /* ⚠️ Falhar ao ler não vira "nenhuma denúncia": é a mesma régua de
+       `listUnansweredQuestions` — o administrador leria "está tudo limpo"
+       durante um erro de banco. */
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const brutas = (linhas ?? []) as {
+      id: string;
+      texto: string;
+      denunciado_em: string;
+      quem_id: string;
+    }[];
+    /* A reincidência é contada AQUI e o id morre nesta função. */
+    const porAutor = new Map<string, number>();
+    for (const l of brutas) porAutor.set(l.quem_id, (porAutor.get(l.quem_id) ?? 0) + 1);
+
+    return {
+      ok: true as const,
+      fila: brutas.map((l) => ({
+        id: l.id,
+        texto: l.texto,
+        quando: l.denunciado_em,
+        reincidencias: porAutor.get(l.quem_id) ?? 1,
+      })) satisfies DenunciaNaFila[],
+    };
+  });
+
+/** Marca uma denúncia como olhada. Não apaga — o histórico é a reincidência. */
+export const resolverDenuncia = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), perguntaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+    const { error } = await (supabaseAdmin as any)
+      .from("rede_perguntas")
+      .update({ resolvido_em: new Date().toISOString() })
+      .eq("id", data.perguntaId);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });

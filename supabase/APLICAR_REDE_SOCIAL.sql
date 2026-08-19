@@ -660,6 +660,15 @@ COMMENT ON COLUMN public.rede_perguntas.quem_id IS
 ALTER TABLE public.rede_stories
   ADD COLUMN IF NOT EXISTS carimbo_semana boolean NOT NULL DEFAULT false;
 
+-- Quando um administrador já olhou a denúncia. ⚠️ Marca, nunca apaga: o
+-- histórico é o que permite contar reincidência da mesma conta.
+ALTER TABLE public.rede_perguntas
+  ADD COLUMN IF NOT EXISTS resolvido_em timestamptz;
+
+CREATE INDEX IF NOT EXISTS rede_perguntas_denunciadas
+  ON public.rede_perguntas (denunciado_em DESC)
+  WHERE denunciado_em IS NOT NULL AND resolvido_em IS NULL;
+
 -- A pergunta que a resposta responde. ⚠️ Guardada no POST e não só na linha da
 -- pergunta: o post viaja pelo feed inteiro, e ler a resposta sem a pergunta
 -- entregaria um texto solto que ninguém entende.
@@ -712,4 +721,6 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
           WHERE table_schema='public' AND table_name='rede_perguntas')               AS perguntas_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='rede_posts' AND column_name='pergunta')                  AS resposta_ok;
+          WHERE table_name='rede_posts' AND column_name='pergunta')                  AS resposta_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_perguntas' AND column_name='resolvido_em')          AS denuncia_ok;

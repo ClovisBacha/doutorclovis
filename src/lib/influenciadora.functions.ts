@@ -175,6 +175,14 @@ export const atribuirInfluenciadora = createServerFn({ method: "POST" })
 export type IndicadaDaCriadora = {
   id: string;
   nome: string;
+  /**
+   * Dá para presentear esta pessoa agora?
+   *
+   * ⚠️ **Neutro de propósito.** Um campo `emCuidado` contaria a perda dela para
+   * a criadora por CAMPO em vez de por ausência — o que é pior, não melhor.
+   * Este diz só que o presente não vai, e serve a qualquer motivo futuro.
+   */
+  podeReceber: boolean;
   /** Já recebeu presente neste ciclo? */
   presenteada: boolean;
 };
@@ -240,16 +248,27 @@ export const minhasIndicadas = createServerFn({ method: "POST" })
       );
     }
 
-    const indicadas: IndicadaDaCriadora[] = ((linhas ?? []) as any[])
-      /* ⚠️ Modo Cuidado some da lista, sem anunciar — como em toda superfície
-         social deste app. */
-      .filter((l) => !l.care_mode)
-      .map((l) => ({
-        id: l.id,
-        /* Primeiro nome, e nada mais: a tela dela não é uma lista de pacientes. */
-        nome: ((l.display_name ?? "") as string).trim().split(/\s+/)[0] || "Alguém",
-        presenteada: jaRecebeu.has(l.id),
-      }));
+    /* ⚠️ **MODO CUIDADO NÃO ENCOLHE ESTA LISTA, e aqui a régua se inverte.**
+       Em toda superfície social deste app a pessoa SOME sem anunciar, e está
+       certo — lá ela some no meio de milhares. Aqui a lista tem sete nomes, e
+       numa lista de sete o SUMIÇO é a informação:
+
+         terça a Marina está lá · quarta não está · a criadora tem o Instagram
+         dela e manda "amiga, tá tudo bem?"
+
+       É o cenário do dono ao contrário — não é o seguidor descobrindo o SOS da
+       influenciadora, é a influenciadora descobrindo a perda da seguidora. Some
+       o PRESENTE (o servidor já recusa em `presentearIndicada`), fica a linha. */
+    const indicadas: IndicadaDaCriadora[] = ((linhas ?? []) as any[]).map((l) => ({
+      id: l.id,
+      /* Primeiro nome, e nada mais: a tela dela não é uma lista de pacientes. */
+      nome: ((l.display_name ?? "") as string).trim().split(/\s+/)[0] || "Alguém",
+      presenteada: jaRecebeu.has(l.id),
+      /* ⚠️ Um booleano NEUTRO, e o nome dele importa: `emCuidado` no payload
+         contaria a perda por campo em vez de por ausência. `podeReceber: false`
+         cobre luto, e cobriria qualquer outro motivo futuro. */
+      podeReceber: !l.care_mode,
+    }));
 
     const gasto = jaRecebeu.size * PRESENTE_DA_INFLUENCIADORA;
     return {

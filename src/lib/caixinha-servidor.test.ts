@@ -79,12 +79,42 @@ describe("⚠️ `quem_id` é guardado sempre e devolvido nunca", () => {
   });
 
   test("quantas funções do módulo tocam em `quem_id`", () => {
-    /* Uma catraca de contagem: a sexta função que precisar do autor tem de
-       passar por aqui e explicar por quê. Hoje são duas — `perguntar`, que o
-       GRAVA, e `denunciarPergunta`, que o lê para bloquear. */
+    /* Uma catraca de contagem: a quarta função que precisar do autor tem de
+       passar por aqui e explicar por quê. Hoje são três:
+         · `perguntar` — GRAVA;
+         · `denunciarPergunta` — lê para bloquear (a única defesa possível numa
+           caixa anônima);
+         · `denunciasAbertas` — lê para CONTAR reincidência, e o id morre lá
+           dentro (ver o teste logo abaixo).
+       Esta catraca já fez o trabalho dela uma vez: `denunciasAbertas` nasceu e
+       o teste ficou vermelho até a razão ser escrita aqui. */
     const nomes = [...CODIGO.matchAll(/export const (\w+) = createServerFn/g)].map((m) => m[1]);
     const tocam = nomes.filter((n) => corpoDe(n).includes("quem_id"));
-    expect(tocam.sort()).toEqual(["denunciarPergunta", "perguntar"]);
+    expect(tocam.sort()).toEqual(["denunciarPergunta", "denunciasAbertas", "perguntar"]);
+  });
+
+  test("⚠️ nem o ADMINISTRADOR recebe `quem_id`", () => {
+    /* O que ele precisa para agir é o TEXTO e a REINCIDÊNCIA. Um id na tela
+       vira um nome na primeira vez que alguém o colar numa consulta — e a
+       caixa é anônima para todo mundo, não só para a dona. */
+    const c = corpoDe("denunciasAbertas");
+    expect(c).toContain("reincidencias:");
+    /* O retorno é montado CAMPO A CAMPO, e nenhum campo é o autor. `quem_id`
+       aparece uma vez no `.map`, e só do lado DIREITO de um `:` — como chave de
+       consulta ao contador. Um `quemId: l.quem_id` cairia aqui. */
+    const i = c.indexOf("fila: brutas.map(");
+    expect(i).toBeGreaterThan(-1);
+    const mapa = c.slice(i, c.indexOf("satisfies DenunciaNaFila", i));
+    const campos = [...mapa.matchAll(/^\s*(\w+):/gm)].map((m) => m[1]);
+    expect(campos.sort()).toEqual(["fila", "id", "quando", "reincidencias", "texto"]);
+    const tipo = CODIGO.slice(
+      CODIGO.indexOf("export type DenunciaNaFila"),
+      CODIGO.indexOf("export const denunciasAbertas"),
+    );
+    expect(tipo.length).toBeGreaterThan(60);
+    for (const proibido of ["quemId", "quem_id", "autor", "avatar"]) {
+      expect(tipo).not.toContain(proibido);
+    }
   });
 });
 

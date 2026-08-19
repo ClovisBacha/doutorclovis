@@ -2900,6 +2900,13 @@ export function OnboardingRitual({
                   Ganhe {BONUS_INFLUENCIADORA} Sementinhas 🌱 para começar. Dá para colocar depois,
                   no Perfil.
                 </p>
+                {/* Ver o mesmo aviso em `CodigoDaEmbaixadora`: o consentimento
+                    tem de dizer o que acontece, e é a MESMA frase nas duas
+                    portas. */}
+                <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
+                  Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para
+                  poder te presentear.
+                </p>
               </div>
             )}
           </div>
@@ -17353,6 +17360,16 @@ export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) 
       <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
         Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
         <strong className="font-semibold">{BONUS_INFLUENCIADORA} Sementinhas 🌱</strong>.
+      </p>
+      {/* ⚠️ **O CONSENTIMENTO PRECISA DIZER O QUE ACONTECE.** O código faz o
+          primeiro nome dela aparecer numa lista da embaixadora, e as duas telas
+          que o pediam falavam só das Sementinhas. Isso é "expor a paciente sem
+          ela saber" — e o que fica exposto não é um nome qualquer: é "esta
+          pessoa é paciente de um app de gestação de alto risco", que é dado de
+          saúde por inferência. */}
+      <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
+        Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para poder te
+        presentear. Nada mais do seu acompanhamento aparece para ela.
       </p>
       <div className="mt-3 flex gap-2">
         <input
