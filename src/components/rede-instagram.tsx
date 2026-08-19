@@ -1942,6 +1942,37 @@ export function RedeNoApp({
    * opcional e, sobretudo, fazer sair do aparelho mais imagem do que o
    * necessário. É foto de gestação, às vezes ultrassom.
    */
+  /**
+   * Votar na enquete de um story.
+   *
+   * ⚠️ Otimista e SEM recarregar a fileira: o visor está aberto por cima de
+   * tudo, e recarregar trocaria o story debaixo do dedo dela.
+   */
+  async function votarNoStory(storyId: string, opcao: number) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { votarNoStory: chamar } = await import("@/lib/rede-social.functions");
+      await chamar({ data: { accessToken: t, storyId, opcao } });
+    } catch {
+      /* O voto local já apareceu; a próxima abertura traz a verdade. */
+    }
+  }
+
+  /**
+   * A pergunta mandada de dentro de um story.
+   *
+   * ⚠️ **É a MESMA `perguntarPara` da caixinha** — mesma tabela, mesma
+   * `decidirPergunta`, mesmo encaminhamento ao médico quando há sinal clínico.
+   * O story é outra PORTA, nunca uma segunda caixinha. Devolve o recado da
+   * recusa (ou `null` quando foi).
+   */
+  async function perguntarNoStory(donaId: string, texto: string): Promise<string | null> {
+    const d = await perguntarPara(donaId, texto);
+    if (d === null) return "Não deu para enviar agora. Tente de novo.";
+    return d === "publicavel" ? null : recadoDoDesfecho(d);
+  }
+
   /* O resumo de domingo. `null` = não há (ou já foi dispensado). */
   const [retro, setRetro] = useState<Retrospectiva | null>(null);
 
@@ -2829,14 +2860,26 @@ export function RedeNoApp({
     }
   }
 
-  async function publicarStory(dataUrl: string, carimbar: boolean) {
+  async function publicarStory(
+    dataUrl: string,
+    carimbar: boolean,
+    enquete: string[],
+    perguntaAberta: boolean,
+  ) {
     setConferindoStory(null);
     try {
       const t = await token();
       if (!t) return;
       const { publicarStory: chamar } = await import("@/lib/rede-social.functions");
       const r = await chamar({
-        data: { accessToken: t, imagem: dataUrl, texto: null, carimbarSemana: carimbar },
+        data: {
+          accessToken: t,
+          imagem: dataUrl,
+          texto: null,
+          carimbarSemana: carimbar,
+          enquete,
+          perguntaAberta,
+        },
       });
       if (r.ok) void carregarFeed();
     } catch {
@@ -3032,7 +3075,9 @@ export function RedeNoApp({
            quando não há o que carimbar (sem DUM, pós-parto, Modo Cuidado). */
         semana={semanaDoCarimbo}
         aoCancelar={() => setConferindoStory(null)}
-        aoPublicar={({ carimbar }) => void publicarStory(conferindoStory, carimbar)}
+        aoPublicar={({ carimbar, enquete, perguntaAberta }) =>
+          void publicarStory(conferindoStory, carimbar, enquete, perguntaAberta)
+        }
       />
     );
   }
@@ -3040,6 +3085,8 @@ export function RedeNoApp({
   if (vendoStory) {
     return (
       <VisorDeStory
+        aoVotarNoStory={votarNoStory}
+        aoPerguntarNoStory={perguntarNoStory}
         bolha={vendoStory}
         aoFechar={() => setVendoStory(null)}
         aoVer={marcarVisto}
@@ -3685,6 +3732,8 @@ export function VisorDeStory({
   souEu = false,
   aoQuemViu,
   aoApagarStory,
+  aoVotarNoStory,
+  aoPerguntarNoStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -3693,8 +3742,19 @@ export function VisorDeStory({
   souEu?: boolean;
   aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[]>;
   aoApagarStory?: (storyId: string) => void;
+  /** Votar na enquete deste story. */
+  aoVotarNoStory?: (storyId: string, opcao: number) => void;
+  /** Mandar uma pergunta pela caixinha aberta neste story. */
+  aoPerguntarNoStory?: (donaId: string, texto: string) => Promise<string | null>;
 }) {
   const [i, setI] = useState(0);
+  /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
+     rede — a mesma decisão otimista da reação. */
+  const [voteiAgora, setVoteiAgora] = useState<Record<string, number>>({});
+  const [pergunta, setPergunta] = useState("");
+  const [mandando, setMandando] = useState(false);
+  const [recado, setRecado] = useState<string | null>(null);
+  const [mandada, setMandada] = useState(false);
   const [pausado, setPausado] = useState(false);
   const [quemViu, setQuemViu] = useState<PessoaNaLista[] | null>(null);
   const [confirmando, setConfirmando] = useState(false);
@@ -3791,6 +3851,116 @@ export function VisorDeStory({
           <span className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-2 text-[15px] font-semibold text-white backdrop-blur-sm">
             🤰 {atual.carimbo}
           </span>
+        )}
+
+        {/* ⚠️ A ENQUETE E A CAIXINHA vivem ACIMA das metades invisíveis
+            (`z-20`): sem isso, tocar numa opção cairia no "avançar story", e a
+            enquete seria um desenho que ninguém consegue usar.
+            ⚠️ E as duas PAUSAM o relógio enquanto estão na tela — responder uma
+            pergunta leva mais que os cinco segundos do story. */}
+        {atual.enquete && (
+          <div className="absolute inset-x-6 bottom-24 z-20 space-y-2">
+            {(() => {
+              const meu = voteiAgora[atual.id] ?? atual.enquete!.meuVoto;
+              const jaVotou = meu !== null && meu !== undefined;
+              const total =
+                atual.enquete!.votos.reduce((a, b) => a + b, 0) +
+                (voteiAgora[atual.id] != null && atual.enquete!.meuVoto === null ? 1 : 0);
+              return atual.enquete!.opcoes.map((op, n) => {
+                const votos =
+                  (atual.enquete!.votos[n] ?? 0) +
+                  (voteiAgora[atual.id] === n && atual.enquete!.meuVoto === null ? 1 : 0);
+                const fatia = total > 0 ? Math.round((votos / total) * 100) : 0;
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    disabled={jaVotou || !aoVotarNoStory}
+                    onClick={() => {
+                      hapticTap();
+                      setVoteiAgora((v) => ({ ...v, [atual.id]: n }));
+                      aoVotarNoStory?.(atual.id, n);
+                    }}
+                    className={`press relative block min-h-[46px] w-full overflow-hidden rounded-full border text-left text-[15px] font-medium text-white backdrop-blur-sm disabled:cursor-default ${
+                      meu === n ? "border-white bg-white/25" : "border-white/60 bg-black/35"
+                    }`}
+                  >
+                    {jaVotou && (
+                      <span
+                        aria-hidden
+                        className="dc-fatia absolute inset-y-0 left-0 w-full rounded-full bg-white/25"
+                        style={{ transform: `scaleX(${fatia / 100})` }}
+                      />
+                    )}
+                    <span className="relative flex items-center gap-2 px-4 py-2.5">
+                      <span className="min-w-0 flex-1 truncate">{op}</span>
+                      {jaVotou && (
+                        <span className="shrink-0 text-[13px] tabular-nums opacity-90">
+                          {fatia}%
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              });
+            })()}
+            {(voteiAgora[atual.id] ?? atual.enquete.meuVoto) === null && (
+              <p className="text-center text-[11px] text-white/75">
+                Toque para votar — o voto não muda depois.
+              </p>
+            )}
+          </div>
+        )}
+
+        {atual.perguntaAberta && !souEu && aoPerguntarNoStory && (
+          <div className="absolute inset-x-6 bottom-24 z-20">
+            {mandada ? (
+              /* ⚠️ Não repete a pergunta na tela depois de enviada: a caixinha é
+                 ANÔNIMA, e mostrar o texto de volta por cima do story de outra
+                 pessoa é o começo de ela achar que ficou público. */
+              <p className="rounded-2xl bg-black/45 px-4 py-3 text-center text-[14px] text-white backdrop-blur-sm">
+                Mandei pra ela, sem o seu nome 💛
+              </p>
+            ) : (
+              <div className="rounded-2xl bg-black/40 p-2.5 backdrop-blur-sm">
+                <p className="px-1 pb-1.5 text-[12px] text-white/85">
+                  Pergunte o que quiser — ela não vê quem perguntou.
+                </p>
+                <div className="flex items-end gap-2">
+                  <textarea
+                    value={pergunta}
+                    onChange={(e) => setPergunta(e.target.value.slice(0, LIMITE_DA_PERGUNTA))}
+                    onFocus={() => setPausado(true)}
+                    onBlur={() => setPausado(false)}
+                    rows={2}
+                    placeholder="Escreva aqui…"
+                    className="min-w-0 flex-1 resize-none rounded-xl bg-white/95 px-3 py-2 text-[14px] leading-snug text-foreground"
+                  />
+                  <button
+                    type="button"
+                    disabled={!pergunta.trim() || mandando}
+                    onClick={async () => {
+                      setMandando(true);
+                      setRecado(null);
+                      const r = await aoPerguntarNoStory(atual.autorId, pergunta.trim());
+                      setMandando(false);
+                      if (r) setRecado(r);
+                      else {
+                        setMandada(true);
+                        setPergunta("");
+                      }
+                    }}
+                    className="press shrink-0 rounded-full bg-white px-3.5 py-2 text-[13px] font-semibold text-foreground disabled:opacity-50"
+                  >
+                    {mandando ? "…" : "Enviar"}
+                  </button>
+                </div>
+                {recado && (
+                  <p className="px-1 pt-1.5 text-[12px] leading-snug text-white">{recado}</p>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* As duas metades invisíveis: esquerda volta, direita avança. Segurar
@@ -4949,10 +5119,14 @@ export function ConferirStory({
   /** "28 semanas", ou `null` quando não há o que carimbar. */
   semana: string | null;
   aoCancelar: () => void;
-  aoPublicar: (opts: { carimbar: boolean }) => void;
+  aoPublicar: (opts: { carimbar: boolean; enquete: string[]; perguntaAberta: boolean }) => void;
 }) {
   const [carimbar, setCarimbar] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  /* `null` = sem enquete. Duas vazias é o estado de quem abriu e ainda não
+     escreveu — a mesma forma do compositor de post. */
+  const [opcoes, setOpcoes] = useState<string[] | null>(null);
+  const [caixinha, setCaixinha] = useState(false);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black">
@@ -5017,12 +5191,87 @@ export function ConferirStory({
           </p>
         )}
 
+        {/* ⚠️ UM DE CADA VEZ. Enquete e caixinha ocupam o MESMO pedaço da tela
+            no visor (a faixa de baixo), e empilhadas sobrariam ~120px de foto —
+            que é o conteúdo. Escolher uma desliga a outra. */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            aria-pressed={opcoes !== null}
+            onClick={() => {
+              setOpcoes((v) => (v === null ? ["", ""] : null));
+              setCaixinha(false);
+            }}
+            className={`press min-h-[44px] flex-1 rounded-2xl px-3 text-[13px] font-semibold ${
+              opcoes !== null ? "bg-white text-black" : "bg-white/12 text-white"
+            }`}
+          >
+            📊 Enquete
+          </button>
+          <button
+            type="button"
+            aria-pressed={caixinha}
+            onClick={() => {
+              setCaixinha((v) => !v);
+              setOpcoes(null);
+            }}
+            className={`press min-h-[44px] flex-1 rounded-2xl px-3 text-[13px] font-semibold ${
+              caixinha ? "bg-white text-black" : "bg-white/12 text-white"
+            }`}
+          >
+            💬 Caixinha
+          </button>
+        </div>
+
+        {opcoes !== null && (
+          <div className="space-y-2">
+            {opcoes.map((o, n) => (
+              <input
+                key={n}
+                value={o}
+                onChange={(e) =>
+                  setOpcoes((v) =>
+                    (v ?? []).map((x, k) => (k === n ? e.target.value.slice(0, 60) : x)),
+                  )
+                }
+                placeholder={`Opção ${n + 1}`}
+                className="w-full rounded-xl bg-white/95 px-3 py-2.5 text-[14px] text-foreground"
+              />
+            ))}
+            {opcoes.length < OPCOES_MAX && (
+              <button
+                type="button"
+                onClick={() => setOpcoes((v) => [...(v ?? []), ""])}
+                className="press text-[12px] text-white/80 underline underline-offset-2"
+              >
+                Mais uma opção
+              </button>
+            )}
+          </div>
+        )}
+
+        {caixinha && (
+          /* ⚠️ Diz que é ANÔNIMA aqui também, e não só do lado de quem
+              pergunta: publicar a caixinha sem saber que as respostas vêm sem
+              nome muda o que ela decide perguntar — e o que ela decide
+              publicar. */
+          <p className="text-center text-[12px] leading-snug text-white/75">
+            Quem responder não aparece para você — a caixinha é anônima.
+          </p>
+        )}
+
         <button
           type="button"
-          disabled={enviando}
+          disabled={enviando || (opcoes !== null && !enqueteValida(limparOpcoes(opcoes)))}
           onClick={() => {
             setEnviando(true);
-            aoPublicar({ carimbar: carimbar && !!semana });
+            aoPublicar({
+              carimbar: carimbar && !!semana,
+              /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
+                 aqui, que aceitaria o que o servidor recusa. */
+              enquete: opcoes ? limparOpcoes(opcoes) : [],
+              perguntaAberta: caixinha,
+            });
           }}
           className="press w-full rounded-2xl bg-white py-3 text-[15px] font-semibold text-black disabled:opacity-60"
         >

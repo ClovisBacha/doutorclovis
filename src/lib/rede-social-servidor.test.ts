@@ -551,11 +551,42 @@ describe("o carimbo do story — Fase 3", () => {
     expect(pub).not.toMatch(/semana: .*(semanas|seloSemana)/);
   });
 
-  test("⚠️ publicar não quebra em banco sem a coluna", () => {
+  test("⚠️ publicar não quebra em banco sem as colunas, e são TRÊS degraus", () => {
     // O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
     // falhar INTEIRO — não só o carimbo.
+    //
+    // ⚠️ E são três degraus, um por LEVA de colunas: o cheio (enquete +
+    // pergunta), o do meio (só o carimbo) e o mínimo. Um recuo que pulasse
+    // direto para o mínimo apagaria o carimbo de quem já rodou AQUELE SQL, só
+    // porque o SQL da enquete ainda não rodou.
     const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
-    expect(pub).toContain(".insert({ autor_id: eu, imagem_path: caminho, texto: data.texto })");
+    expect(pub).toContain("const base = { autor_id: eu, imagem_path: caminho, texto: data.texto }");
+    expect(pub).toContain("enquete_opcoes: enquete");
+    expect(pub).toContain(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
+    expect(pub).toContain(".insert(base)");
+    /* A ordem dos degraus: do mais completo ao mínimo. Os marcadores são os
+       que distinguem um insert do outro — `enquete_opcoes` só existe no
+       primeiro, e o segundo fecha as chaves logo depois do carimbo. */
+    const cheio = pub.indexOf("pergunta_aberta: data.perguntaAberta === true");
+    const meio = pub.indexOf(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
+    const minimo = pub.indexOf(".insert(base)");
+    expect(cheio).toBeGreaterThan(-1);
+    expect(meio).toBeGreaterThan(cheio);
+    expect(minimo).toBeGreaterThan(meio);
+  });
+
+  /* ⚠️ A enquete do story passa pela MESMA régua do post e pela MESMA triagem
+     clínica. "Menino ou menina?" é inofensivo; "posso tomar buscopan?" não é —
+     e uma enquete é exatamente o formato que faz meia dúzia de leigas
+     responderem com conduta. */
+  test("⚠️ a enquete do story usa a régua do post e passa pela triagem", () => {
+    const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
+    expect(pub).toContain("limparOpcoes(data.enquete ?? [])");
+    expect(pub).toContain("enqueteValida(opcoes)");
+    const triagem = pub.indexOf("for (const o of enquete)");
+    const grava = pub.indexOf("const base = {");
+    expect(triagem).toBeGreaterThan(-1);
+    expect(triagem).toBeLessThan(grava);
   });
 
   test("⚠️ o carimbo NÃO passa pela chave do perfil", () => {

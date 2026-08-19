@@ -354,6 +354,47 @@ CREATE TABLE IF NOT EXISTS public.rede_marcacoes (
 
 -- Os posts em que EU fui marcada, do mais novo para o mais velho: é a consulta
 -- da aba do perfil dela.
+-- ─────────────────────────────────────────────────────────────────────────────
+-- ENQUETE E CAIXINHA DENTRO DO STORY (ago/2026 — ideia 4)
+--
+-- ⚠️ AS RÉGUAS SÃO AS MESMAS do post e da caixinha (`limparOpcoes`,
+-- `enqueteValida`, `decidirPergunta`). O que muda é só ONDE o voto é guardado —
+-- e ele precisa de tabela própria porque a chave estrangeira aponta para
+-- `rede_stories`, que expira em 24 h e some com os votos junto (CASCADE).
+--
+-- ⚠️ E a PERGUNTA do story não ganha tabela nenhuma: ela cai na MESMA
+-- `rede_perguntas` da caixinha, com a mesma triagem clínica. O story é só outra
+-- porta para a caixinha que já existe.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.rede_stories
+  ADD COLUMN IF NOT EXISTS enquete_opcoes text[];
+ALTER TABLE public.rede_stories
+  ADD COLUMN IF NOT EXISTS pergunta_aberta boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS public.rede_story_votos (
+  story_id  uuid NOT NULL REFERENCES public.rede_stories ON DELETE CASCADE,
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  -- Índice da opção. O texto vive no story; guardar a string aqui faria o
+  -- resultado mentir se ela editasse a opção depois.
+  opcao     smallint NOT NULL CHECK (opcao >= 0 AND opcao <= 3),
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  -- ⚠️ UM VOTO POR PESSOA, garantido pela chave primária — a mesma decisão da
+  -- enquete do post, e é ela que permite a tela dizer "o voto não muda depois"
+  -- sem depender de o cliente se comportar.
+  PRIMARY KEY (story_id, quem_id)
+);
+
+CREATE INDEX IF NOT EXISTS rede_story_votos_do ON public.rede_story_votos (story_id);
+
+ALTER TABLE public.rede_story_votos ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service manages rede_story_votos" ON public.rede_story_votos;
+CREATE POLICY "Service manages rede_story_votos" ON public.rede_story_votos
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE public.rede_story_votos IS
+  'Votos na enquete de um story. Some com o story (24h). Um por pessoa.';
+
 CREATE INDEX IF NOT EXISTS rede_marcacoes_de ON public.rede_marcacoes (quem_id, criado_em DESC);
 
 ALTER TABLE public.rede_marcacoes ENABLE ROW LEVEL SECURITY;

@@ -64,6 +64,7 @@ import type {
   PostNaTela,
 } from "@/lib/rede-social.functions";
 import type { TipoDeReacao } from "@/lib/rede-social";
+import { recadoDoDesfecho } from "@/lib/caixinha-tela";
 
 export const Route = createFileRoute("/preview-instagram")({
   component: Bancada,
@@ -81,6 +82,7 @@ export const Route = createFileRoute("/preview-instagram")({
     amigas: q.amigas == null ? 1 : Number(q.amigas),
     rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
     retro: q.retro == null ? "" : String(q.retro),
+    voto: q.voto == null ? 0 : Number(q.voto),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -229,6 +231,7 @@ function Bancada() {
     amigas,
     rascunho,
     retro,
+    voto,
     selo,
     trancado,
     carimbo,
@@ -310,6 +313,7 @@ function Bancada() {
   const comRascunho = rascunho !== 0;
   const [vendoQuemReagiu, setVendoQuemReagiu] = useState(false);
   const retroModo = retro;
+  const jaVotouNoStory = voto === 1;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -472,10 +476,32 @@ function Bancada() {
         /* Só o primeiro carimbado: é o contraste que prova que o carimbo é
            por STORY, e não uma propriedade da conta. */
         carimbo: carimbo && n === 0 ? "32 semanas" : null,
+        /* ⚠️ O SEGUNDO tem ENQUETE e o TERCEIRO tem CAIXINHA — um de cada, e
+           nunca os dois no mesmo story: eles ocupam o mesmo pedaço da tela, e
+           empilhados sobrariam ~120px de foto. `?voto=1` mostra o resultado
+           depois de votar, que é o estado que só aparece uma vez por pessoa. */
+        enquete:
+          n === 1
+            ? {
+                opcoes: ["Menino", "Menina"],
+                votos: [12, 9],
+                meuVoto: jaVotouNoStory ? 0 : null,
+              }
+            : null,
+        perguntaAberta: n === 2,
       })),
     };
     return (
       <VisorDeStory
+        aoVotarNoStory={(id, o) => alert(`votaria na opção ${o} do story ${id}`)}
+        aoPerguntarNoStory={async (_dona, texto) =>
+          /* ⚠️ A bancada chama a MESMA triagem do servidor, e não um `alert`:
+             o que precisa ser conferido aqui são os TRÊS desfechos, e inventá-los
+             faria a tela ensaiar um roteiro que a régua não produz. */
+          (await import("@/lib/pergunta-clinica")).triarTexto(texto) === "publicavel"
+            ? null
+            : recadoDoDesfecho((await import("@/lib/pergunta-clinica")).triarTexto(texto))
+        }
         bolha={b}
         aoFechar={() => history.back()}
         /* ⚠️ O rodapé do "visto por" só existe no MEU story, e sem a bancada

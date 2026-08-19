@@ -2252,9 +2252,27 @@ export type StoryNaTela = {
    * que o app não sabe mais apagar.
    */
   carimbo: string | null;
+  /** A enquete de duas a quatro opções, ou `null`. */
+  enquete: EnqueteDoStory | null;
+  /**
+   * A caixinha aberta neste story.
+   *
+   * ⚠️ **Não é uma segunda caixinha.** A pergunta cai na MESMA `rede_perguntas`
+   * e passa pela MESMA `decidirPergunta` — o story é só outra porta para a
+   * caixinha que já existe, e é a porta com a menor barreira (um toque).
+   */
+  perguntaAberta: boolean;
 };
 
 /** Um autor e os stories vivos dele — é assim que a fileira desenha. */
+export type EnqueteDoStory = {
+  opcoes: string[];
+  /** Só NÚMEROS — nunca quem votou. É a mesma decisão da enquete do post. */
+  votos: number[];
+  /** O índice em que EU votei, ou `null`. Só o meu. */
+  meuVoto: number | null;
+};
+
 export type BolhaDeStory = {
   autorId: string;
   autorNome: string;
@@ -2273,6 +2291,10 @@ export const publicarStory = createServerFn({ method: "POST" })
         texto: z.string().max(200).nullable(),
         /** A semana no canto da foto. Escolha POR PUBLICAÇÃO — ver a régua. */
         carimbarSemana: z.boolean().optional(),
+        /** 2 a 4 opções curtas, ou nada. A régua é a MESMA do post. */
+        enquete: z.array(z.string().max(60)).max(6).optional(),
+        /** Abrir a caixinha neste story. */
+        perguntaAberta: z.boolean().optional(),
       })
       .parse(i),
   )
@@ -2302,22 +2324,45 @@ export const publicarStory = createServerFn({ method: "POST" })
     const caminho = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.imagem });
     if (!caminho) return { ok: false as const, motivo: "imagem" as const };
 
+    /* ⚠️ A RÉGUA DA ENQUETE É A MESMA DO POST (`limparOpcoes` +
+       `enqueteValida`) — nunca uma segunda condição escrita aqui, que aceitaria
+       o que a outra tela recusa. */
+    const opcoes = limparOpcoes(data.enquete ?? []);
+    const enquete = enqueteValida(opcoes) ? opcoes : null;
+
+    /* ⚠️ E A TRIAGEM CLÍNICA CORRE NAS OPÇÕES TAMBÉM, como já corria no texto:
+       "menino ou menina?" é inofensivo, "posso tomar buscopan?" não é — e uma
+       enquete é exatamente o formato que faz meia dúzia de leigas responderem. */
+    if (enquete) {
+      const { triarTexto } = await import("@/lib/pergunta-clinica");
+      for (const o of enquete) {
+        const d = triarTexto(o);
+        if (d !== "publicavel") {
+          return { ok: false as const, motivo: d, recado: recadoDeConteudo(d) };
+        }
+      }
+    }
+
+    const base = { autor_id: eu, imagem_path: caminho, texto: data.texto };
+    /* ⚠️ TRÊS DEGRAUS, um por leva de colunas — o mesmo desenho da leitura.
+       Um recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
+       carimbo perdê-lo por causa do SQL da enquete. */
     const { error } = await sb.from("rede_stories").insert({
-      autor_id: eu,
-      imagem_path: caminho,
-      texto: data.texto,
+      ...base,
       carimbo_semana: data.carimbarSemana === true,
+      enquete_opcoes: enquete,
+      pergunta_aberta: data.perguntaAberta === true,
     });
-    /* ⚠️ Recuo para banco sem `carimbo_semana`, pela mesma razão de
-       `perfisPorId`: o deploy chega antes do SQL, e sem isto publicar um story
-       passaria a falhar INTEIRO — não só o carimbo. Sem a coluna, o story sai
-       sem carimbo, que é o padrão dela. */
     if (error) {
-      console.warn("[rede] story sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
+      console.warn("[rede] story sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
       const { error: erro2 } = await sb
         .from("rede_stories")
-        .insert({ autor_id: eu, imagem_path: caminho, texto: data.texto });
-      if (erro2) return { ok: false as const, motivo: "banco" as const };
+        .insert({ ...base, carimbo_semana: data.carimbarSemana === true });
+      if (erro2) {
+        console.warn("[rede] story sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
+        const { error: erro3 } = await sb.from("rede_stories").insert(base);
+        if (erro3) return { ok: false as const, motivo: "banco" as const };
+      }
     }
     return { ok: true as const };
   });
@@ -2364,17 +2409,43 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           .gt("expira_em", agora)
           .order("criado_em", { ascending: true })
           .limit(200);
-      const { data, error } = await monta(
+      /* ⚠️ TRÊS DEGRAUS DE RECUO, um por leva de colunas — e não um só. Um
+         recuo que pulasse direto para o mínimo apagaria o carimbo da semana de
+         quem já rodou aquele SQL, só porque o SQL da enquete ainda não rodou.
+         Cada degrau tira exatamente o que faltou. */
+      const cheio = await monta(
+        sb
+          .from("rede_stories")
+          .select(
+            "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta",
+          ),
+      );
+      if (!cheio.error) return (cheio.data ?? []) as any[];
+
+      console.warn("[rede] stories sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
+      const comCarimbo = await monta(
         sb
           .from("rede_stories")
           .select("id, autor_id, imagem_path, texto, criado_em, carimbo_semana"),
       );
-      if (!error) return (data ?? []) as any[];
+      if (!comCarimbo.error) {
+        return ((comCarimbo.data ?? []) as any[]).map((l) => ({
+          ...l,
+          enquete_opcoes: null,
+          pergunta_aberta: false,
+        }));
+      }
+
       console.warn("[rede] stories sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
       const { data: velhos } = await monta(
         sb.from("rede_stories").select("id, autor_id, imagem_path, texto, criado_em"),
       );
-      return ((velhos ?? []) as any[]).map((l) => ({ ...l, carimbo_semana: false }));
+      return ((velhos ?? []) as any[]).map((l) => ({
+        ...l,
+        carimbo_semana: false,
+        enquete_opcoes: null,
+        pergunta_aberta: false,
+      }));
     })();
     const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
 
@@ -2387,6 +2458,29 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         linhas.map((l) => l.id),
       );
     const jaVi = new Set(((vistos ?? []) as { story_id: string }[]).map((v) => v.story_id));
+
+    /* Os votos das enquetes, de todos os stories da fileira de uma vez. */
+    const votosPorStory = new Map<string, number[]>();
+    const meuVotoNo = new Map<string, number>();
+    try {
+      const { data: vs } = await sb
+        .from("rede_story_votos")
+        .select("story_id, quem_id, opcao")
+        .in(
+          "story_id",
+          linhas.map((l) => l.id),
+        );
+      for (const v of ((vs ?? []) as { story_id: string; quem_id: string; opcao: number }[])) {
+        const atual = votosPorStory.get(v.story_id) ?? [0, 0, 0, 0];
+        if (v.opcao >= 0 && v.opcao < atual.length) atual[v.opcao] += 1;
+        votosPorStory.set(v.story_id, atual);
+        if (v.quem_id === eu) meuVotoNo.set(v.story_id, v.opcao);
+      }
+    } catch {
+      /* Sem a tabela ainda, a enquete aparece zerada em vez de sumir: o desenho
+         que ela publicou continua na tela, e o voto passa a contar quando o SQL
+         rodar. */
+    }
 
     const { urlAssinada } = await import("@/lib/imagens.server");
     const porAutor = new Map<string, BolhaDeStory>();
@@ -2416,6 +2510,19 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         /* O carimbo nasce aqui, da régua, e só quando ela pediu naquele
            story. Os silêncios (luto, pós-parto, sem DUM) vêm de graça. */
         carimbo: l.carimbo_semana ? await carimboDe(p) : null,
+        /* ⚠️ Array vazio é "sem enquete", nunca "enquete de zero opções" — a
+           mesma leitura da enquete do post. */
+        enquete: (l.enquete_opcoes ?? []).length
+          ? {
+              opcoes: l.enquete_opcoes as string[],
+              votos: (votosPorStory.get(l.id) ?? [0, 0, 0, 0]).slice(
+                0,
+                (l.enquete_opcoes as string[]).length,
+              ),
+              meuVoto: meuVotoNo.has(l.id) ? (meuVotoNo.get(l.id) as number) : null,
+            }
+          : null,
+        perguntaAberta: !!l.pergunta_aberta,
       });
       porAutor.set(l.autor_id, b);
     }
@@ -2431,6 +2538,76 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     });
 
     return { ok: true as const, bolhas };
+  });
+
+/**
+ * VOTAR NA ENQUETE DE UM STORY.
+ *
+ * ⚠️ **`ignoreDuplicates` e NUNCA `upsert` que sobrescreve.** A chave primária
+ * é `(story_id, quem_id)`, e é ela que permite a tela dizer "o voto não muda
+ * depois" sem depender de o cliente se comportar. Um `upsert` que atualizasse
+ * transformaria a promessa da tela em mentira.
+ *
+ * ⚠️ **Colidir na chave é SUCESSO REPETIDO, não erro.** Devolver erro faria ela
+ * tentar de novo achando que falhou — a mesma decisão da reserva do chá de bebê
+ * e do presente do médico.
+ *
+ * ⚠️ **E o story precisa ser VISÍVEL para ela.** Sem essa conferência, um
+ * `storyId` sorteado que respondesse `ok` confirmaria a existência do story de
+ * alguém — vazamento pela porta dos fundos, o mesmo cuidado que `reagir` já tem.
+ */
+export const votarNoStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        storyId: z.string().uuid(),
+        opcao: z.number().int().min(0).max(3),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: story } = await sb
+      .from("rede_stories")
+      .select("id, autor_id, enquete_opcoes, expira_em")
+      .eq("id", data.storyId)
+      .maybeSingle();
+    if (!story) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const opcoes = ((story as any).enquete_opcoes ?? []) as string[];
+    if (data.opcao >= opcoes.length) return { ok: false as const, motivo: "indisponivel" as const };
+    if (new Date((story as any).expira_em).getTime() < Date.now()) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* O portão de visibilidade: só quem enxerga o story vota nele. A autora
+       sempre enxerga o próprio. */
+    if ((story as any).autor_id !== eu) {
+      const ctx = await contextoDe(sb, eu);
+      const perfis = await perfisPorId(sb, [(story as any).autor_id]);
+      const autor = perfis.get((story as any).autor_id);
+      const podeVer =
+        !!autor &&
+        !autor.care_mode &&
+        !ctx.bloqueio.has((story as any).autor_id) &&
+        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id));
+      if (!podeVer) return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { error } = await sb
+      .from("rede_story_votos")
+      .insert({ story_id: data.storyId, quem_id: eu, opcao: data.opcao }, { count: "exact" });
+    /* Chave repetida (23505) = ela já votou: sucesso, com `repetido`. */
+    if (error && (error as any).code !== "23505") {
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const, repetido: !!error };
   });
 
 export const marcarStoryVisto = createServerFn({ method: "POST" })
