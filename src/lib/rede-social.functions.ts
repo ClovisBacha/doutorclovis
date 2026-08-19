@@ -89,6 +89,20 @@ export type PostNaTela = {
   minhaReacao: TipoDeReacao | null;
   souAAutora: boolean;
   /**
+   * Quem estava junto.
+   *
+   * ⚠️ **Só o id e o nome — nunca mais que isso.** A linha embaixo do autor é
+   * "com Marina": um avatar por marcada empilharia foto de gente que não
+   * publicou nada, e um link para o perfil já existe pelo próprio nome.
+   *
+   * ⚠️ **E marcar NÃO amplia a visibilidade.** Este campo é decoração da
+   * leitura; quem decide se o post aparece continua sendo `podeVerPost`, sobre
+   * a camada de QUEM PUBLICOU.
+   */
+  marcadas: { id: string; nome: string }[];
+  /** Fui EU a marcada aqui? É o que acende o "tirar minha marcação". */
+  souMarcada: boolean;
+  /**
    * A pergunta anônima que este post responde, ou `null`.
    *
    * ⚠️ **Ela viaja com o POST, e não só na caixinha dela.** O post vai para o
@@ -622,6 +636,61 @@ type OlhoDeQuemVe = {
   bloqueio: { has(id: string): boolean };
 };
 
+/**
+ * Quem foi marcada em cada post.
+ *
+ * ⚠️ **Recuo por tabela ausente.** `rede_marcacoes` nasce num `APLICAR_` que o
+ * dono roda à mão; sem o recuo, TODO o feed quebraria na janela entre o deploy
+ * e o SQL — por causa de uma linha decorativa embaixo do nome.
+ */
+/**
+ * Os posts em que ALGUÉM foi marcada.
+ *
+ * ⚠️ Teto igual ao da página: sem ele, um perfil com centenas de marcações
+ * mandaria centenas de uuids na query string do `in()` — a mesma armadilha de
+ * URL que `sugestoes.ts` documenta com o teto de 60 autoras.
+ */
+async function idsMarcadosDe(sb: any, quem: string): Promise<string[]> {
+  const { data, error } = await sb
+    .from("rede_marcacoes")
+    .select("post_id")
+    .eq("quem_id", quem)
+    .order("criado_em", { ascending: false })
+    .limit(POSTS_POR_PAGINA);
+  if (error) return [];
+  return ((data ?? []) as { post_id: string }[]).map((l) => l.post_id);
+}
+
+async function marcacoesDe(
+  sb: any,
+  postIds: string[],
+): Promise<Map<string, { id: string; nome: string }[]>> {
+  const fora = new Map<string, { id: string; nome: string }[]>();
+  if (postIds.length === 0) return fora;
+  const { data, error } = await sb
+    .from("rede_marcacoes")
+    .select("post_id, quem_id")
+    .in("post_id", postIds);
+  if (error) {
+    console.warn("[rede] sem rede_marcacoes — rode APLICAR_REDE_SOCIAL.sql");
+    return fora;
+  }
+  const linhas = (data ?? []) as { post_id: string; quem_id: string }[];
+  if (linhas.length === 0) return fora;
+
+  const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.quem_id))]);
+  for (const l of linhas) {
+    const p = perfis.get(l.quem_id);
+    /* ⚠️ MODO CUIDADO TIRA O NOME DA LINHA, sem apagar a marcação. Quando ela
+       voltar, a marcação volta com ela — é a mesma decisão da dupla das Amigas,
+       que some dos dois lados sem apagar a linha. */
+    if (!p || p.care_mode) continue;
+    const nome = (p.display_name ?? "").trim() || "Alguém";
+    fora.set(l.post_id, [...(fora.get(l.post_id) ?? []), { id: l.quem_id, nome }]);
+  }
+  return fora;
+}
+
 async function montarPosts(
   sb: any,
   eu: string,
@@ -645,7 +714,7 @@ async function montarPosts(
 
   /* Reações e salvos em PARALELO: duas consultas independentes, e em série a
      segunda só sairia depois de a primeira voltar. */
-  const [{ porPost, minhas }, salvos, votos] = await Promise.all([
+  const [{ porPost, minhas }, salvos, votos, marcadas] = await Promise.all([
     reacoesDe(
       sb,
       visiveis.map((p) => p.id),
@@ -660,6 +729,10 @@ async function montarPosts(
       sb,
       visiveis.map((p) => p.id),
       eu,
+    ),
+    marcacoesDe(
+      sb,
+      visiveis.map((p) => p.id),
     ),
   ]);
 
@@ -690,6 +763,8 @@ async function montarPosts(
         reacoes: porPost.get(p.id) ?? {},
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
+        marcadas: marcadas.get(p.id) ?? [],
+        souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
         salvo: salvos.has(p.id),
         /* ⚠️ A enquete só existe se houver opções: um array vazio (o padrão da
            coluna) é "post sem enquete", nunca "enquete de zero opções". */
@@ -981,13 +1056,40 @@ export const verPerfil = createServerFn({ method: "POST" })
         : { ok: false as const, motivo: "indisponivel" as const };
     }
 
-    const brutos = await postsCrus(sb, (base) =>
-      base
-        .eq("autor_id", data.alvoId)
-        .is("arquivado_em", null)
-        .order("criado_em", { ascending: false })
-        .limit(POSTS_POR_PAGINA),
-    );
+    /* ⚠️ **O PERFIL MOSTRA TAMBÉM O QUE ELA FOI MARCADA** — é o ponto inteiro
+       da marcação ("o post aparece nos dois perfis"). São duas consultas e não
+       um `or()`: o PostgREST não faz junção de tabela dentro de `or`, e trazer
+       as marcações por sub-select devolveria linhas duplicadas quando houvesse
+       mais de uma marcada.
+
+       ⚠️ E o que decide se cada post APARECE continua sendo `podeVerPost`, sobre
+       a camada de QUEM PUBLICOU: estar marcada não amplia visibilidade
+       nenhuma. Quem abre o perfil dela e não podia ver o post continua sem
+       ver. */
+    const marcados = await idsMarcadosDe(sb, data.alvoId);
+    const [proprios, deMarcacao] = await Promise.all([
+      postsCrus(sb, (base) =>
+        base
+          .eq("autor_id", data.alvoId)
+          .is("arquivado_em", null)
+          .order("criado_em", { ascending: false })
+          .limit(POSTS_POR_PAGINA),
+      ),
+      marcados.length
+        ? postsCrus(sb, (base) =>
+            base
+              .in("id", marcados)
+              .is("arquivado_em", null)
+              .order("criado_em", { ascending: false })
+              .limit(POSTS_POR_PAGINA),
+          )
+        : Promise.resolve([]),
+    ]);
+    const porId = new Map<string, any>();
+    for (const p of [...proprios, ...deMarcacao]) porId.set(p.id, p);
+    const brutos = [...porId.values()]
+      .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
+      .slice(0, POSTS_POR_PAGINA);
 
     /* ⚠️ O olho da prévia é um SENTINELA, nunca o meu id: `podeVerPost`
        curto-circuita em `euId === post.autorId` ("a dona sempre vê os dela"), e
@@ -1256,6 +1358,16 @@ export const publicarPost = createServerFn({ method: "POST" })
           .object({ tema: z.string().max(40) })
           .nullable()
           .optional(),
+        /**
+         * Quem estava junto.
+         *
+         * ⚠️ **O teto do zod NÃO é a régua** — é só um freio contra um corpo
+         * absurdo. Quem decide é `marcadasPermitidas`, no servidor, com o que o
+         * BANCO respondeu sobre cada uma (amizade, bloqueio, Modo Cuidado). Um
+         * id forjado aqui poria o nome de qualquer paciente da plataforma
+         * embaixo de uma foto que ela nunca viu.
+         */
+        marcadas: z.array(z.string().uuid()).max(20).optional(),
       })
       .parse(i),
   )
@@ -1363,11 +1475,156 @@ export const publicarPost = createServerFn({ method: "POST" })
         .select("id")
         .single();
       if (erro2 || !p2) return { ok: false as const, motivo: "banco" as const };
+      await gravarMarcacoes(sb, eu, p2.id, data.marcadas ?? []);
       return { ok: true as const, postId: p2.id };
     }
     if (!post) return { ok: false as const, motivo: "banco" as const };
 
+    /* ⚠️ DEPOIS de o post existir, e sem derrubá-lo se falhar: a publicação já
+       aconteceu, e devolver "não deu para publicar" por causa de uma linha
+       decorativa faria ela tentar de novo e publicar duas vezes. */
+    await gravarMarcacoes(sb, eu, post.id, data.marcadas ?? []);
+
     return { ok: true as const, postId: post.id };
+  });
+
+/**
+ * Grava as marcações de um post recém-publicado.
+ *
+ * ⚠️ **A LISTA DO CLIENTE É SÓ UM PEDIDO.** Cada id é conferido contra o BANCO:
+ * o vínculo de amizade nos dois sentidos (`saoAmigas`), o bloqueio e o Modo
+ * Cuidado. A régua está em `marcacoes.ts`, pura e testada; aqui só se coleta o
+ * que ela precisa saber.
+ *
+ * ⚠️ **E ela NUNCA derruba a publicação.** Falhar aqui deixa o post sem a linha
+ * "com Fulana", e nada mais.
+ */
+async function gravarMarcacoes(
+  sb: any,
+  eu: string,
+  postId: string,
+  pedidas: string[],
+): Promise<void> {
+  if (pedidas.length === 0) return;
+  try {
+    const { saoAmigas } = await import("@/lib/amigas.functions");
+    const { marcadasPermitidas } = await import("@/lib/marcacoes");
+    /* ⚠️ O conjunto de bloqueio vem do MESMO caminho que o feed usa
+       (`contextoDe`), e não de uma consulta escrita à mão aqui — duas leituras
+       do mesmo grafo divergem no primeiro conserto. */
+    const ctx = await contextoDe(sb, eu);
+    const perfis = await perfisPorId(sb, [...new Set(pedidas)]);
+
+    const candidatas = [];
+    for (const id of [...new Set(pedidas)]) {
+      const p = perfis.get(id);
+      candidatas.push({
+        id,
+        souEu: id === eu,
+        somosAmigas: id === eu ? false : await saoAmigas(sb, eu, id),
+        bloqueio: ctx.bloqueio.has(id),
+        /* Perfil que não veio conta como indisponível — falhar FECHADO. */
+        emCuidado: !p || !!p.care_mode,
+      });
+    }
+
+    const ok = marcadasPermitidas(candidatas);
+    if (ok.length === 0) return;
+    const { error } = await sb
+      .from("rede_marcacoes")
+      .insert(ok.map((quem_id) => ({ post_id: postId, quem_id })));
+    if (error) {
+      console.warn("[rede] sem rede_marcacoes — rode APLICAR_REDE_SOCIAL.sql");
+      return;
+    }
+    for (const quem of ok) {
+      await registrarAtividade(sb, { donoId: quem, quemId: eu, especie: "marcou", postId });
+    }
+  } catch (e) {
+    console.error("[rede] marcações não gravaram", e);
+  }
+}
+
+/**
+ * TIRAR A PRÓPRIA MARCAÇÃO.
+ *
+ * ⚠️ **É a marcada quem tira, e SÓ ela.** Ter o próprio nome numa foto de
+ * gestação de outra pessoa não é decisão de quem publicou — sem esta saída, a
+ * única defesa dela seria pedir à amiga que apagasse o post inteiro.
+ *
+ * ⚠️ **E o `eq("quem_id", eu)` É O PORTÃO.** Sem ele, qualquer `postId` +
+ * `quemId` no corpo do pedido tiraria a marcação de outra pessoa — e a amiga
+ * marcada sumiria do post sem nunca ter pedido.
+ *
+ * ⚠️ **Ninguém é avisado.** Quem publicou não recebe "Fulana tirou a marcação":
+ * é a mesma decisão do bloqueio e da saída de amizade — transformar um gesto
+ * privado num aviso transforma uma escolha numa briga.
+ */
+export const tirarMinhaMarcacao = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { error } = await sb
+      .from("rede_marcacoes")
+      .delete()
+      .eq("post_id", data.postId)
+      .eq("quem_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * Quem eu posso marcar — a lista que abre no compositor.
+ *
+ * ⚠️ **NUNCA UMA BUSCA.** É a lista do grafo que já existe, e é ela que torna a
+ * marcação segura sem moderação: para aparecer aqui, uma das duas já convidou a
+ * outra. Busca por nome transformaria a base de pacientes numa lista navegável.
+ *
+ * ⚠️ **Quem está em Modo Cuidado não aparece, e a tela não diz por quê** — do
+ * lado de quem marca, a amiga simplesmente não está na lista. É a mesma decisão
+ * da aba de Amigas: "Fulana saiu" contaria a perda dela para outra pessoa.
+ */
+export const amigasParaMarcar = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    try {
+      const { idsDasAmigas } = await import("@/lib/amigas.functions");
+      const r = await idsDasAmigas(sb, eu);
+      /* ⚠️ Grafo degradado devolve lista VAZIA, nunca "todo mundo". Numa régua
+         de quem pode ser exposta, errar para o lado de não oferecer é a única
+         direção segura. */
+      if ((r as any).degradada) return { ok: true as const, amigas: [] };
+      const ids = [...((r as any).todas as Iterable<string>)].filter((x) => x !== eu);
+      if (ids.length === 0) return { ok: true as const, amigas: [] };
+
+      const ctx = await contextoDe(sb, eu);
+      const perfis = await perfisPorId(sb, ids);
+      const amigas = ids
+        .map((id) => ({ id, p: perfis.get(id) }))
+        .filter(({ id, p }) => p && !p.care_mode && !ctx.bloqueio.has(id))
+        .map(({ id, p }) => ({
+          id,
+          nome: (p!.display_name ?? "").trim() || "Alguém",
+          avatar: (p as any)!.avatar_url ?? null,
+        }))
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+      return { ok: true as const, amigas };
+    } catch {
+      return { ok: true as const, amigas: [] };
+    }
   });
 
 export const apagarPost = createServerFn({ method: "POST" })

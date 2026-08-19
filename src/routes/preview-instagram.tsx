@@ -77,6 +77,7 @@ export const Route = createFileRoute("/preview-instagram")({
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     legendas: q.legendas == null ? 1 : Number(q.legendas),
+    amigas: q.amigas == null ? 1 : Number(q.amigas),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -156,6 +157,26 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   reacoes: i === 0 ? { amei: 24, emocionei: 11, torcendo: 6 } : i % 3 === 0 ? { abraco: 4 } : {},
   minhaReacao: i === 0 ? "emocionei" : null,
   souAAutora: i === 3,
+  /* O post 0 tem DUAS marcadas (mostra "com Marina e Carol"), e o 4 tem quatro
+     (mostra a contagem). O 3 é MEU e me tem marcada — é ele que acende o
+     "tirar minha marcação", que de outro jeito seria impossível de fotografar. */
+  marcadas:
+    i === 0
+      ? [
+          { id: "marina", nome: "Marina Costa" },
+          { id: "carol", nome: "Carol" },
+        ]
+      : i === 4
+        ? [
+            { id: "a", nome: "Ana Paula" },
+            { id: "b", nome: "Bruna" },
+            { id: "c", nome: "Tia Zezé" },
+            { id: "d", nome: "Marina Costa" },
+          ]
+        : i === 3
+          ? [{ id: "eu", nome: "Você" }]
+          : [],
+  souMarcada: i === 3,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
      apagado dos outros. Com todos apagados não haveria contraste. */
   salvo: i === 1,
@@ -202,6 +223,7 @@ function Bancada() {
     vazio,
     sugeridas,
     legendas,
+    amigas,
     selo,
     trancado,
     carimbo,
@@ -279,6 +301,7 @@ function Bancada() {
 
   const semSugestoes = sugeridas === 0;
   const semLegendas = legendas === 0;
+  const semAmigasParaMarcar = amigas === 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -296,6 +319,7 @@ function Bancada() {
       votar: (_p: PostNaTela, i: number) => alert(`votaria na opção ${i}`),
       apagar: (_p: PostNaTela) => alert("apagaria"),
       denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
+      tirarMarcacao: (p: PostNaTela) => alert(`tiraria minha marcação do post ${p.id}`),
     }),
     [],
   );
@@ -525,6 +549,21 @@ function Bancada() {
              espera, as três opções, o estado vazio), não o modelo.
              `?legendas=0` mostra o caso em que nada volta — que é o estado
              mais fácil de esquecer de desenhar. */
+          /* ⚠️ A bancada precisa de amigas para o seletor existir — e sem elas
+             o botão nem aparece, que é o comportamento certo e também o
+             impossível de fotografar. `?amigas=0` mostra a conta nova. */
+          amigasParaMarcar={
+            semAmigasParaMarcar
+              ? []
+              : [
+                  { id: "marina", nome: "Marina Costa", avatar: null },
+                  { id: "carol", nome: "Carol", avatar: null },
+                  { id: "ana", nome: "Ana Paula", avatar: null },
+                  { id: "bru", nome: "Bruna", avatar: null },
+                  { id: "ze", nome: "Tia Zezé", avatar: null },
+                  { id: "sof", nome: "Sofia", avatar: null },
+                ]
+          }
           aoSugerirLegenda={async () => {
             await new Promise((r) => setTimeout(r, 700));
             return semLegendas
@@ -539,7 +578,8 @@ function Bancada() {
           aoPublicar={async (p) => {
             alert(
               `publicaria: ${p.fotos.length} foto(s), ${p.visibilidade}, ` +
-                `enquete [${p.enquete.join(" | ")}], aula ${p.aula ? p.aula.tema : "—"}\n${p.texto ?? ""}`,
+                `enquete [${p.enquete.join(" | ")}], aula ${p.aula ? p.aula.tema : "—"}, ` +
+                `marcadas [${p.marcadas.join(", ")}]\n${p.texto ?? ""}`,
             );
             return false; /* `false` mantém a tela aberta, para olhar de novo. */
           }}
@@ -681,6 +721,7 @@ function Bancada() {
           /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
              tinha denúncia e o canal com mais alcance não tinha. */
           aoDenunciar={acoesDaBancada.denunciar}
+          aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */

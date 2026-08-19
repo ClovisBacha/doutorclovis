@@ -364,7 +364,7 @@ export function principaisReacoes(c: ContagemDeReacoes, quantas = 3): TipoDeReac
    7 · AVISOS
    ══════════════════════════════════════════════════════════════════════════ */
 
-export type EspecieDeAviso = "seguiu" | "pediu_para_seguir" | "reagiu" | "aceitou";
+export type EspecieDeAviso = "seguiu" | "pediu_para_seguir" | "reagiu" | "aceitou" | "marcou";
 
 /**
  * ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.**
@@ -377,6 +377,12 @@ export type EspecieDeAviso = "seguiu" | "pediu_para_seguir" | "reagiu" | "aceito
  *
  * O pedido para seguir manda porque ele PEDE UMA AÇÃO dela e fica parado até
  * que ela responda.
+ *
+ * ⚠️ **E a MARCAÇÃO também não manda**, apesar de parecer mais forte que uma
+ * reação — o nome dela vai para a foto de outra pessoa. Não manda porque não há
+ * prazo nem decisão presa: a marcação já está visível, aparece na caixa de
+ * Atividade com emblema, e ela pode tirá-la a qualquer momento. Push é para o
+ * que fica esperando resposta.
  */
 export function avisoMandaPush(e: EspecieDeAviso): boolean {
   return e === "pediu_para_seguir";
@@ -392,6 +398,11 @@ export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
       return `${quem} aceitou seu pedido`;
     case "reagiu":
       return `${quem} reagiu ao seu post`;
+    case "marcou":
+      /* ⚠️ Diz que dá para TIRAR, na própria frase. Descobrir isso só abrindo o
+         post faria a primeira reação de quem não quis ser marcada ser pedir à
+         amiga que apagasse a publicação inteira. */
+      return `${quem} marcou você num post — você pode tirar`;
   }
 }
 

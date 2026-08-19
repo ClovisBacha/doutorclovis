@@ -72,6 +72,7 @@ import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
+import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -422,6 +423,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoApagar,
   aoDenunciar,
   aoVotar,
+  aoTirarMarcacao,
   sugerido = false,
 }: {
   post: PostNaTela;
@@ -443,6 +445,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoDenunciar?: (post: PostNaTela) => void;
   /** Votar na enquete. Sem ele as opções aparecem inertes. */
   aoVotar?: (post: PostNaTela, opcao: number) => void;
+  /** Tirar a PRÓPRIA marcação. Só aparece quando `post.souMarcada`. */
+  aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Veio do algoritmo, não de quem ela segue. */
   sugerido?: boolean;
 }) {
@@ -475,13 +479,24 @@ export const PostInstagram = memo(function PostInstagram({
                 Sugerido para você
               </span>
             )}
+            {/* ⚠️ "com Marina e Carol" — até dois nomes por extenso, do terceiro
+                em diante contagem. Cinco nomes estouram a largura de um iPhone
+                e empurram a hora do post para a linha de baixo. Régua em
+                `marcacoes.ts`, testada. */}
+            {textoDeMarcadas(post.marcadas.map((m) => m.nome)) && (
+              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+                {textoDeMarcadas(post.marcadas.map((m) => m.nome))}
+              </span>
+            )}
           </span>
         </button>
         {/* O ⋯ tem uma ação por lado: apagar no post DELA, denunciar no de
             outra pessoa. No modelo ele abre um menu com oito itens; aqui é uma
             só de cada lado, e um menu de um item é um botão com uma etapa a
             mais. */}
-        {((post.souAAutora && aoApagar) || (!post.souAAutora && aoDenunciar)) && (
+        {((post.souAAutora && aoApagar) ||
+          (!post.souAAutora && aoDenunciar) ||
+          (post.souMarcada && aoTirarMarcacao)) && (
           <button
             type="button"
             onClick={() => setConfirmando(true)}
@@ -497,6 +512,23 @@ export const PostInstagram = memo(function PostInstagram({
           "tem certeza?" — é a mesma decisão do cancelar consulta, pedida pelo
           dono na época. Apagar publicação é irreversível: não há lixeira, e o
           arquivo sai do balde. */}
+      {/* ⚠️ A SAÍDA DE QUEM FOI MARCADA é um botão PRÓPRIO, e não mais um item
+          na mesma confirmação: apagar e denunciar são sobre o post da outra
+          pessoa; tirar a marcação é sobre o NOME DELA. Misturar as três faria a
+          ação mais provável (tirar o próprio nome) ficar atrás de uma pergunta
+          escrita para outra coisa. */}
+      {post.souMarcada && aoTirarMarcacao && !confirmando && (
+        <div className="px-4 pt-1">
+          <button
+            type="button"
+            onClick={() => aoTirarMarcacao(post)}
+            className="press text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+          >
+            Tirar minha marcação
+          </button>
+        </div>
+      )}
+
       {confirmando && (
         <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
           <p className="text-[13px] leading-snug">
@@ -810,6 +842,7 @@ export function TelaPrincipal({
   aoApagar,
   aoDenunciar,
   aoVotar,
+  aoTirarMarcacao,
   aoAbrirPerfil,
   aoTocarStory,
   aoChegarNoFim,
@@ -838,6 +871,8 @@ export function TelaPrincipal({
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela) => void;
   aoVotar?: (post: PostNaTela, opcao: number) => void;
+  /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
+  aoTirarMarcacao?: (post: PostNaTela) => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
    * Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story.
@@ -927,6 +962,7 @@ export function TelaPrincipal({
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
+            aoTirarMarcacao={aoTirarMarcacao}
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
@@ -969,6 +1005,7 @@ export function TelaPrincipal({
                   aoReagir={aoReagir}
                   aoSalvar={aoSalvar}
                   aoVotar={aoVotar}
+                  aoTirarMarcacao={aoTirarMarcacao}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
               ))}
@@ -1744,6 +1781,7 @@ export function RedeNoApp({
     votar: (_p: PostNaTela, _i: number) => {},
     apagar: (_p: PostNaTela) => {},
     denunciar: (_p: PostNaTela) => {},
+    tirarMarcacao: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
   });
   ultimas.current = {
@@ -1752,6 +1790,7 @@ export function RedeNoApp({
     votar: (p, i) => void votar(p, i),
     apagar: (p) => void apagar(p),
     denunciar: (p) => void denunciarPost(p),
+    tirarMarcacao: (p) => void tirarMarcacao(p),
     abrirPerfil: (id) => void abrirPerfil(id),
   };
   const acoes = useMemo(
@@ -1761,6 +1800,7 @@ export function RedeNoApp({
       votar: (p: PostNaTela, i: number) => ultimas.current.votar(p, i),
       apagar: (p: PostNaTela) => ultimas.current.apagar(p),
       denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
+      tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
     }),
     [],
@@ -1774,6 +1814,64 @@ export function RedeNoApp({
    * opcional e, sobretudo, fazer sair do aparelho mais imagem do que o
    * necessário. É foto de gestação, às vezes ultrassom.
    */
+  /**
+   * Quem eu posso marcar — carregada UMA vez, ao abrir o compositor.
+   *
+   * ⚠️ `null` até responder, e por isso o botão só aparece depois: mostrar um
+   * seletor vazio enquanto a lista vem faria a paciente concluir que não tem
+   * amiga nenhuma no app.
+   */
+  const [paraMarcar, setParaMarcar] = useState<
+    { id: string; nome: string; avatar: string | null }[] | null
+  >(null);
+
+  useEffect(() => {
+    if (onde.t !== "novo" || paraMarcar !== null) return;
+    let vivo = true;
+    (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { amigasParaMarcar } = await import("@/lib/rede-social.functions");
+        const r = await amigasParaMarcar({ data: { accessToken: t } });
+        if (vivo && r.ok) setParaMarcar(r.amigas);
+      } catch {
+        if (vivo) setParaMarcar([]);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, paraMarcar]);
+
+  /**
+   * Tirar a MINHA marcação de um post.
+   *
+   * ⚠️ Otimista, e some da tela na hora: o gesto é "não quero meu nome aqui", e
+   * um nome que continua na tela por um segundo depois do toque é exatamente o
+   * segundo que ela não quer.
+   */
+  async function tirarMarcacao(post: PostNaTela) {
+    const aplicar = (ps: PostNaTela[]) =>
+      ps.map((x) =>
+        x.id === post.id
+          ? { ...x, souMarcada: false, marcadas: x.marcadas.filter((m) => m.id !== euId) }
+          : x,
+      );
+    setPosts(aplicar);
+    setDoPerfil(aplicar);
+    setSugestoes(aplicar);
+    setOPost((x) => (x ? aplicar([x])[0] : x));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { tirarMinhaMarcacao } = await import("@/lib/rede-social.functions");
+      await tirarMinhaMarcacao({ data: { accessToken: t, postId: post.id } });
+    } catch {
+      void carregarFeed();
+    }
+  }
+
   async function sugerirLegenda(foto: string): Promise<string[]> {
     const t = await token();
     if (!t) return [];
@@ -2238,6 +2336,8 @@ export function RedeNoApp({
   }
 
   async function publicar(p: {
+    /** Quem estava junto — o servidor confere cada id. */
+    marcadas: string[];
     texto: string | null;
     fotos: string[];
     visibilidade: Visibilidade;
@@ -2260,6 +2360,7 @@ export function RedeNoApp({
           visibilidade: p.visibilidade,
           enquete: p.enquete,
           aula: p.aula,
+          marcadas: p.marcadas,
         },
       });
       if (!r.ok) {
@@ -2714,6 +2815,7 @@ export function RedeNoApp({
     return (
       <NovoPost
         aoSugerirLegenda={sugerirLegenda}
+        amigasParaMarcar={paraMarcar}
         aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoPublicar={publicar}
         aulaDeHoje={aulaDeHoje}
@@ -2815,6 +2917,7 @@ export function RedeNoApp({
         aoVotar={acoes.votar}
         aoApagar={acoes.apagar}
         aoDenunciar={acoes.denunciar}
+        aoTirarMarcacao={acoes.tirarMarcacao}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -2904,6 +3007,7 @@ export function RedeNoApp({
         aoApagar={acoes.apagar}
         aoDenunciar={acoes.denunciar}
         aoVotar={acoes.votar}
+        aoTirarMarcacao={acoes.tirarMarcacao}
         aoAbrirPerfil={acoes.abrirPerfil}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
@@ -3175,6 +3279,7 @@ export function TelaDoPost({
   aoApagar,
   aoDenunciar,
   aoVotar,
+  aoTirarMarcacao,
   aoVoltar,
   aoAbrirPerfil,
 }: {
@@ -3186,6 +3291,8 @@ export function TelaDoPost({
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela) => void;
   aoVotar?: (post: PostNaTela, opcao: number) => void;
+  /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
+  aoTirarMarcacao?: (post: PostNaTela) => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {
@@ -3209,6 +3316,7 @@ export function TelaDoPost({
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
+        aoTirarMarcacao={aoTirarMarcacao}
         aoAbrirPerfil={aoAbrirPerfil}
       />
     </div>
@@ -3655,6 +3763,7 @@ export function NovoPost({
   aoPublicar,
   aulaDeHoje,
   aoSugerirLegenda,
+  amigasParaMarcar,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -3664,6 +3773,8 @@ export function NovoPost({
     visibilidade: Visibilidade;
     enquete: string[];
     aula: AulaNoPost | null;
+    /** Os ids de quem estava junto. O servidor confere cada um. */
+    marcadas: string[];
   }) => Promise<boolean>;
   /**
    * A aula que ela fez hoje, para anexar com um toque.
@@ -3681,9 +3792,19 @@ export function NovoPost({
    * componente continua sendo só desenho, como já era para `aoPublicar`.
    */
   aoSugerirLegenda?: (foto: string) => Promise<string[]>;
+  /**
+   * As amigas que ela pode marcar. `null` = o recurso não está ligado.
+   *
+   * ⚠️ **É uma LISTA, e nunca uma busca.** Para aparecer aqui, uma das duas já
+   * convidou a outra — é o grafo fechado que torna a marcação segura sem
+   * moderação. A régua e o porquê estão em `marcacoes.ts`.
+   */
+  amigasParaMarcar?: { id: string; nome: string; avatar: string | null }[] | null;
 }) {
   const [texto, setTexto] = useState("");
   const [sugestoes, setSugestoes] = useState<string[] | null>(null);
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [escolhendoQuem, setEscolhendoQuem] = useState(false);
   const [pensando, setPensando] = useState(false);
   /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
      outras" divergiria na hora de remover a primeira. */
@@ -3736,6 +3857,7 @@ export function NovoPost({
       visibilidade: vis,
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
+      marcadas,
     });
     setEnviando(false);
     if (ok) aoFechar();
@@ -3864,6 +3986,75 @@ export function NovoPost({
               </div>
             ))}
           </div>
+        )}
+
+        {/* ─── QUEM ESTAVA JUNTO ───────────────────────────────────────────
+            ⚠️ Só aparece quando HÁ amigas. Um botão que abre uma folha vazia
+            ensina que os botões desta tela não valem — e a maioria das contas
+            novas não tem ninguém no grafo ainda. */}
+        {amigasParaMarcar && amigasParaMarcar.length > 0 && (
+          <>
+            <button
+              type="button"
+              onClick={() => setEscolhendoQuem((v) => !v)}
+              aria-expanded={escolhendoQuem}
+              className="press mt-3 w-full rounded-xl border border-border py-2 text-[14px] font-medium"
+            >
+              {marcadas.length === 0
+                ? "👭 Marcar quem estava junto"
+                : `👭 ${marcadas.length} marcada${marcadas.length > 1 ? "s" : ""}`}
+            </button>
+
+            {escolhendoQuem && (
+              <div className="mt-2 rounded-2xl border border-border p-2">
+                {/* ⚠️ Diz o TETO na tela. Descobrir o limite só ao tocar na
+                    sexta amiga é o tipo de recusa que parece defeito. */}
+                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                  Até {MARCADAS_MAX} pessoas, entre as suas amigas do app.
+                </p>
+                <div className="max-h-56 space-y-0.5 overflow-y-auto">
+                  {amigasParaMarcar.map((a) => {
+                    const marcada = marcadas.includes(a.id);
+                    const cheio = marcadas.length >= MARCADAS_MAX && !marcada;
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        disabled={cheio}
+                        aria-pressed={marcada}
+                        onClick={() => {
+                          hapticTap();
+                          setMarcadas((m) =>
+                            m.includes(a.id) ? m.filter((x) => x !== a.id) : [...m, a.id],
+                          );
+                        }}
+                        className={`press flex min-h-[44px] w-full items-center gap-2.5 rounded-xl px-2 text-left text-[14px] disabled:opacity-40 ${
+                          marcada ? "bg-primary/10 font-semibold" : ""
+                        }`}
+                      >
+                        <Foto url={a.avatar} nome={a.nome} lado={32} />
+                        <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                        {marcada && (
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden
+                            className="h-4 w-4 shrink-0 text-primary"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth={2.6}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="m5 12.5 4.5 4.5L19 7.5" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* ─── A ENQUETE ────────────────────────────────────────────────── */}

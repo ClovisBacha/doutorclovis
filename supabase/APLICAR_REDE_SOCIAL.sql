@@ -333,6 +333,41 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
 -- levar pra maternidade") diz mais sobre o momento dela que qualquer post que
 -- ela publique.
 -- ═════════════════════════════════════════════════════════════════════════════
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MARCAR QUEM ESTAVA JUNTO (ago/2026 — ideia 10)
+--
+-- ⚠️ A marcação NÃO amplia a visibilidade do post. Um post `amigas` marcado
+-- continua visível só para as amigas de QUEM PUBLICOU — a leitura é feita em
+-- `podeVerPost`, e não aqui. Se a marcação escancarasse o post para a rede da
+-- marcada, ela viraria a porta dos fundos da camada de visibilidade.
+--
+-- ⚠️ E quem tira a marcação é A MARCADA. Ter o próprio nome numa foto de
+-- gestação de outra pessoa não é decisão de quem publicou; sem essa saída a
+-- única defesa dela seria pedir para a amiga apagar o post inteiro.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rede_marcacoes (
+  post_id   uuid NOT NULL REFERENCES public.rede_posts ON DELETE CASCADE,
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, quem_id)
+);
+
+-- Os posts em que EU fui marcada, do mais novo para o mais velho: é a consulta
+-- da aba do perfil dela.
+CREATE INDEX IF NOT EXISTS rede_marcacoes_de ON public.rede_marcacoes (quem_id, criado_em DESC);
+
+ALTER TABLE public.rede_marcacoes ENABLE ROW LEVEL SECURITY;
+
+-- Escrita só pelo servidor: é ele que confere o vínculo (`saoAmigas`), o
+-- bloqueio e o Modo Cuidado de cada marcada, uma por uma. Um `INSERT` direto do
+-- navegador poria o nome de qualquer paciente embaixo de qualquer foto.
+DROP POLICY IF EXISTS "Service manages rede_marcacoes" ON public.rede_marcacoes;
+CREATE POLICY "Service manages rede_marcacoes" ON public.rede_marcacoes
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE public.rede_marcacoes IS
+  'Quem estava junto num post. Escrita só pelo servidor; a marcada pode tirar a própria marcação.';
+
 CREATE TABLE IF NOT EXISTS public.rede_salvos (
   quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   post_id   uuid NOT NULL REFERENCES public.rede_posts ON DELETE CASCADE,
@@ -397,7 +432,7 @@ CREATE TABLE IF NOT EXISTS public.rede_atividade (
   dono_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   -- Quem fez.
   quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  especie   text NOT NULL CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu')),
+  especie   text NOT NULL CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou')),
   -- Só em 'reagiu'. `ON DELETE CASCADE`: post apagado leva a linha junto —
   -- uma atividade que aponta para o nada é uma linha que não abre nada.
   post_id   uuid REFERENCES public.rede_posts ON DELETE CASCADE,
@@ -415,6 +450,13 @@ CREATE INDEX IF NOT EXISTS rede_atividade_novas
 -- ⚠️ Uma linha por (quem, espécie, post). Sem isto, tirar e pôr a reação cinco
 -- vezes encheria a caixa dela com cinco avisos da mesma pessoa sobre o mesmo
 -- post — e ela abriria a aba achando que cinco pessoas reagiram.
+-- ⚠️ O CHECK acima só vale para banco NOVO — `CREATE TABLE IF NOT EXISTS` não
+-- toca em tabela existente. Sem este bloco, a marcação seria aceita pelo
+-- servidor e o AVISO recusado pelo banco: a marcada nunca saberia.
+ALTER TABLE public.rede_atividade DROP CONSTRAINT IF EXISTS rede_atividade_especie_check;
+ALTER TABLE public.rede_atividade ADD CONSTRAINT rede_atividade_especie_check
+  CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou'));
+
 CREATE UNIQUE INDEX IF NOT EXISTS rede_atividade_uma_por_gesto
   ON public.rede_atividade (dono_id, quem_id, especie, coalesce(post_id, dono_id));
 

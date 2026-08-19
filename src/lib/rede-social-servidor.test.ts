@@ -279,7 +279,7 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são sete", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são nove", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -320,7 +320,18 @@ describe("higiene", () => {
     expect(rm).toContain('.eq("seguido_id", eu)');
     expect(rm).toContain('.eq("seguidor_id", data.quemId)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(8);
+    /* ⚠️ E o NONO: tirar a PRÓPRIA marcação. Ter o próprio nome numa foto de
+       gestação de outra pessoa não é decisão de quem publicou — sem esta saída,
+       a única defesa dela seria pedir à amiga que apagasse o post inteiro.
+       `.eq("quem_id", eu)` é o portão: sem ele, um `postId` + `quemId` no corpo
+       do pedido tiraria a marcação de OUTRA pessoa, e a amiga marcada sumiria
+       do post sem nunca ter pedido. */
+    const mm = corpoDe("tirarMinhaMarcacao").replace(/\s+/g, " ");
+    expect(mm).toContain(".delete(");
+    expect(mm).toContain('.eq("post_id", data.postId)');
+    expect(mm).toContain('.eq("quem_id", eu)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(9);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {
