@@ -35,7 +35,7 @@
  * ⚠️ A zona de sugestões ("Você está em dia" + pessoas + publicações) só abre
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -277,6 +277,24 @@ function Bancada() {
   const semSugestoes = sugeridas === 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
+  /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
+     A produção passa referências FIXAS (`acoes`, em `RedeNoApp`), porque o
+     cartão é `memo`. Uma bancada que passasse fecho novo a cada pintura mediria
+     um app que não existe — e foi exatamente o que aconteceu na primeira
+     medição desta mudança: o `memo` errava em todos os cartões e o número não
+     se mexia. `setReacoes` com função dispensa o valor anterior no fecho. */
+  const acoesDaBancada = useMemo(
+    () => ({
+      reagir: (post: PostNaTela, tipo: TipoDeReacao | null) =>
+        setReacoes((m) => ({ ...m, [post.id]: tipo })),
+      abrirPerfil: (id: string) => alert(`abriria o perfil de ${id}`),
+      salvar: (_p: PostNaTela, v: boolean) => alert(v ? "guardaria" : "tiraria dos salvos"),
+      votar: (_p: PostNaTela, i: number) => alert(`votaria na opção ${i}`),
+      apagar: (_p: PostNaTela) => alert("apagaria"),
+      denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
+    }),
+    [],
+  );
   const comReacoes = (ps: PostNaTela[]) =>
     ps.map((p) => {
       if (!(p.id in reacoes)) return p;
@@ -635,14 +653,14 @@ function Bancada() {
              reordenando, o toque duplo virando coração. A tela desenhava e
              nunca respondia, que é o estado em que uma tela passa meses sem
              ninguém perceber que ela não funciona. */
-          aoReagir={(post, tipo) => setReacoes((m) => ({ ...m, [post.id]: tipo }))}
-          aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
-          aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
-          aoVotar={(_, i) => alert(`votaria na opção ${i}`)}
-          aoApagar={() => alert("apagaria")}
+          aoReagir={acoesDaBancada.reagir}
+          aoAbrirPerfil={acoesDaBancada.abrirPerfil}
+          aoSalvar={acoesDaBancada.salvar}
+          aoVotar={acoesDaBancada.votar}
+          aoApagar={acoesDaBancada.apagar}
           /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
              tinha denúncia e o canal com mais alcance não tinha. */
-          aoDenunciar={(p) => alert(`denunciaria o post ${p.id}`)}
+          aoDenunciar={acoesDaBancada.denunciar}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */

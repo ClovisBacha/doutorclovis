@@ -25,7 +25,7 @@
  *  3. **Seguidores e seguindo não são públicos.** A única divergência de
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -396,7 +396,24 @@ function IconeMarcador({ cheio }: { cheio: boolean }) {
   );
 }
 
-export function PostInstagram({
+/**
+ * ⚠️ AS AÇÕES RECEBEM O POST — e essa assinatura existe por DESEMPENHO.
+ *
+ * Elas eram `(t) => void`, e a lista montava um fecho por post e por ação:
+ * `aoReagir={(t) => aoReagir(p, t)}`. Cinco funções novas por post a cada
+ * pintura — então `memo` neste componente não valeria nada, porque as props
+ * mudam de identidade mesmo quando o post não muda.
+ *
+ * Medido em `/preview-instagram`, com 19 posts e a CPU estrangulada em 6×:
+ * escolher uma reação custava **232 ms** do toque à pintura, porque
+ * `setPosts` devolve uma lista nova e TODOS os cartões redesenhavam. Acima de
+ * 100 ms o toque deixa de parecer instantâneo — e o feed só cresce.
+ *
+ * Com o post de volta pelo argumento, quem chama passa a MESMA referência para
+ * todos os cartões, e `aplicar` já preserva a identidade de quem não mudou
+ * (`if (p.id !== post.id) return p`). Aí `memo` funciona: repinta um cartão.
+ */
+export const PostInstagram = memo(function PostInstagram({
   post,
   aoReagir,
   aoAbrirPerfil,
@@ -407,12 +424,12 @@ export function PostInstagram({
   sugerido = false,
 }: {
   post: PostNaTela;
-  aoReagir: (t: TipoDeReacao | null) => void;
+  aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoAbrirPerfil?: (id: string) => void;
   /** Guardar/desguardar. Sem ele o marcador não aparece. */
-  aoSalvar?: (salvar: boolean) => void;
+  aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
-  aoApagar?: () => void;
+  aoApagar?: (post: PostNaTela) => void;
   /**
    * Denunciar. Só no post de OUTRA pessoa.
    *
@@ -422,9 +439,9 @@ export function PostInstagram({
    * nenhuma pega (assédio, mentira, foto de outra pessoa), e para essas o único
    * caminho é uma pessoa olhar.
    */
-  aoDenunciar?: () => void;
+  aoDenunciar?: (post: PostNaTela) => void;
   /** Votar na enquete. Sem ele as opções aparecem inertes. */
-  aoVotar?: (opcao: number) => void;
+  aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Veio do algoritmo, não de quem ela segue. */
   sugerido?: boolean;
 }) {
@@ -500,8 +517,8 @@ export function PostInstagram({
               type="button"
               onClick={() => {
                 setConfirmando(false);
-                if (post.souAAutora) aoApagar?.();
-                else aoDenunciar?.();
+                if (post.souAAutora) aoApagar?.(post);
+                else aoDenunciar?.(post);
               }}
               className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
             >
@@ -521,7 +538,7 @@ export function PostInstagram({
              mostraria o oposto do que acabou de acontecer. */
           aoToqueDuplo={() => {
             hapticTap();
-            if (post.minhaReacao !== REACAO_DO_TOQUE_DUPLO) aoReagir(REACAO_DO_TOQUE_DUPLO);
+            if (post.minhaReacao !== REACAO_DO_TOQUE_DUPLO) aoReagir(post, REACAO_DO_TOQUE_DUPLO);
           }}
         />
       )}
@@ -580,7 +597,7 @@ export function PostInstagram({
         {aoSalvar && (
           <button
             type="button"
-            onClick={() => aoSalvar(!post.salvo)}
+            onClick={() => aoSalvar(post, !post.salvo)}
             aria-label={post.salvo ? "Tirar dos salvos" : "Salvar"}
             aria-pressed={post.salvo}
             className="press ml-auto leading-none"
@@ -618,7 +635,7 @@ export function PostInstagram({
                 aria-pressed={post.minhaReacao === r.tipo}
                 onClick={() => {
                   hapticTap();
-                  aoReagir(post.minhaReacao === r.tipo ? null : r.tipo);
+                  aoReagir(post, post.minhaReacao === r.tipo ? null : r.tipo);
                   setEscolhendo(false);
                 }}
                 /* A escada é o que faz a barra parecer uma coisa que ABRIU. */
@@ -655,7 +672,7 @@ export function PostInstagram({
                 disabled={jaVotou || !aoVotar}
                 onClick={() => {
                   hapticTap();
-                  aoVotar?.(i);
+                  aoVotar?.(post, i);
                 }}
                 aria-pressed={meu === i}
                 /* ⚠️ `rounded-full` e altura de 40px, não um retângulo de
@@ -775,7 +792,7 @@ export function PostInstagram({
       </p>
     </article>
   );
-}
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    A TELA PRINCIPAL
@@ -899,11 +916,16 @@ export function TelaPrincipal({
           <PostInstagram
             key={p.id}
             post={p}
-            aoReagir={(t) => aoReagir(p, t)}
-            aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
-            aoApagar={aoApagar && p.souAAutora ? () => aoApagar(p) : undefined}
-            aoDenunciar={aoDenunciar && !p.souAAutora ? () => aoDenunciar(p) : undefined}
-            aoVotar={aoVotar ? (i) => aoVotar(p, i) : undefined}
+            /* ⚠️ AS MESMAS REFERÊNCIAS PARA TODOS OS CARTÕES — nunca um fecho
+               por post. É isto que faz o `memo` do cartão valer alguma coisa;
+               com `(t) => aoReagir(p, t)` as props mudam a cada pintura e o
+               `memo` nunca acerta. O portão de quem pode apagar/denunciar
+               mudou-se para DENTRO do cartão, que já tem `post.souAAutora`. */
+            aoReagir={aoReagir}
+            aoSalvar={aoSalvar}
+            aoApagar={aoApagar}
+            aoDenunciar={aoDenunciar}
+            aoVotar={aoVotar}
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
@@ -943,9 +965,9 @@ export function TelaPrincipal({
                   post={p}
                   /* O rótulo é OBRIGATÓRIO — ver `PostInstagram`. */
                   sugerido
-                  aoReagir={(t) => aoReagir(p, t)}
-                  aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
-                  aoVotar={aoVotar ? (i) => aoVotar(p, i) : undefined}
+                  aoReagir={aoReagir}
+                  aoSalvar={aoSalvar}
+                  aoVotar={aoVotar}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
               ))}
@@ -1696,6 +1718,52 @@ export function RedeNoApp({
   /** Já pedi as sugestões nesta visita? Ver `carregarSugestoes`. */
   const sugestoesPedidas = useRef(false);
   const arquivoDoStory = useRef<HTMLInputElement>(null);
+
+  /**
+   * ⚠️ AS AÇÕES DA LISTA, COM REFERÊNCIA FIXA — e sem isto o `memo` do cartão
+   * não vale nada.
+   *
+   * `reagir`, `guardar`, `votar` e as outras são declaradas no corpo deste
+   * componente: cada pintura cria funções NOVAS. Passadas direto, todo cartão
+   * recebe props diferentes a cada `setPosts` e redesenha, mesmo o post que
+   * não mudou uma vírgula.
+   *
+   * Aqui o objeto é criado UMA vez (`useMemo` com lista vazia) e cada método
+   * encaminha para a versão mais recente, guardada num `ref` que é reescrito a
+   * cada render. Referência estável por fora, fecho fresco por dentro — sem
+   * `useCallback` em cascata, que obrigaria a memoizar tudo que elas leem.
+   *
+   * ⚠️ O `ref` é atualizado no CORPO do render, não num efeito: um efeito roda
+   * DEPOIS da pintura, e o toque que acontecer entre as duas chamaria a versão
+   * anterior — com o estado anterior nos fechos.
+   */
+  const ultimas = useRef({
+    reagir: (_p: PostNaTela, _t: TipoDeReacao | null) => {},
+    guardar: (_p: PostNaTela, _v: boolean) => {},
+    votar: (_p: PostNaTela, _i: number) => {},
+    apagar: (_p: PostNaTela) => {},
+    denunciar: (_p: PostNaTela) => {},
+    abrirPerfil: (_id: string) => {},
+  });
+  ultimas.current = {
+    reagir: (p, t) => void reagir(p, t),
+    guardar: (p, v) => void guardar(p, v),
+    votar: (p, i) => void votar(p, i),
+    apagar: (p) => void apagar(p),
+    denunciar: (p) => void denunciarPost(p),
+    abrirPerfil: (id) => void abrirPerfil(id),
+  };
+  const acoes = useMemo(
+    () => ({
+      reagir: (p: PostNaTela, t: TipoDeReacao | null) => ultimas.current.reagir(p, t),
+      guardar: (p: PostNaTela, v: boolean) => ultimas.current.guardar(p, v),
+      votar: (p: PostNaTela, i: number) => ultimas.current.votar(p, i),
+      apagar: (p: PostNaTela) => ultimas.current.apagar(p),
+      denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
+      abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
+    }),
+    [],
+  );
 
   async function token() {
     const { supabase } = await import("@/integrations/supabase/client");
@@ -2710,11 +2778,11 @@ export function RedeNoApp({
     return (
       <TelaDoPost
         post={oPost}
-        aoReagir={(t) => reagir(oPost, t)}
-        aoSalvar={(v) => guardar(oPost, v)}
-        aoVotar={(i) => votar(oPost, i)}
-        aoApagar={oPost.souAAutora ? () => apagar(oPost) : undefined}
-        aoDenunciar={oPost.souAAutora ? undefined : () => void denunciarPost(oPost)}
+        aoReagir={acoes.reagir}
+        aoSalvar={acoes.guardar}
+        aoVotar={acoes.votar}
+        aoApagar={acoes.apagar}
+        aoDenunciar={acoes.denunciar}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -2799,12 +2867,12 @@ export function RedeNoApp({
       <TelaPrincipal
         posts={posts}
         stories={fileira}
-        aoReagir={reagir}
-        aoSalvar={guardar}
-        aoApagar={apagar}
-        aoDenunciar={(p) => void denunciarPost(p)}
-        aoVotar={votar}
-        aoAbrirPerfil={abrirPerfil}
+        aoReagir={acoes.reagir}
+        aoSalvar={acoes.guardar}
+        aoApagar={acoes.apagar}
+        aoDenunciar={acoes.denunciar}
+        aoVotar={acoes.votar}
+        aoAbrirPerfil={acoes.abrirPerfil}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
         desafio={desafio}
@@ -3079,12 +3147,13 @@ export function TelaDoPost({
   aoAbrirPerfil,
 }: {
   post: PostNaTela;
-  aoReagir: (t: TipoDeReacao | null) => void;
-  aoSalvar?: (salvar: boolean) => void;
-  aoApagar?: () => void;
+  /* As ações carregam o POST — ver a nota de desempenho em `PostInstagram`. */
+  aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
+  aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
-  aoDenunciar?: () => void;
-  aoVotar?: (opcao: number) => void;
+  aoDenunciar?: (post: PostNaTela) => void;
+  aoVotar?: (post: PostNaTela, opcao: number) => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {
