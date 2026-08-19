@@ -29,6 +29,9 @@ export async function signInWithGoogle(role: "paciente" | "medico"): Promise<Err
  * ⚠️ **E ela é obrigatória, não enfeite.** Pela diretriz 4.8 da App Store, um
  * app que oferece login social de terceiro tem de oferecer "Sign in with Apple"
  * também. Sem isso, o app é recusado na revisão — e este app vai para a loja.
+ *
+ * Como ligar o provedor no Supabase: `docs/APPLE_LOGIN.md`. O segredo que ele
+ * pede é um JWT que vence em seis meses — `scripts/segredo-apple.mjs` gera.
  */
 export async function signInWithApple(role: "paciente" | "medico"): Promise<Error | null> {
   return entrarComProvedor("apple", role);
