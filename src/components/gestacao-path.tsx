@@ -1645,6 +1645,26 @@ export function GestacaoPath({
           const { toast } = await import("sonner");
           toast.success(`+${b.ganho} 🌱 da ofensiva com sua dupla 🔥`);
         }
+
+        /* ─── ⚠️ E O DESAFIO EM GRUPO, PELO MESMO MOTIVO ─────────────────
+           Ele nasceu com UM chamador só — o efeito da aba Comunidade —, que é
+           exatamente o defeito que a dupla acabou de consertar três linhas
+           acima, repetido uma fase depois. A atividade do desafio acontece
+           AQUI, no Caminho: quem fecha o dia e não abre a Comunidade não
+           recebia, e a criadora via um grupo "fechando" sem que a carteira de
+           ninguém se mexesse.
+
+           Mesma segurança da dupla: idempotente pela `dedupe_key`, só paga o
+           desafio VIGENTE (não retroage), sai cedo para quem não entrou em
+           nenhum, e o Modo Cuidado é conferido dentro dela. */
+        const { cobrarBonusDoDesafio } = await import("@/lib/desafio-em-grupo.functions");
+        const d = await cobrarBonusDoDesafio({ data: { accessToken: s.session.access_token } });
+        if (d.ok && d.ganho > 0) {
+          const { creditarSementinhas } = await import("@/lib/evento-sementinhas");
+          creditarSementinhas(d.ganho);
+          const { toast } = await import("sonner");
+          toast.success(`+${d.ganho} 🌱 do desafio da semana 👭`);
+        }
       } catch {
         /* fica em 0: a fita mostra o número honesto de quem não tem ninguém */
       }

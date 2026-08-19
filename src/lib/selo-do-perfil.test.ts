@@ -289,17 +289,38 @@ describe("o piso da semana", () => {
 });
 
 describe("a aba Do bebê", () => {
-  /* A tabela injetada, com a mesma forma de `babyForWeek`. */
-  const tabela = (semana: number) =>
-    semana < 4 || semana > 42
-      ? null
-      : { size: "42,4 cm", weight: "1,7 kg", fruit: "Berinjela", desc: "Já reconhece a sua voz." };
+  /* ⚠️ **A tabela injetada CLAMPA, como a de verdade** — e ela não fazia isso.
+     `babyForWeek` é `BABY_BY_WEEK[clamp(4, 42, week)] ?? BABY_BY_WEEK[40]`: ela
+     NUNCA devolve `null`. O dublê antigo devolvia `null` fora da faixa, então o
+     piso de `bebeDoPerfil` (`if (semana < SEMANA_COM_TABELA) return null`) era
+     provado pelo DUBLÊ e não pela régua: apagá-lo passava verde, e em produção
+     a paciente de 2 semanas veria a fruta da 4ª — "do tamanho de uma semente de
+     papoula" quando ainda não há o que desenhar.
+     Um dublê mais permissivo que o colaborador real é um teste que mede a si
+     mesmo. */
+  const tabela = (semana: number) => {
+    const s = Math.max(4, Math.min(42, semana));
+    return {
+      size: `${s} cm`,
+      weight: "1,7 kg",
+      fruit: "Berinjela",
+      desc: "Já reconhece a sua voz.",
+    };
+  };
   const emoji = () => "🍆";
   const ver = (e: Partial<EntradaDoSelo>, souEu = false) =>
     bebeDoPerfil({ ...BASE, ...e }, { souEu }, tabela, emoji);
 
   test("com a semana pública, a visitante vê", () => {
     expect(ver({})?.fruta).toBe("Berinjela");
+  });
+
+  test("⚠️ antes da 4ª semana NÃO há aba, mesmo com a chave ligada", () => {
+    /* O piso é da RÉGUA, e não da tabela: `babyForWeek` clampa e devolveria a
+       fruta da 4ª semana para quem está na 2ª. */
+    expect(ver({ totalDias: 2 * 7 })).toBeNull();
+    expect(ver({ totalDias: 3 * 7 + 6 })).toBeNull();
+    expect(ver({ totalDias: 4 * 7 })).not.toBeNull();
   });
 
   test("⚠️ sem a semana pública, a visitante NÃO vê — é o mesmo fato", () => {

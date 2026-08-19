@@ -215,6 +215,14 @@ export function bebeDoPerfil(
      CLAMPA para ela — pedir a semana 2 devolveria os dados da 4 sem avisar. O
      piso mora aqui para a aba calar em vez de mentir. */
   if (semana < SEMANA_COM_TABELA) return null;
+  /* ⚠️ **E o TETO, que a régua não tinha.** `babyForWeek` CLAMPA
+     (`BABY_BY_WEEK[clamp(4, 42, week)] ?? BABY_BY_WEEK[40]`) e nunca devolve
+     `null`: sem este corte, a paciente de 50 semanas — DUM corrigida, ou uma
+     leitura pós-termo — veria a aba do bebê de 40, como se fosse a dela.
+     O teste já cobrava isso; quem o cumpria era o DUBLÊ, que devolvia `null`
+     fora da faixa enquanto o colaborador real clampa. Um dublê mais permissivo
+     que a coisa real é um teste que mede a si mesmo. */
+  if (semana > SEMANA_MAXIMA) return null;
   const dados = tabela(semana);
   if (!dados) return null;
   return {
