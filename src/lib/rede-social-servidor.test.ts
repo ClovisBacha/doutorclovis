@@ -285,7 +285,35 @@ describe("higiene", () => {
     expect(st).toContain(".delete(");
     expect(st).toContain('.eq("autor_id", eu)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(7);
+    /* ⚠️ E o OITAVO: tirar alguém de perto sem bloquear. É a saída do meio que
+       faltava — a lista só oferecia "seguir/deixar de seguir", que é sobre quem
+       EU sigo; para tirar quem me segue, a única opção era bloquear, que é
+       nuclear e que a própria tela descreve como reversível.
+       `.eq("seguido_id", eu)` é o portão: sem ele, um id no corpo do pedido
+       desfaria o seguir entre duas OUTRAS pessoas. */
+    const rm = corpoDe("removerSeguidor").replace(/\s+/g, " ");
+    expect(rm).toContain(".delete(");
+    expect(rm).toContain('.eq("seguido_id", eu)');
+    expect(rm).toContain('.eq("seguidor_id", data.quemId)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(8);
+  });
+
+  test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {
+    /* Sem isso, um uuid sorteado que respondesse `ok` confirmaria a existência
+       de um post privado — vazamento pela porta dos fundos, o mesmo cuidado que
+       `reagir` já tem. E denunciar o PRÓPRIO post é recusado: abriria um jeito
+       barato de encher a fila do administrador. */
+    const c = corpoDe("denunciarPost").replace(/\s+/g, " ");
+    const conferiu = c.indexOf("montarPosts(sb, eu, [bruto], ctx)");
+    const gravou = c.indexOf('.from("rede_perguntas").insert(');
+    expect(conferiu).toBeGreaterThan(-1);
+    expect(gravou).toBeGreaterThan(conferiu);
+    expect(c).toContain("if (visivel.autorId === eu)");
+    /* A linha nasce ARQUIVADA: a denúncia é do administrador, e não uma
+       pergunta na caixinha de quem publicou. */
+    expect(c).toContain("denunciado_em: agora");
+    expect(c).toContain("arquivado_em: agora");
   });
 
   test("⚠️ e o POST nunca é apagado, só arquivado", () => {

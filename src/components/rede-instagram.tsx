@@ -311,6 +311,7 @@ export function PostInstagram({
   aoAbrirPerfil,
   aoSalvar,
   aoApagar,
+  aoDenunciar,
   aoVotar,
   sugerido = false,
 }: {
@@ -321,6 +322,16 @@ export function PostInstagram({
   aoSalvar?: (salvar: boolean) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: () => void;
+  /**
+   * Denunciar. Só no post de OUTRA pessoa.
+   *
+   * ⚠️ Era a lacuna que fechava o círculo: a caixinha tinha denúncia e o FEED
+   * não — o canal com mais alcance era o único sem canal de reporte. A régua
+   * clínica agora roda em `publicarPost`; o que sobra são as coisas que régua
+   * nenhuma pega (assédio, mentira, foto de outra pessoa), e para essas o único
+   * caminho é uma pessoa olhar.
+   */
+  aoDenunciar?: () => void;
   /** Votar na enquete. Sem ele as opções aparecem inertes. */
   aoVotar?: (opcao: number) => void;
   /** Veio do algoritmo, não de quem ela segue. */
@@ -357,11 +368,11 @@ export function PostInstagram({
             )}
           </span>
         </button>
-        {/* O ⋯ só no post DELA, e só quando há o que fazer com ele. No modelo
-            ele abre um menu com denúncia, silenciar e mais seis coisas; aqui
-            há uma ação só, e um menu de um item é um botão com uma etapa a
+        {/* O ⋯ tem uma ação por lado: apagar no post DELA, denunciar no de
+            outra pessoa. No modelo ele abre um menu com oito itens; aqui é uma
+            só de cada lado, e um menu de um item é um botão com uma etapa a
             mais. */}
-        {post.souAAutora && aoApagar && (
+        {((post.souAAutora && aoApagar) || (!post.souAAutora && aoDenunciar)) && (
           <button
             type="button"
             onClick={() => setConfirmando(true)}
@@ -379,7 +390,13 @@ export function PostInstagram({
           arquivo sai do balde. */}
       {confirmando && (
         <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
-          <p className="text-[13px] leading-snug">Apagar esta publicação?</p>
+          <p className="text-[13px] leading-snug">
+            {post.souAAutora
+              ? "Apagar esta publicação?"
+              : /* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra
+                   vai saber — e é a mesma razão pela qual o bloqueio é mudo. */
+                "Denunciar esta publicação? Ela fica registrada para a gente olhar, e quem publicou não é avisada."}
+          </p>
           <div className="mt-2 flex gap-2">
             <button
               type="button"
@@ -392,11 +409,12 @@ export function PostInstagram({
               type="button"
               onClick={() => {
                 setConfirmando(false);
-                aoApagar?.();
+                if (post.souAAutora) aoApagar?.();
+                else aoDenunciar?.();
               }}
               className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
             >
-              Sim, apagar
+              {post.souAAutora ? "Sim, apagar" : "Denunciar"}
             </button>
           </div>
         </div>
@@ -572,6 +590,7 @@ export function TelaPrincipal({
   aoReagir,
   aoSalvar,
   aoApagar,
+  aoDenunciar,
   aoVotar,
   aoAbrirPerfil,
   aoTocarStory,
@@ -598,6 +617,8 @@ export function TelaPrincipal({
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
+  /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
+  aoDenunciar?: (post: PostNaTela) => void;
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
@@ -681,6 +702,7 @@ export function TelaPrincipal({
             aoReagir={(t) => aoReagir(p, t)}
             aoSalvar={aoSalvar ? (v) => aoSalvar(p, v) : undefined}
             aoApagar={aoApagar && p.souAAutora ? () => aoApagar(p) : undefined}
+            aoDenunciar={aoDenunciar && !p.souAAutora ? () => aoDenunciar(p) : undefined}
             aoVotar={aoVotar ? (i) => aoVotar(p, i) : undefined}
             aoAbrirPerfil={aoAbrirPerfil}
           />
@@ -1618,6 +1640,45 @@ export function RedeNoApp({
     }
   }
 
+  async function denunciarPost(post: PostNaTela) {
+    /* Some da tela na hora, como o apagar: ela acabou de denunciar, e um post
+       que continua ali lê como "não foi". */
+    setPosts((ps) => ps.filter((x) => x.id !== post.id));
+    setSugestoes((ps) => ps.filter((x) => x.id !== post.id));
+    if (onde.t === "post") setOnde({ t: "feed" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarPost: chamar } = await import("@/lib/rede-social.functions");
+      const r = await chamar({ data: { accessToken: t, postId: post.id } });
+      const { toast } = await import("sonner");
+      if (r.ok) toast.success("Denunciada. A gente vai olhar.");
+      else toast.error("Não deu para denunciar agora.");
+    } catch {
+      /* Ela vê o post voltar na próxima carga. */
+    }
+  }
+
+  async function removerSeguidor(quemId: string) {
+    /* ⚠️ Some da lista na hora, e o CONTADOR do perfil desce junto: o número
+       vive em `perfil.meusSeguidores`, e sem isto a lista mostraria 11 pessoas
+       embaixo de um "12 seguidores". */
+    setGente((g) => g.filter((p) => p.id !== quemId));
+    setPerfil((p) =>
+      p && p.meusSeguidores != null
+        ? { ...p, meusSeguidores: Math.max(0, p.meusSeguidores - 1) }
+        : p,
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { removerSeguidor: chamar } = await import("@/lib/rede-social.functions");
+      await chamar({ data: { accessToken: t, quemId } });
+    } catch {
+      /* A próxima abertura da lista corrige. */
+    }
+  }
+
   async function arquivarDaCaixa(id: string) {
     const t = await token();
     if (!t) return;
@@ -2438,6 +2499,9 @@ export function RedeNoApp({
         gente={gente}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
+        /* ⚠️ Só em SEGUIDORES: em "Seguindo", quem sai é ela, e para isso já
+           existe o botão do perfil. */
+        aoRemover={onde.tipo === "seguidores" ? (id) => void removerSeguidor(id) : undefined}
       />
     );
   }
@@ -2450,6 +2514,7 @@ export function RedeNoApp({
         aoSalvar={(v) => guardar(oPost, v)}
         aoVotar={(i) => votar(oPost, i)}
         aoApagar={oPost.souAAutora ? () => apagar(oPost) : undefined}
+        aoDenunciar={oPost.souAAutora ? undefined : () => void denunciarPost(oPost)}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -2537,6 +2602,7 @@ export function RedeNoApp({
         aoReagir={reagir}
         aoSalvar={guardar}
         aoApagar={apagar}
+        aoDenunciar={(p) => void denunciarPost(p)}
         aoVotar={votar}
         aoAbrirPerfil={abrirPerfil}
         aoChegarNoFim={maisAntigas}
@@ -2695,12 +2761,22 @@ export function ListaDeGente({
   gente,
   aoVoltar,
   aoAbrirPerfil,
+  aoRemover,
 }: {
   titulo: string;
   gente: PessoaNaLista[];
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
+  /**
+   * Tirar alguém de perto sem bloquear. Só na lista de SEGUIDORES.
+   *
+   * ⚠️ A saída do meio que faltava: a lista só oferecia "seguir/deixar de
+   * seguir", que é sobre quem EU sigo. Para tirar quem me segue, a única opção
+   * era bloquear — nuclear, e que a própria tela descreve como reversível.
+   */
+  aoRemover?: (id: string) => void;
 }) {
+  const [confirmando, setConfirmando] = useState<string | null>(null);
   return (
     <div>
       <header className="flex h-11 items-center gap-2 px-4">
@@ -2720,23 +2796,66 @@ export function ListaDeGente({
         <ul>
           {gente.map((p) => (
             <li key={p.id}>
-              <button
-                type="button"
-                onClick={() => aoAbrirPerfil?.(p.id)}
-                className="press flex w-full items-center gap-3 px-4 py-2.5 text-left"
-              >
-                <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] font-semibold leading-tight">
-                    {p.nome}
-                  </span>
-                  {p.bio && (
-                    <span className="block truncate text-[12px] leading-tight text-muted-foreground">
-                      {p.bio}
+              <div className="flex items-center gap-1 pr-3">
+                <button
+                  type="button"
+                  onClick={() => aoAbrirPerfil?.(p.id)}
+                  className="press flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 text-left"
+                >
+                  <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px] font-semibold leading-tight">
+                      {p.nome}
                     </span>
-                  )}
-                </span>
-              </button>
+                    {p.bio && (
+                      <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                        {p.bio}
+                      </span>
+                    )}
+                  </span>
+                </button>
+                {aoRemover && (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmando((c) => (c === p.id ? null : p.id))}
+                    aria-label={`Opções de ${p.nome}`}
+                    className="press shrink-0 px-2 text-[15px] leading-none text-muted-foreground"
+                  >
+                    ⋯
+                  </button>
+                )}
+              </div>
+              {/* ⚠️ Confirmação em MENSAGEM separada, e dizendo o que acontece —
+                  a mesma decisão do cancelar consulta e do bloquear. E a frase
+                  diz que é CALADO: sem isso, ela hesita achando que a outra vai
+                  ser avisada. */}
+              {confirmando === p.id && aoRemover && (
+                <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
+                  <p className="text-[13px] leading-snug">
+                    Tirar {p.nome} dos seus seguidores? Ela deixa de ver o que você publica, e não é
+                    avisada.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmando(null)}
+                      className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                    >
+                      Não
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmando(null);
+                        aoRemover(p.id);
+                      }}
+                      className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+                    >
+                      Tirar
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>
@@ -2754,6 +2873,7 @@ export function TelaDoPost({
   aoReagir,
   aoSalvar,
   aoApagar,
+  aoDenunciar,
   aoVotar,
   aoVoltar,
   aoAbrirPerfil,
@@ -2762,6 +2882,8 @@ export function TelaDoPost({
   aoReagir: (t: TipoDeReacao | null) => void;
   aoSalvar?: (salvar: boolean) => void;
   aoApagar?: () => void;
+  /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
+  aoDenunciar?: () => void;
   aoVotar?: (opcao: number) => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
@@ -2784,6 +2906,7 @@ export function TelaDoPost({
         aoReagir={aoReagir}
         aoSalvar={aoSalvar}
         aoApagar={aoApagar}
+        aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
         aoAbrirPerfil={aoAbrirPerfil}
       />

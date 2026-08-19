@@ -2557,3 +2557,99 @@ export const marcarAtividadeVista = createServerFn({ method: "POST" })
     if (error) return { ok: false as const, motivo: "banco" as const };
     return { ok: true as const };
   });
+
+/**
+ * TIRAR ALGUÉM DE PERTO — sem bloquear.
+ *
+ * ⚠️ **Faltava a saída do meio.** `listaDeGente` mostrava os seguidores e só
+ * oferecia "seguir/deixar de seguir" — o que é sobre QUEM EU SIGO, não sobre
+ * quem me segue. A única forma de tirar alguém de dentro era BLOQUEAR, que é
+ * nuclear e que a própria tela descreve como reversível. Quem abriu o perfil
+ * quando era pública e depois o fechou ficava com os antigos seguidores dentro,
+ * para sempre.
+ *
+ * ⚠️ **E é CALADO**, como o bloqueio. "Fulana te removeu" transforma um gesto
+ * privado numa briga, e num app onde as pessoas se conhecem da vida real isso
+ * piora exatamente a situação que motivou o gesto. Ela simplesmente deixa de
+ * ver os posts novos — do lado dela é o mesmo que a pessoa ter parado de
+ * publicar.
+ *
+ * ⚠️ **`.eq("seguido_id", eu)` é o portão**: sem ele, um id no corpo do pedido
+ * desfaria o seguir entre duas outras pessoas.
+ */
+export const removerSeguidor = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), quemId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("rede_seguidores")
+      .delete()
+      .eq("seguidor_id", data.quemId)
+      .eq("seguido_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * DENUNCIAR UM POST.
+ *
+ * ⚠️ **Era a lacuna que fechava o círculo**: a caixinha tinha denúncia e o
+ * FEED não — o canal com mais alcance era o único sem canal de reporte. Com a
+ * régua clínica agora rodando em `publicarPost`, o que sobra são as coisas que
+ * régua nenhuma pega (assédio, mentira, foto de outra pessoa), e para essas o
+ * único caminho é uma pessoa olhar.
+ *
+ * ⚠️ **Reaproveita `rede_perguntas`**, e isso é decisão e não preguiça: a fila
+ * que o Painel já lê é essa, e uma segunda tabela significaria uma segunda
+ * fila — que é como uma delas passa meses sem ninguém abrir. A linha nasce
+ * denunciada e arquivada, com o texto do post copiado; `dona_id` é quem
+ * PUBLICOU (é sobre ela que a denúncia fala) e `quem_id` é quem denunciou.
+ */
+export const denunciarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Só dá para denunciar o que eu POSSO VER — a mesma régua da leitura.
+       Sem isto, um uuid sorteado que respondesse `ok` confirmaria a existência
+       de um post privado, que é vazamento pela porta dos fundos (é o mesmo
+       cuidado que `reagir` já tem). */
+    const [bruto] = await postsCrus(sb, (base) =>
+      base.eq("id", data.postId).is("arquivado_em", null).limit(1),
+    );
+    if (!bruto) return { ok: false as const, motivo: "indisponivel" as const };
+    const ctx = await contextoDe(sb, eu);
+    const [visivel] = await montarPosts(sb, eu, [bruto], ctx);
+    if (!visivel) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ Denunciar o PRÓPRIO post não faz sentido, e abriria um jeito barato de
+       encher a fila do administrador. */
+    if (visivel.autorId === eu) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const agora = new Date().toISOString();
+    const { error } = await sb.from("rede_perguntas").insert({
+      dona_id: visivel.autorId,
+      quem_id: eu,
+      texto: `[publicação] ${visivel.texto ?? "(sem legenda)"}`,
+      desfecho: "publicavel",
+      denunciado_em: agora,
+      arquivado_em: agora,
+    });
+    /* Duplicata é SUCESSO REPETIDO: ela tocou duas vezes, e dizer "erro" a
+       faria tentar de novo. */
+    if (error && (error as { code?: string }).code !== "23505") {
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });

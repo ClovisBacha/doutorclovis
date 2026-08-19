@@ -86,6 +86,8 @@ export const Route = createFileRoute("/preview-instagram")({
     caixinha: q.caixinha == null ? 1 : Number(q.caixinha),
     /* Quantas perguntas a caixa da dona tem, em `?tela=caixinha`. */
     perguntas: q.perguntas == null ? 3 : Number(q.perguntas),
+    /* ⚠️ `== null`, nunca `=== undefined` — a armadilha de sempre. */
+    remover: q.remover == null ? 1 : Number(q.remover),
   }),
 });
 
@@ -192,8 +194,19 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
 }
 
 function Bancada() {
-  const { tela, meu, vazio, sugeridas, selo, trancado, carimbo, desafio, caixinha, perguntas } =
-    Route.useSearch();
+  const {
+    tela,
+    meu,
+    vazio,
+    sugeridas,
+    selo,
+    trancado,
+    carimbo,
+    desafio,
+    caixinha,
+    perguntas,
+    remover,
+  } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
      de verdade propondo um desafio e uma paciente com o código dela. */
@@ -290,6 +303,9 @@ function Bancada() {
     return (
       <div className="mx-auto max-w-md py-2">
         <ListaDeGente
+          /* ⚠️ `?remover=0` tira o ⋯ — é o estado da lista "Seguindo", onde
+             quem sai é ela e o botão não existe. */
+          aoRemover={remover === 0 ? undefined : (id) => alert(`removeria ${id}`)}
           titulo="Seguidores"
           gente={vazio ? [] : GENTE}
           aoVoltar={() => history.back()}
@@ -605,6 +621,9 @@ function Bancada() {
           aoSalvar={(_, v) => alert(v ? "guardaria" : "tiraria dos salvos")}
           aoVotar={(_, i) => alert(`votaria na opção ${i}`)}
           aoApagar={() => alert("apagaria")}
+          /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
+             tinha denúncia e o canal com mais alcance não tinha. */
+          aoDenunciar={(p) => alert(`denunciaria o post ${p.id}`)}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
