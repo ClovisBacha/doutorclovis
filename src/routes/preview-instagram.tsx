@@ -52,6 +52,7 @@ import {
   TelaDaCaixinha,
   TelaPrincipal,
   VisorDeStory,
+  FolhaDeQuemReagiu,
   type PerguntaNaTela,
   type PessoaNaLista,
   type Story,
@@ -305,6 +306,7 @@ function Bancada() {
   const semLegendas = legendas === 0;
   const semAmigasParaMarcar = amigas === 0;
   const comRascunho = rascunho !== 0;
+  const [vendoQuemReagiu, setVendoQuemReagiu] = useState(false);
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -323,6 +325,9 @@ function Bancada() {
       apagar: (_p: PostNaTela) => alert("apagaria"),
       denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
       tirarMarcacao: (p: PostNaTela) => alert(`tiraria minha marcação do post ${p.id}`),
+      /* ⚠️ A folha abre com DADO fabricado: quem reagiu só existe numa conta com
+         reações de verdade, e é justamente a folha que precisa ser olhada. */
+      verQuemReagiu: () => setVendoQuemReagiu(true),
     }),
     [],
   );
@@ -742,6 +747,7 @@ function Bancada() {
              tinha denúncia e o canal com mais alcance não tinha. */
           aoDenunciar={acoesDaBancada.denunciar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
+          aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
           /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
@@ -753,6 +759,19 @@ function Bancada() {
             setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
             setPaginas((n) => n + 1);
           }}
+        />
+      )}
+      {vendoQuemReagiu && (
+        <FolhaDeQuemReagiu
+          gente={[
+            { id: "marina", nome: "Marina Costa", avatarUrl: null, emoji: "❤️" },
+            { id: "carol", nome: "Carol", avatarUrl: null, emoji: "🥹" },
+            { id: "ana", nome: "Ana Paula", avatarUrl: null, emoji: "😂" },
+            { id: "bru", nome: "Bruna", avatarUrl: null, emoji: "🙏" },
+          ]}
+          carregando={false}
+          aoFechar={() => setVendoQuemReagiu(false)}
+          aoAbrirPerfil={(id) => alert(`abriria o perfil de ${id}`)}
         />
       )}
     </div>

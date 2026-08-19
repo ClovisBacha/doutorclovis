@@ -39,6 +39,7 @@ import {
   limparOpcoes,
   postEhValido,
   reacaoConhecida,
+  emojiDaReacao,
   REACOES,
   type AulaNoPost,
   type ConjuntoDeBloqueio,
@@ -2469,6 +2470,86 @@ export const marcarStoryVisto = createServerFn({ method: "POST" })
  * vista — esconder uma linha faria o número na tela discordar da lista logo
  * abaixo dele, e ela contaria as duas.
  */
+/**
+ * QUEM REAGIU AO MEU POST — e COM QUÊ.
+ *
+ * Pedido do dono (ideia 7). Existia "quem viu meu story" e não existia isto: a
+ * curiosidade número um depois de publicar ficava sem resposta, e o número
+ * sozinho ("12") não diz quem.
+ *
+ * ⚠️ **SÓ A AUTORA, e a conferência vem ANTES da leitura.** A lista de quem
+ * reagiu a um post de gestação é o CÍRCULO SOCIAL dela — a mesma razão pela
+ * qual este app não tem lista pública de seguidores (`NUMEROS_PUBLICOS`). Um
+ * `postId` no corpo do pedido não pode devolver a lista do post de outra
+ * pessoa, e por isso o dono é conferido antes de qualquer consulta de reações.
+ *
+ * ⚠️ **NÃO filtra por Modo Cuidado nem por bloqueio** — ao contrário da caixa
+ * de Atividade, e pela mesma razão de `quemViuMeuStory`: lá a linha é um gesto
+ * dirigido a ela; aqui é o REGISTRO de quem reagiu ao post dela. Esconder uma
+ * linha faria o número (que já foi mostrado, e que continua contando todo
+ * mundo) discordar da lista logo abaixo — e um contador que não bate com a
+ * lista é o tipo de coisa que faz a paciente desconfiar do app inteiro.
+ */
+export const quemReagiuAoPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* O PORTÃO, antes de tudo — ver o cabeçalho. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id")
+      .eq("id", data.postId)
+      .maybeSingle();
+    if (!post || (post as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { data: linhas } = await sb
+      .from("rede_reacoes")
+      .select("quem_id, tipo, criado_em")
+      .eq("post_id", data.postId)
+      .order("criado_em", { ascending: false })
+      .limit(200);
+
+    const cruas = (linhas ?? []) as { quem_id: string; tipo: string }[];
+    const perfis = await perfisPorId(
+      sb,
+      cruas.map((l) => l.quem_id),
+    );
+    const gente = cruas
+      .map((l) => {
+        const p = perfis.get(l.quem_id);
+        if (!p) return null;
+        /* ⚠️ Tipo desconhecido (gravado por uma versão futura, ou por um banco
+           com o CHECK largo) cai no coração em vez de sumir: perder a LINHA
+           faria o número discordar da lista. */
+        const tipo = reacaoConhecida(l.tipo) ? l.tipo : ("amei" as TipoDeReacao);
+        return {
+          id: l.quem_id,
+          nome: (p.display_name ?? "").trim() || "Alguém",
+          avatarUrl: p.avatar_url ?? null,
+          tipo,
+          emoji: emojiDaReacao(tipo),
+        };
+      })
+      .filter(Boolean) as {
+      id: string;
+      nome: string;
+      avatarUrl: string | null;
+      tipo: TipoDeReacao;
+      emoji: string;
+    }[];
+
+    return { ok: true as const, gente };
+  });
+
 export const quemViuMeuStory = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), storyId: z.string().uuid() }).parse(i),

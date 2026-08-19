@@ -432,6 +432,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
+  aoVerQuemReagiu,
   sugerido = false,
 }: {
   post: PostNaTela;
@@ -455,6 +456,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação. Só aparece quando `post.souMarcada`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /** Ver quem reagiu. Só no post DELA — ver a nota na linha de ações. */
+  aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** Veio do algoritmo, não de quem ela segue. */
   sugerido?: boolean;
 }) {
@@ -610,7 +613,32 @@ export const PostInstagram = memo(function PostInstagram({
             <CoracaoVazio />
           )}
         </button>
-        {total > 0 && (
+        {/* ⚠️ O RESUMO SÓ É BOTÃO NO POST DELA. A lista de quem reagiu a um post
+            de gestação é o círculo social — a mesma razão pela qual este app
+            não tem lista pública de seguidores. Para as outras, o resumo
+            continua sendo texto, e não um botão que promete e recusa. */}
+        {total > 0 && post.souAAutora && aoVerQuemReagiu ? (
+          <button
+            type="button"
+            onClick={() => aoVerQuemReagiu(post)}
+            className="press flex min-w-0 items-center gap-1.5"
+            aria-label={`Ver quem reagiu — ${total}`}
+          >
+            <span aria-hidden className="flex -space-x-1.5 text-[15px] leading-none">
+              {principaisReacoes(post.reacoes).map((t) => (
+                <span
+                  key={t}
+                  className="grid h-[22px] w-[22px] place-items-center rounded-full bg-card ring-1 ring-border/70"
+                >
+                  {emojiDaReacao(t)}
+                </span>
+              ))}
+            </span>
+            <span className="text-[13px] font-semibold tabular-nums underline underline-offset-2">
+              {total}
+            </span>
+          </button>
+        ) : total > 0 ? (
           <span className="flex min-w-0 items-center gap-1.5">
             {/* ⚠️ Os emojis que o post DE FATO recebeu, e não um número seco.
                 "12 reações" conta a mesma história para doze corações e doze
@@ -631,7 +659,7 @@ export const PostInstagram = memo(function PostInstagram({
             <span className="text-[13px] font-semibold tabular-nums">{total}</span>
             <span className="sr-only">{total === 1 ? "reação" : "reações"}</span>
           </span>
-        )}
+        ) : null}
         {/* O marcador fica na PONTA DIREITA, separado das reações pelo vão que
             sobra — é o arranjo deles, e ele diz uma coisa verdadeira: guardar é
             gesto privado (ninguém vê, nem a autora), reagir é gesto social. */}
@@ -851,6 +879,7 @@ export function TelaPrincipal({
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
+  aoVerQuemReagiu,
   aoAbrirPerfil,
   aoTocarStory,
   aoChegarNoFim,
@@ -881,6 +910,8 @@ export function TelaPrincipal({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /** Ver quem reagiu. Só no post DELA. */
+  aoVerQuemReagiu?: (post: PostNaTela) => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
    * Toque numa bolinha da fileira. Recebe o id do AUTOR, não do story.
@@ -971,6 +1002,7 @@ export function TelaPrincipal({
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
             aoTirarMarcacao={aoTirarMarcacao}
+            aoVerQuemReagiu={aoVerQuemReagiu}
             aoAbrirPerfil={aoAbrirPerfil}
           />
         ))
@@ -1014,6 +1046,7 @@ export function TelaPrincipal({
                   aoSalvar={aoSalvar}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
+                  aoVerQuemReagiu={aoVerQuemReagiu}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
               ))}
@@ -1790,6 +1823,7 @@ export function RedeNoApp({
     apagar: (_p: PostNaTela) => {},
     denunciar: (_p: PostNaTela) => {},
     tirarMarcacao: (_p: PostNaTela) => {},
+    verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
   });
   ultimas.current = {
@@ -1799,6 +1833,7 @@ export function RedeNoApp({
     apagar: (p) => void apagar(p),
     denunciar: (p) => void denunciarPost(p),
     tirarMarcacao: (p) => void tirarMarcacao(p),
+    verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
   };
   const acoes = useMemo(
@@ -1809,6 +1844,7 @@ export function RedeNoApp({
       apagar: (p: PostNaTela) => ultimas.current.apagar(p),
       denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
+      verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
     }),
     [],
@@ -1822,6 +1858,38 @@ export function RedeNoApp({
    * opcional e, sobretudo, fazer sair do aparelho mais imagem do que o
    * necessário. É foto de gestação, às vezes ultrassom.
    */
+  /* Quem reagiu ao post aberto na folha. `null` = folha fechada. */
+  const [quemReagiu, setQuemReagiu] = useState<{
+    postId: string;
+    gente: QuemReagiu[] | null;
+  } | null>(null);
+
+  /**
+   * Abre a folha de quem reagiu.
+   *
+   * ⚠️ **Abre VAZIA e só depois preenche** (`gente: null` = carregando). Esperar
+   * a resposta antes de abrir faria o toque parecer que não funcionou, que é o
+   * defeito que a rodada de desempenho acabou de consertar em outro lugar.
+   */
+  async function verQuemReagiu(post: PostNaTela) {
+    setQuemReagiu({ postId: post.id, gente: null });
+    try {
+      const t = await token();
+      if (!t) return setQuemReagiu({ postId: post.id, gente: [] });
+      const { quemReagiuAoPost } = await import("@/lib/rede-social.functions");
+      const r = await quemReagiuAoPost({ data: { accessToken: t, postId: post.id } });
+      /* ⚠️ Só aplica se a folha ainda for DESTE post: dois toques rápidos em
+         posts diferentes trariam a lista errada para a folha aberta. */
+      setQuemReagiu((atual) =>
+        atual && atual.postId === post.id ? { postId: post.id, gente: r.ok ? r.gente : [] } : atual,
+      );
+    } catch {
+      setQuemReagiu((atual) =>
+        atual && atual.postId === post.id ? { postId: post.id, gente: [] } : atual,
+      );
+    }
+  }
+
   /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
    *
@@ -3068,6 +3136,7 @@ export function RedeNoApp({
         aoDenunciar={acoes.denunciar}
         aoVotar={acoes.votar}
         aoTirarMarcacao={acoes.tirarMarcacao}
+        aoVerQuemReagiu={acoes.verQuemReagiu}
         aoAbrirPerfil={acoes.abrirPerfil}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
@@ -3079,6 +3148,19 @@ export function RedeNoApp({
         aoSeguirPessoa={seguirPessoa}
         aoTocarStory={verStory}
       />
+      {/* ⚠️ FORA da `<TelaPrincipal>`: a folha é `fixed` e cobre a tela inteira,
+          e dentro da lista ela herdaria o empilhamento do cartão. */}
+      {quemReagiu && (
+        <FolhaDeQuemReagiu
+          gente={quemReagiu.gente}
+          carregando={quemReagiu.gente === null}
+          aoFechar={() => setQuemReagiu(null)}
+          aoAbrirPerfil={(id) => {
+            setQuemReagiu(null);
+            void abrirPerfil(id);
+          }}
+        />
+      )}
     </>
   );
 }
@@ -3332,6 +3414,83 @@ export function ListaDeGente({
    O POST SOZINHO — o que a grade abre
    ══════════════════════════════════════════════════════════════════════════ */
 
+export type QuemReagiu = {
+  id: string;
+  nome: string;
+  avatarUrl: string | null;
+  emoji: string;
+};
+
+/**
+ * QUEM REAGIU — a folha.
+ *
+ * ⚠️ **Uma FOLHA e não uma tela**: ela abre por cima do feed e fecha no mesmo
+ * lugar. Trocar de tela para ver quem reagiu tiraria a paciente do post que ela
+ * estava lendo, e a volta cairia no topo do feed.
+ *
+ * ⚠️ **O emoji fica NO AVATAR, num círculo pequeno** — é assim que a informação
+ * "quem" e "com quê" vira uma linha só. Numa coluna à parte, o olho lê duas
+ * listas.
+ */
+export function FolhaDeQuemReagiu({
+  gente,
+  carregando,
+  aoFechar,
+  aoAbrirPerfil,
+}: {
+  gente: QuemReagiu[] | null;
+  carregando: boolean;
+  aoFechar: () => void;
+  aoAbrirPerfil?: (id: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-end justify-center" role="dialog" aria-modal>
+      <button
+        type="button"
+        aria-label="Fechar"
+        onClick={aoFechar}
+        className="absolute inset-0 bg-foreground/30"
+      />
+      <div
+        className="relative max-h-[70vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-card p-4"
+        style={{ paddingBottom: "calc(1rem + var(--safe-bottom))" }}
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
+        <h2 className="mb-2 text-[15px] font-semibold">Quem reagiu</h2>
+
+        {carregando && <div className="skeleton h-16 rounded-2xl" />}
+
+        {!carregando && gente && gente.length === 0 && (
+          <p className="py-6 text-center text-[13px] text-muted-foreground">
+            Ninguém ainda. Também tudo bem 💛
+          </p>
+        )}
+
+        {!carregando &&
+          gente?.map((g) => (
+            <button
+              key={`${g.id}-${g.emoji}`}
+              type="button"
+              onClick={() => aoAbrirPerfil?.(g.id)}
+              className="press flex min-h-[52px] w-full items-center gap-3 text-left"
+            >
+              <span className="relative shrink-0">
+                <Foto url={g.avatarUrl} nome={g.nome} lado={40} />
+                <span
+                  aria-hidden
+                  className="absolute -bottom-0.5 -right-1 grid h-[20px] w-[20px] place-items-center rounded-full bg-card text-[12px] leading-none ring-1 ring-border/70"
+                >
+                  {g.emoji}
+                </span>
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[14px]">{g.nome}</span>
+            </button>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export function TelaDoPost({
   post,
   aoReagir,
@@ -3340,6 +3499,7 @@ export function TelaDoPost({
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
+  aoVerQuemReagiu,
   aoVoltar,
   aoAbrirPerfil,
 }: {
@@ -3353,6 +3513,8 @@ export function TelaDoPost({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /** Ver quem reagiu. Só no post DELA. */
+  aoVerQuemReagiu?: (post: PostNaTela) => void;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
 }) {
@@ -3377,6 +3539,7 @@ export function TelaDoPost({
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
         aoTirarMarcacao={aoTirarMarcacao}
+        aoVerQuemReagiu={aoVerQuemReagiu}
         aoAbrirPerfil={aoAbrirPerfil}
       />
     </div>

@@ -397,6 +397,21 @@ describe("quem viu meu story", () => {
     expect(dono).toBeLessThan(lista);
     expect(c).toContain('motivo: "indisponivel"');
   });
+
+  /* ⚠️ A MESMA ORDEM em "quem reagiu", e pela mesma razão: a lista de quem
+     reagiu a um post de gestação é o CÍRCULO SOCIAL dela. Um `postId` no corpo
+     do pedido não pode devolver a lista do post de outra pessoa — e a única
+     coisa entre isso e o vazamento é a conferência do dono vir ANTES da
+     consulta de reações. */
+  test("⚠️ quem reagiu confere o DONO antes de ler as reações", () => {
+    const c = corpoDe("quemReagiuAoPost").replace(/\s+/g, " ");
+    const dono = c.indexOf("autor_id !== eu");
+    const lista = c.indexOf('from("rede_reacoes")');
+    expect(dono).toBeGreaterThan(-1);
+    expect(lista).toBeGreaterThan(-1);
+    expect(dono).toBeLessThan(lista);
+    expect(c).toContain('motivo: "indisponivel"');
+  });
 });
 
 describe("sugerido para você — o pool é estreito, e o estreitamento é o recurso", () => {
