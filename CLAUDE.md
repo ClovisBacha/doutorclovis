@@ -4087,6 +4087,127 @@ toque repinta a árvore inteira. É a maior peça estrutural que resta, e ficou
 parada de propósito — é cirurgia grande, e o dono precisa dizer se a lentidão
 sobreviveu às quatro correções acima antes de valer o risco.
 
+## As oito ideias da Comunidade, aplicadas (ago/2026)
+
+Pedido do dono, na ordem dele: **9, 10, 8, 7, 6, 4, 3, 2** — "são muitas, então
+programe para fazer cada uma com perfeição". Cada uma saiu com régua pura
+testada, mutantes conferidos em vermelho, bancada própria e verificação no
+navegador antes do commit.
+
+### 9 · A legenda sugerida pela IA (`legenda-sugerida.ts` + `/api/legenda-da-foto`)
+
+⚠️ **A chave `mostrar_semana` é o portão, e virou o teste mais importante do
+arquivo.** Se ela escondeu a semana no perfil e o número entra no prompt, o
+modelo escreve o número — e a legenda publica, com o dedo dela no botão, o dado
+que a chave existe para esconder. O nome do bebê tem chave PRÓPRIA
+(`mostrar_bebe`): são duas decisões dela, e uma não governa a outra.
+
+⚠️ **A régua clínica roda ANTES de sugerir.** Sem ela, o botão entregaria uma
+frase bonita e o "Compartilhar" a recusaria depois — o app escrevendo o que o
+app proíbe.
+
+⚠️ **O que volta é RASCUNHO e ACRESCENTA**, nunca apaga. E a foto é reduzida a
+**512px** antes de sair (contra os 1080 do post) e não fica guardada — a tela
+**diz isso antes de ela tocar**, e não numa política. É foto de gestação, às
+vezes ultrassom.
+
+### 10 · Marcar quem estava junto (`marcacoes.ts`, `rede_marcacoes`)
+
+⚠️ **Só dentro do grafo já conectado, e NUNCA uma busca.** Buscar por nome
+transformaria a base de pacientes numa lista navegável.
+
+⚠️ **A marcada pode tirar a marcação**, e ninguém é avisado — "Fulana tirou"
+transformaria um gesto privado numa briga.
+
+⚠️ **A marcação NÃO amplia a visibilidade.** Se escancarasse o post para a rede
+da marcada, viraria a porta dos fundos da camada — que é o recurso.
+
+⚠️ **Não manda push**: não há prazo nem decisão presa, e o canal é o do aviso de
+emergência.
+
+### 8 · O rascunho do compositor (`rascunho-do-post.ts`)
+
+⚠️ **AS FOTOS NÃO ENTRAM, e não é economia — é proteção.** Dez data URLs de
+~300 KB encostariam nos ~5 MB de cota do `localStorage`, e o que quebra quando a
+cota estoura é a PRÓXIMA gravação de qualquer coisa — incluindo o
+`journey_state`, que carrega a jornada inteira dela.
+
+⚠️ **Oferece, nunca preenche sozinho**, e a chave carrega o id da conta (o
+aparelho é compartilhado). Visibilidade desconhecida cai no MAIS FECHADO.
+
+⚠️ **E o apagar vem ANTES do fechar**: fechando primeiro, o efeito com atraso de
+700 ms regravaria o texto recém-publicado.
+
+### 7 · Quem reagiu, e com quê
+
+⚠️ **Só a autora, e a conferência do DONO vem ANTES da leitura** — há teste
+sobre a ORDEM, e o mutante que a inverte fica vermelho. E o resumo só vira botão
+no post dela.
+
+⚠️ **Não filtra por Modo Cuidado nem bloqueio**, ao contrário da Atividade: aqui
+é o REGISTRO de quem reagiu ao post dela, e esconder uma linha faria o número
+discordar da lista logo abaixo.
+
+### 6 · A retrospectiva da semana (`retrospectiva.ts`)
+
+⚠️ **Não é placar, e por isso não compara semanas** — "mais que a semana
+passada" viraria esteira, e bastaria uma internação para o cartão dizer que ela
+caiu. Há teste com lista de palavras proibidas.
+
+⚠️ **Só aparece quando há o que mostrar**: "você não publicou nada" é cobrança
+com cara de resumo, e chega a quem teve a semana pior.
+
+⚠️ **O dia da semana é conferido no CLIENTE** — "é domingo" depende do fuso
+dela, e o servidor roda em UTC.
+
+### 4 · Enquete e caixinha dentro do story
+
+⚠️ **As réguas são as MESMAS** — `limparOpcoes`/`enqueteValida` do post, e a
+pergunta cai na MESMA `rede_perguntas` com a MESMA `decidirPergunta`. O story é
+outra PORTA, nunca uma segunda caixinha.
+
+⚠️ **A triagem clínica corre nas OPÇÕES da enquete**, não só no texto: enquete é
+exatamente o formato que faz meia dúzia de leigas responderem com conduta.
+
+⚠️ **Um de cada vez** (ocupam o mesmo pedaço da tela), e as duas vivem **acima**
+das metades invisíveis de avançar/voltar — sem `z-20`, tocar numa opção
+avançaria o story.
+
+### 3 · O selo do obstetra
+
+⚠️ **Resolvido pelo vínculo ATUAL, e visível SÓ na lista que a autora abre.** Um
+selo no feed contaria a terceiros que aquela pessoa é a médica dela.
+
+⚠️ **E ele fechou um buraco:** o médico não tem linha em `patient_profiles`,
+então a reação dele SUMIA da lista — o mais importante dos reagentes era o único
+invisível.
+
+**Falta uma decisão do dono:** dar ao médico uma porta para reagir de dentro do
+painel exigiria decidir se ele VÊ as publicações sociais da paciente.
+
+### 2 · "Então e agora" (`entao-e-agora.ts`, `rede_posts.comparacao_de`)
+
+⚠️ **O carimbo é derivado na leitura, nunca guardado** — mesma decisão do
+carimbo do story: texto guardado sobrevive à decisão dela.
+
+⚠️ **A chave manda nos DOIS carimbos.** Fazer a metade antiga escapar dela seria
+publicar a semana pela porta dos fundos — o passado dela é tão dela quanto o
+presente.
+
+⚠️ **A foto antiga NÃO é reenviada** (aponta para o mesmo arquivo), e a coluna é
+`ON DELETE SET NULL`: apagar o post antigo não pode derrubar o novo.
+
+⚠️ **28 dias de distância mínima**, e **semanas iguais não viram carimbo** —
+"28s → 28s" faz a comparação parecer quebrada.
+
+### O que o SQL passou a precisar
+
+`supabase/APLICAR_REDE_SOCIAL.sql` cresceu com: `rede_marcacoes`,
+`rede_story_votos`, `rede_posts.comparacao_de`, `rede_stories.enquete_opcoes`,
+`rede_stories.pergunta_aberta`, o CHECK de `rede_reacoes` com treze tipos e o de
+`rede_atividade.especie` com `'marcou'` — os dois por `ALTER` idempotente,
+porque `CREATE TABLE IF NOT EXISTS` não toca em tabela existente.
+
 ## As reações do feed: treze, com toque duplo (ago/2026)
 
 Pedido do dono: "adicione recursos de reação mais legais na imagem, como like
