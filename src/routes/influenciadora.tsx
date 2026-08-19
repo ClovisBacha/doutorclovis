@@ -262,10 +262,124 @@ export default function PainelDaEmbaixadora() {
         )}
       </div>
 
+      <PresenteParaAsIndicadas />
+
       <p className="mt-8 text-center text-[11.5px] leading-relaxed text-muted-foreground">
         Os valores acima são o que já foi apurado das mensalidades pagas. O pagamento é combinado
         direto com a gente — qualquer dúvida, escreva para obstetrica.app@gmail.com.
       </p>
     </section>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O PRESENTE PARA AS INDICADAS — Fase 5
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O bolso da criadora, e quem ela pode presentear.
+ *
+ * ⚠️ **A lista NÃO é uma lista de pacientes.** Primeiro nome e mais nada — sem
+ * foto, sem semana, sem qualquer dado clínico. Uma tela comercial não pode
+ * virar prontuário, e é a mesma razão pela qual o painel do médico e o da
+ * criadora nunca se pareceram.
+ *
+ * ⚠️ E quem chega aqui já passou pelo portão: `minhasIndicadas` resolve a
+ * criadora pelo E-MAIL DA SESSÃO, nunca por um código vindo do cliente.
+ */
+function PresenteParaAsIndicadas() {
+  const [dados, setDados] = useState<{
+    nome: string;
+    indicadas: { id: string; nome: string; presenteada: boolean }[];
+    bolso: number;
+    gasto: number;
+    restante: number;
+    presente: number;
+  } | null>(null);
+  const [enviando, setEnviando] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function carregar() {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { minhasIndicadas } = await import("@/lib/influenciadora.functions");
+      const r = await minhasIndicadas({ data: { accessToken: token } });
+      if (r.ok && r.painel) setDados(r.painel);
+    } catch {
+      /* A seção simplesmente não aparece. */
+    }
+  }
+
+  useEffect(() => {
+    void carregar();
+  }, []);
+
+  async function presentear(id: string) {
+    setEnviando(id);
+    setErro(null);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { presentearIndicada } = await import("@/lib/influenciadora.functions");
+      const r = await presentearIndicada({ data: { accessToken: token, pacienteId: id } });
+      if (r.ok) await carregar();
+      else
+        setErro(
+          r.motivo === "sem_bolso"
+            ? "O seu bolso deste mês acabou. Ele volta no dia 1º."
+            : "Não deu para enviar agora.",
+        );
+    } catch {
+      setErro("Não deu para enviar agora.");
+    } finally {
+      setEnviando(null);
+    }
+  }
+
+  if (!dados || dados.indicadas.length === 0) return null;
+
+  return (
+    <div className="mt-8 rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <h2 className="font-serif text-xl">Presentear quem você trouxe</h2>
+      <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+        Você tem <strong className="font-semibold">{dados.restante} 🌱</strong> este mês para dar —
+        cada presente vale {dados.presente} 🌱, e cada pessoa recebe um por mês. As Sementinhas
+        compram só enfeites do app; nada do cuidado dela depende disso.
+      </p>
+
+      <ul className="mt-3 divide-y divide-border">
+        {dados.indicadas.map((p) => (
+          <li key={p.id} className="flex items-center gap-3 py-2.5">
+            <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.nome}</span>
+            {p.presenteada ? (
+              <span className="shrink-0 text-[12px] text-muted-foreground">enviado ✓</span>
+            ) : (
+              <button
+                type="button"
+                disabled={enviando === p.id || dados.restante < dados.presente}
+                onClick={() => presentear(p.id)}
+                className="press shrink-0 rounded-xl bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground disabled:opacity-50"
+              >
+                {enviando === p.id ? "Enviando…" : `Dar ${dados.presente} 🌱`}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {erro && <p className="mt-2 text-[13px] text-destructive">{erro}</p>}
+
+      {/* ⚠️ Ela precisa saber que o presente CHEGA — o defeito que o presente do
+          médico teve por meses foi exatamente este: gravava, o saldo subia, e
+          nenhuma tela dizia de onde veio. */}
+      <p className="mt-3 text-[12px] leading-snug text-muted-foreground">
+        Quem receber vê o seu nome no app, na tela do Caminho.
+      </p>
+    </div>
   );
 }

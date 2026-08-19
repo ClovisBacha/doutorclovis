@@ -4,7 +4,11 @@ import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/type
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
 import { carregarQuizDoDia } from "@/lib/daily-quizzes";
-import { RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_MEDICO } from "@/lib/economia-sementinhas";
+import {
+  RAZAO_PRESENTE_AMIGA,
+  RAZAO_PRESENTE_INFLUENCIADORA,
+  RAZAO_PRESENTE_MEDICO,
+} from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
 import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
@@ -149,8 +153,8 @@ export type PresenteRecebido = {
   quantidade: number;
   /** ISO — também é o que a tela usa para lembrar que já anunciou este. */
   quando: string;
-  /** Quem deu: o médico dela ou a amiga que a trouxe. */
-  de: "medico" | "amiga";
+  /** Quem deu: o médico dela, a amiga que a trouxe, ou a criadora do código. */
+  de: "medico" | "amiga" | "criadora";
   /** Primeiro nome de quem deu, quando dá para saber. */
   nome: string | null;
 };
@@ -169,7 +173,7 @@ async function presenteRecente(
     .from("sementinhas_ledger")
     .select("amount, reason, created_at")
     .eq("user_id", userId)
-    .in("reason", [RAZAO_PRESENTE_MEDICO, RAZAO_PRESENTE_AMIGA])
+    .in("reason", [RAZAO_PRESENTE_MEDICO, RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_INFLUENCIADORA])
     .gte("created_at", desde)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -181,7 +185,12 @@ async function presenteRecente(
      jeito; o que se perde é a festa, e festa errada é pior que festa ausente. */
   if (error || !linha) return null;
 
-  const de = linha.reason === RAZAO_PRESENTE_MEDICO ? "medico" : "amiga";
+  const de =
+    linha.reason === RAZAO_PRESENTE_MEDICO
+      ? "medico"
+      : linha.reason === RAZAO_PRESENTE_INFLUENCIADORA
+        ? "criadora"
+        : "amiga";
   return {
     quantidade: linha.amount ?? 0,
     quando: linha.created_at as string,
@@ -204,7 +213,7 @@ async function presenteRecente(
 async function nomeDeQuemDeu(
   db: Db,
   userId: string,
-  de: "medico" | "amiga",
+  de: "medico" | "amiga" | "criadora",
 ): Promise<string | null> {
   const sb = db as unknown as {
     from: (t: string) => {
@@ -216,10 +225,32 @@ async function nomeDeQuemDeu(
   try {
     const { data: perfil } = await sb
       .from("patient_profiles")
-      .select("doctor_id, referred_by")
+      .select("doctor_id, referred_by, ref_code")
       .eq("id", userId)
       .maybeSingle();
-    const p = perfil as { doctor_id?: string | null; referred_by?: string | null } | null;
+    const p = perfil as {
+      doctor_id?: string | null;
+      referred_by?: string | null;
+      ref_code?: string | null;
+    } | null;
+
+    /* ⚠️ A criadora sai de `ref_code` → `affiliates.name`, e não de
+       `referred_by`: aquele é o grafo de AMIZADE, e o código foi tirado dele
+       de propósito — uma criadora com três mil seguidoras viraria amiga de
+       três mil gestantes. É a decisão que `influenciadora.functions.ts`
+       registra com todas as letras. */
+    if (de === "criadora") {
+      const codigo = p?.ref_code;
+      if (!codigo) return null;
+      const { data: aff } = await sb
+        .from("affiliates")
+        .select("name")
+        .eq("code", codigo)
+        .maybeSingle();
+      const nome = ((aff as { name?: string | null } | null)?.name ?? "").trim();
+      return nome.split(/\s+/)[0] || null;
+    }
+
     const quem = de === "medico" ? p?.doctor_id : p?.referred_by;
     if (!quem) return null;
 

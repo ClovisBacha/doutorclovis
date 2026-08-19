@@ -212,6 +212,15 @@ export const PRESENTE_SUGERIDO = 30;
  */
 export const RAZAO_PRESENTE_MEDICO = "presente-do-medico";
 export const RAZAO_PRESENTE_AMIGA = "presente-de-amiga";
+/**
+ * O presente da criadora para quem chegou pelo código dela.
+ *
+ * ⚠️ Razão PRÓPRIA, e não `RAZAO_PRESENTE_AMIGA`: as duas somam no mesmo
+ * bolso da paciente, mas quem deu é outra pessoa e o AVISO precisa dizer o
+ * nome certo. Reusar a razão faria o app anunciar "sua amiga te mandou um
+ * presente" sobre uma criadora que ela nunca conheceu.
+ */
+export const RAZAO_PRESENTE_INFLUENCIADORA = "presente-da-influenciadora";
 
 /**
  * O BÔNUS COMPRADO — o bolso que SÓ PRESENTEIA (ago/2026).

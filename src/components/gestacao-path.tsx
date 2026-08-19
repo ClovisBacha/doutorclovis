@@ -274,7 +274,16 @@ function AvisoDePresente({
      já resolveu título e primeiro nome lá. Montar `Dr(a). ${nome}` aqui era o
      defeito: o `display_name` do cadastro já traz o título, e a primeira foto
      desta tela saiu com "Dr(a). Dr. Clóvis Bacha". */
-  const deQuem = presente.nome ?? (presente.de === "medico" ? "O seu médico" : "Uma amiga");
+  /* ⚠️ Três origens, três frases de recuo. Sem a terceira, o presente da
+     criadora cairia no "Uma amiga" — e ela não é amiga dela: é quem trouxe a
+     paciente para o app. O código foi tirado do grafo de amizade de propósito. */
+  const deQuem =
+    presente.nome ??
+    (presente.de === "medico"
+      ? "O seu médico"
+      : presente.de === "criadora"
+        ? "Quem te trouxe para cá"
+        : "Uma amiga");
 
   return (
     <div

@@ -149,12 +149,22 @@ describe("a carteira dela entrega o presente para a tela", () => {
     expect(sementinhas).toMatch(/if \(careMode\) return null;/);
   });
 
-  test("procura as DUAS razões, não só a do médico", () => {
-    /* A mesada da assinante presenteia as amigas dela pelo mesmo ledger. Ler só
-       a razão do médico deixaria metade dos presentes invisível. */
+  test("procura as TRÊS razões, não só a do médico", () => {
+    /* A mesada da assinante presenteia as amigas dela pelo mesmo ledger, e a
+       criadora presenteia quem chegou pelo código dela. Ler só a razão do
+       médico deixaria dois terços dos presentes invisíveis.
+
+       ⚠️ A razão da criadora é PRÓPRIA e não reusa a da amiga: as duas somam no
+       mesmo bolso, mas quem deu é outra pessoa — reusar faria o app anunciar
+       "sua amiga te mandou um presente" sobre alguém que ela nunca conheceu. */
     expect(sementinhas).toMatch(
-      /\.in\("reason", \[RAZAO_PRESENTE_MEDICO, RAZAO_PRESENTE_AMIGA\]\)/,
+      /\.in\(\s*"reason",\s*\[RAZAO_PRESENTE_MEDICO,\s*RAZAO_PRESENTE_AMIGA,\s*RAZAO_PRESENTE_INFLUENCIADORA\]/s,
     );
+    /* E o nome de quem deu sai do VÍNCULO, nunca do ledger: a criadora vem de
+       `ref_code` → `affiliates.name`, e não de `referred_by` — aquele é o grafo
+       de amizade, e o código foi tirado dele de propósito. */
+    expect(sementinhas).toContain('if (de === "criadora")');
+    expect(sementinhas).toMatch(/from\("affiliates"\)[\s\S]{0,80}select\("name"\)/);
   });
 });
 
