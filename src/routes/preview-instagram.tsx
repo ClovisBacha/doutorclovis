@@ -814,7 +814,10 @@ function Bancada() {
       {vendoQuemReagiu && (
         <FolhaDeQuemReagiu
           gente={[
-            { id: "marina", nome: "Marina Costa", avatarUrl: null, emoji: "❤️" },
+            /* ⚠️ O selo do médico só existe numa conta vinculada a um obstetra que
+               por acaso reagiu — sem a bancada, seria impossível olhar. */
+            { id: "doc", nome: "Dr. Clóvis", avatarUrl: null, emoji: "❤️", ehMeuMedico: true },
+            { id: "marina", nome: "Marina Costa", avatarUrl: null, emoji: "🤗" },
             { id: "carol", nome: "Carol", avatarUrl: null, emoji: "🥹" },
             { id: "ana", nome: "Ana Paula", avatarUrl: null, emoji: "😂" },
             { id: "bru", nome: "Bruna", avatarUrl: null, emoji: "🙏" },

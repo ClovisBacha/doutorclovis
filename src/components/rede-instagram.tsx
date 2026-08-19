@@ -3588,6 +3588,15 @@ export type QuemReagiu = {
   nome: string;
   avatarUrl: string | null;
   emoji: string;
+  /**
+   * É o obstetra DELA?
+   *
+   * ⚠️ **Resolvido no servidor pelo vínculo ATUAL**, e visível SÓ nesta lista,
+   * que só a autora abre. Um selo no feed contaria a terceiros que aquela
+   * pessoa é a médica dela — e expor um vínculo clínico aos seguidores é
+   * exatamente o que o dono proibiu.
+   */
+  ehMeuMedico?: boolean;
 };
 
 /**
@@ -3652,7 +3661,17 @@ export function FolhaDeQuemReagiu({
                   {g.emoji}
                 </span>
               </span>
-              <span className="min-w-0 flex-1 truncate text-[14px]">{g.nome}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px]">{g.nome}</span>
+                {/* ⚠️ O selo é TEXTO e não um emoji de estetoscópio: ele
+                    precisa dizer o que é sem depender de o desenho ser
+                    reconhecido, e é a informação mais valiosa da lista. */}
+                {g.ehMeuMedico && (
+                  <span className="block text-[11px] font-semibold leading-tight text-primary">
+                    Seu obstetra
+                  </span>
+                )}
+              </span>
             </button>
           ))}
       </div>

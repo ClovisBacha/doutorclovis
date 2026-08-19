@@ -412,11 +412,11 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, " +
-  "lmp_date, reference_date, reference_weeks, reference_days, birth_date";
+  "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
 const COLUNAS_SEM_SELO =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
-  "baby_name, lmp_date, reference_date, reference_weeks, reference_days, birth_date";
+  "baby_name, lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
 async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
   console.warn("[rede] sem mostrar_semana/mostrar_bebe — rode APLICAR_REDE_SOCIAL.sql");
@@ -2775,20 +2775,56 @@ export const quemReagiuAoPost = createServerFn({ method: "POST" })
       sb,
       cruas.map((l) => l.quem_id),
     );
+
+    /* ─── O SELO DO MÉDICO ─────────────────────────────────────────────────
+       ⚠️ **Resolvido pelo VÍNCULO ATUAL** (`patient_profiles.doctor_id` DELA),
+       nunca por um campo vindo do cliente e nunca pelo que estava carimbado na
+       linha da reação. Ela pode ter trocado de médico depois; o selo tem de
+       dizer quem é o obstetra dela HOJE.
+
+       ⚠️ **E ele só aparece AQUI**, numa lista que só a autora abre. Um selo
+       visível no feed contaria a terceiros que aquela pessoa é a médica dela —
+       e expor um vínculo clínico aos seguidores é exatamente o que o dono
+       proibiu ("os seguidores dela não têm que saber isso").
+
+       ⚠️ **O médico NÃO TEM linha em `patient_profiles`**, então `perfisPorId`
+       não o acha e a reação dele SUMIRIA da lista — o mais importante dos
+       reagentes seria o único invisível. O nome dele vem de `doctors`. */
+    const meuMedico = ((perfis.get(eu) as any)?.doctor_id ?? null) as string | null;
+    const nomesDeMedico = new Map<string, string>();
+    const semPerfil = cruas.map((l) => l.quem_id).filter((id) => !perfis.has(id));
+    if (semPerfil.length) {
+      try {
+        const { data: docs } = await sb
+          .from("doctors")
+          .select("id, display_name")
+          .in("id", [...new Set(semPerfil)]);
+        const { nomeDoMedico } = await import("@/lib/nome-do-medico");
+        for (const d of (docs ?? []) as { id: string; display_name: string | null }[]) {
+          nomesDeMedico.set(d.id, nomeDoMedico(d.display_name) ?? "Seu médico");
+        }
+      } catch {
+        /* Sem a tabela, quem não tem perfil some — o comportamento de antes. */
+      }
+    }
+
     const gente = cruas
       .map((l) => {
         const p = perfis.get(l.quem_id);
-        if (!p) return null;
+        const nomeMedico = nomesDeMedico.get(l.quem_id);
+        if (!p && !nomeMedico) return null;
         /* ⚠️ Tipo desconhecido (gravado por uma versão futura, ou por um banco
            com o CHECK largo) cai no coração em vez de sumir: perder a LINHA
            faria o número discordar da lista. */
         const tipo = reacaoConhecida(l.tipo) ? l.tipo : ("amei" as TipoDeReacao);
         return {
           id: l.quem_id,
-          nome: (p.display_name ?? "").trim() || "Alguém",
-          avatarUrl: p.avatar_url ?? null,
+          nome: nomeMedico ?? ((p!.display_name ?? "").trim() || "Alguém"),
+          avatarUrl: p?.avatar_url ?? null,
           tipo,
           emoji: emojiDaReacao(tipo),
+          /* O selo, e só quando for o médico DELA hoje. */
+          ehMeuMedico: !!meuMedico && l.quem_id === meuMedico,
         };
       })
       .filter(Boolean) as {
@@ -2797,6 +2833,7 @@ export const quemReagiuAoPost = createServerFn({ method: "POST" })
       avatarUrl: string | null;
       tipo: TipoDeReacao;
       emoji: string;
+      ehMeuMedico: boolean;
     }[];
 
     return { ok: true as const, gente };
