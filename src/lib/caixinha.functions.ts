@@ -38,6 +38,7 @@ import {
   type DesfechoDaPergunta,
 } from "@/lib/pergunta-clinica";
 import { LIMITE_DO_TEXTO } from "@/lib/rede-social";
+import { FUSO_DA_CLINICA } from "@/lib/disponibilidade";
 
 export type PerguntaNaCaixa = {
   id: string;
@@ -57,12 +58,39 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
   return data.user?.id ?? null;
 }
 
-/** Meia-noite de hoje em São Paulo, em ISO — a janela do teto diário. */
+/**
+ * Meia-noite de hoje no fuso da clínica, em ISO — a janela do teto diário.
+ *
+ * ⚠️ **Pelo `Intl`, e nunca por `-3h` cravado.** A primeira versão subtraía três
+ * horas na mão: funciona hoje e vira a QUINTA grafia da mesma ideia num repo em
+ * que `conquistas.ts`, `cota-ia.server.ts`, `desafio-em-grupo.functions.ts` e
+ * `clinical.functions.ts` já usam `America/Sao_Paulo` explícito. O offset do
+ * Brasil já foi -2 (horário de verão até 2019) e volta a ser discutido — no dia
+ * em que voltar, quatro arquivos acertam e um erra por uma hora, em silêncio.
+ *
+ * O fuso sai de `FUSO_DA_CLINICA`, que já existe: uma string repetida é uma
+ * string que um dia diverge.
+ */
 function inicioDoDia(): string {
-  const agora = new Date();
-  const sp = new Date(agora.getTime() - 3 * 3600_000);
-  const meiaNoite = Date.UTC(sp.getUTCFullYear(), sp.getUTCMonth(), sp.getUTCDate());
-  return new Date(meiaNoite + 3 * 3600_000).toISOString();
+  const dia = new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO_DA_CLINICA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  /* O deslocamento do fuso NAQUELE dia, e não um número fixo: é ele que
+     transforma a meia-noite local no instante UTC que o `gte` compara. */
+  const meiaNoiteUTC = new Date(`${dia}T00:00:00Z`).getTime();
+  const desloc = new Date(`${dia}T00:00:00Z`).toLocaleString("en-US", {
+    timeZone: FUSO_DA_CLINICA,
+    hour12: false,
+    hour: "2-digit",
+  });
+  /* `desloc` é a hora local correspondente a 00:00Z. Se for 21, o fuso está
+     3 h atrás e a meia-noite local acontece 3 h DEPOIS de 00:00Z. */
+  const h = Number(desloc) % 24;
+  const atraso = h === 0 ? 0 : 24 - h;
+  return new Date(meiaNoiteUTC + atraso * 3600_000).toISOString();
 }
 
 /**
