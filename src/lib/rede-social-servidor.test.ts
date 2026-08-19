@@ -67,10 +67,18 @@ describe("o bloqueio", () => {
     // Guardar só o meu deixaria quem me bloqueou continuar aparecendo no meu
     // feed — e "bloquear" promete que nenhuma das duas vê a outra.
     const c = funcaoInterna("contextoDe").replace(/\s+/g, " ");
+    /* As DUAS consultas — só o fato de existirem duas linhas é o que a fonte
+       pode provar. O que acontece com o resultado delas é testado por
+       COMPORTAMENTO, em `conjuntoDeBloqueio` (`rede-social.test.ts`): esta
+       asserção já quebrou uma vez por renomeação de variável, que é o cheiro
+       de teste que lê fonte para provar comportamento. */
     expect(c).toContain('.eq("quem_id", eu)');
     expect(c).toContain('.eq("bloqueado_id", eu)');
-    expect(c).toContain("bloqueio.add(b.bloqueado_id)");
-    expect(c).toContain("bloqueio.add(b.quem_id)");
+    /* ⚠️ E a falha de leitura tem de ser LIDA. Sem `error`, `data ?? []` vira
+       conjunto vazio e o bloqueio falha ABERTO — quem ela bloqueou volta ao
+       feed. Ver `conjuntoDeBloqueio`. */
+    expect(c).toContain("bloqueioFalhou");
+    expect(c).toContain("conjuntoDeBloqueio(ids, bloqueioFalhou)");
   });
 
   test("⚠️ bloquear DESFAZ o seguir nos dois sentidos", () => {

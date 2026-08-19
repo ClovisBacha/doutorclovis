@@ -537,3 +537,39 @@ export function temaDoDia(dia: number): TemaDaAula {
   const i = ((Math.floor(dia) % 7) + 7) % 7;
   return TEMAS_DA_AULA[i];
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QUEM ESTÁ BLOQUEADA — e o que responder quando não deu para saber
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O conjunto de bloqueio, com uma resposta segura para a falha de leitura.
+ *
+ * ⚠️ **Um `Set` cru falha ABERTO, e foi assim que ele viveu.** `supabase-js` não
+ * lança em erro de consulta: resolve com `{ data: null, error }`, e `data ?? []`
+ * transformava um timeout em conjunto VAZIO. Como TODOS os pontos de uso
+ * perguntam `bloqueio.has(x)` para ESCONDER, um conjunto vazio não escondia
+ * ninguém: os posts de quem ela bloqueou voltavam ao feed, o perfil dele abria,
+ * os stories reapareciam e a caixinha anônima voltava a aceitar pergunta dele —
+ * sem erro na tela. No mesmo `contextoDe`, três linhas abaixo, o grafo de
+ * amigas já falhava FECHADO, com o comentário certo escrito ao lado: a
+ * assimetria era interna à função.
+ *
+ * A correção NÃO é conferir `error` em catorze lugares. É fazer a resposta ser
+ * segura por construção: degradado, `has()` responde **`true` para todo
+ * mundo** — nada aparece —, e isso vale também para o ponto de uso que alguém
+ * escrever amanhã sem ler este comentário.
+ *
+ * ⚠️ Mora aqui, e não no servidor, porque é RÉGUA: no servidor ela só poderia
+ * ser testada lendo o fonte, e teste que lê fonte foi exatamente o que deixou
+ * dez asserções desta aba passarem verdes sobre guardas apagadas.
+ */
+export type ConjuntoDeBloqueio = { has(id: string): boolean; readonly degradado: boolean };
+
+export function conjuntoDeBloqueio(ids: Iterable<string>, degradado: boolean): ConjuntoDeBloqueio {
+  const set = new Set(ids);
+  return {
+    degradado,
+    has: (id: string) => degradado || set.has(id),
+  };
+}

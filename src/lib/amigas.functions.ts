@@ -70,7 +70,7 @@ export async function saoAmigas(sb: any, eu: string, outra: string): Promise<boo
   /* ⚠️ QUEM ENCERROU NÃO É AMIGA, e esta é a primeira pergunta — antes das
      duas fontes. Sem isto, `perfilDaAmiga`, `convidarDupla` e o presente
      continuariam atravessando uma saída que a lista já respeita. */
-  if ((await encerradasCom(sb, eu)).has(outra)) return false;
+  if ((await encerradasCom(sb, eu)).fora.has(outra)) return false;
 
   const { data } = await sb
     .from("patient_profiles")
@@ -100,7 +100,7 @@ export async function saoAmigas(sb: any, eu: string, outra: string): Promise<boo
 export async function idsDasAmigas(
   sb: any,
   eu: string,
-): Promise<{ todas: string[]; trazidasPorMim: Set<string> }> {
+): Promise<{ todas: string[]; trazidasPorMim: Set<string>; degradada: boolean }> {
   const { data: minha } = await sb
     .from("patient_profiles")
     .select("referred_by")
@@ -141,7 +141,7 @@ export async function idsDasAmigas(
      TEXTO, então um `Set.delete` entra na conta como se fosse um DELETE de
      tabela — é a mesma armadilha que a linha logo abaixo já documenta, e eu
      caí nela de novo ao escrever este bloco. */
-  const encerradas = await encerradasCom(sb, eu);
+  const { fora: encerradas, falhou: degradada } = await encerradasCom(sb, eu);
   const vivas = [...ids].filter((id) => !encerradas.has(id));
   const trazidasVivas = new Set([...trazidasPorMim].filter((id) => !encerradas.has(id)));
   /* Filtro em vez de `ids.delete(eu)`: a catraca de "escrita no banco sem
@@ -149,7 +149,7 @@ export async function idsDasAmigas(
      texto, e um `Set.delete` aqui entrava na conta como se fosse um DELETE de
      tabela. Inflar a dívida com falso positivo é pior que a linha extra —
      esconde a dívida real atrás de ruído. */
-  return { todas: vivas.filter((id) => id !== eu), trazidasPorMim: trazidasVivas };
+  return { todas: vivas.filter((id) => id !== eu), trazidasPorMim: trazidasVivas, degradada };
 }
 
 /**
@@ -160,28 +160,40 @@ export async function idsDasAmigas(
  * melhor sem transformar uma falha de rede em "a aba inteira sumiu", que é
  * pior: a paciente perderia todas as amigas por causa de uma consulta lenta.
  *
- * O que fecha o buraco não é este `catch`, é o SERVIDOR: `presentearAmiga` e
- * `convidarDupla` conferem o vínculo por conta própria, então o pior caso é um
- * nome reaparecendo na lista por uma abertura — não uma ação que atravessa.
+ * O que fechava o buraco não era este `catch`, era o SERVIDOR: `presentearAmiga`
+ * e `convidarDupla` conferem o vínculo por conta própria, então o pior caso na
+ * aba Amigas é um nome reaparecendo na lista por uma abertura.
+ *
+ * ⚠️ **ESSA JUSTIFICATIVA DEIXOU DE VALER NO DIA EM QUE A REDE SOCIAL PASSOU A
+ * CONSUMIR `idsDasAmigas`.** Lá não há segunda conferência: `ctx.amigas` É a
+ * régua final, e ela decide duas coisas graves — quem enxerga a camada
+ * `amigas` (a mais restrita, o desabafo de terça) e quem ATRAVESSA um perfil
+ * privado (`alcancaOPerfil` aceita `somosAmigas`). Uma amiga encerrada
+ * reaparecendo ali não é um nome na lista: é o post fechado dela sendo lido por
+ * quem ela pediu distância.
+ *
+ * Por isso a falha passou a ser DECLARADA (`degradada`), e cada chamador
+ * escolhe: a aba Amigas continua tolerante (perder todas as amigas por uma
+ * consulta lenta é pior), e a rede fecha.
  *
  * A tabela pode não existir (`APLICAR_AMIZADES.sql` é do dono): o `catch`
  * cobre isso, e a aba continua inteira sem ela.
  */
-async function encerradasCom(sb: any, eu: string): Promise<Set<string>> {
+async function encerradasCom(sb: any, eu: string): Promise<{ fora: Set<string>; falhou: boolean }> {
   try {
     const { data, error } = await sb
       .from("amizades_encerradas")
       .select("menor, maior")
       .or(`menor.eq.${eu},maior.eq.${eu}`)
       .limit(500);
-    if (error || !data) return new Set();
+    if (error || !data) return { fora: new Set(), falhou: true };
     const fora = new Set<string>();
     for (const l of data as { menor: string; maior: string }[]) {
       fora.add(l.menor === eu ? l.maior : l.menor);
     }
-    return fora;
+    return { fora, falhou: false };
   } catch {
-    return new Set();
+    return { fora: new Set(), falhou: true };
   }
 }
 
@@ -1111,7 +1123,7 @@ export const convidarAmiga = createServerFn({ method: "POST" })
 
       /* Já encerraram? O convite não ressuscita a amizade por fora: a saída
          some da lista dos dois lados e reabri-la é uma decisão de quem saiu. */
-      if ((await encerradasCom(sb, eu)).has(alvo)) {
+      if ((await encerradasCom(sb, eu)).fora.has(alvo)) {
         return porEmail ? anonima : { ok: false as const, error: "nao_encontrada" as const };
       }
 

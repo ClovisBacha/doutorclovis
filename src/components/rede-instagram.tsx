@@ -510,6 +510,20 @@ export function PostInstagram({
         </div>
       )}
 
+      {/* ⚠️ A PERGUNTA vem ANTES do texto, e citada. Ela é a metade que dá
+          sentido à outra: "Sim, foi na 20ª" solto no feed não quer dizer nada,
+          e era exatamente isso que o feed mostrava enquanto a coluna existia
+          sem leitor. Sem NADA sobre quem perguntou — a caixinha é anônima, e
+          continua anônima depois de respondida. */}
+      {post.pergunta && (
+        <div className="mx-4 mt-2 rounded-xl border-l-2 border-primary/40 bg-muted/40 px-3 py-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Perguntaram
+          </p>
+          <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-snug">{post.pergunta}</p>
+        </div>
+      )}
+
       {/* ⚠️ A aula anexada mostra o TEMA, e nunca o dia: o dia gestacional é a
           semana dela disfarçada (D = semana × 7 + diaDaSemana), e publicá-lo
           passaria por cima da chave `mostrar_semana`. Nunca a nota, tampouco —

@@ -645,6 +645,21 @@ COMMENT ON COLUMN public.rede_perguntas.quem_id IS
   'Anonimato na TELA, nunca no banco: sem esta coluna não há roteamento '
   'clínico, teto diário, bloqueio nem denúncia. O servidor jamais a devolve.';
 
+-- ⚠️ **O CARIMBO DO STORY PRECISA DE `ALTER`, e por isso ele está AQUI.**
+--
+-- Ele nasceu escrito DENTRO do `CREATE TABLE IF NOT EXISTS public.rede_stories`
+-- lá em cima. Num banco que já tinha a tabela — que é o caso de qualquer um que
+-- rodou este arquivo antes —, o `CREATE` vira no-op e a coluna NUNCA nasce; e
+-- rodar o SQL de novo não conserta, porque continua sendo o mesmo no-op. A
+-- própria conferência do fim relatava `carimbo_ok = false` sem que houvesse
+-- comando algum capaz de mudar isso.
+--
+-- Era a única coluna nova do arquivo fora do padrão `ALTER TABLE … ADD COLUMN
+-- IF NOT EXISTS`. A definição de cima fica (serve ao banco que nasce agora);
+-- esta linha serve ao que já existe.
+ALTER TABLE public.rede_stories
+  ADD COLUMN IF NOT EXISTS carimbo_semana boolean NOT NULL DEFAULT false;
+
 -- A pergunta que a resposta responde. ⚠️ Guardada no POST e não só na linha da
 -- pergunta: o post viaja pelo feed inteiro, e ler a resposta sem a pergunta
 -- entregaria um texto solto que ninguém entende.

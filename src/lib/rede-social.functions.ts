@@ -32,12 +32,14 @@ import {
   podeVerPost,
   POSTS_POR_PAGINA,
   aulaValida,
+  conjuntoDeBloqueio,
   enqueteValida,
   limparOpcoes,
   postEhValido,
   reacaoConhecida,
   REACOES,
   type AulaNoPost,
+  type ConjuntoDeBloqueio,
   type ContagemDeReacoes,
   type TipoDeReacao,
   type EspecieDeAviso,
@@ -84,6 +86,19 @@ export type PostNaTela = {
   /** A minha, para o botão já nascer aceso. */
   minhaReacao: TipoDeReacao | null;
   souAAutora: boolean;
+  /**
+   * A pergunta anônima que este post responde, ou `null`.
+   *
+   * ⚠️ **Ela viaja com o POST, e não só na caixinha dela.** O post vai para o
+   * feed inteiro: ler "Sim, foi na 20ª" sem saber o que foi perguntado entrega
+   * um texto solto que ninguém entende — e o ponto inteiro da caixinha se perde
+   * exatamente no caminho que funciona. (O recuo por banco antigo cita a
+   * pergunta dentro do texto e por isso acertava; o caminho feliz gravava na
+   * coluna e a tela nunca a lia.)
+   *
+   * ⚠️ Continua sem QUEM perguntou — a coluna nem é lida.
+   */
+  pergunta: string | null;
   /** A enquete, ou `null`. Os votos são NÚMEROS — nunca quem votou. */
   enquete: {
     opcoes: string[];
@@ -172,41 +187,64 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
 /** Tudo que a visibilidade precisa, numa leva só. */
 type Contexto = {
   sigo: Set<string>;
-  bloqueio: Set<string>;
+  bloqueio: ConjuntoDeBloqueio;
   amigas: Set<string>;
+  /**
+   * Alguma das leituras falhou.
+   *
+   * ⚠️ Quem lê isto devolve ERRO, e nunca a tela de "não há nada": um feed
+   * vazio e um feed que não carregou são a mesma imagem e conclusões opostas.
+   * O contexto continua seguro sozinho (ver `Bloqueio`) — isto é para a tela
+   * não mentir.
+   */
+  degradado: boolean;
 };
 
 async function contextoDe(sb: any, eu: string): Promise<Contexto> {
-  const [{ data: seguindo }, { data: bloqMeus }, { data: bloqDeles }] = await Promise.all([
+  const [seg, meus, deles] = await Promise.all([
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
   ]);
 
-  /* ⚠️ O bloqueio entra nos DOIS sentidos no mesmo Set. Guardar só o meu
+  /* ⚠️ O bloqueio entra nos DOIS sentidos no mesmo conjunto. Guardar só o meu
      deixaria quem me bloqueou continuar aparecendo no meu feed — e a palavra
      "bloquear" promete que nenhuma das duas vê a outra. */
-  const bloqueio = new Set<string>();
-  for (const b of (bloqMeus ?? []) as { bloqueado_id: string }[]) bloqueio.add(b.bloqueado_id);
-  for (const b of (bloqDeles ?? []) as { quem_id: string }[]) bloqueio.add(b.quem_id);
+  const ids = new Set<string>();
+  for (const b of ((meus as any).data ?? []) as { bloqueado_id: string }[]) ids.add(b.bloqueado_id);
+  for (const b of ((deles as any).data ?? []) as { quem_id: string }[]) ids.add(b.quem_id);
+  const bloqueioFalhou = !!(meus as any).error || !!(deles as any).error;
 
   /* O grafo de amizade é o que JÁ EXISTE. Reusar `idsDasAmigas` em vez de
      recriar: duas réguas de "quem é amiga" divergiriam, e aqui a divergência
      apareceria como post da camada restrita vazando. */
   let amigas = new Set<string>();
+  let amigasFalhou = false;
   try {
     const { idsDasAmigas } = await import("@/lib/amigas.functions");
     const r = await idsDasAmigas(sb, eu);
-    amigas = r.todas instanceof Set ? r.todas : new Set(r.todas as string[]);
+    /* ⚠️ **`degradada` é a lista SEM as amizades encerradas subtraídas**, e aqui
+       isso não é um nome a mais na lista: `amigas` destranca a camada mais
+       restrita (o desabafo de terça) e ATRAVESSA perfil privado, porque
+       `alcancaOPerfil` aceita `somosAmigas`. A aba Amigas tolera a degradação
+       de propósito (perder todas as amigas por uma consulta lenta é pior); a
+       rede não pode. Aqui, sem certeza, o conjunto é VAZIO. */
+    if (!r.degradada) {
+      amigas = r.todas instanceof Set ? r.todas : new Set(r.todas as string[]);
+    } else {
+      amigasFalhou = true;
+    }
   } catch {
     /* Sem o grafo, a camada `amigas` fecha em vez de abrir. Errar para o lado
        de não mostrar é a única direção segura numa régua de visibilidade. */
+    amigasFalhou = true;
   }
 
   return {
-    sigo: new Set(((seguindo ?? []) as { seguido_id: string }[]).map((s) => s.seguido_id)),
-    bloqueio,
+    sigo: new Set((((seg as any).data ?? []) as { seguido_id: string }[]).map((s) => s.seguido_id)),
+    bloqueio: conjuntoDeBloqueio(ids, bloqueioFalhou),
     amigas,
+    degradado: bloqueioFalhou || amigasFalhou || !!(seg as any).error,
   };
 }
 
@@ -241,7 +279,44 @@ async function perfisPorId(sb: any, ids: string[]) {
  * enquete existir no feed e desaparecer na grade do perfil, sem erro nenhum.
  */
 const COLUNAS_DO_POST =
-  "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, enquete_opcoes, aula";
+  "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
+  "enquete_opcoes, aula, pergunta";
+
+/** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
+const COLUNAS_DO_POST_ANTIGAS =
+  "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em";
+
+/**
+ * TODA leitura de post passa por aqui — e o motivo é o raio de dano.
+ *
+ * ⚠️ **Uma lista única resolveu a divergência entre cinco telas e criou um
+ * ponto único de falha.** As cinco leituras (`verPerfil`, `meuFeed`,
+ * `sugestoesDoFeed`, `verPost`, `meusSalvos`) descartavam o `error`, e num banco
+ * sem `enquete_opcoes`/`aula` o `42703` devolve `data: null` nas CINCO ao mesmo
+ * tempo: feed vazio, todo perfil vazio, zona de sugeridos vazia, post avulso
+ * "indisponivel" e salvos vazio — sem erro na tela e sem log. A aba inteira
+ * preta, e a paciente sem ver nem os próprios posts.
+ *
+ * `publicarPost` já tinha recuo; a LEITURA não tinha. E o deploy chega sempre
+ * antes de o dono rodar o SQL — é a mesma família do `perfisPorId`, que já
+ * documenta este defeito uma fase atrás.
+ *
+ * O recuo devolve as colunas velhas e preenche as novas com `null`: sem
+ * enquete, sem aula e sem a pergunta respondida, que é exatamente o que um
+ * banco sem elas tem a dizer.
+ */
+async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
+  const { data, error } = await monta(sb.from("rede_posts").select(COLUNAS_DO_POST));
+  if (!error) return (data ?? []) as any[];
+  console.warn("[rede] posts sem enquete/aula/pergunta — rode APLICAR_REDE_SOCIAL.sql");
+  const { data: velhos } = await monta(sb.from("rede_posts").select(COLUNAS_DO_POST_ANTIGAS));
+  return ((velhos ?? []) as any[]).map((p) => ({
+    ...p,
+    enquete_opcoes: null,
+    aula: null,
+    pergunta: null,
+  }));
+}
 
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
@@ -458,11 +533,26 @@ async function salvosDe(sb: any, postIds: string[], eu: string): Promise<Set<str
 }
 
 /** Monta os posts para a tela, já filtrados pela régua. */
+/**
+ * O que `montarPosts` precisa saber.
+ *
+ * ⚠️ `bloqueio` é ESTRUTURAL (`{ has }`) e não `Set`: o contexto real entrega um
+ * `Bloqueio`, que responde `true` para todo mundo quando a leitura falhou, e o
+ * espelho entrega um `Set` vazio de propósito (bloqueio é outra pergunta, e a
+ * prévia não é o lugar de simulá-la). Amarrar o tipo a `Set` obrigaria um dos
+ * dois a mentir.
+ */
+type OlhoDeQuemVe = {
+  sigo: Set<string>;
+  amigas: Set<string>;
+  bloqueio: { has(id: string): boolean };
+};
+
 async function montarPosts(
   sb: any,
   eu: string,
   brutos: any[],
-  ctx: Contexto,
+  ctx: OlhoDeQuemVe,
 ): Promise<PostNaTela[]> {
   const autores = await perfisPorId(sb, [...new Set(brutos.map((p) => p.autor_id))]);
 
@@ -540,6 +630,7 @@ async function montarPosts(
             }
           : null,
         aula: aulaValida(p.aula) ? p.aula : null,
+        pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
       };
     }),
   );
@@ -816,13 +907,13 @@ export const verPerfil = createServerFn({ method: "POST" })
         : { ok: false as const, motivo: "indisponivel" as const };
     }
 
-    const { data: brutos } = await sb
-      .from("rede_posts")
-      .select(COLUNAS_DO_POST)
-      .eq("autor_id", data.alvoId)
-      .is("arquivado_em", null)
-      .order("criado_em", { ascending: false })
-      .limit(POSTS_POR_PAGINA);
+    const brutos = await postsCrus(sb, (base) =>
+      base
+        .eq("autor_id", data.alvoId)
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: false })
+        .limit(POSTS_POR_PAGINA),
+    );
 
     /* ⚠️ O olho da prévia é um SENTINELA, nunca o meu id: `podeVerPost`
        curto-circuita em `euId === post.autorId` ("a dona sempre vê os dela"), e
@@ -830,12 +921,12 @@ export const verPerfil = createServerFn({ method: "POST" })
        afirmaria que uma seguidora vê o desabafo de terça, sem erro e sem log. */
     const previa = persona ? contextoDaPersona(persona, data.alvoId) : null;
     const posts = previa
-      ? await montarPosts(sb, previa.euId, (brutos ?? []) as any[], {
+      ? await montarPosts(sb, previa.euId, brutos, {
           sigo: previa.sigo,
           amigas: previa.amigas,
           bloqueio: previa.bloqueio,
         })
-      : await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+      : await montarPosts(sb, eu, brutos, ctx);
 
     const selo = await seloDe(a);
     /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
@@ -1193,20 +1284,18 @@ export const meuFeed = createServerFn({ method: "POST" })
       (id) => !ctx.bloqueio.has(id) || id === eu,
     );
 
-    let q = sb
-      .from("rede_posts")
-      .select(COLUNAS_DO_POST)
-      .in("autor_id", de)
-      .is("arquivado_em", null)
-      .order("criado_em", { ascending: false })
-      /* Puxa mais do que cabe na página: a régua ainda vai FILTRAR (Modo
-         Cuidado, perfil fechado depois de publicar), e sem folga uma página
-         voltaria com três posts. */
-      .limit(POSTS_POR_PAGINA * 2);
-    if (data.antesDe) q = q.lt("criado_em", data.antesDe);
-
-    const { data: brutos } = await q;
-    const posts = await montarPosts(sb, eu, (brutos ?? []) as any[], ctx);
+    const brutos = await postsCrus(sb, (base) => {
+      const q = base
+        .in("autor_id", de)
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: false })
+        /* Puxa mais do que cabe na página: a régua ainda vai FILTRAR (Modo
+           Cuidado, perfil fechado depois de publicar), e sem folga uma página
+           voltaria com três posts. */
+        .limit(POSTS_POR_PAGINA * 2);
+      return data.antesDe ? q.lt("criado_em", data.antesDe) : q;
+    });
+    const posts = await montarPosts(sb, eu, brutos, ctx);
     const pagina = ordenarFeed(posts).slice(0, POSTS_POR_PAGINA);
 
     return {
@@ -1321,18 +1410,18 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
     );
     const ids = ranking.map((p) => p.id);
 
-    const { data: brutos } = await sb
-      .from("rede_posts")
-      .select(COLUNAS_DO_POST)
-      .in("autor_id", ids)
-      .eq("visibilidade", "publico")
-      .is("arquivado_em", null)
-      .order("criado_em", { ascending: false })
-      /* Folga: a régua ainda filtra, e o teto por autora ainda poda. */
-      .limit(SUGESTOES_POR_LEVA * 6);
+    const brutos = await postsCrus(sb, (base) =>
+      base
+        .in("autor_id", ids)
+        .eq("visibilidade", "publico")
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: false })
+        /* Folga: a régua ainda filtra, e o teto por autora ainda poda. */
+        .limit(SUGESTOES_POR_LEVA * 6),
+    );
 
     const escolhidas = ordenarSugestoes(
-      ((brutos ?? []) as any[]).map((p) => ({
+      brutos.map((p) => ({
         postId: p.id,
         autorId: p.autor_id,
         criadoEm: p.criado_em,
@@ -1730,12 +1819,9 @@ export const verPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const { data: bruto } = await sb
-      .from("rede_posts")
-      .select(COLUNAS_DO_POST)
-      .eq("id", data.postId)
-      .is("arquivado_em", null)
-      .maybeSingle();
+    const [bruto] = await postsCrus(sb, (base) =>
+      base.eq("id", data.postId).is("arquivado_em", null).limit(1),
+    );
     if (!bruto) return { ok: false as const, motivo: "indisponivel" as const };
 
     const ctx = await contextoDe(sb, eu);
@@ -1859,15 +1945,31 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     );
 
     const agora = new Date().toISOString();
-    const { data: brutos } = await sb
-      .from("rede_stories")
-      .select("id, autor_id, imagem_path, texto, criado_em, carimbo_semana")
-      .in("autor_id", de)
-      .gt("expira_em", agora)
-      .order("criado_em", { ascending: true })
-      .limit(200);
-
-    const linhas = (brutos ?? []) as any[];
+    /* ⚠️ **RECUO, como o de `publicarStory` — e ele faltava justamente aqui.**
+       `carimbo_semana` nasceu DENTRO do `CREATE TABLE IF NOT EXISTS`, então num
+       banco que já tinha `rede_stories` a coluna nunca foi criada (e re-rodar o
+       SQL não a criava: o `CREATE` vira no-op). Sem o recuo, o `42703`
+       devolvia `data: null` e a fileira ficava com uma bolinha só — a "Seu
+       story", que o cliente sintetiza —, para sempre, sem erro na tela. */
+    const linhas = await (async (): Promise<any[]> => {
+      const monta = (base: any) =>
+        base
+          .in("autor_id", de)
+          .gt("expira_em", agora)
+          .order("criado_em", { ascending: true })
+          .limit(200);
+      const { data, error } = await monta(
+        sb
+          .from("rede_stories")
+          .select("id, autor_id, imagem_path, texto, criado_em, carimbo_semana"),
+      );
+      if (!error) return (data ?? []) as any[];
+      console.warn("[rede] stories sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
+      const { data: velhos } = await monta(
+        sb.from("rede_stories").select("id, autor_id, imagem_path, texto, criado_em"),
+      );
+      return ((velhos ?? []) as any[]).map((l) => ({ ...l, carimbo_semana: false }));
+    })();
     const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
 
     const { data: vistos } = await sb
@@ -2120,11 +2222,7 @@ export const meusSalvos = createServerFn({ method: "POST" })
     const ids = ((linhas ?? []) as { post_id: string }[]).map((l) => l.post_id);
     if (ids.length === 0) return { ok: true as const, posts: [] };
 
-    const { data: brutos } = await sb
-      .from("rede_posts")
-      .select(COLUNAS_DO_POST)
-      .in("id", ids)
-      .is("arquivado_em", null);
+    const brutos = await postsCrus(sb, (base) => base.in("id", ids).is("arquivado_em", null));
 
     const ctx = await contextoDe(sb, eu);
     /* ⚠️ Passa pela régua DE NOVO na leitura: ela pode ter salvado um post e a
@@ -2176,17 +2274,27 @@ async function registrarAtividade(
 ) {
   if (opts.donoId === opts.quemId) return;
   try {
-    const { error } = await sb.from("rede_atividade").upsert(
-      {
-        dono_id: opts.donoId,
-        quem_id: opts.quemId,
-        especie: opts.especie,
-        post_id: opts.postId ?? null,
-      },
-      /* O índice único é sobre (dono, quem, espécie, post) — tirar e pôr a
-         reação cinco vezes não enche a caixa dela com cinco avisos. */
-      { onConflict: "dono_id,quem_id,especie,post_id", ignoreDuplicates: true },
-    );
+    /* ⚠️ **`insert`, e NUNCA `upsert` com `onConflict`.** O índice único do
+       banco é de EXPRESSÃO — `(dono_id, quem_id, especie, coalesce(post_id,
+       dono_id))` —, e ele é assim de propósito: `post_id` é nulo em "seguiu" e
+       "aceitou", e no Postgres cada NULL é distinto, então um índice de colunas
+       simples não deduparia nada. Só que `ON CONFLICT (…, post_id)` não INFERE
+       um índice cuja quarta chave é uma expressão: o Postgres devolve `42P10`,
+       e o erro caía no `console.warn` abaixo.
+       Efeito: a caixa ♡ SEMPRE vazia e o emblema sempre zero — nenhuma reação,
+       nenhum "começou a te seguir", nenhum pedido. E como Aceitar/Recusar mora
+       lá dentro, a porta do pedido sumia junto.
+       Com `insert`, quem dedupa é o índice: a segunda gravação é recusada com
+       `23505`, que aqui é SUCESSO REPETIDO e não erro. */
+    const { error } = await sb.from("rede_atividade").insert({
+      dono_id: opts.donoId,
+      quem_id: opts.quemId,
+      especie: opts.especie,
+      post_id: opts.postId ?? null,
+    });
+    /* `23505` é a dedupe funcionando — tirar e pôr a reação cinco vezes não
+       enche a caixa dela com cinco avisos. */
+    if (error && (error as { code?: string }).code === "23505") return;
     /* ⚠️ NÃO derruba o gesto, mas também não some sem deixar rastro. A catraca
        de `travas-do-servidor.test.ts` existe para forçar esta pergunta, e a
        resposta aqui é a do meio: silêncio para a paciente (a reação dela já

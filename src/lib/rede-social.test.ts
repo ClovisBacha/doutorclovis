@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   aoReagir,
+  conjuntoDeBloqueio,
   aoSeguir,
   avisoMandaPush,
   emojiDaReacao,
@@ -423,5 +424,34 @@ describe("a aula anexada", () => {
     expect(temaDoDia(139)).toBe(temaDoDia(139 + 7));
     // Negativo não estoura nem devolve `undefined`.
     expect(TEMAS_DA_AULA).toContain(temaDoDia(-3));
+  });
+});
+
+describe("⚠️ o conjunto de bloqueio falha FECHADO", () => {
+  test("são feitas as duas perguntas de sempre quando a leitura foi boa", () => {
+    const b = conjuntoDeBloqueio(["ana", "bia"], false);
+    expect(b.has("ana")).toBe(true);
+    expect(b.has("bia")).toBe(true);
+    expect(b.has("carla")).toBe(false);
+    expect(b.degradado).toBe(false);
+  });
+
+  test("⚠️ degradado, TODO MUNDO está bloqueado — inclusive quem não estava", () => {
+    /* Um `Set` cru falhava aberto: `data ?? []` transformava um timeout em
+       conjunto vazio, e como todo ponto de uso pergunta `has()` para ESCONDER,
+       nada era escondido — os posts de quem ela bloqueou voltavam ao feed, o
+       perfil dele abria, e a caixinha anônima voltava a aceitar pergunta dele. */
+    const b = conjuntoDeBloqueio([], true);
+    expect(b.has("qualquer-um")).toBe(true);
+    expect(b.has("")).toBe(true);
+    expect(b.degradado).toBe(true);
+  });
+
+  test("degradado ignora o conteúdo do conjunto, e não o contrário", () => {
+    /* A ordem importa: `degradado || set.has(id)`. Escrito ao contrário, um
+       conjunto parcialmente lido pareceria completo. */
+    const b = conjuntoDeBloqueio(["ana"], true);
+    expect(b.has("ana")).toBe(true);
+    expect(b.has("bia")).toBe(true);
   });
 });

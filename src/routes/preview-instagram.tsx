@@ -170,6 +170,9 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
         ? { opcoes: ["Sim", "Não", "Ainda não sei"], votos: [0, 0, 0], meuVoto: null }
         : null,
   aula: i === 6 ? { tema: "nutrição" as const } : null,
+  /* ⚠️ O post 8 é a RESPOSTA de uma pergunta anônima — a única forma de
+     fotografar o cabeçalho citado sem duas contas e uma caixinha aberta. */
+  pergunta: i === 8 ? "Como você escolheu o nome da Helena? 💛" : null,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
