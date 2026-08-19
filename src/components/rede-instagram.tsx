@@ -71,6 +71,7 @@ import {
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { hapticTap } from "@/lib/haptics";
+import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -1765,6 +1766,36 @@ export function RedeNoApp({
     [],
   );
 
+  /**
+   * Pede três legendas para a foto da capa.
+   *
+   * ⚠️ **Reduz ANTES de mandar** (`LADO_PARA_A_IA`, 512px). A foto do post tem
+   * 1080 em JPEG 0,8, ~300 KB — mandar isso é gastar o 4G dela num botão
+   * opcional e, sobretudo, fazer sair do aparelho mais imagem do que o
+   * necessário. É foto de gestação, às vezes ultrassom.
+   */
+  async function sugerirLegenda(foto: string): Promise<string[]> {
+    const t = await token();
+    if (!t) return [];
+    const menor = await reduzirParaIA(foto);
+    if (!menor) return [];
+    try {
+      const r = await fetch("/api/legenda-da-foto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ foto: menor }),
+      });
+      const dados = (await r.json().catch(() => null)) as {
+        ok?: boolean;
+        sugestoes?: string[];
+      } | null;
+      if (!r.ok || !dados?.ok) return [];
+      return dados.sugestoes ?? [];
+    } catch {
+      return [];
+    }
+  }
+
   async function token() {
     const { supabase } = await import("@/integrations/supabase/client");
     const s = await supabase.auth.getSession();
@@ -2682,6 +2713,7 @@ export function RedeNoApp({
   if (onde.t === "novo") {
     return (
       <NovoPost
+        aoSugerirLegenda={sugerirLegenda}
         aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoPublicar={publicar}
         aulaDeHoje={aulaDeHoje}
@@ -3572,6 +3604,28 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
  * Aqui não há recorte: a foto cabe inteira em 1080×1920, preservando a
  * proporção dela — que é o que `object-contain` do visor espera.
  */
+/**
+ * Reduz a foto SÓ PARA A SUGESTÃO DE LEGENDA.
+ *
+ * ⚠️ Ela não substitui a foto do post — a que vai publicada continua em 1080.
+ * Esta é uma cópia menor, criada para sair do aparelho e ser descartada.
+ */
+async function reduzirParaIA(dataUrl: string): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(await (await fetch(dataUrl)).blob());
+    const escala = Math.min(1, LADO_PARA_A_IA / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.72);
+  } catch {
+    return null;
+  }
+}
+
 const LADO_DO_STORY = { largura: 1080, altura: 1920 };
 async function prepararFotoDoStory(file: File): Promise<string | null> {
   try {
@@ -3600,6 +3654,7 @@ export function NovoPost({
   aoFechar,
   aoPublicar,
   aulaDeHoje,
+  aoSugerirLegenda,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -3618,8 +3673,18 @@ export function NovoPost({
    * premium e estragam a aula de quem está uma semana atrás.
    */
   aulaDeHoje?: AulaNoPost | null;
+  /**
+   * Pede à IA três legendas para a primeira foto. `null` = o recurso não está
+   * ligado (a bancada sem ele, por exemplo) e o botão nem aparece.
+   *
+   * ⚠️ Quem faz a REDE é a tela de cima (`RedeNoApp`), que tem o token — este
+   * componente continua sendo só desenho, como já era para `aoPublicar`.
+   */
+  aoSugerirLegenda?: (foto: string) => Promise<string[]>;
 }) {
   const [texto, setTexto] = useState("");
+  const [sugestoes, setSugestoes] = useState<string[] | null>(null);
+  const [pensando, setPensando] = useState(false);
   /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
      outras" divergiria na hora de remover a primeira. */
   const [fotos, setFotos] = useState<string[]>([]);
@@ -3645,6 +3710,21 @@ export function NovoPost({
   const temConteudo =
     postEhValido({ texto, temImagem: fotos.length > 0 }) || opcoesLimpas.length >= OPCOES_MIN;
   const podeEnviar = temConteudo && enqueteOk && !enviando;
+
+  async function pedirLegendas() {
+    if (!aoSugerirLegenda || !fotos[0] || pensando) return;
+    setPensando(true);
+    setSugestoes(null);
+    try {
+      /* A CAPA. Sugerir a partir da terceira foto de um carrossel descreveria
+         o que a maioria nem vê primeiro. */
+      setSugestoes(await aoSugerirLegenda(fotos[0]));
+    } catch {
+      setSugestoes([]);
+    } finally {
+      setPensando(false);
+    }
+  }
 
   async function enviar() {
     if (!podeEnviar) return;
@@ -3701,6 +3781,64 @@ export function NovoPost({
           <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
             {LIMITE_DO_TEXTO - texto.length}
           </p>
+        )}
+
+        {/* ⚠️ SÓ COM FOTO. É uma legenda PARA a imagem: sem imagem o modelo não
+            teria do que falar, e um botão que aparece antes da foto promete o
+            que não pode entregar. */}
+        {aoSugerirLegenda && fotos.length > 0 && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={pedirLegendas}
+              disabled={pensando}
+              className="press inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-primary/30 bg-primary/5 px-3.5 text-[13px] font-medium text-primary disabled:opacity-60"
+            >
+              {pensando ? "Pensando…" : "✨ Sugerir legenda"}
+            </button>
+
+            {/* ⚠️ ESTA FRASE NÃO SAI. A foto vai para um serviço de fora, e num
+                app de gestação isso é dela saber ANTES de tocar — não depois,
+                numa política. Dizer também que não fica guardada é o que separa
+                "mandaram minha ultrassom para alguém" de uma escolha
+                informada. */}
+            {sugestoes === null && !pensando && (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                A foto é enviada só para escrever a sugestão, e não fica guardada.
+              </p>
+            )}
+
+            {sugestoes !== null && sugestoes.length === 0 && !pensando && (
+              <p className="mt-1.5 text-[12px] text-muted-foreground">
+                Não consegui pensar em nada para esta foto. Escreva do seu jeito 💛
+              </p>
+            )}
+
+            {sugestoes !== null && sugestoes.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {sugestoes.map((sug, n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => {
+                      hapticTap();
+                      /* ACRESCENTA, nunca apaga — a régua mora em
+                         `legenda-sugerida.ts`, testada. */
+                      setTexto(aplicarSugestao(texto, sug).slice(0, LIMITE_DO_TEXTO));
+                      setSugestoes(null);
+                    }}
+                    style={{ ["--dc-atraso" as string]: `${n * 45}ms` }}
+                    className="dc-reacao-entra press block w-full rounded-2xl border border-border bg-muted/40 px-3 py-2 text-left text-[13px] leading-snug"
+                  >
+                    {sug}
+                  </button>
+                ))}
+                <p className="pt-0.5 text-[11px] text-muted-foreground">
+                  Toque para usar — dá para editar depois.
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         {fotos.length > 0 && (

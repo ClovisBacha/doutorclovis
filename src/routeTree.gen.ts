@@ -80,6 +80,7 @@ import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
 import { Route as ApiLembretesTickRouteImport } from './routes/api/lembretes-tick'
+import { Route as ApiLegendaDaFotoRouteImport } from './routes/api/legenda-da-foto'
 import { Route as ApiInstagramWebhookRouteImport } from './routes/api/instagram-webhook'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCartaSemanalRouteImport } from './routes/api/carta-semanal'
@@ -445,6 +446,11 @@ const ApiLembretesTickRoute = ApiLembretesTickRouteImport.update({
   path: '/api/lembretes-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLegendaDaFotoRoute = ApiLegendaDaFotoRouteImport.update({
+  id: '/api/legenda-da-foto',
+  path: '/api/legenda-da-foto',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiInstagramWebhookRoute = ApiInstagramWebhookRouteImport.update({
   id: '/api/instagram-webhook',
   path: '/api/instagram-webhook',
@@ -561,6 +567,7 @@ export interface FileRoutesByFullPath {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/legenda-da-foto': typeof ApiLegendaDaFotoRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
@@ -643,6 +650,7 @@ export interface FileRoutesByTo {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/legenda-da-foto': typeof ApiLegendaDaFotoRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
@@ -727,6 +735,7 @@ export interface FileRoutesById {
   '/api/carta-semanal': typeof ApiCartaSemanalRoute
   '/api/chat': typeof ApiChatRoute
   '/api/instagram-webhook': typeof ApiInstagramWebhookRoute
+  '/api/legenda-da-foto': typeof ApiLegendaDaFotoRoute
   '/api/lembretes-tick': typeof ApiLembretesTickRoute
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
@@ -811,6 +820,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/legenda-da-foto'
     | '/api/lembretes-tick'
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
@@ -893,6 +903,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/legenda-da-foto'
     | '/api/lembretes-tick'
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
@@ -976,6 +987,7 @@ export interface FileRouteTypes {
     | '/api/carta-semanal'
     | '/api/chat'
     | '/api/instagram-webhook'
+    | '/api/legenda-da-foto'
     | '/api/lembretes-tick'
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
@@ -1057,6 +1069,7 @@ export interface RootRouteChildren {
   ApiCartaSemanalRoute: typeof ApiCartaSemanalRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiInstagramWebhookRoute: typeof ApiInstagramWebhookRoute
+  ApiLegendaDaFotoRoute: typeof ApiLegendaDaFotoRoute
   ApiLembretesTickRoute: typeof ApiLembretesTickRoute
   ApiMeditacaoTickRoute: typeof ApiMeditacaoTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
@@ -1574,6 +1587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLembretesTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/legenda-da-foto': {
+      id: '/api/legenda-da-foto'
+      path: '/api/legenda-da-foto'
+      fullPath: '/api/legenda-da-foto'
+      preLoaderRoute: typeof ApiLegendaDaFotoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/instagram-webhook': {
       id: '/api/instagram-webhook'
       path: '/api/instagram-webhook'
@@ -1725,6 +1745,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCartaSemanalRoute: ApiCartaSemanalRoute,
   ApiChatRoute: ApiChatRoute,
   ApiInstagramWebhookRoute: ApiInstagramWebhookRoute,
+  ApiLegendaDaFotoRoute: ApiLegendaDaFotoRoute,
   ApiLembretesTickRoute: ApiLembretesTickRoute,
   ApiMeditacaoTickRoute: ApiMeditacaoTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,

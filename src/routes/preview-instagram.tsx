@@ -75,6 +75,8 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
+    /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
+    legendas: q.legendas == null ? 1 : Number(q.legendas),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
@@ -199,6 +201,7 @@ function Bancada() {
     meu,
     vazio,
     sugeridas,
+    legendas,
     selo,
     trancado,
     carimbo,
@@ -275,6 +278,7 @@ function Bancada() {
   };
 
   const semSugestoes = sugeridas === 0;
+  const semLegendas = legendas === 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
@@ -515,6 +519,22 @@ function Bancada() {
         <NovoPost
           /* A aula de hoje, para o anexo aparecer na bancada. */
           aulaDeHoje={{ tema: "nutrição" }}
+          /* ⚠️ A BANCADA NÃO CHAMA A IA — ela fabrica a RESPOSTA. Chamar de
+             verdade custaria crédito a cada abertura da bancada e exigiria
+             sessão; e o que precisa ser conferido aqui é a TELA (o botão, a
+             espera, as três opções, o estado vazio), não o modelo.
+             `?legendas=0` mostra o caso em que nada volta — que é o estado
+             mais fácil de esquecer de desenhar. */
+          aoSugerirLegenda={async () => {
+            await new Promise((r) => setTimeout(r, 700));
+            return semLegendas
+              ? []
+              : [
+                  "Hoje ele resolveu dar cambalhota a tarde inteira.",
+                  "Essa carinha aqui já é minha coisa favorita.",
+                  "Mais um pedacinho da nossa história 💛",
+                ];
+          }}
           aoFechar={() => history.back()}
           aoPublicar={async (p) => {
             alert(
