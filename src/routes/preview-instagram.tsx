@@ -145,8 +145,14 @@ const CORES: [string, string, string][] = [
 const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   id: `p${i}`,
   autorId: i === 3 ? "eu" : i % 2 === 0 ? "marina" : "carol",
-  autorNome: i === 3 ? "Você" : i % 2 === 0 ? "Marina Costa" : "Carol",
+  autorNome: i === 1 ? "Obstétrica" : i === 3 ? "Você" : i % 2 === 0 ? "Marina Costa" : "Carol",
   autorAvatar: null,
+  /* ⚠️ UM post da CONTA OFICIAL na bancada. Sem ele, o selo do consultório
+     continuaria sendo impossível de olhar — que é exatamente o motivo de ele
+     ter passado uma leva inteira montado no servidor e desenhado em lugar
+     nenhum. O 1 cai dentro do recorte que a bancada desenha (POSTS.slice(0, 5)), então o selo aparece ao lado do nome no
+     cabeçalho do cartão, que é onde ele mora de verdade. */
+  autorOficial: i === 1,
   /* O post 5 é SÓ TEXTO: é ele que prova que a célula da grade mostra o texto
      em vez de um buraco cinza. */
   texto:

@@ -6,19 +6,32 @@
  * oficial que publica resolve o dia um — e dá ao dono um canal próprio para os
  * 13,7 mil seguidores do Instagram dele.
  *
- * ─── ⚠️ ELA PUBLICA E É SEGUIDA. ELA NÃO LÊ. ────────────────────────────────
+ * ─── ⚠️ ELA É UMA CONTA COMO QUALQUER OUTRA (decisão do dono, ago/2026) ─────
  *
- * O CLAUDE.md registra uma decisão PENDENTE do dono: dar ao médico uma porta
- * para reagir "exigiria decidir se ele VÊ as publicações sociais da paciente".
- * Essa decisão continua dele, e esta conta foi desenhada para não tocá-la:
+ * A pergunta que ficou pendente por uma leva — "o médico pode ver as
+ * publicações sociais da paciente?" — foi respondida, e a resposta desfez uma
+ * decisão MINHA que estava escrita aqui ("ela publica e é seguida; ela NÃO
+ * lê"). Palavras dele:
  *
- *  · ela publica na camada `publico`, que é a que qualquer pessoa já pode ver;
- *  · ela aparece nas sugestões e pode ser seguida;
- *  · **ela não tem feed, não reage, não abre perfil de paciente e não recebe
- *    caixinha.** Nada aqui lê o que as pacientes publicam.
+ *   "o que o médico vê não tem limitação diferente de qualquer pessoa que
+ *    acessa a plataforma, mesmo modelo do Instagram — existem perfil aberto e
+ *    privado, e isso vai da paciente."
  *
- * Quando o dono decidir a outra pergunta, o que muda é OUTRA coisa; isto
- * continua de pé do jeito que está.
+ * Então esta conta **publica E lê**, e não ganha nada por ser do consultório:
+ *
+ *  · perfil PRIVADO continua privado para ela — ela precisa pedir e ser
+ *    aceita, como qualquer conta;
+ *  · a camada `amigas` continua fora (ela não é amiga de ninguém);
+ *  · Modo Cuidado esconde a paciente dela como esconde de todo mundo;
+ *  · e ela NÃO tem porta a partir do painel do consultório: o médico entra
+ *    nela pelo `/auth`, com o e-mail dela, como numa conta qualquer. Uma porta
+ *    a partir da sessão do painel seria exatamente o privilégio que a decisão
+ *    do dono recusa.
+ *
+ * ⚠️ **O que muda é o ALCANCE dela, nunca a régua.** `podeVerPost`,
+ * `alcancaOPerfil` e `conjuntoDeBloqueio` continuam sendo os mesmos para ela e
+ * para uma paciente — não existe, e não pode passar a existir, um `if` que
+ * pergunte `conta_oficial` dentro de uma régua de visibilidade.
  *
  * ─── ⚠️ E ELA NÃO É SEGUIDA AUTOMATICAMENTE ────────────────────────────────
  *

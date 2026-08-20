@@ -75,6 +75,20 @@ export type PostNaTela = {
   autorId: string;
   autorNome: string;
   autorAvatar: string | null;
+  /**
+   * O autor é a CONTA OFICIAL do consultório?
+   *
+   * ⚠️ **O selo precisa existir no POST, e não só na lista de gente.** Ele era
+   * montado em `listaDeGente` e desenhado em UM lugar — a fileira de sugeridas.
+   * No feed, onde a conta oficial de fato aparece, ela lia como uma paciente
+   * qualquer chamada "Obstétrica": uma conta institucional publicando conselho
+   * sem nada que a identifique como institucional é exatamente o que um selo
+   * existe para impedir.
+   *
+   * ⚠️ Não confundir com o selo do OBSTETRA (`quemReagiuAoPost`), que é
+   * resolvido pelo vínculo atual e só aparece na lista que a autora abre.
+   */
+  autorOficial: boolean;
   texto: string | null;
   /** A PRIMEIRA foto — é ela que a grade e a prévia usam. */
   imagemUrl: string | null;
@@ -170,6 +184,14 @@ export type PerfilNaTela = {
   vitrine?: boolean;
   /** O código dela, para a tela montar o endereço da vitrine. Só a DONA. */
   codigoDaVitrine?: string | null;
+  /**
+   * É a CONTA OFICIAL do consultório?
+   *
+   * ⚠️ Público por natureza — identifica uma conta institucional, não uma
+   * relação clínica de ninguém. Não confundir com o selo do OBSTETRA, que é
+   * resolvido pelo vínculo atual e só aparece na lista que a autora abre.
+   */
+  oficial?: boolean;
   /** `null` = não sigo. */
   meuVinculo: "ativo" | "pendente" | null;
   souEu: boolean;
@@ -928,6 +950,7 @@ async function montarPosts(
         autorId: p.autor_id,
         autorNome: (a?.display_name ?? "").trim() || "Alguém",
         autorAvatar: a?.avatar_url ?? null,
+        autorOficial: ehContaOficial(a as any),
         texto: p.texto ?? null,
         imagemUrl: urls[0] ?? null,
         imagens: urls,
@@ -1014,6 +1037,7 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         bio: (p as any)?.bio ?? null,
         avatarUrl: (p as any)?.avatar_url ?? null,
         publico: !!(p as any)?.perfil_publico,
+        oficial: ehContaOficial(p as any),
         vitrine: vitrine.ligada,
         codigoDaVitrine: vitrine.codigo,
         meuVinculo: null,
@@ -1305,6 +1329,7 @@ export const verPerfil = createServerFn({ method: "POST" })
       bio: a.bio ?? null,
       avatarUrl: a.avatar_url ?? null,
       publico: !!a.perfil_publico,
+      oficial: ehContaOficial(a as any),
       /* Sob a prévia, o vínculo é o da PERSONA — senão a tela mostraria
          "Editar perfil" no lugar de "Seguir" enquanto afirma ser a visão de
          uma estranha. */

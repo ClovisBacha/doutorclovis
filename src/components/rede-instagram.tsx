@@ -632,8 +632,20 @@ export const PostInstagram = memo(function PostInstagram({
         >
           <Foto url={post.autorAvatar} nome={post.autorNome} lado={AVATAR_DO_POST} />
           <span className="min-w-0">
-            <span className="block truncate text-[13px] font-semibold leading-tight">
-              {post.autorNome}
+            {/* ⚠️ **O SELO DO CONSULTÓRIO VIVE AQUI, no cabeçalho do cartão.**
+                Ele era montado no servidor e desenhado só na fileira de
+                sugeridas — ou seja, no lugar onde a paciente passa uma vez, e
+                não no lugar onde a conta oficial de fato aparece. Sem ele no
+                post, uma conta institucional publicando orientação lia como
+                mais uma paciente chamada "Obstétrica", que é exatamente o que
+                um selo existe para impedir.
+
+                ⚠️ `truncate` fica no NOME, e o selo é irmão dele: dentro do
+                mesmo `span` truncado, o selo some junto com o fim de um nome
+                comprido — e o selo é a informação, não o enfeite. */}
+            <span className="flex min-w-0 items-center text-[13px] font-semibold leading-tight">
+              <span className="truncate">{post.autorNome}</span>
+              {post.autorOficial && <SeloOficial />}
             </span>
             {/* ⚠️ "Sugerido para você" é OBRIGATÓRIO quando o post não veio de
                 quem ela segue. Sem o rótulo, o feed passa a misturar estranhos
@@ -1074,7 +1086,8 @@ export const PostInstagram = memo(function PostInstagram({
 
       {post.texto && (
         <p className="px-4 pt-1.5 text-[14px] leading-snug">
-          <span className="font-semibold">{post.autorNome}</span>{" "}
+          <span className="font-semibold">{post.autorNome}</span>
+          {post.autorOficial && <SeloOficial />}{" "}
           <span className="whitespace-pre-wrap">{post.texto}</span>
         </p>
       )}
@@ -1931,7 +1944,13 @@ export function TelaDePerfil({
             ‹
           </button>
         )}
-        <h1 className="min-w-0 flex-1 truncate text-[16px] font-semibold">{perfil.nome}</h1>
+        <h1 className="flex min-w-0 flex-1 items-center text-[16px] font-semibold">
+          <span className="truncate">{perfil.nome}</span>
+          {/* ⚠️ O selo é IRMÃO do nome, e não filho do `truncate`: dentro dele
+              ele some junto com o fim de um nome comprido, e o selo é a
+              informação. */}
+          {perfil.oficial && <SeloOficial />}
+        </h1>
         {/* No modelo, os salvos moram atrás do ☰ do próprio perfil. O ícone é
             o MESMO marcador do post — é o que liga o gesto ao lugar onde ele
             guarda. */}

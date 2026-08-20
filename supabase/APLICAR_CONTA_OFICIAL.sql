@@ -28,7 +28,7 @@ ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS conta_oficial boolean NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN public.patient_profiles.conta_oficial IS
-  'Conta institucional do consultorio na Comunidade. Publica e e seguida; nao le o feed de ninguem. Fica FORA de toda contagem de paciente.';
+  'Conta institucional do consultorio na Comunidade. Publica e le como qualquer conta -- sem privilegio nenhum sobre perfil privado. Fica FORA de toda contagem de paciente.';
 
 -- ⚠️ UMA SO. Duas contas oficiais fariam a fileira de sugeridas ter duas
 -- primeiras, e `comOficialNoTopo` fixaria uma arbitraria.
