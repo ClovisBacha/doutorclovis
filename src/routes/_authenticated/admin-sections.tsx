@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  getFunilDeIndicacao,
   getGrowthMetrics,
   getChurnAlerts,
   type GrowthMetrics,
@@ -18,6 +19,7 @@ import {
   type Announcement,
 } from "@/lib/announcements.functions";
 import { listFlags, setFlag, type PlatformFlag } from "@/lib/flags.functions";
+import { SEM_MEDIDA, taxa, type Funil } from "@/lib/funil-de-indicacao";
 import { getNpsReport, type NpsReport } from "@/lib/nps.functions";
 import { getAuditLog, type AuditEntry } from "@/lib/audit.functions";
 import { getPaymentIncidents, type PaymentIncidentsReport } from "@/lib/payments.functions";
@@ -67,6 +69,12 @@ export function CrescimentoTab() {
 
   return (
     <div className="space-y-6">
+      {/* ⚠️ **O FUNIL DA INDICAÇÃO VEM PRIMEIRO**, e não no fim da aba. As nove
+          mudanças desta leva existem para trazer gente; sem este bloco, nenhuma
+          delas pode ser julgada — e a decisão de manter, cortar ou ampliar cada
+          uma seria no escuro. */}
+      <FunilDaIndicacao />
+
       {/* Forecast */}
       <Panel
         title="Previsão de receita (MRR)"
@@ -1266,5 +1274,71 @@ Authorization: Bearer dtk_...
         </pre>
       </Panel>
     </div>
+  );
+}
+
+/**
+ * O FUNIL DA INDICAÇÃO — quatro degraus, e um deles diz "não medido".
+ *
+ * ⚠️ **"Não medido" NÃO vira zero.** O primeiro degrau (quantas pessoas abriram
+ * o link) não tem como ser provado pelo estado: o código fica no navegador e só
+ * vira linha quando a conta é criada. Um número inventado ali faria todas as
+ * taxas abaixo mentirem juntas — e este painel existe justamente para decidir
+ * sobre elas. A régua está em `funil-de-indicacao.ts`.
+ */
+function FunilDaIndicacao() {
+  const [f, setF] = useState<Funil | null>(null);
+  const [carregando, setCarregando] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await getFunilDeIndicacao({ data: { accessToken: await adminToken() } });
+        if (r.ok && r.funil) setF(r.funil);
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, []);
+
+  if (carregando) return <div className="skeleton h-40 rounded-3xl" />;
+  if (!f) return null;
+
+  const criaram = f.degraus.find((d) => d.chave === "criaram")?.quantos ?? null;
+
+  return (
+    <Panel
+      title="Funil da indicação"
+      subtitle={`${f.comCodigo} pacientes já têm código para convidar`}
+    >
+      <div className="space-y-3">
+        {f.degraus.map((d) => {
+          const t =
+            d.chave === "criaram" || d.chave === "abriram" ? null : taxa(criaram, d.quantos);
+          return (
+            <div key={d.chave} className="rounded-2xl border border-border p-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-sm font-semibold">{d.rotulo}</span>
+                <span className="shrink-0 text-right text-sm tabular-nums">
+                  {d.quantos === null ? (
+                    <em className="not-italic text-muted-foreground">{SEM_MEDIDA}</em>
+                  ) : (
+                    <>
+                      <strong className="text-base">{d.quantos}</strong>
+                      {t !== null && <span className="ml-1.5 text-muted-foreground">{t}%</span>}
+                    </>
+                  )}
+                </span>
+              </div>
+              {/* ⚠️ A linha do "como foi contado" não é enfeite: é ela que
+                  impede alguém de ler "publicaram: 12" como "12 posts" e
+                  decidir sobre uma métrica que nunca existiu. */}
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                {d.comoFoiContado}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }

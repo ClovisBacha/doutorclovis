@@ -570,3 +570,93 @@ export const getChurnAlerts = createServerFn({ method: "POST" })
     };
     return { ok: true as const, result };
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O FUNIL DA INDICAÇÃO
+   A régua (e o que ele NÃO mede) mora em `src/lib/funil-de-indicacao.ts`.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantas contas vieram por convite, e o que elas fizeram depois.
+ *
+ * ⚠️ **Super-admin, como todo o resto deste arquivo.** É o retrato do
+ * crescimento da plataforma inteira; nenhum médico e nenhuma criadora vê isto.
+ *
+ * ⚠️ **Contagens com `head: true`, e nunca as listas.** O funil precisa de
+ * números — carregar as linhas traria para a memória do servidor os nomes e os
+ * uuids de todas as pacientes indicadas, para desenhar quatro barras.
+ */
+export const getFunilDeIndicacao = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Falha ao contar devolve ZERO, e não derruba o painel — mesma decisão
+       de `safe()` no resto do arquivo. Um degrau a menos é melhor que a tela
+       inteira em branco; e o `comoFoiContado` de cada degrau já diz o que ele
+       significa. */
+    const conta = async (montar: (q: any) => any): Promise<number> => {
+      const r = await safe(
+        async () =>
+          await montar(sb.from("patient_profiles").select("id", { count: "exact", head: true })),
+        { count: 0 } as { count: number | null },
+      );
+      return (r as { count: number | null })?.count ?? 0;
+    };
+
+    const [porAmiga, porCriadora, comCodigo] = await Promise.all([
+      conta((q) => q.not("referred_by", "is", null)),
+      conta((q) => q.not("ref_code", "is", null)),
+      conta((q) => q.not("referral_code", "is", null)),
+    ]);
+
+    /* ⚠️ **Os dois degraus de baixo precisam do CRUZAMENTO**, e o PostgREST não
+       faz junção entre tabelas numa contagem. A saída é ler só os IDS das
+       indicadas (uuid e mais nada) e intersectar com os autores de posts e com
+       quem segue alguém. É o mínimo que responde à pergunta — e continua sem
+       trazer nome nenhum. */
+    const indicadas = new Set<string>();
+    await safe(async () => {
+      const { data: linhas } = await sb
+        .from("patient_profiles")
+        .select("id")
+        .or("referred_by.not.is.null,ref_code.not.is.null")
+        .limit(MAX_ROWS);
+      for (const l of (linhas ?? []) as { id: string }[]) indicadas.add(l.id);
+      return null;
+    }, null);
+
+    const comAlgum = async (tabela: string, coluna: string): Promise<Set<string>> => {
+      const fora = new Set<string>();
+      await safe(async () => {
+        const { data: linhas } = await sb.from(tabela).select(coluna).limit(MAX_ROWS);
+        for (const l of (linhas ?? []) as Record<string, string>[]) {
+          const id = l[coluna];
+          if (id) fora.add(id);
+        }
+        return null;
+      }, null);
+      return fora;
+    };
+
+    const [autores, seguidores] = await Promise.all([
+      comAlgum("rede_posts", "autor_id"),
+      comAlgum("rede_seguidores", "seguidor_id"),
+    ]);
+
+    let publicaram = 0;
+    let conectaram = 0;
+    for (const id of indicadas) {
+      if (autores.has(id)) publicaram += 1;
+      if (seguidores.has(id)) conectaram += 1;
+    }
+
+    const { montarFunil } = await import("@/lib/funil-de-indicacao");
+    return {
+      ok: true as const,
+      funil: montarFunil({ porAmiga, porCriadora, publicaram, conectaram, comCodigo }),
+    };
+  });
