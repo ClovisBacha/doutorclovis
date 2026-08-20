@@ -95,6 +95,9 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null`, como todos os outros. `""` = a live marcada para daqui a
        pouco (o caso comum), `agora` = ao vivo, `nao` = sem live nenhuma. */
     live: q.live == null ? "" : String(q.live),
+    /* ⚠️ `== null`, como todos. `""` = filtro desligado, `1` = ligado com
+       gente, `vazio` = ligado e sem ninguém (o estado que precisa ter saída). */
+    fase: q.fase == null ? "" : String(q.fase),
     voto: q.voto == null ? 0 : Number(q.voto),
     comparar: q.comparar == null ? 1 : Number(q.comparar),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
@@ -264,6 +267,7 @@ function Bancada() {
     rascunho,
     retro,
     live,
+    fase,
     voto,
     comparar,
     selo,
@@ -862,7 +866,7 @@ function Bancada() {
              ela; `?vazio=1` mostra a conta nova, em que a fileira de pessoas é
              a única coisa na tela. */
           sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
-          pessoas={semSugestoes ? [] : GENTE}
+          pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
           aoSeguirPessoa={(id) => console.log("seguiria", id)}
           /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
              nasce no servidor — sem a bancada, olhar este cartão exigiria uma
@@ -933,6 +937,13 @@ function Bancada() {
              uma live real com data no futuro — que é como um cartão passa
              meses sem ninguém nunca ter visto. `?live=agora` mostra o estado
              "ao vivo". */
+          /* ⚠️ O recorte por fase é decidido no SERVIDOR (ele lê a DUM de cada
+             candidata), então sem a bancada o interruptor e o vazio dele
+             seriam impossíveis de olhar sem duas contas reais com DUMs
+             diferentes. `?fase=1` liga; `?fase=vazio` mostra o estado em que
+             ninguém corresponde — que é o que precisa continuar tendo saída. */
+          mesmaFase={fase !== ""}
+          aoTrocarFase={() => {}}
           live={
             live === "nao"
               ? null
@@ -946,7 +957,11 @@ function Bancada() {
           }
           aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
           aoIrParaOJogo={() => alert("iria para o Caminho")}
-          temMais={!vazio && paginas < 3}
+          /* ⚠️ Com `?fase=`, a bancada encerra a paginação: a fileira de
+             sugeridas (e o interruptor do recorte) só aparece quando o feed
+             acaba, e rolar três páginas para conferir um interruptor é como
+             uma tela passa meses sem ninguém nunca ter olhado. */
+          temMais={!vazio && paginas < 3 && fase === ""}
           aoChegarNoFim={() => {
             setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
             setPaginas((n) => n + 1);

@@ -83,6 +83,7 @@ import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
 import type { Momento } from "@/lib/momento";
 import { SELO_OFICIAL } from "@/lib/conta-oficial";
 import { liveDoTopo, quandoAcontece, type LiveNoTopo } from "@/lib/proxima-live";
+import { ROTULO_DO_FILTRO, VAZIO_DO_FILTRO } from "@/lib/fase-parecida";
 import { esquecerMomento, lerMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { momentoComoDataUrl } from "@/lib/share-card";
 import { hapticTap } from "@/lib/haptics";
@@ -1267,6 +1268,8 @@ export function TelaPrincipal({
   temMais = false,
   desafio,
   live,
+  mesmaFase = false,
+  aoTrocarFase,
   aoEntrarNoDesafio,
   aoIrParaOJogo,
   convite,
@@ -1342,6 +1345,9 @@ export function TelaPrincipal({
   aoVer?: (id: string) => void;
   /** A próxima live do médico dela — ver `proxima-live.ts`. `null` é o normal. */
   live?: LiveNoTopo | null;
+  /** O recorte por fase nas sugeridas — ver `fase-parecida.ts`. */
+  mesmaFase?: boolean;
+  aoTrocarFase?: (v: boolean) => void;
   aoChegarNoFim?: () => void;
   /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
   temMais?: boolean;
@@ -1474,15 +1480,22 @@ export function TelaPrincipal({
           escolheu, num app de gestação de alto risco, faz a paciente ler um
           relato duro sem saber se veio de uma amiga ou de uma estranha. Com o
           aviso no meio, tudo que está abaixo dele tem procedência. */}
-      {!temMais && (pessoas.length > 0 || sugestoes.length > 0) && (
+      {/* ⚠️ `mesmaFase` entra nas DUAS condições, e isso não é detalhe: com o
+          filtro ligado e ninguém correspondendo, `pessoas` fica vazia — e sem
+          esta cláusula a fileira INTEIRA sumia, levando junto o interruptor que
+          a desligaria. Beco sem saída, exatamente o que a aba de assinatura já
+          pagou uma vez. */}
+      {!temMais && (pessoas.length > 0 || sugestoes.length > 0 || mesmaFase) && (
         <>
           {posts.length > 0 && <EmDia />}
 
-          {pessoas.length > 0 && (
+          {(pessoas.length > 0 || mesmaFase) && (
             <FileiraDePessoas
               pessoas={pessoas}
               aoSeguir={aoSeguirPessoa}
               aoAbrirPerfil={aoAbrirPerfil}
+              mesmaFase={mesmaFase}
+              aoTrocarFase={aoTrocarFase}
             />
           )}
 
@@ -1712,10 +1725,16 @@ function FileiraDePessoas({
   pessoas,
   aoSeguir,
   aoAbrirPerfil,
+  mesmaFase = false,
+  aoTrocarFase,
 }: {
   pessoas: PessoaNaLista[];
   aoSeguir?: (id: string) => void;
   aoAbrirPerfil?: (id: string) => void;
+  /** O recorte por fase está ligado? Ver `fase-parecida.ts`. */
+  mesmaFase?: boolean;
+  /** Sem ele o interruptor não aparece — nunca um botão que não faz nada. */
+  aoTrocarFase?: (v: boolean) => void;
 }) {
   /* Quem ela acabou de seguir. ⚠️ O cartão NÃO some: sumir no toque tira da
      tela a única confirmação de que o toque funcionou, e ela toca de novo. */
@@ -1724,6 +1743,46 @@ function FileiraDePessoas({
   return (
     <section className="border-b border-border py-4">
       <h2 className="pb-2 text-[14px] font-semibold">Sugestões para você</h2>
+
+      {/* ⚠️ **O RÓTULO FALA DA FASE DELA, nunca das outras.** "Gestantes do 3º
+          trimestre" anunciaria, para quem lesse a tela por cima do ombro dela,
+          em que trimestre ela está — e `mostrar_semana` existe exatamente para
+          essa decisão ser dela. "Parecida com a sua" diz a mesma coisa e não
+          conta nada de ninguém.
+
+          ⚠️ E NINGUÉM É ROTULADO na fileira: a fase recorta o que ela vê, e não
+          aparece em cartão nenhum. É a diferença entre um recorte e um GRUPO. */}
+      {aoTrocarFase && (
+        <button
+          type="button"
+          role="switch"
+          aria-checked={mesmaFase}
+          onClick={() => aoTrocarFase(!mesmaFase)}
+          className="press mb-3 flex w-full items-center gap-2.5 rounded-full border border-border px-3 py-2 text-left"
+        >
+          <span
+            aria-hidden
+            className={`h-5 w-9 shrink-0 rounded-full transition-colors ${
+              mesmaFase ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`block h-4 w-4 rounded-full bg-white shadow transition-transform ${
+                mesmaFase ? "translate-x-[18px] translate-y-0.5" : "translate-x-0.5 translate-y-0.5"
+              }`}
+            />
+          </span>
+          <span className="min-w-0 flex-1 truncate text-[12.5px]">{ROTULO_DO_FILTRO}</span>
+        </button>
+      )}
+
+      {/* ⚠️ Ligado e sem ninguém é um resultado LEGÍTIMO, e o vazio EXPLICA a
+          régua — como o vazio da busca. Cair de volta na lista completa faria o
+          interruptor parecer quebrado e entregaria justamente quem ela pediu
+          para não ver. */}
+      {mesmaFase && pessoas.length === 0 && (
+        <p className="pb-2 text-[12.5px] leading-snug text-muted-foreground">{VAZIO_DO_FILTRO}</p>
+      )}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pessoas.map((p) => {
           const jaSegue = seguidas.has(p.id);
@@ -2642,6 +2701,10 @@ export function RedeNoApp({
      ausente ou lista vazia devolvem `null`, que é o caso NORMAL — na maioria
      dos dias não há live marcada, e o topo do feed é dos stories. */
   const [live, setLive] = useState<LiveNoTopo | null>(null);
+  /* O recorte por fase nas sugeridas. ⚠️ Desligado por padrão: o recorte é uma
+     escolha dela, e um filtro ligado sozinho esconderia gente sem que ela
+     soubesse por quê. */
+  const [mesmaFase, setMesmaFase] = useState(false);
   /* A caixinha: as perguntas dela e a chave. `naCaixa` alimenta o emblema da
      bolinha, e por isso é carregado JUNTO com o feed — um número que só
      chegasse ao abrir a caixa nasceria sempre zerado, e ninguém abriria. */
@@ -3529,14 +3592,17 @@ export function RedeNoApp({
     }
   }
 
-  async function carregarSugestoes() {
-    if (sugestoesPedidas.current) return;
+  async function carregarSugestoes(fase = mesmaFase) {
+    /* ⚠️ A trava é de PRIMEIRA CARGA, e trocar o filtro precisa furá-la: sem
+       isso o interruptor mudaria a chave e a lista continuaria a mesma, que é
+       um botão que não faz nada. */
+    if (sugestoesPedidas.current && fase === mesmaFase) return;
     sugestoesPedidas.current = true;
     try {
       const t = await token();
       if (!t) return;
       const { sugestoesDoFeed } = await import("@/lib/rede-social.functions");
-      const r = await sugestoesDoFeed({ data: { accessToken: t } });
+      const r = await sugestoesDoFeed({ data: { accessToken: t, mesmaFase: fase } });
       if (!r.ok) return;
       setSugestoes(r.posts);
       setPessoas(r.pessoas);
@@ -4532,6 +4598,11 @@ export function RedeNoApp({
         temMais={!!proximo}
         desafio={desafio}
         live={live}
+        mesmaFase={mesmaFase}
+        aoTrocarFase={(v) => {
+          setMesmaFase(v);
+          void carregarSugestoes(v);
+        }}
         aoEntrarNoDesafio={entrarNoDesafio}
         aoIrParaOJogo={onIrParaOJogo}
         sugestoes={sugestoes}

@@ -2281,7 +2281,11 @@ async function elosEmComum(sb: any, quemEuSigo: string[]): Promise<Map<string, n
 
 /** As colunas que a zona de sugestões lê da candidata. */
 const COLUNAS_DA_CANDIDATA =
-  "id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at, conta_oficial";
+  "id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at, conta_oficial, " +
+  /* ⚠️ **AS DATAS SERVEM PARA ORDENAR, E NUNCA VIAJAM.** A fase é calculada
+     aqui, no servidor, e o que sai para o cliente é a LISTA já recortada — o
+     número da semana de ninguém sai desta função. Ver `fase-parecida.ts`. */
+  "lmp_date, reference_date, reference_weeks, reference_days, birth_date";
 
 /**
  * As candidatas a sugestão, com recuo para banco sem `conta_oficial`.
@@ -2340,7 +2344,21 @@ function naFileira(perfil: any): PessoaNaLista {
  * nunca é sugerida para si mesma.
  */
 export const sugestoesDoFeed = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /**
+         * Só quem está numa fase parecida com a dela.
+         *
+         * ⚠️ Opcional e DESLIGADO por padrão: o recorte é uma escolha dela, e
+         * um filtro ligado sozinho esconderia gente sem que ela soubesse por
+         * quê.
+         */
+        mesmaFase: z.boolean().optional(),
+      })
+      .parse(i),
+  )
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
     if (!eu) return { ok: false as const, motivo: "sessao" as const };
@@ -2373,11 +2391,44 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
        porta dos fundos da busca. */
     const publicos = await candidatasPublicas(sb);
 
-    const candidatas = ((publicos ?? []) as any[]).filter(
+    const podeAparecer = ((publicos ?? []) as any[]).filter(
       (p) =>
         !fora(p.id) &&
         podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: !!p.care_mode }),
     );
+
+    /* ─── ⚠️ O RECORTE POR FASE ──────────────────────────────────────────────
+       Fase é biografia; diagnóstico é prontuário — e por isso o filtro é por
+       FASE e nunca por condição clínica (ver `fase-parecida.ts`).
+
+       ⚠️ **A fase é calculada AQUI e não sai daqui.** As datas entram no select
+       só para ordenar; o que viaja ao cliente é a lista já recortada, e o
+       número da semana de ninguém acompanha. Um "grupo da reta final" com lista
+       visível contaria a fase de cada uma que está lá, desfazendo pela lateral
+       a chave `mostrar_semana`.
+
+       ⚠️ **Ligado e sem ninguém é um resultado LEGÍTIMO**, e a tela explica.
+       Cair de volta na lista completa faria o interruptor parecer quebrado — e,
+       pior, entregaria justamente as pessoas que ela pediu para não ver. */
+    const candidatas = !data.mesmaFase
+      ? podeAparecer
+      : await (async () => {
+          const { computeGestation } = await import("@/lib/gestacao");
+          const { faseDe, mesmaFase } = await import("@/lib/fase-parecida");
+          const faseDaLinha = (p: any): ReturnType<typeof faseDe> => {
+            const g = computeGestation({
+              lmp: p?.lmp_date ?? null,
+              referenceDate: p?.reference_date ?? null,
+              referenceWeeks: p?.reference_weeks ?? null,
+              referenceDays: p?.reference_days ?? null,
+              today: hojeEmSaoPaulo(),
+            });
+            return faseDe(g?.weeks ?? null, !!p?.birth_date);
+          };
+          const eusPerfis = await perfisPorId(sb, [eu]);
+          const minha = faseDaLinha(eusPerfis.get(eu));
+          return podeAparecer.filter((p) => mesmaFase(minha, faseDaLinha(p)));
+        })();
     if (candidatas.length === 0) {
       return { ok: true as const, posts: [], sugeridos: [] as string[], pessoas: [] };
     }
