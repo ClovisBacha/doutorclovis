@@ -2499,8 +2499,21 @@ export function RedeNoApp({
       const t = await token();
       if (!t) return;
       const { tirarMinhaMarcacao } = await import("@/lib/rede-social.functions");
-      await tirarMinhaMarcacao({ data: { accessToken: t, postId: post.id } });
+      const r = await tirarMinhaMarcacao({ data: { accessToken: t, postId: post.id } });
+      /* ⚠️ **RECUSA NÃO É SILÊNCIO AQUI.** A tela já tinha tirado o nome dela do
+         post (otimista, que é o certo), e um `ok: false` deixava a mentira na
+         tela: ela via "com Fulana" sem o próprio nome e ia embora achando que
+         tinha saído da foto. Tirar uma marcação é a defesa dela contra aparecer
+         onde não quer — é o único lugar da tela onde falhar em silêncio é
+         pior que um toast. */
+      if (!r.ok) {
+        const { toast } = await import("sonner");
+        toast.error("Não deu para tirar a marcação. Tente de novo.");
+        void carregarFeed();
+      }
     } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para tirar a marcação. Tente de novo.");
       void carregarFeed();
     }
   }
@@ -3177,6 +3190,11 @@ export function RedeNoApp({
       ps.map((x) => (x.id === post.id ? { ...x, salvo: salvar } : x));
     setPosts(aplicar);
     setDoPerfil(aplicar);
+    /* ⚠️ E a zona de SUGERIDOS também, que ficava de fora: o servidor gravava
+       e o marcador do cartão não mudava. Salvar a publicação de uma
+       desconhecida é justamente o gesto que a zona existe para provocar, e a
+       tela respondia como se nada tivesse acontecido. */
+    setSugestoes(aplicar);
     setOPost((x) => (x ? aplicar([x])[0] : x));
     /* Tirar dos salvos com a lista aberta some da lista; guardar não a
        preenche, porque a lista vem ordenada do servidor. */
@@ -3390,9 +3408,21 @@ export function RedeNoApp({
           perguntaAberta,
         },
       });
-      if (r.ok) void carregarFeed();
+      if (r.ok) {
+        void carregarFeed();
+        return;
+      }
+      /* ⚠️ **A RECUSA PRECISA CHEGAR, e ela era engolida.** O story passa pela
+         MESMA régua clínica do post — e o `!r.ok` caía num `if` sem `else`: a
+         tela de conferência fechava, a fileira não mudava, e nada dizia nada.
+         Ela concluía que o app tinha travado e mandava de novo, com o mesmo
+         texto, para sempre. O recado vem do SERVIDOR pela mesma razão do
+         publicar: decidir aqui por que foi recusado seria uma segunda régua. */
+      const { toast } = await import("sonner");
+      toast.error(("recado" in r && r.recado) || "Não deu para publicar o story. Tente de novo.");
     } catch {
-      /* A fileira não muda; ela tenta de novo. */
+      const { toast } = await import("sonner");
+      toast.error("Não deu para publicar o story. Tente de novo.");
     }
   }
 
@@ -4332,13 +4362,22 @@ export function VisorDeStory({
        story passa por baixo da folha e ela fecha a lista para ler a foto
        seguinte — ou pior, a confirmação de apagar fica em pé sobre um story que
        já não é o que ela mandou apagar. */
-    if (pausado || quemViu || confirmando || !atual) return;
+    /* ⚠️ **A ENQUETE PAUSA O RELÓGIO enquanto ela não votou** — o comentário do
+       bloco da enquete prometia isso e nada o fazia: só a caixinha pausava, no
+       `onFocus` do campo. Ler quatro opções e escolher leva mais que os cinco
+       segundos do story, e a enquete trocava de foto debaixo do dedo dela.
+       Depois do voto o relógio volta: ela já viu o resultado, e travar a tela
+       para sempre seria trocar um defeito por outro. As metades de avançar
+       continuam funcionando, então nunca há como ficar presa. */
+    const enqueteEsperando =
+      !!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null;
+    if (pausado || quemViu || confirmando || enqueteEsperando || !atual) return;
     const t = setTimeout(() => {
       if (i + 1 < bolha.stories.length) setI(i + 1);
       else aoFechar();
     }, DURACAO_DO_STORY);
     return () => clearTimeout(t);
-  }, [i, pausado, quemViu, confirmando, atual?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [i, pausado, quemViu, confirmando, atual?.id, voteiAgora]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!atual) return null;
 
@@ -4358,7 +4397,16 @@ export function VisorDeStory({
                    sozinha e chegaria ao fim antes da foto trocar. */
                 animation:
                   n === i ? `dc-story-barra ${DURACAO_DO_STORY}ms linear forwards` : undefined,
-                animationPlayState: pausado || quemViu || confirmando ? "paused" : "running",
+                /* A barrinha para JUNTO com o relógio — se ela continuasse
+                   correndo, chegaria ao fim antes de a foto trocar, que lê
+                   como travamento. */
+                animationPlayState:
+                  pausado ||
+                  quemViu ||
+                  confirmando ||
+                  (!!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null)
+                    ? "paused"
+                    : "running",
               }}
             />
           </span>
@@ -4453,8 +4501,17 @@ export function VisorDeStory({
                     <span className="relative flex items-center gap-2 px-4 py-2.5">
                       <span className="min-w-0 flex-1 truncate">{op}</span>
                       {jaVotou && (
+                        /* ⚠️ **NÚMERO junto da porcentagem, e não a porcentagem
+                           sozinha.** "67%" são dois votos de três, e numa base
+                           pequena a porcentagem transforma três pessoas numa
+                           maioria. O post do feed já dizia os dois desde o
+                           primeiro dia; o story dizia só a fração — a mesma
+                           enquete contando duas histórias em duas telas. */
                         <span className="shrink-0 text-[13px] tabular-nums opacity-90">
                           {fatia}%
+                          <span className="ml-1 font-normal opacity-75">
+                            ({rotuloDeVotos(votos)})
+                          </span>
                         </span>
                       )}
                     </span>
@@ -4991,8 +5048,21 @@ export function NovoPost({
      gravação no `localStorage` — que é SÍNCRONA e bloqueia a linha principal.
      Num texto de trezentos caracteres seriam trezentas gravações, e o teclado
      começa a engasgar antes do fim da frase. */
+  /* ⚠️ **A PRIMEIRA PASSADA NÃO GRAVA — e sem isto o compositor APAGAVA o
+     rascunho ao abrir.** O efeito roda na montagem com os campos vazios;
+     700 ms depois `paraGuardar` devolvia `guardar: false` (rascunho vazio
+     apaga, que é a regra certa) e o `localStorage` era limpo. A faixa "você
+     tinha um rascunho" continuava na tela porque o texto já estava em memória
+     — então quem tocasse em "Recuperar" na hora não via nada de errado, e quem
+     fechasse a tela para voltar depois perdia o texto para sempre. O defeito
+     mais silencioso possível: a única prova sumia junto. */
+  const primeiraPintura = useRef(true);
   useEffect(() => {
     if (!aoMudarRascunho) return;
+    if (primeiraPintura.current) {
+      primeiraPintura.current = false;
+      return;
+    }
     const id = setTimeout(() => {
       aoMudarRascunho({
         texto,

@@ -955,3 +955,70 @@ describe("o post comparado", () => {
     expect(recuo).toContain("imagem_path: caminho");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OS SEIS DEFEITOS MÉDIOS DA MESMA AUDITORIA
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("a marcação respeita o bloqueio", () => {
+  /* ⚠️ O bloqueio some com a pessoa inteira, nos dois sentidos — mas a linha
+     "com Fulana" embaixo da foto de uma TERCEIRA continuava dizendo o nome
+     dela, e o toque abria o perfil. Bloquear não pode ser uma proteção que a
+     marcação de outra pessoa desfaz. */
+  test("⚠️ `marcacoesDe` recebe e aplica o conjunto de bloqueio", () => {
+    const i = CODIGO.indexOf("async function marcacoesDe");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = CODIGO.slice(i, CODIGO.indexOf("async function montarPosts"));
+    expect(corpo).toContain("bloqueio: { has(id: string): boolean }");
+    expect(corpo).toContain("if (bloqueio.has(l.quem_id)) continue;");
+    /* E o Modo Cuidado continua ao lado — são dois portões, não um. */
+    expect(corpo).toContain("p.care_mode");
+  });
+
+  test("⚠️ e quem passa é o `ctx.bloqueio` de quem está vendo", () => {
+    const corpo = CODIGO.slice(CODIGO.indexOf("async function montarPosts"));
+    const i = corpo.indexOf("marcacoesDe(");
+    expect(i).toBeGreaterThan(-1);
+    expect(corpo.slice(i, i + 160)).toContain("ctx.bloqueio");
+  });
+});
+
+describe("editar o próprio post", () => {
+  const corpo = corpoDe("editarPost");
+
+  /* ⚠️ `enquete_opcoes` nasce num APLICAR_ que o dono roda à mão. Sem recuo, o
+     PostgREST recusava o SELECT inteiro, `antes` vinha `null` e a paciente
+     recebia "esta publicação não é sua" SOBRE O PRÓPRIO POST — um erro de
+     banco vestido de acusação de propriedade. */
+  test("⚠️ a leitura de propriedade tem recuo por coluna ausente", () => {
+    expect(corpo).toContain('lerAntes("imagem_path, enquete_opcoes")');
+    expect(corpo).toContain('lerAntes("imagem_path")');
+  });
+
+  test('⚠️ falhar nas duas é "banco", nunca "nao_e_seu"', () => {
+    const i = corpo.indexOf('lerAntes("imagem_path")');
+    const depois = corpo.slice(i, corpo.indexOf("const temEnquete"));
+    /* A ordem importa: o `banco` tem de vir ANTES do `nao_e_seu`, senão um
+       erro de leitura continua saindo como acusação. */
+    expect(depois.indexOf('motivo: "banco"')).toBeGreaterThan(-1);
+    expect(depois.indexOf('motivo: "banco"')).toBeLessThan(depois.indexOf('motivo: "nao_e_seu"'));
+  });
+});
+
+describe("o selo do médico na lista de quem reagiu", () => {
+  const corpo = corpoDe("quemReagiuAoPost");
+
+  /* ⚠️ O mapa era montado só com QUEM REAGIU, e logo abaixo se lia
+     `perfis.get(eu)?.doctor_id`: `meuMedico` era `null` sempre, a menos que ela
+     tivesse reagido ao próprio post. O selo — o ponto inteiro desta tela — não
+     saía nunca. */
+  test("⚠️ `eu` entra na consulta de perfis, senão o vínculo nunca é achado", () => {
+    expect(corpo).toContain("perfisPorId(sb, [eu, ...cruas.map((l) => l.quem_id)])");
+    expect(corpo).toContain("perfis.get(eu) as any)?.doctor_id");
+  });
+
+  /* E o médico continua entrando pela porta dele: ele não tem linha em
+     `patient_profiles`, e sem isto a reação dele sumiria da lista. */
+  test("o nome do médico vem de `doctors`, não do perfil de paciente", () => {
+    expect(corpo).toContain('.from("doctors")');
+  });
+});

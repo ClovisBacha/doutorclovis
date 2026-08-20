@@ -695,6 +695,7 @@ async function idsMarcadosDe(sb: any, quem: string): Promise<string[]> {
 async function marcacoesDe(
   sb: any,
   postIds: string[],
+  bloqueio: { has(id: string): boolean },
 ): Promise<Map<string, { id: string; nome: string }[]>> {
   const fora = new Map<string, { id: string; nome: string }[]>();
   if (postIds.length === 0) return fora;
@@ -716,6 +717,12 @@ async function marcacoesDe(
        voltar, a marcação volta com ela — é a mesma decisão da dupla das Amigas,
        que some dos dois lados sem apagar a linha. */
     if (!p || p.care_mode) continue;
+    /* ⚠️ **E O BLOQUEIO TAMBÉM, que faltava.** O bloqueio vale nos DOIS
+       sentidos e some com a pessoa inteira — mas a linha "com Fulana" embaixo
+       da foto de uma terceira continuava dizendo o nome dela, e o toque abria
+       o perfil. Bloquear não pode ser uma proteção que a marcação de outra
+       pessoa desfaz. */
+    if (bloqueio.has(l.quem_id)) continue;
     const nome = (p.display_name ?? "").trim() || "Alguém";
     fora.set(l.post_id, [...(fora.get(l.post_id) ?? []), { id: l.quem_id, nome }]);
   }
@@ -764,6 +771,7 @@ async function montarPosts(
     marcacoesDe(
       sb,
       visiveis.map((p) => p.id),
+      ctx.bloqueio,
     ),
   ]);
 
@@ -1815,12 +1823,23 @@ export const editarPost = createServerFn({ method: "POST" })
        texto vazio sem imagem; apagar a legenda de um post que é só texto
        deixaria uma linha no feed sem nada dentro. Quem quer tirar o post do ar
        usa arquivar, que é a porta certa e reversível. */
-    const { data: antes } = await sb
-      .from("rede_posts")
-      .select("imagem_path, enquete_opcoes")
-      .eq("id", data.postId)
-      .eq("autor_id", eu)
-      .maybeSingle();
+    /* ⚠️ **RECUO POR COLUNA AUSENTE, e aqui ele mente de um jeito específico.**
+       `enquete_opcoes` nasce num `APLICAR_` que o dono roda à mão, e o PostgREST
+       recusa o SELECT INTEIRO por causa dela: `antes` vinha `null` e a paciente
+       recebia "esta publicação não é sua" **sobre o próprio post**. Um erro de
+       banco vestido de acusação de propriedade é a pior tradução possível. */
+    const lerAntes = async (colunas: string) =>
+      await sb
+        .from("rede_posts")
+        .select(colunas)
+        .eq("id", data.postId)
+        .eq("autor_id", eu)
+        .maybeSingle();
+    let leitura = await lerAntes("imagem_path, enquete_opcoes");
+    if (leitura.error) leitura = await lerAntes("imagem_path");
+    /* Falha nas DUAS não é "não é seu": é banco. */
+    if (leitura.error) return { ok: false as const, motivo: "banco" as const };
+    const antes = leitura.data;
     if (!antes) return { ok: false as const, motivo: "nao_e_seu" as const };
     const temEnquete = (((antes as any).enquete_opcoes ?? []) as string[]).length > 0;
     if (!temEnquete && !postEhValido({ texto, temImagem: !!(antes as any).imagem_path })) {
@@ -3246,10 +3265,13 @@ export const quemReagiuAoPost = createServerFn({ method: "POST" })
       .limit(200);
 
     const cruas = (linhas ?? []) as { quem_id: string; tipo: string }[];
-    const perfis = await perfisPorId(
-      sb,
-      cruas.map((l) => l.quem_id),
-    );
+    /* ⚠️ **`eu` ENTRA NA LISTA, e sem isso o selo do médico nunca aparecia.**
+       O mapa era montado só com QUEM REAGIU, e logo abaixo se lia
+       `perfis.get(eu)?.doctor_id` para descobrir quem é o obstetra dela — que
+       só existiria no mapa se ela tivesse reagido ao próprio post. Na prática
+       `meuMedico` era `null` sempre, e o selo, que é o ponto inteiro desta
+       tela, não saía nunca. Custa um id a mais na MESMA consulta. */
+    const perfis = await perfisPorId(sb, [eu, ...cruas.map((l) => l.quem_id)]);
 
     /* ─── O SELO DO MÉDICO ─────────────────────────────────────────────────
        ⚠️ **Resolvido pelo VÍNCULO ATUAL** (`patient_profiles.doctor_id` DELA),
