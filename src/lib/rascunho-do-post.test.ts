@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   chaveDoRascunho,
   ehRascunhoUtil,
@@ -122,10 +123,46 @@ describe("as fotos", () => {
      nos ~5 MB de cota, e o que quebra quando a cota estoura é a PRÓXIMA
      gravação de qualquer coisa — incluindo o `journey_state`, que carrega a
      jornada inteira dela. */
-  test("⚠️ NÃO existem no rascunho", () => {
+  /* ⚠️ **A PRIMEIRA VERSÃO DESTE TESTE ERA TAUTOLÓGICA** — ela olhava as
+     chaves do `base()` do próprio arquivo de teste, então provava que o teste
+     não escreve `fotos`, e nada sobre o app. Mutação que ficava VERDE:
+     acrescentar `fotos?: string[]` ao tipo e passar `fotos` no objeto do efeito
+     do compositor. O campo opcional não quebra `base()`, o excess-property
+     check não dispara porque o campo passa a existir no tipo, e dez data URLs
+     de ~300 KB entram no `localStorage` — encostando na cota de ~5 MB, cuja
+     vítima é a PRÓXIMA gravação de qualquer coisa, inclusive o `journey_state`
+     que carrega a jornada inteira dela. Agora quem é medido é o COMPOSITOR. */
+  test("⚠️ NÃO existem no rascunho — nem no tipo, nem no que é guardado", () => {
     const campos = Object.keys(base());
     expect(campos).not.toContain("fotos");
     expect(campos).not.toContain("imagens");
     expect(JSON.stringify(base({ texto: "oi" }))).not.toContain("data:image");
+  });
+
+  test("⚠️ e o COMPOSITOR não as manda — é ele quem tem as fotos em mãos", () => {
+    const tela = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    const i = tela.indexOf("aoMudarRascunho({");
+    expect(i).toBeGreaterThan(-1);
+    const chamada = tela.slice(i, tela.indexOf("});", i));
+    /* O que ele manda, e nada além disso. */
+    expect(chamada).toContain("texto,");
+    expect(chamada).not.toContain("fotos");
+    expect(chamada).not.toContain("imagens");
+  });
+
+  /* ⚠️ E o que sai de `paraGuardar` é o que vai para o `localStorage`: uma foto
+     que entrasse pelo objeto seria gravada, por mais que o TIPO não a preveja
+     (o `JSON.stringify` não conhece tipo nenhum). */
+  test("⚠️ `paraGuardar` não deixa passar data URL nenhuma", () => {
+    const comFoto = {
+      ...base({ texto: "oi" }),
+      fotos: ["data:image/jpeg;base64,AAAA"],
+    } as unknown as Parameters<typeof paraGuardar>[0];
+    const r = paraGuardar(comFoto, new Date("2026-08-19T12:00:00Z"));
+    expect(r.guardar).toBe(true);
+    if (r.guardar) {
+      expect(r.texto).not.toContain("data:image");
+      expect(r.texto).not.toContain("fotos");
+    }
   });
 });

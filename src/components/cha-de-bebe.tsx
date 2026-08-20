@@ -41,6 +41,8 @@ export function ChaDeBebe({
   const [dados, setDados] = useState<BancadaDoCha | null>(bancada ?? null);
   const [carregando, setCarregando] = useState(!bancada);
   const [novoTitulo, setNovoTitulo] = useState("");
+  /** O item cuja saída está sendo confirmada. `null` = nenhum. */
+  const [confirmando, setConfirmando] = useState<string | null>(null);
 
   useEffect(() => {
     if (bancada || careMode) {
@@ -158,6 +160,42 @@ export function ChaDeBebe({
     }
   }
 
+  /**
+   * TIRAR um item da lista.
+   *
+   * ⚠️ **`arquivarItem` estava escrita, testada e SEM CHAMADOR desde o
+   * primeiro dia.** Ela podia pôr item e nunca tirar: um "Berço" digitado
+   * errado ficava para sempre no link que trinta pessoas receberam. É a mesma
+   * família de defeito de `proximoDesbloqueio` e das três conquistas da Escola
+   * do Bebê — servidor pronto, porta inexistente.
+   *
+   * ⚠️ **E o servidor RECUSA arquivar item já reservado** — quem prometeu
+   * merece saber antes. A tela diz isso com a palavra certa em vez de "não
+   * deu": um erro genérico aqui faria ela tentar de novo para sempre.
+   */
+  async function tirar(itemId: string) {
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { arquivarItem, minhaLista } = await import("@/lib/presentes.functions");
+      const r = await arquivarItem({ data: { accessToken: token, itemId } });
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "tem-reserva"
+            ? "Alguém já reservou esse item — fale com ela antes de tirar 💛"
+            : "Não deu para tirar o item.",
+        );
+        return;
+      }
+      const novo = await minhaLista({ data: { accessToken: token } });
+      if (novo.ok) setDados({ lista: novo.lista, guardados: novo.guardados });
+      setConfirmando(null);
+    } catch {
+      toast.error("Não deu para tirar o item.");
+    }
+  }
+
   async function acrescentar() {
     const t = novoTitulo.trim();
     if (!t) return;
@@ -269,11 +307,47 @@ export function ChaDeBebe({
             .map((i) => {
               const e = i.tipo === "cota" ? estadoDaCota(i.meta, i.reservado) : null;
               return (
-                <li key={i.id} className="flex items-baseline justify-between gap-2 text-sm">
-                  <span className="min-w-0 flex-1">{i.titulo}</span>
-                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                    {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
-                  </span>
+                <li key={i.id} className="text-sm">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="min-w-0 flex-1">{i.titulo}</span>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
+                    </span>
+                    {/* ⚠️ Alvo de 44px e ✕ desenhado em texto: é o único
+                        controle destrutivo desta tela, e mirar num × de 16px
+                        ao lado do nome do item é pedir para errar. */}
+                    <button
+                      type="button"
+                      onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}
+                      aria-label={`Tirar ${i.titulo} da lista`}
+                      className="press -my-2 shrink-0 px-2 py-2 text-base leading-none text-muted-foreground"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  {/* ⚠️ MENSAGEM SEPARADA, e não o mesmo botão virando "tem
+                      certeza?" — a mesma decisão do cancelar consulta, e pelo
+                      mesmo motivo: o segundo toque no lugar do primeiro
+                      confirma o que ela ainda estava lendo. */}
+                  {confirmando === i.id && (
+                    <div className="mt-1.5 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+                      <span className="min-w-0 flex-1 text-xs">Tirar da lista?</span>
+                      <button
+                        type="button"
+                        onClick={() => void tirar(i.id)}
+                        className="press shrink-0 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground"
+                      >
+                        Tirar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmando(null)}
+                        className="press shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  )}
                 </li>
               );
             })}

@@ -154,3 +154,36 @@ describe("a enquete do story", () => {
     expect(FONTE).toContain("|| enqueteEsperando ||");
   });
 });
+
+describe("a tela de um post só", () => {
+  /* ⚠️ **É o caminho mais provável do "ver quem reagiu", e era o único sem a
+     prop.** A autora abre a grade do próprio perfil e toca num post de duas
+     semanas atrás: o resumo com os emojis vinha desenhado como texto morto,
+     ela tocava no número e nada acontecia. O único caminho vivo era achar o
+     mesmo post rolando o feed cronológico — que depois de algumas páginas não
+     existe mais. */
+  test("⚠️ `TelaDoPost` recebe `aoVerQuemReagiu`", () => {
+    const i = FONTE.indexOf("<TelaDoPost");
+    expect(i).toBeGreaterThan(-1);
+    const tag = FONTE.slice(i, FONTE.indexOf("/>", i));
+    expect(tag).toContain("aoVerQuemReagiu=");
+  });
+});
+
+describe("quem viu o meu story", () => {
+  /* ⚠️ **Falha de leitura virava "Ninguém viu ainda"** — a única recompensa de
+     publicar um story transformada na informação errada, sem nada que a
+     distinguisse de um erro. Mesma régua de `chavesResgatadas` e
+     `contarTrofeus`: falha ao LER nunca vira "não tem". */
+  test("⚠️ `null` é falha e `[]` é ninguém — e a tela distingue os dois", () => {
+    const i = FONTE.indexOf("async function quemViu(");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = FONTE.slice(i, FONTE.indexOf("\n  }\n", i));
+    expect(corpo).toContain("r.ok ? r.gente : null");
+    expect(corpo).not.toContain("return [];");
+    /* E o estado guarda o terceiro caso, senão o `??` volta a achatar. */
+    expect(FONTE).toContain('PessoaNaLista[] | "erro" | null');
+    expect(FONTE).toContain('setQuemViu((await aoQuemViu(atual.id)) ?? "erro")');
+    expect(FONTE).toContain("Não deu para carregar agora.");
+  });
+});

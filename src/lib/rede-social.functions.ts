@@ -1647,7 +1647,6 @@ async function gravarMarcacoes(
 ): Promise<void> {
   if (pedidas.length === 0) return;
   try {
-    const { saoAmigas } = await import("@/lib/amigas.functions");
     const { marcadasPermitidas } = await import("@/lib/marcacoes");
     /* ⚠️ O conjunto de bloqueio vem do MESMO caminho que o feed usa
        (`contextoDe`), e não de uma consulta escrita à mão aqui — duas leituras
@@ -1661,7 +1660,17 @@ async function gravarMarcacoes(
       candidatas.push({
         id,
         souEu: id === eu,
-        somosAmigas: id === eu ? false : await saoAmigas(sb, eu, id),
+        /* ⚠️ **`ctx.amigas`, e NUNCA `saoAmigas` direto — as duas metades do
+           mesmo recurso falhavam para lados opostos.** `saoAmigas` responde
+           pelo `referred_by`, que SOBREVIVE ao encerramento da amizade (o
+           recibo fica de propósito), e não sabe nada de `amizades_encerradas`
+           quando essa leitura falha. `ctx.amigas` já é a lista com as
+           encerradas subtraídas e VAZIA quando degradada — a mesma régua que
+           destranca a camada `amigas` do feed. Sem isto, B encerrava a amizade
+           e A ainda punha o nome dela embaixo de uma foto de barriga, com uma
+           linha em `rede_atividade` — exatamente o vínculo do qual B pediu
+           distância, e sem aviso nenhum. */
+        somosAmigas: id === eu ? false : ctx.amigas.has(id),
         bloqueio: ctx.bloqueio.has(id),
         /* Perfil que não veio conta como indisponível — falhar FECHADO. */
         emCuidado: !p || !!p.care_mode,

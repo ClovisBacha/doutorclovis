@@ -48,6 +48,13 @@ const FONTES = [
      exatamente o que era verdade das sete que a catraca nasceu para pegar. */
   "src/lib/desafio-em-grupo.functions.ts",
   "src/lib/influenciadora.functions.ts",
+  /* ⚠️ **E o chá de bebê ficava de fora, com DUAS funções mortas.**
+     `arquivarItem` (a dona nunca conseguia tirar um item da lista que trinta
+     pessoas já receberam) e `cancelarReserva` (a amiga que tocou no item
+     errado não tinha saída nenhuma) estavam escritas, testadas e sem chamador
+     desde o primeiro dia. A aba do chá é alcançada pela Comunidade, então a
+     catraca da rede é o lugar certo para cobrar. */
+  "src/lib/presentes.functions.ts",
 ];
 
 /** Onde o APP mora. Bancadas e testes ficam de fora — ver o cabeçalho. */

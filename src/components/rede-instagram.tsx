@@ -2109,6 +2109,7 @@ export function RedeNoApp({
   onIrParaOJogo,
   onAbrirSOS,
   aulaDeHoje,
+  sinalDeVoltarAoFeed = 0,
 }: {
   careMode?: boolean;
   onAbrirSecoes?: () => void;
@@ -2129,9 +2130,40 @@ export function RedeNoApp({
    * por `minha-conta`. Sem ela, o compositor simplesmente não oferece o anexo.
    */
   aulaDeHoje?: AulaNoPost | null;
+  /**
+   * Sobe a cada toque no ícone da Comunidade na barra de baixo.
+   *
+   * ⚠️ **É um CONTADOR, nunca um booleano.** Precisa disparar de novo a cada
+   * toque, e um booleano só dispararia uma vez. Ver `onSelect` em
+   * `minha-conta`: de dentro de uma sub-tela o toque caía num `setTab("Feed")`
+   * que já era "Feed", e a tela não se mexia.
+   */
+  sinalDeVoltarAoFeed?: number;
 }) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
+
+  /**
+   * O toque no ícone da Comunidade volta ao começo.
+   *
+   * ⚠️ **A primeira passada não faz nada** (o efeito roda na montagem, quando
+   * ela ACABOU de chegar por outro caminho — pelo hub, por um deep-link, pelo
+   * cartão de presente). Sem a guarda, abrir a aba já num perfil a jogaria
+   * para o feed no primeiro quadro.
+   *
+   * Estando já no feed, só rola para o topo — que é o gesto do modelo, e a
+   * única resposta possível a um toque que "não muda de tela".
+   */
+  const primeiroSinal = useRef(true);
+  useEffect(() => {
+    if (primeiroSinal.current) {
+      primeiroSinal.current = false;
+      return;
+    }
+    setOnde({ t: "feed" });
+    setVendoStory(null);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [sinalDeVoltarAoFeed]);
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
   const [gente, setGente] = useState<PessoaNaLista[]>([]);
@@ -3426,15 +3458,24 @@ export function RedeNoApp({
     }
   }
 
-  async function quemViu(storyId: string): Promise<PessoaNaLista[]> {
+  /**
+   * Quem viu o meu story.
+   *
+   * ⚠️ **`null` é FALHA e `[]` é "ninguém viu" — e os dois eram a mesma coisa.**
+   * Com o 4G oscilando, a folha abria afirmando "Ninguém viu ainda" sobre um
+   * story que oito pessoas já tinham visto: a única recompensa de publicar
+   * virava a informação errada, sem nada que a distinguisse de uma falha. É a
+   * mesma régua de `chavesResgatadas` e de `contarTrofeus` — falha ao LER
+   * nunca pode virar "não tem". */
+  async function quemViu(storyId: string): Promise<PessoaNaLista[] | null> {
     try {
       const t = await token();
-      if (!t) return [];
+      if (!t) return null;
       const { quemViuMeuStory } = await import("@/lib/rede-social.functions");
       const r = await quemViuMeuStory({ data: { accessToken: t, storyId } });
-      return r.ok ? r.gente : [];
+      return r.ok ? r.gente : null;
     } catch {
-      return [];
+      return null;
     }
   }
 
@@ -3764,6 +3805,13 @@ export function RedeNoApp({
         aoDenunciar={acoes.denunciar}
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoEditar={acoes.editar}
+        /* ⚠️ **Faltava, e este é o caminho mais provável do recurso.** A autora
+           abre a grade do próprio perfil e toca num post de duas semanas atrás:
+           é AQUI que ela quer saber quem reagiu. Sem a prop, o resumo com os
+           emojis vinha desenhado como texto morto — ela tocava no número e nada
+           acontecia —, e o único caminho vivo era achar o mesmo post rolando o
+           feed cronológico, que depois de algumas páginas não existe mais. */
+        aoVerQuemReagiu={acoes.verQuemReagiu}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -4324,7 +4372,8 @@ export function VisorDeStory({
   aoVer?: (storyId: string) => void;
   /** É o meu story? Só então aparecem "visto por" e a lixeira. */
   souEu?: boolean;
-  aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[]>;
+  /** `null` = não deu para ler (nunca "ninguém viu") — ver `quemViu`. */
+  aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[] | null>;
   aoApagarStory?: (storyId: string) => void;
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
@@ -4344,7 +4393,8 @@ export function VisorDeStory({
   const [recado, setRecado] = useState<string | null>(null);
   const [mandada, setMandada] = useState(false);
   const [pausado, setPausado] = useState(false);
-  const [quemViu, setQuemViu] = useState<PessoaNaLista[] | null>(null);
+  /** `null` = folha fechada · `"erro"` = não deu para ler · lista = a verdade. */
+  const [quemViu, setQuemViu] = useState<PessoaNaLista[] | "erro" | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const atual = bolha.stories[i];
 
@@ -4668,7 +4718,7 @@ export function VisorDeStory({
           {aoQuemViu && (
             <button
               type="button"
-              onClick={async () => setQuemViu((await aoQuemViu(atual.id)) ?? [])}
+              onClick={async () => setQuemViu((await aoQuemViu(atual.id)) ?? "erro")}
               className="press flex-1 text-left text-[13px] text-white/85"
             >
               👁 Ver quem viu
@@ -4718,7 +4768,11 @@ export function VisorDeStory({
         <div className="absolute inset-x-0 bottom-0 z-10 max-h-[60%] overflow-y-auto rounded-t-3xl bg-card p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-[15px] font-semibold">
-              {quemViu.length === 1 ? "1 pessoa viu" : `${quemViu.length} pessoas viram`}
+              {quemViu === "erro"
+                ? "Quem viu"
+                : quemViu.length === 1
+                  ? "1 pessoa viu"
+                  : `${quemViu.length} pessoas viram`}
             </h2>
             <button
               type="button"
@@ -4729,7 +4783,13 @@ export function VisorDeStory({
               ×
             </button>
           </div>
-          {quemViu.length === 0 ? (
+          {quemViu === "erro" ? (
+            /* ⚠️ Diz que NÃO CONSEGUIU, e nunca "ninguém viu" — as duas frases
+               são notícias opostas, e a errada é a que desanima quem publicou. */
+            <p className="py-8 text-center text-[13px] text-muted-foreground">
+              Não deu para carregar agora. Tente de novo daqui a pouco.
+            </p>
+          ) : quemViu.length === 0 ? (
             <p className="py-8 text-center text-[13px] text-muted-foreground">Ninguém viu ainda.</p>
           ) : (
             <ul className="mt-2">

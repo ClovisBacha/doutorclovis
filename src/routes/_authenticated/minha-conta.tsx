@@ -1208,6 +1208,9 @@ function MinhaContaPage() {
    */
   const [voltarAoHub, setVoltarAoHub] = useState<BottomSection | null>(null);
 
+  /* O sinal de "voltar ao começo da Comunidade" — ver `onSelect`. */
+  const [voltarAoFeed, setVoltarAoFeed] = useState(0);
+
   const goToTab = (t: string, sub?: string) => {
     /* Só guarda origem quando existe uma: na home mobile não há "tela
        anterior", e guardar a aba que estava por baixo faria o voltar pular
@@ -1757,6 +1760,16 @@ function MinhaContaPage() {
       saude: "Saúde",
     };
     setTab(sectionMap[section]);
+    /* ⚠️ **TOCAR NO ÍCONE DA COMUNIDADE ESTANDO DENTRO DELA NÃO FAZIA NADA.**
+       A aba tem sub-telas próprias (perfil, salvos, caixinha, arquivados,
+       busca), e a barra só publica atalhos quando ela está no FEED — então
+       de dentro de uma sub-tela o toque caía num `setTab("Feed")` que já era
+       "Feed", e a tela não se mexia. A paciente ficava presa num perfil sem
+       nenhuma pista de como voltar ao feed além da seta.
+       O sinal é um CONTADOR e não um booleano: ele precisa disparar de novo a
+       cada toque, e um booleano só dispararia uma vez. Estando já no feed, o
+       efeito só rola para o topo — que é o gesto do modelo. */
+    if (section === "comunidade") setVoltarAoFeed((n) => n + 1);
     setHubAberto(section === "saude" ? "saude" : null);
   }
 
@@ -2290,7 +2303,14 @@ function MinhaContaPage() {
                   <button
                     key={cat.label}
                     onClick={() => {
-                      if (!active) setTab(cat.tabs[0]);
+                      /* ⚠️ `goToTab`, não `setTab` cru — a MESMA lição da
+                         pílula das Recompensas, no botão ao lado. `setTab`
+                         sozinho não limpa `consultasSub`, que é o estado ÚNICO
+                         de sub-tela: quem tivesse aberto Chutes (ou a Loja)
+                         voltava a cair nela toda vez que trocasse de categoria
+                         nesta fita, e a tela de entrada da categoria ficava
+                         inalcançável por aqui. */
+                      if (!active) goToTab(cat.tabs[0]);
                       setMobileHome(false);
                     }}
                     className={`press flex-shrink-0 rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] ${
@@ -2442,6 +2462,8 @@ function MinhaContaPage() {
                 {tab === "Feed" && (
                   <RedeNoApp
                     careMode={careMode}
+                    /* Ver `onSelect`: sobe a cada toque no ícone da barra. */
+                    sinalDeVoltarAoFeed={voltarAoFeed}
                     onAbrirSecoes={() => goToTab("Comunidade")}
                     /* ⚠️ O bilhete que o Caminho deixou ao terminar a aula — lido
                        AQUI, e não dentro do compositor, porque quem sabe quando

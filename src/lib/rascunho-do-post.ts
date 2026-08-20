@@ -127,7 +127,21 @@ export function paraGuardar(
   r: Omit<RascunhoDoPost, "em">,
   agora: Date,
 ): { guardar: true; texto: string } | { guardar: false } {
-  const cheio: RascunhoDoPost = { ...r, em: agora.toISOString() };
+  /* ⚠️ **CAMPO A CAMPO, e nunca `{ ...r }`.** O espalhamento gravava o que
+     recebesse: uma foto acrescentada ao objeto do compositor entraria no
+     `localStorage` mesmo sem existir no TIPO, porque `JSON.stringify` não
+     conhece tipo nenhum. E o que quebra quando a cota de ~5 MB estoura não é
+     este rascunho — é a PRÓXIMA gravação de qualquer coisa, inclusive o
+     `journey_state`, que carrega a jornada inteira dela. O que não é copiado
+     não é guardado. */
+  const cheio: RascunhoDoPost = {
+    texto: r.texto,
+    visibilidade: r.visibilidade,
+    enquete: r.enquete,
+    comAula: r.comAula,
+    marcadas: r.marcadas,
+    em: agora.toISOString(),
+  };
   /* ⚠️ Rascunho vazio APAGA o que estava lá, em vez de gravar um vazio: se ela
      apagou tudo, é porque desistiu daquele texto — e reoferecê-lo depois seria
      devolver o que ela acabou de tirar da tela. */

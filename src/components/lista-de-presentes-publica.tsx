@@ -38,6 +38,7 @@ export function ListaDePresentesPublica({
   token,
   lista,
   aoReservar,
+  aoCancelar,
 }: {
   token: string;
   lista: ListaPublica;
@@ -49,7 +50,9 @@ export function ListaDePresentesPublica({
     quemNome: string;
     recado: string | null;
     idemKey: string;
-  }) => Promise<{ ok: boolean; motivo?: string; maximo?: number }>;
+  }) => Promise<{ ok: boolean; motivo?: string; maximo?: number; tokenReserva?: string }>;
+  /** Injetável para a bancada. Sem ela, chama `cancelarReserva` de verdade. */
+  aoCancelar?: (tokenReserva: string) => Promise<{ ok: boolean }>;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const [nome, setNome] = useState("");
@@ -57,6 +60,24 @@ export function ListaDePresentesPublica({
   const [recado, setRecado] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [feitos, setFeitos] = useState<Record<string, number>>({});
+  /**
+   * O comprovante de cada reserva desta visita — o que torna o "Desfazer"
+   * possível.
+   *
+   * ⚠️ **`cancelarReserva` estava escrita, testada e SEM CHAMADOR.** O servidor
+   * sabia desfazer desde o primeiro dia; a tela jogava o `tokenReserva` fora no
+   * instante em que ele chegava. Quem tocasse no item errado — e num cartão de
+   * fralda, com quatro tamanhos empilhados, isso acontece — não tinha nenhuma
+   * saída: nem cancelar, nem avisar, nem sequer entender o que ficou prometido.
+   *
+   * ⚠️ **NÃO vai para o `localStorage`, e isso é decisão.** O token de reserva
+   * é uma CAPACIDADE — quem o tem cancela a promessa, sem login nenhum. O link
+   * da lista roda no grupo do WhatsApp da família e é aberto em celular
+   * emprestado; guardar a capacidade no aparelho deixaria a próxima pessoa
+   * cancelando o presente da anterior. O desfazer vale enquanto a página está
+   * aberta, que é a janela do arrependimento.
+   */
+  const [comprovantes, setComprovantes] = useState<Record<string, string>>({});
 
   /* As fraldas viram um bloco só, ordenado por carência; o resto é lista
      comum. Separar aqui e não no servidor é de propósito: a régua de ordem é
@@ -97,7 +118,12 @@ export function ListaDePresentesPublica({
           const { reservarPorToken } = await import("@/lib/presentes.functions");
           return reservarPorToken({
             data: { ...p, revelarEm: null },
-          }) as Promise<{ ok: boolean; motivo?: string; maximo?: number }>;
+          }) as Promise<{
+            ok: boolean;
+            motivo?: string;
+            maximo?: number;
+            tokenReserva?: string;
+          }>;
         });
 
       const r = await chamar({
@@ -130,6 +156,7 @@ export function ListaDePresentesPublica({
       }
 
       setFeitos((f) => ({ ...f, [item.id]: (f[item.id] ?? 0) + quantidade }));
+      if (r.tokenReserva) setComprovantes((c) => ({ ...c, [item.id]: r.tokenReserva! }));
       setAberto(null);
       setRecado("");
       setQuantidade(1);
@@ -139,6 +166,72 @@ export function ListaDePresentesPublica({
     } finally {
       setEnviando(false);
     }
+  }
+
+  /**
+   * DESFAZER a reserva.
+   *
+   * ⚠️ **Marca, nunca apaga** (é o servidor quem decide isso), e a tela só
+   * devolve o contador ao que era: ela nunca reservou mais de uma vez pelo
+   * mesmo cartão nesta visita, então subtrair o que ela acabou de somar é
+   * exato.
+   */
+  async function desfazer(item: ItemDaLista) {
+    const tk = comprovantes[item.id];
+    if (!tk || enviando) return;
+    setEnviando(true);
+    try {
+      const chamar =
+        aoCancelar ??
+        (async (t: string) => {
+          const { cancelarReserva } = await import("@/lib/presentes.functions");
+          return (await cancelarReserva({ data: { tokenReserva: t } })) as { ok: boolean };
+        });
+      const r = await chamar(tk);
+      if (!r.ok) {
+        toast.error("Não deu para desfazer. Tente de novo.");
+        return;
+      }
+      setFeitos((f) => {
+        const resto = { ...f };
+        delete resto[item.id];
+        return resto;
+      });
+      setComprovantes((c) => {
+        const resto = { ...c };
+        delete resto[item.id];
+        return resto;
+      });
+      toast.success("Desfeito. Ninguém fica sabendo 💛");
+    } catch {
+      toast.error("Não deu para desfazer. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  /**
+   * "Você marcou · Desfazer" — a linha que aparece depois de reservar.
+   *
+   * ⚠️ **Um componente só para os DOIS cartões** (fralda e item comum): duas
+   * cópias divergiriam no primeiro ajuste, e esta é a única saída que a amiga
+   * tem depois de tocar no item errado.
+   */
+  function Desfazer({ item }: { item: ItemDaLista }) {
+    if (!comprovantes[item.id]) return null;
+    return (
+      <div className="mt-2 flex items-center gap-2 rounded-xl bg-primary/10 px-3 py-2">
+        <span className="min-w-0 flex-1 text-xs text-foreground">Você marcou esse 💛</span>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={() => void desfazer(item)}
+          className="press shrink-0 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+        >
+          Desfazer
+        </button>
+      </div>
+    );
   }
 
   function Formulario({ item }: { item: ItemDaLista }) {
@@ -242,7 +335,9 @@ export function ListaDePresentesPublica({
                   <p className="mt-1 text-xs tabular-nums text-muted-foreground">
                     {legendaDoTamanho(s)}
                   </p>
+                  <Desfazer item={f} />
                   {!cheio &&
+                    !comprovantes[f.id] &&
                     (aberto === f.id ? (
                       <Formulario item={f} />
                     ) : (
@@ -298,7 +393,9 @@ export function ListaDePresentesPublica({
                   </>
                 )}
 
+                <Desfazer item={i} />
                 {!feito &&
+                  !comprovantes[i.id] &&
                   (aberto === i.id ? (
                     <Formulario item={i} />
                   ) : (

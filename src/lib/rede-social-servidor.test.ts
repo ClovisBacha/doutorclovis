@@ -311,10 +311,23 @@ describe("editar a legenda", () => {
      trocar a foto faria as reações apontarem para uma imagem que ninguém viu. */
   test("⚠️ só o TEXTO muda", () => {
     const c = corpoDe("editarPost");
+    /* ⚠️ **A ÂNCORA É CONFERIDA ANTES DO RECORTE — e sem isso este teste
+       mentia.** `indexOf` devolve **−1** quando a âncora some, e `slice(-1)`
+       devolve UM CARACTERE: bastava alguém inlinar o helper `gravar` — um
+       refactor inocente — para os quatro `not.toContain` passarem sobre uma
+       string de um caractere, com a edição já podendo reescrever a camada de
+       visibilidade de um post que meia dúzia de pessoas já leu. É o mecanismo
+       nº 1 da lista de armadilhas do cabeçalho de `caixinha.ts`, cometido aqui
+       de novo. */
+    const i = c.indexOf("const gravar =");
+    expect(i).toBeGreaterThan(-1);
+    const gravacao = c.slice(i);
+    /* E o recorte tem de conter o `update` de verdade, senão ele não mede nada. */
+    expect(gravacao).toContain('.from("rede_posts").update(campos)');
+    expect(gravacao).toContain("gravar({ texto");
     for (const proibido of ["visibilidade:", "imagem_path:", "enquete_opcoes:", "comparacao_de:"]) {
       /* O `select` de conferência pode citar as colunas; o que não pode é
          gravá-las. Por isso a busca é pelo trecho do `update`. */
-      const gravacao = c.slice(c.indexOf("const gravar ="));
       expect(gravacao).not.toContain(proibido);
     }
   });
@@ -1020,5 +1033,29 @@ describe("o selo do médico na lista de quem reagiu", () => {
      `patient_profiles`, e sem isto a reação dele sumiria da lista. */
   test("o nome do médico vem de `doctors`, não do perfil de paciente", () => {
     expect(corpo).toContain('.from("doctors")');
+  });
+});
+
+describe("gravar as marcações", () => {
+  const corpo = CODIGO.slice(
+    CODIGO.indexOf("async function gravarMarcacoes"),
+    CODIGO.indexOf("export const tirarMinhaMarcacao"),
+  );
+
+  /* ⚠️ **AS DUAS METADES DO MESMO RECURSO FALHAVAM PARA LADOS OPOSTOS.**
+     `amigasParaMarcar` (quem a tela oferece) já usava `idsDasAmigas` e
+     devolvia lista VAZIA quando degradada; a GRAVAÇÃO usava `saoAmigas`, que
+     responde pelo `referred_by` — e o `referred_by` SOBREVIVE ao encerramento
+     da amizade, de propósito (o recibo fica). B encerrava a amizade e A ainda
+     punha o nome dela embaixo de uma foto de barriga, com uma linha em
+     `rede_atividade`: exatamente o vínculo do qual B pediu distância. */
+  test("⚠️ a amizade sai de `ctx.amigas`, que falha FECHADO", () => {
+    expect(corpo).toContain("ctx.amigas.has(id)");
+    expect(corpo).not.toContain("saoAmigas");
+  });
+
+  test("e o bloqueio e o Modo Cuidado continuam fechando", () => {
+    expect(corpo).toContain("ctx.bloqueio.has(id)");
+    expect(corpo).toContain("emCuidado: !p || !!p.care_mode");
   });
 });

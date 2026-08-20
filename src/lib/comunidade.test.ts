@@ -92,9 +92,20 @@ describe("a barra de baixo", () => {
        aparição da string. A frase passou a existir também na condição que
        ESCONDE a barra de cima, que vem antes no arquivo — e a janela de 260
        caracteres caía no lugar errado, reprovando código correto. */
+    /* ⚠️ **A JANELA DE 260 CARACTERES NUNCA ALCANÇAVA A REGRESSÃO QUE ELE DIZ
+       COBRIR.** `<RedeNoApp>` recebe uma dúzia de props comentadas, então o
+       bloco do Feed tem milhares de caracteres — e a janela parava bem antes.
+       Só pegaria o defeito se alguém reintroduzisse as configurações
+       EXATAMENTE na linha acima do `<RedeNoApp>`; escritas em qualquer outro
+       ponto do mesmo bloco, a suíte continuava verde sobre a tela que o dono
+       reclamou com a foto do aparelho. O recorte é o BLOCO INTEIRO. */
     const i = CONTA.indexOf('{tab === "Feed" && (');
     expect(i).toBeGreaterThan(-1);
-    const bloco = CONTA.slice(i, i + 260);
+    const proximaAba = CONTA.indexOf("{tab === ", i + 10);
+    const bloco = CONTA.slice(i, proximaAba === -1 ? CONTA.length : proximaAba);
+    /* Um bloco que caiba na janela antiga é sinal de recorte errado, não de
+       bloco curto: `<RedeNoApp>` sozinho passa de mil caracteres. */
+    expect(bloco.length).toBeGreaterThan(500);
     expect(bloco).toContain("RedeNoApp");
     expect(bloco).not.toContain("ConfiguracoesDoPerfil");
   });
@@ -117,5 +128,57 @@ describe("a barra de baixo", () => {
     }
     // E o cabeçalho da tela realmente saiu.
     expect(REDE).not.toContain('<h1 className="text-lg font-semibold tracking-tight">Comunidade');
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ O ÍCONE DA BARRA VOLTA AO COMEÇO — e não fazia nada
+   A aba tem sub-telas próprias (perfil, salvos, caixinha, arquivados, busca) e
+   a barra só publica atalhos quando ela está no FEED. De dentro de uma
+   sub-tela o toque caía num `setTab("Feed")` que já era "Feed", e a tela não
+   se mexia: ela ficava presa num perfil sem nenhuma pista além da seta.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("tocar no ícone da Comunidade", () => {
+  const CONTA = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+  const REDE = readFileSync("src/components/rede-instagram.tsx", "utf8");
+
+  test("⚠️ a rota manda um SINAL, e ele é um contador", () => {
+    expect(CONTA).toContain('if (section === "comunidade") setVoltarAoFeed((n) => n + 1);');
+    /* Contador, nunca booleano: precisa disparar de novo a cada toque. */
+    expect(CONTA).toContain("useState(0)");
+    expect(CONTA).toContain("sinalDeVoltarAoFeed={voltarAoFeed}");
+  });
+
+  test("⚠️ a tela responde voltando ao feed e fechando o story", () => {
+    const i = REDE.indexOf("const primeiroSinal = useRef(true)");
+    expect(i).toBeGreaterThan(-1);
+    const efeito = REDE.slice(i, REDE.indexOf("[sinalDeVoltarAoFeed]", i));
+    expect(efeito).toContain('setOnde({ t: "feed" })');
+    expect(efeito).toContain("setVendoStory(null)");
+  });
+
+  /* ⚠️ A primeira passada não faz nada: o efeito roda na montagem, quando ela
+     ACABOU de chegar por outro caminho (o hub, um deep-link, o cartão de
+     presente). Sem a guarda, abrir a aba já num perfil a jogaria para o feed
+     no primeiro quadro. */
+  test("⚠️ e a montagem NÃO dispara o retorno", () => {
+    const i = REDE.indexOf("const primeiroSinal = useRef(true)");
+    const efeito = REDE.slice(i, REDE.indexOf("[sinalDeVoltarAoFeed]", i));
+    expect(efeito).toContain("if (primeiroSinal.current)");
+    expect(efeito.indexOf("primeiroSinal.current = false")).toBeLessThan(
+      efeito.indexOf('setOnde({ t: "feed" })'),
+    );
+  });
+
+  /* ⚠️ E a fita de categorias do computador navega por `goToTab`, nunca por
+     `setTab` cru — a MESMA lição da pílula das Recompensas: `setTab` não limpa
+     `consultasSub`, e quem tivesse aberto uma sub-tela voltava a cair nela a
+     cada troca de categoria. */
+  test("⚠️ a fita do desktop usa `goToTab`", () => {
+    const i = CONTA.indexOf("CATEGORIES.map((cat)");
+    expect(i).toBeGreaterThan(-1);
+    const fita = CONTA.slice(i, CONTA.indexOf("</button>", i));
+    expect(fita).toContain("goToTab(cat.tabs[0])");
+    expect(fita).not.toContain("setTab(cat.tabs[0])");
   });
 });
