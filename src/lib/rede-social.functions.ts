@@ -3495,7 +3495,15 @@ export const removerSeguidor = createServerFn({ method: "POST" })
  */
 export const denunciarPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        /* Catálogo fechado — ver `denuncias.ts`. O zod aceita a string e quem
+           decide é `motivoConhecido`, para a lista viver num lugar só. */
+        motivo: z.string().max(20),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
@@ -3520,18 +3528,197 @@ export const denunciarPost = createServerFn({ method: "POST" })
        encher a fila do administrador. */
     if (visivel.autorId === eu) return { ok: false as const, motivo: "indisponivel" as const };
 
-    const agora = new Date().toISOString();
-    const { error } = await sb.from("rede_perguntas").insert({
-      dona_id: visivel.autorId,
+    const { motivoConhecido } = await import("@/lib/denuncias");
+    if (!motivoConhecido(data.motivo)) return { ok: false as const, motivo: "motivo" as const };
+
+    /* ⚠️ O TRECHO É CONGELADO AQUI. Se ela editar ou arquivar o post depois, a
+       fila continua sabendo o que foi denunciado — sem isso, a linha da
+       administração apontaria para um texto que já não existe, e a denúncia
+       viraria impossível de julgar. */
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "post",
+      alvo_id: visivel.id,
+      denunciada_id: visivel.autorId,
       quem_id: eu,
-      texto: `[publicação] ${visivel.texto ?? "(sem legenda)"}`,
-      desfecho: "publicavel",
-      denunciado_em: agora,
-      arquivado_em: agora,
+      motivo: data.motivo,
+      trecho: (visivel.texto ?? "(sem legenda)").slice(0, 400),
     });
     /* Duplicata é SUCESSO REPETIDO: ela tocou duas vezes, e dizer "erro" a
        faria tentar de novo. */
     if (error && (error as { code?: string }).code !== "23505") {
+      console.error("[rede] denúncia não gravou", error);
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * A FILA DA PLATAFORMA — quem foi denunciada, e por quê.
+ *
+ * Pedido do dono: "a plataforma tem que ter o conhecimento dos perfis
+ * denunciados, e por que foi denunciado".
+ *
+ * ⚠️ **Aqui o NOME da denunciada APARECE, ao contrário da fila da caixinha.** E
+ * a diferença não é descuido: na caixinha o que se julga é uma pergunta anônima,
+ * e revelar quem escreveu quebraria a promessa que faz a caixa existir. Aqui o
+ * que se julga é uma CONTA — e agir sobre ela (avisar, suspender, remover) é
+ * impossível sem saber qual é. É o que a diretriz 1.2 pede.
+ *
+ * ⚠️ **Quem DENUNCIOU continua invisível**, inclusive para o administrador. Ele
+ * precisa do alvo, do motivo e da reincidência; saber quem apertou o botão só
+ * abriria caminho para retaliação, e num app onde as pessoas se conhecem da
+ * vida real isso é concreto.
+ *
+ * ⚠️ **A reincidência é contada por PESSOA e sobre a fila INTEIRA** (inclusive
+ * as já resolvidas): uma conta com três denúncias resolvidas e uma nova não é
+ * uma conta com uma denúncia. A régua está em `denuncias.ts`, testada.
+ */
+export const denunciasDaRede = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+
+    const sb = supabaseAdmin as any;
+
+    /* Todas as linhas servem para CONTAR a reincidência; só as abertas vão para
+       a tela. Duas consultas seriam duas viagens para o mesmo dado. */
+    const { data: linhas, error } = await sb
+      .from("rede_denuncias")
+      .select("id, alvo, alvo_id, denunciada_id, quem_id, motivo, trecho, criado_em, resolvido_em")
+      .order("criado_em", { ascending: false })
+      .limit(400);
+    if (error) {
+      /* ⚠️ Falha ao ler devolve ERRO, e nunca lista vazia: "está tudo limpo" é
+         a frase mais perigosa que uma fila de denúncias pode dizer errado. É a
+         mesma régua de `denunciasAbertas` na caixinha. */
+      console.warn("[rede] sem rede_denuncias — rode APLICAR_REDE_SOCIAL.sql");
+      return { ok: false as const, motivo: "banco" as const };
+    }
+
+    const todas = (linhas ?? []) as {
+      id: string;
+      alvo: "post" | "perfil";
+      alvo_id: string;
+      denunciada_id: string;
+      quem_id: string;
+      motivo: string;
+      trecho: string | null;
+      criado_em: string;
+      resolvido_em: string | null;
+    }[];
+
+    const { ordenarFila, reincidenciasPorPessoa } = await import("@/lib/denuncias");
+    const quantas = reincidenciasPorPessoa(
+      todas.map((l) => ({ denunciadaId: l.denunciada_id, quemId: l.quem_id })),
+    );
+
+    const abertas = todas.filter((l) => !l.resolvido_em);
+    const perfis = await perfisPorId(sb, [...new Set(abertas.map((l) => l.denunciada_id))]);
+
+    const fila = abertas.map((l) => ({
+      id: l.id,
+      alvo: l.alvo,
+      denunciadaId: l.denunciada_id,
+      denunciadaNome: (perfis.get(l.denunciada_id)?.display_name ?? "").trim() || "Sem nome",
+      motivo: l.motivo as never,
+      trecho: l.trecho,
+      quando: l.criado_em,
+      reincidencias: quantas.get(l.denunciada_id) ?? 1,
+    }));
+
+    return { ok: true as const, fila: ordenarFila(fila) };
+  });
+
+/** Marcar uma denúncia como olhada. */
+export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), denunciaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+
+    const sb = supabaseAdmin as any;
+    /* ⚠️ MARCA, não apaga: a linha resolvida continua contando para a
+       reincidência da conta. Apagar faria a quinta denúncia parecer a
+       primeira. */
+    const { error } = await sb
+      .from("rede_denuncias")
+      .update({ resolvido_em: new Date().toISOString() })
+      .eq("id", data.denunciaId);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * DENUNCIAR UM PERFIL.
+ *
+ * ⚠️ **Ele não existia, e é o canal que faltava.** Dava para denunciar um POST —
+ * mas o problema quase nunca é uma publicação: é uma conta que insiste, que
+ * copia foto de outra pessoa, ou que distribui conselho de saúde em toda parte.
+ * Denunciar o post errado de quem faz isso não descreve o problema.
+ *
+ * ⚠️ **É CALADO**, como o bloqueio: a denunciada não é avisada. Anunciar
+ * transformaria uma proteção num confronto, e num app onde as pessoas se
+ * conhecem da vida real isso piora a situação que a motivou.
+ */
+export const denunciarPerfil = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        motivo: z.string().max(20),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    /* ⚠️ Denunciar a SI MESMA abriria um jeito barato de encher a fila. */
+    if (data.alvoId === eu) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { motivoConhecido } = await import("@/lib/denuncias");
+    if (!motivoConhecido(data.motivo)) return { ok: false as const, motivo: "motivo" as const };
+
+    /* ⚠️ **O ALVO PRECISA EXISTIR**, e a conferência é a mesma da leitura de
+       perfil. Sem ela, um uuid sorteado que respondesse `ok` confirmaria que
+       aquela conta existe — o mesmo vazamento pela porta dos fundos que
+       `denunciarPost` já evita. */
+    const perfis = await perfisPorId(sb, [data.alvoId]);
+    if (!perfis.get(data.alvoId)) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "perfil",
+      alvo_id: data.alvoId,
+      denunciada_id: data.alvoId,
+      quem_id: eu,
+      motivo: data.motivo,
+      trecho: null,
+    });
+    if (error && (error as { code?: string }).code !== "23505") {
+      console.error("[rede] denúncia de perfil não gravou", error);
       return { ok: false as const, motivo: "banco" as const };
     }
     return { ok: true as const };

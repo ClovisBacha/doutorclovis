@@ -334,6 +334,59 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
 -- ela publique.
 -- ═════════════════════════════════════════════════════════════════════════════
 -- ─────────────────────────────────────────────────────────────────────────────
+-- AS DENÚNCIAS DA REDE (ago/2026)
+--
+-- ⚠️ Isto deixou de ser melhoria quando a aba ganhou conteúdo publicado por
+-- usuária. Pela diretriz 1.2 da App Store, um app com conteúdo gerado por
+-- usuário precisa de quatro coisas: filtrar o censurável, oferecer denúncia,
+-- permitir bloquear e AGIR sobre a denúncia. As três primeiras existiam; a
+-- quarta era um botão que consolava — denúncia de PERFIL não existia, e a de
+-- post caía numa fila que só a caixinha alimentava.
+--
+-- ⚠️ O MOTIVO É CATÁLOGO FECHADO, e nunca texto livre: campo aberto num app de
+-- gestação é onde alguém escreve a informação clínica de OUTRA pessoa, e esse
+-- texto iria parar numa tela de administração, gravado, sobre quem nunca soube.
+--
+-- ⚠️ E o índice único é (alvo, alvo_id, quem_id): a mesma pessoa denunciando a
+-- mesma coisa duas vezes é UM incômodo, não dois. Sem ele, um toque nervoso
+-- inflaria a reincidência, que é o número que decide a ordem da fila.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rede_denuncias (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  alvo         text NOT NULL CHECK (alvo IN ('post','perfil')),
+  alvo_id      uuid NOT NULL,
+  -- Quem foi denunciada. É o que a plataforma precisa saber.
+  denunciada_id uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  quem_id      uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  motivo       text NOT NULL CHECK (motivo IN ('assedio','saude','imagem','spam','outro')),
+  -- O texto do post denunciado, congelado no instante da denúncia: se ela
+  -- editar ou arquivar depois, a fila continua sabendo o que foi denunciado.
+  trecho       text,
+  criado_em    timestamptz NOT NULL DEFAULT now(),
+  resolvido_em timestamptz
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS rede_denuncias_uma_por_pessoa
+  ON public.rede_denuncias (alvo, alvo_id, quem_id);
+CREATE INDEX IF NOT EXISTS rede_denuncias_abertas
+  ON public.rede_denuncias (criado_em DESC) WHERE resolvido_em IS NULL;
+CREATE INDEX IF NOT EXISTS rede_denuncias_por_alvo
+  ON public.rede_denuncias (denunciada_id);
+
+ALTER TABLE public.rede_denuncias ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ NENHUMA policy para `authenticated`. Uma paciente que pudesse varrer esta
+-- tabela leria quem denunciou quem, e por quê — a lista de desafetos da
+-- plataforma inteira. Escrita e leitura só pelo servidor, que confere a sessão
+-- (e, na leitura, o e-mail de administrador).
+DROP POLICY IF EXISTS "Service manages rede_denuncias" ON public.rede_denuncias;
+CREATE POLICY "Service manages rede_denuncias" ON public.rede_denuncias
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE public.rede_denuncias IS
+  'Denúncias de post e de perfil. Motivo de catálogo fechado; só o servidor lê e escreve.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- EDITAR A LEGENDA DEPOIS DE PUBLICAR (ago/2026)
 --
 -- ⚠️ A coluna é o SELO, não o histórico. Ela existe para a tela poder dizer

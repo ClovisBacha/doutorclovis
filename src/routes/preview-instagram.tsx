@@ -341,7 +341,7 @@ function Bancada() {
       salvar: (_p: PostNaTela, v: boolean) => alert(v ? "guardaria" : "tiraria dos salvos"),
       votar: (_p: PostNaTela, i: number) => alert(`votaria na opção ${i}`),
       apagar: (_p: PostNaTela) => alert("apagaria"),
-      denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
+      denunciar: (p: PostNaTela, m: string) => alert(`denunciaria o post ${p.id} por "${m}"`),
       tirarMarcacao: (p: PostNaTela) => alert(`tiraria minha marcação do post ${p.id}`),
       /* ⚠️ A bancada GRAVA a edição no estado, e não num alert: o que precisa
          ser olhado é o texto trocando e o selo "editado" nascendo — com um
@@ -787,6 +787,10 @@ function Bancada() {
           aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
           aoAbrirEspelho={meu ? () => alert("abriria o espelho") : undefined}
           aoBloquear={meu ? undefined : () => alert("bloquearia")}
+          /* ⚠️ Sem a bancada, olhar o seletor de motivo exigiria duas contas e
+             uma denúncia de verdade — e é justamente a tela que precisa ser
+             lida com calma antes de existir. */
+          aoDenunciarPerfil={meu ? undefined : (m) => alert(`denunciaria o perfil por "${m}"`)}
           /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
              bancada aprovaria a pílula sem o controle que é o ponto dela. */
           aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}

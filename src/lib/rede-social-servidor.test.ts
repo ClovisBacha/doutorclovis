@@ -394,14 +394,60 @@ describe("higiene", () => {
        barato de encher a fila do administrador. */
     const c = corpoDe("denunciarPost").replace(/\s+/g, " ");
     const conferiu = c.indexOf("montarPosts(sb, eu, [bruto], ctx)");
-    const gravou = c.indexOf('.from("rede_perguntas").insert(');
+    const gravou = c.indexOf('.from("rede_denuncias").insert(');
     expect(conferiu).toBeGreaterThan(-1);
     expect(gravou).toBeGreaterThan(conferiu);
     expect(c).toContain("if (visivel.autorId === eu)");
-    /* A linha nasce ARQUIVADA: a denúncia é do administrador, e não uma
-       pergunta na caixinha de quem publicou. */
-    expect(c).toContain("denunciado_em: agora");
-    expect(c).toContain("arquivado_em: agora");
+    /* ⚠️ O MOTIVO é conferido contra o catálogo fechado. Sem isso, um corpo
+       montado à mão gravaria texto livre num campo que vai para a tela de
+       administração — e texto livre numa denúncia de app de gestação é onde
+       alguém escreve a informação clínica de OUTRA pessoa. */
+    expect(c).toContain("motivoConhecido(data.motivo)");
+    const conferiuMotivo = c.indexOf("motivoConhecido(data.motivo)");
+    expect(conferiuMotivo).toBeGreaterThan(-1);
+    expect(gravou).toBeGreaterThan(conferiuMotivo);
+    /* ⚠️ O TRECHO é congelado aqui: se ela editar ou arquivar o post depois, a
+       fila continua sabendo o que foi denunciado. */
+    expect(c).toContain("trecho:");
+  });
+
+  test("⚠️ denunciar um PERFIL confere que o alvo existe, e não sou eu", () => {
+    /* Sem a conferência, um uuid sorteado que respondesse `ok` confirmaria que
+       aquela conta existe — o mesmo vazamento pela porta dos fundos que a
+       denúncia de post já evitava. E denunciar a si mesma abriria um jeito
+       barato de encher a fila. */
+    const c = corpoDe("denunciarPerfil").replace(/\s+/g, " ");
+    expect(c).toContain("if (data.alvoId === eu)");
+    const conferiu = c.indexOf("perfisPorId(sb, [data.alvoId])");
+    const gravou = c.indexOf('.from("rede_denuncias").insert(');
+    expect(conferiu).toBeGreaterThan(-1);
+    expect(gravou).toBeGreaterThan(conferiu);
+    expect(c).toContain("motivoConhecido(data.motivo)");
+  });
+
+  test("⚠️ a fila da plataforma é de ADMIN, e falha ao ler devolve ERRO", () => {
+    /* "está tudo limpo" é a frase mais perigosa que uma fila de denúncias pode
+       dizer errado — e é o que uma lista vazia diria numa falha de banco. */
+    for (const nome of ["denunciasDaRede", "resolverDenunciaDaRede"]) {
+      const c = corpoDe(nome).replace(/\s+/g, " ");
+      expect(c).toContain("process.env.ADMIN_EMAILS");
+      expect(c).toContain('motivo: "sem_acesso"');
+    }
+    const leitura = corpoDe("denunciasDaRede").replace(/\s+/g, " ");
+    expect(leitura).toContain('return { ok: false as const, motivo: "banco" as const };');
+    /* ⚠️ Quem DENUNCIOU não sai daqui: o `quem_id` é lido para CONTAR a
+       reincidência e morre no servidor. Saber quem apertou o botão abriria
+       caminho para retaliação. */
+    expect(leitura).not.toContain("quemId: l.quem_id,");
+    expect(leitura).toContain("reincidenciasPorPessoa(");
+  });
+
+  test("⚠️ resolver MARCA, nunca apaga", () => {
+    /* A linha resolvida continua contando para a reincidência da conta. Apagar
+       faria a quinta denúncia parecer a primeira. */
+    const c = corpoDe("resolverDenunciaDaRede").replace(/\s+/g, " ");
+    expect(c).toContain(".update({ resolvido_em:");
+    expect(c).not.toContain(".delete(");
   });
 
   test("⚠️ e o POST nunca é apagado, só arquivado", () => {

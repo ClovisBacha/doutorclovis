@@ -73,6 +73,7 @@ import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
+import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import {
   chaveDaRetrospectiva,
   ehDomingo,
@@ -256,6 +257,81 @@ function CoracaoDoToque() {
  * dele, e este vive na mesma linha que o ⋯, que é um traço da cor do texto. Um
  * lápis amarelo-e-marrom ao lado dele lê como adesivo colado ali.
  */
+/**
+ * O SELETOR DE MOTIVO — usado no post e no perfil.
+ *
+ * ⚠️ **Catálogo fechado, e nunca campo livre.** A razão está em `denuncias.ts`:
+ * texto aberto num app de gestação é onde alguém escreve a informação clínica
+ * de OUTRA pessoa, e esse texto iria para uma tela de administração, gravado,
+ * sobre quem nunca soube.
+ *
+ * ⚠️ **Um componente só, e não duas cópias.** As duas portas (post e perfil)
+ * precisam oferecer exatamente os mesmos motivos — duas listas divergiriam no
+ * primeiro ajuste, e a fila passaria a receber motivos que a tela do outro lado
+ * não sabe nomear.
+ */
+export function EscolherMotivo({
+  titulo,
+  aviso,
+  aoCancelar,
+  aoEnviar,
+}: {
+  titulo: string;
+  aviso: string;
+  aoCancelar: () => void;
+  aoEnviar: (motivo: MotivoDaDenuncia) => void;
+}) {
+  const [motivo, setMotivo] = useState<MotivoDaDenuncia | null>(null);
+  return (
+    <div className="rounded-2xl border border-border bg-muted/40 p-3">
+      <p className="text-[13px] font-semibold leading-snug">{titulo}</p>
+      {/* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra vai
+          saber — a mesma razão pela qual o bloqueio é mudo. */}
+      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{aviso}</p>
+
+      <div className="mt-2.5 space-y-1">
+        {MOTIVOS.map((m) => (
+          <button
+            key={m.motivo}
+            type="button"
+            onClick={() => setMotivo(m.motivo)}
+            aria-pressed={motivo === m.motivo}
+            className={`press block min-h-[44px] w-full rounded-xl border px-3 py-1.5 text-left ${
+              motivo === m.motivo ? "border-primary bg-primary/10" : "border-border"
+            }`}
+          >
+            <span className="block text-[13px] font-medium">{m.rotulo}</span>
+            <span className="block text-[11px] leading-tight text-muted-foreground">
+              {m.explica}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-2.5 flex gap-2">
+        <button
+          type="button"
+          onClick={aoCancelar}
+          className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+        >
+          Cancelar
+        </button>
+        <button
+          type="button"
+          /* ⚠️ Só habilita com motivo escolhido: sem isso a fila recebe
+             "outro" por omissão, e o campo que existe para dizer POR QUÊ passa
+             a não dizer nada. */
+          disabled={!motivo}
+          onClick={() => motivo && aoEnviar(motivo)}
+          className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground disabled:opacity-45"
+        >
+          Denunciar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function IconeLapis() {
   return (
     <svg
@@ -501,7 +577,7 @@ export const PostInstagram = memo(function PostInstagram({
    * nenhuma pega (assédio, mentira, foto de outra pessoa), e para essas o único
    * caminho é uma pessoa olhar.
    */
-  aoDenunciar?: (post: PostNaTela) => void;
+  aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
   /** Votar na enquete. Sem ele as opções aparecem inertes. */
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação. Só aparece quando `post.souMarcada`. */
@@ -660,14 +736,14 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
-      {confirmando && (
+      {/* ⚠️ Duas telas diferentes atrás do mesmo ⋯, e de propósito: arquivar é
+          uma pergunta de sim/não sobre o post DELA; denunciar precisa do
+          MOTIVO, porque sem ele a fila da plataforma não sabe o que julgar. */}
+      {confirmando && post.souAAutora && (
         <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
           <p className="text-[13px] leading-snug">
-            {post.souAAutora
-              ? "Tirar esta publicação do ar? Ela vai para os arquivados, e você pode trazer de volta quando quiser."
-              : /* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra
-                   vai saber — e é a mesma razão pela qual o bloqueio é mudo. */
-                "Denunciar esta publicação? Ela fica registrada para a gente olhar, e quem publicou não é avisada."}
+            Tirar esta publicação do ar? Ela vai para os arquivados, e você pode trazer de volta
+            quando quiser.
           </p>
           <div className="mt-2 flex gap-2">
             <button
@@ -681,21 +757,30 @@ export const PostInstagram = memo(function PostInstagram({
               type="button"
               onClick={() => {
                 setConfirmando(false);
-                if (post.souAAutora) aoApagar?.(post);
-                else aoDenunciar?.(post);
+                aoApagar?.(post);
               }}
               /* ⚠️ Vermelho só para DENUNCIAR. Arquivar é reversível, e pintar
                  de destrutivo o que se desfaz num toque ensina a ter medo do
                  botão errado. */
-              className={`press flex-1 rounded-xl py-1.5 text-[13px] font-semibold ${
-                post.souAAutora
-                  ? "bg-foreground/85 text-background"
-                  : "bg-destructive text-destructive-foreground"
-              }`}
+              className="press flex-1 rounded-xl bg-foreground/85 py-1.5 text-[13px] font-semibold text-background"
             >
-              {post.souAAutora ? "Sim, arquivar" : "Denunciar"}
+              Sim, arquivar
             </button>
           </div>
+        </div>
+      )}
+
+      {confirmando && !post.souAAutora && (
+        <div className="mx-4 mb-2">
+          <EscolherMotivo
+            titulo="Por que você está denunciando esta publicação?"
+            aviso="Ela fica registrada para a gente olhar, e quem publicou não é avisada."
+            aoCancelar={() => setConfirmando(false)}
+            aoEnviar={(m) => {
+              setConfirmando(false);
+              aoDenunciar?.(post, m);
+            }}
+          />
         </div>
       )}
 
@@ -1109,7 +1194,7 @@ export function TelaPrincipal({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
-  aoDenunciar?: (post: PostNaTela) => void;
+  aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
@@ -1515,6 +1600,7 @@ export function TelaDePerfil({
   aoAbrirLista,
   aoAbrirSalvos,
   aoBloquear,
+  aoDenunciarPerfil,
   aoAbrirEspelho,
   aoAplicarCodigo,
   aoPerguntar,
@@ -1540,6 +1626,8 @@ export function TelaDePerfil({
   aoAbrirSalvos?: () => void;
   /** Só no perfil de terceiro. */
   aoBloquear?: () => void;
+  /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
+  aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
   /** Abre "ver como os outros veem". Só no próprio perfil. */
   aoAbrirEspelho?: () => void;
   /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
@@ -1570,6 +1658,7 @@ export function TelaDePerfil({
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
+  const [denunciandoPerfil, setDenunciandoPerfil] = useState(false);
   const [confirmandoCodigo, setConfirmandoCodigo] = useState(false);
 
   /* A trava do espelho: toda ação vira `undefined` de uma vez. */
@@ -1657,6 +1746,39 @@ export function TelaDePerfil({
               Bloquear
             </button>
           </div>
+
+          {/* ⚠️ **DENUNCIAR MORA AO LADO DE BLOQUEAR, e são coisas diferentes.**
+              Bloquear resolve para ELA e não conta a ninguém; denunciar leva o
+              caso à plataforma. Sem esta porta, a única saída de quem encontra
+              uma conta que insiste, copia foto ou distribui conselho de saúde
+              era bloquear — e a conta seguia fazendo o mesmo com as outras.
+              Era a metade que faltava para a diretriz 1.2 da App Store. */}
+          {aoDenunciarPerfil && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                setDenunciandoPerfil(true);
+              }}
+              className="press mt-2 w-full text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+            >
+              Denunciar este perfil para a plataforma
+            </button>
+          )}
+        </div>
+      )}
+
+      {denunciandoPerfil && aoDenunciarPerfil && (
+        <div className="mx-4 mt-2">
+          <EscolherMotivo
+            titulo={`Por que você está denunciando ${perfil.nome}?`}
+            aviso="A denúncia vai para a plataforma olhar, e essa pessoa não é avisada."
+            aoCancelar={() => setDenunciandoPerfil(false)}
+            aoEnviar={(m) => {
+              setDenunciandoPerfil(false);
+              aoDenunciarPerfil(m);
+            }}
+          />
         </div>
       )}
 
@@ -2040,7 +2162,7 @@ export function RedeNoApp({
     guardar: (_p: PostNaTela, _v: boolean) => {},
     votar: (_p: PostNaTela, _i: number) => {},
     apagar: (_p: PostNaTela) => {},
-    denunciar: (_p: PostNaTela) => {},
+    denunciar: (_p: PostNaTela, _m: MotivoDaDenuncia) => {},
     tirarMarcacao: (_p: PostNaTela) => {},
     editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
@@ -2051,7 +2173,7 @@ export function RedeNoApp({
     guardar: (p, v) => void guardar(p, v),
     votar: (p, i) => void votar(p, i),
     apagar: (p) => void apagar(p),
-    denunciar: (p) => void denunciarPost(p),
+    denunciar: (p, m) => void denunciarPost(p, m),
     tirarMarcacao: (p) => void tirarMarcacao(p),
     editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
@@ -2063,7 +2185,7 @@ export function RedeNoApp({
       guardar: (p: PostNaTela, v: boolean) => ultimas.current.guardar(p, v),
       votar: (p: PostNaTela, i: number) => ultimas.current.votar(p, i),
       apagar: (p: PostNaTela) => ultimas.current.apagar(p),
-      denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
+      denunciar: (p: PostNaTela, m: MotivoDaDenuncia) => ultimas.current.denunciar(p, m),
       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
       editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
@@ -2526,7 +2648,7 @@ export function RedeNoApp({
     }
   }
 
-  async function denunciarPost(post: PostNaTela) {
+  async function denunciarPost(post: PostNaTela, motivo: MotivoDaDenuncia) {
     /* Some da tela na hora, como o apagar: ela acabou de denunciar, e um post
        que continua ali lê como "não foi". */
     setPosts((ps) => ps.filter((x) => x.id !== post.id));
@@ -2536,12 +2658,34 @@ export function RedeNoApp({
       const t = await token();
       if (!t) return;
       const { denunciarPost: chamar } = await import("@/lib/rede-social.functions");
-      const r = await chamar({ data: { accessToken: t, postId: post.id } });
+      const r = await chamar({ data: { accessToken: t, postId: post.id, motivo } });
       const { toast } = await import("sonner");
       if (r.ok) toast.success("Denunciada. A gente vai olhar.");
       else toast.error("Não deu para denunciar agora.");
     } catch {
       /* Ela vê o post voltar na próxima carga. */
+    }
+  }
+
+  /**
+   * Denunciar um PERFIL.
+   *
+   * ⚠️ **Não some da tela, ao contrário do post denunciado.** Denunciar um
+   * perfil não é dizer "não quero mais ver" — para isso existe bloquear, que é
+   * outro botão a dois toques dali. Sumir com o perfil aqui faria a paciente
+   * achar que denunciar bloqueia, e ela deixaria de usar o botão certo.
+   */
+  async function denunciarUmPerfil(alvoId: string, motivo: MotivoDaDenuncia) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarPerfil } = await import("@/lib/rede-social.functions");
+      const r = await denunciarPerfil({ data: { accessToken: t, alvoId, motivo } });
+      const { toast } = await import("sonner");
+      if (r.ok) toast.success("Denunciado. A gente vai olhar.");
+      else toast.error("Não deu para denunciar agora.");
+    } catch {
+      /* silencioso: a tela não mudou, então não há o que desfazer */
     }
   }
 
@@ -3505,6 +3649,7 @@ export function RedeNoApp({
             : undefined
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
+        aoDenunciarPerfil={perfil.souEu ? undefined : (m) => void denunciarUmPerfil(perfil.id, m)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
         /* ⚠️ Bandeira vermelha abre a Central de Emergência — a MESMA que a
@@ -3972,7 +4117,7 @@ export function TelaDoPost({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
-  aoDenunciar?: (post: PostNaTela) => void;
+  aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
