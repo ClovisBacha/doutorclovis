@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { fraseDoRodape, ROTULO_DO_BOTAO, type OndeConvida } from "./convite-do-app";
 
-const TODAS: OndeConvida[] = ["presentes", "album", "acompanhante"];
+const TODAS: OndeConvida[] = ["presentes", "album", "acompanhante", "perfil"];
 
 describe("as frases do rodapé", () => {
   test("cada página tem a sua, e são diferentes", () => {
@@ -15,6 +15,7 @@ describe("as frases do rodapé", () => {
     expect(fraseDoRodape("presentes").titulo.toLowerCase()).toContain("lista");
     expect(fraseDoRodape("album").titulo.toLowerCase()).toContain("álbum");
     expect(fraseDoRodape("acompanhante").titulo.toLowerCase()).toContain("acompanhando");
+    expect(fraseDoRodape("perfil").titulo.toLowerCase()).toContain("perfil");
   });
 
   /* ⚠️ Quem lê pode estar grávida, e a promessa clínica é do médico dela — não
@@ -32,6 +33,10 @@ describe("as frases do rodapé", () => {
       "tranquil",
       "garant",
       "médico responde",
+      /* ⚠️ A da vitrine não pode prometer seguir: a página pública não tem
+         botão de seguir, e seguir exige conta. */
+      "siga",
+      "seguir",
     ]) {
       expect(tudo).not.toContain(proibido);
     }

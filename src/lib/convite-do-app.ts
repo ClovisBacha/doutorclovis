@@ -32,7 +32,7 @@
  */
 
 /** A página de onde o convite está sendo mostrado. Muda a FRASE, nada mais. */
-export type OndeConvida = "presentes" | "album" | "acompanhante";
+export type OndeConvida = "presentes" | "album" | "acompanhante" | "perfil";
 
 /**
  * A frase, por página.
@@ -61,6 +61,15 @@ export function fraseDoRodape(onde: OndeConvida): { titulo: string; sub: string 
       return {
         titulo: "Você está acompanhando pelo Obstétrica",
         sub: "Se você também está grávida, o app é seu também.",
+      };
+    case "perfil":
+      /* ⚠️ A da vitrine fala do APP, e não da pessoa. "Siga a Marina aqui"
+         prometeria um botão de seguir que a página pública não tem — seguir
+         exige conta —, e a frustração de um botão que não existe é pior que a
+         ausência dele. */
+      return {
+        titulo: "Este perfil vive no Obstétrica",
+        sub: "O app da gestação — do positivo ao pós-parto.",
       };
   }
 }

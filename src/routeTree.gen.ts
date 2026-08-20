@@ -70,6 +70,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
 import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
+import { Route as PCodigoRouteImport } from './routes/p.$codigo'
 import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
 import { Route as MedicosCadastroRouteImport } from './routes/medicos_.cadastro'
 import { Route as ApiWhatsappRouteImport } from './routes/api/whatsapp'
@@ -398,6 +399,11 @@ const PresenteTokenRoute = PresenteTokenRouteImport.update({
   path: '/presente/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PCodigoRoute = PCodigoRouteImport.update({
+  id: '/p/$codigo',
+  path: '/p/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MedicosGoogleCallbackRoute = MedicosGoogleCallbackRouteImport.update({
   id: '/medicos_/google-callback',
   path: '/medicos/google-callback',
@@ -594,6 +600,7 @@ export interface FileRoutesByFullPath {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
+  '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
@@ -679,6 +686,7 @@ export interface FileRoutesByTo {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos/cadastro': typeof MedicosCadastroRoute
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
+  '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
@@ -766,6 +774,7 @@ export interface FileRoutesById {
   '/api/whatsapp': typeof ApiWhatsappRoute
   '/medicos_/cadastro': typeof MedicosCadastroRoute
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
+  '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
@@ -853,6 +862,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
+    | '/p/$codigo'
     | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
@@ -938,6 +948,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos/cadastro'
     | '/medicos/google-callback'
+    | '/p/$codigo'
     | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
@@ -1024,6 +1035,7 @@ export interface FileRouteTypes {
     | '/api/whatsapp'
     | '/medicos_/cadastro'
     | '/medicos_/google-callback'
+    | '/p/$codigo'
     | '/presente/$token'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
@@ -1108,6 +1120,7 @@ export interface RootRouteChildren {
   ApiWhatsappRoute: typeof ApiWhatsappRoute
   MedicosCadastroRoute: typeof MedicosCadastroRoute
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
+  PCodigoRoute: typeof PCodigoRoute
   PresenteTokenRoute: typeof PresenteTokenRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
   ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
@@ -1543,6 +1556,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PresenteTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$codigo': {
+      id: '/p/$codigo'
+      path: '/p/$codigo'
+      fullPath: '/p/$codigo'
+      preLoaderRoute: typeof PCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/medicos_/google-callback': {
       id: '/medicos_/google-callback'
       path: '/medicos/google-callback'
@@ -1800,6 +1820,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWhatsappRoute: ApiWhatsappRoute,
   MedicosCadastroRoute: MedicosCadastroRoute,
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
+  PCodigoRoute: PCodigoRoute,
   PresenteTokenRoute: PresenteTokenRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
   ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ConviteDoApp } from "@/components/convite-do-app";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -33,6 +34,8 @@ function getVoterToken(): string {
 function VotarNomePage() {
   const { token: shareToken } = Route.useParams();
   const [session, setSession] = useState<NameSession | null>(null);
+  /** O código dela, para o rodapé de convite. `null` em Modo Cuidado. */
+  const [codigoDeConvite, setCodigoDeConvite] = useState<string | null>(null);
   const [entries, setEntries] = useState<NameEntry[]>([]);
   const [motherName, setMotherName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +68,7 @@ function VotarNomePage() {
         return;
       }
       setSession(res.session);
+      setCodigoDeConvite(res.codigoDeConvite ?? null);
       setEntries(res.entries);
       setMotherName(res.motherName ?? null);
     } catch {
@@ -305,6 +309,11 @@ function VotarNomePage() {
           {!voterName.trim() && session.is_active && entries.length > 0 && (
             <p className="mt-3 text-xs text-center text-amber-600">Preencha seu nome para votar.</p>
           )}
+
+          {/* ⚠️ A QUARTA página pública, e a que faltava. O link da votação vai
+              para o grupo da família inteiro — as outras três já convidavam e
+              esta terminava sem dizer o que é o app. Ver `convite-do-app.ts`. */}
+          <ConviteDoApp onde="album" codigo={codigoDeConvite} />
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { codigoParaConvite } from "@/lib/convite.functions";
+import { codigoLimpo } from "@/lib/quem-convidou";
 import { z } from "zod";
 
 // ─── Album ────────────────────────────────────────────────────────────────────
@@ -395,7 +396,11 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
     // Also get patient's baby name for display
     const { data: profile } = await supabaseAdmin
       .from("patient_profiles")
-      .select("display_name, baby_name")
+      /* ⚠️ `referral_code` e `care_mode` entram AQUI, e não numa segunda
+         consulta: o perfil já está sendo lido para achar o nome dela, e a
+         página de votação é a QUARTA página pública do app — o link vai para o
+         grupo da família inteiro e ela era a única sem convite nenhum. */
+      .select("display_name, baby_name, referral_code, care_mode")
       .eq("id", session.patient_user_id)
       .single();
     /* `patient_user_id` é usado ACIMA para achar o nome dela, e sai do retorno.
@@ -409,6 +414,13 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
       entries: enriched as NameEntry[],
       motherName: (profile as any)?.display_name ?? null,
       babyName: (profile as any)?.baby_name ?? null,
+      /* ⚠️ `null` em Modo Cuidado — a votação continua de pé (é a família dela
+         escolhendo, e a página não é do app), mas o convite fala de gestação em
+         curso. Mesma régua de `codigoParaConvite`, aplicada sobre o perfil que
+         já está em mãos. */
+      codigoDeConvite: (profile as any)?.care_mode
+        ? null
+        : codigoLimpo((profile as any)?.referral_code),
     };
   });
 

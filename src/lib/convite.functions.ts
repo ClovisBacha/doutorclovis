@@ -20,6 +20,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 import { codigoLimpo, primeiroNome, type QuemConvidou } from "@/lib/quem-convidou";
+import type { PerfilPublico, PostPublico } from "@/lib/perfil-publico";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -135,3 +136,114 @@ export async function codigoParaConvite(sb: any, userId: string): Promise<string
     return null;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O PERFIL PÚBLICO — a vitrine de quem abriu o perfil ao mundo
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O perfil de uma paciente, para uma pessoa SEM CONTA.
+ *
+ * A régua (o portão, o teto, o que fica de fora) mora em
+ * `src/lib/perfil-publico.ts`. Aqui é a ida ao banco.
+ *
+ * ⚠️ **Um `null` só, para três motivos.** Perfil fechado, Modo Cuidado e código
+ * inexistente devolvem a mesma coisa — ver `podeAbrirPerfilPublico`.
+ *
+ * ⚠️ **A SEMANA passa pela régua única** (`seloDoPerfil`), com `birth_date` no
+ * select: sem ele, `computeGestation` conta para sempre e uma mãe que pariu na
+ * 39ª apareceria como "47 semanas" numa página aberta ao mundo. É o mesmo
+ * defeito que a legenda sugerida teve.
+ */
+export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ codigo: z.string().min(1).max(24) }).parse(i))
+  .handler(async ({ data }): Promise<{ perfil: PerfilPublico | null }> => {
+    const codigo = codigoLimpo(data.codigo);
+    if (!codigo) return { perfil: null };
+
+    try {
+      const req = getRequest();
+      if (req && limitado(clientIp(req))) return { perfil: null };
+    } catch {
+      /* ver o comentário gêmeo em `quemConvidou` */
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const COLUNAS =
+      "id, display_name, bio, avatar_url, care_mode, perfil_publico, referral_code, " +
+      "birth_date, lmp_date, reference_date, reference_weeks, reference_days, baby_name";
+    /* ⚠️ RECUO POR COLUNA AUSENTE: `mostrar_semana`/`mostrar_bebe` nascem num
+       `APLICAR_` que o dono roda à mão, e o PostgREST recusa o SELECT INTEIRO
+       por causa de uma coluna que não conhece. Sem o recuo, a página inteira
+       deixaria de existir na janela entre o deploy e o SQL. */
+    const um = async (colunas: string) =>
+      await sb.from("patient_profiles").select(colunas).eq("referral_code", codigo).maybeSingle();
+    let r = await um(`${COLUNAS}, mostrar_semana, mostrar_bebe`);
+    if (r.error) r = await um(COLUNAS);
+    const p = r.data as Record<string, any> | null;
+
+    const { podeAbrirPerfilPublico, POSTS_NA_VITRINE } = await import("@/lib/perfil-publico");
+    if (
+      !podeAbrirPerfilPublico({
+        existe: !!p,
+        perfilPublico: !!p?.perfil_publico,
+        emCuidado: !!p?.care_mode,
+      })
+    ) {
+      return { perfil: null };
+    }
+
+    const { computeGestation } = await import("@/lib/gestacao");
+    const { entradaDoSelo, hojeEmSaoPaulo, seloDoPerfil } = await import("@/lib/selo-do-perfil");
+    const g = computeGestation({
+      lmp: p!.lmp_date ?? null,
+      referenceDate: p!.reference_date ?? null,
+      referenceWeeks: p!.reference_weeks ?? null,
+      referenceDays: p!.reference_days ?? null,
+      /* O dia de São Paulo, e não o do contêiner — ver `seloDe`. */
+      today: hojeEmSaoPaulo(),
+    });
+    const selo = seloDoPerfil(entradaDoSelo(p as any, g?.totalDays ?? null));
+
+    /* ⚠️ **SÓ A CAMADA `publico`, e o filtro está na CONSULTA.** Um visitante
+       sem conta não segue ninguém e não é amiga de ninguém: filtrar depois de
+       ler seria trazer para a memória do servidor exatamente o que esta página
+       não pode mostrar. E `arquivado_em` fora, porque arquivar é tirar do ar. */
+    let posts: PostPublico[] = [];
+    try {
+      const { data: linhas } = await sb
+        .from("rede_posts")
+        .select("id, texto, imagem_path, criado_em")
+        .eq("autor_id", p!.id)
+        .eq("visibilidade", "publico")
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: false })
+        .limit(POSTS_NA_VITRINE);
+      const { urlAssinada } = await import("@/lib/imagens.server");
+      posts = await Promise.all(
+        ((linhas ?? []) as any[]).map(async (l) => ({
+          id: l.id as string,
+          imagemUrl: l.imagem_path ? await urlAssinada("rede", l.imagem_path, 3600) : null,
+          texto: (l.texto as string | null) ?? null,
+          criadoEm: l.criado_em as string,
+        })),
+      );
+    } catch {
+      /* Sem as publicações a vitrine vira só o cartão de perfil — que é melhor
+         que uma página que não abre. */
+    }
+
+    return {
+      perfil: {
+        nome: (p!.display_name as string | null)?.trim() || "Alguém",
+        bio: ((p!.bio as string | null) ?? "").trim() || null,
+        avatarUrl: (p!.avatar_url as string | null) ?? null,
+        seloSemana: selo.semana,
+        seloBebe: selo.bebe,
+        posts,
+        codigoDeConvite: codigo,
+      },
+    };
+  });
