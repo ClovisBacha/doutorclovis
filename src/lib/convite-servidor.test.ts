@@ -149,3 +149,29 @@ describe("a função é pública de propósito", () => {
     expect(TODO).not.toContain("pacienteDaSessao");
   });
 });
+
+/**
+ * ⚠️ A FOTO É RENOVADA NAS DUAS, e o defeito era o comentário estar velho.
+ *
+ * Ele dizia "a foto já é data URL no banco (JPEG 256px reduzido no canvas)" — e
+ * era verdade até o editor de perfil da rede passar a SUBIR a foto para o balde
+ * e gravar uma URL ASSINADA, que vence em 7 dias. Devolvida crua, a foto de
+ * quem convidou (na faixa) e a da vitrine pública respondiam 403 a partir do
+ * oitavo dia: nome certo, buraco no lugar do rosto — justamente a metade que
+ * faz alguém confiar num link que chegou pelo WhatsApp.
+ *
+ * `renovarUrlAssinada` devolve data URL intacta, então não há regressão para
+ * quem ainda tem o formato antigo. É a mesma função, e o mesmo defeito, que
+ * `perfisPorId` já conserta para a rede inteira.
+ */
+describe("a foto de quem convidou não vence", () => {
+  for (const fn of ["quemConvidou", "perfilPublicoPorCodigo"]) {
+    test(`${fn} renova a URL assinada`, () => {
+      const c = corpoDe(fn);
+      expect(c).toContain("renovarUrlAssinada");
+      // Nunca a coluna crua indo direto para a resposta.
+      expect(c).not.toContain("avatarUrl: (p!.avatar_url as string | null) ?? null");
+      expect(c).not.toContain("avatarUrl: ((perfil as any).avatar_url as string | null) ?? null");
+    });
+  }
+});

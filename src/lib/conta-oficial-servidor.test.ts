@@ -24,9 +24,24 @@ const SQL = readFileSync("supabase/APLICAR_CONTA_OFICIAL.sql", "utf8")
 describe("a conta oficial na rede", () => {
   /* ⚠️ Ela cairia no FIM da fileira exatamente na conta nova — que é a única
      para quem ela importa. Fixar é a única forma de o dia um funcionar. */
-  test("⚠️ vem fixada no topo das sugeridas, pela régua pura", () => {
-    expect(REDE).toContain("comOficialNoTopo(pessoas, oficial)");
-    expect(REDE).toContain("pessoas.find((p) => p.oficial)?.id ?? null");
+  /**
+   * ⚠️ ESTA ASSERÇÃO JÁ TRAVOU O DEFEITO NO LUGAR, e vale registrar.
+   *
+   * Ela cobrava `pessoas.find((p) => p.oficial)` — e `pessoas` já é o recorte de
+   * `PESSOAS_SUGERIDAS` do ranking, ordenado por elos em comum. A conta oficial
+   * não tem elo com ninguém: ela cai no FIM e é a primeira a ser cortada.
+   * Procurá-la ali era procurar no único lugar de onde ela sempre tinha acabado
+   * de sair, e `comOficialNoTopo` virava no-op silencioso — a conta do
+   * consultório não aparecia para ninguém, que é o recurso inteiro do dia um.
+   *
+   * O teste ficou verde o tempo todo, porque ele descrevia o código em vez de
+   * descrever o que o código precisa fazer. Hoje cobra a busca entre as
+   * CANDIDATAS, e o comportamento está em `conta-oficial.test.ts`.
+   */
+  test("⚠️ vem fixada no topo, e é procurada ANTES do corte", () => {
+    expect(REDE).toContain("candidatas.find((c) => ehContaOficial(c as any))");
+    expect(REDE).toContain("fileiraComOficial(pessoas");
+    expect(REDE).not.toContain("pessoas.find((p) => p.oficial)");
   });
 
   /* ⚠️ Uma coluna própria, e nunca um nome reconhecido por texto. */

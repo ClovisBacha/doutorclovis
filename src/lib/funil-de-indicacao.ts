@@ -48,6 +48,12 @@ export type Funil = {
 };
 
 export type FatosDoFunil = {
+  /**
+   * Contas com `referred_by` OU `ref_code` — contadas UMA vez.
+   *
+   * ⚠️ Não é `porAmiga + porCriadora`: os dois campos convivem na mesma linha.
+   */
+  chegaram: number;
   /** Contas com `referred_by` — vieram pelo convite de outra paciente. */
   porAmiga: number;
   /** Contas com `ref_code` — vieram pelo link de uma criadora. */
@@ -66,8 +72,24 @@ export type FatosDoFunil = {
  * conversão sem essa linha é onde alguém lê "publicaram: 12" como "12 posts" —
  * e decide sobre uma métrica que nunca existiu.
  */
+/**
+ * Quantos "seguir" o próprio app escreve por conta.
+ *
+ * ⚠️ **É por isso que o degrau começa a contar no SEGUNDO.** `paresDoSeguir`
+ * grava uma linha da recém-chegada para a indicadora no instante da
+ * atribuição. Um degrau que contasse "segue ao menos uma pessoa" mediria essa
+ * escrita e ficaria em ~100% para sempre — um número que sobe sozinho, num
+ * painel que existe para dizer ao dono onde o funil vaza.
+ */
+export const SEGUIR_AUTOMATICO = 1;
+
 export function montarFunil(f: FatosDoFunil): Funil {
-  const chegaram = f.porAmiga + f.porCriadora;
+  /* ⚠️ **NUNCA `porAmiga + porCriadora`.** Os dois campos convivem na mesma
+     linha (quem entrou pelo link de uma amiga pode digitar depois o código de
+     uma embaixadora no Perfil), então a soma conta essa paciente duas vezes e
+     infla o denominador de todas as taxas abaixo. `chegaram` é contado à parte,
+     com `OR`, e o recuo é o MAIOR dos dois — nunca a soma. */
+  const chegaram = Math.max(f.chegaram, f.porAmiga, f.porCriadora);
   return {
     comCodigo: f.comCodigo,
     degraus: [
@@ -82,7 +104,11 @@ export function montarFunil(f: FatosDoFunil): Funil {
         chave: "criaram",
         rotulo: "Criaram conta por convite",
         quantos: chegaram,
-        comoFoiContado: `${f.porAmiga} por convite de amiga · ${f.porCriadora} por link de criadora.`,
+        comoFoiContado:
+          `${f.porAmiga} por convite de amiga · ${f.porCriadora} por link de criadora` +
+          (f.porAmiga + f.porCriadora > chegaram
+            ? ` · ${f.porAmiga + f.porCriadora - chegaram} têm os dois, e contam uma vez.`
+            : "."),
       },
       {
         chave: "publicaram",
@@ -92,9 +118,12 @@ export function montarFunil(f: FatosDoFunil): Funil {
       },
       {
         chave: "conectaram",
-        rotulo: "Seguem alguém",
+        rotulo: "Seguem alguém além de quem as trouxe",
         quantos: f.conectaram,
-        comoFoiContado: "Contas vindas por convite que seguem ao menos uma pessoa.",
+        comoFoiContado:
+          `Contas vindas por convite com mais de ${SEGUIR_AUTOMATICO} seguir ativo. ` +
+          "O primeiro é escrito pelo próprio app na atribuição do convite, então " +
+          "contá-lo mediria a nossa automação, e não a paciente.",
       },
     ],
   };

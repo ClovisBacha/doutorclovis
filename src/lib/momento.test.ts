@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
 import {
   momentoDe,
   ROTULO_COMPARTILHAR,
@@ -154,4 +155,60 @@ describe("o cartão fica pronto para virar arquivo", () => {
   test("⚠️ o botão não promete publicar", () => {
     expect(ROTULO_COMPARTILHAR.toLocaleLowerCase("pt-BR")).not.toContain("publicar");
   });
+});
+
+/**
+ * ⚠️ TODA ESPÉCIE TEM UMA TELA — e cinco das oito não tinham.
+ *
+ * `momentoDe` nasceu com oito espécies, régua testada e cartão pronto; o app
+ * chamava TRÊS (chama, troféu, cinco estrelas). As outras cinco — semana,
+ * conquista, marco de gratidão, página do álbum e aula — eram código escrito,
+ * verde no teste e inalcançável pela paciente: exatamente a família do
+ * `proximoDesbloqueio`/`escadaDeTrofeus`, que existiam com zero chamadores, e
+ * das três conquistas da Escola do Bebê que liam uma tabela que nada escreve.
+ *
+ * O pedido do dono era "um mapeamento de TUDO que existe no aplicativo e que a
+ * gente pode usar pra ser compartilhável" — cinco espécies sem porta são cinco
+ * oitavos do pedido não entregues, sem nada quebrado para mostrar.
+ *
+ * ⚠️ **Só conta chamada em COMPONENTE, nunca em bancada** — foi exatamente onde
+ * as portas da rede social viveram enquanto ninguém as alcançava. E os
+ * comentários saem antes de procurar: a prosa que explica uma espécie contém o
+ * nome dela.
+ */
+describe("toda espécie tem chamador no app", () => {
+  function fontes(dir: string): string[] {
+    const saida: string[] = [];
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const caminho = `${dir}/${e.name}`;
+      if (e.isDirectory()) saida.push(...fontes(caminho));
+      else if (/\.tsx?$/.test(e.name) && !/\.test\.tsx?$/.test(e.name)) saida.push(caminho);
+    }
+    return saida;
+  }
+
+  const semComentarios = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+
+  const APP = fontes("src/components")
+    .concat(fontes("src/routes").filter((f) => !/preview-/.test(f)))
+    .map((f) => semComentarios(readFileSync(f, "utf8")))
+    .join("\n");
+
+  const TODAS: EspecieDeMomento[] = [
+    "semana",
+    "cinco_estrelas",
+    "trofeu",
+    "chama",
+    "conquista",
+    "marco_gratidao",
+    "album_semana",
+    "aula",
+  ];
+
+  for (const especie of TODAS) {
+    test(`⚠️ "${especie}" é alcançável a partir do app`, () => {
+      expect(APP).toContain(`especie: "${especie}"`);
+    });
+  }
 });

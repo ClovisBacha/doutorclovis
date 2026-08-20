@@ -6,6 +6,7 @@
  */
 import { useEffect, useState } from "react";
 import {
+  codigoDeCriadoraLimpo,
   codigoLimpo,
   fraseDoConvite,
   inicialDoConvite,
@@ -31,7 +32,7 @@ function guardado(): { codigo: string; tipo: TipoDeConvite } | null {
     const cru = sessionStorage.getItem(CHAVE);
     if (!cru) return null;
     const o = JSON.parse(cru) as { codigo?: string; tipo?: string };
-    const codigo = codigoLimpo(o.codigo);
+    const codigo = o.tipo === "criadora" ? codigoDeCriadoraLimpo(o.codigo) : codigoLimpo(o.codigo);
     if (!codigo) return null;
     return { codigo, tipo: o.tipo === "criadora" ? "criadora" : "amiga" };
   } catch {
@@ -49,7 +50,7 @@ function daVisita(): { codigo: string; tipo: TipoDeConvite } | null {
   if (typeof window === "undefined") return null;
   const q = new URLSearchParams(window.location.search);
   const amiga = codigoLimpo(q.get("amiga"));
-  const criadora = codigoLimpo(q.get("ref"));
+  const criadora = codigoDeCriadoraLimpo(q.get("ref"));
   const achado: { codigo: string; tipo: TipoDeConvite } | null = amiga
     ? { codigo: amiga, tipo: "amiga" }
     : criadora

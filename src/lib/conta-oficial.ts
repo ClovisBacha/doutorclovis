@@ -90,3 +90,27 @@ export function comOficialNoTopo<T extends { id: string }>(
   if (!oficial) return pessoas;
   return [oficial, ...pessoas.filter((p) => p.id !== oficialId)];
 }
+
+/**
+ * A fileira de sugeridas com a conta oficial na frente, mesmo que o ranking a
+ * tenha cortado.
+ *
+ * ⚠️ **O CORTE É QUEM A APAGAVA, e `comOficialNoTopo` sozinha não via.** A
+ * fileira é o recorte de `PESSOAS_SUGERIDAS` de um ranking ordenado por elos em
+ * comum — e a conta oficial não tem elo com ninguém, então ela cai no FIM e é
+ * exatamente a primeira a ser cortada. Procurá-la depois do corte era procurar
+ * no único lugar de onde ela sempre tinha acabado de sair: a função rodava,
+ * devolvia a lista intacta e nada na tela dizia que a conta oficial não estava
+ * lá. Quem recebe `oficial` aqui é a candidata achada ANTES do corte.
+ *
+ * ⚠️ E ela nunca aparece duas vezes: se o ranking já a tinha incluído, a cópia
+ * de baixo sai (é `comOficialNoTopo` quem faz isso).
+ */
+export function fileiraComOficial<T extends { id: string }>(
+  pessoas: T[],
+  oficial: T | null | undefined,
+): T[] {
+  if (!oficial) return pessoas;
+  const juntas = pessoas.some((p) => p.id === oficial.id) ? pessoas : [oficial, ...pessoas];
+  return comOficialNoTopo(juntas, oficial.id);
+}

@@ -1,7 +1,15 @@
 import { describe, expect, test } from "bun:test";
 import { montarFunil, SEM_MEDIDA, taxa } from "./funil-de-indicacao";
 
-const f = { porAmiga: 30, porCriadora: 12, publicaram: 18, conectaram: 25, comCodigo: 120 };
+const f = {
+  porAmiga: 30,
+  porCriadora: 12,
+  /* ⚠️ 38, e não 42: quatro pacientes têm os DOIS campos. */
+  chegaram: 38,
+  publicaram: 18,
+  conectaram: 25,
+  comCodigo: 120,
+};
 
 describe("os degraus", () => {
   test("estão na ordem do funil", () => {
@@ -22,11 +30,31 @@ describe("os degraus", () => {
     expect(d.comoFoiContado.toLowerCase()).toContain("não medido");
   });
 
-  test("as contas por convite somam as duas origens, e a linha diz quais", () => {
+  /**
+   * ⚠️ NUNCA `porAmiga + porCriadora` — e a soma estava lá.
+   *
+   * Os dois campos convivem na mesma linha: quem entrou pelo link de uma amiga
+   * (`referred_by`) pode digitar depois o código de uma embaixadora
+   * (`ref_code`) no Perfil — é exatamente para isso que o cartão da rede de
+   * segurança existe. Somando, essa paciente entrava DUAS VEZES no degrau de
+   * cima e inflava o denominador de todas as taxas abaixo: o painel mostraria
+   * um funil vazando onde ele não vaza.
+   */
+  test("⚠️ quem tem as DUAS origens conta UMA vez", () => {
     const d = montarFunil(f).degraus[1];
-    expect(d.quantos).toBe(42);
+    expect(d.quantos).toBe(38);
+    expect(d.quantos).not.toBe(f.porAmiga + f.porCriadora);
     expect(d.comoFoiContado).toContain("30");
     expect(d.comoFoiContado).toContain("12");
+    // E a linha explica a diferença, senão 30 + 12 ≠ 38 parece erro de conta.
+    expect(d.comoFoiContado).toContain("4");
+  });
+
+  /* ⚠️ Recuo: se a contagem do OR falhar (devolve 0 por `safe()`), o degrau não
+     pode ficar MENOR que uma das origens — seria uma taxa acima de 100%. */
+  test("⚠️ contagem do OR falhando cai no MAIOR, nunca na soma", () => {
+    const d = montarFunil({ ...f, chegaram: 0 }).degraus[1];
+    expect(d.quantos).toBe(30);
   });
 
   /* ⚠️ Um painel de conversão sem essa linha é onde alguém lê "publicaram: 12"

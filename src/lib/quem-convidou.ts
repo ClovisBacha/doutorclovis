@@ -57,6 +57,34 @@ export function codigoLimpo(cru: string | null | undefined): string | null {
 }
 
 /**
+ * O código de uma CRIADORA, limpo — ou `null`.
+ *
+ * ⚠️ **A FORMA É OUTRA, e usar a de cima escondia a faixa dela em silêncio.**
+ * `referral_code` de paciente é gerado pelo app e é sempre `[A-Z0-9]` curto;
+ * `affiliates.code` é escrito À MÃO pelo dono, e o próprio app já aceita bem
+ * mais do que isso: a captura de `?ref=` em `__root.tsx` valida
+ * `[a-zA-Z0-9_-]{3,24}`, guarda 90 dias, atribui a assinatura e paga a
+ * comissão. Ou seja, um código como `DRA-ANA` funciona de ponta a ponta na
+ * economia — e a faixa "Fulana te chamou pra cá" simplesmente não aparecia,
+ * sem erro nenhum, justamente no link que a criadora pôs na bio para trinta
+ * mil pessoas.
+ *
+ * ⚠️ **E `_` PODE entrar aqui porque a consulta é `.eq()`, nunca `ilike`.** O
+ * curinga só existe em `ilike`; é a mesma distinção que `like-seguro.ts`
+ * documenta. `%` continua fora — ele não está no alfabeto que a captura
+ * aceita, então um código com `%` nunca chegaria a ser atribuído de qualquer
+ * forma, e recusá-lo mantém este arquivo seguro se um dia a consulta mudar.
+ *
+ * ⚠️ **A forma é a MESMA da captura, e tem de continuar sendo.** Duas réguas
+ * para "que código é válido" divergem no primeiro ajuste — e a divergência
+ * aparece como criadora sem faixa, que é exatamente este defeito.
+ */
+export function codigoDeCriadoraLimpo(cru: string | null | undefined): string | null {
+  const c = (cru ?? "").trim().toUpperCase();
+  return /^[A-Z0-9_-]{3,24}$/.test(c) ? c : null;
+}
+
+/**
  * O PRIMEIRO nome, e só ele.
  *
  * ⚠️ Sobrenome identifica; primeiro nome apresenta. "Marina Costa" num convite

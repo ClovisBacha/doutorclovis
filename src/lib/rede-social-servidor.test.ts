@@ -642,7 +642,9 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
     // As duas camadas são separadas de propósito — perfil aberto com post
     // `amigas` é o caso normal. Sugerir por uma só entregaria a estranhos o
     // post que ela escreveu para as amigas.
-    expect(C).toContain('.eq("perfil_publico", true)');
+    /* ⚠️ O filtro do PERFIL mudou de casa quando as candidatas ganharam recuo
+       próprio para `conta_oficial` — a asserção segue ele, nunca sai. */
+    expect(funcaoInterna("candidatasPublicas")).toContain('.eq("perfil_publico", true)');
     expect(C).toContain('.eq("visibilidade", "publico")');
   });
 
@@ -1057,5 +1059,75 @@ describe("gravar as marcações", () => {
   test("e o bloqueio e o Modo Cuidado continuam fechando", () => {
     expect(corpo).toContain("ctx.bloqueio.has(id)");
     expect(corpo).toContain("emCuidado: !p || !!p.care_mode");
+  });
+});
+
+/**
+ * ⚠️ O RECUO DEGRAU A DEGRAU, e ele nasceu de um defeito meu no ar.
+ *
+ * `conta_oficial` entrou na lista principal num `APLICAR_` SEPARADO do das
+ * colunas do selo. Existe portanto um banco real — o do dono agora — que TEM
+ * `mostrar_semana`/`mostrar_bebe`/`aceita_perguntas` e ainda NÃO tem
+ * `conta_oficial`: com um recuo só, ele caía direto no degrau de baixo e a rede
+ * inteira perdia o selo da semana, o selo do bebê e a caixinha de perguntas.
+ * Três recursos já ligados, apagados em silêncio por uma coluna que ele nem
+ * sabia que existia.
+ */
+describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
+  test("⚠️ há um degrau entre a lista cheia e a lista sem selo", () => {
+    const p = funcaoInterna("perfisPorId");
+    // O erro do select cheio cai no degrau do meio, nunca direto no de baixo.
+    expect(p).toContain("semAColunaNova(sb, ids)");
+    expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
+
+    const meio = funcaoInterna("semAColunaNova");
+    // E o degrau do meio conhece o de baixo: banco sem selo nenhum ainda desce.
+    expect(meio).toContain("semAsColunasDoSelo(sb, ids)");
+    expect(meio).toContain("COLUNAS_SEM_OFICIAL");
+  });
+
+  /* ⚠️ Derivada, nunca copiada: duas listas escritas à mão divergem no primeiro
+     ajuste, e aqui a divergência apareceria como recurso sumindo, sem erro. */
+  test("⚠️ a lista do meio é DERIVADA da cheia", () => {
+    expect(CODIGO).toContain('COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")');
+  });
+
+  /* ⚠️ Ausente vale `false` nos DOIS degraus — nunca `undefined` viajando até
+     `ehContaOficial`, que é o que faria o selo depender de coincidência. */
+  test("⚠️ os dois degraus preenchem `conta_oficial: false`", () => {
+    expect(funcaoInterna("semAColunaNova")).toContain("conta_oficial: false");
+    expect(funcaoInterna("semAsColunasDoSelo")).toContain("conta_oficial: false");
+  });
+
+  /**
+   * ⚠️ E o select das CANDIDATAS não herda o recuo de `perfisPorId`.
+   *
+   * Sem recuo próprio, acrescentar `conta_oficial` ali apagaria a zona de
+   * sugestões INTEIRA num banco sem a coluna: `42703` devolve `data: null`,
+   * `candidatas` fica vazia e a função retorna cedo — nem publicações
+   * sugeridas, nem fileira de pessoas. Nada na tela, nada no log.
+   */
+  test("⚠️ as candidatas a sugestão têm recuo PRÓPRIO", () => {
+    const c = funcaoInterna("candidatasPublicas");
+    expect(c).toContain("COLUNAS_DA_CANDIDATA");
+    /* ⚠️ O guarda é o recurso: sem ele o recuo vira código morto e a função
+       devolve o `data: null` do erro — a zona some do mesmo jeito. */
+    expect(c).toContain("if (!error) return");
+    expect(c).toContain('COLUNAS_DA_CANDIDATA.replace(", conta_oficial", "")');
+    expect(c).toContain("conta_oficial: false");
+  });
+
+  /**
+   * ⚠️ E a oficial é procurada entre as CANDIDATAS, nunca entre as `pessoas`.
+   *
+   * `pessoas` já é o recorte de `PESSOAS_SUGERIDAS`, e a conta oficial cai no
+   * FIM do ranking por não ter elo com ninguém: procurá-la ali era procurar no
+   * único lugar de onde ela sempre tinha acabado de ser cortada.
+   */
+  test("⚠️ a oficial sai de `candidatas`, e a régua é a de lib/", () => {
+    const s = corpoDe("sugestoesDoFeed");
+    expect(s).toContain("candidatas.find((c) => ehContaOficial(c as any))");
+    expect(s).toContain("fileiraComOficial(pessoas");
+    expect(s).not.toContain("pessoas.find((p) => p.oficial)");
   });
 });

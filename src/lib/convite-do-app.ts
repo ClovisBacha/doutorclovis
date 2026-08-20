@@ -32,7 +32,7 @@
  */
 
 /** A página de onde o convite está sendo mostrado. Muda a FRASE, nada mais. */
-export type OndeConvida = "presentes" | "album" | "acompanhante" | "perfil";
+export type OndeConvida = "presentes" | "album" | "nome" | "acompanhante" | "perfil";
 
 /**
  * A frase, por página.
@@ -56,6 +56,16 @@ export function fraseDoRodape(onde: OndeConvida): { titulo: string; sub: string 
       return {
         titulo: "Este álbum vive no Obstétrica",
         sub: "O app onde ela acompanha a gestação, semana a semana.",
+      };
+    case "nome":
+      /* ⚠️ **NÃO é a frase do álbum, e essa era a que estava lá.** `/votar-nome`
+         herdou `onde="album"` por copiar a linha da página vizinha, e o rodapé
+         dizia "Este álbum vive no Obstétrica" para quem tinha acabado de votar
+         num nome e nunca viu foto nenhuma. Rodapé que descreve outra tela ensina
+         que este app fala do que não está ali. */
+      return {
+        titulo: "Esta votação foi feita no Obstétrica",
+        sub: "O app da gestação dela — do positivo ao pós-parto.",
       };
     case "acompanhante":
       return {

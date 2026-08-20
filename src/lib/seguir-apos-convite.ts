@@ -30,6 +30,15 @@
  *
  * ─── E OS DOIS SILÊNCIOS ───────────────────────────────────────────────────
  *
+ * ⚠️ **E O BLOQUEIO CANCELA O SEGUIR, nos dois sentidos.** `bloquear` desfaz o
+ * seguir de propósito, e numa ordem escolhida a dedo para que meio bloqueio
+ * nunca exista. Ligar as duas de volta aqui ressuscitaria exatamente o vínculo
+ * que ela desfez — e sem nenhum aviso, porque o bloqueio é calado. O caso é
+ * estreito (a recém-chegada acabou de criar a conta) e não é impossível: uma
+ * conta antiga sem `referred_by` fixado passa por este caminho, e o bloqueio
+ * dela pode ser de meses atrás. Guardar custa uma linha; não guardar custa a
+ * proteção inteira.
+ *
  * ⚠️ **Modo Cuidado de QUALQUER UMA das duas cancela o seguir**, e só o seguir:
  * a atribuição, a moeda e a amizade continuam (são o recibo, e o recibo fica).
  * Quem está em luto some da rede sem anunciar; criar um vínculo social para
@@ -41,10 +50,19 @@ export type FatosDoSeguirAposConvite = {
   novaEmCuidado: boolean;
   /** Defesa contra o par degenerado — o banco tem CHECK, mas erro de banco é erro na tela. */
   mesmaPessoa: boolean;
+  /**
+   * Existe bloqueio entre as duas, em QUALQUER sentido?
+   *
+   * ⚠️ **Ausente vale BLOQUEADA quando a leitura falhou** — quem chama decide,
+   * e o lado seguro aqui é não ligar: um seguir a menos é um incômodo, um
+   * seguir que ressuscita um bloqueio é a proteção dela desfeita em silêncio.
+   */
+  bloqueada: boolean;
 };
 
 export function deveLigarNaRede(f: FatosDoSeguirAposConvite): boolean {
   if (f.mesmaPessoa) return false;
+  if (f.bloqueada) return false;
   if (f.indicadoraEmCuidado) return false;
   if (f.novaEmCuidado) return false;
   return true;

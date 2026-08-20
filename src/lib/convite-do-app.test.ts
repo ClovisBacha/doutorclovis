@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { fraseDoRodape, ROTULO_DO_BOTAO, type OndeConvida } from "./convite-do-app";
 
-const TODAS: OndeConvida[] = ["presentes", "album", "acompanhante", "perfil"];
+const TODAS: OndeConvida[] = ["presentes", "album", "nome", "acompanhante", "perfil"];
 
 describe("as frases do rodapé", () => {
   test("cada página tem a sua, e são diferentes", () => {
@@ -14,6 +15,7 @@ describe("as frases do rodapé", () => {
   test("⚠️ cada frase fala da página em que está", () => {
     expect(fraseDoRodape("presentes").titulo.toLowerCase()).toContain("lista");
     expect(fraseDoRodape("album").titulo.toLowerCase()).toContain("álbum");
+    expect(fraseDoRodape("nome").titulo.toLowerCase()).toContain("votação");
     expect(fraseDoRodape("acompanhante").titulo.toLowerCase()).toContain("acompanhando");
     expect(fraseDoRodape("perfil").titulo.toLowerCase()).toContain("perfil");
   });
@@ -59,4 +61,36 @@ describe("as frases do rodapé", () => {
       expect(f.sub.trim().length).toBeGreaterThan(8);
     }
   });
+});
+
+/**
+ * ⚠️ CADA PÁGINA PÚBLICA USA A VARIANTE DELA — e esta catraca nasceu de um
+ * defeito real.
+ *
+ * `/votar-nome` foi escrita copiando a linha da página vizinha e ficou com
+ * `onde="album"`: quem votava num nome lia, no pé, "Este álbum vive no
+ * Obstétrica" — um rodapé descrevendo uma tela que aquela pessoa nunca viu. Não
+ * quebra nada, não aparece em teste, e é exatamente o tipo de coisa que faz o
+ * app parecer descuidado para quem ainda não é usuário.
+ *
+ * A frase é o único trabalho deste componente. Se ela fala de outra página, o
+ * componente não fez nada.
+ */
+describe("a variante de cada rota pública", () => {
+  const ESPERADO: Record<string, OndeConvida> = {
+    "src/routes/album.$token.tsx": "album",
+    "src/routes/votar-nome.$token.tsx": "nome",
+    "src/routes/acompanhar.$token.tsx": "acompanhante",
+    "src/routes/presente.$token.tsx": "presentes",
+    "src/routes/p.$codigo.tsx": "perfil",
+  };
+
+  for (const [arquivo, onde] of Object.entries(ESPERADO)) {
+    test(`${arquivo} usa onde="${onde}"`, () => {
+      const fonte = readFileSync(arquivo, "utf8");
+      const achados = [...fonte.matchAll(/<ConviteDoApp[^>]*onde="([a-z]+)"/g)].map((m) => m[1]);
+      expect(achados.length).toBeGreaterThan(0);
+      for (const a of achados) expect(a).toBe(onde);
+    });
+  }
 });

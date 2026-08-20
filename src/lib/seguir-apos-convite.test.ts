@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { deveLigarNaRede, paresDoSeguir } from "./seguir-apos-convite";
 
-const base = { indicadoraEmCuidado: false, novaEmCuidado: false, mesmaPessoa: false };
+const base = {
+  indicadoraEmCuidado: false,
+  novaEmCuidado: false,
+  mesmaPessoa: false,
+  bloqueada: false,
+};
 
 describe("deveLigarNaRede", () => {
   test("o caso comum liga", () => {
@@ -40,5 +45,28 @@ describe("os pares", () => {
 
   test("nenhum par é degenerado", () => {
     for (const p of paresDoSeguir("a", "b")) expect(p.seguidor_id).not.toBe(p.seguido_id);
+  });
+});
+
+/**
+ * ⚠️ O BLOQUEIO CANCELA O SEGUIR — e este era o buraco.
+ *
+ * `bloquear` desfaz o seguir de propósito, numa ordem escolhida a dedo para que
+ * "meio bloqueio" nunca exista. Ligar as duas de volta aqui ressuscitaria
+ * exatamente o vínculo que ela desfez, e sem nenhum aviso, porque o bloqueio é
+ * calado. O caso é estreito — a recém-chegada acabou de criar a conta —, mas
+ * uma conta antiga sem `referred_by` fixado passa por este mesmo caminho.
+ */
+describe("o bloqueio", () => {
+  test("⚠️ bloqueio entre as duas não liga ninguém", () => {
+    expect(deveLigarNaRede({ ...base, bloqueada: true })).toBe(false);
+  });
+
+  /* ⚠️ E o chamador faz a leitura FALHAR FECHADA: erro de rede vale
+     "bloqueada". Um seguir a menos é um incômodo; um seguir por cima de um
+     bloqueio não tem conserto, porque ninguém é avisado. */
+  test("⚠️ o bloqueio vence até o caso mais comum", () => {
+    expect(deveLigarNaRede({ ...base })).toBe(true);
+    expect(deveLigarNaRede({ ...base, bloqueada: true })).toBe(false);
   });
 });

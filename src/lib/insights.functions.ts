@@ -607,9 +607,18 @@ export const getFunilDeIndicacao = createServerFn({ method: "POST" })
       return (r as { count: number | null })?.count ?? 0;
     };
 
-    const [porAmiga, porCriadora, comCodigo] = await Promise.all([
+    /* ⚠️ **`chegaram` é UMA CONTAGEM PRÓPRIA, e nunca a soma das duas.** Os dois
+       campos convivem na mesma linha: quem entrou pelo link de uma amiga
+       (`referred_by`) pode digitar depois o código de uma embaixadora
+       (`ref_code`) no Perfil — é exatamente para isso que o cartão da rede de
+       segurança existe. Somando, essa paciente entrava duas vezes no degrau de
+       cima e INFLAVA O DENOMINADOR de todas as taxas abaixo: o painel mostraria
+       um funil vazando onde ele não vaza, e a decisão que ele existe para
+       apoiar seria tomada sobre um número inventado. */
+    const [porAmiga, porCriadora, chegaram, comCodigo] = await Promise.all([
       conta((q) => q.not("referred_by", "is", null)),
       conta((q) => q.not("ref_code", "is", null)),
+      conta((q) => q.or("referred_by.not.is.null,ref_code.not.is.null")),
       conta((q) => q.not("referral_code", "is", null)),
     ]);
 
@@ -629,34 +638,55 @@ export const getFunilDeIndicacao = createServerFn({ method: "POST" })
       return null;
     }, null);
 
-    const comAlgum = async (tabela: string, coluna: string): Promise<Set<string>> => {
-      const fora = new Set<string>();
+    /**
+     * Quantas linhas cada pessoa tem numa tabela, já FILTRADA.
+     *
+     * ⚠️ **O filtro é parâmetro, e não era.** A versão anterior lia a tabela
+     * crua, então "publicaram ao menos uma vez" contava post ARQUIVADO — e
+     * arquivar é a paciente tirando do ar o que ela publicou. O painel dizia
+     * que ela tinha publicado sobre uma publicação que não existe mais, e o
+     * `comoFoiContado` do degrau afirmava, por escrito, "publicação não
+     * arquivada". O rótulo estava certo; a consulta é que não.
+     */
+    const contarPor = async (
+      tabela: string,
+      coluna: string,
+      filtrar: (q: any) => any,
+    ): Promise<Map<string, number>> => {
+      const quantas = new Map<string, number>();
       await safe(async () => {
-        const { data: linhas } = await sb.from(tabela).select(coluna).limit(MAX_ROWS);
+        const { data: linhas } = await filtrar(sb.from(tabela).select(coluna)).limit(MAX_ROWS);
         for (const l of (linhas ?? []) as Record<string, string>[]) {
           const id = l[coluna];
-          if (id) fora.add(id);
+          if (id) quantas.set(id, (quantas.get(id) ?? 0) + 1);
         }
         return null;
       }, null);
-      return fora;
+      return quantas;
     };
 
-    const [autores, seguidores] = await Promise.all([
-      comAlgum("rede_posts", "autor_id"),
-      comAlgum("rede_seguidores", "seguidor_id"),
+    const { SEGUIR_AUTOMATICO } = await import("@/lib/funil-de-indicacao");
+    const [autores, seguidos] = await Promise.all([
+      contarPor("rede_posts", "autor_id", (q) => q.is("arquivado_em", null)),
+      contarPor("rede_seguidores", "seguidor_id", (q) => q.eq("estado", "ativo")),
     ]);
 
     let publicaram = 0;
     let conectaram = 0;
     for (const id of indicadas) {
-      if (autores.has(id)) publicaram += 1;
-      if (seguidores.has(id)) conectaram += 1;
+      if ((autores.get(id) ?? 0) > 0) publicaram += 1;
+      /* ⚠️ **DOIS, e não um — porque o app escreve o primeiro.** Desde P3, a
+         atribuição do convite já grava um seguir automático da recém-chegada
+         para a indicadora. Contando "segue ao menos uma pessoa", este degrau
+         mediria a escrita do próprio app e daria ~100% para sempre: um número
+         que sobe sozinho e não informa nada. A partir do segundo, o gesto é
+         dela. Ver `SEGUIR_AUTOMATICO`. */
+      if ((seguidos.get(id) ?? 0) > SEGUIR_AUTOMATICO) conectaram += 1;
     }
 
     const { montarFunil } = await import("@/lib/funil-de-indicacao");
     return {
       ok: true as const,
-      funil: montarFunil({ porAmiga, porCriadora, publicaram, conectaram, comCodigo }),
+      funil: montarFunil({ porAmiga, porCriadora, chegaram, publicaram, conectaram, comCodigo }),
     };
   });

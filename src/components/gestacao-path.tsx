@@ -117,6 +117,7 @@ import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
 import { guardarAulaDeHoje } from "@/lib/aula-compartilhavel";
+import { temaDoDia } from "@/lib/rede-social";
 
 /**
  * Comemora o bônus por VARIAR as atividades (a "sequência" da semana): confete
@@ -3890,6 +3891,8 @@ export function GestacaoPath({
           revealing={revealing}
           onClose={() => setSheet(null)}
           onShare={share}
+          nomeDaMae={profile?.display_name ?? null}
+          aoPublicarMomento={publicarMomento}
           careMode={careMode}
         />
       )}
@@ -3918,6 +3921,8 @@ function AlbumSheet({
   onClose,
   onShare,
   careMode = false,
+  nomeDaMae,
+  aoPublicarMomento,
 }: {
   week: number;
   babyLabel: string;
@@ -3925,6 +3930,10 @@ function AlbumSheet({
   onClose: () => void;
   onShare: (week: number) => void;
   careMode?: boolean;
+  /** Vai no cartão de compartilhar. */
+  nomeDaMae?: string | null;
+  /** Leva a página do álbum ao compositor da Comunidade. */
+  aoPublicarMomento?: (m: Momento) => void;
 }) {
   const baby = babyForWeek(week);
   const tm = trimMeta(week);
@@ -3985,6 +3994,30 @@ function AlbumSheet({
             </p>
           </div>
         )}
+
+        {/* ── ⚠️ A PÁGINA DO ÁLBUM VIRA CARTÃO ───────────────────────────
+            "Enviar 💌", lá em cima, manda TEXTO — e texto colado no WhatsApp
+            é a única forma de compartilhar deste app que não vira imagem nem
+            leva ninguém para a Comunidade. O cartão fica aqui, no pé, depois
+            do conteúdo da página: o texto continua sendo o gesto rápido, e
+            este é o gesto que publica.
+
+            ⚠️ O portão de Modo Cuidado é o de `momentoDe` — `null`, e o
+            componente não desenha nada. */}
+        <div className="mt-4">
+          <CompartilharMomento
+            momento={momentoDe({
+              especie: "album_semana",
+              numero: week,
+              rotulo: `${babyLabel} do tamanho de ${baby.fruit.toLocaleLowerCase("pt-BR")}`,
+              emoji: fruitEmojiForWeek(week),
+              emCuidado: !!careMode,
+            })}
+            nomeDaMae={nomeDaMae}
+            aoPublicarNaComunidade={aoPublicarMomento}
+            compacto
+          />
+        </div>
       </div>
     </div>
   );
@@ -8047,6 +8080,8 @@ export function GratitudeBlock({
   onEarn,
   aoSair,
   aoIrParaBebe,
+  nomeDaMae,
+  aoPublicarMomento,
   bancada,
 }: {
   day: number;
@@ -8082,6 +8117,10 @@ export function GratitudeBlock({
    * atividades para trocar — lá o botão simplesmente não aparece.
    */
   aoIrParaBebe?: () => void;
+  /** Vai no cartão de compartilhar, quando há marco. */
+  nomeDaMae?: string | null;
+  /** Leva o marco ao compositor da Comunidade. Ausente = só a imagem. */
+  aoPublicarMomento?: (m: Momento) => void;
   /**
    * ⚠️ SÓ A BANCADA (`/preview-gratidao`).
    *
@@ -8757,6 +8796,27 @@ export function GratitudeBlock({
                 <p className="dc-result-in mt-2 font-serif text-6xl font-black text-amber-500">
                   {marcoAtual}
                 </p>
+              )}
+              {/* ⚠️ SÓ NO MARCO, nunca no dia comum. Um botão de compartilhar
+                  em toda gratidão guardada transformaria o exercício mais
+                  íntimo do app numa cobrança diária de publicar — e o texto
+                  dela nunca vai junto: o cartão leva o NÚMERO, e a frase que
+                  ela escreveu fica onde ela a escreveu. O portão de Modo
+                  Cuidado é o de `momentoDe`, que devolve `null` e faz o
+                  componente não desenhar nada. */}
+              {marcoAtual && (
+                <div className="mt-4 w-full max-w-xs">
+                  <CompartilharMomento
+                    momento={momentoDe({
+                      especie: "marco_gratidao",
+                      numero: marcoAtual,
+                      emCuidado: !!careMode,
+                    })}
+                    nomeDaMae={nomeDaMae}
+                    aoPublicarNaComunidade={aoPublicarMomento}
+                    compacto
+                  />
+                </div>
               )}
               {!careMode && reward != null && reward > 0 && (
                 <div className="mt-4 rounded-full bg-emerald-100 px-5 py-2 text-base font-extrabold text-emerald-700">
@@ -9487,6 +9547,8 @@ function WellnessScreen({
                      abre JÁ na tela cheia (a bolha "estudiosa" mora lá), em
                      vez do cartão recolhido que exigia um segundo toque. */
                   aoSair={() => setOpenKey(null)}
+                  nomeDaMae={nomeDaMae}
+                  aoPublicarMomento={aoPublicarMomento}
                 />
               )
             ) : lesson.kind === "carregando" ? (
@@ -9530,6 +9592,13 @@ function WellnessScreen({
                  a atividade Bebê direto da tela de guardado, no instante em
                  que a carta feita das gratidões passa a existir. */
               aoIrParaBebe={() => setOpenKey("bonding")}
+              /* ⚠️ As duas viajam para TODAS as atividades e só quem celebra
+                 as usa — é o mesmo padrão de `babyName`, que só o Bebê lê. Sem
+                 isto, `momentoDe` tinha cinco espécies escritas, testadas e
+                 sem chamador nenhum: régua e cartão prontos, e nenhuma tela
+                 por onde a paciente chegasse neles. */
+              nomeDaMae={nomeDaMae}
+              aoPublicarMomento={aoPublicarMomento}
             />
           </div>
         ) : (
@@ -10006,6 +10075,8 @@ function DailyQuizBlock({
   showPremiumAd = false,
   onEarn,
   aoSair,
+  nomeDaMae,
+  aoPublicarMomento,
 }: {
   quiz: DailyQuiz;
   emoji: string;
@@ -10033,6 +10104,10 @@ function DailyQuizBlock({
    * pra chegar na tela cheia.
    */
   aoSair?: () => void;
+  /** Vai no cartão de compartilhar do resultado. */
+  nomeDaMae?: string | null;
+  /** Leva a aula ao compositor da Comunidade. Ausente = só a imagem. */
+  aoPublicarMomento?: (m: Momento) => void;
 }) {
   const questions = quiz.questions;
   const tm = trimMeta(week);
@@ -10351,6 +10426,24 @@ function DailyQuizBlock({
                     ? (missingHint ?? "Tarefa da aula completa — dia fechado! ✓")
                     : "Aprender vale sempre 💜"}
                 </p>
+                {/* ⚠️ **O CARTÃO LEVA O TEMA, NUNCA O DIA NEM A NOTA.** O dia
+                    gestacional é a semana dela disfarçada (D = semana × 7 + dia),
+                    e a nota seria o placar público que a aba das Amigas gastou
+                    um arquivo inteiro para não ter. A conversão dia→tema roda
+                    AQUI, no aparelho dela, como em `guardarAulaDeHoje`. */}
+                <div className="mt-4 w-full max-w-xs">
+                  <CompartilharMomento
+                    momento={momentoDe({
+                      especie: "aula",
+                      rotulo: temaDoDia(day),
+                      emoji: emoji || "📚",
+                      emCuidado: !!careMode,
+                    })}
+                    nomeDaMae={nomeDaMae}
+                    aoPublicarNaComunidade={aoPublicarMomento}
+                    compacto
+                  />
+                </div>
                 {showPremiumAd && (
                   <div className="mt-4 w-full">
                     <QuizPaywall week={week} context="ad" />

@@ -52,7 +52,9 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
-import { shareMilestoneCard } from "@/lib/share-card";
+import { CompartilharMomento } from "@/components/compartilhar-momento";
+import { momentoDe, type Momento } from "@/lib/momento";
+import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
@@ -78,6 +80,7 @@ import {
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
+  fruitEmojiForWeek,
   computeGestation,
   consultaForWeek,
   dueDateFromLmp,
@@ -1948,6 +1951,11 @@ function MinhaContaPage() {
           motherName={profile?.display_name?.split(" ")[0] ?? ""}
           tone={profile?.baby_skin_tone ?? 0}
           onClose={() => setMilestoneWeek(null)}
+          aoPublicarNaComunidade={(m) => {
+            guardarMomentoParaPublicar(m);
+            setMilestoneWeek(null);
+            goToTab("Feed");
+          }}
         />
       )}
 
@@ -3051,12 +3059,15 @@ function WeekMilestoneModal({
   motherName,
   tone,
   onClose,
+  aoPublicarNaComunidade,
 }: {
   week: number;
   babyName: string | null;
   motherName: string;
   tone: number;
   onClose: () => void;
+  /** Leva o cartão ao compositor da Comunidade. */
+  aoPublicarNaComunidade?: (m: Momento) => void;
 }) {
   const baby = babyForWeek(week);
   const [sound, setSound] = useState(false);
@@ -3137,18 +3148,27 @@ function WeekMilestoneModal({
           <span className="font-semibold">{baby.fruit.toLowerCase()}</span>. {baby.desc}
         </p>
 
-        <div className="mt-8 flex flex-col items-center gap-3">
-          <button
-            onClick={async () => {
-              hapticTap();
-              const r = await shareMilestoneCard({ week, fruit: baby.fruit, babyName, motherName });
-              if (r === "downloaded") toast("Imagem salva! É só postar 💛");
-              else if (r === "error") toast("Não consegui gerar a imagem agora.");
-            }}
-            className="press rounded-full border border-primary/40 bg-card/70 px-8 py-3 text-sm font-semibold text-primary backdrop-blur"
-          >
-            📤 Compartilhar esse momento
-          </button>
+        <div className="mt-8 flex w-full max-w-xs flex-col items-center gap-3">
+          {/* ⚠️ **UM CARTÃO SÓ, e ele passa por `momentoDe`.** Este botão
+              chamava `shareMilestoneCard` direto — um caminho de imagem que não
+              conhecia a Comunidade nem o convite, e que não passava pelo portão
+              de Modo Cuidado da régua (aqui isso não mordia, porque o marco não
+              abre no luto, mas era a segunda régua de sempre). O desenho é o
+              MESMO: chapéu, fruta, número gigante, unidade e a frase do
+              tamanho. O que ele ganha é a segunda saída — publicar na
+              Comunidade — que é o pedido do dono ("compartilhar ali na
+              comunidade, compartilhar ali o nosso Instagram"). */}
+          <CompartilharMomento
+            momento={momentoDe({
+              especie: "semana",
+              numero: week,
+              rotulo: `${babyName || "Meu bebê"} do tamanho de ${baby.fruit.toLocaleLowerCase("pt-BR")}`,
+              emoji: fruitEmojiForWeek(week),
+              emCuidado: false,
+            })}
+            nomeDaMae={motherName}
+            aoPublicarNaComunidade={aoPublicarNaComunidade}
+          />
           <button
             onClick={handleClose}
             className="press rounded-full bg-primary px-8 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
@@ -3864,24 +3884,28 @@ function BabyTab({
               </p>
             )}
 
-            {!careMode && (
-              <button
-                onClick={async () => {
-                  hapticTap();
-                  const r = await shareMilestoneCard({
-                    week: gest.weeks,
-                    fruit: baby.fruit,
-                    babyName: profile.baby_name,
-                    motherName: profile.display_name?.split(" ")[0] ?? null,
-                  });
-                  if (r === "downloaded") toast("Imagem salva! É só postar 💛");
-                  else if (r === "error") toast("Não consegui gerar a imagem agora.");
+            {/* ⚠️ O MESMO cartão do marco, pela mesma régua — e não uma
+                segunda chamada a `shareMilestoneCard`. `momentoDe` devolve
+                `null` no Modo Cuidado, então o portão deixou de ser um `if` na
+                tela e passou a ser a régua: é a lição de `humorDaJornada`
+                aplicada ao compartilhamento. */}
+            <div className="mt-4 max-w-xs">
+              <CompartilharMomento
+                momento={momentoDe({
+                  especie: "semana",
+                  numero: gest.weeks,
+                  rotulo: `${profile.baby_name || "Meu bebê"} do tamanho de ${baby.fruit.toLocaleLowerCase("pt-BR")}`,
+                  emoji: fruitEmojiForWeek(gest.weeks),
+                  emCuidado: !!careMode,
+                })}
+                nomeDaMae={profile.display_name?.split(" ")[0] ?? null}
+                aoPublicarNaComunidade={(m) => {
+                  guardarMomentoParaPublicar(m);
+                  onNavigate("Feed");
                 }}
-                className="press mt-4 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-card/60 px-4 py-2 text-xs font-semibold text-primary backdrop-blur"
-              >
-                📤 Compartilhar minha semana
-              </button>
-            )}
+                compacto
+              />
+            </div>
 
             {/* Progresso da jornada (silenciado no Modo Cuidado) */}
             {!careMode && (
@@ -16254,6 +16278,16 @@ export function ConquistasTab({
    * seu". Acontece de verdade com dois aparelhos abertos ao mesmo tempo.
    * Sem festa: não é conquista nova, é um esclarecimento.
    */
+  /**
+   * A conquista que ela ACABOU de resgatar, para a folha de comemoração.
+   *
+   * ⚠️ **Só o instante do resgate, nunca o estado da grade.** Com o estado, a
+   * folha abriria por cima da aba toda vez que ela viesse olhar as conquistas
+   * que já tem — é a mesma distinção que faz os sprites do Caminho nascerem da
+   * TRANSIÇÃO e não do contador.
+   */
+  const [conquistada, setConquistada] = useState<{ titulo: string; emoji: string } | null>(null);
+
   async function resgatar(key: string) {
     /* Por CHAVE, nunca global: a trava protege este cartão de um toque duplo,
        e não a grade inteira de ser usada. */
@@ -16285,6 +16319,11 @@ export function ConquistasTab({
         celebrateChime(1);
         celebrateHaptic(1);
         toast.success(`+${r.granted} 🌱`);
+        /* ⚠️ O título e o emoji saem do CATÁLOGO (`conquistas.ts`), nunca de um
+           texto digitado aqui: são os mesmos que o cartão da grade desenha, e
+           duas cópias divergiriam no primeiro ajuste de nome. */
+        const def = ACHIEVEMENT_DEFS.find((a) => a.key === key);
+        if (def) setConquistada({ titulo: def.title, emoji: def.emoji });
         return;
       }
       if (r.repetido) toast("Essas Sementinhas já são suas 💛");
@@ -16572,6 +16611,65 @@ export function ConquistasTab({
           </div>
         );
       })}
+
+      {/* ── ⚠️ A CONQUISTA VIRA CARTÃO — no instante do resgate ────────────
+          Pedido do dono: "se a pessoa fez ali cinco exercícios e ganhou lá
+          cinco estrelas, isso na página do jogo tem que depois refletir também
+          essa mensagem pra ela compartilhar ali na comunidade".
+
+          ⚠️ **Nasce do RESGATE, nunca do estado da grade.** Com o estado, a
+          folha abriria por cima da aba toda vez que ela viesse olhar as
+          conquistas que já tem — é a mesma distinção que faz os sprites do
+          Caminho nascerem da TRANSIÇÃO e não do contador.
+
+          ⚠️ **E o portão de Modo Cuidado é o de `momentoDe`**, que devolve
+          `null` e faz o componente não desenhar botão nenhum. Um `if` aqui
+          seria a segunda régua que `humorDaJornada` proíbe. */}
+      {conquistada && (
+        <div
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-6"
+          onClick={() => setConquistada(null)}
+        >
+          <div
+            className="w-full max-w-xs rounded-3xl bg-card p-6 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-5xl">{conquistada.emoji}</p>
+            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-primary">
+              Conquista desbloqueada
+            </p>
+            <p className="mt-1 font-serif text-xl leading-tight">{conquistada.titulo}</p>
+            <div className="mt-4">
+              <CompartilharMomento
+                momento={momentoDe({
+                  especie: "conquista",
+                  rotulo: conquistada.titulo,
+                  emoji: conquistada.emoji,
+                  emCuidado: !!careMode,
+                })}
+                /* ⚠️ `undefined` quando não há para onde navegar — e é o que
+                   faz `CompartilharMomento` ESCONDER o botão em vez de oferecer
+                   um que não leva a lugar nenhum. */
+                aoPublicarNaComunidade={
+                  onNavigate
+                    ? (m) => {
+                        guardarMomentoParaPublicar(m);
+                        setConquistada(null);
+                        onNavigate("Feed");
+                      }
+                    : undefined
+                }
+              />
+            </div>
+            <button
+              onClick={() => setConquistada(null)}
+              className="press mt-3 w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

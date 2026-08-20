@@ -233,6 +233,12 @@ export const attributeReferral = createServerFn({ method: "POST" })
              tempo ela pode ter ligado o Modo Cuidado. */
           novaEmCuidado: await isCareModeActive(supabaseAdmin, uid),
           mesmaPessoa: referrerId === uid,
+          /* ⚠️ **A leitura FALHA FECHADA.** `bloquear` desfaz o seguir de
+             propósito; ressuscitá-lo aqui desfaria a proteção dela em
+             silêncio, porque o bloqueio é calado. Um erro de rede vale
+             "bloqueada": um seguir a menos é um incômodo, um seguir por cima
+             de um bloqueio não tem conserto. */
+          bloqueada: await haBloqueioEntre(sb, referrerId, uid),
         })
       ) {
         for (const par of paresDoSeguir(referrerId, uid)) {
@@ -252,3 +258,27 @@ export const attributeReferral = createServerFn({ method: "POST" })
 
     return { ok: true as const, attributed: true };
   });
+
+/**
+ * Existe bloqueio entre as duas, em qualquer sentido?
+ *
+ * ⚠️ **FALHA FECHADA (`true`).** É a mesma decisão de `conjuntoDeBloqueio` na
+ * rede, e pela mesma razão: todo ponto de uso pergunta isto para ESCONDER ou
+ * para NÃO ligar, então um erro que devolvesse `false` faria a proteção sumir
+ * exatamente quando o banco está instável. Aqui o custo do lado seguro é uma
+ * amiga que precisa tocar em "Seguir" à mão; o custo do outro lado é um
+ * bloqueio desfeito sem que ninguém seja avisado.
+ */
+async function haBloqueioEntre(sb: any, a: string, b: string): Promise<boolean> {
+  try {
+    const { data, error } = await sb
+      .from("rede_bloqueios")
+      .select("quem_id")
+      .or(`and(quem_id.eq.${a},bloqueado_id.eq.${b}),and(quem_id.eq.${b},bloqueado_id.eq.${a})`)
+      .limit(1);
+    if (error) return true;
+    return ((data ?? []) as unknown[]).length > 0;
+  } catch {
+    return true;
+  }
+}

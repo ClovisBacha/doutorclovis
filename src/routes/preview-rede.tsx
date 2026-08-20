@@ -50,6 +50,13 @@ const PERFIL: PerfilNaTela = {
   mostrarSemana: true,
   mostrarBebe: true,
   aceitaPerguntas: true,
+  /* ⚠️ A chave da vitrine nasce DESLIGADA — é o estado real de toda paciente,
+     e a bancada tem de abrir no caso comum, nunca no raro. O endereço aparece
+     do mesmo jeito: ele é a informação que faltava (a página existia e nenhuma
+     tela dizia onde), e escondê-lo enquanto a chave está desligada devolveria
+     o defeito que ele conserta. */
+  vitrine: false,
+  codigoDaVitrine: "MARINA7",
   /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */
   bebe: {
     emoji: "🍆",

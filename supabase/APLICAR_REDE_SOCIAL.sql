@@ -836,6 +836,28 @@ COMMENT ON TABLE public.desafio_participantes IS
 ALTER TABLE public.patient_profiles
   ADD COLUMN IF NOT EXISTS aceita_perguntas boolean NOT NULL DEFAULT false;
 
+-- ---------------------------------------------------------------------------
+-- A VITRINE NA INTERNET ABERTA (/p/<codigo>) -- chave PROPRIA.
+--
+-- ATENCAO: NAO e a mesma coisa que `perfil_publico`, e a separacao e o recurso.
+-- A tela onde ela liga o perfil publico diz, com todas as letras, "qualquer
+-- pessoa NO APP pode te achar e te acompanhar". A pagina /p/<codigo> nao e no
+-- app: abre na internet aberta, sem conta nenhuma, e mostra bio, selo da
+-- semana, nome do bebe e doze publicacoes. Autorizar isso com a chave de dentro
+-- seria alargar, pela porta dos fundos, um consentimento dado para outra coisa
+-- -- exatamente o que "nao podemos expor a paciente sem ela saber" proibe.
+--
+-- Nasce FALSA, como as outras tres chaves do perfil. As DUAS precisam estar
+-- ligadas para a pagina abrir: desligar `perfil_publico` fecha o perfil em todo
+-- lugar, inclusive aqui.
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS vitrine_publica boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN public.patient_profiles.vitrine_publica IS
+  'Ela autorizou a pagina /p/<referral_code>, que abre FORA do app e sem conta. '
+  'Separada de perfil_publico de proposito: sao dois consentimentos diferentes.';
+
 CREATE TABLE IF NOT EXISTS public.rede_perguntas (
   id        uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   -- De quem é a caixa (quem responde).
@@ -985,4 +1007,8 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.tables
           WHERE table_schema='public' AND table_name='rede_story_reacoes')           AS reacao_story_ok,
   EXISTS (SELECT 1 FROM information_schema.tables
-          WHERE table_schema='public' AND table_name='rede_story_votos')             AS enquete_story_ok;
+          WHERE table_schema='public' AND table_name='rede_story_votos')             AS enquete_story_ok,
+  -- Sem esta, a vitrine publica (/p/<codigo>) nao abre para ninguem -- o que e
+  -- o lado seguro: banco sem a coluna e banco sem consentimento.
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='patient_profiles' AND column_name='vitrine_publica')     AS vitrine_ok;

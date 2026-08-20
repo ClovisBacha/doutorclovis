@@ -313,7 +313,7 @@ function VotarNomePage() {
           {/* ⚠️ A QUARTA página pública, e a que faltava. O link da votação vai
               para o grupo da família inteiro — as outras três já convidavam e
               esta terminava sem dizer o que é o app. Ver `convite-do-app.ts`. */}
-          <ConviteDoApp onde="album" codigo={codigoDeConvite} />
+          <ConviteDoApp onde="nome" codigo={codigoDeConvite} />
         </div>
       </div>
     </div>

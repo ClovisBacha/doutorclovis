@@ -19,7 +19,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
-import { codigoLimpo, primeiroNome, type QuemConvidou } from "@/lib/quem-convidou";
+import {
+  codigoDeCriadoraLimpo,
+  codigoLimpo,
+  primeiroNome,
+  type QuemConvidou,
+} from "@/lib/quem-convidou";
 import type { PerfilPublico, PostPublico } from "@/lib/perfil-publico";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -46,7 +51,13 @@ export const quemConvidou = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<{ quem: QuemConvidou | null }> => {
     /* ⚠️ Limpar ANTES da consulta — é a régua que impede `%` e `_` de virarem
        curinga. Ver `codigoLimpo`. */
-    const codigo = codigoLimpo(data.codigo);
+    /* ⚠️ **A FORMA DEPENDE DA ORIGEM.** `referral_code` de paciente é gerado
+       pelo app (alfanumérico curto); `affiliates.code` é escrito à mão e o
+       próprio app aceita hífen, sublinhado e até 24 caracteres na captura de
+       `?ref=`. Uma régua só escondia a faixa de toda criadora com código
+       fora da forma estreita — em silêncio, no link da bio dela. */
+    const codigo =
+      data.tipo === "criadora" ? codigoDeCriadoraLimpo(data.codigo) : codigoLimpo(data.codigo);
     if (!codigo) return { quem: null };
 
     try {
@@ -94,12 +105,22 @@ export const quemConvidou = createServerFn({ method: "POST" })
     const nome = primeiroNome((perfil as any).display_name);
     if (!nome) return { quem: null };
 
+    /* ⚠️ **A FOTO PRECISA SER RENOVADA, e o comentário anterior estava velho.**
+       Ele dizia "já é data URL no banco (JPEG 256px reduzido no canvas)" — e era
+       verdade até o editor de perfil da rede passar a SUBIR a foto para o balde
+       e gravar uma URL ASSINADA, que vence em 7 dias. Devolvida crua, a foto de
+       quem convidou respondia 403 a partir do oitavo dia: a faixa aparecia com
+       o nome certo e um buraco no lugar do rosto, que é justamente a metade que
+       faz a pessoa confiar no link.
+
+       `renovarUrlAssinada` conhece os dois formatos e devolve a data URL
+       intacta — é a mesma função, e o mesmo defeito, que `perfisPorId` já
+       conserta para a rede inteira. */
+    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
     return {
       quem: {
         nome,
-        /* A foto já é data URL no banco (JPEG 256px reduzido no canvas) — o
-           mesmo campo que a aba Amigas desenha. */
-        avatarUrl: ((perfil as any).avatar_url as string | null) ?? null,
+        avatarUrl: await renovarUrlAssinada((perfil as any).avatar_url),
         tipo: "amiga",
       },
     };
@@ -180,7 +201,12 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
        deixaria de existir na janela entre o deploy e o SQL. */
     const um = async (colunas: string) =>
       await sb.from("patient_profiles").select(colunas).eq("referral_code", codigo).maybeSingle();
-    let r = await um(`${COLUNAS}, mostrar_semana, mostrar_bebe`);
+    let r = await um(`${COLUNAS}, mostrar_semana, mostrar_bebe, vitrine_publica`);
+    /* ⚠️ Degrau por degrau, como em `perfisPorId`: `vitrine_publica` nasceu
+       depois das chaves do selo, então existe banco com uma e sem a outra. E
+       ausente vale FALSE nas duas pontas — banco sem a coluna é banco sem
+       consentimento, e a vitrine simplesmente não abre. */
+    if (r.error) r = await um(`${COLUNAS}, mostrar_semana, mostrar_bebe`);
     if (r.error) r = await um(COLUNAS);
     const p = r.data as Record<string, any> | null;
 
@@ -189,6 +215,7 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
       !podeAbrirPerfilPublico({
         existe: !!p,
         perfilPublico: !!p?.perfil_publico,
+        vitrine: !!p?.vitrine_publica,
         emCuidado: !!p?.care_mode,
       })
     ) {
@@ -196,6 +223,7 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
     }
 
     const { computeGestation } = await import("@/lib/gestacao");
+    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
     const { entradaDoSelo, hojeEmSaoPaulo, seloDoPerfil } = await import("@/lib/selo-do-perfil");
     const g = computeGestation({
       lmp: p!.lmp_date ?? null,
@@ -239,7 +267,11 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
       perfil: {
         nome: (p!.display_name as string | null)?.trim() || "Alguém",
         bio: ((p!.bio as string | null) ?? "").trim() || null,
-        avatarUrl: (p!.avatar_url as string | null) ?? null,
+        /* ⚠️ Renovada, como em `quemConvidou` e em `perfisPorId`: a foto do
+           editor de perfil é URL ASSINADA e vence em 7 dias. Crua, a vitrine
+           pública — a página que existe para apresentar o app a quem não tem
+           conta — abriria sem rosto a partir do oitavo dia. */
+        avatarUrl: await renovarUrlAssinada(p!.avatar_url),
         seloSemana: selo.semana,
         seloBebe: selo.bebe,
         posts,

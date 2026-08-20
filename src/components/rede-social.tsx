@@ -28,6 +28,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { linkDaVitrine } from "@/lib/perfil-publico";
 import { LIMITE_DA_BIO } from "@/lib/rede-social";
 import type { PerfilNaTela } from "@/lib/rede-social.functions";
 
@@ -136,6 +137,14 @@ export function ConfiguracoesDoPerfil({
   const [bio, setBio] = useState(bancada?.perfil?.bio ?? "");
   const [salvando, setSalvando] = useState(false);
 
+  /* ⚠️ `window.location.origin` só no NAVEGADOR — lido no render, ele quebraria
+     a hidratação (o servidor não tem `window`), que é o mesmo defeito que o
+     cartão de convite do feed já pagou. Sem ele, `SITE`. */
+  const enderecoDaVitrine = linkDaVitrine(
+    perfil?.codigoDaVitrine,
+    typeof window === "undefined" ? undefined : window.location.origin,
+  );
+
   async function carregar() {
     if (bancada) return;
     try {
@@ -169,6 +178,7 @@ export function ConfiguracoesDoPerfil({
     bio?: string | null;
     mostrarSemana?: boolean;
     mostrarBebe?: boolean;
+    vitrine?: boolean;
   }) {
     setSalvando(true);
     try {
@@ -271,6 +281,65 @@ export function ConfiguracoesDoPerfil({
           </button>
         </div>
       </section>
+
+      {/* ─── A VITRINE NA INTERNET ABERTA ────────────────────────────────
+          ⚠️ **CHAVE PRÓPRIA, e ela nasceu de uma auditoria.** O interruptor de
+          cima promete "qualquer pessoa NO APP"; `/p/<codigo>` abre FORA do app,
+          sem conta nenhuma, e mostra bio, selo, nome do bebê e doze
+          publicações. Autorizar isso com a chave de cima seria alargar, pela
+          porta dos fundos, um consentimento dado para outra coisa — o oposto
+          exato de "não podemos expor a paciente sem ela saber".
+
+          ⚠️ E o ENDEREÇO fica à vista, ligado ou não. Ele era a única coisa que
+          o app não contava a ninguém: a página existia e nenhuma tela dizia
+          onde. Uma vitrine que a dona não sabe achar não é vitrine. */}
+      {perfil.publico && (
+        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="font-semibold">Uma página na internet</h3>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                {perfil.vitrine
+                  ? "Qualquer pessoa com o seu link abre o seu perfil pelo navegador, sem ter conta no app. É o link para pôr na bio do Instagram."
+                  : "Desligada. O seu perfil só existe dentro do app."}
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!perfil.vitrine}
+              aria-label="Página na internet"
+              disabled={salvando}
+              onClick={() => salvar({ vitrine: !perfil.vitrine })}
+              className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+                perfil.vitrine ? "bg-primary" : "bg-muted"
+              }`}
+            >
+              <span
+                className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                  perfil.vitrine ? "translate-x-[22px]" : "translate-x-0.5"
+                }`}
+              />
+            </button>
+          </div>
+
+          {enderecoDaVitrine && (
+            <button
+              type="button"
+              onClick={() => {
+                void navigator.clipboard?.writeText(enderecoDaVitrine);
+                toast.success("Link copiado 💛");
+              }}
+              className="press mt-3 flex w-full items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-left"
+            >
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                {enderecoDaVitrine.replace(/^https?:\/\//, "")}
+              </span>
+              <span className="shrink-0 text-xs font-medium text-primary">Copiar</span>
+            </button>
+          )}
+        </section>
+      )}
 
       {/* ─── O QUE O SEU PERFIL CONTA ────────────────────────────────────
           ⚠️ DUAS chaves, e nunca uma. Uma só obrigaria quem quer publicar o

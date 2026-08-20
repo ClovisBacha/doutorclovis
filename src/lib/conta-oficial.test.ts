@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { comOficialNoTopo, ehContaOficial, SELO_OFICIAL } from "./conta-oficial";
+import { comOficialNoTopo, ehContaOficial, fileiraComOficial, SELO_OFICIAL } from "./conta-oficial";
 
 describe("o portão", () => {
   test("só a coluna marca a conta", () => {
@@ -52,5 +52,40 @@ describe("o selo", () => {
     expect(s).not.toContain("médic");
     expect(s).not.toContain("obstetra");
     expect(s).not.toContain("seu ");
+  });
+});
+
+/**
+ * ⚠️ O DEFEITO QUE ESTA FUNÇÃO EXISTE PARA IMPEDIR, e ele estava no ar.
+ *
+ * A fileira é o recorte de `PESSOAS_SUGERIDAS` de um ranking ordenado por elos
+ * em comum. A conta oficial não tem elo com ninguém, então ela cai no FIM e é a
+ * PRIMEIRA a ser cortada — e a versão anterior procurava por ela DEPOIS do
+ * corte. `comOficialNoTopo` recebia uma lista onde ela nunca estava, devolvia a
+ * lista intacta, e a conta do consultório simplesmente não aparecia para
+ * ninguém. Sem erro e sem log: o recurso inteiro do dia um era um no-op.
+ */
+describe("a fileira, quando o corte já tirou a oficial", () => {
+  const a = { id: "a" };
+  const b = { id: "b" };
+  const oficial = { id: "of" };
+
+  test("⚠️ cortada do ranking, ela ENTRA — e na frente", () => {
+    expect(fileiraComOficial([a, b], oficial)).toEqual([oficial, a, b]);
+  });
+
+  test("já no ranking, ela SOBE e não duplica", () => {
+    expect(fileiraComOficial([a, oficial, b], oficial)).toEqual([oficial, a, b]);
+  });
+
+  /* Sem conta oficial (banco sem a coluna, ou nenhuma marcada) a fileira é a
+     que o ranking devolveu — nunca se inventa uma linha. */
+  test("sem oficial, a lista não muda", () => {
+    expect(fileiraComOficial([a, b], null)).toEqual([a, b]);
+    expect(fileiraComOficial([a, b], undefined)).toEqual([a, b]);
+  });
+
+  test("fileira vazia com oficial vira a oficial sozinha", () => {
+    expect(fileiraComOficial([], oficial)).toEqual([oficial]);
   });
 });

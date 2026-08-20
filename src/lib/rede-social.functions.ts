@@ -21,7 +21,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { trechoParaLike } from "@/lib/like-seguro";
-import { comOficialNoTopo, ehContaOficial } from "@/lib/conta-oficial";
+import { ehContaOficial, fileiraComOficial } from "@/lib/conta-oficial";
 import { z } from "zod";
 import {
   aoSeguir,
@@ -160,6 +160,16 @@ export type PerfilNaTela = {
   bio: string | null;
   avatarUrl: string | null;
   publico: boolean;
+  /**
+   * A vitrine na internet aberta (`/p/<codigo>`) está ligada?
+   *
+   * ⚠️ **Chave PRÓPRIA, e só a DONA a recebe.** Ela nunca viaja no perfil de
+   * outra pessoa: se a vitrine está ligada, quem tem o link já descobre abrindo
+   * o endereço — e quem não tem não precisa saber que ele existe.
+   */
+  vitrine?: boolean;
+  /** O código dela, para a tela montar o endereço da vitrine. Só a DONA. */
+  codigoDaVitrine?: string | null;
   /** `null` = não sigo. */
   meuVinculo: "ativo" | "pendente" | null;
   souEu: boolean;
@@ -377,6 +387,48 @@ async function euEmCuidado(sb: any, eu: string): Promise<boolean> {
   return !!(data as any)?.care_mode;
 }
 
+/**
+ * A vitrine pública dela está ligada?
+ *
+ * ⚠️ **Consulta PRÓPRIA, e não uma coluna a mais em `COLUNAS_DO_PERFIL`.** A
+ * lista principal alimenta feed, busca, stories e salvos — e cada coluna nova
+ * ali é mais um degrau de recuo a manter, para um dado que só a tela de ajustes
+ * dela usa. Aqui a falha custa um interruptor nascendo desligado; lá custaria a
+ * aba inteira.
+ *
+ * ⚠️ **E o erro vale FALSE, nunca `true`.** Banco sem a coluna é banco sem
+ * consentimento: o pior caso é a vitrine não abrir, que é o lado seguro.
+ */
+async function vitrineLigada(
+  sb: any,
+  eu: string,
+): Promise<{ ligada: boolean; codigo: string | null }> {
+  const vazio = { ligada: false, codigo: null as string | null };
+  try {
+    const { data, error } = await sb
+      .from("patient_profiles")
+      .select("vitrine_publica, referral_code")
+      .eq("id", eu)
+      .maybeSingle();
+    if (error) {
+      /* Sem a coluna nova, ainda vale ler o código: a vitrine fica desligada e
+         a tela continua sabendo qual seria o endereço dela. */
+      const { data: so } = await sb
+        .from("patient_profiles")
+        .select("referral_code")
+        .eq("id", eu)
+        .maybeSingle();
+      return { ligada: false, codigo: ((so as any)?.referral_code as string | null) ?? null };
+    }
+    return {
+      ligada: !!(data as any)?.vitrine_publica,
+      codigo: ((data as any)?.referral_code as string | null) ?? null,
+    };
+  } catch {
+    return vazio;
+  }
+}
+
 /** Perfis por id, com o que a rede precisa. */
 async function perfisPorId(sb: any, ids: string[]) {
   if (ids.length === 0) return new Map<string, any>();
@@ -395,7 +447,7 @@ async function perfisPorId(sb: any, ids: string[]) {
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAsColunasDoSelo(sb, ids) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaNova(sb, ids) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -465,10 +517,46 @@ const COLUNAS_DO_PERFIL =
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
+/**
+ * A mesma lista sem `conta_oficial` — DERIVADA, nunca copiada à mão.
+ *
+ * ⚠️ **UM DEGRAU DE RECUO POR COLUNA, e este degrau nasceu de um defeito meu.**
+ * `conta_oficial` (a conta do consultório) entrou na lista principal num
+ * `APLICAR_` SEPARADO do das colunas do selo — então existe um banco real, o do
+ * dono agora, que TEM `mostrar_semana`/`mostrar_bebe`/`aceita_perguntas` e ainda
+ * NÃO tem `conta_oficial`. Com um recuo só, esse banco caía direto no degrau de
+ * baixo e a rede INTEIRA perdia o selo da semana, o selo do bebê e a caixinha de
+ * perguntas — três recursos que o dono já tinha ligado, apagados em silêncio por
+ * uma coluna que ele nem sabia que existia.
+ *
+ * É a mesma lição de `marcarConsultaNoDia`, que precisou de um recuo POR COLUNA
+ * (`patient_user_id` e `duration_minutes`, uma de cada vez) porque um recuo que
+ * só soubesse tirar a primeira quebraria de novo assim que a segunda faltasse
+ * num banco que só rodou meio SQL.
+ *
+ * Derivada e não copiada porque duas listas escritas à mão divergem no primeiro
+ * ajuste — e aqui a divergência apareceria como recurso sumindo, sem erro.
+ */
+const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "");
+
 const COLUNAS_SEM_SELO =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
   "baby_name, lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
+/** Degrau 2: o banco tem o selo e ainda não tem a conta oficial. */
+async function semAColunaNova(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_SEM_OFICIAL)
+    .in("id", ids);
+  if (error) return semAsColunasDoSelo(sb, ids);
+  console.warn("[rede] sem conta_oficial — rode APLICAR_CONTA_OFICIAL.sql");
+  /* Ausente vale `false`: é o que `ehContaOficial` já assume, e o pior caso é a
+     fileira de sugeridas ficar como era antes de a conta oficial existir. */
+  return ((data ?? []) as any[]).map((p) => ({ ...p, conta_oficial: false }));
+}
+
+/** Degrau 3: o banco ainda não rodou o SQL do selo. */
 async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
   console.warn("[rede] sem mostrar_semana/mostrar_bebe — rode APLICAR_REDE_SOCIAL.sql");
   const { data } = await sb.from("patient_profiles").select(COLUNAS_SEM_SELO).in("id", ids);
@@ -478,6 +566,7 @@ async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
     ...p,
     mostrar_semana: false,
     mostrar_bebe: false,
+    conta_oficial: false,
   }));
 }
 
@@ -915,6 +1004,7 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
     );
 
     const selo = await seloDe(p);
+    const vitrine = await vitrineLigada(sb, eu);
 
     return {
       ok: true as const,
@@ -924,6 +1014,8 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         bio: (p as any)?.bio ?? null,
         avatarUrl: (p as any)?.avatar_url ?? null,
         publico: !!(p as any)?.perfil_publico,
+        vitrine: vitrine.ligada,
+        codigoDaVitrine: vitrine.codigo,
         meuVinculo: null,
         souEu: true,
         meusSeguidores: seguidores ?? 0,
@@ -973,6 +1065,10 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
         mostrarBebe: z.boolean().optional(),
         /* A caixinha. Opcional como as outras duas — o update é parcial. */
         aceitaPerguntas: z.boolean().optional(),
+        /* ⚠️ A VITRINE NA INTERNET ABERTA (`/p/<codigo>`) — chave PRÓPRIA, e
+           nunca a mesma de `publico`. A tela do perfil público promete
+           "qualquer pessoa NO APP"; a vitrine abre fora dele, sem conta. */
+        vitrine: z.boolean().optional(),
         bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
         nome: z.string().max(60).optional(),
         /** Data URL. O cliente já corta o quadrado e reduz para 512px. */
@@ -1024,6 +1120,7 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       ...(data.mostrarSemana !== undefined ? { mostrar_semana: data.mostrarSemana } : {}),
       ...(data.mostrarBebe !== undefined ? { mostrar_bebe: data.mostrarBebe } : {}),
       ...(data.aceitaPerguntas !== undefined ? { aceita_perguntas: data.aceitaPerguntas } : {}),
+      ...(data.vitrine !== undefined ? { vitrine_publica: data.vitrine } : {}),
     };
 
     const { error } = await sb
@@ -2100,6 +2197,50 @@ async function elosEmComum(sb: any, quemEuSigo: string[]): Promise<Map<string, n
   return elos;
 }
 
+/** As colunas que a zona de sugestões lê da candidata. */
+const COLUNAS_DA_CANDIDATA =
+  "id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at, conta_oficial";
+
+/**
+ * As candidatas a sugestão, com recuo para banco sem `conta_oficial`.
+ *
+ * ⚠️ **Sem o recuo, acrescentar a coluna apagaria a zona INTEIRA.** Este select
+ * não passa por `perfisPorId`, então ele não herda o recuo de lá: num banco sem
+ * `conta_oficial` o `42703` devolve `data: null`, `candidatas` fica vazia e a
+ * função retorna cedo — nem publicações sugeridas, nem fileira de pessoas, nem
+ * o convite que mora no fim do feed. Nada na tela, nada no log.
+ */
+async function candidatasPublicas(sb: any): Promise<any[]> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_DA_CANDIDATA)
+    .eq("perfil_publico", true)
+    .limit(400);
+  if (!error) return (data ?? []) as any[];
+  console.warn("[rede] candidatas sem conta_oficial — rode APLICAR_CONTA_OFICIAL.sql");
+  const { data: velhas } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_DA_CANDIDATA.replace(", conta_oficial", ""))
+    .eq("perfil_publico", true)
+    .limit(400);
+  return ((velhas ?? []) as any[]).map((p) => ({ ...p, conta_oficial: false }));
+}
+
+/** Uma candidata virando linha da fileira de sugeridas. */
+function naFileira(perfil: any): PessoaNaLista {
+  return {
+    id: perfil.id,
+    nome: (perfil?.display_name ?? "").trim() || "Alguém",
+    bio: perfil?.bio ?? null,
+    avatarUrl: perfil?.avatar_url ?? null,
+    /* ⚠️ `sigo` é sempre `null` aqui: quem eu sigo não entra no pool. E o
+       número de elos NÃO viaja para o cliente — ele ordenou, e acabou. */
+    sigo: null,
+    souEu: false,
+    oficial: ehContaOficial(perfil as any),
+  };
+}
+
 /**
  * A ZONA DE SUGESTÕES — publicações e pessoas que ela ainda não segue.
  *
@@ -2148,11 +2289,7 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
        Cuidado. `podeAparecerNaBusca` é a MESMA régua da busca — quem não pode
        ser encontrada também não pode ser sugerida, senão a sugestão vira a
        porta dos fundos da busca. */
-    const { data: publicos } = await sb
-      .from("patient_profiles")
-      .select("id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at")
-      .eq("perfil_publico", true)
-      .limit(400);
+    const publicos = await candidatasPublicas(sb);
 
     const candidatas = ((publicos ?? []) as any[]).filter(
       (p) =>
@@ -2211,34 +2348,30 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
     const ordem = new Map(escolhidas.map((c, n) => [c.postId, n]));
     posts.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
 
-    const pessoas = ranking.slice(0, PESSOAS_SUGERIDAS).map((p) => {
-      const perfil = candidatas.find((c) => c.id === p.id);
-      return {
-        id: p.id,
-        nome: (perfil?.display_name ?? "").trim() || "Alguém",
-        bio: perfil?.bio ?? null,
-        avatarUrl: perfil?.avatar_url ?? null,
-        /* ⚠️ `sigo` é sempre `null` aqui: quem eu sigo não entra no pool. E o
-           número de elos NÃO viaja para o cliente — ele ordenou, e acabou. */
-        sigo: null,
-        souEu: false,
-        oficial: ehContaOficial(perfil as any),
-      } satisfies PessoaNaLista;
-    });
+    const pessoas = ranking
+      .slice(0, PESSOAS_SUGERIDAS)
+      .map((p) => naFileira(candidatas.find((c) => c.id === p.id) ?? { id: p.id }));
 
     /* ⚠️ **A CONTA OFICIAL VEM FIXADA NO TOPO, e não ordenada junto.**
        `ordenarPessoas` classifica por elos em comum, e a conta oficial não tem
        elos com ninguém: ela cairia no fim exatamente na conta NOVA, que é a
        única para quem ela importa — e resolver o dia um é o ponto inteiro
-       dela. A régua está em `conta-oficial.ts`. */
-    const oficial = pessoas.find((p) => p.oficial)?.id ?? null;
+       dela. A régua está em `conta-oficial.ts`.
+
+       ⚠️ **E ela é procurada entre as CANDIDATAS, nunca entre as `pessoas`.**
+       `pessoas` já é o recorte de `PESSOAS_SUGERIDAS` do ranking, e a conta
+       oficial cai no FIM dele justamente por não ter elo nenhum: procurá-la ali
+       era procurar no único lugar de onde ela sempre tinha acabado de ser
+       cortada, e `comOficialNoTopo` virava no-op silencioso. Achada fora do
+       recorte, ela é montada e entra na frente. */
+    const perfilOficial = candidatas.find((c) => ehContaOficial(c as any)) ?? null;
 
     return {
       ok: true as const,
       posts,
       /* Os ids que a tela precisa rotular "Sugerido para você". */
       sugeridos: posts.map((p) => p.id),
-      pessoas: comOficialNoTopo(pessoas, oficial),
+      pessoas: fileiraComOficial(pessoas, perfilOficial ? naFileira(perfilOficial) : null),
     };
   });
 

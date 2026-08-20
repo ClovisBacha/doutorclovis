@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { podeAbrirPerfilPublico, POSTS_NA_VITRINE } from "./perfil-publico";
 
-const ok = { existe: true, perfilPublico: true, emCuidado: false };
+const ok = { existe: true, perfilPublico: true, vitrine: true, emCuidado: false };
 
 describe("o portão da página pública", () => {
   test("perfil público e vivo abre", () => {
@@ -20,6 +20,26 @@ describe("o portão da página pública", () => {
   test("⚠️ Modo Cuidado e código inexistente respondem igual a perfil fechado", () => {
     expect(podeAbrirPerfilPublico({ ...ok, emCuidado: true })).toBe(false);
     expect(podeAbrirPerfilPublico({ ...ok, existe: false })).toBe(false);
+  });
+
+  /**
+   * ⚠️ A SEGUNDA CHAVE, e ela existe por uma auditoria.
+   *
+   * A tela onde ela liga o perfil público diz "qualquer pessoa **no app** pode
+   * te achar e te acompanhar". Esta página não é no app — abre na internet
+   * aberta, sem conta, com bio, selo da semana, nome do bebê e doze
+   * publicações. Autorizá-la com a chave de dentro seria alargar pela porta dos
+   * fundos um consentimento dado para outra coisa.
+   */
+  test("⚠️ perfil público SEM a chave da vitrine não abre na internet", () => {
+    expect(podeAbrirPerfilPublico({ ...ok, vitrine: false })).toBe(false);
+  });
+
+  /* ⚠️ E a vitrine sozinha também não vale: desligar "perfil público" tem de
+     fechar o perfil em todo lugar, ou a chave de dentro deixa de ser um
+     portão. */
+  test("⚠️ vitrine ligada com perfil FECHADO não abre", () => {
+    expect(podeAbrirPerfilPublico({ ...ok, perfilPublico: false, vitrine: true })).toBe(false);
   });
 });
 
