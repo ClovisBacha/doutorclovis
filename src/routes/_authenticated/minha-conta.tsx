@@ -2429,6 +2429,13 @@ function MinhaContaPage() {
                       careMode={careMode}
                       onOpenShop={() => goToTab("Recompensas")}
                       onOpenAmigas={() => goToTab("Amigas")}
+                      /* ⚠️ A vitória vai para a Comunidade pelo MESMO caminho
+                         que a aula do dia já usa: o Caminho deixa um bilhete
+                         (`guardarMomentoParaPublicar`) e a Comunidade o lê ao
+                         abrir. Aqui só se troca de aba — quem sabe do momento é
+                         a folha que o gerou, e quem sabe desenhar o cartão é o
+                         compositor. */
+                      onPublicarNaComunidade={() => goToTab("Feed")}
                     />
                   </Suspense>
                 )}

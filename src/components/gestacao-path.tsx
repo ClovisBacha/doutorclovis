@@ -113,6 +113,9 @@ import {
   IconeTrofeu,
 } from "@/components/icones-jogo";
 import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from "@/lib/celebrate";
+import { momentoDe, type Momento } from "@/lib/momento";
+import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
+import { CompartilharMomento } from "@/components/compartilhar-momento";
 import { guardarAulaDeHoje } from "@/lib/aula-compartilhavel";
 
 /**
@@ -361,10 +364,21 @@ function FolhaDosTrofeus({
   trofeus,
   onFechar,
   onIrAoCantinho,
+  compartilhar,
 }: {
   trofeus: number;
   onFechar: () => void;
   onIrAoCantinho?: () => void;
+  /**
+   * O botão de compartilhar a vitória — já montado por quem tem o momento em
+   * mãos.
+   *
+   * ⚠️ **Um `ReactNode`, e não os dados do momento.** Esta folha não deve
+   * conhecer `momentoDe` nem `careMode`: ela desenha troféus. Quem monta o
+   * momento é o Caminho, que já tem o portão de luto na mão — e assim não há
+   * uma segunda régua aqui dentro.
+   */
+  compartilhar?: React.ReactNode;
 }) {
   const escada = escadaDeTrofeus();
   const proximo = proximoDesbloqueio(trofeus);
@@ -391,6 +405,11 @@ function FolhaDosTrofeus({
         <p className="mt-2 text-center text-sm leading-relaxed text-slate-500">
           Você ganha um a cada dia em que faz <strong>as quatro atividades</strong> do Caminho.
         </p>
+
+        {/* ⚠️ A folha é PERMANENTE (abre pelo toque no contador), ao contrário
+            da comemoração do troféu, que se fecha sozinha em 5,5 s. Um botão
+            dentro da comemoração seria um alvo que aparece e some. */}
+        {compartilhar && <div className="mt-4 flex justify-center">{compartilhar}</div>}
 
         <div className="mt-5 space-y-2">
           {escada.map((d) => {
@@ -471,6 +490,7 @@ function FolhaDaChama({
   streak,
   perdoes,
   onFechar,
+  compartilhar,
 }: {
   streak: number;
   /**
@@ -485,6 +505,8 @@ function FolhaDaChama({
    */
   perdoes: number;
   onFechar: () => void;
+  /** Ver `FolhaDosTrofeus.compartilhar` — mesma decisão, mesma razão. */
+  compartilhar?: React.ReactNode;
 }) {
   const acesa = sequenciaAcesa(streak);
   return (
@@ -543,6 +565,8 @@ function FolhaDaChama({
             alguma coisa — de manhã a chama continua com o número de ontem.
           </p>
         </div>
+
+        {compartilhar && <div className="mt-4 flex justify-center">{compartilhar}</div>}
 
         <button
           onClick={onFechar}
@@ -832,7 +856,12 @@ import { SessaoDoCasal } from "@/components/sessao-do-casal";
 type Gest = { weeks: number; days: number; totalDays: number } | null;
 
 interface GestacaoPathProps {
-  profile: { baby_name: string | null } | null;
+  /**
+   * ⚠️ `display_name` entrou aqui para o cartão de vitória assinar com o nome
+   * DELA. É o mesmo campo que `share-card.ts` já usava no marco de semana; o
+   * tipo é que era mais estreito do que o dado que `minha-conta` já passa.
+   */
+  profile: { baby_name: string | null; display_name?: string | null } | null;
   gest: Gest;
   /** Premium do quiz: revisão de qualquer aula liberada (grátis = só a de hoje). */
   quizPremium?: boolean;
@@ -842,6 +871,14 @@ interface GestacaoPathProps {
   onOpenShop?: () => void;
   /** Abre a aba das Amigas — o ícone que substituiu o calendário na fita. */
   onOpenAmigas?: () => void;
+  /**
+   * Troca para a aba da Comunidade — o compositor lê o bilhete e abre sozinho.
+   *
+   * ⚠️ Só a NAVEGAÇÃO mora aqui. Quem guarda o momento é a folha que o gerou
+   * (`guardarMomentoParaPublicar`), e quem desenha o cartão é o compositor: o
+   * bilhete guarda o dado, nunca a imagem.
+   */
+  onPublicarNaComunidade?: () => void;
   /**
    * SÓ a bancada de design `/preview-jogo` usa.
    *
@@ -1586,6 +1623,7 @@ export function GestacaoPath({
   onOpenShop,
   bancada,
   onOpenAmigas,
+  onPublicarNaComunidade,
 }: GestacaoPathProps) {
   const hasGest = !!gest;
   // Dia gestacional de hoje (0-based desde a DUM), até a semana 42 (D=300)
@@ -1628,6 +1666,25 @@ export function GestacaoPath({
   const [trofeus, setTrofeus] = useState(bancada?.trofeus ?? 0);
   /* O troféu que ela acabou de ganhar, esperando a comemoração aparecer. */
   const [trofeuNovo, setTrofeuNovo] = useState<number | null>(bancada?.trofeuNovo ?? null);
+
+  /**
+   * Leva uma vitória para o compositor da Comunidade.
+   *
+   * ⚠️ **O bilhete guarda o MOMENTO, e o compositor redesenha o cartão.** Uma
+   * imagem em base64 no `localStorage` encostaria na cota de ~5 MB, e o que
+   * quebra quando ela estoura não é este bilhete — é a próxima gravação de
+   * qualquer coisa, inclusive o `journey_state`. Ver `momento-para-publicar.ts`.
+   *
+   * ⚠️ `undefined` quando não há para onde navegar (a bancada, por exemplo):
+   * `CompartilharMomento` esconde o botão em vez de oferecer um que não leva a
+   * lugar nenhum.
+   */
+  const publicarMomento = onPublicarNaComunidade
+    ? (m: Momento) => {
+        guardarMomentoParaPublicar(m);
+        onPublicarNaComunidade();
+      }
+    : undefined;
   /* A folha que explica o que é o troféu e o que ele abre — ver
      `FolhaDosTrofeus`. Abre pelo toque na fita do topo. */
   const [trofeusAbertos, setTrofeusAbertos] = useState(false);
@@ -3159,7 +3216,19 @@ export function GestacaoPath({
       )}
 
       {chamaAberta && (
-        <FolhaDaChama streak={streak} perdoes={folgas} onFechar={() => setChamaAberta(false)} />
+        <FolhaDaChama
+          streak={streak}
+          perdoes={folgas}
+          onFechar={() => setChamaAberta(false)}
+          compartilhar={
+            <CompartilharMomento
+              momento={momentoDe({ especie: "chama", numero: streak, emCuidado: careMode })}
+              nomeDaMae={profile?.display_name ?? null}
+              aoPublicarNaComunidade={publicarMomento}
+              compacto
+            />
+          }
+        />
       )}
 
       {trofeusAbertos && (
@@ -3173,6 +3242,14 @@ export function GestacaoPath({
                   onOpenShop();
                 }
               : undefined
+          }
+          compartilhar={
+            <CompartilharMomento
+              momento={momentoDe({ especie: "trofeu", numero: trofeus, emCuidado: careMode })}
+              nomeDaMae={profile?.display_name ?? null}
+              aoPublicarNaComunidade={publicarMomento}
+              compacto
+            />
           }
         />
       )}
@@ -3734,6 +3811,8 @@ export function GestacaoPath({
                   bancada?.halves ?? (doneDays.includes(D) ? TOTAL_DO_DIA : momentosDoDia(st))
                 }
                 babyName={profile?.baby_name ?? null}
+                nomeDaMae={profile?.display_name ?? null}
+                aoPublicarMomento={publicarMomento}
                 anim={bancada?.anim}
                 enfeites={
                   bancada?.enfeites ??
@@ -9043,6 +9122,8 @@ function WellnessScreen({
   onEarnLesson,
   onSyncWellness,
   onClose,
+  nomeDaMae,
+  aoPublicarMomento,
 }: {
   day: number;
   /**
@@ -9058,6 +9139,10 @@ function WellnessScreen({
   /** Estrelas do dia (0–5): a aula + os 4 jogos de bem-estar. */
   halves: number;
   lesson: WellnessLesson;
+  /** O nome DELA, que assina o cartão de vitória. */
+  nomeDaMae?: string | null;
+  /** Leva a vitória ao compositor da Comunidade. Ver `momento-para-publicar.ts`. */
+  aoPublicarMomento?: (m: Momento) => void;
   /** Nome do bebê — a tela cumprimenta por ele. */
   babyName?: string | null;
   /** SÓ a bancada: liga uma das três animações de conquista na abertura. */
@@ -9131,12 +9216,22 @@ function WellnessScreen({
 
        Aqui não há ambiguidade — este é o único ponto do arquivo em que uma
        atividade acabou de ser feita. */
-    setRecemFeito(key);
-    /* `halves` é a contagem ANTES deste ganho, então ela é o índice (0-based)
-       da estrela que acabou de acender. Ler o estado depois não serviria: ele
-       só sobe quando o servidor responde. */
-    if (halves + 1 >= TOTAL_DO_DIA) setCincoNovas(true);
-    else setEstrelaNova(halves);
+    /* ⚠️ **OS TRÊS SPRITES NÃO TINHAM PORTÃO DE MODO CUIDADO — e o confete
+       tinha.** O bloco das cinco estrelas confere `!careMode` desde sempre
+       (fireConfetti/celebrateChime/celebrateHaptic), mas o check, a estrela e
+       as cinco animadas nascem AQUI, e nem esta função nem `SpriteDoJogo`
+       conferiam nada: quem acabou de perder a gestação via as estrelas
+       acendendo em cima da atividade. Achado pelo mapeamento dos momentos
+       compartilháveis, e consertado antes de pendurar qualquer botão de
+       compartilhar nelas — senão o botão herdaria o buraco inteiro. */
+    if (!careMode) {
+      setRecemFeito(key);
+      /* `halves` é a contagem ANTES deste ganho, então ela é o índice (0-based)
+         da estrela que acabou de acender. Ler o estado depois não serviria: ele
+         só sobe quando o servidor responde. */
+      if (halves + 1 >= TOTAL_DO_DIA) setCincoNovas(true);
+      else setEstrelaNova(halves);
+    }
     setTimeout(refresh, 500);
   }
 
@@ -9861,6 +9956,26 @@ function WellnessScreen({
                     </>
                   )}
                 </p>
+
+                {/* ⚠️ **AQUI, e não dentro da comemoração.** As cinco animadas
+                    duram dois segundos e somem sozinhas; um botão dentro delas
+                    seria um alvo que aparece e desaparece. Este cartão é
+                    PERMANENTE no pé da folha do dia — ela fecha o dia, vê as
+                    cinco acesas, e o convite continua ali quando ela quiser.
+
+                    ⚠️ E o portão de luto NÃO está neste `&&`: ele está em
+                    `momentoDe`, que devolve `null`. Uma segunda régua aqui é o
+                    que este projeto proíbe desde `humorDaJornada`. */}
+                {halves >= TOTAL_DO_DIA && (
+                  <div className="mt-3 flex justify-center">
+                    <CompartilharMomento
+                      momento={momentoDe({ especie: "cinco_estrelas", emCuidado: !!careMode })}
+                      nomeDaMae={nomeDaMae}
+                      aoPublicarNaComunidade={aoPublicarMomento}
+                      compacto
+                    />
+                  </div>
+                )}
               </div>
             )}
           </>

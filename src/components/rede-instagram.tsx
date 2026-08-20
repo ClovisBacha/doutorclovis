@@ -80,6 +80,9 @@ import {
 } from "@/lib/lugar-no-feed";
 /* Import ESTÁTICO pela mesma razão: régua pura, sem servidor e sem DOM. */
 import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
+import type { Momento } from "@/lib/momento";
+import { esquecerMomento, lerMomentoParaPublicar } from "@/lib/momento-para-publicar";
+import { momentoComoDataUrl } from "@/lib/share-card";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
@@ -2814,6 +2817,32 @@ export function RedeNoApp({
    */
   const [rascunho, setRascunho] = useState<RascunhoDoPost | null>(null);
 
+  /**
+   * A VITÓRIA que ela mandou publicar de outra aba.
+   *
+   * ⚠️ Lida no ABRIR do compositor, e ESQUECIDA no mesmo instante: o bilhete é
+   * de uso único. Sem apagar, sair do compositor e voltar traria o cartão de
+   * novo — sobre a foto que ela estava publicando desta vez.
+   */
+  const [momentoParaPublicar, setMomentoParaPublicar] = useState<Momento | null>(null);
+
+  useEffect(() => {
+    /* ⚠️ **O bilhete também ABRE o compositor**, e não só o preenche. Ela vem
+       do Caminho tocando em "Publicar na Comunidade": chegar no FEED e ter de
+       achar o ＋ sozinha seria o botão prometer uma coisa e entregar outra.
+       Por isso o efeito olha os dois estados — no feed ele navega, no
+       compositor ele preenche. */
+    if (onde.t !== "novo" && onde.t !== "feed") return;
+    const m = lerMomentoParaPublicar();
+    if (!m) return;
+    /* ⚠️ Esquecido no MESMO instante: o bilhete é de uso único. Sem apagar,
+       sair do compositor e voltar traria o cartão de novo — sobre a foto que
+       ela estava publicando desta vez. */
+    esquecerMomento();
+    setMomentoParaPublicar(m);
+    if (onde.t === "feed") setOnde({ t: "novo" });
+  }, [onde.t]);
+
   useEffect(() => {
     if (onde.t !== "novo" || !euId) return;
     try {
@@ -4102,8 +4131,10 @@ export function RedeNoApp({
         aoMudarRascunho={guardarRascunho}
         paraComparar={paraComparar}
         entaoInicial={entaoEscolhido}
+        momentoInicial={momentoParaPublicar}
         aoFechar={() => {
           setEntaoEscolhido(null);
+          setMomentoParaPublicar(null);
           setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" });
         }}
         aoPublicar={publicar}
@@ -5400,6 +5431,17 @@ async function reduzirParaIA(dataUrl: string): Promise<string | null> {
   }
 }
 
+/**
+ * O cartão da vitória, como data URL.
+ *
+ * ⚠️ `require`-like por `import()` não serve aqui: o estado inicial é síncrono.
+ * `share-card.ts` é canvas puro e não puxa nada pesado, então ele entra como
+ * import estático no topo do arquivo.
+ */
+function cartaoDoMomento(m: Momento): string | null {
+  return momentoComoDataUrl(m);
+}
+
 const LADO_DO_STORY = { largura: 1080, altura: 1920 };
 async function prepararFotoDoStory(file: File): Promise<string | null> {
   try {
@@ -5434,6 +5476,7 @@ export function NovoPost({
   aoMudarRascunho,
   paraComparar,
   entaoInicial,
+  momentoInicial,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -5492,6 +5535,14 @@ export function NovoPost({
   paraComparar?: { id: string; imagemUrl: string; criadoEm: string }[] | null;
   /** O "então" já escolhido pelo lembrete do feed — ver `entao-e-agora.ts`. */
   entaoInicial?: string | null;
+  /**
+   * A vitória que ela mandou publicar de outra aba — ver `momento.ts`.
+   *
+   * ⚠️ O compositor REDESENHA o cartão a partir do momento; o bilhete que
+   * atravessa as abas guarda o dado, nunca a imagem (ver
+   * `momento-para-publicar.ts`).
+   */
+  momentoInicial?: Momento | null;
 }) {
   const [texto, setTexto] = useState("");
   const [sugestoes, setSugestoes] = useState<string[] | null>(null);
@@ -5509,7 +5560,19 @@ export function NovoPost({
   const [pensando, setPensando] = useState(false);
   /* Uma LISTA, e a primeira é a capa. Um estado para "a foto" e outro para "as
      outras" divergiria na hora de remover a primeira. */
-  const [fotos, setFotos] = useState<string[]>([]);
+  /**
+   * ⚠️ O cartão da vitória é desenhado NA INICIALIZAÇÃO, e não num efeito.
+   *
+   * Num efeito, o compositor abriria vazio e a foto apareceria um quadro
+   * depois — e o efeito com atraso do rascunho já teria gravado um rascunho
+   * sem ela. Desenhar é síncrono e custa milissegundos: `momentoComoDataUrl`
+   * é canvas puro, sem rede.
+   */
+  const [fotos, setFotos] = useState<string[]>(() => {
+    if (!momentoInicial || typeof document === "undefined") return [];
+    const url = cartaoDoMomento(momentoInicial);
+    return url ? [url] : [];
+  });
   /* ⚠️ O padrão é o mais FECHADO. O erro possível aqui é publicar para menos
      gente do que ela queria — nunca para mais. */
   const [vis, setVis] = useState<Visibilidade>("amigas");

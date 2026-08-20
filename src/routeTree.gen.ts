@@ -25,6 +25,7 @@ import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
+import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
 import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
 import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
@@ -171,6 +172,11 @@ const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
 const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
   id: '/preview-notificacoes',
   path: '/preview-notificacoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMomentoRoute = PreviewMomentoRouteImport.update({
+  id: '/preview-momento',
+  path: '/preview-momento',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewMeditacaoRoute = PreviewMeditacaoRouteImport.update({
@@ -550,6 +556,7 @@ export interface FileRoutesByFullPath {
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
@@ -634,6 +641,7 @@ export interface FileRoutesByTo {
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
@@ -720,6 +728,7 @@ export interface FileRoutesById {
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
+  '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
@@ -806,6 +815,7 @@ export interface FileRouteTypes {
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
+    | '/preview-momento'
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
@@ -890,6 +900,7 @@ export interface FileRouteTypes {
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
+    | '/preview-momento'
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
@@ -975,6 +986,7 @@ export interface FileRouteTypes {
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
     | '/preview-meditacao'
+    | '/preview-momento'
     | '/preview-notificacoes'
     | '/preview-oferta'
     | '/preview-onboarding'
@@ -1061,6 +1073,7 @@ export interface RootRouteChildren {
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewLojaSementinhasRoute: typeof PreviewLojaSementinhasRoute
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
+  PreviewMomentoRoute: typeof PreviewMomentoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
@@ -1213,6 +1226,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-notificacoes'
       fullPath: '/preview-notificacoes'
       preLoaderRoute: typeof PreviewNotificacoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-momento': {
+      id: '/preview-momento'
+      path: '/preview-momento'
+      fullPath: '/preview-momento'
+      preLoaderRoute: typeof PreviewMomentoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-meditacao': {
@@ -1745,6 +1765,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewLojaSementinhasRoute: PreviewLojaSementinhasRoute,
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,
+  PreviewMomentoRoute: PreviewMomentoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
