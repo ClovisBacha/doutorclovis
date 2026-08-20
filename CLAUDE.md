@@ -5354,3 +5354,97 @@ que ninguém pediu: export solto NOVO fica vermelho.
 **Bancadas novas:** `/preview-instagram?vazio=1&sugeridas=0` (o convite no
 vazio) · `?semcodigo=1` (o estado em que ele não aparece) · `?entao=1` (o
 lembrete, que implica `retro=0`).
+
+## As nove ideias de conversão (ago/2026)
+
+Pedido do dono depois das dez sugestões: aplicar **1, 2, 3, 4, 5, 6, 7, 9 e 10**
+— e, na 5, "fazer um mapeamento de tudo que existe no aplicativo e que a gente
+pode usar pra ser compartilhável, tanto na aba da comunidade como no próprio
+Instagram".
+
+### ⚠️ O MAPEAMENTO MUDOU O PLANO EM TRÊS PONTOS
+
+Nove agentes, 462 leituras de arquivo. O que ele achou:
+
+1. **A máquina de imagem JÁ EXISTIA.** `share-card.ts` gera PNG 1080×1350 em
+   canvas, com `navigator.share` de ARQUIVO e recuo para download — só estava
+   cravado na semana. **Dos 34 momentos de conquista do app, DOIS saíam, e os
+   dois eram a mesma coisa.**
+2. **`getGrowthMetrics` já existia** (super-admin), com funil por canal de
+   afiliada — P10 virou "estender", não "construir".
+3. **P6 tinha um bloqueador de PRODUTO**, não de código: a conta do médico
+   esbarra na decisão pendente do dono sobre ele ver o feed das pacientes.
+
+E três defeitos que viraram conserto obrigatório: os sprites de check/estrela/
+cinco sem portão de Modo Cuidado, o marco de semana com portão só no gatilho, e
+seis artes de tema órfãs em `src/assets/social/`.
+
+### O que cada ponto não pode ser
+
+- **P1 · A landing diz quem convidou.** ⚠️ PRIMEIRO NOME e FOTO, e mais nada —
+  o `select` não pede semana, DPP nem sobrenome. ⚠️ É a primeira função da rede
+  **sem sessão**, e pode ser: o código é uma capacidade (32⁷), não um segredo.
+  ⚠️ Modo Cuidado devolve o mesmo `null` de "código não existe". ⚠️
+  `sessionStorage`, nunca o `localStorage` de 60 dias da ATRIBUIÇÃO — são duas
+  perguntas, e a segunda faria a faixa aparecer por dois meses.
+- **P2 · O convite nas QUATRO páginas públicas** (`/presente`, `/album`,
+  `/acompanhar` e `/votar-nome`, que eu tinha perdido). ⚠️ Uma linha no PÉ: a
+  página é DELA. ⚠️ O botão diz "Conhecer o app", nunca "crie sua conta" —
+  metade de quem abre não é gestante.
+- **P3 · Seguir depois do convite.** ⚠️ Pode ser automático porque seguir é
+  ESTRITAMENTE MENOS que o `referred_by` que acabou de ser fixado. ⚠️ `ativo`
+  nos dois sentidos. ⚠️ A ORDEM dos pares é a régua (se a segunda falhar, sobra
+  o que ela pediu ao convidar).
+- **P4 · `/p/<codigo>`.** ⚠️ `perfil_publico` é o portão e nasce FALSO. ⚠️ Um
+  `null` só para três motivos. ⚠️ Só a camada `publico`, e o filtro está na
+  CONSULTA. ⚠️ Nenhum contador. ⚠️ `noindex`.
+- **P5 · Compartilhar as vitórias.** ⚠️ O portão de luto mora em `momentoDe`.
+  ⚠️ O de dentro ABRE o compositor e nunca publica. ⚠️ O bilhete guarda o
+  MOMENTO, nunca a imagem (cota de ~5 MB). ⚠️ JPEG para o post, PNG para fora.
+  ⚠️ A marca não leva o código. ⚠️ Os botões ficam nas folhas PERMANENTES, nunca
+  dentro das comemorações que se fecham sozinhas.
+- **P6 · A conta oficial.** ⚠️ Ela PUBLICA e é SEGUIDA; **ela não lê** — é assim
+  que a decisão pendente do dono continua intocada. ⚠️ E **não é seguida
+  automaticamente**: seguir é um gesto. ⚠️ Fixada no topo das sugeridas
+  (`ordenarPessoas` a jogaria no fim justamente na conta nova). ⚠️ Coluna
+  própria, nunca nome reconhecido por texto.
+- **P7 · O resumo da criadora.** ⚠️ E-MAIL, e não push (ela pode não ter o app,
+  e o push é o canal da emergência). ⚠️ NÚMEROS, e nunca nomes — `count` com
+  `head: true`, então os nomes nem chegam à memória. ⚠️ Semana vazia não manda.
+- **P9 · O convite no momento de orgulho**, dentro da mesma folha — nunca uma
+  segunda mecânica.
+- **P10 · O funil.** ⚠️ O primeiro degrau diz **"não medido"** em vez de
+  estimar: um número inventado no topo faria todas as taxas abaixo mentirem
+  juntas. `taxa()` devolve `null` sobre não medido e sobre zero.
+
+### ⚠️ TRÊS DEFEITOS GRAVES QUE ESTAVAM EM PRODUÇÃO, E QUE NINGUÉM VIA
+
+Os três falham em SILÊNCIO, e pelo mesmo mecanismo: o PostgREST responde
+`42703` a coluna desconhecida, e este projeto engole erro de leitura de
+propósito para o recurso degradar em vez de derrubar a tela.
+
+1. **A legenda sugerida nunca funcionou.** `patient_profiles` se filtra por
+   `id`; **`user_id` não existe**. Os dois selects (o principal e o recuo)
+   falhavam com o MESMO filtro errado, `perfil` vinha `null` e o handler caía em
+   `sugestoes: []`. O botão dizia "não consegui pensar em nada" para toda
+   paciente desde o primeiro dia. 76 chamadas usam `id`; duas usavam `user_id`,
+   e as duas eram minhas.
+2. **Abrir o perfil de uma amiga nunca funcionou.** `perfilDaAmiga` pedia
+   `journey_state` de `patient_profiles` — é TABELA, não coluna. `p` vinha
+   `null` e a função devolvia `sem_vinculo`: "não foi possível abrir este
+   perfil", para todo mundo.
+3. **O resumo da criadora leria `amount_cents`**; a coluna é `commission_cents`.
+
+**`colunas-que-existem.test.ts`** confere cada `select("…")` literal contra o
+que os `.sql` declaram. Foi ele que achou o segundo.
+⚠️ E ele mentiu DUAS vezes antes de ficar de pé: um `ALTER TABLE` pode trazer
+vários `ADD COLUMN` (acusava código correto), e um COMENTÁRIO entre `.from()` e
+`.select()` quebrava a adjacência — depois de eu documentar a correção, a
+mutação que reintroduzia o defeito passou verde.
+**`patient-profiles-por-id.test.ts`** cobra a chave certa; a confusão é fácil,
+porque quase toda outra tabela tem mesmo `user_id`.
+
+**Aplicar:** `supabase/APLICAR_CONTA_OFICIAL.sql` (idempotente; o passo manual
+de criar a conta está escrito nele).
+**Bancadas novas:** `/preview-convite` · `/preview-momento?tudo=1` (`?luto=1`,
+`?semcodigo=1`) · `/preview-instagram?oficial=0`.
