@@ -15,7 +15,13 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { PARAM_INDICACAO, SITE, linkDeIndicacao, mensagemDeConvite } from "./indicacao";
+import {
+  PARAM_INDICACAO,
+  SITE,
+  linkDeIndicacao,
+  linkDoWhatsApp,
+  mensagemDeConvite,
+} from "./indicacao";
 
 const semComentarios = (p: string) =>
   readFileSync(p, "utf8")
@@ -141,5 +147,31 @@ describe("a mensagem do convite", () => {
     for (const proibido of ["tudo certo", "vai dar certo", "sem riscos", "seguro", "garant"]) {
       expect(`${proibido}: ${m.includes(proibido)}`).toBe(`${proibido}: false`);
     }
+  });
+});
+
+describe("o link do WhatsApp", () => {
+  /* ⚠️ O esquema nativo não existe no navegador nem no Android, e num PWA
+     instalado o toque simplesmente não faria nada — sem erro nenhum. É a mesma
+     lição do link da App Store. */
+  test("⚠️ é `https://wa.me`, nunca `whatsapp://`", () => {
+    const u = linkDoWhatsApp("oi");
+    expect(u.startsWith("https://wa.me/?text=")).toBe(true);
+    expect(u).not.toContain("whatsapp://");
+  });
+
+  /* ⚠️ Sem número: o app não tem a agenda dela, e um número cravado mandaria o
+     convite para a pessoa errada. Quem escolhe o destino é ela. */
+  test("⚠️ NÃO leva número de telefone", () => {
+    expect(linkDoWhatsApp("oi")).not.toMatch(/wa\.me\/\d/);
+  });
+
+  test("o texto vai escapado — o link tem `?` e `=` dentro", () => {
+    const link = linkDeIndicacao("MARIA")!;
+    const u = linkDoWhatsApp(mensagemDeConvite(link));
+    /* Sem escapar, o `?amiga=MARIA` do link viraria um segundo parâmetro da
+       URL do WhatsApp e o código sumiria da mensagem. */
+    expect(u.split("?").length).toBe(2);
+    expect(decodeURIComponent(u.split("text=")[1])).toContain("amiga=MARIA");
   });
 });

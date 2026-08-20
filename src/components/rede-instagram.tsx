@@ -70,6 +70,7 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
+import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
@@ -1175,6 +1176,7 @@ export function TelaPrincipal({
   desafio,
   aoEntrarNoDesafio,
   aoIrParaOJogo,
+  convite,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -1189,6 +1191,14 @@ export function TelaPrincipal({
   sugestoes?: PostNaTela[];
   /** Pessoas sugeridas, a fileira do modelo. */
   pessoas?: PessoaNaLista[];
+  /**
+   * O convite pelo WhatsApp — `null` quando não há código (ou no luto).
+   *
+   * ⚠️ **É PROP, e não uma consulta daqui.** O código de indicação já é
+   * carregado uma vez por `RedeNoApp`; buscar de novo nesta lista seria uma
+   * segunda ida ao servidor por pintura do feed.
+   */
+  convite?: { codigo: string | null } | null;
   aoSeguirPessoa?: (id: string) => void;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
@@ -1282,9 +1292,17 @@ export function TelaPrincipal({
       {retro && aoFecharRetro && <CartaoDaSemana retro={retro} aoFechar={aoFecharRetro} />}
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">
-          Ainda não há nada por aqui 💛
-        </p>
+        <>
+          <p className="pb-4 pt-12 text-center text-sm text-muted-foreground">
+            Ainda não há nada por aqui 💛
+          </p>
+          {/* ⚠️ **O CONVITE MORA NO VAZIO, e é aqui que ele vale.** Uma paciente
+              que abre a Comunidade e não vê nada tem duas saídas: seguir
+              alguém que ela não conhece, ou trazer quem ela conhece. A segunda
+              é a que faz a aba existir para ela — e é a que traz gente nova
+              para o app. O mesmo cartão fecha o feed lá embaixo. */}
+          {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
+        </>
       ) : (
         posts.map((p) => (
           <PostInstagram
@@ -1360,8 +1378,93 @@ export function TelaPrincipal({
               ))}
             </>
           )}
+
+          {/* ⚠️ **E O CONVITE FECHA O FEED.** Quem chegou até aqui viu tudo que
+              a rede dela tem — é o instante em que "trazer mais alguém"
+              responde à falta que ela acabou de sentir, e não uma interrupção
+              no meio da leitura. */}
+          {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * CONVIDAR PELO WHATSAPP — com o link de indicação dentro.
+ *
+ * ⚠️ **O LINK CARREGA O CÓDIGO, e é isso que separa este botão do defeito que
+ * `indicacao.ts` existe para não deixar voltar.** A aba das Amigas já teve um
+ * "Convidar" que mandava `/auth` puro: a amiga criava a conta e nunca virava
+ * amiga dela — não aparecia na lista, não dava para formar dupla, e as 100 🌱
+ * não eram pagas a ninguém. Aqui é a MESMA `linkDeIndicacao`, e por isso o
+ * convite da Comunidade paga a indicação como o das Amigas.
+ *
+ * ⚠️ **SEM CÓDIGO, O CARTÃO NÃO APARECE.** Um convite sem indicação é
+ * indistinguível de um bom para quem manda e para quem recebe; só o vínculo
+ * não acontece, semanas depois, sem nada a que apontar. E ela só tem a atenção
+ * da amiga uma vez.
+ *
+ * ⚠️ **NADA DISTO EM MODO CUIDADO** (o portão está em `RedeNoApp`, que é quem
+ * monta o `convite`). A mensagem é escrita na primeira pessoa e diz "na minha
+ * gestação": mandá-la é uma afirmação que ela pode não querer mais fazer, e o
+ * app não põe essas palavras na boca de quem acabou de perder a gestação.
+ */
+function ConvidarPeloWhatsApp({ codigo }: { codigo: string | null }) {
+  if (!codigo) return null;
+
+  /* ⚠️ **O DOMÍNIO DE PRODUÇÃO, e nunca `location.origin`.** Duas razões, e a
+     primeira apareceu como aviso do React na primeira foto desta tela: o
+     servidor renderiza sem `window` e o cliente com ele, então o `href` nascia
+     diferente dos dois lados e a hidratação reclamava. A segunda é pior — em
+     `/preview-*` e em qualquer deploy de preview o link sairia apontando para
+     um endereço que a amiga não consegue abrir, e o convite dela morreria sem
+     ninguém entender por quê. */
+  const link = linkDeIndicacao(codigo, SITE);
+  if (!link) return null;
+  const texto = mensagemDeConvite(link);
+
+  return (
+    <div className="my-6 rounded-3xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
+      <p className="text-[15px] font-semibold">Chame quem já está com você</p>
+      <p className="mx-auto mt-1 max-w-[30ch] text-[13px] leading-snug text-muted-foreground">
+        Sua irmã, a amiga do trabalho, a prima que está grávida junto. Quem entra pelo seu link já
+        chega ligada a você.
+      </p>
+      <div className="mt-4 flex flex-col gap-2">
+        {/* ⚠️ `<a>` e não `window.open`: num PWA instalado o `open` abre uma
+            visão que toma a tela inteira e não tem botão de voltar — o defeito
+            que a Central de Emergência pagou. O link normal deixa o sistema
+            decidir, e é ele que abre o aplicativo do WhatsApp. */}
+        <a
+          href={linkDoWhatsApp(texto)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="press flex min-h-[44px] items-center justify-center rounded-full bg-[#25D366] px-4 text-[15px] font-semibold text-white"
+        >
+          Convidar pelo WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={async () => {
+            /* ⚠️ O TEXTO INTEIRO, e não só a URL: colado em qualquer lugar, um
+               "https://…" sozinho não diz de quem veio nem o que é — e é aí
+               que a amiga decide se abre. Mesma decisão da aba das Amigas. */
+            const { toast } = await import("sonner");
+            try {
+              await navigator.clipboard.writeText(texto);
+              toast.success("Convite copiado 💌");
+            } catch {
+              /* ⚠️ Copiar recusa em contexto inseguro e com permissão negada, e
+                 os dois chegam aqui — dizer nada faria o botão parecer morto. */
+              toast.error("Não deu para copiar. Tente pelo WhatsApp.");
+            }
+          }}
+          className="press min-h-[44px] rounded-full border border-border px-4 text-[14px] font-medium"
+        >
+          Copiar o convite
+        </button>
+      </div>
     </div>
   );
 }
@@ -2179,6 +2282,13 @@ export function RedeNoApp({
   /** A gaveta: o que ela tirou do ar. */
   const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
+  /**
+   * O código de indicação dela — o que faz o convite TRAZER alguém.
+   *
+   * ⚠️ Carregado UMA vez, e não por pintura do feed: `getReferral` cria o
+   * código se ele ainda não existir, então é escrita, não só leitura.
+   */
+  const [meuCodigo, setMeuCodigo] = useState<string | null>(null);
   const [persona, setPersona] = useState<Persona>("estranha");
   /** A foto escolhida, esperando a conferência antes de virar story. */
   const [conferindoStory, setConferindoStory] = useState<string | null>(null);
@@ -3467,6 +3577,39 @@ export function RedeNoApp({
    * virava a informação errada, sem nada que a distinguisse de uma falha. É a
    * mesma régua de `chavesResgatadas` e de `contarTrofeus` — falha ao LER
    * nunca pode virar "não tem". */
+  /**
+   * Carrega o código de indicação, uma vez.
+   *
+   * ⚠️ **Nunca em Modo Cuidado.** A mensagem do convite é escrita na primeira
+   * pessoa e diz "na minha gestação": mandá-la é uma afirmação que ela pode não
+   * querer mais fazer, e o app não põe essas palavras na boca de quem acabou de
+   * perder a gestação. Como o portão mora aqui, nenhuma das duas aparições do
+   * cartão precisa lembrar disso.
+   */
+  useEffect(() => {
+    if (careMode) {
+      setMeuCodigo(null);
+      return;
+    }
+    let vivo = true;
+    (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { getReferral } = await import("@/lib/referral.functions");
+        const r = await getReferral({ data: { accessToken: t } });
+        if (vivo && r.ok) setMeuCodigo(r.code ?? null);
+      } catch {
+        /* Sem código o cartão não aparece — e é o certo: um convite sem
+           indicação não liga ninguém a ninguém. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [careMode]);
+
   async function quemViu(storyId: string): Promise<PessoaNaLista[] | null> {
     try {
       const t = await token();
@@ -3915,6 +4058,7 @@ export function RedeNoApp({
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
         aoTocarStory={verStory}
+        convite={{ codigo: meuCodigo }}
         retro={retro}
         aoFecharRetro={() => {
           setRetro(null);

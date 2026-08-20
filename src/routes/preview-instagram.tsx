@@ -28,6 +28,8 @@
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
  *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
+ *   /preview-instagram?semcodigo=1  → o convite NÃO aparece (sem indicação)
+ *   /preview-instagram?vazio=1      → o feed vazio, com o convite em destaque
  *   /preview-instagram?desafio=fora → o convite do desafio (ainda não entrou)
  *   /preview-instagram?desafio=meio → dentro, 1 de 3 dias
  *   /preview-instagram?desafio=fim  → fechou, com o contador do grupo
@@ -75,6 +77,8 @@ export const Route = createFileRoute("/preview-instagram")({
     tela: q.tela == null ? "feed" : String(q.tela),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
+    /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
+    semcodigo: q.semcodigo == null ? false : !!q.semcodigo,
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
@@ -233,6 +237,7 @@ function Bancada() {
     tela,
     meu,
     vazio,
+    semcodigo,
     sugeridas,
     legendas,
     amigas,
@@ -317,6 +322,7 @@ function Bancada() {
   };
 
   const semSugestoes = sugeridas === 0;
+  const semCodigo = semcodigo;
   const semLegendas = legendas === 0;
   const semAmigasParaMarcar = amigas === 0;
   const comRascunho = rascunho !== 0;
@@ -823,6 +829,12 @@ function Bancada() {
           sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
           pessoas={semSugestoes ? [] : GENTE}
           aoSeguirPessoa={(id) => console.log("seguiria", id)}
+          /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
+             nasce no servidor — sem a bancada, olhar este cartão exigiria uma
+             conta de verdade. `?semcodigo=1` prova o estado em que ele NÃO
+             aparece, que é o único jeito de conferir que um convite sem
+             indicação nunca é oferecido. */
+          convite={{ codigo: semCodigo ? null : "MARIA7X" }}
           /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
              `aoReagir={() => {}}` era impossível ver a mecânica INTEIRA — o
              emoji escolhido pousando na linha, o pulo, o resumo se

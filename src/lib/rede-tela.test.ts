@@ -187,3 +187,65 @@ describe("quem viu o meu story", () => {
     expect(FONTE).toContain("Não deu para carregar agora.");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O CONVITE PELO WHATSAPP — e o defeito que ele não pode repetir
+   A aba das Amigas já teve um "Convidar" que mandava `/auth` PURO: a amiga
+   criava a conta e nunca virava amiga dela — não aparecia na lista, não dava
+   para formar dupla, e as 100 🌱 não eram pagas a ninguém. O botão da tela cujo
+   assunto inteiro é trazer alguém era o único caminho do app que não trazia.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("convidar pela Comunidade", () => {
+  const i = FONTE.indexOf("function ConvidarPeloWhatsApp");
+  const corpo = FONTE.slice(i, FONTE.indexOf("\n}\n", i));
+
+  test("existe", () => {
+    expect(i).toBeGreaterThan(-1);
+  });
+
+  /* ⚠️ O link é o de INDICAÇÃO, e sai da régua única — nunca montado à mão. */
+  test("⚠️ o link carrega o código, pela mesma `linkDeIndicacao`", () => {
+    expect(corpo).toContain("linkDeIndicacao(codigo");
+    expect(corpo).toContain("linkDoWhatsApp(texto)");
+    expect(corpo).toContain("mensagemDeConvite(link)");
+  });
+
+  /* ⚠️ Sem código o cartão NÃO aparece: um convite sem indicação é
+     indistinguível de um bom para quem manda e para quem recebe, e ela só tem
+     a atenção da amiga uma vez. */
+  test("⚠️ sem código, não desenha nada", () => {
+    expect(corpo).toContain("if (!codigo) return null;");
+    expect(corpo).toContain("if (!link) return null;");
+  });
+
+  /* ⚠️ `location.origin` no RENDER quebrou a hidratação na primeira foto desta
+     tela (servidor sem `window`, cliente com) — e, pior, em preview mandaria
+     um endereço que a amiga não consegue abrir. */
+  test("⚠️ o domínio é o de produção, nunca `location.origin`", () => {
+    /* ⚠️ **SEM COMENTÁRIOS antes de procurar** — a primeira execução deste
+       teste ficou VERMELHA sobre código correto, porque o comentário que
+       explica a decisão contém a própria string proibida. É a armadilha que o
+       cabeçalho de `caixinha-servidor.test.ts` descreve, nas duas direções. */
+    const semComentarios = corpo
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+    expect(semComentarios).toContain("linkDeIndicacao(codigo, SITE)");
+    expect(semComentarios).not.toContain("location.origin");
+  });
+
+  /* ⚠️ Modo Cuidado: o portão mora em quem monta o `convite`, e não em cada
+     aparição do cartão — a mensagem diz "na minha gestação" na primeira
+     pessoa, e o app não põe essas palavras na boca de quem acabou de perder a
+     gestação. */
+  test("⚠️ o portão do luto está em `RedeNoApp`, uma vez só", () => {
+    const efeito = FONTE.slice(FONTE.indexOf("Carrega o código de indicação"));
+    expect(efeito.slice(0, 900)).toContain("if (careMode) {");
+    expect(efeito.slice(0, 900)).toContain("setMeuCodigo(null)");
+  });
+
+  /* Os dois pontos de uso: o feed vazio e o fim do feed. */
+  test("aparece no vazio e no fim do feed", () => {
+    const usos = FONTE.split("<ConvidarPeloWhatsApp").length - 1;
+    expect(usos).toBe(2);
+  });
+});

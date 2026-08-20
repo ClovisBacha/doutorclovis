@@ -67,3 +67,24 @@ export function linkDeIndicacao(code: string | null | undefined, origem?: string
 export function mensagemDeConvite(link: string): string {
   return `Estou usando o Obstétrica na minha gestação e tem me ajudado muito 💛 Entra pelo meu link: ${link}`;
 }
+
+/**
+ * O link que abre o WhatsApp com a mensagem escrita.
+ *
+ * ⚠️ **`https://wa.me`, NUNCA `whatsapp://`.** O esquema nativo não existe no
+ * navegador nem no Android, e num PWA instalado o toque simplesmente não faria
+ * nada — sem erro nenhum. É a mesma lição do link da App Store: o `https`
+ * redireciona para o aplicativo em quem o tem e continua sendo página útil em
+ * qualquer outro lugar.
+ *
+ * ⚠️ **SEM NÚMERO, de propósito.** `wa.me/?text=` abre o WhatsApp com a
+ * mensagem pronta e deixa ELA escolher para quem — que é o ponto: o app não
+ * tem (nem deve ter) a agenda dela. Um número cravado mandaria o convite para
+ * a pessoa errada.
+ *
+ * ⚠️ **E quem aperta ENVIAR é ela.** O app escreve o rascunho e para aí — a
+ * mesma decisão do agradecimento do chá de bebê e da transcrição do diário.
+ */
+export function linkDoWhatsApp(mensagem: string): string {
+  return `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
+}
