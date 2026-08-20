@@ -48,7 +48,18 @@ function brl(centavos: number): string {
   return (centavos / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-export default function PainelDaEmbaixadora() {
+/**
+ * ⚠️ **Sem `export`, e isto não é estilo.** O plugin do TanStack Router avisa em
+ * TODA página do app: "these exports from influenciadora.tsx will not be
+ * code-split and will increase your bundle size". Um export não-rota num
+ * arquivo de rota sai do pedaço da rota e entra no da árvore de rotas — que é
+ * o que toda página carrega antes de qualquer coisa aparecer. É a mesma
+ * família do `ChatbotWidget` que o app baixava para não mostrar, e ela apareceu
+ * na varredura das 52 bancadas.
+ *
+ * `component:` acima é o único chamador, e ele está no mesmo arquivo.
+ */
+function PainelDaEmbaixadora() {
   const [carregando, setCarregando] = useState(true);
   const [semSessao, setSemSessao] = useState(false);
   const [painel, setPainel] = useState<PainelDaInfluenciadora | null>(null);
