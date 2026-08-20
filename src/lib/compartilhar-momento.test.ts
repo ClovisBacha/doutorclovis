@@ -145,7 +145,10 @@ describe("o convite dentro da folha", () => {
     const i = FOLHA.indexOf("const buscou = useRef(false)");
     expect(i).toBeGreaterThan(-1);
     const efeito = FOLHA.slice(i, FOLHA.indexOf("}, [aberta]);", i));
-    expect(efeito).toContain("if (!aberta || buscou.current) return;");
+    /* A guarda inteira, com a saída da bancada incluída — recortar só um
+       pedaço dela é como este teste ficou vermelho ao ganhar `codigoDeBancada`,
+       e como ele ficaria VERDE se alguém tirasse `!aberta` amanhã. */
+    expect(efeito).toContain("if (codigoDeBancada || !aberta || buscou.current) return;");
     expect(efeito).toContain("buscou.current = true;");
   });
 
