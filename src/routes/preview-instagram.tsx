@@ -92,6 +92,9 @@ export const Route = createFileRoute("/preview-instagram")({
     amigas: q.amigas == null ? 1 : Number(q.amigas),
     rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
     retro: q.retro == null ? "" : String(q.retro),
+    /* ⚠️ `== null`, como todos os outros. `""` = a live marcada para daqui a
+       pouco (o caso comum), `agora` = ao vivo, `nao` = sem live nenhuma. */
+    live: q.live == null ? "" : String(q.live),
     voto: q.voto == null ? 0 : Number(q.voto),
     comparar: q.comparar == null ? 1 : Number(q.comparar),
     /* ⚠️ `== null` e nunca `=== undefined`. Mesma armadilha de sempre. */
@@ -260,6 +263,7 @@ function Bancada() {
     amigas,
     rascunho,
     retro,
+    live,
     voto,
     comparar,
     selo,
@@ -924,6 +928,22 @@ function Bancada() {
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
           desafio={oDesafio}
+          /* ⚠️ A live vem do servidor (`listLivesPublic`), então sem a bancada
+             o cartão do topo do feed seria impossível de olhar sem cadastrar
+             uma live real com data no futuro — que é como um cartão passa
+             meses sem ninguém nunca ter visto. `?live=agora` mostra o estado
+             "ao vivo". */
+          live={
+            live === "nao"
+              ? null
+              : {
+                  id: "l1",
+                  titulo: "Sinais de trabalho de parto: o que observar",
+                  quando: new Date(Date.now() + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
+                  link: "https://exemplo.com/live",
+                  aoVivo: live === "agora",
+                }
+          }
           aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
           aoIrParaOJogo={() => alert("iria para o Caminho")}
           temMais={!vazio && paginas < 3}

@@ -82,6 +82,7 @@ import {
 import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
 import type { Momento } from "@/lib/momento";
 import { SELO_OFICIAL } from "@/lib/conta-oficial";
+import { liveDoTopo, quandoAcontece, type LiveNoTopo } from "@/lib/proxima-live";
 import { esquecerMomento, lerMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { momentoComoDataUrl } from "@/lib/share-card";
 import { hapticTap } from "@/lib/haptics";
@@ -1265,6 +1266,7 @@ export function TelaPrincipal({
   aoChegarNoFim,
   temMais = false,
   desafio,
+  live,
   aoEntrarNoDesafio,
   aoIrParaOJogo,
   convite,
@@ -1338,6 +1340,8 @@ export function TelaPrincipal({
    */
   /** O cartão entrou na tela. Referência estável — ver `PostInstagram`. */
   aoVer?: (id: string) => void;
+  /** A próxima live do médico dela — ver `proxima-live.ts`. `null` é o normal. */
+  live?: LiveNoTopo | null;
   aoChegarNoFim?: () => void;
   /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
   temMais?: boolean;
@@ -1389,6 +1393,16 @@ export function TelaPrincipal({
       )}
 
       <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
+
+      {/* ⚠️ **A PRÓXIMA LIVE, e ela vem DEPOIS dos stories.** Acima deles
+          empurraria a fileira para fora da primeira dobra — o arranjo exato que
+          o dono pediu para corrigir ("o primeiro elemento da aba será os
+          stories"). E antes do primeiro post, porque um aviso com hora marcada
+          embaixo de cinco publicações é um aviso que chega depois da hora.
+
+          A régua (qual live, e se aparece) está em `proxima-live.ts`; aqui só
+          se desenha. */}
+      {live && <CartaoDaLive live={live} />}
 
       {/* ⚠️ DEPOIS dos stories e ANTES do primeiro post. Acima dos stories ele
           empurraria a fileira para fora da primeira dobra — que é justamente o
@@ -2622,6 +2636,12 @@ export function RedeNoApp({
   /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
   const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
   const [desafio, setDesafio] = useState<DesafioNaTela | null>(null);
+  /* ─── A PRÓXIMA LIVE ────────────────────────────────────────────────────
+     ⚠️ **Consulta PRÓPRIA e best-effort.** `listLivesPublic` já recorta pelo
+     médico dela; aqui só se escolhe qual entra (`liveDoTopo`). Falha, tabela
+     ausente ou lista vazia devolvem `null`, que é o caso NORMAL — na maioria
+     dos dias não há live marcada, e o topo do feed é dos stories. */
+  const [live, setLive] = useState<LiveNoTopo | null>(null);
   /* A caixinha: as perguntas dela e a chave. `naCaixa` alimenta o emblema da
      bolinha, e por isso é carregado JUNTO com o feed — um número que só
      chegasse ao abrir a caixa nasceria sempre zerado, e ninguém abriria. */
@@ -2731,6 +2751,25 @@ export function RedeNoApp({
     abrirPerfil: (id) => void abrirPerfil(id),
     ver: (id) => marcarPostVisto(id),
   };
+  useEffect(() => {
+    if (careMode) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        const { listLivesPublic } = await import("@/lib/lives.functions");
+        const r = await listLivesPublic({ data: t ? { accessToken: t } : {} });
+        if (!vivo || !r.ok) return;
+        setLive(liveDoTopo(r.lives, Date.now(), careMode));
+      } catch {
+        /* Sem live, a aba é a de sempre. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [careMode]);
+
   const acoes = useMemo(
     () => ({
       reagir: (p: PostNaTela, t: TipoDeReacao | null) => ultimas.current.reagir(p, t),
@@ -4492,6 +4531,7 @@ export function RedeNoApp({
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
         desafio={desafio}
+        live={live}
         aoEntrarNoDesafio={entrarNoDesafio}
         aoIrParaOJogo={onIrParaOJogo}
         sugestoes={sugestoes}
@@ -7211,6 +7251,52 @@ export function TelaDaCaixinha({
             ))}
           </ul>
         </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A PRÓXIMA LIVE, no topo do feed.
+ *
+ * ⚠️ **Ele NÃO promete conteúdo clínico nem desfecho.** É um aviso de horário:
+ * o que acontece na live é o médico quem decide, e o cartão que a anuncia não
+ * pode prometer em nome dele. Mesma proibição do rodapé de convite e das
+ * frases do mascote.
+ *
+ * ⚠️ **Sem link, ele ainda vale** — anuncia a hora e some o botão. Um botão que
+ * não leva a lugar nenhum é pior que a ausência dele, e a live pode ser
+ * cadastrada com data antes de o endereço da sala existir.
+ */
+function CartaoDaLive({ live }: { live: LiveNoTopo }) {
+  return (
+    <div className="mb-3 flex items-center gap-3 rounded-2xl border border-primary/25 bg-primary/5 px-3.5 py-3">
+      <span
+        aria-hidden
+        className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+          live.aoVivo ? "animate-pulse bg-red-500" : "bg-primary/60"
+        }`}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+          {live.aoVivo ? "Ao vivo agora" : "Próxima live"}
+        </p>
+        <p className="truncate text-[14px] font-semibold leading-tight">{live.titulo}</p>
+        {!live.aoVivo && (
+          <p className="text-[12px] leading-tight text-muted-foreground">
+            {quandoAcontece(live.quando, Date.now())}
+          </p>
+        )}
+      </div>
+      {live.link && (
+        <a
+          href={live.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="press inline-flex min-h-[44px] shrink-0 items-center rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+        >
+          {live.aoVivo ? "Entrar" : "Ver"}
+        </a>
       )}
     </div>
   );

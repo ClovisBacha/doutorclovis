@@ -121,8 +121,28 @@ async function handle(request: Request): Promise<Response> {
      */
     const criadorasAvisadas = await resumoSemanalDasCriadoras();
 
+    /* ─── E A REDE, QUE ANDAVA SEM NINGUÉM SABER ──────────────────────────
+     *
+     * A rede social manda UM push, e um só: o pedido para seguir. É deliberado
+     * — reação não empurra ninguém, porque este é o mesmo canal do aviso de
+     * emergência. O que faltava não era mais push: era UM, semanal, dizendo
+     * que a rede dela andou. Sem ele, quem publica uma vez e não volta nunca
+     * descobre que três amigas publicaram na quarta.
+     *
+     * Mesmo cron, mesmo padrão stateless, e MESMO DIA do resumo da Gratidão:
+     * dois pushes do mesmo app em dias diferentes ensinam que ele fala demais.
+     */
+    const redeAvisadas = await resumoDaComunidade();
+
     return new Response(
-      JSON.stringify({ ok: true, notified, medicosAvisados, gratidaoAvisadas, criadorasAvisadas }),
+      JSON.stringify({
+        ok: true,
+        notified,
+        medicosAvisados,
+        gratidaoAvisadas,
+        criadorasAvisadas,
+        redeAvisadas,
+      }),
       {
         status: 200,
         headers: { "content-type": "application/json" },
@@ -397,4 +417,103 @@ async function resumoSemanalDasCriadoras(): Promise<number> {
 function comoHtml(texto: string): string {
   const escapado = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   return `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6">${escapado.replace(/\n/g, "<br/>")}</div>`;
+}
+
+/**
+ * O RESUMO SEMANAL DA COMUNIDADE — por push, aos domingos.
+ *
+ * A régua (o mínimo, o texto, o dia) mora em `src/lib/resumo-da-comunidade.ts`.
+ * Aqui é a leitura e o envio.
+ *
+ * ⚠️ **DUAS CONSULTAS PARA A BASE INTEIRA, e nunca uma por paciente.** Um laço
+ * "para cada paciente, conte os posts de quem ela segue" custaria uma ida ao
+ * banco por conta — num cron semanal isso é o tipo de coisa que funciona com
+ * cinquenta pacientes e derruba o trabalho com quinhentas. Lê-se o grafo de
+ * seguir e os posts da semana, e cruza-se em memória.
+ *
+ * ⚠️ **Só a camada `publico`.** As camadas `seguidores` e `amigas` exigiriam
+ * rodar `podeVerPost` para cada par — e um push que anunciasse uma publicação
+ * que ela não pode abrir seria pior que nenhum push.
+ *
+ * ⚠️ **Nem `arquivado_em`.** Arquivar é tirar do ar; anunciar o que a autora
+ * tirou é o app entregando o que ela recolheu.
+ */
+async function resumoDaComunidade(): Promise<number> {
+  const { DIA_DO_RESUMO, textoDoResumo, valeResumoDaComunidade } =
+    await import("@/lib/resumo-da-comunidade");
+  /* Fuso de Brasília, e não do processo — o mesmo defeito de três horas que os
+     outros trabalhos deste arquivo já evitam. */
+  const hojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  if (hojeBR.getDay() !== DIA_DO_RESUMO) return 0;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { sendPushToUser } = await import("@/lib/push.server");
+  const sb = supabaseAdmin as any;
+  const desde = new Date(Date.now() - 7 * 86_400_000).toISOString();
+
+  /* Os posts da semana e o grafo de seguir, em paralelo: duas leituras
+     independentes, e em série a segunda só sairia depois da primeira. */
+  const [posts, laços] = await Promise.all([
+    sb
+      .from("rede_posts")
+      .select("id, autor_id")
+      .eq("visibilidade", "publico")
+      .is("arquivado_em", null)
+      .gte("criado_em", desde)
+      .limit(5000),
+    sb.from("rede_seguidores").select("seguidor_id, seguido_id").eq("estado", "ativo").limit(20000),
+  ]);
+  if (posts.error || laços.error) {
+    console.error("[resumo da comunidade] não consegui ler", posts.error ?? laços.error);
+    return 0;
+  }
+
+  /* Quantos posts cada AUTORA fez nesta semana. */
+  const porAutora = new Map<string, number>();
+  for (const p of (posts.data ?? []) as { autor_id: string }[]) {
+    porAutora.set(p.autor_id, (porAutora.get(p.autor_id) ?? 0) + 1);
+  }
+  if (porAutora.size === 0) return 0;
+
+  /* E o que isso vira para cada seguidora. */
+  const daPaciente = new Map<string, { publicacoes: number; pessoas: number }>();
+  for (const l of (laços.data ?? []) as { seguidor_id: string; seguido_id: string }[]) {
+    const n = porAutora.get(l.seguido_id);
+    if (!n) continue;
+    /* ⚠️ Ela não conta a si mesma: seguir a si é impossível hoje, mas um
+       resumo que somasse os posts DELA diria "3 pessoas publicaram" sobre a
+       própria semana dela. */
+    if (l.seguidor_id === l.seguido_id) continue;
+    const atual = daPaciente.get(l.seguidor_id) ?? { publicacoes: 0, pessoas: 0 };
+    atual.publicacoes += n;
+    atual.pessoas += 1;
+    daPaciente.set(l.seguidor_id, atual);
+  }
+  if (daPaciente.size === 0) return 0;
+
+  /* ⚠️ MODO CUIDADO, consultado DEPOIS de somar e só contra quem tem resumo:
+     ler `care_mode` de toda a base seria varrê-la à toa. É o mesmo recorte do
+     resumo da Gratidão. */
+  const { data: emLuto } = await sb
+    .from("patient_profiles")
+    .select("id")
+    .in("id", [...daPaciente.keys()])
+    .eq("care_mode", true);
+  const luto = new Set(((emLuto ?? []) as { id: string }[]).map((p) => p.id));
+
+  let notificadas = 0;
+  for (const [userId, fatos] of daPaciente) {
+    const f = { ...fatos, emCuidado: luto.has(userId) };
+    if (!valeResumoDaComunidade(f)) continue;
+    const { titulo, corpo } = textoDoResumo(f);
+    const res = await sendPushToUser(userId, {
+      title: titulo,
+      body: corpo,
+      /* O rótulo EXATO de `TABS` — `minha-conta` ignora em silêncio o que não
+         bate, e um deep-link errado leva ao lugar de sempre sem erro nenhum. */
+      url: "/minha-conta?tab=Feed",
+    });
+    if (res.sent > 0) notificadas++;
+  }
+  return notificadas;
 }

@@ -11,7 +11,28 @@ function semComentarios(s: string): string {
   return s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
 }
 const TICK = semComentarios(readFileSync("src/routes/api/push-weekly-tick.ts", "utf8"));
-const CORPO = TICK.slice(TICK.indexOf("async function resumoSemanalDasCriadoras"));
+/**
+ * ⚠️ **A FATIA PARA NA PRÓXIMA FUNÇÃO, e não no fim do arquivo.**
+ *
+ * Ela ia até o EOF, e o arquivo ganhou um trabalho DEPOIS deste: o resumo da
+ * Comunidade, que manda push de propósito. A asserção "não usa
+ * `sendPushToUser`" — que protege a decisão de o resumo da criadora ir por
+ * e-mail — passou a reprovar código do vizinho, correto e alheio a ela.
+ *
+ * É o mesmo defeito que `caixinha-servidor.test.ts` já registra: fatia longa
+ * demais engole o bloco seguinte, e o teste passa a falar de código que não é
+ * dele. Reprovar código certo é o lado barato; o lado caro é o dia em que a
+ * função seguinte satisfaz sozinha um `toContain` e a trava para de proteger.
+ */
+function corpoDe(nome: string): string {
+  const i = TICK.indexOf(`async function ${nome}`);
+  expect(i).toBeGreaterThan(-1);
+  const resto = TICK.slice(i + 10);
+  const j = resto.indexOf("\nasync function ");
+  return j === -1 ? resto : resto.slice(0, j);
+}
+
+const CORPO = corpoDe("resumoSemanalDasCriadoras");
 
 describe("o resumo da criadora", () => {
   /* ⚠️ **NÚMEROS, e nunca a LISTA.** Trazer as linhas seria carregar para a
