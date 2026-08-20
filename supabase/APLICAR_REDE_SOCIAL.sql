@@ -964,4 +964,25 @@ SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name='rede_posts' AND column_name='pergunta')                  AS resposta_ok,
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='rede_perguntas' AND column_name='resolvido_em')          AS denuncia_ok;
+          WHERE table_name='rede_perguntas' AND column_name='resolvido_em')          AS denuncia_ok,
+  -- As oito ideias novas. Cada uma destas colunas/tabelas, faltando, apaga um
+  -- recurso INTEIRO em silencio -- e a leitura ja tem recuo, entao nada quebra:
+  -- so deixa de existir. Por isso elas aparecem aqui.
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='comparacao_de')             AS entao_agora_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='editado_em')                AS editar_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='arquivado_em')              AS arquivar_ok,
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_stories' AND column_name='pergunta_aberta')         AS caixinha_story_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_marcacoes')               AS marcar_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_silenciados')             AS silenciar_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_denuncias')               AS denuncia_perfil_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_story_reacoes')           AS reacao_story_ok,
+  EXISTS (SELECT 1 FROM information_schema.tables
+          WHERE table_schema='public' AND table_name='rede_story_votos')             AS enquete_story_ok;
