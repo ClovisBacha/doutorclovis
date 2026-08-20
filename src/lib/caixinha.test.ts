@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
+  consentiuReceber,
   decidirPergunta,
   decidirResposta,
   PERGUNTAS_POR_DIA,
@@ -209,5 +210,46 @@ describe("⚠️ o recado NÃO ensina quais palavras passam", () => {
     expect(recadoDoVeredicto({ pode: false, motivo: "indisponivel" })).not.toMatch(
       /bloque|luto|cuidado|fechad/i,
     );
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ AS DUAS FONTES DE CONSENTIMENTO — e a caixinha do story era um botão morto
+   O 💬 do compositor grava `pergunta_aberta` e a tela desenha o campo; quem
+   decidia era só `aceita_perguntas`, que nasce DESLIGADA. Quem abria a caixinha
+   num story sem nunca ter mexido nos ajustes publicava um campo que recusava
+   todas as visitantes.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("consentiuReceber", () => {
+  test("⚠️ o story sozinho basta — a chave do perfil nasce desligada", () => {
+    expect(consentiuReceber({ chaveLigada: false, storyAbriuACaixa: true })).toBe(true);
+  });
+
+  test("a chave sozinha basta — é a caixinha permanente do perfil", () => {
+    expect(consentiuReceber({ chaveLigada: true, storyAbriuACaixa: false })).toBe(true);
+  });
+
+  test("sem nenhuma das duas, não recebe", () => {
+    expect(consentiuReceber({ chaveLigada: false, storyAbriuACaixa: false })).toBe(false);
+  });
+
+  /* ⚠️ E o veredicto continua sendo `indisponivel` quando não houve
+     consentimento nenhum — nunca um motivo que distinga a chave do story, que
+     entregaria por eliminação o estado da conta dela. */
+  test("⚠️ sem consentimento a pergunta é recusada como indisponível", () => {
+    const v = decidirPergunta(
+      {
+        souADona: false,
+        donaExiste: true,
+        donaEmCuidado: false,
+        donaAceita: consentiuReceber({ chaveLigada: false, storyAbriuACaixa: false }),
+        alcancoOPerfil: true,
+        bloqueadas: false,
+        mandeiHoje: 0,
+        mandeiParaElaHoje: 0,
+      },
+      "oi",
+    );
+    expect(v).toEqual({ pode: false, motivo: "indisponivel" });
   });
 });

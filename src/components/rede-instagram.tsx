@@ -1347,6 +1347,13 @@ export function TelaPrincipal({
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
                   aoEditar={aoEditar}
+                  /* ⚠️ **E ISTO FALTAVA, justamente aqui.** Esta zona é o ÚNICO
+                     lugar do app onde aparece publicação de quem ela não
+                     escolheu seguir — e era o único sem o ⋯ de denunciar. O
+                     post de estranha é exatamente o que a diretriz 1.2 exige
+                     que se possa denunciar, e o feed de quem ela segue, que é o
+                     caso menos provável, tinha o botão. */
+                  aoDenunciar={aoDenunciar}
                   aoVerQuemReagiu={aoVerQuemReagiu}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
@@ -2277,10 +2284,16 @@ export function RedeNoApp({
    * O story é outra PORTA, nunca uma segunda caixinha. Devolve o recado da
    * recusa (ou `null` quando foi).
    */
-  async function perguntarNoStory(donaId: string, texto: string): Promise<string | null> {
-    const d = await perguntarPara(donaId, texto);
-    if (d === null) return "Não deu para enviar agora. Tente de novo.";
-    return d === "publicavel" ? null : recadoDoDesfecho(d);
+  async function perguntarNoStory(
+    donaId: string,
+    texto: string,
+    storyId: string,
+  ): Promise<string | null> {
+    /* ⚠️ Sem `toast` aqui: o visor é tela cheia com relógio correndo, e o
+       recado precisa aparecer DENTRO da caixinha, onde o dedo dela está. */
+    const r = await enviarPergunta(donaId, texto, storyId);
+    if (!r.ok) return r.recado;
+    return r.desfecho === "publicavel" ? null : recadoDoDesfecho(r.desfecho);
   }
 
   /* O resumo de domingo. `null` = não há (ou já foi dispensado). */
@@ -2652,24 +2665,42 @@ export function RedeNoApp({
    * régua clínica no navegador, e ela discordaria da primeira no dia em que uma
    * das listas mudasse.
    */
-  async function perguntarPara(donaId: string, texto: string): Promise<DesfechoDaPergunta | null> {
+  /**
+   * O envio, uma vez só, para as DUAS portas (o perfil e o story).
+   *
+   * ⚠️ **O texto da recusa vem do SERVIDOR.** Escrevê-lo aqui seria uma segunda
+   * régua: a tela diria "você já mandou bastante hoje" para um teto POR PESSOA,
+   * que é outra coisa — e divergiria no primeiro ajuste.
+   */
+  async function enviarPergunta(
+    donaId: string,
+    texto: string,
+    storyId?: string,
+  ): Promise<{ ok: true; desfecho: DesfechoDaPergunta } | { ok: false; recado: string }> {
+    const generico = "Não deu para enviar agora. Tente de novo.";
     try {
       const t = await token();
-      if (!t) return null;
+      if (!t) return { ok: false as const, recado: generico };
       const { perguntar } = await import("@/lib/caixinha.functions");
-      const r = await perguntar({ data: { accessToken: t, donaId, texto } });
+      /* ⚠️ `storyId` é o CONSENTIMENTO daquela publicação — sem ele o servidor
+         cai na chave permanente do perfil, que nasce desligada, e a caixinha
+         que ela acabou de abrir no story recusaria todo mundo. */
+      const r = await perguntar({ data: { accessToken: t, donaId, texto, storyId } });
       if (!r.ok) {
-        /* ⚠️ O texto vem do SERVIDOR. Escrevê-lo aqui seria uma segunda régua:
-           ela diria "você já mandou bastante hoje" para um teto POR PESSOA, que
-           é outra coisa — e divergiria no primeiro ajuste. */
-        const { toast } = await import("sonner");
-        toast.error(("recado" in r && r.recado) || "Não deu para enviar agora. Tente de novo.");
-        return null;
+        return { ok: false as const, recado: (("recado" in r && r.recado) || generico) as string };
       }
-      return r.desfecho;
+      return { ok: true as const, desfecho: r.desfecho };
     } catch {
-      return null;
+      return { ok: false as const, recado: generico };
     }
+  }
+
+  async function perguntarPara(donaId: string, texto: string): Promise<DesfechoDaPergunta | null> {
+    const r = await enviarPergunta(donaId, texto);
+    if (r.ok) return r.desfecho;
+    const { toast } = await import("sonner");
+    toast.error(r.recado);
+    return null;
   }
 
   /** Responder. `null` = publicou; string = a recusa, com o recado do servidor. */
@@ -4268,7 +4299,7 @@ export function VisorDeStory({
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
   /** Mandar uma pergunta pela caixinha aberta neste story. */
-  aoPerguntarNoStory?: (donaId: string, texto: string) => Promise<string | null>;
+  aoPerguntarNoStory?: (donaId: string, texto: string, storyId: string) => Promise<string | null>;
   /** Reagir a este story. `null` tira a reação. */
   aoReagirAoStory?: (storyId: string, tipo: TipoDeReacao | null) => void;
 }) {
@@ -4520,7 +4551,7 @@ export function VisorDeStory({
                     onClick={async () => {
                       setMandando(true);
                       setRecado(null);
-                      const r = await aoPerguntarNoStory(atual.autorId, pergunta.trim());
+                      const r = await aoPerguntarNoStory(atual.autorId, pergunta.trim(), atual.id);
                       setMandando(false);
                       if (r) setRecado(r);
                       else {

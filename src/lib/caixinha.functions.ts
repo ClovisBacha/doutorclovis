@@ -32,6 +32,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { LIMITE_DA_PERGUNTA, type DesfechoDaPergunta } from "@/lib/pergunta-clinica";
 import {
+  consentiuReceber,
   decidirPergunta,
   decidirResposta,
   recadoDaResposta,
@@ -176,6 +177,16 @@ export const perguntar = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         donaId: z.string().uuid(),
         texto: z.string().min(1).max(LIMITE_DA_PERGUNTA),
+        /**
+         * O story de onde a pergunta partiu, quando partiu de um.
+         *
+         * ⚠️ **É o CONSENTIMENTO daquela publicação**, e não um enfeite: o 💬 do
+         * compositor abre a caixinha naquele story, e é isso que autoriza a
+         * pergunta mesmo com a chave permanente do perfil desligada — que é o
+         * padrão. Conferido no BANCO (é dela, está viva, tem a caixinha aberta):
+         * um id no corpo do pedido não abre caixa nenhuma.
+         */
+        storyId: z.string().uuid().optional(),
       })
       .parse(i),
   )
@@ -194,6 +205,29 @@ export const perguntar = createServerFn({ method: "POST" })
       .select("aceita_perguntas, care_mode, perfil_publico")
       .eq("id", data.donaId)
       .maybeSingle();
+
+    /* ⚠️ A CAIXINHA DO STORY, conferida no banco: o story tem de ser DELA, ter
+       a caixinha aberta e ainda estar de pé (24h). Sem as três, um `storyId`
+       forjado abriria a caixa de quem a mantém fechada.
+       Falha de leitura vale FALSE — cair para a chave permanente é o lado
+       seguro do erro, e o campo só existe onde o story já a abriu. */
+    let storyAbriuACaixa = false;
+    if (data.storyId) {
+      try {
+        const desde = new Date(Date.now() - 24 * 3600_000).toISOString();
+        const { data: st } = await sb
+          .from("rede_stories")
+          .select("id, autor_id, pergunta_aberta, criado_em")
+          .eq("id", data.storyId)
+          .eq("autor_id", data.donaId)
+          .gte("criado_em", desde)
+          .maybeSingle();
+        storyAbriuACaixa = !!(st as any)?.pergunta_aberta;
+      } catch {
+        /* Banco sem a coluna `pergunta_aberta` (o `APLICAR_` ainda não rodou):
+           a caixinha do story não existe ali, e a chave do perfil decide. */
+      }
+    }
 
     /* ⚠️ O bloqueio vale nos DOIS sentidos, como em `contextoDe`. */
     const { data: bloqueios, error: erroBloqueio } = await sb
@@ -247,7 +281,14 @@ export const perguntar = createServerFn({ method: "POST" })
         souADona: eu === data.donaId,
         donaExiste: !!dona,
         donaEmCuidado: !!(dona as any)?.care_mode,
-        donaAceita: !!(dona as any)?.aceita_perguntas,
+        /* ⚠️ DUAS fontes de consentimento, e a derivação é PURA (`caixinha.ts`)
+           pela mesma razão de sempre: um `||` escrito aqui só seria testável
+           lendo o fonte, e foi assim que dez asserções deste arquivo passaram
+           verdes numa auditoria por mutação. */
+        donaAceita: consentiuReceber({
+          chaveLigada: !!(dona as any)?.aceita_perguntas,
+          storyAbriuACaixa,
+        }),
         alcancoOPerfil: alcancaOPerfil({
           perfilPublico: !!(dona as any)?.perfil_publico,
           souEu: false,

@@ -920,3 +920,38 @@ describe("⚠️ Modo Cuidado de QUEM LÊ, no servidor", () => {
     expect(corpo).toContain("if (error) return true;");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ "ENTÃO E AGORA" — o carimbo era código morto
+   `publicarPost` resolvia o post antigo, conferia o dono, punha a foto dele na
+   frente do carrossel… e nunca gravava `comparacao_de`. `montarPosts` já sabia
+   ler a coluna e chamar `carimboDaComparacao`; simplesmente nunca achava um
+   post comparado. O "28s → 34s", que é o recurso inteiro, não aparecia para
+   ninguém — sem erro, sem log, e com as duas fotos no lugar certo.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("o post comparado", () => {
+  const corpo = corpoDe("publicarPost");
+
+  test("⚠️ `comparacao_de` é GRAVADO — senão o carimbo nunca nasce", () => {
+    expect(corpo).toContain("comparacao_de: entao");
+  });
+
+  /* ⚠️ A cadeia inteira: o id só vira coluna depois de o BANCO confirmar que o
+     post antigo é dela. Um id no corpo do pedido não carimba nada. */
+  test("⚠️ o `entao` que é gravado é o conferido contra o dono", () => {
+    const i = corpo.indexOf("data.comparacaoCom");
+    expect(i).toBeGreaterThan(-1);
+    const checagem = corpo.slice(i, corpo.indexOf("comparacao_de: entao"));
+    expect(checagem).toContain('.eq("id", data.comparacaoCom)');
+    expect(checagem).toContain("autor_id === eu");
+    expect(checagem).toContain("entao = (velho as any).id as string");
+  });
+
+  /* ⚠️ E o recuo por coluna ausente publica SEM o carimbo, nunca sem as fotos:
+     perder a publicação inteira por causa de um enfeite é a troca errada. */
+  test("⚠️ o recuo não carrega `comparacao_de`", () => {
+    const recuo = corpo.slice(corpo.indexOf("if (error) {"));
+    expect(recuo).not.toContain("comparacao_de");
+    expect(recuo).toContain("imagem_path: caminho");
+  });
+});

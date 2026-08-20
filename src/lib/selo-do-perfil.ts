@@ -368,3 +368,35 @@ export function alcancaOPerfil(v: {
   if (v.sigoAtivo || v.somosAmigas) return true;
   return v.perfilPublico;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   "HOJE", NO FUSO DELA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O dia de São Paulo, para `computeGestation`.
+ *
+ * ⚠️ **O servidor roda em UTC**, e das 21h à meia-noite ele já está no dia
+ * seguinte — num dia de cada sete isso é a virada de semana: o perfil mostraria
+ * "28 semanas" enquanto a home da mesma paciente, na mesma sessão, mostra 27 em
+ * corpo gigante, porque a home calcula no navegador dela.
+ *
+ * ⚠️ **Mora aqui, e não dentro de um dos servidores, porque quem precisa dele
+ * são TODOS os leitores da semana pública** — o selo, o carimbo do story, a aba
+ * do bebê e a legenda sugerida. Ele nasceu privado em `rede-social.functions.ts`
+ * e a legenda, escrita depois noutro arquivo, simplesmente não o chamou: a
+ * mesma paciente ganhava uma semana no perfil e outra na legenda por três horas
+ * todo dia.
+ */
+export function hojeEmSaoPaulo(): Date {
+  const partes = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+  /* Meio-dia, e não meia-noite: `computeGestation` monta a data da DUM com
+     `T00:00:00` local do processo, e comparar duas meias-noites de fusos
+     diferentes erra por um dia inteiro na direção errada. */
+  return new Date(`${partes}T12:00:00`);
+}

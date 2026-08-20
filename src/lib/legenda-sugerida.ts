@@ -14,6 +14,7 @@
  */
 
 import { LIMITE_DO_TEXTO } from "./rede-social";
+import { semanaPublica, type EntradaDoSelo } from "./selo-do-perfil";
 
 /** Quantas opções a tela oferece. */
 export const SUGESTOES_MAX = 3;
@@ -34,21 +35,45 @@ export const LIMITE_DA_FOTO_BYTES = 1_500_000;
 
 /** O contexto que a tela sabe e o modelo não. */
 export type ContextoDaLegenda = {
-  /** Semana gestacional, ou `null` quando não há gestação em curso. */
-  semana: number | null;
+  /**
+   * A FRASE da semana ("28 semanas"), já passada pela régua única — ou `null`
+   * quando não há o que dizer.
+   *
+   * ⚠️ **É `string | null`, e não um número ao lado de um booleano, porque dois
+   * campos que precisam concordar um dia discordam.** A primeira versão levava
+   * `semana: number` + `mostrarSemana: boolean` e checava só a chave: passavam
+   * pelo prompt a paciente que **já pariu** (`computeGestation` conta para
+   * sempre — duas semanas depois do parto o modelo escrevia na voz de uma
+   * grávida de 41 semanas) e a de DUM corrigida acima de 42. Os dois silêncios
+   * existem em `semanaPublica` desde o primeiro dia; o que faltava era esta
+   * tela CHAMAR a régua em vez de reescrever metade dela.
+   */
+  semana: string | null;
   /** Nome do bebê, se ela cadastrou. */
   nomeDoBebe: string | null;
-  /**
-   * A chave do perfil: ela mostra a semana às outras pessoas?
-   *
-   * ⚠️ **ISTO NÃO É DETALHE — É O PORTÃO.** Se ela escondeu a semana no perfil
-   * e a sugestão escrever "28 semanas", a legenda publica exatamente o dado que
-   * a chave existe para esconder, e publica com o dedo dela no botão. Com a
-   * chave desligada a semana NÃO entra no prompt: nem para citar, nem para
-   * "dar contexto" — um modelo que sabe o número acaba escrevendo o número.
-   */
-  mostrarSemana: boolean;
 };
+
+/**
+ * A linha do perfil vira o contexto do prompt.
+ *
+ * ⚠️ **A MESMA `semanaPublica` do selo e do carimbo do story.** É ela que cala
+ * em Modo Cuidado, depois do parto, sem DUM, acima de 42 semanas e com a chave
+ * desligada — e é por morar num lugar só que a legenda não pode discordar do
+ * perfil. `entradaDoSelo` faz o mapeamento; aqui é só a leitura.
+ *
+ * ⚠️ **O nome do bebê tem chave PRÓPRIA** (`mostrarBebe`), e por isso não é
+ * governado pela da semana: são duas decisões dela. Mas os silêncios de LUTO e
+ * de PARTO valem para os dois — `seloDoPerfil` já cala o nome no Modo Cuidado,
+ * e uma legenda na voz de quem espera um bebê que já nasceu é o mesmo defeito
+ * com outra palavra.
+ */
+export function contextoDaLegenda(e: EntradaDoSelo): ContextoDaLegenda {
+  const podeFalarDoBebe = !e.emCuidado && !e.nasceu && e.mostrarBebe;
+  return {
+    semana: semanaPublica(e),
+    nomeDoBebe: podeFalarDoBebe ? e.nomeDoBebe?.trim() || null : null,
+  };
+}
 
 /**
  * O PROMPT.
@@ -72,9 +97,9 @@ export type ContextoDaLegenda = {
  */
 export function promptDaLegenda(ctx: ContextoDaLegenda): string {
   const contexto: string[] = [];
-  /* A semana só entra com a chave ligada — ver `mostrarSemana`. */
-  if (ctx.mostrarSemana && ctx.semana != null) {
-    contexto.push(`A pessoa está com ${ctx.semana} semanas de gestação.`);
+  /* A semana já vem calada quando tem de vir — ver `contextoDaLegenda`. */
+  if (ctx.semana) {
+    contexto.push(`A pessoa está com ${ctx.semana} de gestação.`);
   }
   if (ctx.nomeDoBebe) contexto.push(`O bebê se chama ${ctx.nomeDoBebe}.`);
 

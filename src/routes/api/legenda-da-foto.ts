@@ -28,11 +28,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
 import { naoAutorizado, usuarioDaRequisicao } from "@/lib/api-auth.server";
 import {
+  contextoDaLegenda,
   LIMITE_DA_FOTO_BYTES,
   lerSugestoes,
   promptDaLegenda,
   type ContextoDaLegenda,
 } from "@/lib/legenda-sugerida";
+import { entradaDoSelo, hojeEmSaoPaulo } from "@/lib/selo-do-perfil";
 
 /* Quatro por minuto: o gesto é "escolher a foto e pedir ideia", e ninguém faz
    isso dez vezes em sessenta segundos. Mais apertado que o do diário porque
@@ -81,15 +83,20 @@ export const Route = createFileRoute("/api/legenda-da-foto")({
         }
 
         /* ─── O CONTEXTO SAI DO BANCO, NUNCA DO CLIENTE ───────────────────────
-           A semana e a chave `mostrar_semana` decidem se o número entra no
-           prompt. Vindas do corpo da requisição, bastaria trocar um booleano
-           para o modelo escrever a semana de quem a escondeu. */
-        let ctx: ContextoDaLegenda = { semana: null, nomeDoBebe: null, mostrarSemana: false };
+           A semana e as chaves do perfil decidem o que entra no prompt. Vindas
+           do corpo da requisição, bastaria trocar um booleano para o modelo
+           escrever a semana de quem a escondeu. */
+        let ctx: ContextoDaLegenda = { semana: null, nomeDoBebe: null };
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const sb = supabaseAdmin as any;
+          /* ⚠️ `birth_date` FAZ PARTE DA RÉGUA, e faltava. `computeGestation`
+             conta para sempre a partir da DUM: sem esta coluna, duas semanas
+             depois do parto o prompt dizia "a pessoa está com 41 semanas de
+             gestação" e o modelo devolvia legendas na voz de uma grávida, sobre
+             a foto do recém-nascido dela. */
           const BASE =
-            "lmp_date, reference_date, reference_weeks, reference_days, baby_name, care_mode";
+            "lmp_date, reference_date, reference_weeks, reference_days, birth_date, baby_name, care_mode";
           const um = async (colunas: string) =>
             await sb
               .from("patient_profiles")
@@ -111,7 +118,9 @@ export const Route = createFileRoute("/api/legenda-da-foto")({
           /* ⚠️ MODO CUIDADO FECHA A PORTA, e fecha aqui e não só na tela: quem
              perdeu a gestação não recebe do app uma legenda animada sobre a
              foto dela. Falha ao LER o perfil também fecha — errar para o lado
-             de não sugerir é gratuito; errar para o outro, não. */
+             de não sugerir é gratuito; errar para o outro, não.
+             (O portão vive TAMBÉM dentro de `semanaPublica`; esta saída
+             antecipada é o que impede a legenda genérica de sair no luto.) */
           if (!perfil || perfil.care_mode) return json({ ok: true, sugestoes: [] });
 
           const { computeGestation } = await import("@/lib/gestacao");
@@ -120,14 +129,16 @@ export const Route = createFileRoute("/api/legenda-da-foto")({
             referenceDate: perfil.reference_date as string | null,
             referenceWeeks: perfil.reference_weeks as number | null,
             referenceDays: perfil.reference_days as number | null,
+            /* ⚠️ O dia é o de SÃO PAULO, não o do contêiner — a mesma linha que
+               `seloDe` já tinha, e que faltava aqui: sem ela, das 21h à
+               meia-noite a legenda falava de uma semana e o perfil de outra. */
+            today: hojeEmSaoPaulo(),
           });
-          ctx = {
-            semana: gest ? gest.weeks : null,
-            /* O nome tem chave PRÓPRIA (`mostrar_bebe`) — são duas decisões
-               diferentes dela, e uma não governa a outra. */
-            nomeDoBebe: perfil.mostrar_bebe ? ((perfil.baby_name as string) ?? null) : null,
-            mostrarSemana: !!perfil.mostrar_semana,
-          };
+          /* ⚠️ A MESMA RÉGUA DO SELO, e não uma segunda leitura das chaves.
+             Esta tela reescrevia metade dela (só a chave `mostrar_semana`) e
+             deixava passar os dois silêncios que mais importam: já pariu, e
+             acima de 42 semanas. */
+          ctx = contextoDaLegenda(entradaDoSelo(perfil as any, gest ? gest.totalDays : null));
         } catch {
           /* Sem contexto o prompt continua válido: o modelo escreve sobre a
              foto e nada mais. Melhor uma legenda genérica que nenhuma. */

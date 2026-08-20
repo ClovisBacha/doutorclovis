@@ -41,10 +41,31 @@ export const PERGUNTAS_POR_DIA = 10;
  */
 export const PERGUNTAS_POR_PESSOA = 3;
 
+/**
+ * ELA CONSENTIU EM RECEBER — e há DUAS fontes de consentimento.
+ *
+ * ⚠️ **A caixinha do story era um controle morto sem isto.** O 💬 do compositor
+ * grava `pergunta_aberta` no story e a tela desenha o campo "pergunte o que
+ * quiser"; quem decidia era `patient_profiles.aceita_perguntas`, que nasce
+ * DESLIGADA. Resultado: quem abria a caixinha num story sem nunca ter mexido
+ * nos ajustes via o campo, escrevia, tocava em enviar e levava "indisponível" —
+ * um botão que o app dela mesma acabou de publicar, recusando as visitantes.
+ *
+ * ⚠️ **E o consentimento do story NÃO liga a chave permanente**, de propósito.
+ * É exatamente a distinção de `semanaParaCarimbo`: a chave do perfil vale para
+ * sempre e para todo mundo; o story é um ato POR PUBLICAÇÃO, que some em 24
+ * horas. Ligar a chave por causa de um story seria o app tomando por ela uma
+ * decisão permanente a partir de um gesto temporário.
+ */
+export function consentiuReceber(f: { chaveLigada: boolean; storyAbriuACaixa: boolean }): boolean {
+  return f.chaveLigada || f.storyAbriuACaixa;
+}
+
 export type FatosDaPergunta = {
   souADona: boolean;
   donaExiste: boolean;
   donaEmCuidado: boolean;
+  /** `consentiuReceber` — a chave do perfil OU a caixinha deste story. */
   donaAceita: boolean;
   /** `alcancaOPerfil` — a MESMA régua de `verPerfil`. */
   alcancoOPerfil: boolean;

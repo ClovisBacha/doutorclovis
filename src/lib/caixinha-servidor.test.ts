@@ -255,3 +255,45 @@ describe("⚠️ falhar ao ler não vira caixa vazia", () => {
     expect(c).toMatch(/if \(error\)[\s\S]{0,220}?return \{ ok: false as const, motivo: "banco"/);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ⚠️ A CAIXINHA DO STORY — o consentimento POR PUBLICAÇÃO
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("o story abre a caixa sem ligar a chave permanente", () => {
+  const corpo = corpoDe("perguntar");
+
+  /* ⚠️ Três condições, e faltar qualquer uma abriria a caixa de quem a mantém
+     fechada: o story tem de ser DELA, ter a caixinha aberta, e estar de pé. */
+  test("⚠️ o story é conferido no BANCO — dono, caixinha aberta e 24h", () => {
+    /* ⚠️ O recorte é a CONSULTA do story, e não "daqui até o fim do corpo": os
+       dois tetos diários também usam `.gte("criado_em", …)`, e apagar a janela
+       de 24 horas do story continuava verde porque a asserção casava a
+       ocorrência dos tetos. É a armadilha que o cabeçalho deste arquivo
+       descreve, cometida de novo — e pega por mutação. */
+    const i = corpo.indexOf('.from("rede_stories")');
+    expect(i).toBeGreaterThan(-1);
+    const consulta = corpo.slice(i, corpo.indexOf("maybeSingle()", i));
+    expect(consulta).toContain('.eq("id", data.storyId)');
+    expect(consulta).toContain('.eq("autor_id", data.donaId)');
+    expect(consulta).toContain('.gte("criado_em"');
+    expect(consulta).toContain("pergunta_aberta");
+    /* E o que decide é a coluna, nunca a existência da linha. */
+    expect(corpo).toContain("storyAbriuACaixa = !!(st as any)?.pergunta_aberta");
+  });
+
+  /* ⚠️ A derivação é a função PURA, e não um `||` escrito no handler: dez
+     asserções deste arquivo já passaram verdes numa auditoria por mutação
+     justamente por medirem posição de string em vez de comportamento. */
+  test("⚠️ o consentimento sai de `consentiuReceber`, não de um || local", () => {
+    expect(corpo).toContain("donaAceita: consentiuReceber({");
+    expect(corpo).toContain("chaveLigada: !!(dona as any)?.aceita_perguntas");
+    expect(corpo).toContain("storyAbriuACaixa,");
+  });
+
+  /* ⚠️ O story NÃO liga a chave do perfil: é a mesma distinção de
+     `semanaParaCarimbo` — ato por publicação contra decisão permanente. */
+  test("⚠️ perguntar nunca escreve em `patient_profiles`", () => {
+    expect(corpo).not.toContain('.from("patient_profiles").update');
+    expect(corpo).not.toContain("aceita_perguntas: true");
+  });
+});

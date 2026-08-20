@@ -54,6 +54,7 @@ import {
   bebeDoPerfil,
   contextoDaPersona,
   entradaDoSelo,
+  hojeEmSaoPaulo,
   olharDe,
   seloDoPerfil,
   semanaParaCarimbo,
@@ -487,27 +488,6 @@ async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
  * aqui faria a rede social discordar do consultório sobre a semana da mesma
  * paciente.
  */
-/**
- * "Hoje" no fuso da paciente.
- *
- * A base inteira é brasileira, e o app já toma essa decisão em outros lugares
- * (o cron do lembrete de meditação, a contagem de dias distintos das
- * conquistas). Sem isto, a semana do perfil discorda da semana da home por
- * três horas todo dia.
- */
-function hojeEmSaoPaulo(): Date {
-  const partes = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Sao_Paulo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-  /* Meio-dia, e não meia-noite: `computeGestation` monta a data da DUM com
-     `T00:00:00` local do processo, e comparar duas meias-noites de fusos
-     diferentes erra por um dia inteiro na direção errada. */
-  return new Date(`${partes}T12:00:00`);
-}
-
 async function seloDe(p: any) {
   const { computeGestation } = await import("@/lib/gestacao");
   const g = computeGestation({
@@ -1594,6 +1574,14 @@ export const publicarPost = createServerFn({ method: "POST" })
            cliente não pode virar linha no banco que `aulaValida` depois
            recusaria — o post ficaria com uma coluna que ninguém desenha. */
         aula: data.aula && aulaValida(data.aula) ? data.aula : null,
+        /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
+           `entao` era resolvido, conferido contra o dono e usado para pôr a
+           foto antiga na frente do carrossel, e então DESCARTADO: a coluna
+           nunca era escrita, então `montarPosts` (que já sabia ler
+           `comparacao_de` e chamar `carimboDaComparacao`) nunca achava um post
+           comparado. A comparação existia como duas fotos e o "28s → 34s" — que
+           é o recurso inteiro — não aparecia para ninguém, sem erro nenhum. */
+        comparacao_de: entao,
       })
       .select("id")
       .single();
@@ -1602,7 +1590,11 @@ export const publicarPost = createServerFn({ method: "POST" })
        `publicarStory`: o deploy chega antes do SQL, e sem isto PUBLICAR pararia
        de funcionar para todo mundo — não só a enquete. */
     if (error) {
-      console.warn("[rede] post sem enquete/aula/pergunta — rode APLICAR_REDE_SOCIAL.sql");
+      console.warn("[rede] post sem enquete/aula/comparacao — rode APLICAR_REDE_SOCIAL.sql");
+      /* ⚠️ O recuo publica SEM o carimbo, e não sem a comparação: as duas fotos
+         continuam no carrossel, na ordem certa. O que se perde é o "28s → 34s",
+         que é enfeite — perder a publicação inteira por causa dele seria a
+         troca errada. */
       const { data: p2, error: erro2 } = await sb
         .from("rede_posts")
         .insert({
