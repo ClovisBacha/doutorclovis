@@ -78,6 +78,8 @@ import {
   lerLugar,
   paraGuardar as lugarParaGuardar,
 } from "@/lib/lugar-no-feed";
+/* Import ESTÁTICO pela mesma razão: régua pura, sem servidor e sem DOM. */
+import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
@@ -1188,6 +1190,9 @@ export function TelaPrincipal({
   aoEntrarNoDesafio,
   aoIrParaOJogo,
   convite,
+  lembreteEntao,
+  aoCompararAgora,
+  aoDispensarEntao,
 }: {
   posts: PostNaTela[];
   stories?: Story[];
@@ -1210,6 +1215,15 @@ export function TelaPrincipal({
    * segunda ida ao servidor por pintura do feed.
    */
   convite?: { codigo: string | null } | null;
+  /**
+   * O lembrete do "então e agora" — `null` quando não há.
+   *
+   * ⚠️ Quem DECIDE é `lembreteDoEntao` (pura, com o portão do Modo Cuidado
+   * dentro); esta tela só desenha o que recebeu.
+   */
+  lembreteEntao?: { id: string; imagemUrl: string; criadoEm: string } | null;
+  aoCompararAgora?: () => void;
+  aoDispensarEntao?: () => void;
   aoSeguirPessoa?: (id: string) => void;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
@@ -1301,6 +1315,21 @@ export function TelaPrincipal({
           arranjo que o dono pediu para corrigir ("o primeiro elemento da aba
           será os stories"). */}
       {retro && aoFecharRetro && <CartaoDaSemana retro={retro} aoFechar={aoFecharRetro} />}
+
+      {/* ⚠️ **UM CARTÃO DE CADA VEZ.** A retrospectiva de domingo e o lembrete
+          podem cair no mesmo dia, e dois cartões empilhados entre os stories e
+          o primeiro post empurram o feed inteiro para fora da dobra — que é
+          exatamente o arranjo que o dono pediu para corrigir. A retrospectiva
+          ganha: ela só existe aos domingos, e o lembrete volta na semana
+          seguinte por conta própria. */}
+      {!retro && lembreteEntao && aoCompararAgora && aoDispensarEntao && (
+        <CartaoDoEntaoEAgora
+          foto={lembreteEntao.imagemUrl}
+          criadoEm={lembreteEntao.criadoEm}
+          aoComparar={aoCompararAgora}
+          aoDispensar={aoDispensarEntao}
+        />
+      )}
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
         <>
@@ -1397,6 +1426,79 @@ export function TelaPrincipal({
           {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * O LEMBRETE DO "ENTÃO E AGORA".
+ *
+ * ⚠️ **Ele existe porque o recurso estava escondido.** A escolha da foto antiga
+ * vive atrás do botão de comparar, DENTRO da tela de publicar: quem não souber
+ * que ele existe nunca esbarra nele. Este cartão é o único lugar em que o app
+ * diz que aquela foto de quatro semanas atrás pode virar alguma coisa.
+ *
+ * ⚠️ **Ele MOSTRA a foto, e é isso que o faz funcionar.** "Que tal um então e
+ * agora?" em texto é mais uma frase; a barriga dela de quatro semanas atrás na
+ * tela é a coisa inteira, e responde sozinha se vale a pena.
+ *
+ * ⚠️ **E ele NÃO diz a semana daquela foto.** A semana pública tem chave
+ * própria (`mostrar_semana`), e este cartão é privado — só ela o vê —, mas
+ * escrever o número aqui criaria uma segunda régua para "que semana era",
+ * ao lado de `carimboDaComparacao`, que é quem responde isso na publicação. O
+ * tempo em dias/semanas corridas não é dado clínico e basta para decidir.
+ */
+function CartaoDoEntaoEAgora({
+  foto,
+  criadoEm,
+  aoComparar,
+  aoDispensar,
+}: {
+  foto: string;
+  criadoEm: string;
+  aoComparar: () => void;
+  aoDispensar: () => void;
+}) {
+  const dias = Math.floor((Date.now() - Date.parse(criadoEm)) / 86_400_000);
+  const semanas = Math.floor(dias / 7);
+  const quando =
+    semanas >= 1 ? `${semanas} ${semanas === 1 ? "semana" : "semanas"}` : `${dias} dias`;
+
+  return (
+    <div className="my-3 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+      <img
+        src={foto}
+        alt=""
+        className="h-16 w-16 shrink-0 rounded-xl object-cover"
+        loading="lazy"
+        decoding="async"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold leading-snug">Faz {quando} desde esta foto</p>
+        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          Dá para pôr as duas lado a lado.
+        </p>
+        <button
+          type="button"
+          onClick={aoComparar}
+          /* ⚠️ 44px medidos, e não 36: a primeira versão saiu com 188×36 e
+             37×40, os dois abaixo do mínimo do projeto. Medido no navegador,
+             não estimado. */
+          className="press mt-2 min-h-[44px] rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+        >
+          Fazer o então e agora
+        </button>
+      </div>
+      {/* ⚠️ Alvo de 44px: é o botão de recusar, e recusar tem de ser tão fácil
+          quanto aceitar — senão o cartão vira armadilha. */}
+      <button
+        type="button"
+        onClick={aoDispensar}
+        aria-label="Dispensar"
+        className="press -mr-1 flex min-h-[44px] min-w-[44px] shrink-0 items-start justify-center self-start pt-2 text-base leading-none text-muted-foreground"
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -2281,6 +2383,30 @@ export function RedeNoApp({
   const [meuCodigo, setMeuCodigo] = useState<string | null>(null);
 
   /**
+   * O LEMBRETE do "então e agora".
+   *
+   * ⚠️ **Um recurso escondido no compositor não acontece.** A escolha da foto
+   * antiga vive atrás do botão de comparar, dentro da tela de publicar: quem
+   * não souber que ele existe nunca esbarra nele. O cartão é o único lugar em
+   * que o app diz que aquela foto de quatro semanas atrás pode virar alguma
+   * coisa.
+   */
+  /**
+   * O "então" que o lembrete escolheu, entregue ao compositor.
+   *
+   * ⚠️ **Zerado ao FECHAR o compositor.** Sem isso, a próxima publicação
+   * comum — dias depois — nasceria com a comparação ligada, e ela publicaria
+   * um "então e agora" que não pediu.
+   */
+  const [entaoEscolhido, setEntaoEscolhido] = useState<string | null>(null);
+
+  const [lembreteEntao, setLembreteEntao] = useState<{
+    id: string;
+    imagemUrl: string;
+    criadoEm: string;
+  } | null>(null);
+
+  /**
    * O toque no ícone da Comunidade volta ao começo.
    *
    * ⚠️ **A primeira passada não faz nada** (o efeito roda na montagem, quando
@@ -2620,7 +2746,10 @@ export function RedeNoApp({
   >(null);
 
   useEffect(() => {
-    if (onde.t !== "novo" || !euId || paraComparar !== null) return;
+    /* ⚠️ Também no FEED, e não só no compositor: é o feed que mostra o
+       lembrete, e a mesma consulta serve os dois — o guarda `!== null` impede
+       a segunda ida quando ela abre o compositor logo depois. */
+    if ((onde.t !== "novo" && onde.t !== "feed") || !euId || paraComparar !== null) return;
     let vivo = true;
     (async () => {
       try {
@@ -2647,6 +2776,34 @@ export function RedeNoApp({
       vivo = false;
     };
   }, [onde.t, euId, paraComparar]);
+
+  useEffect(() => {
+    if (onde.t !== "feed" || !euId || !paraComparar) return;
+    try {
+      const chave = chaveDoLembrete(euId);
+      const escolhida = lembreteDoEntao({
+        candidatos: paraComparar,
+        ultimoEm: localStorage.getItem(chave),
+        agora: new Date(),
+        /* ⚠️ O portão do luto mora DENTRO da régua; aqui só se entrega o fato. */
+        emCuidado: careMode,
+      });
+      if (!escolhida || !escolhida.imagemUrl) return;
+      /* ⚠️ **O carimbo é escrito AGORA, no instante em que ele aparece — e não
+         quando ela dispensa.** Ignorar é a resposta mais comum a qualquer
+         cartão, e contado pela dispensa o lembrete voltaria em toda abertura da
+         aba para quem simplesmente rolou por cima dele. */
+      localStorage.setItem(chave, new Date().toISOString());
+      setLembreteEntao({
+        id: escolhida.id,
+        imagemUrl: escolhida.imagemUrl,
+        criadoEm: escolhida.criadoEm,
+      });
+    } catch {
+      /* sem armazenamento: nenhum lembrete, e nada quebra */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onde.t, euId, paraComparar, careMode]);
 
   /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
@@ -3944,7 +4101,11 @@ export function RedeNoApp({
         rascunho={rascunho}
         aoMudarRascunho={guardarRascunho}
         paraComparar={paraComparar}
-        aoFechar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        entaoInicial={entaoEscolhido}
+        aoFechar={() => {
+          setEntaoEscolhido(null);
+          setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" });
+        }}
         aoPublicar={publicar}
         aulaDeHoje={aulaDeHoje}
       />
@@ -4168,6 +4329,14 @@ export function RedeNoApp({
         aoSeguirPessoa={seguirPessoa}
         aoTocarStory={verStory}
         convite={{ codigo: meuCodigo }}
+        lembreteEntao={lembreteEntao}
+        aoCompararAgora={() => {
+          if (!lembreteEntao) return;
+          setEntaoEscolhido(lembreteEntao.id);
+          setLembreteEntao(null);
+          setOnde({ t: "novo" });
+        }}
+        aoDispensarEntao={() => setLembreteEntao(null)}
         retro={retro}
         aoFecharRetro={() => {
           setRetro(null);
@@ -5264,6 +5433,7 @@ export function NovoPost({
   rascunho,
   aoMudarRascunho,
   paraComparar,
+  entaoInicial,
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
@@ -5320,12 +5490,18 @@ export function NovoPost({
    * estão em `entao-e-agora.ts`. `null` = ainda carregando; `[]` = não há.
    */
   paraComparar?: { id: string; imagemUrl: string; criadoEm: string }[] | null;
+  /** O "então" já escolhido pelo lembrete do feed — ver `entao-e-agora.ts`. */
+  entaoInicial?: string | null;
 }) {
   const [texto, setTexto] = useState("");
   const [sugestoes, setSugestoes] = useState<string[] | null>(null);
   const [marcadas, setMarcadas] = useState<string[]>([]);
   /** O id do post antigo escolhido como "então", ou `null`. */
-  const [entao, setEntao] = useState<string | null>(null);
+  /* ⚠️ Nasce com o que o LEMBRETE escolheu, quando ela veio por ele. Sem isto,
+     tocar em "Comparar" no cartão abriria o compositor com a comparação
+     desligada e ela teria de achar o botão e a foto de novo — o cartão
+     prometeria uma coisa e entregaria outra. */
+  const [entao, setEntao] = useState<string | null>(entaoInicial ?? null);
   const [escolhendoQuem, setEscolhendoQuem] = useState(false);
   /* A faixa "você tinha um rascunho". Some ao recuperar ou ao descartar — e
      `null` (o padrão) é "ainda não decidiu". */

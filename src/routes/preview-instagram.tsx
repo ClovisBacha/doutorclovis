@@ -29,6 +29,7 @@
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
  *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
  *   /preview-instagram?semcodigo=1  → o convite NÃO aparece (sem indicação)
+ *   /preview-instagram?entao=1      → o lembrete do "então e agora"
  *   /preview-instagram?vazio=1      → o feed vazio, com o convite em destaque
  *   /preview-instagram?desafio=fora → o convite do desafio (ainda não entrou)
  *   /preview-instagram?desafio=meio → dentro, 1 de 3 dias
@@ -79,6 +80,7 @@ export const Route = createFileRoute("/preview-instagram")({
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     semcodigo: q.semcodigo == null ? false : !!q.semcodigo,
+    entao: q.entao == null ? false : !!q.entao,
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
@@ -238,6 +240,7 @@ function Bancada() {
     meu,
     vazio,
     semcodigo,
+    entao,
     sugeridas,
     legendas,
     amigas,
@@ -835,6 +838,22 @@ function Bancada() {
              aparece, que é o único jeito de conferir que um convite sem
              indicação nunca é oferecido. */
           convite={{ codigo: semCodigo ? null : "MARIA7X" }}
+          /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
+             de 28+ dias e a janela de sete dias vencida — sem a bancada,
+             olhá-lo exigiria esperar um mês com uma conta de verdade.
+             ⚠️ E ele NÃO aparece junto da retrospectiva (um cartão de cada
+             vez), então `?entao=1` implica `?retro=0`. */
+          lembreteEntao={
+            entao
+              ? {
+                  id: "p-antigo",
+                  imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
+                  criadoEm: new Date(Date.now() - 34 * 86_400_000).toISOString(),
+                }
+              : null
+          }
+          aoCompararAgora={() => console.log("abriria o compositor comparando")}
+          aoDispensarEntao={() => console.log("dispensou")}
           /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
              `aoReagir={() => {}}` era impossível ver a mecânica INTEIRA — o
              emoji escolhido pousando na linha, o pulo, o resumo se
@@ -858,7 +877,7 @@ function Bancada() {
              de seis dias em sete), `?retro=1foto` prova a grade de uma foto só
              e `?retro=vazia` o cartão sem foto, que é o da semana que só virou. */
           retro={
-            retroModo === "0"
+            entao || retroModo === "0"
               ? null
               : {
                   fotos:

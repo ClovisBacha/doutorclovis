@@ -91,3 +91,62 @@ export function legendaSugerida(c: CarimboDaComparacao | null): string {
   if (!c) return "Então e agora 💛";
   return `${c.antes} e ${c.agora} 💛`;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O LEMBRETE — porque um recurso escondido no compositor não acontece
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantos dias entre um lembrete e o próximo.
+ *
+ * ⚠️ **E o carimbo é escrito quando ele APARECE, nunca só quando ela dispensa.**
+ * Ignorar é a resposta mais comum a qualquer cartão — e, contado só pela
+ * dispensa, o lembrete voltaria em toda abertura da aba para quem simplesmente
+ * rolou por cima dele. Um lembrete que não sabe que já foi dado é um anúncio.
+ */
+export const DIAS_ENTRE_LEMBRETES = 7;
+
+/** A chave carrega o ID DA CONTA — o aparelho é compartilhado. */
+export function chaveDoLembrete(euId: string): string {
+  return `dc-rede-entao-lembrete-${euId}`;
+}
+
+/**
+ * Vale lembrar agora? Devolve a foto "então", ou `null`.
+ *
+ * ⚠️ **Nunca em Modo Cuidado**, e o portão mora AQUI — nenhuma tela precisa
+ * lembrar disso. "Que tal comparar com a foto de quatro semanas atrás?" para
+ * quem acabou de perder a gestação é exatamente o que o Modo Cuidado existe
+ * para impedir, e é pior que a maioria dos cartões porque a foto antiga é da
+ * barriga dela.
+ *
+ * ⚠️ **A candidata é a MAIS ANTIGA que serve**, e não a mais recente das
+ * antigas: a graça do formato é a distância, e `candidatosAoEntao` já devolve
+ * em ordem decrescente de data — então a última da lista é a que mostra mais
+ * mudança.
+ */
+export function lembreteDoEntao(opts: {
+  candidatos: CandidatoAoEntao[];
+  /** ISO do último lembrete MOSTRADO, ou `null`. */
+  ultimoEm: string | null;
+  agora: Date;
+  emCuidado: boolean;
+}): CandidatoAoEntao | null {
+  if (opts.emCuidado) return null;
+
+  const comFoto = opts.candidatos.filter((c) => !!c.imagemUrl);
+  if (comFoto.length === 0) return null;
+
+  if (opts.ultimoEm) {
+    const t = Date.parse(opts.ultimoEm);
+    /* ⚠️ Carimbo ilegível NÃO libera o lembrete: errar para o lado de não
+       incomodar é gratuito, e para o outro não. Mesma direção de `lembretes.ts`
+       quando a leitura das respostas falha. */
+    if (!Number.isFinite(t)) return null;
+    const dias = (opts.agora.getTime() - t) / 86_400_000;
+    /* Carimbo do futuro (relógio dessincronizado) também segura o lembrete. */
+    if (dias < DIAS_ENTRE_LEMBRETES) return null;
+  }
+
+  return comFoto[comFoto.length - 1];
+}

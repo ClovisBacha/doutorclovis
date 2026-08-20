@@ -304,3 +304,47 @@ describe("o lugar no feed", () => {
     expect(efeito).toContain("esquecerOLugar()");
   });
 });
+
+describe("o lembrete do então e agora", () => {
+  const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
+    /\{\/\*[\s\S]*?\*\/\}/g,
+    " ",
+  );
+
+  /* ⚠️ Quem DECIDE é a régua pura, com o portão do Modo Cuidado dentro — a tela
+     não pode ter uma segunda condição, que é como o luto volta pela lateral. */
+  test("⚠️ a decisão sai de `lembreteDoEntao`, e o luto vai como fato", () => {
+    const i = semComentarios.indexOf("lembreteDoEntao({");
+    expect(i).toBeGreaterThan(-1);
+    const chamada = semComentarios.slice(i, semComentarios.indexOf("});", i));
+    expect(chamada).toContain("candidatos: paraComparar");
+    expect(chamada).toContain("emCuidado: careMode");
+  });
+
+  /* ⚠️ Ignorar é a resposta mais comum a qualquer cartão. Contado só pela
+     dispensa, o lembrete voltaria em TODA abertura da aba para quem rolou por
+     cima dele. */
+  test("⚠️ o carimbo é gravado quando ele APARECE, não ao dispensar", () => {
+    const i = semComentarios.indexOf("lembreteDoEntao({");
+    const depois = semComentarios.slice(i, i + 900);
+    expect(depois).toContain("localStorage.setItem(chave, new Date().toISOString())");
+    /* E antes de o cartão ir para a tela — nunca depois de um `if` de dispensa. */
+    expect(depois.indexOf("localStorage.setItem(chave")).toBeLessThan(
+      depois.indexOf("setLembreteEntao({"),
+    );
+  });
+
+  /* ⚠️ Dois cartões empilhados entre os stories e o primeiro post empurram o
+     feed para fora da dobra — o arranjo que o dono pediu para corrigir. */
+  test("⚠️ um cartão de cada vez: a retrospectiva ganha", () => {
+    expect(semComentarios).toContain("{!retro && lembreteEntao && aoCompararAgora");
+  });
+
+  /* ⚠️ Sem isto, tocar em "Comparar" abriria o compositor com a comparação
+     desligada: o cartão prometeria uma coisa e entregaria outra. */
+  test("⚠️ o compositor abre JÁ comparando, e zera ao fechar", () => {
+    expect(semComentarios).toContain("useState<string | null>(entaoInicial ?? null)");
+    expect(semComentarios).toContain("entaoInicial={entaoEscolhido}");
+    expect(semComentarios).toContain("setEntaoEscolhido(null)");
+  });
+});

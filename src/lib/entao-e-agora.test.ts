@@ -5,6 +5,8 @@ import {
   DIAS_MINIMOS,
   legendaSugerida,
   type CandidatoAoEntao,
+  chaveDoLembrete,
+  lembreteDoEntao,
 } from "./entao-e-agora";
 
 const AGORA = new Date("2026-08-19T12:00:00Z");
@@ -97,5 +99,88 @@ describe("a legenda sugerida", () => {
         expect(t).not.toContain(proibido);
       }
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O LEMBRETE — um recurso escondido no compositor não acontece
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("lembreteDoEntao", () => {
+  const AGORA2 = new Date("2026-08-20T12:00:00Z");
+  const dias = (n: number) => new Date(AGORA2.getTime() - n * 86_400_000).toISOString();
+  const cand = (id: string, d: number, foto = "u") => ({
+    id,
+    criadoEm: dias(d),
+    imagemUrl: foto as string | null,
+  });
+
+  test("com candidata e sem lembrete anterior, lembra", () => {
+    const r = lembreteDoEntao({
+      candidatos: [cand("a", 30)],
+      ultimoEm: null,
+      agora: AGORA2,
+      emCuidado: false,
+    });
+    expect(r?.id).toBe("a");
+  });
+
+  /* ⚠️ A graça do formato é a DISTÂNCIA, e `candidatosAoEntao` devolve em ordem
+     decrescente de data: a última da lista é a que mostra mais mudança. */
+  test("⚠️ escolhe a MAIS ANTIGA que serve", () => {
+    const r = lembreteDoEntao({
+      candidatos: [cand("nova", 30), cand("velha", 120)],
+      ultimoEm: null,
+      agora: AGORA2,
+      emCuidado: false,
+    });
+    expect(r?.id).toBe("velha");
+  });
+
+  /* ⚠️ "Que tal comparar com a foto de quatro semanas atrás?" para quem acabou
+     de perder a gestação é o que o Modo Cuidado existe para impedir — e a foto
+     antiga é da barriga dela. */
+  test("⚠️ nunca em Modo Cuidado", () => {
+    expect(
+      lembreteDoEntao({
+        candidatos: [cand("a", 30)],
+        ultimoEm: null,
+        agora: AGORA2,
+        emCuidado: true,
+      }),
+    ).toBeNull();
+  });
+
+  test("sem candidata com foto, não lembra", () => {
+    expect(
+      lembreteDoEntao({
+        candidatos: [cand("a", 30, null as unknown as string)],
+        ultimoEm: null,
+        agora: AGORA2,
+        emCuidado: false,
+      }),
+    ).toBeNull();
+    expect(
+      lembreteDoEntao({ candidatos: [], ultimoEm: null, agora: AGORA2, emCuidado: false }),
+    ).toBeNull();
+  });
+
+  /* ⚠️ O carimbo é escrito quando ele APARECE, não só quando ela dispensa —
+     senão quem rola por cima dele o recebe em toda abertura da aba. */
+  test("⚠️ respeita a janela de sete dias", () => {
+    const base = { candidatos: [cand("a", 40)], agora: AGORA2, emCuidado: false };
+    expect(lembreteDoEntao({ ...base, ultimoEm: dias(6) })).toBeNull();
+    expect(lembreteDoEntao({ ...base, ultimoEm: dias(8) })?.id).toBe("a");
+  });
+
+  /* ⚠️ Errar para o lado de não incomodar é gratuito; para o outro, não. */
+  test("⚠️ carimbo ilegível ou do futuro SEGURA o lembrete", () => {
+    const base = { candidatos: [cand("a", 40)], agora: AGORA2, emCuidado: false };
+    expect(lembreteDoEntao({ ...base, ultimoEm: "ontem" })).toBeNull();
+    expect(lembreteDoEntao({ ...base, ultimoEm: dias(-3) })).toBeNull();
+  });
+
+  /* ⚠️ O aparelho é compartilhado. */
+  test("⚠️ a chave carrega o id da conta", () => {
+    expect(chaveDoLembrete("a")).not.toBe(chaveDoLembrete("b"));
   });
 });
