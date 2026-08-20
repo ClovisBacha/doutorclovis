@@ -364,7 +364,13 @@ export function principaisReacoes(c: ContagemDeReacoes, quantas = 3): TipoDeReac
    7 · AVISOS
    ══════════════════════════════════════════════════════════════════════════ */
 
-export type EspecieDeAviso = "seguiu" | "pediu_para_seguir" | "reagiu" | "aceitou" | "marcou";
+export type EspecieDeAviso =
+  | "seguiu"
+  | "pediu_para_seguir"
+  | "reagiu"
+  | "aceitou"
+  | "marcou"
+  | "reagiu_story";
 
 /**
  * ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.**
@@ -398,6 +404,10 @@ export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
       return `${quem} aceitou seu pedido`;
     case "reagiu":
       return `${quem} reagiu ao seu post`;
+    case "reagiu_story":
+      /* ⚠️ Diz que foi no STORY, e não "reagiu ao seu post": o story some em
+         24h, e ela precisa saber que o afago foi naquilo que está acabando. */
+      return `${quem} reagiu ao seu story`;
     case "marcou":
       /* ⚠️ Diz que dá para TIRAR, na própria frase. Descobrir isso só abrindo o
          post faria a primeira reação de quem não quis ser marcada ser pedir à

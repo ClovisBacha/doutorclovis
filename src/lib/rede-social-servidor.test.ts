@@ -355,6 +355,60 @@ describe("silenciar", () => {
   });
 });
 
+describe("reagir ao story", () => {
+  /* ⚠️ NO MODELO, isto vira MENSAGEM DIRETA. Este app não tem mensagem direta —
+     conversa privada entre pacientes é o canal que a decisão de fechar os
+     comentários evitou. Aqui a reação cai na Atividade da autora, e é só isso. */
+  test("⚠️ o aviso é o ponto inteiro — uma reação que ela não vê é botão morto", () => {
+    const c = corpoDe("reagirAoStory").replace(/\s+/g, " ");
+    expect(c).toContain("registrarAtividade(sb, {");
+    expect(c).toContain('especie: "reagiu_story"');
+  });
+
+  /* ⚠️ O MESMO portão de `votarNoStory`: quem não enxerga o story não reage a
+     ele. Sem isso, um uuid sorteado que respondesse `ok` confirmaria a
+     existência de um story privado. */
+  test("⚠️ só reage quem enxerga o story", () => {
+    const c = corpoDe("reagirAoStory").replace(/\s+/g, " ");
+    expect(c).toContain("const podeVer =");
+    expect(c).toContain("!autor.care_mode");
+    expect(c).toContain("ctx.bloqueio.has(");
+    const conferiu = c.indexOf("const podeVer =");
+    const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
+    expect(conferiu).toBeGreaterThan(-1);
+    expect(gravou === -1 ? c.indexOf(".upsert(") : gravou).toBeGreaterThan(conferiu);
+  });
+
+  /* ⚠️ Story vencido não recebe reação: ele some da tela em 24h, e aceitar
+     depois encheria a Atividade dela com afagos a uma coisa que ninguém mais
+     vê — e abriria caminho para mexer com quem já parou de publicar. */
+  test("⚠️ story vencido é recusado", () => {
+    expect(corpoDe("reagirAoStory").replace(/\s+/g, " ")).toContain(
+      "new Date((story as any).expira_em).getTime() < Date.now()",
+    );
+  });
+
+  /* ⚠️ Só a MINHA reação chega à tela — nunca a contagem nem a lista. Um placar
+     num story seria um número público de uma coisa que some em 24h, e a aba
+     inteira foi desenhada sem placar. */
+  test("⚠️ o story leva só a MINHA reação", () => {
+    const c = corpoDe("storiesDoFeed").replace(/\s+/g, " ");
+    /* ⚠️ O RECORTE É OBRIGATÓRIO, e a primeira versão deste teste MENTIU por
+       não tê-lo: `.eq("quem_id", eu)` também aparece na consulta dos já
+       VISTOS, logo acima — então apagar o filtro da consulta de reações
+       passava verde, e o visor mostraria a reação de OUTRA pessoa como se
+       fosse a dela. É a armadilha de `toContain` casando noutro ponto do
+       arquivo, a mesma que já mordeu a catraca de portas. */
+    const i = c.indexOf('.from("rede_story_reacoes")');
+    expect(i).toBeGreaterThan(-1);
+    const consulta = c.slice(i, c.indexOf("} catch", i));
+    expect(consulta).toContain('.eq("quem_id", eu)');
+    expect(c).toContain("minhaReacao: minhaReacaoNo.get(l.id) ?? null");
+    /* Nada de contagem: se alguém acrescentar um `count`, isto cai. */
+    expect(c).not.toContain("reacoesPorStory");
+  });
+});
+
 describe("higiene", () => {
   test('nenhum `select("*")`', () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
@@ -367,7 +421,7 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são dez", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são onze", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -431,7 +485,15 @@ describe("higiene", () => {
     expect(sil).toContain('.eq("quem_id", eu)');
     expect(sil).toContain('.eq("silenciado_id", data.alvoId)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(10);
+    /* ⚠️ E o DÉCIMO PRIMEIRO: tirar a reação de um story. Mesma natureza do
+       silêncio — a linha não guarda história, e o story some em 24h de
+       qualquer jeito. `.eq("quem_id", eu)` é o portão. */
+    const rs = corpoDe("reagirAoStory").replace(/\s+/g, " ");
+    expect(rs).toContain(".delete(");
+    expect(rs).toContain('.eq("story_id", data.storyId)');
+    expect(rs).toContain('.eq("quem_id", eu)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(11);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {

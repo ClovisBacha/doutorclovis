@@ -486,6 +486,40 @@ ALTER TABLE public.rede_stories
 ALTER TABLE public.rede_stories
   ADD COLUMN IF NOT EXISTS pergunta_aberta boolean NOT NULL DEFAULT false;
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- REAGIR AO STORY (ago/2026)
+--
+-- O story tinha enquete e caixinha, e não tinha o gesto mais simples de todos.
+--
+-- ⚠️ NO MODELO, a reação ao story vira uma MENSAGEM DIRETA para quem publicou.
+-- Este app não tem mensagem direta — e não vai ter, porque conversa privada
+-- entre pacientes é o canal que a decisão de fechar os comentários evitou. Aqui
+-- ela cai na caixa de Atividade da autora, com o nome de quem reagiu, e mais
+-- nada: é um afago, não uma conversa.
+--
+-- ⚠️ E UMA por pessoa por story, trocável — a mesma régua da reação ao post.
+-- Sem a chave única, cinco toques viram cinco linhas e a autora abre a
+-- Atividade achando que cinco pessoas reagiram.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rede_story_reacoes (
+  story_id  uuid NOT NULL REFERENCES public.rede_stories ON DELETE CASCADE,
+  quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  tipo      text NOT NULL CHECK (tipo IN ('amei','torcendo','emocionei','forca','abraco','apaixonei','carinho','beijo','fofo','anjo','festa','uau','rindo')),
+  criado_em timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (story_id, quem_id)
+);
+
+CREATE INDEX IF NOT EXISTS rede_story_reacoes_do ON public.rede_story_reacoes (story_id);
+
+ALTER TABLE public.rede_story_reacoes ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Service manages rede_story_reacoes" ON public.rede_story_reacoes;
+CREATE POLICY "Service manages rede_story_reacoes" ON public.rede_story_reacoes
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+COMMENT ON TABLE public.rede_story_reacoes IS
+  'Reação a um story. Vai para a Atividade da autora — não existe mensagem direta neste app.';
+
 CREATE TABLE IF NOT EXISTS public.rede_story_votos (
   story_id  uuid NOT NULL REFERENCES public.rede_stories ON DELETE CASCADE,
   quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
@@ -588,7 +622,7 @@ CREATE TABLE IF NOT EXISTS public.rede_atividade (
   dono_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
   -- Quem fez.
   quem_id   uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
-  especie   text NOT NULL CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou')),
+  especie   text NOT NULL CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou','reagiu_story')),
   -- Só em 'reagiu'. `ON DELETE CASCADE`: post apagado leva a linha junto —
   -- uma atividade que aponta para o nada é uma linha que não abre nada.
   post_id   uuid REFERENCES public.rede_posts ON DELETE CASCADE,
@@ -611,7 +645,7 @@ CREATE INDEX IF NOT EXISTS rede_atividade_novas
 -- servidor e o AVISO recusado pelo banco: a marcada nunca saberia.
 ALTER TABLE public.rede_atividade DROP CONSTRAINT IF EXISTS rede_atividade_especie_check;
 ALTER TABLE public.rede_atividade ADD CONSTRAINT rede_atividade_especie_check
-  CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou'));
+  CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou','reagiu_story'));
 
 CREATE UNIQUE INDEX IF NOT EXISTS rede_atividade_uma_por_gesto
   ON public.rede_atividade (dono_id, quem_id, especie, coalesce(post_id, dono_id));

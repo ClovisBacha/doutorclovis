@@ -2603,6 +2603,15 @@ export type StoryNaTela = {
   /** A enquete de duas a quatro opções, ou `null`. */
   enquete: EnqueteDoStory | null;
   /**
+   * A MINHA reação a este story, ou `null`.
+   *
+   * ⚠️ **Só a minha — nunca a lista de quem reagiu, nem a contagem.** Um número
+   * de reações no story seria um placar público de uma coisa que some em 24h, e
+   * a aba inteira foi desenhada sem placar. Quem publicou vê os nomes na
+   * Atividade dela, um a um, que é onde o afago tem sentido.
+   */
+  minhaReacao: TipoDeReacao | null;
+  /**
    * A caixinha aberta neste story.
    *
    * ⚠️ **Não é uma segunda caixinha.** A pergunta cai na MESMA `rede_perguntas`
@@ -2839,6 +2848,30 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
          rodar. */
     }
 
+    /* ⚠️ SÓ AS MINHAS. Nunca a contagem nem a lista — um número de reações num
+       story seria um placar público de uma coisa que some em 24h, e a aba
+       inteira foi desenhada sem placar. Quem publicou vê os nomes na Atividade,
+       um a um, que é onde o afago tem sentido.
+       Recuo por tabela ausente: sem ele a fileira de stories inteira quebraria
+       na janela entre o deploy e o SQL. */
+    const minhaReacaoNo = new Map<string, TipoDeReacao>();
+    try {
+      const { data: minhas } = await sb
+        .from("rede_story_reacoes")
+        .select("story_id, tipo")
+        .in(
+          "story_id",
+          linhas.map((l: any) => l.id),
+        )
+        .eq("quem_id", eu);
+      for (const r of (minhas ?? []) as { story_id: string; tipo: string }[]) {
+        if (reacaoConhecida(r.tipo)) minhaReacaoNo.set(r.story_id, r.tipo);
+      }
+    } catch {
+      /* Sem a tabela, o visor abre sem reação marcada — e reagir grava assim
+         que o SQL rodar. */
+    }
+
     const { urlAssinada } = await import("@/lib/imagens.server");
     const porAutor = new Map<string, BolhaDeStory>();
 
@@ -2879,6 +2912,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
               meuVoto: meuVotoNo.has(l.id) ? (meuVotoNo.get(l.id) as number) : null,
             }
           : null,
+        minhaReacao: minhaReacaoNo.get(l.id) ?? null,
         perguntaAberta: !!l.pergunta_aberta,
       });
       porAutor.set(l.autor_id, b);
@@ -2913,6 +2947,98 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
  * `storyId` sorteado que respondesse `ok` confirmaria a existência do story de
  * alguém — vazamento pela porta dos fundos, o mesmo cuidado que `reagir` já tem.
  */
+/**
+ * REAGIR A UM STORY.
+ *
+ * ⚠️ **No modelo, isto vira uma MENSAGEM DIRETA para quem publicou.** Este app
+ * não tem mensagem direta — e não vai ter, porque conversa privada entre
+ * pacientes é exatamente o canal que a decisão de fechar os comentários evitou
+ * (de 1.098 respostas com conselho em fóruns de gestação, 5,5% eram
+ * potencialmente danosas, e o grupo não se autocorrige). Aqui a reação cai na
+ * caixa de Atividade da autora, com o nome de quem reagiu, e mais nada: é um
+ * afago, não uma conversa.
+ *
+ * ⚠️ **O portão de visibilidade é o MESMO de `votarNoStory`** — quem não
+ * enxerga o story não reage a ele. Sem isso, um uuid sorteado que respondesse
+ * `ok` confirmaria a existência de um story privado.
+ *
+ * ⚠️ **E o story VENCIDO não recebe reação.** Ele some da tela em 24 h; aceitar
+ * uma reação depois disso encheria a Atividade dela com afagos a uma coisa que
+ * ninguém mais vê — e abriria um caminho para mexer com quem já parou de
+ * publicar.
+ */
+export const reagirAoStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        storyId: z.string().uuid(),
+        /** `null` tira a reação. */
+        tipo: z.string().max(20).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (data.tipo === null) {
+      const { error } = await sb
+        .from("rede_story_reacoes")
+        .delete()
+        .eq("story_id", data.storyId)
+        .eq("quem_id", eu);
+      if (error) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const };
+    }
+    if (!reacaoConhecida(data.tipo)) return { ok: false as const, motivo: "tipo" as const };
+
+    const { data: story } = await sb
+      .from("rede_stories")
+      .select("id, autor_id, expira_em")
+      .eq("id", data.storyId)
+      .maybeSingle();
+    if (!story) return { ok: false as const, motivo: "indisponivel" as const };
+    if (new Date((story as any).expira_em).getTime() < Date.now()) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* O MESMO portão de `votarNoStory`: só quem enxerga o story reage nele. */
+    if ((story as any).autor_id !== eu) {
+      const ctx = await contextoDe(sb, eu);
+      const perfis = await perfisPorId(sb, [(story as any).autor_id]);
+      const autor = perfis.get((story as any).autor_id);
+      const podeVer =
+        !!autor &&
+        !autor.care_mode &&
+        !ctx.bloqueio.has((story as any).autor_id) &&
+        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id));
+      if (!podeVer) return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { error } = await sb
+      .from("rede_story_reacoes")
+      .upsert(
+        { story_id: data.storyId, quem_id: eu, tipo: data.tipo },
+        { onConflict: "story_id,quem_id" },
+      );
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    /* ⚠️ O aviso é o PONTO INTEIRO. Uma reação que a autora nunca vê é um
+       botão que não faz nada — e `registrarAtividade` já ignora quando dono e
+       quem são a mesma pessoa. */
+    await registrarAtividade(sb, {
+      donoId: (story as any).autor_id,
+      quemId: eu,
+      especie: "reagiu_story",
+      postId: data.storyId,
+    });
+    return { ok: true as const };
+  });
+
 export const votarNoStory = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z

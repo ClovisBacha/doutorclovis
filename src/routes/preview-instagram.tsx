@@ -511,12 +511,17 @@ function Bancada() {
                 meuVoto: jaVotouNoStory ? 0 : null,
               }
             : null,
+        minhaReacao: null,
         perguntaAberta: n === 2,
       })),
     };
     return (
       <VisorDeStory
         aoVotarNoStory={(id, o) => alert(`votaria na opção ${o} do story ${id}`)}
+        /* ⚠️ A bancada GUARDA a reação em vez de dar `alert`: o que precisa ser
+           olhado é o emoji acendendo e a frase mudando para "Ela vai ver na
+           caixa dela" — com um alert, nada disso apareceria. */
+        aoReagirAoStory={() => {}}
         aoPerguntarNoStory={async (_dona, texto) =>
           /* ⚠️ A bancada chama a MESMA triagem do servidor, e não um `alert`:
              o que precisa ser conferido aqui são os TRÊS desfechos, e inventá-los

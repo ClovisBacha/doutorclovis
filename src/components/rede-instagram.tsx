@@ -2239,6 +2239,25 @@ export function RedeNoApp({
    * ⚠️ Otimista e SEM recarregar a fileira: o visor está aberto por cima de
    * tudo, e recarregar trocaria o story debaixo do dedo dela.
    */
+  /**
+   * Reagir a um story.
+   *
+   * ⚠️ **Silencioso em caso de falha, e de propósito.** A tela já pintou a
+   * reação (o visor guarda o estado local), e um `toast` de erro por cima de um
+   * story em tela cheia, com relógio correndo, é ruído — ela toca de novo se
+   * quiser. É o oposto do publicar, onde a recusa PRECISA chegar.
+   */
+  async function reagirNoStory(storyId: string, tipo: TipoDeReacao | null) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { reagirAoStory } = await import("@/lib/rede-social.functions");
+      await reagirAoStory({ data: { accessToken: t, storyId, tipo } });
+    } catch {
+      /* ver o cabeçalho */
+    }
+  }
+
   async function votarNoStory(storyId: string, opcao: number) {
     try {
       const t = await token();
@@ -3551,6 +3570,7 @@ export function RedeNoApp({
     return (
       <VisorDeStory
         aoVotarNoStory={votarNoStory}
+        aoReagirAoStory={reagirNoStory}
         aoPerguntarNoStory={perguntarNoStory}
         bolha={vendoStory}
         aoFechar={() => setVendoStory(null)}
@@ -4236,6 +4256,7 @@ export function VisorDeStory({
   aoApagarStory,
   aoVotarNoStory,
   aoPerguntarNoStory,
+  aoReagirAoStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -4248,11 +4269,15 @@ export function VisorDeStory({
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
   /** Mandar uma pergunta pela caixinha aberta neste story. */
   aoPerguntarNoStory?: (donaId: string, texto: string) => Promise<string | null>;
+  /** Reagir a este story. `null` tira a reação. */
+  aoReagirAoStory?: (storyId: string, tipo: TipoDeReacao | null) => void;
 }) {
   const [i, setI] = useState(0);
   /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
      rede — a mesma decisão otimista da reação. */
   const [voteiAgora, setVoteiAgora] = useState<Record<string, number>>({});
+  /* A reação que ela acabou de dar, para a tela responder sem esperar a rede. */
+  const [reagiAgora, setReagiAgora] = useState<Record<string, TipoDeReacao | null>>({});
   const [pergunta, setPergunta] = useState("");
   const [mandando, setMandando] = useState(false);
   const [recado, setRecado] = useState<string | null>(null);
@@ -4411,6 +4436,57 @@ export function VisorDeStory({
                 Toque para votar — o voto não muda depois.
               </p>
             )}
+          </div>
+        )}
+
+        {/* ─── REAGIR ────────────────────────────────────────────────────────
+            ⚠️ **NÃO aparece no MEU story.** Reagir ao próprio é vazio, e ali o
+            rodapé já é do "visto por" e da lixeira.
+
+            ⚠️ **E só quando NÃO há enquete nem caixinha abertas.** Os três
+            ocupam o mesmo pedaço da tela, e a régua "um de cada vez" já valia
+            para os dois primeiros: com os três, o dedo em pânico acertaria o
+            errado.
+
+            ⚠️ `z-20`, acima das metades invisíveis de avançar/voltar — sem
+            isso, tocar num emoji avançaria o story. */}
+        {!souEu && aoReagirAoStory && !atual.enquete && !atual.perguntaAberta && (
+          <div className="absolute inset-x-3 bottom-24 z-20">
+            <div className="flex items-center gap-0.5 overflow-x-auto rounded-full bg-black/45 px-1.5 py-1 backdrop-blur-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {REACOES.map((r, n) => {
+                const minha = (reagiAgora[atual.id] ?? atual.minhaReacao) === r.tipo;
+                return (
+                  <button
+                    key={r.tipo}
+                    type="button"
+                    aria-label={r.rotulo}
+                    aria-pressed={minha}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      hapticTap();
+                      /* Tocar na mesma TIRA — a mesma régua da reação ao post. */
+                      const nova = minha ? null : r.tipo;
+                      setReagiAgora((m) => ({ ...m, [atual.id]: nova }));
+                      aoReagirAoStory(atual.id, nova);
+                    }}
+                    style={{ ["--dc-atraso" as string]: `${n * 18}ms` }}
+                    className={`dc-reacao-entra press grid h-11 w-11 shrink-0 place-items-center rounded-full text-[24px] leading-none transition-transform ${
+                      minha ? "scale-110 bg-white/25" : ""
+                    }`}
+                  >
+                    {r.emoji}
+                  </button>
+                );
+              })}
+            </div>
+            {/* ⚠️ Diz PARA ONDE VAI. No modelo a reação vira mensagem direta;
+                aqui não existe mensagem direta, e sem esta frase ela acha que
+                mandou um recado que ninguém vai ler. */}
+            <p className="mt-1 text-center text-[11px] text-white/75">
+              {(reagiAgora[atual.id] ?? atual.minhaReacao)
+                ? "Ela vai ver na caixa dela 💛"
+                : "Toque para reagir — ela vê o seu nome"}
+            </p>
           </div>
         )}
 
