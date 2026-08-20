@@ -423,8 +423,17 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
 
     const { data: p } = await sb
       .from("patient_profiles")
+      /* ⚠️ **`journey_state` NÃO É COLUNA de `patient_profiles` — é TABELA.**
+         Ela estava neste `select` e o PostgREST responde `42703` a coluna
+         desconhecida: o `{ data: p }` descarta o erro, `p` vem `null`, e a
+         função devolvia `sem_vinculo`. Ou seja, **abrir o perfil de uma amiga
+         nunca funcionou** — a tela dizia "não foi possível abrir este perfil"
+         para todo mundo, sem erro e sem log.
+         O blob da jornada é lido vinte linhas abaixo, da TABELA certa, e sempre
+         foi de lá que o Cantinho dela saiu. Achado por
+         `colunas-que-existem.test.ts`. */
       .select(
-        "id, display_name, baby_name, cantinho_fundo, created_at, journey_state, referred_by, avatar_url, last_seen_at",
+        "id, display_name, baby_name, cantinho_fundo, created_at, referred_by, avatar_url, last_seen_at",
       )
       .eq("id", data.amigaId)
       .maybeSingle();

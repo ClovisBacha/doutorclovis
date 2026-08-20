@@ -55,6 +55,15 @@ describe("o resumo da criadora", () => {
     expect(CORPO).not.toContain("sendPushToUser");
   });
 
+  /* ⚠️ A coluna se chama `commission_cents` (`APLICAR_PENDENTES.sql`), e é a
+     mesma que `meuPainelDeInfluenciadora` lê. Escrita errada, o PostgREST
+     devolve 42703, o try/catch engole, e a linha da comissão nunca apareceria
+     — sem erro e sem log, como o `user_id` da legenda sugerida. */
+  test("⚠️ a comissão vem de `commission_cents`", () => {
+    expect(CORPO).toContain('.select("commission_cents")');
+    expect(CORPO).not.toContain("amount_cents");
+  });
+
   /* Uma criadora que falha não pode derrubar o resumo das outras. */
   test("cada criadora tem o próprio try/catch", () => {
     const i = CORPO.indexOf("for (const a of");

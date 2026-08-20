@@ -349,13 +349,19 @@ async function resumoSemanalDasCriadoras(): Promise<number> {
           .eq("ref_code", a.code),
       ]);
 
+      /* ⚠️ **`commission_cents`, e NUNCA `amount_cents`.** A coluna se chama
+         assim (`APLICAR_PENDENTES.sql`: `commission_cents int`), e é a mesma
+         que `meuPainelDeInfluenciadora` lê. Escrito errado, o PostgREST devolve
+         `42703`, o `try/catch` engole, e a linha da comissão simplesmente nunca
+         apareceria no e-mail — sem erro e sem log. É o mesmo mecanismo do
+         `user_id` que deixou a legenda sugerida muda por semanas. */
       const { data: ganhos } = await sb
         .from("affiliate_earnings")
-        .select("amount_cents")
+        .select("commission_cents")
         .eq("affiliate_code", a.code)
         .limit(1000);
-      const centavos = ((ganhos ?? []) as { amount_cents: number | null }[]).reduce(
-        (s, g) => s + (g.amount_cents ?? 0),
+      const centavos = ((ganhos ?? []) as { commission_cents: number | null }[]).reduce(
+        (s, g) => s + (g.commission_cents ?? 0),
         0,
       );
 
