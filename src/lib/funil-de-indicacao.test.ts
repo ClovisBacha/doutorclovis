@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { montarFunil, SEM_MEDIDA, taxa } from "./funil-de-indicacao";
+import { JANELA_DE_VISITAS, montarFunil, SEM_MEDIDA, taxa } from "./funil-de-indicacao";
 
 const f = {
   porAmiga: 30,
@@ -84,5 +84,65 @@ describe("a taxa", () => {
     expect(taxa(10, null)).toBeNull();
     expect(taxa(0, 5)).toBeNull();
     expect(taxa(-1, 5)).toBeNull();
+  });
+});
+
+/**
+ * ⚠️ O TOPO DO FUNIL É UMA JANELA, E OS DEGRAUS ABAIXO SÃO DE SEMPRE.
+ *
+ * A contagem de aberturas começa no dia em que a tabela nasce. Comparar "12
+ * visitas" com "380 contas criadas desde o começo do app" produziria uma taxa
+ * acima de 3.000% — e um painel com um número desses é um painel que ninguém
+ * volta a acreditar, inclusive nos números que estão certos.
+ */
+describe("as aberturas de link", () => {
+  const comVisitas = { ...f, visitas: 200, chegaramNaJanela: 20 };
+
+  test("o degrau mostra o número", () => {
+    const d = montarFunil(comVisitas).degraus[0];
+    expect(d.quantos).toBe(200);
+    expect(d.rotulo).toContain(String(JANELA_DE_VISITAS));
+  });
+
+  test("⚠️ a taxa compara com as contas da MESMA janela", () => {
+    // 20 de 200 = 10%. Com `chegaram` (38, de sempre) daria 19% — errado.
+    expect(montarFunil(comVisitas).taxaDaJanela).toBe(10);
+  });
+
+  /**
+   * ⚠️ Sem a tabela, `null` — e NUNCA zero.
+   *
+   * Zero é uma medida ("ninguém abriu"); a ausência é "ainda não medimos". No
+   * dia seguinte ao deploy, e antes de o dono rodar o SQL, um zero faria o
+   * painel afirmar que o link da criadora não circula.
+   */
+  test("⚠️ sem medição é NÃO MEDIDO, e não zero", () => {
+    const d = montarFunil({ ...f, visitas: null }).degraus[0];
+    expect(d.quantos).toBeNull();
+    expect(d.comoFoiContado.toLowerCase()).toContain("não medido");
+    expect(montarFunil({ ...f, visitas: null }).taxaDaJanela).toBeNull();
+  });
+
+  /* ⚠️ E o texto do degrau AVISA que é janela: sem essa frase, o dono compara
+     de cabeça com o degrau de baixo, que é de sempre. */
+  test("⚠️ o texto diz que é uma janela", () => {
+    const d = montarFunil(comVisitas).degraus[0];
+    expect(d.comoFoiContado.toLowerCase()).toContain("janela");
+    expect(d.comoFoiContado).toContain("20");
+  });
+
+  /* ⚠️ E ele não pode virar rastreador: o texto promete o que a tabela guarda,
+     e a tabela não guarda IP nem identificação. */
+  test("⚠️ o texto promete o que a tabela cumpre", () => {
+    const t = montarFunil(comVisitas).degraus[0].comoFoiContado.toLowerCase();
+    expect(t).toContain("sem ip");
+    expect(t).toContain("uma vez por");
+  });
+
+  /* Zero visitas com a tabela existindo É uma medida — e a taxa não divide. */
+  test("zero visitas é medida, e a taxa some", () => {
+    const g = montarFunil({ ...f, visitas: 0, chegaramNaJanela: 0 });
+    expect(g.degraus[0].quantos).toBe(0);
+    expect(g.taxaDaJanela).toBeNull();
   });
 });

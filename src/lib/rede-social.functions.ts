@@ -107,6 +107,20 @@ export type PostNaTela = {
   minhaReacao: TipoDeReacao | null;
   souAAutora: boolean;
   /**
+   * Quantas pessoas viram este post — **só para a autora**, e `null` para todo
+   * o resto.
+   *
+   * ⚠️ **NÚMERO, NUNCA LISTA.** O story tem "visto por" porque some em 24h e é
+   * uma foto solta; o post é permanente e pode ser um desabafo. Entregar QUEM
+   * leu produz a pergunta "por que a fulana viu e não reagiu?", que é
+   * exatamente a leitura que esta aba não pode induzir.
+   *
+   * ⚠️ **E `null` para quem não é a autora** — não é `0`. Um zero na tela das
+   * outras seria um contador público de audiência, que é a coisa que este app
+   * decidiu não ter (ver `NUMEROS_PUBLICOS`).
+   */
+  vistas: number | null;
+  /**
    * Quem estava junto.
    *
    * ⚠️ **Só o id e o nome — nunca mais que isso.** A linha embaixo do autor é
@@ -763,6 +777,44 @@ async function salvosDe(sb: any, postIds: string[], eu: string): Promise<Set<str
   return new Set(((data ?? []) as { post_id: string }[]).map((l) => l.post_id));
 }
 
+/**
+ * Quantas pessoas viram cada post — SÓ os meus.
+ *
+ * ⚠️ **O recorte é `autor_id === eu`, e ele acontece ANTES da consulta.** Pedir
+ * a contagem de todos os posts visíveis e filtrar depois traria para a memória
+ * do servidor a audiência dos posts das outras — e bastaria um `console.log`
+ * ou um campo esquecido no retorno para ela viajar. O que não é lido não vaza.
+ *
+ * ⚠️ **E devolve CONTAGEM, nunca as linhas.** `quem_id` existe só para dedupar;
+ * ele não sai desta função.
+ *
+ * ⚠️ Falha (inclusive `42P01`, antes de o dono rodar o SQL) devolve mapa vazio
+ * — e a tela mostra `null`, que é "não sei", e não "ninguém viu".
+ */
+async function vistasDosMeus(
+  sb: any,
+  posts: { id: string; autor_id: string }[],
+  eu: string,
+): Promise<Map<string, number>> {
+  const meus = posts.filter((p) => p.autor_id === eu).map((p) => p.id);
+  const fora = new Map<string, number>();
+  if (meus.length === 0) return fora;
+  try {
+    const { data, error } = await sb
+      .from("rede_post_vistas")
+      .select("post_id")
+      .in("post_id", meus)
+      .limit(5000);
+    if (error) return fora;
+    for (const l of (data ?? []) as { post_id: string }[]) {
+      fora.set(l.post_id, (fora.get(l.post_id) ?? 0) + 1);
+    }
+  } catch {
+    /* Sem a tabela, sem número — e a tela diz "não sei", nunca "ninguém". */
+  }
+  return fora;
+}
+
 /** Monta os posts para a tela, já filtrados pela régua. */
 /**
  * O que `montarPosts` precisa saber.
@@ -864,7 +916,7 @@ async function montarPosts(
 
   /* Reações e salvos em PARALELO: duas consultas independentes, e em série a
      segunda só sairia depois de a primeira voltar. */
-  const [{ porPost, minhas }, salvos, votos, marcadas] = await Promise.all([
+  const [{ porPost, minhas }, salvos, votos, marcadas, vistas] = await Promise.all([
     reacoesDe(
       sb,
       visiveis.map((p) => p.id),
@@ -885,6 +937,7 @@ async function montarPosts(
       visiveis.map((p) => p.id),
       ctx.bloqueio,
     ),
+    vistasDosMeus(sb, visiveis, eu),
   ]);
 
   /* ─── OS CARIMBOS DO "ENTÃO E AGORA" ───────────────────────────────────
@@ -959,6 +1012,10 @@ async function montarPosts(
         reacoes: porPost.get(p.id) ?? {},
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
+        /* ⚠️ `null` para quem não é a autora — e não `0`. Um zero na tela das
+           outras seria um contador público de audiência, que é a coisa que este
+           app decidiu não ter. */
+        vistas: p.autor_id === eu ? (vistas.get(p.id) ?? 0) : null,
         comparacao: comparacoes.get(p.id) ?? null,
         editadoEm: p.editado_em ?? null,
         marcadas: marcadas.get(p.id) ?? [],
@@ -3864,6 +3921,76 @@ export const marcarAtividadeVista = createServerFn({ method: "POST" })
       .eq("dono_id", eu)
       .is("visto_em", null);
     if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * MARCA QUE EU VI ESTES POSTS.
+ *
+ * ─── O SILÊNCIO QUE FAZ ALGUÉM PARAR DE PUBLICAR ────────────────────────────
+ *
+ * O story tem "visto por" desde o começo; o post não tinha nada. Publicar sem
+ * saber se alguém viu é falar para uma parede — e numa base pequena o silêncio
+ * total lê como "ninguém se importa" mesmo quando trinta pessoas viram e
+ * nenhuma reagiu.
+ *
+ * ⚠️ **SÓ O NÚMERO CHEGA À AUTORA, NUNCA A LISTA** — e a diferença em relação
+ * ao story é deliberada. O story some em 24h e é uma foto solta; o post é
+ * permanente e pode ser um desabafo. Entregar quem LEU o desabafo produz a
+ * pergunta "por que a fulana viu e não reagiu?", que é exatamente o tipo de
+ * leitura que esta aba não pode induzir. `quem_id` existe para contar UMA vez
+ * por pessoa, é gravado e nunca devolvido — a mesma decisão da caixinha
+ * anônima.
+ *
+ * ⚠️ **EM LOTE, e não uma chamada por post.** Um feed de vinte posts daria
+ * vinte idas ao servidor enquanto ela rola — e a rolagem é justamente o
+ * momento em que a linha principal não pode estar ocupada.
+ *
+ * ⚠️ **A MINHA PRÓPRIA visualização não conta.** Abrir o próprio perfil
+ * inflaria o número de todos os posts dela de uma vez, e o número perderia o
+ * único sentido que tem: quantas OUTRAS pessoas viram.
+ *
+ * ⚠️ **E ela nunca derruba nada.** Falha de rede, tabela ausente (`42P01`,
+ * antes de o dono rodar o SQL) ou colisão de chave são silêncio: é métrica no
+ * meio de uma rolagem.
+ */
+export const marcarPostsVistos = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /* Teto de 60: é mais que qualquer leva do feed, e impede um corpo
+           montado à mão de mandar dez mil ids numa instrução só. */
+        postIds: z.array(z.string().uuid()).min(1).max(60),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    try {
+      /* ⚠️ `ignoreDuplicates`: quem dedupa é a chave primária, e `23505` aqui é
+         sucesso repetido — ela já tinha visto. Tratar como erro faria a tela
+         tentar de novo a cada rolagem. */
+      const { error } = await sb.from("rede_post_vistas").upsert(
+        data.postIds.map((post_id) => ({ post_id, quem_id: eu })),
+        { onConflict: "post_id,quem_id", ignoreDuplicates: true },
+      );
+      /* ⚠️ **O erro é LIDO e engolido de propósito, e a diferença importa.**
+         Engolir sem ler é o defeito que a catraca de escritas persegue (o
+         webhook da Stripe: cinco escritas sem checagem e a médica pagando sem
+         receber o plano). Aqui a decisão é o contrário e é explícita: isto é
+         métrica no meio de uma rolagem, e derrubar a leitura do feed porque um
+         contador não gravou seria a pior troca possível. O `warn` existe para
+         o caso mais provável — a tabela ainda não aplicada. */
+      if (error) console.warn("[rede] vistas do post não gravaram", error.code);
+    } catch {
+      /* Métrica: nunca derruba a rolagem. */
+    }
     return { ok: true as const };
   });
 

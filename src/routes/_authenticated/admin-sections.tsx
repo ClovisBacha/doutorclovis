@@ -1312,8 +1312,16 @@ function FunilDaIndicacao() {
     >
       <div className="space-y-3">
         {f.degraus.map((d) => {
+          /* ⚠️ A taxa do topo vem PRONTA da régua (`taxaDaJanela`), e não é
+             calculada aqui: o par certo é "visitas na janela × contas criadas
+             NA MESMA janela". Comparar visitas de 30 dias com contas de sempre
+             daria uma taxa acima de 3.000%. */
           const t =
-            d.chave === "criaram" || d.chave === "abriram" ? null : taxa(criaram, d.quantos);
+            d.chave === "abriram"
+              ? f.taxaDaJanela
+              : d.chave === "criaram"
+                ? null
+                : taxa(criaram, d.quantos);
           return (
             <div key={d.chave} className="rounded-2xl border border-border p-3">
               <div className="flex items-baseline justify-between gap-3">

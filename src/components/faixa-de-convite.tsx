@@ -67,6 +67,45 @@ function daVisita(): { codigo: string; tipo: TipoDeConvite } | null {
   return guardado();
 }
 
+/** Onde fica o código JÁ CONTADO nesta sessão. */
+const CHAVE_CONTADO = "obst_convite_contado";
+
+/**
+ * Conta a abertura do link — UMA vez por código, por sessão.
+ *
+ * ⚠️ **A chave é SEPARADA da que guarda o convite.** `CHAVE` existe para a
+ * faixa sobreviver à navegação entre páginas; se ela também servisse de "já
+ * contei", a primeira página contaria e as outras não — que é o certo — mas o
+ * dia em que alguém mudasse a semântica de uma delas quebraria a outra em
+ * silêncio, e o defeito apareceria como número de alcance caindo pela metade.
+ *
+ * ⚠️ **Guarda o CÓDIGO, não um booleano.** Quem abre um link novo, de outra
+ * pessoa, na mesma sessão está chegando por OUTRO convite — e essa visita
+ * conta. Com um booleano, a segunda criadora nunca receberia crédito nenhum.
+ *
+ * ⚠️ **Sem armazenamento, conta assim mesmo.** Modo privado é o caso em que
+ * duplicar é melhor que sumir: um número um pouco alto é ruído, um número zero
+ * é uma decisão de produto tomada sobre um dado que não existe.
+ *
+ * ⚠️ E ela nunca espera nem derruba nada — é métrica no caminho da landing.
+ */
+function contarUmaVez(achado: { codigo: string; tipo: TipoDeConvite }): void {
+  try {
+    if (sessionStorage.getItem(CHAVE_CONTADO) === achado.codigo) return;
+    sessionStorage.setItem(CHAVE_CONTADO, achado.codigo);
+  } catch {
+    /* segue e conta */
+  }
+  void (async () => {
+    try {
+      const { contarVisitaDeConvite } = await import("@/lib/convite.functions");
+      await contarVisitaDeConvite({ data: { codigo: achado.codigo, tipo: achado.tipo } });
+    } catch {
+      /* Contador é métrica: nunca derruba a landing. */
+    }
+  })();
+}
+
 export function FaixaDeConvite({
   escura = false,
   bancada,
@@ -95,6 +134,7 @@ export function FaixaDeConvite({
     if (bancada) return;
     const achado = daVisita();
     if (!achado) return;
+    contarUmaVez(achado);
     let vivo = true;
     (async () => {
       try {

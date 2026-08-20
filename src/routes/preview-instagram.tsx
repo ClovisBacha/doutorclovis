@@ -153,6 +153,10 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      nenhum. O 1 cai dentro do recorte que a bancada desenha (POSTS.slice(0, 5)), então o selo aparece ao lado do nome no
      cabeçalho do cartão, que é onde ele mora de verdade. */
   autorOficial: i === 1,
+  /* ⚠️ Só o post 3 é DELA, e é o único com número — nos outros a contagem é
+     `null`, que é o estado real: audiência de post alheio não existe nesta
+     tela, e um `0` ali seria o contador público que este app não tem. */
+  vistas: i === 3 ? 47 : null,
   /* O post 5 é SÓ TEXTO: é ele que prova que a célula da grade mostra o texto
      em vez de um buraco cinza. */
   texto:

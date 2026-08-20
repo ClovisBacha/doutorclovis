@@ -684,9 +684,52 @@ export const getFunilDeIndicacao = createServerFn({ method: "POST" })
       if ((seguidos.get(id) ?? 0) > SEGUIR_AUTOMATICO) conectaram += 1;
     }
 
-    const { montarFunil } = await import("@/lib/funil-de-indicacao");
+    const { JANELA_DE_VISITAS, montarFunil } = await import("@/lib/funil-de-indicacao");
+
+    /* ─── O TOPO DO FUNIL, e ele é uma JANELA ────────────────────────────────
+       ⚠️ **`null` quando a tabela não existe, e nunca zero.** Zero é uma
+       medida ("ninguém abriu"); a ausência da tabela é "ainda não medimos", e
+       o degrau tem texto próprio para cada um. Confundi-los faria o painel
+       afirmar que o link da criadora não circula, no dia seguinte ao deploy e
+       antes de o dono rodar o SQL. */
+    const desde = new Date(Date.now() - JANELA_DE_VISITAS * 86400_000).toISOString().slice(0, 10);
+    let visitas: number | null = null;
+    try {
+      const { data: linhas, error } = await sb
+        .from("visitas_de_convite")
+        .select("contagem")
+        .gte("dia", desde)
+        .limit(MAX_ROWS);
+      if (!error) {
+        visitas = ((linhas ?? []) as { contagem: number }[]).reduce(
+          (t, l) => t + (l.contagem ?? 0),
+          0,
+        );
+      }
+    } catch {
+      /* Segue com `null`: métrica ausente não derruba o painel. */
+    }
+
+    /* O par da taxa: contas por convite criadas DENTRO da mesma janela. Sem
+       ele, "visitas de 30 dias" contra "contas de sempre" daria uma taxa
+       acima de 3.000%. */
+    const chegaramNaJanela =
+      visitas === null
+        ? null
+        : await conta((q) =>
+            q.or("referred_by.not.is.null,ref_code.not.is.null").gte("created_at", desde),
+          );
     return {
       ok: true as const,
-      funil: montarFunil({ porAmiga, porCriadora, chegaram, publicaram, conectaram, comCodigo }),
+      funil: montarFunil({
+        porAmiga,
+        porCriadora,
+        chegaram,
+        publicaram,
+        conectaram,
+        comCodigo,
+        visitas,
+        chegaramNaJanela,
+      }),
     };
   });

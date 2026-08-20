@@ -279,3 +279,75 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
       },
     };
   });
+
+/**
+ * CONTA UMA ABERTURA DE LINK DE CONVITE.
+ *
+ * ─── O DEGRAU CEGO ──────────────────────────────────────────────────────────
+ *
+ * O painel de indicação media "criaram conta", "publicaram" e "seguem alguém",
+ * e o degrau de cima aparecia como NÃO MEDIDO com todas as letras. Sem esse
+ * número, todas as taxas abaixo dele são cegas — não dá para saber se o
+ * problema é o link não circular ou a página não converter, que são dois
+ * problemas com consertos opostos.
+ *
+ * ⚠️ **NÃO GUARDA NADA DE QUEM ABRIU.** Sem IP, sem user agent, sem
+ * identificador de visitante, sem hora — só o dia. Isto é um contador de
+ * alcance, não um rastreador: quem abre o link de uma gestante pode ser a
+ * chefe dela, a sogra ou o ex, e a única pergunta que o painel precisa
+ * responder é "quantas pessoas abriram". Colher mais seria dado de terceiro
+ * sem conta e sem consentimento, para uma pergunta já respondida sem ele.
+ *
+ * ⚠️ **UMA POR VISITA, e quem garante isso é o chamador.** `FaixaDeConvite` já
+ * guarda o código no `sessionStorage` para não repintar a faixa a cada
+ * navegação — a mesma memória serve aqui. Contar no efeito sem esse guarda
+ * multiplicaria a visita pelo número de páginas que ela abriu.
+ *
+ * ⚠️ **E ela nunca derruba nada.** É métrica: falha de rede, tabela ausente
+ * (`42P01`, antes de o dono rodar o SQL) ou limitador estourado devolvem
+ * silêncio. Um contador que quebrasse a landing seria a pior troca possível.
+ */
+export const contarVisitaDeConvite = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        codigo: z.string().min(1).max(24),
+        tipo: z.enum(["amiga", "criadora"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }): Promise<{ ok: boolean }> => {
+    /* A MESMA limpeza da faixa, e pela mesma razão: o código entra numa chave
+       primária de texto, e a forma dele depende da origem. */
+    const codigo =
+      data.tipo === "criadora" ? codigoDeCriadoraLimpo(data.codigo) : codigoLimpo(data.codigo);
+    if (!codigo) return { ok: false };
+
+    try {
+      const req = getRequest();
+      /* ⚠️ O IP entra no LIMITADOR e nunca no banco: ele existe para impedir
+         que um script infle o número de uma criadora, e some no fim da
+         requisição. É o mesmo `clientIp` de `quemConvidou`. */
+      if (req && limitado(clientIp(req))) return { ok: false };
+    } catch {
+      /* Sem requisição em mãos (build, teste), segue. */
+    }
+
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      /* O dia de SÃO PAULO, e não o do contêiner: o servidor roda em UTC, e
+         das 21h à meia-noite ele já está no dia seguinte — o painel mostraria
+         visitas de hoje na linha de amanhã. */
+      const dia = new Date(
+        new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }),
+      ).toLocaleDateString("en-CA");
+      await (supabaseAdmin as any).rpc("contar_visita_de_convite", {
+        p_codigo: codigo,
+        p_tipo: data.tipo,
+        p_dia: dia,
+      });
+      return { ok: true };
+    } catch {
+      return { ok: false };
+    }
+  });

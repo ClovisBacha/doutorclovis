@@ -45,6 +45,17 @@ export type Funil = {
   degraus: Degrau[];
   /** Convites que EXISTEM: quantas pacientes já têm código para convidar. */
   comCodigo: number;
+  /**
+   * De cada 100 aberturas de link, quantas viraram conta — **dentro da mesma
+   * janela**. `null` quando a medição ainda não existe.
+   *
+   * ⚠️ **Ela sai daqui pronta, e a tela não a calcula.** O par certo é
+   * `visitas` × `chegaramNaJanela`; usar `chegaram` (que é de sempre) contra
+   * `visitas` (que é de 30 dias) daria uma taxa acima de 3.000% num painel que
+   * ninguém volta a acreditar. Deixar a conta na tela é deixar a armadilha na
+   * tela.
+   */
+  taxaDaJanela: number | null;
 };
 
 export type FatosDoFunil = {
@@ -63,7 +74,29 @@ export type FatosDoFunil = {
   /** Dessas, quantas seguem ao menos uma pessoa. */
   conectaram: number;
   comCodigo: number;
+  /**
+   * Aberturas de link nos últimos {@link JANELA_DE_VISITAS} dias — ou `null`
+   * quando a medição ainda não existe (banco sem a tabela).
+   *
+   * ⚠️ **É UMA JANELA, e os degraus abaixo são de SEMPRE.** A contagem começou
+   * no dia em que a tabela nasceu; comparar "12 visitas" com "380 contas
+   * criadas desde o começo do app" produziria uma taxa acima de 3.000% e um
+   * painel que ninguém volta a acreditar. Por isso a taxa deste degrau usa
+   * `chegaramNaJanela`, e nunca `chegaram`.
+   */
+  visitas?: number | null;
+  /** Contas por convite criadas DENTRO da mesma janela — o par da taxa. */
+  chegaramNaJanela?: number | null;
 };
+
+/**
+ * Quantos dias a contagem de aberturas cobre.
+ *
+ * ⚠️ **Trinta, e o mesmo número dos dois lados.** O que faz a taxa significar
+ * alguma coisa não é o tamanho da janela: é ela ser a MESMA no numerador e no
+ * denominador. Mudar aqui muda os dois, porque é uma constante só.
+ */
+export const JANELA_DE_VISITAS = 30;
 
 /**
  * Monta os degraus.
@@ -92,13 +125,19 @@ export function montarFunil(f: FatosDoFunil): Funil {
   const chegaram = Math.max(f.chegaram, f.porAmiga, f.porCriadora);
   return {
     comCodigo: f.comCodigo,
+    taxaDaJanela: taxa(f.visitas ?? null, f.chegaramNaJanela ?? null),
     degraus: [
       {
         chave: "abriram",
-        rotulo: "Abriram o link",
-        quantos: null,
+        rotulo: `Abriram o link (${JANELA_DE_VISITAS} dias)`,
+        quantos: f.visitas ?? null,
         comoFoiContado:
-          "Não medido: o código fica no navegador e só vira linha quando a conta é criada.",
+          f.visitas == null
+            ? "Não medido ainda: rode APLICAR_VISITAS_DE_CONVITE.sql para começar a contar."
+            : `Aberturas de link nos últimos ${JANELA_DE_VISITAS} dias, contadas uma vez por ` +
+              "visita. Sem IP e sem identificação de quem abriu — só o dia. " +
+              "⚠️ É uma JANELA: os degraus abaixo são de sempre, e a taxa daqui " +
+              `compara com as ${f.chegaramNaJanela ?? 0} contas criadas na mesma janela.`,
       },
       {
         chave: "criaram",

@@ -1131,3 +1131,51 @@ describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
     expect(s).not.toContain("pessoas.find((p) => p.oficial)");
   });
 });
+
+/**
+ * ⚠️ QUANTAS VIRAM O POST — O NÚMERO CHEGA, A LISTA NÃO.
+ *
+ * O story tem "visto por"; o post não pode ter. O story some em 24h e é uma
+ * foto solta; o post é permanente e pode ser um desabafo — entregar QUEM leu
+ * produz a pergunta "por que a fulana viu e não reagiu?", que é exatamente a
+ * leitura que esta aba não pode induzir. `quem_id` existe só para contar uma
+ * vez por pessoa, e nunca sai do servidor.
+ */
+describe("as vistas do post", () => {
+  const corpo = funcaoInterna("vistasDosMeus");
+
+  test("⚠️ o recorte por AUTORA acontece antes da consulta", () => {
+    /* Pedir a contagem de todos os posts visíveis e filtrar depois traria para
+       a memória do servidor a audiência dos posts das outras — e bastaria um
+       campo esquecido no retorno para ela viajar. O que não é lido não vaza. */
+    const i = corpo.indexOf("p.autor_id === eu");
+    const j = corpo.indexOf('.from("rede_post_vistas")');
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(-1);
+    expect(i).toBeLessThan(j);
+  });
+
+  test("⚠️ devolve CONTAGEM, e `quem_id` nunca é lido", () => {
+    expect(corpo).toContain("Map<string, number>");
+    expect(corpo).not.toContain("quem_id");
+  });
+
+  /* ⚠️ Falha (inclusive a tabela ainda não aplicada) devolve mapa VAZIO, e a
+     tela mostra `null` — "não sei", nunca "ninguém viu". */
+  test("⚠️ falha não vira zero", () => {
+    expect(corpo).toContain("if (error) return fora");
+  });
+
+  /* ⚠️ `null` para quem não é a autora, e não `0`: um zero na tela das outras
+     seria o contador público de audiência que este app decidiu não ter. */
+  test("⚠️ só a autora recebe o número", () => {
+    expect(CODIGO).toContain("vistas: p.autor_id === eu ? (vistas.get(p.id) ?? 0) : null");
+  });
+
+  /* ⚠️ E a escrita não conta a própria autora nem devolve lista. */
+  test("⚠️ `marcarPostsVistos` grava e não lê nada de volta", () => {
+    const m = corpoDe("marcarPostsVistos");
+    expect(m).toContain("ignoreDuplicates: true");
+    expect(m).not.toContain(".select(");
+  });
+});

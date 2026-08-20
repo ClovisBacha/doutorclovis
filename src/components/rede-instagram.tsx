@@ -573,11 +573,23 @@ export const PostInstagram = memo(function PostInstagram({
   aoTirarMarcacao,
   aoVerQuemReagiu,
   aoEditar,
+  aoVer,
   sugerido = false,
 }: {
   post: PostNaTela;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoAbrirPerfil?: (id: string) => void;
+  /**
+   * O cartão entrou na tela — conta como visto.
+   *
+   * ⚠️ **UMA REFERÊNCIA para todos os cartões**, como `aoReagir`: um fecho por
+   * post faz as props mudarem a cada pintura e o `memo` nunca acertar.
+   *
+   * ⚠️ E ele dispara UMA VEZ por montagem: o observador se desliga no primeiro
+   * cruzamento. Sem isso, rolar para cima e para baixo mandaria o mesmo id dez
+   * vezes — a chave primária dedupa no banco, mas o tráfego seria real.
+   */
+  aoVer?: (id: string) => void;
   /** Guardar/desguardar. Sem ele o marcador não aparece. */
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
@@ -618,12 +630,42 @@ export const PostInstagram = memo(function PostInstagram({
      `imagemUrl` — o recuo faz os dois terem a mesma forma aqui. */
   const fotos = post.imagens?.length ? post.imagens : post.imagemUrl ? [post.imagemUrl] : [];
 
+  /* ─── O CARTÃO ENTROU NA TELA ────────────────────────────────────────────
+     ⚠️ **`IntersectionObserver`, e não um ouvinte de `scroll`** — a aba vive
+     dentro de `minha-conta`, e quem rola pode ser a janela ou um contêiner
+     interno. É a mesma razão da sentinela da paginação.
+
+     ⚠️ **Metade do cartão visível, e não um pixel.** Um post que só encostou na
+     borda enquanto ela rolava rápido não foi VISTO por ninguém, e contar isso
+     transformaria o número em "quantas vezes o cartão passou pela tela" com
+     nome de "quantas pessoas viram".
+
+     ⚠️ **Desliga no primeiro cruzamento.** Rolar para cima e para baixo mandaria
+     o mesmo id dez vezes: a chave primária dedupa no banco, mas o tráfego seria
+     real, e ele acontece durante a rolagem. */
+  const caixa = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const alvo = caixa.current;
+    if (!alvo || !aoVer) return;
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((e) => e.isIntersecting)) {
+          aoVer(post.id);
+          obs.disconnect();
+        }
+      },
+      { threshold: 0.5 },
+    );
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [aoVer, post.id]);
+
   return (
     /* ⚠️ `data-post` é a ÂNCORA de "onde ela parou" — ver `lugar-no-feed.ts`. O
        lugar é guardado por ID de post, e não em pixels: as fotos chegam por URL
        assinada DEPOIS da primeira pintura, então a altura da lista muda embaixo
        de qualquer número de rolagem. */
-    <article data-post={post.id} className="-mx-4 border-b border-border pb-3">
+    <article data-post={post.id} ref={caixa} className="-mx-4 border-b border-border pb-3">
       <header className="flex items-center gap-2.5 px-4 py-2.5">
         <button
           type="button"
@@ -1101,6 +1143,24 @@ export const PostInstagram = memo(function PostInstagram({
           um berro de duas linhas. O modelo mudou para minúscula anos atrás, e
           em português a versão em caixa alta lê pior que em inglês. */}
       <p className="px-4 pt-1 text-[11px] text-muted-foreground">
+        {/* ⚠️ **QUANTAS VIRAM — só no post DELA, e só o número.** O servidor
+            devolve `null` para quem não é a autora, então esta linha não pode
+            virar um contador público de audiência nem por engano.
+
+            ⚠️ **E não é botão.** O story abre a lista de quem viu porque some
+            em 24h e é uma foto solta; o post é permanente e pode ser um
+            desabafo — entregar QUEM leu produz a pergunta "por que a fulana viu
+            e não reagiu?", que é a leitura que esta aba não pode induzir.
+
+            ⚠️ Vem ANTES da hora, e não depois: o que ela abre o app para saber
+            é se alguém viu; a data ela já sabe. */}
+        {post.vistas !== null && (
+          <>
+            <strong className="font-semibold tabular-nums">{post.vistas}</strong>
+            {post.vistas === 1 ? " pessoa viu" : " pessoas viram"}
+            {" · "}
+          </>
+        )}
         {haQuantoPublicou(post.criadoEm, Date.now())}
         {/* ⚠️ O selo existe para quem LÊ, não para quem escreveu: sem ele,
             corrigir o texto vira reescrita silenciosa da história, e quem
@@ -1200,6 +1260,7 @@ export function TelaPrincipal({
   retro,
   aoFecharRetro,
   aoAbrirPerfil,
+  aoVer,
   aoTocarStory,
   aoChegarNoFim,
   temMais = false,
@@ -1275,6 +1336,8 @@ export function TelaPrincipal({
    * duas vezes. A trava mora no contêiner, que é quem sabe se já há um pedido
    * no ar.
    */
+  /** O cartão entrou na tela. Referência estável — ver `PostInstagram`. */
+  aoVer?: (id: string) => void;
   aoChegarNoFim?: () => void;
   /** Ainda há página seguinte. Sem isso a sentinela ficaria armada para sempre. */
   temMais?: boolean;
@@ -1379,6 +1442,7 @@ export function TelaPrincipal({
             aoEditar={aoEditar}
             aoVerQuemReagiu={aoVerQuemReagiu}
             aoAbrirPerfil={aoAbrirPerfil}
+            aoVer={aoVer}
           />
         ))
       )}
@@ -2610,7 +2674,51 @@ export function RedeNoApp({
     editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
+    ver: (_id: string) => {},
   });
+  /* ─── O LOTE DE "VISTOS" ─────────────────────────────────────────────────
+     ⚠️ **UMA chamada por leva, e não uma por post.** Vinte cartões entrando na
+     tela durante uma rolagem dariam vinte idas ao servidor — no exato momento
+     em que a linha principal não pode estar ocupada. Os ids se acumulam num
+     `Set` e saem juntos meio segundo depois de o último entrar.
+
+     ⚠️ **`useRef` e não `useState`**: o observador dispara várias vezes dentro
+     do mesmo quadro, e um estado só valeria no render seguinte — os primeiros
+     ids se perderiam. É a mesma razão da trava da sentinela de paginação.
+
+     ⚠️ **E o `jaMandados` impede o reenvio na volta.** O cartão desmonta ao sair
+     da lista (troca de aba, nova página) e remonta depois; sem esta memória, o
+     mesmo post sairia de novo a cada volta. */
+  const pendentes = useRef<Set<string>>(new Set());
+  const jaMandados = useRef<Set<string>>(new Set());
+  const relogioDoLote = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function marcarPostVisto(id: string) {
+    if (jaMandados.current.has(id)) return;
+    jaMandados.current.add(id);
+    pendentes.current.add(id);
+    if (relogioDoLote.current) clearTimeout(relogioDoLote.current);
+    relogioDoLote.current = setTimeout(() => {
+      const ids = [...pendentes.current];
+      pendentes.current.clear();
+      if (ids.length === 0) return;
+      void (async () => {
+        try {
+          const t = await token();
+          if (!t) return;
+          const { marcarPostsVistos } = await import("@/lib/rede-social.functions");
+          /* Teto de 60 no servidor — a leva do feed é bem menor, mas uma
+             rolagem longa pode acumular. */
+          for (let i = 0; i < ids.length; i += 60) {
+            await marcarPostsVistos({ data: { accessToken: t, postIds: ids.slice(i, i + 60) } });
+          }
+        } catch {
+          /* Métrica: nunca derruba a rolagem. */
+        }
+      })();
+    }, 500);
+  }
+
   ultimas.current = {
     reagir: (p, t) => void reagir(p, t),
     guardar: (p, v) => void guardar(p, v),
@@ -2621,6 +2729,7 @@ export function RedeNoApp({
     editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
+    ver: (id) => marcarPostVisto(id),
   };
   const acoes = useMemo(
     () => ({
@@ -2633,6 +2742,7 @@ export function RedeNoApp({
       editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
+      ver: (id: string) => ultimas.current.ver(id),
     }),
     [],
   );
@@ -4375,6 +4485,10 @@ export function RedeNoApp({
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoVerQuemReagiu={acoes.verQuemReagiu}
         aoAbrirPerfil={acoes.abrirPerfil}
+        /* ⚠️ Referência estável, como as outras: um fecho por post faria o
+           `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
+           do app. */
+        aoVer={acoes.ver}
         aoChegarNoFim={maisAntigas}
         temMais={!!proximo}
         desafio={desafio}
