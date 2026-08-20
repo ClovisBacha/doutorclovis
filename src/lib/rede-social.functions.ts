@@ -1828,9 +1828,15 @@ export const apagarPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    /* Marca, não apaga: as reações apontam para o post, e um DELETE levaria
-       junto o registro de quem esteve ali. O `.eq("autor_id")` é o que impede
-       apagar post alheio — o id vem do cliente. */
+    /* ⚠️ **ISTO SEMPRE FOI ARQUIVAR, E A TELA CHAMAVA DE APAGAR.**
+       Marca, não apaga: as reações apontam para o post, e um DELETE levaria
+       junto o registro de quem esteve ali. Só que a paciente lia "apagar" e
+       tomava uma decisão que ela achava irreversível — e "apaguei o post do chá
+       de bebê sem querer" é o arrependimento clássico do formato. O nome da
+       tela passou a dizer a verdade, e `desarquivarPost` deu a volta que o
+       banco sempre permitiu.
+       O `.eq("autor_id")` é o que impede mexer em post alheio — o id vem do
+       cliente. */
     const { error } = await sb
       .from("rede_posts")
       .update({ arquivado_em: new Date().toISOString() })
@@ -1838,6 +1844,69 @@ export const apagarPost = createServerFn({ method: "POST" })
       .eq("autor_id", eu);
     if (error) return { ok: false as const, motivo: "banco" as const };
     return { ok: true as const };
+  });
+
+/**
+ * DESARQUIVAR — a volta que o banco sempre permitiu e a tela não oferecia.
+ *
+ * ⚠️ **`.eq("autor_id", eu)` é o portão**, como no arquivar: sem ele, um uuid no
+ * corpo do pedido traria de volta ao feed o post que outra pessoa tirou de
+ * circulação — e ela não teria como saber que voltou.
+ */
+export const desarquivarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **Modo Cuidado NÃO impede desarquivar**, pela mesma razão de editar:
+       o que ela tirou do ar é dela, e devolver ao feed é decisão dela. Quem
+       impede o post NOVO é `publicarPost`. */
+    const { error } = await sb
+      .from("rede_posts")
+      .update({ arquivado_em: null })
+      .eq("id", data.postId)
+      .eq("autor_id", eu);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * A GAVETA: os posts que ela tirou do ar.
+ *
+ * ⚠️ **Só os DELA, e só ela vê.** `.eq("autor_id", eu)` é o recorte inteiro —
+ * não há régua de visibilidade a aplicar aqui, porque não há terceiro nesta
+ * tela. Uma lista de arquivados de outra pessoa seria o registro do que ela
+ * decidiu esconder, que é o oposto de arquivar.
+ */
+export const meusArquivados = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const brutos = await postsCrus(sb, (base) =>
+      base
+        .eq("autor_id", eu)
+        .not("arquivado_em", "is", null)
+        .order("arquivado_em", { ascending: false })
+        .limit(POSTS_POR_PAGINA),
+    );
+
+    /* ⚠️ Passa por `montarPosts` como qualquer outra lista — é ele que assina as
+       URLs das fotos e traz reações e marcações. Montar à mão aqui daria uma
+       tela com foto quebrada, que é como o arquivado pareceria perdido. */
+    const ctx = await contextoDe(sb, eu);
+    const posts = await montarPosts(sb, eu, brutos, ctx);
+    return { ok: true as const, posts };
   });
 
 /** O feed: posts de quem eu sigo, das minhas amigas, e os meus. */

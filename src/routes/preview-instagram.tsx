@@ -45,6 +45,7 @@ import {
   ListaDeGente,
   NovoPost,
   TelaDeBusca,
+  TelaDosArquivados,
   TelaDosSalvos,
   TelaDePerfil,
   TelaDoPost,
@@ -672,6 +673,21 @@ function Bancada() {
             );
             return false; /* `false` mantém a tela aberta, para olhar de novo. */
           }}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "arquivados") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        {/* ⚠️ Sem a bancada, olhar os arquivados exigiria publicar, arquivar e
+            voltar numa conta de verdade. `?vazio=1` mostra a gaveta vazia, que
+            é o estado da maioria. */}
+        <TelaDosArquivados
+          posts={vazio ? [] : POSTS.slice(0, 3)}
+          aoVoltar={() => history.back()}
+          aoDesarquivar={(p) => alert(`traria de volta o post ${p.id}`)}
         />
       </div>
     );

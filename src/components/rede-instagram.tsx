@@ -594,9 +594,14 @@ export const PostInstagram = memo(function PostInstagram({
       </header>
 
       {/* ⚠️ A confirmação é uma MENSAGEM separada, e não o mesmo botão virando
-          "tem certeza?" — é a mesma decisão do cancelar consulta, pedida pelo
-          dono na época. Apagar publicação é irreversível: não há lixeira, e o
-          arquivo sai do balde. */}
+          "tem certeza?" — é a mesma decisão do cancelar consulta.
+
+          ⚠️ **E ela passou a dizer a verdade.** A ação sempre foi ARQUIVAR (o
+          servidor marca `arquivado_em`, nunca deleta — as reações apontam para
+          o post), mas a tela chamava de "apagar": a paciente tomava uma decisão
+          que ela achava irreversível, e "apaguei o post do chá de bebê sem
+          querer" é o arrependimento clássico do formato. A palavra mudou e a
+          volta ganhou tela. */}
       {/* ⚠️ A SAÍDA DE QUEM FOI MARCADA é um botão PRÓPRIO, e não mais um item
           na mesma confirmação: apagar e denunciar são sobre o post da outra
           pessoa; tirar a marcação é sobre o NOME DELA. Misturar as três faria a
@@ -659,7 +664,7 @@ export const PostInstagram = memo(function PostInstagram({
         <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
           <p className="text-[13px] leading-snug">
             {post.souAAutora
-              ? "Apagar esta publicação?"
+              ? "Tirar esta publicação do ar? Ela vai para os arquivados, e você pode trazer de volta quando quiser."
               : /* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra
                    vai saber — e é a mesma razão pela qual o bloqueio é mudo. */
                 "Denunciar esta publicação? Ela fica registrada para a gente olhar, e quem publicou não é avisada."}
@@ -679,9 +684,16 @@ export const PostInstagram = memo(function PostInstagram({
                 if (post.souAAutora) aoApagar?.(post);
                 else aoDenunciar?.(post);
               }}
-              className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+              /* ⚠️ Vermelho só para DENUNCIAR. Arquivar é reversível, e pintar
+                 de destrutivo o que se desfaz num toque ensina a ter medo do
+                 botão errado. */
+              className={`press flex-1 rounded-xl py-1.5 text-[13px] font-semibold ${
+                post.souAAutora
+                  ? "bg-foreground/85 text-background"
+                  : "bg-destructive text-destructive-foreground"
+              }`}
             >
-              {post.souAAutora ? "Sim, apagar" : "Denunciar"}
+              {post.souAAutora ? "Sim, arquivar" : "Denunciar"}
             </button>
           </div>
         </div>
@@ -1926,6 +1938,7 @@ type Onde =
   | { t: "novo" }
   | { t: "atividade" }
   | { t: "salvos" }
+  | { t: "arquivados" }
   | { t: "busca" }
   | { t: "caixinha" }
   | { t: "espelho" };
@@ -1971,6 +1984,8 @@ export function RedeNoApp({
   const [avisos, setAvisos] = useState<AtividadeNaTela[]>([]);
   const [naoVistas, setNaoVistas] = useState(0);
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
+  /** A gaveta: o que ela tirou do ar. */
+  const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   const [persona, setPersona] = useState<Persona>("estranha");
   /** A foto escolhida, esperando a conferência antes de virar story. */
@@ -2967,6 +2982,40 @@ export function RedeNoApp({
     }
   }
 
+  async function abrirArquivados() {
+    setArquivados([]);
+    setOnde({ t: "arquivados" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusArquivados } = await import("@/lib/rede-social.functions");
+      const r = await meusArquivados({ data: { accessToken: t } });
+      if (r.ok) setArquivados(r.posts);
+    } catch {
+      /* Lista vazia; a tela já diz que ela não tirou nada do ar. */
+    }
+  }
+
+  /**
+   * Trazer de volta.
+   *
+   * ⚠️ **Some da gaveta NA HORA, e o feed é recarregado.** Sem recarregar, o
+   * post volta ao banco e não aparece no feed até a próxima abertura — e ela
+   * concluiria que "trazer de volta" não funcionou.
+   */
+  async function desarquivar(post: PostNaTela) {
+    setArquivados((ps) => ps.filter((x) => x.id !== post.id));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { desarquivarPost } = await import("@/lib/rede-social.functions");
+      await desarquivarPost({ data: { accessToken: t, postId: post.id } });
+      void carregarFeed();
+    } catch {
+      void abrirArquivados();
+    }
+  }
+
   async function abrirAtividade() {
     setOnde({ t: "atividade" });
     /* ⚠️ O emblema zera JÁ, sem esperar o servidor: ela está olhando a caixa
@@ -3217,6 +3266,12 @@ export function RedeNoApp({
       },
       { id: "salvos", rotulo: "Salvos", icone: "marcador", aoTocar: () => void abrirSalvos() },
       {
+        id: "arquivados",
+        rotulo: "Arquivados",
+        icone: "grade",
+        aoTocar: () => void abrirArquivados(),
+      },
+      {
         id: "caixinha",
         rotulo: "Caixinha",
         icone: "balao",
@@ -3349,6 +3404,16 @@ export function RedeNoApp({
         posts={salvos}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
+  if (onde.t === "arquivados") {
+    return (
+      <TelaDosArquivados
+        posts={arquivados}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDesarquivar={desarquivar}
       />
     );
   }
@@ -5156,6 +5221,90 @@ export function TelaDosSalvos({
           na borda no modelo, e uma das duas com respiro faria a mesma grade
           parecer duas. */}
       <GradeDePosts posts={posts} vazio="Você ainda não guardou nada." aoAbrirPost={aoAbrirPost} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OS ARQUIVADOS
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A GAVETA — o que ela tirou do ar.
+ *
+ * ⚠️ **Ela é uma LISTA, e não a grade dos salvos.** Na grade só cabe a foto, e
+ * aqui cada linha precisa de um botão ("Trazer de volta") — a decisão de
+ * arquivar só vira reversível de verdade quando a volta está à mão, e não atrás
+ * de abrir o post.
+ */
+export function TelaDosArquivados({
+  posts,
+  aoVoltar,
+  aoDesarquivar,
+}: {
+  posts: PostNaTela[];
+  aoVoltar: () => void;
+  aoDesarquivar: (post: PostNaTela) => void;
+}) {
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="text-[16px] font-semibold">Arquivados</h1>
+      </header>
+      {/* ⚠️ Diz que NINGUÉM MAIS VÊ, e diz que as reações continuam lá. As duas
+          coisas são a razão de arquivar ser diferente de apagar, e nenhuma das
+          duas é adivinhável. */}
+      <p className="px-4 pb-3 text-[12px] leading-snug text-muted-foreground">
+        Ninguém mais vê o que está aqui. As reações e a data continuam guardadas — se você trouxer
+        de volta, volta como estava.
+      </p>
+
+      {posts.length === 0 ? (
+        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">
+          Você não tirou nenhuma publicação do ar.
+        </p>
+      ) : (
+        <ul className="space-y-2 px-4 pb-6">
+          {posts.map((p) => (
+            <li key={p.id} className="flex items-center gap-3 rounded-2xl border border-border p-2">
+              {p.imagemUrl ? (
+                <img
+                  src={p.imagemUrl}
+                  alt=""
+                  className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                />
+              ) : (
+                /* Post só de texto: um quadrado com a primeira linha, para a
+                   lista não ter buraco cinza. */
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted/50 px-1 text-center text-[10px] leading-tight text-muted-foreground">
+                  {(p.texto ?? "").slice(0, 28) || "sem texto"}
+                </span>
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[13px]">{p.texto ?? "Sem legenda"}</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  {haQuantoPublicou(p.criadoEm, Date.now())}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => aoDesarquivar(p)}
+                className="press min-h-[44px] shrink-0 rounded-full border border-border px-3 text-[12px] font-medium"
+              >
+                Trazer de volta
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
