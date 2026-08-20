@@ -10,54 +10,85 @@
  * aconteceu com ela.
  */
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { ConviteDoApp } from "@/components/convite-do-app";
 import type { PerfilPublico } from "@/lib/perfil-publico";
 
 export const Route = createFileRoute("/p/$codigo")({
+  /**
+   * ⚠️ **A LEITURA MUDOU DE `useEffect` PARA `loader`, e é isso que faz a
+   * prévia existir.**
+   *
+   * O WhatsApp, o Instagram e o Telegram NÃO RODAM JAVASCRIPT quando buscam o
+   * cartão de um link: eles pedem o HTML e leem as `<meta>` que vierem nele.
+   * Com a busca no `useEffect`, o robô recebia uma página vazia e o cartão saía
+   * genérico — no link que a criadora põe na bio para milhares de pessoas, e
+   * que é a única superfície de conversão que este app tem fora dele mesmo.
+   *
+   * De quebra, some o esqueleto: quem abre já recebe a página montada.
+   */
+  loader: async ({ params }) => {
+    try {
+      const { perfilPublicoPorCodigo } = await import("@/lib/convite.functions");
+      const r = await perfilPublicoPorCodigo({ data: { codigo: params.codigo } });
+      return { perfil: r.perfil };
+    } catch {
+      /* Falha de rede vira "não disponível" — o MESMO desfecho dos outros
+         três, e nunca uma tela de erro que conte que algo existe aqui. */
+      return { perfil: null as PerfilPublico | null };
+    }
+  },
   component: Pagina,
-  head: () => ({
+  head: ({ loaderData }) => ({
     meta: [
       /* ⚠️ **Fora do índice.** Esta página é o cartão de visita de UMA pessoa,
          e ela não pediu para virar resultado de busca do Google. O link vive na
-         bio dela e no story dela — que é onde ela o pôs. */
+         bio dela e no story dela — que é onde ela o pôs.
+
+         ⚠️ E `noindex` NÃO impede a prévia: o robô do WhatsApp não é buscador,
+         ele lê as `og:` e monta o cartão do mesmo jeito. São duas coisas
+         diferentes, e este arquivo precisa das duas. */
       { name: "robots", content: "noindex" },
+      ...metaDaVitrine(loaderData?.perfil ?? null),
     ],
   }),
 });
 
+/**
+ * As `og:` da vitrine.
+ *
+ * ⚠️ **O MESMO CARTÃO PARA OS QUATRO SILÊNCIOS.** Código inexistente, perfil
+ * fechado, vitrine desligada e Modo Cuidado devolvem `perfil: null`, e todos
+ * caem no cartão genérico do app — que é exatamente o que o `__root` já
+ * publica. Um cartão que dissesse "perfil indisponível" contaria, para quem
+ * colou o link no grupo da família, que ali existe alguém; e num app de
+ * gestação de alto risco a diferença entre "não existe" e "não está disponível
+ * agora" é uma informação que ninguém tem o direito de deduzir.
+ *
+ * ⚠️ **A BIO NÃO ENTRA, e a foto dela também não.** A página é pública — ela
+ * ligou a chave —, mas o cartão de prévia é COPIADO e fica guardado no
+ * histórico de toda conversa em que o link for colado, muito depois de ela
+ * desligar a chave. O que viaja é o primeiro nome e a marca do app; o resto
+ * exige abrir a página, que ela pode fechar quando quiser.
+ */
+function metaDaVitrine(perfil: PerfilPublico | null) {
+  if (!perfil) return [];
+  /* Só o PRIMEIRO nome — a mesma régua de `primeiroNome`: sobrenome
+     identifica, primeiro nome apresenta. E este texto vai para o WhatsApp de
+     gente que ela não escolheu. */
+  const nome = perfil.nome.trim().split(/\s+/)[0] || "Alguém";
+  const titulo = `${nome} está no Obstétrica`;
+  const descricao = "Acompanhamento da gestação, semana a semana — do positivo ao pós-parto.";
+  return [
+    { property: "og:title", content: titulo },
+    { property: "og:description", content: descricao },
+    { name: "twitter:title", content: titulo },
+    { name: "twitter:description", content: descricao },
+  ];
+}
+
 function Pagina() {
   const { codigo } = Route.useParams();
-  const [perfil, setPerfil] = useState<PerfilPublico | null>(null);
-  const [carregando, setCarregando] = useState(true);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const { perfilPublicoPorCodigo } = await import("@/lib/convite.functions");
-        const r = await perfilPublicoPorCodigo({ data: { codigo } });
-        if (vivo) setPerfil(r.perfil);
-      } catch {
-        if (vivo) setPerfil(null);
-      } finally {
-        if (vivo) setCarregando(false);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, [codigo]);
-
-  if (carregando) {
-    return (
-      <div className="mx-auto max-w-md space-y-4 px-4 py-12">
-        <div className="skeleton mx-auto h-24 w-24 rounded-full" />
-        <div className="skeleton mx-auto h-6 w-40 rounded-xl" />
-        <div className="skeleton h-48 rounded-2xl" />
-      </div>
-    );
-  }
+  const { perfil } = Route.useLoaderData();
 
   if (!perfil) {
     return (
@@ -144,7 +175,7 @@ function Pagina() {
           a mesma coisa, um embaixo do outro. O componente compartilhado já é o
           convite, com o código DELA: quem cria conta por aqui vira indicação
           dela, como nas outras páginas públicas. */}
-      <ConviteDoApp onde="perfil" codigo={perfil.codigoDeConvite} />
+      <ConviteDoApp onde="perfil" codigo={perfil.codigoDeConvite} nome={perfil.nome} />
     </div>
   );
 }

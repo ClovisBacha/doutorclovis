@@ -28,6 +28,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
 import { LIMITE_DA_BIO } from "@/lib/rede-social";
 import type { PerfilNaTela } from "@/lib/rede-social.functions";
@@ -258,9 +259,12 @@ export function ConfiguracoesDoPerfil({
           <div className="min-w-0">
             <h3 className="font-semibold">Perfil público</h3>
             <p className="mt-1 text-xs leading-snug text-muted-foreground">
-              {perfil.publico
-                ? "Qualquer pessoa no app pode te achar e te acompanhar. Cada publicação continua com a camada que você escolher."
-                : "Só quem você aceitar te acompanha, e você não aparece na busca."}
+              {/* ⚠️ O texto mora em `chaves-do-perfil.ts`, e não aqui: ele é o
+                  CONSENTIMENTO, e o ritual de boas-vindas passou a mostrar o
+                  mesmo interruptor. Duas cópias divergem no primeiro ajuste, e
+                  a divergência seria duas telas prometendo coisas diferentes
+                  sobre a mesma chave. */}
+              {perfil.publico ? TEXTO_PERFIL_PUBLICO.ligado : TEXTO_PERFIL_PUBLICO.desligado}
             </p>
           </div>
           <button

@@ -45,7 +45,18 @@ export type OndeConvida = "presentes" | "album" | "nome" | "acompanhante" | "per
  * das frases do mascote e da faixa de quem convidou. Quem lê pode estar
  * grávida, e a promessa clínica é do médico dela, não de um rodapé.
  */
-export function fraseDoRodape(onde: OndeConvida): { titulo: string; sub: string } {
+export function fraseDoRodape(
+  onde: OndeConvida,
+  /**
+   * O PRIMEIRO nome de quem trouxe. Só a vitrine usa — ver o caso `perfil`.
+   *
+   * ⚠️ **Primeiro nome, nunca o completo.** É a mesma régua de `primeiroNome`,
+   * e vale ainda mais aqui: este rodapé aparece para gente que ela não
+   * escolheu, e a página já traz o nome dela em cima porque ela decidiu isso.
+   * O que não pode é o convite AMPLIAR o que a página já mostra.
+   */
+  nome?: string | null,
+): { titulo: string; sub: string } {
   switch (onde) {
     case "presentes":
       return {
@@ -72,15 +83,33 @@ export function fraseDoRodape(onde: OndeConvida): { titulo: string; sub: string 
         titulo: "Você está acompanhando pelo Obstétrica",
         sub: "Se você também está grávida, o app é seu também.",
       };
-    case "perfil":
-      /* ⚠️ A da vitrine fala do APP, e não da pessoa. "Siga a Marina aqui"
-         prometeria um botão de seguir que a página pública não tem — seguir
-         exige conta —, e a frustração de um botão que não existe é pior que a
-         ausência dele. */
+    case "perfil": {
+      /* ⚠️ **A VITRINE PASSOU A DIZER DE QUEM ELA É, e não é enfeite.** Quem
+         abriu este endereço veio por causa de UMA pessoa — o link estava na
+         bio dela, no story dela, na mensagem dela. O rodapé anterior falava do
+         app em abstrato e desperdiçava a única coisa que essa visita tem de
+         diferente de qualquer outra: um nome que a pessoa reconhece.
+
+         ⚠️ **Continua sem prometer "seguir".** "Siga a Marina aqui" prometeria
+         um botão que a página pública não tem (seguir exige conta), e a
+         frustração de um botão que não existe é pior que a ausência dele. O que
+         o texto faz é NOMEAR a origem da visita; o botão continua sendo
+         "Conhecer o app".
+
+         Sem nome, cai na frase antiga — nunca "Alguém está no Obstétrica", que
+         soa como erro de sistema. */
+      const quem = (nome ?? "").trim();
+      if (!quem) {
+        return {
+          titulo: "Este perfil vive no Obstétrica",
+          sub: "O app da gestação — do positivo ao pós-parto.",
+        };
+      }
       return {
-        titulo: "Este perfil vive no Obstétrica",
-        sub: "O app da gestação — do positivo ao pós-parto.",
+        titulo: `Você chegou pelo perfil de ${quem}`,
+        sub: `${quem} acompanha a gestação dela por aqui — do positivo ao pós-parto.`,
       };
+    }
   }
 }
 

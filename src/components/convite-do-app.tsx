@@ -7,7 +7,16 @@
 import { fraseDoRodape, ROTULO_DO_BOTAO, type OndeConvida } from "@/lib/convite-do-app";
 import { linkDeIndicacao, SITE } from "@/lib/indicacao";
 
-export function ConviteDoApp({ onde, codigo }: { onde: OndeConvida; codigo: string | null }) {
+export function ConviteDoApp({
+  onde,
+  codigo,
+  nome,
+}: {
+  onde: OndeConvida;
+  codigo: string | null;
+  /** Só a vitrine (`onde="perfil"`) usa — ver `fraseDoRodape`. */
+  nome?: string | null;
+}) {
   /**
    * ⚠️ **SEM CÓDIGO, NÃO APARECE.** Um link sem indicação é indistinguível de um
    * bom para quem manda e para quem recebe — só o vínculo não acontece, e a
@@ -20,7 +29,7 @@ export function ConviteDoApp({ onde, codigo }: { onde: OndeConvida; codigo: stri
   const link = linkDeIndicacao(codigo, SITE);
   if (!link) return null;
 
-  const { titulo, sub } = fraseDoRodape(onde);
+  const { titulo, sub } = fraseDoRodape(onde, nome);
 
   return (
     /* ⚠️ **UMA LINHA, NO PÉ, depois do conteúdo inteiro.** A página é DELA — a

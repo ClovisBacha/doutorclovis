@@ -94,3 +94,55 @@ describe("a variante de cada rota pública", () => {
     });
   }
 });
+
+/**
+ * ⚠️ A VITRINE NOMEIA QUEM TROUXE — e o que ela NÃO pode fazer.
+ *
+ * Quem abriu `/p/<codigo>` veio por causa de UMA pessoa: o link estava na bio
+ * dela, no story dela, na mensagem dela. O rodapé antigo falava do app em
+ * abstrato e desperdiçava a única coisa que separa essa visita de qualquer
+ * outra — um nome que quem lê reconhece.
+ */
+describe("o rodapé da vitrine", () => {
+  test("⚠️ diz o nome de quem trouxe", () => {
+    const f = fraseDoRodape("perfil", "Marina");
+    expect(f.titulo).toContain("Marina");
+    expect(f.sub).toContain("Marina");
+  });
+
+  /* ⚠️ PRIMEIRO nome, nunca o completo — quem chama é quem corta, e o teste
+     existe para o dia em que alguém passar `display_name` inteiro por engano:
+     a frase tem de sair com o que recebeu, sem inventar sobrenome nenhum. */
+  test("⚠️ nunca acrescenta nada ao nome recebido", () => {
+    const f = fraseDoRodape("perfil", "Marina");
+    expect(f.titulo).not.toContain("Costa");
+    expect(f.titulo.match(/Marina/g)?.length).toBe(1);
+  });
+
+  /* ⚠️ Sem nome, volta à frase antiga — nunca "Alguém está no Obstétrica", que
+     lê como erro de sistema no lugar mais visível que este app tem. */
+  test("⚠️ sem nome, a frase antiga — nunca um placeholder", () => {
+    for (const vazio of [undefined, null, "", "   "]) {
+      const f = fraseDoRodape("perfil", vazio);
+      expect(f.titulo.toLowerCase()).toContain("perfil");
+      expect(f.titulo.toLowerCase()).not.toContain("alguém");
+      expect(f.titulo.toLowerCase()).not.toContain("undefined");
+    }
+  });
+
+  /* ⚠️ E ela continua NÃO prometendo seguir: a página pública não tem esse
+     botão, porque seguir exige conta. A proibição já vale para todas as
+     frases; aqui ela é reconferida com o nome dentro, que é o caso novo. */
+  test("⚠️ com nome, ainda não promete seguir", () => {
+    const t = `${fraseDoRodape("perfil", "Marina").titulo} ${fraseDoRodape("perfil", "Marina").sub}`;
+    expect(t.toLocaleLowerCase("pt-BR")).not.toContain("siga");
+    expect(t.toLocaleLowerCase("pt-BR")).not.toContain("seguir");
+  });
+
+  /* As outras quatro páginas ignoram o nome — passar um não muda nada nelas. */
+  test("só a vitrine usa o nome", () => {
+    for (const onde of ["presentes", "album", "nome", "acompanhante"] as OndeConvida[]) {
+      expect(fraseDoRodape(onde, "Marina")).toEqual(fraseDoRodape(onde));
+    }
+  });
+});

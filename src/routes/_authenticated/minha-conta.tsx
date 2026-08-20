@@ -53,6 +53,11 @@ import { EmergencySheet } from "@/components/emergency-sheet";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
+import {
+  CONVITE_DA_COMUNIDADE,
+  ofereceAComunidade,
+  TEXTO_PERFIL_PUBLICO,
+} from "@/lib/chaves-do-perfil";
 import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { motion, AnimatePresence } from "motion/react";
@@ -2611,6 +2616,15 @@ export function OnboardingRitual({
   const [babyName, setBabyName] = useState("");
   const [avatar, setAvatar] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  /* ─── A COMUNIDADE, NO ÚLTIMO PASSO ────────────────────────────────────────
+     ⚠️ **Nasce DESLIGADA**, como a chave nasce no banco. O ritual OFERECE; um
+     perfil que nascesse aberto exporia milhares de gestantes de alto risco por
+     omissão, sem ninguém nunca ter pedido plateia.
+
+     ⚠️ E ela liga só `perfil_publico` — NUNCA `vitrine_publica`, que é a página
+     aberta na internet e merece um momento deliberado, não uma chavinha no meio
+     das boas-vindas. */
+  const [entrarNaComunidade, setEntrarNaComunidade] = useState(false);
   /* ─── O CÓDIGO DA INFLUENCIADORA ────────────────────────────────────────────
      Nasce PRÉ-PREENCHIDO quando ela veio por um link `?ref=` — é o "link
      inteligente" do desenho. Quem baixou pela busca da loja digita.
@@ -2684,6 +2698,10 @@ export function OnboardingRitual({
       if (name.trim()) payload.display_name = name.trim();
       if (babyName.trim()) payload.baby_name = babyName.trim();
       if (avatar) payload.avatar_url = avatar;
+      /* ⚠️ Só quando ela LIGOU. Mandar `false` explícito também funcionaria
+         hoje, e seria uma pegadinha no dia em que o padrão do banco mudar: o
+         ritual passaria a DESLIGAR uma chave que ninguém tocou. */
+      if (entrarNaComunidade) payload.perfil_publico = true;
       if (mode === "dum" && lmp) {
         payload.lmp_date = lmp;
         payload.due_date = dueDateFromLmp(lmp);
@@ -2697,6 +2715,18 @@ export function OnboardingRitual({
         .upsert(payload)
         .select()
         .single();
+      /* ⚠️ Recuo por coluna ausente, como no resto do app: `perfil_publico`
+         nasce num `APLICAR_` que o dono roda à mão, e o deploy chega antes. Sem
+         isto, um `42703` derrubaria o ritual INTEIRO — nome, DUM e foto — por
+         causa de uma chavinha opcional. */
+      if (error && String(error.message || "").includes("perfil_publico")) {
+        delete payload.perfil_publico;
+        ({ data, error } = await (supabase as any)
+          .from("patient_profiles")
+          .upsert(payload)
+          .select()
+          .single());
+      }
       if (error && String(error.message || "").includes("avatar_url")) {
         delete payload.avatar_url;
         ({ data, error } = await (supabase as any)
@@ -2957,6 +2987,59 @@ export function OnboardingRitual({
                   poder te presentear.
                 </p>
               </div>
+            )}
+
+            {/* ─── ENTRAR NA COMUNIDADE ───────────────────────────────────────
+                O feed nasce vazio e o perfil nasce fechado — então a paciente
+                nova abre a Comunidade, não é encontrável por ninguém, não tem
+                ninguém para ver, e conclui que a aba não tem nada. Este é o
+                único minuto em que ela está disposta a mexer nisso.
+
+                ⚠️ **OFERECE, e nunca liga sozinho.** O padrão é desligado, como
+                no banco: um perfil que nascesse aberto exporia milhares de
+                gestantes de alto risco por omissão.
+
+                ⚠️ **E não segue ninguém por ela.** Seguir é um gesto, e um app
+                que segue coisas pela paciente ensina que a lista dela não é
+                dela — a mesma razão pela qual nem a conta oficial é seguida
+                automaticamente (ver `conta-oficial.ts`). O que ela ganha é ser
+                ENCONTRÁVEL; quem ela segue continua sendo escolha dela.
+
+                ⚠️ **O texto é o MESMO da tela de configurações**
+                (`chaves-do-perfil.ts`): duas cópias divergem no primeiro
+                ajuste, e aqui a divergência seria duas telas prometendo coisas
+                diferentes sobre o mesmo interruptor. */}
+            {ofereceAComunidade({ emCuidado: false }) && (
+              <button
+                type="button"
+                role="switch"
+                aria-checked={entrarNaComunidade}
+                onClick={() => setEntrarNaComunidade((v) => !v)}
+                className="press mx-auto mt-6 flex w-full max-w-xs items-start gap-3 rounded-2xl border border-border bg-background/70 p-3 text-left"
+              >
+                <span
+                  aria-hidden
+                  className={`mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
+                    entrarNaComunidade ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      entrarNaComunidade
+                        ? "translate-x-[22px] translate-y-0.5"
+                        : "translate-x-0.5 translate-y-0.5"
+                    }`}
+                  />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-semibold">
+                    {CONVITE_DA_COMUNIDADE.titulo}
+                  </span>
+                  <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+                    {entrarNaComunidade ? TEXTO_PERFIL_PUBLICO.ligado : CONVITE_DA_COMUNIDADE.sub}
+                  </span>
+                </span>
+              </button>
             )}
           </div>
         );
