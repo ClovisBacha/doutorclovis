@@ -39,6 +39,7 @@ const PERFIL: PerfilNaTela = {
   publico: true,
   meuVinculo: null,
   souEu: true,
+  silenciado: false,
   meusSeguidores: 137,
   euSigo: 64,
   seloSemana: "32 semanas",

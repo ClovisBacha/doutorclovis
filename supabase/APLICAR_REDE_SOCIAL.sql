@@ -334,6 +334,39 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
 -- ela publique.
 -- ═════════════════════════════════════════════════════════════════════════════
 -- ─────────────────────────────────────────────────────────────────────────────
+-- SILENCIAR SEM DEIXAR DE SEGUIR (ago/2026)
+--
+-- ⚠️ Faltava o MEIO-TERMO. Só existia bloquear, que desfaz o seguir nos dois
+-- sentidos e que a própria tela descreve como coisa séria. Numa rede em que as
+-- pessoas se conhecem da vida real — a irmã, a cunhada, a amiga do trabalho —
+-- não ter o degrau de baixo faz alguém bloquear a irmã, ou desistir da aba.
+--
+-- ⚠️ SILENCIAR NÃO É BLOQUEAR, e a diferença é o recurso:
+--   · o vínculo CONTINUA (ela segue seguindo, e continua sendo amiga);
+--   · o perfil dela continua acessível — dá para visitar quando quiser;
+--   · só o FEED deixa de trazer as publicações dela;
+--   · é CALADO e reversível, e ninguém é avisado.
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.rede_silenciados (
+  quem_id       uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  silenciado_id uuid NOT NULL REFERENCES auth.users ON DELETE CASCADE,
+  criado_em     timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (quem_id, silenciado_id)
+);
+
+ALTER TABLE public.rede_silenciados ENABLE ROW LEVEL SECURITY;
+
+-- ⚠️ SÓ ELA vê e escreve a própria lista — inclusive contra a silenciada. Saber
+-- quem te silenciou é exatamente o que transformaria um gesto privado numa
+-- briga, que é a razão de o bloqueio também ser mudo.
+DROP POLICY IF EXISTS "Vê só os próprios silenciados" ON public.rede_silenciados;
+CREATE POLICY "Vê só os próprios silenciados" ON public.rede_silenciados
+  FOR ALL USING (auth.uid() = quem_id) WITH CHECK (auth.uid() = quem_id);
+
+COMMENT ON TABLE public.rede_silenciados IS
+  'Some do feed sem desfazer o vínculo. Calado, reversível, e só a dona vê.';
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- AS DENÚNCIAS DA REDE (ago/2026)
 --
 -- ⚠️ Isto deixou de ser melhoria quando a aba ganhou conteúdo publicado por

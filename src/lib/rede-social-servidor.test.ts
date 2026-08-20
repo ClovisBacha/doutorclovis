@@ -320,6 +320,41 @@ describe("editar a legenda", () => {
   });
 });
 
+describe("silenciar", () => {
+  /* ⚠️ A DECISÃO CENTRAL DO RECURSO: silenciar é preferência de FEED, e não
+     régua de visibilidade. Se entrasse em `podeVerPost`, visitar o perfil da
+     silenciada mostraria uma tela vazia — ou seja, viraria um bloqueio de um
+     lado só, e a palavra passaria a mentir. */
+  test("⚠️ o silêncio NÃO entra em `podeVerPost`", () => {
+    const regua = readFileSync("src/lib/rede-social.ts", "utf8");
+    expect(regua).not.toContain("silenciad");
+    const monta = funcaoInterna("montarPosts");
+    expect(monta).not.toContain("silenciad");
+  });
+
+  /* Ele é aplicado num lugar só: a lista de autores do feed. */
+  test("⚠️ é aplicado SÓ no feed", () => {
+    const feed = corpoDe("meuFeed").replace(/\s+/g, " ");
+    expect(feed).toContain("!ctx.silenciados.has(id)");
+    /* E o perfil NÃO o aplica: `verPerfil` só o LÊ para desenhar o botão. */
+    const perfil = corpoDe("verPerfil");
+    expect(perfil).toContain("silenciado: persona ? false : ctx.silenciados.has(data.alvoId)");
+    expect(perfil.replace(/\s+/g, " ")).not.toContain("!ctx.silenciados.has");
+  });
+
+  /* ⚠️ Falha ABERTO, ao contrário do bloqueio: sem conseguir ler a lista, o
+     feed traz tudo. O pior caso é ela ver um post que preferia não ver —
+     contra o pior caso do bloqueio, que é vazamento. */
+  test("⚠️ falha ABERTO — a tabela ausente não derruba o feed", () => {
+    const ctx = funcaoInterna("contextoDe").replace(/\s+/g, " ");
+    expect(ctx).toContain("(calados as any).data ?? []");
+  });
+
+  test("⚠️ silenciar a si mesma é recusado", () => {
+    expect(corpoDe("silenciar").replace(/\s+/g, " ")).toContain("if (data.alvoId === eu)");
+  });
+});
+
 describe("higiene", () => {
   test('nenhum `select("*")`', () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
@@ -332,7 +367,7 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são nove", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são dez", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -384,7 +419,19 @@ describe("higiene", () => {
     expect(mm).toContain('.eq("post_id", data.postId)');
     expect(mm).toContain('.eq("quem_id", eu)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(9);
+    /* ⚠️ E o DÉCIMO: voltar a ouvir quem foi silenciada. Aqui o DELETE é a
+       operação certa — a linha de silêncio não guarda história nenhuma, e
+       manter um "silenciado: false" marcado faria a lista crescer para sempre
+       com o registro de quem ela um dia calou. É o oposto da denúncia, cuja
+       linha resolvida continua contando reincidência.
+       `.eq("quem_id", eu)` é o portão: sem ele, um id no corpo do pedido
+       desfaria o silêncio de OUTRA pessoa. */
+    const sil = corpoDe("silenciar").replace(/\s+/g, " ");
+    expect(sil).toContain(".delete(");
+    expect(sil).toContain('.eq("quem_id", eu)');
+    expect(sil).toContain('.eq("silenciado_id", data.alvoId)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(10);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {

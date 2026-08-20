@@ -161,6 +161,15 @@ export type PerfilNaTela = {
   /** `null` = não sigo. */
   meuVinculo: "ativo" | "pendente" | null;
   souEu: boolean;
+  /**
+   * Eu silenciei esta pessoa?
+   *
+   * ⚠️ **Só a MINHA lista chega aqui — nunca a dela.** Saber quem te silenciou
+   * é exatamente o que transformaria um gesto privado numa briga, e é a mesma
+   * razão pela qual o bloqueio é mudo. Sob a prévia é sempre `false`: a persona
+   * é uma visitante inventada e não silenciou ninguém.
+   */
+  silenciado: boolean;
   /** ⚠️ Só a DONA vê. Não existe contador público de seguidores — ver a régua. */
   meusSeguidores: number | null;
   /**
@@ -231,6 +240,21 @@ type Contexto = {
   bloqueio: ConjuntoDeBloqueio;
   amigas: Set<string>;
   /**
+   * Quem ela silenciou.
+   *
+   * ⚠️ **Isto NÃO entra em `podeVerPost`, e é a decisão central do recurso.**
+   * Silenciar não é uma régua de VISIBILIDADE — é uma preferência de FEED. A
+   * diferença aparece quando ela visita o perfil da silenciada: lá as
+   * publicações continuam à mostra, porque ela foi até lá para ver. Se
+   * silenciar entrasse na régua de visibilidade, viraria um bloqueio de um lado
+   * só, e a palavra passaria a mentir.
+   *
+   * ⚠️ E ele falha ABERTO de propósito, ao contrário do bloqueio: sem conseguir
+   * ler a lista, o feed traz tudo. O pior caso é ela ver um post que preferia
+   * não ver — contra o pior caso do bloqueio, que é vazamento.
+   */
+  silenciados: Set<string>;
+  /**
    * Alguma das leituras falhou.
    *
    * ⚠️ Quem lê isto devolve ERRO, e nunca a tela de "não há nada": um feed
@@ -242,10 +266,11 @@ type Contexto = {
 };
 
 async function contextoDe(sb: any, eu: string): Promise<Contexto> {
-  const [seg, meus, deles] = await Promise.all([
+  const [seg, meus, deles, calados] = await Promise.all([
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
+    sb.from("rede_silenciados").select("silenciado_id").eq("quem_id", eu),
   ]);
 
   /* ⚠️ O bloqueio entra nos DOIS sentidos no mesmo conjunto. Guardar só o meu
@@ -285,6 +310,13 @@ async function contextoDe(sb: any, eu: string): Promise<Contexto> {
     sigo: new Set((((seg as any).data ?? []) as { seguido_id: string }[]).map((s) => s.seguido_id)),
     bloqueio: conjuntoDeBloqueio(ids, bloqueioFalhou),
     amigas,
+    /* ⚠️ Falha ABERTO (conjunto vazio), ao contrário do bloqueio — ver o tipo.
+       E a tabela nasce num APLICAR_ que o dono roda à mão: sem o `?? []`, o
+       feed inteiro quebraria na janela entre o deploy e o SQL por causa de uma
+       preferência. */
+    silenciados: new Set(
+      (((calados as any).data ?? []) as { silenciado_id: string }[]).map((x) => x.silenciado_id),
+    ),
     degradado: bloqueioFalhou || amigasFalhou || !!(seg as any).error,
   };
 }
@@ -1196,6 +1228,7 @@ export const verPerfil = createServerFn({ method: "POST" })
           : ("ativo" as const)
         : (((vinculo as any)?.estado as "ativo" | "pendente") ?? null),
       souEu: persona ? false : data.alvoId === eu,
+      silenciado: persona ? false : ctx.silenciados.has(data.alvoId),
       /* ⚠️ `null` para terceiros — não existe contador público de seguidores.
          Um placar de audiência num app de gestação de alto risco mede
          popularidade num momento em que ela já está sendo medida clinicamente. */
@@ -1909,6 +1942,55 @@ export const meusArquivados = createServerFn({ method: "POST" })
     return { ok: true as const, posts };
   });
 
+/**
+ * SILENCIAR / VOLTAR A OUVIR.
+ *
+ * ⚠️ **É CALADO e reversível, e ninguém é avisado** — a mesma decisão do
+ * bloqueio e da saída de amizade: contar transformaria um gesto privado numa
+ * briga, e num app onde as pessoas se conhecem da vida real isso piora a
+ * situação que o motivou.
+ *
+ * ⚠️ **E não desfaz vínculo nenhum.** Ela continua seguindo, continua amiga,
+ * continua podendo abrir o perfil. O que muda é só o feed.
+ */
+export const silenciar = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        /** `false` volta a ouvir. */
+        silenciar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    /* Silenciar a si mesma não faz sentido e esconderia os próprios posts do
+       próprio feed — o feed já se protege, mas recusar aqui é mais honesto. */
+    if (data.alvoId === eu) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (!data.silenciar) {
+      const { error } = await sb
+        .from("rede_silenciados")
+        .delete()
+        .eq("quem_id", eu)
+        .eq("silenciado_id", data.alvoId);
+      if (error) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const };
+    }
+
+    const { error } = await sb
+      .from("rede_silenciados")
+      .upsert({ quem_id: eu, silenciado_id: data.alvoId }, { onConflict: "quem_id,silenciado_id" });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
 /** O feed: posts de quem eu sigo, das minhas amigas, e os meus. */
 export const meuFeed = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -1931,8 +2013,17 @@ export const meuFeed = createServerFn({ method: "POST" })
       return { ok: true as const, posts: [] as PostNaTela[], proximo: null };
     }
     const ctx = await contextoDe(sb, eu);
+    /* ⚠️ **O SILÊNCIO É APLICADO AQUI, e SÓ AQUI.** Ele não entra em
+       `podeVerPost` de propósito: silenciar é preferência de FEED, não régua de
+       visibilidade. Visitar o perfil da silenciada continua mostrando tudo —
+       ela foi até lá para ver. Se entrasse na régua, viraria um bloqueio de um
+       lado só e a palavra passaria a mentir.
+
+       ⚠️ E `|| id === eu` protege o caso bobo: silenciar a si mesma (que a tela
+       não oferece, mas um pedido montado à mão sim) não pode esconder os
+       próprios posts do próprio feed. */
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
-      (id) => !ctx.bloqueio.has(id) || id === eu,
+      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
     );
 
     const brutos = await postsCrus(sb, (base) => {
@@ -2648,8 +2739,17 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     /* Mesmo portão do feed — ver `euEmCuidado`. */
     if (await euEmCuidado(sb, eu)) return { ok: true as const, bolhas: [] as BolhaDeStory[] };
     const ctx = await contextoDe(sb, eu);
+    /* ⚠️ **O SILÊNCIO É APLICADO AQUI, e SÓ AQUI.** Ele não entra em
+       `podeVerPost` de propósito: silenciar é preferência de FEED, não régua de
+       visibilidade. Visitar o perfil da silenciada continua mostrando tudo —
+       ela foi até lá para ver. Se entrasse na régua, viraria um bloqueio de um
+       lado só e a palavra passaria a mentir.
+
+       ⚠️ E `|| id === eu` protege o caso bobo: silenciar a si mesma (que a tela
+       não oferece, mas um pedido montado à mão sim) não pode esconder os
+       próprios posts do próprio feed. */
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
-      (id) => !ctx.bloqueio.has(id) || id === eu,
+      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
     );
 
     const agora = new Date().toISOString();

@@ -282,6 +282,7 @@ function Bancada() {
     publico: true,
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
+    silenciado: false,
     meusSeguidores: meu ? 137 : null,
     euSigo: meu ? 64 : null,
     /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
@@ -791,6 +792,7 @@ function Bancada() {
              uma denúncia de verdade — e é justamente a tela que precisa ser
              lida com calma antes de existir. */
           aoDenunciarPerfil={meu ? undefined : (m) => alert(`denunciaria o perfil por "${m}"`)}
+          aoSilenciar={meu ? undefined : (v) => alert(v ? "silenciaria" : "voltaria a ouvir")}
           /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
              bancada aprovaria a pílula sem o controle que é o ponto dela. */
           aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}

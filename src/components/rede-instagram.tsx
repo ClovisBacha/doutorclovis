@@ -1601,6 +1601,7 @@ export function TelaDePerfil({
   aoAbrirSalvos,
   aoBloquear,
   aoDenunciarPerfil,
+  aoSilenciar,
   aoAbrirEspelho,
   aoAplicarCodigo,
   aoPerguntar,
@@ -1628,6 +1629,8 @@ export function TelaDePerfil({
   aoBloquear?: () => void;
   /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
+  /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
+  aoSilenciar?: (silenciar: boolean) => void;
   /** Abre "ver como os outros veem". Só no próprio perfil. */
   aoAbrirEspelho?: () => void;
   /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
@@ -1746,6 +1749,34 @@ export function TelaDePerfil({
               Bloquear
             </button>
           </div>
+
+          {/* ⚠️ **SILENCIAR É O DEGRAU DE BAIXO, e ele faltava.** Só existia
+              bloquear — que desfaz o seguir nos dois sentidos e que a própria
+              tela descreve como coisa séria. Numa rede em que as pessoas se
+              conhecem da vida real (a irmã, a cunhada, a amiga do trabalho),
+              não ter o meio-termo faz alguém bloquear a irmã, ou desistir da
+              aba. Aqui o vínculo CONTINUA: some só do feed. */}
+          {aoSilenciar && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoSilenciar(!perfil.silenciado);
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              {perfil.silenciado
+                ? `Voltar a ver ${perfil.nome} no feed`
+                : `Silenciar ${perfil.nome} no feed`}
+            </button>
+          )}
+          {aoSilenciar && (
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {perfil.silenciado
+                ? "As publicações dela voltam a aparecer no seu feed."
+                : "Você continua seguindo, e o perfil dela continua aqui — só o feed para de trazer as publicações. Ela não é avisada."}
+            </p>
+          )}
 
           {/* ⚠️ **DENUNCIAR MORA AO LADO DE BLOQUEAR, e são coisas diferentes.**
               Bloquear resolve para ELA e não conta a ninguém; denunciar leva o
@@ -2675,6 +2706,34 @@ export function RedeNoApp({
    * outro botão a dois toques dali. Sumir com o perfil aqui faria a paciente
    * achar que denunciar bloqueia, e ela deixaria de usar o botão certo.
    */
+  /**
+   * Silenciar, ou voltar a ouvir.
+   *
+   * ⚠️ **O feed é recarregado, e o perfil aberto NÃO muda.** Silenciar tira do
+   * feed; a tela em que ela está é o perfil da pessoa, e sumir com o que está
+   * ali no momento do toque faria "silenciar" parecer "bloquear" — que é
+   * exatamente a confusão que este botão existe para desfazer.
+   */
+  async function silenciarPerfil(alvoId: string, calar: boolean) {
+    setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: calar } : p));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { silenciar } = await import("@/lib/rede-social.functions");
+      const r = await silenciar({ data: { accessToken: t, alvoId, silenciar: calar } });
+      const { toast } = await import("sonner");
+      if (r.ok) {
+        toast.success(calar ? "Silenciada. Ela não é avisada." : "Voltou para o seu feed.");
+        void carregarFeed();
+      } else {
+        setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: !calar } : p));
+        toast.error("Não deu para mudar agora.");
+      }
+    } catch {
+      setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: !calar } : p));
+    }
+  }
+
   async function denunciarUmPerfil(alvoId: string, motivo: MotivoDaDenuncia) {
     try {
       const t = await token();
@@ -3650,6 +3709,7 @@ export function RedeNoApp({
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
         aoDenunciarPerfil={perfil.souEu ? undefined : (m) => void denunciarUmPerfil(perfil.id, m)}
+        aoSilenciar={perfil.souEu ? undefined : (v) => void silenciarPerfil(perfil.id, v)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
         /* ⚠️ Bandeira vermelha abre a Central de Emergência — a MESMA que a
