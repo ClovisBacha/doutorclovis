@@ -71,6 +71,13 @@ import {
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
+/* Import ESTÁTICO: régua pura, sem servidor e sem DOM — ver `lugar-no-feed.ts`. */
+import {
+  chaveDoLugar,
+  deveRestaurar,
+  lerLugar,
+  paraGuardar as lugarParaGuardar,
+} from "@/lib/lugar-no-feed";
 import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
@@ -606,7 +613,11 @@ export const PostInstagram = memo(function PostInstagram({
   const fotos = post.imagens?.length ? post.imagens : post.imagemUrl ? [post.imagemUrl] : [];
 
   return (
-    <article className="-mx-4 border-b border-border pb-3">
+    /* ⚠️ `data-post` é a ÂNCORA de "onde ela parou" — ver `lugar-no-feed.ts`. O
+       lugar é guardado por ID de post, e não em pixels: as fotos chegam por URL
+       assinada DEPOIS da primeira pintura, então a altura da lista muda embaixo
+       de qualquer número de rolagem. */
+    <article data-post={post.id} className="-mx-4 border-b border-border pb-3">
       <header className="flex items-center gap-2.5 px-4 py-2.5">
         <button
           type="button"
@@ -2246,27 +2257,6 @@ export function RedeNoApp({
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
 
-  /**
-   * O toque no ícone da Comunidade volta ao começo.
-   *
-   * ⚠️ **A primeira passada não faz nada** (o efeito roda na montagem, quando
-   * ela ACABOU de chegar por outro caminho — pelo hub, por um deep-link, pelo
-   * cartão de presente). Sem a guarda, abrir a aba já num perfil a jogaria
-   * para o feed no primeiro quadro.
-   *
-   * Estando já no feed, só rola para o topo — que é o gesto do modelo, e a
-   * única resposta possível a um toque que "não muda de tela".
-   */
-  const primeiroSinal = useRef(true);
-  useEffect(() => {
-    if (primeiroSinal.current) {
-      primeiroSinal.current = false;
-      return;
-    }
-    setOnde({ t: "feed" });
-    setVendoStory(null);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [sinalDeVoltarAoFeed]);
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
   const [gente, setGente] = useState<PessoaNaLista[]>([]);
@@ -2289,6 +2279,125 @@ export function RedeNoApp({
    * código se ele ainda não existir, então é escrita, não só leitura.
    */
   const [meuCodigo, setMeuCodigo] = useState<string | null>(null);
+
+  /**
+   * O toque no ícone da Comunidade volta ao começo.
+   *
+   * ⚠️ **A primeira passada não faz nada** (o efeito roda na montagem, quando
+   * ela ACABOU de chegar por outro caminho — pelo hub, por um deep-link, pelo
+   * cartão de presente). Sem a guarda, abrir a aba já num perfil a jogaria
+   * para o feed no primeiro quadro.
+   *
+   * Estando já no feed, só rola para o topo — que é o gesto do modelo, e a
+   * única resposta possível a um toque que "não muda de tela".
+   */
+  const primeiroSinal = useRef(true);
+  useEffect(() => {
+    if (primeiroSinal.current) {
+      primeiroSinal.current = false;
+      return;
+    }
+    setOnde({ t: "feed" });
+    setVendoStory(null);
+    /* ⚠️ O toque no ícone APAGA o lugar guardado, e isto não é limpeza: ele é
+       um pedido explícito de voltar ao começo. Sem apagar, a próxima abertura
+       da aba a devolveria ao ponto que ela acabou de dizer que não queria. */
+    esquecerOLugar();
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sinalDeVoltarAoFeed]);
+
+  /* ══════════════════════════════════════════════════════════════════════
+     ONDE ELA PAROU DE LER — ver `lugar-no-feed.ts` para o porquê de tudo.
+     ══════════════════════════════════════════════════════════════════════ */
+
+  function esquecerOLugar() {
+    try {
+      if (euId) sessionStorage.removeItem(chaveDoLugar(euId));
+    } catch {
+      /* sem armazenamento: o feed abre no topo, como sempre abriu */
+    }
+  }
+
+  /**
+   * Guarda o post que está no alto da tela.
+   *
+   * ⚠️ **`sessionStorage`, e não `localStorage`.** "Onde eu parei" morre com a
+   * aba: guardar entre sessões devolveria a paciente ao meio de um feed que
+   * mudou inteiro, e é justamente o que apareceu de novo que ela quer ver ao
+   * abrir o app de manhã. A validade de trinta minutos da régua é a segunda
+   * defesa, para a aba que fica aberta o dia todo.
+   */
+  const guardarOLugar = useCallback(() => {
+    if (!euId || typeof document === "undefined") return;
+    try {
+      const artigos = [...document.querySelectorAll<HTMLElement>("article[data-post]")];
+      /* O primeiro cuja base ainda não passou do alto da tela: é o que ela
+         está lendo, e não o que já ficou para trás. */
+      const alvo = artigos.find((a) => a.getBoundingClientRect().bottom > 0);
+      const id = alvo?.dataset.post;
+      if (!id) return;
+      const t = lugarParaGuardar(id, new Date());
+      if (t) sessionStorage.setItem(chaveDoLugar(euId), t);
+    } catch {
+      /* idem */
+    }
+  }, [euId]);
+
+  /* Guarda ao SAIR do feed (para uma sub-tela) e ao esconder a página — o
+     caminho de quem troca de aba no app ou sai dele. `visibilitychange` é o
+     único evento confiável no iOS; `beforeunload` não dispara lá. */
+  useEffect(() => {
+    if (onde.t !== "feed") {
+      guardarOLugar();
+      return;
+    }
+    const aoEsconder = () => {
+      if (document.visibilityState === "hidden") guardarOLugar();
+    };
+    document.addEventListener("visibilitychange", aoEsconder);
+    return () => {
+      document.removeEventListener("visibilitychange", aoEsconder);
+      /* Desmontar a aba (trocar para Bebê, Jogo…) também é sair do feed. */
+      guardarOLugar();
+    };
+  }, [onde.t, guardarOLugar]);
+
+  /**
+   * Volta para o lugar — UMA vez por montagem.
+   *
+   * ⚠️ **Uma vez, e o `ref` é o que garante isso.** O efeito depende de `posts`,
+   * que muda a cada página carregada pela rolagem infinita: sem a trava, cada
+   * página nova puxaria a tela de volta para o mesmo post — a paciente rolando
+   * para baixo e o app puxando para cima.
+   */
+  const jaVoltei = useRef(false);
+  useEffect(() => {
+    if (jaVoltei.current || onde.t !== "feed" || !euId || posts.length === 0) return;
+    try {
+      const lugar = lerLugar(sessionStorage.getItem(chaveDoLugar(euId)), new Date());
+      if (
+        !deveRestaurar(
+          lugar,
+          posts.map((p) => p.id),
+        )
+      ) {
+        jaVoltei.current = true;
+        return;
+      }
+      const alvo = document.querySelector<HTMLElement>(`article[data-post="${lugar!.postId}"]`);
+      if (!alvo) return;
+      jaVoltei.current = true;
+      /* ⚠️ **`instant`, e NUNCA `auto`.** Medido no navegador: `styles.css` põe
+         `scroll-behavior: smooth` no `<html>`, e `auto` quer dizer "use o que o
+         CSS mandar" — então a volta ao lugar saía como uma rolagem ANIMADA de
+         dois mil e quinhentos pixels na abertura da aba, que lê como o app se
+         movendo sozinho. `instant` ignora o CSS. */
+      alvo.scrollIntoView({ block: "start", behavior: "instant" });
+    } catch {
+      jaVoltei.current = true;
+    }
+  }, [onde.t, euId, posts]);
   const [persona, setPersona] = useState<Persona>("estranha");
   /** A foto escolhida, esperando a conferência antes de virar story. */
   const [conferindoStory, setConferindoStory] = useState<string | null>(null);

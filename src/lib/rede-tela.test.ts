@@ -249,3 +249,58 @@ describe("convidar pela Comunidade", () => {
     expect(usos).toBe(2);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ONDE ELA PAROU DE LER — a plumaria de DOM (a régua está em `lugar-no-feed`)
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("o lugar no feed", () => {
+  const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
+    /\{\/\*[\s\S]*?\*\/\}/g,
+    " ",
+  );
+
+  /* ⚠️ A âncora é o ID DO POST, e não pixels: as fotos chegam por URL assinada
+     depois da primeira pintura, então a altura da lista muda embaixo de
+     qualquer número de rolagem. */
+  test("⚠️ cada post carrega `data-post`", () => {
+    expect(semComentarios).toContain("<article data-post={post.id}");
+    expect(semComentarios).toContain('querySelectorAll<HTMLElement>("article[data-post]")');
+  });
+
+  /* ⚠️ `sessionStorage`: "onde eu parei" morre com a aba. Entre sessões,
+     devolveria a paciente ao meio de um feed que mudou inteiro — e o que ela
+     quer de manhã é o que apareceu de novo. */
+  test("⚠️ é `sessionStorage`, nunca `localStorage`", () => {
+    const i = semComentarios.indexOf("const guardarOLugar");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = semComentarios.slice(i, semComentarios.indexOf("}, [euId]);", i));
+    expect(bloco).toContain("sessionStorage.setItem");
+    expect(bloco).not.toContain("localStorage");
+  });
+
+  /* ⚠️ Medido no navegador: `styles.css` põe `scroll-behavior: smooth` no
+     `<html>`, e `auto` quer dizer "use o CSS" — a volta saía como uma rolagem
+     ANIMADA de 2.500 px na abertura da aba. */
+  test("⚠️ a volta é `instant`, e nunca `auto`", () => {
+    expect(semComentarios).toContain('behavior: "instant"');
+    expect(semComentarios).not.toContain('scrollIntoView({ block: "start", behavior: "auto" })');
+  });
+
+  /* ⚠️ O efeito depende de `posts`, que muda a cada página da rolagem infinita:
+     sem a trava, cada página nova puxaria a tela de volta ao mesmo post — a
+     paciente rolando para baixo e o app puxando para cima. */
+  test("⚠️ volta UMA vez por montagem", () => {
+    expect(semComentarios).toContain("const jaVoltei = useRef(false)");
+    expect(semComentarios).toContain("if (jaVoltei.current ||");
+  });
+
+  /* ⚠️ O toque no ícone da barra é um pedido explícito de voltar ao começo —
+     sem apagar o lugar, a próxima abertura devolveria a paciente ao ponto que
+     ela acabou de dizer que não queria. */
+  test("⚠️ o toque no ícone da barra APAGA o lugar", () => {
+    const i = semComentarios.indexOf("const primeiroSinal = useRef(true)");
+    expect(i).toBeGreaterThan(-1);
+    const efeito = semComentarios.slice(i, semComentarios.indexOf("[sinalDeVoltarAoFeed]", i));
+    expect(efeito).toContain("esquecerOLugar()");
+  });
+});
