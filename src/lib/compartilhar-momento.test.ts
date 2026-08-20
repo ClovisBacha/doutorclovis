@@ -115,3 +115,44 @@ describe("o bilhete que atravessa as abas", () => {
     expect(CAMINHO).not.toContain("momentoComoDataUrl");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O CONVITE NO MOMENTO DE ORGULHO — a ideia 9
+   Convidar só existia na Comunidade, e os instantes em que ela está feliz não
+   ofereciam nada.
+   ══════════════════════════════════════════════════════════════════════════ */
+describe("o convite dentro da folha", () => {
+  /* ⚠️ O MESMO `linkDeIndicacao` do convite pelo WhatsApp. Uma segunda
+     construção do link é o defeito que `indicacao.ts` existe para não deixar
+     voltar — o "Convidar" que mandava `/auth` puro e não ligava ninguém. */
+  test("⚠️ usa a régua única do link, e não monta um à mão", () => {
+    expect(FOLHA).toContain("linkDeIndicacao(codigo, SITE)");
+    expect(FOLHA).toContain("linkDoWhatsApp(mensagemDeConvite(linkDoConvite))");
+    expect(FOLHA).not.toContain("/auth");
+    expect(FOLHA).not.toContain("whatsapp://");
+  });
+
+  /* ⚠️ Sem código, o convite NÃO SAI — mesma regra do cartão do feed e da aba
+     Amigas. E ela só tem a atenção da amiga uma vez. */
+  test("⚠️ sem código, o convite não aparece", () => {
+    expect(FOLHA).toContain("{linkDoConvite && (");
+  });
+
+  /* ⚠️ `getReferral` CRIA o código se não existir — é escrita. Chamá-la na
+     montagem faria toda tela que celebra bater no servidor sem ninguém ter
+     pedido nada. */
+  test("⚠️ o código só é buscado quando a folha ABRE, e uma vez só", () => {
+    const i = FOLHA.indexOf("const buscou = useRef(false)");
+    expect(i).toBeGreaterThan(-1);
+    const efeito = FOLHA.slice(i, FOLHA.indexOf("}, [aberta]);", i));
+    expect(efeito).toContain("if (!aberta || buscou.current) return;");
+    expect(efeito).toContain("buscou.current = true;");
+  });
+
+  /* ⚠️ O momento é dela; o convite é um segundo assunto. Em primeiro plano,
+     transformaria a comemoração num pedido. */
+  test("⚠️ vem DEPOIS das duas saídas", () => {
+    expect(FOLHA.indexOf("Salvar imagem")).toBeLessThan(FOLHA.indexOf("Chamar alguém"));
+    expect(FOLHA.indexOf("Publicar na Comunidade")).toBeLessThan(FOLHA.indexOf("Chamar alguém"));
+  });
+});

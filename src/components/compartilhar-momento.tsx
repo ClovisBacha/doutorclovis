@@ -20,14 +20,16 @@
  * devolve `null` — então esta folha nem chega a existir. Um segundo portão aqui
  * seria a segunda régua que este projeto proíbe desde `humorDaJornada`.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ROTULO_COMPARTILHAR, type Momento } from "@/lib/momento";
+import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
 
 export function CompartilharMomento({
   momento,
   nomeDaMae,
   aoPublicarNaComunidade,
   compacto = false,
+  codigoDeBancada,
 }: {
   /** `null` = não há o que compartilhar (Modo Cuidado, número inválido). */
   momento: Momento | null;
@@ -43,11 +45,66 @@ export function CompartilharMomento({
   aoPublicarNaComunidade?: (m: Momento) => void;
   /** Botão pequeno, para dentro de um cartão que já está cheio. */
   compacto?: boolean;
+  /**
+   * Injetável pela bancada.
+   *
+   * ⚠️ O convite só aparece com um `referral_code` real, que só existe numa
+   * conta de verdade — sem isto, a linha "Chamar alguém" seria construída às
+   * cegas, que é como uma tela passa meses sem ninguém nunca ter olhado. A
+   * bancada fabrica o DADO, nunca o desenho.
+   */
+  codigoDeBancada?: string | null;
 }) {
   const [aberta, setAberta] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
+  /**
+   * O CONVITE NO MOMENTO DE ORGULHO — a ideia 9 do dono.
+   *
+   * ⚠️ **Ele mora AQUI, e não numa segunda mecânica.** Convidar só existia na
+   * Comunidade, e os instantes em que ela está feliz — fechou o dia, ganhou o
+   * troféu, segurou quarenta dias de chama — não ofereciam nada. É o mesmo
+   * `linkDeIndicacao` do convite pelo WhatsApp: uma segunda construção do link
+   * seria o defeito que `indicacao.ts` existe para não deixar voltar.
+   *
+   * ⚠️ **Carregado só quando a folha ABRE.** `getReferral` cria o código se ele
+   * ainda não existir — é escrita, não leitura —, e chamá-la na montagem faria
+   * toda tela que celebra bater no servidor sem ninguém ter pedido nada.
+   */
+  const [codigo, setCodigo] = useState<string | null>(codigoDeBancada ?? null);
+  const buscou = useRef(false);
+
+  useEffect(() => {
+    if (codigoDeBancada || !aberta || buscou.current) return;
+    buscou.current = true;
+    let vivo = true;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data: s } = await supabase.auth.getSession();
+        const t = s.session?.access_token;
+        if (!t) return;
+        const { getReferral } = await import("@/lib/referral.functions");
+        const r = await getReferral({ data: { accessToken: t } });
+        if (vivo && r.ok) setCodigo(r.code ?? null);
+      } catch {
+        /* Sem código, o convite não aparece — e é o certo: um convite sem
+           indicação não liga ninguém a ninguém. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aberta]);
+
   if (!momento) return null;
+
+  /* ⚠️ **Sem código, o convite NÃO SAI** — mesma regra do cartão do feed e da
+     aba Amigas. Um convite sem indicação é indistinguível de um bom para quem
+     manda e para quem recebe; só o vínculo não acontece, semanas depois, sem
+     nada a que apontar. */
+  const linkDoConvite = linkDeIndicacao(codigo, SITE);
 
   async function paraFora() {
     if (ocupado || !momento) return;
@@ -121,6 +178,22 @@ export function CompartilharMomento({
                 >
                   Publicar na Comunidade
                 </button>
+              )}
+
+              {/* ⚠️ **O CONVITE VEM DEPOIS DAS DUAS SAÍDAS, e discreto.** O
+                  momento é dela; o convite é um segundo assunto, e pô-lo em
+                  primeiro plano transformaria a comemoração num pedido. Ele
+                  some inteiro sem código. */}
+              {linkDoConvite && (
+                <a
+                  href={linkDoWhatsApp(mensagemDeConvite(linkDoConvite))}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setAberta(false)}
+                  className="press flex min-h-[44px] items-center justify-center rounded-2xl border border-dashed border-border px-4 text-[13px] font-medium text-muted-foreground"
+                >
+                  Chamar alguém pra fazer junto
+                </a>
               )}
 
               <button

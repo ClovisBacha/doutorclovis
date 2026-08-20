@@ -10,6 +10,7 @@
  *   /preview-momento?especie=chama&n=41 → a sequência
  *   /preview-momento?luto=1             → o Modo Cuidado: nada aparece
  *   /preview-momento?tudo=1             → os oito cartões, um do lado do outro
+ *   /preview-momento?semcodigo=1        → sem código: o convite não aparece
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -37,6 +38,7 @@ export const Route = createFileRoute("/preview-momento")({
     n: q.n == null ? 12 : Number(q.n),
     luto: q.luto == null ? false : !!q.luto,
     tudo: q.tudo == null ? false : !!q.tudo,
+    semcodigo: q.semcodigo == null ? false : !!q.semcodigo,
   }),
 });
 
@@ -47,7 +49,7 @@ function rotuloDe(e: EspecieDeMomento): string | null {
 }
 
 function Bancada() {
-  const { especie, n, luto, tudo } = Route.useSearch();
+  const { especie, n, luto, tudo, semcodigo: semCodigo } = Route.useSearch();
   const lista = tudo ? ESPECIES : [(especie as EspecieDeMomento) ?? "trofeu"];
 
   return (
@@ -80,6 +82,10 @@ function Bancada() {
                     momento={m}
                     nomeDaMae="Marina"
                     aoPublicarNaComunidade={() => console.log("iria para o compositor", m)}
+                    /* ⚠️ O convite só existe com código real; sem isto ele
+                       seria construído às cegas. `?semcodigo=1` prova o estado
+                       em que ele NÃO aparece. */
+                    codigoDeBancada={semCodigo ? null : "MARIA7X"}
                   />
                 </div>
               </>
