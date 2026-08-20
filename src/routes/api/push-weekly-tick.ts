@@ -110,10 +110,24 @@ async function handle(request: Request): Promise<Response> {
      */
     const gratidaoAvisadas = await nudgeGratidaoDaSemana();
 
-    return new Response(JSON.stringify({ ok: true, notified, medicosAvisados, gratidaoAvisadas }), {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
+    /* ─── E A CRIADORA, QUE SÓ SABIA ABRINDO A TELA ────────────────────────
+     *
+     * Nada — nem cron, nem e-mail, nem push — tocava em `affiliates` (o único
+     * chamador era o webhook da Stripe). O que faz uma criadora postar de novo
+     * não é o extrato: é saber que o link funcionou esta semana.
+     *
+     * Mesmo cron, mesmo padrão stateless dos dois trabalhos acima. Segunda, e
+     * não domingo: domingo é o dia do resumo da PACIENTE.
+     */
+    const criadorasAvisadas = await resumoSemanalDasCriadoras();
+
+    return new Response(
+      JSON.stringify({ ok: true, notified, medicosAvisados, gratidaoAvisadas, criadorasAvisadas }),
+      {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      },
+    );
   } catch (e) {
     console.error("[push-weekly-tick] failed", e);
     return new Response(JSON.stringify({ ok: false }), {
@@ -268,3 +282,113 @@ export const Route = createFileRoute("/api/push-weekly-tick")({
     },
   },
 });
+
+/**
+ * O RESUMO SEMANAL DA CRIADORA — por e-mail, às segundas.
+ *
+ * A régua (o que pode ser dito, quando não mandar, o dia) mora em
+ * `src/lib/resumo-da-criadora.ts`. Aqui é a leitura e o envio.
+ *
+ * ⚠️ **E-MAIL, e não push.** Ela pode não ter o app instalado — é parceira, não
+ * paciente —, e o push deste app é o canal do aviso de EMERGÊNCIA. Ver o
+ * cabeçalho da régua.
+ *
+ * ⚠️ **Sem `RESEND_API_KEY`, `sendEmail` é no-op silencioso.** O trabalho roda,
+ * conta zero e não quebra nada — o mesmo comportamento de todo o resto do app.
+ *
+ * Stateless, como os dois trabalhos acima: sem tabela de "já mandei", o
+ * controle é o dia da semana. O cron entra aqui uma vez por semana.
+ */
+async function resumoSemanalDasCriadoras(): Promise<number> {
+  /* Fuso de Brasília, e não do processo — o mesmo defeito de três horas que os
+     dois trabalhos acima evitam. */
+  const hojeBR = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const { DIA_DO_RESUMO, assuntoDoResumo, corpoDoResumo, valeMandarResumo } =
+    await import("@/lib/resumo-da-criadora");
+  if (hojeBR.getDay() !== DIA_DO_RESUMO) return 0;
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const sb = supabaseAdmin as any;
+
+  /* ⚠️ Só afiliada ATIVA e COM e-mail: um código desligado não atribui nada, e
+     sem e-mail não há para onde mandar. */
+  const { data: afiliadas, error } = await sb
+    .from("affiliates")
+    .select("code, name, email, active")
+    .eq("active", true)
+    .not("email", "is", null)
+    .limit(500);
+  if (error) {
+    console.error("[resumo da criadora] não consegui listar", error);
+    return 0;
+  }
+
+  const desde = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const { sendEmail } = await import("@/lib/email.server");
+  let mandados = 0;
+
+  for (const a of (afiliadas ?? []) as {
+    code: string;
+    name: string | null;
+    email: string | null;
+  }[]) {
+    if (!a.email) continue;
+    try {
+      /* ⚠️ **`head: true` e `count`, e nunca a LISTA.** O resumo diz quantas;
+         trazer as linhas seria carregar para a memória do servidor exatamente
+         os nomes que o e-mail não pode conter. */
+      const [{ count: novas }, { count: total }] = await Promise.all([
+        sb
+          .from("patient_profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("ref_code", a.code)
+          .gte("created_at", desde),
+        sb
+          .from("patient_profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("ref_code", a.code),
+      ]);
+
+      const { data: ganhos } = await sb
+        .from("affiliate_earnings")
+        .select("amount_cents")
+        .eq("affiliate_code", a.code)
+        .limit(1000);
+      const centavos = ((ganhos ?? []) as { amount_cents: number | null }[]).reduce(
+        (s, g) => s + (g.amount_cents ?? 0),
+        0,
+      );
+
+      const numeros = { novas: novas ?? 0, total: total ?? 0, centavos };
+      if (!valeMandarResumo(numeros)) continue;
+
+      const { primeiroNome } = await import("@/lib/quem-convidou");
+      /* ⚠️ `sendEmail` só aceita `html` — o corpo é texto puro e vira HTML
+         aqui, com escape. Sem escapar, um nome com `<` viraria marcação no
+         cliente de e-mail dela. */
+      await sendEmail({
+        to: a.email,
+        subject: assuntoDoResumo(numeros),
+        html: comoHtml(corpoDoResumo(numeros, primeiroNome(a.name))),
+      });
+      mandados += 1;
+    } catch (e) {
+      /* Uma criadora que falha não pode derrubar o resumo das outras. */
+      console.error("[resumo da criadora] falhou para", a.code, e);
+    }
+  }
+  return mandados;
+}
+
+/**
+ * Texto puro vira HTML simples.
+ *
+ * ⚠️ **Escapa antes de trocar as quebras.** O único trecho variável é o nome
+ * dela (`affiliates.name`, escrito pelo dono) e os números — mas um `<` num
+ * nome viraria marcação, e a regra vale para todo texto que atravessa um
+ * cliente de e-mail.
+ */
+function comoHtml(texto: string): string {
+  const escapado = texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<div style="font-family:system-ui,sans-serif;font-size:15px;line-height:1.6">${escapado.replace(/\n/g, "<br/>")}</div>`;
+}
