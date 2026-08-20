@@ -23,6 +23,7 @@
  */
 
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { FaixaDeConvite } from "@/components/faixa-de-convite";
 import { useEffect, useState } from "react";
 import { Reveal } from "@/components/reveal";
 import { SkyCanvas, useWeatherSky } from "@/components/weather-sky";
@@ -161,8 +162,16 @@ function Index() {
               barra fixa. Era preciso rolar 1,3 tela para ver o botão. No
               desktop a ordem se inverte, onde as duas colunas cabem juntas. */}
           <div className="liquid-glass rounded-[2rem] p-6 md:p-9">
+            {/* ⚠️ **ACIMA DO H1, e não no rodapé.** O convite já fez o trabalho
+                difícil — alguém em quem ela confia disse "entra aqui" — e a
+                landing jogava isso fora mostrando a mesma tela para todo mundo.
+                A faixa se desenha sozinha só quando há código na visita; sem
+                ele, esta linha não pinta nada. Ver `quem-convidou.ts`. */}
+            <div className="empty:hidden">
+              <FaixaDeConvite escura />
+            </div>
             <Reveal variant="blur">
-              <p className="glass-chip text-[11px] font-bold uppercase tracking-[0.22em] text-white">
+              <p className="glass-chip mt-4 text-[11px] font-bold uppercase tracking-[0.22em] text-white">
                 Boa madrugada
               </p>
             </Reveal>

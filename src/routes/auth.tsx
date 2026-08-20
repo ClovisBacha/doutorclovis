@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { FaixaDeConvite } from "@/components/faixa-de-convite";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyDoctor } from "@/lib/doctors.functions";
@@ -341,6 +342,19 @@ function AuthPage() {
           "radial-gradient(ellipse 80% 60% at 50% 0%, oklch(0.92 0.03 52 / 0.6) 0%, transparent 70%)",
       }}
     >
+      {/* ⚠️ **ACIMA DO TÍTULO, e esta é a tela que converte.** A landing
+          apresenta o app; aqui ela já decidiu olhar, e o nome de quem a chamou
+          é o que empurra o último passo. A faixa só existe quando há código na
+          visita — em login normal esta linha não pinta nada.
+
+          ⚠️ E ela NÃO aparece para o médico nem para o acompanhante: um
+          convite de amiga sobre o formulário do consultório é ruído, e o
+          acompanhante nem cria conta. */}
+      {role === "paciente" && (
+        <div className="mb-5 empty:hidden">
+          <FaixaDeConvite />
+        </div>
+      )}
       <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Minha conta</p>
       <h1 className="mt-3 font-serif text-3xl">{title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">
