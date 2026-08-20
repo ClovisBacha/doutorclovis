@@ -5217,3 +5217,140 @@ contra falso positivo virou máquina de falso negativo.
 **Bancadas novas:** `/preview-instagram?tela=caixinha` (`&perguntas=0`,
 `&caixinha=0`) · `?tela=lista&remover=0` · `?tela=perfil` (o campo de perguntar,
 e os três desfechos da triagem).
+
+## A auditoria de 36 agentes, e as oito ideias novas (ago/2026)
+
+Pedido do dono, em duas partes: aplicar oito ideias novas (1, 2, 3, 4, 5, 6, 7 e
+10 — **a 8, limite de publicação, ele recusou**: "não queremos limitar nossos
+usuários"), e depois diagnosticar a aba inteira.
+
+### ⚠️ A AUDITORIA ACHOU 22 DEFEITOS, E QUATRO ERAM RECURSOS MORTOS
+
+Todos falhavam em SILÊNCIO, com 3.504 testes verdes, `tsc` limpo e bancadas
+bonitas. O padrão vale mais que a lista: este projeto tinha catraca para
+**"existe chamador?"** e nenhuma para **"a chamada funciona?"**.
+
+- **A legenda da IA ignorava a régua única da semana pública.** Conferia só
+  `mostrar_semana` e reescrevia metade de `semanaPublica`: passavam a paciente
+  que **já pariu** (`computeGestation` conta para sempre — duas semanas depois
+  do parto o prompt dizia "41 semanas de gestação" e o modelo escrevia na voz
+  de uma grávida, sobre a foto do recém-nascido) e a de DUM corrigida acima de 42. `ContextoDaLegenda.semana` virou `string | null` — a FRASE já passada pela
+  régua — porque dois campos que precisam concordar um dia discordam.
+- **O carimbo do "então e agora" nunca nasceu**: `publicarPost` resolvia o post
+  antigo, conferia o dono, punha a foto na frente do carrossel e DESCARTAVA o
+  id. `montarPosts` já sabia ler `comparacao_de` e nunca achava um post
+  comparado.
+- **A caixinha do story era um controle morto**: o 💬 grava `pergunta_aberta` e
+  a tela desenha o campo, mas quem decidia era `aceita_perguntas`, que nasce
+  DESLIGADA. Virou consentimento POR PUBLICAÇÃO (`consentiuReceber`), com o
+  story conferido no banco — e ele **não liga a chave permanente**, que é a
+  mesma distinção de `semanaParaCarimbo`.
+- **O único post de estranha era o único sem denúncia**: a zona "Publicações
+  sugeridas" não passava `aoDenunciar`. Toda prop de ação é opcional em
+  `PostInstagram` (tem de ser — a gaveta dos arquivados não reage nem vota),
+  então esquecer uma não quebra nada: some um botão, em silêncio.
+
+**`hojeEmSaoPaulo` saiu de `rede-social.functions.ts` para `selo-do-perfil.ts`**
+— era privado, e a legenda, escrita depois noutro arquivo, simplesmente não o
+chamou.
+
+⚠️ **E o bloco final de `APLICAR_REDE_SOCIAL.sql` não cobria NADA disto.** Dez
+verificações novas. Cada coluna faltando apaga um recurso INTEIRO em silêncio,
+porque a leitura tem recuo: nada quebra, o recurso deixa de existir.
+
+### Os oito médios, e sete deles mentiam na tela
+
+- **`marcacoesDe` não conhecia o bloqueio** — a linha "com Fulana" embaixo da
+  foto de uma TERCEIRA continuava dizendo o nome de quem ela bloqueou.
+- **`gravarMarcacoes` decidia por `saoAmigas`, que falha ABERTO** na amizade
+  encerrada (o `referred_by` sobrevive, de propósito), enquanto
+  `amigasParaMarcar` já usava `idsDasAmigas` e falhava fechado. As duas metades
+  do mesmo recurso, para lados opostos.
+- **O selo do médico nunca apareceu**: `perfis` era montado só com QUEM REAGIU e
+  logo abaixo se lia `perfis.get(eu)?.doctor_id`.
+- **`editarPost` acusava a dona** — sem recuo, o `42703` de `enquete_opcoes`
+  virava "esta publicação não é sua" SOBRE O PRÓPRIO POST.
+- **`tirarMinhaMarcacao`, `publicarStory` e `guardar`** diziam "pronto" sobre o
+  que o servidor recusou.
+- ⚠️ **O compositor APAGAVA o rascunho ao abrir**: o efeito rodava na montagem
+  com os campos vazios e, 700 ms depois, `paraGuardar` devolvia
+  `guardar: false` (rascunho vazio apaga — a regra certa). A faixa continuava na
+  tela porque o texto já estava em memória, então quem tocasse em "Recuperar" na
+  hora não via nada de errado — e quem voltasse depois perdia o texto para
+  sempre, com a única prova sumindo junto.
+- **A enquete do story** mostrava só a porcentagem ("67%" são dois votos de
+  três) e não pausava o relógio, embora o comentário do bloco prometesse.
+
+### ⚠️ E CINCO TESTES MEUS MENTIAM, pelos mecanismos já catalogados
+
+1. `.gte("criado_em"` casava a ocorrência dos TETOS DIÁRIOS, não a do story.
+2. "as fotos NÃO existem no rascunho" era TAUTOLÓGICO — olhava as chaves do
+   `base()` do próprio teste. Refeito, ele achou um defeito real: `paraGuardar`
+   fazia `{ ...r }` e gravaria uma foto acrescentada ao objeto mesmo sem ela
+   existir no TIPO (`JSON.stringify` não conhece tipo). Virou cópia campo a
+   campo.
+3. "só o TEXTO muda" fazia `slice(indexOf(...))` sem conferir a âncora: inlinar
+   o helper dava −1, `slice(-1)` devolvia UM caractere e os quatro
+   `not.toContain` passavam.
+4. "a aba do Feed desenha SÓ o feed" media 260 caracteres num bloco de milhares.
+5. E um teste NOVO ficou vermelho sobre código CERTO, porque o comentário que
+   explica a decisão contém a string proibida. **Tira-se o comentário antes de
+   procurar** — nas duas direções.
+
+### As oito ideias, e o que cada uma não pode ser
+
+- **N1 · Editar a legenda** — só o TEXTO muda; a visibilidade de um post já
+  lido não se reescreve pela porta dos fundos.
+- **N2 · O lembrete do "então e agora"** (`lembreteDoEntao`, pura). O recurso
+  estava escondido atrás do botão de comparar, dentro da tela de publicar. ⚠️ O
+  cartão MOSTRA a foto (texto é mais uma frase; a barriga dela responde
+  sozinha), ⚠️ o carimbo é escrito quando ele APARECE — não quando ela dispensa,
+  senão volta em toda abertura para quem rolou por cima —, ⚠️ um cartão de cada
+  vez (a retrospectiva de domingo ganha) e ⚠️ o compositor abre JÁ comparando,
+  zerando ao fechar.
+- **N3 · Silenciar sem deixar de seguir** — é preferência de FEED, e não régua
+  de visibilidade: em `podeVerPost` viraria bloqueio de um lado só.
+- **N4 · O feed guarda onde ela parou** (`lugar-no-feed.ts`, pura). ⚠️ O lugar é
+  um POST e nunca pixels (as fotos chegam por URL assinada depois da primeira
+  pintura), ⚠️ `sessionStorage` e não `localStorage` ("onde eu parei" morre com
+  a aba), ⚠️ volta UMA vez por montagem (senão cada página da rolagem infinita
+  puxa a tela de volta) e ⚠️ `behavior: "instant"`, nunca `"auto"` — medido:
+  `styles.css` põe `scroll-behavior: smooth` no `<html>`, e a volta saía como
+  uma rolagem animada de 2.500 px.
+- **N5 · Reação ao story** — treze emojis, e o afago chega na autora.
+- **N6 · Arquivar em vez de apagar** — isto SEMPRE foi arquivar; a tela é que
+  chamava de apagar, e ela tomava uma decisão que achava irreversível.
+- **N7 · Denunciar perfil + a fila da plataforma** (`denuncias.ts`). ⚠️ Motivo é
+  CATÁLOGO FECHADO: campo aberto numa denúncia de app de gestação é onde alguém
+  escreve a informação clínica de outra pessoa. ⚠️ Reincidência conta por QUEM
+  DENUNCIOU, não por linha. Fila em `ADMIN_EMAILS`, nunca "qualquer médico".
+- **N10 · Convidar pelo WhatsApp** — a MESMA `linkDeIndicacao`, senão é o
+  defeito que ela existe para não deixar voltar (o "Convidar" que mandava
+  `/auth` puro e não ligava ninguém a ninguém). ⚠️ `https://wa.me`, nunca
+  `whatsapp://`; ⚠️ sem número; ⚠️ sem código o cartão NÃO aparece; ⚠️ nada
+  disto em Modo Cuidado (a mensagem diz "na minha gestação" na primeira pessoa);
+  ⚠️ e `location.origin` no RENDER quebrou a hidratação — vai `SITE`.
+
+### O diagnóstico: a varredura das 52 bancadas
+
+Abrir cada `/preview-*` num navegador e LER O CONSOLE — o método que achou o
+laço da barra em minutos depois de três rodadas de dedução.
+
+**Zero `PAGEERROR`, zero tela vazia, zero aviso de hidratação, zero "Maximum
+update depth"** nas 52. E UM aviso, repetido em TODAS:
+
+⚠️ **`influenciadora.tsx` exportava `PainelDaEmbaixadora`.** Um export não-rota
+num arquivo de rota sai do pedaço DAQUELA rota e entra no da árvore de rotas —
+que é o que toda página carrega antes de qualquer coisa aparecer. Mesma família
+do `ChatbotWidget`. Medido em dois builds: entrada **925.902 → 914.648 B**
+(gzip 283.571 → 280.044). E a mesma medição mostrou que as oito ideias da noite
+custaram **+416 B crus** no pacote de entrada.
+
+`rotas-sem-export-solto.test.ts` é a catraca, e ela **nomeia a dívida antiga**
+(32 exports em 5 arquivos, que o plugin não acusa) em vez de exigir um refator
+que ninguém pediu: export solto NOVO fica vermelho.
+
+**Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (idempotente).
+**Bancadas novas:** `/preview-instagram?vazio=1&sugeridas=0` (o convite no
+vazio) · `?semcodigo=1` (o estado em que ele não aparece) · `?entao=1` (o
+lembrete, que implica `retro=0`).
