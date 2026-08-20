@@ -153,8 +153,14 @@ export const attributeReferral = createServerFn({ method: "POST" })
 
     // Credita a indicadora: 100 🌱 por amiga (dedupe pelo id da amiga), fora do
     // Modo Cuidado da indicadora. Best-effort — a atribuição já está fixada.
+    /* ⚠️ UMA leitura do Modo Cuidado da indicadora, e não três. Ela decide a
+       moeda, o push e o seguir — e este caminho roda no PRIMEIRO login de toda
+       conta nova. Ler a mesma linha três vezes seguidas é desperdício num
+       lugar em que ele custa a primeira impressão do app. */
+    const refEmCuidado = await isCareModeActive(supabaseAdmin, referrerId);
+
     try {
-      if (!(await isCareModeActive(supabaseAdmin, referrerId))) {
+      if (!refEmCuidado) {
         await grantSementinhas(typedDb(supabaseAdmin), referrerId, [
           {
             amount: REFERRAL_REWARD,
@@ -184,7 +190,7 @@ export const attributeReferral = createServerFn({ method: "POST" })
 
        Best-effort: a atribuição já está fixada e não depende disto. */
     try {
-      if (!(await isCareModeActive(supabaseAdmin, referrerId))) {
+      if (!refEmCuidado) {
         const { data: amiga } = await sb
           .from("patient_profiles")
           .select("display_name")
@@ -201,6 +207,47 @@ export const attributeReferral = createServerFn({ method: "POST" })
       }
     } catch (e) {
       console.error("[referral] push failed", e);
+    }
+
+    /* ─── ⚠️ E AS DUAS PASSAM A SE SEGUIR NA COMUNIDADE ──────────────────
+       A atribuição entregava a AMIZADE (Cantinho, dupla, presente, a camada
+       `amigas` do feed) e não entregava a única coisa que faz um feed existir:
+       ter alguém para ver. Na aba da Comunidade as duas continuavam invisíveis
+       uma para a outra, e a indicadora tinha de ir à BUSCA procurar pelo nome
+       da amiga que ela mesma acabou de trazer.
+
+       Seguir é estritamente MENOS que o vínculo recém-criado — a régua inteira
+       está em `seguir-apos-convite.ts`, com o portão de Modo Cuidado dentro.
+
+       Best-effort, como a moeda e o push: a atribuição já está fixada, e
+       derrubá-la por causa de duas linhas decorativas faria a amiga tentar de
+       novo e o `referred_by` já estar preenchido — ou seja, perder a indicação
+       de vez. */
+    try {
+      const { deveLigarNaRede, paresDoSeguir } = await import("@/lib/seguir-apos-convite");
+      if (
+        deveLigarNaRede({
+          indicadoraEmCuidado: refEmCuidado,
+          /* ⚠️ A recém-chegada também é conferida: a atribuição pode acontecer
+             semanas depois (o código fica 60 dias no navegador), e nesse meio
+             tempo ela pode ter ligado o Modo Cuidado. */
+          novaEmCuidado: await isCareModeActive(supabaseAdmin, uid),
+          mesmaPessoa: referrerId === uid,
+        })
+      ) {
+        for (const par of paresDoSeguir(referrerId, uid)) {
+          /* ⚠️ `insert` e não `upsert`: quem dedupa é o índice único do par, e
+             `23505` aqui é sucesso repetido — a amiga pode já seguir a
+             indicadora por conta própria. */
+          const { error } = await sb.from("rede_seguidores").insert(par);
+          if (error && (error as any).code !== "23505") {
+            console.warn("[referral] seguir não gravou", error);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[referral] seguir falhou", e);
     }
 
     return { ok: true as const, attributed: true };
