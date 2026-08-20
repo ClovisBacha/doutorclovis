@@ -29,6 +29,7 @@
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
  *   /preview-instagram?sugeridas=0  → o feed sem a zona de sugestões
  *   /preview-instagram?semcodigo=1  → o convite NÃO aparece (sem indicação)
+ *   /preview-instagram?oficial=0    → a fileira sem a conta oficial
  *   /preview-instagram?entao=1      → o lembrete do "então e agora"
  *   /preview-instagram?vazio=1      → o feed vazio, com o convite em destaque
  *   /preview-instagram?desafio=fora → o convite do desafio (ainda não entrou)
@@ -80,6 +81,8 @@ export const Route = createFileRoute("/preview-instagram")({
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     semcodigo: q.semcodigo == null ? false : !!q.semcodigo,
+    /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
+    oficial: q.oficial == null ? 1 : Number(q.oficial),
     entao: q.entao == null ? false : !!q.entao,
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
@@ -240,6 +243,7 @@ function Bancada() {
     meu,
     vazio,
     semcodigo,
+    oficial: oficialParam,
     entao,
     sugeridas,
     legendas,
@@ -326,6 +330,7 @@ function Bancada() {
 
   const semSugestoes = sugeridas === 0;
   const semCodigo = semcodigo;
+  const semOficial = oficialParam === 0;
   const semLegendas = legendas === 0;
   const semAmigasParaMarcar = amigas === 0;
   const comRascunho = rascunho !== 0;
@@ -384,6 +389,19 @@ function Bancada() {
   const [paginas, setPaginas] = useState(0);
 
   const GENTE: PessoaNaLista[] = [
+    {
+      /* ⚠️ A conta oficial do consultório, para o selo ser FOTOGRAFÁVEL: ele
+         só existe numa conta marcada no banco, e sem isto seria construído às
+         cegas — que é como uma tela passa meses sem ninguém nunca ter olhado.
+         `?oficial=0` mostra a fileira sem ele. */
+      id: "g0",
+      nome: "Obstétrica",
+      bio: "A conta do consultório",
+      avatarUrl: null,
+      sigo: null,
+      souEu: false,
+      oficial: !semOficial,
+    },
     {
       id: "g1",
       nome: "Ana Paula Ribeiro",

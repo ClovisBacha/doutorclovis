@@ -81,6 +81,7 @@ import {
 /* Import ESTÁTICO pela mesma razão: régua pura, sem servidor e sem DOM. */
 import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
 import type { Momento } from "@/lib/momento";
+import { SELO_OFICIAL } from "@/lib/conta-oficial";
 import { esquecerMomento, lerMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { momentoComoDataUrl } from "@/lib/share-card";
 import { hapticTap } from "@/lib/haptics";
@@ -1645,6 +1646,11 @@ function FileiraDePessoas({
               </button>
               <p className="line-clamp-2 text-center text-[13px] font-semibold leading-tight">
                 {p.nome}
+                {/* ⚠️ **DESENHADO, e não o emoji ✅.** Ele sai verde no Android,
+                    azul no iOS e como caixinha em parte dos aparelhos antigos —
+                    e este é o selo que diz "esta conta é do consultório". Mesma
+                    lição do 📞 preto no iOS. */}
+                {p.oficial && <SeloOficial />}
               </p>
               {p.bio && (
                 <p className="line-clamp-1 w-full text-center text-[11px] leading-tight text-muted-foreground">
@@ -4530,6 +4536,8 @@ export type PessoaNaLista = {
   avatarUrl: string | null;
   sigo: "ativo" | "pendente" | null;
   souEu: boolean;
+  /** A conta oficial do consultório — ver `conta-oficial.ts`. */
+  oficial?: boolean;
 };
 
 export function ListaDeGente({
@@ -7072,5 +7080,33 @@ export function TelaDaCaixinha({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * O selo da CONTA OFICIAL do consultório.
+ *
+ * ⚠️ Não confundir com o selo do OBSTETRA (em `quemReagiuAoPost`): aquele é
+ * resolvido pelo vínculo atual e só aparece na lista que a autora abre, para
+ * não contar a terceiros quem é a médica dela. Este identifica uma conta
+ * institucional, e é público por natureza. Ver `conta-oficial.ts`.
+ */
+function SeloOficial() {
+  return (
+    <svg
+      role="img"
+      aria-label={SELO_OFICIAL}
+      viewBox="0 0 24 24"
+      className="ml-1 inline-block h-[14px] w-[14px] align-[-2px]"
+      fill="currentColor"
+    >
+      <title>{SELO_OFICIAL}</title>
+      <path
+        className="text-primary"
+        fill="currentColor"
+        d="M12 1.5 14.4 4l3.4-.4.9 3.3 3 1.7-1.4 3.1 1.4 3.1-3 1.7-.9 3.3-3.4-.4L12 22.5 9.6 20l-3.4.4-.9-3.3-3-1.7L4.7 12 3.3 8.9l3-1.7.9-3.3 3.4.4L12 1.5Z"
+      />
+      <path d="m10.8 15.3-3-3 1.3-1.3 1.7 1.7 4.1-4.1 1.3 1.3-5.4 5.4Z" fill="#fff" />
+    </svg>
   );
 }

@@ -21,6 +21,7 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { trechoParaLike } from "@/lib/like-seguro";
+import { comOficialNoTopo, ehContaOficial } from "@/lib/conta-oficial";
 import { z } from "zod";
 import {
   aoSeguir,
@@ -461,7 +462,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
-  "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, " +
+  "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
 const COLUNAS_SEM_SELO =
@@ -2221,15 +2222,23 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
            número de elos NÃO viaja para o cliente — ele ordenou, e acabou. */
         sigo: null,
         souEu: false,
+        oficial: ehContaOficial(perfil as any),
       } satisfies PessoaNaLista;
     });
+
+    /* ⚠️ **A CONTA OFICIAL VEM FIXADA NO TOPO, e não ordenada junto.**
+       `ordenarPessoas` classifica por elos em comum, e a conta oficial não tem
+       elos com ninguém: ela cairia no fim exatamente na conta NOVA, que é a
+       única para quem ela importa — e resolver o dia um é o ponto inteiro
+       dela. A régua está em `conta-oficial.ts`. */
+    const oficial = pessoas.find((p) => p.oficial)?.id ?? null;
 
     return {
       ok: true as const,
       posts,
       /* Os ids que a tela precisa rotular "Sugerido para você". */
       sugeridos: posts.map((p) => p.id),
-      pessoas,
+      pessoas: comOficialNoTopo(pessoas, oficial),
     };
   });
 
@@ -2499,6 +2508,15 @@ export type PessoaNaLista = {
   /** Eu sigo esta pessoa? Para o botão da linha já nascer certo. */
   sigo: "ativo" | "pendente" | null;
   souEu: boolean;
+  /**
+   * É a conta oficial do consultório?
+   *
+   * ⚠️ **É o selo do CONSULTÓRIO, e não o do obstetra dela** — aquele é
+   * resolvido pelo vínculo ATUAL e só aparece na lista que a autora abre, para
+   * não contar a terceiros quem é a médica dela. Este identifica uma conta
+   * institucional, e é público por natureza. Ver `conta-oficial.ts`.
+   */
+  oficial?: boolean;
 };
 
 /**
@@ -2560,6 +2578,7 @@ export const listaDeGente = createServerFn({ method: "POST" })
           avatarUrl: p.avatar_url ?? null,
           sigo: ctx.sigo.has(id) ? ("ativo" as const) : null,
           souEu: id === eu,
+          oficial: ehContaOficial(p as any),
         };
       })
       .filter(Boolean) as PessoaNaLista[];
