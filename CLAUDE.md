@@ -5574,3 +5574,128 @@ As cinco ganharam tela:
 **Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (agora com
 `vitrine_publica`) e `supabase/APLICAR_CONTA_OFICIAL.sql`.
 **Bancada:** `/preview-rede` (a chave da vitrine e o endereço).
+
+## As dez ideias de conversão, em cinco fases (ago/2026)
+
+O dono aprovou as dez e pediu que fossem aplicadas "com perfeição". Uma delas
+(a #8) era decisão dele, e ele respondeu — desfazendo uma decisão minha.
+
+### Fase A · O dia um
+
+⚠️ **A VITRINE NÃO TINHA PRÉVIA, E A CAUSA ERA O `useEffect`.** WhatsApp,
+Instagram e Telegram **não rodam JavaScript** quando buscam o cartão de um
+link: pedem o HTML e leem as `<meta>` que vierem nele. `/p/<codigo>` buscava o
+perfil no cliente, então o robô recebia página vazia — no link que a criadora
+põe na bio, a única superfície de conversão que o app tem fora dele mesmo.
+Virou `loader` + `head({ loaderData })`.
+
+- ⚠️ **O MESMO CARTÃO PARA OS QUATRO SILÊNCIOS** (código inexistente, perfil
+  fechado, vitrine desligada, Modo Cuidado). Um cartão "perfil indisponível"
+  contaria, para quem colou o link no grupo da família, que ali existe alguém.
+- ⚠️ **A BIO E A FOTO NÃO ENTRAM.** A página é pública, mas o cartão é COPIADO
+  e fica no histórico de toda conversa em que o link for colado, muito depois
+  de ela desligar a chave.
+- ⚠️ **`noindex` não impede a prévia** — o robô do WhatsApp não é buscador. São
+  duas coisas diferentes, e a rota precisa das duas.
+
+**O rodapé da vitrine passou a dizer de quem ela é** — quem abriu veio por causa
+de UMA pessoa. ⚠️ Continua sem prometer "seguir": a página pública não tem esse
+botão. Sem nome, volta à frase antiga — nunca "Alguém está no Obstétrica".
+
+**O ritual de boas-vindas oferece a Comunidade.** O feed nasce vazio e o perfil
+nasce fechado; este é o único minuto em que ela está disposta a mexer nisso.
+⚠️ **Oferece e nunca liga sozinho** · ⚠️ **liga `perfil_publico`, NUNCA
+`vitrine_publica`** · ⚠️ **não segue ninguém por ela** (seguir é um gesto) ·
+⚠️ **nunca em Modo Cuidado**.
+
+⚠️ **E o texto da chave mudou de casa** (`chaves-do-perfil.ts`): ele é o
+CONSENTIMENTO e passou a ter duas portas. Há catraca cobrando que as duas telas
+leiam a constante.
+
+### Fase B · A conta oficial é uma conta como qualquer outra
+
+⚠️ **UMA DECISÃO MINHA FOI DESFEITA PELO DONO.** `conta-oficial.ts` abria
+dizendo "ela publica e é seguida; ela NÃO lê". Palavras dele:
+
+> "o que o médico vê não tem limitação diferente de qualquer pessoa que acessa
+> a plataforma, mesmo modelo do Instagram — existem perfil aberto e privado, e
+> isso vai da paciente."
+
+Ela publica E lê, e não ganha nada: perfil privado continua privado para ela, a
+camada `amigas` continua fora, Modo Cuidado a esconde como esconde de todo
+mundo, e **ela não tem porta a partir do painel** — o médico entra nela pelo
+`/auth`, como numa conta qualquer.
+
+⚠️ **O que mudou é o ALCANCE, nunca a RÉGUA.** Há catraca cobrando que
+`rede-social.ts` e `perfil-publico.ts` não conheçam `conta_oficial`.
+
+⚠️ **E o selo era montado e nunca desenhado onde importa** — existia só na
+fileira de sugeridas. No feed e no perfil ela lia como mais uma paciente
+chamada "Obstétrica". ⚠️ O selo é IRMÃO do nome, nunca filho do `truncate`.
+
+### Fase C · Medir
+
+**"Abriram o link"** virou `visitas_de_convite`, contador AGREGADO por (código,
+tipo, dia). ⚠️ **Sem IP, sem user agent, sem hora** — é contador de alcance, não
+rastreador: quem abre o link de uma gestante pode ser a chefe, a sogra ou o ex.
+⚠️ **Uma por sessão, com chave própria que guarda o CÓDIGO** (não um booleano):
+quem abre outro link na mesma sessão chegou por outro convite.
+
+⚠️ **E O DEGRAU É UMA JANELA enquanto os de baixo são de sempre.** Comparar "12
+visitas" com "380 contas desde o começo" daria taxa acima de 3.000% — e um
+painel com um número desses é um painel que ninguém volta a acreditar.
+`taxaDaJanela` sai PRONTA da régua; deixar a conta na tela é deixar a armadilha
+na tela.
+
+**"Quantas viram o post"** — o story tinha "visto por" e o post não tinha nada.
+⚠️ **SÓ O NÚMERO, NUNCA A LISTA**, e a diferença em relação ao story é
+deliberada: o story some em 24h; o post é permanente e pode ser um desabafo.
+Entregar QUEM leu produz "por que a fulana viu e não reagiu?".
+⚠️ **A tabela não tem policy nenhuma** — uma policy de LINHA daria a linha
+inteira com `quem_id` dentro, e **RLS não esconde coluna**.
+⚠️ **O recorte por autora acontece ANTES da consulta.** ⚠️ **`null` para as
+outras, e não `0`.** ⚠️ **Metade do cartão visível, e o observador desliga no
+primeiro cruzamento.**
+
+### Fase D · Recorrência
+
+**A live no topo do feed**, lendo `listLivesPublic`, que já recorta pelo médico
+dela. ⚠️ **A MAIS PRÓXIMA, e não `lives[0]`** — a lista vem em ordem
+DECRESCENTE. ⚠️ Sete dias de antecedência · ⚠️ a que acabou some sozinha (90 min
+supostos) · ⚠️ a que começou há dez minutos ENTRA, marcada como ao vivo.
+
+**O resumo semanal da rede**, no cron que já roda. A rede mandava UM push só (o
+pedido para seguir), e é deliberado — este é o canal do aviso de emergência.
+⚠️ **Duas publicações no mínimo** · ⚠️ **NÚMERO e nunca NOME** (o push chega na
+tela de bloqueio, e quem estiver ao lado lê) · ⚠️ **não cobra** · ⚠️ **duas
+consultas para a base inteira**, nunca uma por paciente.
+
+### Fase E · "Quem está numa fase parecida com a sua"
+
+⚠️ **POR FASE, E NUNCA POR DIAGNÓSTICO.** Fase é biografia; diagnóstico é
+prontuário — e um recorte "pré-eclâmpsia" é o fórum de conselho leigo que a
+decisão de não ter comentários existe para impedir.
+
+⚠️ **E NINGUÉM É ROTULADO — é a diferença entre um RECORTE e um GRUPO.** Um
+"grupo da reta final" com lista visível conta a fase de cada uma que está lá, e
+desfaz pela lateral a chave `mostrar_semana`. A fase é calculada no SERVIDOR e
+não viaja; `PessoaNaLista` não tem campo de fase, e o rótulo fala da fase DELA.
+
+⚠️ **LIGADO E SEM NINGUÉM PRECISOU DE SAÍDA**: `pessoas.length > 0` fechava a
+fileira inteira, levando junto o interruptor que a desligaria.
+
+### ⚠️ E eu previ um defeito no comentário e o escrevi assim mesmo
+
+O endereço da vitrine lia `window.location.origin` no RENDER, com um
+`typeof window === "undefined"` que eu achei que bastava. Não basta: o servidor
+renderiza `SITE` e o cliente renderiza `127.0.0.1:8080` na primeira passada, e o
+React descarta a árvore. O guarda evita o CRASH no servidor; não evita a
+DIVERGÊNCIA, porque as duas execuções são exatamente as que precisam concordar.
+Achado abrindo `/preview-rede` num navegador e lendo o console.
+
+**Aplicar no Supabase:** `APLICAR_REDE_SOCIAL.sql` (com `vitrine_publica`) ·
+`APLICAR_CONTA_OFICIAL.sql` · `APLICAR_VISITAS_DE_CONVITE.sql` ·
+`APLICAR_VISTAS_DO_POST.sql`.
+**Bancadas:** `/preview-rede` · `/preview-onboarding?passo=4` ·
+`/preview-instagram` (selo, vistas, live) · `?live=agora` · `?fase=1` ·
+`?fase=vazio`.

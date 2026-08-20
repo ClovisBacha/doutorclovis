@@ -138,13 +138,26 @@ export function ConfiguracoesDoPerfil({
   const [bio, setBio] = useState(bancada?.perfil?.bio ?? "");
   const [salvando, setSalvando] = useState(false);
 
-  /* ⚠️ `window.location.origin` só no NAVEGADOR — lido no render, ele quebraria
-     a hidratação (o servidor não tem `window`), que é o mesmo defeito que o
-     cartão de convite do feed já pagou. Sem ele, `SITE`. */
-  const enderecoDaVitrine = linkDaVitrine(
-    perfil?.codigoDaVitrine,
-    typeof window === "undefined" ? undefined : window.location.origin,
-  );
+  /**
+   * ⚠️ **EU PREVI ESTE DEFEITO NO COMENTÁRIO E O ESCREVI ASSIM MESMO.**
+   *
+   * A versão anterior lia `window.location.origin` DENTRO do render, com um
+   * `typeof window === "undefined"` achando que isso bastava. Não basta: o
+   * servidor renderiza `SITE` e o cliente renderiza `127.0.0.1:8080` na
+   * PRIMEIRA passada — textos diferentes, e o React descarta a árvore inteira
+   * ("Hydration failed because the server rendered text didn't match").
+   *
+   * O guarda de `typeof window` evita o CRASH no servidor; ele não evita a
+   * divergência, porque as duas execuções são exatamente as que precisam
+   * concordar. Quem resolve é o estado: nasce `undefined` (igual ao servidor) e
+   * vira a origem real depois da montagem.
+   *
+   * Achado abrindo `/preview-rede` num navegador e lendo o console — que é a
+   * lição que o laço da barra de baixo já custou uma vez.
+   */
+  const [origem, setOrigem] = useState<string | undefined>(undefined);
+  useEffect(() => setOrigem(window.location.origin), []);
+  const enderecoDaVitrine = linkDaVitrine(perfil?.codigoDaVitrine, origem);
 
   async function carregar() {
     if (bancada) return;
