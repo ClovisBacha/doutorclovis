@@ -103,3 +103,35 @@ export const quemConvidou = createServerFn({ method: "POST" })
       },
     };
   });
+
+/**
+ * O CÓDIGO QUE VAI NO RODAPÉ DAS PÁGINAS PÚBLICAS — a régua, num lugar só.
+ *
+ * As três páginas públicas (`/presente`, `/album`, `/acompanhar`) precisam da
+ * mesma decisão: mostrar o convite, e com o código DELA. Escrita em três
+ * lugares, ela divergiria no primeiro conserto — e a divergência apareceria
+ * como convite oferecido a quem está em luto, que é o pior desfecho possível.
+ *
+ * ⚠️ **Modo Cuidado devolve `null`.** As três páginas continuam de pé no luto —
+ * o álbum é a memória dela, e o acompanhante é a rede de apoio —, mas o convite
+ * fala de gestação em curso ("o app da gestação dela", "se você também está
+ * grávida"). Ele é a única coisa daquelas telas que precisa sumir.
+ *
+ * ⚠️ **E sem código não há convite.** Um link sem indicação é indistinguível de
+ * um bom para quem manda e para quem recebe; só o vínculo não acontece. Mesma
+ * decisão de `linkDeIndicacao` devolver `null`.
+ */
+export async function codigoParaConvite(sb: any, userId: string): Promise<string | null> {
+  try {
+    const { data } = await sb
+      .from("patient_profiles")
+      .select("referral_code, care_mode")
+      .eq("id", userId)
+      .maybeSingle();
+    if (!data || (data as any).care_mode) return null;
+    return codigoLimpo((data as any).referral_code);
+  } catch {
+    /* Sem o código, o rodapé não aparece — e é o certo. */
+    return null;
+  }
+}

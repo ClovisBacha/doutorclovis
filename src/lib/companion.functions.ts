@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { codigoParaConvite } from "@/lib/convite.functions";
 import { z } from "zod";
 
 const Schema = z.object({ token: z.string().min(8).max(64) });
@@ -70,7 +71,15 @@ export const getCompanionView = createServerFn({ method: "POST" })
       console.error("[companion] reward failed", e);
     }
 
-    return { ok: true as const, profile: profile as CompanionView };
+    return {
+      ok: true as const,
+      profile: profile as CompanionView,
+      /* ⚠️ O código dela, para o rodapé de convite — `null` em Modo Cuidado.
+         O painel do acompanhante continua de pé no luto (ele é a rede de apoio
+         dela, e o contato de emergência entra por aqui); o que some é só o
+         convite, que diz "se você também está grávida". Ver `codigoParaConvite`. */
+      codigoDeConvite: await codigoParaConvite(supabaseAdmin as any, invite.user_id as string),
+    };
   });
 
 /** Concede 100 🌱 à gestante quando o link do acompanhante é aberto (1x). */

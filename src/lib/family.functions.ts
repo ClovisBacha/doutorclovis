@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { codigoParaConvite } from "@/lib/convite.functions";
 import { z } from "zod";
 
 // ─── Album ────────────────────────────────────────────────────────────────────
@@ -132,6 +133,11 @@ export const getAlbumByToken = createServerFn({ method: "POST" })
     return {
       ok: true as const,
       posts: (await comUrlDeImagem(posts ?? [])) as AlbumPostPublico[],
+      /* ⚠️ O código dela, para o rodapé de convite — `null` em Modo Cuidado.
+         O ÁLBUM continua de pé no luto (as fotos são a memória do que houve, e
+         escondê-las seria o app apagar o bebê dela); o que some é só o convite,
+         que fala de gestação em curso. A régua está em `codigoParaConvite`. */
+      codigoDeConvite: await codigoParaConvite(supabaseAdmin as any, invite.user_id as string),
     };
   });
 

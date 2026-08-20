@@ -31,6 +31,7 @@
  *    família é o app tomando a decisão mais íntima que existe no lugar dela.
  */
 import { createServerFn } from "@tanstack/react-start";
+import { codigoLimpo } from "@/lib/quem-convidou";
 import { z } from "zod";
 import { faixaDe, metaDeFraldas, podeReservarFralda, TAMANHOS } from "@/lib/fraldas";
 import { podeReservarCotas } from "@/lib/cotas";
@@ -45,6 +46,14 @@ export type ListaPublica = {
   dataDoCha: string | null;
   aberta: boolean;
   itens: ItemDaLista[];
+  /**
+   * O código de indicação DELA, para o rodapé de convite — ou `null`.
+   *
+   * ⚠️ É o mesmo `referral_code` do convite pelo WhatsApp, então quem cria
+   * conta pela lista de presentes vira indicação dela e as 100 🌱 são pagas.
+   * `null` em Modo Cuidado e sem código; ver `codigoParaConvite`.
+   */
+  codigoDeConvite?: string | null;
 };
 
 /** O que a DONA recebe — com os nomes, porque é ela. */
@@ -84,7 +93,13 @@ async function listaViva(
 
   const { data: p } = await sb
     .from("patient_profiles")
-    .select("display_name, baby_name, care_mode")
+    /* ⚠️ `referral_code` entra AQUI, e não numa segunda consulta em
+       `listaPorToken`: o perfil já está sendo lido, e o `care_mode` logo abaixo
+       já é o portão do convite. Uma ida a mais ao banco por abertura de uma
+       página que trinta pessoas abrem seria puro desperdício — e obrigaria
+       `listaPorToken` a mencionar `user_id`, que é justamente o que a catraca
+       desta tela proíbe (ela nunca devolve o uuid dela). */
+    .select("display_name, baby_name, care_mode, referral_code")
     .eq("id", data.user_id)
     .maybeSingle();
   if (p?.care_mode) return null;
@@ -371,6 +386,12 @@ export const listaPorToken = createServerFn({ method: "POST" })
       dataDoCha: viva.row.data_do_cha ?? null,
       aberta: true,
       donaNome: (viva.perfil.display_name ?? "").trim() || "Ela",
+      /* ⚠️ O CÓDIGO DELA, para o rodapé de convite. `codigoParaConvite` já
+         devolve `null` em Modo Cuidado — e `listaViva` nem chegaria aqui nesse
+         caso, mas a régua fica num lugar só de propósito. */
+      /* ⚠️ `listaViva` já recusou a lista inteira em Modo Cuidado, então aqui
+         basta limpar o código. Ver `convite-do-app.ts`. */
+      codigoDeConvite: codigoLimpo(viva.perfil.referral_code),
       bebeNome: (viva.perfil.baby_name ?? "").trim() || null,
       itens,
     };

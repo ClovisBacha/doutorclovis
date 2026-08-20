@@ -13,6 +13,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ListaDePresentesPublica } from "@/components/lista-de-presentes-publica";
+import { ConviteDoApp } from "@/components/convite-do-app";
 import type { ListaPublica } from "@/lib/presentes.functions";
 
 export const Route = createFileRoute("/presente/$token")({
@@ -63,5 +64,14 @@ function Pagina() {
     );
   }
 
-  return <ListaDePresentesPublica token={token} lista={lista} />;
+  return (
+    <>
+      <ListaDePresentesPublica token={token} lista={lista} />
+      {/* ⚠️ DEPOIS da lista inteira, e nunca no meio — ver `convite-do-app.ts`.
+          A página é a festa dela; o convite é uma linha no pé. */}
+      <div className="mx-auto max-w-md px-4 pb-10">
+        <ConviteDoApp onde="presentes" codigo={lista.codigoDeConvite ?? null} />
+      </div>
+    </>
+  );
 }

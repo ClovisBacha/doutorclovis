@@ -97,12 +97,18 @@ export const Route = createFileRoute("/api/legenda-da-foto")({
              a foto do recém-nascido dela. */
           const BASE =
             "lmp_date, reference_date, reference_weeks, reference_days, birth_date, baby_name, care_mode";
+          /* ⚠️ **`id`, e NUNCA `user_id`.** `patient_profiles` tem a chave
+             primária `id`, que JÁ É o uuid de `auth.users` (a primeira
+             migration: `id UUID PRIMARY KEY REFERENCES auth.users(id)`). A
+             coluna `user_id` não existe — e como o recuo por coluna ausente
+             tenta a segunda leitura com o MESMO filtro errado, as duas
+             falhavam, `perfil` vinha `null` e o endpoint devolvia
+             `sugestoes: []` para TODA paciente. O botão "✨ Sugerir legenda"
+             nunca funcionou: ele dizia "não consegui pensar em nada" desde o
+             primeiro dia, e o `try/catch` fazia isso em silêncio.
+             `patient-profiles-por-id.test.ts` é a catraca. */
           const um = async (colunas: string) =>
-            await sb
-              .from("patient_profiles")
-              .select(colunas)
-              .eq("user_id", usuario.id)
-              .maybeSingle();
+            await sb.from("patient_profiles").select(colunas).eq("id", usuario.id).maybeSingle();
 
           /* ⚠️ RECUO POR COLUNA AUSENTE. `mostrar_semana`/`mostrar_bebe` nascem
              num `APLICAR_` que o dono roda À MÃO, depois do deploy — e o

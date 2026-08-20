@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCompanionView, type CompanionView as Profile } from "@/lib/companion.functions";
+import { ConviteDoApp } from "@/components/convite-do-app";
 import {
   babyForWeek,
   computeGestation,
@@ -99,6 +100,8 @@ type PapaiTab = "bebe" | "apoiar" | "tarefas" | "parto";
 function CompanionView() {
   const { token } = Route.useParams();
   const [profile, setProfile] = useState<Profile | null>(null);
+  /** O código dela, para o rodapé de convite. `null` em Modo Cuidado. */
+  const [codigoDeConvite, setCodigoDeConvite] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<PapaiTab>("bebe");
@@ -122,6 +125,7 @@ function CompanionView() {
           return;
         }
         setProfile(res.profile);
+        setCodigoDeConvite(res.codigoDeConvite ?? null);
       } catch {
         // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
         setErr("Não foi possível carregar. Verifique a conexão e recarregue.");
@@ -406,6 +410,13 @@ function CompanionView() {
             </div>
           </div>
         )}
+      </div>
+
+      {/* ⚠️ DEPOIS de tudo, no pé — ver `convite-do-app.ts`. Este painel é a
+          ferramenta de quem cuida dela, e o convite é uma linha discreta no
+          fim, nunca um bloco no meio do que ele veio ler. */}
+      <div className="mx-auto max-w-md px-1">
+        <ConviteDoApp onde="acompanhante" codigo={codigoDeConvite} />
       </div>
 
       <p className="mt-10 text-center text-xs text-muted-foreground">
