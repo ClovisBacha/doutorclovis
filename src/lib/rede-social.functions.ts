@@ -112,6 +112,14 @@ export type PostNaTela = {
    */
   comparacao: { antes: string; agora: string } | null;
   /**
+   * Quando a legenda foi editada, ou `null`.
+   *
+   * ⚠️ **É o SELO, não o histórico.** A tela precisa dizer "editado" — sem
+   * isso, corrigir o texto vira reescrita silenciosa da história, e quem reagiu
+   * ao que estava escrito antes não tem como saber que mudou.
+   */
+  editadoEm: string | null;
+  /**
    * A pergunta anônima que este post responde, ou `null`.
    *
    * ⚠️ **Ela viaja com o POST, e não só na caixinha dela.** O post vai para o
@@ -377,7 +385,7 @@ async function perfisPorId(sb: any, ids: string[]) {
  */
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
-  "enquete_opcoes, aula, pergunta, comparacao_de";
+  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -413,6 +421,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     aula: null,
     pergunta: null,
     comparacao_de: null,
+    editado_em: null,
   }));
 }
 
@@ -818,6 +827,7 @@ async function montarPosts(
         minhaReacao: minhas.get(p.id) ?? null,
         souAAutora: p.autor_id === eu,
         comparacao: comparacoes.get(p.id) ?? null,
+        editadoEm: p.editado_em ?? null,
         marcadas: marcadas.get(p.id) ?? [],
         souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
         salvo: salvos.has(p.id),
@@ -1722,6 +1732,89 @@ export const amigasParaMarcar = createServerFn({ method: "POST" })
     } catch {
       return { ok: true as const, amigas: [] };
     }
+  });
+
+/**
+ * EDITAR A LEGENDA DE UM POST JÁ PUBLICADO.
+ *
+ * Hoje o único conserto de um erro de digitação era apagar o post e perder as
+ * reações — e é a falta mais básica que restava na aba.
+ *
+ * ⚠️ **A RÉGUA CLÍNICA RODA AQUI, e é a razão de esta função existir por
+ * inteiro em vez de um `update` na tela.** Sem ela, editar seria a PORTA DOS
+ * FUNDOS de `publicarPost`: bastava publicar "que fofo" e depois trocar por
+ * "não precisa ir ao pronto-socorro" para o texto proibido entrar no feed sem
+ * passar por nada. É o mesmo texto, o mesmo alcance e o mesmo nome de
+ * consultório em volta.
+ *
+ * ⚠️ **`.eq("autor_id", eu)` é o portão**, como em `apagarPost`: o `postId` vem
+ * do cliente, e sem ele qualquer uuid reescreveria a legenda de qualquer
+ * paciente da plataforma.
+ *
+ * ⚠️ **Só o TEXTO muda.** Foto, enquete, visibilidade, marcações e comparação
+ * ficam como estavam — editar a camada de quem vê depois de o post ter sido
+ * lido não desfaz a leitura, e trocar a foto faria as reações apontarem para
+ * uma imagem que ninguém viu.
+ *
+ * ⚠️ **Modo Cuidado NÃO impede editar.** Ele impede PUBLICAR; quem entrou em
+ * luto e quer corrigir ou esvaziar o que escreveu antes precisa poder — barrar
+ * aqui a deixaria presa ao texto de quando estava grávida.
+ */
+export const editarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const texto = data.texto?.trim() || null;
+
+    /* A régua clínica, a MESMA de `publicarPost` — ver o cabeçalho. */
+    const { triarTexto } = await import("@/lib/pergunta-clinica");
+    const desfecho = triarTexto(texto ?? "");
+    if (desfecho !== "publicavel") {
+      return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
+    }
+
+    /* ⚠️ **UM POST NÃO PODE FICAR VAZIO PELA EDIÇÃO.** `postEhValido` recusa
+       texto vazio sem imagem; apagar a legenda de um post que é só texto
+       deixaria uma linha no feed sem nada dentro. Quem quer tirar o post do ar
+       usa arquivar, que é a porta certa e reversível. */
+    const { data: antes } = await sb
+      .from("rede_posts")
+      .select("imagem_path, enquete_opcoes")
+      .eq("id", data.postId)
+      .eq("autor_id", eu)
+      .maybeSingle();
+    if (!antes) return { ok: false as const, motivo: "nao_e_seu" as const };
+    const temEnquete = (((antes as any).enquete_opcoes ?? []) as string[]).length > 0;
+    if (!temEnquete && !postEhValido({ texto, temImagem: !!(antes as any).imagem_path })) {
+      return { ok: false as const, motivo: "vazio" as const };
+    }
+
+    const gravar = async (campos: Record<string, unknown>) =>
+      await sb.from("rede_posts").update(campos).eq("id", data.postId).eq("autor_id", eu);
+
+    let r = await gravar({ texto, editado_em: new Date().toISOString() });
+    /* ⚠️ Recuo por coluna ausente: `editado_em` nasce num APLICAR_ que o dono
+       roda à mão. Sem ele, editar pararia de funcionar inteiro por causa do
+       SELO — e o selo é o acessório, não a edição. */
+    if (r.error) {
+      console.warn("[rede] sem editado_em — rode APLICAR_REDE_SOCIAL.sql");
+      r = await gravar({ texto });
+    }
+    if (r.error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
   });
 
 export const apagarPost = createServerFn({ method: "POST" })

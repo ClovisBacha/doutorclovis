@@ -248,6 +248,31 @@ function CoracaoDoToque() {
  * tela inteira existe para fazer alguém tocar. Contorno desenhado: mesma
  * espessura do marcador de salvar, ao lado do qual ele vive.
  */
+/**
+ * O LÁPIS de editar — desenhado, nunca ✏️.
+ *
+ * ⚠️ A mesma lição do 📞 preto no iOS, do 📅 com data dentro do glifo e do 🤍
+ * cinza no Android: emoji é um caractere que cada fabricante desenha do jeito
+ * dele, e este vive na mesma linha que o ⋯, que é um traço da cor do texto. Um
+ * lápis amarelo-e-marrom ao lado dele lê como adesivo colado ali.
+ */
+function IconeLapis() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L8.5 17.5 4 19l1.5-4.5z" />
+    </svg>
+  );
+}
+
 function CoracaoVazio() {
   return (
     <svg
@@ -457,6 +482,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoVotar,
   aoTirarMarcacao,
   aoVerQuemReagiu,
+  aoEditar,
   sugerido = false,
 }: {
   post: PostNaTela;
@@ -480,6 +506,13 @@ export const PostInstagram = memo(function PostInstagram({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação. Só aparece quando `post.souMarcada`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /**
+   * Salvar a legenda editada. Devolve `true` quando gravou.
+   *
+   * ⚠️ Devolve BOOLEANO porque a régua clínica pode recusar: o campo só fecha
+   * quando gravou, senão o texto dela sumiria junto com a recusa.
+   */
+  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
   /** Ver quem reagiu. Só no post DELA — ver a nota na linha de ações. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** Veio do algoritmo, não de quem ela segue. */
@@ -487,6 +520,9 @@ export const PostInstagram = memo(function PostInstagram({
 }) {
   const [escolhendo, setEscolhendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  /** `null` = não está editando. String = o texto em edição. */
+  const [editando, setEditando] = useState<string | null>(null);
+  const [salvandoTexto, setSalvandoTexto] = useState(false);
   const total = totalDeReacoes(post.reacoes);
   /* Post antigo (anterior ao carrossel) tem `imagens` vazio e só
      `imagemUrl` — o recuo faz os dois terem a mesma forma aqui. */
@@ -529,6 +565,20 @@ export const PostInstagram = memo(function PostInstagram({
             outra pessoa. No modelo ele abre um menu com oito itens; aqui é uma
             só de cada lado, e um menu de um item é um botão com uma etapa a
             mais. */}
+        {/* ✏️ Editar — só no post DELA, e separado do ⋯: apagar/denunciar são
+            ações de fim de linha, editar é conserto. Misturar as três faria a
+            mais frequente (corrigir uma vírgula) ficar atrás de um menu que
+            existe para as outras duas. */}
+        {post.souAAutora && aoEditar && (
+          <button
+            type="button"
+            onClick={() => setEditando(post.texto ?? "")}
+            aria-label="Editar a legenda"
+            className="press grid h-11 w-9 shrink-0 place-items-center text-muted-foreground"
+          >
+            <IconeLapis />
+          </button>
+        )}
         {((post.souAAutora && aoApagar) ||
           (!post.souAAutora && aoDenunciar) ||
           (post.souMarcada && aoTirarMarcacao)) && (
@@ -536,7 +586,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => setConfirmando(true)}
             aria-label="Opções da publicação"
-            className="press shrink-0 px-1 text-lg leading-none text-muted-foreground"
+            className="press grid h-11 w-9 shrink-0 place-items-center text-lg leading-none text-muted-foreground"
           >
             ⋯
           </button>
@@ -561,6 +611,47 @@ export const PostInstagram = memo(function PostInstagram({
           >
             Tirar minha marcação
           </button>
+        </div>
+      )}
+
+      {/* ⚠️ EDITA NO LUGAR, e não numa tela nova. Sair do feed para corrigir uma
+          vírgula perde o contexto do que ela estava lendo — e o post inteiro
+          continua à vista enquanto ela escreve. */}
+      {editando !== null && (
+        <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/30 p-3">
+          <textarea
+            value={editando}
+            onChange={(e) => setEditando(e.target.value.slice(0, LIMITE_DO_TEXTO))}
+            rows={3}
+            autoFocus
+            aria-label="Legenda"
+            className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-[14px] leading-snug"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setEditando(null)}
+              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={salvandoTexto}
+              onClick={async () => {
+                setSalvandoTexto(true);
+                const ok = await aoEditar?.(post, editando);
+                setSalvandoTexto(false);
+                /* ⚠️ Só fecha se GRAVOU. Fechando de qualquer jeito, uma recusa
+                   da régua clínica sumiria com o texto que ela escreveu — e ela
+                   não teria como ler o recado nem tentar de novo. */
+                if (ok) setEditando(null);
+              }}
+              className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-60"
+            >
+              {salvandoTexto ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
         </div>
       )}
 
@@ -883,6 +974,11 @@ export const PostInstagram = memo(function PostInstagram({
           em português a versão em caixa alta lê pior que em inglês. */}
       <p className="px-4 pt-1 text-[11px] text-muted-foreground">
         {haQuantoPublicou(post.criadoEm, Date.now())}
+        {/* ⚠️ O selo existe para quem LÊ, não para quem escreveu: sem ele,
+            corrigir o texto vira reescrita silenciosa da história, e quem
+            reagiu ao que estava escrito antes não tem como saber que mudou.
+            Discreto de propósito — é uma nota de rodapé, não uma acusação. */}
+        {post.editadoEm && <span className="opacity-70"> · editado</span>}
       </p>
     </article>
   );
@@ -971,6 +1067,7 @@ export function TelaPrincipal({
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
+  aoEditar,
   aoVerQuemReagiu,
   retro,
   aoFecharRetro,
@@ -1004,6 +1101,8 @@ export function TelaPrincipal({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /** Salvar a legenda editada — ver `PostInstagram`. */
+  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
@@ -1105,6 +1204,7 @@ export function TelaPrincipal({
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
             aoTirarMarcacao={aoTirarMarcacao}
+            aoEditar={aoEditar}
             aoVerQuemReagiu={aoVerQuemReagiu}
             aoAbrirPerfil={aoAbrirPerfil}
           />
@@ -1149,6 +1249,7 @@ export function TelaPrincipal({
                   aoSalvar={aoSalvar}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
+                  aoEditar={aoEditar}
                   aoVerQuemReagiu={aoVerQuemReagiu}
                   aoAbrirPerfil={aoAbrirPerfil}
                 />
@@ -1926,6 +2027,7 @@ export function RedeNoApp({
     apagar: (_p: PostNaTela) => {},
     denunciar: (_p: PostNaTela) => {},
     tirarMarcacao: (_p: PostNaTela) => {},
+    editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
   });
@@ -1936,6 +2038,7 @@ export function RedeNoApp({
     apagar: (p) => void apagar(p),
     denunciar: (p) => void denunciarPost(p),
     tirarMarcacao: (p) => void tirarMarcacao(p),
+    editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
   };
@@ -1947,6 +2050,7 @@ export function RedeNoApp({
       apagar: (p: PostNaTela) => ultimas.current.apagar(p),
       denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
+      editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
     }),
@@ -2198,6 +2302,47 @@ export function RedeNoApp({
       await tirarMinhaMarcacao({ data: { accessToken: t, postId: post.id } });
     } catch {
       void carregarFeed();
+    }
+  }
+
+  /**
+   * Salvar a legenda editada.
+   *
+   * ⚠️ **Devolve BOOLEANO e mostra o recado da régua clínica.** Sem o recado,
+   * quem escreveu "não precisa ir ao pronto-socorro" recebe um "não deu" mudo,
+   * reescreve a mesma frase e tenta de novo para sempre — o mesmo defeito que
+   * `publicar` já tinha resolvido. O texto vem do SERVIDOR: decidir aqui por
+   * que foi recusado seria uma segunda régua clínica no navegador.
+   */
+  async function editarLegenda(post: PostNaTela, texto: string): Promise<boolean> {
+    try {
+      const t = await token();
+      if (!t) return false;
+      const { editarPost } = await import("@/lib/rede-social.functions");
+      const r = await editarPost({ data: { accessToken: t, postId: post.id, texto } });
+      if (!r.ok) {
+        const { toast } = await import("sonner");
+        if ("recado" in r && r.recado) toast.error(r.recado, { duration: 7000 });
+        else if (r.motivo === "vazio")
+          toast.error("A legenda não pode ficar vazia. Para tirar do ar, use arquivar.");
+        else toast.error("Não deu para salvar. Tente de novo.");
+        return false;
+      }
+      /* Otimista DEPOIS de gravar: o selo "editado" aparece junto com o texto
+         novo, e não antes — senão o post diria "editado" sobre a legenda velha
+         numa falha de rede. */
+      const limpo = texto.trim() || null;
+      const aplicar = (ps: PostNaTela[]) =>
+        ps.map((x) =>
+          x.id === post.id ? { ...x, texto: limpo, editadoEm: new Date().toISOString() } : x,
+        );
+      setPosts(aplicar);
+      setDoPerfil(aplicar);
+      setSugestoes(aplicar);
+      setOPost((x) => (x ? aplicar([x])[0] : x));
+      return true;
+    } catch {
+      return false;
     }
   }
 
@@ -3269,6 +3414,7 @@ export function RedeNoApp({
         aoApagar={acoes.apagar}
         aoDenunciar={acoes.denunciar}
         aoTirarMarcacao={acoes.tirarMarcacao}
+        aoEditar={acoes.editar}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPerfil={abrirPerfil}
       />
@@ -3750,6 +3896,7 @@ export function TelaDoPost({
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
+  aoEditar,
   aoVerQuemReagiu,
   aoVoltar,
   aoAbrirPerfil,
@@ -3764,6 +3911,8 @@ export function TelaDoPost({
   aoVotar?: (post: PostNaTela, opcao: number) => void;
   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
   aoTirarMarcacao?: (post: PostNaTela) => void;
+  /** Salvar a legenda editada — ver `PostInstagram`. */
+  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
@@ -3793,6 +3942,7 @@ export function TelaDoPost({
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
         aoTirarMarcacao={aoTirarMarcacao}
+        aoEditar={aoEditar}
         aoVerQuemReagiu={aoVerQuemReagiu}
         aoAbrirPerfil={aoAbrirPerfil}
       />

@@ -186,6 +186,8 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* O post 2 (o carrossel de três) vira a comparação: é ele que prova os dois
      carimbos sobre as duas primeiras fotos. */
   comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
+  /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
+  editadoEm: i === 0 ? atras(20) : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
      apagado dos outros. Com todos apagados não haveria contraste. */
   salvo: i === 1,
@@ -322,6 +324,8 @@ function Bancada() {
   const semComparar = comparar === 0;
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
+  /** As legendas editadas na bancada. */
+  const [edicoes, setEdicoes] = useState<Record<string, string>>({});
   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
      A produção passa referências FIXAS (`acoes`, em `RedeNoApp`), porque o
      cartão é `memo`. Uma bancada que passasse fecho novo a cada pintura mediria
@@ -338,6 +342,13 @@ function Bancada() {
       apagar: (_p: PostNaTela) => alert("apagaria"),
       denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
       tirarMarcacao: (p: PostNaTela) => alert(`tiraria minha marcação do post ${p.id}`),
+      /* ⚠️ A bancada GRAVA a edição no estado, e não num alert: o que precisa
+         ser olhado é o texto trocando e o selo "editado" nascendo — com um
+         alert, a tela nunca mostraria nem um nem outro. */
+      editar: async (p: PostNaTela, t: string) => {
+        setEdicoes((m) => ({ ...m, [p.id]: t }));
+        return true;
+      },
       /* ⚠️ A folha abre com DADO fabricado: quem reagiu só existe numa conta com
          reações de verdade, e é justamente a folha que precisa ser olhada. */
       verQuemReagiu: () => setVendoQuemReagiu(true),
@@ -345,7 +356,11 @@ function Bancada() {
     [],
   );
   const comReacoes = (ps: PostNaTela[]) =>
-    ps.map((p) => {
+    ps.map((p0) => {
+      const p =
+        p0.id in edicoes
+          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date().toISOString() }
+          : p0;
       if (!(p.id in reacoes)) return p;
       const nova = reacoes[p.id];
       const c = { ...p.reacoes };
@@ -796,6 +811,7 @@ function Bancada() {
              tinha denúncia e o canal com mais alcance não tinha. */
           aoDenunciar={acoesDaBancada.denunciar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
+          aoEditar={acoesDaBancada.editar}
           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
           /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
              bancada, olhá-lo exigiria esperar o domingo certo com uma conta que

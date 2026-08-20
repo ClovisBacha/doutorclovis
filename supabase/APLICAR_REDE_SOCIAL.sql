@@ -334,6 +334,19 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
 -- ela publique.
 -- ═════════════════════════════════════════════════════════════════════════════
 -- ─────────────────────────────────────────────────────────────────────────────
+-- EDITAR A LEGENDA DEPOIS DE PUBLICAR (ago/2026)
+--
+-- ⚠️ A coluna é o SELO, não o histórico. Ela existe para a tela poder dizer
+-- "editado" — sem isso, corrigir uma vírgula vira reescrita silenciosa da
+-- história, e quem reagiu ao texto antigo não tem como saber que ele mudou.
+--
+-- ⚠️ E NÃO guardamos a versão anterior. Guardar o texto antigo de um post sobre
+-- gestação criaria um arquivo de coisas que ela decidiu tirar do ar — o
+-- oposto do que editar significa.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.rede_posts ADD COLUMN IF NOT EXISTS editado_em timestamptz;
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- "ENTÃO E AGORA" (ago/2026 — ideia 2)
 --
 -- ⚠️ GUARDA SÓ QUAL POST É O "ENTÃO". As duas semanas são DERIVADAS na leitura,

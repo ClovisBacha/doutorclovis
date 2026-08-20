@@ -267,6 +267,59 @@ describe("o que é dela", () => {
   });
 });
 
+describe("editar a legenda", () => {
+  /* ⚠️ O TESTE QUE JUSTIFICA A FUNÇÃO EXISTIR.
+     Sem a régua clínica aqui, editar seria a PORTA DOS FUNDOS de
+     `publicarPost`: bastava publicar "que fofo" e trocar depois por "não
+     precisa ir ao pronto-socorro" para o texto proibido entrar no feed sem
+     passar por nada — mesmo alcance, mesmo nome de consultório em volta. */
+  test("⚠️ a régua clínica roda no texto NOVO, e RECUSA antes de gravar", () => {
+    const c = corpoDe("editarPost");
+    const limpo = c.replace(/\s+/g, " ");
+    expect(limpo).toContain('await import("@/lib/pergunta-clinica")');
+    expect(limpo).toContain('triarTexto(texto ?? "")');
+    /* A recusa acontece ANTES de qualquer `.update(` — é isso que impede o
+       texto de entrar. Comparar posições e não só existência: com o `triarTexto`
+       depois do update, as duas strings continuariam no arquivo. */
+    const ondeTria = limpo.indexOf("triarTexto(");
+    const ondeGrava = limpo.indexOf(".update(");
+    expect(ondeTria).toBeGreaterThan(-1);
+    expect(ondeGrava).toBeGreaterThan(-1);
+    expect(ondeTria).toBeLessThan(ondeGrava);
+    expect(limpo).toContain('desfecho !== "publicavel"');
+    expect(limpo).toContain("recadoDeConteudo(desfecho)");
+  });
+
+  /* ⚠️ O `postId` vem do cliente. Sem o portão, qualquer uuid reescreveria a
+     legenda de qualquer paciente da plataforma. */
+  test("⚠️ só a AUTORA edita — nas duas consultas", () => {
+    const c = corpoDe("editarPost").replace(/\s+/g, " ");
+    /* Uma vez na leitura de conferência, outra no update. */
+    expect((c.match(/\.eq\("autor_id", eu\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
+  });
+
+  /* ⚠️ Apagar a legenda de um post que é só texto deixaria uma linha no feed
+     sem nada dentro. Quem quer tirar do ar usa arquivar, que é reversível. */
+  test("⚠️ um post não pode ficar vazio pela edição", () => {
+    const c = corpoDe("editarPost").replace(/\s+/g, " ");
+    expect(c).toContain("postEhValido({");
+    expect(c).toContain('motivo: "vazio"');
+  });
+
+  /* ⚠️ Foto, enquete, visibilidade, marcações e comparação NÃO mudam: editar a
+     camada de quem vê depois de o post ter sido lido não desfaz a leitura, e
+     trocar a foto faria as reações apontarem para uma imagem que ninguém viu. */
+  test("⚠️ só o TEXTO muda", () => {
+    const c = corpoDe("editarPost");
+    for (const proibido of ["visibilidade:", "imagem_path:", "enquete_opcoes:", "comparacao_de:"]) {
+      /* O `select` de conferência pode citar as colunas; o que não pode é
+         gravá-las. Por isso a busca é pelo trecho do `update`. */
+      const gravacao = c.slice(c.indexOf("const gravar ="));
+      expect(gravacao).not.toContain(proibido);
+    }
+  });
+});
+
 describe("higiene", () => {
   test('nenhum `select("*")`', () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
