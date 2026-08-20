@@ -5448,3 +5448,129 @@ porque quase toda outra tabela tem mesmo `user_id`.
 de criar a conta está escrito nele).
 **Bancadas novas:** `/preview-convite` · `/preview-momento?tudo=1` (`?luto=1`,
 `?semcodigo=1`) · `/preview-instagram?oficial=0`.
+
+## A auditoria de 28 agentes, e os onze defeitos desta leva (ago/2026)
+
+Quatro lentes adversariais sobre os nove pontos de conversão (vazamento ·
+ponta a ponta · testes que mentem · produto e luto), mais uma fase de
+refutação. 41 achados brutos. **Todos falhavam em silêncio, com 3.741 testes
+verdes e `tsc` limpo.**
+
+### ⚠️ O CONSENTIMENTO DIZIA "NO APP" E A PÁGINA ABRIA NA INTERNET
+
+A tela onde ela liga o perfil público diz "qualquer pessoa **no app** pode te
+achar". `/p/<codigo>` não é no app: abre sem conta nenhuma, com bio, selo da
+semana, nome do bebê e doze fotos. Autorizar isso com a chave de dentro é
+alargar, pela porta dos fundos, um consentimento dado para outra coisa — o
+oposto exato de "não podemos expor a paciente sem ela saber".
+
+- **`vitrine_publica` é chave PRÓPRIA**, nasce falsa, e a tela dela diz que o
+  endereço abre fora do app. Mesma lei de `mostrar_semana`/`mostrar_bebe`.
+- ⚠️ **As DUAS precisam estar ligadas.** A vitrine sozinha não vale: desligar
+  "perfil público" tem de continuar fechando o perfil em todo lugar.
+- **E o ENDEREÇO ficou à vista, ligado ou não.** Ele era a única coisa que o
+  app não contava a ninguém: a página existia e nenhuma tela dizia onde. Uma
+  vitrine que a dona não sabe achar não é vitrine. `linkDaVitrine`
+  (`perfil-publico.ts`) é o único lugar que monta `/p/`.
+
+### ⚠️ `conta_oficial` APAGARIA O SELO E A CAIXINHA DA REDE INTEIRA
+
+Ela entrou em `COLUNAS_DO_PERFIL` num `APLICAR_` **separado** do das colunas
+do selo. Existe portanto um banco real — o do dono agora — que TEM
+`mostrar_semana`/`mostrar_bebe`/`aceita_perguntas` e ainda NÃO tem
+`conta_oficial`: com um recuo só, ele caía direto no degrau de baixo e a rede
+inteira perdia os dois selos e a caixinha. Três recursos já ligados, apagados
+em silêncio por uma coluna que ele nem sabia que existia.
+
+**O recuo virou um degrau POR COLUNA** — a mesma lição de
+`marcarConsultaNoDia`, que precisou de um recuo para `patient_user_id` e outro
+para `duration_minutes`. E `COLUNAS_SEM_OFICIAL` é DERIVADA da lista cheia:
+duas listas à mão divergem no primeiro ajuste, e aqui a divergência aparece
+como recurso sumindo.
+
+### ⚠️ E A CONTA OFICIAL NUNCA CHEGAVA AO TOPO
+
+Duas causas somadas: `conta_oficial` não estava no select das candidatas
+(então `ehContaOficial` era sempre falso), e a busca acontecia **depois** do
+corte de `PESSOAS_SUGERIDAS` — e a conta oficial cai no fim do ranking por não
+ter elo com ninguém, ou seja, era a primeira a ser cortada. `comOficialNoTopo`
+virava no-op silencioso: o recurso inteiro do dia um não existia.
+
+⚠️ **E o teste do servidor cobrava `pessoas.find((p) => p.oficial)`** — ele
+travava o defeito no lugar, verde, porque descrevia o CÓDIGO em vez do que o
+código precisa fazer. A régua virou `fileiraComOficial`, pura e testada por
+comportamento.
+
+⚠️ **O select das candidatas tem recuo PRÓPRIO**: ele não herda o de
+`perfisPorId`, e sem recuo a zona de sugestões inteira sumiria num banco sem a
+coluna — nem publicações, nem fileira de pessoas, nem o convite do fim do feed.
+
+### Os outros seis
+
+- **A foto de quem convidou quebrava no 8º dia** (URL assinada não renovada),
+  na faixa da landing e na vitrine pública. O comentário dizia "já é data URL
+  no banco" — verdade até o editor de perfil passar a subir para o balde.
+  ⚠️ Comentário desatualizado é a forma mais barata de um defeito sobreviver a
+  uma revisão.
+- **O funil media duas coisas que o rótulo não prometia**: contava post
+  ARQUIVADO como "publicaram" e pedido PENDENTE como "seguem alguém" — e este
+  último passou a medir a escrita do PRÓPRIO app (P3 grava o seguir na
+  atribuição), então daria ~100% para sempre. Conta a partir do SEGUNDO seguir
+  (`SEGUIR_AUTOMATICO`).
+- ⚠️ **E o degrau de cima somava `porAmiga + porCriadora`**, contando duas
+  vezes quem tem os dois campos (entrou pelo link de uma amiga e digitou depois
+  o código de uma embaixadora) — **inflando o denominador de todas as taxas
+  abaixo**. `chegaram` é contagem própria, com `OR`.
+- ⚠️ **Código de criadora com hífen não mostrava faixa nenhuma.** A captura de
+  `?ref=` aceita `[a-zA-Z0-9_-]{3,24}`, guarda 90 dias, atribui a assinatura e
+  paga a comissão — e a faixa usava a régua ESTREITA da paciente
+  (`[A-Z0-9]{3,12}`). `DRA-ANA` funcionava de ponta a ponta na economia e a
+  faixa não aparecia, no link que ela pôs na bio para trinta mil pessoas.
+  São duas formas: `codigoDeCriadoraLimpo` é a MESMA da captura, e há teste
+  comparando as duas regex.
+- ⚠️ **O auto-seguir do convite ressuscitava o vínculo que `bloquear` desfaz**
+  de propósito, sem aviso, porque o bloqueio é calado. A leitura falha
+  FECHADA (erro vale "bloqueada").
+- **`/votar-nome` mostrava o rodapé do ÁLBUM** para quem tinha acabado de votar
+  num nome e nunca viu foto nenhuma. Ganhou variante `nome`, e há catraca
+  cobrando que cada rota pública use a variante dela.
+
+### ⚠️ CINCO DAS OITO ESPÉCIES DE MOMENTO NÃO TINHAM CHAMADOR
+
+Régua testada, cartão pronto, e a paciente sem porta nenhuma: **semana ·
+conquista · marco de gratidão · página do álbum · aula**. O pedido era "um
+mapeamento de TUDO que existe no aplicativo e que a gente pode usar pra ser
+compartilhável" — cinco oitavos não entregues, sem nada quebrado para mostrar.
+Mesma família do `escadaDeTrofeus` com zero chamadores.
+
+As cinco ganharam tela:
+
+| espécie          | onde                                          |
+| ---------------- | --------------------------------------------- |
+| `semana`         | marco de nova semana **e** o hero da aba Bebê |
+| `conquista`      | folha que abre no RESGATE (nunca no estado)   |
+| `marco_gratidao` | tela de guardado, **só** no marco             |
+| `album_semana`   | pé da página do álbum da semana               |
+| `aula`           | resultado do quiz — leva o TEMA, nunca o dia  |
+
+- ⚠️ **O marco da semana tinha caminho próprio** (`shareMilestoneCard` direto),
+  que não conhecia a Comunidade nem o convite e não passava pelo portão de
+  `momentoDe`. Virou o mesmo componente das outras sete — o desenho é idêntico
+  (chapéu, fruta, número gigante, unidade), e o que ele ganha é a segunda saída.
+- ⚠️ **A aula leva o TEMA, nunca o dia nem a nota**: o dia gestacional é a
+  semana disfarçada, e a nota seria o placar público que a aba das Amigas
+  gastou um arquivo inteiro para não ter.
+- ⚠️ **A conquista nasce do RESGATE, nunca do estado da grade** — com o estado,
+  a folha abriria toda vez que ela viesse olhar as conquistas que já tem. Mesma
+  distinção que faz os sprites do Caminho nascerem da TRANSIÇÃO.
+- ⚠️ **A gratidão só compartilha NO MARCO**, e o cartão leva o NÚMERO: um botão
+  em toda gratidão guardada transformaria o exercício mais íntimo do app numa
+  cobrança diária de publicar, e o texto dela nunca vai junto.
+- **Catraca:** `momento.test.ts` cobra que toda espécie seja alcançável a
+  partir de `src/components` e `src/routes` — **bancada não conta**, que é
+  exatamente onde as portas da rede social viveram enquanto ninguém as
+  alcançava.
+
+**Aplicar no Supabase:** `supabase/APLICAR_REDE_SOCIAL.sql` (agora com
+`vitrine_publica`) e `supabase/APLICAR_CONTA_OFICIAL.sql`.
+**Bancada:** `/preview-rede` (a chave da vitrine e o endereço).
