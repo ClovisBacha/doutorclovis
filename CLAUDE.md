@@ -6354,3 +6354,58 @@ não dar.
 ⚠️ **A pergunta de triagem, para a próxima vez:** não é "o erro foi olhado?" —
 é **"se esta leitura voltar vazia, alguma coisa fica mais permitida?"**. Se a
 resposta for sim, ela falha fechada.
+
+## ⚠️ DOIS RECURSOS ESTAVAM ESCUROS PORQUE O CRON NUNCA FOI AGENDADO (ago/2026)
+
+`vercel.json` declara **um** cron: `push-weekly-tick`. Os outros três endpoints
+(`lembretes-tick`, `meditacao-tick`, `waitlist-tick`) dependem de serviço
+externo — decisão registrada, porque intervalo menor que diário exige plano Pro.
+
+Só que a fila de espera tinha previsto isso e os outros dois não:
+
+| endpoint         | tinha chamador fora do cron? | consequência                   |
+| ---------------- | ---------------------------- | ------------------------------ |
+| `waitlist-tick`  | **sim** (ao abrir a fila)    | degrada, funciona              |
+| `lembretes-tick` | **não**                      | 24 h, 4 h e pré-consulta MUDOS |
+| `meditacao-tick` | **não**                      | lembrete diário MUDO           |
+
+O comentário da fila já dizia a régua: _"a fila avança de duas formas
+(redundância proposital): proativamente pelo cron, e preguiçosamente toda vez
+que alguém lê/mexe na fila — **assim ela progride mesmo que o cron não esteja
+configurado**"_. Os outros dois passaram a ter a mesma redundância.
+
+- ⚠️ **O que torna seguro chamar de forma preguiçosa NÃO é a varredura — é a
+  IDEMPOTÊNCIA.** Os lembretes gravam em `appointment_reminders` **antes** de
+  enviar, com índice único; a meditação carimba antes de enviar e conta em
+  HORAS. Chamar dez vezes por minuto manda no máximo uma. Se alguém tirar a
+  gravação-antes-do-envio, a chamada preguiçosa vira spam **no mesmo canal por
+  onde chega o aviso de emergência** — há teste sobre a ordem.
+- ⚠️ **Estrangulador de 10 min, porque a varredura é GLOBAL.** Sem ele, cada
+  paciente que abrisse "minhas consultas" leria os compromissos da plataforma
+  inteira. O relógio é de módulo (best-effort de propósito): quem garante a
+  correção continua sendo o índice único.
+- ⚠️ **O CRON FORÇA, o preguiçoso não.** Ele é a fonte proativa; estrangulá-lo
+  porque uma paciente abriu a tela um minuto antes inverteria o desenho.
+- **Ganchos:** lembretes em `getMyAppointments` (onde a fila já varre) e
+  meditação em `carimbarQueApareceu` (abertura do app, já rara por natureza).
+
+### ⚠️ E DUAS CATRACAS PEGARAM O MEU PRÓPRIO CONSERTO
+
+1. **`rotas-sem-export-solto`**: eu tinha exportado `varrerLembretes` do arquivo
+   de ROTA. Export não-rota ali sai do pedaço daquela rota e entra no da árvore
+   de rotas, que toda página carrega — foi assim que `PainelDaEmbaixadora` custou
+   11 kB. O trabalho mudou-se para `lib/lembretes.server.ts` e
+   `lib/meditacao.server.ts`.
+2. **`tabelas-que-existem`**: ela cobra que o cron leia `preconsulta_forms` (e
+   não `pre_consultation_forms`, o nome que já custou um pedido nunca enviado) —
+   e lia o arquivo da rota, que deixou de ter a consulta. O alvo acompanhou.
+   ⚠️ Ao acrescentar "a rota não tem `.from(`", a asserção casou `Buffer.from(a)`
+   do comparador de segredo. **Com a ASPA** (`.from("`): leitura de tabela sempre
+   tem o nome entre aspas.
+
+⚠️ **E uma asserção minha mentiu na primeira tentativa:** "o registro vem antes
+do envio" ancorava em `.from("appointment_reminders")`, que casava a LEITURA do
+que já foi enviado — três consultas antes, e legitimamente antes do push. A
+mutação que movia a GRAVAÇÃO para depois passou verde. Hoje ancora no
+`const { error: erroRegistro }`. Quinta vez que "outra ocorrência do mesmo nome"
+engana um teste aqui.

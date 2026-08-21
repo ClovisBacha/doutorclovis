@@ -1377,6 +1377,28 @@ export const carimbarQueApareceu = createServerFn({ method: "POST" })
     try {
       const eu = await pacienteDaSessao(data.accessToken);
       if (!eu) return { ok: false as const };
+      /* ⚠️ **A VARREDURA DO LEMBRETE DE MEDITAÇÃO PEGA CARONA AQUI.**
+         `vercel.json` agenda só o `push-weekly-tick`; o `meditacao-tick`
+         depende de cron EXTERNO e, sem ele, o lembrete diário NUNCA sai. Esta
+         função é o melhor gancho que existe: roda na abertura do app, para
+         toda paciente, e já é naturalmente rara.
+
+         É a mesma redundância proposital da fila de espera — "assim ela
+         progride mesmo que o cron não esteja configurado" — e o que a torna
+         segura é o CARIMBO, não a varredura: o registro é gravado antes do
+         envio e a régua conta em horas, então chamar dez vezes manda uma.
+
+         Fora do caminho do retorno de propósito: o carimbo de `last_seen_at` é
+         o trabalho desta função, e um lembrete que falha não pode fazer a
+         paciente sumir da lista de amigas. */
+      void (async () => {
+        try {
+          const { varrerLembretesDeMeditacao } = await import("@/lib/meditacao.server");
+          await varrerLembretesDeMeditacao();
+        } catch {
+          /* lembrete é secundário à presença */
+        }
+      })();
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
       const limite = new Date(Date.now() - 3600_000).toISOString();

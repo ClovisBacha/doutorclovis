@@ -103,9 +103,26 @@ describe("as tabelas que o código pede existem no schema", () => {
 
   test("o cron de lembretes lê a tabela de pré-consulta com o nome certo", () => {
     /* O caso concreto que motivou o arquivo. `pre_consultation_forms` não
-       existe; `preconsulta_forms` existe. */
-    const cron = readFileSync("src/routes/api/lembretes-tick.ts", "utf8");
-    expect(cron).toContain('.from("preconsulta_forms")');
-    expect(cron).not.toContain('.from("pre_consultation_forms")');
+       existe; `preconsulta_forms` existe.
+
+       ⚠️ **A CONSULTA MUDOU DE ARQUIVO, e esta catraca pegou a mudança.** O
+       trabalho saiu de `routes/api/lembretes-tick.ts` para
+       `lib/lembretes.server.ts` quando os lembretes ganharam varredura
+       preguiçosa (a outra catraca — `rotas-sem-export-solto` — exigiu a
+       mudança, porque export não-rota em arquivo de rota engorda a árvore de
+       rotas). O alvo aqui acompanha; a asserção é a MESMA. */
+    const varredura = readFileSync("src/lib/lembretes.server.ts", "utf8");
+    expect(varredura).toContain('.from("preconsulta_forms")');
+    expect(varredura).not.toContain('.from("pre_consultation_forms")');
+    /* E a rota continua sendo só a porta: se a consulta voltar para lá, é
+       porque alguém desfez a separação.
+
+       ⚠️ **Com a ASPA.** Sem ela a asserção casava `Buffer.from(a)`, do
+       comparador de segredo em tempo constante — e reprovava um arquivo
+       correto. É a mesma família dos casamentos frouxos que este repositório já
+       pagou: `.includes` pegando `bloquearPeriodo`, `_complete$` pegando
+       `profile_complete`. Leitura de tabela sempre tem o nome entre aspas. */
+    const rota = readFileSync("src/routes/api/lembretes-tick.ts", "utf8");
+    expect(rota).not.toContain('.from("');
   });
 });

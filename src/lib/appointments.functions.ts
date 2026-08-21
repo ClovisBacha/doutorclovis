@@ -219,6 +219,29 @@ export const getMyAppointments = createServerFn({ method: "POST" })
     } catch {
       /* fila é secundária ao carregar consultas */
     }
+    /* ⚠️ **OS LEMBRETES GANHARAM A MESMA REDUNDÂNCIA, e por um motivo medido:**
+       `vercel.json` agenda só o `push-weekly-tick`. O `lembretes-tick` depende
+       de cron EXTERNO, e enquanto ele não existir o recurso fica escuro — o
+       aviso de 24 h, o de 4 h e o pedido de pré-consulta de 48 h simplesmente
+       não saem. A fila de espera já tinha resolvido isto, e o comentário dela
+       diz por quê: "assim ela progride mesmo que o cron não esteja
+       configurado".
+
+       ⚠️ **O que torna seguro chamar aqui não é a varredura, é a
+       IDEMPOTÊNCIA:** a régua não repete o que está em `appointment_reminders`
+       e o índice único recusa a segunda gravação. O pior caso é leitura a mais,
+       nunca push repetido — que é o que faria a paciente desligar as
+       notificações do app, o mesmo canal do aviso de emergência.
+
+       E `varrerLembretes` tem estrangulador próprio, porque a varredura é
+       GLOBAL: sem ele, cada visita leria os compromissos da plataforma
+       inteira. */
+    try {
+      const { varrerLembretes } = await import("@/lib/lembretes.server");
+      await varrerLembretes();
+    } catch {
+      /* lembrete é secundário ao carregar consultas — nunca derruba a tela */
+    }
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("appointment_requests")
       .select(
