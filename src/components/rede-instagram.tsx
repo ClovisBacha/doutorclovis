@@ -79,7 +79,7 @@ import {
   paraGuardar as lugarParaGuardar,
 } from "@/lib/lugar-no-feed";
 /* Import ESTÁTICO pela mesma razão: régua pura, sem servidor e sem DOM. */
-import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
+import { chaveDoLembrete, legendaSugerida, lembreteDoEntao } from "@/lib/entao-e-agora";
 import type { Momento } from "@/lib/momento";
 import { SELO_OFICIAL } from "@/lib/conta-oficial";
 import { SELO_PREMIUM } from "@/lib/assinatura";
@@ -6616,7 +6616,36 @@ export function NovoPost({
           <>
             <button
               type="button"
-              onClick={() => setEntao((v) => (v ? null : (paraComparar[0]?.id ?? null)))}
+              onClick={() => {
+                const proximo = entao ? null : (paraComparar[0]?.id ?? null);
+                setEntao(proximo);
+                /* ⚠️ **O `setTexto` fica FORA do updater de `setEntao`.**
+                   Escrevi dentro primeiro, e a bancada mostrou o resultado na
+                   hora: a legenda entrava DUAS vezes por toque. Um updater de
+                   estado é chamado mais de uma vez de propósito (o React
+                   reexecuta para conferir pureza), então efeito colateral lá
+                   dentro roda em dobro. Vale para qualquer `setX(prev => …)`
+                   deste arquivo.
+
+                   ⚠️ **E só quando a legenda está VAZIA.** `aplicarSugestao`
+                   ACRESCENTA — que é o certo para o botão da IA, onde ela PEDE
+                   a sugestão. Aqui a oferta é automática, e acrescentar
+                   empilhava uma cópia a cada liga/desliga (medido: quatro
+                   linhas iguais em três toques). Oferecer, nunca preencher por
+                   cima do que ela escreveu.
+
+                   ⚠️ **O carimbo é SEMPRE `null` aqui, de propósito.**
+                   `CandidatoAoEntao` não carrega semana, e não deve carregar:
+                   as duas semanas saem de `lmp_date`, que NUNCA viaja para o
+                   navegador — é o que sustenta a chave `mostrar_semana`. Quem
+                   monta "12s e 28s" é o servidor, na LEITURA, com
+                   `carimboDaComparacao`. Mandar a semana para cá "para
+                   melhorar a sugestão" publicaria o dado clínico pela porta
+                   dos fundos da tela que existe para fechá-la. */
+                if (proximo && !texto.trim()) {
+                  setTexto(aplicarSugestao("", legendaSugerida(null)).slice(0, LIMITE_DO_TEXTO));
+                }
+              }}
               aria-pressed={!!entao}
               className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
                 entao ? "border-primary bg-primary/10" : "border-border"

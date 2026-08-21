@@ -125,7 +125,16 @@ export function limparCacheDoFeed(): void {
   armazem.clear();
 }
 
-/** Quantas entradas há agora. Só para teste e para a bancada. */
+/**
+ * Quantas entradas há agora.
+ *
+ * ⚠️ **É introspecção SÓ DE TESTE**, e está na lista de exceções de
+ * `rede-tem-porta.test.ts` por isso. O armazém é um `Map` de módulo: sem esta
+ * função não há como afirmar que ele esvaziou, e "esvaziou" é a asserção que
+ * protege o feed de outra paciente num aparelho compartilhado. O comentário
+ * anterior dizia "e para a bancada" — não era verdade, e uma justificativa
+ * falsa é o que faz uma exceção virar buraco.
+ */
 export function tamanhoDoCache(): number {
   return armazem.size;
 }

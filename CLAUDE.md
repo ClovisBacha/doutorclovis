@@ -5963,3 +5963,71 @@ erro nenhum.
 125 kB comprimidos, zero memoização —, e ela segue parada de propósito: é
 cirurgia grande, e o dono precisa dizer se a lentidão sobreviveu às correções
 desta leva antes de valer o risco.
+
+## A segunda catraca, e a régua que ninguém chamava (ago/2026)
+
+`legendaSugerida` (`entao-e-agora.ts`) tinha **uma** ocorrência no repositório
+inteiro: a própria definição. Escrita, testada, com o comentário explicando que
+"cai no campo como rascunho" — e nenhuma tela, nenhum servidor e nem o próprio
+módulo a usavam. O compositor tinha o seletor de "então e agora" e nunca
+oferecia a legenda.
+
+⚠️ **A catraca de portas não podia pegar**: ela cobra `createServerFn`, e esta é
+uma régua PURA. É `proximoDesbloqueio`/`escadaDeTrofeus` chegando pelo outro
+lado do `lib/`. `rede-tem-porta.test.ts` ganhou um segundo bloco para as réguas.
+
+- ⚠️ **A régua é "zero usos em qualquer lugar", e não "zero chamadores no
+  app".** Confundir as duas daria seis falsos positivos de uma vez
+  (`aindaVale`, `podeSerMarcada`, `daSemana`, `semanaPublica`,
+  `temTermoClinicoAlemDaAbertura`, `vigente`): todas são usadas DENTRO do
+  próprio módulo e exportadas para o teste alcançá-las, que é o padrão da casa.
+- ⚠️ **O `import` NÃO É USO — e sem tirá-lo a catraca não morde nada.** Medido:
+  com a linha de import contando, as três mutações que apagam a CHAMADA
+  passavam TODAS verdes, porque o nome continuava no import do componente. Uma
+  catraca de função morta que aceita o import aprova exatamente o defeito que
+  existe para pegar: **importar sem chamar É o defeito.**
+- ⚠️ **Arquivo por arquivo, nunca sobre a junção**, e **o template literal não
+  é removido**: tirá-lo junto com as aspas derrubou catorze funções vivas —
+  `${chamada(x)}` é call site de verdade e mora dentro de crase.
+- **A exceção é uma só, com razão escrita** (`tamanhoDoCache`, introspecção do
+  `Map` de módulo do cache). Exceção sem razão é o buraco que a catraca fecha.
+
+### ⚠️ E LIGAR A FUNÇÃO PRODUZIU DOIS DEFEITOS, os dois vistos na BANCADA
+
+- **A legenda entrava DUAS vezes por toque.** Eu tinha posto o `setTexto`
+  dentro do updater de `setEntao` — e um updater de estado é reexecutado de
+  propósito (o React confere pureza), então efeito colateral lá dentro roda em
+  dobro. **Vale para qualquer `setX(prev => …)` do repositório.**
+- **E empilhava a cada liga/desliga** (medido: quatro linhas iguais em três
+  toques). `aplicarSugestao` ACRESCENTA — certo para o botão da IA, onde ela
+  PEDE a sugestão; errado para uma oferta automática. Agora só entra com o
+  campo vazio: oferecer, nunca escrever por cima do que ela digitou.
+
+⚠️ **O carimbo aqui é SEMPRE `null`, e tem de continuar sendo.**
+`CandidatoAoEntao` não carrega semana de propósito: as duas semanas saem de
+`lmp_date`, que **nunca viaja para o navegador** — é o que sustenta a chave
+`mostrar_semana`. Quem monta "12s e 32s" é o SERVIDOR, na leitura, com
+`carimboDaComparacao`. Mandar a semana para o cliente "para melhorar a
+sugestão" publicaria o dado clínico pela porta dos fundos da tela que existe
+para fechá-la. Há teste cobrando que o tipo continue sem semana.
+
+⚠️ **A bancada não alcançava o controle**, e é por isso que ele nunca tinha
+sido olhado: o botão exige as DUAS pontas (foto antiga E foto de hoje) e a
+bancada só fabricava a antiga. `?comFoto=1` usa `momentoInicial`, que é prop de
+PRODUÇÃO — a bancada injeta o DADO nos mesmos estados, nunca o desenho.
+⚠️ E ela **segura a MONTAGEM, não a prop**: `fotos` é semeada no INICIALIZADOR
+do `useState`, então gatear a prop fez o botão sumir de vez — o compositor
+montava sem foto e nunca mais relia.
+
+⚠️ **Duas lições de método, as duas pagas nesta rodada:**
+
+1. **Restaurar mutação com `cp`, NUNCA com `git checkout`**, em arquivo não
+   commitado: o `checkout` reverteu o arquivo inteiro para o HEAD e apagou a
+   catraca recém-escrita junto com a mutação.
+2. **A prosa quebra teste nos DOIS sentidos.** Este teste ficou vermelho na
+   primeira execução porque o MEU comentário, explicando que o carimbo mora no
+   servidor, contém a palavra `carimboDaComparacao`. Na catraca de portas a
+   prosa fazia o contrário: aprovava função morta. Tira-se o comentário antes
+   de procurar, sempre.
+
+**Bancada:** `/preview-instagram?tela=novo&comFoto=1`.

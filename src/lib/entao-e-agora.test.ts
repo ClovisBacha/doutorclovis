@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   candidatosAoEntao,
@@ -182,5 +183,77 @@ describe("lembreteDoEntao", () => {
   /* ⚠️ O aparelho é compartilhado. */
   test("⚠️ a chave carrega o id da conta", () => {
     expect(chaveDoLembrete("a")).not.toBe(chaveDoLembrete("b"));
+  });
+});
+
+/**
+ * ⚠️ A OFERTA DA LEGENDA NO COMPOSITOR — dois defeitos MEDIDOS na bancada.
+ *
+ * `legendaSugerida` passou meses com ZERO chamadores: escrita, testada, com o
+ * comentário dizendo que "cai no campo como rascunho", e nenhuma tela a
+ * chamava. Ao ligá-la, a bancada mostrou dois defeitos na primeira execução —
+ * os dois invisíveis em teste de unidade e os dois travados aqui.
+ */
+describe("o compositor oferece a legenda sem estragar nada", () => {
+  const TELA = readFileSync("src/components/rede-instagram.tsx", "utf8");
+  const trecho = (() => {
+    const i = TELA.indexOf("↔️ Então e agora");
+    const abre = TELA.lastIndexOf("onClick={() => {", i);
+    expect(abre).toBeGreaterThan(0);
+    expect(i).toBeGreaterThan(abre);
+    /* ⚠️ **Comentários fora ANTES de procurar** — e este teste provou a regra
+       sozinho: ele ficou vermelho na primeira execução porque a MINHA prosa,
+       explicando que o carimbo mora no servidor, contém a palavra
+       `carimboDaComparacao`. Nos dois sentidos a prosa engana: aqui reprovando
+       código certo, e na catraca de portas aprovando função morta. */
+    return TELA.slice(abre, i).replace(/\/\*[\s\S]*?\*\//g, " ");
+  })();
+
+  /**
+   * ⚠️ **EFEITO COLATERAL NUNCA DENTRO DE UM UPDATER DE ESTADO.**
+   *
+   * Escrevi `setEntao((v) => { …; setTexto(…); return proximo; })` e a bancada
+   * mostrou o resultado na hora: a legenda entrava DUAS vezes por toque. Um
+   * updater é reexecutado de propósito (o React confere pureza), então efeito
+   * lá dentro roda em dobro. Vale para qualquer `setX(prev => …)`.
+   */
+  test("⚠️ o `setTexto` fica FORA do updater de `setEntao`", () => {
+    /* O updater com corpo de bloco é a forma que carregava o defeito. */
+    expect(trecho).not.toMatch(/setEntao\(\s*\([^)]*\)\s*=>\s*\{/);
+    /* E a decisão é tomada antes, com o valor atual em mãos. */
+    expect(trecho).toContain("const proximo = entao ?");
+    expect(trecho).toContain("setEntao(proximo);");
+  });
+
+  /**
+   * ⚠️ **SÓ COM A LEGENDA VAZIA.** `aplicarSugestao` ACRESCENTA — certo para o
+   * botão da IA, onde ela PEDE a sugestão. Aqui a oferta é automática, e
+   * acrescentar empilhava uma cópia a cada liga/desliga (medido: quatro linhas
+   * iguais em três toques). Oferecer, nunca escrever por cima do que ela
+   * digitou.
+   */
+  test("⚠️ só oferece quando o campo está vazio", () => {
+    expect(trecho).toContain("!texto.trim()");
+  });
+
+  /**
+   * ⚠️ **O carimbo é `null` aqui, e tem de continuar sendo.**
+   *
+   * `CandidatoAoEntao` não carrega semana de propósito: as duas semanas saem de
+   * `lmp_date`, que NUNCA viaja para o navegador — é o que sustenta a chave
+   * `mostrar_semana`. Quem monta "12s e 32s" é o SERVIDOR, na leitura. Mandar a
+   * semana para o cliente "para melhorar a sugestão" publicaria o dado clínico
+   * pela porta dos fundos da tela que existe para fechá-la.
+   */
+  test("⚠️ o compositor nunca monta o carimbo (a semana não viaja)", () => {
+    expect(trecho).toContain("legendaSugerida(null)");
+    expect(trecho).not.toContain("carimboDaComparacao");
+    /* E `CandidatoAoEntao` continua sem campo de semana. */
+    const fonte = readFileSync("src/lib/entao-e-agora.ts", "utf8");
+    const tipo = fonte.slice(
+      fonte.indexOf("export type CandidatoAoEntao"),
+      fonte.indexOf("};", fonte.indexOf("export type CandidatoAoEntao")),
+    );
+    expect(tipo).not.toMatch(/semana/i);
   });
 });

@@ -160,3 +160,124 @@ describe("toda função de servidor da rede tem porta no app", () => {
     });
   }
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A SEGUNDA CATRACA — as RÉGUAS puras, e não só as funções de servidor
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **`legendaSugerida` passou por baixo da catraca de cima.**
+ *
+ * Ela existia em `entao-e-agora.ts` — escrita, testada, com um comentário
+ * explicando que "cai no campo como rascunho" — e tinha **UMA** ocorrência no
+ * repositório inteiro: a própria definição. Nenhuma tela a chamava, nenhum
+ * servidor a chamava, e nem o módulo dela a usava por dentro. O compositor
+ * tinha o seletor de "então e agora" e nunca oferecia a legenda.
+ *
+ * A catraca de cima não podia pegar: ela cobra `createServerFn`, e esta é uma
+ * régua PURA. É `proximoDesbloqueio`/`escadaDeTrofeus` chegando pelo outro lado
+ * do `lib/`.
+ *
+ * ⚠️ **A régua é "zero usos em qualquer lugar", e não "zero chamadores no
+ * app".** Confundir as duas daria sete falsos positivos de uma vez:
+ * `aindaVale`, `podeSerMarcada`, `daSemana`, `semanaPublica`,
+ * `temTermoClinicoAlemDaAbertura` e `vigente` são usadas DENTRO do próprio
+ * módulo e exportadas para o teste alcançá-las — o padrão deste repositório,
+ * não um defeito. Morta é a que ninguém usa em lugar nenhum.
+ */
+
+/**
+ * ⚠️ **A LISTA DE EXCEÇÕES, curta de propósito.**
+ *
+ * Só entra introspecção que EXISTE PARA O TESTE e não tem outro jeito de ser
+ * escrita: `tamanhoDoCache` lê o `Map` de módulo de `cache-do-feed`, e sem ela
+ * não há como afirmar que o armazém esvaziou — a asserção que protege o feed de
+ * outra paciente num aparelho compartilhado.
+ *
+ * ⚠️ **Exceção sem razão escrita é o buraco que a catraca existe para fechar.**
+ * Se a próxima entrada não puder dizer por que a função não pode ter chamador,
+ * ela não é exceção: é função morta.
+ */
+const SO_PARA_TESTE = new Set(["tamanhoDoCache"]);
+
+const REGUAS = [
+  "src/lib/entao-e-agora.ts",
+  "src/lib/legenda-sugerida.ts",
+  "src/lib/sugestoes.ts",
+  "src/lib/esboco-de-perfil.ts",
+  "src/lib/marcacoes.ts",
+  "src/lib/retrospectiva.ts",
+  "src/lib/selo-do-perfil.ts",
+  "src/lib/miniatura.ts",
+  "src/lib/cache-do-feed.ts",
+  "src/lib/pergunta-clinica.ts",
+  "src/lib/aula-compartilhavel.ts",
+];
+
+/**
+ * Conta usos REAIS de um identificador num arquivo.
+ *
+ * ⚠️ **ARQUIVO POR ARQUIVO, e NUNCA sobre a junção de todos.** É a armadilha
+ * que este repositório já pagou: uma regex de string aplicada ao blob inteiro
+ * desloca o pareamento numa aspa desemparelhada e passa a comer identificadores
+ * reais — foi assim que uma trava contra falso positivo virou máquina de falso
+ * negativo, deixando vermelhas quatro funções que TÊM chamador.
+ *
+ * ⚠️ **O `import` NÃO É USO, e sem tirá-lo a catraca não morde nada.** Medido:
+ * com a linha de import contando, as três mutações que apagam a CHAMADA de
+ * `legendaSugerida` (trocar por literal, virar string, virar comentário)
+ * passavam TODAS verdes, porque o nome continuava na linha do import. Uma
+ * catraca de função morta que aceita o import aprova exatamente o defeito que
+ * ela existe para pegar: **importar sem chamar É o defeito.**
+ *
+ * ⚠️ **O template literal NÃO é removido.** Tirá-lo junto com as aspas derrubou
+ * catorze funções vivas: `${chamada(x)}` é call site de verdade, e mora dentro
+ * de crase. Saem só as strings de uma linha.
+ */
+function usosNoArquivo(caminho: string, nome: string): number {
+  const src = semComentarios(readFileSync(caminho, "utf8"))
+    .replace(/import\s+[^;]*?from\s*["'][^"']+["'];?/g, " ")
+    .replace(/"[^"\n]*"/g, '""')
+    .replace(/'[^'\n]*'/g, "''");
+  return (src.match(new RegExp(`\\b${nome}\\b`, "g")) ?? []).length;
+}
+
+describe("toda régua pura da rede é usada por alguém", () => {
+  /* Todo o `src/`, menos os testes — a busca é ampla de propósito: uma régua
+     pode ser usada por outra régua, por um servidor ou por uma tela, e as três
+     contam. O que não conta é o teste dela. */
+  const todo = (() => {
+    const out: string[] = [];
+    const anda = (dir: string) => {
+      for (const nome of readdirSync(dir)) {
+        const p = join(dir, nome);
+        if (statSync(p).isDirectory()) {
+          anda(p);
+          continue;
+        }
+        if (!/\.(ts|tsx)$/.test(nome)) continue;
+        if (nome.includes(".test.")) continue;
+        out.push(p);
+      }
+    };
+    anda("src");
+    return out;
+  })();
+
+  test("o inventário não está vazio (senão o teste passa por acidente)", () => {
+    expect(todo.length).toBeGreaterThan(100);
+    expect(REGUAS.length).toBeGreaterThan(8);
+  });
+
+  for (const fonte of REGUAS) {
+    for (const m of readFileSync(fonte, "utf8").matchAll(/export function (\w+)/g)) {
+      const nome = m[1];
+      if (SO_PARA_TESTE.has(nome)) continue;
+      test(`\`${nome}\` (${fonte.replace("src/lib/", "")}) é usada em algum lugar`, () => {
+        const usos = todo.reduce((soma, p) => soma + usosNoArquivo(p, nome), 0);
+        /* Uma ocorrência é a própria definição. Duas ou mais = alguém a usa. */
+        expect(usos).toBeGreaterThan(1);
+      });
+    }
+  }
+});

@@ -12,6 +12,14 @@
  *   /preview-instagram?tela=perfil&meu=1 → o PRÓPRIO perfil (com os números)
  *   /preview-instagram?vazio=1      → quem chegou agora
  *   /preview-instagram?tela=editar  → editar perfil (foto, nome, bio)
+ *   /preview-instagram?tela=novo&comFoto=1
+ *       → o compositor JÁ COM uma foto de hoje escolhida. É a única forma de
+ *         ver o botão "Então e agora": ele exige as duas pontas (uma foto
+ *         antiga E a de hoje), e a bancada só fabricava a antiga — então o
+ *         controle, o seletor de foto e a legenda que ele oferece nunca tinham
+ *         sido olhados por ninguém. Foi ao ligar isto que apareceram os dois
+ *         defeitos da oferta (legenda em dobro por toque, e empilhando a cada
+ *         liga/desliga).
  *   /preview-instagram?tela=lista   → a lista de seguidores
  *   /preview-instagram?tela=post    → um post sozinho, o que a grade abre
  *   /preview-instagram?tela=story   → o visor de story em tela cheia
@@ -39,7 +47,7 @@
  * ⚠️ A zona de sugestões ("Você está em dia" + pessoas + publicações) só abre
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -92,6 +100,10 @@ export const Route = createFileRoute("/preview-instagram")({
     legendas: q.legendas == null ? 1 : Number(q.legendas),
     amigas: q.amigas == null ? 1 : Number(q.amigas),
     rascunho: q.rascunho == null ? 1 : Number(q.rascunho),
+    /* ⚠️ `== null`, como todos os outros. `1` = o compositor já abre com uma
+       foto de HOJE escolhida, que é a metade que faltava para o botão "Então e
+       agora" existir na bancada. */
+    comFoto: q.comFoto == null ? 0 : Number(q.comFoto),
     retro: q.retro == null ? "" : String(q.retro),
     /* ⚠️ `== null`, como todos os outros. `""` = a live marcada para daqui a
        pouco (o caso comum), `agora` = ao vivo, `nao` = sem live nenhuma. */
@@ -279,6 +291,7 @@ function Bancada() {
     fase,
     voto,
     comparar,
+    comFoto,
     selo,
     trancado,
     carimbo,
@@ -365,6 +378,38 @@ function Bancada() {
   const retroModo = retro;
   const jaVotouNoStory = voto === 1;
   const semComparar = comparar === 0;
+  /**
+   * ⚠️ **A foto de HOJE, sem a qual o "Então e agora" não é fotografável.**
+   *
+   * O botão exige as DUAS pontas (`paraComparar.length > 0 && fotos.length >
+   * 0`), e isso é o comportamento certo: um botão de comparação sem a foto de
+   * hoje prometeria o que não pode entregar. Mas a bancada só fabricava a ponta
+   * ANTIGA — então o controle, o seletor de foto e a legenda que ele oferece
+   * nunca tinham sido vistos por ninguém, e só apareceriam numa conta real com
+   * uma foto escolhida na mão.
+   *
+   * ⚠️ **Usa `momentoInicial`, que é prop de PRODUÇÃO**, e não um atalho novo:
+   * ele semeia `fotos` no inicializador do `useState` (síncrono, canvas puro).
+   * É a régua da casa — a bancada injeta o DADO nos mesmos estados da produção,
+   * nunca o desenho. O cartão de momento faz as vezes da foto de hoje só para o
+   * controle existir; o que se confere aqui é o CONTROLE, não a imagem.
+   */
+  const comFotoDeHoje = comFoto === 1;
+  /**
+   * ⚠️ **A foto de hoje só entra DEPOIS de montar, e isso é da bancada.**
+   *
+   * `momentoInicial` semeia `fotos` no inicializador do `useState`, lendo
+   * `document` — que no SSR não existe. O servidor renderiza o compositor SEM
+   * foto e o cliente COM, e o React acusa hydration mismatch e joga a árvore
+   * fora. Em produção isso não acontece porque a paciente chega aqui navegando
+   * (só cliente); é a bancada que renderiza no servidor.
+   *
+   * Segurar um render resolve sem tocar na produção — a mesma manobra da
+   * bancada do ritual de boas-vindas, que escreve o `localStorage` antes de
+   * montar e espera um render.
+   */
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
   /** As legendas editadas na bancada. */
@@ -657,11 +702,32 @@ function Bancada() {
   }
 
   if (tela === "novo") {
+    /* ⚠️ **Segura a MONTAGEM, e não a prop.** Trocar `momentoInicial` depois de
+       montar não faz nada: `fotos` é semeada no INICIALIZADOR do `useState`,
+       que roda uma vez só. Gatear a prop deixou o botão sumir de vez — o
+       compositor montava sem foto e nunca mais relia. Quem espera é o render
+       inteiro. */
+    if (comFotoDeHoje && !montado) return null;
     return (
       <div className="mx-auto max-w-md py-2">
         <NovoPost
           /* A aula de hoje, para o anexo aparecer na bancada. */
           aulaDeHoje={{ tema: "nutrição" }}
+          momentoInicial={
+            comFotoDeHoje
+              ? {
+                  especie: "chama",
+                  numero: 12,
+                  unidade: "dias seguidos",
+                  chapeu: "SUA SEQUÊNCIA",
+                  titulo: "12 dias seguidos 💛",
+                  emoji: "🔥",
+                  legenda: "",
+                  textoDeShare: "",
+                  arquivo: "chama",
+                }
+              : null
+          }
           /* ⚠️ A BANCADA NÃO CHAMA A IA — ela fabrica a RESPOSTA. Chamar de
              verdade custaria crédito a cada abertura da bancada e exigiria
              sessão; e o que precisa ser conferido aqui é a TELA (o botão, a
