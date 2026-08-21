@@ -6031,3 +6031,39 @@ montava sem foto e nunca mais relia.
    de procurar, sempre.
 
 **Bancada:** `/preview-instagram?tela=novo&comFoto=1`.
+
+## ⚠️ A TELA DE ASSINATURA NÃO TINHA COMO ASSINAR (ago/2026)
+
+Achado ao começar a leva de conversão. Para quem **nunca assinou** — a maioria
+das pacientes — `AssinaturaTab` mostrava uma frase de prosa e nada mais: o bloco
+de botões inteiro estava atrás de `temAcesso`, ou seja, só aparecia para quem
+**já pagava**. A única tela do app cujo assunto é a assinatura era um beco sem
+saída exatamente para quem poderia assinar.
+
+- **A frase virou lista** (`VANTAGENS_DO_PREMIUM`, fora do JSX pela razão de
+  sempre — é texto que o dono relê). Três linhas concretas no lugar de uma
+  vaga.
+- ⚠️ **Nenhuma vantagem pode vender CUIDADO.** Diário, registros, SOS, conversa
+  com o médico e lembretes são do plano gratuito e continuam sendo. Há teste com
+  lista de palavras proibidas: uma linha que insinuasse acesso clínico
+  transformaria a assinatura em pedágio de saúde, e a frase do limite ético
+  ("nada do seu cuidado depende da assinatura") passaria a mentir na mesma tela.
+- ⚠️ **UM primário só, e a primeira versão desta correção errou isso.** Eu
+  acrescentei um "Assinar o Premium" ao lado do "Conhecer o Premium" que já
+  existia — dois primários empilhados dizendo a mesma coisa, e o de cima
+  **morto**, porque com `IAP_ATIVO = false` não há compra em canal nenhum. É o
+  defeito de duas portas que o presente entre amigas já pagou. Hoje é o MESMO
+  botão, e o veredito escolhe o rótulo.
+- ⚠️ **O canal sai de `podeComprarAqui`, nunca de um `if` local.** A paciente
+  assina pela loja da Apple/Google (`CANAL_DE.premium_paciente === "app"`),
+  nunca pelo Stripe. Uma segunda régua aqui diria "abra pela App Store" sobre um
+  app que não está em loja nenhuma — o defeito exato que `canal-de-venda.ts`
+  documenta ter cometido uma vez. Quando o IAP virar, o mesmo botão vira a
+  compra de verdade, sem uma linha de tela nova.
+- **O layout é funcional AGORA**, com o IAP desligado — a mesma lição já escrita
+  para a Loja de Sementinhas: benefícios e botão sempre aparecem, só o que o
+  botão FAZ muda. Esconder tudo até o app entrar na loja significaria que a tela
+  só existiria depois, e "depois" é quando ninguém volta para conferir.
+
+Quatro mutações conferidas em vermelho. Medido nos cinco estados: um botão por
+estado, limite ético em todos, zero erros de console.

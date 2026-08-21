@@ -157,3 +157,67 @@ describe("a corrente do selo de assinante", () => {
     expect(TELA.split("<SeloPremium />").length - 1).toBe(4);
   });
 });
+
+/**
+ * ⚠️ A TELA DE ASSINATURA NÃO TINHA COMO ASSINAR.
+ *
+ * Para quem NUNCA assinou — a maioria das pacientes — a tela mostrava uma
+ * frase de prosa e nada mais: o bloco de botões inteiro estava atrás de
+ * `temAcesso`, ou seja, só aparecia para quem JÁ pagava. A única tela do app
+ * cujo assunto é a assinatura era um beco sem saída exatamente para quem
+ * poderia assinar.
+ */
+describe("quem nunca assinou tem caminho e tem o que ler", () => {
+  const TELA = readFileSync("src/components/assinatura-tab.tsx", "utf8");
+  const semProsa = TELA.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+
+  test("⚠️ existe um caminho para quem não tem acesso", () => {
+    expect(semProsa).toContain("{!temAcesso && (");
+  });
+
+  /**
+   * ⚠️ **UM botão só.** A primeira versão desta correção acrescentou um
+   * "Assinar o Premium" ao lado do "Conhecer o Premium" — dois primários
+   * empilhados dizendo a mesma coisa, e o de cima MORTO, porque com
+   * `IAP_ATIVO = false` não há compra em canal nenhum. É o defeito de duas
+   * portas que o presente entre amigas já pagou.
+   */
+  test("⚠️ um primário só para quem não assina", () => {
+    expect(semProsa.split("Conhecer o Premium").length - 1).toBe(1);
+    expect(semProsa.split("Assinar o Premium").length - 1).toBe(1);
+    /* E os dois são o MESMO botão, escolhido pelo veredito. */
+    expect(semProsa).toMatch(
+      /vereditoDaAssinatura\.pode \? "Assinar o Premium" : "Conhecer o Premium"/,
+    );
+  });
+
+  /**
+   * ⚠️ **O canal sai de `podeComprarAqui`, nunca de um `if` local.** A paciente
+   * assina pela loja da Apple/Google (`CANAL_DE.premium_paciente === "app"`),
+   * nunca pelo Stripe. Uma segunda régua aqui diria "abra pela App Store" sobre
+   * um app que não está em loja nenhuma — o defeito exato que
+   * `canal-de-venda.ts` documenta ter cometido uma vez.
+   */
+  test("⚠️ o veredito de canal é o da régua única", () => {
+    expect(semProsa).toContain('podeComprarAqui("premium_paciente", ehNativo())');
+    expect(semProsa).not.toContain("IAP_ATIVO");
+  });
+
+  /**
+   * ⚠️ **Nenhuma vantagem pode prometer CUIDADO.** Diário, registros, SOS,
+   * conversa com o médico e lembretes são do plano gratuito e continuam sendo —
+   * é o limite ético do produto. Uma linha que insinuasse acesso clínico
+   * transformaria a assinatura em pedágio de saúde.
+   */
+  test("⚠️ as vantagens não vendem cuidado", () => {
+    const bloco = TELA.slice(
+      TELA.indexOf("const VANTAGENS_DO_PREMIUM"),
+      TELA.indexOf("];", TELA.indexOf("const VANTAGENS_DO_PREMIUM")),
+    );
+    for (const proibido of ["SOS", "emergência", "diário", "lembrete", "registro", "consulta"]) {
+      expect(bloco.toLocaleLowerCase("pt-BR")).not.toContain(proibido.toLocaleLowerCase("pt-BR"));
+    }
+    /* E a frase do limite ético continua na tela. */
+    expect(TELA).toContain("Nada do seu cuidado depende da assinatura");
+  });
+});

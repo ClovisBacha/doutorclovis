@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
    arquivo puxaria o `sonner` junto, que toca `document` ao carregar e derruba o
    `bun test` inteiro. Aconteceu — nove testes de outros arquivos caíram. */
 import { ASSINATURAS_DA_LOJA, lojaDaAssinatura, origemDaAssinatura } from "@/lib/assinatura";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
+import { ehNativo } from "@/lib/nativo";
 
 /**
  * MINHA ASSINATURA — a tela que não existia.
@@ -65,6 +67,24 @@ function dataLonga(iso: string | null | undefined): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" });
 }
+
+/**
+ * O que o Premium abre, na ordem em que pesa para a paciente.
+ *
+ * ⚠️ **Fica FORA do JSX de propósito** — é texto que o dono relê e corrige, e
+ * texto enterrado em componente é texto que ninguém revisa. Mesma razão de
+ * `frases-do-mascote.ts` e `cartas-do-bebe.ts`.
+ *
+ * ⚠️ **E nenhuma linha aqui pode prometer CUIDADO.** Diário, registros, SOS,
+ * conversa com o médico e lembretes são do plano gratuito e continuam sendo —
+ * é o limite ético do produto, dito em voz alta logo abaixo. Uma vantagem que
+ * insinuasse acesso clínico transformaria a assinatura em pedágio de saúde.
+ */
+const VANTAGENS_DO_PREMIUM = [
+  "As aulas completas da jornada, todo dia",
+  "O cérebro do seu médico nas respostas da conversa",
+  "A loja inteira do Cantinho, e 120 🌱 por mês só para presentear uma amiga",
+];
 
 export function AssinaturaTab({
   onNavigate,
@@ -161,6 +181,11 @@ export function AssinaturaTab({
   const temAcesso = ativa || (fimDoPeriodo > Date.now() && viva?.status === "canceled");
   /** Nunca assinou — nem hoje, nem antes. Muda o que a tela tem a dizer. */
   const nuncaAssinou = !viva;
+  /* ⚠️ **`ehNativo()` só é verdade dentro da casca nativa**, e hoje nenhuma
+     paciente tem uma — o app é um PWA. Com `IAP_ATIVO = false` o veredito é
+     `iap_indisponivel` para todo mundo, e o texto dele é o que a tela mostra:
+     "ainda não está pronta", nunca "vá para a App Store". */
+  const vereditoDaAssinatura = podeComprarAqui("premium_paciente", ehNativo());
 
   return (
     <div className="space-y-4">
@@ -212,11 +237,43 @@ export function AssinaturaTab({
           </p>
         )}
 
+        {/* ⚠️ **A TELA DE ASSINATURA NÃO TINHA COMO ASSINAR.**
+
+            Para quem nunca assinou — que é a MAIORIA das pacientes — esta tela
+            mostrava uma frase de prosa e mais nada: o bloco de botões inteiro
+            estava atrás de `temAcesso`, ou seja, só aparecia para quem JÁ
+            pagava. A única tela do app cujo assunto é a assinatura era um beco
+            sem saída exatamente para quem poderia assinar.
+
+            ⚠️ **O layout é funcional AGORA, com `IAP_ATIVO = false`** — é a
+            lição já escrita para a Loja de Sementinhas: os benefícios e o botão
+            SEMPRE aparecem, e só o que o botão FAZ muda. Esconder tudo até o
+            app entrar na loja significaria que a tela só existiria depois, e
+            "depois" é quando ninguém volta para conferir.
+
+            ⚠️ **E o veredito vem de `podeComprarAqui`, nunca de um `if` local.**
+            É a régua única de canal: a paciente assina pela loja da Apple/Google
+            (`CANAL_DE.premium_paciente === "app"`), nunca pelo Stripe, e com o
+            IAP desligado a compra não acontece em canal NENHUM. Uma segunda
+            régua aqui diria "abra pela App Store" sobre um app que não está em
+            loja nenhuma — que é literalmente o defeito que `canal-de-venda.ts`
+            documenta ter cometido uma vez. */}
         {nuncaAssinou && (
-          <p className="mt-4 text-[13.5px] leading-snug text-muted-foreground">
-            Você está no plano gratuito. O Premium abre as aulas completas, o cérebro do seu médico
-            e a loja inteira do Cantinho.
-          </p>
+          <div className="mt-4">
+            <p className="text-[13.5px] leading-snug text-muted-foreground">
+              Você está no plano gratuito. O Premium abre:
+            </p>
+            <ul className="mt-2.5 space-y-1.5">
+              {VANTAGENS_DO_PREMIUM.map((v) => (
+                <li key={v} className="flex gap-2 text-[13.5px] leading-snug">
+                  <span aria-hidden className="text-primary">
+                    ✓
+                  </span>
+                  <span>{v}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
 
         <div className="mt-5">
@@ -283,12 +340,31 @@ export function AssinaturaTab({
             </p>
           )}
 
-          {!temAcesso && onNavigate && (
+          {/* ⚠️ **UM botão só, e ele conta a verdade de hoje.**
+
+              A primeira versão desta correção acrescentou um "Assinar o
+              Premium" ao lado deste — dois primários empilhados dizendo a mesma
+              coisa, que é o defeito de duas portas que este repositório já
+              pagou no presente entre amigas. E o de cima estava MORTO, porque
+              com `IAP_ATIVO = false` não há compra em canal nenhum.
+
+              Enquanto a compra não abre, a ação honesta é a que FUNCIONA: levar
+              ao Caminho, onde as aulas e a loja do Cantinho mostram o que ela
+              ganharia. Quando o IAP virar, o mesmo botão vira a compra de
+              verdade — sem uma linha de tela nova, porque quem decide é
+              `podeComprarAqui`. */}
+          {!temAcesso && (
             <button
-              onClick={() => onNavigate("Caminho")}
+              onClick={() => {
+                if (!vereditoDaAssinatura.pode) {
+                  toast(vereditoDaAssinatura.texto);
+                  return;
+                }
+                onNavigate?.("Caminho");
+              }}
               className="press min-h-11 w-full rounded-full bg-primary text-sm font-bold text-primary-foreground"
             >
-              Conhecer o Premium
+              {vereditoDaAssinatura.pode ? "Assinar o Premium" : "Conhecer o Premium"}
             </button>
           )}
         </div>
