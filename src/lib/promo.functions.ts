@@ -92,7 +92,7 @@ const PRECOS: PrecosDaPaciente = {
  * dois chamadores esperam uma Promise, e a porta fica aberta para um preço
  * regional ou uma campanha por coorte sem mexer em quem chama.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+
 export async function lerPrecos(_uid: string): Promise<PrecosDaPaciente> {
   return PRECOS;
 }

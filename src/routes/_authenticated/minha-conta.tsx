@@ -1638,6 +1638,12 @@ function MinhaContaPage() {
   }, [userId, profile]);
 
   async function signOut() {
+    /* ⚠️ **O cache da Comunidade some ANTES da sessão.** Ele guarda fotos,
+       textos e nomes de OUTRAS pacientes; num aparelho compartilhado — que num
+       consultório é o caso comum, não a exceção — a próxima conta a entrar não
+       pode encontrar o feed da anterior na tela. Ele mora só na memória e nunca
+       no disco, exatamente por isso. */
+    (await import("@/lib/cache-do-feed")).limparCacheDoFeed();
     await supabase.auth.signOut();
     // Limpa a jornada local (dc-path-*) e o marcador de sync: num aparelho
     // compartilhado, a próxima conta NÃO pode ver nem re-subir os dados de

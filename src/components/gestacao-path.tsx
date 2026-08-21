@@ -6254,7 +6254,6 @@ export function MeditationBlock({
        toque este efeito roda de novo. */
     const t = setTimeout(() => prepararVoz(f), 600);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, etapa, voz, minutos, med.theme, densidade, careMode, day]);
 
   /**
@@ -8264,7 +8263,6 @@ export function GratitudeBlock({
   }, [gravando]);
   useEffect(() => {
     if (gravando && segundos >= LIMITE_SEGUNDOS) void pararEEnviar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gravando, segundos]);
 
   /**

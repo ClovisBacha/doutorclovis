@@ -239,7 +239,13 @@ describe("o que é dela", () => {
        cravava o literal `0`, e por isso continuava verde sobre o defeito que
        ela deveria ter pegado: o contador REAL nunca chegava à tela, e o perfil
        dizia "0 seguidores" logo acima de uma lista com doze pessoas. */
-    expect(c).toMatch(/meusSeguidores: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
+    /* ⚠️ A CONTAGEM mudou de lugar (subiu para o `Promise.all` que colapsou as
+       cinco esperas do fim), e a asserção seguiu ela — nunca saiu. O que ela
+       guarda é a mesma coisa: `null` nos DOIS casos de terceiro. */
+    expect(c).toMatch(
+      /persona \|\| data\.alvoId !== eu \? Promise\.resolve\(null\) : contarSeguidores\(sb, eu\)/,
+    );
+    expect(c).toContain("meusSeguidores: seguidores,");
     expect(c).not.toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
     expect(c).toMatch(/euSigo: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
     expect(corpoDe("buscarPerfis")).toContain("meusSeguidores: null");
@@ -736,7 +742,9 @@ describe("o espelho — 'ver como os outros veem'", () => {
     // Era o campo que uma prévia feita só sobre `podeVerPost` desenharia sem
     // nunca ter filtrado: os selos são campos de `PerfilNaTela`, montados a
     // partir do perfil, e não passam pelo filtro dos posts.
-    expect(C).toContain("await seloDe(a)");
+    /* Subiu para o `Promise.all` do fim; a régua é a mesma. */
+    expect(C).toMatch(/seloDe\(a\)/);
+    expect(C).toContain("seloSemana: selo.semana");
     expect(C).toContain("seloSemana: selo.semana");
     expect(C).toContain("seloBebe: selo.bebe");
     // E a régua é a de `lib/`, nunca reescrita aqui.
@@ -836,7 +844,9 @@ describe("o código de embaixadora no perfil — Fase 5", () => {
 
   test("⚠️ e nunca no MEU próprio perfil", () => {
     // No meu, a pílula ofereceria que eu me indicasse.
-    expect(C).toContain("data.alvoId === eu ? null : await codigoDeEmbaixadora(sb, data.alvoId)");
+    expect(C).toContain(
+      "data.alvoId === eu ? Promise.resolve(null) : codigoDeEmbaixadora(sb, data.alvoId)",
+    );
   });
 
   test("⚠️ só código ATIVO aparece", () => {
@@ -1077,7 +1087,7 @@ describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
   test("⚠️ há um degrau entre a lista cheia e a lista sem selo", () => {
     const p = funcaoInterna("perfisPorId");
     // O erro do select cheio cai no degrau do meio, nunca direto no de baixo.
-    expect(p).toContain("semAColunaNova(sb, ids)");
+    expect(p).toContain("semAColunaNova(sb, faltando)");
     expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
 
     const meio = funcaoInterna("semAColunaNova");
@@ -1177,5 +1187,40 @@ describe("as vistas do post", () => {
     const m = corpoDe("marcarPostsVistos");
     expect(m).toContain("ignoreDuplicates: true");
     expect(m).not.toContain(".select(");
+  });
+});
+
+/**
+ * ⚠️ A LATÊNCIA DE `contextoDe` APARECE EM TODA LEITURA DA REDE.
+ *
+ * Ele abre feed, perfil, post avulso, salvos, sugestões e atividade — se ele
+ * espera duas vezes, as seis telas esperam duas vezes. O grafo de amizade era
+ * buscado DEPOIS das quatro consultas de seguir/bloquear/silenciar, em série, e
+ * não depende de nenhuma delas.
+ */
+describe("contextoDe espera UMA vez, não duas", () => {
+  const c = funcaoInterna("contextoDe");
+
+  test("⚠️ o grafo de amigas entra no MESMO Promise.all", () => {
+    /* Se `idsDasAmigas` voltar para fora do `Promise.all`, a espera dobra em
+       seis telas de uma vez — e nada quebra, então nada avisa. */
+    const ate = c.slice(0, c.indexOf("]);"));
+    expect(ate).toContain("idsDasAmigas");
+    expect(ate).toContain("Promise.all");
+  });
+
+  /**
+   * ⚠️ E A DEGRADAÇÃO CONTINUA FECHANDO A CAMADA `amigas`.
+   *
+   * Esta é a parte que a otimização não pode ter afrouxado: `amigas` destranca
+   * o desabafo de terça e atravessa perfil privado. Sem certeza sobre o grafo,
+   * o conjunto é VAZIO — errar para o lado de não mostrar é a única direção
+   * segura numa régua de visibilidade.
+   */
+  test("⚠️ sem grafo, a camada `amigas` FECHA", () => {
+    expect(c).toContain("if (grafo && !grafo.degradada)");
+    expect(c).toContain("amigasFalhou = true");
+    /* O conjunto começa vazio e só é preenchido no ramo bom. */
+    expect(c).toContain("let amigas = new Set<string>()");
   });
 });

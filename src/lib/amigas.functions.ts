@@ -101,16 +101,20 @@ export async function idsDasAmigas(
   sb: any,
   eu: string,
 ): Promise<{ todas: string[]; trazidasPorMim: Set<string>; degradada: boolean }> {
-  const { data: minha } = await sb
-    .from("patient_profiles")
-    .select("referred_by")
-    .eq("id", eu)
-    .maybeSingle();
-  const { data: trazidas } = await sb
-    .from("patient_profiles")
-    .select("id")
-    .eq("referred_by", eu)
-    .limit(200);
+  /* ⚠️ **AS QUATRO CONSULTAS NUMA ONDA SÓ.** Elas eram SEQUENCIAIS — quem me
+     trouxe, depois quem eu trouxe, depois as amizades aceitas, depois as
+     encerradas — e nenhuma depende da anterior: as quatro são recortadas pelo
+     MESMO `eu`. Medido com uma bancada que conta as idas ao banco: abrir um
+     perfil custava 24 viagens em 18 ondas seriais, e QUATRO dessas ondas eram
+     estas. Como `idsDasAmigas` é chamada por `contextoDe`, que abre toda
+     leitura da rede, a espera aparecia no feed, no perfil, no post, nos salvos,
+     nos sugeridos e na atividade. */
+  const [{ data: minha }, { data: trazidas }, aceitas, encerradasR] = await Promise.all([
+    sb.from("patient_profiles").select("referred_by").eq("id", eu).maybeSingle(),
+    sb.from("patient_profiles").select("id").eq("referred_by", eu).limit(200),
+    amizadesAceitas(sb, eu),
+    encerradasCom(sb, eu),
+  ]);
 
   const ids = new Set<string>();
   const quemMeTrouxe = (minha as { referred_by?: string | null } | null)?.referred_by;
@@ -126,7 +130,7 @@ export async function idsDasAmigas(
      duas contas que já existiam. `amizades` é o pedido+aceite entre contas
      existentes, e as duas fontes somam — uma amiga pode ter chegado por
      qualquer uma das duas portas, e da lista para baixo elas são iguais. */
-  for (const outra of await amizadesAceitas(sb, eu)) ids.add(outra);
+  for (const outra of aceitas) ids.add(outra);
 
   /* ─── ⚠️ AS AMIZADES ENCERRADAS SAEM AQUI ────────────────────────────
      No SERVIDOR, e antes de qualquer leitura — é a mesma regra do Modo
@@ -141,7 +145,7 @@ export async function idsDasAmigas(
      TEXTO, então um `Set.delete` entra na conta como se fosse um DELETE de
      tabela — é a mesma armadilha que a linha logo abaixo já documenta, e eu
      caí nela de novo ao escrever este bloco. */
-  const { fora: encerradas, falhou: degradada } = await encerradasCom(sb, eu);
+  const { fora: encerradas, falhou: degradada } = encerradasR;
   const vivas = [...ids].filter((id) => !encerradas.has(id));
   const trazidasVivas = new Set([...trazidasPorMim].filter((id) => !encerradas.has(id)));
   /* Filtro em vez de `ids.delete(eu)`: a catraca de "escrita no banco sem

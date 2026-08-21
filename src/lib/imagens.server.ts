@@ -403,7 +403,9 @@ export function expiraEmSegundos(assinada: string): number | null {
     if (!token) return null;
     const corpo = token.split(".")[1];
     if (!corpo) return null;
-    const json = Buffer.from(corpo.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const json = Buffer.from(corpo.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString(
+      "utf8",
+    );
     const exp = (JSON.parse(json) as { exp?: unknown })?.exp;
     return typeof exp === "number" && Number.isFinite(exp) ? exp : null;
   } catch {
@@ -441,7 +443,9 @@ export async function urlsAssinadas(
   if (unicos.length === 0) return saida;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin.storage.from(balde).createSignedUrls(unicos, segundos);
+    const { data, error } = await supabaseAdmin.storage
+      .from(balde)
+      .createSignedUrls(unicos, segundos);
     if (error || !data) return saida;
     data.forEach((item, i) => {
       const caminho = item?.path ?? unicos[i];

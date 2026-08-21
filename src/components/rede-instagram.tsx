@@ -90,6 +90,7 @@ import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { guardarNoCache, lerDoCache } from "@/lib/cache-do-feed";
 import {
   esbocoDoAutor,
   QUADRADOS_DO_ESQUELETO,
@@ -1999,6 +2000,27 @@ export function CaixinhaNoPerfil({
  * bancada não alcança esta tela — e uma tela de espera que só existe por meio
  * segundo é justamente a que ninguém consegue parar para olhar.
  */
+/**
+ * O que a Comunidade guarda para a próxima volta à aba.
+ *
+ * ⚠️ **Só o que a primeira dobra precisa.** Salvos, gaveta, sugeridos, grade do
+ * perfil e caixinha ficam de fora: eles são buscados quando ela abre cada um, e
+ * guardá-los aqui encheria a memória com telas que ela talvez nem visite.
+ */
+type CacheDoFeed = {
+  posts: PostNaTela[];
+  proximo: string | null;
+  bolhas: BolhaDeStory[];
+  avisos: AtividadeNaTela[];
+  naoVistas: number;
+  euId: string | null;
+  meuAvatar: string | null;
+  semanaDoCarimbo: string | null;
+};
+
+/** Uma chave só: `limparCacheDoFeed()` no logout apaga tudo de qualquer forma. */
+const CHAVE_DO_FEED = "comunidade:feed";
+
 export function PerfilCarregando({
   esboco,
   aoVoltar,
@@ -3137,7 +3159,6 @@ export function RedeNoApp({
     } catch {
       /* sem armazenamento: nenhum lembrete, e nada quebra */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onde.t, euId, paraComparar, careMode]);
 
   /**
@@ -3183,7 +3204,6 @@ export function RedeNoApp({
       setRascunho(null);
     }
     /* Só ao ENTRAR na tela: `euId` não muda dentro dela. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onde.t, euId]);
 
   /**
@@ -3385,6 +3405,21 @@ export function RedeNoApp({
       if (at.ok) {
         setAvisos(at.itens);
         setNaoVistas(at.novas);
+      }
+      /* ⚠️ Guardado só quando o FEED veio: com `r.ok` falso o cache gravaria
+         uma tela vazia e a próxima volta pintaria "nada por aqui" na hora,
+         sobre uma conta que tem publicações. */
+      if (r.ok) {
+        guardarNoCache(CHAVE_DO_FEED, {
+          posts: r.posts,
+          proximo: r.proximo,
+          bolhas: st.ok ? st.bolhas : [],
+          avisos: at.ok ? at.itens : [],
+          naoVistas: at.ok ? at.novas : 0,
+          euId: meu.ok ? meu.perfil.id : null,
+          meuAvatar: meu.ok ? (meu.perfil.avatarUrl ?? null) : null,
+          semanaDoCarimbo: meu.ok ? meu.semanaDoCarimbo : null,
+        } satisfies CacheDoFeed);
       }
       void carregarDesafio();
       void carregarCaixinha();
@@ -3625,6 +3660,25 @@ export function RedeNoApp({
     if (careMode) {
       setCarregando(false);
       return;
+    }
+    /* ⚠️ **MOSTRA O VELHO, BUSCA O NOVO.** As abas de `minha-conta` são
+       montadas com `{tab === "X" && <X/>}` — o que é bom (aba fora da tela não
+       custa render) e tem um preço que ninguém tinha pago: trocar de aba
+       DESMONTA este componente e joga o estado fora. Ir ao Bebê e voltar
+       refazia o feed inteiro, e a paciente esperava de novo por uma tela que
+       ela viu dez segundos atrás. É a metade da lentidão que mais irrita: não é
+       a primeira abertura, é a quinta. */
+    const guardado = lerDoCache<CacheDoFeed>(CHAVE_DO_FEED);
+    if (guardado) {
+      setPosts(guardado.posts);
+      setProximo(guardado.proximo);
+      setBolhas(guardado.bolhas);
+      setAvisos(guardado.avisos);
+      setNaoVistas(guardado.naoVistas);
+      setEuId(guardado.euId);
+      setMeuAvatar(guardado.meuAvatar);
+      setSemanaDoCarimbo(guardado.semanaDoCarimbo);
+      setCarregando(false);
     }
     void carregarFeed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4271,7 +4325,6 @@ export function RedeNoApp({
     return () => {
       vivo = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [careMode]);
 
   async function quemViu(storyId: string): Promise<PessoaNaLista[] | null> {
@@ -5795,7 +5848,13 @@ export function TelaDeAtividade({
                     onClick={() => a.postId && aoAbrirPost?.(a.postId)}
                     className="press shrink-0"
                   >
-                    <img src={a.postCapa} alt="" className="h-10 w-10 rounded object-cover" />
+                    <img
+                      src={a.postCapa}
+                      alt=""
+                      className="h-10 w-10 rounded object-cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   </button>
                 )}
               </div>
@@ -6248,7 +6307,13 @@ export function NovoPost({
           <div className="mt-2 flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {fotos.map((f, n) => (
               <div key={n} className="relative shrink-0">
-                <img src={f} alt="" className="h-24 w-24 rounded-xl object-cover" />
+                <img
+                  src={f}
+                  alt=""
+                  className="h-24 w-24 rounded-xl object-cover"
+                  loading="lazy"
+                  decoding="async"
+                />
                 {/* A PRIMEIRA leva o selo — sem ele ninguém sabe qual vai
                     aparecer na grade do perfil. */}
                 {n === 0 && (
@@ -6372,7 +6437,13 @@ export function NovoPost({
                         entao === c.id ? "border-primary" : "border-transparent"
                       }`}
                     >
-                      <img src={c.imagemUrl} alt="" className="h-20 w-20 object-cover" />
+                      <img
+                        src={c.imagemUrl}
+                        alt=""
+                        className="h-20 w-20 object-cover"
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </button>
                   ))}
                 </div>

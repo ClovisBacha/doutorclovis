@@ -164,7 +164,6 @@ function NumeroQueRola({ valor, duracao = 420 }: { valor: number; duracao?: numb
          O ponto de parada verdadeiro já está em `anterior.current`, escrito a
          cada quadro pelo laço. Não mexer nele é o conserto. */
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [valor, reduce, duracao]);
 
   return <>{brl(mostrado)}</>;

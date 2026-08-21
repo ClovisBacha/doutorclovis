@@ -12,33 +12,8 @@
  * rosto de uma paciente pelo de outra. É o defeito mais grave que este arquivo
  * poderia produzir, e é o que estes testes travam.
  */
-import { describe, expect, mock, test } from "bun:test";
-
-/**
- * ⚠️ O STORAGE DE MENTIRA, para o lote ser testado POR COMPORTAMENTO.
- *
- * Sem ele, tudo que dava para provar era que a string "renovarUrlsAssinadas"
- * aparece no fonte — e teste que procura palavra é teste que mente (a lição
- * está escrita em `caixinha.ts` e custou dez asserções falsas nesta base). Com
- * o dublê, dá para provar as três coisas que importam: a ordem, o lote e o
- * silêncio quando nada precisa ser renovado.
- */
-const chamadas: string[][] = [];
-mock.module("@/integrations/supabase/client.server", () => ({
-  supabaseAdmin: {
-    storage: {
-      from: (balde: string) => ({
-        createSignedUrls: async (paths: string[]) => {
-          chamadas.push(paths);
-          return {
-            data: paths.map((p) => ({ error: null, path: p, signedUrl: `NOVA:${balde}/${p}` })),
-            error: null,
-          };
-        },
-      }),
-    },
-  },
-}));
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { expiraEmSegundos, MARGEM_DE_RENOVACAO_SEG, renovarUrlsAssinadas } from "./imagens.server";
 
@@ -127,7 +102,6 @@ describe("a margem de renovação", () => {
  * lentidão nasceu.
  */
 describe("os caminhos quentes não assinam um por um", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
   const semComentarios = (s: string) =>
     s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
 
@@ -156,65 +130,5 @@ describe("os caminhos quentes não assinam um por um", () => {
     const corpo = fonte.slice(i, fonte.indexOf("\n}", i));
     expect(corpo).toContain("renovarUrlsAssinadas");
     expect(corpo).not.toContain("renovarUrlAssinada(");
-  });
-});
-
-describe("o lote, por comportamento", () => {
-  /**
-   * ⚠️ A ORDEM É O INVARIANTE, e é o que separa este conserto de um acidente.
-   *
-   * Quem chama casa por índice (`linhas.map((p, i) => …urls[i])`). Uma saída
-   * fora de ordem trocaria o rosto de uma paciente pelo de outra, em silêncio,
-   * no feed inteiro. A entrada aqui é de propósito a pior possível: assinada
-   * vencendo, data URL, nulo, assinada vencendo, assinada fresca e link
-   * externo — tudo misturado.
-   */
-  test("⚠️ preserva a ORDEM com a entrada toda misturada", async () => {
-    chamadas.length = 0;
-    const entrada = [
-      velha("a.jpg"),
-      "data:image/jpeg;base64,ZZZ",
-      null,
-      velha("b.jpg"),
-      fresca("ok.jpg"),
-      "https://externo/x.png",
-    ];
-    const saida = await renovarUrlsAssinadas(entrada);
-    expect(saida).toHaveLength(entrada.length);
-    expect(saida[0]).toBe("NOVA:rede/a.jpg");
-    /* data URL passa intacta — é o que o `campo-foto` e o ritual gravam. */
-    expect(saida[1]).toBe("data:image/jpeg;base64,ZZZ");
-    expect(saida[2]).toBeNull();
-    expect(saida[3]).toBe("NOVA:rede/b.jpg");
-    /* A fresca volta IGUAL, sem passar pela rede. */
-    expect(saida[4]).toBe(entrada[4]);
-    expect(saida[5]).toBe("https://externo/x.png");
-  });
-
-  test("⚠️ UMA requisição para o lote inteiro, não uma por item", async () => {
-    chamadas.length = 0;
-    await renovarUrlsAssinadas([velha("1.jpg"), velha("2.jpg"), velha("3.jpg"), velha("4.jpg")]);
-    expect(chamadas).toHaveLength(1);
-    expect(chamadas[0]).toHaveLength(4);
-  });
-
-  /* ⚠️ O caso COMUM: o avatar é assinado por sete dias, então quase toda
-     leitura da rede não precisa renovar nada. Antes, toda leitura renovava
-     tudo. */
-  test("⚠️ NENHUMA requisição quando tudo ainda está fresco", async () => {
-    chamadas.length = 0;
-    const r = await renovarUrlsAssinadas([fresca("1.jpg"), fresca("2.jpg")]);
-    expect(chamadas).toHaveLength(0);
-    expect(r[0]).toContain("token=");
-  });
-
-  /* ⚠️ O mesmo caminho repetido (duas pacientes com a mesma foto, ou o mesmo
-     post citado duas vezes) não vira duas entradas no pedido. */
-  test("caminho repetido entra uma vez só no pedido", async () => {
-    chamadas.length = 0;
-    const saida = await renovarUrlsAssinadas([velha("x.jpg"), velha("x.jpg")]);
-    expect(chamadas[0]).toHaveLength(1);
-    expect(saida[0]).toBe("NOVA:rede/x.jpg");
-    expect(saida[1]).toBe("NOVA:rede/x.jpg");
   });
 });

@@ -284,6 +284,8 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
 
 /** Tudo que a visibilidade precisa, numa leva só. */
 type Contexto = {
+  /** A memória de perfis desta requisição. Ver `MemoriaDePerfis`. */
+  perfis: Map<string, any>;
   sigo: Set<string>;
   bloqueio: ConjuntoDeBloqueio;
   amigas: Set<string>;
@@ -314,11 +316,23 @@ type Contexto = {
 };
 
 async function contextoDe(sb: any, eu: string): Promise<Contexto> {
-  const [seg, meus, deles, calados] = await Promise.all([
+  /* ⚠️ **AS CINCO NA MESMA LEVA.** O grafo de amizade era buscado DEPOIS destas
+     quatro, em série — e não depende de nenhuma delas. Como `contextoDe` abre
+     toda leitura da rede (feed, perfil, post, salvos, sugestões, atividade), a
+     espera dobrada aparecia em todas elas de uma vez. */
+  const [seg, meus, deles, calados, grafo] = await Promise.all([
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
     sb.from("rede_silenciados").select("silenciado_id").eq("quem_id", eu),
+    (async () => {
+      try {
+        const { idsDasAmigas } = await import("@/lib/amigas.functions");
+        return await idsDasAmigas(sb, eu);
+      } catch {
+        return null;
+      }
+    })(),
   ]);
 
   /* ⚠️ O bloqueio entra nos DOIS sentidos no mesmo conjunto. Guardar só o meu
@@ -334,27 +348,24 @@ async function contextoDe(sb: any, eu: string): Promise<Contexto> {
      apareceria como post da camada restrita vazando. */
   let amigas = new Set<string>();
   let amigasFalhou = false;
-  try {
-    const { idsDasAmigas } = await import("@/lib/amigas.functions");
-    const r = await idsDasAmigas(sb, eu);
-    /* ⚠️ **`degradada` é a lista SEM as amizades encerradas subtraídas**, e aqui
-       isso não é um nome a mais na lista: `amigas` destranca a camada mais
-       restrita (o desabafo de terça) e ATRAVESSA perfil privado, porque
-       `alcancaOPerfil` aceita `somosAmigas`. A aba Amigas tolera a degradação
-       de propósito (perder todas as amigas por uma consulta lenta é pior); a
-       rede não pode. Aqui, sem certeza, o conjunto é VAZIO. */
-    if (!r.degradada) {
-      amigas = r.todas instanceof Set ? r.todas : new Set(r.todas as string[]);
-    } else {
-      amigasFalhou = true;
-    }
-  } catch {
-    /* Sem o grafo, a camada `amigas` fecha em vez de abrir. Errar para o lado
-       de não mostrar é a única direção segura numa régua de visibilidade. */
+  /* ⚠️ **`degradada` é a lista SEM as amizades encerradas subtraídas**, e aqui
+     isso não é um nome a mais na lista: `amigas` destranca a camada mais
+     restrita (o desabafo de terça) e ATRAVESSA perfil privado, porque
+     `alcancaOPerfil` aceita `somosAmigas`. A aba Amigas tolera a degradação de
+     propósito (perder todas as amigas por uma consulta lenta é pior); a rede
+     não pode. Aqui, sem certeza, o conjunto é VAZIO — e um erro na busca cai no
+     mesmo lugar: sem o grafo, a camada `amigas` FECHA em vez de abrir. Errar
+     para o lado de não mostrar é a única direção segura numa régua de
+     visibilidade. */
+  if (grafo && !grafo.degradada) {
+    amigas = grafo.todas instanceof Set ? grafo.todas : new Set(grafo.todas as string[]);
+  } else {
     amigasFalhou = true;
   }
 
   return {
+    /* A memória nasce aqui e morre com a resposta — ver `MemoriaDePerfis`. */
+    perfis: new Map<string, any>(),
     sigo: new Set((((seg as any).data ?? []) as { seguido_id: string }[]).map((s) => s.seguido_id)),
     bloqueio: conjuntoDeBloqueio(ids, bloqueioFalhou),
     amigas,
@@ -465,10 +476,38 @@ async function vitrineLigada(
   }
 }
 
+/**
+ * A MEMÓRIA DE UMA REQUISIÇÃO SÓ — para o mesmo perfil não ser buscado duas
+ * vezes na mesma resposta.
+ *
+ * ⚠️ **`verPerfil` chamava `perfisPorId` DUAS vezes com o mesmo id**: uma para
+ * montar o cabeçalho e outra dentro de `montarPosts`, para o autor das
+ * publicações — que é a mesma pessoa. Medido com uma bancada que conta as idas
+ * ao banco: duas consultas a `patient_profiles` e duas renovações de URL
+ * assinada, em ondas SERIAIS diferentes. O feed tem o mesmo padrão sempre que
+ * um autor aparece em duas listas.
+ *
+ * ⚠️ **A memória vive UMA requisição, e é por isso que ela é um parâmetro e não
+ * um módulo.** Um cache de módulo no servidor seria compartilhado entre
+ * pacientes e entre requisições: a linha de `patient_profiles` carrega
+ * `care_mode`, `perfil_publico` e as chaves do selo, e servir a versão velha
+ * dessas colunas a outra pessoa é mostrar o perfil de quem acabou de entrar em
+ * Modo Cuidado. Aqui o mapa nasce e morre dentro da mesma resposta.
+ */
+type MemoriaDePerfis = Map<string, any>;
+
 /** Perfis por id, com o que a rede precisa. */
-async function perfisPorId(sb: any, ids: string[]) {
+async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
   if (ids.length === 0) return new Map<string, any>();
-  const { data, error } = await sb.from("patient_profiles").select(COLUNAS_DO_PERFIL).in("id", ids);
+  /* O que já foi lido nesta requisição não é lido de novo. */
+  const faltando = memoria ? ids.filter((id) => !memoria.has(id)) : ids;
+  if (faltando.length === 0) {
+    return new Map(ids.map((id) => [id, memoria!.get(id)]));
+  }
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_DO_PERFIL)
+    .in("id", faltando);
 
   /* ⚠️ **RECUO PARA BANCO SEM AS COLUNAS DO SELO.**
      `mostrar_semana`/`mostrar_bebe` nascem num `APLICAR_` que o dono roda à
@@ -483,7 +522,7 @@ async function perfisPorId(sb: any, ids: string[]) {
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAColunaNova(sb, ids) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaNova(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -499,7 +538,16 @@ async function perfisPorId(sb: any, ids: string[]) {
      de meio dia de validade é reaproveitado sem tocar na rede. */
   const { renovarUrlsAssinadas } = await import("@/lib/imagens.server");
   const urls = await renovarUrlsAssinadas(linhas.map((p) => p.avatar_url));
-  return new Map(linhas.map((p, i) => [p.id, { ...p, avatar_url: urls[i] }]));
+  const saida = new Map<string, any>();
+  linhas.forEach((p, i) => {
+    const pronto = { ...p, avatar_url: urls[i] };
+    saida.set(p.id, pronto);
+    memoria?.set(p.id, pronto);
+  });
+  /* Os que já estavam na memória voltam junto — quem chamou pediu por TODOS. */
+  if (memoria)
+    for (const id of ids) if (!saida.has(id) && memoria.has(id)) saida.set(id, memoria.get(id));
+  return saida;
 }
 
 /**
@@ -834,6 +882,14 @@ type OlhoDeQuemVe = {
   sigo: Set<string>;
   amigas: Set<string>;
   bloqueio: { has(id: string): boolean };
+  /**
+   * A memória de perfis DESTA requisição.
+   *
+   * ⚠️ Opcional porque nem todo chamador de `montarPosts` monta um contexto
+   * completo (o espelho fabrica um olho de mentira). Sem ela, `perfisPorId`
+   * simplesmente busca como sempre buscou.
+   */
+  perfis?: Map<string, any>;
 };
 
 /**
@@ -904,7 +960,15 @@ async function montarPosts(
   brutos: any[],
   ctx: OlhoDeQuemVe,
 ): Promise<PostNaTela[]> {
-  const autores = await perfisPorId(sb, [...new Set(brutos.map((p) => p.autor_id))]);
+  /* ⚠️ Com a memória do contexto: `verPerfil` já leu o perfil da dona para
+     montar o cabeçalho, e o autor de todas as publicações dela é ela mesma. Sem
+     isto eram duas consultas a `patient_profiles` e duas renovações de URL
+     assinada, em ondas seriais diferentes. */
+  const autores = await perfisPorId(
+    sb,
+    [...new Set(brutos.map((p) => p.autor_id))],
+    (ctx as OlhoDeQuemVe).perfis,
+  );
 
   const visiveis = brutos.filter((p) => {
     const a = autores.get(p.autor_id);
@@ -1286,7 +1350,20 @@ export const verPerfil = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
 
     const ctx = await contextoDe(sb, eu);
-    const perfis = await perfisPorId(sb, [data.alvoId]);
+    /* Com a memória do contexto: as publicações desta tela são todas DELA, e
+       `montarPosts` pediria o mesmo perfil de novo, numa onda serial a mais. */
+    /* ⚠️ **O PERFIL E O VÍNCULO NA MESMA ONDA.** Os dois alimentam o portão de
+       alcance logo abaixo, e nenhum depende do outro — eram duas esperas em
+       fila para uma decisão só. */
+    const [perfis, { data: vinculo }] = await Promise.all([
+      perfisPorId(sb, [data.alvoId], ctx.perfis),
+      sb
+        .from("rede_seguidores")
+        .select("estado")
+        .eq("seguidor_id", eu)
+        .eq("seguido_id", data.alvoId)
+        .maybeSingle(),
+    ]);
     const a = perfis.get(data.alvoId);
 
     /* ⚠️ A persona só vale sobre o meu próprio perfil — ver o cabeçalho. */
@@ -1299,13 +1376,6 @@ export const verPerfil = createServerFn({ method: "POST" })
     if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu)) {
       return { ok: false as const, motivo: "indisponivel" as const };
     }
-
-    const { data: vinculo } = await sb
-      .from("rede_seguidores")
-      .select("estado")
-      .eq("seguidor_id", eu)
-      .eq("seguido_id", data.alvoId)
-      .maybeSingle();
 
     /* ⚠️ **O PORTÃO DE ALCANCE, e ele vale para o visitante DE VERDADE.**
        Até a Fase 1 esta função nunca conferiu `perfil_publico`: com o uuid em
@@ -1344,8 +1414,16 @@ export const verPerfil = createServerFn({ method: "POST" })
        a camada de QUEM PUBLICOU: estar marcada não amplia visibilidade
        nenhuma. Quem abre o perfil dela e não podia ver o post continua sem
        ver. */
-    const marcados = await idsMarcadosDe(sb, data.alvoId);
-    const [proprios, deMarcacao] = await Promise.all([
+    /* ⚠️ **As publicações DELA saem junto com a busca das marcações.** Só a
+       segunda consulta (os posts em que ela foi marcada) depende da primeira;
+       a lista dos posts próprios não depende de nada. Eram três ondas em fila
+       e viraram duas.
+
+       ⚠️ E as duas rodam DEPOIS do portão de alcance, de propósito: ler as
+       publicações de um perfil que a régua vai recusar é trabalho jogado fora e,
+       pior, é a ordem que um dia alguém "otimiza" movendo o portão para baixo. */
+    const [marcados, proprios] = await Promise.all([
+      idsMarcadosDe(sb, data.alvoId),
       postsCrus(sb, (base) =>
         base
           .eq("autor_id", data.alvoId)
@@ -1353,16 +1431,16 @@ export const verPerfil = createServerFn({ method: "POST" })
           .order("criado_em", { ascending: false })
           .limit(POSTS_POR_PAGINA),
       ),
-      marcados.length
-        ? postsCrus(sb, (base) =>
-            base
-              .in("id", marcados)
-              .is("arquivado_em", null)
-              .order("criado_em", { ascending: false })
-              .limit(POSTS_POR_PAGINA),
-          )
-        : Promise.resolve([]),
     ]);
+    const deMarcacao = marcados.length
+      ? await postsCrus(sb, (base) =>
+          base
+            .in("id", marcados)
+            .is("arquivado_em", null)
+            .order("criado_em", { ascending: false })
+            .limit(POSTS_POR_PAGINA),
+        )
+      : [];
     const porId = new Map<string, any>();
     for (const p of [...proprios, ...deMarcacao]) porId.set(p.id, p);
     const brutos = [...porId.values()]
@@ -1382,17 +1460,26 @@ export const verPerfil = createServerFn({ method: "POST" })
         })
       : await montarPosts(sb, eu, brutos, ctx);
 
-    const selo = await seloDe(a);
-    /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
-       aba tem de mostrar o que a visitante veria. */
-    const bebe = await bebeDe(a, !persona && data.alvoId === eu);
+    /* ⚠️ **AS QUATRO ÚLTIMAS ESPERAS VIRARAM UMA.** Selo, bebê, a pílula do
+       código e "eu já tenho código?" eram quatro `await` em fila, no fim da
+       função — e nenhum depende do outro. Medido: eram as ondas 20, 21 e 22 de
+       22, ou seja, um terço da espera total gasto DEPOIS de a tela já ter tudo
+       que precisa para desenhar.
 
-    /* A pílula do código só faz sentido no perfil de OUTRA pessoa: no meu, ela
-       ofereceria que eu me indicasse. */
-    const codigo = data.alvoId === eu ? null : await codigoDeEmbaixadora(sb, data.alvoId);
-    /* ⚠️ `ref_code` é fixado UMA VEZ — quem já tem não pode aplicar outro, e a
-       tela precisa saber disso ANTES de oferecer o botão. */
-    const jaTenhoCodigo = await tenhoRefCode(sb, eu);
+       ⚠️ A pílula do código só faz sentido no perfil de OUTRA pessoa: no meu,
+       ela ofereceria que eu me indicasse. E `ref_code` é fixado UMA VEZ, então
+       a tela precisa saber se eu já tenho ANTES de oferecer o botão. */
+    const [selo, bebe, codigo, jaTenhoCodigo, seguidores] = await Promise.all([
+      seloDe(a),
+      /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
+         aba tem de mostrar o que a visitante veria. */
+      bebeDe(a, !persona && data.alvoId === eu),
+      data.alvoId === eu ? Promise.resolve(null) : codigoDeEmbaixadora(sb, data.alvoId),
+      tenhoRefCode(sb, eu),
+      /* ⚠️ Era um `await` DENTRO do objeto literal, o que é uma quinta espera
+         escondida no meio da montagem — e a mais fácil de não ver. */
+      persona || data.alvoId !== eu ? Promise.resolve(null) : contarSeguidores(sb, eu),
+    ]);
 
     const perfil: PerfilNaTela = {
       id: data.alvoId,
@@ -1417,7 +1504,7 @@ export const verPerfil = createServerFn({ method: "POST" })
       /* ⚠️ Era `0` CRAVADO, e a tela dizia "0 seguidores" logo acima de uma
          lista que abre com doze pessoas. O número existe em `meuPerfilSocial`
          desde sempre e nunca chegava aqui. */
-      meusSeguidores: persona ? null : data.alvoId === eu ? await contarSeguidores(sb, eu) : null,
+      meusSeguidores: seguidores,
       /* ⚠️ Os selos passam pela MESMA régua na prévia e na tela real. Eles não
          dependem de quem olha — dependem das chaves —, e é justamente por isso
          que precisam estar aqui: era o campo que uma prévia feita só sobre
