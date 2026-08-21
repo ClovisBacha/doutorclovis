@@ -3402,3 +3402,45 @@ button:active > .duo3d {
     animation: none;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O ESQUELETO — a forma da tela antes do conteúdo
+   ══════════════════════════════════════════════════════════════════════════
+
+   ⚠️ Ele existe porque a tela do perfil não tinha estado de carregamento
+   NENHUM: `onde.t === "perfil"` com `perfil` nulo não casava com ramo algum e a
+   árvore caía de volta no FEED. A paciente tocava no avatar de quem publicou, a
+   tela não mudava, e segundos depois saltava para o perfil — que é o relato do
+   dono ("demora cinco segundos, ou até mais"). Meio segundo com resposta visual
+   é rápido; meio segundo de tela imóvel é um app quebrado, e a reação natural é
+   tocar de novo, o que dispara outra busca e piora o que já estava ruim.
+
+   ⚠️ `prefers-reduced-motion` PARA o brilho e deixa o bloco cinza — nunca o
+   esconde. Um esqueleto invisível devolve a tela imóvel que ele veio consertar.
+   É a mesma decisão da chama da sequência. */
+.dc-esqueleto {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--muted) 75%, transparent) 25%,
+    color-mix(in oklch, var(--muted) 40%, transparent) 37%,
+    color-mix(in oklch, var(--muted) 75%, transparent) 63%
+  );
+  background-size: 400% 100%;
+  animation: dc-esqueleto-brilho 1.4s ease-in-out infinite;
+}
+
+@keyframes dc-esqueleto-brilho {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-esqueleto {
+    animation: none;
+    background: color-mix(in oklch, var(--muted) 60%, transparent);
+  }
+}

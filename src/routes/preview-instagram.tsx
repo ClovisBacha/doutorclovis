@@ -51,6 +51,7 @@ import {
   TelaDeBusca,
   TelaDosArquivados,
   TelaDosSalvos,
+  PerfilCarregando,
   TelaDePerfil,
   TelaDoPost,
   TelaDeAtividade,
@@ -827,7 +828,19 @@ function Bancada() {
 
   return (
     <div className="mx-auto max-w-md py-2">
-      {tela === "perfil" ? (
+      {/* ⚠️ A TELA DE ESPERA, que era impossível de olhar. Ela só existe entre o
+          toque no avatar e a resposta do servidor — meio segundo numa conta de
+          verdade —, e era exatamente por isso que ela não existia: ninguém
+          conseguia parar nela. `?tela=esboco` mostra o caso com prévia (nome e
+          foto que vieram do cartão do feed) e `&vazio=1` o caso sem prévia
+          nenhuma, que é o que acontece quando o perfil é aberto por um caminho
+          que não passou por nenhuma lista. */}
+      {tela === "esboco" ? (
+        <PerfilCarregando
+          esboco={vazio ? null : { id: "a", nome: "Marina Costa", avatarUrl: null, oficial: false }}
+          aoVoltar={() => history.back()}
+        />
+      ) : tela === "perfil" ? (
         <TelaDePerfil
           perfil={perfil}
           posts={vazio ? [] : POSTS}

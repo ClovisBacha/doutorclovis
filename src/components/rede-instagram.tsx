@@ -91,6 +91,12 @@ import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import {
+  esbocoDoAutor,
+  QUADRADOS_DO_ESQUELETO,
+  type EsbocoDePerfil,
+  type PreviaDoAutor,
+} from "@/lib/esboco-de-perfil";
+import {
   chaveDaRetrospectiva,
   ehDomingo,
   fraseDaRetrospectiva,
@@ -1973,6 +1979,86 @@ export function CaixinhaNoPerfil({
   );
 }
 
+/**
+ * ⚠️ A TELA DE ESPERA DO PERFIL — o conserto da lentidão que o dono relatou.
+ *
+ * Antes, `onde.t === "perfil"` com `perfil` ainda nulo não casava com ramo
+ * nenhum e a árvore caía de volta no FEED. Do lado de quem usa: toca no avatar,
+ * a tela não muda, e vários segundos depois salta para o perfil. Isso não lê
+ * como "carregando" — lê como "travou", e a reação natural é tocar de novo, o
+ * que dispara outra busca e piora o que já estava ruim.
+ *
+ * ⚠️ **O cabeçalho mostra SÓ nome, foto e selo** — os três que já estavam
+ * desenhados no cartão em que ela tocou. Semana, bebê, bio, contadores e
+ * publicações ficam de fora até o servidor responder, porque quem decide o que
+ * aparece num perfil é `verPerfil`, cruzando Modo Cuidado, bloqueio nos dois
+ * sentidos e a camada de cada post. Um esboço que mostrasse mais seria uma
+ * segunda régua de visibilidade. Ver `src/lib/esboco-de-perfil.ts`.
+ *
+ * ⚠️ **Componente exportado, e não JSX solto dentro do ramo.** Sem isso a
+ * bancada não alcança esta tela — e uma tela de espera que só existe por meio
+ * segundo é justamente a que ninguém consegue parar para olhar.
+ */
+export function PerfilCarregando({
+  esboco,
+  aoVoltar,
+}: {
+  esboco: EsbocoDePerfil | null;
+  aoVoltar?: () => void;
+}) {
+  return (
+    <div className="pb-24">
+      <header className="flex items-center gap-2 px-4 py-3">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 flex h-10 w-10 items-center justify-center rounded-full"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            className="h-6 w-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </button>
+        <p className="truncate font-semibold">{esboco?.nome ?? "Perfil"}</p>
+        {esboco?.oficial && <SeloOficial />}
+      </header>
+
+      <div className="flex items-center gap-4 px-4">
+        {esboco?.avatarUrl ? (
+          <img
+            src={esboco.avatarUrl}
+            alt=""
+            width={86}
+            height={86}
+            className="h-[86px] w-[86px] shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="dc-esqueleto h-[86px] w-[86px] shrink-0 rounded-full" />
+        )}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="dc-esqueleto h-4 w-2/3 rounded" />
+          <div className="dc-esqueleto h-4 w-1/3 rounded" />
+        </div>
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-0.5 px-0.5">
+        {Array.from({ length: QUADRADOS_DO_ESQUELETO }, (_, i) => (
+          <div key={i} className="dc-esqueleto aspect-[3/4] w-full" />
+        ))}
+      </div>
+      <p className="sr-only" role="status">
+        Carregando o perfil
+      </p>
+    </div>
+  );
+}
+
 export function TelaDePerfil({
   perfil,
   posts,
@@ -2525,6 +2611,15 @@ export function RedeNoApp({
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
 
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
+  /**
+   * O CABEÇALHO PROVISÓRIO, com o que o feed já sabia.
+   *
+   * ⚠️ Ele nunca vira o perfil: é substituído pela resposta real e some inteiro
+   * quando ela é `indisponivel` (bloqueio, Modo Cuidado e perfil inexistente
+   * respondem a mesma palavra, e a tela não conta qual foi). Ver
+   * `src/lib/esboco-de-perfil.ts`.
+   */
+  const [esboco, setEsboco] = useState<EsbocoDePerfil | null>(null);
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
   const [gente, setGente] = useState<PessoaNaLista[]>([]);
   const [oPost, setOPost] = useState<PostNaTela | null>(null);
@@ -3650,8 +3745,42 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * O QUE A TELA JÁ SABE sobre quem publicou, sem perguntar ao servidor.
+   *
+   * ⚠️ **Ela procura nas listas que já estão em memória** — feed, sugeridos,
+   * grade do perfil aberto, salvos, gaveta, fileira de stories, lista de gente
+   * e caixa de atividade. Todos esses já DESENHARAM o nome e a foto da pessoa
+   * na tela anterior, então reaproveitá-los não revela nada novo: é a mesma
+   * informação, para a mesma pessoa, no mesmo instante.
+   *
+   * ⚠️ E `aoAbrirPerfil` continua recebendo só o `id`. Passar a prévia por prop
+   * obrigaria a mudar as seis chamadas e, pior, criaria fecho novo a cada
+   * pintura em `acoes` — que é exatamente o que faz `memo()` nunca acertar e o
+   * feed inteiro repintar a cada reação (o defeito já custou 232 ms aqui).
+   */
+  function previaDoAutor(id: string): PreviaDoAutor | null {
+    for (const lista of [posts, sugestoes, doPerfil, salvos, arquivados]) {
+      const p = lista.find((x) => x.autorId === id);
+      if (p) return { id, nome: p.autorNome, avatarUrl: p.autorAvatar, oficial: p.autorOficial };
+    }
+    for (const lista of [pessoas, gente]) {
+      const g = lista.find((x) => x.id === id);
+      if (g) return { id, nome: g.nome, avatarUrl: g.avatarUrl, oficial: g.oficial };
+    }
+    const b = bolhas.find((x) => x.autorId === id);
+    if (b) return { id, nome: b.autorNome, avatarUrl: b.autorAvatar };
+    const a = avisos.find((x) => x.quemId === id);
+    if (a) return { id, nome: a.quemNome, avatarUrl: a.quemAvatar ?? null };
+    return null;
+  }
+
   async function abrirPerfil(id: string) {
     setPerfil(null);
+    /* ⚠️ O ESBOÇO ANTES DA IDA AO SERVIDOR. Sem ele, `onde.t === "perfil"` com
+       `perfil` nulo não casava com ramo nenhum e a árvore caía de volta no
+       FEED: a paciente tocava no avatar e a tela não mudava, por segundos. */
+    setEsboco(esbocoDoAutor(previaDoAutor(id)));
     setOnde({ t: "perfil", id });
     try {
       const t = await token();
@@ -4478,6 +4607,49 @@ export function RedeNoApp({
     );
   }
 
+  /* ⚠️ **O MESMO defeito da tela do perfil, na tela do post.** `onde.t ===
+     "post"` sem `oPost` também não casava com ramo nenhum: tocar num quadrado
+     da grade deixava a tela parada até a resposta chegar. Aqui o esqueleto é
+     só a moldura — a foto e a legenda são exatamente o que o servidor precisa
+     dizer se ela pode ver. */
+  if (onde.t === "post" && !oPost) {
+    return (
+      <div className="pb-24">
+        <header className="flex items-center gap-2 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+            aria-label="Voltar"
+            className="press -ml-1 flex h-10 w-10 items-center justify-center rounded-full"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-6 w-6"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path d="M15 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <p className="font-semibold">Publicação</p>
+        </header>
+        <div className="flex items-center gap-2.5 px-4 py-2.5">
+          <div className="dc-esqueleto h-8 w-8 rounded-full" />
+          <div className="dc-esqueleto h-4 w-32 rounded" />
+        </div>
+        <div className="dc-esqueleto aspect-[4/5] w-full" />
+        <div className="space-y-2 px-4 py-3">
+          <div className="dc-esqueleto h-4 w-3/4 rounded" />
+          <div className="dc-esqueleto h-4 w-1/2 rounded" />
+        </div>
+        <p className="sr-only" role="status">
+          Carregando a publicação
+        </p>
+      </div>
+    );
+  }
+
   if (onde.t === "post" && oPost) {
     return (
       <TelaDoPost
@@ -4500,6 +4672,25 @@ export function RedeNoApp({
         aoAbrirPerfil={abrirPerfil}
       />
     );
+  }
+
+  /**
+   * ⚠️ A TELA DE ESPERA DO PERFIL — e ela é o conserto que o dono pediu.
+   *
+   * Antes, `onde.t === "perfil"` com `perfil` ainda nulo não casava com ramo
+   * nenhum e a árvore caía de volta no FEED. Do lado de quem usa: toca no
+   * avatar, a tela não muda, e vários segundos depois salta para o perfil. Isso
+   * não lê como "carregando" — lê como "travou", e a reação natural é tocar de
+   * novo, o que dispara outra busca e piora o que já estava ruim.
+   *
+   * ⚠️ O cabeçalho mostra SÓ nome, foto e selo — os três que já estavam
+   * desenhados no cartão em que ela tocou. Semana, bebê, bio, contadores e
+   * publicações ficam de fora até o servidor responder, porque quem decide o
+   * que aparece num perfil é `verPerfil`, cruzando Modo Cuidado, bloqueio e as
+   * camadas. Ver `src/lib/esboco-de-perfil.ts`.
+   */
+  if (onde.t === "perfil" && !perfil) {
+    return <PerfilCarregando esboco={esboco} aoVoltar={() => setOnde({ t: "feed" })} />;
   }
 
   if (onde.t === "perfil" && perfil) {

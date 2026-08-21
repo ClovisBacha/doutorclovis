@@ -490,11 +490,16 @@ async function perfisPorId(sb: any, ids: string[]) {
      inteiro. Um ponto só, porque `perfisPorId` alimenta feed, perfil, busca,
      stories, atividade e salvos — renovar em cada um deles seria seis lugares
      para esquecer o sétimo. */
-  const { renovarUrlAssinada } = await import("@/lib/imagens.server");
-  const renovadas = await Promise.all(
-    linhas.map(async (p) => ({ ...p, avatar_url: await renovarUrlAssinada(p.avatar_url) })),
-  );
-  return new Map(renovadas.map((p) => [p.id, p]));
+  /* ⚠️ **EM LOTE, e não uma assinatura por perfil.** `renovarUrlAssinada`
+     (singular) é uma ida à rede POR AVATAR: um feed de vinte autores custava
+     vinte requisições ao Storage só para desenhar vinte fotinhas de 32px, e
+     `perfisPorId` alimenta feed, perfil, busca, stories, atividade e salvos.
+     `renovarUrlsAssinadas` manda um `POST` por balde — e, como o avatar é
+     assinado por sete dias, o caso comum não manda nenhum: quem ainda tem mais
+     de meio dia de validade é reaproveitado sem tocar na rede. */
+  const { renovarUrlsAssinadas } = await import("@/lib/imagens.server");
+  const urls = await renovarUrlsAssinadas(linhas.map((p) => p.avatar_url));
+  return new Map(linhas.map((p, i) => [p.id, { ...p, avatar_url: urls[i] }]));
 }
 
 /**
@@ -984,7 +989,18 @@ async function montarPosts(
     }
   }
 
-  const { urlAssinada } = await import("@/lib/imagens.server");
+  /* ⚠️ **AS FOTOS DE TODOS OS POSTS SÃO ASSINADAS DE UMA VEZ.** Era uma ida à
+     rede POR FOTO: uma tela de perfil com doze publicações de até cinco fotos
+     chegava a sessenta requisições ao Storage antes de a primeira imagem
+     aparecer — e é literalmente o caminho que o dono descreveu ("clico na foto
+     de quem publicou e demora cinco segundos"). Um `POST` só resolve o lote
+     inteiro. As URLs do post continuam de vida curta (uma hora): quem manda no
+     tempo é o parâmetro, não o lote. */
+  const { urlsAssinadas } = await import("@/lib/imagens.server");
+  const todosOsCaminhos = visiveis.flatMap(
+    (p) => [p.imagem_path, ...((p.imagens ?? []) as string[])].filter(Boolean) as string[],
+  );
+  const assinadas = await urlsAssinadas("rede", todosOsCaminhos, 3600);
   return Promise.all(
     visiveis.map(async (p) => {
       const a = autores.get(p.autor_id);
@@ -995,9 +1011,7 @@ async function montarPosts(
       const caminhos = [p.imagem_path, ...((p.imagens ?? []) as string[])].filter(
         Boolean,
       ) as string[];
-      const urls = (await Promise.all(caminhos.map((c) => urlAssinada("rede", c, 3600)))).filter(
-        Boolean,
-      ) as string[];
+      const urls = caminhos.map((c) => assinadas.get(c)).filter(Boolean) as string[];
       return {
         id: p.id,
         autorId: p.autor_id,
@@ -3177,7 +3191,15 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
          que o SQL rodar. */
     }
 
-    const { urlAssinada } = await import("@/lib/imagens.server");
+    /* ⚠️ **EM LOTE, e este laço era SEQUENCIAL.** O `await urlAssinada` morava
+       dentro do `for`, então uma fileira de vinte stories eram vinte viagens em
+       fila indiana — e a fileira é a primeira coisa que a aba desenha. */
+    const { urlsAssinadas } = await import("@/lib/imagens.server");
+    const capasDosStories = await urlsAssinadas(
+      "rede",
+      linhas.map((l: any) => l.imagem_path).filter(Boolean),
+      3600,
+    );
     const porAutor = new Map<string, BolhaDeStory>();
 
     for (const l of linhas) {
@@ -3198,7 +3220,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         autorId: l.autor_id,
         autorNome: b.autorNome,
         autorAvatar: b.autorAvatar,
-        imagemUrl: await urlAssinada("rede", l.imagem_path, 3600),
+        imagemUrl: capasDosStories.get(l.imagem_path) ?? null,
         texto: l.texto ?? null,
         criadoEm: l.criado_em,
         visto,
@@ -3506,17 +3528,21 @@ export const minhaSemana = createServerFn({ method: "POST" })
 
     const ids = brutos.map((p: any) => p.id);
     const { porPost } = await reacoesDe(sb, ids, eu);
-    const { urlAssinada } = await import("@/lib/imagens.server");
+    /* Em lote: trinta publicações da semana custavam trinta assinaturas. */
+    const { urlsAssinadas } = await import("@/lib/imagens.server");
     const { montarRetrospectiva } = await import("@/lib/retrospectiva");
-
-    const posts = await Promise.all(
-      brutos.map(async (p: any) => ({
-        id: p.id as string,
-        criadoEm: p.criado_em as string,
-        imagemUrl: p.imagem_path ? await urlAssinada("rede", p.imagem_path, 3600) : null,
-        reacoes: totalDeReacoes(porPost.get(p.id) ?? {}),
-      })),
+    const capas = await urlsAssinadas(
+      "rede",
+      brutos.map((p: any) => p.imagem_path).filter(Boolean),
+      3600,
     );
+
+    const posts = brutos.map((p: any) => ({
+      id: p.id as string,
+      criadoEm: p.criado_em as string,
+      imagemUrl: p.imagem_path ? (capas.get(p.imagem_path) ?? null) : null,
+      reacoes: totalDeReacoes(porPost.get(p.id) ?? {}),
+    }));
 
     return {
       ok: true as const,
@@ -3906,10 +3932,17 @@ export const minhaAtividade = createServerFn({ method: "POST" })
         .select("id, imagem_path")
         .in("id", postIds)
         .is("arquivado_em", null);
-      const { urlAssinada } = await import("@/lib/imagens.server");
+      /* ⚠️ Em lote, e este laço também era SEQUENCIAL: a caixa do coração
+         mostra até cinquenta linhas, e cada capa era uma viagem esperando a
+         anterior. */
+      const { urlsAssinadas } = await import("@/lib/imagens.server");
+      const assinadas = await urlsAssinadas(
+        "rede",
+        ((ps ?? []) as any[]).map((p) => p.imagem_path).filter(Boolean),
+        3600,
+      );
       for (const p of (ps ?? []) as any[]) {
-        if (!p.imagem_path) continue;
-        const u = await urlAssinada("rede", p.imagem_path, 3600);
+        const u = p.imagem_path ? assinadas.get(p.imagem_path) : null;
         if (u) capas.set(p.id, u);
       }
     }

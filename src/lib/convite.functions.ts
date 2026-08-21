@@ -249,15 +249,23 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
         .is("arquivado_em", null)
         .order("criado_em", { ascending: false })
         .limit(POSTS_NA_VITRINE);
-      const { urlAssinada } = await import("@/lib/imagens.server");
-      posts = await Promise.all(
-        ((linhas ?? []) as any[]).map(async (l) => ({
-          id: l.id as string,
-          imagemUrl: l.imagem_path ? await urlAssinada("rede", l.imagem_path, 3600) : null,
-          texto: (l.texto as string | null) ?? null,
-          criadoEm: l.criado_em as string,
-        })),
+      /* ⚠️ **EM LOTE, e aqui isso pesa mais que em qualquer outra tela.** Esta é
+         a página que a criadora põe na bio: quem chega não tem conta, não tem
+         cache e está decidindo em dez segundos se o app vale a pena. Doze
+         assinaturas em sequência de requisições eram doze idas ao Storage
+         antes da primeira foto. Uma só agora. */
+      const { urlsAssinadas } = await import("@/lib/imagens.server");
+      const capas = await urlsAssinadas(
+        "rede",
+        ((linhas ?? []) as any[]).map((l) => l.imagem_path).filter(Boolean),
+        3600,
       );
+      posts = ((linhas ?? []) as any[]).map((l) => ({
+        id: l.id as string,
+        imagemUrl: l.imagem_path ? (capas.get(l.imagem_path) ?? null) : null,
+        texto: (l.texto as string | null) ?? null,
+        criadoEm: l.criado_em as string,
+      }));
     } catch {
       /* Sem as publicações a vitrine vira só o cartão de perfil — que é melhor
          que uma página que não abre. */

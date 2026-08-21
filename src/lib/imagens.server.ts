@@ -366,3 +366,145 @@ export async function renovarUrlAssinada(
   const caminho = decodeURIComponent(m[2]);
   return (await urlAssinada(balde, caminho, segundos)) ?? guardada;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O LOTE — e por que assinar uma por uma custava segundos
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * QUANTO TEMPO SOBRANDO FAZ UMA URL VALER A PENA REAPROVEITAR.
+ *
+ * ⚠️ **A maior parte das assinaturas era desperdício puro.** `salvarPerfilSocial`
+ * grava o avatar com SETE DIAS de validade, e `perfisPorId` re-assinava a URL a
+ * cada leitura — feed, busca, stories, atividade, salvos, lista de amigas. Uma
+ * URL com seis dias de vida pela frente era jogada fora e refeita, ao custo de
+ * uma ida à rede, para produzir outra idêntica em efeito.
+ *
+ * Com doze horas de margem, o caso comum passa a custar ZERO requisições: só
+ * quem está de fato perto de vencer é renovado.
+ */
+export const MARGEM_DE_RENOVACAO_SEG = 12 * 3600;
+
+/**
+ * Quando esta URL assinada vence, em segundos-época — ou `null`.
+ *
+ * O token de uma URL assinada do Storage é um JWT cujo payload traz `exp`.
+ * ⚠️ **Isto NÃO é verificação de assinatura, e não pode virar uma.** O `exp` é
+ * lido só para decidir "vale a pena renovar?"; quem valida o token é o Storage,
+ * do outro lado. Ler sem verificar aqui é seguro porque a resposta errada custa
+ * no máximo uma renovação a mais — nunca acesso a nada.
+ *
+ * ⚠️ **Não decifrou vale RENOVAR** (devolve `null`, e quem chama re-assina): o
+ * lado seguro é a foto que carrega, nunca a requisição economizada.
+ */
+export function expiraEmSegundos(assinada: string): number | null {
+  try {
+    const token = new URL(assinada, "https://x.invalid").searchParams.get("token");
+    if (!token) return null;
+    const corpo = token.split(".")[1];
+    if (!corpo) return null;
+    const json = Buffer.from(corpo.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8");
+    const exp = (JSON.parse(json) as { exp?: unknown })?.exp;
+    return typeof exp === "number" && Number.isFinite(exp) ? exp : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Ainda dura o bastante para ser reaproveitada? */
+function aindaServe(assinada: string, agoraSeg: number): boolean {
+  const exp = expiraEmSegundos(assinada);
+  return exp !== null && exp - agoraSeg > MARGEM_DE_RENOVACAO_SEG;
+}
+
+/**
+ * ASSINA UM LOTE DE CAMINHOS DO MESMO BALDE — numa requisição só.
+ *
+ * ⚠️ **`createSignedUrl` (singular) é uma ida à rede POR ARQUIVO**, e é isso que
+ * fazia abrir um perfil demorar. Uma tela de perfil com doze publicações de até
+ * cinco fotos chega a sessenta assinaturas; um feed de vinte autores soma o
+ * avatar de cada um. `createSignedUrls` (PLURAL) manda todos os caminhos num
+ * `POST` só.
+ *
+ * ⚠️ **A resposta é casada por CAMINHO, nunca por índice.** A API devolve o
+ * `path` de volta em cada item, e depender da ordem seria a classe de defeito
+ * que silenciosamente entrega a foto de uma paciente no lugar da de outra.
+ * O índice entra só como recuo, quando o `path` volta nulo.
+ */
+export async function urlsAssinadas(
+  balde: string,
+  caminhos: string[],
+  segundos = VALIDADE_SEGUNDOS,
+): Promise<Map<string, string>> {
+  const saida = new Map<string, string>();
+  const unicos = [...new Set(caminhos.filter(Boolean))];
+  if (unicos.length === 0) return saida;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.storage.from(balde).createSignedUrls(unicos, segundos);
+    if (error || !data) return saida;
+    data.forEach((item, i) => {
+      const caminho = item?.path ?? unicos[i];
+      if (caminho && item?.signedUrl) saida.set(caminho, item.signedUrl);
+    });
+    return saida;
+  } catch {
+    return saida;
+  }
+}
+
+/**
+ * RENOVA UM LOTE DE URLs GUARDADAS EM COLUNA — a versão em lote de
+ * `renovarUrlAssinada`, com as mesmas regras e sem o custo por item.
+ *
+ * Três economias, nesta ordem:
+ *
+ *  1. **data URL, link externo e `null` não custam nada** — passam intactos, como
+ *     na versão singular (é o que preserva quem gravou pelo `campo-foto`);
+ *  2. **URL que ainda dura mais que `MARGEM_DE_RENOVACAO_SEG` é reaproveitada** —
+ *     e este é o caso comum, porque o avatar é assinado por sete dias;
+ *  3. **o que sobrou é assinado em LOTE**, uma requisição por balde.
+ *
+ * ⚠️ **A ORDEM DA SAÍDA É A DA ENTRADA.** Quem chama casa por índice
+ * (`linhas.map`), e devolver fora de ordem trocaria o rosto de uma paciente pelo
+ * de outra — o defeito mais grave que este arquivo poderia produzir.
+ *
+ * ⚠️ **Falha devolve o valor ANTIGO, nunca `null`** — a mesma decisão da versão
+ * singular: uma URL talvez-vencida ainda pode estar no cache do navegador dela,
+ * e trocá-la por um vazio garantido é piorar.
+ */
+export async function renovarUrlsAssinadas(
+  guardadas: (string | null | undefined)[],
+  segundos = VALIDADE_SEGUNDOS,
+): Promise<(string | null)[]> {
+  const agoraSeg = Math.floor(Date.now() / 1000);
+  /* Por balde, os caminhos que de fato precisam de assinatura nova. */
+  const pedidos = new Map<string, Set<string>>();
+  /* Por índice, onde procurar o resultado depois. */
+  const ondeBuscar: ({ balde: string; caminho: string } | null)[] = guardadas.map((g) => {
+    if (!g || g.startsWith("data:")) return null;
+    const m = g.match(/\/object\/sign\/([^/]+)\/([^?]+)/);
+    if (!m) return null;
+    if (aindaServe(g, agoraSeg)) return null;
+    const balde = decodeURIComponent(m[1]);
+    const caminho = decodeURIComponent(m[2]);
+    if (!pedidos.has(balde)) pedidos.set(balde, new Set());
+    pedidos.get(balde)!.add(caminho);
+    return { balde, caminho };
+  });
+
+  if (pedidos.size === 0) return guardadas.map((g) => g ?? null);
+
+  const assinadas = new Map<string, Map<string, string>>();
+  await Promise.all(
+    [...pedidos.entries()].map(async ([balde, caminhos]) => {
+      assinadas.set(balde, await urlsAssinadas(balde, [...caminhos], segundos));
+    }),
+  );
+
+  return guardadas.map((g, i) => {
+    const alvo = ondeBuscar[i];
+    if (!alvo) return g ?? null;
+    return assinadas.get(alvo.balde)?.get(alvo.caminho) ?? g ?? null;
+  });
+}

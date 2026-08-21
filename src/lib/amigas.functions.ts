@@ -348,9 +348,17 @@ export const minhasAmigas = createServerFn({ method: "POST" })
        grava sete dias na coluna; no oitavo a foto responde 403 — e não só na
        Comunidade: esta lista lê a MESMA coluna. `renovarUrlAssinada` devolve
        data URL e link externo intactos, então quem gravou pelo `campo-foto` não
-       é tocada. */
-    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
-    for (const a of amigas) a.avatarUrl = await renovarUrlAssinada(a.avatarUrl);
+       é tocada.
+
+       ⚠️ **E EM LOTE.** Este laço era `for … await`: SEQUENCIAL, uma ida à rede
+       por amiga, uma esperando a anterior. Vinte amigas eram vinte viagens em
+       fila indiana antes de a aba desenhar. `renovarUrlsAssinadas` manda uma
+       requisição por balde — e nenhuma para quem ainda está longe de vencer. */
+    const { renovarUrlsAssinadas } = await import("@/lib/imagens.server");
+    const urls = await renovarUrlsAssinadas(amigas.map((a) => a.avatarUrl));
+    amigas.forEach((a, i) => {
+      a.avatarUrl = urls[i];
+    });
 
     /* Ordem: a chama mais alta primeiro. Não é placar — é a lista de quem está
        ativa, que é quem faz sentido convidar para a dupla hoje. */
