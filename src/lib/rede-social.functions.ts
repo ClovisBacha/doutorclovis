@@ -90,8 +90,17 @@ export type PostNaTela = {
    */
   autorOficial: boolean;
   texto: string | null;
-  /** A PRIMEIRA foto — é ela que a grade e a prévia usam. */
+  /** A PRIMEIRA foto, em tamanho cheio — é ela que a tela do post abre. */
   imagemUrl: string | null;
+  /**
+   * A versão de 480px, para a GRADE e as capas pequenas.
+   *
+   * ⚠️ `null` em toda publicação anterior ao recurso, e isso é permanente:
+   * `urlDaGrade` cai na foto cheia. Nunca use esta URL na tela que abre ao
+   * tocar na publicação — lá ela apareceria mole justamente onde a paciente
+   * quer ver a foto de verdade.
+   */
+  miniaturaUrl: string | null;
   /**
    * O carrossel inteiro, a primeira inclusa.
    *
@@ -578,7 +587,7 @@ const AUTORES_NO_FEED = 200;
  */
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
-  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em";
+  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -615,6 +624,8 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     pergunta: null,
     comparacao_de: null,
     editado_em: null,
+    /* Sem a coluna, a grade cai na foto cheia — que é o que ela sempre fez. */
+    miniatura_path: null,
   }));
 }
 
@@ -1080,7 +1091,10 @@ async function montarPosts(
      tempo é o parâmetro, não o lote. */
   const { urlsAssinadas } = await import("@/lib/imagens.server");
   const todosOsCaminhos = visiveis.flatMap(
-    (p) => [p.imagem_path, ...((p.imagens ?? []) as string[])].filter(Boolean) as string[],
+    (p) =>
+      [p.imagem_path, p.miniatura_path, ...((p.imagens ?? []) as string[])].filter(
+        Boolean,
+      ) as string[],
   );
   const assinadas = await urlsAssinadas("rede", todosOsCaminhos, 3600);
   return Promise.all(
@@ -1102,6 +1116,7 @@ async function montarPosts(
         autorOficial: ehContaOficial(a as any),
         texto: p.texto ?? null,
         imagemUrl: urls[0] ?? null,
+        miniaturaUrl: p.miniatura_path ? (assinadas.get(p.miniatura_path) ?? null) : null,
         imagens: urls,
         visibilidade: p.visibilidade,
         criadoEm: p.criado_em,
@@ -1719,6 +1734,16 @@ export const publicarPost = createServerFn({ method: "POST" })
         texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
         /** Data URL. O cliente já reduz para 512px antes de mandar. */
         imagem: z.string().max(1_500_000).nullable(),
+        /**
+         * A versão de 480px da PRIMEIRA foto, para a grade.
+         *
+         * ⚠️ **Opcional, e falhar a subida NÃO recusa o post.** A foto grande é
+         * o conteúdo; a miniatura é só economia de byte. Recusar a publicação
+         * dela por causa de uma redução que não subiu seria trocar um problema
+         * de desempenho por um de produto — e `urlDaGrade` já sabe cair na foto
+         * cheia.
+         */
+        miniatura: z.string().max(600_000).nullable().optional(),
         /** As DEMAIS do carrossel. Até nove — a primeira vai em `imagem`. */
         extras: z.array(z.string().max(1_500_000)).max(9).optional(),
         visibilidade: z.enum(["publico", "seguidores", "amigas"]),
@@ -1841,6 +1866,7 @@ export const publicarPost = createServerFn({ method: "POST" })
     }
 
     let caminho: string | null = null;
+    let miniatura: string | null = null;
     const extras: string[] = [];
     if (data.imagem) {
       const { guardarImagem } = await import("@/lib/imagens.server");
@@ -1858,6 +1884,15 @@ export const publicarPost = createServerFn({ method: "POST" })
         if (!c) return { ok: false as const, motivo: "imagem" as const };
         extras.push(c);
       }
+
+      /* ⚠️ **A MINIATURA NÃO RECUSA O POST.** Ao contrário das fotos acima, ela
+         não é conteúdo: é a versão de 480px que a grade usa para não baixar
+         1080. Se a redução não subir, a grade cai na foto cheia — que é o que
+         ela sempre fez. Derrubar a publicação por isso seria trocar um problema
+         de desempenho por um de produto. */
+      if (data.miniatura) {
+        miniatura = await guardarImagem({ balde: "rede", donoId: eu, dataUrl: data.miniatura });
+      }
     }
 
     /* ⚠️ O "ENTÃO" É A PRIMEIRA FOTO, e a de agora vem depois. A ordem é a
@@ -1866,6 +1901,11 @@ export const publicarPost = createServerFn({ method: "POST" })
     if (fotoDoEntao && caminho) {
       extras.unshift(caminho);
       caminho = fotoDoEntao;
+      /* ⚠️ **A MINIATURA ERA DA FOTO DE AGORA, e a primeira passou a ser a de
+         ANTES.** Mantê-la faria a grade mostrar a foto de hoje numa publicação
+         cuja capa é a de quatro semanas atrás — a comparação contada ao
+         contrário, e só na grade. Sem miniatura, a grade cai na foto cheia. */
+      miniatura = null;
     }
 
     const { data: post, error } = await sb
@@ -1874,6 +1914,7 @@ export const publicarPost = createServerFn({ method: "POST" })
         autor_id: eu,
         texto: data.texto?.trim() || null,
         imagem_path: caminho,
+        miniatura_path: miniatura,
         imagens: extras,
         visibilidade: data.visibilidade,
         enquete_opcoes: opcoes,
@@ -1897,7 +1938,9 @@ export const publicarPost = createServerFn({ method: "POST" })
        `publicarStory`: o deploy chega antes do SQL, e sem isto PUBLICAR pararia
        de funcionar para todo mundo — não só a enquete. */
     if (error) {
-      console.warn("[rede] post sem enquete/aula/comparacao — rode APLICAR_REDE_SOCIAL.sql");
+      console.warn(
+        "[rede] post sem enquete/aula/comparacao/miniatura — rode APLICAR_REDE_SOCIAL.sql",
+      );
       /* ⚠️ O recuo publica SEM o carimbo, e não sem a comparação: as duas fotos
          continuam no carrossel, na ordem certa. O que se perde é o "28s → 34s",
          que é enfeite — perder a publicação inteira por causa dele seria a
@@ -4052,22 +4095,45 @@ export const minhaAtividade = createServerFn({ method: "POST" })
     const postIds = [...new Set(brutas.map((l) => l.post_id).filter(Boolean))] as string[];
     const capas = new Map<string, string>();
     if (postIds.length) {
-      const { data: ps } = await sb
-        .from("rede_posts")
-        .select("id, imagem_path")
-        .in("id", postIds)
-        .is("arquivado_em", null);
+      /* ⚠️ **A MINIATURA, e com recuo por coluna ausente.** A capa desenha
+         40×40 e baixava a foto de 1080 — a caixa mostra até cinquenta linhas.
+         O `select` com a coluna nova falha inteiro (`42703`) num banco que
+         ainda não rodou o SQL, e sem o recuo a caixa do coração ficaria SEM
+         capa nenhuma. */
+      let ps: any[] | null = null;
+      {
+        const cheio = await sb
+          .from("rede_posts")
+          .select("id, imagem_path, miniatura_path")
+          .in("id", postIds)
+          .is("arquivado_em", null);
+        if (cheio.error) {
+          const velho = await sb
+            .from("rede_posts")
+            .select("id, imagem_path")
+            .in("id", postIds)
+            .is("arquivado_em", null);
+          ps = ((velho.data ?? []) as any[]).map((p) => ({ ...p, miniatura_path: null }));
+        } else {
+          ps = (cheio.data ?? []) as any[];
+        }
+      }
       /* ⚠️ Em lote, e este laço também era SEQUENCIAL: a caixa do coração
          mostra até cinquenta linhas, e cada capa era uma viagem esperando a
          anterior. */
       const { urlsAssinadas } = await import("@/lib/imagens.server");
       const assinadas = await urlsAssinadas(
         "rede",
-        ((ps ?? []) as any[]).map((p) => p.imagem_path).filter(Boolean),
+        ((ps ?? []) as any[])
+          .map((p) => p.miniatura_path ?? p.imagem_path)
+          .filter(Boolean) as string[],
         3600,
       );
       for (const p of (ps ?? []) as any[]) {
-        const u = p.imagem_path ? assinadas.get(p.imagem_path) : null;
+        /* A mesma escolha da grade: miniatura quando existe, foto cheia quando
+           não — e publicação anterior ao recurso nunca terá. */
+        const caminho = p.miniatura_path ?? p.imagem_path;
+        const u = caminho ? assinadas.get(caminho) : null;
         if (u) capas.set(p.id, u);
       }
     }

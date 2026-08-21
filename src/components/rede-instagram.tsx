@@ -90,6 +90,7 @@ import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
 import { guardarNoCache, lerDoCache } from "@/lib/cache-do-feed";
 import {
   esbocoDoAutor,
@@ -3970,6 +3971,8 @@ export function RedeNoApp({
     comparacaoCom: string | null;
     texto: string | null;
     fotos: string[];
+    /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
+    miniatura?: string | null;
     visibilidade: Visibilidade;
     enquete: string[];
     aula: AulaNoPost | null;
@@ -3986,6 +3989,7 @@ export function RedeNoApp({
              servidor, que guardou a capa numa coluna própria desde antes de o
              carrossel existir. */
           imagem: p.fotos[0] ?? null,
+          miniatura: p.miniatura ?? null,
           extras: p.fotos.slice(1),
           visibilidade: p.visibilidade,
           enquete: p.enquete,
@@ -5928,6 +5932,42 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
 }
 
 /**
+ * A MINIATURA DA GRADE — a mesma foto a 480px.
+ *
+ * ⚠️ **Gerada AQUI, no aparelho dela, e não no servidor.** O arquivo grande já
+ * está no navegador nesse instante: reduzir aqui custa um `drawImage` e não
+ * custa upload, banda nem função de servidor. Gerar depois obrigaria a BAIXAR
+ * de volta a foto que acabou de subir.
+ *
+ * ⚠️ E ela é da PRIMEIRA foto só. A grade e as capas pequenas mostram a capa;
+ * as demais do carrossel só existem dentro da publicação aberta, onde a foto
+ * cheia é a certa.
+ *
+ * Ver `src/lib/miniatura.ts` para a conta que decidiu o 480.
+ */
+async function prepararMiniatura(file: File): Promise<string | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maior = Math.max(bitmap.width, bitmap.height);
+    /* Foto que já é pequena não vira um segundo arquivo do mesmo peso. */
+    if (!valeMiniatura(maior)) return null;
+    const escala = LADO_DA_MINIATURA / maior;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * escala);
+    canvas.height = Math.round(bitmap.height * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    /* 0,75 e não 0,8: num quadrado de 130px o olho não distingue, e a diferença
+       de peso é real. */
+    return canvas.toDataURL("image/jpeg", 0.75);
+  } catch {
+    /* Sem miniatura a grade cai na foto cheia — nunca se perde a publicação. */
+    return null;
+  }
+}
+
+/**
  * Reduz a foto do STORY.
  *
  * ⚠️ **Ela subia por `prepararAvatar`** — 512px QUADRADOS, com recorte central.
@@ -6013,6 +6053,8 @@ export function NovoPost({
   aoPublicar: (p: {
     texto: string | null;
     fotos: string[];
+    /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
+    miniatura?: string | null;
     visibilidade: Visibilidade;
     enquete: string[];
     aula: AulaNoPost | null;
@@ -6110,6 +6152,15 @@ export function NovoPost({
      a enquete e ainda não escreveu — e não uma enquete inválida na tela. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
   const [comAula, setComAula] = useState(false);
+  /**
+   * A miniatura da PRIMEIRA foto.
+   *
+   * ⚠️ Guardada em estado próprio, e não derivada de `fotos`: o `File` original
+   * só existe no instante em que ela escolhe, e reduzir a partir do data URL já
+   * reduzido seria reduzir duas vezes. `null` é normal — foto pequena, canvas
+   * indisponível, ou a foto veio de um cartão de momento.
+   */
+  const [miniatura, setMiniatura] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -6179,6 +6230,7 @@ export function NovoPost({
     const ok = await aoPublicar({
       texto: texto.trim() || null,
       fotos,
+      miniatura,
       visibilidade: vis,
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
@@ -6603,6 +6655,12 @@ export function NovoPost({
             if (!d) setErro("Não consegui ler essa imagem.");
             else {
               setErro(null);
+              /* ⚠️ A miniatura é da PRIMEIRA foto, e é gerada AQUI porque o
+                 arquivo já está em mãos. Fora daqui seria preciso guardar o
+                 `File` — e ela pode trocar a ordem das fotos antes de publicar.
+                 `null` quando a original já é pequena, ou quando o canvas
+                 falhou: a grade cai na foto cheia. */
+              if (fotos.length === 0) setMiniatura(await prepararMiniatura(f));
               setFotos((fs) => [...fs, d]);
             }
           }}
@@ -6651,8 +6709,22 @@ export function GradeDePosts({
           style={{ aspectRatio: String(RAZAO_DA_GRADE) }}
           className="press relative overflow-hidden bg-muted/60"
         >
-          {p.imagemUrl ? (
-            <img src={p.imagemUrl} alt="" className="h-full w-full object-cover" loading="lazy" />
+          {urlDaGrade(p) ? (
+            /* ⚠️ **`width`/`height` são o que faz o `loading="lazy"` FUNCIONAR.**
+               Sem as dimensões o navegador não sabe a altura de cada célula, não
+               consegue calcular o que está fora da tela e pede as vinte imagens
+               de uma vez. Medido: 21 de 21 requisições saíam na abertura, com 8
+               células visíveis. Quem dimensiona na tela continua sendo o CSS —
+               estes números só declaram a PROPORÇÃO. */
+            <img
+              src={urlDaGrade(p) ?? undefined}
+              alt=""
+              width={CELULA_DA_GRADE.largura}
+              height={CELULA_DA_GRADE.altura}
+              className="h-full w-full object-cover"
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             /* Post só de texto na grade: mostra o texto, não um buraco. */
             <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">

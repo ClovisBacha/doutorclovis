@@ -702,6 +702,29 @@ COMMENT ON TABLE public.rede_bloqueios IS
 -- `quizPremium` e estraga a aula de quem está uma semana atrás).
 ALTER TABLE public.rede_posts ADD COLUMN IF NOT EXISTS aula jsonb;
 
+-- ---------------------------------------------------------------------------
+-- A MINIATURA DA GRADE (ago/2026)
+--
+-- A grade do perfil desenha celulas de 130x173 e baixava a foto de 1080px para
+-- cada uma. Medido numa abertura de perfil: 2,67 MB e 21 requisicoes, para
+-- desenhar miniaturas -- e e exatamente o caminho que o dono descreveu como
+-- "clico na foto de quem publicou e demora cinco segundos".
+--
+-- A foto grande continua existindo e continua sendo a que abre quando ela toca
+-- na publicacao. O que muda e o que a GRADE pede.
+--
+-- ATENCAO: nasce por ALTER, e nao dentro de um CREATE TABLE IF NOT EXISTS --
+-- num banco que ja tem a tabela o CREATE e no-op e a coluna nunca nasceria. Foi
+-- isso que deixou `carimbo_semana` impossivel de criar por uma leva inteira.
+--
+-- NULL e valido e permanente: toda publicacao anterior a este recurso continua
+-- servindo a foto cheia na grade. Ver `urlDaGrade` em src/lib/miniatura.ts.
+-- ---------------------------------------------------------------------------
+ALTER TABLE public.rede_posts ADD COLUMN IF NOT EXISTS miniatura_path text;
+
+COMMENT ON COLUMN public.rede_posts.miniatura_path IS
+  'Versao de 480px da primeira foto, para a grade e as capas pequenas. NULL nas publicacoes anteriores ao recurso -- a grade cai na foto cheia.';
+
 -- A enquete mora em ARRAY no próprio post, pela razão já escrita para
 -- `imagens`: são 2 a 4 strings curtas, sempre lidas junto com o post.
 ALTER TABLE public.rede_posts
@@ -1011,4 +1034,8 @@ SELECT
   -- Sem esta, a vitrine publica (/p/<codigo>) nao abre para ninguem -- o que e
   -- o lado seguro: banco sem a coluna e banco sem consentimento.
   EXISTS (SELECT 1 FROM information_schema.columns
-          WHERE table_name='patient_profiles' AND column_name='vitrine_publica')     AS vitrine_ok;
+          WHERE table_name='patient_profiles' AND column_name='vitrine_publica')     AS vitrine_ok,
+  -- Sem esta, a grade continua baixando a foto de 1080 para desenhar 130x173.
+  -- Nada quebra: `urlDaGrade` cai na foto cheia.
+  EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name='rede_posts' AND column_name='miniatura_path')            AS miniatura_ok;

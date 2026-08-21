@@ -173,6 +173,11 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
         ? "Ultrassom de hoje — a mãozinha no rosto bem na hora da foto"
         : null,
   imagemUrl: i === 5 ? null : foto(c[0], c[1], c[2]),
+  /* ⚠️ Metade COM miniatura e metade SEM, de propósito: o recuo é permanente
+     (toda publicação anterior ao recurso cai na foto cheia), e uma bancada em
+     que todas têm miniatura nunca mostraria o caminho que a maioria do acervo
+     vai percorrer. */
+  miniaturaUrl: i === 5 || i % 2 === 1 ? null : foto(c[0], c[1], c[2]),
   /* O post 2 é um CARROSSEL de três: é ele que prova os pontinhos e o
      deslizar. Com um só, não haveria o que conferir. */
   imagens:
