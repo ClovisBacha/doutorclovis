@@ -18,6 +18,7 @@
     "social": "node scripts/social/gerar.mjs",
     "prepare": "husky",
     "test": "bun test src/",
+    "medir:ondas": "bun test medicoes/ondas-do-perfil.test.ts",
     "app:sync": "cap sync",
     "app:ios": "cap open ios",
     "app:android": "cap open android"

@@ -255,15 +255,36 @@ const sbFake: any = {
   },
 };
 
-mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sbFake }));
 /* ⚠️ **`imagens.server` NÃO é dublê aqui, e isso é de propósito.** Mocá-lo faria
-   este arquivo medir uma assinatura imaginária — e, pior, o dublê vazaria para
-   os testes do LOTE logo abaixo, que precisam do módulo de verdade (`mock.module`
-   do bun é global e o último registro vence). O que é dublê é o STORAGE, dentro
-   de `sbFake`: assim o caminho medido é o real, `createSignedUrls` inclusive. */
+   este arquivo medir uma assinatura imaginária. O que é dublê é o STORAGE,
+   dentro de `sbFake`: assim o caminho medido é o real, `createSignedUrls`
+   inclusive. */
 
 const ALVO = "00000000-0000-4000-8000-000000000001";
 test("⚠️ abrir um perfil não pode voltar a ser uma cascata", async () => {
+  /**
+   * ⚠️ **ESTE ARQUIVO MORA FORA DE `src/`, e é por isso que ele existe aqui.**
+   *
+   * `mock.module` do bun escreve num registro COMPARTILHADO entre todos os
+   * arquivos de teste, e todos eles são IMPORTADOS antes de qualquer um rodar —
+   * então o último import vence, independentemente da ordem de execução. Três
+   * outros arquivos da base (`assento-de-clinica`, `cortes-do-cerebro`,
+   * `lacunas-parecidas`) mocam o MESMO `client.server`, e um deles já
+   * documentava a armadilha por escrito.
+   *
+   * Na prática: esta medição passava sozinha e falhava (às vezes) na suíte
+   * inteira, porque media `verPerfil` contra o Supabase de outro arquivo. Um
+   * teste que muda de resposta conforme a ordem dos vizinhos não mede nada — e
+   * um teste intermitente é pior que teste nenhum, porque ensina a ignorar o
+   * vermelho.
+   *
+   * O script de teste é `bun test src/`, então nada daqui roda na CI. A medição
+   * se roda de propósito: `bun run medir:ondas`. Quem protege a estrutura no dia
+   * a dia são as asserções de FORMA em `rede-social-servidor.test.ts` (os
+   * `Promise.all` de `contextoDe`, do perfil+vínculo e da cauda), que não
+   * dependem de dublê nenhum e foram conferidas por mutação.
+   */
+  mock.module("@/integrations/supabase/client.server", () => ({ supabaseAdmin: sbFake }));
   const { verPerfil } = await import("@/lib/rede-social.functions");
   t0 = performance.now();
   const _r: any = await (verPerfil as any)({ data: { accessToken: "x".repeat(20), alvoId: ALVO } });
@@ -298,7 +319,7 @@ test("⚠️ abrir um perfil não pode voltar a ser uma cascata", async () => {
   expect(ondas).toBeLessThanOrEqual(TETO_DE_ONDAS);
 });
 
-import { renovarUrlsAssinadas } from "./imagens.server";
+import { renovarUrlsAssinadas } from "../src/lib/imagens.server";
 
 const agora = () => Math.floor(Date.now() / 1000);
 const comExp = (segundos: number, caminho: string) => {
