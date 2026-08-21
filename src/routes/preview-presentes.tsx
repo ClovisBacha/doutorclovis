@@ -14,9 +14,19 @@
  *   /preview-presentes?rn=cheio    → RN no teto (o cartão "completo" e a ordem)
  *   /preview-presentes?cota=11     → 11 de 12 cotas do carrinho
  *   /preview-presentes?vazio=1     → lista ainda sendo montada
+ *   /preview-presentes?dona=1      → A TELA DA DONA (`ChaDeBebe`), com o
+ *                                    formulário de acrescentar item e o de
+ *                                    dividir em cotas.
+ *
+ * ⚠️ **A tela da DONA não tinha bancada nenhuma até aqui**, e foi por isso que
+ * ninguém viu que as cotas não tinham como nascer: o servidor aceita
+ * `tipo: "cota"`, a régua está testada e a página pública desenha a reserva —
+ * mas o único lugar do `src/` que escrevia `tipo: "cota"` era esta bancada, do
+ * lado PÚBLICO. A tela que a gestante usa mandava `tipo: "item"` cravado.
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { ListaDePresentesPublica } from "@/components/lista-de-presentes-publica";
+import { ChaDeBebe } from "@/components/cha-de-bebe";
 import { faixaDe, metaDeFraldas, TAMANHOS } from "@/lib/fraldas";
 import type { ItemDaLista } from "@/lib/presentes";
 import type { ListaPublica } from "@/lib/presentes.functions";
@@ -29,11 +39,13 @@ export const Route = createFileRoute("/preview-presentes")({
     rn: q.rn == null ? "" : String(q.rn),
     cota: q.cota == null ? 0 : Number(q.cota) || 0,
     vazio: q.vazio == null ? false : !!q.vazio,
+    /* ⚠️ `== null`, como todos os outros — na revalidação chega `null`. */
+    dona: q.dona == null ? false : !!q.dona,
   }),
 });
 
 function Bancada() {
-  const { rn, cota, vazio } = Route.useSearch();
+  const { rn, cota, vazio, dona } = Route.useSearch();
   const meta = metaDeFraldas();
 
   const fraldas: ItemDaLista[] = TAMANHOS.map((t, n) => ({
@@ -100,6 +112,17 @@ function Bancada() {
     aberta: true,
     itens: vazio ? [] : [...fraldas, ...outros],
   };
+
+  if (dona) {
+    /* ⚠️ **A bancada injeta o DADO no mesmo `useState` da produção** (a prop
+       `bancada`), nunca o desenho — é a régua da casa. `salvarItens` vai ao
+       servidor de verdade e falha sem sessão; o que se confere aqui é o
+       FORMULÁRIO (a caixa de cotas, o campo de valor, as sugestões de divisão e
+       o piso de R$ 25), que é o que não existia. */
+    return (
+      <ChaDeBebe bancada={{ lista: { ...lista, token: "bancada", reservas: [] }, guardados: 2 }} />
+    );
+  }
 
   return (
     <ListaDePresentesPublica

@@ -6109,3 +6109,52 @@ REPROVAVA código certo. O que sobrou são duas asserções de COMPORTAMENTO, so
 o fonte com os comentários removidos: por onde a compra passa, e que o flag
 continua sem escritor. Três mutações em vermelho, inclusive a que deixa só o
 comentário citando o portão.
+
+## ⚠️ AS COTAS DO CHÁ NÃO TINHAM COMO NASCER (ago/2026)
+
+Achada por uma varredura de funções exportadas sem nenhum uso — a mesma que
+pegou `legendaSugerida`, agora sobre o `src/lib/` inteiro.
+
+`sugerirCotas` (`cotas.ts`) não tinha CHAMADOR NENHUM. Investigando: o servidor
+aceita `tipo: "cota"`, a régua está inteira e testada (com o caso do
+R$ 1.200 ÷ 7 que quebra em ponto flutuante), e a página pública desenha a
+reserva de cota — mas **o único lugar do `src/` que escrevia `tipo: "cota"` era
+a BANCADA**. O formulário da gestante mandava `tipo: "item"` cravado.
+
+Das três espécies de item, a **fralda** nasce semeada com a lista e o **item
+comum** tem formulário; a **cota** era uma função documentada como pronta e
+inalcançável. Mesma família das sete funções de servidor sem porta — e, como
+elas, era a bancada que a fazia parecer entregue.
+
+- **A divisão sai de `sugerirCotas`, nunca de um campo livre.** É ela que
+  garante o piso de R$ 25 por cota: "12x de R$ 8" transforma o carrinho numa
+  vaquinha de trocado, o oposto do que a cota existe para fazer. Abaixo de
+  R$ 50 a tela diz **o piso**, e não "valor inválido" — sem o número ela não
+  sabe o que corrigir.
+- **Centavos inteiros, com a conversão num lugar só.** `Math.round` no total,
+  uma vez; nunca aritmética de reais espalhada pela tela.
+- ⚠️ **A conferência vai no caminho do ENVIO, não só no botão desabilitado.**
+  `ItemSchema` exige `meta >= 1` e `centavosTotal` até R$ 100.000 — fora disso
+  volta um erro de banco genérico, que não diz à mãe o que corrigir.
+- **Desligado por padrão**: a maioria dos itens de um chá é item simples, e
+  abrir o formulário em modo cota faria toda mãe decidir sobre divisão para
+  acrescentar uma mamadeira.
+
+### ⚠️ E A TELA DA DONA NÃO TINHA BANCADA — foi por isso que ninguém viu
+
+`/preview-presentes` cobria só a página PÚBLICA. `ChaDeBebe` já aceitava a prop
+`bancada` e nenhuma rota a usava. `?dona=1` fecha isso.
+
+**E a primeira SSR dessa tela revelou um defeito que já estava lá:** o link do
+chá lia `window.location.origin` no RENDER. O guarda
+`typeof window === "undefined"` evita o CRASH e **não evita a DIVERGÊNCIA** — o
+servidor desenhava `/presente/<token>` e o cliente o endereço absoluto, e o
+React descartava a árvore. **É o mesmo defeito que o endereço da vitrine já
+pagou aqui, num arquivo diferente**, invisível porque em produção a tela é
+alcançada por navegação do cliente.
+
+⚠️ E `SITE` é mais certo por um segundo motivo: este link é COPIADO para o
+WhatsApp da família — `origin` num preview da Vercel gravaria o endereço do
+preview na conversa, para sempre.
+
+**Bancada:** `/preview-presentes?dona=1`.

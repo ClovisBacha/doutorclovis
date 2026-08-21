@@ -19,7 +19,8 @@ import {
   quemFaltaAgradecer,
   textoDeAgradecimento,
 } from "@/lib/agradecimento";
-import { legendaDaCota, estadoDaCota } from "@/lib/cotas";
+import { legendaDaCota, estadoDaCota, sugerirCotas } from "@/lib/cotas";
+import { SITE } from "@/lib/indicacao";
 import {
   legendaDoTamanho,
   ordemDeUrgencia,
@@ -31,6 +32,20 @@ import type { ListaDaDona } from "@/lib/presentes.functions";
 
 export type BancadaDoCha = { lista: ListaDaDona; guardados: number };
 
+/**
+ * "R$ 150" — o valor de UMA cota, a partir do total e do número de pedaços.
+ *
+ * ⚠️ **Arredonda para baixo, e a diferença some na ÚLTIMA cota** — é a mesma
+ * decisão de `cotas.ts` (R$ 1.200 ÷ 7 dá 17143 centavos, e sete deles somam um
+ * centavo a mais). Aqui o número é só a etiqueta do botão; quem manda no valor
+ * cobrado é a régua no servidor. Espalhar o resto entre as primeiras faria a
+ * tela mostrar dois preços para a mesma cota.
+ */
+function reaisPorCota(centavosTotal: number, pedacos: number): string {
+  const c = Math.floor(centavosTotal / pedacos);
+  return (c / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 export function ChaDeBebe({
   careMode = false,
   bancada,
@@ -41,6 +56,27 @@ export function ChaDeBebe({
   const [dados, setDados] = useState<BancadaDoCha | null>(bancada ?? null);
   const [carregando, setCarregando] = useState(!bancada);
   const [novoTitulo, setNovoTitulo] = useState("");
+  /* ⚠️ **AS COTAS NÃO TINHAM COMO NASCER.** O servidor aceita `tipo: "cota"`,
+     a régua está inteira e testada (`cotas.ts`, com o caso do R$ 1.200 ÷ 7), e
+     a página pública desenha a reserva de cota — mas o único lugar do `src/`
+     que escrevia `tipo: "cota"` era a BANCADA. Nenhuma gestante conseguia criar
+     uma: o formulário mandava `tipo: "item"` cravado. Das três espécies, a
+     fralda nasce semeada com a lista e o item comum tem formulário; a cota era
+     uma função documentada como pronta e inalcançável.
+
+     ⚠️ E é a bancada que fazia parecer entregue — mesmo defeito das sete
+     funções de servidor sem porta, que também só existiam em `/preview-*`. */
+  const [ehCota, setEhCota] = useState(false);
+  /** Em REAIS, como ela digita. Vira centavos só na hora de mandar. */
+  const [valorDaCota, setValorDaCota] = useState("");
+  const [pedacos, setPedacos] = useState<number | null>(null);
+
+  /* O total em centavos, ou 0 quando o campo ainda não é um número. */
+  const centavosDaCota = useMemo(() => {
+    const n = Number(valorDaCota.replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+  }, [valorDaCota]);
+  const sugestoesDeCota = useMemo(() => sugerirCotas(centavosDaCota), [centavosDaCota]);
   /** O item cuja saída está sendo confirmada. `null` = nenhum. */
   const [confirmando, setConfirmando] = useState<string | null>(null);
 
@@ -73,11 +109,26 @@ export function ChaDeBebe({
 
   const lista = dados?.lista ?? null;
 
-  const url = useMemo(() => {
-    if (!lista) return "";
-    const base = typeof window !== "undefined" ? window.location.origin : "";
-    return `${base}/presente/${lista.token}`;
-  }, [lista]);
+  /**
+   * O endereço que ela manda para a família.
+   *
+   * ⚠️ **`SITE`, e NUNCA `window.location.origin`.** O guarda
+   * `typeof window === "undefined"` evita o CRASH no servidor e **não evita a
+   * DIVERGÊNCIA**: o servidor renderizava `/presente/<token>` e o cliente
+   * `http://127.0.0.1:8080/presente/<token>`, e as duas execuções são
+   * exatamente as que precisam concordar — o React descarta a árvore e
+   * remonta.
+   *
+   * É o mesmo defeito que o endereço da vitrine já pagou neste repositório, num
+   * arquivo diferente. Aqui ele ficou invisível porque a tela da DONA não tinha
+   * bancada: em produção ela é alcançada por navegação do cliente, então o
+   * servidor nunca a desenhava.
+   *
+   * E `SITE` é mais certo por um segundo motivo: este link é COPIADO para o
+   * WhatsApp da família. `origin` num preview da Vercel gravaria o endereço do
+   * preview na conversa, para sempre.
+   */
+  const url = useMemo(() => (lista ? `${SITE}/presente/${lista.token}` : ""), [lista]);
 
   const fraldas = useMemo(
     () => (lista?.itens ?? []).filter((i) => i.tipo === "fralda" && i.tamanho),
@@ -204,20 +255,35 @@ export function ChaDeBebe({
       const token = s.data.session?.access_token;
       if (!token) return;
       const { salvarItens, minhaLista } = await import("@/lib/presentes.functions");
+      /* ⚠️ **Centavos INTEIROS, e a conversão mora aqui.** `sugerirCotas` e
+         `estadoDaCota` trabalham em centavos porque R$ 1.200 ÷ 7 é o caso que
+         quebra em ponto flutuante — `Math.round` no total, uma vez, e nunca
+         aritmética de reais espalhada pela tela. */
+      const centavos = ehCota ? centavosDaCota : null;
+      /* ⚠️ **Confere aqui, e não só no botão desabilitado.** `ItemSchema` exige
+         `meta >= 1` e `centavosTotal` entre 1 e R$ 100.000 — um payload fora
+         disso volta como erro de banco genérico ("não deu para guardar"), que
+         não diz à mãe o que corrigir. O `disabled` é do cliente e some com um
+         toque em outra ordem; a régua tem de estar no caminho do envio. */
+      if (ehCota && (!pedacos || centavos == null || centavos < 1 || centavos > 100_000_00)) {
+        toast.error("Confira o valor e escolha em quantas cotas dividir.");
+        return;
+      }
       const r = await salvarItens({
         data: {
           accessToken: token,
           itens: [
             {
               id: null,
-              tipo: "item",
+              tipo: ehCota ? "cota" : "item",
               titulo: t,
               nota: null,
               ordem: 100 + lista!.itens.length,
               tamanho: null,
-              meta: 1,
+              /* Na cota, `meta` é o NÚMERO DE COTAS; no item comum, 1. */
+              meta: ehCota ? pedacos! : 1,
               teto: null,
-              centavosTotal: null,
+              centavosTotal: centavos,
             },
           ],
         },
@@ -227,6 +293,9 @@ export function ChaDeBebe({
         return;
       }
       setNovoTitulo("");
+      setEhCota(false);
+      setValorDaCota("");
+      setPedacos(null);
       const novo = await minhaLista({ data: { accessToken: token } });
       if (novo.ok) setDados({ lista: novo.lista, guardados: novo.guardados });
       toast.success("Item na lista 💛");
@@ -362,11 +431,93 @@ export function ChaDeBebe({
           <button
             type="button"
             onClick={acrescentar}
-            className="press shrink-0 rounded-xl border border-primary/40 px-3 py-2 text-sm font-medium text-primary"
+            disabled={ehCota && !pedacos}
+            className="press shrink-0 rounded-xl border border-primary/40 px-3 py-2 text-sm font-medium text-primary disabled:opacity-40"
           >
             Pôr na lista
           </button>
         </div>
+
+        {/* ─── DIVIDIR EM COTAS ──────────────────────────────────────────
+            ⚠️ **Desligado por padrão.** A maioria dos itens de um chá é item
+            simples; abrir o formulário já em modo cota faria toda mãe decidir
+            sobre divisão para acrescentar uma mamadeira. */}
+        <label className="mt-2 flex items-center gap-2 text-[13px] text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={ehCota}
+            onChange={(e) => {
+              setEhCota(e.target.checked);
+              if (!e.target.checked) {
+                setValorDaCota("");
+                setPedacos(null);
+              }
+            }}
+            className="h-4 w-4 accent-primary"
+          />
+          É caro — quero dividir em cotas
+        </label>
+
+        {ehCota && (
+          <div className="mt-2 rounded-2xl border border-border p-3">
+            <label className="block text-[12px] text-muted-foreground" htmlFor="valor-da-cota">
+              Quanto custa, mais ou menos?
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">R$</span>
+              <input
+                id="valor-da-cota"
+                inputMode="decimal"
+                value={valorDaCota}
+                onChange={(e) => {
+                  /* Só dígito, vírgula e ponto: o campo vira centavos depois, e
+                     letra aqui viraria `NaN` no `Math.round`. */
+                  setValorDaCota(e.target.value.replace(/[^\d.,]/g, "").slice(0, 9));
+                  setPedacos(null);
+                }}
+                placeholder="1200"
+                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            {/* ⚠️ **As opções saem de `sugerirCotas`, que já existia e não tinha
+                CHAMADOR NENHUM.** Ela é quem garante o piso de R$ 25 por cota:
+                "12x de R$ 8" transforma o carrinho numa vaquinha de trocado —
+                o oposto do que a cota existe para fazer. Deixar a mãe digitar
+                um número livre reintroduziria exatamente isso. */}
+            {sugestoesDeCota.length > 0 ? (
+              <>
+                <p className="mt-2.5 text-[12px] text-muted-foreground">Dividir em:</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {sugestoesDeCota.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setPedacos(n)}
+                      aria-pressed={pedacos === n}
+                      className={`press rounded-full border px-3 py-1.5 text-[13px] ${
+                        pedacos === n
+                          ? "border-primary bg-primary/10 font-semibold text-primary"
+                          : "border-border"
+                      }`}
+                    >
+                      {n}x de {reaisPorCota(centavosDaCota, n)}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              /* ⚠️ Diz o PISO, não "valor inválido": sem o número ela não sabe
+                 o que corrigir, e o piso é a regra inteira. */
+              valorDaCota.trim() !== "" && (
+                <p className="mt-2.5 text-[12px] text-muted-foreground">
+                  Para dividir, o presente precisa custar pelo menos R$ 50 — cada cota não pode
+                  ficar abaixo de R$ 25.
+                </p>
+              )
+            )}
+          </div>
+        )}
       </section>
 
       {/* ─── O QUE ESTÁ GUARDADO ───────────────────────────────────────── */}

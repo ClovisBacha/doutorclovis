@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, test } from "bun:test";
 import {
   chamadaDaCota,
@@ -143,5 +144,61 @@ describe("os textos", () => {
     const t = chamadaDaCota(120000, 12);
     expect(t).toContain("12x");
     expect(t).toContain("100,00");
+  });
+});
+
+/**
+ * ⚠️ AS COTAS NÃO TINHAM COMO NASCER.
+ *
+ * O servidor aceita `tipo: "cota"`, esta régua está inteira e testada (com o
+ * caso do R$ 1.200 ÷ 7), e a página pública desenha a reserva de cota — mas o
+ * único lugar do `src/` que escrevia `tipo: "cota"` era a BANCADA. A tela da
+ * gestante mandava `tipo: "item"` cravado, e `sugerirCotas` não tinha CHAMADOR
+ * NENHUM. Das três espécies de item, a fralda nasce semeada com a lista e o
+ * item comum tem formulário; a cota era uma função documentada como pronta e
+ * inalcançável.
+ */
+describe("a dona consegue criar uma cota", () => {
+  const TELA = readFileSync("src/components/cha-de-bebe.tsx", "utf8");
+  const codigo = TELA.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
+
+  test("⚠️ o formulário escreve `cota`, e não `item` cravado", () => {
+    expect(codigo).toContain('tipo: ehCota ? "cota" : "item"');
+    expect(codigo).not.toContain('tipo: "item",');
+  });
+
+  /**
+   * ⚠️ **As opções saem de `sugerirCotas`.** É ela que garante o piso de R$ 25:
+   * "12x de R$ 8" transforma o carrinho numa vaquinha de trocado, que é o
+   * oposto do que a cota existe para fazer. Um campo de número livre
+   * reintroduziria exatamente isso.
+   */
+  test("⚠️ a divisão vem da régua, nunca de número livre", () => {
+    expect(codigo).toContain("sugerirCotas(centavosDaCota)");
+  });
+
+  /**
+   * ⚠️ **O payload é conferido no caminho do ENVIO, não só no botão.**
+   * `ItemSchema` exige `meta >= 1` e `centavosTotal` entre 1 e R$ 100.000; fora
+   * disso volta um erro de banco genérico, que não diz à mãe o que corrigir.
+   */
+  test("⚠️ o envio confere o valor e a divisão", () => {
+    expect(codigo).toContain("centavos > 100_000_00");
+    expect(codigo).toContain("!pedacos");
+  });
+
+  /**
+   * ⚠️ **O link é `SITE`, nunca `window.location.origin`.**
+   *
+   * O guarda `typeof window === "undefined"` evita o crash no servidor e NÃO
+   * evita a divergência: o servidor renderizava `/presente/<token>` e o cliente
+   * o endereço absoluto, e o React descartava a árvore. Mesmo defeito que o
+   * endereço da vitrine já pagou, noutro arquivo — invisível aqui porque a tela
+   * da dona não tinha bancada. E `origin` num preview da Vercel gravaria o
+   * endereço do preview no WhatsApp da família, para sempre.
+   */
+  test("⚠️ o link do chá não lê `location.origin`", () => {
+    expect(codigo).not.toContain("location.origin");
+    expect(codigo).toContain("`${SITE}/presente/${lista.token}`");
   });
 });
