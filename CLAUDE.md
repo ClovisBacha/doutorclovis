@@ -6158,3 +6158,52 @@ WhatsApp da família — `origin` num preview da Vercel gravaria o endereço do
 preview na conversa, para sempre.
 
 **Bancada:** `/preview-presentes?dona=1`.
+
+## ⚠️ O PAINEL DO MÉDICO QUASE NÃO TEM BANCADA (ago/2026)
+
+Depois de dois defeitos seguidos aparecerem em telas sem bancada (as cotas que
+não nasciam e o link com `location.origin`), fiz a varredura que faltava: o
+**fecho transitivo dos imports** a partir de todas as `/preview-*`.
+
+⚠️ **A contagem ingênua mente.** Procurar o NOME do componente dentro dos
+arquivos de bancada dá 64 de 86 "sem bancada" — e está errado, porque
+`ceu-do-dia`, `baby-illustration` e `grafico-clinico` são desenhados DENTRO de
+telas que têm bancada e nunca aparecem por nome. Pelo alcance real são **41**.
+
+E o padrão é nítido: **o app da paciente tem bancadas; o painel do médico quase
+nenhuma.** Prontuário (689 linhas), agenda do dia (512), registrar consulta
+(427), grade de horários (372), mesada do médico (387), calendário do mês (321),
+fila de denúncias (258) e o alerta de SOS (249) — nenhum deles era olhável.
+
+### A tela de maior risco do produto, e o que ela escondia
+
+`AlertaSosMedico` é o que o médico vê quando uma paciente aperta o SOS, com a
+localização dela. Recebe tudo por prop e não busca nada — sempre foi
+bancada-ável, e nunca teve rota. Para olhá-la era preciso uma paciente de
+verdade apertando o botão de emergência.
+
+⚠️ **E olhar achou um defeito na hora.** No estado sem telefone, o aviso dizia
+_"Use o WhatsApp ou o contato de emergência abaixo"_ — e os dois dependem de
+dados que naquele ramo podem não existir: o botão do WhatsApp é gated pelo
+**mesmo `telPaciente`** que acabou de faltar (então nunca aparece ali), e o
+contato vem da ficha, que pode ser nula. Medido em `?magro=1`: o aviso mandava
+o médico usar dois caminhos, e **nenhum dos dois estava desenhado**.
+
+Numa tela de emergência isso não é texto impreciso — é o médico procurando um
+botão que não existe enquanto uma paciente espera. O aviso passou a ter três
+casos (contato de emergência · mapa · nem um nem outro) e a citar só o que está
+na tela.
+
+⚠️ **O que NÃO era defeito, e ficou como está:** o botão "Já atendi" parece
+apagado ao lado do "Ligar", e isso é hierarquia deliberada — medido, ele dá
+4,54:1, acima do mínimo. As cinco ações da folha passam (4,53 · 5,29 · 17,20 ·
+4,54 · 6,52). Mexer nele por impressão visual seria desfazer a decisão de que a
+única coisa que importa nos primeiros dez segundos é LIGAR para ela.
+
+⚠️ **Medir contraste aqui exige o CANVAS**, nunca regex: o projeto escreve cor
+em `oklch`, e um parser de expressão regular lê 0.62/0.19/29 como se fosse RGB.
+É a mesma armadilha que já "aprovou" seis textos a 1,03:1 neste repositório.
+
+**Bancada:** `/preview-sos-medico` · `?magro=1` (sem ficha, sem GPS, sem
+telefone — o caso real de quem apertou o SOS com o perfil incompleto) ·
+`?atendendo=1` · `?fila=0` · `?falhou=1` (um canal de aviso não saiu).

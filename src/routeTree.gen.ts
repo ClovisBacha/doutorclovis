@@ -16,6 +16,7 @@ import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrimeiraConsultaRouteImport } from './routes/primeira-consulta'
 import { Route as PreviewTutorialRouteImport } from './routes/preview-tutorial'
+import { Route as PreviewSosMedicoRouteImport } from './routes/preview-sos-medico'
 import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
@@ -128,6 +129,11 @@ const PrimeiraConsultaRoute = PrimeiraConsultaRouteImport.update({
 const PreviewTutorialRoute = PreviewTutorialRouteImport.update({
   id: '/preview-tutorial',
   path: '/preview-tutorial',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSosMedicoRoute = PreviewSosMedicoRouteImport.update({
+  id: '/preview-sos-medico',
+  path: '/preview-sos-medico',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewSosRoute = PreviewSosRouteImport.update({
@@ -572,6 +578,7 @@ export interface FileRoutesByFullPath {
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-sos-medico': typeof PreviewSosMedicoRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -658,6 +665,7 @@ export interface FileRoutesByTo {
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-sos-medico': typeof PreviewSosMedicoRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -746,6 +754,7 @@ export interface FileRoutesById {
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
+  '/preview-sos-medico': typeof PreviewSosMedicoRoute
   '/preview-tutorial': typeof PreviewTutorialRoute
   '/primeira-consulta': typeof PrimeiraConsultaRoute
   '/privacidade': typeof PrivacidadeRoute
@@ -834,6 +843,7 @@ export interface FileRouteTypes {
     | '/preview-saude'
     | '/preview-sons'
     | '/preview-sos'
+    | '/preview-sos-medico'
     | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
@@ -920,6 +930,7 @@ export interface FileRouteTypes {
     | '/preview-saude'
     | '/preview-sons'
     | '/preview-sos'
+    | '/preview-sos-medico'
     | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
@@ -1007,6 +1018,7 @@ export interface FileRouteTypes {
     | '/preview-saude'
     | '/preview-sons'
     | '/preview-sos'
+    | '/preview-sos-medico'
     | '/preview-tutorial'
     | '/primeira-consulta'
     | '/privacidade'
@@ -1095,6 +1107,7 @@ export interface RootRouteChildren {
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
   PreviewSosRoute: typeof PreviewSosRoute
+  PreviewSosMedicoRoute: typeof PreviewSosMedicoRoute
   PreviewTutorialRoute: typeof PreviewTutorialRoute
   PrimeiraConsultaRoute: typeof PrimeiraConsultaRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
@@ -1176,6 +1189,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-tutorial'
       fullPath: '/preview-tutorial'
       preLoaderRoute: typeof PreviewTutorialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-sos-medico': {
+      id: '/preview-sos-medico'
+      path: '/preview-sos-medico'
+      fullPath: '/preview-sos-medico'
+      preLoaderRoute: typeof PreviewSosMedicoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-sos': {
@@ -1795,6 +1815,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSonsRoute: PreviewSonsRoute,
   PreviewSosRoute: PreviewSosRoute,
+  PreviewSosMedicoRoute: PreviewSosMedicoRoute,
   PreviewTutorialRoute: PreviewTutorialRoute,
   PrimeiraConsultaRoute: PrimeiraConsultaRoute,
   PrivacidadeRoute: PrivacidadeRoute,

@@ -150,9 +150,34 @@ export function AlertaSosMedico({
               {formataTelefone(telPaciente)}
             </a>
           ) : (
+            /* ⚠️ **O AVISO SÓ PODE CITAR O QUE ESTÁ NA TELA.**
+               Ele dizia "use o WhatsApp ou o contato de emergência abaixo" — e
+               os dois dependem de dados que, neste ramo, podem não existir: o
+               botão do WhatsApp é gated pelo MESMO `telPaciente` que acabou de
+               faltar (então nunca aparece aqui), e o contato de emergência vem
+               da ficha, que pode ser nula. Medido na bancada `?magro=1`: o
+               aviso mandava o médico usar dois caminhos, e nenhum dos dois
+               estava desenhado.
+
+               Numa tela de emergência isso não é texto impreciso — é o médico
+               procurando um botão que não existe enquanto uma paciente espera. */
             <p className="rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-500/10 dark:text-amber-200">
-              Ela não cadastrou telefone no perfil. Use o WhatsApp ou o contato de emergência
-              abaixo.
+              {f.contatoTel ? (
+                <>
+                  Ela não cadastrou telefone no perfil. Ligue para o contato de emergência dela,
+                  abaixo.
+                </>
+              ) : mapa ? (
+                <>
+                  Ela não cadastrou telefone e não há contato de emergência na ficha. O que dá para
+                  fazer daqui é ver onde ela está.
+                </>
+              ) : (
+                <>
+                  Ela não cadastrou telefone e não há contato de emergência na ficha. Procure-a pela
+                  conversa do app ou pelo cadastro dela no painel.
+                </>
+              )}
             </p>
           )}
 
