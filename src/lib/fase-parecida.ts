@@ -73,6 +73,25 @@ export function mesmaFase(minha: Fase | null, dela: Fase | null): boolean {
  * ela está — e a chave `mostrar_semana` existe exatamente para essa decisão ser
  * dela. "Parecida com a sua" diz a mesma coisa e não conta nada de ninguém.
  */
+/**
+ * ⚠️ O RESÍDUO DESTE RECURSO, escrito para não ser esquecido.
+ *
+ * O rótulo descreve o FILTRO, nunca uma pessoa: ninguém aparece marcado com a
+ * fase dela, e a conversão semana→fase acontece no SERVIDOR, a partir de
+ * `lmp_date`, que nunca viaja. Isso é o que separa este recurso de um "grupo da
+ * reta final", que contaria a fase de cada uma que estivesse lá.
+ *
+ * ⚠️ **Ainda assim sobra uma inferência, e ela é real:** com o filtro LIGADO,
+ * quem aparece está na mesma faixa de quem olha. É grosseira (três faixas de
+ * ~13 semanas), é voluntária (só quem liga o filtro a obtém) e não diz semana
+ * nenhuma — mas existe, e é exatamente o tipo de coisa que some da memória de
+ * quem mexer aqui daqui a seis meses.
+ *
+ * O que NÃO pode acontecer, e é o que este comentário existe para impedir:
+ * um selo por pessoa, um agrupamento com cabeçalho de fase, ou o filtro ligado
+ * por PADRÃO — qualquer um dos três transforma uma inferência grosseira e
+ * escolhida num dado publicado sobre terceiros.
+ */
 export const ROTULO_DO_FILTRO = "Quem está numa fase parecida com a sua";
 
 /**

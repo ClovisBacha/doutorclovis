@@ -131,3 +131,44 @@ describe("o que o recorte NÃO conhece", () => {
     expect(tipo).not.toContain("semana");
   });
 });
+
+/**
+ * ⚠️ NINGUÉM É ROTULADO — as três coisas que não podem acontecer.
+ *
+ * O recorte por fase é seguro porque descreve o FILTRO e não as pessoas: a
+ * conversão semana→fase roda no servidor, a partir de `lmp_date`, que nunca
+ * viaja. Sobra uma inferência grosseira (com o filtro ligado, quem aparece está
+ * na mesma faixa de ~13 semanas), e ela é aceitável porque é voluntária.
+ *
+ * O que a tornaria inaceitável são estes três, e é o que este teste trava.
+ */
+describe("o recorte por fase não publica a fase de ninguém", () => {
+  const tela = readFileSync("src/components/rede-instagram.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+
+  /* 1. Nenhum selo por pessoa. */
+  test("⚠️ a tela não desenha a fase de ninguém", () => {
+    for (const proibido of ["1º trimestre", "2º trimestre", "3º trimestre", "reta final"]) {
+      expect(tela.toLocaleLowerCase("pt-BR")).not.toContain(proibido.toLocaleLowerCase("pt-BR"));
+    }
+  });
+
+  /* 2. Nenhum agrupamento com cabeçalho de fase — a tela recebe uma lista só. */
+  test("⚠️ a fase NÃO viaja para o cliente", () => {
+    const servidor = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+    /* `faseDe`/`mesmaFase` são usadas para FILTRAR, e o resultado não entra em
+       nenhum campo da resposta. */
+    expect(servidor).not.toMatch(/fase:\s*fase(De)?\(/);
+    expect(servidor).not.toContain("faseDaPessoa:");
+  });
+
+  /* 3. E o filtro nasce DESLIGADO: ligado por padrão, a inferência deixa de ser
+     escolhida — e vira uma decisão que o app tomou pela paciente. */
+  test("⚠️ o filtro é opt-in", () => {
+    const servidor = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+    expect(servidor).toContain("mesmaFase: z.boolean().optional()");
+    /* `!data.mesmaFase` é o caminho sem filtro — ou seja, ausente = desligado. */
+    expect(servidor).toContain("!data.mesmaFase");
+  });
+});

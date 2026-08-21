@@ -5699,3 +5699,192 @@ Achado abrindo `/preview-rede` num navegador e lendo o console.
 **Bancadas:** `/preview-rede` · `/preview-onboarding?passo=4` ·
 `/preview-instagram` (selo, vistas, live) · `?live=agora` · `?fase=1` ·
 `?fase=vazio`.
+
+## A noite da lentidão: 18 esperas em fila viraram 10 (ago/2026)
+
+Relato do dono, no aparelho: _"clico na foto do paciente que fez a postagem, e
+às vezes demora muito tempo pra ler lá pra área do perfil, demora ali cinco
+segundos, ou até mais"_.
+
+**Eram DUAS causas somadas**, e a segunda é a que fazia a espera parecer um
+travamento.
+
+### ⚠️ 1. A TELA NÃO TINHA ESTADO DE CARREGAMENTO — NENHUM
+
+`abrirPerfil` faz `setPerfil(null)` e troca o destino. Só que a tela do perfil
+só é renderizada em `onde.t === "perfil" && perfil`: com `perfil` nulo, **nenhum
+ramo casava e a árvore caía de volta no FEED**.
+
+Ela tocava no avatar e a tela não mudava. Nada piscava, nada carregava, nenhum
+sinal de que o toque foi registrado — e segundos depois a tela saltava. Do lado
+de quem usa isso não lê como "está carregando", lê como "o app travou", e a
+reação natural é tocar de novo, o que dispara outra busca e piora o que já
+estava ruim. O mesmo valia para a tela do post.
+
+⚠️ **Uma tela sem estado de carregamento transforma qualquer latência em defeito
+percebido.** Meio segundo com resposta visual é rápido; meio segundo de tela
+imóvel é um app quebrado.
+
+`PerfilCarregando` monta o cabeçalho com o que a tela **já sabia**: nome, foto e
+selo saem das listas em memória (feed, sugeridos, grade, salvos, gaveta,
+stories, gente, atividade), que acabaram de desenhar essas três coisas no cartão
+em que ela tocou.
+
+⚠️ **E SÓ essas três.** Semana, nome do bebê, bio, contadores e publicações
+ficam de fora até o servidor responder: quem decide o que aparece num perfil é
+`verPerfil`, cruzando Modo Cuidado, bloqueio nos dois sentidos e a camada de
+cada post. Um esboço que mostrasse mais seria uma segunda régua de visibilidade.
+
+⚠️ E `aoAbrirPerfil` continua recebendo só o `id` — a prévia é procurada nas
+listas que o componente já tem. Passá-la por prop criaria fecho novo a cada
+pintura em `acoes`, que é o que faz `memo()` nunca acertar (já custou 232 ms no
+cartão do post).
+
+### ⚠️ 2. UMA IDA À REDE POR IMAGEM
+
+`createSignedUrl` (singular) é um `POST` ao Storage **por arquivo**. Contado no
+código: uma abertura de perfil com doze publicações de até cinco fotos chegava a
+sessenta requisições antes de a primeira imagem aparecer. E três desses laços
+eram **sequenciais** (`for … await`): a fileira de stories, a lista de amigas e
+as capas da caixa de atividade.
+
+- `urlsAssinadas` usa `createSignedUrls` (**plural**): um `POST` por balde.
+  ⚠️ A resposta é casada por **caminho**, nunca por índice — depender da ordem
+  seria a classe de defeito que entrega a foto de uma paciente no lugar da de
+  outra.
+- `renovarUrlsAssinadas` **não renova o que ainda está fresco**, lendo o `exp` de
+  dentro do token. ⚠️ Não decifrou vale RENOVAR: o pior caso é uma requisição a
+  mais, nunca uma foto quebrada.
+
+### ⚠️ E A RENOVAÇÃO SE REALIMENTAVA
+
+`salvarPerfilSocial` grava o avatar com SETE DIAS; a renovação usava a validade
+padrão (uma hora) e não grava de volta na coluna. A partir do dia em que a URL
+entra na margem, toda leitura produzia uma URL de UMA HORA, que na leitura
+seguinte já estava dentro da margem — e a partir daí **toda leitura da rede
+voltava a assinar todos os avatares, para sempre**, com data marcada (~6,6 dias
+depois de cada troca de foto) e sem nada quebrado para avisar.
+
+E há um segundo custo, no NAVEGADOR: a URL assinada é a chave do cache de
+imagem. Se ela muda a cada leitura, a mesma foto é baixada de novo em toda tela.
+`VALIDADE_AVATAR_SEG` é a mesma dos dois lados, nos cinco leitores.
+
+### As quatro cascatas, medidas
+
+`medicoes/ondas-do-perfil.test.ts` roda `verPerfil` contra um Supabase de mentira
+e conta cada ida **e o instante em que ela começa**:
+
+|        | idas | ondas seriais | @50 ms/ida |
+| ------ | ---- | ------------- | ---------- |
+| antes  | 24   | **18**        | 941 ms     |
+| depois | 22   | **10**        | 471 ms     |
+
+⚠️ **O que importa é a ONDA, não a consulta.** Vinte consultas em paralelo custam
+uma latência; cinco em fila custam cinco. Uma consulta a mais dentro de uma onda
+que já existe é de graça; uma a menos numa onda nova é regressão — a conta que um
+teste de "quantas queries" não veria.
+
+1. **`idsDasAmigas` fazia quatro consultas em fila** e nenhuma depende da outra:
+   as quatro são recortadas pelo mesmo `eu`. Como ela é chamada por `contextoDe`,
+   que abre TODA leitura da rede, a espera aparecia em seis telas.
+2. **`contextoDe` buscava o grafo depois das outras quatro**, também em série.
+3. **`perfisPorId` era chamada DUAS vezes com o mesmo id** — o cabeçalho e o
+   autor das publicações, que é a mesma pessoa. Ganhou memória de **uma
+   requisição**. ⚠️ Parâmetro, e nunca módulo: a linha carrega `care_mode`,
+   `perfil_publico` e as chaves do selo, e servir a versão velha dessas colunas a
+   outra pessoa é mostrar o perfil de quem acabou de entrar em Modo Cuidado.
+4. **O fim de `verPerfil` eram cinco `await` em fila** — o último escondido
+   dentro do objeto literal, que é o mais fácil de não ver.
+
+⚠️ **O PORTÃO DE ALCANCE NÃO SE MOVEU.** As publicações continuam sendo lidas
+DEPOIS dele — ler o que a régua vai recusar é trabalho jogado fora e, pior, é a
+ordem que um dia alguém "otimiza" movendo o portão para baixo.
+
+⚠️ **A medição mora FORA de `src/`** (`bun run medir:ondas`). `mock.module` do
+bun escreve num registro COMPARTILHADO entre arquivos de teste, e todos são
+importados antes de qualquer um rodar: a bancada media o Supabase do vizinho e
+mudava de resposta conforme a ordem. Um teste intermitente é pior que teste
+nenhum. Quem protege no dia a dia são as asserções de FORMA em
+`rede-social-servidor.test.ts` (os três `Promise.all`), conferidas por mutação.
+
+### O cache de memória da Comunidade
+
+As abas de `minha-conta` são montadas com `{tab === "X" && <X/>}` — bom (aba fora
+da tela não custa render) e com um preço que ninguém tinha pago: trocar de aba
+DESMONTA o componente e joga o estado fora. Ir ao Bebê e voltar refazia o feed
+inteiro. É a metade da lentidão que mais irrita: não é a primeira abertura, é a
+quinta.
+
+⚠️ **Memória, e NUNCA disco.** O cache guarda fotos, textos e nomes de OUTRAS
+pacientes: no `localStorage` viraria uma segunda cópia desse conteúdo no aparelho
+dela, que sobrevive ao logout, aparece em backup e não é apagada pela varredura
+da LGPD. ⚠️ E é **apagado no logout**, antes de derrubar a sessão — num aparelho
+compartilhado, que num consultório é o caso comum, a próxima conta não pode
+encontrar o feed da anterior.
+
+### O que descia sem precisar
+
+- **`@tanstack/react-query` nunca foi usado** — vinha do template, criava um
+  `QueryClient`, viajava no contexto e envolvia a árvore num provider, e NENHUM
+  componente chama `useQuery`/`useMutation`. Estava no chunk de ENTRADA, que toda
+  página baixa: 923.489 → 902.501 B crus, 283.545 → 277.416 gzip.
+- **A Comunidade virou `lazy()`** (120,8 kB crus / 30,9 gzip). Conferido no
+  bundle: agora é `import("./rede-instagram-*.js")`, sem nenhum import estático.
+- **`qrcode` saiu do preload** (folha de emergência: 49,2 → 24,7 kB).
+- **A fileira de stories parou de repintar à toa** — vinte dos trinta e oito
+  renders de uma reação eram as bolinhas. ⚠️ `memo` no componente **sem**
+  `useMemo` na lista seria trabalho perdido. E ⚠️ o `useMemo` entrou depois de um
+  `return` antecipado: `rules-of-hooks`, que o eslint pegou — sem ele viraria um
+  defeito que só aparece ao trocar de tela.
+
+## A auditoria das dez, e os três defeitos que ela achou (ago/2026)
+
+### ⚠️ QUALQUER PACIENTE PODIA SE DAR O SELO DO CONSULTÓRIO
+
+`patient_profiles` é escrita direto do navegador com a chave anon em vários
+pontos do app (a chave do perfil público, a bio, a foto, o Modo Cuidado) — e a
+policy de LINHA não distingue COLUNA. `conta_oficial` entrou sem o `REVOKE` que
+este repo já usa três vezes, então uma paciente autenticada podia rodar
+`UPDATE patient_profiles SET conta_oficial = true WHERE id = auth.uid()` e passar
+a aparecer com o selo e **fixada em primeiro** na fileira de sugeridas de toda
+conta nova.
+
+Num app que carrega o nome de um consultório de alto risco, isso não é vandalismo
+de rede social: é alguém falando com autoridade médica emprestada para quem
+acabou de chegar. `colunas-do-servidor.test.ts` é a catraca, e diz por que cada
+coluna está lá.
+
+### ⚠️ O MODO CUIDADO FALHAVA ABERTO NOS DOIS RESUMOS SEMANAIS
+
+Os dois pushes de domingo consultam quem está em luto DEPOIS de somar — recorte
+certo. Mas o `error` era descartado, e `data` vem `null` na falha: o conjunto
+saía VAZIO e o portão virava no-op. Toda paciente em Modo Cuidado recebia o push
+comemorando "coisas boas". Mesma classe do `conjuntoDeBloqueio`, na superfície em
+que dói mais. Erro ao ler o luto agora devolve zero e **não manda nada** — o
+resumo é um agrado, não uma necessidade.
+
+### ⚠️ O BOTÃO DA VITRINE LEVAVA A `/auth` SEM O CÓDIGO
+
+`/p/<codigo>` é a única página em que o código chega pelo CAMINHO, e as três
+capturas do app leem só a QUERY. Com `PublicBottomNav` por cima, o CTA dominante
+(botão gradiente de largura inteira, só no celular — onde um link do WhatsApp
+abre) apontava para `/auth` puro: `referred_by` ficava nulo e as 100 🌱 não eram
+pagas a ninguém. É palavra por palavra o defeito que `indicacao.ts` documenta.
+
+### ⚠️ E A PRÉVIA DIZIA "Alguém está no Obstétrica"
+
+`metaDaVitrine` tinha um `split(/\s+/)[0] || "Alguém"` com um comentário
+afirmando ser "a mesma régua de `primeiroNome`". Não era: `primeiroNome` recusa
+nome de um caractere e devolve `null`. E o placeholder é justamente o que
+`perfilPublicoPorCodigo` grava com `display_name` vazio — que nasce do trecho
+antes do @ do e-mail. ⚠️ **Não se conserta depois: o título é o que o WhatsApp
+COPIA e guarda no histórico de toda conversa em que o link foi colado.**
+
+### O resíduo do recorte por fase, escrito para não ser esquecido
+
+O rótulo descreve o FILTRO, nunca uma pessoa, e a conversão semana→fase roda no
+servidor a partir de `lmp_date`, que nunca viaja. ⚠️ **Ainda assim sobra uma
+inferência**: com o filtro ligado, quem aparece está na mesma faixa de ~13
+semanas. É grosseira e voluntária — e o que a tornaria inaceitável são três
+coisas que o teste agora trava: selo por pessoa, agrupamento com cabeçalho de
+fase, e o filtro ligado por PADRÃO.
