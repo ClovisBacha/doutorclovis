@@ -42,6 +42,22 @@
 /** Quanto tempo o guardado ainda serve para pintar a tela. */
 export const VALIDADE_MS = 90_000;
 
+/**
+ * A janela do PERFIL de outra pessoa — mais curta que a do feed, de propósito.
+ *
+ * ⚠️ **O que o cache do perfil guarda é mais que o do feed:** bio, selo, nome do
+ * bebê e as publicações dela. Se a pessoa BLOQUEAR quem está olhando entre uma
+ * abertura e a outra, o guardado mostraria por um instante um perfil que já não
+ * pode ser visto — conteúdo que aquela paciente de fato já tinha visto, mas
+ * ainda assim depois de a outra ter dito "não quero mais".
+ *
+ * A busca de verdade corrige em seguida (`indisponivel` → volta ao feed, e a
+ * entrada é apagada), então a janela é o tamanho do estrago. Quarenta e cinco
+ * segundos cobrem o padrão real — abrir, voltar, abrir de novo — e não cobrem
+ * "voltei nesse perfil depois do almoço".
+ */
+export const VALIDADE_DO_PERFIL_MS = 45_000;
+
 type Entrada = { dados: unknown; quando: number };
 
 /**
@@ -69,17 +85,33 @@ export function guardarNoCache(chave: string, dados: unknown): void {
  * É a mesma decisão de `haQuantoPublicou`, e pela mesma razão: teste que lê o
  * relógio do contêiner falha às terças.
  */
-export function lerDoCache<T>(chave: string, agora: number = Date.now()): T | null {
+export function lerDoCache<T>(
+  chave: string,
+  agora: number = Date.now(),
+  validadeMs: number = VALIDADE_MS,
+): T | null {
   const e = armazem.get(chave);
   if (!e) return null;
   /* ⚠️ Relógio que andou para TRÁS não valida um cache eterno: a diferença
      negativa também está fora da janela. */
   const idade = agora - e.quando;
-  if (idade < 0 || idade > VALIDADE_MS) {
+  if (idade < 0 || idade > validadeMs) {
     armazem.delete(chave);
     return null;
   }
   return e.dados as T;
+}
+
+/**
+ * Apaga UMA entrada.
+ *
+ * ⚠️ Existe para o caso em que o servidor recusa o que estava guardado — um
+ * perfil que virou `indisponivel` (bloqueio, Modo Cuidado, conta apagada).
+ * Sem isto, a entrada continuaria válida pelo resto da janela e a tela voltaria
+ * a pintá-la na próxima abertura, depois de o servidor já ter dito não.
+ */
+export function esquecerDoCache(chave: string): void {
+  armazem.delete(chave);
 }
 
 /**

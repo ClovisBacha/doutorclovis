@@ -92,7 +92,12 @@ import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
-import { guardarNoCache, lerDoCache } from "@/lib/cache-do-feed";
+import {
+  esquecerDoCache,
+  guardarNoCache,
+  lerDoCache,
+  VALIDADE_DO_PERFIL_MS,
+} from "@/lib/cache-do-feed";
 import {
   esbocoDoAutor,
   QUADRADOS_DO_ESQUELETO,
@@ -2039,6 +2044,16 @@ type CacheDoFeed = {
 /** Uma chave só: `limparCacheDoFeed()` no logout apaga tudo de qualquer forma. */
 const CHAVE_DO_FEED = "comunidade:feed";
 
+/**
+ * A chave do perfil de UMA pessoa.
+ *
+ * ⚠️ Por id, e não uma chave só: guardar "o último perfil aberto" faria a
+ * segunda abertura pintar o perfil de OUTRA pessoa por um instante — o mesmo
+ * defeito que a bolinha "Seu story" teve quando lia `perfil` em vez de
+ * `meuAvatar`.
+ */
+const chaveDoPerfil = (id: string) => `comunidade:perfil:${id}`;
+
 export function PerfilCarregando({
   esboco,
   aoVoltar,
@@ -3855,17 +3870,43 @@ export function RedeNoApp({
        FEED: a paciente tocava no avatar e a tela não mudava, por segundos. */
     setEsboco(esbocoDoAutor(previaDoAutor(id)));
     setOnde({ t: "perfil", id });
+    /* ⚠️ **MOSTRA O GUARDADO E BUSCA O NOVO.** Reabrir o mesmo perfil pagava as
+       dez esperas outra vez — e "abrir, voltar, abrir de novo" é o padrão real
+       de quem está olhando o feed. Com o guardado, a segunda abertura é
+       instantânea; a busca continua acontecendo por trás e corrige o que mudou.
+
+       ⚠️ A janela é mais curta que a do feed (45 s): o que está aqui é bio,
+       selo, nome do bebê e as publicações dela — e se ela BLOQUEAR quem está
+       olhando entre uma abertura e a outra, o guardado mostraria por um instante
+       um perfil que já não pode ser visto. A janela é o tamanho do estrago. */
+    const chave = chaveDoPerfil(id);
+    const guardado = lerDoCache<{ perfil: PerfilNaTela; posts: PostNaTela[] }>(
+      chave,
+      Date.now(),
+      VALIDADE_DO_PERFIL_MS,
+    );
+    if (guardado) {
+      setPerfil(guardado.perfil);
+      setDoPerfil(guardado.posts);
+    }
     try {
       const t = await token();
-      if (!t) return;
+      /* ⚠️ Sem sessão a espera não acaba nunca: o esqueleto ficaria na tela para
+         sempre, que é pior que o defeito que ele veio consertar. */
+      if (!t) return void setOnde({ t: "feed" });
       const { verPerfil } = await import("@/lib/rede-social.functions");
       const r = await verPerfil({ data: { accessToken: t, alvoId: id } });
       if (r.ok) {
         setPerfil(r.perfil);
         setDoPerfil(r.posts);
+        guardarNoCache(chave, { perfil: r.perfil, posts: r.posts });
       } else {
         /* `indisponivel` cobre bloqueio, Modo Cuidado e perfil inexistente com
-           a mesma resposta — e a tela não conta qual foi. */
+           a mesma resposta — e a tela não conta qual foi.
+           ⚠️ E o guardado É APAGADO: sem isto, a entrada continuaria válida pelo
+           resto da janela e a tela voltaria a pintá-la na próxima abertura,
+           depois de o servidor já ter dito não. */
+        esquecerDoCache(chave);
         setOnde({ t: "feed" });
       }
     } catch {

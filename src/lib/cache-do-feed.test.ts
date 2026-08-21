@@ -11,8 +11,10 @@ import { readFileSync } from "node:fs";
 import {
   guardarNoCache,
   lerDoCache,
+  esquecerDoCache,
   limparCacheDoFeed,
   tamanhoDoCache,
+  VALIDADE_DO_PERFIL_MS,
   VALIDADE_MS,
 } from "./cache-do-feed";
 
@@ -123,5 +125,74 @@ describe("nada disso vai para o disco", () => {
     expect(fonte).not.toContain("localStorage");
     expect(fonte).not.toContain("sessionStorage");
     expect(fonte).not.toContain("indexedDB");
+  });
+});
+
+/**
+ * ⚠️ O CACHE DO PERFIL — mais curto que o do feed, e por quê.
+ *
+ * O que ele guarda é mais do que o feed guarda: bio, selo, nome do bebê e as
+ * publicações de UMA pessoa. Se ela bloquear quem está olhando entre uma
+ * abertura e a outra, o guardado mostraria por um instante um perfil que já não
+ * pode ser visto.
+ */
+describe("a janela do perfil", () => {
+  test("⚠️ é MAIS CURTA que a do feed", () => {
+    expect(VALIDADE_DO_PERFIL_MS).toBeLessThan(VALIDADE_MS);
+  });
+
+  /* E ainda cobre o padrão real: abrir, voltar, abrir de novo. */
+  test("cobre abrir-voltar-abrir", () => {
+    expect(VALIDADE_DO_PERFIL_MS).toBeGreaterThanOrEqual(20_000);
+  });
+
+  test("a validade é escolhida por quem lê, não fixa no módulo", () => {
+    guardarNoCache("p", 1);
+    /* Dentro da janela curta: serve. */
+    expect(lerDoCache("p", Date.now() + 10_000, VALIDADE_DO_PERFIL_MS)).toBe(1);
+    guardarNoCache("p", 1);
+    /* Fora da curta, mesmo estando dentro da do feed: não serve. */
+    expect(lerDoCache("p", Date.now() + 60_000, VALIDADE_DO_PERFIL_MS)).toBeNull();
+  });
+});
+
+/**
+ * ⚠️ E O QUE O SERVIDOR RECUSA É ESQUECIDO.
+ *
+ * Sem isto, um perfil que virou `indisponivel` (bloqueio, Modo Cuidado, conta
+ * apagada) continuaria válido pelo resto da janela — e a tela voltaria a
+ * pintá-lo na próxima abertura, DEPOIS de o servidor já ter dito não.
+ */
+describe("esquecer uma entrada", () => {
+  test("⚠️ apaga só a chave pedida", () => {
+    guardarNoCache("a", 1);
+    guardarNoCache("b", 2);
+    esquecerDoCache("a");
+    expect(lerDoCache("a")).toBeNull();
+    expect(lerDoCache("b")).toBe(2);
+  });
+
+  /* E a tela chama isso no ramo da recusa — senão a função seria decoração. */
+  test("⚠️ `abrirPerfil` esquece o guardado quando o servidor recusa", () => {
+    const fonte = readFileSync("src/components/rede-instagram.tsx", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+    const i = fonte.indexOf("async function abrirPerfil");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = fonte.slice(i, i + 1600);
+    expect(corpo).toContain("esquecerDoCache(chave)");
+    /* O esquecimento vem ANTES de voltar ao feed — depois seria inalcançável
+       em alguns caminhos. */
+    expect(corpo.indexOf("esquecerDoCache(chave)")).toBeLessThan(
+      corpo.lastIndexOf('setOnde({ t: "feed" })'),
+    );
+  });
+
+  /* ⚠️ A chave é POR ID. Uma chave só ("o último perfil aberto") faria a segunda
+     abertura pintar o perfil de OUTRA pessoa por um instante — o mesmo defeito
+     que a bolinha "Seu story" teve. */
+  test("⚠️ a chave do perfil carrega o id", () => {
+    const fonte = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    expect(fonte).toContain("`comunidade:perfil:${id}`");
   });
 });

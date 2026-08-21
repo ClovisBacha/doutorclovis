@@ -1259,3 +1259,64 @@ describe("o feed não monta uma URL que o servidor recusa", () => {
     expect(n).toBeGreaterThanOrEqual(100);
   });
 });
+
+/**
+ * ⚠️ A BUSCA MOSTRA OS SELOS — e é a tela em que o oficial mais serve.
+ *
+ * É aqui que alguém digita o nome da clínica procurando por ela. Sem
+ * `conta_oficial` no select, o resultado saía sem selo justamente onde ele
+ * distingue a conta do consultório de uma homônima.
+ */
+describe("a busca de perfis", () => {
+  const c = corpoDe("buscarPerfis").replace(/\s+/g, " ");
+
+  test("⚠️ traz o selo oficial e o de assinante", () => {
+    expect(c).toContain("conta_oficial");
+    expect(c).toContain("ehContaOficial(");
+    expect(c).toContain("quemTemSelo(");
+  });
+
+  /* ⚠️ Com RECUO: a coluna nasce num `APLICAR_` que o dono roda à mão, e sem ele
+     a busca inteira devolveria vazio na janela entre o deploy e o SQL. "Não
+     achei ninguém" é indistinguível de "a busca quebrou". */
+  test("⚠️ e com recuo para banco sem a coluna", () => {
+    expect(c).toContain("if (achadas.error)");
+    expect(c).toContain("COLUNAS_DA_BUSCA");
+  });
+
+  /* O portão continua na CONSULTA, e não num filtro depois — quem não abriu o
+     perfil não pode nem viajar pela rede. */
+  test("⚠️ o portão do perfil público não se moveu", () => {
+    expect(c).toContain('.eq("perfil_publico", true)');
+    expect(c).toContain("podeAparecerNaBusca({");
+  });
+});
+
+/**
+ * ⚠️ AS CANDIDATAS NÃO TRAZEM A FOTO — e a ausência é o ponto.
+ *
+ * A consulta lê até 400 linhas para RANQUEAR e mostra oito. `avatar_url` guarda
+ * JPEG em base64 nos perfis antigos (é o que o `campo-foto` e o ritual gravam):
+ * trazer 400 delas é arrastar megabytes pela rede para desenhar oito fotinhas.
+ */
+describe("a zona de sugestões não arrasta 400 avatares", () => {
+  test("⚠️ a consulta das candidatas não pede `avatar_url` nem `bio`", () => {
+    const i = CODIGO.indexOf("const COLUNAS_DA_CANDIDATA");
+    expect(i).toBeGreaterThan(-1);
+    const lista = CODIGO.slice(i, CODIGO.indexOf(";", i));
+    expect(lista).not.toContain("avatar_url");
+    expect(lista).not.toContain("bio");
+    /* O que ela precisa para ranquear e para o portão continua lá. */
+    expect(lista).toContain("last_seen_at");
+    expect(lista).toContain("care_mode");
+    expect(lista).toContain("conta_oficial");
+  });
+
+  /* ⚠️ E a foto das que APARECEM vem por `perfisPorId` — o caminho único do
+     avatar na rede, com renovação de URL, memória de requisição e o selo. */
+  test("⚠️ a foto dos exibidos vem de `perfisPorId`", () => {
+    const c = corpoDe("sugestoesDoFeed").replace(/\s+/g, " ");
+    expect(c).toContain("const naFila = ranking.slice(0, PESSOAS_SUGERIDAS)");
+    expect(c).toContain("perfisPorId( sb, naFila.map((p) => p.id), ctx.perfis, )");
+  });
+});

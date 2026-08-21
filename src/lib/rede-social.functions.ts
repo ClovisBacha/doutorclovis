@@ -2513,8 +2513,20 @@ async function elosEmComum(sb: any, quemEuSigo: string[]): Promise<Map<string, n
 }
 
 /** As colunas que a zona de sugestões lê da candidata. */
+/**
+ * ⚠️ **SEM `avatar_url` E SEM `bio` — e a ausência é o ponto.**
+ *
+ * Esta consulta lê até 400 linhas para RANQUEAR, e mostra umas oito. A coluna
+ * `avatar_url` guarda **JPEG em base64** nos perfis antigos (é o formato que o
+ * `campo-foto` e o ritual de boas-vindas gravam): trazer 400 delas é arrastar
+ * megabytes pela rede para desenhar oito fotinhas.
+ *
+ * A foto e a bio das que de fato aparecem vêm depois, por `perfisPorId`, que já
+ * é o caminho único do avatar em toda a rede — com renovação de URL, memória de
+ * requisição e o selo de assinante junto.
+ */
 const COLUNAS_DA_CANDIDATA =
-  "id, display_name, avatar_url, bio, perfil_publico, care_mode, last_seen_at, conta_oficial, " +
+  "id, display_name, perfil_publico, care_mode, last_seen_at, conta_oficial, " +
   /* ⚠️ **AS DATAS SERVEM PARA ORDENAR, E NUNCA VIAJAM.** A fase é calculada
      aqui, no servidor, e o que sai para o cliente é a LISTA já recortada — o
      número da semana de ninguém sai desta função. Ver `fase-parecida.ts`. */
@@ -2715,9 +2727,21 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
     const ordem = new Map(escolhidas.map((c, n) => [c.postId, n]));
     posts.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
 
-    const pessoas = ranking
-      .slice(0, PESSOAS_SUGERIDAS)
-      .map((p) => naFileira(candidatas.find((c) => c.id === p.id) ?? { id: p.id }));
+    /* ⚠️ **A FOTO E A BIO SÓ DE QUEM VAI APARECER.** A consulta das candidatas
+       não traz `avatar_url` de propósito — ela lê até 400 linhas para ranquear e
+       mostra oito, e aquela coluna guarda JPEG em base64 nos perfis antigos.
+       Aqui os oito passam por `perfisPorId`, que já é o caminho único do avatar
+       na rede: renova a URL assinada, usa a memória da requisição e traz o selo
+       de assinante junto. */
+    const naFila = ranking.slice(0, PESSOAS_SUGERIDAS);
+    const cheios = await perfisPorId(
+      sb,
+      naFila.map((p) => p.id),
+      ctx.perfis,
+    );
+    const pessoas = naFila.map((p) =>
+      naFileira(cheios.get(p.id) ?? candidatas.find((c) => c.id === p.id) ?? { id: p.id }),
+    );
 
     /* ⚠️ **A CONTA OFICIAL VEM FIXADA NO TOPO, e não ordenada junto.**
        `ordenarPessoas` classifica por elos em comum, e a conta oficial não tem
@@ -2963,14 +2987,35 @@ export const buscarPerfis = createServerFn({ method: "POST" })
     /* ⚠️ `.eq("perfil_publico", true)` na CONSULTA, não num filtro depois: quem
        não abriu o perfil não pode nem viajar pela rede. É o portão que preserva
        o desenho original da aba — o grafo fechado por indicação. */
-    const { data: linhas } = await sb
-      .from("patient_profiles")
-      .select("id, display_name, avatar_url, bio, perfil_publico, care_mode")
-      .eq("perfil_publico", true)
-      .ilike("display_name", trechoParaLike(data.termo.trim()))
-      .limit(20);
+    /* ⚠️ **A BUSCA TAMBÉM MOSTRA OS SELOS**, e a oficial mais que todas: é aqui
+       que alguém digita o nome da clínica procurando por ela. Sem `conta_oficial`
+       no select, o resultado saía sem o selo justamente na tela em que ele mais
+       serve — e a paciente não teria como distinguir a conta do consultório de
+       uma homônima.
 
-    const ctx = await contextoDe(sb, eu);
+       ⚠️ E com RECUO: a coluna nasce num `APLICAR_` que o dono roda à mão, e sem
+       o recuo a busca inteira devolveria vazio na janela entre o deploy e o SQL.
+       "Não achei ninguém" é indistinguível de "a busca quebrou". */
+    const buscar = (colunas: string) =>
+      sb
+        .from("patient_profiles")
+        .select(colunas)
+        .eq("perfil_publico", true)
+        .ilike("display_name", trechoParaLike(data.termo.trim()))
+        .limit(20);
+    const COLUNAS_DA_BUSCA = "id, display_name, avatar_url, bio, perfil_publico, care_mode";
+    let achadas = await buscar(`${COLUNAS_DA_BUSCA}, conta_oficial`);
+    if (achadas.error) achadas = await buscar(COLUNAS_DA_BUSCA);
+    const linhas = achadas.data;
+
+    /* Os dois recortes saem na MESMA onda: o contexto não depende da busca. */
+    const [ctx, comSelo] = await Promise.all([
+      contextoDe(sb, eu),
+      quemTemSelo(
+        sb,
+        ((linhas ?? []) as any[]).map((p) => p.id),
+      ),
+    ]);
     return {
       ok: true as const,
       perfis: ((linhas ?? []) as any[])
@@ -2989,6 +3034,8 @@ export const buscarPerfis = createServerFn({ method: "POST" })
           meuVinculo: (ctx.sigo.has(p.id) ? "ativo" : null) as "ativo" | null,
           souEu: false,
           meusSeguidores: null,
+          oficial: ehContaOficial(p as any),
+          premium: comSelo.has(p.id),
         })),
     };
   });
