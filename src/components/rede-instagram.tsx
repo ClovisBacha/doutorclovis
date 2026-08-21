@@ -4494,6 +4494,43 @@ export function RedeNoApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [careMode, onde.t, naoVistas, naCaixa, euId, onAbrirSecoes]);
 
+  /* ⚠️ **ANTES DE QUALQUER `return` ANTECIPADO.** Este `useMemo` estava lá
+     embaixo, depois de `if (careMode) return …` e de uma dezena de ramos por
+     destino — ou seja, era chamado CONDICIONALMENTE, e a ordem dos hooks mudava
+     conforme a tela. É erro de `rules-of-hooks`, não estilo: o React casa hooks
+     por POSIÇÃO, e uma ordem que muda entre renders faz um hook ler o estado de
+     outro. O eslint pegou; sem ele isso viraria um defeito que só aparece ao
+     trocar de tela. */
+  /* ⚠️ **`useMemo`, senão o `memo` da fileira nunca acerta.** A lista era
+     remontada a cada render do feed — array novo, referência nova, e a fileira
+     repintava inteira mesmo sem nada ter mudado. Memoizar o COMPONENTE sem
+     estabilizar a PROP é trabalho perdido. */
+  const fileira: Story[] = useMemo(
+    () => [
+      ...(euId && !bolhas.some((b) => b.autorId === euId)
+        ? [
+            {
+              id: euId,
+              nome: "Seu story",
+              /* ⚠️ **`perfil` é o ÚLTIMO PERFIL ABERTO, e não o meu.** Ele não é
+               limpo no voltar, então abrir o perfil da Marina e voltar ao feed
+               deixava a primeira bolinha — a "Seu story" — com a foto dela.
+               `meuAvatar` é carregado por `meuPerfilSocial`, junto com o feed. */
+              avatarUrl: meuAvatar,
+              novo: false,
+            },
+          ]
+        : []),
+      ...bolhas.map((b) => ({
+        id: b.autorId,
+        nome: b.autorId === euId ? "Seu story" : b.autorNome,
+        avatarUrl: b.autorAvatar,
+        novo: b.novo,
+      })),
+    ],
+    [euId, bolhas, meuAvatar],
+  );
+
   /* ⚠️ **`return null` DEIXAVA A ABA EM BRANCO, e sem saída.**
      A barra de baixo abre "Feed", e o único caminho para o hub é o atalho ⊞ que
      esta MESMA tela publica — e o efeito dos atalhos retorna cedo em Modo
@@ -4796,35 +4833,6 @@ export function RedeNoApp({
   /* A MINHA bolinha entra sempre, mesmo sem story — é o convite para publicar.
      Se o servidor já a devolveu (porque tenho story vivo), ela não é
      duplicada. */
-  /* ⚠️ **`useMemo`, senão o `memo` da fileira nunca acerta.** A lista era
-     remontada a cada render do feed — array novo, referência nova, e a fileira
-     repintava inteira mesmo sem nada ter mudado. Memoizar o COMPONENTE sem
-     estabilizar a PROP é trabalho perdido. */
-  const fileira: Story[] = useMemo(
-    () => [
-      ...(euId && !bolhas.some((b) => b.autorId === euId)
-        ? [
-            {
-              id: euId,
-              nome: "Seu story",
-              /* ⚠️ **`perfil` é o ÚLTIMO PERFIL ABERTO, e não o meu.** Ele não é
-               limpo no voltar, então abrir o perfil da Marina e voltar ao feed
-               deixava a primeira bolinha — a "Seu story" — com a foto dela.
-               `meuAvatar` é carregado por `meuPerfilSocial`, junto com o feed. */
-              avatarUrl: meuAvatar,
-              novo: false,
-            },
-          ]
-        : []),
-      ...bolhas.map((b) => ({
-        id: b.autorId,
-        nome: b.autorId === euId ? "Seu story" : b.autorNome,
-        avatarUrl: b.autorAvatar,
-        novo: b.novo,
-      })),
-    ],
-    [euId, bolhas, meuAvatar],
-  );
 
   return (
     <>
