@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { IAP_ATIVO } from "./canal-de-venda";
 
 /**
@@ -24,9 +24,9 @@ const DEPS: Record<string, string> = { ...PKG.dependencies, ...PKG.devDependenci
 
 describe("o plano do IAP diz a verdade sobre o repositório", () => {
   test("⚠️ o Capacitor está instalado, e o documento não diz o contrário", () => {
-    expect(DEPS["@capacitor/core"]).toBeString();
-    expect(DEPS["@capacitor/ios"]).toBeString();
-    expect(DEPS["@capacitor/android"]).toBeString();
+    expect(typeof DEPS["@capacitor/core"]).toBe("string");
+    expect(typeof DEPS["@capacitor/ios"]).toBe("string");
+    expect(typeof DEPS["@capacitor/android"]).toBe("string");
     /* A frase antiga, exatamente como estava, não pode voltar. */
     expect(DOC).not.toContain("Capacitor instalado        | **Não**");
     expect(DOC).toContain("**instalado**");
@@ -53,7 +53,6 @@ describe("o plano do IAP diz a verdade sobre o repositório", () => {
     const fontes = ["src/lib", "src/routes/api"];
     const temValidacao = fontes.some((d) => {
       try {
-        const { readdirSync } = require("node:fs") as typeof import("node:fs");
         return readdirSync(d).some((n) => /recibo|receipt|iap/i.test(n) && !n.includes(".test."));
       } catch {
         return false;

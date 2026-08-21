@@ -6554,3 +6554,13 @@ de pagamento que nunca rodou é a pior coisa para se ter no repositório com car
 de pronto. `plano-iap-atualizado.test.ts` amarra o documento aos fatos do
 repositório, para ele não envelhecer de novo em silêncio — inclusive virando
 sozinho o texto do plugin no dia em que alguém rodar o `bun add`.
+
+### ⚠️ E EU COMMITEI COM VERMELHO DUAS VEZES — `bun run verificar`
+
+Duas vezes nesta sessão o commit saiu com teste ou `tsc` vermelho, e as duas
+pela MESMA causa: encadear `npx tsc … ; npx eslint … ; bun test … && git commit`
+verifica o **`git`**, não as checagens. Elas imprimem o problema e saem com
+código **0** — o `&&` passa.
+
+`scripts/verificar.sh` (`bun run verificar`) roda as três e **sai com erro** se
+qualquer uma falhar. `bun run verificar && git commit` passa a ser verdade.
