@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { MenuDaConta } from "@/components/menu-conta";
+import { ExportarDados } from "@/components/exportar-dados";
+import { ExcluirConta } from "@/components/excluir-conta";
 
 /**
  * Bancada de design do MENU DA CONTA — a folha que abre na silhueta do topo.
@@ -21,6 +23,13 @@ export const Route = createFileRoute("/preview-conta")({
     // `?semana=37` liga a linha de Pós-parto, que só existe da 36 em diante —
     // sem isto o caso mais alto da folha (nove linhas) nunca seria medido.
     semana: Number(q.semana ?? 20),
+    /* ⚠️ **A caixa de privacidade nunca tinha sido olhada.** "Excluir conta"
+       existe há meses e "Baixar meus dados" nasceu agora, e as duas vivem no
+       fundo de uma aba atrás do login. `?privacidade=1` desenha as duas juntas,
+       que é como a paciente as encontra — e a ORDEM importa: a saída
+       não-destrutiva vem primeiro, para quem chegou ali querendo o dado e não o
+       fim da conta. */
+    privacidade: q.privacidade === true || String(q.privacidade ?? "") === "1",
   }),
   head: () => ({
     meta: [{ title: "Bancada do menu da conta" }, { name: "robots", content: "noindex" }],
@@ -29,7 +38,15 @@ export const Route = createFileRoute("/preview-conta")({
 });
 
 function PreviewConta() {
-  const { painel, lidas, semana, pendente } = Route.useSearch();
+  const { painel, lidas, semana, pendente, privacidade } = Route.useSearch();
+  if (privacidade) {
+    return (
+      <div className="mx-auto max-w-md space-y-3 p-4">
+        <ExportarDados />
+        <ExcluirConta />
+      </div>
+    );
+  }
   return (
     <div className="fixed inset-0 z-[50] bg-gradient-to-b from-sky-200 to-rose-100">
       <MenuDaConta

@@ -67,6 +67,7 @@ import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
 import { ativarAvisos, renovarAvisosSeJaAutorizado } from "@/lib/avisos";
 import { ExcluirConta } from "@/components/excluir-conta";
+import { ExportarDados } from "@/components/exportar-dados";
 import { apagarMinhasConversas } from "@/lib/conta.functions";
 import { sendTestPushToMe } from "@/lib/push.functions";
 import {
@@ -5706,6 +5707,11 @@ function ProfileTab({
           não pode mudar. */}
       <ApagarConversas />
 
+      {/* ⚠️ ANTES da caixa de excluir, de propósito: muita gente que chega
+          aqui quer o DADO, não o fim da conta. Oferecer a saída não-destrutiva
+          primeiro é o que evita uma exclusão que ela não queria — e até agora
+          este lugar só tinha a destrutiva. */}
+      <ExportarDados ehMedico={ehMedico} />
       <ExcluirConta ehMedico={ehMedico} />
 
       <div className="rounded-3xl border border-border bg-card p-6">

@@ -6424,3 +6424,53 @@ lembrete sequer** — que é a mesma classe de defeito que ele veio consertar.
 
 Virou `await`, depois do carimbo. O custo é pequeno porque o estrangulador faz
 quase toda chamada voltar `null` na hora: só uma a cada dez minutos toca o banco.
+
+## Exportar os dados existe (LGPD Art. 18, II e V) — ago/2026
+
+`conta.functions.ts` tinha `excluirMinhaConta` e `apagarMinhasConversas`, e mais
+nada. A paciente só tinha a opção **destrutiva**: para levar o que é dela,
+apagava tudo. Num app de saúde isso pesa mais que na média — o que ela registrou
+aqui é a gestação inteira.
+
+### ⚠️ LISTA DE PERMISSÃO, NUNCA VARREDURA
+
+**Um export que vaze dado de TERCEIRO é pior que não ter export.** A tentação é
+varrer toda tabela com o `user_id` dela — e essa varredura um dia acha uma
+tabela onde "o id dela" significa outra coisa: `presente_reservas` tem o NOME de
+quem deu, `rede_perguntas` tem o `quem_id` da caixinha ANÔNIMA (gravado
+justamente para nunca ser devolvido), `amizades` e `duplas` têm o id da outra,
+`rede_denuncias` tem quem foi denunciado.
+
+Cada fonte entra à mão em `FONTES` (`exportar-dados.ts`), com `porque` escrito.
+Há teste proibindo as onze tabelas compartilhadas por nome.
+
+- ⚠️ **`sementinhas_ledger` entra SEM `dedupe_key`** — ela carrega o id de quem
+  deu o presente (`presente:<medico>:<paciente>:<token>`). É o caso mais fácil
+  de deixar passar, porque a tabela é dela.
+- ⚠️ **`consultations` entra pela METADE**, e a metade é a que o produto já
+  separou: `resumo_paciente` é o campo rotulado "o que ela vai ler", escrito
+  para ela. `achados` e `conduta` são o registro profissional do médico —
+  liberá-los por botão automático é decisão de prontuário, não de software.
+- ⚠️ **A SESSÃO É O ÚNICO RECORTE.** Não há `pacienteId` no corpo: bastaria
+  trocar um uuid para baixar a gestação de outra pessoa. E conta de MÉDICO é
+  recusada antes de qualquer leitura — o dado dele é de terceiros.
+- ⚠️ **Falha de leitura vira `falhas`, nunca bloco vazio**, e a tela DIZ.
+  Export silenciosamente incompleto é pior que nenhum: ela acredita que levou
+  tudo, apaga a conta, e o que faltou some junto. Tabela ausente (`42P01`) não
+  é falha — num banco atrás das migrations não há o que levar.
+- ⚠️ **O que fica de fora vai DENTRO do arquivo** (`FORA_DO_EXPORT`), com o
+  motivo. Omitir em silêncio seria fingir completude.
+- ⚠️ **O nome do arquivo não carrega o nome dela**: downloads é pasta
+  compartilhada. E o aviso diz que o arquivo tem dado de saúde e **não tem
+  senha** — quem exporta manda por WhatsApp sem pensar, e é o único momento em
+  que dá para dizer isso.
+- **A caixa vem ANTES da de excluir**: muita gente que chega ali quer o DADO,
+  não o fim da conta.
+
+Cinco mutações em vermelho. **Bancada:** `/preview-conta?privacidade=1` — as
+duas caixas nunca tinham sido olhadas juntas.
+
+⚠️ **E a prosa me enganou pela SEXTA vez**: o teste "não existe alvo vindo do
+cliente" ficou vermelho por causa do meu próprio comentário, que diz "não há
+`pacienteId` no corpo do pedido". **A partir daqui, tirar comentário antes de
+procurar é padrão em qualquer teste que leia fonte** — não só nas catracas.
