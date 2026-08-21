@@ -4122,7 +4122,8 @@ function LessonSheet({
         <button
           onClick={onClose}
           aria-label="Fechar"
-          className="press text-2xl leading-none text-slate-400"
+          /* ⚠️ 44px e `slate-600` — ver o comentário do irmão desta tela. */
+          className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
         >
           ✕
         </button>
@@ -5045,7 +5046,12 @@ export function MovementBlock({
             <button
               onClick={close}
               aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
+              /* ⚠️ **44px e `slate-600`, medidos.** Era `text-slate-400` sem
+                 preenchimento: alvo de 20×24 a 2,54:1 — abaixo do mínimo nas
+                 duas contas, e é o ÚNICO jeito de sair de uma sessão que ocupa
+                 a tela inteira. O `-m-2` cresce a área do dedo sem mover o
+                 desenho de lugar. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
             >
               ✕
             </button>
@@ -6694,7 +6700,12 @@ export function MeditationBlock({
             <button
               onClick={close}
               aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
+              /* ⚠️ **44px e `slate-600`, medidos.** Era `text-slate-400` sem
+                 preenchimento: alvo de 20×24 a 2,54:1 — abaixo do mínimo nas
+                 duas contas, e é o ÚNICO jeito de sair de uma sessão que ocupa
+                 a tela inteira. O `-m-2` cresce a área do dedo sem mover o
+                 desenho de lugar. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
             >
               ✕
             </button>
@@ -7759,7 +7770,12 @@ export function BondingBlock({
             <button
               onClick={close}
               aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
+              /* ⚠️ **44px e `slate-600`, medidos.** Era `text-slate-400` sem
+                 preenchimento: alvo de 20×24 a 2,54:1 — abaixo do mínimo nas
+                 duas contas, e é o ÚNICO jeito de sair de uma sessão que ocupa
+                 a tela inteira. O `-m-2` cresce a área do dedo sem mover o
+                 desenho de lugar. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
             >
               ✕
             </button>
@@ -8556,7 +8572,12 @@ export function GratitudeBlock({
             <button
               onClick={close}
               aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
+              /* ⚠️ **44px e `slate-600`, medidos.** Era `text-slate-400` sem
+                 preenchimento: alvo de 20×24 a 2,54:1 — abaixo do mínimo nas
+                 duas contas, e é o ÚNICO jeito de sair de uma sessão que ocupa
+                 a tela inteira. O `-m-2` cresce a área do dedo sem mover o
+                 desenho de lugar. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
             >
               ✕
             </button>
@@ -10274,7 +10295,12 @@ function DailyQuizBlock({
             <button
               onClick={close}
               aria-label="Fechar"
-              className="press text-2xl leading-none text-slate-400"
+              /* ⚠️ **44px e `slate-600`, medidos.** Era `text-slate-400` sem
+                 preenchimento: alvo de 20×24 a 2,54:1 — abaixo do mínimo nas
+                 duas contas, e é o ÚNICO jeito de sair de uma sessão que ocupa
+                 a tela inteira. O `-m-2` cresce a área do dedo sem mover o
+                 desenho de lugar. */
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-2xl leading-none text-slate-600"
             >
               ✕
             </button>

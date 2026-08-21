@@ -6681,3 +6681,41 @@ mensagem exata. **A régua, mais uma vez: ancore no específico, nunca no nome q
 o arquivo pode ter duas vezes.**
 
 Quatro mutações em vermelho.
+
+## A acessibilidade do app da paciente foi MEDIDA (ago/2026)
+
+`scripts/acessibilidade.mjs` (`bun run acessibilidade`) abre 15 bancadas da
+paciente e mede o que dá para medir sem opinião: contraste, tamanho de alvo,
+botão de ícone sem nome, imagem informativa sem `alt`.
+
+⚠️ **AS DUAS ARMADILHAS DE MEDIÇÃO ESTÃO DENTRO DO SCRIPT**, porque as duas já
+custaram aqui: o `oklch` lido por regex (que "aprovou" seis textos a 1,03:1) e o
+fundo TRANSLÚCIDO não composto (que "reprovou" vinte links de rodapé a 6,15:1).
+Cor sai do canvas **e** o fundo é empilhado até um opaco.
+
+### O que a varredura achou, e o que dela é real
+
+Bruto: **124 de contraste, 49 de alvo, 0 sem nome, 0 sem alt.** ⚠️ **O número
+bruto não é a resposta** — a mesma lição das varreduras de 523 e de 64. Duas
+classes dominam e são falso positivo:
+
+- **"Pular para o conteúdo principal", 1×1** — é o link de salto, escondido de
+  propósito e visível ao receber foco. Está CERTO.
+- **"Abrir menu", 36×36** — é a navbar do site institucional, que aparece em
+  toda bancada e não faz parte do app da paciente.
+
+### O que era real, e foi corrigido
+
+⚠️ **O ✕ que fecha uma sessão de tela cheia**: `text-slate-400` sem
+preenchimento, dando **20×24 px a 2,54:1** — abaixo do mínimo nas duas contas.
+E é o **único** jeito de sair de uma meditação, de um exercício ou de uma aula
+que ocupa a tela inteira.
+
+Seis botões com a mesma classe. Agora `-m-2 flex h-11 w-11` (o `-m-2` cresce a
+área do dedo sem mover o desenho) e `text-slate-600`. **Medido depois: 44×44 e
+7,32:1** nas duas telas.
+
+O resto do contraste é texto auxiliar entre 3,4 e 4,5:1 — real, porém de outra
+natureza (legenda, não controle), e mexer nele é decisão de paleta que atravessa
+o app inteiro. Fica levantado, e o script está no `package.json` para ser rodado
+de novo.
