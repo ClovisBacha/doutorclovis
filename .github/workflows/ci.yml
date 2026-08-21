@@ -104,14 +104,26 @@ jobs:
       #
       # ⚠️ E com `--host 127.0.0.1`: o Vite tenta IPv6 (`:::8080`) por padrão, e
       # o runner não resolve isso.
+      # ⚠️ A ESPERA É POR HTTP, e não por texto no log.
+      #
+      # A primeira versão fazia `grep -q "Local:"` e NUNCA casava: a saída
+      # colorida do Vite insere um escape ANSI entre `Local` e `:`
+      # (`\e[1mLocal\e[22m:`). O servidor subia em 1,8 s, o laço esperava os
+      # 120 s inteiros, e o job falhava com "o servidor não subiu" impresso
+      # logo acima de uma linha do próprio log dizendo que ele subiu.
+      #
+      # É a mesma família dos casamentos frouxos que este repo já pagou —
+      # procurar um texto que não está literalmente lá. Perguntar ao SERVIDOR
+      # testa a condição que importa: ele está servindo?
       - name: Sobe o servidor
         run: |
           bun run dev --host 127.0.0.1 --port 8080 > /tmp/dev.log 2>&1 &
           for i in $(seq 1 60); do
-            grep -q "Local:" /tmp/dev.log && break
+            curl -sf -o /dev/null http://127.0.0.1:8080/ && break
             sleep 2
           done
-          grep -q "Local:" /tmp/dev.log || { echo "o servidor não subiu"; cat /tmp/dev.log; exit 1; }
+          curl -sf -o /dev/null http://127.0.0.1:8080/ || {
+            echo "o servidor não respondeu em 120s"; cat /tmp/dev.log; exit 1; }
 
       - run: bun run varrer:bancadas
 

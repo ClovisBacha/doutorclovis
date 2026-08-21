@@ -16,7 +16,7 @@
  * Sai com código 1 se qualquer bancada tiver erro de console ou não renderizar.
  */
 import { chromium } from "playwright";
-import { readdirSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 
 const porta = (process.argv.find((a) => a.startsWith("--porta=")) ?? "").split("=")[1] || "8080";
 const base = `http://127.0.0.1:${porta}`;
@@ -42,11 +42,32 @@ const EXTRAS = [
   "/preview-registrar-consulta?primeira=1",
 ];
 
-/** Ruído que não é defeito do app. */
-const IGNORAR = /cert|ERR_CERT|favicon|net::ERR_ABORTED/i;
+/**
+ * Ruído que não é defeito do app.
+ *
+ * ⚠️ **O 429 entra aqui, e é uma decisão, não uma vista grossa.** A varredura
+ * abre 42 páginas em lotes contra os MESMOS serviços externos (clima, Supabase),
+ * e eles limitam taxa — medido. Um recurso barrado por excesso de chamadas
+ * simultâneas de UMA varredura não diz nada sobre a tela, e deixá-lo acusar
+ * tornaria o job intermitente, que é o que ele existe para não ser.
+ *
+ * ⚠️ Note o que NÃO está aqui: 4xx que não seja 429, 5xx, e qualquer erro de
+ * JavaScript. Falha de carregamento por rota errada ou por servidor quebrado
+ * continua sendo defeito.
+ */
+const IGNORAR = /cert|ERR_CERT|favicon|net::ERR_ABORTED|status of 429/i;
 
+/* ⚠️ **O CAMINHO FIXO É DO CONTÊINER DE DESENVOLVIMENTO, NÃO DO RUNNER.**
+   Aqui o Chromium vive em `/opt/pw-browsers/chromium` (o ambiente já vem com
+   ele). No GitHub Actions quem instala é `playwright install`, que põe em
+   `~/.cache/ms-playwright` — e um `executablePath` fixo faria o Playwright
+   procurar um arquivo que não existe.
+
+   Só passa o caminho quando ele EXISTE; senão deixa o Playwright resolver
+   sozinho, que é o certo em qualquer máquina. */
+const caminhoLocal = process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium";
 const b = await chromium.launch({
-  executablePath: process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium",
+  ...(existsSync(caminhoLocal) ? { executablePath: caminhoLocal } : {}),
   args: ["--no-proxy-server"],
 });
 const ctx = await b.newContext({ viewport: { width: 393, height: 852 }, ignoreHTTPSErrors: true });

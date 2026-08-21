@@ -6515,6 +6515,27 @@ determinístico falha nas duas, artefato de carga não.
 de verdade, que é coisa que este app tem: o laço do `useSyncExternalStore`
 nasceu exatamente assim.
 
+### ⚠️ E O JOB FALHOU NA PRIMEIRA VEZ — por dois erros MEUS
+
+1. **A espera pelo servidor procurava um texto que não existe.** O passo fazia
+   `grep -q "Local:"` no log do Vite, e a saída COLORIDA insere um escape ANSI
+   entre `Local` e `:` (`\e[1mLocal\e[22m:`). O servidor subia em 1,8 s, o laço
+   esperava os 120 s inteiros, e o job falhava com "o servidor não subiu"
+   impresso logo acima da linha do log dizendo que ele subiu. É a mesma família
+   dos casamentos frouxos que este repositório já pagou várias vezes — procurar
+   um texto que não está literalmente lá. Virou `curl -sf`, que testa a
+   condição que importa: **ele está servindo?**
+2. **O caminho do Chromium era do contêiner de desenvolvimento.**
+   `/opt/pw-browsers/chromium` existe aqui; no runner quem instala é
+   `playwright install`, que põe em `~/.cache/ms-playwright`. Agora o caminho só
+   é passado quando o arquivo EXISTE.
+
+⚠️ **E o 429 entrou na lista de ruído, como decisão.** A varredura abre 42
+páginas em lotes contra os MESMOS serviços externos (clima, Supabase) e eles
+limitam taxa — medido. Um recurso barrado por excesso de chamadas simultâneas da
+própria varredura não diz nada sobre a tela. **O que NÃO foi ignorado:** 4xx que
+não seja 429, 5xx, e qualquer erro de JavaScript.
+
 ## ⚠️ O PLANO DO IAP DIZIA O CONTRÁRIO DA REALIDADE (ago/2026)
 
 `docs/plano-iap.md` é o documento que o dono lê para decidir se destrava a
