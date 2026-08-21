@@ -36,6 +36,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS patient_profiles_uma_conta_oficial
   ON public.patient_profiles ((true))
   WHERE conta_oficial;
 
+-- ---------------------------------------------------------------------------
+-- ATENCAO: NENHUMA PACIENTE PODE SE DAR O SELO DO CONSULTORIO.
+--
+-- `patient_profiles` e escrita direto do navegador com a chave anon em varios
+-- pontos do app (a chave do perfil publico, a bio, a foto, o Modo Cuidado). Sem
+-- este REVOKE, qualquer paciente autenticada poderia rodar
+--
+--     UPDATE patient_profiles SET conta_oficial = true WHERE id = auth.uid();
+--
+-- e passaria a aparecer com o selo "Conta oficial" e FIXADA EM PRIMEIRO na
+-- fileira de sugeridas de toda conta nova. Num app que carrega o nome de um
+-- consultorio de gestacao de alto risco, uma paciente se passando pela clinica
+-- nao e vandalismo de rede social: e alguem falando com autoridade medica
+-- emprestada para quem acabou de chegar.
+--
+-- O indice unico acima limita o dano (so UMA linha pode ter o selo), mas nao o
+-- impede: enquanto o dono nao criar a conta oficial, a primeira a tentar leva.
+--
+-- E o mesmo padrao que este repo ja usa tres vezes -- `referred_by`,
+-- `referral_code` (APLICAR_GAMIFICACAO) e `med_reminder_sent_at`
+-- (APLICAR_LEMBRETE_DE_MEDITACAO): coluna que o SERVIDOR escreve, o navegador
+-- nao escreve.
+--
+-- Idempotente: REVOKE de permissao que ja nao existe nao e erro.
+-- ---------------------------------------------------------------------------
+REVOKE UPDATE (conta_oficial) ON public.patient_profiles FROM authenticated;
+REVOKE UPDATE (conta_oficial) ON public.patient_profiles FROM anon;
+
 -- ── 2 · Como CRIAR a conta (passo manual, uma vez) ─────────────────────────
 --
 -- A conta precisa de uma linha em `auth.users`, porque `patient_profiles.id`
@@ -68,6 +96,12 @@ WHERE id = (SELECT id FROM auth.users WHERE lower(email) = lower('TROQUE_PELO_EM
 SELECT
   EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name='patient_profiles' AND column_name='conta_oficial')  AS coluna_ok,
+  -- Tem de vir FALSE: se `authenticated` ainda puder escrever a coluna, o
+  -- REVOKE acima nao rodou e qualquer paciente pode se dar o selo.
+  (SELECT bool_or(privilege_type = 'UPDATE')
+     FROM information_schema.column_privileges
+    WHERE table_name='patient_profiles' AND column_name='conta_oficial'
+      AND grantee='authenticated')                                              AS selo_escrevivel,
   (SELECT count(*) FROM public.patient_profiles WHERE conta_oficial)            AS quantas_oficiais,
   (SELECT display_name FROM public.patient_profiles WHERE conta_oficial LIMIT 1) AS nome_da_oficial,
   (SELECT perfil_publico FROM public.patient_profiles WHERE conta_oficial LIMIT 1) AS publica_ok;
