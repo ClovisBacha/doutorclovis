@@ -452,12 +452,26 @@ export const dispararEmergencia = createServerFn({ method: "POST" })
           avisados: canais.destinos,
         },
       };
+      /* ⚠️ **ESTA ESCADA DE RECUO NUNCA RODAVA — no SOS.**
+         O teste era `code !== "42703"`, e `postgrest.ts` documenta por quê isso
+         está errado: um INSERT cujo payload tem coluna fora do schema cache
+         volta **PGRST204**, do PostgREST — 42703 vem do Postgres, num SELECT.
+         Ou seja, a primeira tentativa falhava, o `break` disparava, e as duas
+         tentativas com menos colunas nunca aconteciam.
+
+         Num banco sem as colunas mais novas de `panic_events`, o acionamento
+         de emergência simplesmente **não era gravado** — e a escada existe
+         exatamente para esse banco. Os avisos saíam (push, e-mail, WhatsApp),
+         mas o registro que o médico vê depois, não.
+
+         `colunaAusente` cobre os dois códigos, e é o mesmo conserto que
+         `doctors.functions.ts` já tinha recebido pelo mesmo motivo. */
+      const { colunaAusente } = await import("./postgrest");
       for (const linha of [eventoCompleto, { ...eventoBase, channels: canais }, eventoBase]) {
         const { error } = await sb.from("panic_events").insert(linha);
         if (!error) break;
-        // 42703 = coluna inexistente. Qualquer outro erro não melhora tentando
-        // com menos colunas, então não insistimos.
-        if ((error as { code?: string }).code !== "42703") break;
+        /* Qualquer outro erro não melhora tentando com menos colunas. */
+        if (!colunaAusente(error)) break;
       }
 
       return { ok: true as const, canais, mensagem: texto };

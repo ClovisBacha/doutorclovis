@@ -241,7 +241,13 @@ export async function embedBrainEntry(
       .from("brain_entries")
       .update({ embedding: vec })
       .eq("id", entryId);
-    if (error && (error as { code?: string }).code !== "42703") {
+    /* ⚠️ `colunaAusente`, e não `42703` cru: este é um UPDATE, e um payload com
+       coluna fora do schema cache volta PGRST204. Com o teste antigo, o banco
+       SEM a coluna `embedding` — que é o caso normal antes da migration —
+       registrava um erro no log a cada entrada do cérebro, gritando sobre uma
+       situação esperada. Alarme que grita sempre é alarme que se ignora. */
+    const { colunaAusente } = await import("./postgrest");
+    if (error && !colunaAusente(error)) {
       console.error("[cérebro] vetor não gravou; entrada fica inencontrável", entryId, error);
     }
   } catch {

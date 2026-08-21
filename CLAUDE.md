@@ -6564,3 +6564,49 @@ código **0** — o `&&` passa.
 
 `scripts/verificar.sh` (`bun run verificar`) roda as três e **sai com erro** se
 qualquer uma falhar. `bun run verificar && git commit` passa a ser verdade.
+
+## ⚠️ O ACIONAMENTO DE SOS NÃO ERA GRAVADO (ago/2026)
+
+Achado ao escrever a catraca do recuo de coluna ausente — item 7 da leva.
+
+`panic_events` tem uma escada de três tentativas: linha completa → sem a ficha
+congelada → só o básico. Ela existe **para o banco atrás das migrations**, que é
+o caso normal aqui. O teste era:
+
+```ts
+if ((error as { code?: string }).code !== "42703") break;
+```
+
+⚠️ **E `42703` nunca sai de um INSERT.** O cabeçalho de `postgrest.ts` já
+documentava: **42703** é do Postgres, num SELECT; **PGRST204** é do PostgREST,
+num INSERT/UPDATE cujo payload tem coluna fora do schema cache — nem chega ao
+Postgres. A primeira tentativa falhava, o `break` disparava, e as duas
+tentativas com menos colunas **nunca aconteciam**.
+
+Num banco sem as colunas mais novas, a paciente apertava o SOS, **os avisos
+saíam** (push, e-mail, WhatsApp) e o **registro que o médico vê depois, não**.
+Falha silenciosa no caminho mais caro do produto.
+
+É a terceira vez que este mesmo erro custa aqui — o "Salvar perfil" do médico
+falhava SEMPRE pelo mesmo motivo, e a devolutiva de exame sumia enquanto a tela
+dizia "✓".
+
+### A catraca, e o que ela deliberadamente NÃO cobra
+
+`recuo-de-coluna.test.ts` acusa `"42703"` cru **apenas em caminho de escrita**
+(há `.insert/.update/.upsert` na janela e não há `.select`).
+
+- ⚠️ **`42703` num SELECT está CERTO** — é literalmente o código que o Postgres
+  devolve ali. Proibir o literal em todo lugar viraria migração de **39 sítios
+  para consertar 3**, e catraca que obriga refator grande é catraca que alguém
+  desliga.
+- ⚠️ **Ambíguo não acusa.** Janela com `select` E escrita passa: o falso
+  positivo mandaria alguém mexer em código correto, que é pior que o falso
+  negativo aqui.
+- O SOS tem asserção PRÓPRIA, por ser o caminho mais caro.
+
+Junto saiu o `embeddings.server.ts`, que pelo mesmo engano **registrava erro no
+log a cada entrada do cérebro** num banco sem a coluna `embedding` — gritando
+sobre uma situação esperada. Alarme que grita sempre é alarme que se ignora.
+
+Três mutações em vermelho, inclusive a que deixa só o comentário citando a régua.
