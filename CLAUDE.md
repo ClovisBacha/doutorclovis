@@ -6232,3 +6232,32 @@ consulta anterior — o rascunho pega tudo) · `?vazio=1` (nada no período).
 **Custo medido:** cada rota de bancada acrescenta pouco à árvore de rotas, que
 toda página carrega — a do SOS custou **+660 bytes crus / +143 comprimidos** na
 entrada. É o preço de uma tela olhável.
+
+### E o prontuário, a maior tela clínica do app (689 linhas)
+
+Também prop-driven — "ele desenha, quem chama age" —, então a bancada não custou
+uma linha de mudança na produção. Os três estados que ninguém consegue fabricar
+numa conta de teste:
+
+- ⚠️ **`?degradada=1` — "NADA RELATADO" ≠ "DESCONHECIDO".** Quando o banco não
+  tem as colunas do perfil rico, os campos ausentes são DESCONHECIDOS, não
+  vazios. Espaço em branco onde deveria estar "alergias" é lido como "não tem
+  alergia", e a diferença entre os dois é uma prescrição. Medido: a tela abre
+  com o aviso âmbar dizendo isso e mandando aplicar o SQL antes de decidir.
+- ⚠️ **`?incompleto=1`** — alguma fonte não pôde ser lida, e a tela avisa em vez
+  de fingir completude. Um prontuário que parece inteiro e não está é pior que
+  um que assume a falha.
+- **`?semficha=1`** e **`?carregando=1`** — os dois vazios.
+
+**Bancada:** `/preview-prontuario` · `?degradada=1` · `?incompleto=1` ·
+`?carregando=1` · `?semficha=1` · `?secao=quem` (as abas do cartão da paciente
+usam uma seção de cada vez).
+
+⚠️ **UMA OBSERVAÇÃO QUE NÃO VIROU MUDANÇA:** o bloco "Desde a última consulta"
+tem quatro contadores, e um deles é **"exames enviados"** — de um recurso que
+saiu do produto. Varrido: nada escreve em `exam_files` hoje. Para toda paciente
+que entrou depois da remoção o contador é **permanentemente 0**, ocupando um
+quarto do bloco mais importante da tela. Não mexi porque quem enviou exame ANTES
+ainda tem contagem de verdade ali, e apagar o contador esconderia esse histórico
+— é decisão do dono, não minha. Aparece em `prontuario-paciente.tsx` e em
+`painel-no-app.tsx`.

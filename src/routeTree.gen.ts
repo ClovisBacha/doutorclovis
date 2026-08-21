@@ -23,6 +23,7 @@ import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
 import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
 import { Route as PreviewRedeRouteImport } from './routes/preview-rede'
+import { Route as PreviewProntuarioRouteImport } from './routes/preview-prontuario'
 import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
@@ -166,6 +167,11 @@ const PreviewRegistrarConsultaRoute =
 const PreviewRedeRoute = PreviewRedeRouteImport.update({
   id: '/preview-rede',
   path: '/preview-rede',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewProntuarioRoute = PreviewProntuarioRouteImport.update({
+  id: '/preview-prontuario',
+  path: '/preview-prontuario',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewPresentesRoute = PreviewPresentesRouteImport.update({
@@ -580,6 +586,7 @@ export interface FileRoutesByFullPath {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-prontuario': typeof PreviewProntuarioRoute
   '/preview-rede': typeof PreviewRedeRoute
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
@@ -668,6 +675,7 @@ export interface FileRoutesByTo {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-prontuario': typeof PreviewProntuarioRoute
   '/preview-rede': typeof PreviewRedeRoute
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
@@ -758,6 +766,7 @@ export interface FileRoutesById {
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
+  '/preview-prontuario': typeof PreviewProntuarioRoute
   '/preview-rede': typeof PreviewRedeRoute
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
@@ -848,6 +857,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-prontuario'
     | '/preview-rede'
     | '/preview-registrar-consulta'
     | '/preview-regua'
@@ -936,6 +946,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-prontuario'
     | '/preview-rede'
     | '/preview-registrar-consulta'
     | '/preview-regua'
@@ -1025,6 +1036,7 @@ export interface FileRouteTypes {
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
+    | '/preview-prontuario'
     | '/preview-rede'
     | '/preview-registrar-consulta'
     | '/preview-regua'
@@ -1115,6 +1127,7 @@ export interface RootRouteChildren {
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
+  PreviewProntuarioRoute: typeof PreviewProntuarioRoute
   PreviewRedeRoute: typeof PreviewRedeRoute
   PreviewRegistrarConsultaRoute: typeof PreviewRegistrarConsultaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
@@ -1252,6 +1265,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-rede'
       fullPath: '/preview-rede'
       preLoaderRoute: typeof PreviewRedeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-prontuario': {
+      id: '/preview-prontuario'
+      path: '/preview-prontuario'
+      fullPath: '/preview-prontuario'
+      preLoaderRoute: typeof PreviewProntuarioRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-presentes': {
@@ -1831,6 +1851,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,
+  PreviewProntuarioRoute: PreviewProntuarioRoute,
   PreviewRedeRoute: PreviewRedeRoute,
   PreviewRegistrarConsultaRoute: PreviewRegistrarConsultaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
