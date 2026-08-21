@@ -11,6 +11,7 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { ConviteDoApp } from "@/components/convite-do-app";
+import { primeiroNome } from "@/lib/quem-convidou";
 import type { PerfilPublico } from "@/lib/perfil-publico";
 
 export const Route = createFileRoute("/p/$codigo")({
@@ -72,10 +73,26 @@ export const Route = createFileRoute("/p/$codigo")({
  */
 function metaDaVitrine(perfil: PerfilPublico | null) {
   if (!perfil) return [];
-  /* Só o PRIMEIRO nome — a mesma régua de `primeiroNome`: sobrenome
-     identifica, primeiro nome apresenta. E este texto vai para o WhatsApp de
-     gente que ela não escolheu. */
-  const nome = perfil.nome.trim().split(/\s+/)[0] || "Alguém";
+  /* ⚠️ **`primeiroNome` DE VERDADE, e não uma segunda régua que só se parece
+     com ela.** Aqui havia um `split(/\s+/)[0] || "Alguém"` com um comentário
+     afirmando ser "a mesma régua" — e não era: `primeiroNome` RECUSA nome de um
+     caractere (lixo de cadastro) e devolve `null`, enquanto o `||` transformava
+     tudo que sobrasse no placeholder.
+
+     E o placeholder não era hipotético: `perfilPublicoPorCodigo` já grava
+     `nome: display_name?.trim() || "Alguém"`, e `display_name` é preenchido
+     pelo gatilho com o trecho antes do @ do e-mail. Então saíam títulos como
+     "Alguém está no Obstétrica" — a frase que esta leva proibiu por escrito,
+     porque soa como erro de sistema — e "bachaclovis está no Obstétrica".
+
+     ⚠️ **E isso não se conserta depois.** O título é o que o WhatsApp COPIA e
+     guarda no histórico de toda conversa em que o link foi colado: desligar a
+     chave amanhã não tira de lá.
+
+     Sem primeiro nome utilizável, a página cai no cartão genérico do site (o
+     `<head>` do root) — que apresenta o app sem afirmar nada sobre ninguém. */
+  const nome = primeiroNome(perfil.nome);
+  if (!nome) return [];
   const titulo = `${nome} está no Obstétrica`;
   const descricao = "Acompanhamento da gestação, semana a semana — do positivo ao pós-parto.";
   return [

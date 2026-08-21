@@ -358,8 +358,12 @@ export const minhasAmigas = createServerFn({ method: "POST" })
        por amiga, uma esperando a anterior. Vinte amigas eram vinte viagens em
        fila indiana antes de a aba desenhar. `renovarUrlsAssinadas` manda uma
        requisição por balde — e nenhuma para quem ainda está longe de vencer. */
-    const { renovarUrlsAssinadas } = await import("@/lib/imagens.server");
-    const urls = await renovarUrlsAssinadas(amigas.map((a) => a.avatarUrl));
+    const { renovarUrlsAssinadas, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
+    /* Com a validade do AVATAR — ver `VALIDADE_AVATAR_SEG`. */
+    const urls = await renovarUrlsAssinadas(
+      amigas.map((a) => a.avatarUrl),
+      VALIDADE_AVATAR_SEG,
+    );
     amigas.forEach((a, i) => {
       a.avatarUrl = urls[i];
     });
@@ -478,12 +482,15 @@ export const perfilDaAmiga = createServerFn({ method: "POST" })
     const skin = typeof blob["dc-path-skin"] === "string" ? (blob["dc-path-skin"] as string) : null;
 
     /* Mesma renovação da lista — ver o comentário em `minhasAmigas`. */
-    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
+    const { renovarUrlAssinada, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
     const perfil: PerfilDeAmiga = {
       id: p.id,
       nome: (p.display_name ?? "").trim() || "Amiga",
       bebe: (p.baby_name ?? "").trim() || null,
-      avatarUrl: await renovarUrlAssinada((p.avatar_url as string | null) ?? null),
+      avatarUrl: await renovarUrlAssinada(
+        (p.avatar_url as string | null) ?? null,
+        VALIDADE_AVATAR_SEG,
+      ),
       vistaEm: (p.last_seen_at as string | null) ?? null,
       sequencia: chamaDe(linhas, hoje),
       trofeus: trofeusDasChaves(

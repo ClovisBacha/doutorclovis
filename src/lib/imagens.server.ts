@@ -386,6 +386,26 @@ export async function renovarUrlAssinada(
 export const MARGEM_DE_RENOVACAO_SEG = 12 * 3600;
 
 /**
+ * A VALIDADE DO AVATAR — sete dias, a MESMA com que ele é gravado.
+ *
+ * ⚠️ **RENOVAR COM UMA HORA ERA UM DEFEITO, e ele se realimentava.**
+ * `salvarPerfilSocial` grava a URL do avatar com sete dias. A renovação usava a
+ * validade PADRÃO deste arquivo (uma hora) e não grava o resultado de volta na
+ * coluna — então, a partir do dia em que a URL de sete dias entra na margem de
+ * renovação, toda leitura produzia uma URL de UMA HORA, que na leitura seguinte
+ * já estava dentro da margem e era renovada de novo. A partir daí, TODA leitura
+ * da rede voltava a assinar TODOS os avatares, para sempre: a economia que a
+ * margem existe para dar simplesmente parava de existir, com data marcada e sem
+ * nada quebrado para avisar.
+ *
+ * ⚠️ **E há um segundo custo, no NAVEGADOR.** A URL assinada é a chave do cache
+ * de imagem: se ela muda a cada leitura, o navegador baixa a mesma foto de novo
+ * em toda abertura de tela. Uma validade longa e estável é o que faz a segunda
+ * visita ser instantânea.
+ */
+export const VALIDADE_AVATAR_SEG = 7 * 24 * 3600;
+
+/**
  * Quando esta URL assinada vence, em segundos-época — ou `null`.
  *
  * O token de uma URL assinada do Storage é um JWT cujo payload traz `exp`.

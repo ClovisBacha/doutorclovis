@@ -536,8 +536,16 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
      `renovarUrlsAssinadas` manda um `POST` por balde — e, como o avatar é
      assinado por sete dias, o caso comum não manda nenhum: quem ainda tem mais
      de meio dia de validade é reaproveitado sem tocar na rede. */
-  const { renovarUrlsAssinadas } = await import("@/lib/imagens.server");
-  const urls = await renovarUrlsAssinadas(linhas.map((p) => p.avatar_url));
+  const { renovarUrlsAssinadas, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
+  /* ⚠️ **COM A VALIDADE DO AVATAR, e não com o padrão de uma hora.** Renovar
+     para uma hora fazia a URL nascer JÁ dentro da margem de renovação: na
+     leitura seguinte ela era renovada de novo, e a partir daí toda leitura da
+     rede voltava a assinar todos os avatares, para sempre. E, no navegador, uma
+     URL que muda a cada leitura é uma foto baixada de novo em cada tela. */
+  const urls = await renovarUrlsAssinadas(
+    linhas.map((p) => p.avatar_url),
+    VALIDADE_AVATAR_SEG,
+  );
   const saida = new Map<string, any>();
   linhas.forEach((p, i) => {
     const pronto = { ...p, avatar_url: urls[i] };

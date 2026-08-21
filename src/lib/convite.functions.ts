@@ -116,11 +116,11 @@ export const quemConvidou = createServerFn({ method: "POST" })
        `renovarUrlAssinada` conhece os dois formatos e devolve a data URL
        intacta — é a mesma função, e o mesmo defeito, que `perfisPorId` já
        conserta para a rede inteira. */
-    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
+    const { renovarUrlAssinada, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
     return {
       quem: {
         nome,
-        avatarUrl: await renovarUrlAssinada((perfil as any).avatar_url),
+        avatarUrl: await renovarUrlAssinada((perfil as any).avatar_url, VALIDADE_AVATAR_SEG),
         tipo: "amiga",
       },
     };
@@ -223,7 +223,7 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
     }
 
     const { computeGestation } = await import("@/lib/gestacao");
-    const { renovarUrlAssinada } = await import("@/lib/imagens.server");
+    const { renovarUrlAssinada, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
     const { entradaDoSelo, hojeEmSaoPaulo, seloDoPerfil } = await import("@/lib/selo-do-perfil");
     const g = computeGestation({
       lmp: p!.lmp_date ?? null,
@@ -279,7 +279,7 @@ export const perfilPublicoPorCodigo = createServerFn({ method: "POST" })
            editor de perfil é URL ASSINADA e vence em 7 dias. Crua, a vitrine
            pública — a página que existe para apresentar o app a quem não tem
            conta — abriria sem rosto a partir do oitavo dia. */
-        avatarUrl: await renovarUrlAssinada(p!.avatar_url),
+        avatarUrl: await renovarUrlAssinada(p!.avatar_url, VALIDADE_AVATAR_SEG),
         seloSemana: selo.semana,
         seloBebe: selo.bebe,
         posts,
