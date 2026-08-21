@@ -1224,3 +1224,38 @@ describe("contextoDe espera UMA vez, não duas", () => {
     expect(c).toContain("let amigas = new Set<string>()");
   });
 });
+
+/**
+ * ⚠️ O `.in()` DO FEED TEM TETO — e é limite de URL, não de gosto.
+ *
+ * O `.in()` do PostgREST vai na QUERY STRING, e cada uuid custa 37 caracteres:
+ * 400 autores são ~15 kB de endereço, e o servidor recusa acima de alguns kB.
+ * Sem teto, a paciente MAIS conectada — a que mais usa a aba — seria a primeira
+ * a ver o feed parar de carregar, com um 414 que não aparece em lugar nenhum da
+ * tela.
+ */
+describe("o feed não monta uma URL que o servidor recusa", () => {
+  test("⚠️ o `.in()` é sobre a lista RECORTADA", () => {
+    expect(CODIGO).not.toContain('.in("autor_id", de)');
+    expect(CODIGO).toContain('.in("autor_id", recorte)');
+    expect(CODIGO).toContain("AUTORES_NO_FEED");
+  });
+
+  /* ⚠️ E o teto nunca corta as publicações DELA do próprio feed: `eu` entra na
+     frente antes do `slice`. */
+  test("⚠️ `eu` vem primeiro no recorte", () => {
+    expect(CODIGO).toContain(
+      "const recorte = [eu, ...de.filter((id) => id !== eu)].slice(0, AUTORES_NO_FEED)",
+    );
+  });
+
+  /* Duzentos uuids são ~7,4 kB de URL — com folga para os outros parâmetros, e
+     muito mais gente do que qualquer paciente segue hoje. */
+  test("⚠️ o teto cabe numa URL", () => {
+    const m = CODIGO.match(/const AUTORES_NO_FEED = (\d+)/);
+    expect(m).toBeTruthy();
+    const n = Number(m![1]);
+    expect(n * 37).toBeLessThan(8000);
+    expect(n).toBeGreaterThanOrEqual(100);
+  });
+});

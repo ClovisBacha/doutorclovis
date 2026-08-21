@@ -559,6 +559,16 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
 }
 
 /**
+ * Quantos autores cabem num `.in()` — LIMITE DE URL, não de gosto.
+ *
+ * O `.in()` do PostgREST vai na query string, e cada uuid custa 37 caracteres:
+ * 400 autores são ~15 kB de endereço, e o servidor recusa acima de alguns kB.
+ * Duzentos são ~7,4 kB, com folga para o resto dos parâmetros, e é muito mais
+ * gente do que qualquer paciente segue hoje.
+ */
+const AUTORES_NO_FEED = 200;
+
+/**
  * As colunas que a rede lê de `rede_posts`.
  *
  * ⚠️ **Uma lista só, e é o que impede o recurso de sumir numa tela só.** Havia
@@ -2335,9 +2345,19 @@ export const meuFeed = createServerFn({ method: "POST" })
       (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
     );
 
+    /* ⚠️ **O `.in()` VAI NA QUERY STRING, e ela tem teto.** Cada uuid custa 37
+       caracteres na URL: 400 autores são ~15 kB de endereço, e o PostgREST
+       (como todo servidor HTTP) recusa acima de alguns kB. Numa paciente muito
+       conectada isto pararia de carregar de vez — 414, sem nada na tela dizendo
+       o quê. E seria justamente quem MAIS usa a aba.
+
+       ⚠️ **`eu` PRIMEIRO, sempre**: o teto nunca pode cortar o que ela publicou
+       do próprio feed. */
+    const recorte = [eu, ...de.filter((id) => id !== eu)].slice(0, AUTORES_NO_FEED);
+
     const brutos = await postsCrus(sb, (base) => {
       const q = base
-        .in("autor_id", de)
+        .in("autor_id", recorte)
         .is("arquivado_em", null)
         .order("criado_em", { ascending: false })
         /* Puxa mais do que cabe na página: a régua ainda vai FILTRAR (Modo
@@ -3175,6 +3195,16 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
       (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
     );
 
+    /* ⚠️ **O `.in()` VAI NA QUERY STRING, e ela tem teto.** Cada uuid custa 37
+       caracteres na URL: 400 autores são ~15 kB de endereço, e o PostgREST
+       (como todo servidor HTTP) recusa acima de alguns kB. Numa paciente muito
+       conectada isto pararia de carregar de vez — 414, sem nada na tela dizendo
+       o quê. E seria justamente quem MAIS usa a aba.
+
+       ⚠️ **`eu` PRIMEIRO, sempre**: o teto nunca pode cortar o que ela publicou
+       do próprio feed. */
+    const recorte = [eu, ...de.filter((id) => id !== eu)].slice(0, AUTORES_NO_FEED);
+
     const agora = new Date().toISOString();
     /* ⚠️ **RECUO, como o de `publicarStory` — e ele faltava justamente aqui.**
        `carimbo_semana` nasceu DENTRO do `CREATE TABLE IF NOT EXISTS`, então num
@@ -3185,7 +3215,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     const linhas = await (async (): Promise<any[]> => {
       const monta = (base: any) =>
         base
-          .in("autor_id", de)
+          .in("autor_id", recorte)
           .gt("expira_em", agora)
           .order("criado_em", { ascending: true })
           .limit(200);
