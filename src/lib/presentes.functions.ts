@@ -431,11 +431,26 @@ export const reservarPorToken = createServerFn({ method: "POST" })
     /* ⚠️ O SALDO É RELIDO AQUI, imediatamente antes de decidir. A régua pura
        responde "pode" com toda a confiança quando recebe um saldo velho, e
        duas amigas na última cota no mesmo segundo é o caso real. */
-    const { data: vivas } = await sb
+    const { data: vivas, error: erroDoSaldo } = await sb
       .from("presente_reservas")
       .select("quantidade")
       .eq("item_id", item.id)
       .is("cancelada_em", null);
+    /* ⚠️ **A FALHA DESTA LEITURA NÃO PODE VIRAR "ITEM LIVRE".**
+       O erro era descartado, e `vivas ?? []` fazia `jaReservado` virar ZERO —
+       ou seja, a régua recebia "ninguém reservou nada" e liberava o item
+       inteiro. Duas amigas comprariam o mesmo berço, e a lista diria que estava
+       tudo certo para as duas.
+
+       É a mesma forma do defeito da agenda (`doctor_blocks` não conferido, que
+       oferecia horários dentro das férias): uma leitura cujo silêncio faz a
+       coisa parecer MAIS disponível do que está. Toda leitura que só SUBTRAI
+       disponibilidade tem de falhar fechada.
+
+       E o próprio comentário acima já dizia por que a releitura existe — "duas
+       amigas na última cota no mesmo segundo é o caso real". Ela existia e
+       falhava aberta. */
+    if (erroDoSaldo) return { ok: false as const, motivo: "indisponivel" as const };
     const jaReservado = ((vivas ?? []) as { quantidade: number }[]).reduce(
       (s, r) => s + (r.quantidade ?? 0),
       0,

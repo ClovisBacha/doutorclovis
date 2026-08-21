@@ -6324,3 +6324,33 @@ citando `g.error || b.error`, porque o teste tira a prosa antes de procurar.
 disponibilidade, ela entra na mesma conferência. Uma fonte nova que falhe aberta
 não quebra nada visivelmente — ela só oferece horários que não existem, e o
 defeito aparece como duas pacientes na mesma sala.
+
+### E a varredura que isso motivou achou o irmão dele
+
+Se a classe se repete (bloqueio, luto, amigas, conquistas, agora agenda), ela
+merece varredura e não só conserto. Procurei toda leitura de TABELA cujo
+resultado vira exclusão e cujo `error` não é olhado.
+
+⚠️ **A varredura ingênua dá 523 e é inútil** — quase tudo é `auth.getSession()`,
+que não é risco (sem sessão não há token, e todo chamador confere). Estreitada
+para leituras de tabela que viram exclusão, dá **66**; e desses, quase todos são
+leitura para EXIBIR, não para barrar. **O que importa é a direção da falha:**
+só é defeito quando o silêncio faz a coisa parecer MAIS disponível.
+
+Sobrou **um**, e é gêmeo do da agenda: **`reservarPorToken`**, no chá de bebê. O
+saldo é relido imediatamente antes de decidir — e o comentário dela já dizia por
+quê: _"duas amigas na última cota no mesmo segundo é o caso real"_. A releitura
+existia e **falhava aberta**: o `error` era descartado e `vivas ?? []` fazia
+`jaReservado` virar ZERO, ou seja, a régua recebia "ninguém reservou nada" e
+liberava o item inteiro. **Duas amigas comprariam o mesmo berço, e a lista diria
+que estava tudo certo para as duas.**
+
+Dois falsos positivos que valem registro, porque explicam a régua de triagem:
+`disponibilidade.functions.ts:198` é um DELETE com erro conferido (não é leitura
+nenhuma), e `cantinho.functions.ts:274` falha **fechada** — menos itens lidos
+significa menos conjuntos completos e menos bônus pago, que erra para o lado de
+não dar.
+
+⚠️ **A pergunta de triagem, para a próxima vez:** não é "o erro foi olhado?" —
+é **"se esta leitura voltar vazia, alguma coisa fica mais permitida?"**. Se a
+resposta for sim, ela falha fechada.

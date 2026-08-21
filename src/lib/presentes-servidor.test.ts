@@ -205,3 +205,45 @@ describe("o token", () => {
     expect(FONTE).not.toContain("companion_invites");
   });
 });
+
+/**
+ * ⚠️ TODA LEITURA QUE SÓ **SUBTRAI** DISPONIBILIDADE FALHA FECHADA.
+ *
+ * `reservarPorToken` relê o saldo imediatamente antes de decidir — e o
+ * comentário dela já dizia por quê: "duas amigas na última cota no mesmo
+ * segundo é o caso real". A releitura existia e **falhava aberta**: o `error`
+ * era descartado e `vivas ?? []` fazia `jaReservado` virar ZERO, ou seja, a
+ * régua recebia "ninguém reservou nada" e liberava o item inteiro. Duas amigas
+ * comprariam o mesmo berço, e a lista diria que estava tudo certo para as duas.
+ *
+ * É a mesma forma do defeito da agenda (`doctor_blocks` não conferido, que
+ * oferecia horários dentro das férias do médico), achado na mesma varredura.
+ */
+describe("a reserva falha FECHADA", () => {
+  const FONTE = readFileSync("src/lib/presentes.functions.ts", "utf8");
+  /* Comentários fora antes de procurar — a prosa agora cita os identificadores
+     para explicar o defeito, e casaria com a asserção sem o código existir. */
+  const codigo = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+  const corpo = (() => {
+    const i = codigo.indexOf("export const reservarPorToken");
+    expect(i).toBeGreaterThan(-1);
+    const fim = codigo.indexOf("export const", i + 20);
+    return codigo.slice(i, fim === -1 ? codigo.length : fim);
+  })();
+
+  test("⚠️ a falha ao reler o saldo não vira 'item livre'", () => {
+    expect(corpo).toContain("error: erroDoSaldo");
+    expect(corpo).toContain("if (erroDoSaldo)");
+    /* E a recusa vem ANTES de a régua pura receber o saldo. */
+    expect(corpo.indexOf("if (erroDoSaldo)")).toBeLessThan(corpo.indexOf("const jaReservado"));
+  });
+
+  /* A releitura tem de continuar existindo: sem ela a régua decide com saldo
+     velho, que é o defeito que ela nasceu para consertar. */
+  test("⚠️ o saldo continua sendo relido antes de decidir", () => {
+    expect(corpo).toContain('.from("presente_reservas")');
+    expect(corpo.indexOf('.from("presente_reservas")')).toBeLessThan(
+      corpo.indexOf("const jaReservado"),
+    );
+  });
+});
