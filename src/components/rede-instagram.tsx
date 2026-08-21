@@ -198,7 +198,20 @@ export function BolinhaDeStory({
 
 export type Story = { id: string; nome: string; avatarUrl: string | null; novo: boolean };
 
-export function FileiraDeStories({
+/**
+ * ⚠️ **`memo`, e a razão é medida.**
+ *
+ * A fileira repintava INTEIRA a cada toque no feed — vinte dos trinta e oito
+ * renders lógicos de uma única reação eram as bolinhas, que não mudaram nada.
+ * Ela é o primeiro elemento da aba e o mais caro por render (uma imagem redonda
+ * por pessoa), então é o pior lugar possível para repintar à toa.
+ *
+ * ⚠️ E `memo` só acerta se as PROPS forem estáveis: a lista vem de um `useMemo`
+ * e `aoTocar` do objeto `acoes`, que tem referência fixa. Um fecho inline aqui
+ * desfaria o `memo` por completo e em silêncio — é o defeito que já custou
+ * 232 ms no cartão do post.
+ */
+export const FileiraDeStories = memo(function FileiraDeStories({
   stories,
   aoTocar,
 }: {
@@ -224,7 +237,7 @@ export function FileiraDeStories({
       </div>
     </div>
   );
-}
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    O CARROSSEL
@@ -4783,28 +4796,35 @@ export function RedeNoApp({
   /* A MINHA bolinha entra sempre, mesmo sem story — é o convite para publicar.
      Se o servidor já a devolveu (porque tenho story vivo), ela não é
      duplicada. */
-  const fileira: Story[] = [
-    ...(euId && !bolhas.some((b) => b.autorId === euId)
-      ? [
-          {
-            id: euId,
-            nome: "Seu story",
-            /* ⚠️ **`perfil` é o ÚLTIMO PERFIL ABERTO, e não o meu.** Ele não é
+  /* ⚠️ **`useMemo`, senão o `memo` da fileira nunca acerta.** A lista era
+     remontada a cada render do feed — array novo, referência nova, e a fileira
+     repintava inteira mesmo sem nada ter mudado. Memoizar o COMPONENTE sem
+     estabilizar a PROP é trabalho perdido. */
+  const fileira: Story[] = useMemo(
+    () => [
+      ...(euId && !bolhas.some((b) => b.autorId === euId)
+        ? [
+            {
+              id: euId,
+              nome: "Seu story",
+              /* ⚠️ **`perfil` é o ÚLTIMO PERFIL ABERTO, e não o meu.** Ele não é
                limpo no voltar, então abrir o perfil da Marina e voltar ao feed
                deixava a primeira bolinha — a "Seu story" — com a foto dela.
                `meuAvatar` é carregado por `meuPerfilSocial`, junto com o feed. */
-            avatarUrl: meuAvatar,
-            novo: false,
-          },
-        ]
-      : []),
-    ...bolhas.map((b) => ({
-      id: b.autorId,
-      nome: b.autorId === euId ? "Seu story" : b.autorNome,
-      avatarUrl: b.autorAvatar,
-      novo: b.novo,
-    })),
-  ];
+              avatarUrl: meuAvatar,
+              novo: false,
+            },
+          ]
+        : []),
+      ...bolhas.map((b) => ({
+        id: b.autorId,
+        nome: b.autorId === euId ? "Seu story" : b.autorNome,
+        avatarUrl: b.autorAvatar,
+        novo: b.novo,
+      })),
+    ],
+    [euId, bolhas, meuAvatar],
+  );
 
   return (
     <>

@@ -157,7 +157,6 @@ import { AmigasTab } from "@/components/amigas";
 import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
 import { ConfiguracoesDoPerfil } from "@/components/rede-social";
-import { RedeNoApp } from "@/components/rede-instagram";
 import { aulaDeHojeParaCompartilhar } from "@/lib/aula-compartilhavel";
 import type { AulaNoPost } from "@/lib/rede-social";
 import { AssinaturaTab } from "@/components/assinatura-tab";
@@ -189,6 +188,22 @@ import { setCareMode } from "@/lib/care-mode.functions";
  */
 const GestacaoPath = lazy(() =>
   import("@/components/gestacao-path").then((m) => ({ default: m.GestacaoPath })),
+);
+
+/**
+ * ⚠️ **A COMUNIDADE TAMBÉM É `lazy()`, e pelo mesmo motivo medido.**
+ *
+ * `rede-instagram.tsx` são ~120 kB crus / ~31 kB gzip, e era import ESTÁTICO —
+ * ou seja, descia para TODA paciente que abre Minha Conta, inclusive quem nunca
+ * toca na aba. É a mesma conta que fez `GestacaoPath` virar `lazy()` (264 → 91
+ * kB) e que tirou o chatbot do chunk de entrada (255 kB).
+ *
+ * ⚠️ E, como lá, o que separa de verdade é o import estático NÃO EXISTIR: puxar
+ * uma única função ou um único tipo deste módulo por `import` estático traria os
+ * 120 kB de volta junto.
+ */
+const RedeNoApp = lazy(() =>
+  import("@/components/rede-instagram").then((m) => ({ default: m.RedeNoApp })),
 );
 import { ensureInitialJourneyPull, lsGet, lsSet } from "@/lib/journey-sync";
 import { Bolha } from "@/components/bolha";
@@ -2486,27 +2501,43 @@ function MinhaContaPage() {
                     decisão de exposição que uma gestante de alto risco toma uma
                     vez e precisa achar sem procurar. */}
                 {tab === "Feed" && (
-                  <RedeNoApp
-                    careMode={careMode}
-                    /* Ver `onSelect`: sobe a cada toque no ícone da barra. */
-                    sinalDeVoltarAoFeed={voltarAoFeed}
-                    onAbrirSecoes={() => goToTab("Comunidade")}
-                    /* ⚠️ O bilhete que o Caminho deixou ao terminar a aula — lido
+                  <Suspense
+                    fallback={
+                      <div className="space-y-4 py-6">
+                        {/* A espera tem a FORMA do feed — a mesma decisão do
+                            esqueleto do perfil: meio segundo de tela imóvel lê
+                            como app travado. */}
+                        <div className="flex gap-3 px-4">
+                          {[0, 1, 2, 3].map((i) => (
+                            <div key={i} className="dc-esqueleto h-[72px] w-[72px] rounded-full" />
+                          ))}
+                        </div>
+                        <div className="dc-esqueleto aspect-[4/5] w-full" />
+                      </div>
+                    }
+                  >
+                    <RedeNoApp
+                      careMode={careMode}
+                      /* Ver `onSelect`: sobe a cada toque no ícone da barra. */
+                      sinalDeVoltarAoFeed={voltarAoFeed}
+                      onAbrirSecoes={() => goToTab("Comunidade")}
+                      /* ⚠️ O bilhete que o Caminho deixou ao terminar a aula — lido
                        AQUI, e não dentro do compositor, porque quem sabe quando
                        a aba abriu é esta tela. Ler no compositor pegaria o
                        estado de quando a Comunidade montou, e ela pode ter feito
                        a aula depois disso, na mesma sessão. */
-                    aulaDeHoje={aulaDeHoje}
-                    /* O desafio acontece no Caminho: sem esta porta, o cartão
+                      aulaDeHoje={aulaDeHoje}
+                      /* O desafio acontece no Caminho: sem esta porta, o cartão
                        convidaria para uma atividade sem dizer onde ela é. */
-                    onIrParaOJogo={() => goToTab("Caminho")}
-                    /* ⚠️ A MESMA folha do SOS da barra de baixo, e não uma
+                      onIrParaOJogo={() => goToTab("Caminho")}
+                      /* ⚠️ A MESMA folha do SOS da barra de baixo, e não uma
                        segunda: a triagem da caixinha de perguntas pode achar
                        bandeira vermelha no que alguém escreveu, e o que ela tem
                        a oferecer nesse caso é o caminho que avisa o médico e o
                        contato de emergência com localização. */
-                    onAbrirSOS={() => setEmergencyOpen(true)}
-                  />
+                      onAbrirSOS={() => setEmergencyOpen(true)}
+                    />
+                  </Suspense>
                 )}
                 {tab === "Amigas" && <AmigasTab careMode={careMode} />}
                 {/* Calendário e Consultas agora são uma tela só (unificada). */}

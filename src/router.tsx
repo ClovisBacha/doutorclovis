@@ -1,4 +1,3 @@
-import { QueryClient } from "@tanstack/react-query";
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { prepararNativo } from "@/lib/nativo";
@@ -14,11 +13,8 @@ import { prepararNativo } from "@/lib/nativo";
 prepararNativo();
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
-
   const router = createRouter({
     routeTree,
-    context: { queryClient },
     /* Restaurar a rolagem é o certo para o site: quem lia um texto longo,
        clicou num link e voltou, quer cair onde parou.
        Dentro do app (`/minha-conta`) é o contrário. Lá as telas não são rotas

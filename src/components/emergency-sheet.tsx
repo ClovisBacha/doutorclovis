@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { toast } from "sonner";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
@@ -443,9 +442,22 @@ export function EmergencySheet({
      novo no mesmo instante, sem recarregar a página. E é gerado no próprio
      aparelho: cada paciente tem o seu, e nenhum dado de saúde sai daqui. */
   useEffect(() => {
-    QRCode.toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" })
-      .then(setQr)
-      .catch(() => setQr(null));
+    /* ⚠️ **`import()` DINÂMICO, e não estático.** `qrcode` são ~25 kB, e este
+       componente é preload da abertura do app — a biblioteca descia para TODA
+       paciente, inclusive quem nunca abre a ficha. O QR só existe dentro de uma
+       tela que ela precisa abrir de propósito, então buscá-lo na hora não
+       atrasa nada que ela esteja olhando. Medido: o chunk da folha de
+       emergência caiu de 49,2 kB para 24,7 kB. */
+    let vivo = true;
+    void import("qrcode")
+      .then((m) =>
+        (m.default ?? m).toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" }),
+      )
+      .then((url) => vivo && setQr(url))
+      .catch(() => vivo && setQr(null));
+    return () => {
+      vivo = false;
+    };
   }, [card]);
 
   return (

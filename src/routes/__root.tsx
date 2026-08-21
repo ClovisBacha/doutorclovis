@@ -1,8 +1,7 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
-  createRootRouteWithContext,
+  createRootRoute,
   useRouter,
   useRouterState,
   HeadContent,
@@ -205,7 +204,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -300,14 +299,21 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * ⚠️ **`@tanstack/react-query` SAIU, e ele nunca foi usado.**
+ *
+ * Ele vinha do template do TanStack Start: o `QueryClient` era criado no router,
+ * viajava no contexto da rota e envolvia a árvore num `QueryClientProvider` — e
+ * NENHUM componente deste app chama `useQuery` ou `useMutation` (varrido: zero
+ * ocorrências fora dessas duas linhas de encanamento). Eram ~24 kB crus no chunk
+ * de ENTRADA, que é o que TODA página baixa antes de qualquer coisa aparecer,
+ * para uma biblioteca que não fazia nada.
+ *
+ * Se um dia o app buscar dados por `useQuery`, o provider volta — junto com o
+ * primeiro `useQuery` de verdade, e não antes dele.
+ */
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SiteShell />
-    </QueryClientProvider>
-  );
+  return <SiteShell />;
 }
 
 function CanonicalLink() {
