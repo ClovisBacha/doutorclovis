@@ -1388,17 +1388,19 @@ export const carimbarQueApareceu = createServerFn({ method: "POST" })
          segura é o CARIMBO, não a varredura: o registro é gravado antes do
          envio e a régua conta em horas, então chamar dez vezes manda uma.
 
-         Fora do caminho do retorno de propósito: o carimbo de `last_seen_at` é
-         o trabalho desta função, e um lembrete que falha não pode fazer a
-         paciente sumir da lista de amigas. */
-      void (async () => {
-        try {
-          const { varrerLembretesDeMeditacao } = await import("@/lib/meditacao.server");
-          await varrerLembretesDeMeditacao();
-        } catch {
-          /* lembrete é secundário à presença */
-        }
-      })();
+         ⚠️ **E É `await`, NUNCA `void (async () => …)()`.** Escrevi
+         dispare-e-esqueça primeiro e a catraca `travas-do-servidor` reprovou —
+         com razão: no servidor a invocação CONGELA quando a resposta sai, e a
+         promessa que ninguém guarda morre antes de rodar, sem erro e sem log.
+         Esta base já perdeu três recursos exatamente assim
+         (`curarLacunasSemVetor`, `backfillBrainEmbeddings`, `notifyDoctorOfGap`).
+         O conserto teria ficado bonito no diff e não teria mandado um lembrete
+         sequer.
+
+         O custo de esperar é pequeno porque o estrangulador faz quase toda
+         chamada voltar `null` na hora: só uma a cada dez minutos toca o banco.
+         E vem DEPOIS do carimbo, que é o trabalho desta função — um lembrete
+         que falha não pode fazer a paciente sumir da lista de amigas. */
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       const sb = supabaseAdmin as any;
       const limite = new Date(Date.now() - 3600_000).toISOString();
@@ -1407,8 +1409,16 @@ export const carimbarQueApareceu = createServerFn({ method: "POST" })
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", eu)
         .or(`last_seen_at.is.null,last_seen_at.lt.${limite}`);
-      if (error) return { ok: false as const };
-      return { ok: true as const };
+      const carimbou = !error;
+
+      try {
+        const { varrerLembretesDeMeditacao } = await import("@/lib/meditacao.server");
+        await varrerLembretesDeMeditacao();
+      } catch {
+        /* lembrete é secundário à presença — nunca derruba o carimbo */
+      }
+
+      return carimbou ? { ok: true as const } : { ok: false as const };
     } catch {
       /* coluna ainda não existe (SQL não aplicado): a lista mostra a linha sem
          "há 2h", e mais nada muda */

@@ -6409,3 +6409,18 @@ que já foi enviado — três consultas antes, e legitimamente antes do push. A
 mutação que movia a GRAVAÇÃO para depois passou verde. Hoje ancora no
 `const { error: erroRegistro }`. Quinta vez que "outra ocorrência do mesmo nome"
 engana um teste aqui.
+
+### ⚠️ E UMA TERCEIRA CATRACA IMPEDIU QUE O CONSERTO NASCESSE MORTO
+
+Escrevi a chamada da meditação como `void (async () => {…})()`, para não pôr uma
+varredura no caminho da resposta. `travas-do-servidor.test.ts` reprovou, e estava
+certa: **no servidor a invocação CONGELA quando a resposta sai**, e a promessa
+que ninguém guarda morre antes de rodar — sem erro, sem log, sem nada. Esta base
+já perdeu três recursos exatamente assim (`curarLacunasSemVetor`,
+`backfillBrainEmbeddings`, `notifyDoctorOfGap`).
+
+O conserto teria ficado bonito no diff, passado no `tsc`, e **não mandado um
+lembrete sequer** — que é a mesma classe de defeito que ele veio consertar.
+
+Virou `await`, depois do carimbo. O custo é pequeno porque o estrangulador faz
+quase toda chamada voltar `null` na hora: só uma a cada dez minutos toca o banco.
