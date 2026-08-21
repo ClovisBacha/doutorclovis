@@ -6536,6 +6536,28 @@ limitam taxa — medido. Um recurso barrado por excesso de chamadas simultâneas
 própria varredura não diz nada sobre a tela. **O que NÃO foi ignorado:** 4xx que
 não seja 429, 5xx, e qualquer erro de JavaScript.
 
+### ⚠️ E UM TERCEIRO ERRO MEU: o runner não tem `.env`
+
+Depois dos dois primeiros consertos o job continuou vermelho, agora com **42 de
+42 bancadas quebradas** e sempre a mesma linha:
+
+> `Missing Supabase environment variable(s): SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY`
+
+O cliente do Supabase **lança na importação** sem elas, então nenhuma página
+desenha. Aqui na máquina de desenvolvimento existe um `.env` e a varredura
+passava; no runner, não — **eu tinha validado a varredura numa condição que o
+CI não tem.**
+
+O passo `cp .env.example .env` resolve, e não expõe nada: ⚠️ **as duas chaves são
+públicas por desenho** — vão para o pacote do navegador em todo deploy, e o
+`.env.example` (versionado) as traz preenchidas justamente por isso. Conferido
+antes de usar: os quatro segredos de verdade (`SERVICE_ROLE`,
+`GOOGLE_GENERATIVE_AI`, `RESEND`, `STRIPE`) estão **vazios** nesse arquivo.
+
+**Reproduzido localmente antes de commitar** — `.env` movido para fora, só o
+`.env.example` no lugar: 43 bancadas, zero problemas. É a condição do runner,
+e é assim que se confere um conserto de CI sem gastar três rodadas de push.
+
 ## ⚠️ O PLANO DO IAP DIZIA O CONTRÁRIO DA REALIDADE (ago/2026)
 
 `docs/plano-iap.md` é o documento que o dono lê para decidir se destrava a

@@ -104,6 +104,23 @@ jobs:
       #
       # ⚠️ E com `--host 127.0.0.1`: o Vite tenta IPv6 (`:::8080`) por padrão, e
       # o runner não resolve isso.
+      # ⚠️ **AS BANCADAS PRECISAM DAS CHAVES PÚBLICAS DO SUPABASE.**
+      #
+      # Sem elas o cliente do Supabase LANÇA na importação ("Missing Supabase
+      # environment variable(s)") e **toda** página falha — foi assim que este
+      # job ficou vermelho nas primeiras execuções, com 42 de 42 quebradas.
+      # Aqui na máquina de desenvolvimento existe um `.env`, então a varredura
+      # passava; no runner, não.
+      #
+      # ⚠️ **E as duas SÃO públicas por desenho** — vão para o pacote do
+      # navegador em todo deploy, e o `.env.example` (versionado) as traz
+      # preenchidas justamente por isso. Conferido: os quatro segredos de
+      # verdade (`SERVICE_ROLE`, `GOOGLE_GENERATIVE_AI`, `RESEND`, `STRIPE`)
+      # estão VAZIOS nesse arquivo. Copiar `.env.example` não expõe nada, e é o
+      # mesmo conjunto que qualquer visitante do site já recebe.
+      - name: Chaves públicas para as bancadas
+        run: cp .env.example .env
+
       # ⚠️ A ESPERA É POR HTTP, e não por texto no log.
       #
       # A primeira versão fazia `grep -q "Local:"` e NUNCA casava: a saída
