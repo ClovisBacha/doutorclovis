@@ -7,12 +7,39 @@
 
 ## O estado de hoje, sem enfeite
 
-|                            |                                                                               |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| Capacitor instalado        | **Não** — nem `ios/`, nem `android/`, nem `@capacitor/*` no `package.json`    |
-| O que existe               | `capacitor.config.ts`, `native/shell/index.html`, a ponte `src/lib/nativo.ts` |
-| Portas de pagamento no app | **Todas fechadas**, com o motivo em português                                 |
-| Chaves do Stripe           | vazias                                                                        |
+> ⚠️ **ESTA TABELA ESTAVA DESATUALIZADA E DIZIA O CONTRÁRIO DA REALIDADE.** Ela
+> afirmava "Capacitor instalado: **Não** — nem `ios/`, nem `android/`, nem
+> `@capacitor/*` no `package.json`". Os três existem, e existem há tempo
+> suficiente para haver um workflow de CI compilando os dois projetos.
+>
+> Não é detalhe de documentação: **é o documento que o dono lê para decidir se
+> destrava a receita da paciente**, e ele estimava para baixo o que já está
+> pronto — exatamente como o comentário do `QuizPaywall` que inventava um canal
+> de PIX que não existe. Conferido item por item em ago/2026.
+
+| o que                          | estado                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| Capacitor                      | **instalado** — `@capacitor/core` 8.5.0, `cli`, `ios`, `android`              |
+| Projetos nativos               | **existem** — `ios/` e `android/` no repositório                              |
+| CI do app nativo               | **existe** — `.github/workflows/app-nativo.yml` compila os dois               |
+| Plugins presentes              | app · geolocation · haptics · push-notifications · splash-screen · status-bar |
+| **Plugin de COMPRA**           | ⚠️ **não instalado** — é o que falta do lado do código                        |
+| **Validação de recibo**        | ⚠️ **não existe** — varrido o `src/`: nenhum `verifyReceipt`, nenhum Pub/Sub  |
+| Produtos cadastrados nas lojas | ⚠️ **decisão do dono** — sem eles nada funciona, e não dá para fazer por aqui |
+| Portas de pagamento no app     | **todas fechadas**, com o motivo em português                                 |
+| `IAP_ATIVO`                    | `false`                                                                       |
+
+### O que falta, em ordem
+
+1. **Cadastrar os produtos** nas duas lojas (App Store Connect / Play Console).
+   É a única etapa que **só o dono faz**, e ela bloqueia as outras duas: sem id
+   de produto não há o que comprar nem o que validar.
+2. **Instalar um plugin de compra** e ligar o `comprar()` das três telas a ele.
+3. **Validar o recibo no servidor** — a seção 3 abaixo, que não mudou.
+
+⚠️ **E `IAP_ATIVO` continua sendo a última coisa a virar, não a primeira.** Com
+os produtos ausentes, ligá-la troca "a compra ainda não está aberta" por um erro
+de loja no meio do checkout — que é pior, porque a paciente já decidiu pagar.
 
 **A divisão mora num arquivo só: `src/lib/canal-de-venda.ts`.** Ele diz que
 `premium_paciente` e `sementinhas` se vendem no canal "app", `plano_medico` no

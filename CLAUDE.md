@@ -6514,3 +6514,43 @@ determinístico falha nas duas, artefato de carga não.
 ⚠️ **E ela é UMA só.** Três tentativas começariam a esconder defeito de corrida
 de verdade, que é coisa que este app tem: o laço do `useSyncExternalStore`
 nasceu exatamente assim.
+
+## ⚠️ O PLANO DO IAP DIZIA O CONTRÁRIO DA REALIDADE (ago/2026)
+
+`docs/plano-iap.md` é o documento que o dono lê para decidir se destrava a
+receita da paciente. A tabela de estado dele afirmava:
+
+> Capacitor instalado — **Não** — nem `ios/`, nem `android/`, nem `@capacitor/*`
+> no `package.json`
+
+**Os três existem.** `@capacitor/core` 8.5.0, `cli`, `ios` e `android` no
+`package.json`; as pastas `ios/` e `android/` no repositório; e um workflow de
+CI (`app-nativo.yml`) compilando os dois — com um comentário próprio explicando
+que build para simulador não exige conta de desenvolvedor.
+
+⚠️ **Não é detalhe de documentação: é estimativa para baixo do que já está
+pronto, num documento que decide investimento.** Mesma classe do comentário do
+`QuizPaywall` que inventava um canal de PIX inexistente — e a terceira vez que
+prosa desatualizada engana alguém aqui. Eu mesmo repeti a estimativa errada ao
+dono antes de conferir.
+
+### O que falta de verdade, conferido item por item
+
+1. **Cadastrar os produtos** nas duas lojas — é a única etapa que **só o dono
+   faz**, e ela bloqueia as outras: sem id de produto não há o que comprar nem
+   o que validar.
+2. **Instalar um plugin de compra** — varrido o `package.json`: não há nenhum
+   (`purchase`, `revenuecat`, `billing`, `storekit`).
+3. **Validar o recibo no servidor** — varrido o `src/`: nenhum `verifyReceipt`,
+   nenhum Pub/Sub, nenhum `purchaseToken`.
+
+⚠️ **E `IAP_ATIVO` é a ÚLTIMA coisa a virar, não a primeira.** Com os produtos
+ausentes, ligá-la troca "a compra ainda não está aberta" por **um erro de loja
+no meio do checkout** — pior, porque a paciente já decidiu pagar.
+
+**O que NÃO fiz, de propósito:** instalar o plugin e escrever a validação de
+recibo. Sem produto cadastrado não há como exercitar nenhum dos dois, e código
+de pagamento que nunca rodou é a pior coisa para se ter no repositório com cara
+de pronto. `plano-iap-atualizado.test.ts` amarra o documento aos fatos do
+repositório, para ele não envelhecer de novo em silêncio — inclusive virando
+sozinho o texto do plugin no dia em que alguém rodar o `bun add`.
