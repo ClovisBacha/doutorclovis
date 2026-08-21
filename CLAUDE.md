@@ -6719,3 +6719,27 @@ O resto do contraste é texto auxiliar entre 3,4 e 4,5:1 — real, porém de out
 natureza (legenda, não controle), e mexer nele é decisão de paleta que atravessa
 o app inteiro. Fica levantado, e o script está no `package.json` para ser rodado
 de novo.
+
+### E a agenda do consultório ganhou bancada
+
+`CalendarioDoMes` + `DiaDaAgenda` somam 833 linhas e decidem o que o médico vê
+do próprio mês. Também prop-driven — bancada sem uma linha de mudança na
+produção.
+
+O que ela existe para provar, e que só se confere olhando:
+
+- ⚠️ **`firme: false` aparece TRACEJADO.** Um pedido não confirmado e uma
+  particular sem horário aparecem para ele não esquecer que existem — mas
+  pintá-los como compromisso faria o médico contar com uma hora que ninguém
+  combinou. **Medido: os dias 25 e 27 saem com o ponto vazado**, os outros
+  cheios.
+- **As três cores por TIPO** (🟢 presencial · 🟠 teleconsulta · 🟣 particular),
+  porque é o tipo que muda o dia dele.
+- ⚠️ **O mês é FIXO na bancada** (`2026-08`), nunca `new Date()`: uma bancada
+  que muda de conteúdo conforme o dia da execução não serve para comparar duas
+  fotos.
+
+Nenhum defeito encontrado desta vez — a tela está certa, e agora dá para
+conferir.
+
+**Bancada:** `/preview-agenda` · `?vazio=1` · `?firme=0` (só o que não tem hora).
