@@ -6474,3 +6474,43 @@ duas caixas nunca tinham sido olhadas juntas.
 cliente" ficou vermelho por causa do meu próprio comentário, que diz "não há
 `pacienteId` no corpo do pedido". **A partir daqui, tirar comentário antes de
 procurar é padrão em qualquer teste que leia fonte** — não só nas catracas.
+
+## As bancadas passaram a ser abertas pelo CI (ago/2026)
+
+⚠️ **Este job existe por um defeito concreto:** um `getServerSnapshot`
+devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço infinito e
+**deixou o app sem abrir**. Ele viveu vários commits com `tsc` limpo, lint
+limpo e 3.900 testes verdes — porque **nenhum deles abre uma página**. A
+varredura que o achou era manual, e por isso não acontecia.
+
+`scripts/varrer-bancadas.mjs` (`bun run varrer:bancadas`) abre as 42 bancadas
+num Chromium e lê o console. Pega o que teste unitário não pega: erro de
+hidratação, laço de render, `undefined` no caminho de desenho, import quebrado,
+e a tela que simplesmente não desenha nada.
+
+- **As rotas saem do DISCO**, não de uma lista à mão — bancada nova entra na
+  varredura sozinha, que é o ponto.
+- ⚠️ **`networkidle`, e não `domcontentloaded`.** Medido: com
+  `domcontentloaded` a varredura passava por cima de um mismatch de hidratação
+  real (foi assim que o `location.origin` do chá de bebê escapou de uma
+  varredura anterior).
+- ⚠️ **Tela que não desenha nada é defeito**, mesmo sem erro no console — daí
+  a checagem de que o `body` tem texto.
+- ⚠️ **O servidor de DESENVOLVIMENTO, não o build:** o build gera
+  `.vercel/output` (Build Output API), que o `vite preview` não serve — medido.
+
+### ⚠️ E UMA SEGUNDA CHANCE, EM SÉRIE — que não é leniência
+
+A primeira execução acusou mismatch de hidratação em
+`/preview-instagram?vazio=1`. Repetido oito vezes em série: **zero**. Ele só
+aparecia dentro do lote paralelo — artefato de carga do servidor de
+desenvolvimento, não defeito da tela.
+
+**Um teste que falha uma vez em vinte por carga é pior que teste nenhum:** as
+pessoas passam a re-rodar sem ler, e no dia em que o vermelho for de verdade ele
+é ignorado junto. A segunda chance roda SOZINHA, sem concorrência — defeito
+determinístico falha nas duas, artefato de carga não.
+
+⚠️ **E ela é UMA só.** Três tentativas começariam a esconder defeito de corrida
+de verdade, que é coisa que este app tem: o laço do `useSyncExternalStore`
+nasceu exatamente assim.

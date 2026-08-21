@@ -74,3 +74,49 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run lint
+
+  bancadas:
+    name: Bancadas — abre as telas e lê o console
+    runs-on: ubuntu-latest
+    # ⚠️ ESTE JOB EXISTE POR UM DEFEITO CONCRETO: um `getServerSnapshot`
+    # devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço
+    # infinito e DEIXOU O APP SEM ABRIR. Ele viveu vários commits com `tsc`
+    # limpo, lint limpo e 3.900 testes verdes — porque nenhum deles abre uma
+    # página. A varredura que o achou era manual, e por isso não aconteceu.
+    #
+    # O que este job pega e o teste unitário não pega: erro de hidratação, laço
+    # de render, `undefined` no caminho de desenho, import quebrado, e a tela
+    # que simplesmente não desenha nada.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      # O Chromium do Playwright, e só ele — os outros dois navegadores
+      # dobrariam o tempo do job sem pegar nada a mais.
+      - run: bunx playwright install --with-deps chromium
+
+      # ⚠️ O servidor de DESENVOLVIMENTO, e não o build: o build gera
+      # `.vercel/output` (Build Output API), que o `vite preview` não serve —
+      # medido. E o dev serve as rotas de bancada do mesmo jeito.
+      #
+      # ⚠️ E com `--host 127.0.0.1`: o Vite tenta IPv6 (`:::8080`) por padrão, e
+      # o runner não resolve isso.
+      - name: Sobe o servidor
+        run: |
+          bun run dev --host 127.0.0.1 --port 8080 > /tmp/dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            grep -q "Local:" /tmp/dev.log && break
+            sleep 2
+          done
+          grep -q "Local:" /tmp/dev.log || { echo "o servidor não subiu"; cat /tmp/dev.log; exit 1; }
+
+      - run: bun run varrer:bancadas
+
+      # O log do servidor ajuda a diagnosticar quando o job falha — sem ele,
+      # "a página não desenhou nada" não diz se foi a tela ou o servidor.
+      - name: Log do servidor
+        if: failure()
+        run: tail -60 /tmp/dev.log
