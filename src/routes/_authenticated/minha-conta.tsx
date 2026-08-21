@@ -7162,6 +7162,25 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
   const [dia, setDia] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
+  /**
+   * ⚠️ **A GRAVAÇÃO DA TRIAGEM ERA MUDA NOS DOIS SENTIDOS.**
+   *
+   * `saveTriageLog` era chamada com `void … .catch(() => {})`, e o servidor
+   * devolve `{ ok: false }` (resposta 200 normal) quando o INSERT falha — então
+   * nem a exceção nem o desfecho chegavam a lugar nenhum.
+   *
+   * Isso importa porque `triage_logs` é uma das onze fontes de
+   * `clinical_events`, e é por ela que uma triagem vermelha ou amarela entra em
+   * `eventosQuePedemOlhar` — a fila de trabalho do painel. Sem a linha,
+   * "sangramento" ou "redução dos movimentos do bebê" (dois dos nove sintomas
+   * VERMELHOS de `triage.ts`) não chegam ao obstetra, e **nem ela nem ele têm
+   * como saber**.
+   *
+   * ⚠️ O "não atrapalha a orientação" do comentário antigo estava CERTO e
+   * continua: a conduta aparece inteira na tela, com o 192 no vermelho, mesmo
+   * que a gravação falhe. O que mudou é ela saber que o registro não foi.
+   */
+  const [registrou, setRegistrou] = useState<boolean | null>(null);
   const [result, setResult] = useState<{
     level: RiskLevel;
     reasons: string[];
@@ -7201,7 +7220,10 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
       try {
         const { data: s } = await supabase.auth.getSession();
         if (s.session?.access_token) {
-          void saveTriageLog({
+          /* ⚠️ `await` e LEITURA do desfecho — ver o comentário de `registrou`.
+             `{ ok: false }` vem num 200, então `.catch` sozinho não bastaria:
+             era preciso olhar o valor. */
+          const gravou = await saveTriageLog({
             data: {
               accessToken: s.session.access_token,
               level: res.level,
@@ -7210,7 +7232,13 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
               diastolic: dia ? Number(dia) : null,
               note: note || null,
             },
-          }).catch(() => {});
+          }).catch(() => ({ ok: false as const }));
+          setRegistrou(gravou.ok);
+        } else {
+          /* Sem sessão não há onde gravar, e isso não é falha a anunciar: a
+             triagem funciona para visitante, e ela não tem conta para ver o
+             histórico. */
+          setRegistrou(null);
         }
       } catch {
         /* sessão indisponível — a triagem já foi mostrada, seguimos */
@@ -7329,6 +7357,22 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
             >
               Ligar 192 (SAMU)
             </a>
+          )}
+          {/* ⚠️ **SÓ quando a triagem NÃO é verde.** Numa triagem verde o
+              registro é histórico, e avisar sobre uma falha de gravação
+              assustaria sem dar nada a fazer. No amarelo e no vermelho é o
+              contrário: é justamente a triagem que deveria entrar na fila do
+              médico, e ela precisa saber que não entrou — senão fica esperando
+              um retorno que ninguém vai dar.
+
+              E é texto NA CAIXA, nunca um `toast`: ela rola a tela lendo a
+              orientação, e um aviso que some em cinco segundos é um aviso que
+              não aconteceu. */}
+          {registrou === false && result.level !== "verde" && (
+            <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900">
+              Não consegui registrar isto na sua conta — então seu médico não vai ver por aqui. A
+              orientação acima vale do mesmo jeito. Se puder, fale com o consultório.
+            </p>
           )}
         </div>
       )}
@@ -15945,25 +15989,46 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
     return vaccines.some((v) => v.vaccine_key === key);
   }
 
+  /**
+   * ⚠️ **A CADERNETA MARCAVA NA TELA SEM CONFERIR SE GRAVOU.**
+   *
+   * As duas funções devolvem `{ ok: boolean }` — resposta 200 normal, mesmo
+   * quando o `upsert` falha — e o resultado era descartado. A vacina aparecia
+   * marcada, a mãe fechava o app, e na abertura seguinte o quadradinho estava
+   * vazio de novo. Numa caderneta isso é pior que um contador errado: ela usa
+   * esta tela para saber **o que ainda falta aplicar no bebê**.
+   *
+   * Agora a tela só muda depois do "gravou", e a falha é dita. É a mesma régua
+   * do presente entre amigas ("relê depois de gravar") e do bônus da dupla
+   * ("`ganho += BONUS` somava por fé").
+   */
   async function toggleVaccine(key: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    if (isDone(key)) {
-      await removeVaccine({ data: { accessToken: s.session.access_token, vaccineKey: key } });
-      setVaccines((v) => v.filter((x) => x.vaccine_key !== key));
-    } else {
-      await markVaccineGiven({
-        data: {
-          accessToken: s.session.access_token,
-          vaccineKey: key,
-          administeredAt: dateInput,
-          batch: null,
-        },
-      });
-      setVaccines((v) => [
-        ...v,
-        { id: "", vaccine_key: key, administered_at: dateInput, batch: null },
-      ]);
+    const marcada = isDone(key);
+    try {
+      const r = marcada
+        ? await removeVaccine({ data: { accessToken: s.session.access_token, vaccineKey: key } })
+        : await markVaccineGiven({
+            data: {
+              accessToken: s.session.access_token,
+              vaccineKey: key,
+              administeredAt: dateInput,
+              batch: null,
+            },
+          });
+      if (!r.ok) {
+        toast.error("Não consegui salvar — tente de novo.");
+        return;
+      }
+      /* Só depois do desfecho: a tela passa a refletir o banco, não a intenção. */
+      setVaccines((v) =>
+        marcada
+          ? v.filter((x) => x.vaccine_key !== key)
+          : [...v, { id: "", vaccine_key: key, administered_at: dateInput, batch: null }],
+      );
+    } catch {
+      toast.error("Não consegui salvar — tente de novo.");
     }
   }
 

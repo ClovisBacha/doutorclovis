@@ -6631,3 +6631,53 @@ log a cada entrada do cérebro** num banco sem a coluna `embedding` — gritando
 sobre uma situação esperada. Alarme que grita sempre é alarme que se ignora.
 
 Três mutações em vermelho, inclusive a que deixa só o comentário citando a régua.
+
+## ⚠️ DUAS ESCRITAS FALHAVAM E A TELA DIZIA QUE DEU CERTO (ago/2026)
+
+A varredura das LEITURAS ("se voltar vazia, algo fica mais permitido?") achou
+dois defeitos graves. Esta é a outra metade — gravações cujo desfecho é
+descartado.
+
+⚠️ **O `try/catch` NÃO basta, e é o engano central.** Estas funções de servidor
+devolvem `{ ok: false }` numa resposta **200 normal** — não lançam. Um `catch`
+em volta pega a queda de rede e deixa passar exatamente o caso mais comum, que é
+o INSERT recusado pelo banco. É preciso **ler o valor**.
+
+### 1. A triagem de sintomas
+
+`saveTriageLog` era chamada com `void … .catch(() => {})`. E `triage_logs` é uma
+das onze fontes de `clinical_events` — é por ela que uma triagem **vermelha**
+entra em `eventosQuePedemOlhar`, a fila de trabalho do painel. Sem a linha,
+"sangramento" ou "redução dos movimentos do bebê" (dois dos nove sintomas
+vermelhos de `triage.ts`) **não chegam ao obstetra**, e nem ela nem ele têm como
+saber.
+
+- ⚠️ **O "não atrapalha a orientação" do comentário antigo estava CERTO e
+  continua**: a conduta aparece inteira, com o 192 no vermelho, mesmo que a
+  gravação falhe — e há teste sobre a ORDEM, provando que nenhuma falha de
+  registro pode esconder o encaminhamento.
+- ⚠️ **O aviso só sai quando a triagem NÃO é verde.** Numa verde o registro é
+  histórico, e assustar sem dar o que fazer é ruído; no amarelo e no vermelho é
+  justamente a que deveria entrar na fila do médico, e ela precisa saber que não
+  entrou — senão fica esperando um retorno que ninguém vai dar.
+- **Texto na CAIXA, nunca `toast`**: ela rola a tela lendo a orientação, e um
+  aviso que some em cinco segundos é um aviso que não aconteceu.
+- **O servidor passou a registrar a falha.** `assessSymptoms`, no mesmo arquivo,
+  já registrava a falha da IA — a ESCRITA clínica estava calada onde a chamada
+  de modelo não estava.
+
+### 2. A caderneta de vacinas
+
+`markVaccineGiven`/`removeVaccine` devolvem `{ ok }` e o resultado era jogado
+fora: a vacina aparecia marcada, a mãe fechava o app, e na abertura seguinte o
+quadradinho estava vazio. Numa caderneta isso é pior que um contador errado — é
+a tela que diz **o que ainda falta aplicar no bebê**. Agora a lista só muda
+depois do desfecho.
+
+⚠️ **E uma asserção minha mentiu de novo — SÉTIMA vez.** O teste "o servidor
+registra a falha" casava `console.error` genérico, e o arquivo já tinha um (o da
+IA). A mutação que apagava o log da GRAVAÇÃO passou verde. Hoje ancora na
+mensagem exata. **A régua, mais uma vez: ancore no específico, nunca no nome que
+o arquivo pode ter duas vezes.**
+
+Quatro mutações em vermelho.

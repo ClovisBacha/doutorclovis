@@ -149,6 +149,12 @@ export const saveTriageLog = createServerFn({ method: "POST" })
       diastolic: data.diastolic ?? null,
       note: data.note ?? null,
     });
+    /* ⚠️ A falha existe no log do servidor mesmo quando a tela decide não
+       incomodar a paciente. `assessSymptoms`, logo acima, já registra a falha
+       da IA — a ESCRITA clínica estava calada onde a chamada de modelo não
+       está. Sem isto, "a triagem dela não apareceu na minha fila" não tem onde
+       ser investigado. */
+    if (error) console.error("[triagem] não gravou em triage_logs", error);
     return { ok: !error };
   });
 
