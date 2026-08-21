@@ -21,6 +21,7 @@ import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
+import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
 import { Route as PreviewRedeRouteImport } from './routes/preview-rede'
 import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
@@ -156,6 +157,12 @@ const PreviewReguaRoute = PreviewReguaRouteImport.update({
   path: '/preview-regua',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewRegistrarConsultaRoute =
+  PreviewRegistrarConsultaRouteImport.update({
+    id: '/preview-registrar-consulta',
+    path: '/preview-registrar-consulta',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const PreviewRedeRoute = PreviewRedeRouteImport.update({
   id: '/preview-rede',
   path: '/preview-rede',
@@ -574,6 +581,7 @@ export interface FileRoutesByFullPath {
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-rede': typeof PreviewRedeRoute
+  '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -661,6 +669,7 @@ export interface FileRoutesByTo {
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-rede': typeof PreviewRedeRoute
+  '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -750,6 +759,7 @@ export interface FileRoutesById {
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
   '/preview-rede': typeof PreviewRedeRoute
+  '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -839,6 +849,7 @@ export interface FileRouteTypes {
     | '/preview-onboarding'
     | '/preview-presentes'
     | '/preview-rede'
+    | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -926,6 +937,7 @@ export interface FileRouteTypes {
     | '/preview-onboarding'
     | '/preview-presentes'
     | '/preview-rede'
+    | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -1014,6 +1026,7 @@ export interface FileRouteTypes {
     | '/preview-onboarding'
     | '/preview-presentes'
     | '/preview-rede'
+    | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-sons'
@@ -1103,6 +1116,7 @@ export interface RootRouteChildren {
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
   PreviewRedeRoute: typeof PreviewRedeRoute
+  PreviewRegistrarConsultaRoute: typeof PreviewRegistrarConsultaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
@@ -1224,6 +1238,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-regua'
       fullPath: '/preview-regua'
       preLoaderRoute: typeof PreviewReguaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-registrar-consulta': {
+      id: '/preview-registrar-consulta'
+      path: '/preview-registrar-consulta'
+      fullPath: '/preview-registrar-consulta'
+      preLoaderRoute: typeof PreviewRegistrarConsultaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-rede': {
@@ -1811,6 +1832,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,
   PreviewRedeRoute: PreviewRedeRoute,
+  PreviewRegistrarConsultaRoute: PreviewRegistrarConsultaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSonsRoute: PreviewSonsRoute,

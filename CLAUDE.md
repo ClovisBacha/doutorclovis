@@ -6207,3 +6207,28 @@ em `oklch`, e um parser de expressão regular lê 0.62/0.19/29 como se fosse RGB
 **Bancada:** `/preview-sos-medico` · `?magro=1` (sem ficha, sem GPS, sem
 telefone — o caso real de quem apertou o SOS com o perfil incompleto) ·
 `?atendendo=1` · `?fila=0` · `?falhou=1` (um canal de aviso não saiu).
+
+### E a de registrar consulta, que é onde o dado clínico é ESCRITO
+
+Depois do SOS, é a de maior consequência: um defeito aqui não some da tela —
+fica no prontuário, e outro profissional o lê meses depois.
+
+O que a bancada existe para provar é a decisão central do componente:
+⚠️ **o rascunho entra SÓ no campo de ACHADOS.** `consultas.systolic` é o que o
+MÉDICO aferiu no consultório; preenchê-lo com a pressão que ela mediu em casa
+faria o prontuário afirmar uma aferição que não aconteceu. Medido nos três
+estados: o campo de achados recebe o resumo e **os cinco campos de medida ficam
+vazios**. (A régua já tinha teste, e ele morde — conferido por mutação.)
+
+⚠️ **Uma armadilha de bancada, que NÃO é defeito do produto:** o campo de data
+aparece como `mm/dd/yyyy` na foto. `<input type="date">` desenha no formato do
+**navegador**, não da página, e o Chromium do contêiner roda em `en-US` — numa
+máquina brasileira sai `dd/mm/yyyy`, e a página não tem como mandar nisso. Vale
+lembrar antes de "consertar" um formato de data a partir de uma captura.
+
+**Bancada:** `/preview-registrar-consulta` (retorno) · `?primeira=1` (sem
+consulta anterior — o rascunho pega tudo) · `?vazio=1` (nada no período).
+
+**Custo medido:** cada rota de bancada acrescenta pouco à árvore de rotas, que
+toda página carrega — a do SOS custou **+660 bytes crus / +143 comprimidos** na
+entrada. É o preço de uma tela olhável.
