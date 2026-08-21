@@ -279,9 +279,22 @@ export const horariosLivresDoMedico = createServerFn({ method: "POST" })
         .neq("status", "encerrada"),
     ]);
 
-    if (g.error) {
+    /* ⚠️ **`b.error` ENTRA AQUI, e a falta dele era um defeito.**
+       Só `g.error` era conferido. Se a leitura de `doctor_blocks` falhasse,
+       `bloqueios` virava `[]` e `horariosLivres` não subtraía NADA — a paciente
+       recebia horários dentro das férias, do congresso ou da tarde que o médico
+       bloqueou, e marcava neles.
+
+       É a MESMA falha que o comentário dos ocupados, quinze linhas abaixo,
+       existe para impedir ("falha na leitura NÃO vira 'está tudo livre'"),
+       aplicada à outra entrada que também só REMOVE disponibilidade. E a função
+       irmã deste arquivo (`gradeDoMedico`) já fazia `g.error || b.error` — o
+       médico via a própria agenda falhar fechada, e a paciente não. A assimetria
+       dentro do mesmo arquivo é a prova de que era esquecimento, não decisão. */
+    if (g.error || b.error) {
       const { faltaNoBanco } = await import("./postgrest");
-      if (faltaNoBanco(g.error)) return { ok: false as const, motivo: "sem_tabela" as const };
+      if (faltaNoBanco(g.error ?? b.error))
+        return { ok: false as const, motivo: "sem_tabela" as const };
       return { ok: false as const, motivo: "falhou" as const };
     }
 

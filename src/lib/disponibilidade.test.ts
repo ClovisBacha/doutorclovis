@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 /**
  * OS HORÁRIOS LIVRES — onde cada borda vale uma consulta.
  *
@@ -261,5 +262,50 @@ describe("7. agrupado por dia, que é como a tela mostra", () => {
       { dia: "2026-08-20", horas: ["10:00", "09:00"] },
       { dia: "2026-08-21", horas: ["09:00"] },
     ]);
+  });
+});
+
+/**
+ * ⚠️ TODA LEITURA QUE SÓ **REMOVE** DISPONIBILIDADE TEM DE FALHAR FECHADA.
+ *
+ * `horariosLivresDoMedico` conferia só `g.error` (a grade). Se a leitura de
+ * `doctor_blocks` falhasse, `bloqueios` virava `[]`, `horariosLivres` não
+ * subtraía nada, e a paciente recebia horários dentro das FÉRIAS do médico — e
+ * marcava neles.
+ *
+ * É a mesma falha que o comentário dos ocupados, logo abaixo no mesmo arquivo,
+ * existe para impedir ("falha na leitura NÃO vira 'está tudo livre'"), aplicada
+ * à outra entrada que também só remove.
+ *
+ * ⚠️ E a prova de que era esquecimento e não decisão está no MESMO ARQUIVO: a
+ * função irmã (`gradeDoMedico`, a do médico) já fazia `g.error || b.error`. O
+ * médico via a própria agenda falhar fechada; a paciente, não.
+ */
+describe("a disponibilidade falha FECHADA nas três leituras", () => {
+  const FONTE = readFileSync("src/lib/disponibilidade.functions.ts", "utf8");
+  /* Comentários fora antes de procurar — este arquivo agora tem prosa que cita
+     os próprios identificadores para explicar o defeito. */
+  const codigo = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+
+  const corpo = (() => {
+    const i = codigo.indexOf("export const horariosLivresDoMedico");
+    expect(i).toBeGreaterThan(-1);
+    const fim = codigo.indexOf("export const", i + 20);
+    return codigo.slice(i, fim === -1 ? codigo.length : fim);
+  })();
+
+  test("⚠️ a falha ao ler os BLOQUEIOS não vira 'tudo livre'", () => {
+    expect(corpo).toContain("g.error || b.error");
+  });
+
+  test("⚠️ a falha ao ler os OCUPADOS não vira 'tudo livre'", () => {
+    expect(corpo).toContain("ap.error || tc.error");
+  });
+
+  /* Tabela ausente tem motivo PRÓPRIO: "não consegui ler" e "você ainda não
+     rodou o SQL" mandam fazer coisas diferentes. */
+  test("⚠️ tabela ausente continua distinta de falha", () => {
+    expect(corpo).toContain('motivo: "sem_tabela"');
+    expect(corpo).toContain('motivo: "falhou"');
   });
 });

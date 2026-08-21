@@ -6295,3 +6295,32 @@ aqui:** o `oklch` lido por regex (que "aprovou" seis textos a 1,03:1) e o alfa
 não composto (que "reprovou" vinte a 2,30:1). A primeira erra para o lado de
 aprovar; a segunda, para o de reprovar. **Cor sai do canvas E o fundo é
 composto** — as duas coisas, sempre.
+
+## ⚠️ A PACIENTE PODIA MARCAR DENTRO DAS FÉRIAS DO MÉDICO (ago/2026)
+
+Achado ao conferir a regra que o próprio arquivo documenta: _"falha na leitura
+dos ocupados NÃO vira 'está tudo livre'"_.
+
+`horariosLivresDoMedico` conferia **só `g.error`** (a grade semanal). A leitura
+de `doctor_blocks` — férias, congresso, uma tarde bloqueada — não era conferida:
+falhando, `bloqueios` virava `[]`, `horariosLivres` **não subtraía nada**, e a
+paciente recebia horários dentro do bloqueio e marcava neles.
+
+⚠️ **É a MESMA falha do comentário dos ocupados, aplicada à outra entrada que
+também só REMOVE disponibilidade.** Grade, bloqueios e ocupados são três
+leituras cujo silêncio faz a agenda parecer MAIS livre do que está — e as três
+têm de falhar fechadas.
+
+⚠️ **E a prova de que era esquecimento, não decisão, está no MESMO ARQUIVO:** a
+função irmã (`gradeDoMedico`, a que o MÉDICO usa) já fazia `g.error || b.error`.
+O médico via a própria agenda falhar fechada; a paciente, não. Quando duas
+funções do mesmo arquivo tratam o mesmo erro de formas diferentes, a mais
+recente costuma ser a errada.
+
+Três mutações conferidas em vermelho — inclusive a que deixa só o COMENTÁRIO
+citando `g.error || b.error`, porque o teste tira a prosa antes de procurar.
+
+⚠️ **A régua que fica:** ao acrescentar uma quarta fonte que subtraia
+disponibilidade, ela entra na mesma conferência. Uma fonte nova que falhe aberta
+não quebra nada visivelmente — ela só oferece horários que não existem, e o
+defeito aparece como duas pacientes na mesma sala.
