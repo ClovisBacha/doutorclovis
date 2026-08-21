@@ -6261,3 +6261,37 @@ quarto do bloco mais importante da tela. Não mexi porque quem enviou exame ANTE
 ainda tem contagem de verdade ali, e apagar o contador esconderia esse histórico
 — é decisão do dono, não minha. Aparece em `prontuario-paciente.tsx` e em
 `painel-no-app.tsx`.
+
+### ⚠️ MEDIR CONTRASTE SOBRE FUNDO TRANSLÚCIDO — a segunda armadilha
+
+Ao varrer o alerta de SOS, os links do rodapé do site mediram **2,30:1** e eu
+quase os reportei como reprovados. Refeita a medição na página real, eles dão
+**6,15:1 — zero reprovações**. O 2,30 era artefato do meu método.
+
+A causa: o rodapé tem `background` com **alfa 0,4**
+(`oklab(0.96 … / 0.4)`). Ler `getComputedStyle(el).backgroundColor` e jogar
+direto no canvas compõe a cor sobre o **preto transparente** do canvas, e não
+sobre o que está de fato atrás dela na página. O número sai escuro demais e o
+texto claro parece reprovar.
+
+O jeito certo é **empilhar todos os fundos até achar um opaco e compor de baixo
+para cima** (e compor a própria cor do texto, que também pode ter alfa):
+
+```js
+const pilha = []; // sobe até o primeiro fundo opaco
+let n = el;
+while (n) {
+  const c = parse(getComputedStyle(n).backgroundColor);
+  if (c.a > 0) pilha.push(c);
+  if (c.a >= 1) break;
+  n = n.parentElement;
+}
+let base = { r: 255, g: 255, b: 255 }; // o branco do canvas do navegador
+for (let i = pilha.length - 1; i >= 0; i--) base = sobre(pilha[i], base);
+```
+
+⚠️ **São DUAS armadilhas diferentes na mesma medição, e as duas já custaram
+aqui:** o `oklch` lido por regex (que "aprovou" seis textos a 1,03:1) e o alfa
+não composto (que "reprovou" vinte a 2,30:1). A primeira erra para o lado de
+aprovar; a segunda, para o de reprovar. **Cor sai do canvas E o fundo é
+composto** — as duas coisas, sempre.
