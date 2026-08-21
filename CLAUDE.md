@@ -5888,3 +5888,78 @@ inferência**: com o filtro ligado, quem aparece está na mesma faixa de ~13
 semanas. É grosseira e voluntária — e o que a tornaria inaceitável são três
 coisas que o teste agora trava: selo por pessoa, agrupamento com cabeçalho de
 fase, e o filtro ligado por PADRÃO.
+
+## A grade do perfil parava na vigésima, e a folha de estilo não era o problema (ago/2026)
+
+Os dois últimos itens da leva de desempenho. O primeiro era capacidade
+faltando; o segundo, uma suspeita minha que a medição derrubou.
+
+### ⚠️ Uma paciente com cem publicações via vinte
+
+`verPerfil` devolvia uma página (`POSTS_POR_PAGINA = 20`) e nenhum cursor. As
+outras oitenta não tinham caminho nenhum no app — do PRÓPRIO perfil dela. Não
+era lentidão: era função ausente, em silêncio, na tela onde ela guarda a
+gestação inteira.
+
+- ⚠️ **O cursor entra na MESMA `verPerfil`, e não numa `maisDoPerfil` própria.**
+  Uma segunda função teria de repetir o portão de alcance
+  (`alcancaOPerfil`), e portão duplicado é portão que um dia diverge — aqui a
+  divergência apareceria como **back door para ler as publicações de um perfil
+  que a régua recusa**. Reler o perfil custa uma consulta; separar custaria a
+  garantia.
+- ⚠️ **Ele recorta as DUAS fontes** (próprios e marcados). Sem o cursor nos
+  marcados, cada página traria os mesmos posts de marcação de volta e a grade
+  repetiria fotos.
+- ⚠️ **`proximo` sai de `brutos`, NUNCA de `daGrade`.** A régua de visibilidade
+  filtra DEPOIS de ler: uma página em que `podeVerPost` recusou tudo devolveria
+  lista vazia, o cursor viraria `null` e a grade pararia ali — escondendo para
+  sempre o que vem depois. É a mesma armadilha da paginação do feed.
+- **A sentinela é componente próprio** (`SentinelaDaGrade`), para o `useEffect`
+  não morar dentro de um retorno condicional — a lição de rules-of-hooks que já
+  custou uma volta aqui. E a trava de reentrada é **`useRef`**: a sentinela
+  dispara duas vezes no mesmo tranco de rolagem, e um estado só valeria no
+  render seguinte.
+- **A junção não repete por id**, como no feed: duas páginas podem se sobrepor
+  porque a régua filtra depois de ler, e chave repetida derruba a lista inteira.
+
+### ⚠️ EU IA PARTIR `styles.css`, E A MEDIÇÃO DISSE PARA NÃO
+
+Eu tinha proposto dividir a folha (298 kB) por achar que ela pesava na abertura.
+Medido no build de produção, com o número que atravessa a rede:
+
+| peça                     | gzip         |
+| ------------------------ | ------------ |
+| `index.js` (**entrada**) | **276,8 kB** |
+| `daily-quizzes.data`     | 151,2 kB     |
+| `minha-conta`            | 125,5 kB     |
+| `painel`                 | 117,8 kB     |
+| `gestacao-path`          | 96,0 kB      |
+| `chatbot-widget`         | 72,4 kB      |
+| **`styles.css`**         | **42,3 kB**  |
+
+**A folha é 15% do JS de entrada** — e é cache de primeira visita, enquanto o JS
+é baixado, interpretado E EXECUTADO antes de o toque responder. Partir a folha
+em duas exigiria dois `@source`, e um utilitário usado por um componente
+compartilhado que caísse em só uma delas vira **tela sem estilo em produção,
+invisível em dev** (o dev serve tudo). Risco alto, ganho fracionário de 42 kB,
+numa página da qual o dono nunca reclamou.
+
+**Varredura de CSS morto: praticamente nada.** Das 43 classes `.dc-*`, duas não
+tinham referência — e uma delas (`.dc-glass-text`) já não existe: o nome só
+aparece na PROSA que documenta a remoção dela. ⚠️ Sobrou `.dc-float`, ~20 linhas
+que valem ~100 bytes comprimidos, e ela **fica**: o comentário dela explica por
+que a animação não carrega posicionamento, e o bloco do `.dc-rec-dot` a cita
+como o caso de contraste da regra de segurança (`prefers-reduced-motion` pode
+apagar um enfeite, nunca o único sinal de que o microfone está aberto). Trocar
+duas lições documentadas por cem bytes é o mau negócio deste repositório.
+
+⚠️ **E uma varredura de `.dc-*` órfãs NÃO pode ser automatizada por nome:**
+`figura-movimento.tsx` monta `dc-mv-${fecha ? "fecha" : "respira"}` em template
+literal, e `chama-sequencia.tsx` monta a classe por interpolação. Um script que
+apagasse toda classe sem ocorrência literal quebraria as duas animações sem
+erro nenhum.
+
+**A maior peça que resta continua sendo `minha-conta.tsx`** — 20.367 linhas,
+125 kB comprimidos, zero memoização —, e ela segue parada de propósito: é
+cirurgia grande, e o dono precisa dizer se a lentidão sobreviveu às correções
+desta leva antes de valer o risco.
