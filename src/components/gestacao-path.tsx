@@ -1944,8 +1944,14 @@ export function GestacaoPath({
   const [showBirthForm, setShowBirthForm] = useState(false);
   const [albumOpen, setAlbumOpen] = useState(false);
 
-  // Premium ativado: limpa o flag de "comprovante enviado" (o paywall some,
-  // mas o flag sincronizado não deve ficar para sempre no blob da jornada).
+  /* LIMPEZA DE BLOB ANTIGO — e só isso.
+     ⚠️ **`dc-path-premium-pending` NÃO TEM QUEM ESCREVA.** Varrido o `src/`
+     inteiro: as duas únicas linhas que o tocam são a leitura e a limpeza logo
+     abaixo. Era o flag de "comprovante enviado" do fluxo assistido que o
+     cabeçalho do `QuizPaywall` ainda descrevia e que não existe mais.
+     Fica porque um blob de jornada gravado por uma versão ANTIGA pode carregar
+     a chave, e limpá-la é barato; mas ninguém deve escrever nela de novo sem
+     antes reconstruir o fluxo inteiro. */
   useEffect(() => {
     if (quizPremium && lsGet<string>("dc-path-premium-pending", "")) {
       lsSet("dc-path-premium-pending", "");
@@ -4272,8 +4278,22 @@ function LessonSheet({
 
 /* ══════════════════ Paywall das aulas premium ══════════════════
    Grátis: só a aula do dia de HOJE. Premium: revisitar/fazer qualquer aula
-   já liberada. Pagamento assistido: PIX + comprovante no WhatsApp e o
-   consultório ativa o acesso (toggle no painel do médico). */
+   já liberada.
+
+   ⚠️ **ESTE CABEÇALHO DESCREVIA UM FLUXO QUE NÃO EXISTE.** Ele dizia
+   "pagamento assistido: PIX + comprovante no WhatsApp e o consultório ativa o
+   acesso (toggle no painel do médico)" — e não há PIX, nem link de WhatsApp,
+   nem comprovante em lugar nenhum deste arquivo (nem do `src/`). O caminho real
+   é `createSubscriptionCheckout` mais o resgate de código, e quem decide se a
+   compra pode acontecer é `podeComprarAqui`.
+
+   Não é detalhe de prosa: um comentário que inventa um CANAL DE RECEITA faz o
+   próximo leitor concluir que o app já sabe cobrar por fora da loja — e a
+   decisão seguinte é tomada em cima disso. É a mesma lição já registrada aqui
+   sobre as três constantes de preço mortas ("parece autoridade, e alguém a usa
+   achando que é a fonte") e sobre o comentário do avatar que continuava
+   afirmando "já é data URL no banco" depois de o editor passar a subir para o
+   balde. */
 
 /* ─── TRÊS CONSTANTES DE PREÇO MORTAS SAÍRAM DAQUI ────────────────────────
    `QUIZ_PRICE_MONTHLY` (19,9), `QUIZ_PRICE_ANNUAL_MONTH` (9,9) e

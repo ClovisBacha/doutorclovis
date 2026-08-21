@@ -189,6 +189,8 @@ export function mergeJourneyValue(key: string, local: unknown, cloud: unknown): 
   }
   // Demais chaves (nascimento, início, check-in, welcomed, premium-pending):
   // mutáveis → a nuvem (mais recente) vence, como antes.
+  // ⚠️ `premium-pending` está aqui só por blob ANTIGO: nada no `src/` escreve
+  // nessa chave hoje (ver o comentário em `gestacao-path.tsx`).
   return cloud;
 }
 

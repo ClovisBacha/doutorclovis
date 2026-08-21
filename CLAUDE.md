@@ -6067,3 +6067,45 @@ saída exatamente para quem poderia assinar.
 
 Quatro mutações conferidas em vermelho. Medido nos cinco estados: um botão por
 estado, limite ético em todos, zero erros de console.
+
+## ⚠️ UM COMENTÁRIO INVENTAVA UM CANAL DE RECEITA (ago/2026)
+
+O cabeçalho do `QuizPaywall` (`gestacao-path.tsx`) afirmava, por escrito:
+_"pagamento assistido: PIX + comprovante no WhatsApp e o consultório ativa o
+acesso (toggle no painel do médico)"_.
+
+**Nada disso existe.** Varrido o `src/` inteiro: não há PIX, não há `wa.me`, não
+há comprovante. O caminho real é `createSubscriptionCheckout` mais o resgate de
+código, com `podeComprarAqui` decidindo se a compra pode acontecer — e como
+`CANAL_DE.premium_paciente === "app"` e `IAP_ATIVO = false`, hoje ela não
+acontece em canal nenhum.
+
+⚠️ **Isto quase me fez afirmar ao dono que existe um caminho de receita da
+paciente funcionando por fora da loja.** Um comentário que inventa CANAL não é
+detalhe de prosa: o próximo leitor conclui que o app já sabe cobrar, e a decisão
+de negócio seguinte sai daí. É a terceira vez que prosa desatualizada engana
+alguém neste repositório — as três constantes de preço mortas ("parece
+autoridade, e alguém a usa achando que é a fonte") e o comentário do avatar que
+continuava afirmando "já é data URL no banco" depois de o editor passar a subir
+para o balde.
+
+⚠️ **E `dc-path-premium-pending` NÃO TEM QUEM ESCREVA.** Era o flag de
+"comprovante enviado" desse fluxo. As duas únicas linhas que o tocam são a
+leitura e a limpeza (gravando `""`). A limpeza fica — blob de jornada de versão
+antiga pode carregar a chave —, mas ninguém deve escrever nela sem reconstruir
+o fluxo inteiro: **meio fluxo de pagamento é pior que nenhum, porque a paciente
+acha que pagou.**
+
+### ⚠️ E O TESTE NÃO POLICIA PROSA — isso foi decidido depois de tentar
+
+A primeira versão de `paywall-da-aula.test.ts` tinha a regra "se a palavra PIX
+aparece, o código tem de tê-la". Ficou vermelha na hora, por causa do comentário
+que eu **acabara de escrever** explicando que o PIX não existe: para dizer que a
+afirmação é falsa, é preciso citá-la.
+
+É a terceira vez que casar texto engana aqui, **nos dois sentidos**: na catraca
+de portas a prosa APROVAVA função morta; no teste do "então e agora" ela
+REPROVAVA código certo. O que sobrou são duas asserções de COMPORTAMENTO, sobre
+o fonte com os comentários removidos: por onde a compra passa, e que o flag
+continua sem escritor. Três mutações em vermelho, inclusive a que deixa só o
+comentário citando o portão.
