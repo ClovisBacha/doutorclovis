@@ -275,11 +275,19 @@ async function nudgeGratidaoDaSemana(): Promise<number> {
      alegria, e um push comemorando "coisas boas" não pode chegar a quem
      perdeu a gestação. Consultada DEPOIS de somar, contra só quem escreveu:
      ler `care_mode` de todo mundo seria varrer a base à toa. */
-  const { data: emLuto } = await (supabaseAdmin as any)
+  const { data: emLuto, error: erroDoLuto } = await (supabaseAdmin as any)
     .from("patient_profiles")
     .select("id")
     .in("id", [...porPaciente.keys()])
     .eq("care_mode", true);
+  /* ⚠️ **NÃO CONSEGUIU LER? NÃO MANDA NADA** — ver o mesmo bloco no resumo da
+     Comunidade. O `error` era descartado e `data` vem `null` na falha, então o
+     portão virava no-op e o push comemorando "coisas boas" chegava a quem
+     perdeu a gestação. */
+  if (erroDoLuto) {
+    console.warn("[push-weekly] resumo da Gratidão pulado: não deu para ler o Modo Cuidado");
+    return 0;
+  }
   for (const p of (emLuto ?? []) as { id: string }[]) porPaciente.delete(p.id);
 
   let notificadas = 0;
@@ -494,11 +502,23 @@ async function resumoDaComunidade(): Promise<number> {
   /* ⚠️ MODO CUIDADO, consultado DEPOIS de somar e só contra quem tem resumo:
      ler `care_mode` de toda a base seria varrê-la à toa. É o mesmo recorte do
      resumo da Gratidão. */
-  const { data: emLuto } = await sb
+  const { data: emLuto, error: erroDoLuto } = await sb
     .from("patient_profiles")
     .select("id")
     .in("id", [...daPaciente.keys()])
     .eq("care_mode", true);
+  /* ⚠️ **NÃO CONSEGUIU LER? NÃO MANDA NADA.**
+     O `error` era descartado, e `data` vem `null` quando a consulta falha — o
+     conjunto saía VAZIO e o portão do luto virava um no-op: TODA paciente em
+     Modo Cuidado recebia o resumo da Comunidade. É o Modo Cuidado falhando
+     ABERTO, no canal do aviso de emergência, para quem acabou de perder a
+     gestação.
+     Este resumo é um agrado, não uma necessidade: não mandar por uma noite não
+     custa nada, e mandar para a pessoa errada custa o que não se desfaz. */
+  if (erroDoLuto) {
+    console.warn("[push-weekly] resumo da Comunidade pulado: não deu para ler o Modo Cuidado");
+    return 0;
+  }
   const luto = new Set(((emLuto ?? []) as { id: string }[]).map((p) => p.id));
 
   let notificadas = 0;
