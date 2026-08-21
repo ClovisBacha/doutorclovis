@@ -1320,3 +1320,50 @@ describe("a zona de sugestões não arrasta 400 avatares", () => {
     expect(c).toContain("perfisPorId( sb, naFila.map((p) => p.id), ctx.perfis, )");
   });
 });
+
+/**
+ * ⚠️ A GRADE DO PERFIL PARAVA NA VIGÉSIMA PUBLICAÇÃO.
+ *
+ * `verPerfil` devolvia uma página e mais nada: uma paciente com cem publicações
+ * só via as vinte primeiras do PRÓPRIO perfil, e as outras oitenta não tinham
+ * caminho nenhum no app. Não era lentidão — era capacidade faltando, em
+ * silêncio.
+ */
+describe("a grade do perfil pagina", () => {
+  const c = corpoDe("verPerfil").replace(/\s+/g, " ");
+
+  /**
+   * ⚠️ **A MESMA FUNÇÃO, com cursor — e não uma `maisDoPerfil` própria.**
+   *
+   * Uma segunda função teria de repetir o portão de alcance, e portão duplicado
+   * é portão que um dia diverge: a divergência apareceria como back door para
+   * ler as publicações de um perfil que a régua recusa. Reler o perfil custa uma
+   * consulta; separar custaria a garantia.
+   */
+  test("⚠️ o cursor entra em `verPerfil`, e o portão continua único", () => {
+    expect(c).toContain("antesDe");
+    expect(c).toContain("alcancaOPerfil({");
+    /* O portão vem ANTES da leitura das publicações, como sempre veio. */
+    expect(c.indexOf("alcancaOPerfil({")).toBeLessThan(c.indexOf("idsMarcadosDe(sb, data.alvoId)"));
+    /* E não existe uma segunda porta. */
+    expect(CODIGO).not.toContain("export const maisDoPerfil");
+  });
+
+  /* ⚠️ O cursor vale para as DUAS fontes. Sem ele nos marcados, cada página
+     traria os mesmos posts de marcação de volta — e a grade repetiria fotos. */
+  test("⚠️ o cursor recorta os próprios E os de marcação", () => {
+    expect(c.split('q.lt("criado_em", data.antesDe)').length - 1).toBe(2);
+  });
+
+  /**
+   * ⚠️ O CURSOR SAI DE `brutos`, E NÃO DA LISTA JÁ FILTRADA.
+   *
+   * A régua de visibilidade filtra depois de ler: uma página em que
+   * `podeVerPost` recusou tudo devolveria a lista vazia, o cursor viraria `null`
+   * e a grade pararia ali — escondendo para sempre o que vem depois.
+   */
+  test("⚠️ `proximo` é medido pelo que o BANCO devolveu", () => {
+    expect(c).toContain("brutos.length === POSTS_POR_PAGINA");
+    expect(c).not.toContain("daGrade.length === POSTS_POR_PAGINA");
+  });
+});

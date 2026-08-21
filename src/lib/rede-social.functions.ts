@@ -1430,6 +1430,17 @@ export const verPerfil = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         alvoId: z.string().uuid(),
+        /**
+         * O cursor da grade — a data da publicação mais antiga já mostrada.
+         *
+         * ⚠️ **É a MESMA função, e não uma segunda que só busca posts.** Uma
+         * `maisDoPerfil` própria teria de repetir o portão de alcance, e um
+         * portão duplicado é um portão que um dia diverge — aqui a divergência
+         * apareceria como back door para ler as publicações de um perfil que a
+         * régua recusa. Reler o perfil custa UMA consulta; separar custaria a
+         * garantia.
+         */
+        antesDe: z.string().datetime({ offset: true }).nullable().optional(),
         /** O espelho. Só vale quando `alvoId` sou eu. */
         comoVisitante: z.enum(["estranha", "seguidora", "amiga"]).nullable().optional(),
       })
@@ -1517,22 +1528,27 @@ export const verPerfil = createServerFn({ method: "POST" })
        pior, é a ordem que um dia alguém "otimiza" movendo o portão para baixo. */
     const [marcados, proprios] = await Promise.all([
       idsMarcadosDe(sb, data.alvoId),
-      postsCrus(sb, (base) =>
-        base
+      postsCrus(sb, (base) => {
+        const q = base
           .eq("autor_id", data.alvoId)
           .is("arquivado_em", null)
           .order("criado_em", { ascending: false })
-          .limit(POSTS_POR_PAGINA),
-      ),
+          .limit(POSTS_POR_PAGINA);
+        return data.antesDe ? q.lt("criado_em", data.antesDe) : q;
+      }),
     ]);
     const deMarcacao = marcados.length
-      ? await postsCrus(sb, (base) =>
-          base
+      ? await postsCrus(sb, (base) => {
+          const q = base
             .in("id", marcados)
             .is("arquivado_em", null)
             .order("criado_em", { ascending: false })
-            .limit(POSTS_POR_PAGINA),
-        )
+            .limit(POSTS_POR_PAGINA);
+          /* ⚠️ O cursor vale para as DUAS fontes. Sem ele nos marcados, cada
+             página traria os mesmos posts de marcação de volta — e a grade
+             repetiria as mesmas fotos ao rolar. */
+          return data.antesDe ? q.lt("criado_em", data.antesDe) : q;
+        })
       : [];
     const porId = new Map<string, any>();
     for (const p of [...proprios, ...deMarcacao]) porId.set(p.id, p);
@@ -1623,7 +1639,19 @@ export const verPerfil = createServerFn({ method: "POST" })
       euSigo: persona ? null : data.alvoId === eu ? await contarSeguindo(sb, eu) : null,
     };
 
-    return { ok: true as const, perfil, posts: ordenarFeed(posts) };
+    const daGrade = ordenarFeed(posts);
+    return {
+      ok: true as const,
+      perfil,
+      posts: daGrade,
+      /* ⚠️ O cursor sai de `brutos`, e NÃO de `daGrade`. A régua de visibilidade
+         filtra depois de ler: uma página em que `podeVerPost` recusou tudo
+         devolveria `daGrade` vazio, o cursor viraria `null` e a grade pararia ali
+         — escondendo para sempre o que vem depois. `brutos` é o que o banco de
+         fato entregou, e é ele que diz se ainda há mais. */
+      proximo:
+        brutos.length === POSTS_POR_PAGINA ? (brutos[brutos.length - 1].criado_em as string) : null,
+    };
   });
 
 /* ══════════════════════════════════════════════════════════════════════════

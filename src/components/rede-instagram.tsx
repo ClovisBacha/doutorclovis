@@ -2120,6 +2120,8 @@ export function TelaDePerfil({
   aoSeguir,
   aoVoltar,
   aoAbrirPost,
+  aoChegarNoFim,
+  temMais = false,
   aoAbrirLista,
   aoAbrirSalvos,
   aoBloquear,
@@ -2136,6 +2138,10 @@ export function TelaDePerfil({
   aoSeguir?: () => void;
   aoVoltar?: () => void;
   aoAbrirPost?: (id: string) => void;
+  /** Pede a próxima página da grade deste perfil. */
+  aoChegarNoFim?: () => void;
+  /** Ainda há página seguinte — ver a sentinela. */
+  temMais?: boolean;
   /**
    * Tocar nos números abre a lista.
    *
@@ -2544,7 +2550,13 @@ export function TelaDePerfil({
         /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
            divergiriam na primeira vez que a proporção da célula mudasse, e ela
            já mudou uma vez (1:1 → 3:4, em 2025). */
-        <GradeDePosts posts={naGrade} vazio="Nenhuma publicação ainda." aoAbrirPost={abrirPost} />
+        <GradeDePosts
+          posts={naGrade}
+          vazio="Nenhuma publicação ainda."
+          aoAbrirPost={abrirPost}
+          aoChegarNoFim={aoChegarNoFim}
+          temMais={temMais}
+        />
       ) : perfil.bebe ? (
         /* ⚠️ Esta aba existia VAZIA desde o primeiro dia, prometendo "os marcos
             da gestação vão aparecer aqui 💛" — em qualquer perfil, inclusive o
@@ -2677,6 +2689,14 @@ export function RedeNoApp({
    */
   const [esboco, setEsboco] = useState<EsbocoDePerfil | null>(null);
   const [doPerfil, setDoPerfil] = useState<PostNaTela[]>([]);
+  /**
+   * O cursor da grade do perfil aberto.
+   *
+   * ⚠️ Ele mora aqui, e não dentro de `TelaDePerfil`: a tela é remontada a cada
+   * abertura, e o cursor precisa acompanhar a lista — que também mora aqui.
+   */
+  const [proximoDoPerfil, setProximoDoPerfil] = useState<string | null>(null);
+  const buscandoDoPerfil = useRef(false);
   const [gente, setGente] = useState<PessoaNaLista[]>([]);
   const [oPost, setOPost] = useState<PostNaTela | null>(null);
   const [bolhas, setBolhas] = useState<BolhaDeStory[]>([]);
@@ -3880,14 +3900,15 @@ export function RedeNoApp({
        olhando entre uma abertura e a outra, o guardado mostraria por um instante
        um perfil que já não pode ser visto. A janela é o tamanho do estrago. */
     const chave = chaveDoPerfil(id);
-    const guardado = lerDoCache<{ perfil: PerfilNaTela; posts: PostNaTela[] }>(
-      chave,
-      Date.now(),
-      VALIDADE_DO_PERFIL_MS,
-    );
+    const guardado = lerDoCache<{
+      perfil: PerfilNaTela;
+      posts: PostNaTela[];
+      proximo: string | null;
+    }>(chave, Date.now(), VALIDADE_DO_PERFIL_MS);
     if (guardado) {
       setPerfil(guardado.perfil);
       setDoPerfil(guardado.posts);
+      setProximoDoPerfil(guardado.proximo);
     }
     try {
       const t = await token();
@@ -3899,7 +3920,8 @@ export function RedeNoApp({
       if (r.ok) {
         setPerfil(r.perfil);
         setDoPerfil(r.posts);
-        guardarNoCache(chave, { perfil: r.perfil, posts: r.posts });
+        setProximoDoPerfil(r.proximo);
+        guardarNoCache(chave, { perfil: r.perfil, posts: r.posts, proximo: r.proximo });
       } else {
         /* `indisponivel` cobre bloqueio, Modo Cuidado e perfil inexistente com
            a mesma resposta — e a tela não conta qual foi.
@@ -3911,6 +3933,46 @@ export function RedeNoApp({
       }
     } catch {
       setOnde({ t: "feed" });
+    }
+  }
+
+  /**
+   * A PRÓXIMA PÁGINA DA GRADE DO PERFIL.
+   *
+   * ⚠️ **É a MESMA `verPerfil`, com o cursor** — e não uma função que só busca
+   * posts. Uma segunda função teria de repetir o portão de alcance, e um portão
+   * duplicado é um portão que um dia diverge: aqui a divergência apareceria como
+   * back door para ler as publicações de um perfil que a régua recusa.
+   *
+   * ⚠️ **A trava é `useRef`, e não `useState`.** A sentinela pode disparar duas
+   * vezes no mesmo tranco de rolagem, e um estado só valeria no render seguinte
+   * — as duas chamadas sairiam. É a mesma trava da paginação do feed.
+   */
+  async function maisDoPerfil() {
+    if (!proximoDoPerfil || buscandoDoPerfil.current) return;
+    const alvo = onde.t === "perfil" ? onde.id : null;
+    if (!alvo) return;
+    buscandoDoPerfil.current = true;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { verPerfil } = await import("@/lib/rede-social.functions");
+      const r = await verPerfil({
+        data: { accessToken: t, alvoId: alvo, antesDe: proximoDoPerfil },
+      });
+      if (!r.ok) return;
+      /* ⚠️ Junta SEM repetir por id: a régua filtra depois de ler, e duas
+         páginas podem se sobrepor — chave repetida derruba a lista inteira no
+         React. É a mesma junção da paginação do feed. */
+      setDoPerfil((ps) => {
+        const vistos = new Set(ps.map((p) => p.id));
+        return [...ps, ...r.posts.filter((p) => !vistos.has(p.id))];
+      });
+      setProximoDoPerfil(r.proximo);
+    } catch {
+      /* Fica onde está; a sentinela tenta de novo na próxima rolagem. */
+    } finally {
+      buscandoDoPerfil.current = false;
     }
   }
 
@@ -4851,6 +4913,8 @@ export function RedeNoApp({
       <TelaDePerfil
         perfil={perfil}
         posts={doPerfil}
+        aoChegarNoFim={maisDoPerfil}
+        temMais={!!proximoDoPerfil}
         aoVoltar={() => setOnde({ t: "feed" })}
         aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
         aoAbrirPost={abrirPost}
@@ -6748,53 +6812,100 @@ export function GradeDePosts({
   posts,
   vazio,
   aoAbrirPost,
+  aoChegarNoFim,
+  temMais = false,
 }: {
   posts: PostNaTela[];
   vazio: string;
   aoAbrirPost?: (id: string) => void;
+  /** Pede a próxima página. Ausente = a grade não pagina (salvos, gaveta). */
+  aoChegarNoFim?: () => void;
+  /** ⚠️ Sem isto a sentinela ficaria armada para sempre, pedindo página atrás
+      de página vazia — a mesma trava do feed. */
+  temMais?: boolean;
 }) {
   if (posts.length === 0) {
     return <p className="py-16 text-center text-sm text-muted-foreground">{vazio}</p>;
   }
   return (
-    <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: VAO_DA_GRADE }}>
-      {posts.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          onClick={() => aoAbrirPost?.(p.id)}
-          /* ⚠️ `aspect-ratio` de 3:4, a proporção NOVA da grade. A antiga era
+    <>
+      <div className="grid" style={{ gridTemplateColumns: "repeat(3, 1fr)", gap: VAO_DA_GRADE }}>
+        {posts.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => aoAbrirPost?.(p.id)}
+            /* ⚠️ `aspect-ratio` de 3:4, a proporção NOVA da grade. A antiga era
              quadrada, e mudou em 2025 — quem construir 1:1 hoje corta a foto
              vertical, que é a maioria. */
-          style={{ aspectRatio: String(RAZAO_DA_GRADE) }}
-          className="press relative overflow-hidden bg-muted/60"
-        >
-          {urlDaGrade(p) ? (
-            /* ⚠️ **`width`/`height` são o que faz o `loading="lazy"` FUNCIONAR.**
+            style={{ aspectRatio: String(RAZAO_DA_GRADE) }}
+            className="press relative overflow-hidden bg-muted/60"
+          >
+            {urlDaGrade(p) ? (
+              /* ⚠️ **`width`/`height` são o que faz o `loading="lazy"` FUNCIONAR.**
                Sem as dimensões o navegador não sabe a altura de cada célula, não
                consegue calcular o que está fora da tela e pede as vinte imagens
                de uma vez. Medido: 21 de 21 requisições saíam na abertura, com 8
                células visíveis. Quem dimensiona na tela continua sendo o CSS —
                estes números só declaram a PROPORÇÃO. */
-            <img
-              src={urlDaGrade(p) ?? undefined}
-              alt=""
-              width={CELULA_DA_GRADE.largura}
-              height={CELULA_DA_GRADE.altura}
-              className="h-full w-full object-cover"
-              loading="lazy"
-              decoding="async"
-            />
-          ) : (
-            /* Post só de texto na grade: mostra o texto, não um buraco. */
-            <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
-              {p.texto}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
+              <img
+                src={urlDaGrade(p) ?? undefined}
+                alt=""
+                width={CELULA_DA_GRADE.largura}
+                height={CELULA_DA_GRADE.altura}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                decoding="async"
+              />
+            ) : (
+              /* Post só de texto na grade: mostra o texto, não um buraco. */
+              <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+                {p.texto}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      {/* ⚠️ **A GRADE PARAVA NA VIGÉSIMA PUBLICAÇÃO, e não havia como pedir mais.**
+          `verPerfil` devolvia uma página e mais nada: uma paciente com cem
+          publicações só via as vinte primeiras do PRÓPRIO perfil, e as outras
+          oitenta não tinham caminho nenhum no app. Não era lentidão — era
+          capacidade faltando, e em silêncio.
+
+          A sentinela é a MESMA do feed: `IntersectionObserver` e não ouvinte de
+          `scroll`, porque a aba vive dentro de `minha-conta` e quem rola pode ser
+          a janela ou um contêiner interno. */}
+      {aoChegarNoFim && temMais && (
+        <SentinelaDaGrade aoChegar={aoChegarNoFim} quantos={posts.length} />
+      )}
+    </>
   );
+}
+
+/**
+ * A sentinela da grade.
+ *
+ * ⚠️ Componente próprio para o `useEffect` não precisar viver dentro de um
+ * `return` condicional da grade — que é onde a regra dos hooks quebra (e já
+ * quebrou, no `useMemo` da fileira de stories).
+ */
+function SentinelaDaGrade({ aoChegar, quantos }: { aoChegar: () => void; quantos: number }) {
+  const fim = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const alvo = fim.current;
+    if (!alvo) return;
+    const obs = new IntersectionObserver(
+      (entradas) => {
+        if (entradas.some((e) => e.isIntersecting)) aoChegar();
+      },
+      /* Uma tela de antecedência, como no feed: a página seguinte chega antes de
+         ela bater no fundo. */
+      { rootMargin: "600px" },
+    );
+    obs.observe(alvo);
+    return () => obs.disconnect();
+  }, [aoChegar, quantos]);
+  return <div ref={fim} className="h-1" aria-hidden />;
 }
 
 export function TelaDosSalvos({
