@@ -70,3 +70,91 @@ export const ASSINATURAS_DA_LOJA = {
 export function lojaDaAssinatura(source: string | null | undefined): "apple" | "google" {
   return (source ?? "").toLowerCase().includes("google") ? "google" : "apple";
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O SELO DE ASSINANTE NA COMUNIDADE
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O SELO QUE APARECE AO LADO DO NOME DE QUEM ASSINA.
+ *
+ * Pedido do dono: "o selo que pode se ganhar deve estar atrelado a pessoa
+ * pagando o premium".
+ *
+ * ─── ⚠️ ELE NÃO É O SELO DO CONSULTÓRIO ─────────────────────────────────────
+ *
+ * São duas marcas diferentes e não podem parecer a mesma: a oficial identifica
+ * a CLÍNICA (uma conta só, coluna própria, escrita revogada do navegador); esta
+ * identifica uma assinante. Forma e cor distintas — senão a paciente lê "conta
+ * oficial" onde está escrito "assinante", e o selo institucional deixa de valer
+ * alguma coisa.
+ *
+ * ─── ⚠️ E ELE NUNCA É UMA COLUNA ────────────────────────────────────────────
+ *
+ * `patient_profiles` é escrita direto do navegador em vários pontos do app, e a
+ * policy de LINHA não distingue COLUNA. Uma coluna `tem_selo` cairia no mesmo
+ * buraco que `conta_oficial` teve: qualquer paciente se daria o selo com um
+ * `UPDATE`. Aqui ele é DERIVADO da assinatura, no servidor, a cada leitura.
+ *
+ * Derivar tem um segundo ganho: o selo **some sozinho** quando a assinatura
+ * acaba. Uma coluna carimbada ficaria mentindo por meses, e ninguém repara num
+ * selo a mais.
+ */
+export const SELO_PREMIUM = "Assinante";
+
+/** O que a linha de `subscriptions` precisa dizer para o selo existir. */
+export type FatosDaAssinante = {
+  /** `status` da linha — `active`, `trialing`, `canceled`, … */
+  status: string | null | undefined;
+  /** Até quando o período pago vale. */
+  ateQuando: string | null | undefined;
+  /** `source` da linha — o que separa quem paga de quem ganhou. */
+  origem: string | null | undefined;
+};
+
+/**
+ * Os status que significam "está pagando agora".
+ *
+ * ⚠️ `trialing` ENTRA. Quem está no teste de uma assinatura recorrente já deu o
+ * cartão e vai ser cobrada; tirá-la do selo por sete dias e devolvê-lo depois
+ * seria o app piscando um símbolo social na cara dela.
+ *
+ * ⚠️ E `canceled` NÃO entra, mesmo dentro do período pago. Aqui o selo difere
+ * do ACESSO de propósito: `AssinaturaTab` já ensina que "tem acesso" ≠ "está
+ * pagando", e este selo é sobre a segunda coisa. Quem cancelou continua com
+ * tudo que pagou até o fim do período — só não carrega mais a marca de
+ * assinante ativa.
+ */
+const STATUS_PAGANDO = new Set(["active", "trialing"]);
+
+/**
+ * Ela carrega o selo?
+ *
+ * ⚠️ **O PRESENTE DO MÉDICO CONTA**, e esta é a única decisão de produto aqui.
+ * A paciente que ganhou um ano de Premium pelo convite do obstetra
+ * (`source: "convite"`) não paga nada — mas é assinante ativa, e distinguir
+ * criaria uma segunda classe DENTRO do Premium, visível para todo mundo, sobre
+ * um presente que o médico deu a ela. Numa comunidade de gestação de alto risco
+ * isso é pior que o ganho.
+ *
+ * Se um dia a decisão for o contrário, é uma linha: recusar `"presente"` aqui.
+ *
+ * ⚠️ **Sem linha nenhuma NÃO tem selo** — e é o caso da maioria. `null` e
+ * `undefined` caem no mesmo lugar, sem exceção de conveniência.
+ */
+export function temSeloPremium(
+  f: FatosDaAssinante | null | undefined,
+  agora = Date.now(),
+): boolean {
+  if (!f) return false;
+  if (!STATUS_PAGANDO.has((f.status ?? "").trim().toLowerCase())) return false;
+  /* Sem data de fim, a assinatura é corrente e válida — é o que a loja grava
+     enquanto a renovação está em dia. */
+  if (!f.ateQuando) return true;
+  const fim = new Date(f.ateQuando).getTime();
+  /* ⚠️ Data ilegível NÃO tira o selo: o estrago de tirar por engano recai sobre
+     quem está pagando, e um selo a mais por um dia não custa nada. É a mesma
+     direção de `planoVigente`. */
+  if (!Number.isFinite(fim)) return true;
+  return fim >= agora;
+}

@@ -89,6 +89,8 @@ export type PostNaTela = {
    * resolvido pelo vínculo atual e só aparece na lista que a autora abre.
    */
   autorOficial: boolean;
+  /** Quem publicou é assinante? Ver `temSeloPremium`. */
+  autorPremium: boolean;
   texto: string | null;
   /** A PRIMEIRA foto, em tamanho cheio — é ela que a tela do post abre. */
   imagemUrl: string | null;
@@ -215,6 +217,15 @@ export type PerfilNaTela = {
    * resolvido pelo vínculo atual e só aparece na lista que a autora abre.
    */
   oficial?: boolean;
+  /**
+   * Ela é assinante ativa?
+   *
+   * ⚠️ **Não é o selo do consultório** — são duas marcas diferentes, com formas
+   * distintas. A oficial identifica a CLÍNICA; esta identifica quem assina. E
+   * ele é DERIVADO da assinatura a cada leitura, nunca uma coluna: ver
+   * `quemTemSelo`.
+   */
+  premium?: boolean;
   /** `null` = não sigo. */
   meuVinculo: "ativo" | "pendente" | null;
   souEu: boolean;
@@ -486,6 +497,46 @@ async function vitrineLigada(
 }
 
 /**
+ * QUEM DESTES IDS CARREGA O SELO DE ASSINANTE — em LOTE.
+ *
+ * ⚠️ **O selo é DERIVADO, e nunca uma coluna.** `patient_profiles` é escrita
+ * direto do navegador em vários pontos do app, e a policy de LINHA não distingue
+ * COLUNA: uma coluna `tem_selo` cairia no mesmo buraco que `conta_oficial` teve,
+ * em que qualquer paciente se dava o selo com um `UPDATE`. Derivar tem um
+ * segundo ganho — o selo some sozinho quando a assinatura acaba, e uma coluna
+ * carimbada ficaria mentindo por meses.
+ *
+ * ⚠️ **Uma consulta para o lote inteiro**, e não uma por autor: este helper é
+ * chamado de dentro de `perfisPorId`, que alimenta feed, perfil, busca, stories,
+ * atividade e salvos. Uma consulta por pessoa devolveria a lentidão que a leva
+ * anterior acabou de tirar.
+ *
+ * ⚠️ **Falha devolve NINGUÉM com selo.** Errar para o lado de não mostrar é o
+ * lado barato: um selo a menos por uma noite não fere ninguém, e um selo a mais
+ * é o app afirmando que alguém paga.
+ */
+async function quemTemSelo(sb: any, ids: string[]): Promise<Set<string>> {
+  const com = new Set<string>();
+  if (ids.length === 0) return com;
+  try {
+    const { data, error } = await sb
+      .from("subscriptions")
+      .select("user_id, status, current_period_end, source")
+      .in("user_id", ids);
+    if (error) return com;
+    const { temSeloPremium } = await import("@/lib/assinatura");
+    for (const l of (data ?? []) as any[]) {
+      if (temSeloPremium({ status: l.status, ateQuando: l.current_period_end, origem: l.source })) {
+        com.add(l.user_id as string);
+      }
+    }
+  } catch {
+    /* Sem a tabela ou sem rede: ninguém com selo. */
+  }
+  return com;
+}
+
+/**
  * A MEMÓRIA DE UMA REQUISIÇÃO SÓ — para o mesmo perfil não ser buscado duas
  * vezes na mesma resposta.
  *
@@ -551,13 +602,21 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
      leitura seguinte ela era renovada de novo, e a partir daí toda leitura da
      rede voltava a assinar todos os avatares, para sempre. E, no navegador, uma
      URL que muda a cada leitura é uma foto baixada de novo em cada tela. */
-  const urls = await renovarUrlsAssinadas(
-    linhas.map((p) => p.avatar_url),
-    VALIDADE_AVATAR_SEG,
-  );
+  /* O selo sai na MESMA onda da renovação das fotos: são duas idas
+     independentes, e em série a segunda esperaria a primeira à toa. */
+  const [urls, comSelo] = await Promise.all([
+    renovarUrlsAssinadas(
+      linhas.map((p) => p.avatar_url),
+      VALIDADE_AVATAR_SEG,
+    ),
+    quemTemSelo(
+      sb,
+      linhas.map((p) => p.id),
+    ),
+  ]);
   const saida = new Map<string, any>();
   linhas.forEach((p, i) => {
-    const pronto = { ...p, avatar_url: urls[i] };
+    const pronto = { ...p, avatar_url: urls[i], tem_selo: comSelo.has(p.id) };
     saida.set(p.id, pronto);
     memoria?.set(p.id, pronto);
   });
@@ -1114,6 +1173,7 @@ async function montarPosts(
         autorNome: (a?.display_name ?? "").trim() || "Alguém",
         autorAvatar: a?.avatar_url ?? null,
         autorOficial: ehContaOficial(a as any),
+        autorPremium: a?.tem_selo === true,
         texto: p.texto ?? null,
         imagemUrl: urls[0] ?? null,
         miniaturaUrl: p.miniatura_path ? (assinadas.get(p.miniatura_path) ?? null) : null,
@@ -1521,6 +1581,7 @@ export const verPerfil = createServerFn({ method: "POST" })
       avatarUrl: a.avatar_url ?? null,
       publico: !!a.perfil_publico,
       oficial: ehContaOficial(a as any),
+      premium: (a as any)?.tem_selo === true,
       /* Sob a prévia, o vínculo é o da PERSONA — senão a tela mostraria
          "Editar perfil" no lugar de "Seguir" enquanto afirma ser a visão de
          uma estranha. */
@@ -2496,6 +2557,7 @@ function naFileira(perfil: any): PessoaNaLista {
     sigo: null,
     souEu: false,
     oficial: ehContaOficial(perfil as any),
+    premium: (perfil as any)?.tem_selo === true,
   };
 }
 
@@ -2955,6 +3017,8 @@ export type PessoaNaLista = {
    * institucional, e é público por natureza. Ver `conta-oficial.ts`.
    */
   oficial?: boolean;
+  /** Assinante ativa. Ver `temSeloPremium`. */
+  premium?: boolean;
 };
 
 /**
@@ -3017,6 +3081,7 @@ export const listaDeGente = createServerFn({ method: "POST" })
           sigo: ctx.sigo.has(id) ? ("ativo" as const) : null,
           souEu: id === eu,
           oficial: ehContaOficial(p as any),
+          premium: (p as any)?.tem_selo === true,
         };
       })
       .filter(Boolean) as PessoaNaLista[];

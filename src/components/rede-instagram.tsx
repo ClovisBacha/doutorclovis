@@ -82,6 +82,7 @@ import {
 import { chaveDoLembrete, lembreteDoEntao } from "@/lib/entao-e-agora";
 import type { Momento } from "@/lib/momento";
 import { SELO_OFICIAL } from "@/lib/conta-oficial";
+import { SELO_PREMIUM } from "@/lib/assinatura";
 import { liveDoTopo, quandoAcontece, type LiveNoTopo } from "@/lib/proxima-live";
 import { ROTULO_DO_FILTRO, VAZIO_DO_FILTRO } from "@/lib/fase-parecida";
 import { esquecerMomento, lerMomentoParaPublicar } from "@/lib/momento-para-publicar";
@@ -711,6 +712,7 @@ export const PostInstagram = memo(function PostInstagram({
             <span className="flex min-w-0 items-center text-[13px] font-semibold leading-tight">
               <span className="truncate">{post.autorNome}</span>
               {post.autorOficial && <SeloOficial />}
+              {post.autorPremium && <SeloPremium />}
             </span>
             {/* ⚠️ "Sugerido para você" é OBRIGATÓRIO quando o post não veio de
                 quem ela segue. Sem o rótulo, o feed passa a misturar estranhos
@@ -1152,7 +1154,8 @@ export const PostInstagram = memo(function PostInstagram({
       {post.texto && (
         <p className="px-4 pt-1.5 text-[14px] leading-snug">
           <span className="font-semibold">{post.autorNome}</span>
-          {post.autorOficial && <SeloOficial />}{" "}
+          {post.autorOficial && <SeloOficial />}
+          {post.autorPremium && <SeloPremium />}{" "}
           <span className="whitespace-pre-wrap">{post.texto}</span>
         </p>
       )}
@@ -1822,6 +1825,7 @@ function FileiraDePessoas({
                     e este é o selo que diz "esta conta é do consultório". Mesma
                     lição do 📞 preto no iOS. */}
                 {p.oficial && <SeloOficial />}
+                {p.premium && <SeloPremium />}
               </p>
               {p.bio && (
                 <p className="line-clamp-1 w-full text-center text-[11px] leading-tight text-muted-foreground">
@@ -2209,6 +2213,7 @@ export function TelaDePerfil({
               ele some junto com o fim de um nome comprido, e o selo é a
               informação. */}
           {perfil.oficial && <SeloOficial />}
+          {perfil.premium && <SeloPremium />}
         </h1>
         {/* No modelo, os salvos moram atrás do ☰ do próprio perfil. O ícone é
             o MESMO marcador do post — é o que liga o gesto ao lugar onde ele
@@ -5049,6 +5054,18 @@ export function EditarPerfil({
    A LISTA DE GENTE
    ══════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * ⚠️ **ESTE TIPO É UMA SEGUNDA CÓPIA, e ela já mordeu.**
+ *
+ * `rede-social.functions.ts` exporta um `PessoaNaLista` com o mesmo nome, e é
+ * ELE que o servidor devolve. Este aqui é o que a tela declara — e como o nome é
+ * igual, acrescentar um campo lá e esquecer daqui não dá erro de importação:
+ * dá um `Property does not exist` numa linha distante, que foi exatamente o que
+ * aconteceu ao ligar o selo de assinante.
+ *
+ * Os dois precisam andar juntos. O certo seria a tela importar o do servidor;
+ * enquanto isso não acontece, quem mexer num mexe no outro.
+ */
 export type PessoaNaLista = {
   id: string;
   nome: string;
@@ -5058,6 +5075,8 @@ export type PessoaNaLista = {
   souEu: boolean;
   /** A conta oficial do consultório — ver `conta-oficial.ts`. */
   oficial?: boolean;
+  /** Assinante ativa — ver `temSeloPremium`. Forma DIFERENTE da oficial. */
+  premium?: boolean;
 };
 
 export function ListaDeGente({
@@ -7743,6 +7762,34 @@ function CartaoDaLive({ live }: { live: LiveNoTopo }) {
  * não contar a terceiros quem é a médica dela. Este identifica uma conta
  * institucional, e é público por natureza. Ver `conta-oficial.ts`.
  */
+/**
+ * O SELO DE ASSINANTE.
+ *
+ * ⚠️ **Precisa NÃO parecer o selo do consultório**, e é por isso que ele é uma
+ * forma diferente e não a mesma estrela com outra cor: a oficial é um selo
+ * recortado com um ✓ dentro (identifica a CLÍNICA); esta é uma folhinha —
+ * a mesma família visual da Sementinha, que é a moeda do app. Se os dois
+ * convergirem, a paciente lê "conta oficial" onde está escrito "assinante", e o
+ * selo institucional deixa de valer alguma coisa.
+ *
+ * ⚠️ E ele NUNCA aparece sozinho: quem tem os dois vê os dois, na ordem
+ * oficial → assinante, porque a identidade da clínica vem antes do plano.
+ */
+function SeloPremium() {
+  return (
+    <svg
+      role="img"
+      aria-label={SELO_PREMIUM}
+      viewBox="0 0 24 24"
+      className="ml-1 inline-block h-[13px] w-[13px] align-[-2px] text-emerald-600"
+      fill="currentColor"
+    >
+      <title>{SELO_PREMIUM}</title>
+      <path d="M20 3c-6.6 0-12 3.1-12 9 0 1.5.4 2.8 1.1 3.9L6 19l1.4 1.4 3.1-3.1c1.1.7 2.4 1.1 3.9 1.1 5.9 0 9-5.4 9-12 0-.7 0-1.4-.1-2-.7-.3-1.5-.4-2.3-.4Z" />
+    </svg>
+  );
+}
+
 function SeloOficial() {
   return (
     <svg

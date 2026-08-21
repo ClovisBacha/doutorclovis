@@ -178,6 +178,9 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      que todas têm miniatura nunca mostraria o caminho que a maioria do acervo
      vai percorrer. */
   miniaturaUrl: i === 5 || i % 2 === 1 ? null : foto(c[0], c[1], c[2]),
+  /* ⚠️ Nem todo mundo assina — uma bancada em que todas têm selo esconderia o
+     caso normal, que é a maioria da base. */
+  autorPremium: i === 0 || i === 4,
   /* O post 2 é um CARROSSEL de três: é ele que prova os pontinhos e o
      deslizar. Com um só, não haveria o que conferir. */
   imagens:
