@@ -6961,3 +6961,51 @@ computador, onde um `confirm` é feio mas não é problema de revisão, e proibi
 ali obrigaria a mexer em oito lugares para resolver zero. As **bancadas** também
 ficam de fora: `alert` numa `/preview-*` é o jeito mais direto de mostrar para
 onde um toque levaria, e elas não vão para a loja.
+
+## A varredura de preparação para o iOS — o que ela achou e o que ela LIMPOU (ago/2026)
+
+Pedido do dono: _"pesquisa ampla sobre o que pode ser melhorado dentro do
+código, pra deixar tudo preparado, pra não houver erros"_ — antes de levar o app
+para o iPhone.
+
+Orientei a varredura pelo que **o travaria amanhã**, e não por revisão genérica.
+
+### O que ela achou (os dois já consertados acima)
+
+1. **Quatro frases faltando no `Info.plist`** — o app FECHAVA ao tocar no
+   microfone ou na câmera.
+2. **Diálogo do sistema** (`alert`/`confirm`) no app da paciente — abre com o
+   nome do domínio, que é a cara de "site embrulhado" da diretriz 4.2.
+
+### O que ela varreu e estava CERTO — e vale registrar para não ser refeito
+
+- **`100vh`** — quatro usos, todos legítimos: uma página HTML injetada, um valor
+  de RESERVA no CSS (`var(--dc-fim, 100vh)`) e um bloco `md:` de desktop. O app
+  da paciente já usa `svh`/`lvh` com a razão escrita.
+- **`new Date("YYYY-MM-DD")`** — nenhuma ocorrência real; a única casada é um
+  COMENTÁRIO explicando por que não se faz isso. A lição já pegou.
+- **`console.log`** no app da paciente e na trilha: **zero**.
+- **Segredo commitado: NENHUM.** Quatro arquivos casaram no padrão e os quatro
+  são documentação ou validação — o texto que explica o formato da chave
+  (`sk_live_…`) e um `includes("BEGIN PRIVATE KEY")` que confere um PEM colado
+  pelo dono. ⚠️ **Casar padrão não é achar segredo**; conclui-se olhando cada um.
+  E o `.env` está fora do versionamento.
+- **A tela SEM CONEXÃO já oferece o 192 e o consultório em texto puro**, que
+  funciona sem rede. É a pior cara possível do app e já foi pensada.
+- **O ícone** usa o formato moderno de entrada única (1024×1024), aceito pelo
+  Xcode.
+
+### ⚠️ O que o projeto usa, e que quase todo tutorial erra
+
+**SPM, não CocoaPods.** `ios/App/CapApp-SPM/Package.swift`; não existe `Podfile`.
+Um `pod install` falha com um erro que parece grave e não é. `npx cap sync ios`
+rodou aqui em 0,39 s e encontrou os seis plugins.
+
+### O que ficou de fora, e por quê
+
+- **Peso do pacote**: entrada em 277 kB comprimidos (react-dom, router,
+  supabase, sonner, lucide — todos legítimos em quase toda página). O que
+  sobra de verdade é o `minha-conta` com 122 kB, e ele é o item bloqueado na
+  decisão do dono.
+- **Painel do médico**: os `confirm` dele ficaram. É desktop, não vai para a
+  loja, e proibi-los obrigaria a mexer em oito lugares para resolver zero.
