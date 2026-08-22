@@ -6765,3 +6765,58 @@ Nenhum defeito encontrado desta vez — a tela está certa, e agora dá para
 conferir.
 
 **Bancada:** `/preview-agenda` · `?vazio=1` · `?firme=0` (só o que não tem hora).
+
+## ⚠️ O CONTÊINER DEVOLVE INSTANTÂNEOS ANTIGOS — e o conserto (ago/2026)
+
+Pedido do dono: _"alguns erros se repetem — esses erros de commit, que aí a
+gente sempre volta, e toda vez pega uma versão antiga do código"_.
+
+### A causa, medida
+
+O contêiner **não clona o repositório do zero** quando reinicia: ele restaura um
+**instantâneo** do espaço de trabalho. Cinco vezes numa única noite ele voltou ao
+MESMO commit (`ee24f25`, de 19/ago) com arquivos "modificados" que eram versões
+**anteriores** às do remoto — num caso medido, **4.572 linhas a menos**.
+
+⚠️ **O perigo não é perder trabalho** (ele está no remoto, porque eu empurro a
+cada item). **É COMMITAR AQUELES ARQUIVOS.** Um `git add -A && git commit` ali
+reverte a sessão inteira, e o diff parece legítimo — nada acusa.
+
+### As duas defesas
+
+1. **`.claude/hooks/session-start.sh`** — na abertura da sessão, compara com o
+   remoto e age **só no caso INEQUÍVOCO**:
+
+   | situação                     | o que faz                                    |
+   | ---------------------------- | -------------------------------------------- |
+   | igual                        | nada                                         |
+   | **atrás** (HEAD é ancestral) | guarda a árvore em `restos-*.patch` e alinha |
+   | **à frente**                 | NÃO TOCA — avisa que falta empurrar          |
+   | **divergiu**                 | NÃO TOCA — avisa alto                        |
+
+   ⚠️ Nos dois últimos há trabalho local que só uma pessoa pode julgar, e um
+   hook que decide sozinho ali destrói exatamente o que veio proteger. E mesmo
+   no caso seguro **nada é apagado**: vai para um `.patch` com o nome impresso.
+
+2. **`bun run verificar` ganhou a quarta checagem** — recusa commit com a árvore
+   atrás do remoto. O hook cobre a abertura; esta trava cobre o reinício **no
+   meio** do trabalho, que foi como aconteceu todas as vezes.
+
+### ⚠️ O limite honesto desta solução
+
+Uma proteção que mora no repositório **não se defende de uma cópia do
+repositório sem ela**. O instantâneo que volta é de 19/ago e não tem o hook —
+então ele só passa a funcionar quando um instantâneo NOVO for tirado, depois
+desta mudança. Não é conserto retroativo, e dizer o contrário seria vender o que
+não entrego.
+
+### ⚠️ E duas lições de método, ganhas errando aqui
+
+- **`bun install` falhando NÃO é a sessão quebrada.** Medido: três tentativas
+  seguidas morrem em `ConnectionClosed downloading tarball` e o `node_modules`
+  está inteiro — ele vem na imagem. A pergunta certa não é "o install passou?",
+  é **"dá para trabalhar?"**, e quem responde é a presença do `node_modules`.
+- ⚠️ **Não se testa uma trava NÃO COMMITADA com operações que resetam a
+  árvore.** Passei três tentativas achando que a trava estava quebrada: cada
+  `git reset --hard` do meu próprio teste apagava a trava junto, e o script que
+  rodava era o antigo. Commite primeiro, teste depois.

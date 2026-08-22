@@ -1,0 +1,538 @@
+diff --git a/src/components/rede-instagram.tsx b/src/components/rede-instagram.tsx
+index 5509d8b..b907420 100644
+--- a/src/components/rede-instagram.tsx
++++ b/src/components/rede-instagram.tsx
+@@ -457,6 +457,7 @@ export const PostInstagram = memo(function PostInstagram({
+   aoVotar,
+   aoTirarMarcacao,
+   aoVerQuemReagiu,
++  aoEditar,
+   sugerido = false,
+ }: {
+   post: PostNaTela;
+@@ -480,6 +481,13 @@ export const PostInstagram = memo(function PostInstagram({
+   aoVotar?: (post: PostNaTela, opcao: number) => void;
+   /** Tirar a PRÓPRIA marcação. Só aparece quando `post.souMarcada`. */
+   aoTirarMarcacao?: (post: PostNaTela) => void;
++  /**
++   * Salvar a legenda editada. Devolve `true` quando gravou.
++   *
++   * ⚠️ Devolve BOOLEANO porque a régua clínica pode recusar: o campo só fecha
++   * quando gravou, senão o texto dela sumiria junto com a recusa.
++   */
++  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+   /** Ver quem reagiu. Só no post DELA — ver a nota na linha de ações. */
+   aoVerQuemReagiu?: (post: PostNaTela) => void;
+   /** Veio do algoritmo, não de quem ela segue. */
+@@ -487,6 +495,9 @@ export const PostInstagram = memo(function PostInstagram({
+ }) {
+   const [escolhendo, setEscolhendo] = useState(false);
+   const [confirmando, setConfirmando] = useState(false);
++  /** `null` = não está editando. String = o texto em edição. */
++  const [editando, setEditando] = useState<string | null>(null);
++  const [salvandoTexto, setSalvandoTexto] = useState(false);
+   const total = totalDeReacoes(post.reacoes);
+   /* Post antigo (anterior ao carrossel) tem `imagens` vazio e só
+      `imagemUrl` — o recuo faz os dois terem a mesma forma aqui. */
+@@ -529,6 +540,20 @@ export const PostInstagram = memo(function PostInstagram({
+             outra pessoa. No modelo ele abre um menu com oito itens; aqui é uma
+             só de cada lado, e um menu de um item é um botão com uma etapa a
+             mais. */}
++        {/* ✏️ Editar — só no post DELA, e separado do ⋯: apagar/denunciar são
++            ações de fim de linha, editar é conserto. Misturar as três faria a
++            mais frequente (corrigir uma vírgula) ficar atrás de um menu que
++            existe para as outras duas. */}
++        {post.souAAutora && aoEditar && (
++          <button
++            type="button"
++            onClick={() => setEditando(post.texto ?? "")}
++            aria-label="Editar a legenda"
++            className="press shrink-0 px-1 text-[13px] text-muted-foreground"
++          >
++            ✏️
++          </button>
++        )}
+         {((post.souAAutora && aoApagar) ||
+           (!post.souAAutora && aoDenunciar) ||
+           (post.souMarcada && aoTirarMarcacao)) && (
+@@ -564,6 +589,47 @@ export const PostInstagram = memo(function PostInstagram({
+         </div>
+       )}
+ 
++      {/* ⚠️ EDITA NO LUGAR, e não numa tela nova. Sair do feed para corrigir uma
++          vírgula perde o contexto do que ela estava lendo — e o post inteiro
++          continua à vista enquanto ela escreve. */}
++      {editando !== null && (
++        <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/30 p-3">
++          <textarea
++            value={editando}
++            onChange={(e) => setEditando(e.target.value.slice(0, LIMITE_DO_TEXTO))}
++            rows={3}
++            autoFocus
++            aria-label="Legenda"
++            className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-[14px] leading-snug"
++          />
++          <div className="mt-2 flex gap-2">
++            <button
++              type="button"
++              onClick={() => setEditando(null)}
++              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
++            >
++              Cancelar
++            </button>
++            <button
++              type="button"
++              disabled={salvandoTexto}
++              onClick={async () => {
++                setSalvandoTexto(true);
++                const ok = await aoEditar?.(post, editando);
++                setSalvandoTexto(false);
++                /* ⚠️ Só fecha se GRAVOU. Fechando de qualquer jeito, uma recusa
++                   da régua clínica sumiria com o texto que ela escreveu — e ela
++                   não teria como ler o recado nem tentar de novo. */
++                if (ok) setEditando(null);
++              }}
++              className="press flex-1 rounded-xl bg-primary py-1.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-60"
++            >
++              {salvandoTexto ? "Salvando…" : "Salvar"}
++            </button>
++          </div>
++        </div>
++      )}
++
+       {confirmando && (
+         <div className="mx-4 mb-2 rounded-2xl border border-border bg-muted/40 p-3">
+           <p className="text-[13px] leading-snug">
+@@ -883,6 +949,11 @@ export const PostInstagram = memo(function PostInstagram({
+           em português a versão em caixa alta lê pior que em inglês. */}
+       <p className="px-4 pt-1 text-[11px] text-muted-foreground">
+         {haQuantoPublicou(post.criadoEm, Date.now())}
++        {/* ⚠️ O selo existe para quem LÊ, não para quem escreveu: sem ele,
++            corrigir o texto vira reescrita silenciosa da história, e quem
++            reagiu ao que estava escrito antes não tem como saber que mudou.
++            Discreto de propósito — é uma nota de rodapé, não uma acusação. */}
++        {post.editadoEm && <span className="opacity-70"> · editado</span>}
+       </p>
+     </article>
+   );
+@@ -971,6 +1042,7 @@ export function TelaPrincipal({
+   aoDenunciar,
+   aoVotar,
+   aoTirarMarcacao,
++  aoEditar,
+   aoVerQuemReagiu,
+   retro,
+   aoFecharRetro,
+@@ -1004,6 +1076,8 @@ export function TelaPrincipal({
+   aoVotar?: (post: PostNaTela, opcao: number) => void;
+   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
+   aoTirarMarcacao?: (post: PostNaTela) => void;
++  /** Salvar a legenda editada — ver `PostInstagram`. */
++  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+   /** Ver quem reagiu. Só no post DELA. */
+   aoVerQuemReagiu?: (post: PostNaTela) => void;
+   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
+@@ -1105,6 +1179,7 @@ export function TelaPrincipal({
+             aoDenunciar={aoDenunciar}
+             aoVotar={aoVotar}
+             aoTirarMarcacao={aoTirarMarcacao}
++            aoEditar={aoEditar}
+             aoVerQuemReagiu={aoVerQuemReagiu}
+             aoAbrirPerfil={aoAbrirPerfil}
+           />
+@@ -1149,6 +1224,7 @@ export function TelaPrincipal({
+                   aoSalvar={aoSalvar}
+                   aoVotar={aoVotar}
+                   aoTirarMarcacao={aoTirarMarcacao}
++                  aoEditar={aoEditar}
+                   aoVerQuemReagiu={aoVerQuemReagiu}
+                   aoAbrirPerfil={aoAbrirPerfil}
+                 />
+@@ -1926,6 +2002,7 @@ export function RedeNoApp({
+     apagar: (_p: PostNaTela) => {},
+     denunciar: (_p: PostNaTela) => {},
+     tirarMarcacao: (_p: PostNaTela) => {},
++    editar: async (_p: PostNaTela, _t: string) => false,
+     verQuemReagiu: (_p: PostNaTela) => {},
+     abrirPerfil: (_id: string) => {},
+   });
+@@ -1936,6 +2013,7 @@ export function RedeNoApp({
+     apagar: (p) => void apagar(p),
+     denunciar: (p) => void denunciarPost(p),
+     tirarMarcacao: (p) => void tirarMarcacao(p),
++    editar: (p, t) => editarLegenda(p, t),
+     verQuemReagiu: (p) => void verQuemReagiu(p),
+     abrirPerfil: (id) => void abrirPerfil(id),
+   };
+@@ -1947,6 +2025,7 @@ export function RedeNoApp({
+       apagar: (p: PostNaTela) => ultimas.current.apagar(p),
+       denunciar: (p: PostNaTela) => ultimas.current.denunciar(p),
+       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
++      editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
+       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
+       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
+     }),
+@@ -2201,6 +2280,47 @@ export function RedeNoApp({
+     }
+   }
+ 
++  /**
++   * Salvar a legenda editada.
++   *
++   * ⚠️ **Devolve BOOLEANO e mostra o recado da régua clínica.** Sem o recado,
++   * quem escreveu "não precisa ir ao pronto-socorro" recebe um "não deu" mudo,
++   * reescreve a mesma frase e tenta de novo para sempre — o mesmo defeito que
++   * `publicar` já tinha resolvido. O texto vem do SERVIDOR: decidir aqui por
++   * que foi recusado seria uma segunda régua clínica no navegador.
++   */
++  async function editarLegenda(post: PostNaTela, texto: string): Promise<boolean> {
++    try {
++      const t = await token();
++      if (!t) return false;
++      const { editarPost } = await import("@/lib/rede-social.functions");
++      const r = await editarPost({ data: { accessToken: t, postId: post.id, texto } });
++      if (!r.ok) {
++        const { toast } = await import("sonner");
++        if ("recado" in r && r.recado) toast.error(r.recado, { duration: 7000 });
++        else if (r.motivo === "vazio")
++          toast.error("A legenda não pode ficar vazia. Para tirar do ar, use arquivar.");
++        else toast.error("Não deu para salvar. Tente de novo.");
++        return false;
++      }
++      /* Otimista DEPOIS de gravar: o selo "editado" aparece junto com o texto
++         novo, e não antes — senão o post diria "editado" sobre a legenda velha
++         numa falha de rede. */
++      const limpo = texto.trim() || null;
++      const aplicar = (ps: PostNaTela[]) =>
++        ps.map((x) =>
++          x.id === post.id ? { ...x, texto: limpo, editadoEm: new Date().toISOString() } : x,
++        );
++      setPosts(aplicar);
++      setDoPerfil(aplicar);
++      setSugestoes(aplicar);
++      setOPost((x) => (x ? aplicar([x])[0] : x));
++      return true;
++    } catch {
++      return false;
++    }
++  }
++
+   async function sugerirLegenda(foto: string): Promise<string[]> {
+     const t = await token();
+     if (!t) return [];
+@@ -3269,6 +3389,7 @@ export function RedeNoApp({
+         aoApagar={acoes.apagar}
+         aoDenunciar={acoes.denunciar}
+         aoTirarMarcacao={acoes.tirarMarcacao}
++        aoEditar={acoes.editar}
+         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+         aoAbrirPerfil={abrirPerfil}
+       />
+@@ -3750,6 +3871,7 @@ export function TelaDoPost({
+   aoDenunciar,
+   aoVotar,
+   aoTirarMarcacao,
++  aoEditar,
+   aoVerQuemReagiu,
+   aoVoltar,
+   aoAbrirPerfil,
+@@ -3764,6 +3886,8 @@ export function TelaDoPost({
+   aoVotar?: (post: PostNaTela, opcao: number) => void;
+   /** Tirar a PRÓPRIA marcação — ver `PostInstagram`. */
+   aoTirarMarcacao?: (post: PostNaTela) => void;
++  /** Salvar a legenda editada — ver `PostInstagram`. */
++  aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+   /** Ver quem reagiu. Só no post DELA. */
+   aoVerQuemReagiu?: (post: PostNaTela) => void;
+   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
+@@ -3793,6 +3917,7 @@ export function TelaDoPost({
+         aoDenunciar={aoDenunciar}
+         aoVotar={aoVotar}
+         aoTirarMarcacao={aoTirarMarcacao}
++        aoEditar={aoEditar}
+         aoVerQuemReagiu={aoVerQuemReagiu}
+         aoAbrirPerfil={aoAbrirPerfil}
+       />
+diff --git a/src/lib/rede-social-servidor.test.ts b/src/lib/rede-social-servidor.test.ts
+index 594a0f3..ee3ee38 100644
+--- a/src/lib/rede-social-servidor.test.ts
++++ b/src/lib/rede-social-servidor.test.ts
+@@ -267,6 +267,59 @@ describe("o que é dela", () => {
+   });
+ });
+ 
++describe("editar a legenda", () => {
++  /* ⚠️ O TESTE QUE JUSTIFICA A FUNÇÃO EXISTIR.
++     Sem a régua clínica aqui, editar seria a PORTA DOS FUNDOS de
++     `publicarPost`: bastava publicar "que fofo" e trocar depois por "não
++     precisa ir ao pronto-socorro" para o texto proibido entrar no feed sem
++     passar por nada — mesmo alcance, mesmo nome de consultório em volta. */
++  test("⚠️ a régua clínica roda no texto NOVO, e RECUSA antes de gravar", () => {
++    const c = corpoDe("editarPost");
++    const limpo = c.replace(/\s+/g, " ");
++    expect(limpo).toContain('await import("@/lib/pergunta-clinica")');
++    expect(limpo).toContain('triarTexto(texto ?? "")');
++    /* A recusa acontece ANTES de qualquer `.update(` — é isso que impede o
++       texto de entrar. Comparar posições e não só existência: com o `triarTexto`
++       depois do update, as duas strings continuariam no arquivo. */
++    const ondeTria = limpo.indexOf("triarTexto(");
++    const ondeGrava = limpo.indexOf(".update(");
++    expect(ondeTria).toBeGreaterThan(-1);
++    expect(ondeGrava).toBeGreaterThan(-1);
++    expect(ondeTria).toBeLessThan(ondeGrava);
++    expect(limpo).toContain('desfecho !== "publicavel"');
++    expect(limpo).toContain("recadoDeConteudo(desfecho)");
++  });
++
++  /* ⚠️ O `postId` vem do cliente. Sem o portão, qualquer uuid reescreveria a
++     legenda de qualquer paciente da plataforma. */
++  test("⚠️ só a AUTORA edita — nas duas consultas", () => {
++    const c = corpoDe("editarPost").replace(/\s+/g, " ");
++    /* Uma vez na leitura de conferência, outra no update. */
++    expect((c.match(/\.eq\("autor_id", eu\)/g) ?? []).length).toBeGreaterThanOrEqual(2);
++  });
++
++  /* ⚠️ Apagar a legenda de um post que é só texto deixaria uma linha no feed
++     sem nada dentro. Quem quer tirar do ar usa arquivar, que é reversível. */
++  test("⚠️ um post não pode ficar vazio pela edição", () => {
++    const c = corpoDe("editarPost").replace(/\s+/g, " ");
++    expect(c).toContain("postEhValido({");
++    expect(c).toContain('motivo: "vazio"');
++  });
++
++  /* ⚠️ Foto, enquete, visibilidade, marcações e comparação NÃO mudam: editar a
++     camada de quem vê depois de o post ter sido lido não desfaz a leitura, e
++     trocar a foto faria as reações apontarem para uma imagem que ninguém viu. */
++  test("⚠️ só o TEXTO muda", () => {
++    const c = corpoDe("editarPost");
++    for (const proibido of ["visibilidade:", "imagem_path:", "enquete_opcoes:", "comparacao_de:"]) {
++      /* O `select` de conferência pode citar as colunas; o que não pode é
++         gravá-las. Por isso a busca é pelo trecho do `update`. */
++      const gravacao = c.slice(c.indexOf("const gravar ="));
++      expect(gravacao).not.toContain(proibido);
++    }
++  });
++});
++
+ describe("higiene", () => {
+   test('nenhum `select("*")`', () => {
+     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
+diff --git a/src/lib/rede-social.functions.ts b/src/lib/rede-social.functions.ts
+index d7c20c1..0c4056d 100644
+--- a/src/lib/rede-social.functions.ts
++++ b/src/lib/rede-social.functions.ts
+@@ -111,6 +111,14 @@ export type PostNaTela = {
+    * ver `entao-e-agora.ts`. A primeira foto do carrossel é o "então".
+    */
+   comparacao: { antes: string; agora: string } | null;
++  /**
++   * Quando a legenda foi editada, ou `null`.
++   *
++   * ⚠️ **É o SELO, não o histórico.** A tela precisa dizer "editado" — sem
++   * isso, corrigir o texto vira reescrita silenciosa da história, e quem reagiu
++   * ao que estava escrito antes não tem como saber que mudou.
++   */
++  editadoEm: string | null;
+   /**
+    * A pergunta anônima que este post responde, ou `null`.
+    *
+@@ -377,7 +385,7 @@ async function perfisPorId(sb: any, ids: string[]) {
+  */
+ const COLUNAS_DO_POST =
+   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
+-  "enquete_opcoes, aula, pergunta, comparacao_de";
++  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em";
+ 
+ /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
+ const COLUNAS_DO_POST_ANTIGAS =
+@@ -413,6 +421,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
+     aula: null,
+     pergunta: null,
+     comparacao_de: null,
++    editado_em: null,
+   }));
+ }
+ 
+@@ -818,6 +827,7 @@ async function montarPosts(
+         minhaReacao: minhas.get(p.id) ?? null,
+         souAAutora: p.autor_id === eu,
+         comparacao: comparacoes.get(p.id) ?? null,
++        editadoEm: p.editado_em ?? null,
+         marcadas: marcadas.get(p.id) ?? [],
+         souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
+         salvo: salvos.has(p.id),
+@@ -1724,6 +1734,89 @@ export const amigasParaMarcar = createServerFn({ method: "POST" })
+     }
+   });
+ 
++/**
++ * EDITAR A LEGENDA DE UM POST JÁ PUBLICADO.
++ *
++ * Hoje o único conserto de um erro de digitação era apagar o post e perder as
++ * reações — e é a falta mais básica que restava na aba.
++ *
++ * ⚠️ **A RÉGUA CLÍNICA RODA AQUI, e é a razão de esta função existir por
++ * inteiro em vez de um `update` na tela.** Sem ela, editar seria a PORTA DOS
++ * FUNDOS de `publicarPost`: bastava publicar "que fofo" e depois trocar por
++ * "não precisa ir ao pronto-socorro" para o texto proibido entrar no feed sem
++ * passar por nada. É o mesmo texto, o mesmo alcance e o mesmo nome de
++ * consultório em volta.
++ *
++ * ⚠️ **`.eq("autor_id", eu)` é o portão**, como em `apagarPost`: o `postId` vem
++ * do cliente, e sem ele qualquer uuid reescreveria a legenda de qualquer
++ * paciente da plataforma.
++ *
++ * ⚠️ **Só o TEXTO muda.** Foto, enquete, visibilidade, marcações e comparação
++ * ficam como estavam — editar a camada de quem vê depois de o post ter sido
++ * lido não desfaz a leitura, e trocar a foto faria as reações apontarem para
++ * uma imagem que ninguém viu.
++ *
++ * ⚠️ **Modo Cuidado NÃO impede editar.** Ele impede PUBLICAR; quem entrou em
++ * luto e quer corrigir ou esvaziar o que escreveu antes precisa poder — barrar
++ * aqui a deixaria presa ao texto de quando estava grávida.
++ */
++export const editarPost = createServerFn({ method: "POST" })
++  .inputValidator((i: unknown) =>
++    z
++      .object({
++        accessToken: z.string().min(10),
++        postId: z.string().uuid(),
++        texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
++      })
++      .parse(i),
++  )
++  .handler(async ({ data }) => {
++    const eu = await pacienteDaSessao(data.accessToken);
++    if (!eu) return { ok: false as const, motivo: "sessao" as const };
++
++    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
++    const sb = supabaseAdmin as any;
++
++    const texto = data.texto?.trim() || null;
++
++    /* A régua clínica, a MESMA de `publicarPost` — ver o cabeçalho. */
++    const { triarTexto } = await import("@/lib/pergunta-clinica");
++    const desfecho = triarTexto(texto ?? "");
++    if (desfecho !== "publicavel") {
++      return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
++    }
++
++    /* ⚠️ **UM POST NÃO PODE FICAR VAZIO PELA EDIÇÃO.** `postEhValido` recusa
++       texto vazio sem imagem; apagar a legenda de um post que é só texto
++       deixaria uma linha no feed sem nada dentro. Quem quer tirar o post do ar
++       usa arquivar, que é a porta certa e reversível. */
++    const { data: antes } = await sb
++      .from("rede_posts")
++      .select("imagem_path, enquete_opcoes")
++      .eq("id", data.postId)
++      .eq("autor_id", eu)
++      .maybeSingle();
++    if (!antes) return { ok: false as const, motivo: "nao_e_seu" as const };
++    const temEnquete = (((antes as any).enquete_opcoes ?? []) as string[]).length > 0;
++    if (!temEnquete && !postEhValido({ texto, temImagem: !!(antes as any).imagem_path })) {
++      return { ok: false as const, motivo: "vazio" as const };
++    }
++
++    const gravar = async (campos: Record<string, unknown>) =>
++      await sb.from("rede_posts").update(campos).eq("id", data.postId).eq("autor_id", eu);
++
++    let r = await gravar({ texto, editado_em: new Date().toISOString() });
++    /* ⚠️ Recuo por coluna ausente: `editado_em` nasce num APLICAR_ que o dono
++       roda à mão. Sem ele, editar pararia de funcionar inteiro por causa do
++       SELO — e o selo é o acessório, não a edição. */
++    if (r.error) {
++      console.warn("[rede] sem editado_em — rode APLICAR_REDE_SOCIAL.sql");
++      r = await gravar({ texto });
++    }
++    if (r.error) return { ok: false as const, motivo: "banco" as const };
++    return { ok: true as const };
++  });
++
+ export const apagarPost = createServerFn({ method: "POST" })
+   .inputValidator((i: unknown) =>
+     z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+diff --git a/src/routes/preview-instagram.tsx b/src/routes/preview-instagram.tsx
+index d0b9bd6..12169a7 100644
+--- a/src/routes/preview-instagram.tsx
++++ b/src/routes/preview-instagram.tsx
+@@ -186,6 +186,8 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
+   /* O post 2 (o carrossel de três) vira a comparação: é ele que prova os dois
+      carimbos sobre as duas primeiras fotos. */
+   comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
++  /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
++  editadoEm: i === 0 ? atras(20) : null,
+   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
+      apagado dos outros. Com todos apagados não haveria contraste. */
+   salvo: i === 1,
+@@ -322,6 +324,8 @@ function Bancada() {
+   const semComparar = comparar === 0;
+   /* Qual reação a bancada guarda para cada post. `undefined` = a do fixture. */
+   const [reacoes, setReacoes] = useState<Record<string, TipoDeReacao | null>>({});
++  /** As legendas editadas na bancada. */
++  const [edicoes, setEdicoes] = useState<Record<string, string>>({});
+   /* ⚠️ `useCallback` com lista VAZIA, e não um fecho na prop.
+      A produção passa referências FIXAS (`acoes`, em `RedeNoApp`), porque o
+      cartão é `memo`. Uma bancada que passasse fecho novo a cada pintura mediria
+@@ -338,6 +342,13 @@ function Bancada() {
+       apagar: (_p: PostNaTela) => alert("apagaria"),
+       denunciar: (p: PostNaTela) => alert(`denunciaria o post ${p.id}`),
+       tirarMarcacao: (p: PostNaTela) => alert(`tiraria minha marcação do post ${p.id}`),
++      /* ⚠️ A bancada GRAVA a edição no estado, e não num alert: o que precisa
++         ser olhado é o texto trocando e o selo "editado" nascendo — com um
++         alert, a tela nunca mostraria nem um nem outro. */
++      editar: async (p: PostNaTela, t: string) => {
++        setEdicoes((m) => ({ ...m, [p.id]: t }));
++        return true;
++      },
+       /* ⚠️ A folha abre com DADO fabricado: quem reagiu só existe numa conta com
+          reações de verdade, e é justamente a folha que precisa ser olhada. */
+       verQuemReagiu: () => setVendoQuemReagiu(true),
+@@ -345,7 +356,11 @@ function Bancada() {
+     [],
+   );
+   const comReacoes = (ps: PostNaTela[]) =>
+-    ps.map((p) => {
++    ps.map((p0) => {
++      const p =
++        p0.id in edicoes
++          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date().toISOString() }
++          : p0;
+       if (!(p.id in reacoes)) return p;
+       const nova = reacoes[p.id];
+       const c = { ...p.reacoes };
+@@ -796,6 +811,7 @@ function Bancada() {
+              tinha denúncia e o canal com mais alcance não tinha. */
+           aoDenunciar={acoesDaBancada.denunciar}
+           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
++          aoEditar={acoesDaBancada.editar}
+           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
+           /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
+              bancada, olhá-lo exigiria esperar o domingo certo com uma conta que
+diff --git a/supabase/APLICAR_REDE_SOCIAL.sql b/supabase/APLICAR_REDE_SOCIAL.sql
+index 9f482d3..34cb77f 100644
+--- a/supabase/APLICAR_REDE_SOCIAL.sql
++++ b/supabase/APLICAR_REDE_SOCIAL.sql
+@@ -333,6 +333,19 @@ CREATE POLICY "Service manages rede_stories_vistos" ON public.rede_stories_visto
+ -- levar pra maternidade") diz mais sobre o momento dela que qualquer post que
+ -- ela publique.
+ -- ═════════════════════════════════════════════════════════════════════════════
++-- ─────────────────────────────────────────────────────────────────────────────
++-- EDITAR A LEGENDA DEPOIS DE PUBLICAR (ago/2026)
++--
++-- ⚠️ A coluna é o SELO, não o histórico. Ela existe para a tela poder dizer
++-- "editado" — sem isso, corrigir uma vírgula vira reescrita silenciosa da
++-- história, e quem reagiu ao texto antigo não tem como saber que ele mudou.
++--
++-- ⚠️ E NÃO guardamos a versão anterior. Guardar o texto antigo de um post sobre
++-- gestação criaria um arquivo de coisas que ela decidiu tirar do ar — o
++-- oposto do que editar significa.
++-- ─────────────────────────────────────────────────────────────────────────────
++ALTER TABLE public.rede_posts ADD COLUMN IF NOT EXISTS editado_em timestamptz;
++
+ -- ─────────────────────────────────────────────────────────────────────────────
+ -- "ENTÃO E AGORA" (ago/2026 — ideia 2)
+ --
+.claude/hooks/session-start.sh
+.claude/settings.json
+restos-20260822-020904.patch
+v-tmp.mjs
