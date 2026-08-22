@@ -6919,3 +6919,45 @@ entre esse defeito e a loja.
 
 Quatro mutações em vermelho (tirar a do microfone, tirar a da câmera, deixar uma
 frase genérica, trocar o modo de push).
+
+## ⚠️ DIÁLOGO DO SISTEMA NO APP DA PACIENTE (ago/2026)
+
+Achado na varredura de preparação para o iOS.
+
+`alert()` e `window.confirm()` no app instalado abrem com **"www.obstetrica.com.br
+diz:"** — o nome do domínio, dentro do app. É a cara de "site embrulhado" que a
+**diretriz 4.2** da Apple reprova, e ela aparecia justamente nas telas de apagar
+coisa, que é onde a paciente menos precisa duvidar de onde está. Além disso o
+`confirm` TRAVA a linha principal.
+
+⚠️ **E contrariava uma decisão já tomada pelo dono:** no cancelar consulta ele
+pediu, explicitamente, confirmação em **mensagem separada** com Sim/Não — nunca
+o mesmo botão virando "tem certeza?".
+
+⚠️ **A lição já estava escrita numa tela e não tinha sido aplicada às outras.**
+`minha-conta.tsx` tinha, desde antes, um comentário dizendo _"era um `alert()`
+do sistema; num app instalado isso é um diálogo modal"_ — e **três outros**
+`alert`/`confirm` seguiam vivos no MESMO arquivo. É a mesma forma do `42703` em
+caminho de escrita: consertado num lugar, deixado em cinco.
+
+Trocados os quatro:
+
+| onde                           | era              | virou                        |
+| ------------------------------ | ---------------- | ---------------------------- |
+| apagar conversas com a IA      | `window.confirm` | confirmação na tela, Sim/Não |
+| apagar histórico de contrações | `window.confirm` | idem                         |
+| falha do microfone             | `alert`          | `toast.error`                |
+| "Copiado!"                     | `alert`          | `toast.success`              |
+
+⚠️ **O texto do microfone também mudou**: "verifique as permissões do navegador"
+não ajuda quem está no app instalado, onde o caminho é **Ajustes → Obstétrica →
+Microfone**.
+
+### O recorte da catraca, e por que ele é esse
+
+`sem-dialogo-do-sistema.test.ts` cobre o **app da paciente** e os componentes —
+é ele que vira app de iPhone. O **painel do médico fica de fora**: é usado no
+computador, onde um `confirm` é feio mas não é problema de revisão, e proibir
+ali obrigaria a mexer em oito lugares para resolver zero. As **bancadas** também
+ficam de fora: `alert` numa `/preview-*` é o jeito mais direto de mostrar para
+onde um toque levaria, e elas não vão para a loja.

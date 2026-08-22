@@ -7594,15 +7594,28 @@ function Info({ label, value }: { label: string; value: string }) {
 function ApagarConversas() {
   const [apagando, setApagando] = useState(false);
   const [pronto, setPronto] = useState(false);
+  /**
+   * ⚠️ **A CONFIRMAÇÃO VIVE NA TELA, e não num `window.confirm`.**
+   *
+   * Duas razões, e as duas são concretas:
+   *
+   *  1. **No app instalado, o diálogo do sistema abre com
+   *     "www.obstetrica.com.br diz:"** — o nome do domínio, dentro do app. É a
+   *     cara de navegador embrulhado que a diretriz 4.2 da Apple reprova, numa
+   *     tela que a paciente só visita quando está apagando algo.
+   *  2. **É a decisão que o dono já tomou**, explicitamente, para o cancelar
+   *     consulta: confirmação em MENSAGEM separada, com Sim/Não — nunca o mesmo
+   *     botão virando "tem certeza?".
+   *
+   * O comentário lá em cima nesta mesma tela já dizia isso sobre um `alert()`
+   * ("num app instalado, isso é um diálogo modal"). A lição foi aprendida uma
+   * vez e não foi aplicada aos outros três.
+   */
+  const [confirmando, setConfirmando] = useState(false);
 
   async function apagar() {
     if (apagando) return;
-    if (
-      !window.confirm(
-        "Apagar todas as suas conversas com a IA? Isto não apaga sua conta, seu diário, seus exames nem as respostas do seu médico.",
-      )
-    )
-      return;
+    setConfirmando(false);
     setApagando(true);
     try {
       const { data: s } = await supabase.auth.getSession();
@@ -7633,13 +7646,40 @@ function ApagarConversas() {
         Você pode apagar tudo quando quiser, sem perder nada do resto: a gestação, o diário, os
         exames e as respostas dele continuam.
       </p>
-      <button
-        onClick={apagar}
-        disabled={apagando || pronto}
-        className="mt-4 rounded-full border border-border px-5 py-2 text-sm font-medium disabled:opacity-50"
-      >
-        {pronto ? "Apagadas ✓" : apagando ? "Apagando…" : "Apagar minhas conversas"}
-      </button>
+      {!confirmando ? (
+        <button
+          onClick={() => setConfirmando(true)}
+          disabled={apagando || pronto}
+          className="press mt-4 min-h-11 rounded-full border border-border px-5 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          {pronto ? "Apagadas ✓" : apagando ? "Apagando…" : "Apagar minhas conversas"}
+        </button>
+      ) : (
+        /* ⚠️ A confirmação é uma MENSAGEM separada com Sim/Não — nunca o mesmo
+           botão virando "tem certeza?". É o padrão que o dono pediu
+           explicitamente no cancelar consulta, e o que ela lê aqui é o que o
+           `window.confirm` dizia: o que sai e o que FICA. */
+        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50/60 p-3">
+          <p className="text-[13px] leading-snug text-rose-900">
+            Apagar todas as suas conversas com a IA? Isto <strong>não</strong> apaga sua conta, seu
+            diário, seus exames nem as respostas do seu médico.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={apagar}
+              className="press min-h-11 flex-1 rounded-full bg-rose-600 px-4 text-sm font-semibold text-white"
+            >
+              Sim, apagar
+            </button>
+            <button
+              onClick={() => setConfirmando(false)}
+              className="press min-h-11 flex-1 rounded-full border border-border px-4 text-sm font-medium"
+            >
+              Não
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -9646,10 +9686,15 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
     load();
   }
 
+  /* ⚠️ A confirmação vive na TELA — ver `ApagarConversas`, que carrega a razão
+     inteira: no app instalado o `window.confirm` abre com o nome do domínio, e
+     a decisão do dono é confirmação em mensagem separada. */
+  const [confirmandoLimpar, setConfirmandoLimpar] = useState(false);
+
   async function clearSession() {
+    setConfirmandoLimpar(false);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
-    if (!window.confirm("Apagar todo o histórico de contrações?")) return;
     const { error } = await (supabase as any)
       .from("contraction_logs")
       .delete()
@@ -9777,12 +9822,33 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
               Últimas contrações
             </p>
             <button
-              onClick={clearSession}
-              className="text-xs text-muted-foreground hover:text-destructive"
+              onClick={() => setConfirmandoLimpar(true)}
+              className="press min-h-11 px-1 text-xs text-muted-foreground hover:text-destructive"
             >
               Limpar sessão
             </button>
           </div>
+          {confirmandoLimpar && (
+            <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/60 p-3">
+              <p className="text-[13px] leading-snug text-rose-900">
+                Apagar todo o histórico de contrações? Isto não tem volta.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={clearSession}
+                  className="press min-h-11 flex-1 rounded-full bg-rose-600 px-4 text-sm font-semibold text-white"
+                >
+                  Sim, apagar
+                </button>
+                <button
+                  onClick={() => setConfirmandoLimpar(false)}
+                  className="press min-h-11 flex-1 rounded-full border border-border px-4 text-sm font-medium"
+                >
+                  Não
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mt-3 space-y-2">
             {recentContractions.map((c, idx) => {
               const dur = c.ended_at
@@ -11100,11 +11166,18 @@ function ConsultasTab() {
       setSavedMsg(null);
     } catch (err) {
       stream?.getTracks().forEach((t) => t.stop());
-      alert(
+      /* ⚠️ `toast`, e não `alert`. Num app instalado o diálogo do sistema abre
+         com "www.obstetrica.com.br diz:" — parece navegador, não app, que é
+         exatamente a impressão que a diretriz 4.2 da Apple pune. E ele TRAVA a
+         linha principal até alguém tocar em OK.
+
+         O texto também mudou: "permissões do navegador" não ajuda quem está no
+         app instalado, onde o caminho é Ajustes → Obstétrica → Microfone. */
+      toast.error(
         err instanceof DOMException &&
           (err.name === "NotAllowedError" || err.name === "SecurityError")
-          ? "Não foi possível acessar o microfone. Verifique as permissões do navegador."
-          : "Seu navegador não suporta gravação de áudio. Tente atualizar o navegador.",
+          ? "Não consegui usar o microfone. Libere o acesso nos ajustes do seu celular."
+          : "Este aparelho não grava áudio por aqui. Você pode digitar normalmente.",
       );
     }
   }
@@ -12915,7 +12988,8 @@ function CartaBebêTab({
           <button
             onClick={() => {
               const text = `Carta do bebê — Semana ${week}\n\n${letter}`;
-              navigator.clipboard?.writeText(text).then(() => alert("Copiado!"));
+              /* Idem: mensagem curta é `toast`, nunca diálogo do sistema. */
+              navigator.clipboard?.writeText(text).then(() => toast.success("Copiado 💛"));
             }}
             className="rounded-full border border-border px-6 py-3 text-sm text-muted-foreground hover:bg-secondary"
           >
