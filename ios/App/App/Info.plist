@@ -24,6 +24,46 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+
+	<!-- ═══════════════════════════════════════════════════════════════════
+	     AS QUATRO FRASES QUE FALTAVAM.
+
+	     ⚠️ NO iOS, USAR A CÂMERA, O MICROFONE OU A GALERIA SEM A FRASE
+	     CORRESPONDENTE AQUI **NÃO É PERMISSÃO NEGADA — É O APP FECHANDO.**
+	     O sistema encerra o processo na hora, sem diálogo e sem erro. E o
+	     app usa as três: oito campos de foto (avatar, álbum, publicações,
+	     comparação "então e agora") e o gravador do diário
+	     (`src/lib/gravador.ts`).
+
+	     Antes desta mudança havia UMA declaração — a de localização. A
+	     paciente que tocasse no microfone para ditar o diário, ou na câmera
+	     para pôr foto no perfil, veria o app sumir.
+
+	     ⚠️ E o texto de cada uma é lido pela REVISÃO DA APPLE. Frase
+	     genérica ("este app precisa da câmera") é motivo de rejeição pela
+	     diretriz 5.1.1: ela exige que se diga PARA QUÊ. As de baixo dizem.
+	     ═══════════════════════════════════════════════════════════════════ -->
+	<key>NSCameraUsageDescription</key>
+	<string>Para você tirar foto do seu bebê, da sua barriga ou do seu ultrassom e guardar no álbum da sua gestação.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Para você escolher fotos que já estão no seu celular e pôr no seu álbum, no seu perfil ou nas suas publicações.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Para salvar no seu celular as fotos e lembranças que você criar aqui.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Para você ditar o seu diário em vez de digitar. O áudio vira texto na hora e não é guardado.</string>
+
+	<!-- ⚠️ PUSH EM SEGUNDO PLANO. Sem este modo o iOS não entrega a
+	     notificação com o app fechado — e este é o mesmo canal por onde
+	     chega o aviso de consulta e o retorno do SOS. O plugin
+	     `@capacitor/push-notifications` já está instalado; faltava a chave.
+
+	     ⚠️ Isto NÃO substitui ligar "Push Notifications" nas Capabilities do
+	     Xcode nem o certificado APNs — os três são necessários, e nenhum
+	     avisa quando falta. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

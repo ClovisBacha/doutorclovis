@@ -6873,3 +6873,49 @@ alguém abrir. Régua em `src/lib/estado-das-portas.ts`, busca em uma ida só.
 
 Cinco mutações em vermelho. **Bancada:** `/preview-comunidade?vivo=1` ·
 `?ilegivel=1` (o caso que mais importa) · `?luto=1`.
+
+## ⚠️ QUATRO FRASES FALTAVAM NO `Info.plist` — e a falta delas FECHA O APP (ago/2026)
+
+Achado na preparação para o trabalho de iOS. É o defeito mais caro que restava,
+e nada no repositório o pegava.
+
+**No iOS, usar câmera, microfone ou galeria sem a frase correspondente no
+`Info.plist` NÃO é permissão negada — é o sistema ENCERRAR o processo**, na
+hora, sem diálogo e sem erro.
+
+O `Info.plist` tinha **uma** declaração (localização). E o app usa três recursos:
+
+| recurso          | onde                                                           |
+| ---------------- | -------------------------------------------------------------- |
+| câmera / galeria | 8 campos de foto — avatar, álbum, publicações, "então e agora" |
+| microfone        | `gravador.ts`, o ditado do diário                              |
+| localização      | o SOS (essa estava lá)                                         |
+
+A paciente que tocasse no microfone para ditar o diário, ou na câmera para pôr
+foto no perfil, **veria o app sumir**. `tsc`, lint e 4.000 testes: todos verdes.
+
+Entraram `NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`,
+`NSPhotoLibraryAddUsageDescription` e `NSMicrophoneUsageDescription` — mais
+`UIBackgroundModes: remote-notification`, sem o qual **o iOS não entrega push
+com o app fechado**, e esse é o mesmo canal do aviso de consulta e do retorno do
+SOS.
+
+⚠️ **O TEXTO É LIDO PELA REVISÃO DA APPLE.** Frase genérica ("este app precisa
+da câmera") é rejeição pela diretriz 5.1.1 — ela exige dizer PARA QUÊ. As
+quatro dizem, e há teste recusando abertura genérica.
+
+### A catraca, e o que ela deliberadamente faz
+
+`permissoes-do-ios.test.ts` roda **no Linux, sem Xcode**, e é a única coisa
+entre esse defeito e a loja.
+
+- ⚠️ **O gatilho é o USO REAL, não uma lista à mão.** Se amanhã alguém
+  acrescentar um campo de foto num lugar novo, a exigência continua valendo sem
+  ninguém lembrar de atualizar o teste; se um recurso SAIR do produto, ela cai
+  sozinha.
+- ⚠️ **Ela NÃO substitui o Xcode.** Ligar "Push Notifications" nas Capabilities
+  e o certificado APNs continuam sendo necessários — os três são, e nenhum avisa
+  quando falta. Este teste cobre o único que mora no repositório.
+
+Quatro mutações em vermelho (tirar a do microfone, tirar a da câmera, deixar uma
+frase genérica, trocar o modo de push).
