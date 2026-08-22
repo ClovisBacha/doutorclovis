@@ -126,3 +126,37 @@ describe("as tabelas que o código pede existem no schema", () => {
     expect(rota).not.toContain('.from("');
   });
 });
+
+/**
+ * ⚠️ E AS COLUNAS? — a catraca que eu TENTEI e NÃO dá para construir hoje.
+ *
+ * Eu escrevi, nesta mesma noite, uma consulta a `amizades.de_id` / `.para_id` /
+ * `.estado`. As colunas de verdade se chamam `menor` / `maior` / `aceita`. E a
+ * `companion_invites.revoked_at` que inventei também não existe — é
+ * `expires_at`.
+ *
+ * ⚠️ **Nada teria acusado.** `tsc` não conhece o schema, o lint não olha string,
+ * e o `.eq()` errado volta `42703` em tempo de execução: o contador viraria
+ * `null` e o recurso ficaria **invisível, sem nunca dar erro** — a mesma falha
+ * silenciosa que esta noite passou consertando, cometida por mim.
+ *
+ * ─── POR QUE A CATRACA NÃO EXISTE ───────────────────────────────────────────
+ *
+ * A fonte natural seria `types.ts`, que é GERADO do banco. Medido: ele conhece
+ * **27 tabelas de 112** e **não sabe o que é `doctor_id`** — está muito atrás do
+ * schema. Uma varredura sobre ele acusou **37 falsos positivos**, incluindo
+ * `patient_profiles.doctor_id`, que o app inteiro usa.
+ *
+ * ⚠️ **Catraca com falso positivo é catraca que alguém desliga**, e aí ela deixa
+ * de pegar o defeito de verdade. Preferi não ter a essa.
+ *
+ * ─── O QUE DESTRAVA, quando alguém quiser ───────────────────────────────────
+ *
+ * Regenerar `types.ts` a partir do banco (`supabase gen types typescript`).
+ * Feito isso, a varredura passa a ser possível e vale a pena — o recorte certo
+ * é só `.eq("col", …)` COLADO num `.from("tabela")`, no mesmo encadeamento:
+ * tentar casar qualquer coluna com qualquer tabela dá falso positivo em cascata.
+ *
+ * Enquanto isso, a defesa é humana: **conferir a coluna no `supabase/*.sql`
+ * antes de escrever o filtro.** Foi assim que este erro foi achado.
+ */

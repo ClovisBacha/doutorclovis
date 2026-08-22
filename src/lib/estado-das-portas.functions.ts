@@ -79,14 +79,33 @@ export const estadoDasPortas = createServerFn({ method: "POST" })
             return null;
           }
         })(),
-        /* Quantas amigas — o número que a fita do Caminho já mostra. */
-        contar(() =>
-          sb
-            .from("amizades")
-            .select("id", { count: "exact", head: true })
-            .or(`de_id.eq.${eu},para_id.eq.${eu}`)
-            .eq("estado", "aceita"),
-        ),
+        /* ⚠️ **`idsDasAmigas`, e NUNCA uma consulta minha a `amizades`.**
+           A primeira versão contava `amizades` direto — e estava errada de duas
+           formas. A grave: o grafo de amigas deste app tem DOIS lados (a
+           indicação, via `referred_by`, e a amizade aceita), menos as
+           encerradas. Contar só uma tabela daria um número MENOR do que a
+           lista que ela encontra ao abrir a porta, e um emblema que não bate
+           com a tela é pior que emblema nenhum.
+
+           A besta, achada ao conferir o schema: eu tinha inventado os nomes das
+           colunas (`de_id`/`para_id`/`estado`). Elas se chamam `menor`/`maior`
+           (par ordenado) e `aceita`. A consulta teria falhado com `42703`, o
+           contador viraria `null`, e o recurso ficaria invisível **sem nunca dar
+           erro** — exatamente a falha silenciosa que o resto desta noite passou
+           consertando.
+
+           `idsDasAmigas` já resolve os dois grafos e falha FECHADA. Reusá-la
+           também garante que o número aqui e a lista lá são o mesmo conjunto. */
+        (async () => {
+          try {
+            const { idsDasAmigas } = await import("./amigas.functions");
+            const r = await idsDasAmigas(sb, eu);
+            /* Degradada = não consegui ler direito. `null`, nunca zero. */
+            return r.degradada ? null : r.todas.length;
+          } catch {
+            return null;
+          }
+        })(),
         contar(() =>
           sb
             .from("family_album_posts")
@@ -99,12 +118,16 @@ export const estadoDasPortas = createServerFn({ method: "POST" })
             .select("id", { count: "exact", head: true })
             .eq("user_id", eu),
         ),
+        /* ⚠️ `expires_at`, e não `revoked_at` — esta coluna eu também tinha
+           inventado. Conferido no schema: a tabela tem `token`,
+           `companion_name`, `created_at` e `expires_at`, e mais nada.
+           "Ativo" = sem prazo, ou com prazo no futuro. */
         contar(() =>
           sb
             .from("companion_invites")
             .select("id", { count: "exact", head: true })
             .eq("user_id", eu)
-            .is("revoked_at", null),
+            .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`),
         ),
       ]);
 

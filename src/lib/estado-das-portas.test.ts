@@ -151,3 +151,42 @@ describe("o servidor", () => {
     expect(SRV).not.toContain("feed:");
   });
 });
+
+describe("o contador de amigas usa a régua do app, não uma consulta própria", () => {
+  const SRV = readFileSync("src/lib/estado-das-portas.functions.ts", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    " ",
+  );
+
+  /**
+   * ⚠️ **O GRAFO DE AMIGAS TEM DOIS LADOS.** A indicação (`referred_by`) e a
+   * amizade aceita, menos as encerradas — `idsDasAmigas` resolve os três.
+   * Contar `amizades` direto daria um número MENOR do que a lista que ela
+   * encontra ao abrir a porta, e emblema que não bate com a tela é pior que
+   * emblema nenhum.
+   *
+   * ⚠️ **E a primeira versão inventou os nomes das colunas** (`de_id`,
+   * `para_id`, `estado`). Elas se chamam `menor`, `maior` e `aceita`. A
+   * consulta teria voltado `42703`, o contador viraria `null`, e o recurso
+   * ficaria invisível sem nunca dar erro.
+   */
+  test("⚠️ reusa `idsDasAmigas` e não consulta `amizades` direto", () => {
+    expect(SRV).toContain("idsDasAmigas");
+    expect(SRV).not.toContain('from("amizades")');
+  });
+
+  /** `degradada` (não consegui ler) vira `null`, nunca zero. */
+  test("⚠️ grafo degradado não vira zero", () => {
+    expect(SRV).toContain("degradada ? null");
+  });
+
+  /**
+   * ⚠️ `companion_invites` tem `expires_at`, não `revoked_at` — outra coluna
+   * que eu inventei. Conferido no schema: a tabela tem `token`,
+   * `companion_name`, `created_at` e `expires_at`, e mais nada.
+   */
+  test("⚠️ o convite do acompanhante filtra pela coluna que existe", () => {
+    expect(SRV).toContain("expires_at");
+    expect(SRV).not.toContain("revoked_at");
+  });
+});

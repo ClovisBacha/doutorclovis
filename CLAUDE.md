@@ -7009,3 +7009,46 @@ rodou aqui em 0,39 s e encontrou os seis plugins.
   decisão do dono.
 - **Painel do médico**: os `confirm` dele ficaram. É desktop, não vai para a
   loja, e proibi-los obrigaria a mexer em oito lugares para resolver zero.
+
+### ⚠️ E EU INVENTEI TRÊS NOMES DE COLUNA no contador da Comunidade
+
+Conferindo o meu próprio trabalho contra o schema, achei o defeito que esta
+noite inteira passou consertando — cometido por mim, no código novo:
+
+| escrevi                        | existe                           |
+| ------------------------------ | -------------------------------- |
+| `amizades.de_id` / `.para_id`  | `menor` / `maior` (par ordenado) |
+| `amizades.estado`              | `aceita` (boolean)               |
+| `companion_invites.revoked_at` | `expires_at`                     |
+
+⚠️ **Nada teria acusado.** `tsc` não conhece o schema, o lint não olha string, e
+o `.eq()` errado volta `42703` em tempo de execução: o contador viraria `null`,
+e `null` — pela régua que eu mesmo acabara de escrever — **não desenha nada**. O
+recurso ficaria invisível **sem nunca dar erro**.
+
+⚠️ **E o conserto certo não era trocar os nomes: era não fazer a consulta.**
+`idsDasAmigas` já existe e resolve os DOIS lados do grafo (indicação +
+amizade aceita − encerradas), falhando fechada. Minha consulta a uma tabela só
+daria um número MENOR do que a lista que ela encontra ao abrir a porta — e
+emblema que não bate com a tela é pior que emblema nenhum.
+
+### ⚠️ A catraca de colunas NÃO É CONSTRUÍVEL HOJE, e isso é um achado
+
+Tentei automatizar a conferência. A fonte natural é `types.ts`, que é gerado do
+banco. **Medido: ele conhece 27 tabelas de 112 e não sabe o que é
+`doctor_id`.** Uma varredura sobre ele acusou **37 falsos positivos**, entre
+eles `patient_profiles.doctor_id`, que o app inteiro usa.
+
+⚠️ **Catraca com falso positivo é catraca que alguém desliga** — e aí ela deixa
+de pegar o defeito de verdade. Preferi não ter a essa, e deixei escrito em
+`tabelas-que-existem.test.ts` o que destrava: **regenerar o `types.ts`**
+(`supabase gen types typescript`). Feito isso, a varredura vale a pena, e o
+recorte certo é só `.eq("col", …)` colado num `.from("tabela")` — casar qualquer
+coluna com qualquer tabela dá falso positivo em cascata.
+
+Enquanto isso a defesa é humana: **conferir a coluna no `supabase/*.sql` antes
+de escrever o filtro.** Foi assim que este erro foi achado.
+
+⚠️ **Isto entra na lista de coisas para o dono:** o `types.ts` desatualizado não
+é só um teste que não dá para escrever — é o autocompletar e a checagem de tipo
+do Supabase valendo para um quarto do banco.
