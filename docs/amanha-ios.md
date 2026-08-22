@@ -139,6 +139,39 @@ para se ter no repositório com cara de pronto.
 
 ---
 
+## Um comando de 30 segundos que vale muito: regenerar os tipos
+
+⚠️ **`src/integrations/supabase/types.ts` conhece 27 tabelas de 112, e não sabe
+o que é `doctor_id`.** Medido esta noite.
+
+Consequência prática: o autocompletar e a checagem de tipo do Supabase valem
+para **menos de um quarto do banco** — e é por isso que existem **559 casts
+`as any`** nos arquivos de servidor. Cada um deles é um lugar onde o TypeScript
+parou de ajudar.
+
+E foi essa lacuna que deixou passar, esta noite, três nomes de coluna que eu
+inventei no contador da Comunidade (`amizades.de_id` não existe; é `menor`).
+Achei conferindo o SQL à mão. Com os tipos em dia, o `tsc` teria acusado.
+
+```bash
+# na raiz do projeto, no seu Mac (você tem as credenciais)
+npx supabase login                       # se for a primeira vez
+npx supabase gen types typescript \
+  --project-id <o-ref-do-projeto> \
+  > src/integrations/supabase/types.ts
+
+bun run verificar                        # tem de continuar verde
+```
+
+⚠️ **Olhe o diff antes de commitar.** Se ele vier vazio ou pequeno demais, a
+geração falhou em silêncio — o arquivo é a fonte de tipo do app inteiro, e um
+truncado é pior que um desatualizado.
+
+**Eu não fiz isso daqui de propósito:** exige conectar na sua base de produção,
+e um `types.ts` gerado torto quebraria os tipos de tudo. É seu, e é um comando.
+
+---
+
 ## O risco que precisa de decisão sua: a diretriz 4.2
 
 O app carrega o site publicado. A Apple reprova app que é "só um site
