@@ -6820,3 +6820,56 @@ não entrego.
   árvore.** Passei três tentativas achando que a trava estava quebrada: cada
   `git reset --hard` do meu próprio teste apagava a trava junto, e o script que
   rodava era o antigo. Commite primeiro, teste depois.
+
+## A aba Comunidade era um MENU, não um hub (ago/2026)
+
+Pedido do dono: ela _"não tem o acabamento que a aba do Instagram tem"_.
+
+Fotografadas lado a lado, a diferença **não é de estilo — é de INFORMAÇÃO**:
+
+| aba do Instagram                               | Comunidade             |
+| ---------------------------------------------- | ---------------------- |
+| stories de quem ela conhece, com anel e nome   | seis cartões idênticos |
+| a próxima live, com horário e botão            | que nunca mudam        |
+| "você entrou na 29ª semana, publicou 3 vezes…" | —                      |
+
+Agora cada porta diz **se aconteceu algo atrás dela** ("3 presentes
+reservados", "12 fotos no álbum", "7 sugestões de nome"), que é o que faz
+alguém abrir. Régua em `src/lib/estado-das-portas.ts`, busca em uma ida só.
+
+- ⚠️ **"NÃO CONSEGUI LER" NÃO É "ZERO".** Contagem ilegível vira `null`, e
+  `null` **não desenha nada** — a porta volta a ser só a porta. Zero AFIRMARIA
+  que não há nada, e ela deixaria de abrir onde havia. Mesma régua da fila de
+  denúncias, da disponibilidade da agenda e do saldo do chá de bebê. Fotografado
+  em `?ilegivel=1`: Chá e Álbum voltam ao subtítulo, só Amigas traz número.
+- ⚠️ **A frase SUBSTITUI o subtítulo, não se soma a ele.** Duas linhas de texto
+  miúdo num cartão de 170px viram bloco cinza — e o FATO vale mais que a
+  descrição, que ela já leu nas visitas anteriores.
+- ⚠️ **A ordem NÃO é por contagem.** Quem tem novidade sobe; entre si, mantêm a
+  ordem original. Ordenar por tamanho transforma o hub num PLACAR — a
+  comparação que a aba das Amigas gastou um arquivo inteiro para não ter. E é
+  estável: sem isso o cartão pula de lugar enquanto ela olha.
+- ⚠️ **Nenhuma frase cobra.** Há teste com lista de palavras proibidas
+  ("falta", "você não", "não perca"). Num app de gestação de alto risco, um hub
+  que cobra é um hub que ela fecha.
+- **O FEED fica de fora de propósito**: contá-lo exigiria guardar a última
+  visita e varrer o feed inteiro, para um número que o próprio feed já mostra —
+  e seria a única porta a empurrar consumo em vez de relatar um fato.
+- **A aba não espera o servidor para desenhar**: os cartões aparecem na hora e o
+  estado chega depois. Um esqueleto trocaria uma tela pobre por uma vazia.
+
+### ⚠️ E DOIS ERROS MEUS, os dois pegos por olhar
+
+1. **O teto `9+` era mentira.** A bancada mostrou o cartão do Álbum com o
+   emblema **9+** ao lado da frase **"12 fotos no álbum"** — dois números para a
+   mesma coisa, se contradizendo a um centímetro. Virou `99+`, o mesmo teto do
+   contador de amigas, que cobre o caso real sem nunca contradizer a frase.
+2. ⚠️ **EU SOBRESCREVI UM ARQUIVO QUE JÁ EXISTIA.** Criei a régua como
+   `resumo-da-comunidade.ts` — que **já era** o push semanal ("três pessoas que
+   você acompanha publicaram"). O `tsc` acusou, e o `git checkout` restaurou;
+   mas o `Write` num caminho sem conferir antes é como se apaga trabalho sem
+   perceber. A régua nova chama-se `estado-das-portas.ts`, e os dois arquivos
+   dizem no cabeçalho que não devem ser confundidos.
+
+Cinco mutações em vermelho. **Bancada:** `/preview-comunidade?vivo=1` ·
+`?ilegivel=1` (o caso que mais importa) · `?luto=1`.
