@@ -75,14 +75,33 @@ describe("as cinco cores, e o Modo Cuidado", () => {
     }
   });
 
-  test("⚠️ o Modo Cuidado nunca recebe a cor mais escura", () => {
-    /* A régua do luto mora aqui para a música, como mora em `humorDaJornada`
-       para a personagem. A diferença entre "recolhido" e "escuro" é a
-       diferença entre acolher e afirmar a perda. */
+  test("⚠️ o portão de luto MUDA a peça — não passa vaziamente", () => {
+    /* A primeira versão deste teste passava sobre nada: nenhuma janela pousava
+       na cor escura, então o portão nunca disparava, e o teste ficava verde
+       igual com `luto: false` e igual com a linha do portão APAGADA. Medido:
+       `JSON.stringify(arcoDaMusica(38, false))` era idêntico ao de `true`.
+
+       A prova de que o portão existe é a diferença. */
+    const normal = JSON.stringify(arcoDaMusica(38, false));
+    const luto = JSON.stringify(arcoDaMusica(38, true));
+    expect(luto).not.toBe(normal);
+  });
+
+  test("⚠️ e no luto a peça NÃO VIAJA — fica no recolhido do começo", () => {
+    /* O arco continua existindo (densidade, cauda, vozes entrando e saindo);
+       o que não acontece é a viagem harmônica. Quem está de luto não é levada
+       a lugar nenhum. */
     for (const t of arcoDaMusica(38, true)) {
-      expect({ momento: t.momento, ok: t.cor.noLuto }).toEqual({ momento: t.momento, ok: true });
-      expect(t.cor.drone).not.toBe("mi");
+      expect({ momento: t.momento, drone: t.cor.drone }).toEqual({
+        momento: t.momento,
+        drone: "la",
+      });
     }
+  });
+
+  test("a cor mais escura EXISTE fora do luto — senão não haveria o que barrar", () => {
+    const cores = arcoDaMusica(38, false).map((t) => t.cor.drone);
+    expect(cores).toContain("mi");
   });
 
   test("a volta devolve o drone ao lá do começo — é o que FECHA a sessão", () => {

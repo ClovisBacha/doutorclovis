@@ -306,9 +306,18 @@ describe("⚠️ o sheet de sons dentro da sessão", () => {
     );
   });
 
-  test("lista os sons de SOUNDSCAPES, e o silêncio vira 'Desligar' no final", () => {
+  test("lista os sons OFERTADOS, e o silêncio vira 'Desligar' no final", () => {
+    /* ⚠️ `SOUNDSCAPES` cru virou `sonsOfertados(careMode)`: "Ritmo de ninar" e
+       "Ventre" são os únicos do catálogo cujo nome afirma sobre uma gestação em
+       curso, e numa folha aberta por quem acabou de perder a gestação seriam a
+       única coisa da tela falando do bebê, no presente. O recorte mora em
+       `ofertaveis`, num lugar só.
+
+       O teste cobra a CHAMADA, e não a lista crua — travar `SOUNDSCAPES` aqui
+       seria travar a ausência do portão. */
     const sheet = trecho("── O SHEET DE SONS", "── 3. Fechamento");
-    expect(sheet).toContain('SOUNDSCAPES.filter((s) => s.key !== "silencio")');
+    expect(sheet).toContain("sonsOfertados(careMode)");
+    expect(sheet).toContain('.filter((s) => s.key !== "silencio")');
     expect(sheet).toContain('trocarSom("silencio")');
     expect(sheet).toContain("Desligar som");
   });

@@ -13,6 +13,7 @@
  */
 
 import inspire from "@/assets/audio/inspire.mp3";
+import { emConteudo } from "./sessao-de-audio";
 import segure from "@/assets/audio/segure.mp3";
 import solte from "@/assets/audio/solte.mp3";
 import mov0 from "@/assets/audio/mov-ombros.mp3";
@@ -125,6 +126,19 @@ export function preparar(src: string): void {
   }
 }
 
+/**
+ * ⚠️ A VOZ SOBE A SESSÃO DE ÁUDIO — e ela era a que faltava.
+ *
+ * `sessao-de-audio.ts` enumera quatro telas que tocam `<audio>` e diz que todas
+ * devolvem a sessão ao repouso no desmonte. Três devolviam; a VOZ da meditação,
+ * a primeira da lista, não chamava nenhuma das duas — e é ela que toca em toda
+ * sessão guiada.
+ *
+ * Ela SOBE aqui (a fala precisa ser ouvida mesmo com o botão de silêncio, como
+ * qualquer conteúdo que a paciente pediu) e QUEM DEVOLVE é o desmonte do bloco
+ * de meditação, pelo mesmo retorno de efeito das outras três. Devolver aqui, no
+ * `parar()`, seria errado: `parar` roda entre uma frase e a próxima.
+ */
 export function tocar(
   src: string,
   opts?: { canal?: Canal; volume?: number; aoTerminar?: () => void },
@@ -137,6 +151,7 @@ export function tocar(
        elemento pode ter sido usado antes — sem isso a segunda vez que uma
        rechamada tocasse começaria do fim dela. */
     const pronta = prontas.get(src);
+    emConteudo();
     const a = pronta ?? new Audio(src);
     if (pronta) {
       try {

@@ -118,6 +118,25 @@ export type Contexto = {
   desdeOGesto: number;
   /** Quantas vezes esta espécie já tocou hoje. */
   jaTocouHoje: number;
+  /**
+   * ⚠️ ESTÁ DENTRO DE UMA SESSÃO QUE ELA COMEÇOU?
+   *
+   * Sem isto, `compasso` e `fim` NUNCA TOCAVAM. A deixa da respiração sai de um
+   * `setTimeout` catorze a dezesseis segundos depois do último toque, e o fim
+   * da sessão sai minutos depois — os dois batiam no portão de gesto e eram
+   * barrados, sempre. Os dois sons mais defensáveis do arquivo eram os únicos
+   * inalcançáveis, e nenhum teste pegava porque `podeSoar` estava certa: era o
+   * CONTEXTO que estava errado.
+   *
+   * O portão de gesto existe para impedir som vindo de push, de cron ou de
+   * temporizador que ela não pediu. Dentro de uma sessão de meditação que ela
+   * abriu e está ouvindo de olhos fechados, o som É esperado — e exigir um
+   * toque recente seria exigir que ela abrisse os olhos para poder ouvir a
+   * deixa que existe para ela não precisar abrir.
+   */
+  emSessao?: boolean;
+  /** A hora local, 0 a 23. Sem ela, o portão da noite não se aplica. */
+  hora?: number;
 };
 
 /**
@@ -125,6 +144,24 @@ export type Contexto = {
  * nada — e o app tem push, cron e temporizadores que podem disparar sozinhos.
  */
 const JANELA_DO_GESTO_MS = 2000;
+
+/**
+ * ⚠️ O SILÊNCIO NOTURNO — e ele não é o mesmo que "ela desligou".
+ *
+ * O argumento central deste arquivo é o quarto de hospital às três da manhã. A
+ * primeira versão tinha uma proteção só contra isso: "ela não ligou o som". Mas
+ * quem liga de DIA, num momento em que o som faz sentido, leva o som de
+ * MADRUGADA junto — e é justamente ali que o estrago acontece.
+ *
+ * Das 22h às 7h, só o alarme passa. Não é uma preferência a mais: é a hora do
+ * dia, que o app já sabe e ela não precisa gerenciar.
+ */
+const NOITE_COMECA = 22;
+const NOITE_ACABA = 7;
+
+export function ehNoite(hora: number): boolean {
+  return hora >= NOITE_COMECA || hora < NOITE_ACABA;
+}
 
 /**
  * A régua. Pura, e é ela que os testes cobram — nunca o sintetizador.
@@ -135,9 +172,13 @@ export function podeSoar(especie: EspecieDeSom, ctx: Contexto): boolean {
 
   if (ctx.nivel === "desligado") return false;
   if (ctx.careMode) return false;
+  /* Das 22h às 7h, só o alarme. Ver `ehNoite`. */
+  if (ctx.hora !== undefined && ehNoite(ctx.hora)) return false;
   /* Aba em segundo plano: ela não está aqui, e o som iria para o quarto. */
   if (!ctx.visivel) return false;
-  if (ctx.desdeOGesto > JANELA_DO_GESTO_MS) return false;
+  /* Dentro de uma sessão que ela abriu, o relógio do gesto não se aplica —
+     ver `emSessao`. */
+  if (!ctx.emSessao && ctx.desdeOGesto > JANELA_DO_GESTO_MS) return false;
   if (ctx.nivel === "essencial" && !ESSENCIAIS.includes(especie)) return false;
   const teto = TETO_POR_DIA[especie];
   if (teto !== undefined && ctx.jaTocouHoje >= teto) return false;
@@ -281,19 +322,71 @@ export const DESENHOS: Record<EspecieDeSom, Desenho> = {
 /* ═══════════════════════ O sintetizador ════════════════════════════════════ */
 
 let ctxCache: AudioContext | null = null;
+let dormir: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * ⚠️ O CONTEXTO DE INTERFACE FECHA SOZINHO — e antes ele vivia para sempre.
+ *
+ * Ele nascia na primeira notinha e ficava aberto pela vida da aba. Um
+ * `AudioContext` vivo mantém a sessão de áudio do sistema ATIVA, que é
+ * exatamente o que `sessao-de-audio.ts` existe para não deixar acontecer — o
+ * arquivo inteiro fala em devolver a sessão ao repouso, e este contexto a
+ * segurava por baixo. E nenhum `stop()` o alcançava: ele não pertence a tela
+ * nenhuma.
+ *
+ * Oito segundos de folga cobrem qualquer sequência de sons de interface (o mais
+ * longo tem 0,9 s) e são curtos o bastante para o aparelho voltar ao repouso
+ * logo depois. Reabrir custa poucos milissegundos.
+ */
+const OCIOSO_MS = 8000;
+
+function adiarFechamento() {
+  if (dormir) clearTimeout(dormir);
+  dormir = setTimeout(() => {
+    dormir = null;
+    const meu = ctxCache;
+    ctxCache = null;
+    try {
+      void meu?.close();
+    } catch {
+      /* ignore */
+    }
+  }, OCIOSO_MS);
+}
 
 function contexto(): AudioContext | null {
   if (typeof window === "undefined") return null;
-  if (ctxCache && ctxCache.state !== "closed") return ctxCache;
+  if (ctxCache && ctxCache.state !== "closed") {
+    adiarFechamento();
+    return ctxCache;
+  }
   try {
     const AC =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AC) return null;
     ctxCache = new AC();
+    adiarFechamento();
     return ctxCache;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Cria e acorda o contexto AGORA, sem tocar nada.
+ *
+ * ⚠️ Serve para ser chamada no prefixo síncrono de um toque que só vai produzir
+ * som depois de esperas — o SOS é o caso. Depois de um `await` o gesto já
+ * passou, e o iOS recusa o contexto em silêncio.
+ */
+export function destravar(): void {
+  const ctx = contexto();
+  if (!ctx) return;
+  try {
+    void ctx.resume().catch(() => {});
+  } catch {
+    /* ignore */
   }
 }
 

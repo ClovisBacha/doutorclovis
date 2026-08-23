@@ -586,10 +586,31 @@ basal. O desenho da sessão importa mais que a afinação dela.
 0,72 a 40 Hz, 0,07 a 432. Pior no GRAVE, que é onde estes sons vivem; a prosa
 antiga afirmava "0,11 cents", certo para 257 Hz e falso como afirmação geral.
 
-### Os vinte sons
+### Os trinta e dois sons
 
-`som-primitivas.ts` (as peças) · `som-receitas.ts` (as vinte) ·
+`som-primitivas.ts` (as peças) · `som-receitas.ts` (as trinta e duas) ·
 `som-continuo.ts` (WAV, render, tocador). A divisão é por PERGUNTA.
+
+**Águas (8)** chuva · chuva forte · chuva no telhado · chuva no carro ·
+tempestade · riacho · cachoeira · mar · lago
+**Ar e fogo (4)** vento nas folhas · vento na janela · lareira · fogueira
+**Vida (4)** floresta à noite · passarinhos · sapos · cigarras
+**Corpo (2)** coração do bebê · ventre
+**Tons (5)** pad · drone grave · tigela tibetana · sino de vento · piano esparso
+**O quieto (8)** cabine de avião · ventilador · ar-condicionado · secador ·
+máquina de lavar · ruído branco · rosa · marrom
+
+⚠️ **Secador, máquina de lavar e ar-condicionado não são enfeite**: são o
+repertório clássico de acalmar recém-nascido. Num app de gestação, quem procura
+"som de secador" está procurando exatamente isso — e hoje procurava fora do app.
+
+⚠️ **O trovão da tempestade é LONGE de propósito**, e é decisão de produto: um
+estouro perto acorda quem estava adormecendo e assusta quem está ansiosa, que
+são as duas pessoas para quem esta tela existe. Ataque de 900 ms, corte descendo
+de 260 para 70 Hz ao longo de sete segundos — trovão longe não tem estouro.
+
+#### O que separa um som bom de um chiado
+
 
 ⚠️ **O que separa um som bom de um chiado** não é o filtro: é o EVENTO. Chuva é
 densidade de impactos; riacho é a BOLHA (frequência de Minnaert, com o deslize
@@ -658,6 +679,25 @@ do estado zerado, e só. Hoje a emenda fecha por **costura**: renderiza-se 20 ms
 a mais e mistura-se a sobra na cabeça do trecho. (Isso NÃO é o "fade dentro do
 trecho" que o `renderizar` proíbe: ali é rampa de volume que vira pulso a cada
 volta; aqui a amplitude não muda.)
+
+#### ⚠️ CINCO SONS TINHAM MODULAÇÃO MORTA, e o `tsc` não pegava
+
+`bandaLenta` devolvia um `GainNode` cujo PARÂMETRO de ganho era modulado pelas
+senoides — e a saída de ÁUDIO dele era silêncio, porque nada era ligado à
+entrada. Os cinco usos faziam `bandaLenta(...).connect(algo.gain)`, ou seja
+**ligavam SILÊNCIO a um parâmetro**. Nenhum modulava coisa nenhuma.
+
+A fogueira nunca tremeluziu, o drone nunca evoluiu, o avião e o
+ar-condicionado nunca respiraram, e as cigarras — cujo envelope inteiro dependia
+disso — saíram com **pico 0,02** e pediram ganho de **37×** para chegar ao nível
+das outras. Foi esse número absurdo, no relatório de `--niveis`, que denunciou o
+resto.
+
+⚠️ **`GainNode.connect(AudioParam)` é assinatura VÁLIDA**, então o código estava
+certo em tipo e vazio em efeito — a classe de defeito que só a medição pega.
+`moduladorLento` é o que sempre foi preciso: um nó cuja SAÍDA é a soma das
+senoides. Ligado a um parâmetro ele SOMA ao valor dele, então o centro vai em
+`param.value` e a amplitude no modulador.
 
 ### A música — o app não tinha nenhuma
 
@@ -755,9 +795,95 @@ coisa que o app tem. Nada é retirado — o que muda é a afinação (era dó-mi
 de A=440) e os três portões que ele nunca teve: aba escondida, ausência de gesto
 recente, e teto de três por dia.
 
+#### ⚠️ A REVISÃO ADVERSARIAL ACHOU DEZESSEIS COISAS, e sete sobreviveram
+
+Três agentes leram o trabalho da noite com lentes diferentes (risco clínico ·
+técnica de Web Audio · testes que mentem) e um verificador cético tentou
+refutar cada achado. Dez foram refutados; os que sobreviveram estavam todos
+CERTOS, e vários matavam funções inteiras:
+
+- ⚠️ **`comVolta` ESTOURAVA AO VIVO em dez dos trinta e dois sons.** Ele agenda
+  a cópia de emenda em `t − 30`, que ao vivo (janela de 20 s, `t0` = o
+  `currentTime` de um contexto recém-criado) é tempo NEGATIVO —
+  `RangeError`, não um evento ignorado. A exceção subia ANTES de o agendador ser
+  armado e caía num `catch` que engole: a paciente escolhia "Chuva", ouvia vinte
+  segundos com gotas, e **o resto da sessão só a cama de ruído**. Sem erro na
+  tela, sem log, com o chip do som aceso. Medido: seis dos dez estouravam em 6
+  de 6 aberturas. Hoje `montar` recebe `paraLaco`, e há
+  `node scripts/ouvir.mjs --aovivo` para isto nunca mais passar.
+- ⚠️ **O WHOOSH DO VENTRE CONGELAVA aos vinte segundos.** O nó nascia dentro do
+  `if (base)`, que só é verdadeiro na primeira janela — 48 rampas na primeira,
+  ZERO na segunda. Numa sessão de dez minutos eram vinte segundos de útero e
+  quase dez minutos de ruído marrom com um thump por cima, no som cujo
+  comentário diz "estático, é ruído marrom; travado na batida, é útero".
+- ⚠️ **O FECHO DA MÚSICA ERA SEMPRE AGENDADO NO PASSADO.** `agendar` só o
+  chamava depois da última janela, e `setTargetAtTime` com tempo passado vale
+  `alvo · e^(−Δ/3,2)` NA HORA: um degrau instantâneo de −16 dB (−27 nas sessões
+  curtas). Exatamente o "fade de player" que o comentário dizia existir para
+  evitar. ⚠️ E `--musica` não podia ver: a bancada mede `montarPeca`, que é o
+  único caminho que estava correto.
+- ⚠️ **CINCO SONS TINHAM MODULAÇÃO MORTA** — ver a seção acima.
+- ⚠️ **UM PÁSSARO CANTAVA nos primeiros dois segundos de TODA janela de 20 s**,
+  para sempre: a frase reancorava em `t0`. É o defeito de 139 ms do coração,
+  sobrevivendo noutro lugar.
+- ⚠️ **Grilos e sapos disparavam DUAS VEZES** no meio-segundo de sobreposição
+  entre janelas, em fase — +6 dB no mesmo chirp.
+- ⚠️ **O CORO DOS SAPOS voltava a cada 10 s**: os cinco contadores eram
+  múltiplos de três. Com máximo divisor comum 1 caiu para 0,627 — e ainda
+  reprovava, porque três eram PARES e voltavam na metade do laço. Com todos
+  ímpares: **0,139**.
+- ⚠️ **A RAJADA DO VENTO tem pico 2,27, não 1** (é soma de senoides). Os ganhos
+  estavam dimensionados pelo RMS: o corte do passa-faixa ia a −418 Hz, o Web
+  Audio clampava em zero, e **o vento SUMIA na rajada mais forte**. A folhagem
+  tinha só um dos dois estágios modulados, então aparecia igualmente quando o
+  vento MORRIA.
+- ⚠️ **O SOS NÃO TINHA TETO DE TEMPO.** Num wi-fi de hospital com portal
+  cativo, a promessa não resolve, o `catch` nunca roda, e `panic` fica em
+  "sending" PARA SEMPRE — com o botão desabilitado exibindo "Localizando e
+  avisando…". Ela não conseguia nem tentar de novo. O repositório já tinha
+  aplicado esta correção ao vizinho MENOS importante (o endereço tem teto de
+  2 s, "um enfeite não pode segurar a emergência"); a chamada que É a
+  emergência ficou sem.
+- ⚠️ **E O ÁUDIO DO ALARME NASCIA FORA DO GESTO.** O contexto é criado na
+  primeira nota, e no SOS ela só acontece depois do GPS, do endereço e do
+  servidor — depois do `await` o gesto já passou e o iOS recusa em silêncio. O
+  único som que ignora preferência e Modo Cuidado seria justamente o mudo.
+  `destravarSomDeUI()` no prefixo síncrono do toque, como `destravar()` dos
+  Sons para dormir já fazia.
+- ⚠️ **"Coração do bebê — o batimento dele, do doppler" AFIRMAVA PROCEDÊNCIA.**
+  O som é um oscilador a 140 bpm. Redução de movimento fetal é um dos nove
+  sintomas VERMELHOS: a paciente podia abrir os Sons para dormir, ouvir um
+  batimento regular e se tranquilizar com uma senoide. Virou "Ritmo de ninar —
+  batida regular, 140 por minuto". A catraca de `afinacao.test.ts` não alcança
+  essa linha (não há contexto de altura nela), então a proteção é o texto.
+- ⚠️ **A CATRACA DA BOCA ERA DERROTADA PELO PRETTIER.** Ela casava LINHA A
+  LINHA, e o prettier quebra JSX em cem colunas — que é como uma frase de
+  interface é escrita. O gatilho ficava numa linha e a alegação na seguinte, e
+  as quatro varreduras passavam. Hoje o arquivo é achatado e a pergunta é de
+  PROXIMIDADE; há teste que injeta exatamente a frase que a atravessou.
+- **O convite prometia um tom que cala das 22h às 7h** sem dizer isso, e a
+  amostra tocava mesmo de madrugada — o app oferece lembrete de meditação às
+  21h, então a sessão que começa 22h05 é o caso comum.
+- **O contexto de som de interface nunca fechava**, mantendo a sessão de áudio
+  do iOS ativa pela vida da aba — contra tudo que `sessao-de-audio.ts` existe
+  para fazer. Fecha sozinho depois de 8 s ocioso.
+- **As chaves de contagem do `localStorage` não eram apagadas** (~2.200 por
+  ano). Neste app, estourar a cota derruba a PRÓXIMA gravação de qualquer
+  coisa, inclusive o `journey_state`.
+- **`setVolume` era a única automação sem âncora.** `cancelScheduledValues` não
+  segura o valor corrente; durante o fade de entrada não há evento anterior, só
+  o `value` intrínseco 0,0001 — mexer no volume no começo fazia o som CAIR A
+  ZERO e voltar.
+
+⚠️ **E UMA LIÇÃO DE MÉTODO, cara:** um dos agentes de revisão EDITOU a árvore de
+trabalho enquanto eu escrevia nela — um `cp` de restauração apagou duas funções
+recém-escritas, e ele as reconstruiu a partir do contrato dos chamadores.
+Revisão adversarial em repositório vivo pede `isolation: "worktree"`.
+
 **Bancadas:** `/preview-som` (os vinte, a música e os sons de interface, todos
 num toque) · `/preview-sons` (a tela dos Sons para dormir).
-**Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10`.
+**Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10` ·
+`--aovivo` (o caminho da meditação, que NÃO é o do render).
 
 ## Resquícios do Lovable (opcional remover)
 

@@ -76,7 +76,18 @@ export const CORES: Record<Momento, Cor> = {
   acolhimento: { drone: "la", oitava: 3, sensacao: "recolhido, íntimo", noLuto: true },
   ancoragem: { drone: "re", oitava: 3, sensacao: "neutro, flutuante", noLuto: true },
   corpo: { drone: "re", oitava: 3, sensacao: "neutro, flutuante", noLuto: true },
-  silencio: { drone: "la", oitava: 2, sensacao: "recolhido, grave", noLuto: true },
+  /**
+   * ⚠️ A JANELA DO SILÊNCIO É A ÚNICA QUE POUSA EM MI — e é ela que dá corpo ao
+   * portão de luto.
+   *
+   * Sobre mi o conjunto vira Em7add11, a cor mais escura das cinco. É a mais
+   * funda, e a janela do silêncio é o momento mais interior da sessão: cabe.
+   *
+   * ⚠️ Mas ela é EXATAMENTE a que não pode aparecer para quem acabou de perder
+   * a gestação — a diferença entre "recolhido" e "escuro" é a diferença entre
+   * acolher e afirmar a perda.
+   */
+  silencio: { drone: "mi", oitava: 2, sensacao: "o mais escuro, funda", noLuto: false },
   volta: { drone: "la", oitava: 3, sensacao: "recolhido, íntimo", noLuto: true },
   /* ⚠️ `fechamento` existe no tipo `Momento` e NÃO existe em `JANELAS` — as
      falas de fechamento entram dentro da janela `volta`. Ele está aqui só para
@@ -213,8 +224,23 @@ export function arcoDaMusica(totalCiclos: number, luto = false): Trecho[] {
       vozes: VOZES_POR_MOMENTO[j.momento],
       rt60: RT60_POR_MOMENTO[j.momento],
       ataque: ATAQUE_POR_MOMENTO[j.momento],
-      /* No Modo Cuidado a cor nunca desce para a mais escura — ver `CORES`. */
-      cor: luto && !cor.noLuto ? CORES.acolhimento : cor,
+      /**
+       * ⚠️ NO MODO CUIDADO A PEÇA NÃO VIAJA — ela fica no recolhido do começo.
+       *
+       * A primeira versão trocava só a cor mais escura, e isso era CÓDIGO
+       * MORTO: nenhuma janela pousava em mi, então `luto && !cor.noLuto` nunca
+       * era verdadeiro. Medido — `JSON.stringify(arcoDaMusica(38, false))` era
+       * idêntico a `arcoDaMusica(38, true)`. E o teste que dizia cobrir isso
+       * passava VAZIAMENTE: passava igual com `luto: false`, e apagar a linha o
+       * mantinha verde.
+       *
+       * Duas coisas mudaram. A janela do silêncio passou a pousar em mi de
+       * verdade (ver `CORES`), o que dá o que barrar; e no luto TODAS as
+       * janelas caem no acolhimento. O arco continua existindo — a densidade
+       * muda, a cauda cresce, as vozes entram e saem —, mas a viagem harmônica
+       * não acontece. Quem está de luto não é levada a lugar nenhum.
+       */
+      cor: luto ? CORES.acolhimento : cor,
     });
     de = ate;
   }
@@ -267,15 +293,33 @@ export function eventosDoTrecho(
       /* O envelope inteiro tem de caber — inclusive a cauda do reverb. */
       if (quando + trecho.ataque + queda + trecho.rt60 > tFim) continue;
       const grau = r() < VIES ? v.graus[0] : v.graus[1];
-      out.push({
-        t: quando,
-        hz: hzDoGrau(base.drone, base.oitava, grau, v.oitava - 3),
-        ganho: v.ganho,
-        voz: i,
-      });
+      const hz = hzDoGrau(base.drone, base.oitava, grau, v.oitava - 3);
+      out.push({ t: quando, hz, ganho: v.ganho, voz: i });
     }
   }
-  return out.sort((a, b) => a.t - b.t);
+  out.sort((a, b) => a.t - b.t);
+
+  /**
+   * ⚠️ A SEGUNDA PASSADA TIRA O QUE FICOU PERTO DEMAIS EM HERTZ.
+   *
+   * A escala garante que nenhum par de CLASSES seja dissonante; ela não garante
+   * distância em hertz. Duas vozes podem soar ao mesmo tempo em oitavas
+   * vizinhas e cair dentro da mesma banda crítica — que é aspereza sensorial,
+   * não convenção cultural: as duas fundamentais brigam dentro do ouvido
+   * interno.
+   *
+   * Some a MAIS NOVA, nunca a mais antiga: a que já está soando foi ouvida, e
+   * cortá-la seria um sino desaparecendo no meio.
+   */
+  const limpo: Evento[] = [];
+  for (const e of out) {
+    /* O que ainda soa quando este entra — cauda de sino é longa, então a
+       janela é generosa. */
+    const soando = limpo.filter((x) => e.t - x.t < 6).map((x) => x.hz);
+    if (conflitaCom(e.hz, soando)) continue;
+    limpo.push(e);
+  }
+  return limpo;
 }
 
 /** A frequência de um grau da escala, a partir da nota em que o drone pousa. */
@@ -311,6 +355,24 @@ export function bandaCritica(f: number): number {
 export function aspero(f1: number, f2: number): boolean {
   if (f1 === f2) return false;
   return Math.abs(f1 - f2) < 0.35 * bandaCritica((f1 + f2) / 2);
+}
+
+/**
+ * ⚠️ E ELA É USADA DE VERDADE — senão seria mais uma régua escrita e não
+ * aplicada.
+ *
+ * A revisão adversarial achou `aspero` sem nenhum chamador fora do teste, que é
+ * a mesma família de `proximoDesbloqueio` e `escadaDeTrofeus`: uma proteção que
+ * existe no papel. Agora `eventosDoTrecho` a consulta.
+ *
+ * O que ela pega e a escala não pega: a pentatônica garante que nenhum PAR DE
+ * CLASSES seja dissonante, mas duas notas da mesma classe em oitavas vizinhas
+ * podem cair perto demais em HERTZ. Ré 4 com mi 4 são dois semitons e 35,6 Hz
+ * de distância a 306 Hz — ásperos. Ré 4 com mi 5 são catorze semitons e limpos.
+ * As duas duplas têm exatamente as mesmas classes.
+ */
+export function conflitaCom(hz: number, tocando: readonly number[]): boolean {
+  return tocando.some((f) => aspero(hz, f));
 }
 
 /** A escala escolhida é segura para sobreposição — a prova mora no teste. */

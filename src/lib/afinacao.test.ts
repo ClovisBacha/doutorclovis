@@ -165,13 +165,20 @@ describe("⚠️ as escalas não podem produzir dissonância por sorteio", () =>
  * que faz.
  */
 describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
-  /* Percorre o `src/` inteiro: a proibição não é de um arquivo, é do produto. */
+  /**
+   * Percorre o `src/` inteiro: a proibição não é de um arquivo, é do produto.
+   *
+   * ⚠️ E inclui os `.json` de CONTEÚDO. A primeira versão varria só `.ts/.tsx`,
+   * e `daily-quizzes.data.json` (294 aulas) e `daily-challenges.data.json` são
+   * exatamente o texto que o dono escreve e revisa. Uma aula dizendo "ouvir
+   * 432 Hz acalma o bebê" entrava em produção sem tocar o teste.
+   */
   function arquivos(dir: string, out: string[] = []): string[] {
     for (const nome of readdirSync(dir)) {
       const p = join(dir, nome);
       if (statSync(p).isDirectory()) {
         arquivos(p, out);
-      } else if (/\.(ts|tsx)$/.test(nome) && !/\.test\.ts$/.test(nome)) {
+      } else if (/\.(ts|tsx|json)$/.test(nome) && !/\.test\.ts$/.test(nome)) {
         out.push(p);
       }
     }
@@ -192,6 +199,50 @@ describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
   }
 
   /**
+   * ⚠️ E A BUSCA NÃO PODE SER LINHA A LINHA — foi assim que uma revisão
+   * adversarial atravessou esta catraca.
+   *
+   * O Prettier quebra JSX em cem colunas, que é exatamente como uma frase de
+   * interface seria escrita:
+   *
+   *     <p>
+   *       Toda a meditação deste app é afinada em 432 Hz — e é essa afinação
+   *       que acalma o bebê e reduz a ansiedade.
+   *     </p>
+   *
+   * O gatilho ("432 Hz") fica numa linha e a alegação ("acalma o bebê") na
+   * seguinte, e as quatro varreduras passavam. **Uma catraca que a formatação
+   * do próprio projeto derrota não protege nada.**
+   *
+   * Colapsando todo espaço em branco num só, o arquivo vira uma linha e a
+   * pergunta passa a ser de PROXIMIDADE: a alegação está perto do gatilho?
+   */
+  function achatar(s: string): string {
+    return semComentarios(s).replace(/\s+/g, " ");
+  }
+
+  /** Quantos caracteres em volta do gatilho contam como "na mesma frase". */
+  const JANELA = 220;
+
+  function procurar(gatilho: RegExp, proibido: RegExp): string[] {
+    const culpados: string[] = [];
+    for (const p of arquivos("src")) {
+      const texto = achatar(readFileSync(p, "utf8"));
+      const re = new RegExp(gatilho.source, "gi");
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(texto)) !== null) {
+        const de = Math.max(0, m.index - JANELA);
+        const perto = texto.slice(de, m.index + m[0].length + JANELA);
+        if (proibido.test(perto)) {
+          culpados.push(p + ": …" + perto.slice(0, 160) + "…");
+          break;
+        }
+      }
+    }
+    return culpados;
+  }
+
+  /**
    * ⚠️ O GATILHO NÃO PODE SER A PALAVRA "FREQUÊNCIA" SOLTA.
    *
    * Em português ela quer dizer "com que frequência" muito mais vezes do que
@@ -199,36 +250,38 @@ describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
    * "Bebê começa a ser sentido com mais frequência" — uma linha da jornada
    * gestacional que não fala de som nenhum. Catraca com falso positivo é
    * catraca que alguém desliga, e aí ela para de proteger.
-   *
-   * O gatilho é o CONTEXTO DE ALTURA: o número 432, um número seguido de Hz,
-   * a palavra hertz, ou afinação.
    */
-  const SOBRE_ALTURA = /(\b432\b|\d\s*hz\b|\bhertz\b|afina[çc][ãa]o)/i;
+  const SOBRE_ALTURA = /(\b432\b|\d\s*hz\b|\bhertz\b|afina[çc][ãa]o)/;
 
   const CURA =
     /(cura|curar|curativ|terapêutic|terapeutic|trata|tratamento|reparo do dna|regenera|frequência sagrada|frequencia sagrada|frequência de cura|frequencia de cura|solfeggio|solfejo sagrado)/i;
 
+  const MOLE = /(acalma|relaxa|reduz|diminui|alivia|equilibra|harmoniza|sincroniza)/i;
+
+  const SOBRE_O_BEBE = /(beb[êe]|feto|fetal|barriga|[úu]tero)/i;
+
   test("nenhum texto liga 432, Hz ou frequência a efeito clínico", () => {
-    const culpados: string[] = [];
-    for (const p of arquivos("src")) {
-      const codigo = semComentarios(readFileSync(p, "utf8"));
-      /* Olha só as linhas que FALAM de frequência: "tratamento" aparece o dia
-         inteiro num app de obstetrícia, e proibir a palavra solta encheria o
-         teste de falso positivo — catraca com falso positivo é catraca que
-         alguém desliga. */
-      for (const linha of codigo.split("\n")) {
-        if (!SOBRE_ALTURA.test(linha)) continue;
-        if (CURA.test(linha)) culpados.push(p + ": " + linha.trim().slice(0, 120));
-      }
-    }
-    expect(culpados).toEqual([]);
+    expect(procurar(SOBRE_ALTURA, CURA)).toEqual([]);
+  });
+
+  test("e a promessa mole também não passa — 'acalma', 'relaxa', 'reduz'", () => {
+    /* A alegação não precisa da palavra "cura" para ser alegação. "432 Hz
+       reduz a ansiedade" é exatamente o que o estudo piloto NÃO sustenta. */
+    expect(procurar(SOBRE_ALTURA, MOLE)).toEqual([]);
+  });
+
+  test("⚠️ e nenhuma tela pode dizer que o BEBÊ responde a uma frequência", () => {
+    /* A alegação sobre o feto é a mais grave possível: não há evidência
+       nenhuma, e ela chega numa paciente que está justamente medindo tudo que
+       o bebê faz. */
+    expect(procurar(SOBRE_ALTURA, SOBRE_O_BEBE)).toEqual([]);
   });
 
   test("⚠️ nem as alegações NOMEADAS que a pesquisa derrubou uma a uma", () => {
-    /* Cada uma destas foi verificada e é falsa. Estão aqui pelo nome porque
-       são exatamente as que aparecem em todo texto de marketing de 432 Hz — e
-       porque a catraca genérica acima não pegaria "ressonância de Schumann",
-       que não contém nenhum verbo clínico e mesmo assim é falsa. */
+    /* Cada uma foi verificada e é falsa. Estão aqui pelo nome porque são
+       exatamente as que aparecem em todo texto de marketing de 432 Hz — e
+       porque a catraca genérica não pegaria "ressonância de Schumann", que não
+       contém verbo clínico nenhum e mesmo assim é falsa. */
     const FALSAS = [
       /schumann/i,
       /solfeggio|solfejo sagrado/i,
@@ -236,51 +289,31 @@ describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
       /repara o dna|reparo do dna/i,
       /geometria sagrada/i,
       /verdi (provou|escolheu)/i,
-      /naz(ista|i)/i,
+      /naz(ista|i)\b/i,
       /cientificamente comprovad/i,
     ];
     const culpados: string[] = [];
     for (const p of arquivos("src")) {
-      const codigo = semComentarios(readFileSync(p, "utf8"));
-      for (const linha of codigo.split("\n")) {
-        for (const re of FALSAS) {
-          if (re.test(linha)) culpados.push(p + ": " + linha.trim().slice(0, 100));
-        }
-      }
+      const texto = achatar(readFileSync(p, "utf8"));
+      for (const re of FALSAS) if (re.test(texto)) culpados.push(p + " → " + re.source);
     }
     expect(culpados).toEqual([]);
   });
 
-  test("⚠️ e nenhuma tela pode dizer que o BEBÊ responde a uma frequência", () => {
-    /* A alegação sobre o feto é a mais grave possível: não há evidência
-       nenhuma, e ela chega numa paciente que está justamente medindo tudo que
-       o bebê faz. Numa base de alto risco, prometer resposta fetal a um som é
-       o tipo de frase que faz a paciente parar de contar movimento porque "o
-       som cuida disso". */
-    const culpados: string[] = [];
-    for (const p of arquivos("src")) {
-      const codigo = semComentarios(readFileSync(p, "utf8"));
-      for (const linha of codigo.split("\n")) {
-        if (!SOBRE_ALTURA.test(linha)) continue;
-        if (/(beb[êe]|feto|fetal|barriga|[úu]tero)/i.test(linha))
-          culpados.push(p + ": " + linha.trim().slice(0, 100));
-      }
-    }
-    expect(culpados).toEqual([]);
-  });
-
-  test("e a promessa mole também não passa — 'acalma', 'relaxa', 'reduz' com Hz junto", () => {
-    /* A alegação não precisa da palavra "cura" para ser alegação. "432 Hz
-       reduz a ansiedade" é exatamente o que o estudo piloto NÃO sustenta. */
-    const MOLE = /(acalma|relaxa|reduz|diminui|alivia|equilibra|harmoniza|sincroniza)/i;
-    const culpados: string[] = [];
-    for (const p of arquivos("src")) {
-      const codigo = semComentarios(readFileSync(p, "utf8"));
-      for (const linha of codigo.split("\n")) {
-        if (!/(432\s*hz|\b432\b.*\bhz\b)/i.test(linha)) continue;
-        if (MOLE.test(linha)) culpados.push(p + ": " + linha.trim().slice(0, 120));
-      }
-    }
-    expect(culpados).toEqual([]);
+  test("⚠️ E A CATRACA PEGA A FRASE QUEBRADA EM DUAS LINHAS", () => {
+    /* A prova de que o conserto vale: este é exatamente o texto que a revisão
+       adversarial usou para atravessar a versão linha-a-linha. */
+    const comQuebra = [
+      "<p>",
+      "  Toda a meditação deste app é afinada em 432 Hz — e é essa afinação que",
+      "  acalma o bebê, reduz a ansiedade e equilibra o batimento dele.",
+      "</p>",
+    ].join("\n");
+    const achatado = comQuebra.replace(/\s+/g, " ");
+    const i = achatado.search(SOBRE_ALTURA);
+    expect(i).toBeGreaterThan(-1);
+    const perto = achatado.slice(Math.max(0, i - JANELA), i + JANELA);
+    expect(MOLE.test(perto)).toBe(true);
+    expect(SOBRE_O_BEBE.test(perto)).toBe(true);
   });
 });

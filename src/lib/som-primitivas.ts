@@ -242,20 +242,27 @@ export function emLaco(ctx: Contexto, buf: AudioBuffer): AudioBufferSourceNode {
  * Exemplos: rajada de folhas 0,05–0,4 Hz → k = 2…12, onze componentes. Chama
  * 1,2–3 Hz → k = 36…90.
  */
-export function bandaLenta(
-  ctx: Contexto,
-  lo: number,
-  hi: number,
-  r: () => number,
-  profundidade: number,
-  centro = 0,
-): GainNode {
-  const saida = ctx.createGain();
-  saida.gain.value = centro;
-  somarComponentes(ctx, lo, hi, r, profundidade, saida.gain);
-  return saida;
-}
-
+/**
+ * ⚠️ `bandaLenta` FOI APAGADA, e o defeito dela vale a explicação.
+ *
+ * Ela devolvia um `GainNode` cujo PARÂMETRO de ganho era modulado pelas
+ * senoides — e a saída de ÁUDIO dele era silêncio, porque nada era ligado à
+ * entrada. Todos os cinco usos faziam `bandaLenta(...).connect(algo.gain)`, ou
+ * seja, ligavam SILÊNCIO a um parâmetro. Nenhum modulava coisa nenhuma.
+ *
+ * O preço, medido em `node scripts/ouvir.mjs --niveis`: a fogueira nunca
+ * tremeluziu, o drone nunca evoluiu, o avião e o ar-condicionado nunca
+ * respiraram, e as cigarras — cujo envelope inteiro dependia disso — saíram
+ * com pico **0,02** e pediram ganho de 37× para chegar ao nível das outras.
+ * Foi esse número absurdo que denunciou o resto.
+ *
+ * ⚠️ E o `tsc` não pegava: `GainNode.connect(AudioParam)` é uma assinatura
+ * válida. O código estava certo em tipo e vazio em efeito.
+ *
+ * `moduladorLento` é o que sempre foi preciso: um nó cuja SAÍDA é a soma das
+ * senoides. Ligado a um parâmetro, ele SOMA ao valor dele — então o centro vai
+ * em `param.value` e a amplitude aqui.
+ */
 /**
  * O mesmo, mas devolvendo um nó de ÁUDIO — para quando a modulação precisa
  * alimentar `frequency` de um filtro em vez de um ganho.
@@ -337,9 +344,41 @@ function somarComponentes(
  * ⚠️ Exige que o aquecimento seja maior que a cauda mais longa do evento —
  * senão a cópia cai antes do começo do render e não é escrita.
  */
-export function comVolta(disparar: (t: number) => void, t: number, cauda: number, fim: number) {
+export function comVolta(
+  disparar: (t: number) => void,
+  t: number,
+  cauda: number,
+  fim: number,
+  paraLaco: boolean,
+) {
   disparar(t);
-  if (t + cauda > fim) disparar(t - LACO);
+  /**
+   * ⚠️ A CÓPIA SÓ EXISTE NO RENDER DO LAÇO — e a falta desta linha derrubava
+   * dez dos trinta e dois sons AO VIVO.
+   *
+   * `comVolta` é um dispositivo de EMENDA: a cópia em `t − LAÇO` existe para
+   * que a cabeça do trecho carregue a cauda do evento que cruza o fim. Isso só
+   * faz sentido quando a janela É o laço de 30 s do render offline.
+   *
+   * Ao vivo a janela tem 20 s e `t0` é o `currentTime` de um contexto recém
+   * criado — algo entre 0,05 e 1,5 s. Então `t − 30` é NEGATIVO, e
+   * `setValueAtTime` com tempo negativo **lança `RangeError`**: não é ignorado,
+   * não toca imediatamente, lança.
+   *
+   * ⚠️ E a consequência era muito pior que o erro. Em `createSoundscape.start()`
+   * a exceção subia ANTES de `proximaJanela` ser fixada e de o agendador ser
+   * armado, e caía num `catch` que engole. Resultado medido: a paciente
+   * escolhia "Chuva", ouvia vinte segundos de chuva com gotas, e **pelo resto
+   * da sessão só a cama de ruído** — o chiado de televisão que este arquivo
+   * inteiro existe para não ser. Sem erro na tela, sem log, com o chip do som
+   * aceso.
+   *
+   * Medido varrendo `t0` de 0,05 a 1,5 s: chuva, chuva forte, chuva no
+   * telhado, chuva no carro, tempestade, riacho, sino de vento e piano
+   * estouravam em 6 de 6 aberturas; lago e fogueira, em 1 de 6 (depende do
+   * sorteio).
+   */
+  if (paraLaco && t + cauda > fim) disparar(t - LACO);
 }
 
 /**

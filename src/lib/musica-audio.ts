@@ -397,7 +397,9 @@ export function criarMusica(o: { minutos: number; luto?: boolean; semente?: numb
       }
       ateOnde = fim;
     }
-    if (ateOnde >= total) fecharComposto();
+    /* ⚠️ Fecha assim que o instante do fecho entra na janela agendada, e não
+       depois que a última janela foi escrita — senão ele nasce atrasado. */
+    if (ctx.currentTime - t0 >= total - 22 - JANELA_SEGS || ateOnde >= total) fecharComposto();
   }
 
   /**
@@ -416,7 +418,31 @@ export function criarMusica(o: { minutos: number; luto?: boolean; semente?: numb
   function fecharComposto() {
     if (fechou || !ctx || !mestre) return;
     fechou = true;
-    aplicarFecho(mestre.gain, t0 + Math.max(0, total - 22), alvo);
+    /**
+     * ⚠️ O FECHO ERA SEMPRE AGENDADO NO PASSADO, e virava um DEGRAU.
+     *
+     * `agendar()` roda a cada 4 s com janela de 12 s, e só chamava
+     * `fecharComposto` depois de escrever a última janela — ou seja, DEPOIS de
+     * `total − 22` já ter passado. `setTargetAtTime` com tempo no passado é
+     * legal e o valor no instante da chamada vira `alvo · e^(−Δ/3,2)`. Medido
+     * no navegador, com o agendador de verdade:
+     *
+     *     1 min → atraso 10 s → o ganho cai para 4,4% NA HORA (−27 dB)
+     *     3 min → atraso  2 s → 53,5%
+     *    10 min → atraso  6 s → 15,3% (−16,3 dB)
+     *
+     * Um paredão instantâneo, que é exatamente o "fade de amplitude aplicado
+     * pelo player" que o comentário desta função diz existir para evitar.
+     *
+     * ⚠️ E `--musica` NUNCA PODERIA VER: a bancada mede `montarPeca`, que
+     * agenda tudo de uma vez, no tempo certo. Ela media o único caminho que
+     * estava correto.
+     *
+     * O conserto: agendar cedo (é `setTargetAtTime`, então marcar no futuro é
+     * exato) e nunca no passado.
+     */
+    const quando = Math.max(ctx.currentTime + FOLGA, t0 + Math.max(0, total - 22));
+    aplicarFecho(mestre.gain, quando, alvo);
   }
 
   function start() {
@@ -521,7 +547,17 @@ export function criarMusica(o: { minutos: number; luto?: boolean; semente?: numb
     alvo = Math.max(0, Math.min(1, v));
     try {
       if (ctx && mestre && !fechou) {
+        /**
+         * ⚠️ A ÂNCORA — `cancelScheduledValues` NÃO segura o valor corrente.
+         *
+         * Ele reverte ao último evento anterior ao corte, e durante o fade de
+         * entrada não existe nenhum: só o `value` intrínseco, 0,0001. Sem o
+         * `setValueAtTime`, mexer no volume nos primeiros 2,5 s fazia o som
+         * CAIR A ZERO e subir de novo. `pausar`, `retomar` e `stop` já
+         * ancoravam; só o volume não.
+         */
         mestre.gain.cancelScheduledValues(ctx.currentTime);
+        mestre.gain.setValueAtTime(Math.max(0.0001, mestre.gain.value), ctx.currentTime);
         mestre.gain.linearRampToValueAtTime(alvo, ctx.currentTime + 0.2);
       }
     } catch {

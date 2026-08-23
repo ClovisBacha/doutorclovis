@@ -62,6 +62,7 @@ import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
+import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
@@ -1977,6 +1978,7 @@ function MinhaContaPage() {
           babyName={profile?.baby_name ?? null}
           motherName={profile?.display_name?.split(" ")[0] ?? ""}
           tone={profile?.baby_skin_tone ?? 0}
+          careMode={careMode}
           onClose={() => setMilestoneWeek(null)}
           aoPublicarNaComunidade={(m) => {
             guardarMomentoParaPublicar(m);
@@ -3179,9 +3181,19 @@ function WeekMilestoneModal({
   babyName,
   motherName,
   tone,
+  careMode,
   onClose,
   aoPublicarNaComunidade,
 }: {
+  /**
+   * ⚠️ `careMode` entrou como PROP, e não por confiar em quem abre.
+   *
+   * A regra do `celebrate.ts` sempre foi "quem chama decide", e a revisão
+   * adversarial achou o preço disso: chamadores que não decidiam. Aqui a festa
+   * dispara no FECHAR do modal, longe de onde ele é aberto — e "está gateado lá
+   * atrás" é o tipo de garantia que sobrevive até alguém mover o `setState`.
+   */
+  careMode: boolean;
   week: number;
   babyName: string | null;
   motherName: string;
@@ -3215,7 +3227,7 @@ function WeekMilestoneModal({
 
   function handleClose() {
     audioRef.current?.stop();
-    celebrateChime();
+    celebrateChime(1, careMode);
     celebrateHaptic();
     onClose();
   }
@@ -9683,6 +9695,26 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
     }
     setActive(null);
     setElapsed(0);
+    /**
+     * ⚠️ O TIQUE DO FIM DA CONTRAÇÃO, e ele é o caso de mão ocupada.
+     *
+     * Ela está cronometrando DOR: olhar a tela para confirmar que o toque
+     * pegou é exatamente o que ela menos consegue fazer nesse minuto. Um tique
+     * de cinquenta milissegundos diz "marquei" sem pedir os olhos.
+     *
+     * ⚠️ A espécie existia declarada, justificada e SEM NENHUM CHAMADOR — a
+     * mesma família de `proximoDesbloqueio` e `escadaDeTrofeus`. Uma revisão
+     * adversarial a achou.
+     *
+     * `emSessao` porque o cronômetro É uma sessão que ela abriu: o toque que
+     * marca o fim é dela, mas o portão de gesto é generoso demais para
+     * depender de milissegundos aqui.
+     */
+    /* ⚠️ Sem `careMode` aqui: este componente não o recebe, e o cronômetro de
+       contrações é justamente uma tela que continua valendo no Modo Cuidado —
+       quem perdeu a gestação pode estar em trabalho de parto. `podeSoar` já
+       barra o resto; este som é sobre o corpo dela, não sobre o bebê. */
+    tocarSomDeUI("intervalo", { emSessao: true });
     load();
   }
 
@@ -16581,7 +16613,7 @@ export function ConquistasTab({
         creditarSementinhas(r.granted);
         setSaldo((v) => (v == null ? v : v + r.granted));
         fireConfetti(1);
-        celebrateChime(1);
+        celebrateChime(1, careMode);
         celebrateHaptic(1);
         toast.success(`+${r.granted} 🌱`);
         /* ⚠️ O título e o emoji saem do CATÁLOGO (`conquistas.ts`), nunca de um
@@ -16656,7 +16688,7 @@ export function ConquistasTab({
              exatamente a mesma comemoração. */
           const nivel = Math.min(5, novas.length) as 1 | 2 | 3 | 4 | 5;
           fireConfetti(nivel);
-          celebrateChime(nivel);
+          celebrateChime(nivel, careMode);
           celebrateHaptic(nivel);
         }
         /* Grava SEMPRE (inclusive em Modo Cuidado): quem sai do Modo Cuidado
@@ -18096,7 +18128,7 @@ function CantinhoTab({
           /* A mesma festa da conquista, e pelo mesmo motivo: fechar um
              conjunto é a coisa mais rara que acontece no Cantinho. */
           fireConfetti(1);
-          celebrateChime(1);
+          celebrateChime(1, careMode);
         } else {
           toast("Adicionado ao seu cantinho! 💛");
         }

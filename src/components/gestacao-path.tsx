@@ -26,7 +26,8 @@ import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
   createSoundscape,
-  GRUPOS_DE_SOM,
+  gruposDeSom,
+  sonsOfertados,
   ROTULO,
   SOUNDSCAPES,
   type Soundscape,
@@ -118,10 +119,12 @@ import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from 
 import {
   gravarNivel,
   lerNivel,
+  ehNoite,
   ouvirAmostraDeUI,
   tocarSomDeUI,
   type NivelDeSom,
 } from "@/lib/tocar-som-de-ui";
+import { emRepouso } from "@/lib/sessao-de-audio";
 import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
@@ -279,7 +282,7 @@ function AvisoDePresente({
   useEffect(() => {
     if (careMode) return;
     fireConfetti();
-    celebrateChime(2);
+    celebrateChime(2, careMode);
     celebrateHaptic(2);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2431,7 +2434,7 @@ export function GestacaoPath({
            linha roda. */
         const nivel = nivelDaSequencia(streak + 1);
         fireConfetti(nivel);
-        celebrateChime(nivel);
+        celebrateChime(nivel, careMode);
         celebrateHaptic(nivel);
         (async () => {
           try {
@@ -5958,6 +5961,16 @@ export function MeditationBlock({
   /* O sheet de sons DENTRO da sessão — pedido do dono: tocar no ícone de som
      não alterna mais direto, abre as opções. */
   const [somNaSessaoAberto, setSomNaSessaoAberto] = useState(false);
+  /**
+   * ⚠️ A SESSÃO DE ÁUDIO VOLTA AO REPOUSO QUANDO ESTE BLOCO SAI.
+   *
+   * A voz da meditação toca `<audio>` e sobe o `audioSession` do iOS para
+   * `playback`, que ignora o botão de silêncio — e ele nunca volta sozinho. As
+   * três telas de áudio longo já faziam isso; a meditação, que é a que mais
+   * toca, era a que faltava. O retorno do efeito é o `finally`: roda no ✕, ao
+   * trocar de aba e quando algo estoura no meio.
+   */
+  useEffect(() => () => emRepouso(), []);
   /* A preferência de som de interface. Lida uma vez, na montagem — ela vive no
      `localStorage` e nada mais a muda enquanto esta tela está aberta. */
   const [nivelDeSom, setNivelDeSom] = useState<NivelDeSom>("desligado");
@@ -6081,7 +6094,7 @@ export function MeditationBlock({
            alternativa é ficar em dúvida se acabou — e abrir os olhos para
            conferir desfaz os últimos minutos. Dois tons DESCENDO: subir é o
            vocabulário do alarme. */
-        tocarSomDeUI("fim", { careMode });
+        tocarSomDeUI("fim", { careMode, emSessao: true });
         finish();
       } else {
         setCiclo((c) => c + 1);
@@ -6098,7 +6111,7 @@ export function MeditationBlock({
          *
          * Nasce desligado. Quem liga é ela, na folha de sons.
          */
-        tocarSomDeUI("compasso", { careMode });
+        tocarSomDeUI("compasso", { careMode, emSessao: true });
       }
     }, dur * 1000);
     /* `RESPIRO` guarda SEGUNDOS, e `vibratePhase` quer milissegundos. O outro
@@ -7010,7 +7023,7 @@ export function MeditationBlock({
                   </p>
                   {/* ⚠️ Agrupado por família: vinte e duas pílulas numa fita lisa é
                       um muro que a paciente não lê. Ver `GRUPOS_DE_SOM`. */}
-                  {GRUPOS_DE_SOM.map((g) => (
+                  {gruposDeSom(careMode).map((g) => (
                     <div key={g.familia || "especiais"} className="mt-2">
                       {g.familia && (
                         <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-400">
@@ -7329,40 +7342,42 @@ export function MeditationBlock({
                   Som de fundo
                 </p>
                 <div className="mt-4 grid gap-2">
-                  {SOUNDSCAPES.filter((s) => s.key !== "silencio").map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => {
-                        trocarSom(s.key);
-                        setSomNaSessaoAberto(false);
-                      }}
-                      className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
-                        som === s.key
-                          ? "bg-violet-500 text-white"
-                          : "border border-violet-200 bg-white/70 text-violet-900"
-                      }`}
-                    >
-                      <span className="text-xl leading-none" aria-hidden>
-                        {s.emoji}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-extrabold">{s.label}</span>
-                        {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
+                  {sonsOfertados(careMode)
+                    .filter((s) => s.key !== "silencio")
+                    .map((s) => (
+                      <button
+                        key={s.key}
+                        onClick={() => {
+                          trocarSom(s.key);
+                          setSomNaSessaoAberto(false);
+                        }}
+                        className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                          som === s.key
+                            ? "bg-violet-500 text-white"
+                            : "border border-violet-200 bg-white/70 text-violet-900"
+                        }`}
+                      >
+                        <span className="text-xl leading-none" aria-hidden>
+                          {s.emoji}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-extrabold">{s.label}</span>
+                          {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
                             de cinco para vinte e dois: "Drone grave" e "Pad calmo"
                             são a mesma coisa para quem nunca ouviu os dois, e ela
                             não vai tocar em cada um para descobrir. */}
-                        {s.sub && (
-                          <span
-                            className={`block text-[11px] leading-snug ${
-                              som === s.key ? "text-white/70" : "text-violet-700/55"
-                            }`}
-                          >
-                            {s.sub}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
+                          {s.sub && (
+                            <span
+                              className={`block text-[11px] leading-snug ${
+                                som === s.key ? "text-white/70" : "text-violet-700/55"
+                              }`}
+                            >
+                              {s.sub}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
                 </div>
                 {/* "No final a opção de desligar" — separada dos chips de som,
                     para não se confundir com mais uma escolha de trilha: é o
@@ -7394,7 +7409,8 @@ export function MeditationBlock({
                     </p>
                     <p className="mt-1 text-[12px] leading-relaxed text-violet-800/70">
                       De olhos fechados, um tom curto avisa quando o ciclo vira — e outro quando a
-                      sessão acaba. Isso não muda os avisos do seu médico nem a emergência.
+                      sessão acaba. Das 22h às 7h ele fica quieto sozinho. Isso não muda os avisos
+                      do seu médico nem a emergência.
                     </p>
                     <div className="mt-3 flex gap-2">
                       {(
@@ -7408,7 +7424,17 @@ export function MeditationBlock({
                           onClick={() => {
                             setNivelDeSom(v);
                             gravarNivel(v);
-                            if (v !== "desligado") ouvirAmostraDeUI("compasso");
+                            /* ⚠️ A amostra respeita a noite. `ouvirAmostraDeUI`
+                               ignora os portões de propósito — é ela pedindo
+                               para ouvir —, mas aqui isso MENTIRIA: ela ligaria
+                               às 22h10, ouviria a confirmação, meditaria dez
+                               minutos e não ouviria nada, sem nada na tela
+                               explicando. O app oferece um lembrete de
+                               meditação às 21h; a sessão que começa depois das
+                               22h é o caso comum, não o raro. */
+                            if (v !== "desligado" && !ehNoite(new Date().getHours())) {
+                              ouvirAmostraDeUI("compasso");
+                            }
                           }}
                           className={`press flex-1 rounded-full py-2.5 text-sm font-bold transition-colors ${
                             nivelDeSom === v
@@ -7509,7 +7535,7 @@ export function MeditationBlock({
 
       {/* Fora da folha da meditação: ela abre os sons sem sessão nenhuma, e a
           folha continua por baixo se ela veio de dentro. */}
-      {sonsAbertos && <SonsParaDormir aoFechar={() => setSonsAbertos(false)} />}
+      {sonsAbertos && <SonsParaDormir aoFechar={() => setSonsAbertos(false)} careMode={careMode} />}
       {casalAberto && <SessaoDoCasal aoSair={() => setCasalAberto(false)} />}
     </>
   );
@@ -7770,7 +7796,19 @@ export function BondingBlock({
    *  `abrirDoAlbum()`, extraído porque as duas fazem exatamente isto. */
   function comecarSom() {
     if (som === "silencio") return;
-    audioRef.current = createSoundscape(som);
+    /**
+     * ⚠️ SEM MÚSICA AQUI, e a razão é a natureza dela.
+     *
+     * A música é COMPOSTA para uma duração: o arco inteiro cabe no tempo
+     * pedido e o fecho começa vinte e dois segundos antes do fim. A leitura da
+     * carta não tem duração fixa — depende de quantas ela lê e de quão devagar.
+     * Oferecer música aqui daria uma peça que acaba no meio da leitura (se ela
+     * demorar) ou que é cortada pela metade (se ela for rápida), e as duas
+     * coisas são piores que um som de fundo que simplesmente continua.
+     *
+     * Os trinta e dois sons contínuos são laços: esses servem.
+     */
+    audioRef.current = createSoundscape(som, { luto: careMode });
     audioRef.current.start();
   }
   function begin() {
@@ -7807,7 +7845,7 @@ export function BondingBlock({
     setSom(k);
     if (phase !== "active") return;
     audioRef.current?.stop();
-    audioRef.current = k === "silencio" ? null : createSoundscape(k);
+    audioRef.current = k === "silencio" ? null : createSoundscape(k, { luto: careMode });
     audioRef.current?.start();
   }
 
@@ -7925,40 +7963,42 @@ export function BondingBlock({
                   Som de fundo
                 </p>
                 <div className="mt-4 grid gap-2">
-                  {SOUNDSCAPES.filter((s) => s.key !== "silencio").map((s) => (
-                    <button
-                      key={s.key}
-                      onClick={() => {
-                        trocarSomDaCarta(s.key);
-                        setSomAberto(false);
-                      }}
-                      className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
-                        som === s.key
-                          ? "bg-rose-500 text-white"
-                          : "border border-rose-200 bg-white/70 text-rose-900"
-                      }`}
-                    >
-                      <span className="text-xl leading-none" aria-hidden>
-                        {s.emoji}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-extrabold">{s.label}</span>
-                        {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
+                  {sonsOfertados(careMode, false)
+                    .filter((s) => s.key !== "silencio")
+                    .map((s) => (
+                      <button
+                        key={s.key}
+                        onClick={() => {
+                          trocarSomDaCarta(s.key);
+                          setSomAberto(false);
+                        }}
+                        className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
+                          som === s.key
+                            ? "bg-rose-500 text-white"
+                            : "border border-rose-200 bg-white/70 text-rose-900"
+                        }`}
+                      >
+                        <span className="text-xl leading-none" aria-hidden>
+                          {s.emoji}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-sm font-extrabold">{s.label}</span>
+                          {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
                             de cinco para vinte e dois: "Drone grave" e "Pad calmo"
                             são a mesma coisa para quem nunca ouviu os dois, e ela
                             não vai tocar em cada um para descobrir. */}
-                        {s.sub && (
-                          <span
-                            className={`block text-[11px] leading-snug ${
-                              som === s.key ? "text-white/70" : "text-violet-700/55"
-                            }`}
-                          >
-                            {s.sub}
-                          </span>
-                        )}
-                      </span>
-                    </button>
-                  ))}
+                          {s.sub && (
+                            <span
+                              className={`block text-[11px] leading-snug ${
+                                som === s.key ? "text-white/70" : "text-violet-700/55"
+                              }`}
+                            >
+                              {s.sub}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    ))}
                 </div>
                 <button
                   onClick={() => {
@@ -8564,7 +8604,7 @@ export function GratitudeBlock({
       if (marco && !careMode) {
         const nivel = nivelDaSequencia(marco);
         fireConfetti(nivel);
-        celebrateChime(nivel);
+        celebrateChime(nivel, careMode);
         celebrateHaptic(nivel);
       }
 
@@ -10641,7 +10681,7 @@ function DailyQuizBlock({
                   if (!careMode) {
                     const acertou = isAnswerCorrect(q, cur);
                     if (acertou) {
-                      celebrateChime(1);
+                      celebrateChime(1, careMode);
                       tocarPadrao([18]);
                     } else {
                       /* Erro NÃO tem som. Ele tem um toque curto, que serve de

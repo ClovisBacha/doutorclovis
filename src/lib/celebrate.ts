@@ -140,11 +140,17 @@ export function fireConfetti(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
  * O Modo Cuidado continua sendo responsabilidade de quem chama, como sempre
  * foi — `humorDaJornada` e os blocos de `careMode` já o resolvem antes daqui.
  */
-export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
+export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1, careMode = false): void {
   if (typeof window === "undefined") return;
   /* A ALTURA é o que o ouvido lê como "foi maior", não o volume — então o
-     nível acrescenta degraus na escada em vez de subir o ganho. */
-  tocarConquistaComPortoes(Math.min(6, 3 + nivel));
+     nível acrescenta degraus na escada em vez de subir o ganho.
+
+     ⚠️ `careMode` é o SEGUNDO cinto. A regra do arquivo sempre foi "quem chama
+     decide", e a revisão achou um chamador que não decidia: o toque em
+     "Resgatar" da aba de conquistas chamava `celebrateChime(1)` sem nenhuma
+     checagem, ao contrário do vizinho dele. Passar aqui custa um argumento e
+     fecha a porta de dentro. */
+  tocarConquistaComPortoes(Math.min(6, 3 + nivel), { careMode });
 }
 
 /**

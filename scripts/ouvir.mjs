@@ -717,8 +717,91 @@ async function medirMusica() {
   console.log("");
 }
 
+/**
+ * ⚠️ O MODO `--aovivo` — porque o caminho da meditação NÃO é o do render.
+ *
+ * Tudo que esta bancada media até aqui era o render OFFLINE: trinta segundos,
+ * `t0 = 0`, janela igual ao laço. O caminho ao vivo é outro — janela de vinte
+ * segundos, `t0 = ctx.currentTime`, e nenhum laço para fechar.
+ *
+ * Foi exatamente nessa diferença que dez dos trinta e dois sons ESTOURAVAM.
+ * `comVolta` agendava a cópia de emenda em `t − 30`, que ao vivo é tempo
+ * NEGATIVO — `RangeError`, não um evento ignorado. A exceção subia antes de o
+ * agendador ser armado e caía num `catch` que engole: a paciente escolhia
+ * "Chuva", ouvia vinte segundos com gotas, e o resto da sessão só a cama de
+ * ruído. Sem erro na tela, sem log, com o chip do som aceso.
+ *
+ * Nada disso aparecia em `tsc`, em lint ou nos quatro mil testes — nenhum deles
+ * monta um grafo de áudio. Este modo monta.
+ */
+async function testarAoVivo() {
+  const { todos } = await lerDoModulo();
+  const dir = join(tmpdir(), "aovivo-" + Date.now());
+  mkdirSync(dir, { recursive: true });
+  const entrada = join(dir, "e.ts");
+  const saida = join(dir, "s.js");
+  writeFileSync(
+    entrada,
+    'import * as SC from "' +
+      join(RAIZ, "src/lib/som-continuo.ts") +
+      '";\n(globalThis).SOM = SC;\n',
+  );
+  execFileSync("bun", ["build", "--outfile=" + saida, "--target=browser", "--format=esm", entrada]);
+  const bundle = readFileSync(saida, "utf8");
+
+  const exe = "/opt/pw-browsers/chromium/chrome-linux/chrome";
+  const navegador = await chromium.launch(existsSync(exe) ? { executablePath: exe } : {});
+  const pagina = await navegador.newPage();
+  await pagina.goto("about:blank");
+  await pagina.addScriptTag({ content: bundle, type: "module" });
+  await pagina.waitForFunction(() => !!globalThis.SOM, { timeout: 15000 });
+
+  const ruins = await pagina.evaluate((sons) => {
+    const S = globalThis.SOM;
+    const taxa = 22050;
+    const out = {};
+    for (const k of sons) {
+      let estouros = 0;
+      let msg = "";
+      /* `t0` varre o que um `AudioContext` recém-criado devolve de verdade. */
+      for (const t0 of [0.05, 0.2, 0.4, 0.7, 1.0, 1.5, 3.7, 21.3]) {
+        const ctx = new OfflineAudioContext(1, Math.round(40 * taxa), taxa);
+        const m = ctx.createGain();
+        m.connect(ctx.destination);
+        try {
+          /* A abertura da sessão: base + primeira janela. */
+          S.montar(ctx, k, m, 20, t0, true, false);
+          /* E a janela seguinte, que é o que o agendador pede a cada 20 s. */
+          S.montar(ctx, k, m, 20, t0 + 20, false, false);
+        } catch (e) {
+          estouros++;
+          msg = String(e).slice(0, 90);
+        }
+      }
+      if (estouros) out[k] = estouros + "/8 · " + msg;
+    }
+    return out;
+  }, todos);
+  await navegador.close();
+  rmSync(dir, { recursive: true, force: true });
+
+  console.log("");
+  const nomes = Object.keys(ruins);
+  if (!nomes.length) {
+    console.log("  ✅ os " + todos.length + " sons montam ao vivo sem estourar");
+    console.log("");
+    return;
+  }
+  console.log("  ❌ " + nomes.length + " de " + todos.length + " estouram no caminho AO VIVO");
+  console.log("");
+  for (const n of nomes) console.log("     " + n.padEnd(18) + ruins[n]);
+  console.log("");
+  process.exit(1);
+}
+
 async function main() {
   if (args.includes("--niveis")) return medirNiveis();
+  if (args.includes("--aovivo")) return testarAoVivo();
   if (args.includes("--musica")) return medirMusica();
 
   /**

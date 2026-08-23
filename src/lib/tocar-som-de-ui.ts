@@ -12,7 +12,9 @@ import {
   NIVEL_PADRAO,
   CHAVE_NIVEL,
   desenhar,
+  destravar,
   ehAlarme,
+  ehNoite,
   tocarConquista,
   podeSoar,
   type EspecieDeSom,
@@ -61,12 +63,12 @@ function ouvirGestos() {
   }
 }
 
-/* Contagem do dia, por espécie. A chave carrega a data local: virou o dia,
-   zerou — sem nenhuma limpeza agendada. */
+/* Contagem do dia, por espécie. A chave carrega a data local — e as de
+   ontem são apagadas na gravação, ver `somar`. */
 function chaveDoDia(e: EspecieDeSom): string {
   const d = new Date();
   const dia = `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
-  return `dc-som-ui-conta:${e}:${dia}`;
+  return `${PREFIXO_CONTA}${e}:${dia}`;
 }
 
 function contarHoje(e: EspecieDeSom): number {
@@ -78,11 +80,38 @@ function contarHoje(e: EspecieDeSom): number {
   }
 }
 
+const PREFIXO_CONTA = "dc-som-ui-conta:";
+
+/**
+ * ⚠️ AS CHAVES DE ONTEM SÃO APAGADAS — antes elas só se acumulavam.
+ *
+ * A prosa anterior dizia "virou o dia, zerou — sem nenhuma limpeza agendada", e
+ * tratava isso como recurso. Não é: a chave de ONTEM continua no
+ * `localStorage`, e nada a remove. São seis espécies vezes trezentos e sessenta
+ * e cinco dias — umas 2.200 chaves por ano.
+ *
+ * Neste app isso tem consequência conhecida: quando a cota do `localStorage`
+ * estoura, quem quebra é a PRÓXIMA gravação de qualquer coisa, inclusive o
+ * `journey_state`, que carrega a jornada inteira dela. É a mesma razão pela
+ * qual o rascunho do compositor não guarda fotos.
+ *
+ * A limpeza roda na gravação, que é rara (seis vezes por dia no máximo) e já
+ * está tocando o `localStorage` de qualquer jeito.
+ */
 function somar(e: EspecieDeSom): void {
   try {
-    localStorage.setItem(chaveDoDia(e), String(contarHoje(e) + 1));
+    const hoje = chaveDoDia(e);
+    localStorage.setItem(hoje, String(contarHoje(e) + 1));
+    const velhas: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PREFIXO_CONTA) && !k.endsWith(hoje.slice(hoje.lastIndexOf(":")))) {
+        velhas.push(k);
+      }
+    }
+    for (const k of velhas) localStorage.removeItem(k);
   } catch {
-    /* ignore */
+    /* modo privado, cota cheia: a contagem não persiste e nada quebra */
   }
 }
 
@@ -93,7 +122,10 @@ function somar(e: EspecieDeSom): void {
  * contexto e conta. Um `if` local aqui seria a segunda régua que o projeto
  * proíbe desde `humorDaJornada`.
  */
-export function tocarSomDeUI(especie: EspecieDeSom, o?: { careMode?: boolean }): void {
+export function tocarSomDeUI(
+  especie: EspecieDeSom,
+  o?: { careMode?: boolean; emSessao?: boolean },
+): void {
   if (typeof window === "undefined") return;
   ouvirGestos();
   const ctx = {
@@ -102,6 +134,8 @@ export function tocarSomDeUI(especie: EspecieDeSom, o?: { careMode?: boolean }):
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
     jaTocouHoje: contarHoje(especie),
+    emSessao: !!o?.emSessao,
+    hora: new Date().getHours(),
   };
   if (!podeSoar(especie, ctx)) return;
   desenhar(especie);
@@ -117,6 +151,21 @@ export function tocarSomDeUI(especie: EspecieDeSom, o?: { careMode?: boolean }):
  */
 export function ouvirAmostraDeUI(especie: EspecieDeSom): void {
   desenhar(especie);
+}
+
+/**
+ * ⚠️ DESTRAVA O ÁUDIO DENTRO DO TOQUE — para o alarme não nascer mudo.
+ *
+ * O `AudioContext` do som de interface nasce na primeira nota. Quando essa
+ * primeira nota só acontece DEPOIS de esperas (o SOS espera GPS, endereço e
+ * servidor), o gesto já passou e o iOS recusa o contexto em silêncio.
+ *
+ * Chamar isto no prefixo SÍNCRONO do toque cria e acorda o contexto enquanto o
+ * gesto ainda vale. É a mesma correção que `destravar()` faz nos Sons para
+ * dormir, e pela mesma razão.
+ */
+export function destravarSomDeUI(): void {
+  destravar();
 }
 
 /**
@@ -138,10 +187,11 @@ export function tocarConquistaComPortoes(degraus: number, o?: { careMode?: boole
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
     jaTocouHoje: contarHoje("conquista"),
+    hora: new Date().getHours(),
   });
   if (!podia) return;
   tocarConquista(degraus);
   somar("conquista");
 }
 
-export { DESENHOS, ehAlarme, type EspecieDeSom, type NivelDeSom };
+export { DESENHOS, ehAlarme, ehNoite, type EspecieDeSom, type NivelDeSom };

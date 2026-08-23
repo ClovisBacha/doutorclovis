@@ -12,7 +12,12 @@ import { SonsParaDormir } from "@/components/sons-para-dormir";
  *
  * Sem dado nenhum: a tela não lê conta, perfil, nem banco.
  */
+type Busca = { luto?: boolean };
+
 export const Route = createFileRoute("/preview-sons")({
+  validateSearch: (q: Record<string, unknown>): Busca => ({
+    luto: q.luto === "1" || q.luto === true,
+  }),
   head: () => ({
     meta: [{ title: "Bancada dos sons" }, { name: "robots", content: "noindex" }],
   }),
@@ -20,5 +25,10 @@ export const Route = createFileRoute("/preview-sons")({
 });
 
 function PreviewSons() {
-  return <SonsParaDormir aoFechar={() => history.back()} />;
+  /* ⚠️ `?luto=1` é a única forma de fotografar a lista SEM "Coração do bebê" e
+     "Ventre" — os dois únicos sons cujo nome afirma sobre uma gestação em
+     curso. Sem a bancada, conferir isso exigiria ligar o Modo Cuidado numa
+     conta real, que é o estado que ninguém quer ligar para testar. */
+  const { luto } = Route.useSearch();
+  return <SonsParaDormir aoFechar={() => history.back()} careMode={!!luto} />;
 }

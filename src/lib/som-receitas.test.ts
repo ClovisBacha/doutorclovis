@@ -25,9 +25,13 @@ import {
 import { LOOP_SEGS } from "./som-continuo";
 
 describe("o catálogo", () => {
-  test("são vinte sons, e nenhum repetido", () => {
-    expect(SONS_CONTINUOS.length).toBe(20);
-    expect(new Set(SONS_CONTINUOS).size).toBe(20);
+  test("são trinta e dois sons, e nenhum repetido", () => {
+    /* ⚠️ O número está travado de propósito: a tabela `NIVEL_AO_VIVO` precisa
+       de uma entrada por som, e um som novo sem entrada cairia no `?? 1` e
+       voltaria a destoar até 30 dB dos vizinhos. Quem acrescentar um som vai
+       reprovar aqui e lembrar de rodar `node scripts/ouvir.mjs --niveis`. */
+    expect(SONS_CONTINUOS.length).toBe(32);
+    expect(new Set(SONS_CONTINUOS).size).toBe(32);
   });
 
   test("⚠️ todo som tem nome, emoji e legenda", () => {

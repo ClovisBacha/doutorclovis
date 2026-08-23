@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
+import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
@@ -176,6 +176,23 @@ export function EmergencySheet({
   async function sendLocation() {
     if (panic !== "idle") return;
     setPanic("sending");
+
+    /**
+     * ⚠️ O ÁUDIO É DESTRAVADO AQUI, DENTRO DO TOQUE — e sem isto o alarme é
+     * mudo no iPhone.
+     *
+     * `desenhar()` cria o `AudioContext` na primeira nota que toca, e no
+     * caminho do SOS essa primeira nota acontece depois de dois `await` (o GPS
+     * pode levar até 5 s, o endereço até 2, mais o servidor). Depois do
+     * `await` o gesto JÁ PASSOU, e o iOS recusa o contexto — em silêncio,
+     * porque o `resume()` é engolido por um `catch` vazio.
+     *
+     * É exatamente a armadilha que os Sons para dormir já documentam
+     * (`destravar()` tocando 50 ms de silêncio DENTRO do toque). Aqui ela dói
+     * mais: o único som do app que ignora a preferência e o Modo Cuidado seria
+     * justamente o que não toca.
+     */
+    destravarSomDeUI();
 
     /* ── A janela do WhatsApp é aberta AGORA, dentro do toque ──────────────
        Isto parece estranho e é o único jeito de funcionar. iOS e Android só
@@ -355,9 +372,32 @@ export function EmergencySheet({
 
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) throw new Error("sem sessão");
-      const r = await dispararEmergencia({
-        data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
-      });
+      /**
+       * ⚠️ TETO DE TEMPO — sem ele o botão morre travado, e é o modo de falha
+       * MAIS PROVÁVEL do SOS.
+       *
+       * A chamada não tinha `AbortController` nem prazo. Num wi-fi de hospital
+       * com portal cativo a requisição é engolida e a promessa não resolve por
+       * minutos: o `catch` nunca roda, nenhum som toca, nenhum aviso aparece, e
+       * `panic` fica em "sending" PARA SEMPRE — com o botão desabilitado
+       * (`disabled={panic !== "idle"}`) exibindo "Localizando e avisando…".
+       * Ela não consegue nem tentar de novo.
+       *
+       * ⚠️ E o repositório já tinha aplicado esta correção ao vizinho MENOS
+       * importante: o endereço tem teto de 2 s, com o comentário "um enfeite
+       * não pode segurar a emergência". A chamada que É a emergência ficou sem.
+       *
+       * Vinte segundos: folgado para uma rede ruim, curto o bastante para ela
+       * ainda poder ligar 192 sem ter perdido a noite olhando um botão morto.
+       */
+      const r = await Promise.race([
+        dispararEmergencia({
+          data: { accessToken: s.session.access_token, latitude: lat, longitude: lng, address },
+        }),
+        new Promise<never>((_, rejeitar) =>
+          setTimeout(() => rejeitar(new Error("demorou")), 20_000),
+        ),
+      ]);
       if (!r.ok) throw new Error("falhou");
 
       setCanais(r.canais);
@@ -374,7 +414,22 @@ export function EmergencySheet({
        * `podeSoar` deixa passar mesmo com o som desligado e mesmo em Modo
        * Cuidado — quem perdeu a gestação continua podendo passar mal.
        */
-      tocarSomDeUI(r.canais.destinos.length ? "sos" : "sos-falhou");
+      /**
+       * ⚠️ FALHA PARCIAL TOCA O SOM DE FALHA, e não o de sucesso.
+       *
+       * A primeira régua era `destinos.length ? "sos" : "sos-falhou"` — e a
+       * revisão achou o buraco: o médico e o contato entram em `destinos`
+       * SEPARADAMENTE. Se o push do médico sai e o e-mail e o SMS do marido
+       * falham, `destinos.length` é 1 e o app tocava o acorde ASCENDENTE de
+       * "chegou". Numa paciente em pânico que não está lendo a tela — que é a
+       * razão declarada de este som existir —, o app confirmaria por áudio um
+       * socorro que não alcançou a pessoa que iria buscá-la.
+       *
+       * `canais.faltou` já carregava exatamente essa informação (o nome do
+       * contato que existe e não recebeu nada) e o som a ignorava.
+       */
+      const chegouEmTodos = r.canais.destinos.length > 0 && !r.canais.faltou;
+      tocarSomDeUI(chegouEmTodos ? "sos" : "sos-falhou");
       /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
          pronta do servidor em vez de ser remontada aqui, senão o parente que
          receber pelos dois canais leria duas versões diferentes do mesmo

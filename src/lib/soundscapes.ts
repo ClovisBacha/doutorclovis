@@ -24,6 +24,7 @@ import {
   FAMILIAS,
   FAMILIA_DO_SOM,
   NIVEL_AO_VIVO,
+  ofertaveis,
   ROTULO_DO_SOM,
   SONS_CONTINUOS,
   montar,
@@ -92,6 +93,40 @@ export const GRUPOS_DE_SOM: { familia: string; sons: SoundscapeKey[] }[] = [
 /** O rótulo de qualquer chave, inclusive as que não são som contínuo. */
 export const ROTULO: Record<string, { label: string; emoji: string; sub?: string }> =
   Object.fromEntries(SOUNDSCAPES.map((s) => [s.key, s]));
+
+/**
+ * Os grupos, já recortados pelo Modo Cuidado.
+ *
+ * ⚠️ "Coração do bebê" e "Ventre" saem da OFERTA para quem está de luto — ver
+ * `FORA_DO_MODO_CUIDADO`. Eles são os únicos do catálogo cujo nome afirma sobre
+ * uma gestação em curso, e numa folha aberta por quem acabou de perder a
+ * gestação seriam a única coisa da tela falando do bebê, no presente.
+ */
+export function gruposDeSom(
+  luto: boolean,
+  comMusica = true,
+): { familia: string; sons: SoundscapeKey[] }[] {
+  const ok = new Set<string>(ofertaveis(luto));
+  return GRUPOS_DE_SOM.map((g) => ({
+    familia: g.familia,
+    sons: g.sons.filter(
+      (k) =>
+        (k === "musica" ? comMusica : true) && (k === "musica" || k === "silencio" || ok.has(k)),
+    ),
+  })).filter((g) => g.sons.length > 0);
+}
+
+/**
+ * A lista lisa, já recortada pelo Modo Cuidado — para as folhas que não agrupam.
+ */
+export function sonsOfertados(luto: boolean, comMusica = true) {
+  const ok = new Set<string>(ofertaveis(luto));
+  return SOUNDSCAPES.filter(
+    (s) =>
+      (s.key === "musica" ? comMusica : true) &&
+      (s.key === "musica" || s.key === "silencio" || ok.has(s.key)),
+  );
+}
 
 /** Agrupados, para a folha de escolha não virar uma lista de vinte. */
 export const SOUNDSCAPES_POR_FAMILIA = FAMILIAS.map((f) => ({
@@ -191,9 +226,26 @@ export function createSoundscape(
   /** Empurra a fronteira dos eventos para a frente enquanto o som toca. */
   function agendarJanelas() {
     if (!ctx || !master || ctx.state !== "running") return;
+    /**
+     * ⚠️ A ÂNCORA — sem ela, uma falha no `start()` vira um laço infinito de
+     * exceções.
+     *
+     * `proximaJanela` nasce em 0 e só é fixado DEPOIS do `montar` do `start()`.
+     * Quando aquele `montar` estourava (ver `comVolta`), `proximaJanela` ficava
+     * em zero — e este `while`, rodando cinco minutos depois, tentaria agendar
+     * dezesseis janelas de uma vez, TODAS NO PASSADO. Com `chuva-telhado` isso
+     * são dezenas de milhares de nós criados de uma vez, disparando juntos.
+     *
+     * E o incremento vem ANTES do `montar`: se ele estourar, a janela seguinte
+     * ainda avança, e o agendador não fica travado repetindo a mesma.
+     */
+    proximaJanela = Math.max(proximaJanela, ctx.currentTime);
     while (proximaJanela < ctx.currentTime + JANELA_SEGS) {
-      montar(ctx, som, nivel ?? master, JANELA_SEGS, proximaJanela, false);
+      const quando = proximaJanela;
       proximaJanela += JANELA_SEGS;
+      /* ⚠️ `false`: ao vivo não há laço, e a cópia de emenda cairia em tempo
+         NEGATIVO — que é `RangeError`, não um evento ignorado. */
+      montar(ctx, som, nivel ?? master, JANELA_SEGS, quando, false, false);
     }
   }
 
@@ -230,7 +282,7 @@ export function createSoundscape(
       nivel = ctx.createGain();
       nivel.gain.value = NIVEL_AO_VIVO[som] ?? 1;
       nivel.connect(master);
-      montar(ctx, som, nivel, JANELA_SEGS, ctx.currentTime, true);
+      montar(ctx, som, nivel, JANELA_SEGS, ctx.currentTime, true, false);
       proximaJanela = ctx.currentTime + JANELA_SEGS;
       heart = setInterval(agendarJanelas, 5000);
     } catch {
@@ -310,7 +362,18 @@ export function createSoundscape(
     alvo = Math.max(0, Math.min(1, v));
     if (!ctx || !master) return;
     try {
+      /**
+       * ⚠️ A ÂNCORA — `cancelScheduledValues` NÃO segura o valor corrente.
+       *
+       * Ele reverte ao último evento anterior ao corte, e durante o fade de
+       * entrada de 1,5 s não existe nenhum: só o `value` intrínseco, 0,0001.
+       * Sem o `setValueAtTime`, mexer no volume no começo da sessão fazia o som
+       * CAIR A ZERO e subir de novo em 0,3 s. `pausar`, `retomar` e `stop` já
+       * ancoravam; só o volume não — era a única automação sem âncora do
+       * arquivo.
+       */
       master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), ctx.currentTime);
       master.gain.linearRampToValueAtTime(Math.max(0.0001, alvo), ctx.currentTime + 0.3);
     } catch {
       /* ignore */
