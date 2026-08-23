@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { emConteudo, emRepouso } from "@/lib/sessao-de-audio";
 import {
   criarTocador,
   faltando,
@@ -99,6 +100,23 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
   }, []);
 
   useEffect(() => () => tocador.current?.parar(), []);
+
+  /**
+   * ⚠️ A SESSÃO DE ÁUDIO DO iOS SOBE AQUI E VOLTA NO DESMONTE.
+   *
+   * Esta tela toca `<audio>`, e elemento de mídia faz o `audioSession` do iOS
+   * escalar de `ambient` para `playback` — que IGNORA o botão de silêncio. E
+   * ele nunca volta sozinho: sem esta limpeza, um som que tocasse horas depois
+   * (a conquista das 3h da manhã, por exemplo) herdaria isso e sairia alto com
+   * o telefone no silencioso. Ver `sessao-de-audio.ts`.
+   *
+   * O retorno do efeito É o `finally`: ele roda no ✕, ao trocar de tela, e
+   * quando algo estoura no meio.
+   */
+  useEffect(() => {
+    emConteudo();
+    return () => emRepouso();
+  }, []);
 
   /**
    * ⚠️ ABRIR A HISTÓRIA DESTRAVA O SOM, no mesmo toque.

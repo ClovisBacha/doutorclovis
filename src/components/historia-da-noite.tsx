@@ -23,6 +23,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { emConteudo, emRepouso } from "@/lib/sessao-de-audio";
 import { pausaDepoisDo, type Historia } from "@/lib/historias-para-dormir";
 import { faixaDoBloco } from "@/lib/voz-da-noite";
 import { anunciarMidia, estadoDaMidia } from "@/lib/media-session";
@@ -93,6 +94,23 @@ export function HistoriaDaNoite({
   }, []);
 
   useEffect(() => () => limpar(), [limpar]);
+
+  /**
+   * ⚠️ A SESSÃO DE ÁUDIO DO iOS SOBE AQUI E VOLTA NO DESMONTE.
+   *
+   * Esta tela toca `<audio>`, e elemento de mídia faz o `audioSession` do iOS
+   * escalar de `ambient` para `playback` — que IGNORA o botão de silêncio. E
+   * ele nunca volta sozinho: sem esta limpeza, um som que tocasse horas depois
+   * (a conquista das 3h da manhã, por exemplo) herdaria isso e sairia alto com
+   * o telefone no silencioso. Ver `sessao-de-audio.ts`.
+   *
+   * O retorno do efeito É o `finally`: ele roda no ✕, ao trocar de tela, e
+   * quando algo estoura no meio.
+   */
+  useEffect(() => {
+    emConteudo();
+    return () => emRepouso();
+  }, []);
 
   /* Toca o bloco atual e agenda o próximo. Um efeito só: o encadeamento é a
      coisa toda, e dividi-lo em dois faria a pausa e a fala terem relógios

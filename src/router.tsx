@@ -1,6 +1,7 @@
 import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { prepararNativo } from "@/lib/nativo";
+import { emRepouso } from "@/lib/sessao-de-audio";
 
 /* O boot do lado nativo acontece aqui, e não num `useEffect` do `__root.tsx`,
    de propósito: este módulo é o começo do lado cliente e roda ANTES de qualquer
@@ -11,6 +12,16 @@ import { prepararNativo } from "@/lib/nativo";
    No servidor e no navegador é no-op — a função checa se há ponte nativa antes
    de sequer buscar o pedaço de código nativo. */
 prepararNativo();
+/**
+ * ⚠️ A SESSÃO DE ÁUDIO COMEÇA EM REPOUSO.
+ *
+ * O padrão do Safari é `auto`, que sobe para `playback` no primeiro `<audio>` e
+ * NUNCA VOLTA — e `playback` ignora o botão de silêncio do iPhone. Como este
+ * app toca `<audio>` em quatro lugares (voz da meditação, histórias, sons para
+ * dormir, sessão do casal), sem esta linha o aparelho terminava o dia
+ * atravessando o silencioso. Ver `sessao-de-audio.ts`.
+ */
+emRepouso();
 
 export const getRouter = () => {
   const router = createRouter({

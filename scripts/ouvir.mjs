@@ -407,6 +407,11 @@ function medir(som, bytes, periodos) {
   const lag = rep.onde;
 
   const falhas = [];
+  /* ⚠️ Ver o comentário de `medirMusica`: NaN passa por qualquer comparação, e
+     um relatório verde sobre NaN é uma permissão que ninguém pediu. */
+  let naoFinitos = 0;
+  for (let i = 0; i < x.length; i++) if (!Number.isFinite(x[i])) naoFinitos++;
+  if (naoFinitos > 0) falhas.push(naoFinitos + " amostras não-finitas — o grafo divergiu");
   const razaoEmenda = e.degrau / (e.p99 || 1e-9);
   if (razaoEmenda > LIMITES.emendaSobreP99Max)
     falhas.push(
@@ -592,8 +597,129 @@ async function medirNiveis() {
   console.log("");
 }
 
+/**
+ * ⚠️ O MODO `--musica` — porque a música também precisa ser conferida.
+ *
+ * Ela é generativa: não há arquivo para ouvir, e o que sai depende do arco, dos
+ * seis períodos primos e do sorteio. Sem uma bancada, seria a única coisa do
+ * app que ninguém consegue verificar sem ouvido — e este projeto já pagou caro
+ * por entregar o que não conseguia verificar.
+ *
+ * Renderiza a peça inteira num `OfflineAudioContext` e mede o mesmo conjunto de
+ * sempre, mais duas coisas próprias da música: se o fim CHEGA A ZERO (o fecho é
+ * composto, não é fade do player) e se o pico fica abaixo do teto.
+ */
+async function medirMusica() {
+  const minutos = Number((args.find((a) => a.startsWith("--min=")) ?? "").split("=")[1] || 10);
+  const dir = join(tmpdir(), "musica-" + Date.now());
+  mkdirSync(dir, { recursive: true });
+  const entrada = join(dir, "entrada.ts");
+  const saida = join(dir, "m.js");
+  writeFileSync(
+    entrada,
+    'import { montarPeca } from "' +
+      join(RAIZ, "src/lib/musica-audio.ts") +
+      '";\n(globalThis).MUSICA = montarPeca;\n',
+  );
+  execFileSync("bun", ["build", "--outfile=" + saida, "--target=browser", "--format=esm", entrada]);
+  const bundle = readFileSync(saida, "utf8");
+
+  const exe = "/opt/pw-browsers/chromium/chrome-linux/chrome";
+  const navegador = await chromium.launch(existsSync(exe) ? { executablePath: exe } : {});
+  const pagina = await navegador.newPage();
+  await pagina.goto("about:blank");
+  await pagina.addScriptTag({ content: bundle, type: "module" });
+  await pagina.waitForFunction(() => !!globalThis.MUSICA, { timeout: 15000 });
+
+  const dados = await pagina.evaluate(
+    async ([min, luto]) => {
+      const taxa = 22050;
+      /* Uma folga no fim para a cauda do reverb caber: derrubar o render no
+         instante final cortaria justamente o que se quer conferir. */
+      const ctx = new OfflineAudioContext(1, Math.round((min * 60 + 40) * taxa), taxa);
+      const m = ctx.createGain();
+      m.gain.value = 0.6;
+      m.connect(ctx.destination);
+      const total = globalThis.MUSICA(ctx, m, { minutos: min, luto });
+      const buf = await ctx.startRendering();
+      return { x: Array.from(buf.getChannelData(0)), taxa, total };
+    },
+    [minutos, false],
+  );
+  await navegador.close();
+  rmSync(dir, { recursive: true, force: true });
+
+  const x = Float32Array.from(dados.x);
+  const taxa = dados.taxa;
+  const p = pico(x);
+  const rr = rms(x);
+  const env = envelope(x, taxa);
+  const esp = espectro(x, taxa);
+
+  /* O último segundo ANTES do fim composto, e o primeiro depois. */
+  const fim = Math.round(dados.total * taxa);
+  const antes = rms(x.subarray(Math.max(0, fim - taxa * 25), Math.max(0, fim - taxa * 23)));
+  const noFim = rms(x.subarray(Math.max(0, fim - taxa), fim));
+  const depois = rms(x.subarray(fim, Math.min(x.length, fim + taxa * 3)));
+
+  console.log("");
+  console.log("  MÚSICA — " + minutos + " min (" + (dados.total / 60).toFixed(2) + " min reais)");
+  console.log("  " + "─".repeat(60));
+  console.log("  pico              " + p.toFixed(3));
+  console.log("  RMS               " + rr.toFixed(4));
+  console.log("  fator de crista   " + (p / rr).toFixed(2));
+  console.log("  envelope máx/med  " + env.razao.toFixed(2));
+  console.log("  centroide         " + Math.round(esp.centroide) + " Hz");
+  console.log("");
+  console.log("  o fecho composto");
+  console.log("    RMS 25 s antes do fim   " + antes.toFixed(5));
+  console.log("    RMS no último segundo   " + noFim.toFixed(5));
+  console.log("    RMS depois do fim       " + depois.toFixed(5));
+  console.log("");
+  console.log("  energia por banda");
+  for (const [k, v] of Object.entries(esp.porBanda)) {
+    console.log("    " + k.padEnd(9) + v.toFixed(1) + "%");
+  }
+  console.log("");
+
+  const falhas = [];
+  /**
+   * ⚠️ NÃO-FINITO É A PRIMEIRA COISA CONFERIDA — e esta linha nasceu de a
+   * bancada ter aprovado NaN.
+   *
+   * O primeiro render da música saiu inteiro em NaN (realimentação instável no
+   * reverb), e o relatório imprimiu "✅ dentro dos limites": toda comparação
+   * com NaN é falsa, então nenhum limite disparou. Uma ferramenta de
+   * verificação que falha ABERTO é pior que não existir — ela dá permissão.
+   */
+  let naoFinitos = 0;
+  for (let i = 0; i < x.length; i++) if (!Number.isFinite(x[i])) naoFinitos++;
+  if (naoFinitos > 0) {
+    falhas.push(
+      naoFinitos +
+        " amostras não-finitas (" +
+        ((100 * naoFinitos) / x.length).toFixed(1) +
+        "%) — o grafo divergiu",
+    );
+  }
+  if (p > 0.95) falhas.push("pico " + p.toFixed(3) + " encosta no teto — vai saturar");
+  if (rr < 0.005) falhas.push("RMS " + rr.toFixed(5) + " — a peça está quase muda");
+  if (noFim > antes * 0.25)
+    falhas.push(
+      "o fim NÃO desce: " + noFim.toFixed(5) + " contra " + antes.toFixed(5) + " antes do fecho",
+    );
+  if (falhas.length) {
+    for (const f of falhas) console.log("  ❌ " + f);
+    console.log("");
+    process.exit(1);
+  }
+  console.log("  ✅ dentro dos limites");
+  console.log("");
+}
+
 async function main() {
   if (args.includes("--niveis")) return medirNiveis();
+  if (args.includes("--musica")) return medirMusica();
 
   /**
    * ⚠️ A LISTA SAI DO MÓDULO COMPILADO, nunca de uma regex sobre o fonte.

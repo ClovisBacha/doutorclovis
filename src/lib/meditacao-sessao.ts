@@ -105,8 +105,14 @@ const ESPACO_MINIMO = 2;
 /**
  * As cinco janelas, em fração da sessão, e de quantos em quantos ciclos se
  * fala dentro de cada uma.
+ *
+ * ⚠️ EXPORTADA porque a MÚSICA usa o mesmo arco. Ela era privada, e a música
+ * generativa precisou dela: se as duas tivessem tabelas próprias, o silêncio
+ * musical e o silêncio da voz cairiam em instantes diferentes — a sessão
+ * passaria a descrever dois arcos ao mesmo tempo, e a impressão seria de trilha
+ * ACOMPANHANDO a fala em vez de composta com ela. Uma régua só.
  */
-const JANELAS: { momento: Momento; ate: number; cada: number }[] = [
+export const JANELAS: { momento: Momento; ate: number; cada: number }[] = [
   { momento: "acolhimento", ate: 0.12, cada: 1 },
   { momento: "ancoragem", ate: 0.3, cada: 1 },
   { momento: "corpo", ate: 0.64, cada: 2 },

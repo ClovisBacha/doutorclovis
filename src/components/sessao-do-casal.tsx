@@ -24,6 +24,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { emConteudo, emRepouso } from "@/lib/sessao-de-audio";
 import {
   ROTULO_DO_ALVO,
   SESSAO_DO_CASAL,
@@ -144,6 +145,23 @@ export function SessaoDoCasal({ aoSair }: { aoSair: () => void }) {
     audioRef.current = null;
   }, []);
   useEffect(() => () => limpar(), [limpar]);
+
+  /**
+   * ⚠️ A SESSÃO DE ÁUDIO DO iOS SOBE AQUI E VOLTA NO DESMONTE.
+   *
+   * Esta tela toca `<audio>`, e elemento de mídia faz o `audioSession` do iOS
+   * escalar de `ambient` para `playback` — que IGNORA o botão de silêncio. E
+   * ele nunca volta sozinho: sem esta limpeza, um som que tocasse horas depois
+   * (a conquista das 3h da manhã, por exemplo) herdaria isso e sairia alto com
+   * o telefone no silencioso. Ver `sessao-de-audio.ts`.
+   *
+   * O retorno do efeito É o `finally`: ele roda no ✕, ao trocar de tela, e
+   * quando algo estoura no meio.
+   */
+  useEffect(() => {
+    emConteudo();
+    return () => emRepouso();
+  }, []);
 
   /* A tela fica acesa: os dois estão com as mãos ocupadas e ninguém vai tocar
      no celular por dez minutos — é o oposto da história para dormir. */
