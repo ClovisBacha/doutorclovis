@@ -19,6 +19,7 @@
  * silêncio, a tela nunca quebra.
  */
 
+import { criarMusica } from "./musica-audio";
 import {
   FAMILIAS,
   FAMILIA_DO_SOM,
@@ -29,7 +30,20 @@ import {
   type SomKey,
 } from "./som-continuo";
 
-export type SoundscapeKey = "silencio" | SomKey;
+/**
+ * ⚠️ `musica` NÃO É UM SOM CONTÍNUO — e é por isso que ela entra aqui e não em
+ * `SONS_CONTINUOS`.
+ *
+ * Os vinte sons são laços de 30 s: tocam para sempre, e o render offline os
+ * transforma em arquivo para os Sons para dormir. A música tem ARCO e FIM — ela
+ * é construída para a duração da sessão, e a última nota é composta, não
+ * cortada. Pôr a música na lista dos contínuos faria o render tentar fechar um
+ * laço de 30 s numa peça de dez minutos.
+ *
+ * O que ela COMPARTILHA é a interface (`start`/`stop`/`setVolume`/`pausar`/
+ * `retomar`), e é por isso que a tela não precisa saber a diferença.
+ */
+export type SoundscapeKey = "silencio" | "musica" | SomKey;
 
 /**
  * ⚠️ A LISTA SAI DO CATÁLOGO, e o silêncio entra à mão.
@@ -42,6 +56,12 @@ export type SoundscapeKey = "silencio" | SomKey;
  * `som-receitas.ts` só conhece coisas que tocam.
  */
 export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string; sub?: string }[] = [
+  {
+    key: "musica",
+    label: "Música",
+    emoji: "🎶",
+    sub: "composta para a duração da sessão",
+  },
   ...SONS_CONTINUOS.map((k) => ({
     key: k as SoundscapeKey,
     label: ROTULO_DO_SOM[k].label,
@@ -50,6 +70,28 @@ export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string; su
   })),
   { key: "silencio", label: "Silêncio", emoji: "🔇" },
 ];
+
+/**
+ * ⚠️ AGRUPADOS, porque vinte e duas pílulas numa fita é um MURO.
+ *
+ * Com cinco opções a fita lisa funcionava. Com vinte e duas ela vira uma
+ * parede de rótulos que a paciente não lê — ela toca nas duas primeiras e
+ * desiste, que é o mesmo resultado de não ter os outros vinte.
+ *
+ * A primeira fileira é a que NÃO é ambiente: a música (composta, com arco e
+ * fim) e o silêncio (a ausência). As seis famílias vêm depois, com título.
+ */
+export const GRUPOS_DE_SOM: { familia: string; sons: SoundscapeKey[] }[] = [
+  { familia: "", sons: ["musica", "silencio"] as SoundscapeKey[] },
+  ...FAMILIAS.map((f) => ({
+    familia: f as string,
+    sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f) as SoundscapeKey[],
+  })),
+].filter((g) => g.sons.length > 0);
+
+/** O rótulo de qualquer chave, inclusive as que não são som contínuo. */
+export const ROTULO: Record<string, { label: string; emoji: string; sub?: string }> =
+  Object.fromEntries(SOUNDSCAPES.map((s) => [s.key, s]));
 
 /** Agrupados, para a folha de escolha não virar uma lista de vinte. */
 export const SOUNDSCAPES_POR_FAMILIA = FAMILIAS.map((f) => ({
@@ -105,9 +147,29 @@ const SILENCIO: Soundscape = {
  */
 const JANELA_SEGS = 20;
 
-export function createSoundscape(kind: SoundscapeKey): Soundscape {
+/**
+ * ⚠️ `opcoes` EXISTE POR CAUSA DA MÚSICA, e ela é opcional de propósito.
+ *
+ * A música precisa saber a duração da sessão (o arco é construído para ela) e
+ * se é Modo Cuidado (a cor mais escura não entra). Os vinte sons não precisam
+ * de nada — são laços. Deixar o parâmetro opcional é o que permite os dezenove
+ * chamadores existentes continuarem como estão.
+ */
+export function createSoundscape(
+  kind: SoundscapeKey,
+  opcoes?: { minutos?: number; luto?: boolean },
+): Soundscape {
   if (kind === "silencio" || typeof window === "undefined") return SILENCIO;
-  /* A partir daqui é um dos quatro sons de verdade. */
+  /**
+   * ⚠️ A MÚSICA TEM A MESMA FORMA E OUTRA NATUREZA.
+   *
+   * `Musica` e `Soundscape` têm exatamente os mesmos cinco métodos, então a
+   * tela troca de um para o outro sem saber. É isso que fez a integração caber
+   * em duas linhas — e é o motivo de a interface ter sido desenhada assim.
+   */
+  if (kind === "musica") {
+    return criarMusica({ minutos: opcoes?.minutos ?? 10, luto: opcoes?.luto });
+  }
   const som: SomKey = kind;
 
   let ctx: AudioContext | null = null;

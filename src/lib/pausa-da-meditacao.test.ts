@@ -119,7 +119,13 @@ describe("voltar", () => {
     /* Ela pode ter silenciado enquanto o contexto voltava. */
     const corpo = fn();
     expect(corpo).toContain("const somAgora = somRef.current;");
-    expect(corpo).toContain("createSoundscape(somAgora)");
+    /* ⚠️ Sem o parêntese de fechamento: o que este teste cobra é que o som
+       recriado seja `somAgora` (o ATUAL) e não o da closure — não a forma exata
+       da chamada. Ele reprovou no dia em que `createSoundscape` ganhou um
+       segundo argumento (a duração, que a música precisa), sobre um código que
+       continuava certo. Teste que trava a assinatura em vez da intenção é
+       teste que cobra manutenção sem dar proteção. */
+    expect(corpo).toContain("createSoundscape(somAgora");
   });
 
   test("a respiração recomeça do início, e o ciclo NÃO volta", () => {

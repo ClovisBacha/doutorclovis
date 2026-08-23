@@ -26,6 +26,8 @@ import { TRILHA_SKINS, SKIN_KEY, estadoDoNo } from "@/lib/trilha-skins";
 import { vibratePhase } from "@/lib/breath-audio";
 import {
   createSoundscape,
+  GRUPOS_DE_SOM,
+  ROTULO,
   SOUNDSCAPES,
   type Soundscape,
   type SoundscapeKey,
@@ -113,6 +115,13 @@ import {
   IconeTrofeu,
 } from "@/components/icones-jogo";
 import { fireConfetti, celebrateChime, celebrateHaptic, nivelDaSequencia } from "@/lib/celebrate";
+import {
+  gravarNivel,
+  lerNivel,
+  ouvirAmostraDeUI,
+  tocarSomDeUI,
+  type NivelDeSom,
+} from "@/lib/tocar-som-de-ui";
 import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
@@ -5949,6 +5958,10 @@ export function MeditationBlock({
   /* O sheet de sons DENTRO da sessão — pedido do dono: tocar no ícone de som
      não alterna mais direto, abre as opções. */
   const [somNaSessaoAberto, setSomNaSessaoAberto] = useState(false);
+  /* A preferência de som de interface. Lida uma vez, na montagem — ela vive no
+     `localStorage` e nada mais a muda enquanto esta tela está aberta. */
+  const [nivelDeSom, setNivelDeSom] = useState<NivelDeSom>("desligado");
+  useEffect(() => setNivelDeSom(lerNivel()), []);
   /**
    * A AMOSTRA DE DEZ SEGUNDOS — pedido do dono.
    *
@@ -6064,10 +6077,28 @@ export function MeditationBlock({
            `minutos` é o que estava no seletor do menu. */
         registrarMeditacao(Math.round((totalCiclos * CICLO_SEGS) / 60), null);
         concluirDiaDoPrograma();
+        /* Ela pode estar deitada, longe da tela, de olhos fechados. Sem isto, a
+           alternativa é ficar em dúvida se acabou — e abrir os olhos para
+           conferir desfaz os últimos minutos. Dois tons DESCENDO: subir é o
+           vocabulário do alarme. */
+        tocarSomDeUI("fim", { careMode });
         finish();
       } else {
         setCiclo((c) => c + 1);
         setFase("in");
+        /**
+         * ⚠️ A DEIXA DA RESPIRAÇÃO É O CASO MAIS DEFENSÁVEL DE SOM DE INTERFACE
+         * QUE EXISTE NESTE APP: os olhos dela estão FECHADOS, por instrução do
+         * próprio app. Todo o resto que se poderia sonorizar tem a informação
+         * na tela; aqui não tem tela.
+         *
+         * Um tom só, 90 ms, o mais grave do conjunto — e só na virada do
+         * CICLO, nunca a cada fase: três tons a cada dezesseis segundos
+         * viraria metrônomo, e metrônomo é o oposto do trabalho desta tela.
+         *
+         * Nasce desligado. Quem liga é ela, na folha de sons.
+         */
+        tocarSomDeUI("compasso", { careMode });
       }
     }, dur * 1000);
     /* `RESPIRO` guarda SEGUNDOS, e `vibratePhase` quer milissegundos. O outro
@@ -6397,7 +6428,7 @@ export function MeditationBlock({
     grantedRef.current = false;
     audioRef.current?.stop();
     somRef.current = som;
-    audioRef.current = createSoundscape(som);
+    audioRef.current = createSoundscape(som, { minutos, luto: careMode });
     audioRef.current.start();
     /* O relógio da sessão nasce aqui, junto com tudo o mais — ver o
        contador ao lado da barra de progresso. */
@@ -6545,7 +6576,7 @@ export function MeditationBlock({
     const somAgora = somRef.current;
     if (!voltou && somAgora !== "silencio") {
       audioRef.current?.stop();
-      audioRef.current = createSoundscape(somAgora);
+      audioRef.current = createSoundscape(somAgora, { minutos, luto: careMode });
       audioRef.current.start();
     }
     setFase("in");
@@ -6614,7 +6645,7 @@ export function MeditationBlock({
     /* Tocar de novo no mesmo chip desliga: quem já ouviu não precisa esperar
        os dez segundos para escolher outro. */
     if (eraEste || k === "silencio") return;
-    const s = createSoundscape(k);
+    const s = createSoundscape(k, { minutos, luto: careMode });
     amostraRef.current = s;
     s.start();
     setAmostrando(k);
@@ -6631,7 +6662,7 @@ export function MeditationBlock({
     somRef.current = k;
     if (etapa === "sessao" && !pausada) {
       audioRef.current?.stop();
-      audioRef.current = createSoundscape(k);
+      audioRef.current = createSoundscape(k, { minutos, luto: careMode });
       audioRef.current.start();
     } else if (etapa === "escolha") {
       ouvirAmostra(k);
@@ -6977,33 +7008,44 @@ export function MeditationBlock({
                   <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
                     Som de fundo
                   </p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {SOUNDSCAPES.map((s) => (
-                      <button
-                        key={s.key}
-                        onClick={() => trocarSom(s.key)}
-                        className={`press flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
-                          som === s.key
-                            ? "bg-violet-500 text-white"
-                            : "border border-violet-200 bg-white/70 text-violet-700"
-                        }`}
-                      >
-                        <span aria-hidden>{s.emoji}</span>
-                        {s.label}
-                        {amostrando === s.key && (
-                          <span className="flex items-end gap-[2px]" aria-hidden>
-                            {[0, 1, 2].map((i) => (
-                              <span
-                                key={i}
-                                className={`dc-onda w-[2px] rounded-full ${som === s.key ? "bg-white" : "bg-violet-400"}`}
-                                style={{ animationDelay: `${i * 0.18}s` }}
-                              />
-                            ))}
-                          </span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
+                  {/* ⚠️ Agrupado por família: vinte e duas pílulas numa fita lisa é
+                      um muro que a paciente não lê. Ver `GRUPOS_DE_SOM`. */}
+                  {GRUPOS_DE_SOM.map((g) => (
+                    <div key={g.familia || "especiais"} className="mt-2">
+                      {g.familia && (
+                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-400">
+                          {g.familia}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        {g.sons.map((k) => (
+                          <button
+                            key={k}
+                            onClick={() => trocarSom(k)}
+                            className={`press flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
+                              som === k
+                                ? "bg-violet-500 text-white"
+                                : "border border-violet-200 bg-white/70 text-violet-700"
+                            }`}
+                          >
+                            <span aria-hidden>{ROTULO[k]?.emoji}</span>
+                            {ROTULO[k]?.label}
+                            {amostrando === k && (
+                              <span className="flex items-end gap-[2px]" aria-hidden>
+                                {[0, 1, 2].map((i) => (
+                                  <span
+                                    key={i}
+                                    className={`dc-onda w-[2px] rounded-full ${som === k ? "bg-white" : "bg-violet-400"}`}
+                                    style={{ animationDelay: `${i * 0.18}s` }}
+                                  />
+                                ))}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                   <p className="mt-1.5 text-[11px] text-violet-700/60">
                     Toque para ouvir 5 segundos antes de escolher.
                   </p>
@@ -7303,7 +7345,22 @@ export function MeditationBlock({
                       <span className="text-xl leading-none" aria-hidden>
                         {s.emoji}
                       </span>
-                      <span className="text-sm font-extrabold">{s.label}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-extrabold">{s.label}</span>
+                        {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
+                            de cinco para vinte e dois: "Drone grave" e "Pad calmo"
+                            são a mesma coisa para quem nunca ouviu os dois, e ela
+                            não vai tocar em cada um para descobrir. */}
+                        {s.sub && (
+                          <span
+                            className={`block text-[11px] leading-snug ${
+                              som === s.key ? "text-white/70" : "text-violet-700/55"
+                            }`}
+                          >
+                            {s.sub}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -7319,6 +7376,52 @@ export function MeditationBlock({
                 >
                   🔇 Desligar som
                 </button>
+
+                {/* ── A DEIXA DA RESPIRAÇÃO ──────────────────────────────────
+                    ⚠️ O convite ao som de interface vive AQUI, e não num banner
+                    na home, e o lugar é a decisão. Aqui ela já escolheu ouvir o
+                    app e já calibrou o volume no alto-falante dela — o
+                    consentimento acústico já foi dado. Um convite na home
+                    chegaria sem nenhum dos dois.
+
+                    ⚠️ E o texto diz o que NÃO acontece. Quem tem medo de som num
+                    quarto de hospital precisa ouvir que isto não mexe no que
+                    importa antes de considerar ligar. */}
+                {!careMode && (
+                  <div className="mt-6 rounded-2xl border border-violet-200 bg-white/60 p-4">
+                    <p className="text-sm font-extrabold text-violet-900">
+                      Um toque na virada da respiração
+                    </p>
+                    <p className="mt-1 text-[12px] leading-relaxed text-violet-800/70">
+                      De olhos fechados, um tom curto avisa quando o ciclo vira — e outro quando a
+                      sessão acaba. Isso não muda os avisos do seu médico nem a emergência.
+                    </p>
+                    <div className="mt-3 flex gap-2">
+                      {(
+                        [
+                          ["desligado", "Não"],
+                          ["essencial", "Sim"],
+                        ] as const
+                      ).map(([v, r]) => (
+                        <button
+                          key={v}
+                          onClick={() => {
+                            setNivelDeSom(v);
+                            gravarNivel(v);
+                            if (v !== "desligado") ouvirAmostraDeUI("compasso");
+                          }}
+                          className={`press flex-1 rounded-full py-2.5 text-sm font-bold transition-colors ${
+                            nivelDeSom === v
+                              ? "bg-violet-500 text-white"
+                              : "border border-violet-200 bg-white/70 text-violet-700"
+                          }`}
+                        >
+                          {r}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -7838,7 +7941,22 @@ export function BondingBlock({
                       <span className="text-xl leading-none" aria-hidden>
                         {s.emoji}
                       </span>
-                      <span className="text-sm font-extrabold">{s.label}</span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-extrabold">{s.label}</span>
+                        {/* ⚠️ A legenda deixou de ser enfeite quando a lista passou
+                            de cinco para vinte e dois: "Drone grave" e "Pad calmo"
+                            são a mesma coisa para quem nunca ouviu os dois, e ela
+                            não vai tocar em cada um para descobrir. */}
+                        {s.sub && (
+                          <span
+                            className={`block text-[11px] leading-snug ${
+                              som === s.key ? "text-white/70" : "text-violet-700/55"
+                            }`}
+                          >
+                            {s.sub}
+                          </span>
+                        )}
+                      </span>
                     </button>
                   ))}
                 </div>

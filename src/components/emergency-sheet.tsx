@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
@@ -361,6 +362,19 @@ export function EmergencySheet({
 
       setCanais(r.canais);
       setPanic(r.canais.destinos.length ? "sent" : "ninguem");
+      /**
+       * ⚠️ ESTE SOM IGNORA A PREFERÊNCIA — porque não é som de interface, é
+       * ALARME.
+       *
+       * É o único ponto do app em que a confirmação é CLÍNICA e a destinatária
+       * pode não estar lendo a tela: ela está em pânico, possivelmente com o
+       * telefone longe do rosto. Um "✓ enviado" só na tela é a confirmação que
+       * ela não vai ver.
+       *
+       * `podeSoar` deixa passar mesmo com o som desligado e mesmo em Modo
+       * Cuidado — quem perdeu a gestação continua podendo passar mal.
+       */
+      tocarSomDeUI(r.canais.destinos.length ? "sos" : "sos-falhou");
       /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
          pronta do servidor em vez de ser remontada aqui, senão o parente que
          receber pelos dois canais leria duas versões diferentes do mesmo
@@ -417,6 +431,18 @@ export function EmergencySheet({
       if (cachorro !== null) window.clearTimeout(cachorro);
       janela?.close();
       setPanic("idle");
+      /**
+       * ⚠️ O ÚNICO ERRO DO APP QUE MERECE SOM.
+       *
+       * A regra geral é que erro NÃO soa: o erro já está na tela, som de erro é
+       * punitivo, e erro é o evento que mais se repete num formulário. Este é a
+       * exceção, e a razão é a consequência — se o aviso não saiu e ela não
+       * ler o toast, ninguém foi avisado e ela acha que foi.
+       *
+       * Desce e repete, ao contrário do sucesso, que sobe: é o que a deixa
+       * distinguir os dois sem olhar.
+       */
+      tocarSomDeUI("sos-falhou");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
     }
   }

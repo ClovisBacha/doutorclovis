@@ -12,6 +12,7 @@
  *   e degradam em silêncio).
  */
 import { tocarPadrao } from "@/lib/nativo";
+import { tocarConquistaComPortoes } from "./tocar-som-de-ui";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -112,40 +113,38 @@ export function fireConfetti(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   requestAnimationFrame(frame);
 }
 
-/** Toque sonoro alegre (arpejo C-E-G-C). Precisa de gesto do usuário. */
+/**
+ * O TOQUE DA CONQUISTA — afinado, e com os portões que faltavam.
+ *
+ * ⚠️ **Ele NÃO passa pela preferência de som de interface, e isso é decisão.**
+ * Este som já existia e já tocava; a preferência nasceu desligada para o que é
+ * NOVO, e aplicar "desligado por padrão" a ele seria TIRAR uma coisa que o app
+ * tem — o que ninguém pediu. Nada é retirado; o que muda é a afinação e o que
+ * o impede de tocar na hora errada.
+ *
+ * ⚠️ **A escala era Dó–mi–sol–dó de A = 440**, ou seja de sistema nenhum: o
+ * pad tocava outro, o marco semanal tocava um terceiro. Agora é a pentatônica
+ * de lá em A = 432, a mesma do resto do som do app — e a mesma cuja propriedade
+ * (nenhum par forma segunda menor nem trítono) garante que dois sons que se
+ * sobreponham por acidente continuem consonantes.
+ *
+ * ⚠️ **E ele ganhou TRÊS portões que não tinha**, todos de `podeSoar`:
+ *
+ * • **aba escondida** — a festa tocava com o app em segundo plano, ou seja no
+ *   quarto e não para ela;
+ * • **sem gesto recente** — o app tem push e cron capazes de disparar sozinhos;
+ * • **teto de três por dia** — num dia bom ela fecha o dia, ganha troféu e
+ *   completa um conjunto: três festas. A quarta não acrescenta e começa a
+ *   tirar.
+ *
+ * O Modo Cuidado continua sendo responsabilidade de quem chama, como sempre
+ * foi — `humorDaJornada` e os blocos de `careMode` já o resolvem antes daqui.
+ */
 export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
   if (typeof window === "undefined") return;
-  try {
-    const AC =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const ctx = new AC();
-    /* Dó–mi–sol–dó sempre; do nível 3 em diante a escala continua subindo,
-       e é a ALTURA que o ouvido lê como "foi maior", não o volume. */
-    const escala = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98, 2093.0];
-    const notes = escala.slice(0, Math.min(escala.length, 3 + nivel));
-    const now = ctx.currentTime;
-    notes.forEach((f, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.value = f;
-      const t0 = now + i * 0.09;
-      gain.gain.setValueAtTime(0, t0);
-      gain.gain.linearRampToValueAtTime(0.18, t0 + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(t0);
-      osc.stop(t0 + 0.42);
-    });
-    setTimeout(() => {
-      ctx.close().catch(() => {});
-    }, 900);
-  } catch {
-    /* sem áudio disponível */
-  }
+  /* A ALTURA é o que o ouvido lê como "foi maior", não o volume — então o
+     nível acrescenta degraus na escada em vez de subir o ganho. */
+  tocarConquistaComPortoes(Math.min(6, 3 + nivel));
 }
 
 /**

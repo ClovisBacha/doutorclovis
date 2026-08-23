@@ -240,10 +240,19 @@ export const DESENHOS: Record<EspecieDeSom, Desenho> = {
     ganho: 0.2,
   },
   /**
-   * ⚠️ O SOS É O ÚNICO QUE SOBE, e é o único acima do teto de 1100 Hz — porque
-   * ele É o alarme para o qual essa faixa está reservada. Duas notas
-   * ascendentes, mais altas e mais longas: o vocabulário de "chegou", não o de
-   * "pronto".
+   * ⚠️ O SOS É O ÚNICO QUE SOBE, e o que o separa do resto é o BRILHO — não o
+   * fundamental.
+   *
+   * A prosa anterior dizia que ele era "o único acima do teto de 1100 Hz", e a
+   * bancada desmentiu na primeira foto: as notas dele são 432 e 864 Hz, as duas
+   * bem abaixo do teto. O que atravessa a faixa reservada ao alarme é o CORTE
+   * do filtro (2600 Hz contra 900–1100 dos outros), que deixa passar os
+   * harmônicos — exatamente a faixa de 2 a 4 kHz onde o ouvido é mais sensível
+   * e onde a IEC 60601-1-8 manda um alarme médico ter energia.
+   *
+   * E a direção é o outro sinal: SOBE. Descer é o vocabulário de "pronto";
+   * subir é o de "chegou". Trocar os dois faria a confirmação do socorro soar
+   * como o fim de um exercício de alongamento.
    */
   sos: {
     passos: [
@@ -350,5 +359,61 @@ export function desenhar(especie: EspecieDeSom): void {
     }
   } catch {
     /* sem áudio: a tela nunca quebra */
+  }
+}
+
+/**
+ * A ESCADA DA CONQUISTA, com o número de degraus pedido.
+ *
+ * ⚠️ Vive aqui, e não em `celebrate.ts`, porque a AFINAÇÃO tem de ser uma só —
+ * era exatamente a divergência que este trabalho veio consertar. `celebrate.ts`
+ * desenha confete e vibra; a nota é assunto daqui.
+ */
+export function tocarConquista(degraus: number): void {
+  const ctx = contexto();
+  if (!ctx) return;
+  try {
+    void ctx.resume().catch(() => {});
+    /* A pentatônica de lá, subindo. Cinco degraus cobrem uma oitava e meia —
+       além disso a escada passaria do teto de 1100 Hz e entraria na faixa
+       reservada ao alarme. */
+    const escada = [N.la4, N.do5, N.re5, N.mi5, N.sol5, N.la5];
+    const passos = escada.slice(0, Math.max(2, Math.min(escada.length, degraus)));
+    const d = DESENHOS.conquista;
+    const t0 = ctx.currentTime + 0.02;
+    const lp = ctx.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.value = d.corte;
+    lp.Q.value = 0.707;
+    const mestre = ctx.createGain();
+    mestre.gain.value = d.ganho;
+    lp.connect(mestre).connect(ctx.destination);
+    passos.forEach((hz, i) => {
+      const o = ctx.createOscillator();
+      /* Triângulo, como era antes: harmônicos ímpares fracos, que o filtro
+         molda. O timbre da festa não mudou — mudou a afinação dele. */
+      o.type = "triangle";
+      o.frequency.value = hz;
+      const g = ctx.createGain();
+      const em = t0 + i * 0.09;
+      const dur = i === passos.length - 1 ? 0.42 : 0.3;
+      g.gain.setValueAtTime(0.0001, em);
+      g.gain.linearRampToValueAtTime(1, em + d.ataque);
+      g.gain.exponentialRampToValueAtTime(0.0001, em + dur);
+      g.gain.setValueAtTime(0, em + dur);
+      o.connect(g).connect(lp);
+      o.start(em);
+      o.stop(em + dur + 0.02);
+      o.onended = () => {
+        try {
+          o.disconnect();
+          g.disconnect();
+        } catch {
+          /* ignore */
+        }
+      };
+    });
+  } catch {
+    /* sem áudio */
   }
 }

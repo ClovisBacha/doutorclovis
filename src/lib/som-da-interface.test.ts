@@ -117,7 +117,16 @@ describe("⚠️ os números, e o que cada um impede", () => {
     }
   });
 
-  test("⚠️ a faixa do ALARME é reservada — só o SOS entra nela", () => {
+  test("⚠️ o que separa o alarme é o BRILHO, não o fundamental", () => {
+    /* A primeira redação da prosa dizia que o SOS era "o único acima do teto de
+       1100 Hz". A foto da bancada desmentiu: as notas dele são 432 e 864 Hz,
+       abaixo do teto. Quem atravessa a faixa reservada é o CORTE do filtro. */
+    for (const e of ALARME) {
+      expect({ e, brilhante: DESENHOS[e].corte > TETO_HZ }).toEqual({ e, brilhante: true });
+    }
+  });
+
+  test("⚠️ a faixa do ALARME é reservada — nenhum som de interface entra nela", () => {
     /* O pico de sensibilidade do ouvido está entre 2 e 5 kHz, e é por isso que
        a norma de alarme médico (IEC 60601-1-8) exige harmônicos ali. Som de
        interface que colocar energia nessa faixa toma emprestado o timbre de

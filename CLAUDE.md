@@ -481,6 +481,284 @@ não `ativa`: bancada que abre no caso raro ensina o caso errado. ⚠️ A da as
 tela** — é a lição do dia aplicada na hora, depois de o campo do onboarding e o
 cartão do Perfil terem sido escritos às cegas e só ganharem bancada num remendo.
 
+
+## O som do app inteiro, e a bancada que faltava (ago/2026)
+
+Pedido do dono: vistoriar todos os efeitos sonoros, acrescentar muitos, cuidar
+especialmente da meditação, e "fazer um estudo profundo sobre os Hertz",
+começando pelos 432 Hz.
+
+O que existia: **vinte e um sons** — quatro paisagens sintetizadas (chuva, mar,
+coração, pad), um tom de respiração do marco semanal, um chime de conquista, e
+536 mp3 que são todos VOZ (a Isabella narrando meditação, histórias e a sessão
+do casal). **Nenhuma música.** Nenhum sino. Nenhum som de interface além do
+chime.
+
+### ⚠️ A BANCADA DE OUVIR VEIO PRIMEIRO, e a razão é a de sempre
+
+Este arquivo conta, com números, como os sons foram consertados: "crista 4,25 →
+8,30", "auto-similaridade 0,997 → −0,002", "o degrau na emenda do coração era
+0,0443". Cada número decidiu uma linha de código — e **nenhum era
+reproduzível**. As medições foram feitas à mão, uma vez, e morreram no terminal.
+
+Quem acrescentasse o quinto som não tinha como saber se ele estava no padrão dos
+quatro. E quem escreve este código NÃO OUVE o resultado. É a lacuna que a skill
+`/tela` nomeia para layout ("se você não consegue verificar, não entregue"),
+aplicada a som.
+
+**`scripts/ouvir.mjs`** renderiza num Chromium de verdade (`OfflineAudioContext`
+não existe em Node), lê o WAV CRU — `decodeAudioData` reamostra e INVENTA um
+degrau nas bordas, que é exatamente o que se quer medir — e mede sete coisas,
+cada uma ligada a um defeito já pago. Modos: sem argumento mede os vinte;
+`--niveis` imprime a tabela de ganho ao vivo; `--musica` mede a peça inteira.
+
+⚠️ **Ela já corrigiu TRÊS métricas minhas, e as três mentiam:**
+
+1. **O percentil da emenda** descreve a POSIÇÃO na fila, nunca o tamanho — e
+   quem estala é o tamanho. Num pad todos os degraus são minúsculos, então um
+   degrau inaudível cai no percentil 100 e "reprova"; numa chuva cheia de gotas,
+   um degrau grande cai em 60 e "passa". Provado variando só o aquecimento: o
+   percentil pulou 91,5 → 10,4 → 33,4 → 78,7 → 89,5 → 95% enquanto o degrau
+   absoluto ficava entre 0,0025 e 0,084, todos muito abaixo do p99. O critério
+   virou **degrau contra o p99 dos degraus do próprio sinal** — tamanho contra
+   tamanho, autocalibrado por som.
+2. **A repetição** era medida no maior período DECLARADO pelo módulo. Falha de
+   dois jeitos: quando o período declarado é o trecho inteiro não sobra lag e a
+   coluna vira "—", parecendo aprovação; e um som que repita num período que
+   ninguém declarou passa batido. Agora ela VARRE os lags.
+3. ⚠️ **E ela APROVOU NaN.** O primeiro render da música saiu inteiro em NaN e o
+   relatório imprimiu "✅ dentro dos limites": toda comparação com NaN é falsa,
+   então nenhum limite disparou. **Ferramenta de verificação que falha ABERTO é
+   pior que não existir — ela dá permissão.** Não-finito é a primeira coisa
+   conferida agora, nos dois modos.
+
+### A afinação: A = 432 Hz, e o que NÃO pode ser dito
+
+`src/lib/afinacao.ts`. Antes havia três sistemas que não concordavam: o pad em
+173,4/174,6/260,1/261,9, a respiração do marco semanal em 174/261, e o chime da
+conquista num acorde de números soltos.
+
+⚠️ **O arquivo existe tanto para AFINAR quanto para BARRAR.** Este é um app
+médico de gestação de alto risco: "432 Hz acalma" ao lado de uma triagem de
+pré-eclâmpsia ensina a paciente que o app afirma coisas sem evidência, e a
+próxima afirmação que ela vai desacreditar é a que importa. Há catraca varrendo
+o `src/` inteiro, nas duas formas (dura e mole) e contra as alegações nomeadas.
+
+O que a pesquisa em fontes primárias achou:
+
+- **440 Hz é de 1834** (Scheibler, congresso de Stuttgart), ISO R16 em 1955.
+  "Os nazistas impuseram o 440" é falso por um século de distância.
+- ⚠️ **VERDI QUERIA 435, NÃO 432.** A carta de 1884 diz: "se a comissão acredita
+  que devemos reduzir as 435 vibrações do diapasão francês para 432, a diferença
+  é tão pequena, QUASE IMPERCEPTÍVEL AO OUVIDO, que me associo de bom grado."
+  Ele pediu o padrão francês e aceitou o 432 como arredondamento.
+- **"Schumann 8 × 54 = 432" se autodestrói**: a fundamental é 7,83 Hz (7,83 × 54
+  = 422,8), e aceitando o 8 arredondado, **8 × 55 = 440**. Os dois são múltiplos
+  exatos de 8. Não há nada ali que distinga o 432.
+- ⚠️ **"A=432 e C=256" são INCOMPATÍVEIS** no temperamento igual: C=256 implica
+  A=430,54, e A=432 implica C=256,87. Só valem juntos num sistema pitagórico que
+  ninguém aplica.
+- **As Solfeggio** foram inventadas por Joseph Puleo nos anos 1970, publicadas
+  por Horowitz em 1999, por redução numerológica (todas reduzem a 3, 6 ou 9).
+  Não vêm de Guido d'Arezzo — o solfejo dele é RELATIVO, e não havia como medir
+  frequência absoluta antes de 1834. E 528 Hz não é dó em afinação nenhuma.
+- **O estudo-âncora é piloto**: Calamassi & Pomponi 2019, *Explore*, n = 33,
+  frequência cardíaca −4,79 bpm com **p = 0,05 exato** em 12+ desfechos sem
+  correção. Sem replicação independente.
+- **E o achado mais decisivo é de percepção**: Van Hedger & Bongiovanni 2023 —
+  ouvintes caem ao NÍVEL DO ACASO ao julgar afinação absoluta quando o estímulo
+  tem pistas de altura relativa, isto é, quando é música. Ninguém identifica a
+  afinação ouvindo música.
+
+⚠️ **E EU TINHA ESCRITO A JUSTIFICATIVA ERRADA.** A primeira versão dizia "mais
+grave, centroide mais baixo, percebido como menos tenso". A primeira metade é
+verdade (Ilie & Thompson 2006) e a aplicação é falsa: aquelas manipulações são
+de SEMITONS A OITAVAS, e aqui a diferença é de 0,32 de semitom. A razão que
+sobra é de engenharia — **uma referência só, para drone, sinos, música e
+interface não brigarem entre si** —, e ela basta. É gosto, não é remédio.
+
+⚠️ **O que move fisiologia de verdade** (Bernardi, *Heart* 2006) é ANDAMENTO,
+dinâmica e SILÊNCIO — a pausa derruba frequência cardíaca e pressão abaixo do
+basal. O desenho da sessão importa mais que a afinação dela.
+
+**A GRADE DO LAÇO:** `noLaco()` encaixa qualquer frequência em múltiplos de
+1/30 Hz, que é o que o laço de 30 s exige. O erro segue **28,85/f cents** —
+0,72 a 40 Hz, 0,07 a 432. Pior no GRAVE, que é onde estes sons vivem; a prosa
+antiga afirmava "0,11 cents", certo para 257 Hz e falso como afirmação geral.
+
+### Os vinte sons
+
+`som-primitivas.ts` (as peças) · `som-receitas.ts` (as vinte) ·
+`som-continuo.ts` (WAV, render, tocador). A divisão é por PERGUNTA.
+
+⚠️ **O que separa um som bom de um chiado** não é o filtro: é o EVENTO. Chuva é
+densidade de impactos; riacho é a BOLHA (frequência de Minnaert, com o deslize
+ASCENDENTE — sem ele soa como sino minúsculo); fogo é o AGRUPAMENTO dos estalos
+(2,5/s uniformes soam como relógio quebrado); pássaro é a AUSÊNCIA de ruído
+(canto é tom puro com trajetória, e quem acrescenta ruído erra).
+
+⚠️ **140 bpm É O CORAÇÃO DO BEBÊ, não o do útero.** O que o feto ouve é dominado
+pelo coração MATERNO, 70 a 80 bpm; 140 a 160 é a fetal, do doppler. Hoje há os
+dois com nomes que não mentem: `coracao` (o do bebê, o apelo emocional) e
+`ventre` (o materno, com o whoosh TRAVADO na batida — a diferença inteira entre
+ruído marrom e útero). 140 bpm é rápido demais para induzir sono, e induzir sono
+é o uso do segundo.
+
+⚠️ **E o passa-alta em 28 Hz do ventre é obrigatório**: alto-falante de celular
+não reproduz abaixo de ~60 Hz, e sem o corte ~40% da energia é inaudível E conta
+na normalização, derrubando o volume do arquivo por causa de uma banda que
+ninguém ouve.
+
+### ⚠️ Os defeitos que a medição achou no que já existia
+
+- **A CHUVA SE REPETIA A CADA 10 s, e era isso que se ouvia.** Varrendo os lags:
+  ~0 em todos, 0,993 em 10 s. E decompondo o render, a cama vale **99% da
+  energia** (RMS 0,0126 contra 0,0012) — o comentário do código afirmava o
+  contrário. A cama passou a durar o laço INTEIRO: 0,993 → 0,007. Custo medido
+  antes de decidir: gerar 30 s de ruído rosa a 48 kHz leva 45 ms.
+- **AS GOTAS SAÍAM CEM VEZES MAIS FRACAS** do que o envelope pedia. `pico` é o
+  ganho de um nó de GANHO, e o que passa por ele é ruído ROSA já cortado por um
+  passa-faixa de Q 3–9 — e o rosa cai 3 dB por oitava, então entre 700 e 5000 Hz
+  não sobrava quase nada. Fonte virou BRANCO, mais um ganho acertado na bancada.
+- **AO VIVO, A CHUVA REPETIA AS MESMAS GOTAS A CADA 20 s.** `montar` sorteia com
+  semente fixa; offline é chamada uma vez, ao vivo uma por janela. A semente
+  passou a somar o instante da janela.
+- **O BATIMENTO TROPEÇAVA A CADA 20 s** — o pior defeito da meditação. As
+  batidas eram agendadas a partir do começo de cada janela, e 20 s não é
+  múltiplo de 0,42857 s: a primeira batida de cada janela saía **139 ms
+  adiantada** (32% do período), **trinta vezes numa sessão de dez minutos**.
+  `naGrade` ancora no zero absoluto — e a correção não podia ser "escolher uma
+  janela múltipla", porque qualquer mudança em `JANELA_SEGS` traria de volta.
+- **VAZAMENTO DE BUFFER**, que a cama de 30 s PIOROU: o mar criava 2,6 MB a cada
+  20 s, uns 79 MB numa meditação de dez minutos. Cache num `WeakMap` por
+  CONTEXTO (morre com a sessão) e por TAXA (servir o buffer errado daria o som
+  com a altura trocada).
+- **31,5 dB DE DIFERENÇA ENTRE OS SONS AO VIVO.** A normalização só existe no
+  render offline. ⚠️ E igualar o RMS de todos seria errado: uma lareira é
+  silêncio com estalos (crista 15) e um pad é contínuo (crista 3,2) — para a
+  lareira alcançar o RMS do pad, o estalo sairia a 3,7 de amplitude. O ganho é o
+  MENOR entre "chega no RMS alvo" e "não passa do pico". **31,5 → 9,7 dB.**
+- **A SESSÃO PODIA RODAR MUDA** e nada avisava: `start()` nunca chamava
+  `resume()`, e um contexto que nasce suspenso fazia `agendarJanelas` desistir
+  em silêncio — meditação inteira sem som, com o chip aceso.
+- **`stop()` FECHAVA O CONTEXTO NO ATO** — um clique, e o pior caminho é trocar
+  de som no MEIO da sessão. Agora há rampa de 80 ms.
+- **LAREIRA E FOGUEIRA SAÍAM IDÊNTICAS**: um `lowpass(1200)` escrito depois do
+  `lowpass(4200 ou 9000)` anulava a única diferença entre elas.
+- **O RESSOADOR DO TELHADO ESTAVA EM PARALELO** — três filtros de realce em
+  paralelo somam três cópias do sinal, o que é volume e não ressoador. Em série:
+  crista 21,3 → 11,5.
+
+⚠️ **E A REGRA DO AQUECIMENTO ERA FALSA.** O arquivo afirmava que ele "tem de
+ser múltiplo inteiro de todo período, senão desloca a fase e o problema volta".
+Medido variando só o aquecimento (4·7·10·11·13·30 s), o degrau pula sem padrão
+nenhum. A conta explica: num sinal de período p, o trecho [w, w+L] fecha quando
+**L** é múltiplo de p — w não entra. O aquecimento serve para os FILTROS saírem
+do estado zerado, e só. Hoje a emenda fecha por **costura**: renderiza-se 20 ms
+a mais e mistura-se a sobra na cabeça do trecho. (Isso NÃO é o "fade dentro do
+trecho" que o `renderizar` proíbe: ali é rampa de volume que vira pulso a cada
+volta; aqui a amplitude não muda.)
+
+### A música — o app não tinha nenhuma
+
+`musica.ts` (régua pura) + `musica-audio.ts` (grafo). Generativa, porque só
+assim dez minutos de sessão dão dez minutos de música.
+
+⚠️ **A ESCALA NÃO É GOSTO — É UM TEOREMA.** Proibir segunda menor e trítono é
+pedir um conjunto independente no grafo circulante C₁₂(1,6), e em Z₁₂ os únicos
+independentes de seis são os dois alternados, que contêm trítonos. **Logo o
+máximo é CINCO.** O teste varre os 4096 subconjuntos e prova: existem
+exatamente doze conjuntos seguros, as doze transposições da pentatônica.
+Escolher pentatônica é a única família que existe.
+
+A emoção vem da **rotação do drone**: um conjunto só (lá·dó·ré·mi·sol) dá cinco
+cores conforme onde o drone pousa. ⚠️ A mais escura (sobre mi) é barrada no Modo
+Cuidado — a diferença entre "recolhido" e "escuro" é a diferença entre acolher e
+afirmar a perda.
+
+O mecanismo é o do Eno em *Music for Airports*: seis vozes com períodos PRIMOS
+(19·23·29·31·37·41), MMC de **595.973.171 s ≈ dezenove anos**. ⚠️ 17 foi
+descartado de propósito: contra o ciclo de 16 s ele deriva um segundo por
+respiração e atravessa o ciclo em 16 delas — uma varredura que o ouvido pega.
+⚠️ E o ganho é proporcional ao período: quem fala mais, fala mais baixo, senão a
+voz de 19 s vira ostinato.
+
+⚠️ **As janelas vêm da SESSÃO**, não de uma cópia: `JANELAS` era privada em
+`meditacao-sessao.ts` e foi exportada. Com tabelas próprias, o silêncio musical
+e o silêncio da voz cairiam em instantes diferentes.
+
+⚠️ **A PEÇA SAÍA INTEIRA EM NaN — 73,5% das amostras.** O reverb de Schroeder
+(comb realimentado com passa-baixa no laço) diverge no Web Audio. Medido:
+Q=1,00/fb=0,90 → NaN aos 35,4 s; Q=0,707/fb=0,85 → pico 4,5×10²⁸; Q=0,50/fb=0,85
+→ 2,3×10⁸; só fb=0,70 fica estável — e aí a cauda cai para ~0,6 s quando o arco
+pede 4 a 9. A primeira leitura foi o Q (um passa-baixa com Q=1, **o padrão do
+`BiquadFilterNode`**, tem pico de +1,25 dB, e dentro de um laço isso põe o ganho
+de volta acima de 1) — verdade, e não bastou. A saída foi **convolução com
+resposta gerada**: FIR não pode divergir por construção e entrega exatamente o
+RT60 pedido. O argumento contra era estético e perde para "o outro caminho
+produz NaN".
+
+⚠️ **O FECHO É COMPOSTO, NÃO UM FADE** — fade diz "acabou o tempo", e a sessão
+precisa dizer "chegamos". E ele precisou virar função de MÓDULO porque só
+existia ao vivo: o render offline montava a peça sem ele, e o relatório dizia "o
+fim não desce" sobre um caminho que não tinha fecho nenhum. **Uma coisa que só
+existe ao vivo é uma coisa que ninguém confere.**
+
+Medido, dez minutos: pico 0,720 · crista 6,06 · centroide 221 Hz · o RMS cai de
+0,127 para 0,00013 no último segundo, exatamente os −60 dB que τ = 3,2 s
+promete.
+
+### O som de interface, e a sessão de áudio do iOS
+
+⚠️ **MINHA PREMISSA ESTAVA INVERTIDA.** Eu escrevia que "Web Audio ignora o
+botão de silêncio do iPhone". É o CONTRÁRIO — o WebKit trata isso como o bug
+237322: Web Audio É silenciado pelo botão, e quem o ignora são os `<audio>`.
+
+⚠️ **E o perigo real é outro, e já estava no repositório.** Desde o iOS 17 o
+`navigator.audioSession.type` começa em `ambient` e **escala para `playback`
+quando um `<audio>` toca — e nunca volta**. Este app toca `<audio>` em quatro
+lugares. O caso concreto do desastre: ela ouve uma história para dormir às 22h,
+a sessão sobe para `playback`, e o som das 3h da manhã herda isso e sai alto com
+o telefone no silencioso. `sessao-de-audio.ts` devolve ao repouso no boot e no
+DESMONTE das três telas de áudio longo — o desmonte é o `finally`.
+
+⚠️ **NUNCA embarcar o `unmute-ios-audio`**: ele existe para desfazer exatamente
+a proteção que este app quer.
+
+**O som de interface nasce DESLIGADO**, e a decisão é sobre quem paga o erro:
+ligar custa um toque; o erro custa um incidente, e o incidente não é "ela
+desliga o som", é **"ela silencia o app inteiro nas Configurações do iPhone"** —
+o mesmo canal do aviso de emergência.
+
+⚠️ **O critério do que merece som NÃO é importância:** é **som só onde os olhos
+NÃO estão.** Isso descarta a categoria que quase todo app sonoriza — toque,
+navegação, curtir, salvar, publicar. E **erro não merece som**: já está na tela
+em vermelho, som de erro é PUNITIVO, e erro é o que mais se repete num
+formulário.
+
+Ficaram seis espécies. Duas são **ALARME** (SOS enviado, SOS falhou) e ignoram a
+preferência, o Modo Cuidado e o teto — quem perdeu a gestação continua podendo
+passar mal. ⚠️ E o SOS é o único que SOBE, e o que o separa é o BRILHO, não o
+fundamental — a foto da bancada desmentiu a primeira redação disto: as notas
+dele são 432 e 864 Hz, abaixo do teto. Quem atravessa a faixa de 2–4 kHz (pico
+de sensibilidade do ouvido, e o que a IEC 60601-1-8 exige de um alarme médico) é
+o CORTE do filtro dele, 2600 Hz contra 900–1100 dos outros.
+
+⚠️ **O ataque é o parâmetro mais importante da lista.** A resposta de
+sobressalto cai monotonicamente com o tempo de subida entre 2 e 100 ms: abaixo
+de ~15 ms é a diferença entre informar e assustar. Nenhum som daqui sobe em
+menos de 20 ms.
+
+⚠️ **`celebrateChime` NÃO passa pela preferência**, e isso é decisão: ele já
+existia e já tocava, e aplicar "desligado por padrão" a ele seria TIRAR uma
+coisa que o app tem. Nada é retirado — o que muda é a afinação (era dó-mi-sol-dó
+de A=440) e os três portões que ele nunca teve: aba escondida, ausência de gesto
+recente, e teto de três por dia.
+
+**Bancadas:** `/preview-som` (os vinte, a música e os sons de interface, todos
+num toque) · `/preview-sons` (a tela dos Sons para dormir).
+**Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10`.
+
 ## Resquícios do Lovable (opcional remover)
 
 - `@lovable.dev/vite-tanstack-config` — preset de build (funciona; remover é
