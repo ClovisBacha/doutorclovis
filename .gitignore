@@ -53,3 +53,4 @@ src/assets/social/*.png
 
 # Pastas de trabalho dos agentes verificadores (screenshots, scripts de medição)
 .verif*/
+.claude/worktrees/
