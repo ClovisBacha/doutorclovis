@@ -79,18 +79,18 @@ export function emConteudo(): void {
 }
 
 /**
- * Roda um conteúdo de áudio longo e SEMPRE devolve a sessão ao repouso.
+ * ⚠️ AQUI HAVIA UM `comAudioLongo(f)` que embrulhava uma promessa num
+ * `try/finally`. Ele foi ESCRITO e nunca teve chamador — e este repositório já
+ * pagou três vezes por deixar código assim de pé (`proximoDesbloqueio`,
+ * `escadaDeTrofeus`, as três conquistas da Escola apontando para uma tabela que
+ * nada escrevia).
  *
- * ⚠️ O `finally` é o ponto inteiro. Sem ele, um erro no meio da história, um
- * toque no ✕ ou o app indo para segundo plano deixariam o aparelho em
- * `playback` **pelo resto do dia** — e o próximo som que tocasse, qualquer que
- * fosse, atravessaria o interruptor de silêncio.
+ * A razão de não servir: as três telas de áudio longo são componentes React, e
+ * o que garante o "sempre volta" nelas não é um `finally` numa promessa — é o
+ * RETORNO DO EFEITO, que roda no ✕, ao trocar de tela e quando algo estoura no
+ * meio. O efeito já é o `finally`; um segundo mecanismo seria uma segunda régua
+ * para a mesma coisa.
+ *
+ * Se um dia houver áudio longo fora de componente (um cron, um worker), a
+ * função volta — com chamador.
  */
-export async function comAudioLongo<T>(f: () => Promise<T>): Promise<T> {
-  emConteudo();
-  try {
-    return await f();
-  } finally {
-    emRepouso();
-  }
-}
