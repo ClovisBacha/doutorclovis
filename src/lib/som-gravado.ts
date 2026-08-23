@@ -25,12 +25,11 @@
  * pode mudar de duração. A gravação entra ONDE a medição disse que a síntese
  * perde, som a som, e o resto continua como está.
  *
- * ⚠️ **E NÃO HÁ NENHUM ARQUIVO AINDA.** `GRAVADOS` nasce vazio de propósito:
- * a fonte do áudio é decisão do dono (biblioteca licenciada, gravação de campo
- * ou banco CC0), e escrever nomes de arquivo que não existem faria a tela
- * prometer um som que nunca carrega. Com a tabela vazia, o app se comporta
- * EXATAMENTE como antes — este arquivo é infraestrutura adormecida até o
- * primeiro `.webm` entrar em `public/sons/`.
+ * ⚠️ **OS OITO SÃO CC0 DE VERDADE**, baixados pelo Openverse (que agrega o
+ * Freesound) e conferidos duas vezes — no filtro da consulta e no resultado.
+ * A procedência de cada um está em `public/sons/CREDITOS.json`; CC0 não exige
+ * atribuição, mas sem o registro ninguém prova daqui a um ano que podia usar.
+ * Baixar de novo: `node scripts/sons/do-openverse.mjs`.
  */
 
 import type { SomKey } from "./som-receitas";
@@ -50,7 +49,23 @@ import type { SomKey } from "./som-receitas";
  * serem jogados fora a cada deploy. Caminho estável é o que torna esse cache
  * possível.
  */
-export const GRAVADOS: Partial<Record<SomKey, { arquivo: string; ganho: number }>> = {};
+export const GRAVADOS: Partial<Record<SomKey, { arquivo: string; ganho: number }>> = {
+  /* ⚠️ O GANHO FECHA O QUE O `loudnorm` NÃO PÔDE FECHAR NO ARQUIVO.
+     Os oito foram normalizados a −20 LUFS em duas passadas, mas a fogueira
+     parou em −30,7: levá-la ao alvo dentro do arquivo exigiria comprimir, e
+     comprimir fogo apaga justamente a diferença entre o estalo e o corpo dele.
+     O arquivo fica limpo e a correção acontece AQUI, no player, onde o Web
+     Audio trabalha em float e tem folga de sobra. Medido com
+     `ebur128`; espalhamento no arquivo 11,5 LU → ~0 depois destes números. */
+  fogueira: { arquivo: "/sons/fogueira.webm", ganho: 3.428 },
+  lareira: { arquivo: "/sons/lareira.webm", ganho: 1.122 },
+  passaros: { arquivo: "/sons/passaros.webm", ganho: 0.912 },
+  sapos: { arquivo: "/sons/sapos.webm", ganho: 1.288 },
+  cigarras: { arquivo: "/sons/cigarras.webm", ganho: 1.012 },
+  "floresta-noite": { arquivo: "/sons/floresta-noite.webm", ganho: 0.977 },
+  riacho: { arquivo: "/sons/riacho.webm", ganho: 1.514 },
+  cachoeira: { arquivo: "/sons/cachoeira.webm", ganho: 1.288 },
+};
 
 /**
  * O ganho MEDIDO da gravação, ou 1 quando não há arquivo.

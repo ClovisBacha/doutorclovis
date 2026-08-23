@@ -75,12 +75,62 @@ describe("o cruzamento que fecha o laço", () => {
   });
 });
 
-describe("o catálogo adormecido", () => {
-  /* ⚠️ ESTE TESTE É O CONTRATO DE SEGURANÇA DA MUDANÇA INTEIRA.
-     Enquanto não houver arquivo nenhum, o app tem de se comportar EXATAMENTE
-     como antes — nenhum som pode passar a depender de rede. */
-  test("sem arquivo registrado, nenhum som se diz gravado", () => {
-    for (const k of SONS_CONTINUOS) expect(temGravacao(k)).toBe(false);
+describe("o catálogo", () => {
+  /**
+   * ⚠️ **O QUE NÃO PODE VIRAR GRAVAÇÃO — e é a metade importante da lista.**
+   *
+   * Ruído sintetizado é EXATO: gravá-lo só acrescentaria o chiado do microfone
+   * de quem gravou. Tons são instrumentos por natureza, e um pad gravado não
+   * pode mudar de duração. Máquinas são filtro mais harmônico, que é como elas
+   * soam mesmo. Trocar qualquer um destes por arquivo é PIORAR, e é o erro que
+   * "melhorar o som" convida a cometer.
+   */
+  const NUNCA_GRAVADO = [
+    "branco",
+    "rosa",
+    "marrom",
+    "pad",
+    "drone",
+    "tigela",
+    "sino-vento",
+    "piano",
+    "ventilador",
+    "ar-condicionado",
+    "secador",
+    "maquina-lavar",
+    "aviao",
+    "coracao",
+    "ventre",
+  ] as const;
+
+  test("⚠️ ruído, tons e máquinas NUNCA viram arquivo", () => {
+    for (const k of NUNCA_GRAVADO) {
+      expect({ k, gravado: temGravacao(k) }).toEqual({ k, gravado: false });
+    }
+  });
+
+  test("os oito de fogo, bicho e água têm gravação", () => {
+    for (const k of [
+      "fogueira",
+      "lareira",
+      "passaros",
+      "sapos",
+      "cigarras",
+      "floresta-noite",
+      "riacho",
+      "cachoeira",
+    ] as const) {
+      expect({ k, gravado: temGravacao(k) }).toEqual({ k, gravado: true });
+    }
+  });
+
+  test("nenhum som fora do catálogo entrou na tabela", () => {
+    for (const k of Object.keys(GRAVADOS)) {
+      expect({ k, existe: (SONS_CONTINUOS as readonly string[]).includes(k) }).toEqual({
+        k,
+        existe: true,
+      });
+    }
   });
 
   test("⚠️ toda entrada futura precisa de caminho E de ganho medido", () => {
