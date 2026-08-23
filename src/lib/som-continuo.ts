@@ -29,6 +29,7 @@
  * 9 s para 10 s: diferença inaudível, e é o que faz 30 s fecharem redondo.
  */
 
+import { noLaco, nota } from "./afinacao";
 import type { SoundscapeKey } from "./soundscapes";
 
 export const SONS_CONTINUOS = ["chuva", "mar", "coracao", "pad"] as const;
@@ -44,27 +45,76 @@ export const LOOP_SEGS = 30;
 export const CAUDA_SEGS = 15;
 
 /**
- * O comprimento do laço de ruído, POR SOM.
+ * O comprimento do laço de ruído: o LAÇO INTEIRO, para nada se repetir dentro
+ * dele.
+ *
+ * ─── A HISTÓRIA, PORQUE ELA SE REPETIU DUAS VEZES ───────────────────────────
  *
  * Era 2 s para todos, e a medição mostrou o preço: 0,997 de auto-similaridade
- * a dois segundos — o ouvido reconhece a volta em menos de um minuto. Dez
- * segundos resolvem, mas custam aquecimento (ver `aquecimentoDe`), e o coração
- * não precisa de tanto: o "shhh" dele é cortado em 320 Hz, e nessa banda
- * estreita a repetição quase não se ouve. Seis segundos fecham com a batida
- * (6 ÷ 3/7 = 14) e mantêm o render dele rápido.
+ * a dois segundos. Passou para 10 s (6 no coração), e a prosa deu o caso por
+ * encerrado.
+ *
+ * ⚠️ **Não estava.** `scripts/ouvir.mjs` mediu a curva inteira de lags e achou
+ * o mesmo defeito um degrau adiante: ~0 em todos os lags e **0,993 exatamente
+ * em 10 s** — o laço só tinha ficado cinco vezes mais lento, não tinha sumido.
+ * E a decomposição do render mostrou por que isso é grave na chuva: a cama vale
+ * 99% da energia (RMS 0,0126 contra 0,0012 das gotas), então o que o ouvido
+ * mais ouve É a cama, e a cama voltava a cada dez segundos.
+ *
+ * Com a cama durando `LOOP_SEGS`, nada se repete dentro do trecho: o laço de
+ * ruído e o laço do arquivo passam a ser o MESMO laço.
+ *
+ * ⚠️ O que impedia isso era uma regra que se provou falsa (ver `XFADE_SEGS`):
+ * o aquecimento precisava ser múltiplo de todo período, e uma cama de 30 s
+ * forçaria aquecimento de 30 s. Como a emenda hoje fecha por costura e não por
+ * fase, o aquecimento é um número só, e a cama pode ter o tamanho que precisar.
+ *
+ * O custo foi MEDIDO no Chromium, e é barato: gerar 30 s de ruído rosa a
+ * 48 kHz leva **45 ms** (10 s levava 16 ms) e ocupa 5,5 MB. São três quadros,
+ * uma vez por sessão, atrás de um fade de entrada de 1,5 s.
  */
-function ruidoSegs(kind: SomKey): number {
-  return kind === "coracao" ? 6 : 10;
+function ruidoSegs(_kind: SomKey): number {
+  return LOOP_SEGS;
 }
 const CHUVA_LFO_SEGS = 10;
 const MAR_ONDA_SEGS = 10;
 const CORACAO_BPM = 140;
-/** 174 e 261 Hz são múltiplos de 87: o pad se repete a cada 1/87 s. */
-const PAD_BASE_HZ = 87;
+
+/**
+ * AS QUATRO VOZES DO PAD, agora afinadas — fá 3 e dó 4 em A = 432.
+ *
+ * Eram 173,4 · 174,6 · 260,1 · 261,9: um fá e um dó de A = 440, arredondados à
+ * mão até caírem na grade do laço. Soavam bem e não pertenciam a sistema
+ * nenhum — nem ao 440, nem ao 432, nem ao resto do app.
+ *
+ * ⚠️ A NOTA É A MESMA, só que certa. Em A = 432 o fá 3 dá 171,44 Hz e o dó 4
+ * dá 256,87, contra 174,61 e 261,63 do padrão ISO: o timbre não muda, o
+ * intervalo continua sendo a quinta justa, e o pad passa a concordar com os
+ * sinos, com a música e com o marco da semana.
+ *
+ * A DESAFINAÇÃO DE ±0,6 Hz é o que dá vida ao pad — o batimento entre vozes
+ * quase iguais produz uma ondulação lenta de amplitude que o ouvido lê como
+ * respiração do som. Sem ela o fator de crista fica em 1,91, que é um tom
+ * morto.
+ *
+ * ⚠️ E TUDO PASSA POR `noLaco`: cada frequência tem de fechar volta inteira em
+ * 30 s, senão sobra meia volta na emenda. `171,44 × 30 = 5143,3` — quebrado, e
+ * seria um estalo a cada 30 s. `noLaco` põe em 171,4333, a 0,07 cents de
+ * distância.
+ */
+const PAD_VOZES = [
+  noLaco(nota("fa", 3) - 0.6),
+  noLaco(nota("fa", 3) + 0.6),
+  noLaco(nota("do", 4) - 0.6),
+  noLaco(nota("do", 4) + 0.6),
+];
 
 /** Todo período interno do som, em segundos. O loop tem de ser múltiplo de todos. */
 export function periodosDe(kind: SomKey): number[] {
-  if (kind === "pad") return [1 / PAD_BASE_HZ];
+  /* Cada voz do pad fecha sozinha em 30 s (é o que `noLaco` garante), então o
+     período de cada uma entra na lista — o teste da emenda confere uma a uma
+     em vez de confiar numa base comum escrita à mão. */
+  if (kind === "pad") return [...PAD_VOZES.map((f) => 1 / f), 15];
   if (kind === "chuva") return [ruidoSegs(kind), CHUVA_LFO_SEGS];
   if (kind === "mar") return [ruidoSegs(kind), MAR_ONDA_SEGS];
   return [ruidoSegs(kind), 60 / CORACAO_BPM];
@@ -156,6 +206,33 @@ export function wav(amostras: Float32Array, taxa: number): Blob {
 type Contexto = BaseAudioContext;
 
 /**
+ * Ruído BRANCO — energia igual por hertz.
+ *
+ * A cama dos sons é rosa (energia igual por oitava, que é como soa tudo que a
+ * natureza faz), mas quem alimenta um RESSONADOR precisa ser branco: o rosa
+ * cai 3 dB por oitava, e entre 700 e 5000 Hz — que é onde a água bate — já
+ * sobrou pouquíssima energia. Foi essa a causa de as gotas saírem cem vezes
+ * mais fracas do que o envelope pedia.
+ */
+function ruidoBranco(ctx: Contexto, segundos: number, semente = 7): AudioBuffer {
+  const len = Math.round(ctx.sampleRate * segundos);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  const rnd = sorteador(semente);
+  for (let i = 0; i < len; i++) d[i] = rnd() * 2 - 1;
+  return buf;
+}
+
+/** Sorteio determinístico: o mesmo render sai igual toda vez. */
+function sorteador(semente: number) {
+  let s = semente >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+}
+
+/**
  * Ruído ROSA — o filtro de Paul Kellett, que é o padrão da literatura de áudio
  * para aproximar 1/f com sete polos e custo desprezível.
  *
@@ -163,10 +240,16 @@ type Contexto = BaseAudioContext;
  * medição do laço de 2 s dava 0,997 de auto-similaridade) e divisor exato de
  * `LOOP_SEGS`, que é o que mantém a emenda sem costura.
  */
-function ruidoRosa(ctx: Contexto, segundos: number): AudioBufferSourceNode {
+function ruidoRosa(ctx: Contexto, segundos: number, semente = 1): AudioBufferSourceNode {
   const len = Math.round(ctx.sampleRate * segundos);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = buf.getChannelData(0);
+  /* ⚠️ SORTEIO COM SEMENTE, e não `Math.random()`.
+     Com `Math.random()` a cama saía DIFERENTE a cada render — o mesmo som
+     medido duas vezes dava dois números, e `scripts/ouvir.mjs` não teria como
+     dizer se uma mudança melhorou ou se foi o sorteio. Determinismo aqui é o
+     que torna a bancada uma bancada. */
+  const rnd = sorteador(semente);
   let b0 = 0,
     b1 = 0,
     b2 = 0,
@@ -175,7 +258,7 @@ function ruidoRosa(ctx: Contexto, segundos: number): AudioBufferSourceNode {
     b5 = 0,
     b6 = 0;
   for (let i = 0; i < len; i++) {
-    const w = Math.random() * 2 - 1;
+    const w = rnd() * 2 - 1;
     b0 = 0.99886 * b0 + w * 0.0555179;
     b1 = 0.99332 * b1 + w * 0.0750759;
     b2 = 0.969 * b2 + w * 0.153852;
@@ -191,14 +274,11 @@ function ruidoRosa(ctx: Contexto, segundos: number): AudioBufferSourceNode {
   return src;
 }
 
-/** Sorteio determinístico: o mesmo render sai igual toda vez. */
-function sorteador(semente: number) {
-  let s = semente >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
+/**
+ * Quanto uma gota precisa ser amplificada para valer o que o envelope diz.
+ * Medido na bancada — ver o comentário dentro de `gota`.
+ */
+const GANHO_GOTA = 1.2;
 
 /**
  * Uma GOTA: um estalo curto de ruído passado por um ressonador.
@@ -207,7 +287,14 @@ function sorteador(semente: number) {
  * de 25 a 70 ms — com a frequência de ressonância sorteada entre 700 e 5000 Hz,
  * que é a faixa em que a água bate em telhado, folha, poça e vidro.
  */
-function gota(ctx: Contexto, saida: AudioNode, fonte: AudioBuffer, t: number, r: () => number) {
+function gota(
+  ctx: Contexto,
+  saida: AudioNode,
+  fonte: AudioBuffer,
+  t: number,
+  r: () => number,
+  forca = 1,
+) {
   const src = ctx.createBufferSource();
   src.buffer = fonte;
   const inicio = r() * Math.max(0.001, fonte.duration - 0.2);
@@ -222,7 +309,35 @@ function gota(ctx: Contexto, saida: AudioNode, fonte: AudioBuffer, t: number, r:
   /* Ao cubo: a maioria das gotas fica discreta e algumas poucas estouram, que
      é a distribuição real — não uma chuva de gotas todas iguais. */
   const u = r();
-  const pico = 0.06 + u * u * u * 1.1;
+  /**
+   * ⚠️ `GANHO_GOTA` NÃO É TEMPERO — é a correção de um defeito medido.
+   *
+   * O comentário da chuva sempre disse que "quem define o som são os impactos;
+   * a cama só preenche o entre", e a cama foi baixada de 0,34 para 0,08 por
+   * causa disso. Só que `pico` é o ganho de um nó de GANHO, não a amplitude de
+   * saída: o que passa por ele é ruído já filtrado por um passa-faixa de Q
+   * entre 3 e 9, que corta quase tudo. Decompondo o render, as gotas ficavam em
+   * RMS 0,0012 contra 0,0126 da cama — **1% da energia**. A intenção escrita
+   * nunca chegou ao sinal.
+   *
+   * Trocar a fonte para ruído branco recupera parte; o resto é este ganho, e
+   * ele foi ACERTADO NA BANCADA (`node scripts/ouvir.mjs`) até as gotas e a
+   * cama ficarem no mesmo patamar de energia.
+   */
+  /**
+   * ⚠️ A CAUDA DA DISTRIBUIÇÃO PRECISOU SER DOMADA, e o motivo é a
+   * normalização.
+   *
+   * Era `0,06 + u³ · 1,1`: a gota mais forte sai 19× a mediana. Como o arquivo
+   * é normalizado PELO PICO, essa única gota define o volume de tudo — medido,
+   * o fator de crista foi a 36 e o RMS do arquivo caiu de 0,134 para 0,025,
+   * ou seja um som cinco vezes mais baixo num iPhone, onde a página não
+   * controla volume nenhum.
+   *
+   * `0,25 + u² · 0,75` mantém a variedade (a razão entre a mais forte e a mais
+   * fraca continua sendo 4) sem que uma gota isolada esmague o arquivo.
+   */
+  const pico = (0.25 + u * u * 0.75) * GANHO_GOTA * forca;
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(pico, t + 0.001);
   g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -230,6 +345,24 @@ function gota(ctx: Contexto, saida: AudioNode, fonte: AudioBuffer, t: number, r:
   src.connect(bp).connect(g).connect(saida);
   src.start(t, inicio, dur + 0.02);
   src.stop(t + dur + 0.03);
+}
+
+/**
+ * ⚠️ A SEMENTE DEPENDE DA JANELA — e sem isso a chuva se repetia a cada 20 s.
+ *
+ * `montar` sorteia com semente fixa. No render offline ela é chamada UMA vez,
+ * então a sequência corre do começo ao fim e nada se repete. **Ao vivo é o
+ * contrário**: `createSoundscape` chama uma vez por janela de `JANELA_SEGS`,
+ * e com semente fixa toda janela recebia a MESMA sequência — as mesmas gotas,
+ * nos mesmos instantes, nas mesmas frequências, a cada vinte segundos, durante
+ * a meditação inteira.
+ *
+ * Somar o instante da janela conserta ao vivo e não mexe no offline, onde
+ * `t0` é sempre 0 e a semente continua sendo a de sempre — o render segue
+ * reproduzível, que é o que a bancada precisa.
+ */
+function semente(base: number, t0: number): number {
+  return (base + Math.round(t0 * 1000)) >>> 0;
 }
 
 /**
@@ -255,9 +388,8 @@ export function montar(
      * BATIMENTO entre vozes quase iguais: 0,6 Hz de diferença produz uma
      * ondulação lenta de amplitude que o ouvido lê como respiração do som.
      *
-     * ⚠️ Toda frequência é múltipla de 1/30 Hz — é o que mantém o loop de 30 s
-     * fechando exato. 174,6 × 30 = 5238, inteiro. Uma desafinação "bonita"
-     * como 174,63 quebraria a emenda.
+     * ⚠️ Toda frequência passa por `noLaco` — ver `PAD_VOZES`. Uma desafinação
+     * "bonita" escrita à mão quebraria a emenda.
      */
     const lp = ctx.createBiquadFilter();
     lp.type = "lowpass";
@@ -275,7 +407,7 @@ export function montar(
     g.gain.value = 0.22;
     lp.connect(g).connect(saida);
 
-    for (const f of [173.4, 174.6, 260.1, 261.9]) {
+    for (const f of PAD_VOZES) {
       const o = ctx.createOscillator();
       /* Triângulo em vez de senoide: tem harmônicos ímpares fracos, que é o
          que o filtro tem para moldar. Senoide não dá o que filtrar. */
@@ -288,7 +420,7 @@ export function montar(
   }
 
   if (kind === "chuva") {
-    const r = sorteador(20260813);
+    const r = sorteador(semente(20260813, t0));
     if (base) {
       /* A cama: rosa, com o grave cortado e o agudo domado. Ela sozinha era o
          som inteiro antes — agora é o fundo sobre o qual as gotas caem. */
@@ -303,12 +435,27 @@ export function montar(
          medido, a curtose do envelope ficava em 2,56 (ruído liso) contra 15,6
          do coração, que é o único som que sempre soou certo. Quem define o
          som da chuva são os impactos; a cama só preenche o entre. */
+      /**
+       * ⚠️ A CAMA VOLTOU A SUBIR — e não é um recuo, é consequência.
+       *
+       * Ela foi de 0,34 para 0,08 quando as gotas foram criadas, com o
+       * argumento de que "afogava as gotas". O argumento estava certo e o
+       * remédio errado: as gotas não estavam sendo afogadas pela cama, estavam
+       * saindo cem vezes mais fracas do que o envelope pedia (ver
+       * `GANHO_GOTA`). Baixar a cama escondeu o sintoma e trouxe outro — o
+       * arquivo é normalizado PELO PICO, então cama baixa com gotas altas dá um
+       * arquivo de RMS baixo, ou seja um som fraco num iPhone.
+       *
+       * Com as gotas no nível certo, a cama pode voltar ao que ela é: o chiado
+       * das mil gotas distantes que não se distinguem uma da outra. Os dois
+       * números foram acertados juntos na bancada.
+       */
       const g = ctx.createGain();
-      g.gain.value = 0.08;
+      g.gain.value = 0.24;
       const lfo = ctx.createOscillator();
       lfo.frequency.value = 1 / CHUVA_LFO_SEGS;
       const lfoG = ctx.createGain();
-      lfoG.gain.value = 0.08;
+      lfoG.gain.value = 0.1;
       lfo.connect(lfoG).connect(g.gain);
       lfo.start(0);
       src.connect(hp).connect(lp).connect(g).connect(saida);
@@ -321,7 +468,7 @@ export function montar(
      * ⚠️ Nenhuma gota é agendada nos últimos 200 ms: no render em loop, uma
      * gota cortada pela emenda vira um clique a cada volta.
      */
-    const fonte = ruidoRosa(ctx, ruidoSegs(kind)).buffer!;
+    const fonte = ruidoBranco(ctx, 2, 991);
     const gotas = ctx.createGain();
     gotas.gain.value = 1;
     gotas.connect(saida);
@@ -347,7 +494,7 @@ export function montar(
   }
 
   if (kind === "mar") {
-    const r = sorteador(776);
+    const r = sorteador(semente(776, t0));
     if (base) {
       /* O fundo: rosa bem grave, o ronco constante do mar longe. */
       const src = ruidoRosa(ctx, ruidoSegs(kind));
@@ -468,20 +615,28 @@ const TAXA_ALVO = 22050;
  * entrar em regime. Depois: coração 0,0001 (percentil 1,8% dos degraus do
  * próprio sinal), mar 0,0169, chuva 0,2211 — todos dentro do normal do sinal.
  */
-const AQUECIMENTO_MIN = 4;
-/* Só divisores de `LOOP_SEGS` entram: assim o aquecimento fecha um número
-   inteiro de voltas de tudo, e o trecho guardado começa na mesma fase em que
-   termina. Um aquecimento "redondo em segundos" mas fora de fase moveria o
-   problema em vez de resolvê-lo. */
-const AQUECIMENTOS = [5, 6, 10, 15, 30];
+/**
+ * ⚠️ UM NÚMERO SÓ, e a regra antiga era falsa.
+ *
+ * A versão anterior escolhia o aquecimento entre os divisores de `LOOP_SEGS`
+ * que fossem múltiplos de todo período do som, com a justificativa de que um
+ * aquecimento "fora de fase moveria o problema em vez de resolvê-lo".
+ *
+ * A medição (registrada em `XFADE_SEGS`) desmentiu: variando SÓ o aquecimento,
+ * o degrau da emenda pula sem padrão nenhum — os múltiplos não são melhores
+ * que os outros. A conta explica: para um sinal de período p, o trecho
+ * [w, w+L] fecha se **L** for múltiplo de p; w não entra.
+ *
+ * O que o aquecimento faz de verdade, e só isso, é dar aos FILTROS tempo de
+ * sair do estado zerado — um biquad tem memória, e no instante zero ela está
+ * vazia. Oito segundos cobrem com folga o mais lento que existe aqui, e são
+ * baratos: o render passa a durar `8 + 30` segundos de tempo simulado, contra
+ * os 40 do pior caso anterior.
+ */
+const AQUECIMENTO_SEGS = 8;
 
-export function aquecimentoDe(kind: SomKey): number {
-  const ps = periodosDe(kind);
-  for (const c of AQUECIMENTOS) {
-    if (c < AQUECIMENTO_MIN) continue;
-    if (ps.every((p) => Math.abs(c / p - Math.round(c / p)) < 1e-9)) return c;
-  }
-  return LOOP_SEGS;
+export function aquecimentoDe(_kind: SomKey): number {
+  return AQUECIMENTO_SEGS;
 }
 
 /**
@@ -496,6 +651,57 @@ export function aquecimentoDe(kind: SomKey): number {
  * que ela desliga.
  */
 const PICO_ALVO = 0.89;
+
+/**
+ * ⚠️ A EMENDA FECHA POR CROSSFADE — e a prosa antiga daqui estava errada.
+ *
+ * O arquivo afirmava que o aquecimento "tem de ser múltiplo inteiro de todo
+ * período do som, senão ele desloca a fase e o problema volta". Medido no
+ * Chromium, o degrau da emenda por aquecimento (4 · 7 · 10 · 11 · 13 · 30 s):
+ *
+ *     chuva   0,0269  0,0025  0,0068  0,0131  0,0788  0,0841
+ *     pad     0,0441  0,0031  0,0509  0,0041  0,0010  0,0463
+ *
+ * Não há padrão nenhum favorecendo os múltiplos — os valores pulam. A conta
+ * explica por quê: para um sinal de período p, o trecho [w, w+L] fecha se **L**
+ * for múltiplo de p, e w não entra na conta. O aquecimento serve para os
+ * filtros entrarem em regime, e só.
+ *
+ * E ficou à mostra um defeito que o critério antigo escondia: no PAD, o maior
+ * degrau do arquivo inteiro É a emenda (0,0509 contra p99 de 0,0453). Num
+ * drone liso, isso é o único evento largo de banda que existe — exatamente o
+ * "tec" que a emenda deveria não ter.
+ *
+ * O conserto é o de sempre em laço de amostra, e não depende de fase nenhuma:
+ * renderiza-se 20 ms A MAIS e mistura-se essa sobra na cabeça do trecho. O
+ * primeiro quadro passa a ser, por construção, a continuação do último.
+ *
+ * ⚠️ Isto NÃO é o "fade dentro do trecho" que o comentário do `renderizar`
+ * proíbe — aquilo é uma rampa de volume que vira pulso a cada volta. Aqui a
+ * amplitude não muda: dois trechos do MESMO som se somam com pesos que fecham
+ * 1. Vinte milissegundos é curto o bastante para nenhum ouvido ouvir a
+ * mistura, e longo o bastante (441 amostras a 22050) para matar o degrau.
+ */
+const XFADE_SEGS = 0.02;
+
+/**
+ * Mistura a sobra do fim na cabeça do trecho, para o laço fechar sem degrau.
+ *
+ * Peso LINEAR e não de potência igual: os dois lados são o mesmo som, e no pad
+ * são quase idênticos em fase — com peso linear a soma fica de amplitude
+ * constante, enquanto potência igual daria um inchaço de 3 dB. Em ruído, a
+ * queda de 3 dB do linear dura 20 ms uma vez a cada 30 s, o que é muito abaixo
+ * de qualquer degrau audível.
+ */
+function costurar(x: Float32Array, quadros: number, sobra: number): Float32Array {
+  if (sobra <= 0 || sobra >= quadros) return x.subarray(0, quadros);
+  const trecho = x.slice(0, quadros);
+  for (let i = 0; i < sobra; i++) {
+    const w = i / sobra;
+    trecho[i] = trecho[i] * w + x[quadros + i] * (1 - w);
+  }
+  return trecho;
+}
 
 function normalizar(amostras: Float32Array): void {
   let pico = 0;
@@ -531,7 +737,9 @@ function criarOffline(quadros: number, taxa: number): OfflineAudioContext | null
 export async function renderizar(kind: SomKey, cauda = false): Promise<Blob | null> {
   const segundos = cauda ? CAUDA_SEGS : LOOP_SEGS;
   const aquecimento = aquecimentoDe(kind);
-  const total = aquecimento + segundos;
+  /* A cauda toca UMA vez e não fecha em nada — ela não precisa da sobra. */
+  const sobraSegs = cauda ? 0 : XFADE_SEGS;
+  const total = aquecimento + segundos + sobraSegs;
   for (const taxa of [TAXA_ALVO, 44100]) {
     try {
       const ctx = criarOffline(Math.round(total * taxa), taxa);
@@ -558,7 +766,14 @@ export async function renderizar(kind: SomKey, cauda = false): Promise<Blob | nu
       const buf = await ctx.startRendering();
       /* Descarta o aquecimento: é ele que deixa os filtros em regime, para o
          começo do trecho soar igual ao fim dele. */
-      const trecho = buf.getChannelData(0).subarray(Math.round(aquecimento * buf.sampleRate));
+      const depoisDoAquecimento = buf
+        .getChannelData(0)
+        .subarray(Math.round(aquecimento * buf.sampleRate));
+      const trecho = costurar(
+        depoisDoAquecimento,
+        Math.round(segundos * buf.sampleRate),
+        Math.round(sobraSegs * buf.sampleRate),
+      );
       normalizar(trecho);
       return wav(trecho, buf.sampleRate);
     } catch {

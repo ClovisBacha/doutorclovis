@@ -54,36 +54,37 @@ describe("⚠️ a emenda do loop", () => {
     expect(CAUDA_SEGS).toBeLessThan(LOOP_SEGS);
   });
 
-  test("⚠️ o aquecimento também fecha em voltas inteiras de tudo", () => {
-    /* Ele existe porque o filtro tem memória: sem descartar um pedaço inicial,
-       o começo do trecho carregava um transitório que o fim já não tinha — e no
-       coração isso media um degrau MAIOR que qualquer outro do arquivo, ou
-       seja, um clique a cada volta. Mas um aquecimento fora de fase moveria o
-       problema em vez de resolvê-lo: ele tem de ser múltiplo de todo período. */
+  test("⚠️ o aquecimento é um número SÓ — e a regra antiga era falsa", () => {
+    /* Ele escolhia entre os divisores de LOOP_SEGS que fossem múltiplos de
+       todo período, com a justificativa de que um aquecimento "fora de fase
+       moveria o problema em vez de resolvê-lo".
+
+       Medido no Chromium com `scripts/ouvir.mjs`, variando SÓ o aquecimento
+       (4 · 7 · 10 · 11 · 13 · 30 s), o degrau da emenda deu:
+
+           chuva  0,0269  0,0025  0,0068  0,0131  0,0788  0,0841
+           pad    0,0441  0,0031  0,0509  0,0041  0,0010  0,0463
+
+       Sem padrão nenhum: os múltiplos não são melhores que os outros. A conta
+       diz por quê — num sinal de período p, o trecho [w, w+L] fecha quando L é
+       múltiplo de p, e w não entra. O aquecimento serve para os FILTROS
+       saírem do estado zerado, e é só isso que ele faz. */
     for (const som of SONS_CONTINUOS) {
-      const a = aquecimentoDe(som);
-      expect({ som, minimo: a >= 4 }).toEqual({ som, minimo: true });
-      for (const p of periodosDe(som)) {
-        const voltas = a / p;
-        expect({ som, p, inteiro: Math.abs(voltas - Math.round(voltas)) < 1e-9 }).toEqual({
-          som,
-          p,
-          inteiro: true,
-        });
-      }
+      expect({ som, a: aquecimentoDe(som) }).toEqual({ som, a: 8 });
     }
   });
 
-  test("o aquecimento é o MENOR que serve — ele custa render", () => {
-    /* Com 30 s para todos, o coração levava 812 ms para ficar pronto; com 6 s,
-       315 ms. É o tempo que ela espera olhando "preparando…".
-       ⚠️ O laço de ruído passou de 2 s para 10 s (ver `ruidoSegs`), e isso
-       empurra o aquecimento junto — o do coração fica em 6 porque o laço dele
-       é 6, e o da chuva em 10 porque o LFO virou 1/10 Hz. */
-    expect(aquecimentoDe("coracao")).toBe(6);
-    expect(aquecimentoDe("mar")).toBe(10);
-    expect(aquecimentoDe("pad")).toBe(5);
-    expect(aquecimentoDe("chuva")).toBe(10);
+  test("⚠️ quem fecha a emenda é a COSTURA, e ela não depende de fase", () => {
+    /* A sobra renderizada a mais é misturada na cabeça do trecho, então o
+       primeiro quadro passa a ser, por construção, a continuação do último.
+       Foi isto que baixou o degrau do pad de 1,12× o p99 do próprio sinal
+       — ou seja, o maior degrau do arquivo ERA a emenda — para 0,22×. */
+    const fonte = readFileSync("src/lib/som-continuo.ts", "utf8");
+    expect(fonte).toContain("function costurar(");
+    /* A cauda toca uma vez e não fecha em nada: costurá-la seria misturar o
+       fim do silêncio na cabeça do fade. */
+    const fn = fonte.slice(fonte.indexOf("export async function renderizar("));
+    expect(fn).toContain("const sobraSegs = cauda ? 0 : XFADE_SEGS;");
   });
 
   test("o coração fecha em batidas inteiras", () => {
@@ -161,8 +162,7 @@ describe("o temporizador", () => {
 });
 
 describe("quais sons entram", () => {
-  test("os quatro do fundo da meditação, e o silêncio fica de fora", () => {
-    expect([...SONS_CONTINUOS]).toEqual(["chuva", "mar", "coracao", "pad"]);
+  test("o silêncio nunca é um som contínuo — ele é a ausência de um", () => {
     expect(ehSomContinuo("silencio")).toBe(false);
     expect(ehSomContinuo("chuva")).toBe(true);
   });

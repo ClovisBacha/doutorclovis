@@ -75,9 +75,10 @@ const pedidos = args.filter((a) => !a.startsWith("--"));
  * `som-continuo.ts`. Mexer num deles é decidir aceitar aquele defeito de volta.
  */
 const LIMITES = {
-  /* O degrau da emenda tem de ficar entre os degraus normais do próprio sinal.
-     50% é folgado de propósito — o que importa é não ser um OUTLIER. */
-  emendaPercentilMax: 50,
+  /* O degrau da emenda não pode passar o p99 dos degraus do próprio sinal.
+     Um sinal cheio de transiente tem p99 alto e aguenta muito; um drone liso
+     tem p99 baixo e qualquer coisa nele é o estalo. Autocalibrado por som. */
+  emendaSobreP99Max: 1,
   /* Pico: `PICO_ALVO` é 0,89. Abaixo de 0,80 o som sai baixo demais num iPhone,
      onde a página não controla volume nenhum; acima de 0,95 encosta no teto. */
   picoMin: 0.8,
@@ -89,12 +90,18 @@ const LIMITES = {
 };
 
 /* Sons de IMPACTO precisam de crista; sons de cama, não. Um pad com crista 9
-   estaria estalando, e uma chuva com crista 2 é chiado de TV. */
-const CRISTA_MINIMA = {
-  chuva: 5,
-  mar: 5,
-  coracao: 5,
+   estaria estalando, e uma chuva com crista 2 é chiado de TV.
+   ⚠️ E crista ALTA DEMAIS também é defeito: acima de ~20 o pico é um evento
+   isolado, e como o arquivo é normalizado pelo pico, tudo o mais fica baixo. */
+const CRISTA = {
+  chuva: [5, 20],
+  mar: [5, 20],
+  coracao: [5, 20],
 };
+
+/* Sons cuja repetição é o próprio som: drone, batimento, onda com período.
+   Cobrar ausência de padrão neles seria cobrar que deixassem de ser o que são. */
+const PERIODICOS = ["pad", "coracao", "mar"];
 
 /* ─────────────────────────── Render no navegador ───────────────────────── */
 
@@ -182,10 +189,23 @@ function rms(x) {
 }
 
 /**
- * O DEGRAU DA EMENDA, em percentil dos degraus do próprio sinal.
+ * O DEGRAU DA EMENDA — absoluto, e contra o p99 dos degraus do próprio sinal.
  *
- * Absoluto não serve: 0,22 é normal na chuva e seria um estalo no pad. O que
- * importa é se o salto da volta é um OUTLIER dentro do que aquele som já faz.
+ * ⚠️ A PRIMEIRA VERSÃO USAVA SÓ O PERCENTIL, e ela mentia nos dois sentidos.
+ * Num pad todos os degraus são minúsculos e parecidos, então um degrau
+ * inaudível cai no percentil 100 e "reprova"; numa chuva, cheia de gotas, um
+ * degrau grande cai no percentil 60 e "passa". O percentil descreve a POSIÇÃO
+ * na fila, nunca o tamanho — e quem estala no ouvido é o tamanho.
+ *
+ * Medido para provar: variando só o aquecimento, o percentil da chuva pulou
+ * 91,5 → 10,4 → 33,4 → 78,7 → 89,5 → 95%, enquanto o degrau absoluto ficou
+ * entre 0,0025 e 0,084 — todos MUITO abaixo do p99 dela, que é 0,25. Nenhuma
+ * daquelas leituras significava nada.
+ *
+ * O critério que ficou: **o degrau da emenda não pode passar o p99 dos degraus
+ * do próprio sinal.** É uma comparação de tamanho contra tamanho, e é
+ * autocalibrada por som — 0,25 é normal na chuva e seria um estalo no pad.
+ * O percentil continua impresso, como diagnóstico.
  */
 function emenda(x) {
   const degrau = Math.abs(x[0] - x[x.length - 1]);
@@ -201,7 +221,39 @@ function emenda(x) {
     else hi = mid;
   }
   abaixo = lo;
-  return { degrau, percentil: (100 * abaixo) / todos.length, maior: todos[todos.length - 1] };
+  return {
+    degrau,
+    percentil: (100 * abaixo) / todos.length,
+    p99: todos[Math.floor(todos.length * 0.99)],
+    maior: todos[todos.length - 1],
+  };
+}
+
+/**
+ * ⚠️ VARRE OS LAGS — não confia no período declarado.
+ *
+ * A primeira versão media a repetição no maior período que o módulo DECLARAVA,
+ * e isso tem dois modos de falhar, os dois já vistos: quando o período
+ * declarado é o comprimento inteiro do trecho não sobra lag para medir e a
+ * coluna vira "—" (parecendo aprovação); e um som que repita num período que
+ * ninguém declarou passa batido, que é exatamente o defeito que se procura.
+ *
+ * Varrendo, a pergunta fica a certa: **existe ALGUM atraso, abaixo de meio
+ * laço, em que este som volta a ser ele mesmo?** Devolve o pior caso e onde.
+ */
+function repeticao(x, taxa, limiteSegs) {
+  let pior = 0;
+  let onde = 0;
+  /* Passo de 1/4 s: fino o bastante para não passar por cima de um laço curto,
+     grosso o bastante para a varredura não custar minutos. */
+  for (let lag = 0.25; lag <= limiteSegs; lag += 0.25) {
+    const c = autoSimilaridade(x, taxa, lag);
+    if (c !== null && Math.abs(c) > pior) {
+      pior = Math.abs(c);
+      onde = lag;
+    }
+  }
+  return { pior, onde };
 }
 
 /** Correlação de Pearson entre o sinal e ele mesmo deslocado por `lag` segundos. */
@@ -348,32 +400,50 @@ function medir(som, bytes, periodos) {
   const e = emenda(x);
   const env = envelope(x, taxa);
   const esp = espectro(x, taxa);
-  /* Mede a repetição no MAIOR período interno do som — é o laço do ruído que
-     o ouvido reconhece, e não o da onda senoidal. */
-  const lag = Math.max(...periodos.filter((v) => v >= 1), 0) || null;
-  const auto = lag ? autoSimilaridade(x, taxa, lag) : null;
+  /* Varre até METADE do trecho: além disso sobram poucas amostras para a
+     correlação significar alguma coisa. */
+  const rep = repeticao(x, taxa, x.length / taxa / 2);
+  const auto = rep.pior;
+  const lag = rep.onde;
 
   const falhas = [];
-  if (e.percentil > LIMITES.emendaPercentilMax)
+  const razaoEmenda = e.degrau / (e.p99 || 1e-9);
+  if (razaoEmenda > LIMITES.emendaSobreP99Max)
     falhas.push(
-      "emenda no percentil " +
-        e.percentil.toFixed(1) +
-        "% (teto " +
-        LIMITES.emendaPercentilMax +
-        "%)",
+      "degrau da emenda " +
+        e.degrau.toFixed(5) +
+        " passa o p99 do próprio sinal (" +
+        e.p99.toFixed(5) +
+        ") — " +
+        razaoEmenda.toFixed(2) +
+        "×",
     );
   if (p < LIMITES.picoMin || p > LIMITES.picoMax)
     falhas.push(
       "pico " + p.toFixed(3) + " fora de [" + LIMITES.picoMin + ", " + LIMITES.picoMax + "]",
     );
   if (r < LIMITES.rmsMin) falhas.push("RMS " + r.toFixed(4) + " — som quase mudo");
-  if (auto !== null && Math.abs(auto) > LIMITES.autoSimilaridadeMax)
-    falhas.push("auto-similaridade " + auto.toFixed(3) + " a " + lag + "s — o laço se ouve");
-  const cristaMin = CRISTA_MINIMA[som];
+  /* Um som TONAL repete por natureza — um drone que não repetisse não seria um
+     drone, e um coração que não repetisse seria arritmia. A cobrança vale só
+     para os que prometem textura sem padrão. */
+  if (PERIODICOS.includes(som)) {
+    /* nada a cobrar: a repetição é o som */
+  } else if (auto > LIMITES.autoSimilaridadeMax) {
+    falhas.push("repete a cada " + lag.toFixed(2) + "s (r = " + auto.toFixed(3) + ")");
+  }
+  const faixa = CRISTA[som];
   const crista = p / (r || 1e-9);
-  if (cristaMin && crista < cristaMin)
+  if (faixa && crista < faixa[0])
     falhas.push(
-      "fator de crista " + crista.toFixed(2) + " (mínimo " + cristaMin + ") — sem impacto",
+      "fator de crista " + crista.toFixed(2) + " (mínimo " + faixa[0] + ") — sem impacto",
+    );
+  if (faixa && crista > faixa[1])
+    falhas.push(
+      "fator de crista " +
+        crista.toFixed(2) +
+        " (teto " +
+        faixa[1] +
+        ") — um pico isolado esmaga o resto na normalização",
     );
 
   return {
@@ -384,6 +454,8 @@ function medir(som, bytes, periodos) {
     rms: +r.toFixed(4),
     crista: +crista.toFixed(2),
     emendaDegrau: +e.degrau.toFixed(5),
+    emendaP99: +e.p99.toFixed(5),
+    emendaSobreP99: +razaoEmenda.toFixed(3),
     emendaPercentil: +e.percentil.toFixed(1),
     maiorDegrau: +e.maior.toFixed(5),
     envelopeRazao: +env.razao.toFixed(2),
@@ -465,9 +537,10 @@ function imprimir(linhas) {
       num("pico", 7) +
       num("RMS", 8) +
       num("crista", 8) +
-      num("emenda%", 9) +
+      num("emenda/p99", 12) +
       num("env.max/med", 13) +
-      num("auto-sim", 10) +
+      num("repete", 10) +
+      num("no lag", 9) +
       num("centro Hz", 11),
   );
   console.log("  " + "─".repeat(78));
@@ -482,9 +555,10 @@ function imprimir(linhas) {
         num(l.pico.toFixed(3), 7) +
         num(l.rms.toFixed(4), 8) +
         num(l.crista.toFixed(2), 8) +
-        num(l.emendaPercentil.toFixed(1), 9) +
+        num(l.emendaSobreP99.toFixed(2), 12) +
         num(l.envelopeRazao.toFixed(2), 13) +
         num(l.autoSimilaridade === null ? "—" : l.autoSimilaridade.toFixed(3), 10) +
+        num(l.lagSegs ? l.lagSegs.toFixed(2) + "s" : "—", 9) +
         num(l.centroideHz, 11),
     );
   }
