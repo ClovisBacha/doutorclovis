@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { createSoundscape } from "./soundscapes";
 import { NIVEL_AO_VIVO, SONS_CONTINUOS } from "./som-receitas";
+import { GRAVADOS } from "./som-gravado";
 
 /**
  * ⚠️ O CORPO DE UMA FUNÇÃO, e não uma fatia entre dois `indexOf`.
@@ -97,7 +98,16 @@ class CtxFalso {
     return new No();
   }
   createBuffer(_c: number, len: number) {
-    return { getChannelData: () => new Float32Array(len) };
+    return { getChannelData: () => new Float32Array(len), copyToChannel: () => {} };
+  }
+  /** Uma gravação de mentira, já decodificada. */
+  async decodeAudioData() {
+    return {
+      numberOfChannels: 1,
+      sampleRate: 48000,
+      length: 48000 * 10,
+      getChannelData: () => new Float32Array(48000 * 10).fill(0.2),
+    };
   }
   async suspend() {
     this.suspensoes++;
@@ -245,6 +255,67 @@ describe("⚠️ o relógio do coração", () => {
     await espera(60); // mais que um período (≈429 ms não, mas o guarda é por estado)
     expect(ctx.currentTime).toBe(antes);
     s.stop();
+  });
+});
+
+describe("⚠️ a passagem da síntese para a gravação", () => {
+  const original = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = original;
+    delete (GRAVADOS as Record<string, unknown>).chuva;
+  });
+
+  function registrarGravacao() {
+    (GRAVADOS as Record<string, unknown>).chuva = { arquivo: "/sons/chuva.webm", ganho: 1 };
+    globalThis.fetch = (() =>
+      Promise.resolve({
+        ok: true,
+        arrayBuffer: async () => new ArrayBuffer(8),
+      } as unknown as Response)) as typeof fetch;
+  }
+
+  test("sem gravação, nada muda: o agendador continua vivo", async () => {
+    const s = createSoundscape("chuva");
+    s.start();
+    await espera(30);
+    /* O agendador é o coração da síntese. Se a passagem o matasse sem haver
+       gravação, o som pararia de evoluir depois da primeira janela. */
+    expect(criados[0].state).toBe("running");
+    s.stop();
+  });
+
+  test("⚠️ com gravação, ela entra e o agendador da síntese PARA", async () => {
+    /* Sem parar o agendador, a síntese seguiria criando nós a cada janela para
+       sempre — inaudíveis (ganho zero) e caros: com `chuva-telhado` são dezenas
+       de milhares de nós por hora. */
+    registrarGravacao();
+    const s = createSoundscape("chuva");
+    s.start();
+    await espera(60);
+    const ctx = criados[0];
+    const antes = ctx.currentTime;
+    ctx.currentTime = 999;
+    await espera(30);
+    expect(ctx.state).toBe("running");
+    expect(antes).toBe(0);
+    s.stop();
+    await espera(160);
+    expect(ctx.state).toBe("closed");
+  });
+
+  test("⚠️ parar DURANTE o carregamento não deixa gravação órfã tocando", async () => {
+    /* O cenário: ela toca em Começar e fecha a folha antes de o arquivo chegar.
+       Sem a conferência depois da espera, a gravação começaria a tocar num
+       componente que já saiu da tela — sem nenhum botão que a desligasse. É o
+       mesmo defeito que `podeRetomar` conferir duas vezes evitou na pausa. */
+    registrarGravacao();
+    const s = createSoundscape("chuva");
+    s.start();
+    const ctx = criados[0];
+    s.stop(); // fecha no meio da espera
+    await espera(200);
+    expect(ctx.state).toBe("closed");
+    expect(CtxFalso.vivos).toBe(0);
   });
 });
 

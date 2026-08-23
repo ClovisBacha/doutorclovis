@@ -20,6 +20,7 @@
  */
 
 import { criarMusica } from "./musica-audio";
+import { carregarGravado, ganhoGravado, temGravacao } from "./som-gravado";
 import {
   FAMILIAS,
   FAMILIA_DO_SOM,
@@ -222,6 +223,12 @@ export function createSoundscape(
   let proximaJanela = 0;
   /** Suspensão adiada, para o volume ter tempo de descer. Ver `pausar()`. */
   let adormecer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * A gravação, quando existe e quando já chegou. Guardada para `stop()` poder
+   * desligá-la: um `AudioBufferSourceNode` em laço toca para SEMPRE, e fechar
+   * o contexto sem pará-lo deixa o nó vivo até o coletor de lixo passar.
+   */
+  let gravado: AudioBufferSourceNode | null = null;
 
   /** Empurra a fronteira dos eventos para a frente enquanto o som toca. */
   function agendarJanelas() {
@@ -285,8 +292,66 @@ export function createSoundscape(
       montar(ctx, som, nivel, JANELA_SEGS, ctx.currentTime, true, false);
       proximaJanela = ctx.currentTime + JANELA_SEGS;
       heart = setInterval(agendarJanelas, 5000);
+      /* ⚠️ `.catch` OBRIGATÓRIO: `void promessa` NÃO trata rejeição — ela vira
+         rejeição não tratada, e no navegador isso é um erro no console de uma
+         paciente por causa de um som que não veio. O `try/catch` daqui não
+         alcança o corpo de uma função assíncrona. */
+      void trocarPelaGravacao().catch(() => {});
     } catch {
       /* sem áudio */
+    }
+  }
+
+  /**
+   * A SÍNTESE COMEÇA NA HORA; A GRAVAÇÃO ENTRA POR CIMA QUANDO CHEGA.
+   *
+   * ⚠️ **ESPERAR O ARQUIVO SERIA SILÊNCIO NO COMEÇO DA MEDITAÇÃO**, e isso é
+   * defeito de produto, não detalhe: ela toca em "Começar", nada acontece por
+   * dois segundos e conclui que o app travou. A síntese não depende de rede e
+   * soa no mesmo quadro — então ela abre, sempre. Se a gravação chegar, o som
+   * melhora sem ninguém ver a costura; se não chegar, ninguém fica sabendo que
+   * havia uma.
+   *
+   * ⚠️ **`vivo` É CONFERIDO DEPOIS DA ESPERA.** Entre pedir o arquivo e ele
+   * chegar cabem: fechar a folha, a sessão acabar e o aparelho bloquear. Sem
+   * esta conferência, a gravação começaria a tocar num componente que já saiu
+   * da tela — sem nenhum botão em lugar nenhum que a desligasse. É exatamente
+   * o defeito que `podeRetomar` conferir duas vezes evitou na pausa.
+   */
+  async function trocarPelaGravacao() {
+    if (!temGravacao(som)) return;
+    const meu = ctx;
+    if (!meu || !nivel) return;
+    const buffer = await carregarGravado(meu, som);
+    /* ⚠️ `ctx !== meu` cobre o caso de terem parado e recomeçado durante a
+       espera: o contexto seria outro, e ligar um nó do antigo no novo é erro. */
+    if (!buffer || ctx !== meu || !nivel || meu.state === "closed") return;
+
+    try {
+      const fonte = meu.createBufferSource();
+      fonte.buffer = buffer;
+      fonte.loop = true;
+      const ganho = meu.createGain();
+      ganho.gain.value = 0.0001;
+      fonte.connect(ganho);
+      ganho.connect(nivel);
+      fonte.start();
+      gravado = fonte;
+
+      /* A troca é um cruzamento de 1,2 s: a síntese desce enquanto a gravação
+         sobe. Cortar a síntese seca daria o degrau que o fade de entrada de
+         1,5 s existe para evitar. */
+      const agora = meu.currentTime;
+      ganho.gain.linearRampToValueAtTime(ganhoGravado(som), agora + 1.2);
+      nivel.gain.linearRampToValueAtTime(0.0001, agora + 1.2);
+
+      /* ⚠️ E O AGENDADOR PARA. Sem isto a síntese continuaria criando nós a
+         cada janela para sempre — inaudíveis, porque o ganho é zero, e caros:
+         com `chuva-telhado` são dezenas de milhares de nós por hora. */
+      if (heart) clearInterval(heart);
+      heart = null;
+    } catch {
+      /* Falhou a troca: a síntese continua tocando, que é o estado bom. */
     }
   }
 
@@ -405,9 +470,20 @@ export function createSoundscape(
     adormecer = null;
     const meu = ctx;
     const meuMaster = master;
+    /* ⚠️ A GRAVAÇÃO PRECISA SER PARADA À MÃO. Um `AudioBufferSourceNode` com
+       `loop = true` toca para sempre; fechar o contexto sem pará-lo deixa o nó
+       vivo até o coletor passar, e no iOS isso é a sessão de áudio continuar
+       marcada como ocupada — a chavinha de silêncio do aparelho para de valer. */
+    const meuGravado = gravado;
+    gravado = null;
     ctx = null;
     master = null;
     nivel = null;
+    try {
+      meuGravado?.stop();
+    } catch {
+      /* já parado */
+    }
     if (!meu) return;
     try {
       if (meuMaster) {

@@ -52,6 +52,18 @@ import type { SomKey } from "./som-receitas";
  */
 export const GRAVADOS: Partial<Record<SomKey, { arquivo: string; ganho: number }>> = {};
 
+/**
+ * O ganho MEDIDO da gravação, ou 1 quando não há arquivo.
+ *
+ * ⚠️ Existe como função, e não como tabela separada, para não haver duas
+ * listas que precisem concordar: o ganho mora ao lado do caminho do arquivo, e
+ * o teste cobra os dois juntos. Uma segunda tabela divergiria no primeiro som
+ * novo — e a divergência apareceria como um som entrando alto demais.
+ */
+export function ganhoGravado(k: SomKey): number {
+  return GRAVADOS[k]?.ganho ?? 1;
+}
+
 /** Existe gravação para este som? */
 export function temGravacao(k: SomKey): boolean {
   return !!GRAVADOS[k];
