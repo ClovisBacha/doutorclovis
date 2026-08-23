@@ -101,7 +101,7 @@ const CRISTA = {
 
 /* Sons cuja repetição é o próprio som: drone, batimento, onda com período.
    Cobrar ausência de padrão neles seria cobrar que deixassem de ser o que são. */
-const PERIODICOS = ["pad", "coracao", "mar"];
+const PERIODICOS = ["pad", "drone", "coracao", "ventre", "mar", "tigela"];
 
 /* ─────────────────────────── Render no navegador ───────────────────────── */
 
@@ -467,27 +467,153 @@ function medir(som, bytes, periodos) {
   };
 }
 
-async function main() {
-  const bundlePath = join(tmpdir(), "ouvir-lista-" + Date.now() + ".ts");
-  /* A lista de sons sai do PRÓPRIO módulo, nunca de uma cópia aqui: um som
-     novo entra na medição sozinho, que é o ponto de a bancada existir. */
-  const fonte = readFileSync(join(RAIZ, "src/lib/som-continuo.ts"), "utf8");
-  const m = fonte.match(/export const SONS_CONTINUOS = \[([^\]]*)\]/);
-  const todos = m
-    ? m[1]
-        .split(",")
-        .map((s) => s.trim().replace(/^"|"$/g, ""))
-        .filter(Boolean)
-    : [];
-  rmSync(bundlePath, { force: true });
+/**
+ * ⚠️ O MODO `--niveis` — porque ao vivo não há normalização.
+ *
+ * O render offline normaliza pelo pico (`PICO_ALVO`), então os arquivos dos
+ * Sons para dormir saem todos no mesmo nível. **O caminho ao vivo da meditação
+ * não passa por lá**: `montar` entrega direto num master fixo. A auditoria
+ * mediu 19,3 dB de diferença entre os quatro sons antigos — trocar de som no
+ * meio da sessão era um susto ou um sumiço.
+ *
+ * Com vinte sons isso deixa de ser incômodo e vira defeito. Este modo mede o
+ * RMS CRU de cada um e imprime a tabela de ganho que iguala todos, para colar
+ * em `som-receitas.ts`. É medição, não estimativa.
+ */
+async function medirNiveis() {
+  const { todos } = await lerDoModulo();
+  const sons = pedidos.length ? pedidos.filter((s) => todos.includes(s)) : todos;
+  const dir = join(tmpdir(), "niveis-" + Date.now());
+  mkdirSync(dir, { recursive: true });
+  const entrada = join(dir, "entrada.ts");
+  const saida = join(dir, "som.js");
+  writeFileSync(
+    entrada,
+    'import * as SC from "' +
+      join(RAIZ, "src/lib/som-continuo.ts") +
+      '";\n(globalThis).SOM = SC;\n',
+  );
+  execFileSync("bun", ["build", "--outfile=" + saida, "--target=browser", "--format=esm", entrada]);
+  const bundle = readFileSync(saida, "utf8");
 
+  const exe = "/opt/pw-browsers/chromium/chrome-linux/chrome";
+  const navegador = await chromium.launch(existsSync(exe) ? { executablePath: exe } : {});
+  const pagina = await navegador.newPage();
+  await pagina.goto("about:blank");
+  await pagina.addScriptTag({ content: bundle, type: "module" });
+  await pagina.waitForFunction(() => !!globalThis.SOM, { timeout: 15000 });
+
+  const linhas = [];
+  for (const som of sons) {
+    const rms = await pagina.evaluate(async (k) => {
+      const taxa = 22050;
+      const aquecimento = 8;
+      const total = aquecimento + 30;
+      const ctx = new OfflineAudioContext(1, Math.round(total * taxa), taxa);
+      const m = ctx.createGain();
+      m.gain.value = 1;
+      m.connect(ctx.destination);
+      globalThis.SOM.montar(ctx, k, m, total);
+      const buf = await ctx.startRendering();
+      const x = buf.getChannelData(0).subarray(Math.round(aquecimento * taxa));
+      let s = 0;
+      let pico = 0;
+      for (let i = 0; i < x.length; i++) {
+        s += x[i] * x[i];
+        pico = Math.max(pico, Math.abs(x[i]));
+      }
+      return { rms: Math.sqrt(s / x.length), pico };
+    }, som);
+    linhas.push({ som, rms: rms.rms, pico: rms.pico });
+  }
+  await navegador.close();
+  rmSync(dir, { recursive: true, force: true });
+
+  /**
+   * ⚠️ O GANHO É LIMITADO PELO PICO, e não só mirado no RMS.
+   *
+   * Igualar o RMS de todos seria o certo se todos tivessem a mesma densidade —
+   * mas uma lareira é silêncio com estalos (crista 15) e um pad é contínuo
+   * (crista 3,2). Para a lareira alcançar o RMS do pad, o estalo dela teria de
+   * sair a 3,7 de amplitude: distorção, e um susto no meio da meditação.
+   *
+   * Então o ganho é o MENOR entre "chega no RMS alvo" e "não passa do pico
+   * alvo". Sons densos alcançam o alvo; sons esparsos param onde o pico manda,
+   * e ficam um pouco abaixo — o que é honesto, porque um som esparso É mais
+   * baixo. O que se elimina é o abismo, não a diferença.
+   */
+  const RMS_ALVO = 0.2;
+  const PICO_ALVO = 1.0;
+
+  console.log("");
+  console.log(
+    "  RMS e pico crus, e o ganho que aproxima (RMS alvo " +
+      RMS_ALVO +
+      ", teto de pico " +
+      PICO_ALVO +
+      ")",
+  );
+  console.log("  " + "─".repeat(70));
+  console.log("");
+  console.log("const NIVEL_AO_VIVO: Record<SomKey, number> = {");
+  const saidas = [];
+  for (const l of linhas) {
+    const g = Math.min(RMS_ALVO / (l.rms || 1e-9), PICO_ALVO / (l.pico || 1e-9));
+    saidas.push(g * l.rms);
+    const chave = l.som.includes("-") ? '"' + l.som + '"' : l.som;
+    const db = 20 * Math.log10(g);
+    console.log(
+      "  " +
+        chave +
+        ": " +
+        g.toFixed(3) +
+        ", // RMS " +
+        l.rms.toFixed(4) +
+        " pico " +
+        l.pico.toFixed(2) +
+        "  (" +
+        (db >= 0 ? "+" : "") +
+        db.toFixed(1) +
+        " dB)",
+    );
+  }
+  console.log("};");
+  const antes =
+    20 * Math.log10(Math.max(...linhas.map((l) => l.rms)) / Math.min(...linhas.map((l) => l.rms)));
+  const depois = 20 * Math.log10(Math.max(...saidas) / Math.min(...saidas));
+  console.log("");
+  console.log(
+    "  espalhamento de RMS:  antes " +
+      antes.toFixed(1) +
+      " dB  →  depois " +
+      depois.toFixed(1) +
+      " dB",
+  );
+  console.log("");
+}
+
+async function main() {
+  if (args.includes("--niveis")) return medirNiveis();
+
+  /**
+   * ⚠️ A LISTA SAI DO MÓDULO COMPILADO, nunca de uma regex sobre o fonte.
+   *
+   * A primeira versão lia `export const SONS_CONTINUOS = [...]` com regex em
+   * `som-continuo.ts`. No dia em que as receitas mudaram de arquivo e a lista
+   * passou a ser RE-EXPORTADA, a regex parou de casar e a bancada disse
+   * "nenhum som conhecido" — falhando aberto, que é o pior desfecho possível
+   * para uma ferramenta de verificação: ela relata sucesso vazio.
+   *
+   * Importando o módulo de verdade, a lista é a lista, venha de onde vier.
+   */
+  const { todos, periodos } = await lerDoModulo();
   const sons = pedidos.length ? pedidos.filter((s) => todos.includes(s)) : todos;
   if (!sons.length) {
     console.error("nenhum som conhecido. conhecidos: " + todos.join(", "));
     process.exit(1);
   }
 
-  const periodosPorSom = await lerPeriodos(sons);
+  const periodosPorSom = periodos;
   const bytesPorSom = await renderizarTodos(sons);
 
   const linhas = [];
@@ -509,22 +635,23 @@ async function main() {
   process.exit(reprovados.length ? 1 : 0);
 }
 
-/** Os períodos vêm do módulo, para o lag da auto-similaridade ser o certo. */
-async function lerPeriodos(sons) {
-  const dir = join(tmpdir(), "ouvir-per-" + Date.now());
+/** A lista e os períodos vêm do módulo compilado — nunca de uma cópia aqui. */
+async function lerDoModulo() {
+  const dir = join(tmpdir(), "ouvir-mod-" + Date.now());
   mkdirSync(dir, { recursive: true });
   const entrada = join(dir, "e.ts");
   const saida = join(dir, "s.js");
   writeFileSync(
     entrada,
-    'export { periodosDe } from "' + join(RAIZ, "src/lib/som-continuo.ts") + '";\n',
+    'export { periodosDe, SONS_CONTINUOS } from "' + join(RAIZ, "src/lib/som-continuo.ts") + '";\n',
   );
   execFileSync("bun", ["build", "--outfile=" + saida, "--target=node", "--format=esm", entrada]);
   const mod = await import("file://" + saida);
-  const out = {};
-  for (const s of sons) out[s] = mod.periodosDe(s);
+  const todos = [...mod.SONS_CONTINUOS];
+  const periodos = {};
+  for (const s of todos) periodos[s] = mod.periodosDe(s);
   rmSync(dir, { recursive: true, force: true });
-  return out;
+  return { todos, periodos };
 }
 
 function imprimir(linhas) {

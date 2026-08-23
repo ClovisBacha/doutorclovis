@@ -191,6 +191,20 @@ describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
     return s.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
   }
 
+  /**
+   * ⚠️ O GATILHO NÃO PODE SER A PALAVRA "FREQUÊNCIA" SOLTA.
+   *
+   * Em português ela quer dizer "com que frequência" muito mais vezes do que
+   * quer dizer hertz, e a primeira versão desta catraca reprovou por causa de
+   * "Bebê começa a ser sentido com mais frequência" — uma linha da jornada
+   * gestacional que não fala de som nenhum. Catraca com falso positivo é
+   * catraca que alguém desliga, e aí ela para de proteger.
+   *
+   * O gatilho é o CONTEXTO DE ALTURA: o número 432, um número seguido de Hz,
+   * a palavra hertz, ou afinação.
+   */
+  const SOBRE_ALTURA = /(\b432\b|\d\s*hz\b|\bhertz\b|afina[çc][ãa]o)/i;
+
   const CURA =
     /(cura|curar|curativ|terapêutic|terapeutic|trata|tratamento|reparo do dna|regenera|frequência sagrada|frequencia sagrada|frequência de cura|frequencia de cura|solfeggio|solfejo sagrado)/i;
 
@@ -203,8 +217,53 @@ describe("⚠️ nenhuma tela afirma efeito de saúde da frequência", () => {
          teste de falso positivo — catraca com falso positivo é catraca que
          alguém desliga. */
       for (const linha of codigo.split("\n")) {
-        if (!/(432|\bHz\b|frequ[êe]ncia)/i.test(linha)) continue;
+        if (!SOBRE_ALTURA.test(linha)) continue;
         if (CURA.test(linha)) culpados.push(p + ": " + linha.trim().slice(0, 120));
+      }
+    }
+    expect(culpados).toEqual([]);
+  });
+
+  test("⚠️ nem as alegações NOMEADAS que a pesquisa derrubou uma a uma", () => {
+    /* Cada uma destas foi verificada e é falsa. Estão aqui pelo nome porque
+       são exatamente as que aparecem em todo texto de marketing de 432 Hz — e
+       porque a catraca genérica acima não pegaria "ressonância de Schumann",
+       que não contém nenhum verbo clínico e mesmo assim é falsa. */
+    const FALSAS = [
+      /schumann/i,
+      /solfeggio|solfejo sagrado/i,
+      /frequ[êe]ncia (do universo|da natureza|da terra|do amor|milagre)/i,
+      /repara o dna|reparo do dna/i,
+      /geometria sagrada/i,
+      /verdi (provou|escolheu)/i,
+      /naz(ista|i)/i,
+      /cientificamente comprovad/i,
+    ];
+    const culpados: string[] = [];
+    for (const p of arquivos("src")) {
+      const codigo = semComentarios(readFileSync(p, "utf8"));
+      for (const linha of codigo.split("\n")) {
+        for (const re of FALSAS) {
+          if (re.test(linha)) culpados.push(p + ": " + linha.trim().slice(0, 100));
+        }
+      }
+    }
+    expect(culpados).toEqual([]);
+  });
+
+  test("⚠️ e nenhuma tela pode dizer que o BEBÊ responde a uma frequência", () => {
+    /* A alegação sobre o feto é a mais grave possível: não há evidência
+       nenhuma, e ela chega numa paciente que está justamente medindo tudo que
+       o bebê faz. Numa base de alto risco, prometer resposta fetal a um som é
+       o tipo de frase que faz a paciente parar de contar movimento porque "o
+       som cuida disso". */
+    const culpados: string[] = [];
+    for (const p of arquivos("src")) {
+      const codigo = semComentarios(readFileSync(p, "utf8"));
+      for (const linha of codigo.split("\n")) {
+        if (!SOBRE_ALTURA.test(linha)) continue;
+        if (/(beb[êe]|feto|fetal|barriga|[úu]tero)/i.test(linha))
+          culpados.push(p + ": " + linha.trim().slice(0, 100));
       }
     }
     expect(culpados).toEqual([]);

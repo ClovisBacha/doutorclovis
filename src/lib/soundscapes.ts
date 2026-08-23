@@ -19,17 +19,43 @@
  * silêncio, a tela nunca quebra.
  */
 
-import { montar, type SomKey } from "./som-continuo";
+import {
+  FAMILIAS,
+  FAMILIA_DO_SOM,
+  NIVEL_AO_VIVO,
+  ROTULO_DO_SOM,
+  SONS_CONTINUOS,
+  montar,
+  type SomKey,
+} from "./som-continuo";
 
 export type SoundscapeKey = "silencio" | SomKey;
 
-export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string }[] = [
-  { key: "pad", label: "Pad calmo", emoji: "🎵" },
-  { key: "chuva", label: "Chuva", emoji: "🌧️" },
-  { key: "mar", label: "Mar", emoji: "🌊" },
-  { key: "coracao", label: "Coração", emoji: "💓" },
+/**
+ * ⚠️ A LISTA SAI DO CATÁLOGO, e o silêncio entra à mão.
+ *
+ * Eram cinco itens escritos aqui. Com vinte sons, uma segunda lista divergiria
+ * do motor no primeiro som novo — e a divergência apareceria como um som que
+ * existe e não tem botão, que é indistinguível de não existir.
+ *
+ * O SILÊNCIO não vem do catálogo porque ele não é um som: é a ausência de um.
+ * `som-receitas.ts` só conhece coisas que tocam.
+ */
+export const SOUNDSCAPES: { key: SoundscapeKey; label: string; emoji: string; sub?: string }[] = [
+  ...SONS_CONTINUOS.map((k) => ({
+    key: k as SoundscapeKey,
+    label: ROTULO_DO_SOM[k].label,
+    emoji: ROTULO_DO_SOM[k].emoji,
+    sub: ROTULO_DO_SOM[k].sub,
+  })),
   { key: "silencio", label: "Silêncio", emoji: "🔇" },
 ];
+
+/** Agrupados, para a folha de escolha não virar uma lista de vinte. */
+export const SOUNDSCAPES_POR_FAMILIA = FAMILIAS.map((f) => ({
+  familia: f,
+  sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f),
+})).filter((g) => g.sons.length > 0);
 
 export type Soundscape = {
   /** Sobe o volume até o alvo (0..1 relativo). Idempotente. */
@@ -86,6 +112,11 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
 
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
+  /**
+   * ⚠️ O nó que iguala os vinte sons. Ver `NIVEL_AO_VIVO` — sem ele, trocar de
+   * som no meio da sessão dá um salto de até 31,5 dB.
+   */
+  let nivel: GainNode | null = null;
   let heart: ReturnType<typeof setInterval> | null = null;
   let alvo = 0.28;
   /* Guardados para a pausa: o batimento é o único som agendado por relógio de
@@ -99,7 +130,7 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
   function agendarJanelas() {
     if (!ctx || !master || ctx.state !== "running") return;
     while (proximaJanela < ctx.currentTime + JANELA_SEGS) {
-      montar(ctx, som, master, JANELA_SEGS, proximaJanela, false);
+      montar(ctx, som, nivel ?? master, JANELA_SEGS, proximaJanela, false);
       proximaJanela += JANELA_SEGS;
     }
   }
@@ -112,6 +143,19 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
         (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AC) return;
       ctx = new AC();
+      /**
+       * ⚠️ `resume()` NA CRIAÇÃO — sem ele a sessão roda MUDA e nada avisa.
+       *
+       * Um `AudioContext` pode nascer `suspended`: política de autoplay,
+       * criação fora de um gesto, teto de contextos do navegador. Quando isso
+       * acontecia, `ctx` ficava não-nulo, `agendarJanelas` desistia em silêncio
+       * (`state !== "running"`) e o `catch` daqui nunca disparava — a meditação
+       * corria inteira sem som, com o chip do som aceso na tela.
+       *
+       * A promessa é ignorada de propósito: se for recusada, `retomar()`
+       * continua sendo o caminho, e não há nada útil a fazer aqui.
+       */
+      void ctx.resume().catch(() => {});
       master = ctx.createGain();
       master.gain.value = 0.0001;
       master.connect(ctx.destination);
@@ -121,7 +165,10 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
 
       /* A base (ruído, filtros, osciladores) nasce uma vez; os eventos vêm
          por janela — ver `JANELA_SEGS`. */
-      montar(ctx, som, master, JANELA_SEGS, ctx.currentTime, true);
+      nivel = ctx.createGain();
+      nivel.gain.value = NIVEL_AO_VIVO[som] ?? 1;
+      nivel.connect(master);
+      montar(ctx, som, nivel, JANELA_SEGS, ctx.currentTime, true);
       proximaJanela = ctx.currentTime + JANELA_SEGS;
       heart = setInterval(agendarJanelas, 5000);
     } catch {
@@ -208,6 +255,22 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
     }
   }
 
+  /**
+   * ⚠️ DESLIGA COM RAMPA — cortar o contexto no ato é um CLIQUE.
+   *
+   * A versão anterior chamava `ctx.close()` seco, e quatro caminhos passam por
+   * aqui: começar a sessão, retomar, fechar a folha e **trocar de som no meio
+   * da sessão**. Este último é o pior: o som atual era cortado e o novo entrava
+   * com 1,5 s de fade, sem cruzamento nenhum.
+   *
+   * O código já SABIA disso — `ouvirAmostra` desce o volume e espera 400 ms
+   * antes de parar. O caminho da sessão não fazia.
+   *
+   * Oitenta milissegundos bastam para matar o degrau e são curtos demais para
+   * quem chamou perceber espera. O contexto é fechado depois, e `ctx` vira
+   * nulo NA HORA — quem chamar `start()` em seguida cria um novo e não encosta
+   * neste.
+   */
   function stop() {
     if (heart) clearInterval(heart);
     heart = null;
@@ -215,13 +278,28 @@ export function createSoundscape(kind: SoundscapeKey): Soundscape {
        `suspend()` num contexto fechado. */
     if (adormecer) clearTimeout(adormecer);
     adormecer = null;
+    const meu = ctx;
+    const meuMaster = master;
+    ctx = null;
+    master = null;
+    nivel = null;
+    if (!meu) return;
     try {
-      ctx?.close();
+      if (meuMaster) {
+        meuMaster.gain.cancelScheduledValues(meu.currentTime);
+        meuMaster.gain.setValueAtTime(Math.max(0.0001, meuMaster.gain.value), meu.currentTime);
+        meuMaster.gain.linearRampToValueAtTime(0.0001, meu.currentTime + 0.08);
+      }
     } catch {
       /* ignore */
     }
-    ctx = null;
-    master = null;
+    setTimeout(() => {
+      try {
+        void meu.close();
+      } catch {
+        /* ignore */
+      }
+    }, 110);
   }
 
   return { start, stop, setVolume, pausar, retomar };

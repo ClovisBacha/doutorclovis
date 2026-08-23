@@ -10,7 +10,37 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import { createSoundscape } from "./soundscapes";
+import { NIVEL_AO_VIVO, SONS_CONTINUOS } from "./som-receitas";
+
+/**
+ * ⚠️ O CORPO DE UMA FUNÇÃO, e não uma fatia entre dois `indexOf`.
+ *
+ * Fatiar de "function A" até "function B" só funciona enquanto B estiver
+ * DEPOIS de A no arquivo — e essa é a fragilidade que o projeto já pagou três
+ * vezes: `indexOf` devolve −1 quando some, `slice(-1, x)` devolve string
+ * vazia, e `not.toContain` sobre vazio PASSA. Aqui ela reapareceu na hora:
+ * `retomar` está declarada antes de `stop`, então a fatia veio vazia e o teste
+ * ficou verde sobre nada.
+ *
+ * Contando chaves a partir da declaração, o corpo é o corpo, venha em que
+ * ordem vier.
+ */
+function corpoDaFuncao(fonte: string, declaracao: string): string {
+  const i = fonte.indexOf(declaracao);
+  if (i < 0) throw new Error("função não encontrada: " + declaracao);
+  const abre = fonte.indexOf("{", i);
+  let nivel = 0;
+  for (let j = abre; j < fonte.length; j++) {
+    if (fonte[j] === "{") nivel++;
+    else if (fonte[j] === "}") {
+      nivel--;
+      if (nivel === 0) return fonte.slice(i, j + 1);
+    }
+  }
+  throw new Error("chave não fechou: " + declaracao);
+}
 
 class Param {
   value = 0;
@@ -96,7 +126,18 @@ beforeEach(() => {
     },
   };
 });
-afterEach(() => {
+afterEach(async () => {
+  /**
+   * ⚠️ ESPERA O FECHAMENTO ADIADO ANTES DE PASSAR PARA O PRÓXIMO TESTE.
+   *
+   * `stop()` faz uma rampa de 80 ms e só então fecha o contexto — sem isso o
+   * corte é um clique. O efeito colateral é que ele tem uma CAUDA assíncrona:
+   * um teste que chama `stop()` e termina deixa o `close()` para depois, e ele
+   * caía dentro do teste SEGUINTE, já com o contador zerado pelo `beforeEach`.
+   * Medido: `CtxFalso.vivos` chegava a −1, e a falha aparecia num teste que
+   * não tinha nada a ver com a causa.
+   */
+  await new Promise((ok) => setTimeout(ok, 160));
   delete (globalThis as Record<string, unknown>).window;
 });
 
@@ -137,6 +178,11 @@ describe("pausar e voltar", () => {
     s.stop(); // ✕ no meio da espera
     ctx.segurarResume?.(); // o navegador responde agora
     expect(await voltando).toBe(false);
+    /* ⚠️ O fechamento é ADIADO em ~110 ms, de propósito: `stop()` faz uma
+       rampa de 80 ms antes de fechar, senão o corte seco é um clique — e um
+       dos quatro caminhos que passam por aqui é trocar de som no MEIO da
+       sessão. Ver o comentário do `stop()`. */
+    await espera(160);
     expect(ctx.state).toBe("closed");
     expect(CtxFalso.vivos).toBe(0);
   });
@@ -185,6 +231,7 @@ describe("⚠️ o relógio do coração", () => {
     const [a, b] = await Promise.all([s.retomar(), s.retomar()]);
     expect([a, b]).toEqual([true, true]);
     s.stop();
+    await espera(160);
     expect(ctx.state).toBe("closed");
   });
 
@@ -201,16 +248,48 @@ describe("⚠️ o relógio do coração", () => {
   });
 });
 
-describe("os quatro sons montam sem quebrar", () => {
-  test("cada receita cria o contexto e nenhum lança", () => {
-    for (const k of ["pad", "chuva", "mar", "coracao"] as const) {
+describe("os vinte sons montam sem quebrar", () => {
+  test("cada receita cria o contexto e nenhum lança", async () => {
+    /* ⚠️ A lista sai do catálogo, e não de uma cópia aqui: um som novo entra
+       nesta prova sozinho. Ela é barata e pega a classe de defeito mais chata
+       de todas — a receita que estoura só quando alguém escolhe aquele som. */
+    for (const k of SONS_CONTINUOS) {
       const s = createSoundscape(k);
       expect(() => s.start()).not.toThrow();
       expect(() => s.setVolume(0.5)).not.toThrow();
       s.stop();
     }
-    expect(criados.length).toBe(4);
+    expect(criados.length).toBe(SONS_CONTINUOS.length);
+    await espera(160);
     expect(CtxFalso.vivos).toBe(0);
+  });
+
+  test("⚠️ e cada um entra com o ganho MEDIDO dele", () => {
+    /* Sem esta tabela, trocar de som no meio da sessão dá um salto de até
+       31,5 dB (medido com `node scripts/ouvir.mjs --niveis`). O teste cobra
+       que todo som do catálogo tenha número — um som novo sem entrada aqui
+       cairia no `?? 1` e voltaria a destoar. */
+    for (const k of SONS_CONTINUOS) {
+      const g = NIVEL_AO_VIVO[k];
+      expect({ k, tem: typeof g === "number" && g > 0 && g < 50 }).toEqual({ k, tem: true });
+    }
+  });
+
+  test("⚠️ o stop faz RAMPA antes de fechar — não só adia o fechamento", () => {
+    /* Adiar o `close()` sem descer o volume trocaria um clique por um clique
+       110 ms depois. Quem mata o degrau é a rampa. */
+    const fonte = readFileSync("src/lib/soundscapes.ts", "utf8");
+    const fn = corpoDaFuncao(fonte, "  function stop()");
+    expect(fn).toContain("linearRampToValueAtTime(0.0001");
+    expect(fn).toContain("void meu.close()");
+  });
+
+  test("⚠️ o contexto é acordado na criação — senão a sessão roda muda", () => {
+    /* Um `AudioContext` pode nascer `suspended`, e aí `agendarJanelas` desiste
+       em silêncio: a meditação inteira sem som, com o chip aceso. */
+    const fonte = readFileSync("src/lib/soundscapes.ts", "utf8");
+    const fn = corpoDaFuncao(fonte, "  function start()");
+    expect(fn).toContain("ctx.resume()");
   });
 
   test("navegador sem Web Audio fica em silêncio, e a tela não quebra", () => {

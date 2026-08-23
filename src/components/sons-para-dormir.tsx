@@ -33,6 +33,9 @@ import {
   faltando,
   quandoDesligar,
   rotuloDoTempo,
+  FAMILIAS,
+  FAMILIA_DO_SOM,
+  ROTULO_DO_SOM,
   SONS_CONTINUOS,
   TEMPOS,
   type SomKey,
@@ -43,12 +46,21 @@ import { anunciarMidia, estadoDaMidia } from "@/lib/media-session";
 import { HISTORIAS, duracaoAproximada, type Historia } from "@/lib/historias-para-dormir";
 import { HistoriaDaNoite } from "@/components/historia-da-noite";
 
-const ROTULO: Record<SomKey, { nome: string; emoji: string; sub: string }> = {
-  chuva: { nome: "Chuva", emoji: "🌧️", sub: "miúda, sem trovão" },
-  mar: { nome: "Mar", emoji: "🌊", sub: "onda indo e voltando" },
-  coracao: { nome: "Coração", emoji: "💓", sub: "o som que ele ouve aí dentro" },
-  pad: { nome: "Pad calmo", emoji: "🎵", sub: "duas notas graves" },
-};
+/**
+ * ⚠️ O CATÁLOGO SAI DO MÓDULO, e não de uma cópia aqui.
+ *
+ * Eram quatro sons escritos à mão nesta tela. Com vinte, uma segunda lista
+ * seria garantia de divergir no primeiro som novo — e a divergência apareceria
+ * como um som que existe no motor e não tem nome na tela, ou pior, um botão
+ * que promete um som que ninguém montou.
+ */
+const ROTULO = ROTULO_DO_SOM;
+
+/** Os sons de cada família, na ordem em que o módulo os declara. */
+const POR_FAMILIA = FAMILIAS.map((f) => ({
+  familia: f,
+  sons: SONS_CONTINUOS.filter((k) => FAMILIA_DO_SOM[k] === f),
+})).filter((g) => g.sons.length > 0);
 
 export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
   const [som, setSom] = useState<SomKey | null>(null);
@@ -185,7 +197,7 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
     if (!som) return;
     estadoDaMidia("playing");
     return anunciarMidia({
-      titulo: `${ROTULO[som].nome} · Sons para dormir`,
+      titulo: `${ROTULO[som].label} · Sons para dormir`,
       aoPausar: () => {
         tocador.current?.elemento.pause();
         estadoDaMidia("paused");
@@ -288,43 +300,53 @@ export function SonsParaDormir({ aoFechar }: { aoFechar: () => void }) {
           Quando a história acaba, a chuva continua sozinha — o quarto não fica mudo de repente.
         </p>
 
-        <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">Sons</p>
-        <div className="mt-2 grid grid-cols-2 gap-3">
-          {SONS_CONTINUOS.map((k) => {
-            const ativo = som === k;
-            return (
-              <button
-                key={k}
-                onClick={() => void escolher(k)}
-                aria-pressed={ativo}
-                className={`press rounded-3xl border p-4 text-left transition-colors ${
-                  ativo
-                    ? "border-indigo-300/60 bg-indigo-400/25"
-                    : "border-white/10 bg-white/[0.06]"
-                }`}
-              >
-                <span className="flex items-center gap-2 text-2xl leading-none">
-                  <span aria-hidden>{ROTULO[k].emoji}</span>
-                  {ativo && (
-                    <span className="flex items-end gap-[3px]" aria-hidden>
-                      {[0, 1, 2].map((i) => (
-                        <span
-                          key={i}
-                          className="dc-onda w-[3px] rounded-full bg-indigo-200"
-                          style={{ animationDelay: `${i * 0.18}s` }}
-                        />
-                      ))}
+        {/* ⚠️ AGRUPADOS POR FAMÍLIA, e não numa lista de vinte.
+            Uma lista lisa de vinte é um catálogo que ninguém percorre: ela toca
+            nos dois primeiros e desiste. Agrupada, ela procura pelo que quer
+            ("hoje eu quero água") em vez de ler vinte rótulos seguidos. */}
+        {POR_FAMILIA.map(({ familia, sons }) => (
+          <div key={familia}>
+            <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
+              {familia}
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              {sons.map((k) => {
+                const ativo = som === k;
+                return (
+                  <button
+                    key={k}
+                    onClick={() => void escolher(k)}
+                    aria-pressed={ativo}
+                    className={`press rounded-3xl border p-4 text-left transition-colors ${
+                      ativo
+                        ? "border-indigo-300/60 bg-indigo-400/25"
+                        : "border-white/10 bg-white/[0.06]"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 text-2xl leading-none">
+                      <span aria-hidden>{ROTULO[k].emoji}</span>
+                      {ativo && (
+                        <span className="flex items-end gap-[3px]" aria-hidden>
+                          {[0, 1, 2].map((i) => (
+                            <span
+                              key={i}
+                              className="dc-onda w-[3px] rounded-full bg-indigo-200"
+                              style={{ animationDelay: `${i * 0.18}s` }}
+                            />
+                          ))}
+                        </span>
+                      )}
                     </span>
-                  )}
-                </span>
-                <span className="mt-2 block text-sm font-extrabold">{ROTULO[k].nome}</span>
-                <span className="mt-0.5 block text-[11px] leading-snug text-white/50">
-                  {carregando === k ? "preparando…" : ROTULO[k].sub}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+                    <span className="mt-2 block text-sm font-extrabold">{ROTULO[k].label}</span>
+                    <span className="mt-0.5 block text-[11px] leading-snug text-white/50">
+                      {carregando === k ? "preparando…" : ROTULO[k].sub}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
 
         <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
           Desligar sozinho em

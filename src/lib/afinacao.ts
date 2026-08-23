@@ -4,68 +4,104 @@
  * ─── O PEDIDO, E O QUE ELE OBRIGA A DIZER ───────────────────────────────────
  *
  * O dono pediu que a meditação fosse afinada em 432 Hz e que se fizesse "um
- * estudo profundo sobre os Hertz". O estudo foi feito, e ele tem duas metades
- * que não podem ser confundidas.
+ * estudo profundo sobre os Hertz". O estudo foi feito — em fontes primárias,
+ * não em resumos de internet — e tem duas metades que não podem ser
+ * confundidas.
  *
- * **A metade que sustenta a decisão:** 432 é uma escolha estética legítima, e
- * escolher UMA afinação para o app inteiro é engenharia boa. Antes disto, o
+ * **A metade que sustenta a decisão:** escolher UMA afinação para o app
+ * inteiro é engenharia boa, e o valor escolhido é arbitrário. Antes disto o
  * pad tocava 173,4 · 174,6 · 260,1 · 261,9 Hz, a respiração do marco semanal
- * tocava 174 e 261, e o chime da conquista tocava um acorde de números soltos.
- * Três lugares, três sistemas, nenhum concordando com nenhum — e som que muda
- * de afinação entre telas soa como outro produto, exatamente como a voz.
+ * tocava 174 e 261, e o chime da conquista tocava um acorde de números soltos:
+ * três lugares, três sistemas, nenhum concordando com nenhum. Som que muda de
+ * afinação entre telas soa como outro produto, exatamente como a voz.
  *
  * **A metade que este arquivo existe para BARRAR:** quase tudo que se lê sobre
  * 432 Hz é falso, e este é um app MÉDICO de gestação de ALTO RISCO. Uma frase
  * de "frequência de cura" ao lado de uma triagem de pré-eclâmpsia contamina a
- * triagem — a paciente não separa as duas, e tem razão em não separar: quem
- * afirma a primeira está dizendo com que rigor trata a segunda.
+ * triagem — a paciente que descobrir que o "528 Hz repara o DNA" é mentira tem
+ * motivo RACIONAL para duvidar do aviso de pré-eclâmpsia na tela ao lado.
  *
  * ⚠️ **NENHUM TEXTO DA INTERFACE PODE AFIRMAR EFEITO DE SAÚDE DA AFINAÇÃO.**
- * Há teste cobrando isso (`afinacao.test.ts`), e ele varre o `src/` inteiro.
+ * Há catraca varrendo o `src/` inteiro (`afinacao.test.ts`).
  *
- * ─── O QUE A PESQUISA ACHOU ─────────────────────────────────────────────────
+ * ─── O QUE A PESQUISA ACHOU, COM AS FONTES ──────────────────────────────────
  *
- * • **440 Hz** é o padrão ISO 16, de 1955, reafirmado em 1975. Antes dele a
- *   afinação variava por cidade e por década — não existe "afinação natural"
- *   que 440 tenha substituído.
+ * • **440 Hz é de 1834**, não do Terceiro Reich. Scheibler mede com o tonômetro
+ *   e o congresso de Stuttgart recomenda A=440 naquele ano; os EUA adotam em
+ *   1926/1936; a conferência de 1939 foi da BBC, com atas públicas; ISO R16 em
+ *   1955, ISO 16 em 1975. "Os nazistas impuseram o 440" é FALSO por um século
+ *   de distância. (O 440 venceu o 439 por uma razão prosaica: 439 é primo e
+ *   ruim de dividir em eletrônica; 440 = 8 × 55.)
  *
- * • **432 Hz** tem história real: o governo italiano decretou 432 em 1884, e
- *   Verdi apoiou. O argumento dele era de VOZ — afinação alta força o
- *   soprano —, nunca de física ou de cura. É um argumento de conforto, e
- *   continua sendo o melhor argumento que existe a favor.
+ * • ⚠️ **VERDI QUERIA 435, NÃO 432** — e esta é a correção que mais dói no
+ *   folclore. A carta dele de 1884 diz: "se a comissão acredita, por exigências
+ *   matemáticas, que devemos reduzir as 435 vibrações do diapasão francês para
+ *   432, a diferença é tão pequena, QUASE IMPERCEPTÍVEL AO OUVIDO, que me
+ *   associo de bom grado." Ele pediu o padrão francês e aceitou o 432 como
+ *   arredondamento de conveniência. São 12,0 cents. E o argumento dele era
+ *   mecânico: o diapasão vinha subindo e machucava cantores de ópera.
  *
- * • **A diferença é de 31,77 cents** — cerca de um terço de semitom. É audível
- *   lado a lado e imperceptível isolada. Ninguém "sente" 432 sem comparação.
+ * • **"Schumann 8 Hz × 54 = 432" se autodestrói.** A fundamental de Schumann é
+ *   7,83 Hz, não 8 — e 7,83 × 54 = 422,8. Mas o golpe é outro: aceitando o 8
+ *   arredondado, **8 × 55 = 440**. Os DOIS são múltiplos inteiros exatos de
+ *   8 Hz. Não há nada ali que distinga o 432. (E 54 não é potência de 2, então
+ *   também não é relação de oitava: as oitavas de 8 Hz são 16 · 32 · 64 · 128 ·
+ *   256 · 512, e 432 não está entre elas.)
  *
- * • **"Ressonância de Schumann × 54 = 432"** é numerologia. A ressonância
- *   fundamental de Schumann é ~7,83 Hz, não 8; 7,83 × 54 = 422,8. O número
- *   redondo só aparece arredondando a medida primeiro e multiplicando depois,
- *   que é como se prova qualquer coisa.
+ * • ⚠️ **"A=432 e C=256" são INCOMPATÍVEIS** no temperamento igual, que é o
+ *   que qualquer sintetizador usa — inclusive este arquivo. C=256 implica
+ *   A=430,54; A=432 implica C=256,87. Os dois só valem juntos num sistema
+ *   pitagórico que ninguém aplica. Quem repete os dois no mesmo parágrafo não
+ *   fez a conta.
  *
  * • **As "frequências Solfeggio"** (174, 285, 396, 417, 528, 639, 741, 852,
- *   963) NÃO vêm do canto medieval. Foram publicadas nos anos 1970 por Joseph
- *   Puleo, obtidas por redução numerológica de versículos do Livro dos
- *   Números. A alegação de que 528 Hz "repara o DNA" não tem um único estudo
- *   revisado por pares por trás. ⚠️ E `breath-audio.ts` toca 174 Hz até hoje —
- *   por coincidência de gosto, não por adesão a isso.
+ *   963) foram inventadas por Joseph Puleo nos anos 1970 e publicadas por
+ *   Leonard Horowitz em 1999. O critério é numerológico: todas reduzem a 3, 6
+ *   ou 9. Não vêm de Guido d'Arezzo — o solfejo dele é RELATIVO (ensina
+ *   intervalos), e além disso não havia como medir frequência absoluta antes
+ *   de 1834. E 528 Hz não é dó em afinação nenhuma: dó5 dá 513,74 em A=432
+ *   (o 528 fica 47,4 cents acima) e 523,25 em A=440.
+ *   ⚠️ `breath-audio.ts` toca 174 Hz até hoje — por coincidência de gosto, e
+ *   não por adesão a isso.
  *
- * • **Estudo existe, e é pequeno:** Calamassi & Pomponi, 2019, na revista
- *   *Explore*, cruzado e duplo-cego, n = 33, achou frequência cardíaca ~4,8
- *   bpm menor ouvindo 432 contra 440. É um piloto, com n de piloto, e o
- *   confundidor óbvio nunca foi controlado: gravação em 432 costuma ser também
- *   mais lenta e mais suave. **Um piloto não sustenta uma afirmação na tela de
- *   um app de saúde.**
+ * • **O estudo-âncora é um piloto, e só.** Calamassi & Pomponi, 2019, *Explore*
+ *   15(4):283–290 — n = 33, cruzado, 20 min. Frequência cardíaca −4,79 bpm com
+ *   **p = 0,05 exato**, num desenho com 12+ desfechos e sem correção para
+ *   comparações múltiplas; pressão não deu significativa. Três dos quatro
+ *   estudos italianos "positivos" são do mesmo primeiro autor, e **não existe
+ *   replicação independente**. Há resultados nulos e invertidos na literatura.
+ *   (A vertente 528 Hz é pior: o trabalho mais citado saiu numa revista da
+ *   OMICS, editora condenada pela FTC em 2019 a US$ 50,1 milhões por alegar
+ *   revisão por pares que não fazia.)
  *
- * ─── ENTÃO POR QUE 432, SE A CIÊNCIA NÃO SUSTENTA? ──────────────────────────
+ * • **E o achado mais decisivo é de percepção, não de fisiologia.** Van Hedger
+ *   & Bongiovanni, *Music & Science* 2023: ouvintes acertam a afinação
+ *   absoluta acima do acaso em notas isoladas e acordes, mas caem ao NÍVEL DO
+ *   ACASO quando o estímulo tem pistas de altura relativa — ou seja, quando é
+ *   música de verdade. Ninguém identifica a afinação ouvindo música.
  *
- * Porque a pergunta certa não é "432 cura?" (não) — é "que afinação usar?", e
- * essa pergunta PRECISA de resposta, porque hoje não há nenhuma. Entre 440 e
- * 432 há um argumento não-místico e mensurável: 432 é mais grave, o centroide
- * espectral desce junto, e som mais grave é percebido como mais escuro e menos
- * tenso. Numa tela cujo trabalho inteiro é baixar a ativação, isso basta.
+ * ─── ⚠️ ENTÃO A RAZÃO É OUTRA, E EU TINHA ESCRITO A ERRADA ──────────────────
  *
- * É uma escolha de TIMBRE, do mesmo tipo que escolher a voz da Isabella. Não
- * precisa de mais justificativa que essa, e não pode ter menos.
+ * A primeira versão desta prosa justificava o 432 assim: "mais grave, o
+ * centroide espectral desce junto, e som mais grave é percebido como mais
+ * escuro e menos tenso". A primeira metade é verdade (Ilie & Thompson 2006:
+ * altura mais grave em música associa-se a maior valência) e **a aplicação é
+ * falsa**: aquelas manipulações são de SEMITONS A OITAVAS, e aqui a diferença
+ * é de 0,32 de semitom. Transpor 1,82% baixa o centroide 1,82%, muito abaixo
+ * de qualquer mudança de timbre percebida.
+ *
+ * A razão que sobra é de ENGENHARIA, e ela basta:
+ *
+ *     Uma referência só, para drone, sinos, música e interface não brigarem
+ *     entre si. O valor é convenção estética entre quem faz áudio de
+ *     relaxamento, e não custa nada. É gosto, não é remédio.
+ *
+ * • **E o que move fisiologia de verdade** (Bernardi, Porta & Sleight, *Heart*
+ *   2006;92:445–452) é ANDAMENTO, dinâmica e SILÊNCIO — a pausa derruba
+ *   frequência cardíaca, pressão e ventilação ABAIXO do basal. Um compasso
+ *   lento e uma pausa bem colocada fazem, medidamente, mais do que 32 cents
+ *   jamais farão. É por isso que o desenho da sessão importa mais que a
+ *   afinação dela, e é onde o esforço deve ir.
  *
  * ─── ⚠️ A GRADE DO LAÇO, QUE É ONDE ISTO ENCOSTA NO CÓDIGO ──────────────────
  *
