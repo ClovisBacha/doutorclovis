@@ -52,6 +52,26 @@ const EVENTO = "dc-sementinhas";
 export function creditarSementinhas(n: number) {
   if (typeof window === "undefined" || !Number.isFinite(n) || n <= 0) return;
   window.dispatchEvent(new CustomEvent(EVENTO, { detail: n }));
+  /**
+   * ⚠️ O SOM DA MOEDA MORA AQUI, e este é o único funil que existe.
+   *
+   * A Sementinha é concedida em seis ou mais pontos diferentes — a aula, as
+   * quatro atividades, o fechamento do dia, o bônus da dupla, o presente, a
+   * conquista. Pôr o som em cada um seria seis chamadas e uma sétima esquecida
+   * no próximo bloco; é exatamente a razão pela qual este módulo existe.
+   *
+   * ⚠️ E o CLAUDE.md já registra que "o contador É a recompensa": um "+5 🌱"
+   * silencioso é indistinguível de nada ter acontecido. O que impedia o som de
+   * virar caixa registradora não podia ser disciplina de quem chama — é o teto
+   * de cinco por dia de `podeSoar`.
+   *
+   * O `import` é dinâmico porque este arquivo não importa NADA de propósito: a
+   * trilha desce por `lazy()`, e um import estático aqui reabriria a divisão de
+   * pacote que a rodada de desempenho fez. `tocar-som-de-ui` é folha (sem
+   * React, sem componente), então o pedaço que ele traz é pequeno — mas
+   * dinâmico ele nem entra no caminho de quem nunca ganha uma Sementinha.
+   */
+  void import("./tocar-som-de-ui").then((m) => m.tocarSomDeUI("moeda")).catch(() => {});
 }
 
 /** Escuta. Devolve a função que cancela — chame no cleanup do efeito. */

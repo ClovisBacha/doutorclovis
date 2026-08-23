@@ -35,7 +35,10 @@ const UI: { chave: EspecieDeSom; rotulo: string; nota: string }[] = [
   { chave: "compasso", rotulo: "Compasso", nota: "a deixa da respiração — olhos fechados" },
   { chave: "intervalo", rotulo: "Intervalo", nota: "fim de um intervalo de contração" },
   { chave: "fim", rotulo: "Fim", nota: "acabou a sessão — desce" },
+  { chave: "guardado", rotulo: "Guardado", nota: "selo — desce, não comemora" },
+  { chave: "moeda", rotulo: "Sementinha", nota: "tique curto, teto de 5 por dia" },
   { chave: "conquista", rotulo: "Conquista", nota: "a festa, afinada em 432" },
+  { chave: "trofeu", rotulo: "Troféu", nota: "mais lento — a animação dura 5,5 s" },
   { chave: "sos", rotulo: "SOS enviado", nota: "⚠️ alarme — sobe, e ignora a preferência" },
   { chave: "sos-falhou", rotulo: "SOS falhou", nota: "⚠️ alarme — desce e repete" },
 ];
@@ -186,7 +189,9 @@ function PreviewSom() {
           ))}
         </div>
         <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-          O SOS não obedece a nenhuma destas escolhas — ele não é som de interface, é alarme.
+          O SOS não obedece a nenhuma destas escolhas — ele não é som de interface, é alarme. A
+          festa (conquista e troféu) toca para quem nunca escolheu nada, e cala se você tocar em
+          "Desligado".
         </p>
         <div className="h-16" />
       </div>

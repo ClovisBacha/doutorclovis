@@ -3219,7 +3219,11 @@ export function GestacaoPath({
           que não se pode pular vira pedágio, e quem fecha o dia todo dia é
           quem mais pagaria esse pedágio. */}
       {trofeuNovo != null && (
-        <TrofeuConquistado numero={trofeuNovo} aoFechar={() => setTrofeuNovo(null)} />
+        <TrofeuConquistado
+          numero={trofeuNovo}
+          careMode={careMode}
+          aoFechar={() => setTrofeuNovo(null)}
+        />
       )}
 
       {/* A escada do troféu, aberta pelo toque na fita. Depois da comemoração
@@ -4941,6 +4945,20 @@ export function MovementBlock({
     if (secs <= 0) {
       if (idx + 1 >= seq.length) {
         setPhase("reflexo");
+        /**
+         * ⚠️ O FIM DA SESSÃO DE MOVIMENTO ERA MUDO — e este é o caso mais forte
+         * de todos os que estavam.
+         *
+         * Ela termina no chão, muitas vezes de olhos fechados, com a voz
+         * gravada tendo guiado a sessão inteira. E o FIM não fazia som nenhum:
+         * o único sinal era visual, numa tela que ela não está olhando. Levantar
+         * para conferir se acabou desfaz os últimos minutos.
+         *
+         * É o mesmo `fim` da meditação, e de propósito: as duas atividades
+         * terminam do mesmo jeito, e dois sons diferentes para "acabou"
+         * ensinariam a paciente a decodificar em vez de reconhecer.
+         */
+        tocarSomDeUI("fim", { careMode, emSessao: true });
         finish();
       } else {
         setIdx(idx + 1);
@@ -8590,6 +8608,22 @@ export function GratitudeBlock({
       setTotal(novoTotal);
 
       /**
+       * ⚠️ O SELO DE GUARDADO — o dia comum era MUDO.
+       *
+       * Só o marco redondo fazia barulho (10, 25, 50…). No dia comum, "Guardei
+       * 💛" — que é a promessa central da atividade — acontecia em silêncio, e
+       * a única confirmação era uma tela trocando.
+       *
+       * ⚠️ E o som DESCE, nunca sobe. Guardar é fechar, não conseguir: a
+       * paciente que escreveu uma gratidão num dia difícil não conquistou nada.
+       * Um arpejo ascendente aqui leria como parabéns por uma coisa que às
+       * vezes custou muito.
+       *
+       * O marco continua com festa maior logo abaixo — a hierarquia é essa.
+       */
+      tocarSomDeUI("guardado", { careMode });
+
+      /**
        * ⚠️ OS MARCOS REDONDOS — festa própria, que a atividade não tinha.
        *
        * `marcoAtingido` só devolve algo quando `novoTotal` bate exatamente um
@@ -10391,6 +10425,21 @@ function DailyQuizBlock({
   function next() {
     if (qIndex + 1 >= total) {
       setPhase("done");
+      /**
+       * ⚠️ A HIERARQUIA ESTAVA INVERTIDA: acertar UMA questão tinha som e
+       * TERMINAR A AULA não.
+       *
+       * O chime toca a cada acerto; o fim da aula inteira só tinha confete —
+       * visual, numa tela que ela está olhando de qualquer jeito. O resultado
+       * era o app fazendo mais barulho pela parte do que pelo todo.
+       *
+       * O nível sobe com o placar: gabaritar soa maior que acertar metade, que
+       * é a mesma régua que `ConfettiBurst big={score === total}` já usa para o
+       * confete. Sem inventar uma segunda escala.
+       */
+      if (score > 0) {
+        celebrateChime(score === total ? 3 : 1, careMode);
+      }
       /* ⚠️ O bilhete para a Comunidade, e ele guarda o TEMA — nunca o dia.
          O dia gestacional é a semana dela disfarçada (D = semana × 7 + dia), e
          mandá-lo passaria por cima da chave `mostrar_semana` do perfil.

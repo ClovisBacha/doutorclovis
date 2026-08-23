@@ -150,6 +150,15 @@ export function celebrateChime(nivel: 1 | 2 | 3 | 4 | 5 = 1, careMode = false): 
      "Resgatar" da aba de conquistas chamava `celebrateChime(1)` sem nenhuma
      checagem, ao contrário do vizinho dele. Passar aqui custa um argumento e
      fecha a porta de dentro. */
+  /**
+   * ⚠️ E ELE PASSOU A RESPEITAR `prefers-reduced-motion`.
+   *
+   * `fireConfetti` já respeitava e o chime não — então quem pediu ao sistema
+   * MENOS estímulo continuava levando o arpejo, com a tela quieta. A
+   * preferência é de "movimento" no nome e de ESTÍMULO no uso; é assim que
+   * todo sistema operacional a trata.
+   */
+  if (prefersReducedMotion()) return;
   tocarConquistaComPortoes(Math.min(6, 3 + nivel), { careMode });
 }
 

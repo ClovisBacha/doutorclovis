@@ -100,6 +100,22 @@ describe("⚠️ os portões que impedem o som de aparecer do nada", () => {
     expect(podeSoar("conquista", { ...NORMAL, jaTocouHoje: 3 })).toBe(false);
   });
 
+  test("⚠️ a festa pode ser SILENCIADA — mas não por omissão", () => {
+    /* A tensão real: a comemoração já existia e já tocava, então aplicar o
+       padrão desligado a ela seria TIRAR uma coisa do app. Mas ser impossível
+       de silenciar também é defeito — era o único som que a paciente não
+       conseguia desligar de jeito nenhum.
+
+       A régua separa "não escolheu" de "escolheu desligar": quem nunca mexeu
+       recebe `completo` e ouve; quem tocou em "Não" recebe `desligado` e não. */
+    expect(podeSoar("conquista", { ...NORMAL, nivel: "completo" })).toBe(true);
+    expect(podeSoar("trofeu", { ...NORMAL, nivel: "completo" })).toBe(true);
+    expect(podeSoar("conquista", { ...NORMAL, nivel: "desligado" })).toBe(false);
+    expect(podeSoar("trofeu", { ...NORMAL, nivel: "desligado" })).toBe(false);
+    /* E o alarme atravessa as duas escolhas. */
+    expect(podeSoar("sos", { ...NORMAL, nivel: "desligado" })).toBe(true);
+  });
+
   test("⚠️ o alarme não tem teto — ela pode passar mal duas vezes no mesmo dia", () => {
     expect(TETO_POR_DIA.sos).toBeUndefined();
     expect(podeSoar("sos", { ...NORMAL, jaTocouHoje: 99 })).toBe(true);
@@ -206,9 +222,39 @@ describe("⚠️ a lista é FECHADA — o que não entrou, não entrou por razã
       expect({ e, proibida: proibidas.test(e) }).toEqual({ e, proibida: false });
   });
 
-  test("são seis espécies, e duas delas são alarme", () => {
-    expect(TODAS.length).toBe(6);
+  test("são nove espécies, e duas delas são alarme", () => {
+    /* ⚠️ O número está travado de propósito: a lista é FECHADA, e cada entrada
+       teve de justificar por escrito por que os olhos não estão nela. Uma
+       espécie nova reprova aqui e obriga quem a acrescentou a escrever a razão
+       — que é o único jeito de a lista não virar "som em tudo". */
+    expect(TODAS.length).toBe(9);
     expect(ALARME.length).toBe(2);
+  });
+
+  test("⚠️ tudo que repete muitas vezes por dia tem TETO", () => {
+    /* A moeda é a mais exposta: ela cai na aula, nas quatro atividades, no
+       fechamento do dia, no bônus da dupla, no presente e na conquista — seis
+       ou mais vezes por dia. Sem teto o app vira caixa registradora, e a décima
+       moeda não acrescenta nada à nona. */
+    for (const e of ["conquista", "trofeu", "moeda", "guardado"] as EspecieDeSom[]) {
+      expect({ e, tem: (TETO_POR_DIA[e] ?? 0) > 0 }).toEqual({ e, tem: true });
+    }
+    /* E o alarme NUNCA tem teto — ela pode passar mal duas vezes no mesmo dia. */
+    for (const e of ALARME) expect(TETO_POR_DIA[e]).toBeUndefined();
+  });
+
+  test("⚠️ o guardado DESCE em relação ao compasso — guardar é fechar", () => {
+    /* Se subisse, leria como "conseguiu!" — e a paciente que escreveu uma
+       gratidão num dia difícil não conseguiu nada. Ela guardou. */
+    expect(DESENHOS.guardado.passos[0].hz).toBeGreaterThan(DESENHOS.compasso.passos[0].hz);
+    expect(DESENHOS.guardado.corte).toBeLessThan(DESENHOS.conquista.corte);
+  });
+
+  test("⚠️ o troféu é mais LENTO que a conquista — a animação dura 5,5 s", () => {
+    /* Um arpejo rápido acabaria antes do desenho e deixaria os últimos quatro
+       segundos em silêncio, que é o defeito que ele veio consertar. */
+    const dur = (e: EspecieDeSom) => Math.max(...DESENHOS[e].passos.map((p) => p.em + p.dur));
+    expect(dur("trofeu")).toBeGreaterThan(dur("conquista"));
   });
 
   test("⚠️ som de interface é SEMPRE Web Audio, nunca <audio>", () => {

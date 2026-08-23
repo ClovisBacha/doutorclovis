@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { deslocamentoDaLinha } from "@/lib/alinhar-na-linha";
 import trofeuSprite from "@/assets/trofeu.webp";
 
@@ -101,12 +102,34 @@ export function TrofeuIcone({
 export function TrofeuConquistado({
   numero,
   aoFechar,
+  careMode = false,
 }: {
   /** Qual troféu é este — "seu 12º dia de 5 estrelas". */
   numero: number;
   aoFechar: () => void;
+  careMode?: boolean;
 }) {
   const [saindo, setSaindo] = useState(false);
+
+  /**
+   * ⚠️ ESTA ERA A ÚNICA ANIMAÇÃO DE CINCO SEGUNDOS E MEIO DO APP, E ERA MUDA.
+   *
+   * O chime do dia fechado toca cerca de um segundo ANTES do troféu aparecer e
+   * já acabou quando ele entra: a paciente via o clímax do jogo inteiro em
+   * silêncio absoluto.
+   *
+   * O som do troféu é PRÓPRIO e mais lento que o da conquista — quatro degraus
+   * ao longo de 1,7 s, contra 0,65 do chime. Um arpejo rápido acabaria antes do
+   * desenho e deixaria os últimos quatro segundos mudos, que é o mesmo defeito
+   * em versão menor.
+   *
+   * ⚠️ E ele nasce no MONTE, junto com o primeiro quadro — não num
+   * `setTimeout`. O quadro 0 da folha de sprite é vazio e o troféu se constrói;
+   * a nota que começa junto com ele é a nota que o acompanha.
+   */
+  useEffect(() => {
+    tocarSomDeUI("trofeu", { careMode });
+  }, [careMode]);
   /* `useRef` e não estado: dois toques rápidos (ou o fim da animação chegando
      junto com um toque) chamariam `aoFechar` duas vezes, e o contador do
      Caminho avançaria dois troféus com uma conquista só. */

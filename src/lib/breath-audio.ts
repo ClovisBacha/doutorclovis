@@ -7,6 +7,8 @@
  */
 import { tocarPadrao } from "./nativo";
 
+import { nota } from "./afinacao";
+
 export type BreathPhase = "in" | "hold" | "out";
 
 export function createBreathAudio() {
@@ -26,13 +28,25 @@ export function createBreathAudio() {
       gain = ctx.createGain();
       gain.gain.value = 0.0001;
       gain.connect(ctx.destination);
-      // Tom base calmo (~174Hz) + uma quinta suave por cima.
+      /**
+       * ⚠️ ERA 174 E 261 Hz, e isso não pertencia a sistema nenhum.
+       *
+       * O 174 é, por coincidência, a primeira das "frequências Solfeggio" —
+       * números inventados nos anos 1970 por redução numerológica, sem nenhuma
+       * base histórica ou física (ver `afinacao.ts`). Ninguém escolheu isso aqui
+       * por adesão àquilo; foi gosto. Mas deixar o número parado é deixar a
+       * coincidência de pé, e o app tinha TRÊS motores em TRÊS afinações.
+       *
+       * Agora é fá 3 e dó 4 em A = 432, o MESMO par do pad da meditação: a
+       * mesma nota, o mesmo intervalo de quinta, o mesmo timbre — só que
+       * pertencendo ao sistema do resto do app.
+       */
       osc1 = ctx.createOscillator();
       osc1.type = "sine";
-      osc1.frequency.value = 174;
+      osc1.frequency.value = nota("fa", 3);
       osc2 = ctx.createOscillator();
       osc2.type = "sine";
-      osc2.frequency.value = 261;
+      osc2.frequency.value = nota("do", 4);
       osc1.connect(gain);
       osc2.connect(gain);
       osc1.start();

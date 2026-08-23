@@ -3207,11 +3207,22 @@ function WeekMilestoneModal({
   const audioRef = useRef<ReturnType<typeof createBreathAudio> | null>(null);
 
   useEffect(() => {
+    /**
+     * ⚠️ O SOM ESTAVA NO MOMENTO ERRADO — e a inversão saltava aos olhos.
+     *
+     * O confete estourava AQUI, na abertura, e o chime só tocava quando ela
+     * FECHAVA o modal. Ou seja: o clímax visual acontecia em silêncio, e a nota
+     * chegava no gesto de sair. Agora os dois estão no mesmo instante.
+     *
+     * O `handleClose` continua com háptico — sair merece um toque, não uma
+     * festa.
+     */
     fireConfetti();
+    celebrateChime(2, careMode);
     return () => {
       audioRef.current?.stop();
     };
-  }, []);
+  }, [careMode]);
 
   function toggleSound() {
     if (sound) {
@@ -3227,7 +3238,8 @@ function WeekMilestoneModal({
 
   function handleClose() {
     audioRef.current?.stop();
-    celebrateChime(1, careMode);
+    /* ⚠️ A festa agora acontece na ABERTURA — ver o efeito acima. Aqui fica só
+       o háptico: sair merece um toque, não um arpejo. */
     celebrateHaptic();
     onClose();
   }
@@ -3385,7 +3397,7 @@ function BemEstarHub({
     <div className="space-y-5">
       <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
-        {sub === "meditacoes" && <MeditacoesTab gest={gest} />}
+        {sub === "meditacoes" && <MeditacoesTab gest={gest} careMode={careMode} />}
         {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />}
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
@@ -4131,23 +4143,31 @@ function BabyTab({
       </StaggerItem>
 
       {/* ── Sentir o coração: vibra no ritmo do bebê (BPM real se o médico
-             registrou na consulta; senão, o típico do trimestre) ─────────── */}
-      <StaggerItem>
-        <HeartbeatFeel
-          defaultBpm={bpmDefault}
-          babyName={profile.baby_name}
-          sourceNote={
-            profile.fetal_bpm
-              ? `Ritmo real medido pelo seu médico${
-                  profile.fetal_bpm_at
-                    ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
-                    : ""
-                } 💗`
-              : undefined
-          }
-          compact
-        />
-      </StaggerItem>
+             registrou na consulta; senão, o típico do trimestre)
+
+             ⚠️ E ELE FICA DENTRO DO MODO CUIDADO. O portão `!careMode` existia
+             três linhas ABAIXO, e este bloco estava fora dele: quem acabou de
+             perder a gestação abria a aba do Bebê e encontrava "O coração de
+             {nome}", com som lub-dub a 140 bpm e vibração no ritmo. É a coisa
+             mais dolorosa que este app consegue fazer. ─────────────────── */}
+      {!careMode && (
+        <StaggerItem>
+          <HeartbeatFeel
+            defaultBpm={bpmDefault}
+            babyName={profile.baby_name}
+            sourceNote={
+              profile.fetal_bpm
+                ? `Ritmo real medido pelo seu médico${
+                    profile.fetal_bpm_at
+                      ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                      : ""
+                  } 💗`
+                : undefined
+            }
+            compact
+          />
+        </StaggerItem>
+      )}
 
       {!careMode && (
         <StaggerItem>
@@ -12365,7 +12385,21 @@ const MEDITATIONS: Meditation[] = [
 
 const TOPICS = [...new Set(MEDITATIONS.map((m) => m.topic))];
 
-function MeditacoesTab({ gest }: { gest: Gest }) {
+/**
+ * ⚠️ `careMode` ENTROU AQUI, e a falta dele era o pior defeito de som do app.
+ *
+ * Esta aba manda o roteiro inteiro da meditação para o `speechSynthesis` — e os
+ * roteiros contêm, literalmente: "Conexão com o bebê", "Você está segura. Seu
+ * bebê está seguro.", "Agradeça ao seu bebê por este dia de companhia.".
+ *
+ * Para quem acabou de perder a gestação, o app FALAVA ISSO EM VOZ ALTA.
+ *
+ * É exatamente o defeito que a meditação do Caminho corrigiu em ago/2026 e que
+ * está registrado lá como "o pior que a revisão encontrou" — e aqui é pior,
+ * porque lá o texto era lido na TELA e aqui é falado. As duas vizinhas na mesma
+ * linha (`SonsBebêTab`, `ApoioEmocionalTab`) já recebiam `careMode`; esta não.
+ */
+function MeditacoesTab({ gest, careMode }: { gest: Gest; careMode: boolean }) {
   const currentTrimester = gest ? trimesterForWeek(gest.weeks) : null;
   /* Suporte à voz só se sabe no CLIENTE. Lido no render, `window` não existe
      no SSR do TanStack Start e a página inteira caía no servidor. */
@@ -18091,6 +18125,19 @@ function CantinhoTab({
       });
       if (res.ok) {
         setSaldo(res.balance);
+        /**
+         * ⚠️ COMPRAR ERA MUDO — exceto no caso RARO.
+         *
+         * O único som da compra era o do conjunto completo, algumas linhas
+         * abaixo. Ou seja: o caso comum (comprar um enfeite) acontecia em
+         * silêncio e o caso excepcional fazia festa — o que faz o comum parecer
+         * ter FALHADO.
+         *
+         * Comprar é a saída da moeda, e merece o mesmo selo de "pousou" que
+         * guardar tem, não o arpejo de conquista. O conjunto completo continua
+         * com a festa maior; a hierarquia é essa.
+         */
+        tocarSomDeUI("guardado", { careMode });
         setOwned((o) => {
           const next = o.includes(itemId) ? o : [...o, itemId];
           // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.

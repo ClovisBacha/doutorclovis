@@ -880,6 +880,74 @@ trabalho enquanto eu escrevia nela — um `cp` de restauração apagou duas fun�
 recém-escritas, e ele as reconstruiu a partir do contrato dos chamadores.
 Revisão adversarial em repositório vivo pede `isolation: "worktree"`.
 
+#### ⚠️ E A SEGUNDA VARREDURA — o app, aba por aba
+
+O dono esclareceu que "site" sempre quis dizer o APLICATIVO, e pediu a vistoria
+completa. Ela achou quatro furos de Modo Cuidado e onze momentos mudos.
+
+**OS QUATRO FUROS DE MODO CUIDADO — e o primeiro é o pior defeito de som que o
+app já teve:**
+
+1. ⚠️ **A segunda meditação FALAVA EM VOZ ALTA sobre o bebê, no luto.**
+   `MeditacoesTab` manda o roteiro inteiro para o `speechSynthesis`, e os
+   roteiros contêm "Conexão com o bebê", "Você está segura. Seu bebê está
+   seguro.", "Agradeça ao seu bebê por este dia de companhia." A prop `careMode`
+   nunca foi passada — as duas vizinhas na MESMA linha recebiam. É exatamente o
+   defeito que a meditação do Caminho corrigiu em ago/2026 e que está registrado
+   lá como "o pior que a revisão encontrou"; aqui é pior, porque lá o texto era
+   LIDO NA TELA e aqui é FALADO.
+2. ⚠️ **O batimento do bebê tocava na aba Bebê, no luto.** O portão `!careMode`
+   existia três linhas ABAIXO do `HeartbeatFeel`, e ele estava fora. Som lub-dub
+   a 140 bpm mais vibração no ritmo, com o texto "O coração de {nome}".
+3. ⚠️ **E no painel do ACOMPANHANTE também** — o marido ou a mãe abria o link e
+   ouvia o batimento de um bebê que não existe mais, com ela sem estar do lado
+   para explicar. `care_mode` precisou atravessar `getCompanionView` até lá.
+4. **A folha de sons oferecia "Coração do bebê" e "Ventre"** — resolvido com
+   `ofertaveis(luto)`.
+
+**OS MOMENTOS MUDOS QUE GANHARAM SOM:**
+
+- ⚠️ **O TROFÉU** — a única animação de 5,5 s do app, e não tinha uma nota. O
+  chime do dia toca ~1 s antes e já acabou quando ele aparece: a paciente via o
+  clímax do jogo em silêncio. Som próprio, mais LENTO que a conquista (1,7 s
+  contra 0,65) — um arpejo rápido acabaria antes do desenho.
+- ⚠️ **O FIM DA SESSÃO DE MOVIMENTO** — o caso mais forte de todos. Ela termina
+  no chão, de olhos fechados, depois de a voz gravada ter guiado a sessão
+  inteira, e o único sinal do fim era VISUAL. Usa o mesmo `fim` da meditação, de
+  propósito: dois sons diferentes para "acabou" ensinariam a decodificar.
+- ⚠️ **O MARCO DE SEMANA ESTAVA INVERTIDO** — o confete estourava na ABERTURA e
+  o chime só tocava quando ela FECHAVA o modal. O clímax visual acontecia mudo e
+  a nota chegava no gesto de sair.
+- ⚠️ **A AULA TINHA A HIERARQUIA INVERTIDA** — acertar UMA questão tinha som e
+  terminar a aula inteira não. O app fazia mais barulho pela parte que pelo
+  todo.
+- **A GRATIDÃO do dia comum** — só o marco redondo soava; "Guardei 💛", que é a
+  promessa central da atividade, era silêncio. ⚠️ E o som DESCE: guardar é
+  fechar, não conseguir. A paciente que escreveu uma gratidão num dia difícil
+  não conquistou nada.
+- **AS SEMENTINHAS** — o CLAUDE.md já dizia que "o contador É a recompensa", e
+  um "+5 🌱" mudo é indistinguível de nada. O som mora no funil único
+  (`creditarSementinhas`), com teto de cinco por dia: ela cai em seis ou mais
+  pontos, e sem teto o app vira caixa registradora.
+- **COMPRAR NO CANTINHO** — mudo, EXCETO o caso raro do conjunto completo. O
+  comum em silêncio e o excepcional com festa faz o comum parecer ter falhado.
+
+**E O ÚLTIMO MOTOR SAIU DA AFINAÇÃO SOLTA:** `breath-audio.ts` tocava 174 e
+261 Hz. O 174 é, por coincidência, a primeira das "frequências Solfeggio" —
+números inventados nos anos 1970 por numerologia. Agora é fá 3 e dó 4 em A=432,
+o MESMO par do pad. Eram três motores em três afinações; hoje é um sistema.
+
+**O CONTROLE GLOBAL, e a tensão que ele resolve.** Havia cinco interruptores
+locais, nenhum lembrado, e a comemoração não passava por nenhum: era **o único
+som do app impossível de desligar**, e um dos que tocam sem ela pedir.
+
+⚠️ Mas aplicar "desligado por padrão" à festa seria TIRAR uma coisa que o app
+tem. A régua separa **"não escolheu"** de **"escolheu desligar"**: quem nunca
+mexeu continua ouvindo a festa exatamente como antes; quem toca em "Não" na
+folha de sons silencia tudo menos o ALARME. E `celebrateChime` passou a
+respeitar `prefers-reduced-motion` — `fireConfetti` já respeitava, então quem
+pedia menos estímulo tinha a tela quieta e o arpejo tocando.
+
 **Bancadas:** `/preview-som` (os vinte, a música e os sons de interface, todos
 num toque) · `/preview-sons` (a tela dos Sons para dormir).
 **Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10` ·

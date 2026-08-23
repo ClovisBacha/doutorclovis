@@ -15,6 +15,18 @@ export type CompanionView = {
   /** BPM fetal medido pelo médico na consulta ("Sentir o coração" v2). */
   fetal_bpm?: number | null;
   fetal_bpm_at?: string | null;
+  /**
+   * ⚠️ O Modo Cuidado da GESTANTE — e ele precisou chegar até aqui.
+   *
+   * O painel do acompanhante desenha o "Sentir o coração", que toca o lub-dub e
+   * vibra no ritmo do bebê. Sem este campo, o marido ou a mãe abria o link e
+   * **ouvia o batimento de um bebê que não existe mais** — e o pior é que ela
+   * não está do lado para explicar.
+   *
+   * O painel continua de pé no luto (ele é a rede de apoio dela, e o contato de
+   * emergência entra por aqui). O que some é o batimento.
+   */
+  care_mode?: boolean | null;
 };
 
 /**
@@ -42,7 +54,7 @@ export const getCompanionView = createServerFn({ method: "POST" })
     }
 
     const base =
-      "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days";
+      "display_name,baby_name,lmp_date,due_date,reference_date,reference_weeks,reference_days,care_mode";
     const first = await (supabaseAdmin as any)
       .from("patient_profiles")
       .select(`${base},fetal_bpm,fetal_bpm_at`)

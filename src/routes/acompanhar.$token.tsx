@@ -298,23 +298,31 @@ function CompanionView() {
 
             {/* Sentir o coração: se o médico registrou o BPM real da consulta,
                 vibra no ritmo EXATO do bebê; senão, usa o típico da semana
-                gestacional (1º tri ~160, 2º ~145, 3º ~135). */}
-            <HeartbeatFeel
-              defaultBpm={
-                profile.fetal_bpm ?? (trimester === 1 ? 160 : trimester === 2 ? 145 : 135)
-              }
-              babyName={profile.baby_name}
-              sourceNote={
-                profile.fetal_bpm
-                  ? `Ritmo real medido pelo médico${
-                      profile.fetal_bpm_at
-                        ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
-                        : ""
-                    } 💗`
-                  : undefined
-              }
-              compact
-            />
+                gestacional (1º tri ~160, 2º ~145, 3º ~135).
+
+                ⚠️ E ELE SOME NO MODO CUIDADO DELA. Sem este portão, o marido ou
+                a mãe abria o link e OUVIA o batimento de um bebê que não existe
+                mais — com ela sem estar do lado para explicar. O resto do painel
+                fica: ele é a rede de apoio dela, e o contato de emergência entra
+                por aqui. */}
+            {!profile.care_mode && (
+              <HeartbeatFeel
+                defaultBpm={
+                  profile.fetal_bpm ?? (trimester === 1 ? 160 : trimester === 2 ? 145 : 135)
+                }
+                babyName={profile.baby_name}
+                sourceNote={
+                  profile.fetal_bpm
+                    ? `Ritmo real medido pelo médico${
+                        profile.fetal_bpm_at
+                          ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
+                          : ""
+                      } 💗`
+                    : undefined
+                }
+                compact
+              />
+            )}
 
             {due && (
               <div className="rounded-2xl border border-border bg-card p-4 text-sm">

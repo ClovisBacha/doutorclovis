@@ -24,13 +24,35 @@ import {
 const NIVEIS: NivelDeSom[] = ["desligado", "essencial", "completo"];
 
 export function lerNivel(): NivelDeSom {
-  if (typeof localStorage === "undefined") return NIVEL_PADRAO;
+  return escolha() ?? NIVEL_PADRAO;
+}
+
+/**
+ * O que ela ESCOLHEU — `null` quando nunca escolheu nada.
+ *
+ * ⚠️ A diferença entre "não escolheu" e "escolheu desligar" é a que resolve uma
+ * tensão real. A comemoração (`celebrateChime`, o troféu) JÁ EXISTIA e já
+ * tocava: aplicar o padrão desligado a ela seria TIRAR uma coisa que o app tem,
+ * e ninguém pediu isso. Mas ser impossível de silenciar também é defeito — era
+ * o único som do app que a paciente não conseguia desligar de jeito nenhum, e
+ * é justamente um dos que tocam sem ela pedir.
+ *
+ * Com os dois estados separados: quem nunca mexeu continua ouvindo a festa
+ * exatamente como antes; quem tocou em "Não" silencia TUDO menos o alarme.
+ */
+function escolha(): NivelDeSom | null {
+  if (typeof localStorage === "undefined") return null;
   try {
     const v = localStorage.getItem(CHAVE_NIVEL) as NivelDeSom | null;
-    return v && NIVEIS.includes(v) ? v : NIVEL_PADRAO;
+    return v && NIVEIS.includes(v) ? v : null;
   } catch {
-    return NIVEL_PADRAO;
+    return null;
   }
+}
+
+/** Ela pediu silêncio explicitamente — nem a festa passa. */
+export function pediuSilencio(): boolean {
+  return escolha() === "desligado";
 }
 
 export function gravarNivel(n: NivelDeSom): void {
@@ -129,7 +151,12 @@ export function tocarSomDeUI(
   if (typeof window === "undefined") return;
   ouvirGestos();
   const ctx = {
-    nivel: lerNivel(),
+    /**
+     * ⚠️ O TROFÉU segue a mesma régua da conquista: ele é festa, já existia
+     * como ANIMAÇÃO, e o som dele é a correção de uma tela que era muda. Quem
+     * nunca escolheu ouve; quem pediu silêncio, não.
+     */
+    nivel: especie === "trofeu" ? (pediuSilencio() ? "desligado" : "completo") : lerNivel(),
     careMode: !!o?.careMode,
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
@@ -177,21 +204,33 @@ export function destravarSomDeUI(): void {
  * portões que nunca teve: aba escondida, ausência de gesto recente, e o teto de
  * três por dia.
  */
-export function tocarConquistaComPortoes(degraus: number, o?: { careMode?: boolean }): void {
+export function tocarConquistaComPortoes(
+  degraus: number,
+  o?: { careMode?: boolean; especie?: EspecieDeSom },
+): void {
   if (typeof window === "undefined") return;
   ouvirGestos();
-  const podia = podeSoar("conquista", {
-    /* `completo` de propósito: é o que faz a preferência NÃO governar aqui. */
-    nivel: "completo",
+  const especie = o?.especie ?? "conquista";
+  const podia = podeSoar(especie, {
+    /**
+     * ⚠️ `completo` a menos que ela tenha PEDIDO silêncio.
+     *
+     * A festa já existia e já tocava, então quem nunca mexeu continua ouvindo —
+     * o padrão desligado vale para o que é NOVO. Mas quem tocou em "Não" na
+     * folha de sons silencia isto também: ser impossível de desligar era o
+     * defeito na outra ponta, e num app que a paciente instala no celular ela
+     * precisa poder pedir silêncio e ser atendida.
+     */
+    nivel: pediuSilencio() ? "desligado" : "completo",
     careMode: !!o?.careMode,
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
-    jaTocouHoje: contarHoje("conquista"),
+    jaTocouHoje: contarHoje(especie),
     hora: new Date().getHours(),
   });
   if (!podia) return;
   tocarConquista(degraus);
-  somar("conquista");
+  somar(especie);
 }
 
 export { DESENHOS, ehAlarme, ehNoite, type EspecieDeSom, type NivelDeSom };

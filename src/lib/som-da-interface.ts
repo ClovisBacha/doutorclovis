@@ -73,6 +73,22 @@ export type EspecieDeSom =
   | "intervalo"
   /** Dia fechado, troféu, conquista grande. É a recompensa que o jogo constrói. */
   | "conquista"
+  /**
+   * O TROFÉU — a única animação de cinco segundos e meio do app, e ela era
+   * MUDA. O chime do dia toca cerca de um segundo antes e já acabou quando o
+   * troféu aparece: a paciente via o clímax em silêncio.
+   */
+  | "trofeu"
+  /**
+   * Ganhar Sementinhas. ⚠️ Tem teto agressivo: a moeda cai em seis ou mais
+   * pontos por dia, e sem limite isto vira caixa registradora.
+   */
+  | "moeda"
+  /**
+   * Guardar — a gratidão do dia, um registro, uma consulta marcada. Um selo,
+   * não uma festa: fecha o gesto sem comemorar.
+   */
+  | "guardado"
   /** ⚠️ SOS enviado. Não é som de interface: é ALARME. Ver `ALARME`. */
   | "sos"
   /** ⚠️ SOS que FALHOU. O único erro do app cuja consequência é clínica. */
@@ -96,7 +112,14 @@ export function ehAlarme(e: EspecieDeSom): boolean {
 }
 
 /** As espécies que entram no nível `essencial`. As outras pedem `completo`. */
-const ESSENCIAIS: readonly EspecieDeSom[] = ["compasso", "fim", "intervalo", "sos", "sos-falhou"];
+const ESSENCIAIS: readonly EspecieDeSom[] = [
+  "compasso",
+  "fim",
+  "intervalo",
+  "guardado",
+  "sos",
+  "sos-falhou",
+];
 
 /**
  * ⚠️ TETO DE FADIGA, e ele é por ESPÉCIE.
@@ -107,6 +130,19 @@ const ESSENCIAIS: readonly EspecieDeSom[] = ["compasso", "fim", "intervalo", "so
  */
 export const TETO_POR_DIA: Partial<Record<EspecieDeSom, number>> = {
   conquista: 3,
+  trofeu: 3,
+  /**
+   * ⚠️ A MOEDA É A MAIS EXPOSTA DE TODAS.
+   *
+   * A Sementinha cai na aula, nas quatro atividades, no fechamento do dia, no
+   * bônus da dupla, no presente, na conquista — seis ou mais vezes por dia. Sem
+   * teto, o app vira uma caixa registradora, e a décima moeda não acrescenta
+   * nada à nona: acrescenta irritação. Cinco cobre a manhã de uma paciente
+   * engajada e cala antes de virar ruído.
+   */
+  moeda: 5,
+  /* Guardar é um gesto que ela repete: diário, registros, gratidão. */
+  guardado: 8,
 };
 
 export type Contexto = {
@@ -295,6 +331,53 @@ export const DESENHOS: Record<EspecieDeSom, Desenho> = {
    * subir é o de "chegou". Trocar os dois faria a confirmação do socorro soar
    * como o fim de um exercício de alongamento.
    */
+  /**
+   * O TROFÉU: quatro degraus subindo mais lentos e mais longos que a conquista.
+   *
+   * ⚠️ Ele é mais LENTO de propósito. A animação dura 5,5 s e constrói o troféu
+   * quadro a quadro; um arpejo rápido acabaria antes do desenho e deixaria os
+   * últimos quatro segundos em silêncio — que é o defeito que ele veio
+   * consertar, só que menor.
+   */
+  trofeu: {
+    passos: [
+      { hz: N.la4, em: 0, dur: 0.5 },
+      { hz: N.do5, em: 0.28, dur: 0.5 },
+      { hz: N.mi5, em: 0.56, dur: 0.55 },
+      { hz: N.la5, em: 0.84, dur: 0.9 },
+    ],
+    ataque: 0.04,
+    corte: 1100,
+    ganho: 0.2,
+  },
+  /**
+   * A MOEDA: um tique curtíssimo, duas notas, quase sem cauda.
+   *
+   * ⚠️ Curto porque ele repete. Tudo que soa muitas vezes por dia tem de caber
+   * embaixo da atenção — a nota informa e some, sem pedir nada.
+   */
+  moeda: {
+    passos: [
+      { hz: N.mi5, em: 0, dur: 0.05 },
+      { hz: N.la5, em: 0.04, dur: 0.09 },
+    ],
+    ataque: 0.02,
+    corte: 1100,
+    ganho: 0.13,
+  },
+  /**
+   * GUARDADO: uma nota só, grave, com cauda. É um selo, não uma festa.
+   *
+   * ⚠️ E ela DESCE em relação ao compasso, não sobe: guardar é fechar. Se
+   * subisse, leria como "conseguiu!", e a paciente que escreveu uma gratidão
+   * difícil não conseguiu nada — ela guardou.
+   */
+  guardado: {
+    passos: [{ hz: N.do5, em: 0, dur: 0.28 }],
+    ataque: 0.03,
+    corte: 850,
+    ganho: 0.15,
+  },
   sos: {
     passos: [
       { hz: N.la4, em: 0, dur: 0.16 },
