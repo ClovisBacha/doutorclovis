@@ -73,6 +73,32 @@ export function gravarNivel(n: NivelDeSom): void {
  */
 let ultimoGesto = 0;
 let ouvindo = false;
+/* O último som que efetivamente tocou — a régua da vez precisa dos dois. */
+let ultimoSomEm = 0;
+let ultimoSom: EspecieDeSom | undefined;
+
+/**
+ * ⚠️ O MODO CUIDADO CARIMBADO — para o portão ser fechado POR PADRÃO.
+ *
+ * Antes, cada ponto de chamada tinha de passar `careMode` à mão. Isso é
+ * exatamente a "segunda régua no chamador" que este projeto já pagou várias
+ * vezes: `AvisoDePresente` teve o portão movido para dentro por isso, e a
+ * revisão desta noite achou `celebrateChime` com um chamador que não passava
+ * nada.
+ *
+ * E há um caso onde passar à mão nem é possível: `creditarSementinhas` é o
+ * funil de DEZESSETE pontos de concessão, num módulo que de propósito não
+ * importa nada — a moeda tocaria sem saber do luto.
+ *
+ * Com o carimbo, quem não passa herda o estado real em vez de herdar `false`.
+ * Quem passa continua mandando: um bloco que sabe mais que a tela (a atividade
+ * do Caminho, por exemplo) segue tendo a última palavra.
+ */
+let lutoAtual = false;
+
+export function carimbarModoCuidado(v: boolean): void {
+  lutoAtual = !!v;
+}
 
 function ouvirGestos() {
   if (ouvindo || typeof document === "undefined") return;
@@ -157,16 +183,20 @@ export function tocarSomDeUI(
      * nunca escolheu ouve; quem pediu silêncio, não.
      */
     nivel: especie === "trofeu" ? (pediuSilencio() ? "desligado" : "completo") : lerNivel(),
-    careMode: !!o?.careMode,
+    careMode: o?.careMode ?? lutoAtual,
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
     jaTocouHoje: contarHoje(especie),
     emSessao: !!o?.emSessao,
     hora: new Date().getHours(),
+    desdeOUltimo: Date.now() - ultimoSomEm,
+    ultimaEspecie: ultimoSom,
   };
   if (!podeSoar(especie, ctx)) return;
   desenhar(especie);
   somar(especie);
+  ultimoSomEm = Date.now();
+  ultimoSom = especie;
 }
 
 /**
@@ -222,15 +252,19 @@ export function tocarConquistaComPortoes(
      * precisa poder pedir silêncio e ser atendida.
      */
     nivel: pediuSilencio() ? "desligado" : "completo",
-    careMode: !!o?.careMode,
+    careMode: o?.careMode ?? lutoAtual,
     visivel: typeof document === "undefined" || document.visibilityState === "visible",
     desdeOGesto: Date.now() - ultimoGesto,
     jaTocouHoje: contarHoje(especie),
     hora: new Date().getHours(),
+    desdeOUltimo: Date.now() - ultimoSomEm,
+    ultimaEspecie: ultimoSom,
   });
   if (!podia) return;
   tocarConquista(degraus);
   somar(especie);
+  ultimoSomEm = Date.now();
+  ultimoSom = especie;
 }
 
 export { DESENHOS, ehAlarme, ehNoite, type EspecieDeSom, type NivelDeSom };

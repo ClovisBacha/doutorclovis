@@ -19,6 +19,7 @@ import {
   TETO_POR_DIA,
   ehAlarme,
   podeSoar,
+  prioridadeDe,
   type Contexto,
   type EspecieDeSom,
 } from "./som-da-interface";
@@ -76,6 +77,24 @@ describe("⚠️ os portões que impedem o som de aparecer do nada", () => {
     }
   });
 
+  test("⚠️ o portão do luto é fechado POR PADRÃO no runtime", () => {
+    /* A régua é pura e recebe `careMode`; quem o fornece é o runtime. E lá ele
+       deixou de depender de cada ponto de chamada passar à mão — o carimbo
+       (`carimbarModoCuidado`) é lido quando ninguém passa nada.
+
+       Isso importa porque há um caminho onde passar é IMPOSSÍVEL:
+       `creditarSementinhas` é o funil de dezessete pontos de concessão, num
+       módulo que de propósito não importa nada. A moeda tocaria sem saber do
+       luto. */
+    const fonte = readFileSync("src/lib/tocar-som-de-ui.ts", "utf8");
+    expect(fonte).toContain("export function carimbarModoCuidado");
+    /* ⚠️ `?? lutoAtual`, e nunca `!!o?.careMode`: o primeiro herda o estado
+       real quando ninguém passa; o segundo herda `false`, que é o portão
+       ABERTO. */
+    expect(fonte).toContain("careMode: o?.careMode ?? lutoAtual");
+    expect(fonte).not.toContain("careMode: !!o?.careMode");
+  });
+
   test("⚠️ e o alarme continua tocando no Modo Cuidado — quem perdeu a gestação continua podendo passar mal", () => {
     expect(podeSoar("sos", { ...NORMAL, careMode: true, nivel: "desligado" })).toBe(true);
   });
@@ -119,6 +138,60 @@ describe("⚠️ os portões que impedem o som de aparecer do nada", () => {
   test("⚠️ o alarme não tem teto — ela pode passar mal duas vezes no mesmo dia", () => {
     expect(TETO_POR_DIA.sos).toBeUndefined();
     expect(podeSoar("sos", { ...NORMAL, jaTocouHoje: 99 })).toBe(true);
+  });
+});
+
+describe("⚠️ a regra da vez — o fechamento do dia disparava TRÊS sons", () => {
+  /* Ao fechar o dia com cinco estrelas o app dispara o chime na hora, a moeda
+     quando o servidor confirma o bônus, e o troféu quando a carteira volta. Os
+     três são separados só pela LATÊNCIA DA REDE — num wi-fi bom eles se
+     atropelam, e o momento mais bonito do jogo vira caixa registradora.
+
+     Um teto por espécie não pega isso: cada um está dentro do seu limite. */
+
+  test("a moeda cala depois da conquista", () => {
+    expect(podeSoar("moeda", { ...NORMAL, ultimaEspecie: "conquista", desdeOUltimo: 300 })).toBe(
+      false,
+    );
+  });
+
+  test("⚠️ mas o TROFÉU passa por cima da conquista — ele é o maior", () => {
+    /* Se a régua fosse "o primeiro cala todos", o troféu — que é o clímax e a
+       única animação de 5,5 s do app — seria engolido pelo chime que veio um
+       segundo antes. A prioridade existe para isso. */
+    expect(podeSoar("trofeu", { ...NORMAL, ultimaEspecie: "conquista", desdeOUltimo: 300 })).toBe(
+      true,
+    );
+  });
+
+  test("o alarme passa por cima de tudo, sempre", () => {
+    for (const antes of TODAS) {
+      expect(podeSoar("sos", { ...NORMAL, ultimaEspecie: antes, desdeOUltimo: 10 })).toBe(true);
+    }
+  });
+
+  test("passada a janela, o som volta a caber", () => {
+    expect(podeSoar("moeda", { ...NORMAL, ultimaEspecie: "conquista", desdeOUltimo: 2000 })).toBe(
+      true,
+    );
+  });
+
+  test("⚠️ e o mesmo som NÃO toca duas vezes seguidas dentro da janela", () => {
+    /* `<=` e não `<`: prioridade igual também cala. Dois "guardado" em meio
+       segundo é o mesmo gesto contado duas vezes. */
+    expect(podeSoar("guardado", { ...NORMAL, ultimaEspecie: "guardado", desdeOUltimo: 400 })).toBe(
+      false,
+    );
+  });
+
+  test("a ordem da prioridade é a que a prosa declara", () => {
+    const p = prioridadeDe;
+    expect(p("sos")).toBeGreaterThan(p("trofeu"));
+    expect(p("trofeu")).toBeGreaterThan(p("conquista"));
+    expect(p("conquista")).toBeGreaterThan(p("fim"));
+    expect(p("fim")).toBeGreaterThan(p("guardado"));
+    expect(p("guardado")).toBeGreaterThan(p("compasso"));
+    expect(p("compasso")).toBeGreaterThan(p("moeda"));
   });
 });
 

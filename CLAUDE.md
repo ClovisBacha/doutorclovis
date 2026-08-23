@@ -948,6 +948,27 @@ folha de sons silencia tudo menos o ALARME. E `celebrateChime` passou a
 respeitar `prefers-reduced-motion` — `fireConfetti` já respeitava, então quem
 pedia menos estímulo tinha a tela quieta e o arpejo tocando.
 
+#### ⚠️ E DOIS DEFEITOS QUE OS SONS NOVOS CRIARAM
+
+- **O FECHAMENTO DO DIA DISPARAVA TRÊS SONS EM CADEIA.** O chime da conquista
+  na hora, a moeda quando o servidor confirma o bônus, e o troféu quando a
+  carteira volta — separados só pela LATÊNCIA DA REDE. Num wi-fi bom eles se
+  atropelam, e o momento mais bonito do jogo vira caixa registradora.
+  ⚠️ Um teto por espécie não pega isso: cada um está dentro do próprio limite.
+  O que resolve é uma régua ENTRE espécies — um som só cala outro se o outro
+  for MENOS importante (`PRIORIDADE`), com janela de 1,2 s. O troféu passa por
+  cima do chime de propósito: ele é o clímax, e se a régua fosse "o primeiro
+  cala todos", a única animação de 5,5 s do app seria engolida pelo som que veio
+  um segundo antes.
+- ⚠️ **A MOEDA TOCAVA SEM SABER DO LUTO**, e não havia como passar `careMode`
+  até lá: `creditarSementinhas` é o funil de DEZESSETE pontos de concessão, num
+  módulo que de propósito não importa nada. Passar por dezessete chamadas seria
+  a "segunda régua no chamador" que o projeto já pagou em `AvisoDePresente` — e
+  a décima oitava, escrita amanhã, esqueceria.
+  `carimbarModoCuidado()` inverte o padrão: quem NÃO passa herda o estado real
+  em vez de herdar `false`. Há teste cobrando `?? lutoAtual` e proibindo
+  `!!o?.careMode`, que é o portão aberto.
+
 **Bancadas:** `/preview-som` (os vinte, a música e os sons de interface, todos
 num toque) · `/preview-sons` (a tela dos Sons para dormir).
 **Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10` ·

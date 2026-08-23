@@ -173,7 +173,53 @@ export type Contexto = {
   emSessao?: boolean;
   /** A hora local, 0 a 23. Sem ela, o portão da noite não se aplica. */
   hora?: number;
+  /** Quanto faz que o último som tocou, e qual era — para a régua da vez. */
+  desdeOUltimo?: number;
+  ultimaEspecie?: EspecieDeSom;
 };
+
+/**
+ * ⚠️ A PRIORIDADE — e ela existe por causa do fechamento do dia.
+ *
+ * Ao fechar o dia com cinco estrelas o app dispara TRÊS sons em cadeia: o chime
+ * da conquista na hora, a moeda quando o servidor confirma o bônus, e o troféu
+ * quando a carteira volta. Os três são separados só pela LATÊNCIA DA REDE — num
+ * wi-fi bom eles se atropelam, e o momento mais bonito do jogo vira uma caixa
+ * registradora, que é exatamente o que o teto de fadiga existe para impedir.
+ *
+ * Um teto por espécie não resolve isso: cada um deles está dentro do seu
+ * limite. O que resolve é uma régua entre espécies — **um som só cala outro se
+ * o outro for MENOS importante**, e a janela é curta o bastante para não
+ * engolir nada que a paciente leria como dois acontecimentos.
+ *
+ * Alarme no topo, sempre. Depois o que é raro e grande (troféu, conquista),
+ * depois o que fecha um gesto (fim, guardado), e por último o que repete
+ * (moeda, compasso, intervalo).
+ */
+const PRIORIDADE: Record<EspecieDeSom, number> = {
+  sos: 100,
+  "sos-falhou": 100,
+  trofeu: 60,
+  conquista: 50,
+  fim: 40,
+  guardado: 30,
+  compasso: 20,
+  intervalo: 20,
+  moeda: 10,
+};
+
+/**
+ * Quanto tempo um som "segura" a vez dos menos importantes.
+ *
+ * 1,2 s cobre a cauda do mais longo da lista (o troféu, 1,74 s de eventos mas
+ * ~0,9 s de energia audível) e é curto o bastante para dois acontecimentos
+ * separados de verdade continuarem soando os dois.
+ */
+const JANELA_DA_VEZ_MS = 1200;
+
+export function prioridadeDe(e: EspecieDeSom): number {
+  return PRIORIDADE[e];
+}
 
 /**
  * ⚠️ SEM GESTO RECENTE, NÃO SOA. Som que ela não provocou é som que aparece do
@@ -218,6 +264,20 @@ export function podeSoar(especie: EspecieDeSom, ctx: Contexto): boolean {
   if (ctx.nivel === "essencial" && !ESSENCIAIS.includes(especie)) return false;
   const teto = TETO_POR_DIA[especie];
   if (teto !== undefined && ctx.jaTocouHoje >= teto) return false;
+  /**
+   * ⚠️ A REGRA DA VEZ: um som recém-tocado cala os MENOS importantes.
+   *
+   * Ver `PRIORIDADE`. Sem isto, o fechamento do dia dispara chime, moeda e
+   * troféu separados só pela latência da rede.
+   */
+  if (
+    ctx.ultimaEspecie !== undefined &&
+    ctx.desdeOUltimo !== undefined &&
+    ctx.desdeOUltimo < JANELA_DA_VEZ_MS &&
+    PRIORIDADE[especie] <= PRIORIDADE[ctx.ultimaEspecie]
+  ) {
+    return false;
+  }
   return true;
 }
 

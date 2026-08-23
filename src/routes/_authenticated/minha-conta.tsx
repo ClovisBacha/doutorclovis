@@ -62,7 +62,7 @@ import { momentoDe, type Momento } from "@/lib/momento";
 import { guardarMomentoParaPublicar } from "@/lib/momento-para-publicar";
 import { motion, AnimatePresence } from "motion/react";
 import { fireConfetti, celebrateChime, celebrateHaptic } from "@/lib/celebrate";
-import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
+import { carimbarModoCuidado, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { creditarSementinhas, ouvirSementinhas } from "@/lib/evento-sementinhas";
 import { BONUS_INFLUENCIADORA } from "@/lib/economia-sementinhas";
 import { ouvirConquistasAResgatar, publicarConquistasAResgatar } from "@/lib/evento-conquistas";
@@ -1255,6 +1255,22 @@ function MinhaContaPage() {
 
   // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
   const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  /**
+   * ⚠️ CARIMBA O MODO CUIDADO PARA O SOM — e isto fecha um portão que nenhuma
+   * prop alcançava.
+   *
+   * `creditarSementinhas` é o funil de dezessete pontos de concessão, num
+   * módulo que de propósito não importa nada: a moeda tocaria sem saber do
+   * luto. Passar `careMode` por dezessete chamadas seria a "segunda régua no
+   * chamador" que este projeto já pagou várias vezes — e a décima oitava
+   * chamada, escrita amanhã, esqueceria.
+   *
+   * Com o carimbo, o portão do luto passa a ser fechado POR PADRÃO: quem não
+   * passa nada herda o estado real, e quem passa continua mandando.
+   */
+  useEffect(() => {
+    carimbarModoCuidado(careMode);
+  }, [careMode]);
   async function toggleCareMode(on: boolean) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session?.access_token) return;
