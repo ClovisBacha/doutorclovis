@@ -266,7 +266,14 @@ describe("a comemoração dispara no fechamento do dia", () => {
     /* Esse bloco JÁ é o instante da conquista e JÁ roda uma vez por dia
        (`!doneDays.includes(D)`). Qualquer condição a mais entre ele e a tela é
        uma chance a mais de a conquista passar em branco. */
-    const i = jogo.indexOf("if (allDone && !doneDays.includes(D))");
+    /* ⚠️ Sem a guarda inteira: este teste cobra ONDE o troféu mora, não a
+       forma exata da condição. Ele reprovou no dia em que a guarda ganhou um
+       `!fechadosRef.current.has(D)` — sobre um código que continuava certo, e
+       que na verdade estava CONSERTANDO um defeito (o fechamento do dia
+       disparava duas vezes, dobrando confete, vibração e duas chamadas ao
+       servidor). Teste que trava a assinatura em vez da intenção cobra
+       manutenção sem dar proteção. */
+    const i = jogo.indexOf("if (allDone && !doneDays.includes(D)");
     expect(i).toBeGreaterThan(-1);
     const bloco = jogo.slice(i, i + 2600);
     expect(bloco).toContain("setTrofeuNovo(agora)");

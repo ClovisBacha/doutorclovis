@@ -969,6 +969,58 @@ pedia menos estímulo tinha a tela quieta e o arpejo tocando.
   em vez de herdar `false`. Há teste cobrando `?? lutoAtual` e proibindo
   `!!o?.careMode`, que é o portão aberto.
 
+#### ⚠️ E A SEGUNDA REVISÃO ADVERSARIAL — o dia SIMULADO com a régua de verdade
+
+Um agente rodou `podeSoar` num dia inteiro de paciente engajada (aula, quatro
+atividades, dia fechado, troféu, marco, compra, gratidão) em vez de estimar. O
+que ele achou:
+
+- ⚠️ **OS ACERTOS DA AULA COMIAM O TETO E O DIA FECHADO FICAVA MUDO.** O acerto
+  de UMA questão usava a espécie `conquista`, cujo teto é 3 — então os três
+  primeiros acertos gastavam a cota inteira, e depois ficavam mudos o fim da
+  aula, o marco de cinquenta gratidões e **o fechamento do dia**. O pequeno e
+  repetido engolindo o grande e raro, que é a hierarquia ao contrário. Virou
+  espécie `acerto`, com teto e prioridade próprios.
+- ⚠️ **O FECHAMENTO DO DIA DISPARAVA DUAS VEZES**, e isto não era defeito de
+  som. `onEarn` chama `markDayTask` duas vezes no mesmo tick, e a guarda era
+  `!doneDays.includes(D)` — estado de React, congelado no fecho do render. O
+  bloco inteiro rodava duas vezes: 2× confete, 2× vibração, 2× `grantDayStarsBonus`,
+  2× `getWallet`, 2× `setTrofeuNovo`, 2× figurinha coletada. A régua da vez
+  calou o segundo chime — o som foi a única coisa que NÃO dobrou, e foi por isso
+  que o defeito apareceu. `useRef` resolve porque não é congelado pelo render.
+- ⚠️ **O SOM MAIOR SOAVA POR CIMA DO MENOR.** A régua da vez cala o menos
+  importante que chega depois; o caso inverso não estava resolvido. Medido nos
+  pares reais: `guardado → conquista` com 275 ms sobrepostos, `fim → conquista`
+  com 245, `moeda → conquista` com 128. E o do meio é estrutural, não de rede —
+  `finish()` chama `onEarn()` antes de qualquer `await`, então os dois saem no
+  MESMO tick. Conserto: **roubo de voz**, o que todo sintetizador faz há
+  cinquenta anos.
+- ⚠️ **`MeditacoesTab` recebia `careMode` e ele era PROP MORTA.** Eu a passei na
+  rodada anterior e nunca a usei — a voz do sistema continuou lendo em voz alta
+  "Seu bebê já te ouve" no luto. Seis dos sete roteiros citam bebê ou parto, e
+  filtrar por conteúdo deixaria um: a porta fecha, e a meditação do Caminho (que
+  tem tratamento próprio de luto) continua ali.
+  ⚠️ E o portão é um EMBRULHO, não um `return` no meio do componente — a
+  primeira versão quebrou a regra dos hooks e o lint pegou.
+- ⚠️ **HAVIA UM TERCEIRO `HeartbeatFeel`, e ele é PÚBLICO.** `/batimentos` está
+  no cabeçalho do site, sem portão nenhum, com um SEGUNDO motor de batimento
+  próprio. Paciente em Modo Cuidado saía da área logada e ouvia o coração fetal
+  a 140 bpm. A página passou a perguntar ao cliente se há sessão e a não
+  desenhar nada disso no luto.
+- **`celebrate()` tinha zero chamadores e chamava `celebrateChime()` sem
+  `careMode`** — uma porta aberta esperando o primeiro chamador. Saiu.
+
+⚠️ **E A CATRACA DE COLUNAS ME PEGOU:** escrevi `.eq("user_id", …)` em
+`patient_profiles`, que **não tem essa coluna** — a chave é `id`. Não daria
+erro: o PostgREST devolveria 42703, o perfil viria nulo, `luto` ficaria `false`
+e o batimento tocaria no luto. É exatamente a classe de defeito que a catraca
+existe para impedir, cometida por mim, no conserto de um defeito de luto.
+
+⚠️ **E DOIS TESTES MEUS TRAVAVAM A ASSINATURA em vez da intenção** — um cobrava
+`createSoundscape(somAgora)` com o parêntese, outro a guarda exata do
+fechamento do dia. Os dois reprovaram sobre código que continuava certo, e o
+segundo reprovou sobre um código que estava CONSERTANDO um defeito.
+
 **Bancadas:** `/preview-som` (os vinte, a música e os sons de interface, todos
 num toque) · `/preview-sons` (a tela dos Sons para dormir).
 **Medir:** `node scripts/ouvir.mjs` · `--niveis` · `--musica --min=10` ·

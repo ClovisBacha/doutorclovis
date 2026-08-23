@@ -295,12 +295,12 @@ describe("⚠️ a lista é FECHADA — o que não entrou, não entrou por razã
       expect({ e, proibida: proibidas.test(e) }).toEqual({ e, proibida: false });
   });
 
-  test("são nove espécies, e duas delas são alarme", () => {
+  test("são dez espécies, e duas delas são alarme", () => {
     /* ⚠️ O número está travado de propósito: a lista é FECHADA, e cada entrada
        teve de justificar por escrito por que os olhos não estão nela. Uma
        espécie nova reprova aqui e obriga quem a acrescentou a escrever a razão
        — que é o único jeito de a lista não virar "som em tudo". */
-    expect(TODAS.length).toBe(9);
+    expect(TODAS.length).toBe(10);
     expect(ALARME.length).toBe(2);
   });
 
@@ -309,7 +309,7 @@ describe("⚠️ a lista é FECHADA — o que não entrou, não entrou por razã
        fechamento do dia, no bônus da dupla, no presente e na conquista — seis
        ou mais vezes por dia. Sem teto o app vira caixa registradora, e a décima
        moeda não acrescenta nada à nona. */
-    for (const e of ["conquista", "trofeu", "moeda", "guardado"] as EspecieDeSom[]) {
+    for (const e of ["conquista", "trofeu", "moeda", "guardado", "acerto"] as EspecieDeSom[]) {
       expect({ e, tem: (TETO_POR_DIA[e] ?? 0) > 0 }).toEqual({ e, tem: true });
     }
     /* E o alarme NUNCA tem teto — ela pode passar mal duas vezes no mesmo dia. */
@@ -328,6 +328,24 @@ describe("⚠️ a lista é FECHADA — o que não entrou, não entrou por razã
        segundos em silêncio, que é o defeito que ele veio consertar. */
     const dur = (e: EspecieDeSom) => Math.max(...DESENHOS[e].passos.map((p) => p.em + p.dur));
     expect(dur("trofeu")).toBeGreaterThan(dur("conquista"));
+  });
+
+  test("⚠️ o som maior CORTA o menor — não soa por cima dele", () => {
+    /* A régua da vez cala o menos importante que chega depois. O caso inverso
+       não estava resolvido: o mais importante chegando 5 ms depois passava, e os
+       dois soavam JUNTOS. Medido nos pares reais do app — guardado → conquista
+       com 275 ms sobrepostos, fim → conquista com 245, moeda → conquista com
+       128. E o do meio é estrutural: `finish()` chama `onEarn()` antes de
+       qualquer `await`, então os dois saem no MESMO tick do JavaScript.
+
+       O conserto é roubo de voz, que é o que todo sintetizador faz. */
+    const fonte = readFileSync("src/lib/som-da-interface.ts", "utf8");
+    expect(fonte).toContain("function roubarAVez");
+    /* Ele desce em rampa e não corta seco — corte seco é o clique clássico. */
+    const corpo = fonte.slice(fonte.indexOf("function roubarAVez"));
+    expect(corpo.slice(0, 600)).toContain("linearRampToValueAtTime(0.0001");
+    /* E os DOIS sintetizadores o chamam: `desenhar` e `tocarConquista`. */
+    expect(fonte.split("roubarAVez(ctx)").length - 1).toBe(2);
   });
 
   test("⚠️ som de interface é SEMPRE Web Audio, nunca <audio>", () => {

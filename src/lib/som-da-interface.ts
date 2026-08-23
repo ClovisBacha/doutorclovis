@@ -71,8 +71,21 @@ export type EspecieDeSom =
   /** Fim de um intervalo do cronômetro de contrações. Mão ocupada,
    *  cronometrando dor: olhar a tela é o que ela menos consegue fazer. */
   | "intervalo"
-  /** Dia fechado, troféu, conquista grande. É a recompensa que o jogo constrói. */
+  /** Dia fechado, conquista grande. É a recompensa que o jogo constrói. */
   | "conquista"
+  /**
+   * ⚠️ O ACERTO DE UMA QUESTÃO DA AULA — e ele é espécie PRÓPRIA por um
+   * defeito medido.
+   *
+   * Ele usava `conquista`, e como o teto é por espécie os TRÊS primeiros
+   * acertos da aula comiam a cota inteira do dia. Simulado rodando `podeSoar`
+   * de verdade: o fim da aula ficava mudo, o marco de 50 gratidões ficava mudo
+   * e o **DIA FECHADO ficava mudo** — o pequeno e repetido engolindo o grande e
+   * raro, que é a hierarquia exatamente ao contrário.
+   *
+   * Espécie própria, teto próprio, prioridade baixa.
+   */
+  | "acerto"
   /**
    * O TROFÉU — a única animação de cinco segundos e meio do app, e ela era
    * MUDA. O chime do dia toca cerca de um segundo antes e já acabou quando o
@@ -131,6 +144,9 @@ const ESSENCIAIS: readonly EspecieDeSom[] = [
 export const TETO_POR_DIA: Partial<Record<EspecieDeSom, number>> = {
   conquista: 3,
   trofeu: 3,
+  /* Uma aula tem de 3 a 7 perguntas; seis cobre a aula inteira e cala quem
+     refizer a mesma três vezes seguidas. */
+  acerto: 6,
   /**
    * ⚠️ A MOEDA É A MAIS EXPOSTA DE TODAS.
    *
@@ -202,6 +218,9 @@ const PRIORIDADE: Record<EspecieDeSom, number> = {
   trofeu: 60,
   conquista: 50,
   fim: 40,
+  /* ⚠️ Abaixo de tudo que é grande: um acerto no meio de uma aula não pode
+     calar o fim dela nem o fechamento do dia. */
+  acerto: 15,
   guardado: 30,
   compasso: 20,
   intervalo: 20,
@@ -365,6 +384,19 @@ export const DESENHOS: Record<EspecieDeSom, Desenho> = {
     corte: 1000,
     ganho: 0.18,
   },
+  /**
+   * O ACERTO: duas notas subindo, curtas. É o irmão pequeno da conquista —
+   * mesma direção (sobe, porque ela acertou), metade do tamanho.
+   */
+  acerto: {
+    passos: [
+      { hz: N.mi5, em: 0, dur: 0.12 },
+      { hz: N.sol5, em: 0.08, dur: 0.18 },
+    ],
+    ataque: 0.025,
+    corte: 1100,
+    ganho: 0.16,
+  },
   conquista: {
     passos: [
       { hz: N.do5, em: 0, dur: 0.2 },
@@ -523,6 +555,44 @@ function contexto(): AudioContext | null {
  * som depois de esperas — o SOS é o caso. Depois de um `await` o gesto já
  * passou, e o iOS recusa o contexto em silêncio.
  */
+/**
+ * ⚠️ O SOM ANTERIOR É CORTADO QUANDO CHEGA UM MAIOR — e sem isto eles se
+ * sobrepunham.
+ *
+ * A régua da vez (`PRIORIDADE`) cala o som MENOS importante que chega logo
+ * depois. Mas o caso inverso não estava resolvido: quando o mais importante
+ * chega 5 ms depois do menor, ele passa — e os dois soam JUNTOS. Medido nos
+ * pares reais do app:
+ *
+ *     guardado → conquista   5 ms de intervalo, 275 ms sobrepostos
+ *     fim      → conquista   5 ms,              245 ms
+ *     moeda    → conquista   2 ms,              128 ms
+ *
+ * E o do meio é estrutural, não de rede: `finish()` chama `onEarn()` ANTES de
+ * qualquer `await`, então o som de "acabou a atividade" e o do dia fechado
+ * saem no MESMO tick do JavaScript.
+ *
+ * Um `<audio>` não resolveria; o que resolve é o que todo sintetizador faz há
+ * cinquenta anos: **roubo de voz**. O que estava soando desce em 25 ms — rápido
+ * o bastante para não atrapalhar o que entra, lento o bastante para não
+ * estalar — e o novo começa limpo.
+ */
+let vozAtual: GainNode | null = null;
+
+function roubarAVez(ctx: AudioContext) {
+  const anterior = vozAtual;
+  vozAtual = null;
+  if (!anterior) return;
+  try {
+    const agora = ctx.currentTime;
+    anterior.gain.cancelScheduledValues(agora);
+    anterior.gain.setValueAtTime(Math.max(0.0001, anterior.gain.value), agora);
+    anterior.gain.linearRampToValueAtTime(0.0001, agora + 0.025);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function destravar(): void {
   const ctx = contexto();
   if (!ctx) return;
@@ -556,6 +626,8 @@ export function desenhar(especie: EspecieDeSom): void {
     const mestre = ctx.createGain();
     mestre.gain.value = d.ganho;
     lp.connect(mestre).connect(ctx.destination);
+    roubarAVez(ctx);
+    vozAtual = mestre;
 
     for (const p of d.passos) {
       const o = ctx.createOscillator();
@@ -624,6 +696,8 @@ export function tocarConquista(degraus: number): void {
     const mestre = ctx.createGain();
     mestre.gain.value = d.ganho;
     lp.connect(mestre).connect(ctx.destination);
+    roubarAVez(ctx);
+    vozAtual = mestre;
     passos.forEach((hz, i) => {
       const o = ctx.createOscillator();
       /* Triângulo, como era antes: harmônicos ímpares fracos, que o filtro

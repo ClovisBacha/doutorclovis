@@ -2412,6 +2412,30 @@ export function GestacaoPath({
     return lsGet<Record<string, boolean>>(LS.dayTasks(D), {});
   }
 
+  /**
+   * ⚠️ O FECHAMENTO DO DIA DISPARAVA DUAS VEZES — e não era defeito de som.
+   *
+   * `onEarn` chama `markDayTask` duas vezes seguidas (`w_${key}` e `bemestar`),
+   * no mesmo tick. A guarda era `!doneDays.includes(D)`, e `doneDays` é estado
+   * de React: na segunda chamada ele ainda é o valor CONGELADO do render, mesmo
+   * com o `setDoneDays` da primeira já tendo rodado. Então o bloco inteiro
+   * rodava duas vezes:
+   *
+   *     2× confete · 2× vibração · 2× `grantDayStarsBonus` · 2× `getWallet` ·
+   *     2× `setTrofeuNovo` · 2× `collectSticker` (dois toasts "Figurinha
+   *     coletada")
+   *
+   * A régua da vez calava o segundo chime — o som foi a única coisa que não
+   * dobrou, e foi por isso que o defeito apareceu: contando os disparos do dia,
+   * o fechamento constava duas vezes.
+   *
+   * ⚠️ O `useRef` resolve porque ele NÃO é congelado pelo render: a segunda
+   * chamada, no mesmo tick, já enxerga o dia marcado. É a mesma lição do `sub`
+   * do `RegistrosHub` e do passo do tutorial — estado de React não serve para
+   * decidir duas vezes dentro do mesmo tick.
+   */
+  const fechadosRef = useRef<Set<number>>(new Set());
+
   function markDayTask(D: number, id: string, value: boolean) {
     const state = { ...dayTaskState(D), [id]: value };
     lsSet(LS.dayTasks(D), state);
@@ -2419,7 +2443,8 @@ export function GestacaoPath({
     if (D === todayD) setTodayTasks(state);
     // As 5 estrelas do dia: a aula + os 4 jogos de bem-estar, uma cada.
     const allDone = momentosDoDia(state) >= TOTAL_DO_DIA;
-    if (allDone && !doneDays.includes(D)) {
+    if (allDone && !doneDays.includes(D) && !fechadosRef.current.has(D)) {
+      fechadosRef.current.add(D);
       const next = [...doneDays, D];
       setDoneDays(next);
       lsSet(LS.doneDays, next);
@@ -10730,7 +10755,18 @@ function DailyQuizBlock({
                   if (!careMode) {
                     const acertou = isAnswerCorrect(q, cur);
                     if (acertou) {
-                      celebrateChime(1, careMode);
+                      /**
+                       * ⚠️ ESPÉCIE PRÓPRIA, e não `conquista` — foi um defeito
+                       * medido.
+                       *
+                       * Isto usava `celebrateChime`, que conta no teto de
+                       * `conquista`. Simulando um dia com `podeSoar` de
+                       * verdade: os TRÊS primeiros acertos comiam a cota
+                       * inteira, e depois ficavam mudos o fim da aula, o marco
+                       * de gratidões e o **fechamento do dia** — o pequeno e
+                       * repetido engolindo o grande e raro.
+                       */
+                      tocarSomDeUI("acerto", { careMode, emSessao: true });
                       tocarPadrao([18]);
                     } else {
                       /* Erro NÃO tem som. Ele tem um toque curto, que serve de

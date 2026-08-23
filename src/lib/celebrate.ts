@@ -181,9 +181,16 @@ export function celebrateHaptic(nivel: 1 | 2 | 3 | 4 | 5 = 1): void {
 }
 
 /** Dispara os três (ideal dentro de um clique). */
-export function celebrate(opts?: { confetti?: boolean; sound?: boolean; haptics?: boolean }): void {
-  const o = { confetti: true, sound: true, haptics: true, ...opts };
-  if (o.confetti) fireConfetti();
-  if (o.sound) celebrateChime();
-  if (o.haptics) celebrateHaptic();
-}
+/**
+ * ⚠️ AQUI HAVIA UM `celebrate(opts)` que juntava confete, som e vibração — e
+ * ele tinha ZERO CHAMADORES no repositório inteiro.
+ *
+ * Pior que código morto: era uma porta ABERTA. Ele chamava `celebrateChime()`
+ * sem `careMode`, então o primeiro chamador que alguém escrevesse herdaria uma
+ * celebração que toca no luto — e herdaria em silêncio, porque a assinatura não
+ * pede nada.
+ *
+ * É a mesma família de `proximoDesbloqueio` e `escadaDeTrofeus`, que este
+ * projeto já pagou três vezes. Quem quiser as três coisas juntas chama as três,
+ * passando `careMode` — que é o que os nove chamadores reais já fazem.
+ */

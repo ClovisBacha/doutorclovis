@@ -3400,11 +3400,29 @@ function BemEstarHub({
   careMode?: boolean;
 }) {
   const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(null);
-  const atual = BEMESTAR_SUBTABS.find((s) => s.key === sub);
+  /**
+   * ⚠️ AS MEDITAÇÕES SAEM DA GRADE NO MODO CUIDADO.
+   *
+   * Seis dos sete roteiros desta aba citam o bebê ou o parto — e ela os manda
+   * para o `speechSynthesis`, ou seja o aparelho **lê em voz alta**: "Seu bebê
+   * já te ouve", "pense no nome que você escolheu", "Você é muito esperado".
+   * Filtrar por conteúdo deixaria uma meditação só; isso não é filtrar, é
+   * fechar a porta — então ela fecha de verdade.
+   *
+   * ⚠️ E ela NÃO fica sem meditação: a do Caminho tem tratamento próprio de
+   * luto (roteiro limpo, cor da música que não desce, portão em
+   * `humorDaJornada`) e continua ali. É a mesma decisão de `portasDaComunidade`
+   * tirar "Nome do bebê" e manter Amigas — o que sai é o que fala no presente
+   * sobre um bebê que vai nascer.
+   */
+  const itens = careMode
+    ? BEMESTAR_SUBTABS.filter((x) => x.key !== "meditacoes")
+    : BEMESTAR_SUBTABS;
+  const atual = itens.find((s) => s.key === sub);
   if (!sub || !atual) {
     return (
       <GradeHub
-        itens={BEMESTAR_SUBTABS}
+        itens={itens}
         onAbrir={(k) => setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"])}
       />
     );
@@ -12415,7 +12433,26 @@ const TOPICS = [...new Set(MEDITATIONS.map((m) => m.topic))];
  * porque lá o texto era lido na TELA e aqui é falado. As duas vizinhas na mesma
  * linha (`SonsBebêTab`, `ApoioEmocionalTab`) já recebiam `careMode`; esta não.
  */
+/**
+ * ⚠️ O PORTÃO DE LUTO É UM EMBRULHO, e não um `return` no meio dos hooks.
+ *
+ * A primeira versão punha `if (careMode) return null` dentro do componente — e
+ * o lint pegou na hora: os `useState` abaixo passariam a ser chamados
+ * condicionalmente, que é a regra dos hooks quebrada. Embrulhando, o
+ * componente de verdade nem é montado.
+ *
+ * A grade já não mostra o ladrilho no Modo Cuidado, mas esta é a tranca que
+ * importa: o `sub` também chega por estado guardado e por navegação vinda de
+ * outra tela, e "está gateado lá atrás" é a garantia que este projeto já viu
+ * falhar. A prop existia e era MORTA — eu a passei numa rodada anterior e nunca
+ * a usei, e a voz continuou lendo sobre o bebê em voz alta.
+ */
 function MeditacoesTab({ gest, careMode }: { gest: Gest; careMode: boolean }) {
+  if (careMode) return null;
+  return <MeditacoesConteudo gest={gest} />;
+}
+
+function MeditacoesConteudo({ gest }: { gest: Gest }) {
   const currentTrimester = gest ? trimesterForWeek(gest.weeks) : null;
   /* Suporte à voz só se sabe no CLIENTE. Lido no render, `window` não existe
      no SSR do TanStack Start e a página inteira caía no servidor. */
