@@ -28,7 +28,21 @@ const SHELL = [
   "/robots.txt",
 ];
 const STATIC_RE = /\.(js|css|woff2?|svg|png|ico|webmanifest|jpg|jpeg|webp)(\?|$)/;
-const AUDIO_RE = /\.(mp3|m4a|aac|ogg|wav)(\?|$)/;
+/**
+ * ⚠️ `webm` ENTROU AQUI, e a ausência dele era defeito silencioso.
+ *
+ * Os oito sons de ambiente gravados (fogo, bicho, água) são Opus dentro de
+ * WebM — 3 MB que, sem esta linha, não passavam por este cache e voltavam da
+ * rede em TODA sessão. O propósito inteiro deste worker é a meditação
+ * funcionar no elevador e na sala de espera; um formato de áudio fora da lista
+ * o desfaz para aquele formato, sem erro nenhum.
+ *
+ * ⚠️ E `webm` NÃO pode entrar em `STATIC_RE`: lá o arquivo seria guardado no
+ * cache VERSIONADO, que `activate` esvazia a cada deploy — os 3 MB cairiam
+ * fora por causa de uma linha de CSS. Áudio tem cache próprio, sem versão, e é
+ * essa a razão de os dois existirem separados.
+ */
+const AUDIO_RE = /\.(mp3|m4a|aac|ogg|wav|webm)(\?|$)/;
 
 /* ⚠️ ARQUIVO EM `/assets/` NÃO SE REVALIDA — e a régua é a MESMA do servidor.
    O Vite carimba o conteúdo no nome (`gestacao-path-CdiOkjf8.js`), e a Vercel
@@ -150,6 +164,9 @@ async function recorte(resposta, cabecalho) {
     status: 206,
     statusText: "Partial Content",
     headers: {
+      /* ⚠️ Preserva o tipo REAL. O padrão `audio/mpeg` só vale como último
+         recurso: devolver mpeg para um WebM faria o Safari desistir da faixa em
+         silêncio, que é o mesmo sintoma de arquivo inexistente. */
       "content-type": resposta.headers.get("content-type") || "audio/mpeg",
       "content-length": String(pedaco.byteLength),
       "content-range": `bytes ${inicio}-${fim}/${total}`,
@@ -181,8 +198,26 @@ function arquivoInteiro(chave) {
        PÁGINA HTML. Guardar isso sob o nome do áudio deixaria a paciente com uma
        página inteira no lugar de uma fala — e, como áudio não revalida, ela
        ficaria lá até a próxima troca de versão do cache. */
-    const tipo = res.headers.get("content-type") || "";
-    if (!tipo.startsWith("audio/")) return res;
+    const tipo = (res.headers.get("content-type") || "").toLowerCase();
+    /**
+     * ⚠️ **`video/webm` TAMBÉM É ÁUDIO AQUI — e sem isto o cache nunca pegaria.**
+     *
+     * A guarda existe porque um arquivo que sumiu do servidor cai na função de
+     * SSR e volta como PÁGINA HTML; guardar isso sob o nome do som deixaria uma
+     * página inteira no lugar da fala, e como áudio não revalida, ela ficaria
+     * lá até a próxima troca de versão.
+     *
+     * Mas WebM não tem MIME de áudio na prática: a Vercel (como quase todo
+     * servidor) serve `.webm` como `video/webm`, mesmo quando dentro só há uma
+     * trilha Opus. Exigir `audio/` deixaria os oito sons novos passando por
+     * aqui e saindo sem serem guardados — o defeito de novo, agora escondido
+     * atrás de uma regex que parecia certa.
+     *
+     * A régua continua estreita: só `audio/*` e `video/webm`. HTML, JSON e
+     * qualquer outra coisa seguem recusados.
+     */
+    const ehSom = tipo.startsWith("audio/") || tipo.startsWith("video/webm");
+    if (!ehSom) return res;
     await guardar(CACHE_AUDIO, chave, res.clone());
     return res;
   })();

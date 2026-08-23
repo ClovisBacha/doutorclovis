@@ -169,6 +169,55 @@ describe("o áudio da meditação passou a ser guardado", () => {
   });
 });
 
+describe("⚠️ o ambiente gravado, que é WebM e não mp3", () => {
+  /**
+   * Os oito sons de fogo, bicho e água são Opus dentro de WebM — 3 MB. Os dois
+   * testes abaixo existem porque a versão anterior deste worker os deixava
+   * passar direto para a rede em TODA sessão, e nenhum teste reclamava.
+   */
+  const WEBM = "/sons/fogueira.webm";
+  const corpoWebm = () => new Uint8Array([...Array(60).keys()]);
+  /* ⚠️ `video/webm`, que é o que a Vercel serve de verdade para `.webm` —
+     mesmo quando dentro só há uma trilha de áudio. */
+  const redeWebm = async (url: string) =>
+    url.endsWith(".webm")
+      ? new Response(corpoWebm(), { status: 200, headers: { "content-type": "video/webm" } })
+      : new Response("conteudo", { status: 200 });
+
+  test("⚠️ `.webm` é tratado como ÁUDIO — some da regex e ele volta à rede sempre", async () => {
+    const sw = carregar(redeWebm);
+    expect((await sw.pedir(WEBM))?.status).toBe(200);
+    expect(sw.chamadas.length).toBe(1);
+    /* O segundo pedido tem de sair do disco. Sem `webm` em `AUDIO_RE` este
+       número vira 2, e os 3 MB voltariam da rede em cada sessão. */
+    expect((await sw.pedir(WEBM))?.status).toBe(200);
+    expect(sw.chamadas.length).toBe(1);
+  });
+
+  test("⚠️ `video/webm` É GUARDADO — exigir `audio/` deixaria tudo passar sem cache", async () => {
+    const sw = carregar(redeWebm);
+    await sw.pedir(WEBM);
+    /* `guardadas` é o que de fato entrou no cache. Com a guarda antiga
+       (`audio/` apenas), esta lista fica VAZIA e o som volta da rede sempre. */
+    expect(sw.caches.guardadas.length).toBe(1);
+  });
+
+  test("mas HTML continua RECUSADO — a guarda não pode ter sido afrouxada", async () => {
+    /* Um arquivo que sumiu do servidor cai no SSR e volta como página. Guardar
+       isso sob o nome do som deixaria uma página inteira no lugar da fala, e
+       áudio não revalida: ficaria lá até a próxima versão do cache. */
+    const sw = carregar(
+      async () =>
+        new Response("<!doctype html><html></html>", {
+          status: 200,
+          headers: { "content-type": "text/html" },
+        }),
+    );
+    await sw.pedir(WEBM);
+    expect(sw.caches.guardadas.length).toBe(0);
+  });
+});
+
 describe("⚠️ o pedido com Range — o que faz o Safari tocar", () => {
   test("bytes=0- devolve 206 com o arquivo inteiro e Content-Range", async () => {
     /* Responder 200 a um pedido com Range é resposta errada, e o Safari desiste
