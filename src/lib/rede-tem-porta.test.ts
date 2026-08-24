@@ -43,6 +43,7 @@ const FONTES = [
   "src/lib/rede-social.functions.ts",
   "src/lib/caixinha.functions.ts",
   "src/lib/conversa.functions.ts",
+  "src/lib/comentarios.functions.ts",
   /* ⚠️ Os dois módulos da Fase 5 ficavam de fora, e o próprio comentário acima
      diz que "um módulo novo fora desta lista é o buraco que a catraca existe
      para fechar". As oito funções deles têm porta hoje — mas ter porta hoje é

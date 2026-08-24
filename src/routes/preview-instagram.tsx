@@ -48,6 +48,7 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useEffect, useMemo, useState } from "react";
+import { Comentarios } from "@/components/rede-comentarios";
 import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
@@ -789,6 +790,42 @@ function Bancada() {
       euIniciei: true,
     },
   ];
+
+  if (tela === "comentarios") {
+    /**
+     * ⚠️ SEM ISTO OS COMENTÁRIOS SÃO IMPOSSÍVEIS DE OLHAR: a lista vem do
+     * servidor e exige sessão MAIS um post com comentários de outras contas.
+     * `?fechados=1` mostra o estado que a dona liga.
+     */
+    const meus = [
+      {
+        id: "k1",
+        autorId: "u1",
+        autorNome: "Marina Costa",
+        autorAvatar: null,
+        texto: "que linda! 💛",
+        criadoEm: "2026-08-24T10:00:00Z",
+        possoApagar: false,
+      },
+      {
+        id: "k2",
+        autorId: "u2",
+        autorNome: "Carol",
+        autorAvatar: null,
+        texto: "também estou de 30 semanas, vamos juntas",
+        criadoEm: "2026-08-24T10:05:00Z",
+        possoApagar: true,
+      },
+    ];
+    return (
+      <div className="mx-auto max-w-[430px] pt-6">
+        <Comentarios
+          postId="00000000-0000-0000-0000-000000000001"
+          bancada={{ comentarios: meus, abertos: conversa !== "fechados", souADona: true }}
+        />
+      </div>
+    );
+  }
 
   if (tela === "conversas") {
     return (

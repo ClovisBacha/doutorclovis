@@ -75,6 +75,7 @@ import {
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
 import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
+import { Comentarios } from "@/components/rede-comentarios";
 import type { ConversaNaTela } from "@/lib/conversa.functions";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
 /* Import ESTÁTICO: régua pura, sem servidor e sem DOM — ver `lugar-no-feed.ts`. */
@@ -5931,6 +5932,12 @@ export function TelaDoPost({
         aoVerQuemReagiu={aoVerQuemReagiu}
         aoAbrirPerfil={aoAbrirPerfil}
       />
+      {/* ⚠️ **OS COMENTÁRIOS SÓ EXISTEM NA TELA DO POST, nunca no feed.**
+          No feed eles custariam uma consulta por publicação a cada rolagem, e
+          transformariam a leitura num mural de opinião — que é exatamente o que
+          o número dos 20,9% recomenda evitar. Quem quer comentar abre o post,
+          e esse toque a mais é uma trava barata contra o comentário impulsivo. */}
+      <Comentarios postId={post.id} aoAbrirPerfil={aoAbrirPerfil} />
     </div>
   );
 }
