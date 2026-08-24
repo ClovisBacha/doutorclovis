@@ -499,6 +499,9 @@ function Bancada() {
          que a produção não tem, que é o defeito que `acoesDaBancada` já
          documenta para as outras ações. */
       republicar: (_p: PostNaTela) => alert("abriria o compositor republicando"),
+      /* ⚠️ A bancada precisa da prop, senão o botão NUNCA aparece — a mesma
+         lição de `republicar`. */
+      compartilhar: (_p: PostNaTela) => alert("abriria a folha do sistema"),
       editar: async (p: PostNaTela, t: string) => {
         setEdicoes((m) => ({ ...m, [p.id]: t }));
         return true;
@@ -1219,6 +1222,7 @@ function Bancada() {
              tinha denúncia e o canal com mais alcance não tinha. */
           aoDenunciar={acoesDaBancada.denunciar}
           aoRepublicar={acoesDaBancada.republicar}
+          aoCompartilhar={acoesDaBancada.compartilhar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
           aoEditar={acoesDaBancada.editar}
           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}

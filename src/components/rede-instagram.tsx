@@ -605,6 +605,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoAbrirPerfil,
   aoSalvar,
   aoRepublicar,
+  aoCompartilhar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -632,6 +633,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   /** Republicar. Só chega onde cabe — ver o comentário do botão. */
   aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: (post: PostNaTela) => void;
   /**
@@ -1004,6 +1007,21 @@ export const PostInstagram = memo(function PostInstagram({
             className="press ml-auto leading-none text-[15px]"
           >
             ↻
+          </button>
+        )}
+        {/* ⚠️ **COMPARTILHAR SÓ A PRÓPRIA PUBLICAÇÃO.** A régua está em
+            `compartilhar-post.ts`, e a razão é que aqui não existe página
+            pública de post: o que sairia é a FOTO, e foto que sai do app não
+            volta. Compartilhar a ultrassom de outra paciente no WhatsApp da
+            família é tirar dela a decisão de onde a imagem circula. */}
+        {aoCompartilhar && post.souAAutora && (
+          <button
+            type="button"
+            onClick={() => aoCompartilhar(post)}
+            aria-label="Compartilhar"
+            className="press ml-auto leading-none text-[15px]"
+          >
+            ↗
           </button>
         )}
         {aoSalvar && (
@@ -1391,6 +1409,7 @@ export function TelaPrincipal({
   aoReagir,
   aoSalvar,
   aoRepublicar,
+  aoCompartilhar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -1452,6 +1471,8 @@ export function TelaPrincipal({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   /** Republicar. Só chega onde cabe — ver o comentário do botão. */
   aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -1630,6 +1651,7 @@ export function TelaPrincipal({
             aoReagir={aoReagir}
             aoSalvar={aoSalvar}
             aoRepublicar={aoRepublicar}
+            aoCompartilhar={aoCompartilhar}
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
@@ -1690,6 +1712,7 @@ export function TelaPrincipal({
                   aoReagir={aoReagir}
                   aoSalvar={aoSalvar}
                   aoRepublicar={aoRepublicar}
+                  aoCompartilhar={aoCompartilhar}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
                   aoEditar={aoEditar}
@@ -4052,6 +4075,62 @@ export function RedeNoApp({
   }, [onde.t]);
 
   /**
+   * COMPARTILHAR A PRÓPRIA PUBLICAÇÃO PARA FORA.
+   *
+   * ⚠️ **ENTREGA O ARQUIVO AO SISTEMA, e cai para o texto quando não dá.** Um
+   * `share({files})` num navegador que só aceita texto falha DEPOIS de a
+   * paciente tocar, com a folha do sistema já aberta — `comoCompartilhar`
+   * pergunta antes.
+   *
+   * ⚠️ **A IMAGEM É BAIXADA DA URL ASSINADA, e por isso pode falhar.** Ela tem
+   * validade, e a rede dela pode estar ruim. Falhou o arquivo, vai o texto: o
+   * pior caso é a amiga receber o link sem a foto, e não um botão que não faz
+   * nada.
+   */
+  async function compartilhar(post: PostNaTela) {
+    const { comoCompartilhar, podeCompartilharPost, textoDoCompartilhamento } =
+      await import("@/lib/compartilhar-post");
+    /* A régua de novo aqui, e não só no botão: o botão some para post alheio,
+       mas quem garante é isto. */
+    if (
+      podeCompartilharPost({
+        souAAutora: post.souAAutora,
+        temImagem: !!post.imagemUrl,
+        temVideo: !!post.videoUrl,
+        temTexto: !!post.texto,
+      })
+    ) {
+      return;
+    }
+
+    const modo = comoCompartilhar(navigator as never);
+    if (modo === "nenhum") return;
+
+    const texto = textoDoCompartilhamento(post.texto, linkDeIndicacao(meuCodigo));
+
+    if (modo === "arquivo" && post.imagemUrl) {
+      try {
+        const r = await fetch(post.imagemUrl);
+        if (r.ok) {
+          const blob = await r.blob();
+          const arq = new File([blob], "obstetrica.jpg", { type: blob.type || "image/jpeg" });
+          if (navigator.canShare?.({ files: [arq] })) {
+            await navigator.share({ files: [arq], text: texto });
+            return;
+          }
+        }
+      } catch {
+        /* Cai para o texto, logo abaixo. */
+      }
+    }
+    try {
+      await navigator.share({ text: texto });
+    } catch {
+      /* Ela cancelou a folha do sistema — não é erro. */
+    }
+  }
+
+  /**
    * REPUBLICAR — abre o compositor já com a original anexada.
    *
    * ⚠️ **NÃO PUBLICA DIRETO.** Republicar sem escrever nada é o gesto que enche
@@ -5334,6 +5413,7 @@ export function RedeNoApp({
         posts={posts}
         soSeguindo={soSeguindo}
         aoRepublicar={republicar}
+        aoCompartilhar={(p) => void compartilhar(p)}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -6010,6 +6090,7 @@ export function TelaDoPost({
   aoReagir,
   aoSalvar,
   aoRepublicar,
+  aoCompartilhar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -6025,6 +6106,8 @@ export function TelaDoPost({
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
   /** Republicar. Só chega onde cabe — ver o comentário do botão. */
   aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -6059,6 +6142,7 @@ export function TelaDoPost({
         aoReagir={aoReagir}
         aoSalvar={aoSalvar}
         aoRepublicar={aoRepublicar}
+        aoCompartilhar={aoCompartilhar}
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
