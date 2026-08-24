@@ -48,6 +48,7 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useEffect, useMemo, useState } from "react";
+import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
 import {
@@ -93,6 +94,10 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
     oficial: q.oficial == null ? 1 : Number(q.oficial),
     entao: q.entao == null ? false : !!q.entao,
+    /* ⚠️ `== null` e NÃO `=== undefined` — a mesma armadilha de sempre: na
+       revalidação chega `null`, e `!!null` seria `false` mesmo com o parâmetro
+       na URL. Ver o comentário do topo. */
+    filhos: q.filhos == null ? "" : String(q.filhos),
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
@@ -276,6 +281,29 @@ function maisUmaPagina(quantos: number, pagina: number): PostNaTela[] {
   return POSTS.slice(0, quantos).map((p) => ({ ...p, id: `${p.id}-pg${pagina}` }));
 }
 
+/**
+ * OS FILHOS DE MENTIRA — três arranjos que a produção leva meses para produzir.
+ *
+ * ⚠️ Sem isto, o editor de filhos e a tira de marcos eram IMPOSSÍVEIS de olhar:
+ * os dois falam com o servidor, e sem sessão a tela mostra o erro — que é
+ * justamente o estado que elas não precisam provar. É a lição do
+ * `PerfilDaAmigaTela`, aplicada antes de custar uma rodada.
+ */
+const FILHOS_DE_MENTIRA: Record<string, Filho[]> = {
+  /* Mãe de um bebê de 3 meses: o caso do mesversário e dos marcos. */
+  bebe: [{ id: "f1", nome: "Helena", sexo: "f", nascidoEm: "2026-05-24", previstoPara: null }],
+  /* Grávida de gêmeas: prova a concordância. */
+  gemeas: [
+    { id: "f1", nome: null, sexo: "f", nascidoEm: null, previstoPara: "2026-12-01" },
+    { id: "f2", nome: null, sexo: "f", nascidoEm: null, previstoPara: "2026-12-01" },
+  ],
+  /* ⚠️ O caso que nenhum app de gestação representa: mãe E grávida. */
+  ambos: [
+    { id: "f1", nome: "Ana", sexo: "f", nascidoEm: "2023-04-10", previstoPara: null },
+    { id: "f2", nome: null, sexo: "m", nascidoEm: null, previstoPara: "2026-12-01" },
+  ],
+};
+
 function Bancada() {
   const {
     tela,
@@ -301,6 +329,7 @@ function Bancada() {
     caixinha,
     perguntas,
     remover,
+    filhos,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -494,7 +523,12 @@ function Bancada() {
   if (tela === "editar") {
     return (
       <div className="mx-auto max-w-md py-2">
-        <EditarPerfil perfil={perfil} aoSalvar={async () => true} aoFechar={() => history.back()} />
+        <EditarPerfil
+          perfil={perfil}
+          aoSalvar={async () => true}
+          aoFechar={() => history.back()}
+          filhosDeMentira={FILHOS_DE_MENTIRA[filhos] ?? FILHOS_DE_MENTIRA.bebe}
+        />
       </div>
     );
   }
@@ -707,6 +741,8 @@ function Bancada() {
     );
   }
 
+  const filhosDaBancada = FILHOS_DE_MENTIRA[filhos] ?? undefined;
+
   if (tela === "novo") {
     /* ⚠️ **Segura a MONTAGEM, e não a prop.** Trocar `momentoInicial` depois de
        montar não faz nada: `fotos` é semeada no INICIALIZADOR do `useState`,
@@ -719,6 +755,10 @@ function Bancada() {
         <NovoPost
           /* A aula de hoje, para o anexo aparecer na bancada. */
           aulaDeHoje={{ tema: "nutrição" }}
+          /* ⚠️ Sem um bebê NASCIDO a tira de marcos não existe — e ela é
+             justamente o que precisa ser olhado. `?filhos=bebe` é o padrão
+             aqui; `?filhos=gemeas` prova que a tira NÃO aparece na gestação. */
+          filhosDeMentira={FILHOS_DE_MENTIRA[filhos] ?? FILHOS_DE_MENTIRA.bebe}
           momentoInicial={
             comFotoDeHoje
               ? {

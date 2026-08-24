@@ -5183,8 +5183,8 @@ function hojeEmSaoPaulo(): string {
   }).format(new Date());
 }
 
-function MeusFilhos({ hoje }: { hoje: string }) {
-  const [filhos, setFilhos] = useState<Filho[] | null>(null);
+function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
+  const [filhos, setFilhos] = useState<Filho[] | null>(bancada ?? null);
   const [erro, setErro] = useState(false);
   const [ocupado, setOcupado] = useState(false);
 
@@ -5195,6 +5195,10 @@ function MeusFilhos({ hoje }: { hoje: string }) {
   }
 
   const recarregar = useCallback(async () => {
+    /* ⚠️ A BANCADA NÃO FALA COM O SERVIDOR. Sem sessão, `meusFilhos` devolve
+       "sessao" e a tela mostraria só o erro — que é exatamente o estado que ela
+       NÃO precisa provar. O dado é fabricado; o desenho é o de produção. */
+    if (bancada) return;
     try {
       const t = await token();
       if (!t) return;
@@ -5213,14 +5217,14 @@ function MeusFilhos({ hoje }: { hoje: string }) {
     } catch {
       setErro(true);
     }
-  }, []);
+  }, [bancada]);
 
   useEffect(() => {
     void recarregar();
   }, [recarregar]);
 
   async function mexer(fn: () => Promise<unknown>) {
-    if (ocupado) return;
+    if (bancada || ocupado) return;
     setOcupado(true);
     try {
       await fn();
@@ -5391,8 +5395,11 @@ export function EditarPerfil({
   perfil,
   aoSalvar,
   aoFechar,
+  filhosDeMentira,
 }: {
   perfil: PerfilNaTela;
+  /** Só a bancada preenche. Ver `MeusFilhos`. */
+  filhosDeMentira?: Filho[];
   aoSalvar: (m: { nome?: string; bio?: string | null; avatar?: string | null }) => Promise<boolean>;
   aoFechar: () => void;
 }) {
@@ -5485,7 +5492,7 @@ export function EditarPerfil({
             pediria o dado estruturado antes de ela ter entendido que existe uma
             frase automática — e o espelho da frase é o que faz preencher valer
             a pena. */}
-        <MeusFilhos hoje={hojeEmSaoPaulo()} />
+        <MeusFilhos hoje={hojeEmSaoPaulo()} bancada={filhosDeMentira} />
       </div>
     </div>
   );
@@ -6500,6 +6507,7 @@ export function NovoPost({
   aoFechar,
   aoPublicar,
   aulaDeHoje,
+  filhosDeMentira,
   aoSugerirLegenda,
   amigasParaMarcar,
   rascunho,
@@ -6510,6 +6518,8 @@ export function NovoPost({
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
+  /** Só a bancada preenche — a tira de marcos precisa de um bebê nascido. */
+  filhosDeMentira?: Filho[];
   aoPublicar: (p: {
     texto: string | null;
     fotos: string[];
@@ -6623,10 +6633,11 @@ export function NovoPost({
    * segundo filho, e a lista devolve o mais velho, poria a idade errada num
    * post que a família inteira vai ver.
    */
-  const [filhosDela, setFilhosDela] = useState<Filho[]>([]);
+  const [filhosDela, setFilhosDela] = useState<Filho[]>(filhosDeMentira ?? []);
   const [marco, setMarco] = useState<string | null>(null);
 
   useEffect(() => {
+    if (filhosDeMentira) return;
     void (async () => {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
@@ -6640,7 +6651,7 @@ export function NovoPost({
            marcos não aparece, e publicar continua funcionando. */
       }
     })();
-  }, []);
+  }, [filhosDeMentira]);
 
   const hojeStr = hojeEmSaoPaulo();
   const caculaNascido = (() => {
