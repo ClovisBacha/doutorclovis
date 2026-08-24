@@ -355,6 +355,7 @@ function Bancada() {
     /* ⚠️ Ligada por padrão, e só no perfil de OUTRA pessoa a caixinha desenha
        — no meu, o que existe é a caixa cheia, que é tela própria. `?caixinha=0`
        fecha, que é o estado em que o botão some. */
+    linhaDosFilhos: "Mãe da Helena, 3 meses",
     feedSoSeguindo: false,
     aceitaPerguntas: caixinha !== 0,
     /* A aba "Do bebê" segue a MESMA chave da semana — é o mesmo fato. */

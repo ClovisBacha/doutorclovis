@@ -27,6 +27,8 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
+import { type Filho, linhaDoPerfil } from "@/lib/filhos";
+import { MAXIMO_DE_FILHOS } from "@/lib/filhos.functions";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -2431,6 +2433,15 @@ export function TelaDePerfil({
             ⚠️ E eles NÃO entram no cabeçalho do post: lá o carimbo seria a
             semana de HOJE sobre um post de seis semanas atrás, que é o defeito
             que `haQuantoPublicou` acabou de consertar. */}
+        {/* ⚠️ A LINHA DOS FILHOS FICA ACIMA DOS SELOS, e a ordem é a vida dela.
+            O selo da semana morre no dia do parto; esta linha continua verdade
+            por anos — "Mãe da Helena, 3 meses", "Mãe de 2, grávida do terceiro".
+            É ela que faz o perfil ter assunto depois que a barriga acaba, e por
+            isso vem primeiro. */}
+        {perfil.linhaDosFilhos && (
+          <p className="mt-2 text-[13px] font-medium leading-snug">{perfil.linhaDosFilhos}</p>
+        )}
+
         {(perfil.seloSemana || perfil.seloBebe) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {/* ⚠️ `text-primary` sobre `primary/12` media 3,87:1 — abaixo do piso
@@ -5127,6 +5138,238 @@ async function prepararAvatar(file: File): Promise<string | null> {
   }
 }
 
+/**
+ * OS FILHOS, NA TELA DE EDITAR O PERFIL.
+ *
+ * ⚠️ **É AQUI QUE A ABA DEIXA DE MORRER NO PARTO.** Enquanto a identidade saía
+ * de `lmp_date`, a conta perdia o assunto no dia do nascimento. Com a lista de
+ * filhos, ela deixa de ser "grávida de 28 semanas" e passa a ser "mãe da
+ * Helena, de 3 meses" — que continua verdade por anos.
+ *
+ * ⚠️ **A LINHA É MOSTRADA ENQUANTO ELA DIGITA**, e não só depois de salvar. É a
+ * única forma de ela entender que a lista de filhos VIRA a frase do perfil: sem
+ * o espelho, "cadastrar filho" parece burocracia sem efeito visível.
+ */
+/**
+ * A data de hoje em São Paulo, como `YYYY-MM-DD`.
+ *
+ * ⚠️ **NÃO É `new Date().toISOString()`.** Aquele devolve UTC, e das 21h à
+ * meia-noite ele já está no dia seguinte — a idade do bebê apareceria um dia a
+ * mais para quem abre o app à noite, que é justamente quando as mães abrem.
+ */
+function hojeEmSaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function MeusFilhos({ hoje }: { hoje: string }) {
+  const [filhos, setFilhos] = useState<Filho[] | null>(null);
+  const [erro, setErro] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function token() {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const s = await supabase.auth.getSession();
+    return s.data.session?.access_token ?? null;
+  }
+
+  const recarregar = useCallback(async () => {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusFilhos } = await import("@/lib/filhos.functions");
+      const r = await meusFilhos({ data: { accessToken: t } });
+      /* ⚠️ `null` e `[]` são coisas DIFERENTES, e a tela precisa distinguir:
+         lista vazia é "ela não cadastrou ninguém" e mostra o convite; falha de
+         leitura é "não sei" e não pode desenhar uma mãe de três como se ela não
+         tivesse filhos. */
+      if (r.ok) {
+        setFilhos(r.filhos);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    void recarregar();
+  }, [recarregar]);
+
+  async function mexer(fn: () => Promise<unknown>) {
+    if (ocupado) return;
+    setOcupado(true);
+    try {
+      await fn();
+      await recarregar();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function acrescentar(comoGestacao: boolean) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { salvarFilho } = await import("@/lib/filhos.functions");
+      await salvarFilho({
+        data: {
+          accessToken: t,
+          /* ⚠️ Nasce SEM data e sem nome. Pedir tudo de uma vez num formulário
+             modal é o que faz a paciente desistir no primeiro campo; ela
+             preenche o que quiser, na linha, depois. */
+          ...(comoGestacao ? {} : { nascidoEm: hoje }),
+        },
+      });
+    });
+  }
+
+  async function mudar(id: string, campos: Record<string, unknown>) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { salvarFilho } = await import("@/lib/filhos.functions");
+      await salvarFilho({ data: { accessToken: t, id, ...campos } as never });
+    });
+  }
+
+  async function remover(id: string) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { removerFilho } = await import("@/lib/filhos.functions");
+      await removerFilho({ data: { accessToken: t, id } });
+    });
+  }
+
+  const linha = filhos ? linhaDoPerfil(filhos, hoje) : null;
+
+  return (
+    <section className="mt-6 border-t border-border pt-5">
+      <h2 className="text-[15px] font-semibold">Meus filhos</h2>
+      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+        É daqui que sai a frase do seu perfil. Nome e sexo são opcionais.
+      </p>
+
+      {/* ⚠️ O ESPELHO DA FRASE. Sem ele, cadastrar filho parece burocracia sem
+          efeito — e é justamente o efeito que faz valer a pena preencher. */}
+      {linha && (
+        <p className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-[13px] font-medium">{linha}</p>
+      )}
+
+      {erro && (
+        <p className="mt-3 text-[13px] text-muted-foreground">
+          Não consegui carregar agora. Tente de novo daqui a pouco.
+        </p>
+      )}
+
+      {filhos?.map((f) => (
+        <div key={f.id} className="mt-3 rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2">
+            <input
+              value={f.nome ?? ""}
+              onChange={(e) =>
+                setFilhos(
+                  (l) => l?.map((x) => (x.id === f.id ? { ...x, nome: e.target.value } : x)) ?? l,
+                )
+              }
+              onBlur={(e) => void mudar(f.id, { nome: e.target.value.slice(0, 40) || null })}
+              placeholder="Nome (opcional)"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+            />
+            <button
+              type="button"
+              aria-label="Remover"
+              disabled={ocupado}
+              onClick={() => void remover(f.id)}
+              className="press shrink-0 rounded-lg px-2 py-1.5 text-[13px] text-muted-foreground"
+            >
+              Remover
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {/* ⚠️ TRÊS estados, e "não sei" é um deles — não um vazio sem nome.
+                O sexo só existe aqui para a concordância ("gêmeas"), e obrigar
+                a escolher faria a tela pedir um dado que muita gente não tem. */}
+            {(["f", "m", null] as const).map((s) => (
+              <button
+                key={String(s)}
+                type="button"
+                disabled={ocupado}
+                onClick={() => void mudar(f.id, { sexo: s })}
+                className={`press rounded-full px-3 py-1 text-[12px] ${
+                  f.sexo === s ? "bg-primary text-primary-foreground" : "bg-muted"
+                }`}
+              >
+                {s === "f" ? "Menina" : s === "m" ? "Menino" : "Não sei"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <label className="text-[12px] text-muted-foreground">
+              {f.nascidoEm ? "Nasceu em" : "Previsto para"}
+            </label>
+            <input
+              type="date"
+              value={(f.nascidoEm ?? f.previstoPara ?? "").slice(0, 10)}
+              onChange={(e) =>
+                void mudar(
+                  f.id,
+                  f.nascidoEm ? { nascidoEm: e.target.value } : { previstoPara: e.target.value },
+                )
+              }
+              className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
+            />
+          </div>
+
+          {/* ⚠️ O NASCIMENTO É UM BOTÃO, e é o momento que o app inteiro
+              esperava. Ele troca `previsto_para` por `nascido_em` — e é essa
+              troca que muda a frase do perfil de "grávida" para "mãe". */}
+          {!f.nascidoEm && (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void mudar(f.id, { nascidoEm: hoje, previstoPara: null })}
+              className="press mt-2 rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+            >
+              Já nasceu 💛
+            </button>
+          )}
+        </div>
+      ))}
+
+      {(filhos?.length ?? 0) < MAXIMO_DE_FILHOS && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void acrescentar(true)}
+            className="press rounded-full border border-border px-3 py-1.5 text-[13px]"
+          >
+            + Estou esperando
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void acrescentar(false)}
+            className="press rounded-full border border-border px-3 py-1.5 text-[13px]"
+          >
+            + Já nasceu
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function EditarPerfil({
   perfil,
   aoSalvar,
@@ -5219,6 +5462,13 @@ export function EditarPerfil({
             {bio.length}/{LIMITE_DA_BIO}
           </span>
         </label>
+
+        {/* ⚠️ OS FILHOS FICAM ABAIXO DA BIO, e a ordem importa: a bio é o que
+            ela escreve, os filhos são o que o app DERIVA. Invertido, a tela
+            pediria o dado estruturado antes de ela ter entendido que existe uma
+            frase automática — e o espelho da frase é o que faz preencher valer
+            a pena. */}
+        <MeusFilhos hoje={hojeEmSaoPaulo()} />
       </div>
     </div>
   );

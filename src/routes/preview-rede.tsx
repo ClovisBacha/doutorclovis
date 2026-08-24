@@ -50,6 +50,7 @@ const PERFIL: PerfilNaTela = {
   possoAplicarOCodigo: false,
   mostrarSemana: true,
   mostrarBebe: true,
+  linhaDosFilhos: "Mãe da Helena, 3 meses",
   feedSoSeguindo: false,
   aceitaPerguntas: true,
   /* ⚠️ A chave da vitrine nasce DESLIGADA — é o estado real de toda paciente,

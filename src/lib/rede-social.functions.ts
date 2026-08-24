@@ -23,6 +23,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { trechoParaLike } from "@/lib/like-seguro";
 import { ehContaOficial, fileiraComOficial } from "@/lib/conta-oficial";
 import { z } from "zod";
+import * as filhosRegua from "./filhos";
 import {
   aoSeguir,
   avisoMandaPush,
@@ -305,6 +306,21 @@ export type PerfilNaTela = {
    * organiza a própria leitura — informação sem uso e sem dono.
    */
   feedSoSeguindo: boolean;
+  /**
+   * "Mãe da Helena, 3 meses" · "Grávida de gêmeas" · "Mãe de 2, grávida do
+   * terceiro". Derivada da lista de filhos, nunca guardada.
+   *
+   * ⚠️ **É O QUE FAZ O PERFIL SOBREVIVER AO PARTO.** O selo da semana morre no
+   * dia do nascimento; esta linha continua verdadeira por anos.
+   *
+   * ⚠️ **E OS NOMES OBEDECEM À CHAVE `mostrar_bebe` QUE JÁ EXISTIA.** Não é
+   * restrição nova: é a mesma chave com que ela já decidiu se o nome do bebê é
+   * público. Com ela desligada, a linha sai sem nomes — "Mãe de 1" em vez de
+   * "Mãe da Helena" — e continua dizendo a verdade. Publicar o nome de uma
+   * criança por baixo de uma chave que a paciente desligou seria contornar o
+   * próprio consentimento dela pela porta dos fundos.
+   */
+  linhaDosFilhos: string | null;
   /**
    * Quantas pessoas EU acompanho — só no meu próprio perfil.
    *
@@ -1606,7 +1622,7 @@ export const verPerfil = createServerFn({ method: "POST" })
        ⚠️ A pílula do código só faz sentido no perfil de OUTRA pessoa: no meu,
        ela ofereceria que eu me indicasse. E `ref_code` é fixado UMA VEZ, então
        a tela precisa saber se eu já tenho ANTES de oferecer o botão. */
-    const [selo, bebe, codigo, jaTenhoCodigo, seguidores, seguindo] = await Promise.all([
+    const [selo, bebe, codigo, jaTenhoCodigo, seguidores, seguindo, filhos] = await Promise.all([
       seloDe(a),
       /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
          aba tem de mostrar o que a visitante veria. */
@@ -1620,6 +1636,11 @@ export const verPerfil = createServerFn({ method: "POST" })
          sobre uma lista que abria com doze pessoas. */
       contarSeguidores(sb, data.alvoId),
       contarSeguindo(sb, data.alvoId),
+      /* ⚠️ Na MESMA rodada: é uma linha do perfil, não vale uma espera própria. */
+      (async () => {
+        const { lerFilhos } = await import("./filhos.functions");
+        return lerFilhos(sb, data.alvoId);
+      })(),
     ]);
 
     const perfil: PerfilNaTela = {
@@ -1644,6 +1665,23 @@ export const verPerfil = createServerFn({ method: "POST" })
          guarda o argumento contrário para quem reabrir o assunto. */
       seguidores,
       seguindo,
+      linhaDosFilhos: (() => {
+        if (!filhos || filhos.length === 0) return null;
+        const { linhaDoPerfil } = filhosRegua;
+        /* ⚠️ Ela SEMPRE vê os próprios nomes; a chave governa o que os OUTROS
+           veem. Sob a prévia (o espelho), vale a régua de terceiro — é o ponto
+           inteiro daquela tela. */
+        const podeNomear = !persona && data.alvoId === eu ? true : !!a.mostrar_bebe;
+        const lista = podeNomear ? filhos : filhos.map((f) => ({ ...f, nome: null }));
+        /* ⚠️ O helper do projeto devolve `Date` (São Paulo); `filhos.ts` fala
+           `YYYY-MM-DD`. A conversão é local e explícita — um `toISOString()`
+           aqui reintroduziria o UTC que o helper existe para evitar. */
+        const d = hojeEmSaoPaulo();
+        const hoje = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+          d.getDate(),
+        ).padStart(2, "0")}`;
+        return linhaDoPerfil(lista, hoje);
+      })(),
       /* ⚠️ Os selos passam pela MESMA régua na prévia e na tela real. Eles não
          dependem de quem olha — dependem das chaves —, e é justamente por isso
          que precisam estar aqui: era o campo que uma prévia feita só sobre
