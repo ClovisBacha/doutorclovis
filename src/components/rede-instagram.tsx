@@ -2360,19 +2360,25 @@ export function TelaDePerfil({
                 rotulo={posts.length === 1 ? "publicação" : "publicações"}
               />
             )}
-            {/* ⚠️ Os dois números de AUDIÊNCIA só no próprio perfil. É a única
-                divergência deliberada do modelo, e ela está pesquisada em
-                `NUMEROS_PUBLICOS`: um placar público mede popularidade num
-                momento em que ela já está sendo medida clinicamente. */}
-            {perfil.souEu && (
-              <>
-                <button type="button" onClick={() => abrirLista?.("seguidores")} className="press">
-                  <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
-                </button>
-                <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
-                  <Numero valor={perfil.euSigo ?? 0} rotulo="seguindo" />
-                </button>
-              </>
+            {/* ⚠️ OS NÚMEROS SÃO PÚBLICOS AGORA, por decisão do dono. Antes
+                apareciam só no próprio perfil, e a razão (clínica) está guardada
+                em `NUMEROS_PUBLICOS` para quem reabrir o assunto.
+
+                ⚠️ `!= null` e não `?? 0`: `null` quer dizer "não sei" (perfil
+                fora de alcance, ou a busca, que não conta de propósito). Um zero
+                no lugar do desconhecido afirmaria que ninguém a segue. */}
+            {perfil.seguidores != null && (
+              <button type="button" onClick={() => abrirLista?.("seguidores")} className="press">
+                <Numero valor={perfil.seguidores} rotulo="seguidores" />
+              </button>
+            )}
+            {(perfil.souEu ? (perfil.euSigo ?? perfil.seguindo) : perfil.seguindo) != null && (
+              <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
+                <Numero
+                  valor={(perfil.souEu ? (perfil.euSigo ?? perfil.seguindo) : perfil.seguindo) ?? 0}
+                  rotulo="seguindo"
+                />
+              </button>
             )}
           </div>
         </div>
@@ -3671,13 +3677,11 @@ export function RedeNoApp({
 
   async function removerSeguidor(quemId: string) {
     /* ⚠️ Some da lista na hora, e o CONTADOR do perfil desce junto: o número
-       vive em `perfil.meusSeguidores`, e sem isto a lista mostraria 11 pessoas
+       vive em `perfil.seguidores`, e sem isto a lista mostraria 11 pessoas
        embaixo de um "12 seguidores". */
     setGente((g) => g.filter((p) => p.id !== quemId));
     setPerfil((p) =>
-      p && p.meusSeguidores != null
-        ? { ...p, meusSeguidores: Math.max(0, p.meusSeguidores - 1) }
-        : p,
+      p && p.seguidores != null ? { ...p, seguidores: Math.max(0, p.seguidores - 1) } : p,
     );
     try {
       const t = await token();

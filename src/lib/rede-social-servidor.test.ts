@@ -224,31 +224,32 @@ describe("o que é dela", () => {
     expect(c).not.toContain(".delete(");
   });
 
-  test("⚠️ o contador de seguidores é `null` para terceiros — e para o espelho", () => {
-    // Não existe placar público de audiência: ele mede popularidade num
-    // momento em que ela já está sendo medida clinicamente.
+  test("⚠️ o contador de seguidores é PÚBLICO — e a busca continua sem contar", () => {
+    // ⚠️ ESTA AFIRMAÇÃO FOI INVERTIDA POR DECISÃO DO DONO, e o teste foi
+    // reescrito em vez de apagado.
     //
-    // ⚠️ Este teste ficou VERMELHO quando o espelho nasceu, e a tentação era
-    // afrouxá-lo. A afirmação que ele guarda não mudou — só ganhou um caso: o
-    // número continua saindo apenas no MEU perfil, e agora nem nele quando a
-    // tela está fingindo ser a de uma visitante (senão a prévia mostraria à
-    // "estranha" um contador que ela nunca veria).
+    // O que ele guardava: não existe placar público de audiência, porque ele
+    // mede popularidade num momento em que ela já está sendo medida
+    // clinicamente. O argumento continua de pé e vive em `NUMEROS_PUBLICOS`.
+    //
+    // O que venceu: "é uma rede social, são pessoas que vão seguir a pessoa, e
+    // é pra mostrar sim". Uma rede social sem contador não lê como discrição,
+    // lê como versão incompleta.
     const c = corpoDe("verPerfil").replace(/\s+/g, " ");
-    /* ⚠️ O que importa é o `null` nos DOIS casos de terceiro (visitante e
-       espelho) — o número real só existe no ramo do meio. A asserção antiga
-       cravava o literal `0`, e por isso continuava verde sobre o defeito que
-       ela deveria ter pegado: o contador REAL nunca chegava à tela, e o perfil
-       dizia "0 seguidores" logo acima de uma lista com doze pessoas. */
-    /* ⚠️ A CONTAGEM mudou de lugar (subiu para o `Promise.all` que colapsou as
-       cinco esperas do fim), e a asserção seguiu ela — nunca saiu. O que ela
-       guarda é a mesma coisa: `null` nos DOIS casos de terceiro. */
-    expect(c).toMatch(
-      /persona \|\| data\.alvoId !== eu \? Promise\.resolve\(null\) : contarSeguidores\(sb, eu\)/,
-    );
-    expect(c).toContain("meusSeguidores: seguidores,");
-    expect(c).not.toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
-    expect(c).toMatch(/euSigo: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
-    expect(corpoDe("buscarPerfis")).toContain("meusSeguidores: null");
+    /* Conta para QUALQUER perfil, não só o próprio — é isso que mudou. */
+    expect(c).toContain("contarSeguidores(sb, data.alvoId)");
+    expect(c).toContain("contarSeguindo(sb, data.alvoId)");
+    /* ⚠️ E não pode voltar a depender de quem olha: um `data.alvoId === eu`
+       em volta da contagem é o defeito antigo de volta. */
+    expect(c).not.toMatch(/data\.alvoId !== eu \? Promise\.resolve\(null\) : contarSeguidores/);
+
+    /* ⚠️ A BUSCA CONTINUA SEM CONTAR, de propósito: são até 20 perfis por
+       consulta, e contar os dois lados de cada um seriam 40 idas ao banco para
+       desenhar uma lista que ninguém lê por número. `null` ali quer dizer "não
+       contei", e a tela sabe distinguir isso de zero. */
+    const b = corpoDe("buscarPerfis").replace(/\s+/g, " ");
+    expect(b).toContain("seguidores: null");
+    expect(b).toContain("seguindo: null");
   });
 
   test("todas as funções exigem sessão", () => {

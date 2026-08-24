@@ -238,8 +238,19 @@ export type PerfilNaTela = {
    * é uma visitante inventada e não silenciou ninguém.
    */
   silenciado: boolean;
-  /** ⚠️ Só a DONA vê. Não existe contador público de seguidores — ver a régua. */
-  meusSeguidores: number | null;
+  /**
+   * Quantas pessoas a acompanham. **Público**, para qualquer perfil visível.
+   *
+   * ⚠️ **O NOME MUDOU DE `meusSeguidores` PARA `seguidores` DE PROPÓSITO.** O
+   * campo era só da dona e agora é de todo mundo; renomear foi a única forma de
+   * obrigar cada leitor a ser relido, em vez de um deles continuar tratando o
+   * número como privado e escondendo o que agora deve aparecer.
+   *
+   * `null` só quando o perfil não é visível para quem pergunta.
+   */
+  seguidores: number | null;
+  /** Quantas pessoas ela acompanha. Mesma régua de `seguidores`. */
+  seguindo: number | null;
   /**
    * "28 semanas", ou `null` — a régua inteira mora em `selo-do-perfil.ts`.
    *
@@ -1230,13 +1241,17 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
        colunas escrita à mão — e sem o recuo para banco sem as colunas do selo,
        que é justamente o que deixaria ESTA tela (a que liga as chaves) sem
        perfil nenhum. Uma leitura só, um recuo só. */
-    const [meus, { count: seguidores }, { data: pendentes }] = await Promise.all([
+    const [meus, { count: seguidores }, seguindoConta, { data: pendentes }] = await Promise.all([
       perfisPorId(sb, [eu]),
       sb
         .from("rede_seguidores")
         .select("id", { count: "exact", head: true })
         .eq("seguido_id", eu)
         .eq("estado", "ativo"),
+      /* ⚠️ Na MESMA rodada, não em série: a tela dela mostra os dois números
+         lado a lado, e uma espera atrás da outra dobraria a abertura do perfil
+         para nada. */
+      contarSeguindo(sb, eu),
       sb
         .from("rede_seguidores")
         .select("seguidor_id, criado_em")
@@ -1270,7 +1285,8 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         codigoDaVitrine: vitrine.codigo,
         meuVinculo: null,
         souEu: true,
-        meusSeguidores: seguidores ?? 0,
+        seguidores: seguidores ?? 0,
+        seguindo: seguindoConta ?? 0,
         /* A tela dela precisa do selo (para mostrar como ficou) E das chaves
            (para os interruptores nascerem no estado certo). */
         seloSemana: selo.semana,
@@ -1578,7 +1594,7 @@ export const verPerfil = createServerFn({ method: "POST" })
        ⚠️ A pílula do código só faz sentido no perfil de OUTRA pessoa: no meu,
        ela ofereceria que eu me indicasse. E `ref_code` é fixado UMA VEZ, então
        a tela precisa saber se eu já tenho ANTES de oferecer o botão. */
-    const [selo, bebe, codigo, jaTenhoCodigo, seguidores] = await Promise.all([
+    const [selo, bebe, codigo, jaTenhoCodigo, seguidores, seguindo] = await Promise.all([
       seloDe(a),
       /* ⚠️ `souEu` REAL, e não o forjado: sob a prévia ela é uma visitante, e a
          aba tem de mostrar o que a visitante veria. */
@@ -1587,7 +1603,11 @@ export const verPerfil = createServerFn({ method: "POST" })
       tenhoRefCode(sb, eu),
       /* ⚠️ Era um `await` DENTRO do objeto literal, o que é uma quinta espera
          escondida no meio da montagem — e a mais fácil de não ver. */
-      persona || data.alvoId !== eu ? Promise.resolve(null) : contarSeguidores(sb, eu),
+      /* ⚠️ AGORA CONTA PARA QUALQUER PERFIL, não só o próprio. Antes o número
+         existia e era descartado para terceiros; a tela mostrava "0 seguidores"
+         sobre uma lista que abria com doze pessoas. */
+      contarSeguidores(sb, data.alvoId),
+      contarSeguindo(sb, data.alvoId),
     ]);
 
     const perfil: PerfilNaTela = {
@@ -1608,13 +1628,10 @@ export const verPerfil = createServerFn({ method: "POST" })
         : (((vinculo as any)?.estado as "ativo" | "pendente") ?? null),
       souEu: persona ? false : data.alvoId === eu,
       silenciado: persona ? false : ctx.silenciados.has(data.alvoId),
-      /* ⚠️ `null` para terceiros — não existe contador público de seguidores.
-         Um placar de audiência num app de gestação de alto risco mede
-         popularidade num momento em que ela já está sendo medida clinicamente. */
-      /* ⚠️ Era `0` CRAVADO, e a tela dizia "0 seguidores" logo acima de uma
-         lista que abre com doze pessoas. O número existe em `meuPerfilSocial`
-         desde sempre e nunca chegava aqui. */
-      meusSeguidores: seguidores,
+      /* ⚠️ Público agora, por decisão do dono — ver `NUMEROS_PUBLICOS`, que
+         guarda o argumento contrário para quem reabrir o assunto. */
+      seguidores,
+      seguindo,
       /* ⚠️ Os selos passam pela MESMA régua na prévia e na tela real. Eles não
          dependem de quem olha — dependem das chaves —, e é justamente por isso
          que precisam estar aqui: era o campo que uma prévia feita só sobre
@@ -3061,7 +3078,12 @@ export const buscarPerfis = createServerFn({ method: "POST" })
           publico: true,
           meuVinculo: (ctx.sigo.has(p.id) ? "ativo" : null) as "ativo" | null,
           souEu: false,
-          meusSeguidores: null,
+          /* ⚠️ A BUSCA NÃO CONTA, e isto não é esquecimento: são até 20 perfis
+             por consulta, e contar os dois lados de cada um seriam 40 idas ao
+             banco para desenhar uma lista que ninguém lê por número. O contador
+             aparece ao ABRIR o perfil. */
+          seguidores: null,
+          seguindo: null,
           oficial: ehContaOficial(p as any),
           premium: comSelo.has(p.id),
         })),

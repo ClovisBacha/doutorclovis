@@ -250,9 +250,9 @@ export function ConfiguracoesDoPerfil({
                 popularidade num momento em que ela já está sendo medida
                 clinicamente. */}
             <p className="text-xs text-muted-foreground">
-              {perfil.meusSeguidores === 1
+              {perfil.seguidores === 1
                 ? "1 pessoa te acompanha"
-                : `${perfil.meusSeguidores ?? 0} pessoas te acompanham`}
+                : `${perfil.seguidores ?? 0} pessoas te acompanham`}
             </p>
           </div>
         </div>

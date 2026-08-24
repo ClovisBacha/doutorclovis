@@ -335,7 +335,8 @@ function Bancada() {
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
     silenciado: false,
-    meusSeguidores: meu ? 137 : null,
+    seguidores: meu ? 137 : 412,
+    seguindo: meu ? 208 : 190,
     euSigo: meu ? 64 : null,
     /* ⚠️ Os dois selos são independentes: `?selo=0` desliga os dois, `?selo=1`
        liga os dois, e `?selo=2` liga SÓ o do bebê — que é o caso que prova que
@@ -689,7 +690,8 @@ function Bancada() {
             id: "eu",
             nome: "Marina Costa",
             souEu: false,
-            meusSeguidores: null,
+            seguidores: null,
+            seguindo: null,
             meuVinculo: persona === "estranha" ? null : "ativo",
           }}
           posts={persona === "estranha" ? POSTS.slice(0, 2) : POSTS.slice(0, 5)}
