@@ -40,6 +40,7 @@ export function Comentarios({
   const [recado, setRecado] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [apagando, setApagando] = useState<string | null>(null);
+  const [indisponivel, setIndisponivel] = useState(false);
   const [denunciando, setDenunciando] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
@@ -53,6 +54,13 @@ export function Comentarios({
         setLista(r.comentarios);
         setAbertos(r.abertos);
         setSouADona(r.souADona);
+        setIndisponivel(false);
+      } else {
+        /* ⚠️ **"NÃO CARREGOU" NÃO PODE TER A CARA DE "NÃO HÁ COMENTÁRIOS".**
+           São a mesma imagem e conclusões opostas — e enquanto o SQL não roda,
+           é este o estado de todo post. Sem a distinção, a paciente comentaria
+           no vazio achando que o dela sumiu. */
+        setIndisponivel(true);
       }
     } catch {
       /* A lista fica com o que já tinha. */
@@ -258,7 +266,11 @@ export function Comentarios({
         </div>
       )}
 
-      {!abertos ? (
+      {indisponivel ? (
+        <p className="mt-3 text-[12px] text-muted-foreground">
+          Não consegui carregar os comentários agora.
+        </p>
+      ) : !abertos ? (
         <p className="mt-3 text-[12px] text-muted-foreground">
           Os comentários deste post estão fechados.
         </p>

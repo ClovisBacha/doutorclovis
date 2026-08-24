@@ -49,12 +49,36 @@ async function postQueEuVejo(sb: any, postId: string, eu: string) {
   const { podeVerPost } = await import("./rede-social");
   const ctx = await contextoDe(sb, eu);
 
-  const { data, error } = await sb
+  /**
+   * ⚠️ **RECUO PARA BANCO SEM `comentarios_abertos`.**
+   *
+   * A coluna nasce num `APLICAR_` que o dono roda à mão, e o deploy chega
+   * SEMPRE antes. Sem este recuo o select falha com `42703`, `postQueEuVejo`
+   * devolve `null` e a tela responde "indisponivel" — a mesma imagem de um post
+   * apagado, sobre um post que está lá.
+   *
+   * Ausente vale ABERTO, que é o padrão da coluna: o pior caso é ela poder
+   * comentar num post que a dona teria fechado se o banco soubesse guardar essa
+   * decisão — e a dona pode apagar. O inverso (tudo fechado) desligaria o
+   * recurso inteiro sem ninguém entender por quê.
+   */
+  const cheia = await sb
     .from("rede_posts")
     .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em")
     .eq("id", postId)
     .maybeSingle();
-  if (error || !data || data.arquivado_em) return null;
+  let data = cheia.data;
+  if (cheia.error) {
+    console.warn("[rede] sem comentarios_abertos — rode APLICAR_CONVERSA_E_COMENTARIOS.sql");
+    const velho = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade, arquivado_em")
+      .eq("id", postId)
+      .maybeSingle();
+    if (velho.error) return null;
+    data = velho.data ? { ...velho.data, comentarios_abertos: true } : null;
+  }
+  if (!data || data.arquivado_em) return null;
 
   const { data: autor, error: erroAutor } = await sb
     .from("patient_profiles")
