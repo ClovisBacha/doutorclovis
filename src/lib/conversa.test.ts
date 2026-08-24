@@ -8,6 +8,7 @@
  */
 
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
 import {
   MENSAGENS_ANTES_DE_ACEITAR,
   minhaColunaDeLeitura,
@@ -172,5 +173,60 @@ describe("a prévia da lista", () => {
   test("vazia não vira reticências soltas", () => {
     expect(previaDaMensagem(null, false)).toBe("");
     expect(previaDaMensagem("   ", false)).toBe("");
+  });
+});
+
+describe("⚠️ quem avisa, e quem NÃO avisa", () => {
+  const FONTE_MSG = readFileSync("src/lib/conversa.functions.ts", "utf8");
+  const FONTE_COM = readFileSync("src/lib/comentarios.functions.ts", "utf8");
+
+  test("⚠️ a MENSAGEM manda push — sem isso a caixa é um canal morto", () => {
+    /* Foi um defeito real: a mensagem direta foi construída inteira e não
+       avisava ninguém. A pessoa só descobria se por acaso abrisse a caixa. */
+    expect(FONTE_MSG).toContain("sendPushToUser");
+  });
+
+  test("⚠️ mas o PEDIDO não manda — só a conversa ACEITA", () => {
+    /* O ponto delicado: uma desconhecida poderia acordar a paciente às três da
+       manhã com uma mensagem que ela nunca pediu. Sem esta distinção, a trava
+       de uma-mensagem viraria uma trava de um-push, que não é a mesma coisa. */
+    const trecho = FONTE_MSG.slice(FONTE_MSG.indexOf("sendPushToUser") - 900);
+    expect(trecho).toContain("if (aceitaAgora)");
+  });
+
+  test("⚠️ o TEXTO da mensagem não vai na notificação", () => {
+    /* Ela aparece na tela bloqueada, e uma conversa entre duas gestantes é o
+       conteúdo mais íntimo desta aba — quem estiver do lado leria. */
+    /* ⚠️ ANCORA NA CHAMADA, e não na primeira ocorrência do nome — a primeira
+       é o `import`, e a fatia a partir dela media o destructuring em vez do
+       corpo do aviso. A asserção passou a olhar `await sendPushToUser(`. */
+    const i = FONTE_MSG.indexOf("await sendPushToUser(");
+    expect(i).toBeGreaterThan(-1);
+    const chamada = FONTE_MSG.slice(i, i + 320);
+    expect(chamada).toContain("te mandou uma mensagem");
+    expect(chamada).not.toContain("texto");
+  });
+
+  test("⚠️ o COMENTÁRIO avisa na caixa ♡ e NÃO manda push", () => {
+    /* O push é o mesmo canal do aviso de emergência: quem desliga por causa de
+       um comentário de madrugada desliga o resto junto. A régua do app diz que
+       push é para o que fica esperando resposta — comentário não fica. */
+    expect(FONTE_COM).toContain('especie: "comentou"');
+    expect(FONTE_COM).not.toContain("sendPushToUser");
+  });
+
+  test("⚠️ e o aviso do comentário vai DEPOIS do insert", () => {
+    /* Avisar de um comentário que não gravou é pior que não avisar. */
+    const c = FONTE_COM.replace(/\s+/g, " ");
+    const ondeInsere = c.indexOf('.from("rede_comentarios") .insert(');
+    const ondeAvisa = c.indexOf("registrarAtividade(sb");
+    expect(ondeInsere).toBeGreaterThan(-1);
+    expect(ondeAvisa).toBeGreaterThan(ondeInsere);
+  });
+
+  test("⚠️ o comentário reaproveita `registrarAtividade`, nunca escreve à mão", () => {
+    /* As duas armadilhas daquele helper (o `insert` em vez de `upsert`, e o
+       `23505` que é sucesso repetido) já custaram a caixa ♡ inteira uma vez. */
+    expect(FONTE_COM).not.toContain('from("rede_atividade")');
   });
 });

@@ -221,6 +221,35 @@ export const comentar = createServerFn({ method: "POST" })
       .from("rede_comentarios")
       .insert({ post_id: data.postId, autor_id: eu, texto });
     if (error) return { ok: false as const, motivo: "banco" as const };
+
+    /**
+     * ⚠️ **O AVISO VAI PARA A CAIXA ♡, E NÃO POR PUSH — e a diferença é regra
+     * deste app.**
+     *
+     * O push aqui é o MESMO canal por onde chega o aviso de emergência: quem
+     * desliga as notificações por causa de um comentário de madrugada desliga
+     * o resto junto. A régua que já vale para as reações vale para o
+     * comentário: ele não pede ação dela, é afeto sobre uma foto.
+     *
+     * ⚠️ **E VAI DEPOIS DO `insert`, nunca antes.** Avisar de um comentário que
+     * não gravou é pior que não avisar.
+     *
+     * ⚠️ O `catch` engole de propósito: o comentário JÁ existe, e derrubar a
+     * resposta por causa do aviso diria "não deu" sobre algo que deu.
+     */
+    if (post.autor_id !== eu) {
+      try {
+        const { registrarAtividade } = await import("./rede-social.functions");
+        await registrarAtividade(sb, {
+          donoId: post.autor_id,
+          quemId: eu,
+          especie: "comentou",
+          postId: data.postId,
+        });
+      } catch {
+        /* O comentário está publicado; o aviso é o acessório. */
+      }
+    }
     return { ok: true as const };
   });
 

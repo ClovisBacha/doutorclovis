@@ -370,7 +370,16 @@ export type EspecieDeAviso =
   | "reagiu"
   | "aceitou"
   | "marcou"
-  | "reagiu_story";
+  | "reagiu_story"
+  /**
+   * Comentou numa publicação dela.
+   *
+   * ⚠️ O índice dedupa por `(dono, quem, espécie, post)`, então dez comentários
+   * da mesma pessoa no mesmo post viram UM aviso. É o certo: a caixa ♡ diz
+   * "Fulana comentou", e dez linhas iguais seriam a mesma informação repetida
+   * com cara de dez pessoas.
+   */
+  | "comentou";
 
 /**
  * ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.**
@@ -396,6 +405,12 @@ export function avisoMandaPush(e: EspecieDeAviso): boolean {
 
 export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
   switch (e) {
+    case "comentou":
+      /* ⚠️ O TEXTO NÃO TRAZ O COMENTÁRIO. Um trecho na caixa faria a frase de
+         quem escreveu aparecer numa tela que ela abre por reflexo — e é
+         justamente o comentário duro que ela não deve encontrar sem contexto,
+         fora da publicação onde ele está. Ela toca e vai ler onde ele vive. */
+      return `${quem} comentou na sua publicação`;
     case "seguiu":
       return `${quem} começou a te acompanhar`;
     case "pediu_para_seguir":

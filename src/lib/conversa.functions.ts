@@ -348,6 +348,45 @@ export const enviarMensagem = createServerFn({ method: "POST" })
       .eq("id", data.conversaId);
     if (erroToque) return { ok: false as const, motivo: "banco" as const };
 
+    /**
+     * ⚠️ **A MENSAGEM MANDA PUSH, e é a única coisa desta aba que manda além do
+     * pedido para seguir.**
+     *
+     * A regra do app é explícita e está em `avisoMandaPush`: *push é para o que
+     * fica esperando resposta*. Reação não manda, marcação não manda, comentário
+     * não manda — nenhum deles prende uma decisão dela. Uma mensagem direta
+     * prende: alguém escreveu e está esperando.
+     *
+     * ⚠️ **E O PEDIDO NÃO MANDA.** Este é o ponto delicado: uma desconhecida
+     * poderia acordar a paciente às três da manhã com uma mensagem que ela
+     * nunca pediu. O pedido aparece no emblema e espera; só a conversa ACEITA
+     * empurra. Sem essa distinção, a trava de uma-mensagem viraria uma trava de
+     * um-push, que não é a mesma coisa.
+     *
+     * ⚠️ **O TEXTO NÃO VAI NA NOTIFICAÇÃO.** Ela aparece na tela bloqueada, e
+     * uma conversa entre duas gestantes é o conteúdo mais íntimo desta aba —
+     * quem estiver do lado do celular leria. Só o nome de quem escreveu.
+     *
+     * ⚠️ E vai DEPOIS de tudo ter gravado. Avisar de uma mensagem que não
+     * gravou é o defeito que o presente do médico já teve.
+     */
+    if (aceitaAgora) {
+      try {
+        const [{ sendPushToUser }, { data: quem }] = await Promise.all([
+          import("./push.server"),
+          sb.from("patient_profiles").select("display_name").eq("id", eu).maybeSingle(),
+        ]);
+        const nome = ((quem?.display_name ?? "") as string).trim() || "Alguém";
+        await sendPushToUser(outro, {
+          title: nome,
+          body: "te mandou uma mensagem",
+          url: "/minha-conta?tab=Comunidade",
+        });
+      } catch {
+        /* A mensagem está gravada; o aviso é o acessório. */
+      }
+    }
+
     return { ok: true as const };
   });
 

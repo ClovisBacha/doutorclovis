@@ -4491,7 +4491,13 @@ export type AtividadeNaTela = {
  * por uma que não. É a mesma decisão de `try/catch` do bônus das cinco
  * estrelas.
  */
-async function registrarAtividade(
+/**
+ * ⚠️ **EXPORTADO PARA OS COMENTÁRIOS USAREM, e nunca copiado.** As duas
+ * armadilhas deste helper (o `insert` em vez de `upsert`, e o `23505` que é
+ * sucesso repetido) já custaram a caixa ♡ inteira uma vez; uma segunda
+ * gravação escrita à mão em `comentarios.functions.ts` reencontraria as duas.
+ */
+export async function registrarAtividade(
   sb: any,
   opts: { donoId: string; quemId: string; especie: EspecieDeAviso; postId?: string | null },
 ) {
