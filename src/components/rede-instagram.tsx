@@ -74,6 +74,8 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
+import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
+import type { ConversaNaTela } from "@/lib/conversa.functions";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
 /* Import ESTÁTICO: régua pura, sem servidor e sem DOM — ver `lugar-no-feed.ts`. */
 import {
@@ -2188,6 +2190,7 @@ export function TelaDePerfil({
   aoPerguntar,
   aoAbrirSOS,
   somenteLeitura = false,
+  aoMandarMensagem,
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
@@ -2243,6 +2246,14 @@ export function TelaDePerfil({
    * e sem volta.
    */
   somenteLeitura?: boolean;
+  /**
+   * Abrir conversa com esta pessoa.
+   *
+   * ⚠️ Opcional de propósito: sob o espelho e nas bancadas o botão não existe,
+   * e `somenteLeitura` já o desliga. Duas travas porque este é o único controle
+   * do perfil que CRIA uma linha nova no banco a partir do perfil de terceiro.
+   */
+  aoMandarMensagem?: (id: string) => void;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
@@ -2557,18 +2568,39 @@ export function TelaDePerfil({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={seguir}
-          disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
-          className={`press mt-3 w-full rounded-lg py-1.5 text-[14px] font-semibold ${
-            perfil.meuVinculo || perfil.souEu
-              ? "border border-border"
-              : "bg-primary text-primary-foreground"
-          }`}
-        >
-          {rotuloDoBotao}
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={seguir}
+            disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
+            className={`press flex-1 rounded-lg py-1.5 text-[14px] font-semibold ${
+              perfil.meuVinculo || perfil.souEu
+                ? "border border-border"
+                : "bg-primary text-primary-foreground"
+            }`}
+          >
+            {rotuloDoBotao}
+          </button>
+
+          {/* ⚠️ **"MENSAGEM" SÓ APARECE ONDE A CONVERSA PODE EXISTIR.**
+              Nunca no próprio perfil, nunca sob o espelho (onde a tela finge
+              ser a visão de uma estranha e todo controle é inerte), e nunca em
+              perfil fora de alcance — ali o servidor recusaria, e um botão que
+              promete e devolve erro é pior que a ausência dele.
+
+              ⚠️ E ele NÃO some quando ela não me segue: aí a conversa nasce
+              como PEDIDO, que é o desenho. Escondê-lo faria a caixa de pedidos
+              existir sem nenhuma porta que a alimentasse. */}
+          {!perfil.souEu && !somenteLeitura && aoMandarMensagem && (
+            <button
+              type="button"
+              onClick={() => aoMandarMensagem(perfil.id)}
+              className="press flex-1 rounded-lg border border-border py-1.5 text-[14px] font-semibold"
+            >
+              Mensagem
+            </button>
+          )}
+        </div>
 
         {/* ⚠️ A caixinha aparece a QUEM VISITA, nunca à dona — no perfil dela o
             que existe é a caixa cheia, que mora no hub. E ela nasce do campo
@@ -2707,6 +2739,8 @@ type Onde =
   | { t: "arquivados" }
   | { t: "busca" }
   | { t: "caixinha" }
+  | { t: "conversas" }
+  | { t: "conversa" }
   | { t: "espelho" };
 
 export function RedeNoApp({
@@ -2781,6 +2815,9 @@ export function RedeNoApp({
   /** A gaveta: o que ela tirou do ar. */
   const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
+  /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
+  const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
+  const [conversaAberta, setConversaAberta] = useState<ConversaNaTela | null>(null);
   /**
    * A escolha dela: `true` = só quem eu sigo.
    *
@@ -3544,6 +3581,8 @@ export function RedeNoApp({
         setAvisos(at.itens);
         setNaoVistas(at.novas);
       }
+      /* O emblema das mensagens, na mesma abertura. Ver `contarNaoLidas`. */
+      void contarNaoLidas();
       /* ⚠️ Guardado só quando o FEED veio: com `r.ok` falso o cache gravaria
          uma tela vazia e a próxima volta pintaria "nada por aqui" na hora,
          sobre uma conta que tem publicações. */
@@ -3887,6 +3926,64 @@ export function RedeNoApp({
       void carregarDesafio();
     }
   }
+
+  /**
+   * Quantas conversas pedem resposta.
+   *
+   * ⚠️ Vem JUNTO com o feed, na abertura — o emblema é o que faz alguém tocar
+   * no atalho. Buscando só ao abrir a caixa, o número nasceria sempre zerado e
+   * ninguém saberia que tem mensagem. É a mesma razão pela qual a atividade já
+   * vem junto.
+   */
+  /**
+   * Abre (ou cria) a conversa com alguém, a partir do perfil.
+   *
+   * ⚠️ **QUEM DECIDE SE PODE É O SERVIDOR**, e a tela só conta o desfecho. Uma
+   * régua aqui divergiria de `podeIniciarConversa` no primeiro ajuste — e a
+   * divergência apareceria como um botão que abre uma tela vazia, ou como um
+   * botão escondido de quem tinha direito a ele.
+   */
+  async function abrirConversaCom(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/conversa.functions");
+      const r = await mod.abrirConversa({ data: { accessToken: t, alvoId } });
+      if (!r.ok) {
+        /* ⚠️ Bloqueio e fora-de-alcance dizem a MESMA coisa na tela. Separar os
+           dois contaria que o bloqueio existe — a mesma razão pela qual o
+           servidor confere o bloqueio antes do alcance. */
+        /* ⚠️ `sonner` entra por import DINÂMICO, como em todo este arquivo:
+           estático ele toca `document` ao carregar e derruba o `bun test`
+           inteiro — a lição de `assinatura.ts`. */
+        const { toast } = await import("sonner");
+        toast.error("Não é possível enviar mensagem para esta pessoa.");
+        return;
+      }
+      const { minhasConversas } = await import("@/lib/conversa.functions");
+      const lista = await minhasConversas({ data: { accessToken: t } });
+      const c = lista.ok ? lista.conversas.find((x) => x.id === r.id) : null;
+      if (!c) return;
+      setConversaAberta(c);
+      setOnde({ t: "conversa" });
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para abrir a conversa agora.");
+    }
+  }
+
+  const contarNaoLidas = useCallback(async () => {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { minhasConversas } = await import("@/lib/conversa.functions");
+      const r = await minhasConversas({ data: { accessToken: t } });
+      if (r.ok) setMsgsNaoLidas(r.naoLidas);
+    } catch {
+      /* Sem o número o atalho fica sem emblema, que é o estado de quem não tem
+         mensagem — nunca um erro na tela. */
+    }
+  }, []);
 
   async function carregarSugestoes(fase = mesmaFase) {
     /* ⚠️ A trava é de PRIMEIRA CARGA, e trocar o filtro precisa furá-la: sem
@@ -4660,6 +4757,17 @@ export function RedeNoApp({
         emblema: naoVistas,
         aoTocar: () => void abrirAtividade(),
       },
+      /* ⚠️ A CAIXA DE ENTRADA FICA AO LADO DA ATIVIDADE, e não no cabeçalho:
+         ele foi removido a pedido do dono ("cada aba não precisa ocupar esse
+         espaço que é precioso"), e as ações viraram estas bolinhas. Pôr um
+         ícone de mensagem no topo desfaria aquela decisão. */
+      {
+        id: "mensagens",
+        rotulo: "Mensagens",
+        icone: "balao",
+        emblema: msgsNaoLidas,
+        aoTocar: () => setOnde({ t: "conversas" }),
+      },
       { id: "publicar", rotulo: "Publicar", icone: "mais", aoTocar: () => setOnde({ t: "novo" }) },
       {
         id: "perfil",
@@ -4833,6 +4941,35 @@ export function RedeNoApp({
         trancado={previa.trancado}
         carregando={previa.carregando}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+      />
+    );
+  }
+
+  if (onde.t === "conversa" && conversaAberta) {
+    return (
+      <Conversa
+        conversa={conversaAberta}
+        aoVoltar={() => {
+          setConversaAberta(null);
+          setOnde({ t: "conversas" });
+          /* ⚠️ Recarrega o emblema ao SAIR da conversa, não ao entrar: quem
+             acabou de ler não pode voltar para a lista com o ponto ainda
+             aceso. */
+          void contarNaoLidas();
+        }}
+        aoAbrirPerfil={abrirPerfil}
+      />
+    );
+  }
+
+  if (onde.t === "conversas") {
+    return (
+      <CaixaDeEntrada
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrir={(c) => {
+          setConversaAberta(c);
+          setOnde({ t: "conversa" });
+        }}
       />
     );
   }
@@ -5011,6 +5148,7 @@ export function RedeNoApp({
         posts={doPerfil}
         aoChegarNoFim={maisDoPerfil}
         temMais={!!proximoDoPerfil}
+        aoMandarMensagem={(id) => void abrirConversaCom(id)}
         aoVoltar={() => setOnde({ t: "feed" })}
         aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
         aoAbrirPost={abrirPost}

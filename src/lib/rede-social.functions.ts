@@ -379,7 +379,16 @@ type Contexto = {
   degradado: boolean;
 };
 
-async function contextoDe(sb: any, eu: string): Promise<Contexto> {
+/**
+ * ⚠️ **EXPORTADO PARA A CONVERSA REAPROVEITAR, e nunca copiar.**
+ *
+ * `conjuntoDeBloqueio` falha FECHADO — degradado, ele responde "bloqueado" para
+ * todo mundo. Uma segunda montagem em `conversa.functions.ts` teria de repetir
+ * essa decisão, e a cópia que divergisse deixaria a mensagem direta falhando
+ * ABERTO: o único lugar do app onde isso significaria uma bloqueada escrevendo
+ * na caixa de entrada de quem a bloqueou.
+ */
+export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
   /* ⚠️ **AS CINCO NA MESMA LEVA.** O grafo de amizade era buscado DEPOIS destas
      quatro, em série — e não depende de nenhuma delas. Como `contextoDe` abre
      toda leitura da rede (feed, perfil, post, salvos, sugestões, atividade), a

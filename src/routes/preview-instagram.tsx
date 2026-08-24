@@ -48,6 +48,7 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useEffect, useMemo, useState } from "react";
+import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
@@ -98,6 +99,8 @@ export const Route = createFileRoute("/preview-instagram")({
        revalidação chega `null`, e `!!null` seria `false` mesmo com o parâmetro
        na URL. Ver o comentário do topo. */
     filhos: q.filhos == null ? "" : String(q.filhos),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    conversa: q.conversa == null ? "" : String(q.conversa),
     /* ⚠️ `== null` e não `=== undefined`: na revalidação chega `null`, e
        `Number(null)` é 0. Mesma armadilha de `preview-saude`. */
     sugeridas: q.sugeridas == null ? 1 : Number(q.sugeridas),
@@ -330,6 +333,7 @@ function Bancada() {
     perguntas,
     remover,
     filhos,
+    conversa,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -742,6 +746,119 @@ function Bancada() {
   }
 
   const filhosDaBancada = FILHOS_DE_MENTIRA[filhos] ?? undefined;
+
+  /**
+   * ⚠️ A CAIXA DE ENTRADA E A CONVERSA SÃO IMPOSSÍVEIS DE OLHAR SEM ISTO.
+   * As duas falam com o servidor e exigem sessão E uma segunda conta que tenha
+   * escrito para você — coisa que uma conta de teste não produz. Os três
+   * arranjos abaixo são os que importam: conversa normal, pedido recebido
+   * (a caixa separada) e pedido enviado (o campo travado).
+   */
+  const CONVERSAS_DE_MENTIRA = [
+    {
+      id: "c1",
+      comId: "u1",
+      comNome: "Marina Costa",
+      comAvatar: null,
+      previa: "vou levar o exame na consulta",
+      ultimaEm: "2026-08-24T10:00:00Z",
+      naoLida: true,
+      pedido: false,
+      euIniciei: false,
+    },
+    {
+      id: "c2",
+      comId: "u2",
+      comNome: "Carol",
+      comAvatar: null,
+      previa: "oi! vi seu post 💛",
+      ultimaEm: "2026-08-23T18:00:00Z",
+      naoLida: true,
+      pedido: true,
+      euIniciei: false,
+    },
+    {
+      id: "c3",
+      comId: "u3",
+      comNome: "Juliana",
+      comAvatar: null,
+      previa: "oi, tudo bem?",
+      ultimaEm: "2026-08-22T09:00:00Z",
+      naoLida: false,
+      pedido: true,
+      euIniciei: true,
+    },
+  ];
+
+  if (tela === "conversas") {
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <CaixaDeEntrada
+          aoVoltar={() => history.back()}
+          aoAbrir={() => {}}
+          bancada={CONVERSAS_DE_MENTIRA}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "conversa") {
+    /* `?conversa=pedido` mostra o campo travado de quem já mandou a sua. */
+    const qual = conversa === "pedido" ? CONVERSAS_DE_MENTIRA[2] : CONVERSAS_DE_MENTIRA[0];
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <Conversa
+          conversa={qual}
+          aoVoltar={() => history.back()}
+          bancada={{
+            pedido: qual.pedido,
+            euIniciei: qual.euIniciei,
+            mensagens:
+              conversa === "pedido"
+                ? [
+                    {
+                      id: "m1",
+                      souEu: true,
+                      texto: "oi, tudo bem?",
+                      criadaEm: "2026-08-22T09:00:00Z",
+                      apagada: false,
+                    },
+                  ]
+                : [
+                    {
+                      id: "m1",
+                      souEu: false,
+                      texto: "oi! como você está?",
+                      criadaEm: "2026-08-24T09:00:00Z",
+                      apagada: false,
+                    },
+                    {
+                      id: "m2",
+                      souEu: true,
+                      texto: "melhor hoje, obrigada 💛",
+                      criadaEm: "2026-08-24T09:30:00Z",
+                      apagada: false,
+                    },
+                    {
+                      id: "m3",
+                      souEu: true,
+                      texto: "",
+                      criadaEm: "2026-08-24T09:40:00Z",
+                      apagada: true,
+                    },
+                    {
+                      id: "m4",
+                      souEu: false,
+                      texto: "vou levar o exame na consulta",
+                      criadaEm: "2026-08-24T10:00:00Z",
+                      apagada: false,
+                    },
+                  ],
+          }}
+        />
+      </div>
+    );
+  }
 
   if (tela === "novo") {
     /* ⚠️ **Segura a MONTAGEM, e não a prop.** Trocar `momentoInicial` depois de
