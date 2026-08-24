@@ -27,7 +27,8 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
-import { type Filho, linhaDoPerfil } from "@/lib/filhos";
+import { type Filho, diasEntre, linhaDoPerfil, mesesEntre } from "@/lib/filhos";
+import { marcosSugeridos, mesversarioDeHoje, textoDoMarco } from "@/lib/marcos";
 import { MAXIMO_DE_FILHOS } from "@/lib/filhos.functions";
 import {
   ABAS_DO_PERFIL,
@@ -1155,6 +1156,19 @@ export const PostInstagram = memo(function PostInstagram({
         <div className="mx-4 mt-2 rounded-xl bg-muted/50 px-3 py-2">
           <p className="text-[13px] font-medium leading-snug">
             📚 Fiz a aula de hoje — sobre <span className="font-semibold">{post.aula.tema}</span>
+          </p>
+        </div>
+      )}
+
+      {/* ⚠️ O MARCO É CALCULADO NA PINTURA, a partir dos DIAS que o banco
+          guarda — nunca de um texto gravado. Um "3 meses" salvo continuaria
+          dizendo "3 meses" daqui a um ano, e o álbum inteiro passaria a mentir
+          a idade. Aqui o post de um ano atrás segue contando a idade que o bebê
+          tinha naquele dia. */}
+      {post.marco && textoDoMarco(post.marco.tipo, post.marco.dias) && (
+        <div className="mx-4 mt-2 rounded-xl bg-primary/10 px-3 py-2">
+          <p className="text-[13px] font-semibold leading-snug">
+            {textoDoMarco(post.marco.tipo, post.marco.dias)}
           </p>
         </div>
       )}
@@ -4163,6 +4177,8 @@ export function RedeNoApp({
     visibilidade: Visibilidade;
     enquete: string[];
     aula: AulaNoPost | null;
+    /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
+    marco?: { tipo: string; dias: number | null } | null;
   }): Promise<boolean> {
     try {
       const t = await token();
@@ -4181,6 +4197,7 @@ export function RedeNoApp({
           visibilidade: p.visibilidade,
           enquete: p.enquete,
           aula: p.aula,
+          marco: p.marco ?? null,
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
         },
@@ -6501,6 +6518,8 @@ export function NovoPost({
     visibilidade: Visibilidade;
     enquete: string[];
     aula: AulaNoPost | null;
+    /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
+    marco?: { tipo: string; dias: number | null } | null;
     /** Os ids de quem estava junto. O servidor confere cada um. */
     marcadas: string[];
     /** O post antigo que vira a primeira foto, ou `null`. */
@@ -6595,6 +6614,48 @@ export function NovoPost({
      a enquete e ainda não escreveu — e não uma enquete inválida na tela. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
   const [comAula, setComAula] = useState(false);
+
+  /**
+   * O BEBÊ MAIS NOVO QUE JÁ NASCEU — é dele que o marco fala.
+   *
+   * ⚠️ **O MAIS NOVO, e não o primeiro da lista.** Uma mãe de dois publica o
+   * mesversário do caçula; oferecer "3 meses" quando o bebê de 3 meses é o
+   * segundo filho, e a lista devolve o mais velho, poria a idade errada num
+   * post que a família inteira vai ver.
+   */
+  const [filhosDela, setFilhosDela] = useState<Filho[]>([]);
+  const [marco, setMarco] = useState<string | null>(null);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const t = (await supabase.auth.getSession()).data.session?.access_token;
+        if (!t) return;
+        const { meusFilhos } = await import("@/lib/filhos.functions");
+        const r = await meusFilhos({ data: { accessToken: t } });
+        if (r.ok) setFilhosDela(r.filhos);
+      } catch {
+        /* Sem filhos carregados o compositor fica como sempre foi: a tira de
+           marcos não aparece, e publicar continua funcionando. */
+      }
+    })();
+  }, []);
+
+  const hojeStr = hojeEmSaoPaulo();
+  const caculaNascido = (() => {
+    const nascidos = filhosDela.filter((f) => f.nascidoEm);
+    if (nascidos.length === 0) return null;
+    return nascidos.reduce((a, b) => ((a.nascidoEm ?? "") > (b.nascidoEm ?? "") ? a : b));
+  })();
+  const bebeNascido = !!caculaNascido;
+  const diasDoBebe = caculaNascido?.nascidoEm ? diasEntre(caculaNascido.nascidoEm, hojeStr) : null;
+  const mesesDoBebe = caculaNascido?.nascidoEm
+    ? (mesesEntre(caculaNascido.nascidoEm, hojeStr) ?? 0)
+    : 0;
+  const mesversarioHoje = caculaNascido?.nascidoEm
+    ? mesversarioDeHoje(caculaNascido.nascidoEm, hojeStr)
+    : null;
   /**
    * A miniatura da PRIMEIRA foto.
    *
@@ -6677,6 +6738,9 @@ export function NovoPost({
       visibilidade: vis,
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
+      /* ⚠️ Os DIAS vão junto, e é isso que faz o post não envelhecer: a tela
+         recalcula "3 meses" a cada pintura, em vez de repetir um texto salvo. */
+      marco: marco && bebeNascido ? { tipo: marco, dias: diasDoBebe } : null,
       marcadas,
       comparacaoCom: entao,
     });
@@ -7065,6 +7129,38 @@ export function NovoPost({
                   : "As opções precisam ser diferentes entre si."}
               </p>
             )}
+          </div>
+        )}
+
+        {/* ─── O MARCO DO BEBÊ ──────────────────────────────────────────
+            ⚠️ **SÓ APARECE PARA QUEM TEM BEBÊ NASCIDO.** Oferecer "primeiro
+            sorriso" a uma gestante é oferecer um botão que não tem como ser
+            usado — e, pior, num app onde nem toda gestação termina bem.
+
+            ⚠️ E A LISTA NÃO ESCONDE NADA: `marcosSugeridos` REORDENA pela idade
+            e mantém o catálogo inteiro. Um bebê que anda aos vinte meses tem de
+            achar "primeiros passos" na tela. */}
+        {bebeNascido && (
+          <div className="mt-3">
+            <p className="text-[13px] font-medium">Um marco de hoje?</p>
+            <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {marcosSugeridos(mesesDoBebe).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMarco((v) => (v === m.id ? null : m.id))}
+                  aria-pressed={marco === m.id}
+                  className={`press shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${
+                    marco === m.id ? "border-primary bg-primary/10 text-primary" : "border-border"
+                  }`}
+                >
+                  {m.emoji}{" "}
+                  {m.id === "mesversario" && mesversarioHoje
+                    ? `${mesversarioHoje} ${mesversarioHoje === 1 ? "mês" : "meses"}`
+                    : m.titulo}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

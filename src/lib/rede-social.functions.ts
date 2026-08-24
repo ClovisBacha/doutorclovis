@@ -24,6 +24,7 @@ import { trechoParaLike } from "@/lib/like-seguro";
 import { ehContaOficial, fileiraComOficial } from "@/lib/conta-oficial";
 import { z } from "zod";
 import * as filhosRegua from "./filhos";
+import { MARCO_POR_ID } from "./marcos";
 import {
   aoSeguir,
   avisoMandaPush,
@@ -183,6 +184,14 @@ export type PostNaTela = {
   } | null;
   /** A aula que ela anexou — só dia e título. */
   aula: AulaNoPost | null;
+  /**
+   * O marco do bebê, quando o post é um.
+   *
+   * ⚠️ `dias` e não texto: "3 meses" gravado continuaria dizendo "3 meses"
+   * daqui a um ano. A tela recalcula a partir dos dias, e o post velho segue
+   * contando a idade daquele dia.
+   */
+  marco: { tipo: string; dias: number | null } | null;
   /**
    * Guardei este post?
    *
@@ -681,7 +690,8 @@ const AUTORES_NO_FEED = 200;
  */
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
-  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path";
+  "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
+  "marco_tipo, marco_dias";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -720,6 +730,8 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     editado_em: null,
     /* Sem a coluna, a grade cai na foto cheia — que é o que ela sempre fez. */
     miniatura_path: null,
+    marco_tipo: null,
+    marco_dias: null,
   }));
 }
 
@@ -1241,6 +1253,7 @@ async function montarPosts(
             }
           : null,
         aula: aulaValida(p.aula) ? p.aula : null,
+        marco: p.marco_tipo ? { tipo: String(p.marco_tipo), dias: p.marco_dias ?? null } : null,
         pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
       };
     }),
@@ -1926,6 +1939,19 @@ export const publicarPost = createServerFn({ method: "POST" })
           .nullable()
           .optional(),
         /**
+         * O marco do bebê.
+         *
+         * ⚠️ **O `tipo` É CONFERIDO CONTRA O CATÁLOGO no handler, não aqui.**
+         * Um `z.string()` aceitaria qualquer texto, e o marco vira rótulo
+         * visível no feed — campo livre ali é texto de terceiro aparecendo com
+         * cara de recurso do app. `dias` tem teto de 40 anos: é freio contra
+         * corpo forjado, não régua clínica.
+         */
+        marco: z
+          .object({ tipo: z.string().max(40), dias: z.number().int().min(0).max(15000).nullable() })
+          .nullable()
+          .optional(),
+        /**
          * Quem estava junto.
          *
          * ⚠️ **O teto do zod NÃO é a régua** — é só um freio contra um corpo
@@ -2079,6 +2105,11 @@ export const publicarPost = createServerFn({ method: "POST" })
            cliente não pode virar linha no banco que `aulaValida` depois
            recusaria — o post ficaria com uma coluna que ninguém desenha. */
         aula: data.aula && aulaValida(data.aula) ? data.aula : null,
+        /* ⚠️ Contra o CATÁLOGO: um tipo fora dele vira post sem marco, nunca um
+           rótulo com o texto que o cliente mandou. */
+        ...(data.marco && MARCO_POR_ID[data.marco.tipo]
+          ? { marco_tipo: data.marco.tipo, marco_dias: data.marco.dias }
+          : {}),
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a
            foto antiga na frente do carrossel, e então DESCARTADO: a coluna

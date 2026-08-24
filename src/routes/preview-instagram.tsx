@@ -233,6 +233,8 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* O post 2 (o carrossel de três) vira a comparação: é ele que prova os dois
      carimbos sobre as duas primeiras fotos. */
   comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
+  /* O post 3 é um mesversário: é ele que prova o rótulo do marco no cartão. */
+  marco: i === 3 ? { tipo: "mesversario", dias: 91 } : null,
   /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
   editadoEm: i === 0 ? atras(20) : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
