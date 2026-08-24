@@ -180,3 +180,67 @@ export function ordenarPessoas(
     })
     .slice(0, limite);
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * O FEED MISTURADO  (ago/2026)
+ *
+ * Pedido do dono: mostrar publicações de quem ela segue E de quem ela não
+ * segue, com uma configuração para voltar ao fechado.
+ *
+ * ⚠️ **ISTO REVERTE O ARRANJO DO "VOCÊ ESTÁ EM DIA", e o argumento antigo fica
+ * registrado porque ele não era estético.** A zona de sugestões só abria depois
+ * que o feed de quem ela segue acabava, e a razão era: interlaçar desconhecidas
+ * entre as pessoas que ela escolheu, num app de gestação de alto risco, faz a
+ * paciente ler um relato duro sem saber se veio de uma amiga ou de uma estranha.
+ *
+ * O que venceu é de produto, e é do dono: um feed que só mostra quem ela já
+ * segue não tem como crescer, e conta nova abre vazia.
+ *
+ * ⚠️ **MAS O RÓTULO NÃO SAIU** — e ele é a proteção que sobrevive à mistura.
+ * Cada publicação de fora continua marcada "Sugerido para você". Misturar sem
+ * avisar seria a única versão desta mudança que eu não faria.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/**
+ * Uma descoberta a cada quantas publicações de quem ela segue.
+ *
+ * Quatro é o que mantém a sensação de "meu feed com tempero" em vez de "feed de
+ * estranhos com algumas amigas". Um número menor inverte o dono da tela.
+ */
+export const CADENCIA_DA_DESCOBERTA = 4;
+
+/**
+ * Costura as descobertas dentro do feed de quem ela segue.
+ *
+ * ⚠️ **NUNCA NA PRIMEIRA POSIÇÃO.** Abrir o aplicativo e a primeira coisa ser
+ * uma desconhecida é o pior caso desta mudança: ela vem ver as amigas e recebe
+ * um estranho na cara. A primeira leva pertence a quem ela escolheu, sempre.
+ *
+ * ⚠️ **E AS SOBRAS VÃO PARA O FIM, nunca descartadas.** Quem segue duas pessoas
+ * tem duas publicações e vinte descobertas; jogar fora dezoito deixaria a tela
+ * quase vazia justamente para quem mais precisa descobrir gente.
+ */
+export function intercalarDescobertas<T>(
+  seguidos: readonly T[],
+  descobertas: readonly T[],
+  cadencia: number = CADENCIA_DA_DESCOBERTA,
+): T[] {
+  if (descobertas.length === 0) return [...seguidos];
+  if (seguidos.length === 0) return [...descobertas];
+  const passo = Math.max(1, Math.floor(cadencia));
+
+  const saida: T[] = [];
+  let fila = 0;
+  for (let i = 0; i < seguidos.length; i++) {
+    saida.push(seguidos[i]);
+    /* `i + 1` para contar publicações JÁ colocadas: com `i`, a primeira
+       descoberta entraria na posição 1 quando a cadência fosse 1. */
+    if ((i + 1) % passo === 0 && fila < descobertas.length) {
+      saida.push(descobertas[fila++]);
+    }
+  }
+  for (; fila < descobertas.length; fila++) saida.push(descobertas[fila]);
+  return saida;
+}

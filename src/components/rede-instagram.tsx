@@ -26,6 +26,7 @@
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { intercalarDescobertas } from "@/lib/sugestoes";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -1276,6 +1277,7 @@ export function CartaoDaSemana({
 
 export function TelaPrincipal({
   posts,
+  soSeguindo = false,
   stories = [],
   sugestoes = [],
   pessoas = [],
@@ -1307,6 +1309,8 @@ export function TelaPrincipal({
   aoDispensarEntao,
 }: {
   posts: PostNaTela[];
+  /** `true` = a paciente pediu para ver só quem ela segue. Ver `feed_so_seguindo`. */
+  soSeguindo?: boolean;
   stories?: Story[];
   /**
    * A ZONA DE SUGESTÕES — publicações de quem ela NÃO segue.
@@ -1386,6 +1390,33 @@ export function TelaPrincipal({
   /** Leva ao Caminho, onde a atividade acontece. */
   aoIrParaOJogo?: () => void;
 }) {
+  /**
+   * ⚠️ O CONJUNTO, e não `sugestoes.some(...)` dentro do laço: com 20 postagens
+   * e 10 descobertas isso seriam 200 comparações a cada pintura do feed, e o
+   * feed repinta a cada reação.
+   */
+  const idsSugeridos = useMemo(() => new Set(sugestoes.map((p) => p.id)), [sugestoes]);
+
+  /**
+   * O QUE VAI À TELA.
+   *
+   * ⚠️ No modo fechado a lista é a dela e nada mais — costurar descobertas ali
+   * seria ignorar a configuração que ela ligou.
+   */
+  const naTela = useMemo(
+    (): PostNaTela[] => (soSeguindo ? posts : intercalarDescobertas(posts, sugestoes)),
+    [soSeguindo, posts, sugestoes],
+  );
+
+  /**
+   * ⚠️ Sobrou descoberta para a zona do fim? SÓ no modo fechado.
+   *
+   * Com o feed misturado elas já foram costuradas lá em cima; repetir aqui
+   * mostraria o mesmo post duas vezes na mesma rolagem — e chave repetida
+   * derruba a lista inteira do React.
+   */
+  const sobrouSugestao = soSeguindo === false ? false : sugestoes.length > 0;
+
   const fim = useRef<HTMLDivElement>(null);
 
   /* ⚠️ A sentinela é um `IntersectionObserver`, e não um ouvinte de `scroll`:
@@ -1473,10 +1504,15 @@ export function TelaPrincipal({
           {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
         </>
       ) : (
-        posts.map((p) => (
+        naTela.map((p) => (
           <PostInstagram
             key={p.id}
             post={p}
+            /* ⚠️ O RÓTULO SOBREVIVEU À MISTURA, e ele é a proteção inteira.
+               Interlaçar desconhecidas sem avisar faria a paciente ler um
+               relato duro sem saber se veio de uma amiga ou de uma estranha —
+               é a única versão desta mudança que eu não faria. */
+            sugerido={idsSugeridos.has(p.id)}
             /* ⚠️ AS MESMAS REFERÊNCIAS PARA TODOS OS CARTÕES — nunca um fecho
                por post. É isto que faz o `memo` do cartão valer alguma coisa;
                com `(t) => aoReagir(p, t)` as props mudam a cada pintura e o
@@ -1514,7 +1550,7 @@ export function TelaPrincipal({
           esta cláusula a fileira INTEIRA sumia, levando junto o interruptor que
           a desligaria. Beco sem saída, exatamente o que a aba de assinatura já
           pagou uma vez. */}
-      {!temMais && (pessoas.length > 0 || sugestoes.length > 0 || mesmaFase) && (
+      {!temMais && (pessoas.length > 0 || sobrouSugestao || mesmaFase) && (
         <>
           {posts.length > 0 && <EmDia />}
 
@@ -1528,7 +1564,11 @@ export function TelaPrincipal({
             />
           )}
 
-          {sugestoes.length > 0 && (
+          {/* ⚠️ SÓ NO MODO FECHADO. Com o feed misturado, estas publicações já
+              foram costuradas lá em cima — repeti-las aqui mostraria o mesmo
+              post duas vezes na mesma rolagem, e chave repetida derruba a lista
+              inteira do React. */}
+          {sobrouSugestao && (
             <>
               <h2 className="px-0 pb-1 pt-4 text-[14px] font-semibold">Publicações sugeridas</h2>
               {sugestoes.map((p) => (
@@ -2717,6 +2757,14 @@ export function RedeNoApp({
   const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   /**
+   * A escolha dela: `true` = só quem eu sigo.
+   *
+   * ⚠️ **NASCE `false`, e o padrão é o aberto.** Uma rede social que abre vazia
+   * para quem acabou de chegar não dá a ninguém motivo para voltar — e conta
+   * nova não segue ninguém. Quem quiser o fechado liga nas configurações.
+   */
+  const [soSeguindo, setSoSeguindo] = useState(false);
+  /**
    * O código de indicação dela — o que faz o convite TRAZER alguém.
    *
    * ⚠️ Carregado UMA vez, e não por pintura do feed: `getReferral` cria o
@@ -3461,6 +3509,11 @@ export function RedeNoApp({
         setEuId(meu.perfil.id);
         setMeuAvatar(meu.perfil.avatarUrl ?? null);
         setSemanaDoCarimbo(meu.semanaDoCarimbo);
+        /* ⚠️ A preferência chega JUNTO com o feed, na mesma rodada. Buscá-la
+           depois faria a tela abrir misturada e, um instante depois, encolher
+           para o modo fechado — as publicações sumindo debaixo do dedo de quem
+           justamente pediu para não ver estranhas. */
+        setSoSeguindo(meu.perfil.feedSoSeguindo);
       }
       if (at.ok) {
         setAvisos(at.itens);
@@ -3744,12 +3797,23 @@ export function RedeNoApp({
 
   /* O feed acabou (não há página seguinte) → a zona de sugestões pode nascer.
      Também cobre a conta NOVA, em que o feed nasce vazio e `proximo` é `null`:
-     ali a fileira de pessoas é a única coisa útil na tela. */
+     ali a fileira de pessoas é a única coisa útil na tela.
+
+     ⚠️ **E NO MODO MISTURADO ELAS SÃO PEDIDAS JÁ NA ABERTURA** (`!soSeguindo`),
+     não ao chegar no fim. A costura precisa das descobertas em mãos desde a
+     primeira pintura; esperar o fim da rolagem faria o feed abrir puro e as
+     desconhecidas aparecerem de repente no meio do que ela já estava lendo,
+     empurrando o post para baixo do dedo. */
   useEffect(() => {
-    if (careMode || carregando || proximo) return;
+    if (careMode) return;
+    if (!soSeguindo) {
+      void carregarSugestoes();
+      return;
+    }
+    if (carregando || proximo) return;
     void carregarSugestoes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [careMode, carregando, proximo]);
+  }, [careMode, carregando, proximo, soSeguindo]);
 
   /**
    * A zona de sugestões.
@@ -4971,6 +5035,7 @@ export function RedeNoApp({
       />
       <TelaPrincipal
         posts={posts}
+        soSeguindo={soSeguindo}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}

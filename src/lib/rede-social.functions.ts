@@ -298,6 +298,14 @@ export type PerfilNaTela = {
    */
   aceitaPerguntas: boolean;
   /**
+   * `true` = ela pediu para ver só quem segue.
+   *
+   * ⚠️ Só chega no perfil DELA. O feed de uma paciente não é da conta de
+   * ninguém, e num perfil de terceiro este campo diria como a outra pessoa
+   * organiza a própria leitura — informação sem uso e sem dono.
+   */
+  feedSoSeguindo: boolean;
+  /**
    * Quantas pessoas EU acompanho — só no meu próprio perfil.
    *
    * ⚠️ Viaja com o perfil, e não como prop solta da tela: `seguindo` era uma
@@ -703,6 +711,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
+  "feed_so_seguindo, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
 /**
@@ -1333,6 +1342,8 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
         mostrarBebe: z.boolean().optional(),
         /* A caixinha. Opcional como as outras duas — o update é parcial. */
         aceitaPerguntas: z.boolean().optional(),
+        /* O feed misturado ou fechado. Opcional como as outras — update parcial. */
+        feedSoSeguindo: z.boolean().optional(),
         /* ⚠️ A VITRINE NA INTERNET ABERTA (`/p/<codigo>`) — chave PRÓPRIA, e
            nunca a mesma de `publico`. A tela do perfil público promete
            "qualquer pessoa NO APP"; a vitrine abre fora dele, sem conta. */
@@ -1388,6 +1399,7 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       ...(data.mostrarSemana !== undefined ? { mostrar_semana: data.mostrarSemana } : {}),
       ...(data.mostrarBebe !== undefined ? { mostrar_bebe: data.mostrarBebe } : {}),
       ...(data.aceitaPerguntas !== undefined ? { aceita_perguntas: data.aceitaPerguntas } : {}),
+      ...(data.feedSoSeguindo !== undefined ? { feed_so_seguindo: data.feedSoSeguindo } : {}),
       ...(data.vitrine !== undefined ? { vitrine_publica: data.vitrine } : {}),
     };
 
@@ -1653,6 +1665,7 @@ export const verPerfil = createServerFn({ method: "POST" })
          uma visitante vê, e escondê-la do espelho faria a prévia mentir sobre
          a única porta que estranhos têm para escrever para ela. */
       aceitaPerguntas: !!a.aceita_perguntas,
+      feedSoSeguindo: !!(a as any).feed_so_seguindo,
       euSigo: persona ? null : data.alvoId === eu ? await contarSeguindo(sb, eu) : null,
     };
 

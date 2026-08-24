@@ -193,6 +193,7 @@ export function ConfiguracoesDoPerfil({
     mostrarSemana?: boolean;
     mostrarBebe?: boolean;
     vitrine?: boolean;
+    feedSoSeguindo?: boolean;
   }) {
     setSalvando(true);
     try {
@@ -293,6 +294,45 @@ export function ConfiguracoesDoPerfil({
             <span
               className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
                 perfil.publico ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+      </section>
+
+      {/* ─── O FEED: misturado ou fechado ──────────────────────────────────
+          ⚠️ **O PADRÃO É O MISTURADO, e o interruptor existe para FECHAR.**
+          Uma rede social que só mostra quem ela já segue não tem como crescer,
+          e conta nova abre vazia — não há motivo nenhum para voltar no dia
+          seguinte. Quem prefere o círculo fechado liga aqui.
+
+          ⚠️ E o rótulo "Sugerido para você" continua em toda publicação de
+          fora, ligada ou desligada esta chave: misturar sem avisar é a única
+          versão disto que não se faz num app de gestação de alto risco. */}
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-semibold">Só quem eu sigo</h3>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              {perfil.feedSoSeguindo
+                ? "Seu feed mostra apenas quem você segue."
+                : "Seu feed mistura quem você segue com pessoas novas — sempre marcadas como sugestão."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={perfil.feedSoSeguindo}
+            aria-label="Mostrar só quem eu sigo"
+            disabled={salvando}
+            onClick={() => salvar({ feedSoSeguindo: !perfil.feedSoSeguindo })}
+            className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+              perfil.feedSoSeguindo ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                perfil.feedSoSeguindo ? "translate-x-[22px]" : "translate-x-0.5"
               }`}
             />
           </button>

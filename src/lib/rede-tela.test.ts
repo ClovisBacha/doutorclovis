@@ -66,10 +66,32 @@ describe("toda lista de posts", () => {
   /* ⚠️ E a zona de sugeridos NÃO oferece apagar: nenhum post ali é dela, e um
      ⋯ com "apagar" sobre a publicação de uma desconhecida seria uma promessa
      que o servidor recusa. */
-  test("⚠️ os sugeridos levam o rótulo obrigatório e não oferecem apagar", () => {
+  test("⚠️ TODA publicação de fora leva o rótulo — nas DUAS listas", () => {
+    /* ⚠️ ERAM DUAS ASSERÇÕES, E UMA DELAS ENVELHECEU COM O FEED MISTURADO.
+       Antes havia uma lista só com sugeridos (a zona do fim), então bastava
+       `toHaveLength(1)` e "não oferece apagar". Agora as descobertas também são
+       costuradas no feed principal, que é a MESMA lista que desenha os posts
+       dela — e essa lista passa `aoApagar` por construção.
+
+       O que NÃO envelheceu, e é a proteção inteira desta mudança: nenhuma
+       publicação de fora pode aparecer sem o rótulo. Misturar desconhecidas sem
+       avisar faria a paciente ler um relato duro sem saber de quem veio. */
     const sug = renderizacoesDePost().filter((r) => /\bsugerido\b/.test(r));
-    expect(sug).toHaveLength(1);
-    expect(sug[0]).not.toContain("aoApagar=");
+    expect(sug.length).toBeGreaterThanOrEqual(2);
+
+    /* Na lista misturada o rótulo é CALCULADO por publicação, e não cravado:
+       um `sugerido` fixo marcaria as amigas dela como estranhas, e um `false`
+       fixo apagaria o aviso justamente onde ele passou a fazer falta. */
+    const misturada = sug.find((r) => r.includes("idsSugeridos"));
+    expect(misturada).toBeTruthy();
+    expect(misturada).toContain("sugerido={idsSugeridos.has(p.id)}");
+
+    /* ⚠️ E APAGAR CONTINUA SENDO DE QUEM ESCREVEU: o portão é INTERNO ao
+       cartão (`post.souAAutora && aoApagar`), e é por isso que passar a ação na
+       lista misturada é seguro. Se aquele portão sumir, este teste tem de cair
+       junto — daí ele cobrar a linha, e não só a prop. */
+    const fonte = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    expect(fonte).toContain("post.souAAutora && aoApagar");
   });
 });
 

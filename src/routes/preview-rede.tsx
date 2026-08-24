@@ -50,6 +50,7 @@ const PERFIL: PerfilNaTela = {
   possoAplicarOCodigo: false,
   mostrarSemana: true,
   mostrarBebe: true,
+  feedSoSeguindo: false,
   aceitaPerguntas: true,
   /* ⚠️ A chave da vitrine nasce DESLIGADA — é o estado real de toda paciente,
      e a bancada tem de abrir no caso comum, nunca no raro. O endereço aparece

@@ -96,9 +96,9 @@ describe("a linha do perfil", () => {
   });
 
   test("grávida de gêmeas", () => {
-    expect(
-      linhaDoPerfil([bebe({ sexo: "f" }), bebe({ sexo: "f" })], HOJE),
-    ).toBe("Grávida de gêmeas");
+    expect(linhaDoPerfil([bebe({ sexo: "f" }), bebe({ sexo: "f" })], HOJE)).toBe(
+      "Grávida de gêmeas",
+    );
   });
 
   test("mãe de um, com nome e idade", () => {
@@ -116,7 +116,10 @@ describe("a linha do perfil", () => {
   test("com dois ou mais, o número informa mais que os nomes", () => {
     expect(
       linhaDoPerfil(
-        [bebe({ nome: "Ana", nascidoEm: "2022-01-10" }), bebe({ nome: "Léo", nascidoEm: "2024-03-02" })],
+        [
+          bebe({ nome: "Ana", nascidoEm: "2022-01-10" }),
+          bebe({ nome: "Léo", nascidoEm: "2024-03-02" }),
+        ],
         HOJE,
       ),
     ).toBe("Mãe de 2");
@@ -133,11 +136,7 @@ describe("a linha do perfil", () => {
   });
 
   test("⚠️ mãe de um esperando gêmeos — o ordinal não serve, o número sim", () => {
-    const filhos = [
-      bebe({ nascidoEm: "2023-04-10" }),
-      bebe({ sexo: "f" }),
-      bebe({ sexo: "f" }),
-    ];
+    const filhos = [bebe({ nascidoEm: "2023-04-10" }), bebe({ sexo: "f" }), bebe({ sexo: "f" })];
     expect(linhaDoPerfil(filhos, HOJE)).toBe("Mãe de 1, grávida de gêmeas");
   });
 
