@@ -1,0 +1,322 @@
+<!-- Aberto DIRETO do disco (file://): sem servidor, sem rede. -->
+<meta charset="utf-8" />
+<title>Segredo do Entrar com a Apple</title>
+<style>
+  :root {
+    color-scheme: light;
+    --tinta: #2b2320;
+    --fraco: #6b5f5a;
+    --linha: #e6dcd7;
+    --acento: #a85c58;
+    --fundo: #fdf6f3;
+    --erro: #b3261e;
+  }
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fundo);
+    color: var(--tinta);
+    font:
+      16px/1.55 -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    padding: 32px 20px 64px;
+  }
+  main {
+    max-width: 44rem;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 1.6rem;
+    margin: 0 0 0.35rem;
+  }
+  .sub {
+    color: var(--fraco);
+    margin: 0 0 1.75rem;
+  }
+  .aviso {
+    border: 1px solid #cfe3d2;
+    background: #f1f8f2;
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 1.75rem;
+    font-size: 0.95rem;
+  }
+  label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin: 1.1rem 0 0.35rem;
+  }
+  .dica {
+    font-weight: 400;
+    color: var(--fraco);
+    font-size: 0.85rem;
+  }
+  input[type="text"],
+  input[type="file"] {
+    width: 100%;
+    padding: 11px 13px;
+    border: 1px solid var(--linha);
+    border-radius: 12px;
+    background: #fff;
+    font: inherit;
+    font-size: 0.95rem;
+  }
+  button {
+    margin-top: 1.6rem;
+    border: 0;
+    border-radius: 999px;
+    background: var(--acento);
+    color: #fff;
+    font: inherit;
+    font-weight: 600;
+    padding: 0.8rem 1.9rem;
+    min-height: 46px;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  #saida {
+    margin-top: 2rem;
+  }
+  .rotulo {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fraco);
+    margin-bottom: 0.4rem;
+  }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #fff;
+    border: 1px solid var(--linha);
+    border-radius: 14px;
+    padding: 14px;
+    font-size: 0.82rem;
+    margin: 0;
+  }
+  .vence {
+    margin-top: 0.9rem;
+    border: 1px solid #f0dcae;
+    background: #fdf6e6;
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 0.92rem;
+  }
+  .erro {
+    color: var(--erro);
+    font-size: 0.92rem;
+    margin-top: 1rem;
+  }
+  .copiar {
+    background: #fff;
+    color: var(--acento);
+    border: 1px solid var(--acento);
+    margin-top: 0.7rem;
+    padding: 0.5rem 1.1rem;
+    min-height: 40px;
+    font-size: 0.9rem;
+  }
+</style>
+
+<main>
+  <h1>Segredo do “Entrar com a Apple”</h1>
+  <p class="sub">
+    A Apple não entrega um <em>client secret</em> pronto: ela dá uma chave privada e espera um JWT
+    assinado com ela. Esta página monta esse JWT.
+  </p>
+
+  <div class="aviso">
+    <strong>A sua chave não sai daqui.</strong> A assinatura acontece dentro do seu navegador, com o
+    WebCrypto. Esta página não faz nenhuma chamada de rede — dá para desligar a internet antes de
+    usá-la e ela funciona igual.
+  </div>
+
+  <label for="p8">
+    1 · O arquivo <code>.p8</code>
+    <span class="dica">— o <code>AuthKey_XXXXXXXXXX.p8</code> que você baixou da Apple</span>
+  </label>
+  <input type="file" id="p8" accept=".p8,.pem,.txt" />
+
+  <label for="team">
+    2 · Team ID <span class="dica">— 10 caracteres, no canto superior direito do portal</span>
+  </label>
+  <input type="text" id="team" placeholder="ABCDE12345" autocapitalize="characters" />
+
+  <label for="key">
+    3 · Key ID <span class="dica">— o meio do nome do arquivo: AuthKey_<b>XXXXXXXXXX</b>.p8</span>
+  </label>
+  <input type="text" id="key" placeholder="FGHIJ67890" autocapitalize="characters" />
+
+  <label for="servico">
+    4 · Services ID <span class="dica">— o identificador em pontos que você criou no passo 2</span>
+  </label>
+  <input type="text" id="servico" placeholder="br.com.obstetrica.web" />
+
+  <button id="gerar" disabled>Gerar o segredo</button>
+
+  <div id="saida"></div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const campos = ["p8", "team", "key", "servico"].map($);
+  const saida = $("saida");
+
+  function conferir() {
+    $("gerar").disabled = !(
+      $("p8").files.length &&
+      $("team").value.trim() &&
+      $("key").value.trim() &&
+      $("servico").value.trim()
+    );
+  }
+  campos.forEach((c) => c.addEventListener("input", conferir));
+  $("p8").addEventListener("change", conferir);
+
+  const b64u = (buf) => {
+    const bytes = new Uint8Array(buf);
+    let s = "";
+    for (const b of bytes) s += String.fromCharCode(b);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  const textoB64u = (t) => b64u(new TextEncoder().encode(t));
+
+  function erro(msg) {
+    saida.innerHTML = '<p class="erro"></p>';
+    saida.querySelector("p").textContent = msg;
+  }
+
+  $("gerar").addEventListener("click", async () => {
+    saida.innerHTML = "";
+    const team = $("team").value.trim().toUpperCase();
+    const key = $("key").value.trim().toUpperCase();
+    const servico = $("servico").value.trim();
+
+    /* Conferir ANTES de assinar: trocar Team ID por Key ID é o erro mais comum
+       aqui, e a Apple responde `invalid_client` sem dizer qual dos dois. */
+    for (const [rotulo, valor] of [
+      ["Team ID", team],
+      ["Key ID", key],
+    ]) {
+      if (!/^[A-Z0-9]{10}$/.test(valor)) {
+        return erro(`${rotulo} inválido: "${valor}" — são 10 caracteres (letras e números).`);
+      }
+    }
+    if (!servico.includes(".")) {
+      return erro(`Services ID inválido: "${servico}" — é o identificador em pontos.`);
+    }
+
+    let pem;
+    try {
+      pem = await $("p8").files[0].text();
+    } catch {
+      return erro("Não consegui ler o arquivo.");
+    }
+    if (!pem.includes("BEGIN PRIVATE KEY")) {
+      return erro("Esse arquivo não parece um .p8 da Apple (falta o cabeçalho PRIVATE KEY).");
+    }
+
+    /* PEM → DER */
+    const corpo = pem
+      .replace(/-----BEGIN PRIVATE KEY-----/, "")
+      .replace(/-----END PRIVATE KEY-----/, "")
+      .replace(/\s+/g, "");
+    let der;
+    try {
+      const bruto = atob(corpo);
+      der = new Uint8Array(bruto.length);
+      for (let i = 0; i < bruto.length; i++) der[i] = bruto.charCodeAt(i);
+    } catch {
+      return erro("O conteúdo do arquivo não é base64 válido.");
+    }
+
+    /* ⚠️ **O SAFARI NÃO EXPÕE O WEBCRYPTO EM `file://`.** Ele não considera um
+       arquivo local um contexto seguro, então `crypto.subtle` é `undefined` — e
+       a mensagem antiga ("o navegador não aceitou a chave") culpava a chave por
+       um problema que era do navegador. O dono perdeu uma volta com isso. */
+    if (!window.crypto || !window.crypto.subtle) {
+      return erro(
+        "Este navegador não libera o WebCrypto em arquivos abertos do disco — é o caso do " +
+          "Safari. Abra este mesmo arquivo no Chrome, que funciona.",
+      );
+    }
+
+    let chave;
+    try {
+      chave = await crypto.subtle.importKey(
+        "pkcs8",
+        der.buffer,
+        { name: "ECDSA", namedCurve: "P-256" },
+        false,
+        ["sign"],
+      );
+    } catch {
+      return erro("O navegador não aceitou a chave. Confira se é o .p8 do Sign in with Apple.");
+    }
+
+    const agora = Math.floor(Date.now() / 1000);
+    /* Seis meses menos um dia: a Apple RECUSA exatamente 15777000 s por
+       arredondamento, e um segundo a mais devolve `invalid_client`. */
+    const vence = agora + 15777000 - 86400;
+
+    const cabecalho = textoB64u(JSON.stringify({ alg: "ES256", kid: key }));
+    const carga = textoB64u(
+      JSON.stringify({
+        iss: team,
+        iat: agora,
+        exp: vence,
+        aud: "https://appleid.apple.com",
+        sub: servico,
+      }),
+    );
+
+    /* ⚠️ O WebCrypto devolve a assinatura CRUA (r‖s), que é exatamente o que o
+       JWT pede. É o contrário do Node, cujo padrão é DER e precisa de
+       `dsaEncoding: "ieee-p1363"` — um JWT ES256 com assinatura DER é recusado
+       sem explicação. */
+    let assinatura;
+    try {
+      assinatura = await crypto.subtle.sign(
+        { name: "ECDSA", hash: "SHA-256" },
+        chave,
+        new TextEncoder().encode(`${cabecalho}.${carga}`),
+      );
+    } catch {
+      return erro("Não consegui assinar. Tente de novo.");
+    }
+
+    const jwt = `${cabecalho}.${carga}.${b64u(assinatura)}`;
+    const dia = new Date(vence * 1000).toLocaleDateString("pt-BR");
+
+    saida.innerHTML = `
+      <p class="rotulo">Cole no Supabase, em Secret Key (for OAuth)</p>
+      <pre id="jwt"></pre>
+      <button class="copiar" id="copiar">Copiar</button>
+      <p class="rotulo" style="margin-top:1.6rem">E no campo Client IDs, cole</p>
+      <pre id="cid"></pre>
+      <div class="vence">
+        <strong>Vence em ${dia}.</strong> É regra da Apple — no dia em que vencer, o “Entrar com a
+        Apple” para de funcionar sem aviso nenhum. Marque na agenda e gere de novo antes disso.
+      </div>`;
+    $("jwt").textContent = jwt;
+    $("cid").textContent = servico;
+    $("copiar").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(jwt);
+        $("copiar").textContent = "Copiado ✓";
+      } catch {
+        $("copiar").textContent = "Selecione e copie à mão";
+      }
+    });
+  });
+</script>

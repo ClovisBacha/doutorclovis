@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
-import { signInWithGoogle } from "@/lib/google-auth";
+import { signInWithApple, signInWithGoogle } from "@/lib/google-auth";
 
 function GoogleIcon() {
   return (
@@ -65,7 +65,72 @@ export function GoogleButton({
   );
 }
 
-/** Divisor "ou" entre o botão do Google e o formulário de e-mail. */
+/**
+ * O logotipo da Apple.
+ *
+ * ⚠️ **Desenhado, e nunca o emoji nem uma imagem.** A Apple exige o glifo dela
+ * nas Human Interface Guidelines do "Sign in with Apple", e um `` sai como
+ * quadrado vazio em Android e Windows — que é metade de quem abre este site.
+ */
+function AppleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="currentColor">
+      <path d="M17.05 12.54c-.02-2.2 1.8-3.26 1.88-3.31-1.02-1.5-2.62-1.7-3.19-1.72-1.36-.14-2.65.8-3.34.8-.69 0-1.75-.78-2.87-.76-1.48.02-2.84.86-3.6 2.18-1.53 2.66-.39 6.6 1.11 8.76.73 1.06 1.6 2.25 2.75 2.2 1.1-.04 1.52-.71 2.85-.71 1.33 0 1.71.71 2.87.69 1.19-.02 1.94-1.08 2.66-2.14.84-1.23 1.19-2.42 1.21-2.48-.03-.01-2.32-.89-2.34-3.51zM14.86 5.4c.6-.74 1.01-1.75.9-2.77-.87.04-1.93.58-2.56 1.31-.56.65-1.05 1.7-.92 2.7.97.08 1.97-.5 2.58-1.24z" />
+    </svg>
+  );
+}
+
+/**
+ * Botão "Continuar com a Apple".
+ *
+ * ⚠️ **Não é enfeite: é requisito de loja.** Pela diretriz 4.8 da App Store, um
+ * app que oferece login social de terceiro precisa oferecer o da Apple também —
+ * e este app vai para a loja (`IAP_ATIVO` já existe desligado esperando isso).
+ * Sem ele, a revisão recusa.
+ *
+ * ⚠️ E ele avisa quando o provedor ainda não foi habilitado no Supabase, como o
+ * do Google: um botão que responde com erro genérico faz a paciente concluir
+ * que a conta dela é que tem problema.
+ */
+export function AppleButton({
+  role,
+  label = "Continuar com a Apple",
+}: {
+  role: "paciente" | "medico";
+  label?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  async function go() {
+    setBusy(true);
+    const err = await signInWithApple(role);
+    if (err) {
+      setBusy(false);
+      const notEnabled =
+        err.message.includes("provider is not enabled") ||
+        err.message.includes("Unsupported provider");
+      toast.error(
+        notEnabled
+          ? "Login com Apple ainda não foi habilitado. Use o Google ou o e-mail por enquanto."
+          : "Não foi possível iniciar o login com a Apple. Tente novamente.",
+      );
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={go}
+      disabled={busy}
+      className="flex w-full items-center justify-center gap-2.5 rounded-full border border-border bg-card px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-secondary disabled:opacity-60"
+    >
+      <AppleIcon />
+      {busy ? "Redirecionando…" : label}
+    </button>
+  );
+}
+
+/** Divisor "ou" entre os botões de conta e o formulário de e-mail. */
 export function OrDivider() {
   return (
     <div className="flex items-center gap-3 py-1">

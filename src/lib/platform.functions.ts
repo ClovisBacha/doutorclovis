@@ -15,7 +15,6 @@ import {
   MAX_ROWS,
   PAID_STATUS,
   PAYING_STATUS,
-  PLAN_PRICE,
   TokenSchema,
   doctorPlanMonthlyCents,
   patientPremiumMonthlyCents,
@@ -24,6 +23,8 @@ import {
   safe,
 } from "@/lib/platform-admin.server";
 import { writeAudit } from "@/lib/audit.server";
+import { planoEfetivo, planoVigente, vencimentoDaConcessao } from "@/lib/entitlements.server";
+import { mensalidadeCentavos, normalizePlan } from "@/lib/entitlements";
 
 export type PlatformDoctor = {
   id: string;
@@ -51,6 +52,80 @@ export type PlatformOverview = {
   generatedAt: string;
 };
 
+/**
+ * O QUE A PLATAFORMA PAGA SOZINHA.
+ *
+ * ─── A COLUNA ESCRITA E NUNCA LIDA, DE NOVO ─────────────────────────────────
+ *
+ * `ai_usage` grava `doctor_id = null` para tudo que não pertence a consultório
+ * nenhum: paciente sem médico vinculado, widget do site público e suporte da
+ * plataforma. Toda leitura de consumo que existe é POR MÉDICO — o card do
+ * painel, "quem consome mais", a projeção do mês.
+ *
+ * Ninguém lia as linhas sem dono. É o mesmo padrão da `similaridade` que este
+ * projeto acabou de consertar (coluna gravada e nunca lida), só que desta vez
+ * é a nossa conta: não havia nenhuma tela que dissesse quanto a plataforma
+ * gasta com quem ainda não é paciente de ninguém — que é exatamente o número
+ * que decide se o widget público se paga.
+ *
+ * Por canal, e não só o total: "gastamos X" não permite decidir nada. "O
+ * widget do site gastou X e o suporte gastou Y" permite desligar um dos dois.
+ */
+export type CustoSemDono = {
+  canal: string;
+  respostas: number;
+  entrada: number;
+  saida: number;
+};
+
+export const custoDaPlataforma = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const, canais: [] as CustoSemDono[] };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { inicioDoCiclo } = await import("./cota-ia.server");
+    const { data: rows, error } = await (supabaseAdmin as any)
+      .from("ai_usage")
+      .select("canal,input_tokens,output_tokens")
+      /* `is null`, não `eq(null)`: em SQL nada é igual a nulo, e `eq` devolveria
+         zero linhas em silêncio — o mesmo "tudo certo" de não ter gasto. */
+      .is("doctor_id", null)
+      .gte("created_at", inicioDoCiclo().toISOString())
+      .limit(5000);
+    if (error) return { ok: false as const, canais: [] as CustoSemDono[] };
+    return { ok: true as const, canais: agruparPorCanal((rows ?? []) as LinhaDeUso[]) };
+  });
+
+export type LinhaDeUso = {
+  canal: string | null;
+  input_tokens: number | null;
+  output_tokens: number | null;
+};
+
+/**
+ * Soma por canal, do mais caro para o mais barato.
+ *
+ * Puro para poder ser exercitado: o `null` do canal é o detalhe que decide se a
+ * tela mostra uma linha honesta ou some com o gasto. Agregar aqui e não no
+ * banco porque o PostgREST não faz GROUP BY.
+ */
+export function agruparPorCanal(linhas: LinhaDeUso[]): CustoSemDono[] {
+  const por = new Map<string, CustoSemDono>();
+  for (const l of linhas) {
+    /* Canal nulo vira "(sem canal)" e NÃO é descartado: linha sem rótulo é
+       gasto real, e sumir com ela produziria um total que não fecha com a
+       fatura — que é o defeito que este card existe para acabar. */
+    const canal = (l.canal ?? "").trim() || "(sem canal)";
+    const atual = por.get(canal) ?? { canal, respostas: 0, entrada: 0, saida: 0 };
+    atual.respostas++;
+    atual.entrada += l.input_tokens ?? 0;
+    atual.saida += l.output_tokens ?? 0;
+    por.set(canal, atual);
+  }
+  return [...por.values()].sort((a, b) => b.saida + b.entrada - (a.saida + a.entrada));
+}
+
 /** Visão geral da plataforma (super-admin). */
 export const getPlatformOverview = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => TokenSchema.parse(i))
@@ -67,21 +142,39 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
       id: string;
       display_name: string | null;
       plan: string | null;
+      plan_expires_at?: string | null;
       active: boolean | null;
       verified: boolean | null;
       created_at: string | null;
+      /** Ausente quando a migration ainda não rodou — o retry abaixo cobre. */
+      ai_messages_per_cycle?: number | null;
     };
-    const docRows = await safe<DocRow[]>(
-      async () =>
-        ((
-          await sb
-            .from("doctors")
-            .select("id,display_name,plan,active,verified,created_at")
-            .order("created_at", { ascending: false })
-            .limit(MAX_ROWS)
-        ).data ?? []) as DocRow[],
-      [],
-    );
+    /* ─── A COLUNA NOVA ENTRA COM RETRY, NUNCA DIRETO ────────────────────────
+       `ai_messages_per_cycle` é o que transforma o plano `mensagens` num preço:
+       sem ela, o MRR conta R$ 29,90 para quem paga R$ 999,00.
+
+       Mas o PostgREST recusa a LINHA INTEIRA quando uma coluna do `select` não
+       existe (42703), e o `safe` aqui cai para `[]` — ou seja, pedir a coluna
+       sem rede faria a lista de médicos sumir por completo do painel da
+       plataforma enquanto a migration estivesse pendente, que é exatamente o
+       estado que o CLAUDE.md avisa ser o normal em produção. */
+    const colunas = "id,display_name,plan,plan_expires_at,active,verified,created_at";
+    const docRows = await safe<DocRow[]>(async () => {
+      const { colunaAusente } = await import("./postgrest");
+      const comQtd = await sb
+        .from("doctors")
+        .select(`${colunas},ai_messages_per_cycle`)
+        .order("created_at", { ascending: false })
+        .limit(MAX_ROWS);
+      if (!comQtd.error) return (comQtd.data ?? []) as DocRow[];
+      if (!colunaAusente(comQtd.error)) throw comQtd.error;
+      const semQtd = await sb
+        .from("doctors")
+        .select(colunas)
+        .order("created_at", { ascending: false })
+        .limit(MAX_ROWS);
+      return (semQtd.data ?? []) as DocRow[];
+    }, []);
 
     // Contagens auxiliares por médico (pacientes vinculadas e entradas de cérebro)
     const patientsByDoctor = await safe<Map<string, number>>(async () => {
@@ -143,9 +236,31 @@ export const getPlatformOverview = createServerFn({ method: "POST" })
     }, 0);
 
     const doctorsActive = doctors.filter((d) => d.active).length;
-    const mrrEstimate = doctors
+    /* ─── O MRR CONTAVA ASSINATURA VENCIDA E PLANO NÃO-NORMALIZADO ──────────
+       Duas coisas, na mesma linha:
+       · `PLAN_PRICE[d.plan]` lia a coluna crua — um `pro` com o cartão recusado
+         há meses seguia somando ao MRR indefinidamente, e é o número que o
+         fundador usa para saber como o negócio vai;
+       · e a chave não era normalizada, então qualquer variante de escrita caía
+         no `?? 0` e o médico sumia da conta em silêncio — o erro no sentido
+         oposto, no mesmo lugar.
+       Pela régua ÚNICA, e com a chave normalizada. */
+    /* O plano `mensagens` não tem UM preço — tem a escada de R$ 29,90 a
+       R$ 999,00. Por isso passa pela `mensalidadeCentavos`, que recebe a
+       quantidade comprada; `PLAN_PRICE` sozinho contaria a entrada para todo
+       mundo e o MRR sairia até dez vezes menor. */
+    const mrrEstimate = docRows
       .filter((d) => d.active)
-      .reduce((s, d) => s + (PLAN_PRICE[d.plan] ?? 0), 0);
+      .reduce(
+        (soma, d) =>
+          soma +
+          mensalidadeCentavos(
+            normalizePlan(planoVigente(d.plan, d.plan_expires_at) ?? "free"),
+            d.ai_messages_per_cycle,
+          ) /
+            100,
+        0,
+      );
 
     const overview: PlatformOverview = {
       isSuperAdmin: true,
@@ -600,7 +715,10 @@ const SetStatusSchema = z.object({
   doctorId: z.string().uuid(),
   active: z.boolean().optional(),
   verified: z.boolean().optional(),
-  plan: z.enum(["trial", "free", "starter", "pro", "clinica", "elite", "black"]).optional(),
+  plan: z.enum(["trial", "free", "mensagens", "clinica"]).optional(),
+  /* Até quando vale a concessão. Ausente = o padrão do plano (ver
+     `vencimentoDaConcessao`); `null` = de propósito sem vencimento. */
+  expiraEm: z.string().datetime().nullable().optional(),
 });
 
 /** Ativa/desativa ou muda o plano de um médico (super-admin). */
@@ -614,18 +732,45 @@ export const setDoctorStatus = createServerFn({ method: "POST" })
     const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (data.active !== undefined) patch.active = data.active;
     if (data.verified !== undefined) patch.verified = data.verified;
-    if (data.plan !== undefined) patch.plan = data.plan;
+    /* ─── PLANO E VENCIMENTO SÃO UM ESTADO SÓ ──────────────────────────────
+       Escrever `plan` sem `plan_expires_at` era um no-op silencioso desde que
+       `planoVigente` passou a rebaixar todo plano vencido — e o alvo típico de
+       uma concessão manual é justamente quem já tem data no passado. Ver
+       `vencimentoDaConcessao`. */
+    if (data.plan !== undefined) {
+      patch.plan = data.plan;
+      patch.plan_expires_at = vencimentoDaConcessao(data.plan, data.expiraEm);
+    }
     const { error } = await (supabaseAdmin as any)
       .from("doctors")
       .update(patch)
       .eq("id", data.doctorId);
-    if (!error)
-      await writeAudit({ id: user.id, email: user.email }, "doctor.status", data.doctorId, {
-        active: data.active ?? null,
-        verified: data.verified ?? null,
-        plan: data.plan ?? null,
-      });
-    return { ok: !error };
+    if (error) return { ok: false as const };
+
+    /* ─── A TELA PRECISA DIZER O QUE VALE, NÃO O QUE FOI PEDIDO ────────────
+       Relemos e passamos pela MESMA régua das capacidades. É o que impede a
+       outra forma da contradição: conceder `black` a um médico desativado
+       também devolvia `ok: true` sem mudar nada — `planRowFor` derruba para
+       `free` quando `active === false`. Agora isso volta visível. */
+    const { data: depois } = await (supabaseAdmin as any)
+      .from("doctors")
+      .select("plan,active,plan_expires_at")
+      .eq("id", data.doctorId)
+      .maybeSingle();
+    const efetivo = depois
+      ? planoEfetivo(depois.plan ?? null, depois.plan_expires_at, depois.active)
+      : null;
+
+    await writeAudit({ id: user.id, email: user.email }, "doctor.status", data.doctorId, {
+      active: data.active ?? null,
+      verified: data.verified ?? null,
+      plan: data.plan ?? null,
+      /* O audit log registrava o PEDIDO. Registrar só o pedido foi o que deixou
+         a concessão morta parecer bem-sucedida na única trilha que existia. */
+      expira_em: (patch.plan_expires_at as string | null | undefined) ?? null,
+      plano_efetivo: efetivo,
+    });
+    return { ok: true as const, planoEfetivo: efetivo, expiraEm: patch.plan_expires_at ?? null };
   });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -870,6 +1015,112 @@ export const createPlatformCoupon = createServerFn({ method: "POST" })
       // colisão improvável (32^8) → tenta outro código
     }
     return { ok: false as const };
+  });
+
+/* ── Quem resgatou cada cupom ──────────────────────────────────────────
+   A lista de cupons responde "quantos usaram". Esta responde "quem, quando,
+   e adiantou alguma coisa" — que é a pergunta que decide se vale repetir a
+   campanha.
+
+   Não existe "converteu" no sentido de pagamento: o cupom DÁ o Premium, não
+   vende. A conversão aqui é de uso — a pessoa voltou depois de resgatar? Por
+   isso as duas colunas que importam são `premium` (ainda tem o benefício, ou
+   perdeu por algum outro caminho) e `ultimoAcesso`, que vem do
+   `last_sign_in_at` do próprio Supabase Auth: sem coluna nova, sem migração.
+   Um cupom com 40 resgates e 38 últimos acessos no dia do resgate distribuiu
+   Premium para ninguém.
+
+   LGPD: isto expõe nome e e-mail de paciente para o dono da plataforma, então
+   a leitura é auditada como qualquer outra ação sensível do super-admin. */
+export type CouponRedeemer = {
+  userId: string;
+  nome: string | null;
+  email: string | null;
+  resgatadoEm: string;
+  premium: boolean;
+  ultimoAcesso: string | null;
+};
+
+export const listCouponRedemptions = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), couponId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const vazio = { ok: false as const, redeemers: [] as CouponRedeemer[], total: 0 };
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return vazio;
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    // `count: exact` no total e só as 200 mais recentes na lista: um cupom de
+    // campanha pode ter dezenas de milhares de resgates, e a tela não é lugar
+    // de carregar todos — mas o rodapé precisa dizer a verdade sobre quantos
+    // ficaram de fora.
+    const {
+      data: reds,
+      count,
+      error,
+    } = await sb
+      .from("platform_coupon_redemptions")
+      .select("user_id,redeemed_at", { count: "exact" })
+      .eq("coupon_id", data.couponId)
+      .order("redeemed_at", { ascending: false })
+      .limit(200);
+    if (error) return vazio;
+
+    const linhas = (reds ?? []) as { user_id: string; redeemed_at: string }[];
+    const ids = linhas.map((r) => r.user_id);
+    if (ids.length === 0) return { ok: true as const, redeemers: [], total: 0 };
+
+    // Nome e Premium saem de uma consulta só. O e-mail e o último acesso moram
+    // em `auth.users`, que não dá join — daí uma chamada por pessoa, em lotes
+    // de 20 para não abrir 200 conexões de uma vez.
+    const perfilPor = await safe<Map<string, { nome: string | null; premium: boolean }>>(
+      async () => {
+        const m = new Map<string, { nome: string | null; premium: boolean }>();
+        const { data: ps } = await sb
+          .from("patient_profiles")
+          .select("id,display_name,quiz_premium")
+          .in("id", ids);
+        for (const p of (ps ?? []) as any[])
+          m.set(p.id, { nome: p.display_name ?? null, premium: !!p.quiz_premium });
+        return m;
+      },
+      new Map(),
+    );
+
+    const authPor = new Map<string, { email: string | null; ultimoAcesso: string | null }>();
+    for (let i = 0; i < ids.length; i += 20) {
+      const lote = ids.slice(i, i + 20);
+      await Promise.all(
+        lote.map(async (id) => {
+          try {
+            const { data: u } = await supabaseAdmin.auth.admin.getUserById(id);
+            if (u?.user)
+              authPor.set(id, {
+                email: u.user.email ?? null,
+                ultimoAcesso: u.user.last_sign_in_at ?? null,
+              });
+          } catch {
+            /* conta apagada ou erro de rede → a linha sai sem e-mail */
+          }
+        }),
+      );
+    }
+
+    const redeemers: CouponRedeemer[] = linhas.map((r) => ({
+      userId: r.user_id,
+      nome: perfilPor.get(r.user_id)?.nome ?? null,
+      email: authPor.get(r.user_id)?.email ?? null,
+      resgatadoEm: r.redeemed_at,
+      premium: perfilPor.get(r.user_id)?.premium ?? false,
+      ultimoAcesso: authPor.get(r.user_id)?.ultimoAcesso ?? null,
+    }));
+
+    await writeAudit({ id: user.id, email: user.email }, "coupon.redemptions.read", data.couponId, {
+      linhas: redeemers.length,
+    });
+    return { ok: true as const, redeemers, total: count ?? redeemers.length };
   });
 
 /** Ativa/desativa um cupom (inativo não resgata mais). */

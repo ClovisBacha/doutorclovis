@@ -34,12 +34,17 @@ export async function authApiKey(
       .maybeSingle();
     if (!data || data.active === false) return null;
     // Marca uso (best-effort, sem propagar erro).
+    /* DISPARA-E-ESQUECE AUTORIZADO: telemetria pura. Perder uma linha não muda
+     nada para ninguém, e aguardar poria uma escrita no caminho da resposta. */
     void (async () => {
       try {
-        await (supabaseAdmin as any)
+        const { error } = await (supabaseAdmin as any)
           .from("doctorthink_api_keys")
           .update({ last_used_at: new Date().toISOString() })
           .eq("id", data.id);
+        /* `last_used_at` é o que responde "esta chave ainda é usada?" na hora
+           de revogar uma. Parado, toda chave parece abandonada. */
+        if (error) console.error("[doctorthink] last_used_at não gravou", data.id, error);
       } catch {
         /* telemetria best-effort */
       }

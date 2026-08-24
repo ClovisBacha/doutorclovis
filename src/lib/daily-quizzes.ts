@@ -14,11 +14,45 @@
  *   3 · Sinais & segurança 4 · Exames & consultas 5 · Bem-estar & vínculo
  *   6 · Revisão da semana
  *
- * O conteúdo vive em daily-quizzes.data.json (280 entradas). O normalizador
+ * O conteúdo vive em daily-quizzes.data.json (294 entradas). O normalizador
  * abaixo aceita TANTO o formato novo (`questions[]`) quanto o antigo
  * (`q1`/`q2`), para a migração do conteúdo nunca quebrar o app.
+ *
+ * ─── ⚠️ O JSON NÃO ENTRA NO PACOTE PRINCIPAL (ago/2026) ─────────────────────
+ *
+ * Ele tem 674 KB. Com `import raw from "./daily-quizzes.data.json"` o Vite o
+ * embutia dentro do chunk de `gestacao-path` — MEDIDO: 892 KB crus, 264 KB
+ * comprimidos, e o banco de aulas sozinho era a maior fatia disso. Pior: esse
+ * chunk baixa junto com a tela de Minha Conta INTEIRA, mesmo quando a paciente
+ * nunca abre a aba Caminho naquele dia. No 4G, à noite, é o "app estragado"
+ * que o dono relatou.
+ *
+ * Agora é `import()` dinâmico: o Vite corta o JSON num arquivo próprio, e ele
+ * só desce quando alguém abre o dia. As 294 aulas são 674 KB para entregar UMA
+ * de cada vez — baixar as 293 que ela não vai ler hoje é o desperdício inteiro.
+ *
+ * ⚠️ Isto torna a leitura ASSÍNCRONA, e é de propósito que não existe um
+ * `quizForDay` síncrono lendo um cache: ele devolveria `null` no primeiro
+ * render, e "não tem aula hoje" é indistinguível de "ainda não carregou". Quem
+ * precisa decidir sem esperar usa `temQuizNoDia`, que é FAIXA, não conteúdo.
  */
-import raw from "./daily-quizzes.data.json";
+
+/**
+ * A faixa coberta pelo banco de aulas — 7 (semana 1, dia 1) a 300 (semana 42,
+ * dia 6), sem buracos.
+ *
+ * ⚠️ São CONSTANTES, e não `Object.keys(RAW)`, porque a pergunta "existe aula
+ * neste dia?" precisa ser respondida ANTES de baixar os 674 KB — é ela que
+ * decide se a intro da aula roda e se o dia mostra aula ou desafio. Ler a
+ * cobertura do próprio JSON o traria de volta pro pacote e desfaria a mudança
+ * inteira.
+ *
+ * `daily-quizzes.test.ts` confere estes dois números contra o arquivo real e
+ * cobra que não haja buraco no meio — é o teste que impede a constante de
+ * mentir depois que alguém acrescentar ou tirar um dia.
+ */
+export const QUIZ_PRIMEIRO_DIA = 7;
+export const QUIZ_ULTIMO_DIA = 300;
 
 /**
  * Uma pergunta. "choice" = uma correta; "multi" = marque todas.
@@ -56,7 +90,15 @@ type RawQuiz = {
 /** Emoji rotativo do dia (variedade visual; o tema real vem do próprio teach). */
 const QUIZ_EMOJIS = ["👶", "🤰", "🥗", "🛟", "🩺", "💛", "⭐"] as const;
 
-const RAW = raw as unknown as Record<string, RawQuiz>;
+/**
+ * Existe aula neste dia? Responde SEM baixar o banco.
+ *
+ * É o que decide se a intro roda e se o dia abre com aula ou com desafio —
+ * duas decisões que acontecem no toque, antes de qualquer espera.
+ */
+export function temQuizNoDia(D: number): boolean {
+  return Number.isFinite(D) && D >= QUIZ_PRIMEIRO_DIA && D <= QUIZ_ULTIMO_DIA;
+}
 
 /** Converte qualquer formato bruto no shape canônico com `questions[]`. */
 function normalize(r: RawQuiz): DailyQuiz {
@@ -64,10 +106,43 @@ function normalize(r: RawQuiz): DailyQuiz {
   return { teach: r.teach, funFact: r.funFact, questions };
 }
 
-/** Quiz do dia gestacional D (semanas 1-40); null fora da faixa (pós-data). */
-export function quizForDay(D: number): DailyQuiz | null {
-  const r = RAW[String(D)];
-  return r ? normalize(r) : null;
+/**
+ * O banco, baixado UMA vez por sessão.
+ *
+ * A PROMESSA é guardada (e não só o resultado) de propósito: dois toques
+ * rápidos em dias diferentes chegam aqui antes de o primeiro `import()`
+ * resolver, e guardar só o resultado faria os dois baixarem. Mesmo raciocínio
+ * da fila `emVoo` do service worker.
+ */
+let bancoEmVoo: Promise<Record<string, RawQuiz>> | null = null;
+
+function banco(): Promise<Record<string, RawQuiz>> {
+  if (!bancoEmVoo) {
+    bancoEmVoo = import("./daily-quizzes.data.json")
+      .then((m) => (m.default ?? m) as unknown as Record<string, RawQuiz>)
+      .catch((e) => {
+        /* Rede caída no meio do download: solta a promessa para a próxima
+           tentativa poder acontecer. Sem isto, uma falha única deixaria a aula
+           indisponível pelo resto da sessão. */
+        bancoEmVoo = null;
+        throw e;
+      });
+  }
+  return bancoEmVoo;
+}
+
+/**
+ * A aula do dia gestacional D; `null` fora da faixa (pós-data) ou se o
+ * download falhar — aí a tela cai no desafio do dia, que é local.
+ */
+export async function carregarQuizDoDia(D: number): Promise<DailyQuiz | null> {
+  if (!temQuizNoDia(D)) return null;
+  try {
+    const r = (await banco())[String(D)];
+    return r ? normalize(r) : null;
+  } catch {
+    return null;
+  }
 }
 
 export function quizEmojiForDay(D: number) {

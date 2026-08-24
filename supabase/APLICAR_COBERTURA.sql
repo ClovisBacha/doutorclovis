@@ -1,0 +1,65 @@
+-- ════════════════════════════════════════════════════════════════════════════
+-- APLICAR NO SQL EDITOR DO SUPABASE — cobertura do Segundo Cérebro
+--
+-- Idempotente: pode rodar mais de uma vez.
+-- Rode DEPOIS do APLICAR_USO_IA.sql (estas colunas entram naquela tabela).
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- A PERGUNTA QUE HOJE NÃO TEM RESPOSTA
+--
+-- "Qual é a eficiência real do cérebro?" — ou seja, de cada 100 perguntas de
+-- paciente, quantas o médico já tinha respondido?
+--
+-- O sinal existe no código (`hadCoverage`) e não era gravado em lugar nenhum.
+-- E `brain_hits`, que parece ser isso, NÃO é: ele registra sempre que um bloco
+-- não-vazio é montado, e a persona do médico sozinha já faz o bloco não ser
+-- vazio. Um "hit" pode não ter tido cobertura nenhuma.
+--
+-- POR QUE A SIMILARIDADE JUNTO
+--
+-- O corte da busca semântica está em 0,55. Para o modelo de embedding em uso,
+-- essa faixa ainda aceita "vagamente relacionado" — e o erro daí é o mais
+-- perigoso num app clínico: a IA acha que TEM cobertura e responde "a sua
+-- médica orienta que…" com uma entrada que não responde bem à pergunta. Ela
+-- soa autorizada e não é.
+--
+-- Guardando a similaridade do melhor acerto — INCLUSIVE quando fica abaixo do
+-- corte —, mexer nesse número passa a ser decisão com a distribuição na mão.
+-- Guardar só os aprovados esconderia metade da informação: saber que a melhor
+-- entrada deu 0,52 é o que revela um corte apertado demais.
+
+ALTER TABLE public.ai_usage
+  ADD COLUMN IF NOT EXISTS cobertura boolean,
+  ADD COLUMN IF NOT EXISTS similaridade real;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- CONSULTAS PRONTAS
+-- ════════════════════════════════════════════════════════════════════════════
+--
+-- 1) A eficiência, por médico:
+--
+--   SELECT doctor_id,
+--          count(*)                                        AS perguntas,
+--          count(*) FILTER (WHERE cobertura)                AS cobertas,
+--          round(100.0 * count(*) FILTER (WHERE cobertura) / count(*), 1) AS pct
+--   FROM public.ai_usage
+--   WHERE especie = 'chat' AND canal = 'app' AND cobertura IS NOT NULL
+--   GROUP BY 1 ORDER BY perguntas DESC;
+--
+-- 2) A distribuição da similaridade — a que decide se 0,55 está certo.
+--    Olhe a faixa 0,55–0,65: é ali que mora o "vagamente relacionado" que
+--    hoje passa como cobertura.
+--
+--   SELECT width_bucket(similaridade, 0, 1, 20) AS faixa,
+--          round((width_bucket(similaridade, 0, 1, 20) - 1) * 0.05, 2) AS de,
+--          count(*),
+--          count(*) FILTER (WHERE cobertura) AS viraram_cobertura
+--   FROM public.ai_usage
+--   WHERE especie = 'chat' AND similaridade IS NOT NULL
+--   GROUP BY 1 ORDER BY 1;
+--
+-- 3) Quantas perguntas ficaram POR POUCO de fora (candidatas a baixar o corte):
+--
+--   SELECT count(*) FROM public.ai_usage
+--   WHERE especie = 'chat' AND cobertura IS FALSE
+--     AND similaridade BETWEEN 0.45 AND 0.55;

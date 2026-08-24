@@ -1133,7 +1133,41 @@ CREATE POLICY "doctor reads own profile" ON public.doctors
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+-- ATENCAO: UPDATE nao e mais concedido na tabela inteira.
+--
+-- Um `GRANT UPDATE ON public.doctors` sem lista de colunas deixa o proprio
+-- medico escrever `plan`, `plan_expires_at`, `verified` e `active` — as colunas
+-- que `entitlements.server.ts` le como fonte de verdade do que ele pagou. Com
+-- uma linha no console do navegador ele viraria plano Black e ganharia o selo da
+-- plataforma. O gatilho `protect_doctor_billing` cobre plan/active/expires, mas
+-- NAO cobre `verified`; o grant por coluna cobre os quatro.
+--
+-- Concedido em bloco tolerante porque, neste ponto do arquivo, algumas colunas
+-- do perfil podem ainda nao existir — a lista real e filtrada pelo catalogo.
+GRANT SELECT ON public.doctors TO authenticated;
+DO $grant_doctors$
+DECLARE
+  cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ')
+    INTO cols
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'doctors'
+     AND column_name IN (
+       'display_name','title','specialty','crm','whatsapp','personal_phone','pix_key',
+       'bio','subspecialty','years_experience','has_masters','has_doctorate',
+       'city','state','accepting_patients',
+       'instagram','rqe','education','hospitals','insurances','languages','approach',
+       'consultation_price_brl','offers_telehealth',
+       'accepts_insurance','accepts_private','updated_at'
+     );
+  EXECUTE 'REVOKE UPDATE ON public.doctors FROM authenticated';
+  IF cols IS NOT NULL THEN
+    EXECUTE format('GRANT UPDATE (%s) ON public.doctors TO authenticated', cols);
+  END IF;
+END
+$grant_doctors$;
 GRANT ALL ON public.doctors TO service_role;
 
 -- 2. Cada paciente pertence a um médico (null = médico dono da instalação,
@@ -1294,7 +1328,41 @@ CREATE POLICY "doctor reads own profile" ON public.doctors
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+-- ATENCAO: UPDATE nao e mais concedido na tabela inteira.
+--
+-- Um `GRANT UPDATE ON public.doctors` sem lista de colunas deixa o proprio
+-- medico escrever `plan`, `plan_expires_at`, `verified` e `active` — as colunas
+-- que `entitlements.server.ts` le como fonte de verdade do que ele pagou. Com
+-- uma linha no console do navegador ele viraria plano Black e ganharia o selo da
+-- plataforma. O gatilho `protect_doctor_billing` cobre plan/active/expires, mas
+-- NAO cobre `verified`; o grant por coluna cobre os quatro.
+--
+-- Concedido em bloco tolerante porque, neste ponto do arquivo, algumas colunas
+-- do perfil podem ainda nao existir — a lista real e filtrada pelo catalogo.
+GRANT SELECT ON public.doctors TO authenticated;
+DO $grant_doctors$
+DECLARE
+  cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ')
+    INTO cols
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'doctors'
+     AND column_name IN (
+       'display_name','title','specialty','crm','whatsapp','personal_phone','pix_key',
+       'bio','subspecialty','years_experience','has_masters','has_doctorate',
+       'city','state','accepting_patients',
+       'instagram','rqe','education','hospitals','insurances','languages','approach',
+       'consultation_price_brl','offers_telehealth',
+       'accepts_insurance','accepts_private','updated_at'
+     );
+  EXECUTE 'REVOKE UPDATE ON public.doctors FROM authenticated';
+  IF cols IS NOT NULL THEN
+    EXECUTE format('GRANT UPDATE (%s) ON public.doctors TO authenticated', cols);
+  END IF;
+END
+$grant_doctors$;
 GRANT ALL ON public.doctors TO service_role;
 
 -- 2. Cada paciente pertence a um médico (null = médico dono da instalação,
@@ -2774,3 +2842,155 @@ CREATE UNIQUE INDEX idx_waitlist_unique_active
 ALTER TABLE public.appointment_waitlist ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.appointment_waitlist FROM anon, authenticated;
 GRANT ALL ON public.appointment_waitlist TO service_role;
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260725160000_sky_theme.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Tema do céu da home do app.
+--
+-- NULL (padrão) = "v2", a arte por momento do dia. O valor só passa a existir
+-- quando a paciente compra o Céu Clássico na Loja e o aplica — por isso não há
+-- DEFAULT: quem nunca trocou continua no tema novo sem escrita nenhuma.
+--
+-- A coluna é validada no servidor contra os ids conhecidos (setSkyTheme), e o
+-- app trata coluna ausente como "v2", então o app funciona sem esta migração —
+-- ela só é necessária para a troca de tema PERSISTIR entre sessões.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS sky_theme text;
+
+COMMENT ON COLUMN public.patient_profiles.sky_theme IS
+  'Tema do céu da home: NULL/v2 = arte por período; v1 = gradiente original (item tema-ceu-v1 da Loja).';
+
+
+-- ───────────────────────────────────────────────────────────────────────────
+-- 20260727120000_home_city.sql
+-- ───────────────────────────────────────────────────────────────────────────
+
+-- Cidade onde a paciente mora — entra na cadeia de localização entre o GPS e
+-- o IP da borda. O IP erra em VPN, em viagem e quando a operadora roteia por
+-- outro estado; nesses casos a cidade do cadastro acerta. O GPS continua
+-- mandando quando existe, porque é o único que sabe onde ela está AGORA.
+-- As coordenadas ficam guardadas junto do nome para a busca de cidade ser
+-- resolvida uma vez só, ao salvar, em vez de a cada abertura do app.
+ALTER TABLE public.patient_profiles
+  ADD COLUMN IF NOT EXISTS home_city text,
+  ADD COLUMN IF NOT EXISTS home_lat double precision,
+  ADD COLUMN IF NOT EXISTS home_lon double precision;
+
+COMMENT ON COLUMN public.patient_profiles.home_city IS
+  'Cidade informada no cadastro (ex.: "Belo Horizonte, MG"). Só rótulo — quem manda no clima são home_lat/home_lon.';
+COMMENT ON COLUMN public.patient_profiles.home_lat IS
+  'Latitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';
+COMMENT ON COLUMN public.patient_profiles.home_lon IS
+  'Longitude da cidade, resolvida na busca ao salvar. Usada quando não há GPS.';
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  QUEM PERGUNTOU CADA LACUNA  (brain_gap_askers)
+-- ----------------------------------------------------------------------------
+--  Estava FALTANDO neste arquivo, e o CLAUDE.md manda rodar justamente este
+--  para fechar as migrations pendentes. A tabela nasceu em
+--  20260731010000_quem_perguntou.sql e só existia em APLICAR_QUEM_PERGUNTOU.sql,
+--  um arquivo separado que ninguém foi instruído a rodar.
+--
+--  A consequência não é uma tela vazia: é a IA quebrando uma promessa. Quando
+--  ela não sabe responder, diz à paciente "registrei a sua pergunta para ele
+--  ver". Quem liga aquela lacuna àquela paciente é ESTA tabela — `brain_gaps` é
+--  deduplicada por pergunta e não guarda quem perguntou. Sem ela o médico
+--  responde, o painel anuncia "Respondida e aprendida", e a resposta não chega
+--  a ninguém.
+-- ════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS public.brain_gap_askers (
+  gap_id     uuid        NOT NULL,
+  user_id    uuid        NOT NULL,
+  -- Quando ELA perguntou. Duas pacientes com a mesma dúvida em semanas
+  -- diferentes é informação clínica, não ruído.
+  created_at timestamptz NOT NULL DEFAULT now(),
+  -- Já foi avisada da resposta? Sem isto, reprocessar a entrega manda o mesmo
+  -- aviso de novo — e um push repetido sobre uma dúvida antiga é o tipo de
+  -- coisa que faz a paciente desligar as notificações.
+  avisada_em timestamptz,
+  PRIMARY KEY (gap_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_gap_askers_gap
+    ON public.brain_gap_askers (gap_id)
+    WHERE avisada_em IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_gap_askers_user
+    ON public.brain_gap_askers (user_id, created_at DESC);
+
+-- FKs com CASCADE nos dois lados: lacuna apagada não deixa ligação órfã, e
+-- conta apagada não deixa rastro de quem perguntou o quê.
+DO $fks$
+BEGIN
+  IF to_regclass('public.brain_gaps') IS NOT NULL
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.brain_gap_askers'::regclass
+          AND conname = 'brain_gap_askers_gap_id_fkey'
+     )
+  THEN
+    ALTER TABLE public.brain_gap_askers
+      ADD CONSTRAINT brain_gap_askers_gap_id_fkey
+      FOREIGN KEY (gap_id) REFERENCES public.brain_gaps(id) ON DELETE CASCADE;
+  END IF;
+
+  IF NOT EXISTS (
+       SELECT 1 FROM pg_constraint
+        WHERE conrelid = 'public.brain_gap_askers'::regclass
+          AND conname = 'brain_gap_askers_user_id_fkey'
+     )
+  THEN
+    ALTER TABLE public.brain_gap_askers
+      ADD CONSTRAINT brain_gap_askers_user_id_fkey
+      FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+  END IF;
+END
+$fks$;
+
+ALTER TABLE public.brain_gap_askers ENABLE ROW LEVEL SECURITY;
+
+-- Só o servidor. A paciente não precisa desta tabela (ela vê a resposta na aba
+-- Perguntas dela), e o médico a alcança pelas server functions do painel.
+DROP POLICY IF EXISTS "servico gerencia quem perguntou" ON public.brain_gap_askers;
+CREATE POLICY "servico gerencia quem perguntou" ON public.brain_gap_askers
+  FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+REVOKE ALL ON public.brain_gap_askers FROM anon, authenticated;
+GRANT ALL ON public.brain_gap_askers TO service_role;
+
+COMMENT ON TABLE public.brain_gap_askers IS
+  'Quem perguntou cada lacuna. Existe para a IA poder cumprir o que promete a paciente ("registrei aqui para ele ver") — brain_gaps e deduplicada por pergunta e nao guarda quem perguntou.';
+
+
+-- ════════════════════════════════════════════════════════════════════════════
+--  IMAGENS NO STORAGE  (exam_files.image_path / family_album_posts.image_path)
+-- ----------------------------------------------------------------------------
+--  Repetido aqui de propósito. O arquivo completo é
+--  supabase/APLICAR_IMAGENS_NO_STORAGE.sql (com os baldes e os índices do
+--  backfill), mas o CLAUDE.md manda rodar ESTE — e depender de alguém lembrar
+--  de um segundo arquivo é como `brain_gap_askers` ficou de fora por semanas.
+--
+--  Sem a coluna, o código NÃO perde só a economia de disco: o PostgREST recusa
+--  o INSERT inteiro com PGRST204 e o SELECT com 42703. Há recuo no código para
+--  os dois casos (ver src/lib/imagens.server.ts), então nada quebra — mas o
+--  laudo continua indo para dentro da linha, que é o que se quer evitar.
+-- ════════════════════════════════════════════════════════════════════════════
+
+ALTER TABLE IF EXISTS public.exam_files
+  ADD COLUMN IF NOT EXISTS image_path text;
+
+ALTER TABLE IF EXISTS public.family_album_posts
+  ADD COLUMN IF NOT EXISTS image_path text;
+
+insert into storage.buckets (id, name, public)
+values ('album', 'album', false)
+on conflict (id) do update set public = false;
+
+insert into storage.buckets (id, name, public)
+values ('exames', 'exames', false)
+on conflict (id) do update set public = false;

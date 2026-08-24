@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -8,6 +8,8 @@ import {
   getPreConsultaForms,
   getPatientReport,
   markPreConsultaSeen,
+  marcarConsultaNoDia,
+  contatoDaPaciente,
   setQuestionAnswered,
   updateAppointmentStatus,
   confirmAppointment,
@@ -22,8 +24,86 @@ import {
   type AdminWaitlistEntry,
 } from "@/lib/admin.functions";
 import { computeGestation } from "@/lib/gestacao";
+import { juntarCrm, separarCrm, UFS } from "@/lib/crm";
+import { buscarCep, digitosCep, formatarCep } from "@/lib/cep";
+import { PerfilProgresso, itensDoPerfil } from "@/components/perfil-progresso";
+import { CampoComOutro } from "@/components/campo-com-outro";
+import { CampoFocos } from "@/components/campo-focos";
+import { CampoFoto } from "@/components/campo-foto";
+import { conferirMeuCrm } from "@/lib/crm-conferencia.functions";
+import {
+  acionamentosDaPaciente,
+  listarAcionamentos,
+  marcarAcionamentoAtendido,
+  type AcionamentoSos,
+} from "@/lib/acionamentos.functions";
+import { AlertaSosMedico } from "@/components/alerta-sos-medico";
+import { ProntuarioPaciente } from "@/components/prontuario-paciente";
+import { RegistrarConsulta } from "@/components/registrar-consulta";
+import { EnviarParaPaciente } from "@/components/enviar-para-paciente";
+import {
+  consultasDaPaciente,
+  fichaClinica,
+  prontuarioDaPaciente,
+  registrarDesfecho,
+  type Consulta,
+  type EventoClinico,
+  type FichaClinica,
+  type TipoDeEmissao,
+} from "@/lib/clinical.functions";
+import { exameSugerido } from "@/lib/exame-sugerido";
+import { filtrarPacientes } from "@/lib/busca-paciente";
+import { quemEstaQuieta, textoDaQuietude } from "@/lib/silencio";
+import { FolhaDaPaciente } from "@/components/folha-da-paciente";
+import { ModoConsulta } from "@/components/modo-consulta";
+import {
+  ABAS_DA_PACIENTE,
+  ABA_INICIAL_DA_PACIENTE,
+  SECOES_DA_ABA,
+  contadorDaAba,
+  type AbaDaPaciente,
+} from "@/lib/abas-da-paciente";
+import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
+import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { GradeDeHorarios } from "@/components/grade-de-horarios";
+import {
+  ESTILO_SINAL,
+  PESO_SINAL,
+  diasDeSilencio,
+  sinalGlicemia,
+  sinalPressao,
+  sinalSilencio,
+} from "@/lib/sinais-clinicos";
+import { ESPECIALIDADES_MEDICO, TITULOS_MEDICO } from "@/lib/medico-opcoes";
+import {
+  MOEDAS,
+  centavosDe,
+  digitandoDinheiro,
+  formatarDinheiro,
+  unidadesInteirasDe,
+  type MoedaChave,
+} from "@/lib/dinheiro";
+import { pendenciasDoMedico, type Pendencia } from "@/lib/doctor-required";
+import { mensalidadeCentavos } from "@/lib/entitlements";
+import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
+import { PerfilNoTopo } from "@/components/perfil-no-topo";
+import { AbasDoPainel } from "@/components/abas-do-painel";
+import { CalendarioDoMes } from "@/components/calendario-do-mes";
+import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unificada";
+import { rolarAte } from "@/lib/rolar-ate";
+import type { PanelTab } from "@/lib/abas-do-painel";
+import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
+import { MesadaDoMedico } from "@/components/mesada-do-medico";
+import {
+  listMyAddresses,
+  saveMyAddress,
+  deleteMyAddress,
+  type DoctorAddress,
+} from "@/lib/doctor-addresses.functions";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { gradientFor, periodFor } from "@/components/weather-sky";
+import { fechoDoTempo, tempoPoupado } from "@/lib/tempo-poupado";
 import { ymdLocal } from "@/lib/utils";
 import {
   getTeleconsultasAdmin,
@@ -35,15 +115,9 @@ import {
   type TeleconsultaSession,
 } from "@/lib/teleconsulta.functions";
 import {
-  getCorporateLeadsAdmin,
-  createCorporateAccountAdmin,
-  updateLeadStatusAdmin,
-  type CorporateLead,
-  type CorporateAccount,
-} from "@/lib/corporativo.functions";
-import {
   getPrivateConsultationsForDoctor,
   confirmPaymentForDoctor,
+  marcarHoraDaConsulta,
   CONSULT_TYPES as PRIVATE_CONSULT_TYPES,
   type PrivateConsultation,
 } from "@/lib/consultaparticular.functions";
@@ -57,18 +131,31 @@ import {
   listUnansweredQuestions,
   answerAndTrain,
   testBrain,
+  cotaDeRespostas,
+  listBrainReviews,
+  resolveBrainReview,
+  curarLacunasDoMedico,
+  embedarEntradasDoMedico,
   listBrainGaps,
+  reabrirLacuna,
   resolveBrainGap,
   dismissBrainGap,
   draftGapAnswer,
   installStarterPack,
   getBrainQualityStats,
+  diagnosticoDaBusca,
+  diasSemRevisao,
+  precisaDeRevisao,
   extractKnowledgeFromTranscript,
   evalBrainQuestion,
   listBrainConversations,
   getBrainConversation,
   getBrainScore,
   type BrainGap,
+  type LacunaQueVoltou,
+} from "@/lib/secondbrain.functions";
+import { MAX_CAMPO_DO_MEDICO } from "@/lib/doctorthink/core";
+import {
   type BrainEntry,
   type BrainSettings,
   type BrainConversation,
@@ -84,6 +171,7 @@ import {
 } from "@/lib/doctors.functions";
 import {
   getMyClinic,
+  sairDaClinica,
   createClinic,
   addClinicDoctor,
   removeClinicDoctor,
@@ -104,10 +192,10 @@ import {
 } from "@/lib/google-calendar.functions";
 import { DoctorBadge } from "@/components/doctor-badge";
 import {
+  encerrarAcompanhamento,
   listPatientRequests,
   respondPatientRequest,
   listMyPatients,
-  setPatientQuizPremium,
   setPatientFetalBpm,
   type PatientRequest,
   type LinkedPatient,
@@ -137,45 +225,42 @@ const STATUS_STYLE: Record<string, string> = {
   declined: "bg-rose-100 text-rose-700",
 };
 
-const PANEL_TABS = [
-  "Painel 📊",
-  "Calendário",
-  "Agendamentos",
-  "Agenda",
-  "Ferramentas",
-  "Perguntas",
-  "Cérebro 🧠",
-  "Pré-consultas",
-  "Teleconsultas",
-  "Consultas Pagas",
-  "Empresas",
-  "Lives",
-  "Engajamento",
-  "Pacientes 👩‍🍼",
-  "Clínica 🏥",
-  "Meu Perfil",
-] as const;
-type PanelTab = (typeof PANEL_TABS)[number];
+/**
+ * A lista de abas e o agrupamento saíram deste arquivo.
+ *
+ * Moram em `src/lib/abas-do-painel.ts`, sem JSX, para o agrupamento poder ser
+ * testado sem montar uma tela de 11 mil linhas — e para a lista não virar
+ * duas, que é como quatro telas deste produto já ficaram implementadas e
+ * inalcançáveis, inclusive a única de receituário.
+ */
 
-// Cada médico (inclusive o Dr. Clóvis) é um inquilino: vê só as abas escopadas
-// por doctor_id no servidor — painel, agendamentos, perguntas, pré-consultas,
-// teleconsultas, engajamento, cérebro, pacientes, consultas pagas, lives e
-// perfil, todas recortadas ao PRÓPRIO médico. O financeiro da plataforma
-// inteira e as Empresas ficam no console do dono (/admin), não aqui.
-const DOCTOR_TABS: readonly PanelTab[] = [
-  "Painel 📊",
-  "Agendamentos",
-  "Perguntas",
-  "Pré-consultas",
-  "Teleconsultas",
-  "Consultas Pagas",
-  "Lives",
-  "Engajamento",
-  "Cérebro 🧠",
-  "Pacientes 👩‍🍼",
-  "Clínica 🏥",
-  "Meu Perfil",
-];
+/**
+ * A aba em que o médico ATERRISSA — declarada, não deduzida.
+ *
+ * Duas coisas do painel se penduram na "tela de entrada": o interruptor de
+ * push do SOS e, no app nativo, o resumo do dia. As duas estavam escritas como
+ * `tab === "Painel 📊"`, o que era verdade só porque o Painel era a primeira
+ * aba. Ao pôr o Cérebro na frente, as duas saíram silenciosamente da tela de
+ * entrada — inclusive o interruptor de SOS, que o comentário ao lado dele
+ * declara textualmente que não pode depender de o médico passear pelas abas.
+ *
+ * Amarrar as duas a ESTA constante faz a próxima reordenação de abas levá-las
+ * junto, em vez de deixá-las para trás sem ninguém perceber.
+ *
+ * ─── POR QUE VOLTOU A SER O PAINEL (ago/2026) ───────────────────────────────
+ *
+ * Era o Cérebro, por uma regra verdadeira: números dizem o que ACONTECEU, o
+ * cérebro é onde ele MUDA o que vai acontecer. O que virou a regra do avesso
+ * foi a FILA DE TRABALHO mudar de lugar. Ela vivia num cabeçalho repetido em
+ * todas as telas e agora mora dentro do Painel; com ela dentro, o Painel deixou
+ * de ser o que aconteceu e passou a ser o que ainda precisa dele.
+ *
+ * De quebra, some o segundo caminho: havia uma `ABA_DE_ENTRADA_SEM_IA` só
+ * porque o Cérebro é paywall no Free e o médico abria o painel dentro de uma
+ * porta fechada. O Painel não é paywall de ninguém — a entrada passou a ser
+ * uma só, para todos os planos e também no app nativo.
+ */
+const ABA_DE_ENTRADA: PanelTab = "Painel 📊";
 
 async function token() {
   const { data } = await supabase.auth.getSession();
@@ -185,35 +270,304 @@ async function token() {
 function PainelPage() {
   const [loading, setLoading] = useState(true);
   const [allowed, setAllowed] = useState(false);
-  const [tab, setTab] = useState<PanelTab>("Painel 📊");
+  /* O perfil do médico LOGADO. Sem ele, três telas do painel usavam o
+     `doctor.config` — o arquivo fixo do dono da instalação — e um assinante
+     cobrava PIX na chave do Dr. Clóvis e imprimia recibo com o CRM dele.
+     Numa plataforma multi-médico isso não é um detalhe de layout: é dinheiro
+     indo para a conta errada e documento assinado por quem não atendeu. */
+  const [euMedico, setEuMedico] = useState<DoctorProfile | null>(null);
+  /** Perguntas pendentes contadas no banco, não filtradas de uma amostra. */
+  const [pendingExato, setPendingExato] = useState<number | null>(null);
+  /* Está dentro do app nativo? Lido em efeito porque `ehNativo()` olha um
+     global do Capacitor, que não existe no SSR. */
+  const [noApp, setNoApp] = useState(false);
+  useEffect(() => {
+    void (async () => {
+      const { ehNativo } = await import("@/lib/nativo");
+      const nativo = ehNativo();
+      setNoApp(nativo);
+      /* Entrada única (ago/2026): o `tab` inicial já nasce onde o app precisa
+         que ele esteja, então não há mais nada a corrigir aqui. Enquanto eram
+         duas constantes, era este `setTab` que fazia o resumo do celular
+         aparecer — se `abaDeEntrada` voltar a divergir de `ABA_DE_ENTRADA`,
+         este desvio precisa voltar junto. */
+    })();
+  }, []);
+  /** Perfil de médico existe mas está inativo: entra, com aviso, em Meu Perfil. */
+  const [inativo, setInativo] = useState(false);
+  /* O que o plano libera. Ficava disponível em `getMyDoctor` e não era lido:
+     o Cérebro aparecia para todo mundo e, no Free, cada tentativa de treinar
+     devolvia "Tente novamente" — um paywall disfarçado de bug. */
+  const [podeIA, setPodeIA] = useState(true);
+  /* Ambos começam liberados e só são FECHADOS por um entitlement que chegou de
+     fato. Fechar por falta de resposta seria mostrar um paywall a quem paga. */
+  const [podeEquipe, setPodeEquipe] = useState(true);
+  const [rotuloPlano, setRotuloPlano] = useState("");
+  /** Mensagens de IA por ciclo do plano vigente — define a mensalidade da escada. */
+  const [mensagensDoPlano, setMensagensDoPlano] = useState<number | null>(null);
+
+  /**
+   * O que a bolinha do perfil precisa gritar antes de ser clicada.
+   *
+   * Conta inativa é o único estado em que o painel INTEIRO mente: as listas
+   * vêm vazias porque as pacientes não acham o médico na busca, e ele conclui
+   * que o produto quebrou. O aviso já existia — dentro da aba, que é
+   * exatamente onde ele não vai olhar enquanto acha que o problema é outro.
+   */
+  const avisoDaConta = inativo
+    ? "Sua conta está inativa — as pacientes não encontram você na busca."
+    : null;
+
+  /* A aba que abre é o Painel — que agora é a FILA DE TRABALHO, e não o
+     relatório de números que ela era. Ver o comentário de `ABA_DE_ENTRADA`. */
+  const [tab, setTab] = useState<PanelTab>(ABA_DE_ENTRADA);
+  /**
+   * Onde ele aterrissou de fato. É o que decide onde aparecem o interruptor de
+   * push do SOS e, no celular, o resumo do dia.
+   *
+   * Hoje é sempre `ABA_DE_ENTRADA` — o Painel não é paywall de ninguém e serve
+   * ao app nativo tão bem quanto ao computador, então os dois desvios que
+   * existiam (Free e nativo) deixaram de ter para onde desviar. Continua com
+   * nome próprio de propósito: as três peças abaixo se penduram em "onde ele
+   * aterrissa", e escritas como `tab === "Painel 📊"` elas já sumiram da tela
+   * uma vez, quando o Cérebro passou para a frente.
+   */
+  const abaDeEntrada = ABA_DE_ENTRADA;
+  /* A rolagem até a aba ativa saiu daqui e mora em `AbasDoPainel`, junto da
+     fita que ela rola. Ela continua importando pelo mesmo motivo de antes:
+     várias trocas de aba são PROGRAMÁTICAS — um cartão do Painel manda para
+     Exames —, e sem isso ele aterrissava numa tela cujo indicador de posição
+     estava fora do campo de visão, justamente quando mais precisa se situar.
+     ("Meu Perfil" saiu da fita e virou a bolinha do canto; quem indica a
+     posição dela é a própria bolinha, via `ativo`.) */
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   // null = o próprio cérebro (comportamento de sempre).
   const [brainAsDoctor, setBrainAsDoctor] = useState<{ id: string; name: string } | null>(null);
   const [appointments, setAppointments] = useState<AdminAppointment[]>([]);
   const [questions, setQuestions] = useState<AdminQuestion[]>([]);
   const [preForms, setPreForms] = useState<AdminPreConsulta[]>([]);
+  /* Solicitações de vínculo no nível do painel. Antes só a aba Pacientes as
+     carregava, então o resumo do topo não tinha como saber que existiam. */
+  const [pedidosVinculo, setPedidosVinculo] = useState<
+    { id: string; patient_name: string | null; created_at: string }[]
+  >([]);
+  /* Acionamentos de SOS pendentes. Consultados ao abrir e a cada 60s: um SOS
+     que chega enquanto ele está com o painel aberto tem que aparecer sozinho —
+     esperar ele recarregar a página é esperar demais. */
+  const [sosPendentes, setSosPendentes] = useState<AcionamentoSos[]>([]);
+  const [sosAberto, setSosAberto] = useState<AcionamentoSos | null>(null);
+  const [sosAtendendo, setSosAtendendo] = useState(false);
+  /* Adiados nesta sessão: some da tela agora e volta na próxima visita. */
+  const [sosAdiados, setSosAdiados] = useState<Set<string>>(new Set());
+
+  /**
+   * Quais fontes da fila falharam ao carregar.
+   *
+   * "☕ Nada esperando por você" é uma boa notícia, e uma boa notícia que na
+   * verdade é uma falha de rede é a pior coisa que este painel pode dizer: o
+   * médico fecha a tela tranquilo com uma emergência não lida do outro lado.
+   */
+  /* ⚠️ NÃO EXISTE MAIS UMA SEGUNDA LEITURA DAS TRIAGENS AQUI.
+     Havia: `loadTriagens` buscava `triage_logs` a cada abertura do painel,
+     guardava a lista em estado — e NENHUMA tela a desenhava. A única coisa que
+     sobrevivia da chamada era um sinalizador de falha que punha "alertas de
+     sintomas" na faixa de fontes com problema, avisando sobre um dado que
+     chegava inteiro pelo outro caminho.
+     `triage_logs` é uma das onze fontes de `clinical_events`, e a triagem
+     vermelha/amarela entra na fila por `eventosQuePedemOlhar` como episódio.
+     Duas leituras da mesma tabela é exatamente o que o contrato único existe
+     para evitar. Se um dia a triagem precisar de tela PRÓPRIA, ela nasce de
+     `clinical_events`, não de um segundo caminho. */
+  /* Eventos clínicos fora de faixa — de TODAS as pacientes dele, das onze
+     fontes. É o que transforma a fila de "coisas administrativas" em "coisas
+     clínicas". */
+  const [eventosClinicos, setEventosClinicos] = useState<EventoClinico[]>([]);
+  /* Qual paciente a fila mandou abrir. Sem isto, "Ver ficha" num item de
+     EMERGÊNCIA trocava de aba e largava o médico numa lista sem busca — a
+     mesma queixa que o prontuário existe para resolver. */
+  const [abrirPaciente, setAbrirPaciente] = useState<string | null>(null);
+  const [nomesPacientes, setNomesPacientes] = useState<Record<string, string>>({});
+
+  const [fonteFalhou, setFonteFalhou] = useState({
+    sos: false,
+    vinculos: false,
+    /* As cinco fontes da fila, e não duas. Com só `sos` e `vinculos`
+       rastreados, uma falha em `getPreConsultaForms` deixava a banda "Para ler"
+       vazia e a tela dizia "☕ Nada esperando por você" com seis pré-consultas
+       não lidas — que é exatamente o bug que a trava existe para impedir. */
+    consultasEPerguntas: false,
+    preConsultas: false,
+    eventos: false,
+    /* O Engajamento não é fonte da FILA — não entra na faixa dela. Mora aqui
+       porque é o mesmo vocabulário, e a aba usa este campo para avisar em vez
+       de ficar oferecendo "Clique para carregar o dashboard" para sempre. */
+    engajamento: false,
+  });
+
+  /* Vigia de SOS. Roda em paralelo ao resto e nunca derruba o painel: um erro
+     aqui custa o aviso, não o consultório. */
+  useEffect(() => {
+    let vivo = true;
+    async function olhar() {
+      try {
+        const tk = await token();
+        const r = await listarAcionamentos({
+          data: { accessToken: tk, apenasPendentes: true, limite: 20 },
+        });
+        if (!vivo) return;
+        if (r.ok) {
+          setSosPendentes(r.acionamentos);
+          setFonteFalhou((f) => ({ ...f, sos: false }));
+        } else setFonteFalhou((f) => ({ ...f, sos: true }));
+      } catch {
+        if (vivo) setFonteFalhou((f) => ({ ...f, sos: true }));
+      }
+    }
+    void olhar();
+    const t = setInterval(olhar, 60_000);
+    return () => {
+      vivo = false;
+      clearInterval(t);
+    };
+  }, []);
+
+  /* A fila envelhece sozinha se ninguém a atualizar.
+     Só o SOS tinha vigia; perguntas, pedidos de consulta e vínculos ficavam
+     congelados no instante do carregamento. Um painel deixado aberto — que é
+     justamente como se usa uma fila de trabalho — dizia "nada esperando" por
+     horas enquanto chegava coisa. Pior: o poll de SOS trocava o array a cada
+     minuto, então a tela PARECIA viva com o dado morto.
+
+     Três minutos, e só com a aba à vista: atualizar em segundo plano gasta
+     bateria e cota de banco para ninguém ver. */
+  useEffect(() => {
+    if (!allowed) return;
+    /* `load(true)` já recarrega as solicitações de vínculo por dentro — chamar
+       `loadPedidosVinculo` aqui também era uma requisição a mais por tique, num
+       efeito cuja justificativa é economia de cota. */
+    /* Freio de um minuto. `visibilitychange` dispara em toda troca de app — no
+       iPhone, também a cada bloqueio de tela. Sem isto, quinze idas ao WhatsApp
+       em cinco minutos custavam sessenta chamadas de servidor, num efeito cuja
+       justificativa escrita é economizar cota. */
+    let ultima = 0;
+    const atualizar = () => {
+      const agora = Date.now();
+      if (agora - ultima < 60_000) return;
+      ultima = agora;
+      load(true).catch(() => {});
+      loadPreForms().catch(() => {});
+      loadEventosClinicos().catch(() => {});
+    };
+    const t = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      atualizar();
+    }, 180_000);
+    /* E ao VOLTAR para a aba: quem pula o tique escondido precisa de um jeito de
+       se pôr em dia, senão o médico volta do WhatsApp e olha para dados de três
+       minutos atrás sem saber disso. */
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") atualizar();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowed]);
+
+  /* Abre o modal sozinho no acionamento mais recente que ele ainda não adiou.
+     Um aviso de emergência que espera um clique para aparecer não é aviso. */
+  useEffect(() => {
+    if (sosAberto) return;
+    const novo = sosPendentes.find((a) => !sosAdiados.has(a.id));
+    if (novo) setSosAberto(novo);
+  }, [sosPendentes, sosAdiados, sosAberto]);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [privateConsults, setPrivateConsults] = useState<any[]>([]);
-  const [corporateLeads, setCorporateLeads] = useState<CorporateLead[]>([]);
-  const [corporateAccounts, setCorporateAccounts] = useState<CorporateAccount[]>([]);
   const [engagement, setEngagement] = useState<{
     totalPatients: number;
     activeLastWeek: number;
     inactiveLastWeek: number;
     unseenPreConsultas: number;
     patients: PatientEngagement[];
+    /** Até onde o servidor foi buscar atividade — a tela precisa para não
+        chamar de "nunca" o que é só "fora da janela". */
+    janelaAtividadeDias?: number;
+    atividadeIncompleta?: boolean;
   } | null>(null);
 
-  async function load() {
+  /**
+   * @param ehRefresh Atualização periódica, e não a entrada na tela.
+   *
+   * A diferença não é cosmética: fora do primeiro carregamento, esta função
+   * NUNCA pode rebaixar autorização. Um soluço de dois segundos no Auth do
+   * Supabase faz `getAdminData` devolver `{ok:false}` sem lançar exceção — e
+   * no caminho de fallback isso terminava em `setAllowed(false)`, ou seja, o
+   * painel inteiro do médico virava "Área restrita — crie sua conta aqui" no
+   * meio do trabalho dele, levando junto o texto que ele estava digitando e
+   * qualquer modal de emergência aberto. No primeiro carregamento o bloqueio é
+   * a resposta certa; a cada três minutos, para sempre, é uma armadilha.
+   */
+  /**
+   * O QUE O PLANO LIBERA — num lugar só.
+   *
+   * Estava escrito duas vezes, nos dois ramos do `load` (caminho feliz e
+   * fallback), e só a cópia do fallback ganhou o desvio do Free. Como o médico
+   * Free ATIVO entra sempre pelo caminho feliz, o desvio nunca rodava para
+   * ele: abria o painel dentro do paywall do Cérebro — uma porta fechada como
+   * primeira tela — e, de quebra, ficava sem o interruptor de push do SOS, que
+   * só aparece na aba de entrada.
+   *
+   * Duas cópias de uma regra divergem. Foi assim com os dois filtros de
+   * lacuna, e foi assim aqui.
+   */
+  function aplicarPlano(
+    ent:
+      | { aiApp?: boolean; teamSeats?: unknown; label?: string; aiRepliesPerCycle?: number | null }
+      | undefined,
+    ehRefresh: boolean,
+  ) {
+    setPodeIA(ent?.aiApp !== false);
+    setPodeEquipe(!!ent?.teamSeats);
+    setRotuloPlano(ent?.label ?? "");
+    /* ─── QUANTAS MENSAGENS ELE COMPROU ──────────────────────────────────────
+       No plano `mensagens` o preço é uma escada, então a mensalidade só pode
+       ser calculada com a quantidade. Ela vem daqui, e não de uma segunda
+       leitura de `doctors.ai_messages_per_cycle`: `comMensagensCompradas` já
+       resolveu a coluna no servidor e a colocou neste campo. Ler a coluna de
+       novo na tela criaria a segunda fonte que esta base já viu divergir. */
+    setMensagensDoPlano(typeof ent?.aiRepliesPerCycle === "number" ? ent.aiRepliesPerCycle : null);
+    /* Só na entrada: arrancar o médico da aba em que ele está, a cada
+       atualização de três minutos, seria pior que o problema que isto resolve.
+       Hoje ele já nasce no Painel, então isto é rede — mas rede que precisa
+       continuar existindo: quem decide o `tab` inicial é o `useState`, e um dia
+       em que a entrada volte a ser uma aba de plano, este é o desvio que
+       impede o Free de abrir o produto num paywall. */
+    if (ent?.aiApp === false && !ehRefresh) setTab(ABA_DE_ENTRADA);
+  }
+
+  async function load(ehRefresh = false) {
     try {
       const tk = await token();
       const res = await getAdminData({ data: { accessToken: tk } });
+      if (!res.ok && ehRefresh) {
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: true }));
+        return;
+      }
       if (res.ok) {
+        /* `incompleto` é o caso do meio: a chamada respondeu, mas uma das três
+           leituras do servidor falhou. Sem isto, o médico via listas parciais
+           com cara de completas — e a pior delas é a de perguntas, que esvazia
+           inteira quando a leitura dos PERFIS falha, porque o nome alimenta o
+           filtro. */
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: !!res.incompleto }));
         // Conta da plataforma (ADMIN_EMAILS) NÃO é médico: seu lugar é o
         // console /admin. Só redireciona quem SERÁ admitido lá (o super-admin
         // dono); um e-mail admin secundário sem conta de médico vê o bloqueio
         // coerente em vez de um beco sem saída (redirect → /admin negado).
         if (res.isTeam) {
+          if (ehRefresh) return;
           const { checkIsSuperAdmin } = await import("@/lib/platform.functions");
           const sa = await checkIsSuperAdmin({ data: { accessToken: tk } });
           if (sa.isSuperAdmin) {
@@ -226,12 +580,48 @@ function PainelPage() {
         setAllowed(true);
         setAppointments(res.appointments);
         setQuestions(res.questions);
+        setPendingExato("pendingQuestions" in res ? res.pendingQuestions : null);
+        setFonteFalhou((f) => ({ ...f, consultasEPerguntas: false }));
+        /* Carrega o próprio perfil também no caminho felizes: é dele que saem
+           a chave PIX e o CRM do recibo. Best-effort — o painel abre sem. */
+        try {
+          const me = await getMyDoctor({ data: { accessToken: tk } });
+          if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
+          if (me.ok) aplicarPlano(me.entitlements, ehRefresh);
+        } catch {
+          /* segue com o padrão */
+        }
+        /* Solicitações de vínculo, para o resumo do topo poder contá-las.
+           Best-effort: uma falha aqui não pode derrubar o painel inteiro — o
+           médico perde o aviso, não o consultório. */
+        await loadPedidosVinculo();
         return;
       }
       // Fallback (getAdminData negou): médico assinante inativo/sem linha ativa?
       const me = await getMyDoctor({ data: { accessToken: tk } });
-      if (me.ok && me.doctor?.active) {
+      if (me.ok && me.doctor) setEuMedico(me.doctor as DoctorProfile);
+      /* O gate só vale para quem TEM perfil de médico.
+         
+         Sem esta condição, o gestor de clínica (que entra pelo resgate mais
+         abaixo e não tem linha em `doctors`) recebia entitlements de plano Free
+         — e era barrado justamente da Clínica e do Cérebro, as duas telas para
+         as quais ele foi admitido. */
+      if (me.ok && me.doctor) aplicarPlano(me.entitlements, ehRefresh);
+      /* Perfil de médico INATIVO também entra — só que direto em Meu Perfil.
+         
+         Antes ele era recusado aqui e caía em "área restrita", vindo de um
+         "esta área é da gestante": dois blocos apontando um para o outro, sem
+         nenhuma tela onde resolver o problema. As abas de dados continuam
+         vazias (o servidor recorta tudo por médico ativo), e é assim que deve
+         ser — o que ele precisa mexer é a assinatura, que está em Meu Perfil. */
+      if (me.ok && me.doctor) {
         setAllowed(true);
+        if (!me.doctor.active) {
+          setInativo(true);
+          /* Só na entrada: arrancar o médico da aba em que ele está, de três em
+             três minutos, seria pior que o problema que isto resolve. */
+          if (!ehRefresh) setTab("Meu Perfil");
+        }
         return;
       }
       // Dono de clínica sem conta de médico (gestor): entra para administrar
@@ -246,21 +636,98 @@ function PainelPage() {
         /* segue para o bloqueio padrão */
       }
       setAllowed(false);
+    } catch {
+      /* Os modos de falha COMUNS lançam — rede caiu, sessão expirou e o token
+         vazio é recusado pelo validador. O ramo `!res.ok` não os cobre, então
+         com a sessão morta a tela ficava congelada e a faixa "não consegui
+         conferir tudo" nunca aparecia: o médico trabalhava num retrato antigo
+         achando que era ao vivo, que é exatamente o que a faixa existe para
+         impedir. */
+      setFonteFalhou((f) => ({ ...f, consultasEPerguntas: true }));
     } finally {
       setLoading(false);
     }
   }
 
+  /**
+   * Solicitações de vínculo pendentes.
+   *
+   * Extraída para poder ser chamada de novo quando a aba Pacientes responde uma
+   * — antes era carregada uma única vez no `load()` e a fila de trabalho ficava
+   * afirmando que a paciente ainda esperava depois de ela ter sido aceita.
+   */
+  async function loadPedidosVinculo() {
+    try {
+      const tk = await token();
+      const { listPatientRequests } = await import("@/lib/patientlink.functions");
+      const pr = await listPatientRequests({ data: { accessToken: tk } });
+      if (pr.ok) {
+        setPedidosVinculo(
+          pr.requests.map((r) => ({
+            id: r.id,
+            patient_name: r.patient_name,
+            created_at: r.created_at,
+          })),
+        );
+        setFonteFalhou((f) => ({ ...f, vinculos: false }));
+      } else setFonteFalhou((f) => ({ ...f, vinculos: true }));
+    } catch {
+      /* Best-effort: uma falha aqui não derruba o painel. Mas fica REGISTRADA,
+         porque uma fila vazia por falha de rede é indistinguível de uma fila
+         vazia de verdade — e a segunda é uma boa notícia que ninguém deveria
+         receber sem ser verdade. */
+      setFonteFalhou((f) => ({ ...f, vinculos: true }));
+    }
+  }
+
   async function loadEngagement() {
-    const tk = await token();
-    const res = await getEngagementData({ data: { accessToken: tk } });
-    if (res.ok) setEngagement(res);
+    /* ─── A ABA MORRIA CALADA ────────────────────────────────────────────────
+     *
+     * `token()` devolve string vazia quando a sessão expira e o validador do
+     * servidor exige `min(10)` — a chamada é REJEITADA e a promessa estoura.
+     * Sem `try`, sem estado de erro e sem `else`, `engagement` ficava `null` e
+     * a aba continuava mostrando "Clique para carregar o dashboard". O médico
+     * clica, nada acontece, clica de novo.
+     *
+     * O irmão ao lado (`loadEventosClinicos`) já fazia isto certo. */
+    try {
+      const tk = await token();
+      const res = await getEngagementData({ data: { accessToken: tk } });
+      if (res.ok) {
+        setEngagement(res);
+        setFonteFalhou((f) => ({ ...f, engajamento: false }));
+      } else setFonteFalhou((f) => ({ ...f, engajamento: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, engajamento: true }));
+    }
+  }
+
+  async function loadEventosClinicos() {
+    try {
+      const tk = await token();
+      const { eventosQuePedemOlhar } = await import("@/lib/clinical.functions");
+      const r = await eventosQuePedemOlhar({ data: { accessToken: tk, dias: 14 } });
+      if (r.ok) {
+        setEventosClinicos(r.eventos);
+        setNomesPacientes(r.nomes);
+        setFonteFalhou((f) => ({ ...f, eventos: r.incompleto }));
+      } else setFonteFalhou((f) => ({ ...f, eventos: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, eventos: true }));
+    }
   }
 
   async function loadPreForms() {
-    const tk = await token();
-    const res = await getPreConsultaForms({ data: { accessToken: tk } });
-    if (res.ok) setPreForms(res.forms);
+    try {
+      const tk = await token();
+      const res = await getPreConsultaForms({ data: { accessToken: tk } });
+      if (res.ok) {
+        setPreForms(res.forms);
+        setFonteFalhou((f) => ({ ...f, preConsultas: false }));
+      } else setFonteFalhou((f) => ({ ...f, preConsultas: true }));
+    } catch {
+      setFonteFalhou((f) => ({ ...f, preConsultas: true }));
+    }
   }
 
   async function loadTeleconsultas() {
@@ -275,17 +742,16 @@ function PainelPage() {
     if (res.ok) setPrivateConsults(res.consultations);
   }
 
-  async function loadCorporate() {
-    const tk = await token();
-    const res = await getCorporateLeadsAdmin({ data: { accessToken: tk } });
-    if (res.ok) {
-      setCorporateLeads(res.leads);
-      setCorporateAccounts(res.accounts);
-    }
-  }
-
   useEffect(() => {
     load();
+    /* Pré-consultas junto do resto, e não só ao abrir a aba.
+       A fila de trabalho vive na tela inicial e lê `preForms`; enquanto essa
+       lista só era carregada dentro do efeito de aba, a banda "Para ler" era
+       vazia por construção na única tela onde a fila aparece — e o médico lia
+       "nada esperando por você" com seis pré-consultas não lidas na caixa. É o
+       mesmo bug que a fila existe para consertar, um nível abaixo. */
+    loadPreForms().catch(() => {});
+    loadEventosClinicos().catch(() => {});
   }, []);
 
   // Retorno do checkout do Stripe (assinatura do médico): o webhook ativa o
@@ -306,32 +772,87 @@ function PainelPage() {
   useEffect(() => {
     if (!allowed) return;
     if (tab === "Engajamento" && !engagement) loadEngagement();
-    if (tab === "Pré-consultas") loadPreForms();
-    if (tab === "Teleconsultas") {
+    /* A FILA precisa do engajamento, e a fila vive na aba de entrada.
+       Enquanto isto só carregava ao abrir "Engajamento", os itens de "sem
+       registro há X dias" eram vazios POR CONSTRUÇÃO na única tela onde a fila
+       aparece — a régua estaria certa e a lista, sempre vazia. */
+    if (tab === abaDeEntrada && !engagement) loadEngagement();
+    /* As pré-consultas viraram uma SEÇÃO da aba Pacientes, então quem dispara a
+       releitura é a abertura dela — era `tab === "Pré-consultas"`, aba que
+       deixou de existir.
+       Isto é ATUALIZAÇÃO, não a primeira carga: `loadPreForms` já roda na
+       montagem (ver o efeito de `load`), porque a fila de trabalho da tela
+       inicial lê `preForms` e ficaria vazia por construção. Trocar aqui por
+       engano não esvaziaria a tela — deixaria a lista velha, que é pior de
+       perceber. */
+    if (tab === "Pacientes 👩‍🍼") loadPreForms();
+
+    /* O calendário junta pedidos, teleconsultas e consultas particulares. Sem
+       carregar as duas últimas ao abrir a aba, a grade mostraria só o
+       presencial — e "não tem nada marcado" é justamente a mentira que este
+       trabalho todo está tentando tirar do painel. */
+    /* O CALENDÁRIO É A AGENDA INTEIRA agora — pedidos, teleconsultas e
+       particulares moram nele, como seções. Então ele carrega tudo que as três
+       abas antigas carregavam; deixar de fora o que era da aba de teleconsulta
+       faria a seção dela abrir vazia dentro do calendário. */
+    if (tab === "Calendário") {
       loadTeleconsultas();
+      loadPrivateConsults();
       loadPreForms();
       // O select de pacientes da nova teleconsulta vem do engagement
       if (!engagement) loadEngagement();
     }
-    if (tab === "Consultas Pagas") loadPrivateConsults();
-    if (tab === "Empresas") loadCorporate();
   }, [tab, allowed]);
 
+  /* AS TRÊS MUTAÇÕES OTIMISTAS pintam a tela antes do servidor responder — e
+     ignoravam o retorno. Um `updateAppointmentStatus` recusado (o índice único
+     de horário barrando double-booking, a sessão expirada) ficava mentindo até
+     o F5. Com o refresh de três minutos ficou pior: o item se desfazia sozinho
+     na cara do médico, sem uma palavra de explicação. Falhou, ele volta ao
+     estado anterior E fica sabendo por quê. */
+  /* O ROLLBACK É POR ITEM, e nunca um snapshot do array inteiro.
+
+     Guardar `const antes = appointments` e restaurá-lo no erro descarta tudo o
+     que entrou entre a captura e a falha. Dois cenários reais: o médico cancela
+     B enquanto a confirmação de A está em voo, A falha, e B volta a "pendente"
+     na tela apesar de o servidor ter aceitado; ou o refresh traz um pedido novo
+     C nesse meio-tempo, A falha, e C SOME do painel e da fila — uma paciente
+     esperando aceite desaparece por causa de outra operação que deu errado. */
   async function changeStatus(id: string, status: AdminAppointment["status"]) {
+    const anterior = appointments.find((x) => x.id === id)?.status;
     setAppointments((a) => a.map((x) => (x.id === id ? { ...x, status } : x)));
-    await updateAppointmentStatus({
-      data: { accessToken: await token(), id, status: status as never },
-    });
+    try {
+      const r = await updateAppointmentStatus({
+        data: { accessToken: await token(), id, status: status as never },
+      });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      if (anterior !== undefined)
+        setAppointments((a) => a.map((x) => (x.id === id ? { ...x, status: anterior } : x)));
+      toast.error("Não consegui salvar essa mudança. Tente de novo.");
+    }
   }
 
   async function toggleAnswered(id: string, answered: boolean) {
     setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered } : x)));
-    await setQuestionAnswered({ data: { accessToken: await token(), id, answered } });
+    try {
+      const r = await setQuestionAnswered({ data: { accessToken: await token(), id, answered } });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: !answered } : x)));
+      toast.error("Não consegui salvar essa mudança. Tente de novo.");
+    }
   }
 
   async function markSeen(id: string) {
     setPreForms((f) => f.map((x) => (x.id === id ? { ...x, seen_by_doctor: true } : x)));
-    await markPreConsultaSeen({ data: { accessToken: await token(), id } });
+    try {
+      const r = await markPreConsultaSeen({ data: { accessToken: await token(), id } });
+      if (!r?.ok) throw new Error("recusado");
+    } catch {
+      setPreForms((f) => f.map((x) => (x.id === id ? { ...x, seen_by_doctor: false } : x)));
+      toast.error("Não consegui marcar como lida. Tente de novo.");
+    }
   }
 
   if (loading)
@@ -350,95 +871,670 @@ function PainelPage() {
           <a href="/medicos/cadastro" className="font-semibold text-primary hover:underline">
             crie sua conta aqui
           </a>{" "}
-          — leva 2 minutos e os primeiros 14 dias são grátis.
+          — leva 2 minutos.
         </p>
       </section>
     );
 
+  /* "Pedidos pendentes" conta pedido de CONSULTA. A solicitação de uma paciente
+     para ser acompanhada por ele é outra coisa, mora em outra tabela e vivia só
+     dentro da aba Pacientes — então o médico lia "0 pedidos pendentes" no topo
+     enquanto uma paciente esperava resposta do outro lado. Um número que diz
+     zero quando há alguém esperando é pior que número nenhum. */
   const pendingAppts = appointments.filter((a) => a.status === "pending").length;
-  const pendingQs = questions.filter((q) => !q.answered).length;
+  /* A contagem EXATA quando o servidor conseguiu fazê-la; senão, o cálculo por
+     amostra de antes — que subconta, mas é melhor que mostrar zero e dizer que
+     não há trabalho. */
+  const pendingQs = pendingExato ?? questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
+  const novasPacientes = pedidosVinculo.length;
+  const sosNaoAtendidos = sosPendentes.length;
+
+  /* A FILA. Montada do que o painel já carregou — nenhuma consulta a mais, e
+     por construção não pode divergir das abas, porque é a mesma fonte. */
+  const fila: ItemFila[] = [
+    ...sosPendentes.map((a) => ({
+      id: `sos-${a.id}`,
+      nivel: "emergencia" as const,
+      titulo: `${a.paciente ?? "Uma paciente"} acionou o SOS`,
+      detalhe: a.motivo
+        ? `${a.motivo}${a.address ? ` · ${a.address}` : ""}`
+        : "Ligue para ela e registre o desfecho.",
+      em: a.created_at,
+      acao: "Abrir",
+      onAcao: () => setSosAberto(a),
+    })),
+    /* MEDIDA FORA DE FAIXA. Antes, uma pressão de 180/120 registrada no diário
+       esperava o médico abrir a ficha dela por iniciativa própria — só a
+       pré-consulta promovia item. Grave entra como emergência. */
+    ...eventosClinicos.map((e) => {
+      const quem = nomesPacientes[e.user_id] || "Uma paciente";
+      return {
+        id: `ev-${e.fonte}-${e.fonte_id}`,
+        nivel: e.gravidade === "grave" ? ("emergencia" as const) : ("espera" as const),
+        titulo: `${quem} — ${e.notas[0] ?? "registro fora de faixa"}`,
+        detalhe: [e.notas.slice(1).join(" · "), e.texto].filter(Boolean).join(" · ") || "Ver ficha",
+        em: e.ocorrido_em,
+        acao: "Ver ficha",
+        onAcao: () => {
+          setTab("Pacientes 👩‍🍼");
+          setAbrirPaciente(e.user_id);
+        },
+      };
+    }),
+    /* A triagem NÃO tem item próprio aqui: ela entra pelo fluxo de eventos
+       clínicos acima (`ev-triage_logs-`), que já traz a pressão junto e tem
+       desfecho registrável. Ter os dois fazia o mesmo episódio aparecer duas
+       vezes — e sumir de um lado sem sumir do outro, porque cada um usava um
+       marcador de resolução diferente. */
+    ...pedidosVinculo.map((r) => ({
+      id: `vinc-${r.id}`,
+      nivel: "espera" as const,
+      titulo: `${r.patient_name ?? "Uma paciente"} quer ser acompanhada por você`,
+      detalhe: "Ela está vendo “aguardando o médico aceitar” na tela dela.",
+      em: r.created_at,
+      acao: "Ver",
+      onAcao: () => setTab("Pacientes 👩‍🍼"),
+    })),
+    ...questions
+      .filter((q) => !q.answered)
+      .map((q) => ({
+        id: `perg-${q.id}`,
+        nivel: "pergunta" as const,
+        titulo: `${q.patient || "Uma paciente"} perguntou`,
+        detalhe: q.question,
+        em: q.created_at,
+        acao: "Responder",
+        onAcao: () => setTab("Perguntas"),
+      })),
+    /* `declined` também é bola com ele: é a paciente RECUSANDO o horário que ele
+       contrapropôs — o servidor até manda e-mail dizendo "talvez queira sugerir
+       outro". O item aparecia só na aba Agendamentos e morria lá. */
+    ...appointments
+      .filter((a) => a.status === "pending" || a.status === "declined")
+      .map((a) => ({
+        id: `cons-${a.id}`,
+        nivel: "consulta" as const,
+        titulo:
+          a.status === "declined"
+            ? `${a.patient_name} recusou o horário sugerido`
+            : `${a.patient_name} pediu consulta`,
+        detalhe: `${new Date(`${a.preferred_date}T00:00:00`).toLocaleDateString("pt-BR")} às ${
+          a.preferred_time
+        }${a.reason ? ` · ${a.reason}` : ""}`,
+        em: a.created_at,
+        acao: "Confirmar",
+        onAcao: () => setTab("Calendário"),
+      })),
+    /* A pressão da pré-consulta agora ganha etiqueta clínica na aba — mas a aba
+       deixou de ser a porta de entrada. Sem promover o nível aqui, uma
+       pré-consulta com 175/115 entrava como "Para ler", peso 4, o ÚLTIMO de
+       todos, abaixo de "Fulana pediu consulta" e sem nenhuma marca. O
+       formulário desenhado para ser lido antes da consulta ficava no fim da
+       fila justamente quando trazia o número que não podia esperar. */
+    /* ─── DE QUEM ELE DEVERIA TER NOTÍCIA E NÃO TEM ───────────────────────
+       O engajamento já sabia quem está inativa, mas vivia numa aba de métrica
+       que ninguém abre no meio do dia, e não cruzava com idade gestacional.
+       Uma gestante de 37 semanas sem notícia há dez dias é uma ligação.
+
+       Nível "leitura", o mais baixo: silêncio NÃO é sinal clínico — ela pode
+       estar ótima e sem paciência para o app. `sinais-clinicos` declara isso no
+       cabeçalho, e pôr este item acima de uma pressão alta desfaria a decisão.
+       Só os seis primeiros: a lista é ordenada por quem estourou mais o próprio
+       prazo, e vinte itens de recado afogariam o resto da fila. */
+    ...quemEstaQuieta(
+      (engagement?.patients ?? []).map((x) => ({
+        id: x.id,
+        nome: x.display_name,
+        semanas: x.reference_weeks ?? null,
+        ultimoEm: x.lastActivityAt ?? null,
+        criadaEm: x.createdAt ?? null,
+      })),
+    )
+      .slice(0, 6)
+      .map((q) => {
+        const t = textoDaQuietude(q);
+        return {
+          id: `quieta-${q.paciente.id}`,
+          nivel: "leitura" as const,
+          titulo: t.titulo,
+          detalhe: t.detalhe,
+          em: q.paciente.ultimoEm,
+          acao: "Abrir",
+          onAcao: () => {
+            setAbrirPaciente(q.paciente.id);
+            setTab("Pacientes 👩‍🍼");
+          },
+        };
+      }),
+    ...preForms
+      .filter((f) => !f.seen_by_doctor)
+      .map((f) => {
+        const sn = sinalPressao(f.systolic, f.diastolic);
+        const grave = sn?.gravidade === "grave";
+        const sintomas =
+          f.symptoms?.length > 0
+            ? `Sintomas: ${f.symptoms.join(", ")}`
+            : (f.questions ?? "Sem sintomas relatados.");
+        return {
+          id: `pre-${f.id}`,
+          nivel: grave ? ("pergunta" as const) : ("leitura" as const),
+          titulo: grave
+            ? `Pré-consulta de ${f.patient_name} — ${f.systolic}/${f.diastolic}`
+            : `Pré-consulta de ${f.patient_name}`,
+          detalhe: sn && sn.gravidade !== "normal" ? `${sn.nota} · ${sintomas}` : sintomas,
+          em: f.submitted_at,
+          acao: "Ler",
+          /* Leva à PACIENTE, e não a uma lista de pré-consultas: quem lê
+             "175/115" precisa do prontuário de quem mandou, na mesma tela. Era
+             `setTab("Pré-consultas")`, aba que deixou de existir. */
+          onAcao: () => {
+            setAbrirPaciente(f.user_id ?? null);
+            setTab("Pacientes 👩‍🍼");
+          },
+        };
+      }),
+  ];
 
   return (
-    <section className="mx-auto max-w-5xl px-5 py-12">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Painel do médico
-      </p>
-      <h1 className="mt-2 font-serif text-3xl md:text-4xl">Gestão do consultório</h1>
+    <section className="mx-auto max-w-5xl px-5 pb-12 pt-6">
+      {/* ─── SEM TÍTULO, DE PROPÓSITO ─────────────────────────────────────
+          O título e a linha de apoio ocupavam a primeira dobra de TODAS as
+          telas para dizer ao médico onde ele já sabia que estava — ele chegou
+          aqui clicando em "painel". O que a primeira dobra tem de mostrar é
+          trabalho, e o trabalho agora começa na fita de abas, logo abaixo da
+          bolinha do perfil. Pedido do dono: "tira esse painel aí de cima, pois
+          ele já tem ali em um ponto".
+
+          (A frase antiga não está citada aqui de propósito: o teste que guarda
+          esta decisão procura o texto no arquivo inteiro, e prosa que cita o
+          código já quebrou asserção nesta base cinco vezes.) */}
+      <div className="flex items-start justify-end gap-4">
+        {/* A conta sai da fita de abas e vem para o canto onde as pessoas
+            procuram conta. Ver `perfil-no-topo.tsx`. */}
+        <PerfilNoTopo
+          nome={euMedico?.display_name}
+          fotoUrl={euMedico?.photo_url}
+          rotuloPlano={rotuloPlano}
+          aviso={avisoDaConta}
+          ativo={tab === "Meu Perfil"}
+          onAbrirPerfil={() => setTab("Meu Perfil")}
+          /* Só quem tem equipe. Sem plano de clínica a entrada não aparece —
+             e o bloco `tab === "Clínica 🏥" && !podeEquipe` continua existindo
+             para quem chegar lá por outro caminho. */
+          onAbrirClinica={podeEquipe ? () => setTab("Clínica 🏥") : undefined}
+          onAbrirCobranca={() => {
+            /* Mesma seção; a cobrança é uma âncora dentro dela.
+               Um quadro só NÃO bastava, e isso custou um achado de auditoria: a
+               troca de aba vale no render seguinte, mas a seção de perfil
+               renderiza um esqueleto enquanto busca os dados do médico, e
+               `#cobranca` só entra na árvore quando a busca termina. Na
+               PRIMEIRA abertura o nó não existia, o `?.` engolia tudo, e o item
+               de menu não fazia nada — funcionando para quem já tinha aberto o
+               perfil antes, que é quem costuma testar. */
+            setTab("Meu Perfil");
+            rolarAte("cobranca");
+          }}
+        />
+      </div>
 
       {/* Resumo — números já recortados por médico no servidor (equipe vê a
           instalação inteira; assinante vê só os próprios). */}
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Pedidos pendentes" value={pendingAppts} highlight={pendingAppts > 0} />
-        <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
-        <Stat label="Pré-consultas novas" value={unseenForms} highlight={unseenForms > 0} />
-        <Stat label="Total agendamentos" value={appointments.length} />
-      </div>
+      {/* O SOS vem ANTES de tudo, inclusive do resumo. Nada no painel é mais
+          urgente que uma paciente que apertou o botão de emergência. */}
+      {sosAberto && (
+        <AlertaSosMedico
+          acionamento={sosAberto}
+          atendendo={sosAtendendo}
+          restantes={
+            sosPendentes.filter((a) => a.id !== sosAberto.id && !sosAdiados.has(a.id)).length
+          }
+          onAtender={async () => {
+            setSosAtendendo(true);
+            try {
+              const r = await marcarAcionamentoAtendido({
+                data: { accessToken: await token(), id: sosAberto.id },
+              });
+              if (!r.ok) {
+                toast.error("Não consegui registrar. Tente de novo.");
+                return;
+              }
+              setSosPendentes((ps) => ps.filter((a) => a.id !== sosAberto.id));
+              /* Também entra em `sosAdiados`: o poll de 60s pode ter saído
+                 ANTES deste clique e chegar depois, ressuscitando na lista o
+                 acionamento que ele acabou de registrar — e o efeito de
+                 auto-abrir reabriria o modal justo quando ele espera o
+                 contrário. */
+              setSosAdiados((s) => new Set(s).add(sosAberto.id));
+              setSosAberto(null);
+              toast.success("Registrado no histórico da paciente ✓");
+            } catch {
+              /* Sem `catch`, o botão piscava "Registrando…", voltava ao normal
+                 e não dizia nada: o médico saía achando que registrou o
+                 desfecho de uma emergência e não registrou. */
+              toast.error("Falha de conexão — o desfecho não foi registrado.");
+            } finally {
+              setSosAtendendo(false);
+            }
+          }}
+          onFechar={() => {
+            // Adiar, não dispensar: volta na próxima visita ao painel.
+            setSosAdiados((s) => new Set(s).add(sosAberto.id));
+            setSosAberto(null);
+          }}
+        />
+      )}
 
-      {/* Tabs — todo médico é inquilino, recortado por doctor_id */}
-      <div className="mt-8 flex flex-wrap gap-2 border-b border-border">
-        {DOCTOR_TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
-              tab === t
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-primary"
-            }`}
-          >
-            {t}
-            {t === "Perguntas" && pendingQs > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                {pendingQs}
-              </span>
-            )}
-            {t === "Pré-consultas" && unseenForms > 0 && (
-              <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs font-bold text-white">
-                {unseenForms}
-              </span>
-            )}
-            {t === "Teleconsultas" &&
-              teleconsultas.filter((s) => s.status === "sala_aberta").length > 0 && (
-                <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-xs font-bold text-white">
-                  {teleconsultas.filter((s) => s.status === "sala_aberta").length}
-                </span>
-              )}
-          </button>
-        ))}
-      </div>
+      {/* ─── AS DUAS FITAS ────────────────────────────────────────────────
+          Eram QUINZE abas numa fita rolável de uma linha só. Num monitor a nona
+          já aparecia cortada; num celular a última ficava mil pixels à direita.
+          O médico não descobria o que existe — precisava lembrar de rolar.
 
-      <div className="mt-8">
-        {tab === "Painel 📊" && <DashboardSection tokenFn={token} onNavigate={setTab} />}
-        {tab === "Calendário" && (
-          <CalendárioSection appointments={appointments} onNavigate={setTab} />
-        )}
-        {tab === "Agendamentos" && (
-          <div className="space-y-6">
-            <AppointmentsSection
-              appointments={appointments}
-              onChangeStatus={changeStatus}
-              onRefresh={load}
+          Agora são cinco grupos em cima e as telas do grupo embaixo. O desenho
+          e o agrupamento moram em `abas-do-painel`; aqui fica só o que este
+          arquivo sabe: QUANTO trabalho espera em cada tela.
+
+          Os contadores sobem para o grupo. É a parte que quase se perdeu: o
+          número em "Perguntas" é o que faz o médico ir até lá, e empurrada para
+          dentro de Cérebro ela sumiria da fita — a fusão que era para revelar
+          as telas passaria a esconder o trabalho. */}
+      <AbasDoPainel
+        className="mt-5"
+        aba={tab}
+        onEscolher={setTab}
+        contadores={{
+          /* Soma: as pré-consultas por ler viraram seção DENTRO de Pacientes,
+             e sem somar aqui o número simplesmente sumiria da fita — que é
+             exatamente como a fusão de abas esconde trabalho em vez de
+             revelá-lo. */
+          "Pacientes 👩‍🍼": novasPacientes + unseenForms,
+          Perguntas: pendingQs,
+          /* Salas abertas contam para a AGENDA: "Teleconsultas" deixou de
+             ser aba e virou seção do calendário. */
+          Calendário: teleconsultas.filter((s) => s.status === "sala_aberta").length,
+        }}
+      />
+
+      {/* Conta inativa: ele entra, mas precisa saber por que as listas estão
+          vazias — senão conclui que o painel está quebrado. */}
+      {inativo && (
+        <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+            Sua conta de médico está inativa
+          </p>
+          <p className="mt-1 text-[13px] leading-snug text-amber-900/85 dark:text-amber-200/85">
+            Enquanto estiver assim, as pacientes não encontram você na busca e as listas do painel
+            ficam vazias. Ative a assinatura no menu do seu perfil, no canto superior direito.
+          </p>
+        </div>
+      )}
+
+      {/* ─── O QUE ERA CABEÇALHO DE TODAS AS TELAS MORA AQUI ──────────────
+          Os quatro números e a fila de trabalho apareciam ACIMA da fita, em
+          TODAS as telas do painel. Repetir a mesma coisa em quinze lugares não
+          é reforço: é a primeira dobra inteira gasta antes de o médico chegar
+          na tela que ele pediu, e no celular era a fila mais as duas fitas
+          empurrando o conteúdo para fora do campo de visão.
+
+          Trazê-los para a aba de entrada é o que faz o Painel deixar de ser o
+          relatório do que aconteceu e virar o que AINDA PRECISA DELE — e é por
+          isso que ele passou a ser a primeira aba.
+
+          ─── POR QUE AQUI FORA, E NÃO DENTRO DO `tab === "Painel 📊"` ────────
+          Aquele bloco vive dentro da `div` que o celular ESCONDE para mostrar
+          `PainelNoApp` no lugar. Posta lá dentro, a fila de trabalho — que
+          lista emergências sem desfecho — simplesmente não existiria no
+          telefone, que é onde ele lê o painel de madrugada. */}
+      {tab === abaDeEntrada && (
+        <div className="mt-6 space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* Primeiro da fila de propósito: uma paciente esperando aceite é o
+              item mais urgente do painel — ela está do outro lado vendo
+              "aguardando o médico aceitar". */}
+            {/* Emergência é o primeiro número porque é o único que não pode
+              esperar. Antes o resumo começava por "pedidos de consulta". */}
+            <Stat
+              label="Emergências sem desfecho"
+              value={sosNaoAtendidos}
+              highlight={sosNaoAtendidos > 0}
+              /* Vermelho, e não a cor da marca. Promover este número a "o único que
+               não pode esperar" e pintá-lo igual a "pedidos de consulta" é
+               desfazer a promoção no mesmo gesto. */
+              tom={sosNaoAtendidos > 0 ? "urgente" : undefined}
             />
-            <WaitlistSection />
-            <BroadcastSection />
+            <Stat
+              label="Pacientes esperando"
+              value={novasPacientes}
+              highlight={novasPacientes > 0}
+            />
+            <Stat label="Pedidos de consulta" value={pendingAppts} highlight={pendingAppts > 0} />
+            <Stat label="Perguntas a responder" value={pendingQs} highlight={pendingQs > 0} />
+          </div>
+
+          {/* A fila ABSORVEU as faixas soltas de SOS e de paciente esperando: elas
+            existiam porque não havia lista, e duas chamadas para a mesma coisa é
+            ruído. O modal de emergência continua, esse é outro assunto. */}
+          <FilaDeTrabalho
+            itens={fila}
+            fontesComFalha={[
+              ...(fonteFalhou.sos ? ["emergências"] : []),
+              ...(fonteFalhou.vinculos ? ["solicitações de pacientes"] : []),
+              ...(fonteFalhou.consultasEPerguntas ? ["consultas e perguntas"] : []),
+              ...(fonteFalhou.preConsultas ? ["pré-consultas"] : []),
+              ...(fonteFalhou.eventos ? ["registros clínicos"] : []),
+            ]}
+          />
+
+          {/* ⚠️ A fila de denúncias da caixinha. Ela SÓ desenha quando há algo —
+              ver o cabeçalho do componente. E o lugar é este porque a fila de
+              trabalho é onde mora "o que ainda precisa dele". */}
+          <FilaDeDenuncias />
+        </div>
+      )}
+
+      {/* No APP, o médico entra por um resumo em vez do painel inteiro: catorze
+          abas desenhadas para tela de computador não encolhem para 390px, e
+          receituário digitado no celular entre duas consultas é receita
+          errada. Nada some — as abas continuam logo abaixo. */}
+      {noApp && tab === abaDeEntrada && (
+        <div className="mt-6">
+          <PainelNoApp
+            nomeDoMedico={euMedico?.display_name ?? null}
+            resumo={{
+              sosAbertos: sosNaoAtendidos,
+              perguntasPendentes: pendingQs,
+              agendamentosPendentes: pendingAppts,
+              preConsultasNovas: unseenForms,
+              salasAbertas: teleconsultas.filter((s) => s.status === "sala_aberta").length,
+              proxima: null,
+            }}
+            onIr={(aba) => setTab(aba as PanelTab)}
+          />
+        </div>
+      )}
+
+      {/* Os avisos ficam na ABA DE ENTRADA, no APP E NO COMPUTADOR — cada
+          aparelho se inscreve separado, e pôr o interruptor só no celular
+          apenas mudaria o defeito de lugar: ele continuaria sem receber SOS
+          na máquina onde passa o dia. Não vai para "Meu Perfil" porque o SOS
+          não pode depender de ele ter passeado pelas abas até achar.
+
+          Estava escrito `tab === "Painel 📊"`, que era a aba de entrada até o
+          Cérebro passar para a frente. A regra é "onde ele aterrissa", não
+          "aquela aba ali" — agora está amarrada à constante que decide isso. */}
+      {tab === abaDeEntrada && (
+        <div className="mt-6">
+          <NotificacoesDoMedico />
+        </div>
+      )}
+
+      {/* ─── NO CELULAR, O RESUMO É A TELA — não um cabeçalho dela ─────────
+          `PainelNoApp` existe porque catorze abas desenhadas para tela de
+          computador não encolhem para 390px. Mas o conteúdo da aba continuava
+          renderizando LOGO ABAIXO dele: o médico abria o app e recebia o
+          resumo do dia mais os doze cards do Cérebro, que é a tela mais pesada
+          do produto. O resumo virou cabeçalho do despejo que ele existe para
+          evitar.
+          Nada some: as abas estão logo acima, e tocar em qualquer uma sai do
+          resumo e mostra a aba inteira — que é o "faz tudo que faz no PC"
+          continuar valendo, só que a pedido. */}
+      <div className={noApp && tab === abaDeEntrada ? "hidden" : "mt-8"}>
+        {tab === "Painel 📊" && (
+          <DashboardSection
+            tokenFn={token}
+            onNavigate={setTab}
+            medico={euMedico}
+            rotuloPlano={rotuloPlano}
+            mensagensDoPlano={mensagensDoPlano}
+          />
+        )}
+        {tab === "Calendário" && (
+          <div className="space-y-10">
+            {/* ─── O CALENDÁRIO VEM PRIMEIRO ───────────────────────────────
+                Era uma faixa de SETE dias que só conhecia `appointments`. O
+                médico via a consulta presencial aqui e a teleconsulta do
+                mesmo dia noutra aba — e nenhuma das duas respondia "como está
+                o meu mês". O merge e a régua de "que dia é isto" moram em
+                `agenda-unificada`, sem JSX: é lá que estão as decisões
+                difíceis (a data combinada ganha da preferida, nas três
+                fontes; particular ainda sem horário entra como preferência),
+                e é lá que elas são testadas.
+
+                Pedido do dono: "esse calendário tem que ser o primeiro
+                elemento da aba" — a conexão com o Google e a grade de
+                horários, que também respondem "quando eu atendo", vêm logo
+                abaixo, e não antes dele. */}
+            <CalendarioDoMes
+              eventos={montarAgenda({
+                pedidos: appointments as never[],
+                teleconsultas: teleconsultas as never[],
+                particulares: privateConsults as never[],
+              })}
+              /* O atalho "é paciente do app": preenche nome. E-mail e
+                 telefone vêm de `aoBuscarContato`, buscados no clique — nem
+                 um nem outro moram nesta lista (o e-mail está em
+                 `auth.users`; o telefone, num select que encareceria TODA
+                 leitura da lista de pacientes por um dado que só importa
+                 aqui). */
+              pacientes={(engagement?.patients ?? []).map((p) => ({
+                id: p.id,
+                nome: p.display_name ?? "Paciente",
+                email: null,
+              }))}
+              aoBuscarContato={async (pacienteId) => {
+                const r = await contatoDaPaciente({
+                  data: { accessToken: await token(), pacienteId },
+                });
+                return r.ok
+                  ? { email: r.email, telefone: r.telefone }
+                  : { email: null, telefone: null };
+              }}
+              aoMarcar={async (v) => {
+                const tk = await token();
+                if (v.tipo === "teleconsulta") {
+                  /* Teleconsulta é OUTRA tabela, com sala e conta do outro lado —
+                     por isso o formulário exige paciente do app, e por isso a
+                     validação disso mora em `validarNovaConsulta`, testada.
+                     `pacienteId` não é nulo aqui: a régua já barrou. */
+                  const r = await createTeleconsulta({
+                    data: {
+                      accessToken: tk,
+                      patientUserId: v.pacienteId!,
+                      /* `deCampoLocal` porque `scheduled_for` é `timestamptz`:
+                         mandar "2026-08-20T14:30" cru são três horas de erro. */
+                      scheduledFor: deCampoLocal(`${v.dia}T${v.hora}`),
+                      doctorNotes: null,
+                    },
+                  });
+                  await loadTeleconsultas();
+                  return { ok: r.ok, erro: r.ok ? undefined : r.error };
+                }
+                const r = await marcarConsultaNoDia({
+                  data: {
+                    accessToken: tk,
+                    dia: v.dia,
+                    hora: v.hora,
+                    nome: v.nome.trim(),
+                    email: v.email.trim(),
+                    /* Quem é ela — o servidor usa isto para pegar o e-mail do
+                       cadastro (que só ele enxerga) e para conferir o vínculo. */
+                    pacienteId: v.pacienteId,
+                    telefone: v.telefone.trim(),
+                    motivo: "",
+                    precoBrl: null,
+                    /* "Das X até Y" virou minutos na tela; o servidor guarda a
+                       duração e usa a MESMA régua para achar choque de FAIXA,
+                       não só de minuto exato. */
+                    duracaoMinutos: v.duracaoMinutos,
+                  },
+                });
+                await load(true);
+                return {
+                  ok: r.ok,
+                  erro: r.ok ? undefined : (r.error ?? undefined),
+                  avisou: r.ok ? r.avisou : undefined,
+                };
+              }}
+              aoEnviarLink={async (ev) => {
+                /* O id do evento vem prefixado (`tele:<uuid>`) porque a agenda
+                   junta três fontes num espaço de ids só. Sem tirar o prefixo, o
+                   servidor recebe um uuid inválido. */
+                const id = ev.id.replace(/^tele:/, "");
+                const sessao = teleconsultas.find((t) => t.id === id);
+                if (!sessao) return { ok: false, erro: "Sessão não encontrada." };
+                const r = await openTeleconsultaRoom({
+                  data: {
+                    accessToken: await token(),
+                    id: sessao.id,
+                    patientUserId: sessao.patient_user_id,
+                    scheduledFor: sessao.scheduled_for,
+                  },
+                });
+                await loadTeleconsultas();
+                return { ok: r.ok, erro: r.ok ? undefined : r.error };
+              }}
+              aoCancelar={async (ev) => {
+                /* Mesmo prefixo de `aoEnviarLink`: a agenda junta as três
+                   fontes num espaço de ids só (`ped:`, `tele:`, `part:`), e
+                   cada uma cancela numa tabela diferente. `changeStatus` não
+                   entra aqui de propósito — ele já mostra o próprio toast, e
+                   este botão mostra o dele; os dois juntos duplicariam o
+                   aviso na tela. */
+                const tk = await token();
+                if (ev.id.startsWith("ped:")) {
+                  const id = ev.id.replace(/^ped:/, "");
+                  const r = await updateAppointmentStatus({
+                    data: { accessToken: tk, id, status: "cancelled" as never },
+                  });
+                  await load(true);
+                  return { ok: !!r?.ok };
+                }
+                if (ev.id.startsWith("tele:")) {
+                  const id = ev.id.replace(/^tele:/, "");
+                  const r = await updateTeleconsultaStatus({
+                    data: { accessToken: tk, id, status: "cancelada" },
+                  });
+                  await loadTeleconsultas();
+                  return { ok: r.ok };
+                }
+                if (ev.id.startsWith("part:")) {
+                  const id = ev.id.replace(/^part:/, "");
+                  const r = await confirmPaymentForDoctor({
+                    data: { accessToken: tk, id, status: "cancelado" },
+                  });
+                  await loadPrivateConsults();
+                  return { ok: !!r.ok };
+                }
+                return { ok: false, erro: "Tipo de evento desconhecido." };
+              }}
+            />
+            {/* A conexão com o Google fica NA AGENDA, e não em Meu Perfil.
+                É ela que decide se a teleconsulta vira um evento no Google
+                Agenda com sala do Meet e convite para as duas — a diferença
+                entre o link chegar sozinho e o médico ter de mandá-lo. */}
+            <GoogleCalendarCard tokenFn={token} />
+            {/* A grade de horários fica na AGENDA, logo abaixo da conexão do
+                Google: as duas respondem "quando eu atendo" — uma para o meu
+                calendário, outra para o app da paciente. */}
+            <GradeDeHorarios tokenFn={token} />
+            <section>
+              <h2 className="font-serif text-xl">Pedidos de consulta</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                O que as pacientes pediram e ainda espera por você — confirmar, sugerir outro
+                horário ou recusar.
+              </p>
+              <AppointmentsSection
+                appointments={appointments}
+                onChangeStatus={changeStatus}
+                onRefresh={load}
+                medico={euMedico}
+              />
+              <WaitlistSection />
+              <BroadcastSection pacientes={engagement?.patients ?? []} />
+            </section>
+            <section>
+              <h2 className="font-serif text-xl">Teleconsultas</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                As salas de vídeo. Abrir a sala manda o convite com o link para ela e para você — a
+                pré-consulta dela e a nota clínica com IA ficam dentro de cada sessão.
+              </p>
+              <TeleconsultasSection
+                sessions={teleconsultas}
+                preForms={preForms}
+                onRefresh={loadTeleconsultas}
+                tokenFn={token}
+                patients={engagement?.patients ?? []}
+              />
+            </section>
+            <section>
+              <h2 className="font-serif text-xl">Consultas particulares</h2>
+              <p className="mb-4 mt-1 text-sm text-muted-foreground">
+                O que foi pago e o que ainda falta pagar — e o horário combinado de cada uma.
+              </p>
+              <ConsultasPagasSection
+                consultations={privateConsults}
+                onRefresh={loadPrivateConsults}
+                tokenFn={token}
+              />
+            </section>
           </div>
         )}
-        {tab === "Agenda" && <AgendaSection />}
         {tab === "Perguntas" && (
-          <QuestionsSection questions={questions} onToggle={toggleAnswered} />
+          <QuestionsSection
+            questions={questions}
+            onToggle={toggleAnswered}
+            onRespondeu={() => load(true).catch(() => {})}
+          />
         )}
-        {tab === "Cérebro 🧠" && (
+        {tab === "Cérebro 🧠" && !podeIA && (
+          <div className="space-y-4">
+            <TrancadoCard
+              titulo="O Segundo Cérebro precisa de um plano com IA"
+              plano={rotuloPlano}
+              texto="É aqui que a IA aprende a responder como você: as respostas que você aprova passam a ser o que a paciente lê no app. No plano Free a IA fica desligada, então nada do que você treinar aqui seria usado."
+              onIrParaPlanos={() => setTab("Meu Perfil")}
+            />
+            {/* A tranca sozinha dizia "você não tem" e mostrava uma parede. A
+                simulação mostra o que está do outro lado dela — e custa zero:
+                é texto local, nenhuma chamada de modelo. Foi a decisão tomada
+                no lugar de dar o teste ao vivo de graça, que seria a nossa
+                chave gastando por quem não paga, sem teto. */}
+            <SimulacaoDoCerebro tema="claro" />
+          </div>
+        )}
+        {tab === "Cérebro 🧠" && podeIA && (
           <CerebroSection
             tokenFn={token}
             asDoctor={brainAsDoctor}
             onExitAsDoctor={() => setBrainAsDoctor(null)}
+            /* SÓ NO PRÓPRIO CONSULTÓRIO. Operando o cérebro de um médico da
+               clínica (`brainAsDoctor`), a lista mostra as pacientes DELE e a
+               aba Pacientes carrega as MINHAS — o clique nunca acharia
+               nenhuma, e falharia calado. Sem callback, a linha não finge ser
+               clicável. */
+            onIrParaPlanos={() => setTab("Meu Perfil")}
+            onAbrirPaciente={
+              brainAsDoctor
+                ? undefined
+                : (id) => {
+                    setTab("Pacientes 👩‍🍼");
+                    setAbrirPaciente(id);
+                  }
+            }
             onTrained={(id) =>
               setQuestions((q) => q.map((x) => (x.id === id ? { ...x, answered: true } : x)))
             }
           />
         )}
-        {tab === "Clínica 🏥" && (
+        {tab === "Clínica 🏥" && !podeEquipe && (
+          <TrancadoCard
+            titulo="A Clínica é do plano Pro Equipe"
+            plano={rotuloPlano}
+            texto="Com ela você adiciona outros médicos, cada um com as próprias pacientes e o próprio cérebro, e opera todos de um lugar só. No seu plano atual a criação de clínica não está liberada."
+            onIrParaPlanos={() => setTab("Meu Perfil")}
+          />
+        )}
+        {tab === "Clínica 🏥" && podeEquipe && (
           <ClinicaSection
             tokenFn={token}
             onOperateBrain={(d) => {
@@ -447,38 +1543,74 @@ function PainelPage() {
             }}
           />
         )}
-        {tab === "Pacientes 👩‍🍼" && <PacientesSection tokenFn={token} />}
-        {tab === "Lives" && <LivesSection tokenFn={token} />}
-        {tab === "Meu Perfil" && <MeuPerfilSection tokenFn={token} />}
-        {tab === "Pré-consultas" && (
-          <PreConsultasSection forms={preForms} onMarkSeen={markSeen} tokenFn={token} />
+        {tab === "Pacientes 👩‍🍼" && (
+          <div className="space-y-10">
+            <PacientesSection
+              tokenFn={token}
+              onVinculoRespondido={loadPedidosVinculo}
+              abrirPacienteId={abrirPaciente}
+              onAbriu={() => setAbrirPaciente(null)}
+              onDesfechoRegistrado={(fonte, fonteId) =>
+                setEventosClinicos((es) =>
+                  es.map((e) =>
+                    e.fonte === fonte && e.fonte_id === fonteId
+                      ? { ...e, tratado_em: new Date().toISOString() }
+                      : e,
+                  ),
+                )
+              }
+              preForms={preForms}
+              onMarkSeenPreConsulta={markSeen}
+              onIrParaAgenda={() => setTab("Calendário")}
+            />
+            {/* ─── A MESADA MOROU EM "MEU PERFIL", E NÃO FAZIA SENTIDO LÁ ───
+                Presentear é uma ação sobre uma paciente, não sobre o cadastro
+                do médico — e é aqui, na aba Pacientes, que ele já está olhando
+                para a lista delas. Pedido do dono: "vai ser lá que o médico
+                dará os presentinhos". */}
+            <MesadaDoMedico tokenFn={token} pacientes={engagement?.patients ?? []} />
+            {/* ─── A LISTA DE PRÉ-CONSULTAS SAIU DAQUI (ago/2026) ────────────
+                Era uma seção própria, com o título "Pré-consultas" escrito na
+                aba — pedido do dono: "não tem que estar escrito ali". O selo
+                "Pré-consulta nova" no quadro da paciente (`PatientMirrorCard`)
+                e o relatório completo dentro da ficha dela (`PatientDetailModal`,
+                aba Agora) são a mesma pré-consulta, só lida por PACIENTE em vez
+                de uma lista solta de todas — "quem clica numa paciente quer a
+                paciente inteira", a mesma razão que já tinha tirado peso e
+                pressão de aparecer só ali. O contador do grupo na fita
+                (`unseenForms`) continua somando sozinho, sem depender desta
+                seção existir. */}
+            {/* ─── "EXAMES QUE ELAS ENVIARAM" SAIU (ago/2026) ────────────────
+                A plataforma parou de aceitar o envio de laudo em foto/PDF —
+                "não vamos ter essa responsabilidade em guardar os exames".
+                `ExamesRecebidos` e o ciclo em `clinical.functions.ts` saíram
+                junto; a tabela `exam_files` e os laudos já enviados antes
+                desta mudança continuam no banco, sem visualizador dedicado. */}
+          </div>
         )}
-        {tab === "Ferramentas" && <FerramentasSection />}
-        {tab === "Teleconsultas" && (
-          <TeleconsultasSection
-            sessions={teleconsultas}
-            preForms={preForms}
-            onRefresh={loadTeleconsultas}
-            tokenFn={token}
-            patients={engagement?.patients ?? []}
-          />
+        {tab === "Lives" && <LivesSection tokenFn={token} />}
+        {tab === "Meu Perfil" && (
+          <>
+            {/* ─── A PORTA DE SAÍDA DA CLÍNICA ─────────────────────────────
+                Um admin de clínica adiciona qualquer médico só com o e-mail —
+                sem convite, sem aceite — e a partir daí opera o Segundo Cérebro
+                dele e lê as CONVERSAS das pacientes dele com a IA.
+                `sairDaClinica` existia, escrevia `clinic_role: null` numa
+                coluna NOT NULL (ou seja, falhava sempre) e não era chamada por
+                tela nenhuma. A saída fica em Meu Perfil, e não na aba Clínica:
+                a aba Clínica é do plano Pro Equipe, e o médico ANEXADO pode não
+                ter esse plano — ele veria um cartão de "não liberado" em vez da
+                porta. */}
+            <SairDaClinicaCard tokenFn={token} />
+            <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+          </>
         )}
         {tab === "Engajamento" && (
-          <EngagementSection engagement={engagement} onRefresh={loadEngagement} tokenFn={token} />
-        )}
-        {tab === "Consultas Pagas" && (
-          <ConsultasPagasSection
-            consultations={privateConsults}
-            onRefresh={loadPrivateConsults}
+          <EngagementSection
+            engagement={engagement}
+            onRefresh={loadEngagement}
             tokenFn={token}
-          />
-        )}
-        {tab === "Empresas" && (
-          <EmpresasSection
-            leads={corporateLeads}
-            accounts={corporateAccounts}
-            onRefresh={loadCorporate}
-            tokenFn={token}
+            falhou={fonteFalhou.engajamento}
           />
         )}
       </div>
@@ -508,13 +1640,6 @@ function timeAgo(iso: string): string {
 }
 
 // Tempo economizado pelo cérebro: cada resposta ≈ 3 min do médico.
-function savedTimeLabel(hits: number): string {
-  const totalMin = hits * 3;
-  if (totalMin < 60) return `${totalMin} min`;
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return m === 0 ? `${h}h` : `${h}h${m}`;
-}
 
 const STAGE_META: {
   key: keyof DoctorDashboard["patients"]["stages"];
@@ -537,9 +1662,23 @@ const STAGE_META: {
 function DashboardSection({
   tokenFn,
   onNavigate,
+  medico,
+  rotuloPlano,
+  mensagensDoPlano,
 }: {
   tokenFn: () => Promise<string>;
   onNavigate: (tab: PanelTab) => void;
+  /** Perfil dele — só para a prova de valor saber o preço da consulta e o plano. */
+  medico?: DoctorProfile | null;
+  /** Rótulo do plano já resolvido (entitlements) — a coluna crua não conhece o
+      assento de clínica. */
+  rotuloPlano?: string | null;
+  /**
+   * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
+   * uma escada (da entrada ao topo do autoatendimento), então sem este número a prova de valor
+   * mostraria a entrada para quem paga o topo.
+   */
+  mensagensDoPlano?: number | null;
 }) {
   const [data, setData] = useState<DoctorDashboard | null>(null);
   const [loading, setLoading] = useState(true);
@@ -583,7 +1722,16 @@ function DashboardSection({
       </div>
     );
 
-  return <DashboardView data={data} onNavigate={onNavigate} onRefresh={load} />;
+  return (
+    <DashboardView
+      data={data}
+      onNavigate={onNavigate}
+      onRefresh={load}
+      medico={medico}
+      rotuloPlano={rotuloPlano}
+      mensagensDoPlano={mensagensDoPlano}
+    />
+  );
 }
 
 /**
@@ -593,17 +1741,67 @@ function DashboardSection({
  */
 function ValorGeradoBanner({
   aiHits,
+  minutosPorResposta,
   answered,
   activePatients,
   onNavigate,
+  precoConsultaCentavos,
+  moedaDoMedico,
+  mensalidadeDoPlanoCentavos,
+  plano,
+  rotuloPlano,
 }: {
   aiHits: number;
+  /** Minutos que UMA resposta dele custaria — ver `src/lib/tempo-poupado.ts`. */
+  minutosPorResposta: number;
   answered: number;
   activePatients: number;
   onNavigate: (tab: PanelTab) => void;
+  /** O que ELE cobra por consulta — o tempo dele vale o que ele cobra. */
+  precoConsultaCentavos?: number | null;
+  moedaDoMedico?: string | null;
+  /** O que ele paga por mês. Sem isso não há comparação honesta a fazer.
+      Nome diferente da função homônima de `entitlements` de propósito: dentro
+      deste componente o identificador curto virava um número, e a função ficava
+      inalcançável a três linhas de distância. */
+  mensalidadeDoPlanoCentavos: number;
+  /**
+   * Plano cru. Mensalidade zero cobre três casos diferentes — teste, grátis e
+   * clínica ("sob consulta", contrato PAGO). Dizer "você ainda não paga nada"
+   * para uma clínica seria falso justamente com o cliente de maior ticket.
+   */
+  plano?: string | null;
+  /** Rótulo do plano JÁ resolvido pelo servidor (entitlements). */
+  rotuloPlano?: string | null;
 }) {
-  const assists = aiHits + answered;
+  /* `plano` é a coluna CRUA de `doctors`. O assento de clínica não é gravado
+     nela — quem entra por uma clínica ativa fica com `trial` no banco e só vira
+     "Clínica" na resolução em memória do servidor. Por isso a frase "você ainda
+     não paga nada" exige as DUAS coisas: coluna de teste E rótulo resolvido de
+     teste. Sem o rótulo, a gente não afirma. */
+  const p = (plano ?? "").trim().toLowerCase();
+  const r = (rotuloPlano ?? "").trim().toLowerCase();
+  /* `""` FORA do conjunto permissivo: é o estado inicial do `useState` E o
+     fallback quando `getMyDoctor` falha. Aceitá-lo transformava "não sei" em
+     "é teste" — o card afirmava "você não paga nada" para quem paga, no exato
+     momento em que a informação não tinha chegado. Desconhecido não afirma. */
+  const emTeste = (p === "trial" || p === "free") && (r === "trial" || r === "free");
+  /* TEMPO ECONOMIZADO É SÓ O QUE A IA FEZ NO LUGAR DELE.
 
+     Antes esta conta era `aiHits + answered`, e `answered` é gravado no
+     instante em que o MÉDICO digita a resposta (`secondbrain.functions.ts`).
+     Ou seja: a tela pegava hora-médico GASTA, chamava de "seu tempo
+     economizado" e ainda convertia em dinheiro para justificar a mensalidade.
+     Um médico com a IA desligada, respondendo tudo sozinho, via a plataforma
+     levar crédito pelo trabalho dele. As perguntas que ele resolveu continuam
+     no painel — como produção dele, que é o que são. */
+  const assists = aiHits;
+
+  /* A porta do CTA é governada pelo que o card AFIRMA — produção da
+     plataforma —, não pelo trabalho dele. Com `answered` na condição, quem
+     respondeu 5 perguntas na mão e nunca usou a IA perdia o empurrão "treine a
+     IA" e ganhava uma vitrine anunciando dois zeros embaixo de "Valor gerado":
+     prova de valor negativa, para quem acabou de pagar. */
   if (assists === 0 && activePatients === 0) {
     return (
       <div className="fade-slide-up rounded-3xl border border-primary/20 bg-primary/5 p-5">
@@ -635,13 +1833,106 @@ function ValorGeradoBanner({
       <p className="font-serif text-lg">💚 Valor gerado este mês</p>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <ValueTile big={aiHits} label="dúvidas respondidas pela sua IA" />
-        <ValueTile big={answered} label="perguntas de pacientes resolvidas" />
-        <ValueTile big={savedTimeLabel(assists)} label="do seu tempo economizado (estimativa)" />
+        <ValueTile big={answered} label="perguntas que você respondeu" />
+        <ValueTile
+          big={tempoPoupado(assists, minutosPorResposta)}
+          label="do seu tempo de volta (estimativa)"
+        />
         <ValueTile big={activePatients} label="pacientes ativas nos últimos 7 dias" />
       </div>
-      <p className="mt-3 text-[11px] text-muted-foreground">
-        Estimativa: cada atendimento da IA equivale a ~3 min seus. É por isso que o plano se paga.
-      </p>
+
+      {/* A frase direta, e ela é o ponto do card.
+
+          Os quatro azulejos são números; número o médico lê e esquece. O que
+          fica é a frase — e ela precisa dizer QUAL tempo voltou, porque é aí
+          que mora a proposta inteira: não é hora de consultório (essa é a renda
+          dele), é a mensagem respondida às onze da noite, no domingo, no meio
+          do jantar. Tempo que ele dava de graça e não contava.
+
+          Só aparece a partir de uma hora: "você ganhou 12 minutos de volta" não
+          é uma frase, é uma piada. */}
+      {assists * minutosPorResposta >= 60 && (
+        <p className="mt-3.5 text-[13.5px] leading-relaxed text-foreground">
+          Você ganhou{" "}
+          <strong className="text-primary">{tempoPoupado(assists, minutosPorResposta)}</strong> de
+          volta este mês — o tempo que você não passou respondendo mensagem fora do consultório.{" "}
+          {fechoDoTempo(new Date().getMonth())}
+        </p>
+      )}
+
+      {/* A conta fechada, em dinheiro.
+
+          "A IA respondeu 3 horas por você" é bonito e some da cabeça na hora de
+          renovar. Em dinheiro, fica. Mas uma tela que argumenta cobrança não
+          pode esconder a premissa: as duas conversões — 3 min por atendimento e
+          40 min por consulta — vão escritas embaixo, porque quem lê "3h" e
+          "R$ 2.025" com consulta de R$ 450 faz a conta de cabeça, chega em
+          R$ 1.350 e conclui, com razão, que a tela está inflando. */}
+      {(() => {
+        const minutos = assists * minutosPorResposta;
+        /* `(horas * 60) / 40` era ida e volta: a conta real é minutos/40, ou
+           seja uma consulta a cada ~13 atendimentos da IA. */
+        const equivalente = minutos / 40;
+        /* A mensalidade da tabela é em REAIS. Se ele cobra a consulta em dólar
+           ou euro, comparar os dois números é comparar grandezas diferentes —
+           e a frase sairia dizendo uma coisa falsa com ar de conta fechada.
+           Sem câmbio confiável, o certo é não afirmar nada. E "não sei a moeda"
+           (`null`, `""`) entra aqui como não-sei, não como real. */
+        const mesmaMoeda = moedaDoMedico === "BRL";
+        const rodape = (
+          <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+            Estimativa: cada resposta da IA poupa ~{minutosPorResposta.toString().replace(".", ",")}{" "}
+            min seus — o tempo de escrever uma resposta do tamanho das suas. A sua hora é calculada
+            pela consulta (~40 min), só como régua de valor.
+          </p>
+        );
+
+        if (mesmaMoeda && precoConsultaCentavos && precoConsultaCentavos > 0) {
+          const valorCentavos = Math.round(equivalente * precoConsultaCentavos);
+          const texto = formatarDinheiro(valorCentavos, moedaDoMedico);
+          /* `formatarDinheiro` devolve "" para valor não finito. Uma frase de
+             cobrança com o número faltando é pior que frase nenhuma. */
+          const ganha =
+            mensalidadeDoPlanoCentavos > 0 && valorCentavos > mensalidadeDoPlanoCentavos;
+          if (texto && valorCentavos > 0) {
+            return (
+              <>
+                {/* A mensalidade aparece SEMPRE que é conhecida, favoreça ou
+                    não. Mostrar a comparação só quando ela ganha é escolher a
+                    dedo — e um card que argumenta cobrança e é estruturalmente
+                    incapaz de sair desfavorável não é prova de valor, é
+                    propaganda. Quando não favorece, o próprio número vira o
+                    argumento honesto: falta uso, e o painel diz onde. */}
+                <p
+                  className={`mt-3 rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                    ganha
+                      ? "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
+                      : "bg-secondary text-foreground"
+                  }`}
+                >
+                  {/* NÃO se diz mais "o equivalente a X em consultas suas".
+                      Consulta é a RENDA dele: a frase antiga afirmava que a IA
+                      poupou consultas, ou seja, que ele faturou menos. O que a
+                      IA poupa é o tempo NÃO PAGO — a mensagem das onze da
+                      noite. O dinheiro continua aqui porque hora some da cabeça
+                      na hora de renovar, mas ele agora VALORA o tempo dele, em
+                      vez de sugerir agenda vazia. */}
+                  Esse tempo, valendo o que vale a sua hora, dá <strong>{texto}</strong>
+                  {mensalidadeDoPlanoCentavos > 0
+                    ? ganha
+                      ? " — mais que a mensalidade do seu plano."
+                      : ` — sua mensalidade é ${formatarDinheiro(mensalidadeDoPlanoCentavos, "BRL")}.`
+                    : emTeste
+                      ? " — e você ainda não paga nada por isso."
+                      : "."}
+                </p>
+                {rodape}
+              </>
+            );
+          }
+        }
+        return rodape;
+      })()}
     </div>
   );
 }
@@ -660,10 +1951,21 @@ export function DashboardView({
   data,
   onNavigate,
   onRefresh,
+  medico,
+  rotuloPlano,
+  mensagensDoPlano,
 }: {
   data: DoctorDashboard;
   onNavigate: (tab: PanelTab) => void;
   onRefresh?: () => void;
+  medico?: DoctorProfile | null;
+  rotuloPlano?: string | null;
+  /**
+   * Mensagens de IA por ciclo do plano vigente. No plano `mensagens` o preço é
+   * uma escada (da entrada ao topo do autoatendimento), então sem este número a prova de valor
+   * mostraria a entrada para quem paga o topo.
+   */
+  mensagensDoPlano?: number | null;
 }) {
   const { patients, questions, brain, appointments, engagement } = data;
   const stageTotal = STAGE_META.reduce((s, m) => s + patients.stages[m.key], 0);
@@ -700,9 +2002,17 @@ export function DashboardView({
       {/* Valor gerado no mês — reenquadra os números como ROI (retenção). */}
       <ValorGeradoBanner
         aiHits={brain.hitsThisMonth}
-        answered={questions.answered}
+        minutosPorResposta={brain.minutosPorResposta}
+        answered={questions.answeredThisMonth}
         activePatients={patients.active7d}
         onNavigate={onNavigate}
+        precoConsultaCentavos={
+          medico?.consultation_price_cents ?? (medico?.consultation_price_brl ?? 0) * 100
+        }
+        moedaDoMedico={medico?.consultation_currency}
+        mensalidadeDoPlanoCentavos={mensalidadeCentavos(medico?.plan ?? "", mensagensDoPlano)}
+        plano={medico?.plan}
+        rotuloPlano={rotuloPlano}
       />
 
       {/* 2. Cards de destaque */}
@@ -898,9 +2208,10 @@ function BrainValueCard({
                 {brain.hitsThisMonth === 1 ? "vez" : "vezes"} este mês
               </p>
               <p className="mt-3 text-sm opacity-90">
-                Isso são cerca de <strong>{savedTimeLabel(brain.hitsThisMonth)}</strong> que você
-                não precisou gastar digitando respostas — o cérebro atendeu por você, no seu tom, a
-                qualquer hora.
+                Isso são cerca de{" "}
+                <strong>{tempoPoupado(brain.hitsThisMonth, brain.minutosPorResposta)}</strong> que
+                você não precisou gastar digitando respostas — o cérebro atendeu por você, no seu
+                tom, a qualquer hora.
               </p>
             </>
           ) : (
@@ -1009,7 +2320,7 @@ function RecentQuestionsCard({
         )}
       </div>
       {items.length === 0 ? (
-        <p className="mt-4 flex-1 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+        <p className="mt-4 flex-1 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
           🎉 Nenhuma pergunta pendente. Suas pacientes estão em dia!
         </p>
       ) : (
@@ -1041,7 +2352,7 @@ function ChurnRiskCard({ patients }: { patients: DoctorDashboard["engagement"]["
         diferença.
       </p>
       {patients.length === 0 ? (
-        <p className="mt-5 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700">
+        <p className="mt-5 rounded-2xl bg-emerald-50/60 p-4 text-sm text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200">
           ✨ Ninguém em risco de abandono. Suas pacientes estão engajadas!
         </p>
       ) : (
@@ -1049,7 +2360,7 @@ function ChurnRiskCard({ patients }: { patients: DoctorDashboard["engagement"]["
           {patients.map((p, i) => (
             <li
               key={`${p.name}-${i}`}
-              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-3"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-amber-200/70 bg-amber-50/50 px-4 py-3 dark:bg-amber-500/10 dark:border-amber-500/30"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-700">
@@ -1102,7 +2413,7 @@ function NextAppointmentCard({
         </div>
         {appointments.pending > 0 && (
           <button
-            onClick={() => onNavigate("Agendamentos")}
+            onClick={() => onNavigate("Calendário")}
             className="shrink-0 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
           >
             Ver pedidos →
@@ -1133,21 +2444,57 @@ function DashboardSkeleton() {
 }
 
 /* ---------- Aviso por push (envio manual) ---------- */
-function BroadcastSection() {
+/**
+ * ENVIAR AVISO — para todas, ou para quem ele escolher.
+ *
+ * Pedido do dono (ago/2026): um filtro para "as pacientes de quinta-feira",
+ * sem incomodar as outras cento e noventa e cinco. Antes disso o único jeito
+ * era mandar para TODAS — e um recado sobre um horário específico virava
+ * notificação para quem nem tinha aquela consulta.
+ */
+function BroadcastSection({ pacientes }: { pacientes: PatientEngagement[] }) {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const [modo, setModo] = useState<"todas" | "selecionar">("todas");
+  const [busca, setBusca] = useState("");
+  const [escolhidas, setEscolhidas] = useState<Set<string>>(new Set());
+
+  const filtradas = filtrarPacientes(pacientes, busca);
+
+  function alternar(id: string) {
+    setEscolhidas((s) => {
+      const novo = new Set(s);
+      if (novo.has(id)) novo.delete(id);
+      else novo.add(id);
+      return novo;
+    });
+  }
 
   async function send() {
     if (title.trim().length < 2 || body.trim().length < 2) {
       toast("Escreva um título e uma mensagem.");
       return;
     }
-    if (!confirm("Enviar este aviso por notificação para as suas pacientes?")) return;
+    /* No modo "selecionar", zero marcada não é "todas" por omissão — seria o
+       oposto do que ele pediu: uma tela que promete "só estas" mandando para
+       o consultório inteiro por engano. */
+    if (modo === "selecionar" && escolhidas.size === 0) {
+      toast('Escolha ao menos uma paciente, ou volte para "Todas".');
+      return;
+    }
+    const paraQuem =
+      modo === "todas" ? "todas as suas pacientes" : `${escolhidas.size} paciente(s) escolhida(s)`;
+    if (!confirm(`Enviar este aviso por notificação para ${paraQuem}?`)) return;
     setSending(true);
     try {
       const res = await sendDoctorBroadcast({
-        data: { accessToken: await token(), title: title.trim(), body: body.trim() },
+        data: {
+          accessToken: await token(),
+          title: title.trim(),
+          body: body.trim(),
+          patientIds: modo === "selecionar" ? [...escolhidas] : undefined,
+        },
       });
       if (res.ok) {
         toast.success(
@@ -1157,6 +2504,7 @@ function BroadcastSection() {
         );
         setTitle("");
         setBody("");
+        setEscolhidas(new Set());
       } else {
         toast.error(res.error || "Não consegui enviar agora.");
       }
@@ -1169,9 +2517,62 @@ function BroadcastSection() {
     <div className="rounded-3xl border border-border bg-card p-6">
       <p className="font-serif text-lg">Enviar aviso às pacientes</p>
       <p className="mt-1 text-sm text-muted-foreground">
-        Manda uma notificação (push) para as suas pacientes que ativaram os lembretes. Ótimo para
-        recados como mudança de horário do consultório.
+        Manda uma notificação (push) para quem ativou os lembretes. Ótimo para recados como mudança
+        de horário do consultório — ou só para quem tem consulta numa data específica.
       </p>
+
+      {/* ── Para quem ── */}
+      <div className="mt-4 flex gap-2">
+        {(["todas", "selecionar"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setModo(m)}
+            className={`rounded-full border px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+              modo === m
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border text-muted-foreground"
+            }`}
+          >
+            {m === "todas"
+              ? "Todas as pacientes"
+              : `Selecionar${escolhidas.size ? ` (${escolhidas.size})` : ""}`}
+          </button>
+        ))}
+      </div>
+
+      {modo === "selecionar" && (
+        <div className="mt-3 rounded-2xl border border-border bg-background p-3">
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar pelo nome…"
+            className="w-full rounded-xl border border-border bg-card px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          <div className="mt-2 max-h-48 overflow-y-auto">
+            {filtradas.length === 0 ? (
+              <p className="p-2 text-[13px] text-muted-foreground">
+                Nenhuma paciente com esse nome.
+              </p>
+            ) : (
+              filtradas.map((p) => (
+                <label
+                  key={p.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-secondary/60"
+                >
+                  <input
+                    type="checkbox"
+                    checked={escolhidas.has(p.id)}
+                    onChange={() => alternar(p.id)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  {p.display_name?.trim() || "Sem nome"}
+                </label>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 space-y-3">
         <input
           value={title}
@@ -1207,14 +2608,22 @@ function BroadcastSection() {
 /* ---------- Fila de espera (visão do médico) ---------- */
 function WaitlistSection() {
   const [entries, setEntries] = useState<AdminWaitlistEntry[] | null>(null);
+  /* Sessão expirada, rede caída e `ok:false` do servidor caíam todos no mesmo
+     lugar que "a fila está mesmo vazia" — e a tela então afirmava, tranquila,
+     "Ninguém na fila de espera no momento". O médico lê isso e para de oferecer
+     vaga; do outro lado há gestantes esperando um horário que ele acha que
+     ninguém quer. */
+  const [falhou, setFalhou] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const res = await getDoctorWaitlist({ data: { accessToken: await token() } });
         setEntries(res.ok ? res.entries : []);
+        setFalhou(!res.ok);
       } catch {
         setEntries([]);
+        setFalhou(true);
       }
     })();
   }, []);
@@ -1241,9 +2650,15 @@ function WaitlistSection() {
           </p>
         </div>
         <span className="rounded-full bg-secondary px-3 py-1 text-xs font-bold">
-          {entries.length}
+          {falhou ? "—" : entries.length}
         </span>
       </div>
+      {falhou && (
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+          📡 Não consegui ler a fila de espera agora. Isto <strong>não</strong> quer dizer que ela
+          está vazia — atualize a página antes de dar uma vaga como não procurada.
+        </p>
+      )}
 
       {entries.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm text-muted-foreground">
@@ -1297,10 +2712,13 @@ function AppointmentsSection({
   appointments,
   onChangeStatus,
   onRefresh,
+  medico,
 }: {
   appointments: AdminAppointment[];
   onChangeStatus: (id: string, s: AdminAppointment["status"]) => void;
   onRefresh: () => void;
+  /** O médico LOGADO. `null` só para a conta de equipe da plataforma. */
+  medico?: DoctorProfile | null;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmForm, setConfirmForm] = useState<{
@@ -1372,10 +2790,21 @@ function AppointmentsSection({
     onRefresh();
   }
 
+  /* A chave é a DELE. Sem a linha abaixo, o assinante mandava a paciente
+     pagar na chave do dono da instalação — o erro mais caro que este painel
+     tinha. Só cai no `doctor.config` quando não há perfil de médico, que é o
+     caso da conta de equipe da plataforma. */
+  const pixKey = medico?.pix_key?.trim() || DOCTOR.pixKey;
+  const pixName = medico?.display_name?.trim() || DOCTOR.pixName;
+
   function pixWhatsApp(a: AdminAppointment) {
+    if (!medico?.pix_key?.trim()) {
+      toast.error("Cadastre a sua chave PIX em Meu Perfil antes de cobrar.");
+      return;
+    }
     const price = (a as any).price_brl ? ((a as any).price_brl / 100).toFixed(2) : "___";
     const msg = encodeURIComponent(
-      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${DOCTOR.pixKey} (${DOCTOR.pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
+      `Olá, ${a.patient_name}! Para confirmar sua consulta no dia ${(a as any).confirmed_date ? new Date((a as any).confirmed_date + "T00:00:00").toLocaleDateString("pt-BR") : new Date(a.preferred_date + "T00:00:00").toLocaleDateString("pt-BR")} às ${(a as any).confirmed_time ?? a.preferred_time}, envie R$ ${price} via PIX para a chave: ${pixKey} (${pixName}). Após o pagamento, envie o comprovante aqui. Obrigado!`,
     );
     window.open(`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}?text=${msg}`, "_blank");
   }
@@ -1636,18 +3065,32 @@ function AppointmentsSection({
                       {STATUS_LABEL[s]}
                     </button>
                   ))}
+                  {/* WhatsApp deixa de ser a ação PRINCIPAL desta linha.
+                  
+                      Ele estava com `bg-primary` — mais destaque que confirmar
+                      ou remarcar —, e o efeito era o produto empurrar a conversa
+                      clínica para fora de si mesmo: o que é dito ali não vira
+                      prontuário, não alimenta a IA, não fica com a paciente, e
+                      some quando ela troca de aparelho.
+                      
+                      O atalho continua, porque combinar horário por WhatsApp é
+                      legítimo e tirá-lo sem alternativa só mandaria o médico
+                      para o celular pessoal. O que muda é o peso visual: agora
+                      ele compete de igual para igual com o resto, e o caminho
+                      clínico (receita, orientação, resposta) tem tela própria. */}
                   <a
                     href={`https://wa.me/55${a.patient_phone.replace(/\D/g, "")}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                    title="Combinar horário. Orientação clínica tem registro no painel."
+                    className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
                   >
                     WhatsApp
                   </a>
                   {ext.price_brl && payStatus !== "pago" && (
                     <button
                       onClick={() => pixWhatsApp(a)}
-                      className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                      className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30"
                     >
                       💰 Cobrar via PIX
                     </button>
@@ -1655,7 +3098,7 @@ function AppointmentsSection({
                   {ext.price_brl && payStatus !== "pago" && (
                     <button
                       onClick={() => markPaid(a.id)}
-                      className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800"
+                      className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200 dark:border-emerald-500/30"
                     >
                       ✓ Marcar pago
                     </button>
@@ -1676,7 +3119,9 @@ function AppointmentsSection({
       )}
 
       {/* Receipt Modal */}
-      {receiptAppt && <ReceiptModal appt={receiptAppt} onClose={() => setReceiptAppt(null)} />}
+      {receiptAppt && (
+        <ReceiptModal appt={receiptAppt} medico={medico} onClose={() => setReceiptAppt(null)} />
+      )}
     </div>
   );
 }
@@ -1685,36 +3130,33 @@ function AppointmentsSection({
 function QuestionsSection({
   questions,
   onToggle,
+  onRespondeu,
 }: {
   questions: AdminQuestion[];
   onToggle: (id: string, answered: boolean) => void;
+  onRespondeu?: () => void;
 }) {
+  const pendentes = questions.filter((q) => !q.answered);
+  const respondidas = questions.filter((q) => q.answered);
   return (
     <div>
       {questions.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nenhuma pergunta ainda.</p>
       ) : (
         <div className="space-y-3">
-          {questions.map((q) => (
-            <div
-              key={q.id}
-              className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]"
-            >
-              <div>
-                <p className="text-sm text-muted-foreground">{q.patient}</p>
-                <p className="mt-1 text-foreground">{q.question}</p>
-              </div>
-              <button
-                onClick={() => onToggle(q.id, !q.answered)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  q.answered
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "border border-border text-muted-foreground hover:text-primary"
-                }`}
-              >
-                {q.answered ? "Respondida ✓" : "Marcar respondida"}
-              </button>
-            </div>
+          {/* PENDENTES PRIMEIRO. A lista vinha misturada por data, então a
+              pergunta de ontem sem resposta ficava embaixo de dez já
+              respondidas — e o que ele veio fazer aqui é responder. */}
+          {pendentes.map((q) => (
+            <CartaoDePergunta key={q.id} q={q} onToggle={onToggle} onRespondeu={onRespondeu} />
+          ))}
+          {respondidas.length > 0 && pendentes.length > 0 && (
+            <p className="pt-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Já respondidas
+            </p>
+          )}
+          {respondidas.map((q) => (
+            <CartaoDePergunta key={q.id} q={q} onToggle={onToggle} onRespondeu={onRespondeu} />
           ))}
         </div>
       )}
@@ -1722,118 +3164,264 @@ function QuestionsSection({
   );
 }
 
-/* ---------- Pré-consultas (Feature 11 + 47) ---------- */
-function PreConsultasSection({
-  forms,
-  onMarkSeen,
-  tokenFn,
+function CartaoDePergunta({
+  q,
+  onToggle,
+  onRespondeu,
 }: {
-  forms: AdminPreConsulta[];
-  onMarkSeen: (id: string) => void;
-  tokenFn: () => Promise<string>;
+  q: AdminQuestion;
+  onToggle: (id: string, answered: boolean) => void;
+  onRespondeu?: () => void;
 }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [reportData, setReportData] = useState<any>(null);
-  const [reportLoading, setReportLoading] = useState(false);
+  const [aberto, setAberto] = useState(false);
+  const [texto, setTexto] = useState("");
+  /* Treinar vem LIGADO. É a alavanca: cada resposta que também vira
+     conhecimento é uma pergunta que a IA responde sozinha da próxima vez, para
+     outra paciente, às três da manhã. */
+  /* DESLIGADO por padrão, e exigindo a pergunta reescrita.
+  
+     Ligado, a pergunta CRUA dela virava conhecimento reutilizável — com o nome
+     do marido, o diagnóstico que ela não contou, o remédio que toma escondido —
+     e entrava no contexto do assistente de OUTRA paciente com um clique. */
+  const [treinar, setTreinar] = useState(false);
+  const [perguntaGeral, setPerguntaGeral] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-  async function loadReport(userId: string) {
-    setReportLoading(true);
-    const tk = await tokenFn();
-    const res = await getPatientReport({ data: { accessToken: tk, userId } });
-    if (res.ok) setReportData(res);
-    setReportLoading(false);
-  }
-
-  function printReport() {
-    window.print();
-  }
-
-  if (forms.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Nenhuma pré-consulta recebida ainda. As pacientes podem preenchê-la em{" "}
-        <strong>Minha Conta → Pré-consulta</strong>.
-      </p>
-    );
+  async function responder() {
+    if (texto.trim().length < 2) {
+      toast.error("Escreva a resposta.");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const { responderPergunta } = await import("@/lib/clinical.functions");
+      const r = await responderPergunta({
+        data: {
+          accessToken: await token(),
+          perguntaId: q.id,
+          resposta: texto.trim(),
+          treinar,
+          perguntaGeneralizada: treinar ? perguntaGeral.trim() || undefined : undefined,
+        },
+      });
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "banco_desatualizado"
+            ? "Falta aplicar o SQL de resposta do médico (APLICAR_MEDICO, seção 15)."
+            : "Não consegui enviar. Tente de novo.",
+        );
+        return;
+      }
+      if ("jaEstava" in r && r.jaEstava) {
+        toast("Esta pergunta já tinha sido respondida.");
+      } else {
+        toast.success(
+          "treinou" in r && r.treinou
+            ? "Respondida, avisada e a IA aprendeu ✓"
+            : "Respondida e avisada ✓",
+        );
+      }
+      setAberto(false);
+      setTexto("");
+      onRespondeu?.();
+    } catch {
+      toast.error("Não consegui enviar. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
-    <div className="space-y-4">
-      {forms.map((f) => (
-        <div
-          key={f.id}
-          className={`rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)] ${!f.seen_by_doctor ? "border-primary/40" : "border-border"}`}
-        >
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-medium">{f.patient_name}</p>
-                {!f.seen_by_doctor && (
-                  <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">
-                    Nova
-                  </span>
-                )}
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Semana {f.weeks_at_submission ?? "—"} ·{" "}
-                {new Date(f.submitted_at).toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setExpandedId((id) => (id === f.id ? null : f.id));
-                  if (!f.seen_by_doctor) onMarkSeen(f.id);
-                  if (expandedId !== f.id) loadReport(f.user_id);
-                }}
-                className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-              >
-                {expandedId === f.id ? "Fechar" : "Ver relatório"}
-              </button>
-            </div>
-          </div>
-
-          {/* Quick summary chips */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {f.symptoms.map((s) => (
-              <span key={s} className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
-                {s}
-              </span>
-            ))}
-            {f.current_weight && (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                ⚖️ {f.current_weight} kg
-              </span>
-            )}
-            {f.systolic && f.diastolic && (
-              <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                💓 {f.systolic}/{f.diastolic}
-              </span>
-            )}
-          </div>
-
-          {f.questions && (
-            <p className="mt-2 text-sm text-muted-foreground">
-              <strong>Perguntas:</strong> {f.questions}
-            </p>
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm text-muted-foreground">{q.patient}</p>
+          <p className="mt-1 text-foreground">{q.question}</p>
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {!q.answered && (
+            <button
+              onClick={() => setAberto((v) => !v)}
+              className="press rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              Responder
+            </button>
           )}
+          <button
+            onClick={() => onToggle(q.id, !q.answered)}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+              q.answered
+                ? "bg-emerald-100 text-emerald-800"
+                : "border border-border text-muted-foreground hover:text-primary"
+            }`}
+          >
+            {q.answered ? "Respondida ✓" : "Só marcar"}
+          </button>
+        </div>
+      </div>
 
-          {/* Expanded report */}
-          {expandedId === f.id && (
-            <div className="mt-5 border-t border-border pt-5">
-              {reportLoading ? (
-                <p className="text-sm text-muted-foreground">Carregando relatório...</p>
-              ) : reportData ? (
-                <PatientReportView data={reportData} formData={f} onPrint={printReport} />
-              ) : null}
+      {aberto && (
+        <div className="mt-3 border-t border-border pt-3">
+          <textarea
+            rows={3}
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Ela recebe no app, com aviso."
+            className="w-full rounded-xl border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          <label className="mt-2 flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={treinar}
+              onChange={(e) => {
+                setTreinar(e.target.checked);
+                if (e.target.checked && !perguntaGeral) setPerguntaGeral("");
+              }}
+              className="mt-0.5"
+            />
+            <span>
+              Ensinar isto à minha IA — ela responde sozinha da próxima vez, para outra paciente.
+            </span>
+          </label>
+          {treinar && (
+            <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50/60 p-2.5">
+              <p className="text-[11px] leading-snug text-amber-900">
+                A pergunta dela vai <strong>como você reescrever aqui</strong>. O texto original
+                pode ter nome, diagnóstico ou detalhe que ela não quer que apareça na conversa de
+                outra paciente — e o cérebro é lido por todas.
+              </p>
+              <input
+                value={perguntaGeral}
+                onChange={(e) => setPerguntaGeral(e.target.value)}
+                placeholder="Ex.: posso tomar dipirona na gravidez?"
+                className="mt-1.5 w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              />
+              {perguntaGeral.trim().length > 0 && perguntaGeral.trim().length < 8 && (
+                <p className="mt-1 text-[11px] text-amber-900">
+                  Muito curta — sem isso a IA não aprende (a resposta chega a ela de qualquer
+                  jeito).
+                </p>
+              )}
             </div>
+          )}
+          <button
+            onClick={responder}
+            disabled={enviando}
+            className="press mt-2 w-full rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {enviando ? "Enviando…" : "Enviar resposta"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A pré-consulta dela, DENTRO da própria ficha (ago/2026).
+ *
+ * Era uma seção solta na aba Pacientes, listando as de TODAS as pacientes
+ * juntas com o título "Pré-consultas" escrito ali — pedido do dono: "não tem
+ * que estar escrito ali na aba de pacientes". O relatório completo
+ * (`PatientReportView`) reaproveita o `ficha` que `PatientDetailModal` já
+ * carregou — MESMA chamada que a seção antiga fazia por trás (`getPatientReport`),
+ * sem pedir de novo e sem o risco que a versão antiga documentava (relatório
+ * de uma paciente vazando para o card de outra): aqui só existe UMA paciente,
+ * a que está com a ficha aberta.
+ */
+function PreConsultaCard({
+  form,
+  ficha,
+  onMarkSeen,
+}: {
+  form: AdminPreConsulta;
+  ficha: any;
+  onMarkSeen: (id: string) => void;
+}) {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <div
+      className={`rounded-2xl border bg-card p-4 shadow-[var(--shadow-card)] ${!form.seen_by_doctor ? "border-primary/40" : "border-border"}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold">Ela respondeu antes da consulta</p>
+            {!form.seen_by_doctor && (
+              <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+                Nova
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Semana {form.weeks_at_submission ?? "—"} ·{" "}
+            {new Date(form.submitted_at).toLocaleDateString("pt-BR", {
+              day: "2-digit",
+              month: "long",
+              year: "numeric",
+            })}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setAberto((a) => !a);
+            if (!form.seen_by_doctor) onMarkSeen(form.id);
+          }}
+          className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
+        >
+          {aberto ? "Fechar" : "Ver relatório"}
+        </button>
+      </div>
+
+      {/* Resumo rápido */}
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {form.symptoms.map((s) => (
+          <span key={s} className="rounded-full bg-rose-100 px-2 py-0.5 text-xs text-rose-700">
+            {s}
+          </span>
+        ))}
+        {form.current_weight && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
+            ⚖️ {form.current_weight} kg
+          </span>
+        )}
+        {form.systolic != null &&
+          form.diastolic != null &&
+          /* `!= null` e não truthy: com `&&`, um "0/80" sumia da tela por
+             inteiro em vez de aparecer marcado como implausível. */
+          (() => {
+            const sn = sinalPressao(form.systolic, form.diastolic);
+            return (
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  sn && sn.gravidade !== "normal"
+                    ? ESTILO_SINAL[sn.gravidade]
+                    : "bg-secondary text-muted-foreground"
+                }`}
+                title={sn?.nota || undefined}
+              >
+                💓 {form.systolic}/{form.diastolic}
+                {sn && sn.gravidade !== "normal" ? ` · ${sn.nota}` : ""}
+              </span>
+            );
+          })()}
+      </div>
+
+      {form.questions && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          <strong>Perguntas:</strong> {form.questions}
+        </p>
+      )}
+
+      {aberto && (
+        <div className="mt-5 border-t border-border pt-5">
+          {ficha ? (
+            <PatientReportView data={ficha} formData={form} onPrint={() => window.print()} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Carregando relatório...</p>
           )}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -1857,7 +3445,6 @@ function PatientReportView({
       })
     : null;
 
-  const lastLog = healthLogs?.[0];
   const completeSessions = (kicks ?? []).filter((k: any) => k.kick_count >= 10).length;
 
   return (
@@ -1893,25 +3480,30 @@ function PatientReportView({
           Sinais Vitais (pré-consulta)
         </p>
         <div className="grid gap-3 sm:grid-cols-3">
+          {/* O fallback procura a linha em que AQUELA medida existe, não a
+              linha mais recente: quem anotou só a pressão hoje deixava o peso
+              em "—", que o médico lê como "nunca se pesou". */}
           <InfoBox
             label="Peso"
-            value={
-              formData.current_weight
-                ? `${formData.current_weight} kg`
-                : lastLog?.weight_kg
-                  ? `${lastLog.weight_kg} kg (último reg.)`
-                  : "—"
-            }
+            value={(() => {
+              if (formData.current_weight) return `${formData.current_weight} kg`;
+              const u = ultimaMedida(healthLogs, "weight_kg");
+              return u.valor ? `${u.valor} kg (reg. ${diaCurto(u.quando) || "anterior"})` : "—";
+            })()}
           />
           <InfoBox
             label="Pressão arterial"
-            value={
-              formData.systolic && formData.diastolic
-                ? `${formData.systolic}/${formData.diastolic} mmHg`
-                : lastLog?.systolic
-                  ? `${lastLog.systolic}/${lastLog.diastolic} mmHg (último reg.)`
-                  : "—"
-            }
+            value={(() => {
+              if (formData.systolic && formData.diastolic)
+                return `${formData.systolic}/${formData.diastolic} mmHg`;
+              const l = (healthLogs ?? []).find(
+                (x: any) => x?.systolic != null && x?.diastolic != null,
+              );
+              if (!l) return "—";
+              return `${l.systolic}/${l.diastolic} mmHg (reg. ${
+                diaCurto(l.log_date ?? l.created_at ?? null) || "anterior"
+              })`;
+            })()}
           />
           <InfoBox label="Estado emocional" value={formData.emotional_state ?? "—"} />
         </div>
@@ -1989,6 +3581,7 @@ function EngagementSection({
   engagement,
   onRefresh,
   tokenFn,
+  falhou = false,
 }: {
   engagement: {
     totalPatients: number;
@@ -1996,13 +3589,20 @@ function EngagementSection({
     inactiveLastWeek: number;
     unseenPreConsultas: number;
     patients: PatientEngagement[];
+    janelaAtividadeDias?: number;
+    atividadeIncompleta?: boolean;
   } | null;
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
+  /** A leitura do dashboard falhou — ver `loadEngagement`. */
+  falhou?: boolean;
 }) {
   const [reportData, setReportData] = useState<Record<string, any>>({});
   const [loadingReport, setLoadingReport] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  /* Por paciente: duas linhas podem falhar de forma diferente, e um erro global
+     mostraria o aviso na linha errada. */
+  const [erroReport, setErroReport] = useState<Record<string, boolean>>({});
 
   async function loadPatientReport(userId: string) {
     if (reportData[userId]) {
@@ -2010,17 +3610,45 @@ function EngagementSection({
       return;
     }
     setLoadingReport(userId);
-    const tk = await tokenFn();
-    const res = await getPatientReport({ data: { accessToken: tk, userId } });
-    if (res.ok) setReportData((d) => ({ ...d, [userId]: res }));
-    setLoadingReport(null);
-    setExpandedId(userId);
+    setErroReport((e) => ({ ...e, [userId]: false }));
+    /* ─── SEM `try`, O BOTÃO FICAVA EM "..." PARA SEMPRE ────────────────────
+     *
+     * `tokenFn()` devolve string vazia quando a sessão expira e o validador do
+     * servidor exige `min(10)` — a chamada é REJEITADA, e a promessa estoura.
+     * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
+     * "Ver relatório" virava "..." e ficava assim, desabilitado, até o médico
+     * recarregar a página. Ele fica clicando num botão morto.
+     *
+     * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
+     * de "não consegui". */
+    try {
+      const tk = await tokenFn();
+      const res = await getPatientReport({ data: { accessToken: tk, userId } });
+      if (res.ok) setReportData((d) => ({ ...d, [userId]: res }));
+      else setErroReport((e) => ({ ...e, [userId]: true }));
+    } catch {
+      setErroReport((e) => ({ ...e, [userId]: true }));
+    } finally {
+      setLoadingReport(null);
+      setExpandedId(userId);
+    }
   }
 
   if (!engagement) {
     return (
       <div className="text-center py-8">
-        <p className="text-sm text-muted-foreground mb-3">Clique para carregar o dashboard.</p>
+        {/* "Clique para carregar" convida a repetir o que acabou de falhar. Se
+            a leitura já foi tentada e não deu, o médico precisa saber disso —
+            senão ele clica, nada acontece, e clica de novo. */}
+        {falhou && (
+          <p className="mx-auto mb-3 max-w-md rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+            📡 Não consegui carregar o dashboard agora. Se insistir e continuar assim, saia e entre
+            de novo — a sua sessão pode ter expirado.
+          </p>
+        )}
+        <p className="text-sm text-muted-foreground mb-3">
+          {falhou ? "Tentar de novo:" : "Clique para carregar o dashboard."}
+        </p>
         <button
           onClick={onRefresh}
           className="rounded-full bg-primary px-6 py-2.5 text-sm text-primary-foreground"
@@ -2036,6 +3664,35 @@ function EngagementSection({
   const inactivePatients = patients.filter((p) => !p.isActive);
   const activePatients = patients.filter((p) => p.isActive);
 
+  /* QUEM SUMIU, em ordem de silêncio.
+
+     "Inativa nos últimos 7 dias" é ruído: quase toda gestante passa uma semana
+     sem abrir o app e está ótima. O que merece a atenção dele é o silêncio
+     LONGO — duas semanas, um mês — e é isso que esta lista separa.
+
+     Silêncio não é sinal clínico, é sinal de engajamento: ela pode estar bem e
+     sem paciência para o app. Por isso o texto diz "sem registro" e nunca "sem
+     acompanhamento". */
+  const janela = engagement?.janelaAtividadeDias ?? 45;
+  const sumidas = patients
+    /* Recém-chegada não é sumida. Sem esta linha, a paciente que se cadastrou
+       ontem e ainda não abriu nada entrava na lista no dia seguinte — e o
+       médico ligava perguntando por que ela "parou de usar". Duas semanas é o
+       mesmo corte da primeira faixa de silêncio: antes disso, não há silêncio
+       para observar. */
+    .filter((p) => !p.createdAt || diasDeSilencio(p.createdAt, janela) >= 14)
+    .map((p) => ({
+      p,
+      s: sinalSilencio(p.lastActivityAt, janela),
+      dias: diasDeSilencio(p.lastActivityAt, janela),
+    }))
+    .filter((x) => x.s && x.s.gravidade !== "normal")
+    /* Desempate por tempo de silêncio. Sem ele, a ordem dentro de cada cor era
+       a ordem que o Postgres devolvesse (o `select` de perfis não tem
+       `ORDER BY`) — então QUAIS oito pacientes ele via podia mudar a cada
+       "Atualizar", sem nada ter mudado nos dados. */
+    .sort((a, b) => PESO_SINAL[a.s!.gravidade] - PESO_SINAL[b.s!.gravidade] || b.dias - a.dias);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -2044,6 +3701,60 @@ function EngagementSection({
           ↺ Atualizar
         </button>
       </div>
+
+      {/* A lista de sumidas vem ANTES dos números: o número diz que existem,
+          a lista diz quem são — e é a lista que vira ação. */}
+      {engagement?.atividadeIncompleta && (
+        /* Sem este aviso, uma falha de leitura no banco se apresentaria como
+           uma lista de pacientes abandonadas — e o médico ligaria para gente
+           que está registrando tudo direitinho. */
+        <div className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3">
+          <p className="text-[13px] font-semibold text-amber-900">
+            📡 Não consegui ler todos os registros
+          </p>
+          <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80">
+            A lista abaixo pode incluir pacientes que na verdade estão ativas. Atualize antes de
+            ligar para alguém.
+          </p>
+        </div>
+      )}
+
+      {sumidas.length > 0 && (
+        <div className="rounded-3xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-500/30 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+            {/* O texto dizia "há mais de 2 semanas" enquanto a lista contava
+                gente com 8 dias de silêncio — o corte anunciado tem que ser o
+                corte aplicado, senão um número errado aqui vira desconfiança em
+                tudo o mais que a tela diz. */}
+            {sumidas.length === 1
+              ? "1 paciente sem registro há duas semanas ou mais"
+              : `${sumidas.length} pacientes sem registro há duas semanas ou mais`}
+          </p>
+          <p className="mt-1 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+            Pode ser só falta de paciência com o app — mas numa gestação de alto risco vale um
+            telefonema antes da próxima consulta.
+          </p>
+          <ul className="mt-3 space-y-1.5">
+            {sumidas.slice(0, 8).map(({ p, s }) => (
+              <li key={p.id} className="flex items-center justify-between gap-3 text-[13px]">
+                <span className="truncate font-medium text-foreground">
+                  {p.display_name ?? "Paciente"}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    ESTILO_SINAL[s!.gravidade]
+                  }`}
+                >
+                  {s!.nota}
+                </span>
+              </li>
+            ))}
+            {sumidas.length > 8 && (
+              <li className="text-[12px] text-muted-foreground">+ {sumidas.length - 8} outras</li>
+            )}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Total de pacientes" value={totalPatients} />
@@ -2071,7 +3782,10 @@ function EngagementSection({
                 referenceDays: p.reference_days,
               });
               return (
-                <div key={p.id} className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4">
+                <div
+                  key={p.id}
+                  className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 dark:bg-amber-500/10 dark:border-amber-500/30"
+                >
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium">{p.display_name ?? "Paciente sem nome"}</p>
@@ -2092,6 +3806,11 @@ function EngagementSection({
                       {loadingReport === p.id ? "..." : "Ver relatório"}
                     </button>
                   </div>
+                  {expandedId === p.id && erroReport[p.id] && (
+                    <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+                      📡 Não consegui carregar o relatório dela agora. Tente de novo em instantes.
+                    </p>
+                  )}
                   {expandedId === p.id && reportData[p.id] && (
                     <div className="mt-4 border-t border-amber-200 pt-4">
                       <EngagementReportSnippet data={reportData[p.id]} />
@@ -2121,7 +3840,7 @@ function EngagementSection({
               return (
                 <div
                   key={p.id}
-                  className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4"
+                  className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4 dark:bg-emerald-500/10 dark:border-emerald-500/30"
                 >
                   <div className="flex items-center justify-between">
                     <div>
@@ -2148,6 +3867,11 @@ function EngagementSection({
                       {loadingReport === p.id ? "..." : "Ver relatório"}
                     </button>
                   </div>
+                  {expandedId === p.id && erroReport[p.id] && (
+                    <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+                      📡 Não consegui carregar o relatório dela agora. Tente de novo em instantes.
+                    </p>
+                  )}
                   {expandedId === p.id && reportData[p.id] && (
                     <div className="mt-4 border-t border-emerald-200 pt-4">
                       <EngagementReportSnippet data={reportData[p.id]} />
@@ -2163,15 +3887,69 @@ function EngagementSection({
   );
 }
 
+/**
+ * A última medida DE VERDADE.
+ *
+ * `health_logs` tem uma linha por registro, e o app envia só os campos que a
+ * paciente preencheu (`minha-conta.tsx` monta o objeto com o que existe). Ler
+ * `healthLogs[0]` e pegar dali o peso significa que uma paciente que hoje
+ * anotou só a pressão faz o médico ver "Último peso: —" — indistinguível de
+ * "nunca se pesou". Aqui procuramos a linha mais recente em que AQUELA medida
+ * está preenchida, e devolvemos também a data, que é metade da informação.
+ */
+function ultimaMedida<T extends Record<string, any>>(
+  logs: T[] | null | undefined,
+  campo: keyof T,
+): { valor: any; quando: string | null } {
+  for (const l of logs ?? []) {
+    const v = l?.[campo];
+    if (v !== null && v !== undefined && v !== "") {
+      return { valor: v, quando: (l.log_date as string) ?? (l.created_at as string) ?? null };
+    }
+  }
+  return { valor: null, quando: null };
+}
+
+/** "12/03" — data curta para caber ao lado do número. */
+function diaCurto(ymd: string | null): string {
+  if (!ymd) return "";
+  const d = new Date(ymd.length <= 10 ? `${ymd}T00:00:00` : ymd);
+  return isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+}
+
 function EngagementReportSnippet({ data }: { data: any }) {
   const { healthLogs, journals, kicks, pendingQuestions, latestPreConsulta } = data;
-  const lastLog = healthLogs?.[0];
+  const peso = ultimaMedida(healthLogs, "weight_kg");
   return (
     <div className="grid gap-3 sm:grid-cols-4 text-sm">
-      <InfoBox label="Último peso" value={lastLog?.weight_kg ? `${lastLog.weight_kg} kg` : "—"} />
+      <InfoBox
+        label="Último peso"
+        value={
+          peso.valor
+            ? `${peso.valor} kg${diaCurto(peso.quando) ? ` · ${diaCurto(peso.quando)}` : ""}`
+            : "—"
+        }
+      />
+      {/* A PA é UM par: a sistólica sem a diastólica renderizava o literal
+          "120/null". Se falta metade, a medida não está pronta para ser lida. */}
       <InfoBox
         label="Última PA"
-        value={lastLog?.systolic ? `${lastLog.systolic}/${lastLog.diastolic}` : "—"}
+        value={(() => {
+          const l = (healthLogs ?? []).find(
+            (x: any) => x?.systolic != null && x?.diastolic != null,
+          );
+          if (!l) return "—";
+          const d = diaCurto(l.log_date ?? l.created_at ?? null);
+          /* Regra compartilhada em `lib/sinais-clinicos`, não repetida aqui:
+             a mesma faixa precisa valer em toda tela que mostra pressão, senão
+             o médico aprende que a cor não quer dizer nada. */
+          const sinal = sinalPressao(l.systolic, l.diastolic);
+          const marca =
+            sinal?.gravidade === "grave" ? "🔴 " : sinal?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${marca}${l.systolic}/${l.diastolic}${d ? ` · ${d}` : ""}`;
+        })()}
       />
       <InfoBox label="Entradas no diário" value={String(journals?.length ?? 0)} />
       <InfoBox label="Perguntas pendentes" value={String(pendingQuestions?.length ?? 0)} />
@@ -2193,13 +3971,39 @@ function EngagementReportSnippet({ data }: { data: any }) {
 }
 
 /* ---------- Shared components ---------- */
-function Stat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function Stat({
+  label,
+  value,
+  highlight,
+  tom,
+}: {
+  label: string;
+  value: number;
+  highlight?: boolean;
+  /** `urgente` sai da cor da marca — é o que separa "olhe isto" de "corra". */
+  tom?: "urgente";
+}) {
+  const urgente = tom === "urgente";
   return (
     <div
-      className={`rounded-2xl border p-4 text-center shadow-[var(--shadow-card)] ${highlight ? "border-primary/30 bg-primary/5" : "border-border bg-card"}`}
+      className={`rounded-2xl border p-4 text-center shadow-[var(--shadow-card)] ${
+        urgente
+          ? "border-rose-300 bg-rose-50"
+          : highlight
+            ? "border-primary/30 bg-primary/5"
+            : "border-border bg-card"
+      }`}
     >
-      <p className={`font-serif text-3xl ${highlight ? "text-primary" : ""}`}>{value}</p>
-      <p className="mt-1 text-xs text-muted-foreground">{label}</p>
+      <p
+        className={`font-serif text-3xl ${
+          urgente ? "text-rose-700" : highlight ? "text-primary" : ""
+        }`}
+      >
+        {value}
+      </p>
+      <p className={`mt-1 text-xs ${urgente ? "text-rose-900/80" : "text-muted-foreground"}`}>
+        {label}
+      </p>
     </div>
   );
 }
@@ -2290,7 +4094,20 @@ function TeleconsultasSection({
       data: {
         accessToken: tk,
         patientUserId: form.patientUserId,
-        scheduledFor: form.scheduledFor || null,
+        /* ─── O FUSO, QUE FALTAVA ────────────────────────────────────────────
+         * `datetime-local` entrega "2026-08-10T20:00" — sem fuso nenhum. Essa
+         * string ia crua para uma coluna `timestamptz`, e o Postgres a
+         * interpreta no fuso da sessão, que na Supabase é UTC. O médico marcava
+         * 20:00, o banco guardava 20:00 UTC, e a paciente recebia convite para
+         * 17:00. Três horas de diferença, num compromisso marcado.
+         *
+         * `new Date(string local).toISOString()` resolve porque o NAVEGADOR
+         * conhece o fuso de quem digitou: ele lê a string como hora local e
+         * devolve o instante certo em UTC.
+         *
+         * A tela de Lives, neste mesmo arquivo, já fazia exatamente isto. A
+         * teleconsulta tinha ficado de fora. */
+        scheduledFor: form.scheduledFor ? new Date(form.scheduledFor).toISOString() : null,
         doctorNotes: form.doctorNotes || null,
       },
     });
@@ -2305,26 +4122,47 @@ function TeleconsultasSection({
     const bullets = noteBullets[s.id] ?? "";
     if (!bullets.trim()) return;
     setGeneratingNote(s.id);
-    const tk = await tokenFn();
-    const res = await generateClinicalNote({
-      data: {
-        accessToken: tk,
-        bullets,
-        patient: {
-          name: s.patient_name ?? "Paciente",
-          weeksAtSubmission: pre?.weeks_at_submission ?? null,
-          weight: pre?.current_weight ?? null,
-          systolic: pre?.systolic ?? null,
-          diastolic: pre?.diastolic ?? null,
-          symptoms: pre?.symptoms ?? [],
-          medications: pre?.medications ?? null,
-          questions: pre?.questions ?? null,
-          emotionalState: pre?.emotional_state ?? null,
+    /* ─── O GANCHO DO PLANO CHEGAVA E ERA JOGADO FORA ───────────────────────
+     *
+     * O servidor passou a barrar a nota SOAP por plano e devolve
+     * `{ ok:false, error: fraseDoGancho("cerebro") }`. Aqui só `res.ok` era
+     * olhado: o botão voltava do "..." e não acontecia nada.
+     *
+     * A aba Teleconsultas não é filtrada por plano — o `podeIA` do painel cobre
+     * só a aba Cérebro —, então o médico no Free vê o botão, digita a consulta
+     * inteira em tópicos, clica, e o produto fica mudo. Ele conclui que está
+     * quebrado, e não que existe um plano. Um gate sem gancho é pior que sem
+     * gate: gasta a paciência dele e não vende nada.
+     *
+     * E o `try/catch` porque `tokenFn()` devolve string vazia com a sessão
+     * expirada: sem ele, `setGeneratingNote(null)` nunca roda e o botão fica em
+     * "..." até o F5. */
+    try {
+      const tk = await tokenFn();
+      const res = await generateClinicalNote({
+        data: {
+          accessToken: tk,
+          bullets,
+          patient: {
+            name: s.patient_name ?? "Paciente",
+            weeksAtSubmission: pre?.weeks_at_submission ?? null,
+            weight: pre?.current_weight ?? null,
+            systolic: pre?.systolic ?? null,
+            diastolic: pre?.diastolic ?? null,
+            symptoms: pre?.symptoms ?? [],
+            medications: pre?.medications ?? null,
+            questions: pre?.questions ?? null,
+            emotionalState: pre?.emotional_state ?? null,
+          },
         },
-      },
-    });
-    setGeneratingNote(null);
-    if (res.ok) setGeneratedNote((p) => ({ ...p, [s.id]: res.note }));
+      });
+      if (res.ok) setGeneratedNote((p) => ({ ...p, [s.id]: res.note }));
+      else toast.error(res.error || "Não foi possível gerar a nota agora.");
+    } catch {
+      toast.error("Não foi possível gerar a nota agora. Tente de novo.");
+    } finally {
+      setGeneratingNote(null);
+    }
   }
 
   async function doSaveNote(id: string) {
@@ -2339,13 +4177,11 @@ function TeleconsultasSection({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-serif text-2xl">Teleconsultas</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Abra a sala de vídeo, veja a pré-consulta da paciente e gere a nota clínica com IA.
-          </p>
-        </div>
+      {/* Sem título próprio: a seção que chama este componente (`painel.tsx`,
+          aba Calendário) já tem "Teleconsultas" + a mesma frase de subtítulo
+          logo acima — um segundo título aqui duplicava as duas linhas na
+          tela, uma embaixo da outra. */}
+      <div className="flex items-center justify-end">
         <button
           onClick={() => setShowForm((v) => !v)}
           className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground"
@@ -2471,10 +4307,20 @@ function TeleconsultasSection({
                             {pre.current_weight} kg
                           </span>
                         )}
-                        {pre.systolic && pre.diastolic && (
+                        {pre.systolic != null && pre.diastolic != null && (
                           <span>
                             <span className="text-muted-foreground">PA: </span>
                             {pre.systolic}/{pre.diastolic} mmHg
+                            {(() => {
+                              const sn = sinalPressao(pre.systolic, pre.diastolic);
+                              return sn?.nota ? (
+                                <span
+                                  className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${ESTILO_SINAL[sn.gravidade]}`}
+                                >
+                                  {sn.nota}
+                                </span>
+                              ) : null;
+                            })()}
                           </span>
                         )}
                         {pre.emotional_state && (
@@ -2702,6 +4548,7 @@ function ConsultasPagasSection({
                 {c.message && (
                   <p className="text-xs mt-0.5 italic text-muted-foreground">"{c.message}"</p>
                 )}
+                <MarcarHorario consulta={c} onRefresh={onRefresh} tokenFn={tokenFn} />
               </div>
               {c.status === "pagamento_enviado" && (
                 <div className="flex flex-col gap-1.5 shrink-0">
@@ -2738,270 +4585,90 @@ function ConsultasPagasSection({
   );
 }
 
-/* ---------- Empresas ---------- */
-function EmpresasSection({
-  leads,
-  accounts,
+/**
+ * MARCAR O HORÁRIO DA CONSULTA PARTICULAR.
+ *
+ * Era a única das três fontes da agenda sem hora combinada: o banco guardava as
+ * datas que a PACIENTE preferia e mais nada, então o calendário do mês tinha de
+ * mostrá-la tracejada, como preferência — justamente a consulta pela qual ele já
+ * recebeu.
+ *
+ * O `datetime-local` devolve "hora de parede", sem fuso. Mandá-la crua para a
+ * coluna `timestamptz` seria erro de três horas no Brasil; por isso o valor
+ * passa por `deCampoLocal` antes de sair daqui, e o servidor recusa qualquer
+ * string sem fuso.
+ */
+function MarcarHorario({
+  consulta,
   onRefresh,
   tokenFn,
 }: {
-  leads: CorporateLead[];
-  accounts: CorporateAccount[];
+  consulta: any;
   onRefresh: () => void;
   tokenFn: () => Promise<string>;
 }) {
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newCompany, setNewCompany] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPlan, setNewPlan] = useState<"basico" | "standard" | "premium">("basico");
-  const [newSeats, setNewSeats] = useState("10");
-  const [newNotes, setNewNotes] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [updatingLeadId, setUpdatingLeadId] = useState<string | null>(null);
+  const [valor, setValor] = useState(() => paraCampoLocal(consulta.scheduled_for));
+  const [salvando, setSalvando] = useState(false);
 
-  const PLANS = { basico: "Básico (10)", standard: "Standard (50)", premium: "Premium (100)" };
-
-  async function handleCreateAccount() {
-    setCreating(true);
-    const tk = await tokenFn();
-    await createCorporateAccountAdmin({
-      data: {
-        accessToken: tk,
-        companyName: newCompany,
-        contactEmail: newEmail,
-        planType: newPlan,
-        maxSeats: Number(newSeats) || 10,
-        notes: newNotes || null,
-      },
-    });
-    setShowCreateForm(false);
-    setNewCompany("");
-    setNewEmail("");
-    setNewNotes("");
-    onRefresh();
-    setCreating(false);
+  async function salvar(quando: string | null) {
+    setSalvando(true);
+    try {
+      const res = await marcarHoraDaConsulta({
+        data: { accessToken: await tokenFn(), id: consulta.id, scheduledFor: quando },
+      });
+      if (res.ok) {
+        toast.success(quando ? "Horário marcado." : "Horário desmarcado.");
+        onRefresh();
+      } else if (res.motivo === "sem_coluna") {
+        /* Diz O QUE FAZER. "Não foi possível salvar" mandaria ele tentar de
+           novo para sempre — a coluna não vai aparecer sozinha. */
+        toast.error("Rode o APLICAR_HORA_DA_CONSULTA.sql no Supabase para marcar horários.");
+      } else {
+        toast.error("Não foi possível marcar o horário.");
+      }
+    } catch {
+      toast.error("Não foi possível marcar o horário.");
+    } finally {
+      setSalvando(false);
+    }
   }
-
-  async function handleLeadStatus(id: string, status: string) {
-    setUpdatingLeadId(id);
-    const tk = await tokenFn();
-    await updateLeadStatusAdmin({ data: { accessToken: tk, id, status } });
-    onRefresh();
-    setUpdatingLeadId(null);
-  }
-
-  const leadStatusColors: Record<string, string> = {
-    novo: "bg-blue-50 border-blue-200",
-    em_contato: "bg-amber-50 border-amber-200",
-    convertido: "bg-green-50 border-green-200",
-    descartado: "bg-secondary border-border opacity-60",
-  };
 
   return (
-    <div className="space-y-8">
-      {/* Active accounts */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Contas corporativas ativas</h3>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white"
-          >
-            + Nova conta
-          </button>
-        </div>
-
-        {showCreateForm && (
-          <div className="rounded-2xl border border-border bg-card p-5 mb-4 space-y-3">
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium mb-1">Empresa *</label>
-                <input
-                  value={newCompany}
-                  onChange={(e) => setNewCompany(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">E-mail de contato *</label>
-                <input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Plano</label>
-                <select
-                  value={newPlan}
-                  onChange={(e) => setNewPlan(e.target.value as any)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                >
-                  {Object.entries(PLANS).map(([k, v]) => (
-                    <option key={k} value={k}>
-                      {v}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium mb-1">Vagas (max)</label>
-                <input
-                  type="number"
-                  value={newSeats}
-                  onChange={(e) => setNewSeats(e.target.value)}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Notas internas</label>
-              <input
-                value={newNotes}
-                onChange={(e) => setNewNotes(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleCreateAccount}
-                disabled={creating || !newCompany || !newEmail}
-                className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-              >
-                {creating ? "Criando..." : "Criar conta"}
-              </button>
-              <button
-                onClick={() => setShowCreateForm(false)}
-                className="rounded-full border border-border px-4 py-1.5 text-xs font-medium"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        )}
-
-        {accounts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma conta corporativa criada ainda.</p>
-        ) : (
-          <div className="space-y-2">
-            {accounts.map((acc) => (
-              <div key={acc.id} className="rounded-2xl border border-border bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{acc.company_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {acc.contact_email} ·{" "}
-                      {PLANS[acc.plan_type as keyof typeof PLANS] ?? acc.plan_type}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Vagas: {acc.max_seats}</p>
-                    {acc.notes && (
-                      <p className="text-xs text-muted-foreground mt-0.5 italic">{acc.notes}</p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="rounded-full bg-primary/10 px-3 py-1 text-xs font-mono font-bold text-primary">
-                      {acc.access_code}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">código de acesso</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Leads */}
-      <div>
-        <h3 className="font-semibold mb-4">
-          Leads / Solicitações de demonstração ({leads.length})
-        </h3>
-        {leads.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma solicitação ainda.</p>
-        ) : (
-          <div className="space-y-2">
-            {leads.map((lead) => (
-              <div
-                key={lead.id}
-                className={`rounded-2xl border p-4 ${leadStatusColors[lead.status] ?? "bg-card border-border"}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-sm">{lead.company_name}</p>
-                    <p className="text-xs">
-                      {lead.contact_name} · {lead.contact_email}
-                    </p>
-                    {lead.contact_phone && (
-                      <p className="text-xs text-muted-foreground">{lead.contact_phone}</p>
-                    )}
-                    {lead.employee_count && (
-                      <p className="text-xs text-muted-foreground">{lead.employee_count}</p>
-                    )}
-                    {lead.message && <p className="text-xs mt-1 italic">"{lead.message}"</p>}
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(lead.created_at).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    {lead.status === "novo" && (
-                      <>
-                        <button
-                          onClick={() => handleLeadStatus(lead.id, "em_contato")}
-                          disabled={updatingLeadId === lead.id}
-                          className="rounded-full bg-amber-500 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
-                        >
-                          Em contato
-                        </button>
-                        <button
-                          onClick={() => handleLeadStatus(lead.id, "convertido")}
-                          disabled={updatingLeadId === lead.id}
-                          className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
-                        >
-                          Convertido
-                        </button>
-                        <button
-                          onClick={() => handleLeadStatus(lead.id, "descartado")}
-                          disabled={updatingLeadId === lead.id}
-                          className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground disabled:opacity-40"
-                        >
-                          Descartar
-                        </button>
-                      </>
-                    )}
-                    {lead.status === "em_contato" && (
-                      <button
-                        onClick={() => handleLeadStatus(lead.id, "convertido")}
-                        disabled={updatingLeadId === lead.id}
-                        className="rounded-full bg-green-600 px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
-                      >
-                        Marcar convertido
-                      </button>
-                    )}
-                    {(lead.status === "convertido" || lead.status === "descartado") && (
-                      <span className="text-xs font-medium capitalize">
-                        {lead.status === "convertido" ? "✅ Convertido" : "✗ Descartado"}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Afiliados (permuta com influenciadores) */}
-      <AffiliatesCard tokenFn={tokenFn} />
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <label className="text-xs text-muted-foreground" htmlFor={`quando-${consulta.id}`}>
+        Horário combinado
+      </label>
+      <input
+        id={`quando-${consulta.id}`}
+        type="datetime-local"
+        value={valor}
+        onChange={(e) => setValor(e.target.value)}
+        className="rounded-full border border-border bg-background px-3 py-1 text-xs"
+      />
+      <button
+        onClick={() => salvar(deCampoLocal(valor))}
+        disabled={salvando || !valor.trim()}
+        className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
+      >
+        Marcar
+      </button>
+      {consulta.scheduled_for && (
+        <button
+          onClick={() => {
+            setValor("");
+            salvar(null);
+          }}
+          disabled={salvando}
+          className="rounded-full border border-border px-3 py-1 text-xs disabled:opacity-40"
+        >
+          Desmarcar
+        </button>
+      )}
     </div>
   );
 }
 
-/**
- * Afiliados: crie códigos para influenciadores (permuta). O link ?ref=CODIGO
- * atribui a paciente; cada fatura paga do Premium credita a comissão (50%
- * por padrão) automaticamente — aqui a equipe acompanha e acerta o repasse.
- */
+/* ---------- Empresas ---------- */
 function AffiliatesCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   const [affiliates, setAffiliates] = useState<Affiliate[] | null>(null);
   const [missing, setMissing] = useState(false);
@@ -3072,7 +4739,7 @@ function AffiliatesCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
       </p>
 
       {missing && (
-        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           Rode o <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar os afiliados.
         </p>
       )}
@@ -3290,616 +4957,32 @@ const EXAM_PANELS = [
   },
 ];
 
-function FerramentasSection() {
-  const [openRx, setOpenRx] = useState<number | null>(null);
-  const [openExam, setOpenExam] = useState<number | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
+/* A `FerramentasSection` foi removida em ago/2026.
 
-  function copyText(text: string, key: string) {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(key);
-      setTimeout(() => setCopied(null), 2000);
-    });
-  }
+   Ela mostrava os mesmos `PRESCRIPTIONS` e `EXAM_PANELS` que hoje abrem dentro
+   do cartão da paciente — e mostrava com um defeito: para enviar, o médico
+   escolhia a paciente DE NOVO, numa lista de duzentos nomes, no fim do fluxo.
+   Mantê-la ao lado do caminho novo criaria duas telas para a mesma coisa, que é
+   como duas cópias de uma regra divergem nesta base.
 
-  function printText(title: string, text: string) {
-    const w = window.open("", "_blank", "width=600,height=700");
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8">
-      <title>${title}</title>
-      <style>
-        body { font-family: Georgia, serif; padding: 40px; color: #111; }
-        h2 { font-size: 18px; margin-bottom: 24px; }
-        pre { font-family: inherit; font-size: 14px; line-height: 1.8; white-space: pre-wrap; }
-        .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 12px; font-size: 12px; color: #666; }
-      </style></head><body>
-      <h2>${title}</h2><pre>${text}</pre>
-      <div class="footer">Emitido em ${new Date().toLocaleDateString("pt-BR")}</div>
-      <script>window.print();</script></body></html>`);
-  }
-
-  return (
-    <div className="space-y-10">
-      {/* Receituário */}
-      <div>
-        <p className="font-serif text-2xl">Receituário Rápido</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Prescrições comuns de obstetrícia. Clique para expandir, copiar ou imprimir.
-        </p>
-        <div className="mt-5 space-y-2">
-          {PRESCRIPTIONS.map((rx, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
-              <button
-                onClick={() => setOpenRx(openRx === i ? null : i)}
-                className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
-              >
-                <span className="flex items-center gap-3 font-medium">
-                  <span className="text-xl">{rx.icon}</span>
-                  {rx.title}
-                </span>
-                <span className="text-muted-foreground text-sm">{openRx === i ? "▲" : "▼"}</span>
-              </button>
-              {openRx === i && (
-                <div className="border-t border-border px-5 py-4 space-y-3">
-                  <pre className="whitespace-pre-wrap text-sm text-foreground font-sans leading-relaxed">
-                    {rx.text}
-                  </pre>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => copyText(rx.text, `rx-${i}`)}
-                      className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                    >
-                      {copied === `rx-${i}` ? "✅ Copiado!" : "Copiar"}
-                    </button>
-                    <button
-                      onClick={() => printText(rx.title, rx.text)}
-                      className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
-                    >
-                      🖨️ Imprimir
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Solicitações de exame */}
-      <div>
-        <p className="font-serif text-2xl">Solicitação de Exames</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Painéis padrão por trimestre. Copie ou imprima em um clique.
-        </p>
-        <div className="mt-5 space-y-2">
-          {EXAM_PANELS.map((panel, i) => {
-            const examText = panel.exams.join("\n");
-            return (
-              <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
-                <button
-                  onClick={() => setOpenExam(openExam === i ? null : i)}
-                  className="flex w-full items-center justify-between px-5 py-4 text-left hover:bg-muted/30"
-                >
-                  <span className="flex items-center gap-3 font-medium">
-                    <span className="text-xl">{panel.icon}</span>
-                    {panel.title}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {openExam === i ? "▲" : `${panel.exams.length} exames ▼`}
-                  </span>
-                </button>
-                {openExam === i && (
-                  <div className="border-t border-border px-5 py-4 space-y-3">
-                    <ul className="space-y-1">
-                      {panel.exams.map((e, j) => (
-                        <li key={j} className="flex items-start gap-2 text-sm text-foreground">
-                          <span className="mt-0.5 text-primary shrink-0">•</span>
-                          {e}
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => copyText(examText, `exam-${i}`)}
-                        className="rounded-full border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted/40"
-                      >
-                        {copied === `exam-${i}` ? "✅ Copiado!" : "Copiar lista"}
-                      </button>
-                      <button
-                        onClick={() =>
-                          printText(`Solicitação de Exames — ${panel.title}`, examText)
-                        }
-                        className="rounded-full bg-primary px-4 py-1.5 text-xs text-primary-foreground"
-                      >
-                        🖨️ Imprimir solicitação
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground border-t border-border pt-4">
-        ⚕️ Prescrições e painéis baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. Sempre confirme
-        com o protocolo vigente da sua instituição e ajuste conforme o quadro clínico da paciente.
-      </p>
-    </div>
-  );
-}
-
-/* ---------- Calendário (week view) ---------- */
-const DOW_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-
-function getWeekStart(date: Date): Date {
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
-  return d;
-}
-
-function CalendárioSection({
-  appointments,
-  onNavigate,
-}: {
-  appointments: AdminAppointment[];
-  onNavigate: (tab: PanelTab) => void;
-}) {
-  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
-
-  function prevWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() - 7);
-    setWeekStart(d);
-  }
-
-  function nextWeek() {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + 7);
-    setWeekStart(d);
-  }
-
-  function goToday() {
-    setWeekStart(getWeekStart(new Date()));
-  }
-
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(d.getDate() + i);
-    return d;
-  });
-
-  const confirmedAppts = appointments.filter(
-    (a) => a.status === "confirmed" && (a as any).confirmed_date,
-  );
-
-  function getAppts(day: Date) {
-    const iso = ymdLocal(day);
-    return confirmedAppts
-      .filter((a) => (a as any).confirmed_date === iso)
-      .sort((a, b) =>
-        ((a as any).confirmed_time ?? "").localeCompare((b as any).confirmed_time ?? ""),
-      );
-  }
-
-  const today = ymdLocal();
-
-  const weekLabel = `${weekDays[0].toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} — ${weekDays[6].toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" })}`;
-
-  return (
-    <div className="space-y-4">
-      {/* Controls */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={prevWeek}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            ← Anterior
-          </button>
-          <button
-            onClick={goToday}
-            className="rounded-full border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary"
-          >
-            Hoje
-          </button>
-          <button
-            onClick={nextWeek}
-            className="rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            Próxima →
-          </button>
-        </div>
-        <p className="text-sm font-medium">{weekLabel}</p>
-        <button
-          onClick={() => onNavigate("Agendamentos")}
-          className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
-        >
-          Ver todos
-        </button>
-      </div>
-
-      {/* Week grid */}
-      <div className="grid grid-cols-7 gap-1.5">
-        {weekDays.map((day, i) => {
-          const iso = ymdLocal(day);
-          const isToday = iso === today;
-          const dayAppts = getAppts(day);
-          return (
-            <div
-              key={i}
-              className={`rounded-2xl border p-2 min-h-[120px] flex flex-col gap-1.5 ${isToday ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
-            >
-              <div className="text-center">
-                <p
-                  className={`text-[10px] font-semibold uppercase tracking-wide ${isToday ? "text-primary" : "text-muted-foreground"}`}
-                >
-                  {DOW_LABELS[i]}
-                </p>
-                <p className={`text-sm font-bold ${isToday ? "text-primary" : ""}`}>
-                  {day.getDate()}
-                </p>
-              </div>
-              {dayAppts.map((a) => (
-                <div
-                  key={a.id}
-                  title={`${a.patient_name} — ${(a as any).confirmed_time}`}
-                  className="rounded-lg bg-primary/10 px-1.5 py-1 text-[10px] leading-tight text-primary truncate"
-                >
-                  <span className="font-medium">{(a as any).confirmed_time}</span>{" "}
-                  {a.patient_name.split(" ")[0]}
-                </div>
-              ))}
-              {dayAppts.length === 0 && (
-                <p className="text-[10px] text-muted-foreground/50 text-center mt-1">—</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Upcoming confirmed list */}
-      <div className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground mb-3">
-          Próximas confirmadas
-        </p>
-        {confirmedAppts.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma consulta confirmada com data definida.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {confirmedAppts
-              .filter((a) => (a as any).confirmed_date >= today)
-              .sort((a, b) => {
-                const da = `${(a as any).confirmed_date}T${(a as any).confirmed_time ?? "00:00"}`;
-                const db = `${(b as any).confirmed_date}T${(b as any).confirmed_time ?? "00:00"}`;
-                return da.localeCompare(db);
-              })
-              .slice(0, 10)
-              .map((a) => {
-                const ext = a as any;
-                return (
-                  <div
-                    key={a.id}
-                    className="flex items-center gap-4 rounded-xl border border-border bg-card px-4 py-2.5"
-                  >
-                    <div className="text-center min-w-[48px]">
-                      <p className="text-sm font-bold text-primary">
-                        {new Date(ext.confirmed_date + "T00:00:00").getDate()}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground uppercase">
-                        {new Date(ext.confirmed_date + "T00:00:00").toLocaleDateString("pt-BR", {
-                          month: "short",
-                        })}
-                      </p>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{a.patient_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {ext.confirmed_time} · {a.reason}
-                      </p>
-                    </div>
-                    {ext.price_brl && (
-                      <p
-                        className={`text-xs font-medium shrink-0 ${ext.payment_status === "pago" ? "text-emerald-600" : "text-amber-600"}`}
-                      >
-                        {ext.payment_status === "pago" ? "✓ " : ""}R${" "}
-                        {(ext.price_brl / 100).toFixed(2)}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+   Os modelos ficaram onde estavam (logo acima): quem os usa agora é
+   `AcoesDaPaciente`. */
 
 /* ---------- Agenda (availability config) ---------- */
-interface DoctorAvailability {
-  id: string;
-  day_of_week: number;
-  start_time: string;
-  end_time: string;
-  slot_minutes: number;
-  enabled: boolean;
-}
 
-interface BlockedDate {
-  id: string;
-  date: string;
-  reason: string | null;
-}
-
-function AgendaSection() {
-  const [availability, setAvailability] = useState<DoctorAvailability[]>([]);
-  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [newBlockDate, setNewBlockDate] = useState("");
-  const [newBlockReason, setNewBlockReason] = useState("");
-  const [addingBlock, setAddingBlock] = useState(false);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    setLoading(true);
-    const [avail, blocked] = await Promise.all([
-      (supabase as any).from("doctor_availability").select("*").order("day_of_week"),
-      (supabase as any).from("blocked_dates").select("*").order("date"),
-    ]);
-    if (avail.data) setAvailability(avail.data);
-    if (blocked.data) setBlockedDates(blocked.data);
-    setLoading(false);
-  }
-
-  async function saveAvailability(row: DoctorAvailability) {
-    setSaving(true);
-    // .select() para detectar update que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("doctor_availability")
-      .update({
-        start_time: row.start_time,
-        end_time: row.end_time,
-        slot_minutes: row.slot_minutes,
-        enabled: row.enabled,
-      })
-      .eq("id", row.id)
-      .select("id");
-    setSaving(false);
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível salvar o horário. Verifique sua permissão de administrador e tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    toast.success("Horário salvo.");
-  }
-
-  function updateRow(idx: number, patch: Partial<DoctorAvailability>) {
-    setAvailability((prev) => {
-      const next = prev.map((r, i) => (i === idx ? { ...r, ...patch } : r));
-      return next;
-    });
-  }
-
-  async function addBlockedDate() {
-    if (!newBlockDate) return;
-    setAddingBlock(true);
-    const { data, error } = await (supabase as any)
-      .from("blocked_dates")
-      .insert({ date: newBlockDate, reason: newBlockReason || null })
-      .select()
-      .single();
-    setAddingBlock(false);
-    if (error || !data) {
-      toast.error(
-        "Não foi possível bloquear a data. Tente novamente." + (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    setBlockedDates((prev) => [...prev, data].sort((a, b) => a.date.localeCompare(b.date)));
-    setNewBlockDate("");
-    setNewBlockReason("");
-  }
-
-  async function removeBlockedDate(id: string) {
-    // .select() para detectar delete que não afetou nenhuma linha (ex.: RLS)
-    const { data, error } = await (supabase as any)
-      .from("blocked_dates")
-      .delete()
-      .eq("id", id)
-      .select("id");
-    if (error || !data?.length) {
-      toast.error(
-        "Não foi possível remover a data bloqueada. Tente novamente." +
-          (error ? ` (${error.message})` : ""),
-      );
-      return;
-    }
-    setBlockedDates((prev) => prev.filter((b) => b.id !== id));
-  }
-
-  if (loading) return <p className="text-sm text-muted-foreground">Carregando...</p>;
-
-  return (
-    <div className="space-y-8">
-      {/* Availability per day */}
-      <div>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <p className="font-serif text-xl">Disponibilidade semanal</p>
-            <p className="text-sm text-muted-foreground mt-0.5">
-              Configure os dias e horários de atendimento. Salve cada linha individualmente.
-            </p>
-          </div>
-        </div>
-        <div className="space-y-2">
-          {availability.map((row, idx) => (
-            <div
-              key={row.id}
-              className={`rounded-2xl border p-4 transition-colors ${row.enabled ? "border-border bg-card" : "border-dashed border-border bg-secondary/30"}`}
-            >
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="flex items-center gap-2 w-28">
-                  <button
-                    onClick={() => updateRow(idx, { enabled: !row.enabled })}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none ${row.enabled ? "bg-primary" : "bg-muted"}`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform ${row.enabled ? "translate-x-4" : "translate-x-0"}`}
-                    />
-                  </button>
-                  <span
-                    className={`text-sm font-medium w-8 ${row.enabled ? "" : "text-muted-foreground"}`}
-                  >
-                    {DOW_LABELS[row.day_of_week]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Início</label>
-                    <input
-                      type="time"
-                      disabled={!row.enabled}
-                      value={row.start_time}
-                      onChange={(e) => updateRow(idx, { start_time: e.target.value })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">Fim</label>
-                    <input
-                      type="time"
-                      disabled={!row.enabled}
-                      value={row.end_time}
-                      onChange={(e) => updateRow(idx, { end_time: e.target.value })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-muted-foreground mb-0.5">
-                      Duração (min)
-                    </label>
-                    <select
-                      disabled={!row.enabled}
-                      value={row.slot_minutes}
-                      onChange={(e) => updateRow(idx, { slot_minutes: Number(e.target.value) })}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs disabled:opacity-40"
-                    >
-                      {[15, 20, 30, 45, 60].map((v) => (
-                        <option key={v} value={v}>
-                          {v} min
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={() => saveAvailability(row)}
-                    disabled={saving}
-                    className="self-end rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
-                  >
-                    Salvar
-                  </button>
-                </div>
-                {row.enabled && (
-                  <p className="text-xs text-muted-foreground ml-auto hidden sm:block">
-                    {Math.floor(
-                      (timeToMins(row.end_time) - timeToMins(row.start_time)) / row.slot_minutes,
-                    )}{" "}
-                    slots/dia
-                  </p>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Blocked dates */}
-      <div>
-        <p className="font-serif text-xl mb-1">Datas bloqueadas</p>
-        <p className="text-sm text-muted-foreground mb-4">
-          Férias, feriados ou dias sem atendimento.
-        </p>
-
-        {/* Add form */}
-        <div className="flex flex-wrap gap-2 mb-4 items-end">
-          <div>
-            <label className="block text-xs text-muted-foreground mb-0.5">Data *</label>
-            <input
-              type="date"
-              value={newBlockDate}
-              onChange={(e) => setNewBlockDate(e.target.value)}
-              className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm"
-            />
-          </div>
-          <div>
-            <label className="block text-xs text-muted-foreground mb-0.5">Motivo (opcional)</label>
-            <input
-              placeholder="Ex: Férias"
-              value={newBlockReason}
-              onChange={(e) => setNewBlockReason(e.target.value)}
-              className="rounded-xl border border-input bg-background px-3 py-1.5 text-sm w-44"
-            />
-          </div>
-          <button
-            onClick={addBlockedDate}
-            disabled={addingBlock || !newBlockDate}
-            className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
-          >
-            {addingBlock ? "..." : "+ Bloquear data"}
-          </button>
-        </div>
-
-        {blockedDates.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhuma data bloqueada.</p>
-        ) : (
-          <div className="space-y-1.5">
-            {blockedDates.map((b) => (
-              <div
-                key={b.id}
-                className="flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-2"
-              >
-                <div className="flex items-center gap-3">
-                  <p className="text-sm font-medium">
-                    {new Date(b.date + "T00:00:00").toLocaleDateString("pt-BR", {
-                      weekday: "short",
-                      day: "2-digit",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </p>
-                  {b.reason && <span className="text-xs text-muted-foreground">{b.reason}</span>}
-                </div>
-                <button
-                  onClick={() => removeBlockedDate(b.id)}
-                  className="rounded-full border border-rose-300 px-2.5 py-0.5 text-xs text-rose-600 hover:bg-rose-100"
-                >
-                  Remover
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function timeToMins(t: string): number {
-  const [h, m] = t.split(":").map(Number);
-  return (h || 0) * 60 + (m || 0);
-}
+/* A aba "Agenda" (grade semanal + datas bloqueadas) foi removida.
+   
+   Ela escrevia direto, do navegador, em `doctor_availability` e
+   `blocked_dates` — duas tabelas que nasceram single-tenant: sem coluna
+   `doctor_id`, uma linha por dia da semana para o consultório inteiro, e com
+   política de RLS que deixava QUALQUER pessoa logada (inclusive uma paciente)
+   reescrever os horários e apagar as férias.
+   
+   A tabela também não alimentava nada: nenhum fluxo de agendamento lia esses
+   horários. Era uma tela que gravava num lugar que ninguém consultava, por um
+   caminho que ninguém deveria ter. A escrita foi revogada na migration
+   `20260730020000`, e a tela saiu junto — quando a agenda por médico for
+   construída, ela nasce com `doctor_id` e com política própria. */
 
 /* ---------- Cérebro 🧠 (Segundo Cérebro do médico) ---------- */
 
@@ -3941,14 +5024,25 @@ function CerebroSection({
   onTrained,
   asDoctor,
   onExitAsDoctor,
+  onAbrirPaciente,
+  onIrParaPlanos,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
   // Plano Clínica: admin operando o cérebro de um médico da clínica.
   asDoctor?: { id: string; name: string } | null;
   onExitAsDoctor?: () => void;
+  /** Da lista "quem mais conversou" direto para o prontuário dela. */
+  onAbrirPaciente?: (patientId: string) => void;
+  /** Do aviso de cota direto para os planos — a ação que resolve o problema. */
+  onIrParaPlanos?: () => void;
 }) {
   const asId = asDoctor?.id;
+  /* Cada fila reporta o seu número; a faixa soma. Contar aqui em cima exigiria
+     levantar as três buscas para este componente — muito mais código para o
+     mesmo resultado, e cada card deixaria de saber carregar sozinho. */
+  const [fila, setFila] = useState({ lacunas: 0, revisao: 0, perguntas: 0 });
+  const esperando = fila.lacunas + fila.revisao + fila.perguntas;
   return (
     // key: trocar de médico REMONTA todos os cards — cada cérebro carrega do
     // zero, sem estado (lacunas, base, placar) vazando de um médico p/ outro.
@@ -3976,17 +5070,97 @@ function CerebroSection({
           estilo, responda perguntas reais das pacientes e alimente a base de conhecimento. O
           cérebro é usado pelo chat do app e pelo atendimento no WhatsApp.
         </p>
+        {/* AS DUAS FILAS, ditas antes de aparecerem.
+            A distinção entre ensinar e corrigir era ensinada só a quem já
+            tinha item na fila — e a fila de revisão some quando está vazia,
+            então o médico podia usar o Cérebro por meses sem descobrir que ela
+            existe. Uma linha aqui custa nada e é o que dá nome às duas coisas
+            que ele vai encontrar rolando a página. */}
+        <p className="mt-2 rounded-xl border border-border bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+          Abaixo há <strong>três filas</strong>, e elas pedem coisas diferentes:{" "}
+          <strong>🕳️ Lacunas</strong> é o que a IA <em>não soube</em> responder —{" "}
+          {asDoctor ? "ele ensina" : "você ensina"} algo novo. <strong>✋ Revisão</strong> é o que
+          ela <em>soube</em> e a paciente reprovou — {asDoctor ? "ele corrige" : "você corrige"} o
+          que já existe. <strong>❓ Perguntas</strong> são dúvidas que a paciente mandou direto —{" "}
+          {asDoctor ? "ele responde" : "você responde"} e a IA aprende junto.
+        </p>
       </div>
+      <ComecePorAqui tokenFn={tokenFn} asDoctor={asId} />
+
+      {/* ─── ① COMO ESTÁ O CÉREBRO ─────────────────────────────────────────
+          SUBIU PARA O TOPO — decisão do dono (ago/2026).
+
+          A ordem anterior punha as filas primeiro, com o argumento de que "são
+          trabalho que rende". O argumento continua verdadeiro, e mesmo assim a
+          ordem estava errada: o placar responde "o meu cérebro está bom?", que
+          é a pergunta que o médico traz ao abrir a aba. As filas respondem "o
+          que eu faço agora" — que só importa depois que ele confia no que
+          construiu.
+
+          E o card carrega o aviso da busca por significado, que quando está
+          desligada explica por que a IA parece não saber o que ele já ensinou.
+          Isso enterrado embaixo de três filas é diagnóstico que ninguém lê. */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Como está o seu cérebro
+      </h3>
       <BrainLevelCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainScoreCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainGapsCard tokenFn={tokenFn} asDoctor={asId} />
+      <BuscaPorSignificadoCard tokenFn={tokenFn} asDoctor={asId} />
+      <ConsumoDaIACard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onAbrirPaciente={onAbrirPaciente}
+        onIrParaPlanos={onIrParaPlanos}
+      />
+
+      {/* ─── ② O QUE ESTÁ ESPERANDO ELE ──────────────────────────────────
+          O argumento para pôr o Cérebro na PRIMEIRA aba foi "a fila de lacunas
+          e a de revisão são trabalho que rende". Dentro da aba, as filas eram o
+          4º e o 5º card: ~1.200px de placar e fatura antes do que ele tem para
+          fazer. A tese e o layout diziam coisas opostas. */}
+      <h3 className="flex items-center gap-2 pt-2 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        O que está esperando você
+        {/* O NÚMERO NA FAIXA. Sem ele, o médico rolava as três filas para
+            descobrir se havia trabalho — e as três, vazias, são ~400px de
+            "nada". Com a soma no cabeçalho, ele decide sem rolar. */}
+        {esperando > 0 && (
+          <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground">
+            {esperando}
+          </span>
+        )}
+      </h3>
+      <BrainGapsCard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, lacunas: n }))}
+      />
+      <BrainReviewCard
+        tokenFn={tokenFn}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, revisao: n }))}
+      />
+      <BrainTrainCard
+        tokenFn={tokenFn}
+        onTrained={onTrained}
+        asDoctor={asId}
+        onContar={(n) => setFila((f) => ({ ...f, perguntas: n }))}
+      />
+
+      {/* ─── ③ FERRAMENTAS ───────────────────────────────────────────────── */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Ferramentas
+      </h3>
       <BrainConversationsCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} />
+      <BrainConsultaCard tokenFn={tokenFn} asDoctor={asId} onIrParaPlanos={onIrParaPlanos} />
       <BrainEvalCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
-      <BrainTrainCard tokenFn={tokenFn} onTrained={onTrained} asDoctor={asId} />
       <BrainKnowledgeCard tokenFn={tokenFn} asDoctor={asId} />
       <BrainPlaygroundCard tokenFn={tokenFn} asDoctor={asId} />
+
+      {/* ─── ④ AJUSTES ───────────────────────────────────────────────────
+          Por último de propósito: é o que ele mexe uma vez e não volta. */}
+      <h3 className="pt-4 text-[11px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+        Ajustes
+      </h3>
+      <BrainSettingsCard tokenFn={tokenFn} asDoctor={asId} />
     </div>
   );
 }
@@ -4236,7 +5410,7 @@ function BrainConversationsCard({
           <div className="h-14 animate-pulse rounded-xl bg-secondary" />
         </div>
       ) : missingTable ? (
-        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           O histórico de conversas ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar.
         </p>
@@ -4323,10 +5497,13 @@ function BrainConversationsCard({
 function BrainConsultaCard({
   tokenFn,
   asDoctor,
+  onIrParaPlanos,
 }: {
   tokenFn: () => Promise<string>;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Para onde o gancho do 402 leva. Ver o comentário no `onClick` do toast. */
+  onIrParaPlanos?: () => void;
 }) {
   const [transcript, setTranscript] = useState("");
   const [transcribing, setTranscribing] = useState(false);
@@ -4342,8 +5519,35 @@ function BrainConsultaCard({
     try {
       const fd = new FormData();
       fd.append("audio", file);
-      const res = await fetch("/api/transcribe", { method: "POST", body: fd });
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        body: fd,
+        // O endpoint agora exige sessão: aceitava 20 MB de áudio de qualquer um.
+        headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
+      });
       if (!res.ok) {
+        /* 402 é o gate do plano, não uma falha. Dizer "tente novamente" a quem
+           esbarrou num plano faz ele tentar de novo e falhar de novo — e nunca
+           descobrir que existe um plano. */
+        if (res.status === 402) {
+          const { fraseDoGancho } = await import("@/lib/gancho-de-upgrade");
+          toast(fraseDoGancho("transcricao"), {
+            duration: 9000,
+            action: {
+              label: "Ver planos",
+              /* `getElementById("cobranca")` NÃO SERVE aqui, e é um defeito que
+                 uma auditoria pegou: a âncora mora na tela de perfil, que só é
+                 renderizada quando `tab === "Meu Perfil"`. O médico está na aba
+                 Cérebro quando transcreve, então o nó não existe, o `?.` engole
+                 tudo e o botão não faz absolutamente nada. Um gancho que não
+                 leva a lugar nenhum é pior que nenhum gancho: ele confirma ao
+                 médico que o produto está quebrado. */
+              onClick: () => onIrParaPlanos?.(),
+            },
+          });
+          return;
+        }
         toast.error("Não foi possível transcrever o áudio — tente novamente.");
         return;
       }
@@ -4454,6 +5658,176 @@ function BrainConsultaCard({
 }
 
 /**
+ * "A MINHA RESPOSTA CHEGOU A SER ENCONTRADA?"
+ *
+ * Nasceu de um caso real: a paciente perguntou "pode comer comida japonesa",
+ * recebeu informação geral e, no fim, *"registrei sua pergunta para a Dra."* —
+ * com a médica já tendo escrito sobre peixe cru. A leitura dela foi a única
+ * possível: o que eu respondi não valeu de nada.
+ *
+ * A causa está em `podeAtribuir`: assinar o nome do médico exige uma
+ * similaridade MEDIDA, e o ranking por palavras não produz número nenhum. Sem
+ * a busca vetorial, atribuir é impossível e toda pergunta vira lacuna — o
+ * cérebro responde e parece vazio.
+ *
+ * O que este card faz é tirar isso do log do servidor e pôr na tela dele. Os
+ * três estados são deliberadamente diferentes em CONSEQUÊNCIA, não em tom:
+ *
+ *   · desligada  → nada que ele escrever será encontrado por significado;
+ *   · com dívida → parte da base está invisível, e a barra diz quanto;
+ *   · funcionando→ a distribuição real, e o que a faixa do meio significa.
+ *
+ * O número não vem de uma chamada de teste ("o serviço responde agora?") — vem
+ * de `ai_usage.similaridade`, o que aconteceu com as pacientes DELE.
+ */
+function BuscaPorSignificadoCard({
+  tokenFn,
+  asDoctor,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+}) {
+  const [d, setD] = useState<{
+    respostas: number;
+    comNumero: number;
+    assinadas: number;
+    faixaDoMeio: number;
+    semNada: number;
+    cegas: number;
+    entradas: number;
+  } | null>(null);
+  const [semTabela, setSemTabela] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await diagnosticoDaBusca({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) setD(res);
+        else setSemTabela(true);
+      } catch {
+        setSemTabela(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tokenFn]);
+
+  if (semTabela) {
+    return (
+      <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-5 text-amber-900 shadow-[var(--shadow-card)]">
+        <p className="font-medium">🔎 Busca por significado</p>
+        <p className="mt-1 text-sm leading-relaxed">
+          Não consigo medir ainda — falta rodar{" "}
+          <code className="rounded bg-amber-100 px-1">supabase/APLICAR_USO_IA.sql</code> e{" "}
+          <code className="rounded bg-amber-100 px-1">supabase/APLICAR_PENDENTES.sql</code> no
+          Supabase. Sem eles, a busca cai no ranking por palavras e nenhuma resposta pode levar o
+          seu nome.
+        </p>
+      </div>
+    );
+  }
+  if (!d) return null;
+
+  /* SEM BASE, NENHUM NÚMERO QUER DIZER ALGO. Um cérebro vazio tem 0 assinadas e
+     0 cegas — os mesmos números de um cérebro perfeito sem uso. */
+  if (d.entradas === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+        <p className="font-medium">🔎 Busca por significado</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Ainda não há nada na sua base para encontrar. Responda uma pergunta na fila ou adicione
+          uma entrada — a partir da primeira, este card passa a medir.
+        </p>
+      </div>
+    );
+  }
+
+  const desligada = d.comNumero === 0 && d.respostas > 0;
+  const pctCegas = d.entradas > 0 ? Math.round((d.cegas / d.entradas) * 100) : 0;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+      <p className="font-medium">🔎 Busca por significado</p>
+
+      {desligada ? (
+        /* O ESTADO QUE CUSTA CARO, e o único em que o card grita. Não é um
+           aviso de configuração: é a explicação de por que o trabalho dele
+           parece não valer nada para a paciente. */
+        <div className="mt-2 rounded-xl border border-rose-300 bg-rose-50/70 px-3 py-2.5 text-sm leading-relaxed text-rose-900">
+          <strong>Está desligada.</strong> Nenhuma das {d.respostas} respostas deste ciclo conseguiu
+          comparar a pergunta da paciente com o seu material por significado — só por palavra exata.
+          Por isso <em>“pode comer comida japonesa?”</em> não encontra a sua orientação sobre peixe
+          cru, e a IA diz que registrou a dúvida para você mesmo quando você já respondeu.
+          <br />
+          <span className="mt-1 inline-block">
+            Abra <strong>Base de conhecimento</strong> logo abaixo e deixe a aba aberta: ela prepara
+            20 entradas por visita.
+          </span>
+        </div>
+      ) : d.cegas > 0 ? (
+        <div className="mt-2 rounded-xl border border-amber-300 bg-amber-50/70 px-3 py-2.5 text-sm leading-relaxed text-amber-900">
+          <strong>
+            {d.cegas} de {d.entradas} entradas ({pctCegas}%) ainda não são encontráveis
+          </strong>{" "}
+          por significado. O que estiver nelas só aparece se a paciente usar as mesmas palavras.
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-muted-foreground">
+          Funcionando — toda a sua base está encontrável por significado.
+        </p>
+      )}
+
+      {d.comNumero > 0 && (
+        <>
+          <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+            <div
+              className="bg-emerald-500"
+              style={{ width: `${(d.assinadas / d.comNumero) * 100}%` }}
+            />
+            <div
+              className="bg-amber-400"
+              style={{ width: `${(d.faixaDoMeio / d.comNumero) * 100}%` }}
+            />
+            <div
+              className="bg-slate-300"
+              style={{ width: `${(d.semNada / d.comNumero) * 100}%` }}
+            />
+          </div>
+          <dl className="mt-3 grid grid-cols-3 gap-3 text-center">
+            <div>
+              <dt className="text-[11px] text-muted-foreground">com o seu nome</dt>
+              <dd className="text-lg font-semibold tabular-nums text-emerald-600">{d.assinadas}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">usaram, sem assinar</dt>
+              <dd className="text-lg font-semibold tabular-nums text-amber-600">{d.faixaDoMeio}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-muted-foreground">nada parecido</dt>
+              <dd className="text-lg font-semibold tabular-nums text-muted-foreground">
+                {d.semNada}
+              </dd>
+            </div>
+          </dl>
+          {/* A COLUNA DO MEIO É A QUE GERA A DÚVIDA DELE. Sem esta linha, ver
+              "usaram, sem assinar: 7" não explica por que sete pacientes
+              ouviram "registrei sua pergunta" sobre coisas que ele escreveu. */}
+          {d.faixaDoMeio > 0 && (
+            <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+              As do meio casaram de assunto, mas não o bastante para eu afirmar que aquela é a
+              conduta que <strong>você</strong> daria àquela pergunta. Nelas o seu material entra na
+              resposta, sem o seu nome, e a dúvida vai para a sua fila. Confirmando uma vez, a
+              próxima igual já sai assinada.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
  * Nível do Cérebro — score de completude 0–100 com visual tecnológico
  * (anel neural pulsante, grade de circuito, scanline) e o checklist exato
  * do que preencher para subir. Gamifica a configuração do Segundo Cérebro.
@@ -4470,6 +5844,29 @@ function BrainLevelCard({
   const [items, setItems] = useState<BrainScoreItem[]>([]);
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
+  /* OS TILES VIERAM PARA CÁ. Eram um card separado logo abaixo — dois placares
+     na mesma faixa respondendo "como está o meu cérebro" com números
+     diferentes, e o médico tendo que decidir qual era o verdadeiro. */
+  const [stats, setStats] = useState<{
+    hitsMonth: number;
+    gapsOpen: number;
+    coveragePct: number | null;
+    satisfactionPct: number | null;
+    feedbackCount: number;
+  } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getBrainQualityStats({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+        });
+        if (res.ok) setStats(res);
+      } catch {
+        /* os números são enriquecimento — sem eles, o anel continua de pé */
+      }
+    })();
+  }, [tokenFn]);
 
   useEffect(() => {
     (async () => {
@@ -4547,14 +5944,27 @@ function BrainLevelCard({
           <p className="text-[10px] font-bold uppercase tracking-[0.24em] text-cyan-300/90">
             Nível do Segundo Cérebro
           </p>
+          {/* O rótulo também não pode mentir enquanto carrega. A FRASE abaixo
+              foi consertada e este `{level}` ficou: com `pct = score ?? 0`, um
+              médico com score 95 lia "Iniciante" em corpo 2xl por um beat. */}
           <p className="mt-1 font-serif text-2xl">
-            {level}
-            {pct >= 90 && " 🏆"}
+            {score == null ? "—" : level}
+            {score != null && pct >= 90 && " 🏆"}
           </p>
+          {/* A FRASE MAIS ERRADA POSSÍVEL NO PRIMEIRO CARD DA TELA.
+              `items` começa `[]`, então `pending.length === 0` é verdadeiro
+              durante TODO o carregamento — e o card afirmava "Cérebro
+              completo" ao mesmo tempo em que o anel mostrava "…/100" e o
+              título dizia "Iniciante". Um médico no primeiro acesso lia que o
+              cérebro dele estava pronto.
+              `score == null` é o sinal de que ainda não chegou nada; é o mesmo
+              que o anel já usa duas linhas acima. */}
           <p className="mt-1 text-sm text-white/70">
-            {pending.length === 0
-              ? "Cérebro completo — continue respondendo lacunas para mantê-lo afiado."
-              : `${pending.length} ${pending.length === 1 ? "item pendente" : "itens pendentes"} para evoluir o cérebro.`}
+            {score == null
+              ? "Conferindo o estado do seu cérebro…"
+              : pending.length === 0
+                ? "Cérebro completo — continue respondendo lacunas para mantê-lo afiado."
+                : `${pending.length} ${pending.length === 1 ? "item pendente" : "itens pendentes"} para evoluir o cérebro.`}
           </p>
           <button
             onClick={() => setExpanded((e) => !e)}
@@ -4564,6 +5974,39 @@ function BrainLevelCard({
           </button>
         </div>
       </div>
+
+      {/* ─── OS NÚMEROS DO MÊS, no mesmo card do anel ─────────────────────
+          Eram um placar SEPARADO logo abaixo: dois cards na mesma faixa
+          respondendo "como está o meu cérebro" com números diferentes, e o
+          médico tendo que decidir qual era o verdadeiro. O anel é a nota; estes
+          três são de onde ela vem.
+          Só aparecem quando há sinal — num cérebro novo eles seriam três zeros
+          repetindo o que o anel já disse. */}
+      {stats && (stats.hitsMonth > 0 || stats.feedbackCount > 0) && (
+        <div className="relative mt-5 grid grid-cols-3 gap-3">
+          {[
+            {
+              v: stats.coveragePct != null ? `${stats.coveragePct}%` : "—",
+              r: "Dúvidas que o cérebro cobriu",
+            },
+            {
+              v: stats.satisfactionPct != null ? `${stats.satisfactionPct}%` : "—",
+              r: "Satisfação (👍)",
+            },
+            { v: String(stats.hitsMonth), r: "Respostas com o seu conhecimento" },
+          ].map((t) => (
+            <div
+              key={t.r}
+              className="rounded-2xl border border-white/15 bg-white/[0.07] p-3 text-center"
+            >
+              <p className="font-serif text-2xl leading-none">{t.v}</p>
+              <p className="mt-1.5 text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/60">
+                {t.r}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Checklist do que preencher para subir o score */}
       {expanded && (
@@ -4606,85 +6049,681 @@ function BrainLevelCard({
 }
 
 /**
- * Placar de qualidade do cérebro — a prova numérica: cobertura das dúvidas,
- * satisfação das pacientes e usos no mês. Some silenciosamente enquanto as
- * tabelas de telemetria não existirem (migração pendente) ou sem dados.
+ * COMECE POR AQUI — a tela do médico que abriu o Cérebro pela primeira vez.
+ *
+ * A ordem dos cards está certa para o cérebro MADURO: trabalho, depois estado,
+ * depois ferramentas. Para o primeiro acesso ela era o pior arranjo possível —
+ * e o primeiro acesso virou a primeira tela do produto quando o Cérebro passou
+ * a ser a aba de entrada.
+ *
+ * O que ele lia, na ordem: "nenhuma lacuna aberta — o cérebro cobriu tudo que
+ * perguntaram ✅", "nenhuma resposta reprovada", "tudo respondido por aqui 🎉",
+ * um anel zerado e "nenhuma resposta ainda neste ciclo". **Três caixas verdes
+ * de "nada a fazer" e um zero**, num cérebro que nunca foi treinado. Lê-se
+ * "está pronto", e as três ações que de fato começam o produto estavam abaixo
+ * da dobra ou escondidas num botão de 12px.
+ *
+ * Some sozinho assim que existe qualquer conhecimento aprovado — não é
+ * onboarding com "pular", é a ausência de conteúdo falando por si.
  */
-function BrainScoreCard({
+function ComecePorAqui({
   tokenFn,
   asDoctor,
 }: {
   tokenFn: () => Promise<string>;
-  // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
 }) {
-  const [stats, setStats] = useState<{
-    hitsMonth: number;
-    gapsOpen: number;
-    coveragePct: number | null;
-    satisfactionPct: number | null;
-    feedbackCount: number;
+  const [novo, setNovo] = useState<boolean | null>(null);
+  const [instalando, setInstalando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    try {
+      const res = await listBrainEntries({
+        data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+      });
+      /* APROVADAS, não "existe alguma linha": o kit de partida entra como
+         rascunho, e um cérebro com 33 rascunhos e nada aprovado é exatamente
+         um cérebro que ainda não começou. */
+      setNovo(res.ok ? !res.entries.some((e) => e.approved) : false);
+    } catch {
+      /* Na dúvida, não aparece: um bloco de boas-vindas para quem já trabalhou
+         é pior que nenhum. */
+      setNovo(false);
+    }
+  }, [tokenFn, asDoctor]);
+
+  useEffect(() => {
+    carregar();
+  }, [carregar]);
+
+  if (novo !== true) return null;
+
+  const passo = "flex items-start gap-3 rounded-2xl border border-border bg-card p-4";
+  const numero =
+    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground";
+
+  return (
+    <div className="rounded-3xl border border-primary/30 bg-primary/5 p-5">
+      <p className="font-serif text-xl">👋 Comece por aqui</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Seu cérebro ainda não tem nenhuma resposta aprovada — então as caixas verdes abaixo dizem
+        &ldquo;nada pendente&rdquo; porque ninguém perguntou nada ainda, não porque está pronto.
+        Três passos e a IA passa a falar como {asDoctor ? "ele" : "você"}.
+      </p>
+
+      <div className="mt-4 space-y-2">
+        <div className={passo}>
+          <span className={numero}>1</span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Diga como você fala</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              É o que muda o tom de toda resposta. Fica no card <strong>Estilo do médico</strong>,
+              no fim desta aba.
+            </p>
+          </div>
+        </div>
+
+        <div className={passo}>
+          <span className={numero}>2</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold">Instale 30 dúvidas clássicas</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Entram como rascunho: você edita no seu estilo e aprova o que quiser. Nada vai para as
+              pacientes sem o seu aval.
+            </p>
+            <button
+              type="button"
+              disabled={instalando}
+              onClick={async () => {
+                setInstalando(true);
+                try {
+                  const res = await installStarterPack({
+                    data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+                  });
+                  if (res.ok) {
+                    toast.success(
+                      `${res.installed} dúvidas instaladas como rascunho — revise e aprove na Base de conhecimento 👇`,
+                    );
+                    carregar();
+                  } else toast.error("Não consegui instalar agora. Tente de novo.");
+                } catch {
+                  toast.error("Não consegui instalar agora. Tente de novo.");
+                } finally {
+                  setInstalando(false);
+                }
+              }}
+              className="press mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {instalando ? "Instalando…" : "Instalar agora"}
+            </button>
+          </div>
+        </div>
+
+        <div className={passo}>
+          <span className={numero}>3</span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Grave uma consulta</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              A IA extrai as suas orientações do áudio e escreve os rascunhos na sua voz. Fica em{" "}
+              <strong>Consulta vira conhecimento</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * O CONSUMO DE IA DO MÉDICO — quanto do ciclo já foi usado, e por quem.
+ *
+ * Card PRÓPRIO, e essa é a correção mais importante dele: viveu dentro do
+ * `BrainScoreCard`, que devolve `null` quando as tabelas de telemetria não
+ * respondem. Em produção, com migrations pendentes, o médico simplesmente não
+ * via consumo nenhum — e não havia erro para explicar por quê.
+ *
+ * Ele não pode descobrir o limite pelo EFEITO: a paciente recebendo resposta
+ * sem a voz dele é a pior forma de saber, porque ele não vê a conversa e ela
+ * não sabe que algo mudou.
+ */
+function ConsumoDaIACard({
+  tokenFn,
+  asDoctor,
+  onAbrirPaciente,
+  onIrParaPlanos,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+  /** Abre o prontuário daquela paciente — sem isto a lista é só um relatório. */
+  onAbrirPaciente?: (patientId: string) => void;
+  /** A ÚNICA ação que resolve a cota estourada não tinha porta: o texto dizia
+      "ou se você subir de plano" sem link, botão ou aba. O `TrancadoCard`
+      vizinho já tem essa ponte; este não tinha. */
+  onIrParaPlanos?: () => void;
+}) {
+  const [cota, setCota] = useState<{
+    usadas: number;
+    teto: number | null;
+    estado: "ok" | "aviso" | "estourada";
+    falha?: "rede" | "migracao" | null;
+    pacientes?: { patientId: string; nome: string; respostas: number; fatia: number }[];
   } | null>(null);
+  /** A leitura em si falhou (não a medição): sem isto, o card fica em esqueleto para sempre. */
+  const [naoCarregou, setNaoCarregou] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const tk = await tokenFn();
-        const res = await getBrainQualityStats({
-          data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+        const res = await cotaDeRespostas({
+          data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
         });
-        if (res.ok) setStats(res);
+        if (res.ok && "estado" in res) setCota(res);
+        else setNaoCarregou(true);
       } catch {
-        /* placar é enhancement — sem dados, sem card */
+        /* ESQUELETO ETERNO era o comportamento antigo: `cota` ficava `null`
+           para sempre, sem retry e sem texto. */
+        setNaoCarregou(true);
       }
     })();
-  }, [tokenFn]);
+    /* `asDoctor` NAS DEPENDÊNCIAS. O efeito lê essa prop, e o componente é
+       montado sem `key`: no plano Clínica, trocar de médico ("ver como") não
+       remontava nada e o card seguia mostrando o consumo do médico ANTERIOR —
+       número de plano atribuído à pessoa errada. */
+  }, [tokenFn, asDoctor]);
 
-  // Sem nenhum sinal ainda (mês zerado e nada aberto) → não polui o painel.
-  if (!stats || (stats.hitsMonth === 0 && stats.gapsOpen === 0 && stats.feedbackCount === 0)) {
-    return null;
+  /* ESTADOS EXPLÍCITOS, e isto é conserto de um silêncio.
+     Era `if (!cota || cota.usadas <= 0) return null` — e `respostasNoCiclo`
+     devolve 0 quando a tabela `ai_usage` não existe (migration pendente). Ou
+     seja: o card sumia exatamente no cenário que o refator dele veio corrigir,
+     só que por outro caminho. "Não tenho como medir" e "você não usou nada"
+     não podem produzir a mesma tela. */
+  if (naoCarregou) {
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs text-amber-900">
+        Não consegui medir o consumo agora.{" "}
+        <button type="button" onClick={() => window.location.reload()} className="underline">
+          Tentar de novo
+        </button>
+      </p>
+    );
+  }
+  if (cota === null) {
+    return <div className="skeleton h-24 rounded-3xl" />;
+  }
+  if (cota.falha) {
+    /* Mediu e não conseguiu — diferente de "não usou". */
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs leading-snug text-amber-900">
+        {cota.falha === "migracao" ? (
+          <>
+            Não consigo medir o consumo: falta a tabela de uso no banco. Rode{" "}
+            <code>supabase/APLICAR_USO_IA.sql</code> no SQL Editor do Supabase.
+          </>
+        ) : (
+          <>O banco não respondeu agora — o número do mês pode estar incompleto.</>
+        )}
+      </p>
+    );
   }
 
-  const tile = "rounded-2xl border border-border bg-card p-4 text-center";
-  return (
-    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-      <p className="font-serif text-xl">📊 Qualidade da sua IA — este mês</p>
-      <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none text-primary">
-            {stats.coveragePct != null ? `${stats.coveragePct}%` : "—"}
-          </p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Cobertura das dúvidas
-          </p>
-        </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none text-primary">
-            {stats.satisfactionPct != null ? `${stats.satisfactionPct}%` : "—"}
-          </p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Satisfação (👍)
-          </p>
-        </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none">{stats.hitsMonth}</p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Respostas com seu cérebro
-          </p>
-        </div>
-        <div className={tile}>
-          <p className="font-serif text-3xl leading-none">{stats.gapsOpen}</p>
-          <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Lacunas abertas
-          </p>
-        </div>
+  const temTeto = cota.teto != null && cota.teto > 0;
+  const pct = temTeto ? Math.min(100, Math.round((cota.usadas / (cota.teto as number)) * 100)) : 0;
+
+  if (cota.usadas <= 0) {
+    return (
+      <div className="rounded-3xl border border-border bg-card p-5">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Respostas da IA neste mês
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Nenhuma resposta ainda neste ciclo
+          {temTeto ? ` — seu plano dá ${cota.teto} por mês.` : "."}
+        </p>
       </div>
-      {stats.coveragePct != null && stats.coveragePct < 70 && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          💡 Responda as lacunas abaixo para subir a cobertura — cada resposta vira conhecimento
-          permanente.
+    );
+  }
+
+  /* ─── VOU ESTOURAR ANTES DO FIM DO MÊS? ─────────────────────────────────
+     A barra respondia "quanto usei"; esta é a pergunta seguinte, e a única
+     acionável — subir de plano no dia 10 é decisão, descobrir no dia 30 é
+     constatação. Regra de três sobre o ritmo do ciclo, no fuso de Brasília
+     (mesmo de `inicioDoCiclo`, senão a projeção vira no dia errado). */
+  const hojeSP = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const parteSP = (t: string) => Number(hojeSP.find((p) => p.type === t)?.value ?? 0);
+  const diaDoCiclo = Math.max(1, parteSP("day"));
+  const diasDoMes = new Date(Date.UTC(parteSP("year"), parteSP("month"), 0)).getUTCDate();
+  const projecao = Math.round((cota.usadas / diaDoCiclo) * diasDoMes);
+  /* Piso de 5 dias: no dia 1, a regra de três multiplica ruído por 31 — vinte
+     respostas viram "você chega a ~620 das 500", o que é chute com cara de
+     medida. */
+  const vaiEstourar =
+    temTeto && diaDoCiclo >= 5 && projecao > (cota.teto as number) && cota.estado !== "estourada";
+  /* A barra de cada paciente é proporcional à MAIOR, não ao total.
+     Proporcional ao total, numa fila de cinquenta gestantes, a maior fatia dá
+     ~12% da largura e todas as outras colapsam no piso — seis barrinhas do
+     mesmo tamanho, que é precisamente a comparação que o card existe para
+     fazer. A porcentagem do total continua escrita ao lado, em número. */
+  const maior = Math.max(1, ...(cota.pacientes ?? []).map((p) => p.respostas));
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Respostas da IA neste mês
+        </p>
+        <p className="text-sm tabular-nums">
+          <strong>{cota.usadas}</strong>
+          {/* Plano ilimitado também vê o próprio consumo. Antes o card exigia
+              teto, então justamente quem paga mais não enxergava nada. */}
+          <span className="text-muted-foreground">
+            {temTeto ? ` de ${cota.teto}` : " · plano sem limite"}
+          </span>
+        </p>
+      </div>
+
+      {temTeto && (
+        <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div
+            className={`h-full rounded-full transition-[width] duration-500 ${
+              cota.estado === "estourada"
+                ? "bg-destructive"
+                : cota.estado === "aviso"
+                  ? "bg-amber-500"
+                  : "bg-primary"
+            }`}
+            /* Teto de 100% na largura: passar do limite não pode fazer a barra
+               vazar do card. O número ao lado continua contando a verdade. */
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+
+      {vaiEstourar && (
+        <p className="mt-2 text-xs text-amber-700">
+          No seu ritmo, você chega a <strong>~{projecao}</strong> das {cota.teto} até o fim do mês.
         </p>
       )}
+
+      {/* QUEM está consumindo. O total responde "quanto"; esta lista responde a
+          pergunta seguinte, que é a que ele de fato faz. Numa fila de cinquenta
+          gestantes, três costumam responder por metade das conversas — e saber
+          quais são muda o que ele faz: pode ser ansiedade que pede consulta, ou
+          uma dúvida recorrente que vale virar entrada do cérebro. */}
+      {!!cota.pacientes?.length && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Quem mais conversou
+          </p>
+          {/* Dois denominadores na mesma linha pediam reconciliação toda vez:
+              a barra compara com quem mais conversou, o número é a fatia do
+              mês. Uma legenda custa uma linha. */}
+          <p className="text-[10px] leading-snug text-muted-foreground">
+            A barra compara com quem mais conversou; a porcentagem é a fatia do mês.
+            {onAbrirPaciente ? " Toque para abrir o prontuário." : ""}
+          </p>
+          {cota.pacientes.map((p) => {
+            /* A COR DIZ ALGUMA COISA — mas NÃO a mesma coisa que a barra de
+               cima. Vermelho e âmbar significam "cota estourada" e "cota em
+               aviso" a 40px daqui; reusá-los aqui faria "Maria em vermelho"
+               ler como "Maria tem algo errado", quando é o contrário: ela
+               conversa muito, o que é engajamento.
+               Escala sequencial própria (índigo → violeta): ordena sem alarmar. */
+            const cor =
+              p.fatia >= 0.4
+                ? "bg-violet-600"
+                : p.fatia >= 0.25
+                  ? "bg-indigo-500"
+                  : "bg-primary/60";
+            return (
+              /* CLICÁVEL. `patientId` é o `auth.users.id` — exatamente o que
+                 `setAbrirPaciente` espera. A ponte não estava ligada: o card
+                 mostrava "Maria — 87 · 31%" e o médico ia procurar Maria pelo
+                 nome na aba Pacientes. É a diferença entre relatório e
+                 ferramenta. */
+              <button
+                type="button"
+                key={p.patientId}
+                disabled={!onAbrirPaciente}
+                onClick={() => onAbrirPaciente?.(p.patientId)}
+                className={`flex w-full items-center gap-3 rounded-lg py-0.5 text-left transition-colors ${
+                  onAbrirPaciente ? "hover:bg-secondary/60" : "cursor-default"
+                }`}
+              >
+                <span className="w-28 shrink-0 truncate text-xs" title={p.nome}>
+                  {p.nome}
+                </span>
+                <span className="h-2 flex-1 overflow-hidden rounded-full bg-secondary">
+                  <span
+                    className={`block h-full rounded-full ${cor}`}
+                    /* Piso de 4%: uma paciente com 1 de 300 respostas
+                       desenharia uma barra invisível, e barra invisível diz
+                       "zero" quando o número diz "um". */
+                    style={{ width: `${Math.max(4, Math.round((p.respostas / maior) * 100))}%` }}
+                  />
+                </span>
+                <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                  {p.respostas} · {Math.round(p.fatia * 100)}%
+                </span>
+              </button>
+            );
+          })}
+          {/* FECHA A SOMA. Seis linhas somando 58% deixavam o médico sem saber
+              se tinha visto tudo — e sem nada dizendo que a lista é um recorte. */}
+          {(() => {
+            const somaFatias = cota.pacientes.reduce((a, p) => a + p.fatia, 0);
+            const resto = Math.round((1 - somaFatias) * 100);
+            return resto >= 1 ? (
+              <p className="pt-0.5 text-[11px] text-muted-foreground">
+                Outras pacientes · {resto}%
+              </p>
+            ) : null;
+          })()}
+        </div>
+      )}
+
+      {temTeto && cota.estado !== "ok" && (
+        <div
+          className={`mt-3 rounded-xl border px-3 py-2 text-xs ${
+            cota.estado === "estourada"
+              ? "border-destructive/40 bg-destructive/10 text-destructive"
+              : "border-amber-400/40 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {cota.estado === "estourada" ? (
+            <>
+              <strong>Cota do mês esgotada</strong> ({cota.usadas} de {cota.teto} respostas). Suas
+              pacientes continuam sendo atendidas, mas <strong>sem as suas orientações</strong> —
+              elas voltam na virada do mês ou se você subir de plano.
+              {onIrParaPlanos && (
+                <>
+                  {" "}
+                  <button
+                    type="button"
+                    onClick={onIrParaPlanos}
+                    className="font-semibold underline"
+                  >
+                    Ver planos →
+                  </button>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              Você usou{" "}
+              <strong>
+                {cota.usadas} das {cota.teto}
+              </strong>{" "}
+              respostas deste mês. Ao esgotar, suas pacientes continuam atendidas, porém sem as suas
+              orientações.
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A FILA DE REVISÃO — respostas que a IA SOUBE dar e a paciente reprovou.
+ *
+ * É a irmã da fila de lacunas, e a diferença entre as duas é a diferença entre
+ * ENSINAR e CORRIGIR. Antes elas eram a mesma: todo 👎 virava "a IA não soube
+ * responder", inclusive quando ela sabia — e o médico, ao respondê-lo, criava
+ * uma SEGUNDA entrada sobre o mesmo assunto, deixando a errada aprovada e
+ * competindo com a nova na busca.
+ *
+ * Por isso o card mostra as TRÊS coisas: o que ela perguntou, o que ela LEU, e
+ * o que está aprovado hoje. Sem a resposta que ela leu, o médico revisaria no
+ * escuro.
+ */
+function BrainReviewCard({
+  tokenFn,
+  asDoctor,
+  onContar,
+}: {
+  tokenFn: () => Promise<string>;
+  asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
+}) {
+  const [itens, setItens] = useState<
+    {
+      id: string;
+      question: string;
+      answer: string | null;
+      entryQuestion: string | null;
+      entryAnswer: string | null;
+    }[]
+  >([]);
+  const [editando, setEditando] = useState<string | null>(null);
+  /* Distingue "não deu para olhar" de "não há nada" — ver `carregar`. */
+  const [falhou, setFalhou] = useState<"rede" | "migracao" | null>(null);
+  /* `itens` nasce `[]`, então o primeiro paint dizia "nenhuma resposta
+     reprovada" ANTES de saber — a mesma classe de defeito que o card de nível
+     acabou de consertar, no card vizinho. */
+  const [carregando, setCarregando] = useState(true);
+  const [texto, setTexto] = useState("");
+  const [ocupado, setOcupado] = useState(false);
+
+  async function carregar() {
+    try {
+      const tk = await tokenFn();
+      const res = await listBrainReviews({
+        data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+      });
+      if (res.ok) {
+        setItens(res.itens);
+        onContar?.(res.itens.length);
+        setFalhou(null);
+        setCarregando(false);
+      } else {
+        /* ERRO NÃO PODE SE DISFARÇAR DE FILA VAZIA.
+           `res.ok === false` era descartado e o card caía no estado "nenhuma
+           resposta reprovada ✅" — dizendo ao médico que está tudo bem quando
+           na verdade não deu para olhar. O irmão `BrainGapsCard` distingue
+           "migracao" de "rede" justamente porque, nas palavras do comentário
+           dele, isso "não pode se disfarçar de 'nenhuma lacuna ✅'". E o
+           servidor JÁ devolve `semTabela` — o campo existia sem consumidor. */
+        setFalhou("semTabela" in res && res.semTabela ? "migracao" : "rede");
+      }
+    } catch {
+      setFalhou("rede");
+    } finally {
+      setCarregando(false);
+    }
+  }
+  useEffect(() => {
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function resolver(id: string, novaResposta?: string) {
+    if (ocupado) return;
+    setOcupado(true);
+    try {
+      const tk = await tokenFn();
+      const res = await resolveBrainReview({
+        data: {
+          accessToken: tk,
+          reviewId: id,
+          ...(novaResposta ? { answer: novaResposta } : {}),
+          ...(asDoctor ? { asDoctor } : {}),
+        },
+      });
+      if (!res.ok) {
+        toast.error("Não consegui salvar. Tente de novo.");
+        return;
+      }
+      /* O `avisada` do servidor era JOGADO FORA. O toast dizia "corrigido"
+         mesmo quando a paciente NÃO foi avisada — ela trocou de médico, ou o
+         push falhou —, e o médico ficava achando que tinha fechado o ciclo com
+         quem reclamou. Dizer a verdade custa uma frase. */
+      const corrigiu = "corrigida" in res && res.corrigida;
+      const avisou = "avisada" in res && res.avisada;
+      toast.success(
+        corrigiu
+          ? avisou
+            ? "Corrigido — a IA já responde com o texto novo, e a paciente foi avisada 🧠"
+            : "Corrigido — a IA já responde com o texto novo. Não consegui avisar a paciente desta vez."
+          : "Confirmado. A resposta continua como está.",
+      );
+      setEditando(null);
+      setTexto("");
+      setItens((v) => v.filter((x) => x.id !== id));
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  /* FILA VAZIA VIRA UMA LINHA, NÃO O NADA.
+     Era `return null`, e o custo disso era o item que o médico pediu: ele
+     achava a aba confusa, e a distinção entre ENSINAR (lacuna) e CORRIGIR
+     (revisão) só era ensinada a quem já tivesse item na fila. Como a fila de
+     revisão é a rara das duas, dava para usar o Cérebro por meses sem
+     descobrir que ela existe — enquanto a de lacunas aparece sempre, com
+     estado vazio explicativo. Assimetria pura.
+     Uma linha discreta não é "caixa vazia": é o nome da coisa. */
+  if (carregando) return <div className="skeleton h-16 rounded-2xl" />;
+
+  if (falhou) {
+    return (
+      <p className="rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-xs leading-snug text-amber-900">
+        {falhou === "migracao" ? (
+          <>
+            ✋ <strong>Revisão</strong> — a fila existe, mas o banco ainda não tem as colunas dela.
+            Rode <code>supabase/APLICAR_REVISAO.sql</code> no SQL Editor do Supabase.
+          </>
+        ) : (
+          <>
+            ✋ <strong>Revisão</strong> — não consegui carregar agora.{" "}
+            <button type="button" onClick={carregar} className="underline">
+              Tentar de novo
+            </button>
+          </>
+        )}
+      </p>
+    );
+  }
+
+  if (!itens.length) {
+    return (
+      <p className="rounded-2xl border border-dashed border-border px-4 py-3 text-xs text-muted-foreground">
+        ✋ <strong>Revisão</strong> — nenhuma resposta reprovada. Quando uma paciente marcar 👎 numa
+        resposta que saiu do <em>seu</em> conhecimento, ela aparece aqui para você corrigir o texto
+        (é diferente da fila de lacunas, que é o que a IA não soube responder).
+      </p>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-amber-400/50 bg-amber-50/60 p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">
+        ✋ Respostas que uma paciente não achou úteis{" "}
+        <span className="ml-1 rounded-full bg-amber-500 px-2 py-0.5 align-middle text-xs font-semibold text-white">
+          {itens.length}
+        </span>
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Aqui a IA <strong>sabia</strong> responder e usou o seu conhecimento — mas a paciente marcou
+        👎. Corrija o texto e a IA passa a responder do jeito novo na hora; ou confirme, se a
+        resposta estava certa.
+      </p>
+
+      <div className="mt-4 space-y-3">
+        {itens.map((it) => (
+          <div key={it.id} className="rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold">&ldquo;{it.question}&rdquo;</p>
+
+            {it.answer && (
+              <div className="mt-2 rounded-xl bg-secondary/50 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  O que ela leu
+                </p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+                  {it.answer}
+                </p>
+              </div>
+            )}
+
+            {/* A TERCEIRA COISA. O comentário deste card diz que ele mostra as
+                três — pergunta, o que ela leu, e o que está aprovado hoje — e
+                mostrava duas: a entrada de origem era buscada, tipada e nunca
+                renderizada. Sem ela o médico não sabe QUAL texto do cérebro
+                dele produziu aquilo, que é justamente o que ele vai corrigir. */}
+            {it.entryQuestion && editando !== it.id && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Veio da sua entrada: <em>&ldquo;{it.entryQuestion}&rdquo;</em>
+              </p>
+            )}
+
+            {editando === it.id ? (
+              <div className="mt-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  A sua resposta, corrigida
+                </p>
+                <textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  rows={5}
+                  className="mt-1 w-full rounded-xl border border-border bg-background p-3 text-sm"
+                />
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    disabled={ocupado || texto.trim().length < 5}
+                    onClick={() => resolver(it.id, texto.trim())}
+                    className="press rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    Salvar correção
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditando(null);
+                      setTexto("");
+                    }}
+                    className="rounded-full border border-border px-5 py-2 text-sm"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditando(it.id);
+                    /* Abre com o texto APROVADO, não com o que ela leu: é a
+                       entrada que vai ser gravada, e partir dela evita que uma
+                       edição rápida sobrescreva o conhecimento com a versão
+                       que a própria paciente reprovou. */
+                    setTexto(it.entryAnswer ?? it.answer ?? "");
+                  }}
+                  className="press rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+                >
+                  Corrigir resposta
+                </button>
+                <button
+                  type="button"
+                  disabled={ocupado}
+                  onClick={() => resolver(it.id)}
+                  className="rounded-full border border-border px-5 py-2 text-sm disabled:opacity-50"
+                >
+                  Está certa, manter
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -4695,15 +6734,35 @@ function BrainScoreCard({
  * pelas mais perguntadas. O médico responde aqui e vira conhecimento aprovado
  * na hora.
  */
+/**
+ * Há quanto tempo a primeira paciente está esperando.
+ *
+ * Texto e não número puro: "há 26 dias" pesa, "26" não. Hoje some — dizer "há
+ * 0 dias" numa dúvida de agora seria ruído em toda linha nova da fila.
+ */
+function esperaDe(criadaEm?: string | null): string {
+  if (!criadaEm) return "";
+  const dias = Math.floor((Date.now() - new Date(criadaEm).getTime()) / 86_400_000);
+  if (!Number.isFinite(dias) || dias <= 0) return "";
+  return dias === 1 ? " · há 1 dia" : ` · há ${dias} dias`;
+}
+
 function BrainGapsCard({
   tokenFn,
   asDoctor,
+  onContar,
 }: {
   tokenFn: () => Promise<string>;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
 }) {
   const [gaps, setGaps] = useState<BrainGap[]>([]);
+  /* As IGNORADAS que continuaram sendo perguntadas. Lista separada de
+     propósito: misturá-las com a fila desfaria a decisão dele sem avisar. */
+  const [voltaram, setVoltaram] = useState<LacunaQueVoltou[]>([]);
+  const [reabrindo, setReabrindo] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   // Erro/tabela ausente NÃO pode se disfarçar de "nenhuma lacuna ✅"
   const [loadError, setLoadError] = useState<"rede" | "migracao" | null>(null);
@@ -4714,6 +6773,11 @@ function BrainGapsCard({
   const [editedQuestion, setEditedQuestion] = useState("");
   const [busy, setBusy] = useState(false);
   const [dismissingId, setDismissingId] = useState<string | null>(null);
+  /* ─── RESPONDER SÓ PARA ELA ─────────────────────────────────────────────
+     A mesma alavanca que a aba Perguntas já tinha, com o padrão INVERTIDO: lá
+     o caso comum é a dúvida específica de uma paciente, aqui é a dúvida que
+     várias fizeram. O padrão segue o caso comum, não a simetria. */
+  const [soParaEla, setSoParaEla] = useState(false);
   const [installing, setInstalling] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [drafted, setDrafted] = useState<string | null>(null); // gapId com rascunho da IA
@@ -4753,7 +6817,18 @@ function BrainGapsCard({
       });
       if (res.ok) {
         setGaps(res.gaps);
+        setVoltaram(("voltaram" in res ? res.voltaram : []) ?? []);
+        onContar?.(res.gaps.length);
         setLoadError(null);
+        /* Lacuna sem vetor não agrupa nem é agrupada, e toda lacuna anterior à
+           migration nasceu assim. A cura vai numa requisição SEPARADA de
+           propósito: a lista já está na tela, e é a requisição dela que mantém
+           o trabalho vivo em serverless — dentro do `listBrainGaps` a cura
+           tinha que caber no instante do carregamento, e era isso que a fazia
+           falhar em bloco. Ninguém espera por ela. */
+        void curarLacunasDoMedico({
+          data: { accessToken: tk, ...(asDoctor ? { asDoctor } : {}) },
+        }).catch(() => {});
       } else if ("missingTable" in res && res.missingTable) {
         setLoadError("migracao");
       } else {
@@ -4782,9 +6857,22 @@ function BrainGapsCard({
           gapId,
           answer: answer.trim(),
           ...(q.length >= 8 ? { question: q.slice(0, 300) } : {}),
+          ...(soParaEla ? { soParaEla: true } : {}),
           ...(asDoctor ? { asDoctor } : {}),
         },
       });
+      if (!res.ok && "reason" in res && res.reason === "varias_pacientes") {
+        /* A lacuna é COMPARTILHADA: "só para ela" não tem uma "ela". Entregar a
+           todas seria o dano que a opção existe para impedir, e escolher uma por
+           conta própria seria adivinhar qual. */
+        const q = "quantas" in res && typeof res.quantas === "number" ? res.quantas : null;
+        toast.error(
+          q && q > 1
+            ? `${q} pacientes estão esperando esta resposta — "só para ela" não vale aqui. Responda de forma geral, ou fale com ela pela aba Perguntas.`
+            : "Não consegui confirmar quem está esperando. Tente de novo.",
+        );
+        return;
+      }
       if (!res.ok) {
         toast.error(
           "reason" in res && res.reason === "plan"
@@ -4793,12 +6881,39 @@ function BrainGapsCard({
         );
         return;
       }
-      toast.success("Respondida e aprendida pelo cérebro 🧠");
+      /* Diz quantas parecidas saíram junto. Sem isso, três linhas somem da
+         fila e o médico fica sem saber se respondeu ou se perdeu alguma. */
+      const juntas = "parecidas" in res && typeof res.parecidas === "number" ? res.parecidas : 0;
+      /* ─── O TOAST DIZIA "APRENDIDA" QUANDO NADA FOI APRENDIDO ────────────
+         Duas situações em que o cérebro não aprende: "só para ela" marcada, e
+         o campo da pergunta generalizada em branco (que agora é o padrão).
+         Em ambas o médico lia "Respondida e aprendida pelo cérebro 🧠". */
+      const aprendeu = !soParaEla && editedQuestion.trim().length >= 8;
+      const parecidasTxt =
+        juntas > 0
+          ? ` — ${juntas} pergunta${juntas > 1 ? "s" : ""} parecida${juntas > 1 ? "s" : ""} também ${juntas > 1 ? "foram respondidas" : "foi respondida"}`
+          : "";
+      if (aprendeu) {
+        toast.success(`Respondida e aprendida pelo cérebro 🧠${parecidasTxt}`);
+      } else {
+        toast.success(`Respondida ✓${parecidasTxt}`, {
+          description: soParaEla
+            ? "Só para ela: não virou conhecimento do consultório."
+            : "O cérebro não aprendeu: o campo da pergunta generalizada ficou em branco.",
+        });
+      }
       setAnswering(null);
       setDrafted(null);
       setAnswer("");
       setEditedQuestion("");
-      setGaps((gs) => gs.filter((g) => g.id !== gapId));
+      /* A caixa "só para ela" é do item, não da tela: deixá-la marcada faria a
+         PRÓXIMA lacuna ser respondida em modo individual sem ele perceber. */
+      setSoParaEla(false);
+      setGaps((gs) => {
+        const restantes = gs.filter((g) => g.id !== gapId);
+        onContar?.(restantes.length); // o badge desce junto com a fila
+        return restantes;
+      });
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
@@ -4814,12 +6929,41 @@ function BrainGapsCard({
       const res = await dismissBrainGap({
         data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
       });
-      if (res.ok) setGaps((gs) => gs.filter((g) => g.id !== gapId));
-      else toast.error("Não foi possível ignorar.");
+      if (res.ok) {
+        /* O CONTADOR DA FAIXA TAMBÉM DESCE.
+           `onContar` só era chamado no CARREGAMENTO. O médico trabalhava a
+           fila inteira e o badge "O que está esperando você" continuava no
+           número de quando ele abriu a tela — até recarregar. Um número que não
+           responde ao trabalho ensina a ignorar o número. */
+        setGaps((gs) => {
+          const restantes = gs.filter((g) => g.id !== gapId);
+          onContar?.(restantes.length);
+          return restantes;
+        });
+      } else toast.error("Não foi possível ignorar.");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
       setDismissingId(null);
+    }
+  }
+
+  async function reabrir(gapId: string) {
+    if (reabrindo) return;
+    setReabrindo(gapId);
+    try {
+      const tk = await tokenFn();
+      const res = await reabrirLacuna({
+        data: { accessToken: tk, gapId, ...(asDoctor ? { asDoctor } : {}) },
+      });
+      if (res.ok) {
+        setVoltaram((vs) => vs.filter((v) => v.id !== gapId));
+        await load();
+      } else toast.error("Não foi possível trazer de volta.");
+    } catch {
+      toast.error("Falha de conexão — tente novamente.");
+    } finally {
+      setReabrindo(null);
     }
   }
 
@@ -4880,7 +7024,7 @@ function BrainGapsCard({
       {loading ? (
         <div className="skeleton mt-4 h-20 rounded-2xl" />
       ) : loadError === "migracao" ? (
-        <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           A tabela de lacunas ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o autoaprendizado.
         </p>
@@ -4901,22 +7045,91 @@ function BrainGapsCard({
             <div key={g.id} className="rounded-2xl border border-border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <p className="min-w-0 flex-1 text-sm font-medium">"{g.question}"</p>
+                {/* A IDADE, ao lado da repetição.
+                    "3× perguntada" não distingue três pacientes ontem de três
+                    ao longo de um mês — e a segunda é alguém esperando há um
+                    mês por uma resposta que a IA prometeu. Sem a idade, a fila
+                    ordenava por volume e a espera mais longa sumia. */}
                 <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[11px] text-muted-foreground">
-                  {g.hits}× perguntada{g.channel === "whatsapp" ? " · WhatsApp" : ""}
+                  {g.hits}× perguntada{esperaDe(g.created_at)}
+                  {g.channel === "whatsapp" ? " · WhatsApp" : ""}
                 </span>
               </div>
               {answering === g.id ? (
                 <div className="mt-3">
-                  <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
-                    Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+                  {/* ─── SÓ PARA ELA, OU PARA TODAS ──────────────────────────
+                      A lacuna nasce de várias pacientes, então o padrão é
+                      virar conhecimento. Mas o contador ao lado pode dizer
+                      "1× perguntada" — e aí a resposta pode ser "pode continuar
+                      o remédio que passei na consulta", que não é conduta geral
+                      e não pode ser publicada no cérebro.
+                      Quando é UMA só, a tela sugere; a decisão continua dele. */}
+                  <label className="mb-2 flex items-start gap-2 text-[12px] leading-snug text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={soParaEla}
+                      onChange={(e) => setSoParaEla(e.target.checked)}
+                      className="mt-0.5"
+                    />
+                    <span>
+                      Responder <strong>só para ela</strong> — a resposta chega a quem perguntou e
+                      NÃO vira conhecimento do consultório.
+                      {/* PACIENTES DISTINTAS, não `hits`. `hits` conta
+                          re-perguntas: a mesma gestante perguntando três vezes
+                          fazia a tela dizer "3 pacientes" e esconder esta
+                          sugestão — a única orientação que ela dá sobre a
+                          decisão mais delicada do painel. E o servidor já
+                          contava `brain_gap_askers` para recusar "só para ela":
+                          tela e servidor contavam coisas diferentes sobre a
+                          mesma decisão. Sem a contagem, a tela não afirma. */}
+                      {g.pacientes === 1 && !soParaEla ? (
+                        <em className="ml-1 not-italic text-amber-700">
+                          Só uma paciente perguntou isto — talvez seja do caso dela.
+                        </em>
+                      ) : null}
+                      {(g.pacientes ?? 0) > 1 && soParaEla ? (
+                        <em className="ml-1 not-italic text-rose-700">
+                          {g.pacientes} pacientes estão esperando — &quot;só para ela&quot; não vale
+                          aqui.
+                        </em>
+                      ) : null}
+                    </span>
                   </label>
-                  <input
-                    value={editedQuestion}
-                    onChange={(e) => setEditedQuestion(e.target.value)}
-                    maxLength={300}
-                    placeholder="Ex: Posso tomar dipirona na gestação?"
-                    className="mb-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
-                  />
+                  {!soParaEla && (
+                    <>
+                      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                        Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
+                      </label>
+                      <input
+                        value={editedQuestion}
+                        onChange={(e) => setEditedQuestion(e.target.value)}
+                        maxLength={300}
+                        placeholder="Ex: Posso tomar dipirona na gestação?"
+                        className="mb-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                      />
+                      {/* O atalho para quando o texto dela já é genérico — que é
+                          o caso comum. Vira um clique consciente em vez de um
+                          padrão invisível. */}
+                      <div className="mb-2 flex items-center gap-2 text-[11px] text-muted-foreground">
+                        {editedQuestion.trim().length >= 8 ? (
+                          <span className="text-emerald-700">
+                            ✓ vai virar conhecimento do consultório
+                          </span>
+                        ) : (
+                          <span className="text-amber-700">
+                            Em branco: ela recebe a resposta e o cérebro não aprende nada.
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditedQuestion(g.question.slice(0, 300))}
+                          className="ml-auto rounded-full border border-input px-2 py-0.5 hover:bg-muted"
+                        >
+                          usar o texto dela
+                        </button>
+                      </div>
+                    </>
+                  )}
                   <textarea
                     value={answer}
                     onChange={(e) => setAnswer(e.target.value)}
@@ -4945,7 +7158,11 @@ function BrainGapsCard({
                       disabled={busy || answer.trim().length < 5}
                       className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                     >
-                      {busy ? "Salvando…" : "Responder e treinar 🧠"}
+                      {busy
+                        ? "Salvando…"
+                        : soParaEla
+                          ? "Responder só para ela"
+                          : "Responder e treinar 🧠"}
                     </button>
                     <button
                       onClick={() => {
@@ -4953,6 +7170,7 @@ function BrainGapsCard({
                         setDrafted(null);
                         setAnswer("");
                         setEditedQuestion("");
+                        setSoParaEla(false); // cancelar também limpa
                       }}
                       className="rounded-full border border-border px-4 py-2 text-xs text-muted-foreground"
                     >
@@ -4966,7 +7184,21 @@ function BrainGapsCard({
                     onClick={() => {
                       setAnswering(g.id);
                       setAnswer("");
-                      setEditedQuestion(g.question.slice(0, 300));
+                      /* ─── O CAMPO NASCE VAZIO ────────────────────────────
+                         Era `setEditedQuestion(g.question.slice(0, 300))`: o
+                         campo cujo rótulo pede "generalize e remova nomes/dados
+                         pessoais" já nascia contendo exatamente o texto cru da
+                         paciente. Enviar sem tocar nele — o caminho de menor
+                         esforço — publicava o literal em `brain_entries`, que é
+                         permanente e é lida no prompt de TODAS as outras.
+                         Vazio, generalizar vira um ato; e quem quiser o texto
+                         dela tem o botão ao lado, que é uma escolha. */
+                      setEditedQuestion("");
+                      /* ABRIR outra lacuna também limpa. Sem isto, a caixa
+                         marcada na lacuna anterior valia para esta — e o
+                         médico responderia em modo individual sem saber, ou
+                         seria recusado sem entender por quê. */
+                      setSoParaEla(false);
                     }}
                     className="rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
                   >
@@ -4985,7 +7217,72 @@ function BrainGapsCard({
           ))}
         </div>
       )}
+
+      {/* ─── IGNORADAS QUE VOLTARAM ────────────────────────────────────────
+          "Ignorar" tinha virado "nunca mais": a busca por texto encontra a
+          lacuna em qualquer status e incrementa `hits`, mas só `respondida`
+          volta para `aberta` — e a fila lê `aberta`. Ele ignorava quando UMA
+          paciente tinha perguntado e nunca mais via aquilo, enquanto cada
+          paciente seguinte ouvia "registrei aqui para ele ver".
+          Lista SEPARADA, e volta só com o clique dele: reabrir sozinha
+          desfaria a decisão na cara dura. */}
+      {voltaram.length > 0 && (
+        <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50/60 p-4">
+          <p className="text-sm font-medium text-amber-900">
+            🔁 Você ignorou, e continuaram perguntando
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-amber-800">
+            Cada uma dessas pacientes ouviu da IA que a dúvida ficou registrada para você.
+          </p>
+          <div className="mt-3 space-y-2">
+            {voltaram.map((g) => (
+              <div
+                key={g.id}
+                className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-white/70 px-3 py-2"
+              >
+                <p className="min-w-0 flex-1 text-sm text-foreground">{g.question}</p>
+                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-amber-800">
+                  +{g.perguntaramDepois} {g.perguntaramDepois === 1 ? "paciente" : "pacientes"}{" "}
+                  depois
+                </span>
+                <button
+                  onClick={() => reabrir(g.id)}
+                  disabled={reabrindo === g.id}
+                  className="shrink-0 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                >
+                  {reabrindo === g.id ? "…" : "Trazer de volta"}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+/**
+ * Quanto do campo já foi usado — e o aviso quando o corte está perto.
+ *
+ * O teto existe por dois motivos que se somam: estes três campos entram no
+ * prompt em TODA mensagem (então o custo deles se paga toda vez), e são texto
+ * livre do médico dentro das instruções do modelo. Sem teto, o campo mais caro
+ * do prompt era justamente o único que ninguém limitava.
+ *
+ * O contador aparece só a partir de 70%: um número embaixo de todo campo, o
+ * tempo inteiro, ensina a não olhar para ele.
+ */
+function ContadorDoCampo({ valor }: { valor: string }) {
+  const usado = valor.length;
+  if (usado < MAX_CAMPO_DO_MEDICO * 0.7) return null;
+  const cheio = usado >= MAX_CAMPO_DO_MEDICO;
+  return (
+    <p
+      className={`mt-1 text-[11px] tabular-nums ${cheio ? "text-amber-600" : "text-muted-foreground"}`}
+    >
+      {usado}/{MAX_CAMPO_DO_MEDICO}
+      {cheio ? " — limite atingido" : ""}
+    </p>
   );
 }
 
@@ -5023,7 +7320,14 @@ function BrainSettingsCard({
         data: { accessToken: await tokenFn(), settings, ...(asDoctor ? { asDoctor } : {}) },
       });
       if (!res.ok) {
-        toast.error("Não foi possível salvar o estilo. Tente novamente.");
+        /* O motivo importa: "não deu para salvar" e "falta o seu WhatsApp"
+           pedem coisas diferentes dele, e a segunda é acionável em dez
+           segundos — na aba ao lado. */
+        toast.error(
+          "reason" in res && res.reason === "semWhatsapp"
+            ? "Preencha o WhatsApp do consultório em Meu Perfil antes de ligar a IA — é por ele que a paciente fala com você quando a IA não pode responder."
+            : "Não foi possível salvar o estilo. Tente novamente.",
+        );
         return;
       }
       toast.success("Estilo do médico salvo.");
@@ -5055,10 +7359,12 @@ function BrainSettingsCard({
             <textarea
               value={settings.persona}
               onChange={(e) => patch({ persona: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder="Ex: Sou acolhedor e direto, explico com linguagem simples e sempre tranquilizo a paciente antes de orientar."
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.persona} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -5067,12 +7373,14 @@ function BrainSettingsCard({
             <textarea
               value={settings.sample_phrases}
               onChange={(e) => patch({ sample_phrases: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder={
                 "Ex:\nFica tranquila, isso é comum na gestação.\nQualquer dúvida, estou por aqui."
               }
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.sample_phrases} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted-foreground">
@@ -5081,10 +7389,12 @@ function BrainSettingsCard({
             <textarea
               value={settings.rules}
               onChange={(e) => patch({ rules: e.target.value })}
+              maxLength={MAX_CAMPO_DO_MEDICO}
               rows={3}
               placeholder="Ex: Nunca indicar medicação. Em sangramento ou dor forte, orientar procurar o pronto-socorro imediatamente."
               className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
+            <ContadorDoCampo valor={settings.rules} />
           </div>
           <div className="flex flex-wrap items-center gap-6">
             <BrainToggle
@@ -5116,11 +7426,14 @@ function BrainTrainCard({
   tokenFn,
   onTrained,
   asDoctor,
+  onContar,
 }: {
   tokenFn: () => Promise<string>;
   onTrained: (questionId: string) => void;
   // Plano Clínica: operar o cérebro de um médico da clínica (admin).
   asDoctor?: string;
+  /** Reporta quantos itens esta fila tem — a faixa soma os três. */
+  onContar?: (n: number) => void;
 }) {
   const [questions, setQuestions] = useState<
     { id: string; question: string; created_at: string }[] | null
@@ -5130,14 +7443,28 @@ function BrainTrainCard({
   // dados pessoais) fica só no histórico da paciente.
   const [editedQuestions, setEditedQuestions] = useState<Record<string, string>>({});
   const [sendingId, setSendingId] = useState<string | null>(null);
+  /* Distingue "não deu para olhar" de "não há perguntas" — o servidor devolvia
+     `ok: true` com lista vazia no erro, e a tela dizia "Tudo respondido! 🎉"
+     durante uma falha de banco. */
+  const [falhouQ, setFalhouQ] = useState(false);
+  /** Quantas existem NO TOTAL — a tela mostra as 50 mais antigas. */
+  const [totalQ, setTotalQ] = useState(0);
 
   useEffect(() => {
     (async () => {
       const res = await listUnansweredQuestions({
         data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
       });
-      if (res.ok) setQuestions(res.questions);
-      else toast.error("Não foi possível carregar as perguntas das pacientes.");
+      if (res.ok) {
+        setQuestions(res.questions);
+        setTotalQ(res.total);
+        onContar?.(res.total);
+        setFalhouQ(false);
+      } else {
+        /* ESQUELETO ETERNO era o que acontecia: `questions` ficava `null` para
+           sempre, com um toast que some em 4 segundos e nada na tela. */
+        setFalhouQ(true);
+      }
     })();
   }, [tokenFn]);
 
@@ -5146,7 +7473,12 @@ function BrainTrainCard({
     if (!answer || sendingId) return;
     setSendingId(q.id);
     try {
-      const edited = (editedQuestions[q.id] ?? q.question).trim();
+      /* ─── SEM QUEDA PARA O TEXTO CRU ────────────────────────────────────
+         Era `editedQuestions[q.id] ?? q.question`: o campo que pede para
+         generalizar tinha o texto da paciente como valor efetivo enquanto ela
+         não fosse editado, e o servidor publicava esse literal em
+         `brain_entries` — permanente, e lida no prompt de todas as outras. */
+      const edited = (editedQuestions[q.id] ?? "").trim();
       const res = await answerAndTrain({
         data: {
           accessToken: await tokenFn(),
@@ -5161,9 +7493,23 @@ function BrainTrainCard({
         return;
       }
       setQuestions((prev) => (prev ?? []).filter((x) => x.id !== q.id));
+      /* O TOTAL desce junto com a lista. `totalQ` vem de uma contagem exata do
+         servidor e ficava parado: o médico respondia as cinquenta da tela e o
+         cabeçalho continuava dizendo o número de quando abriu. */
+      setTotalQ((n) => Math.max(0, n - 1));
+      onContar?.(Math.max(0, totalQ - 1));
       // Reflete o "respondida" também na aba Perguntas e no contador do topo.
       onTrained(q.id);
-      toast.success("🧠 O cérebro aprendeu mais uma");
+      /* O toast dizia "o cérebro aprendeu" mesmo quando nada foi aprendido —
+         e agora "nada aprendido" é o padrão de quem não generaliza. Quem
+         responde precisa saber qual das duas coisas aconteceu. */
+      if ("treinou" in res && res.treinou === false) {
+        toast.success("Respondida ✓", {
+          description: "O cérebro não aprendeu: o campo da pergunta generalizada ficou em branco.",
+        });
+      } else {
+        toast.success("🧠 O cérebro aprendeu mais uma");
+      }
     } catch {
       toast.error("Não foi possível treinar com essa resposta. Tente novamente.");
     } finally {
@@ -5172,14 +7518,39 @@ function BrainTrainCard({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Treinar respondendo</p>
+    /* MESMO PESO DAS OUTRAS DUAS FILAS.
+       Esta é a terceira fila de trabalho — perguntas REAIS que pacientes
+       mandaram — e era o card mais fraco da página: `p-5` e `font-medium`,
+       enquanto "Prova de qualidade" e o playground ganhavam `p-6` e
+       `font-serif text-xl`. Ferramenta gritava, trabalho sussurrava. */
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <p className="font-serif text-xl">
+        ❓ Perguntas das pacientes esperando você
+        {totalQ > 0 && (
+          <span className="ml-2 rounded-full bg-primary px-2 py-0.5 align-middle text-xs font-semibold text-primary-foreground">
+            {totalQ}
+          </span>
+        )}
+      </p>
+      {/* A tela mostra as mais ANTIGAS — dizer isso evita o médico concluir que
+          resolveu a fila ao terminar as 50. */}
+      {questions && totalQ > questions.length && (
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Mostrando as {questions.length} mais antigas de {totalQ}.
+        </p>
+      )}
       <p className="mt-0.5 text-sm text-muted-foreground">
         Cada resposta sua vira conhecimento: a paciente recebe a resposta e o cérebro aprende a
         conduta para as próximas.
       </p>
 
-      {questions === null ? (
+      {falhouQ ? (
+        <p className="mt-4 rounded-xl border border-amber-300 bg-amber-50/70 p-4 text-sm leading-snug text-amber-900">
+          Não consegui carregar as perguntas agora —{" "}
+          <strong>isto não quer dizer que não há nenhuma</strong>. Atualize a página antes de
+          concluir que a fila está vazia.
+        </p>
+      ) : questions === null ? (
         <div className="mt-4 space-y-3">
           <div className="h-24 animate-pulse rounded-xl bg-secondary" />
           <div className="h-24 animate-pulse rounded-xl bg-secondary" />
@@ -5205,11 +7576,30 @@ function BrainTrainCard({
                 Pergunta que entra no cérebro — generalize e remova nomes/dados pessoais
               </label>
               <input
-                value={editedQuestions[q.id] ?? q.question}
+                value={editedQuestions[q.id] ?? ""}
                 onChange={(e) => setEditedQuestions((eq) => ({ ...eq, [q.id]: e.target.value }))}
                 maxLength={300}
+                placeholder="Ex: Posso tomar dipirona na gestação?"
                 className="mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
               />
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                {(editedQuestions[q.id] ?? "").trim().length >= 8 ? (
+                  <span className="text-emerald-700">✓ vai virar conhecimento do consultório</span>
+                ) : (
+                  <span className="text-amber-700">
+                    Em branco: ela recebe a resposta e o cérebro não aprende nada.
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setEditedQuestions((eq) => ({ ...eq, [q.id]: q.question.slice(0, 300) }))
+                  }
+                  className="ml-auto rounded-full border border-input px-2 py-0.5 hover:bg-muted"
+                >
+                  usar o texto dela
+                </button>
+              </div>
               <textarea
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
@@ -5247,12 +7637,28 @@ function BrainKnowledgeCard({
   const [newAnswer, setNewAnswer] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [adding, setAdding] = useState(false);
+  /* A entrada parecida que o servidor achou — o aviso antes de criar uma
+     segunda verdade sobre o mesmo assunto. */
+  const [parecida, setParecida] = useState<{
+    id: string;
+    question: string;
+    answer: string;
+    similaridade: number;
+  } | null>(null);
   // Edição inline: revisar/generalizar pergunta e resposta (ex.: rascunho do
   // kit ou de transcrição com detalhe pessoal) sem excluir e recriar.
   const [editingId, setEditingId] = useState<string | null>(null);
+  /** Abre a edição de uma entrada já existente — usado pelo aviso de duplicata. */
+  function startEdit(id: string, question: string, answer: string) {
+    setEditingId(id);
+    setEditQ(question);
+    setEditA(answer);
+  }
   const [editQ, setEditQ] = useState("");
   const [editA, setEditA] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
+  /** Entradas sem vetor: invisíveis para a busca por significado. */
+  const [cegas, setCegas] = useState(0);
 
   // Busca com debounce; a primeira carga (search vazio) é imediata.
   useEffect(() => {
@@ -5270,6 +7676,34 @@ function BrainKnowledgeCard({
         if (!alive) return;
         if (res.ok) setEntries(res.entries);
         else toast.error("Não foi possível carregar a base de conhecimento.");
+
+        /* DAR VETOR ÀS ENTRADAS QUE NÃO TÊM — em requisição SEPARADA.
+           `match_brain_entries` exige `embedding IS NOT NULL`. Sem vetor, a
+           busca semântica não devolve NADA e o chat cai calado no ranking por
+           palavras: "posso comer comida japonesa?" não encontra a orientação
+           sobre sushi. E nascem sem vetor o kit de partida, tudo o que foi
+           salvo antes da migration e tudo o que foi salvo com a chave de IA
+           fora do ar.
+           Requisição própria pelo mesmo motivo da cura de lacunas: é a
+           requisição dela que mantém o trabalho vivo em serverless. Dentro do
+           `listBrainEntries` isto era disparado e esquecido, e a invocação
+           congelava com a resposta — nenhuma entrada era embedada, nunca, sem
+           um único erro no log.
+           Só na primeira carga (`!search`): trocar o termo de busca não muda
+           quais entradas estão cegas. */
+        if (!search) {
+          void embedarEntradasDoMedico({
+            data: { accessToken: await tokenFn(), ...(asDoctor ? { asDoctor } : {}) },
+          })
+            .then((r) => {
+              /* O número volta para a TELA. O teto é 20 por visita, então uma
+                 base de 100 entradas precisa de cinco aberturas — e sem isto o
+                 médico não tinha como saber que parte do conhecimento dele não
+                 era encontrável por significado. */
+              if (alive && r?.ok && "cegas" in r) setCegas(r.cegas);
+            })
+            .catch(() => {});
+        }
       },
       search ? 350 : 0,
     );
@@ -5347,7 +7781,7 @@ function BrainKnowledgeCard({
     toast.success("Entrada excluída.");
   }
 
-  async function add() {
+  async function add(mesmoAssim = false) {
     if (!newQuestion.trim() || !newAnswer.trim() || adding) return;
     setAdding(true);
     try {
@@ -5357,13 +7791,23 @@ function BrainKnowledgeCard({
           question: newQuestion.trim(),
           answer: newAnswer.trim(),
           category: newCategory.trim() || null,
+          ...(mesmoAssim ? { mesmoAssim: true } : {}),
           ...(asDoctor ? { asDoctor } : {}),
         },
       });
+      /* JÁ EXISTE ALGO PARECIDO. Não é erro — é a informação que faltava para
+         ele decidir entre editar o que já escreveu e criar uma segunda
+         verdade sobre o mesmo assunto. Editar é quase sempre o certo, e era
+         justamente a opção que não existia. */
+      if (!res.ok && "reason" in res && res.reason === "parecida" && "parecida" in res) {
+        setParecida(res.parecida);
+        return;
+      }
       if (!res.ok || !res.entry) {
         toast.error("Não foi possível adicionar a entrada. Tente novamente.");
         return;
       }
+      setParecida(null);
       const entry = res.entry;
       // Com busca ativa, limpa o filtro (o effect recarrega a lista completa,
       // já com a nova entrada); sem busca, insere direto no topo.
@@ -5382,7 +7826,24 @@ function BrainKnowledgeCard({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Base de conhecimento</p>
+      <p className="font-medium">📚 Base de conhecimento</p>
+      {/* A DÍVIDA DE VETORES, à vista.
+          Entrada sem vetor é INVISÍVEL para a busca por significado — e o
+          backfill embeda 20 por visita, então uma base grande precisa de várias
+          aberturas desta aba. Sem este aviso, o médico não tinha como saber que
+          parte do conhecimento dele não estava sendo encontrada. */}
+      {cegas > 0 && (
+        <p className="mt-1 rounded-xl border border-amber-300 bg-amber-50/70 px-3 py-2 text-xs leading-snug text-amber-900">
+          <strong>
+            {cegas}{" "}
+            {cegas === 1
+              ? "entrada ainda não é encontrável"
+              : "entradas ainda não são encontráveis"}
+          </strong>{" "}
+          por significado — a IA só as acha por palavra exata. Estou preparando aos poucos; mantenha
+          esta aba aberta ou volte aqui mais tarde.
+        </p>
+      )}
       <p className="mt-0.5 text-sm text-muted-foreground">
         Tudo o que o cérebro já sabe. Desative uma entrada para tirá-la das respostas sem excluir.
       </p>
@@ -5412,13 +7873,62 @@ function BrainKnowledgeCard({
               className="w-44 rounded-xl border border-input bg-background px-3 py-2 text-sm"
             />
             <button
-              onClick={add}
+              onClick={() => add()}
               disabled={adding || !newQuestion.trim() || !newAnswer.trim()}
               className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
               {adding ? "Adicionando..." : "+ Adicionar ao cérebro"}
             </button>
           </div>
+
+          {/* ─── VOCÊ JÁ ESCREVEU ALGO PARECIDO ─────────────────────────────
+              A base não deduplicava nada, e a faixa do meio empurra para a
+              duplicata: material próximo não assina, vira lacuna, ele
+              responde, e nasce uma segunda entrada competindo com a primeira.
+              Duas verdades sobre o mesmo tema, e a busca devolvendo a que
+              estiver por um fio mais perto — às vezes a versão velha.
+              Aviso, e não bloqueio: "1º trimestre" e "3º trimestre" são
+              legitimamente parecidos e precisam coexistir. */}
+          {parecida && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50/70 p-4 text-amber-900">
+              <p className="text-sm font-medium">
+                Você já escreveu algo muito parecido ({Math.round(parecida.similaridade * 100)}% de
+                semelhança)
+              </p>
+              <div className="mt-2 rounded-xl border border-amber-200 bg-white/70 px-3 py-2">
+                <p className="text-sm font-medium">"{parecida.question}"</p>
+                <p className="mt-1 line-clamp-3 text-xs text-muted-foreground">{parecida.answer}</p>
+              </div>
+              <p className="mt-2 text-[11px] leading-snug">
+                Duas entradas sobre o mesmo assunto competem entre si na busca — e a IA pode acabar
+                usando a versão antiga. Editar a que existe costuma ser o certo.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  onClick={() => {
+                    startEdit(parecida.id, parecida.question, parecida.answer);
+                    setParecida(null);
+                  }}
+                  className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white"
+                >
+                  Editar a que existe
+                </button>
+                <button
+                  onClick={() => add(true)}
+                  disabled={adding}
+                  className="rounded-full border border-amber-400 px-4 py-2 text-xs font-medium disabled:opacity-40"
+                >
+                  {adding ? "Adicionando..." : "Criar mesmo assim"}
+                </button>
+                <button
+                  onClick={() => setParecida(null)}
+                  className="rounded-full px-3 py-2 text-xs text-amber-800 underline"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -5461,6 +7971,19 @@ function BrainKnowledgeCard({
                     {entry.category && (
                       <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
                         {entry.category}
+                      </span>
+                    )}
+                    {/* A IDADE DA CONDUTA.
+                        Uma orientação escrita há dois anos entrava na resposta
+                        com a mesma confiança da de ontem, e nem ele nem a tela
+                        conseguiam dizer qual era qual — em obstetrícia, onde a
+                        conduta muda por ciclo de diretriz.
+                        Só aparece quando passa de um ano: marcar tudo o tempo
+                        todo ensina a não olhar. */}
+                    {precisaDeRevisao(entry) && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+                        revisar · {Math.floor((diasSemRevisao(entry) ?? 0) / 365)} ano
+                        {Math.floor((diasSemRevisao(entry) ?? 0) / 365) > 1 ? "s" : ""} sem olhar
                       </span>
                     )}
                   </div>
@@ -5569,7 +8092,10 @@ function BrainPlaygroundCard({
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
-      <p className="font-medium">Playground</p>
+      {/* "Playground" era a única palavra em inglês de um painel inteiramente
+          em português, feito para médicos brasileiros. E o nome não dizia o que
+          a ferramenta faz. */}
+      <p className="font-medium">🧪 Testar antes de a paciente perguntar</p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         Pergunte como se fosse uma paciente e veja o que o cérebro responde hoje.
       </p>
@@ -5621,6 +8147,75 @@ function BrainPlaygroundCard({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * A saída da clínica, para quem foi posto nela.
+ *
+ * Aparece só para MEMBRO (nunca para o dono — a clínica ficaria sem
+ * administrador e os outros presos de vez). Fica em Meu Perfil de propósito: a
+ * aba Clínica exige o plano Pro Equipe, e quem foi anexado pode não tê-lo.
+ */
+function SairDaClinicaCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  const [clinica, setClinica] = useState<{ name: string; role: string } | null>(null);
+  const [saindo, setSaindo] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await getMyClinic({ data: { accessToken: await tokenFn() } });
+        if (res.ok && res.clinic && res.clinic.role === "member") {
+          setClinica({ name: res.clinic.name, role: res.clinic.role });
+        }
+      } catch {
+        /* sem clínica, sem cartão */
+      }
+    })();
+  }, [tokenFn]);
+
+  if (!clinica) return null;
+
+  async function sair() {
+    if (saindo) return;
+    if (
+      !window.confirm(
+        `Sair da clínica ${clinica?.name}? A administração dela deixa de operar o seu Segundo Cérebro e de ver as conversas das suas pacientes. Suas pacientes, sua base de conhecimento e seus dados continuam seus.`,
+      )
+    )
+      return;
+    setSaindo(true);
+    try {
+      const res = await sairDaClinica({ data: { accessToken: await tokenFn() } });
+      if (res.ok) {
+        setClinica(null);
+        toast.success("Você saiu da clínica.");
+      } else {
+        toast.error("Não foi possível sair agora. Tente de novo.");
+      }
+    } catch {
+      toast.error("Não foi possível sair agora. Tente de novo.");
+    } finally {
+      setSaindo(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50/60 p-5 text-amber-900">
+      <p className="font-medium">🏥 Você faz parte da clínica {clinica.name}</p>
+      <p className="mt-1 text-sm leading-relaxed">
+        A administração dela opera o seu Segundo Cérebro e vê as conversas das suas pacientes com a
+        IA. Se você não pediu isso, pode sair agora — suas pacientes, sua base de conhecimento e
+        seus dados continuam seus.
+      </p>
+      <button
+        onClick={sair}
+        disabled={saindo}
+        className="mt-3 rounded-full border border-amber-400 px-5 py-2 text-sm font-medium disabled:opacity-50"
+      >
+        {saindo ? "Saindo…" : "Sair da clínica"}
+      </button>
     </div>
   );
 }
@@ -5747,7 +8342,7 @@ function ClinicaSection({
 
   if (migrate)
     return (
-      <p className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+      <p className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
         As tabelas do plano Clínica ainda não existem no banco — rode o{" "}
         <strong>APLICAR_PENDENTES.sql</strong> no SQL Editor do Supabase.
       </p>
@@ -5911,8 +8506,31 @@ function ClinicaSection({
 
 /* ---------- Receipt Modal ---------- */
 import { DOCTOR } from "@/lib/doctor.config";
+import { PainelNoApp } from "@/components/painel-no-app";
+import { NotificacoesDoMedico } from "@/components/notificacoes-do-medico";
 
-function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () => void }) {
+function ReceiptModal({
+  appt,
+  medico,
+  onClose,
+}: {
+  appt: AdminAppointment;
+  /** O médico LOGADO — o recibo é assinado por quem atendeu. */
+  medico?: DoctorProfile | null;
+  onClose: () => void;
+}) {
+  /* Antes o recibo imprimia o nome, o título e o CRM do `doctor.config`: todo
+     assinante entregava à paciente um documento assinado "Dr. Clóvis Bacha,
+     CRM-MG 22.333". Um recibo com o CRM de outro profissional não é um erro
+     de layout. */
+  /* Tudo ou nada. Um recibo é documento: com médico logado valem SÓ os dados
+     dele, e um CRM em branco imprime em branco. Cair no CRM do fundador na
+     linha da assinatura é pior que não imprimir CRM nenhum. */
+  const temMed = !!medico?.display_name?.trim();
+  const nomeMed = temMed ? medico!.display_name.trim() : DOCTOR.name;
+  const tituloMed = temMed ? (medico!.title ?? "").trim() : DOCTOR.title;
+  const crmMed = temMed ? (medico!.crm ?? "").trim() : DOCTOR.crm;
+  const rqeMed = temMed ? (medico!.rqe ?? "").trim() : DOCTOR.rqe;
   const ext = appt as any;
   const printRef = useRef<HTMLDivElement>(null);
   const receiptDate = ext.confirmed_date
@@ -5961,9 +8579,24 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden">
+      {/* `max-h-[90svh]` + coluna + rolagem SÓ no corpo.
+
+          Antes era `overflow-hidden` sem teto de altura: num celular o recibo é
+          mais alto que a tela, então o fim dele — valor, forma de pagamento,
+          assinatura — ficava cortado, sem barra de rolagem e sem jeito de
+          alcançar. A barra de botões fica fixa em cima, que é onde o médico
+          precisa do "Imprimir" mesmo tendo rolado até o fim.
+
+          `svh` e não `vh` porque no Safari do iPhone `vh` ignora a barra de
+          endereço e o modal passa do fundo da tela. */}
+      {/* `print:*` no PAI, não no corpo: `handlePrint` copia o `innerHTML` para
+          uma janela nova com CSS próprio, onde nenhuma classe do Tailwind
+          existe — um `print:` no filho seria letra morta. Estas valem para o
+          outro caminho, o Ctrl+P na própria página, onde era o `max-h` do pai
+          que cortava o recibo. */}
+      <div className="flex max-h-[90svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-white shadow-2xl print:max-h-none print:overflow-visible print:shadow-none">
         {/* Toolbar */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-3">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-3">
           <p className="text-sm font-medium text-muted-foreground">Recibo #{receiptNumber}</p>
           <div className="flex gap-2">
             <button
@@ -5982,14 +8615,17 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
         </div>
 
         {/* Receipt content */}
-        <div ref={printRef} className="px-8 py-6">
+        <div
+          ref={printRef}
+          className="min-h-0 flex-1 overflow-y-auto px-8 py-6 print:overflow-visible"
+        >
           {/* Header */}
           <div className="border-b border-gray-200 pb-5 mb-5">
-            <h1 className="font-serif text-2xl text-gray-900">{DOCTOR.name}</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{DOCTOR.title}</p>
+            <h1 className="font-serif text-2xl text-gray-900">{nomeMed}</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{tituloMed}</p>
             <p className="text-xs text-gray-400">
-              {DOCTOR.crm}
-              {DOCTOR.rqe ? ` · ${DOCTOR.rqe}` : ""}
+              {crmMed}
+              {rqeMed ? ` · ${rqeMed}` : ""}
             </p>
           </div>
 
@@ -6023,7 +8659,7 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
               <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400">
                 Descrição
               </p>
-              <p className="text-sm text-gray-800">Consulta de {DOCTOR.title}</p>
+              <p className="text-sm text-gray-800">Consulta de {tituloMed}</p>
               <p className="text-xs text-gray-500">{appt.reason}</p>
             </div>
           </div>
@@ -6050,8 +8686,8 @@ function ReceiptModal({ appt, onClose }: { appt: AdminAppointment; onClose: () =
           <div className="mt-10 flex justify-end">
             <div className="text-center">
               <div className="h-12 border-b border-gray-400 w-48" />
-              <p className="text-xs text-gray-500 mt-1">{DOCTOR.name}</p>
-              <p className="text-[10px] text-gray-400">{DOCTOR.crm}</p>
+              <p className="text-xs text-gray-500 mt-1">{nomeMed}</p>
+              <p className="text-[10px] text-gray-400">{crmMed}</p>
             </div>
           </div>
 
@@ -6078,11 +8714,13 @@ function DoctorBilling({
   active: boolean;
   exists: boolean;
 }) {
-  const [cycle, setCycle] = useState<"monthly" | "annual">("monthly");
   const [busy, setBusy] = useState<string | null>(null);
   // Convite de paciente: +15% em qualquer plano (aplicado no checkout).
   const [inviteDiscount, setInviteDiscount] = useState(false);
-  const isPaid = active && ["starter", "pro", "clinica", "elite", "black"].includes(plan);
+  /* `mensagens` ENTRA AQUI, e a falta dele não era cosmética: um médico que
+     acabou de assinar a escada nova seria tratado como não-assinante no próprio
+     painel — banner de venda no lugar da gestão da assinatura. */
+  const isPaid = active && ["mensagens", "clinica"].includes(plan);
   const isTeam = plan === "clinica";
 
   useEffect(() => {
@@ -6098,8 +8736,29 @@ function DoctorBilling({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function checkout(planKey: "starter" | "pro" | "elite" | "black") {
-    setBusy(planKey);
+  /**
+   * Abre o checkout da escada.
+   *
+   * Recebe MENSAGENS, não nome de plano: o plano deixou de ser um nome e passou
+   * a ser um número, e é essa quantidade que vira `line_items[0][quantity]` no
+   * Stripe e `doctors.ai_messages_per_cycle` no webhook.
+   */
+  async function checkout(mensagens: number) {
+    /* O médico USA o app, mas não ASSINA nele — plano de médico se contrata
+       no site. Duas razões, e as duas contam:
+       · a loja da Apple/Google cobra comissão sobre assinatura vendida dentro
+         do app, e plano de médico é B2B vendido fora dele;
+       · e abrir o Stripe dentro do app é reprovação na revisão (3.1.1).
+       Ontem eu deixei estas portas abertas de propósito, escrevendo que "o app
+       nativo é da paciente". Estava errado: o médico também vai usar o app. */
+    const { ehNativo } = await import("@/lib/nativo");
+    const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprarAqui("plano_medico", ehNativo());
+    if (!veredito.pode) {
+      toast(veredito.texto, { duration: 6000 });
+      return;
+    }
+    setBusy("checkout");
     try {
       const tk = await tokenFn();
       const { createSubscriptionCheckout } = await import("@/lib/billing.functions");
@@ -6107,7 +8766,8 @@ function DoctorBilling({
         data: {
           accessToken: tk,
           product: "doctor_plan",
-          plan: cycle === "annual" ? (`${planKey}_annual` as const) : planKey,
+          plan: "mensagens",
+          mensagens,
           returnPath: "/painel",
         },
       });
@@ -6119,8 +8779,10 @@ function DoctorBilling({
         res.error === "pagamento_indisponivel"
           ? "O pagamento está sendo configurado. Tente em instantes."
           : res.error === "plano_indisponivel"
-            ? "Este ciclo ainda não está disponível — tente o mensal."
-            : "Não foi possível abrir o pagamento.",
+            ? "O plano ainda não está disponível. Avisamos assim que abrir."
+            : res.error === "fora_da_escada"
+              ? `Acima de ${TETO_AUTOATENDIMENTO.toLocaleString("pt-BR")} mensagens o plano é de Clínica — fale com a gente.`
+              : "Não foi possível abrir o pagamento.",
       );
     } catch {
       toast.error("Não foi possível abrir o pagamento.");
@@ -6129,6 +8791,16 @@ function DoctorBilling({
   }
 
   async function portal() {
+    /* O portal do Stripe também troca de plano e de cartão — ou seja, também
+       é compra. Fica no site, pelo mesmo motivo do checkout. Cancelar continua
+       possível lá, sem passar pelo app. */
+    const { ehNativo } = await import("@/lib/nativo");
+    const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprarAqui("plano_medico", ehNativo());
+    if (!veredito.pode) {
+      toast(veredito.texto, { duration: 6000 });
+      return;
+    }
     setBusy("portal");
     try {
       const tk = await tokenFn();
@@ -6151,11 +8823,11 @@ function DoctorBilling({
 
   if (isPaid) {
     return (
-      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6">
-        <p className="font-serif text-lg text-emerald-900">
+      <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 dark:bg-emerald-500/10 dark:border-emerald-500/30">
+        <p className="font-serif text-lg text-emerald-900 dark:text-emerald-100">
           Assinatura ativa · plano {plan === "clinica" ? "Pro Equipe" : plan}
         </p>
-        <p className="mt-1 text-sm text-emerald-800">
+        <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">
           Sua cobrança é automática. Troque o cartão, veja faturas ou cancele quando quiser.
         </p>
         <button
@@ -6169,83 +8841,6 @@ function DoctorBilling({
     );
   }
 
-  const PlanBtn = ({
-    planKey,
-    name,
-    monthly,
-    tagline,
-    highlight,
-    black,
-    perk,
-  }: {
-    planKey: "starter" | "pro" | "elite" | "black";
-    name: string;
-    monthly: number;
-    tagline: string;
-    highlight?: boolean;
-    black?: boolean;
-    perk?: string;
-  }) => (
-    <div
-      className={`rounded-2xl border p-4 ${
-        black
-          ? "border-neutral-700 bg-neutral-900 text-white"
-          : highlight
-            ? "border-amber-400 bg-card ring-1 ring-amber-300"
-            : "border-border bg-card"
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        <p className="font-serif text-base">{name}</p>
-        {black ? (
-          <span className="rounded-full bg-amber-400 px-2 py-0.5 text-[10px] font-black text-neutral-900">
-            MÁXIMO
-          </span>
-        ) : highlight ? (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-700">
-            TOP
-          </span>
-        ) : null}
-      </div>
-      <p className={`mt-0.5 text-xs ${black ? "text-white/60" : "text-muted-foreground"}`}>
-        {tagline}
-      </p>
-      <p className="mt-2 text-2xl font-extrabold">
-        R$ {monthly}
-        <span
-          className={`text-sm font-normal ${black ? "text-white/60" : "text-muted-foreground"}`}
-        >
-          /mês
-        </span>
-      </p>
-      {cycle === "annual" && (
-        <p className={`text-[11px] font-semibold ${black ? "text-amber-300" : "text-emerald-600"}`}>
-          cobrado 1×/ano · 2 meses grátis
-        </p>
-      )}
-      {perk && (
-        <p
-          className={`mt-1.5 text-[11px] font-semibold ${black ? "text-amber-300" : "text-amber-700"}`}
-        >
-          {perk}
-        </p>
-      )}
-      <button
-        onClick={() => checkout(planKey)}
-        disabled={!!busy}
-        className={`press mt-3 w-full rounded-full py-2.5 text-sm font-semibold disabled:opacity-60 ${
-          black
-            ? "bg-amber-400 text-neutral-900"
-            : highlight
-              ? "bg-amber-500 text-white"
-              : "bg-primary text-primary-foreground"
-        }`}
-      >
-        {busy === planKey ? "Abrindo pagamento…" : `Assinar ${name}`}
-      </button>
-    </div>
-  );
-
   return (
     <div className="rounded-3xl border border-primary/30 bg-primary/5 p-6">
       <div className="flex items-center justify-between gap-3">
@@ -6258,58 +8853,30 @@ function DoctorBilling({
         </div>
       </div>
 
-      <div className="mt-4 inline-flex rounded-full border border-border bg-card p-1 text-xs font-semibold">
-        <button
-          onClick={() => setCycle("monthly")}
-          className={`rounded-full px-3 py-1.5 ${cycle === "monthly" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          Mensal
-        </button>
-        <button
-          onClick={() => setCycle("annual")}
-          className={`rounded-full px-3 py-1.5 ${cycle === "annual" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          Anual · 2 meses grátis
-        </button>
-      </div>
+      {/* ─── O ALTERNADOR MENSAL/ANUAL SAIU ────────────────────────────────
+          A escada tem um Price graduado só, MENSAL. O botão "Anual · 2 meses
+          grátis" mandava `plan: "essencial_annual"` e o `priceIdFor` respondia
+          `null`: o médico clicava e nada acontecia, sem erro na tela. Um botão
+          que não faz nada é pior que um botão ausente. */}
 
       {inviteDiscount && (
         <p className="mt-3 rounded-2xl border border-emerald-300/60 bg-emerald-50 p-3 text-center text-sm font-semibold text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-300">
-          🎁 Convite de paciente ativo: <strong>+15% de desconto</strong> em qualquer plano, para
-          sempre — aplicado automaticamente no pagamento.
+          🎁 Convite de paciente ativo: <strong>+15% de desconto</strong> para sempre — aplicado
+          automaticamente no pagamento.
         </p>
       )}
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <PlanBtn
-          planKey="starter"
-          name="Starter"
-          monthly={149}
-          tagline="Até 50 pacientes · 1 cérebro"
-        />
-        <PlanBtn
-          planKey="pro"
-          name="Pro"
-          monthly={297}
-          tagline="Até 150 pacientes · IA no WhatsApp"
-        />
-        <PlanBtn
-          planKey="elite"
-          name="Reconhecido"
-          monthly={597}
-          tagline="Selo + topo da busca · até 5 cérebros"
-          highlight
-          perk="🎟️ 25 convites premium/mês + selo verificado"
-        />
-        <PlanBtn
-          planKey="black"
-          name="Black"
-          monthly={1499}
-          tagline="Até 20 cérebros · 500 pacientes/médico"
-          black
-          perk="🖤 250 convites/mês · gerente dedicado · topo da busca · selo Black"
-        />
-      </div>
+      {/* ─── OS CINCO CARTÕES VIRARAM UM SELETOR ───────────────────────────
+          Eles vendiam Essencial/Starter/Pro/Reconhecido/Black com teto de
+          PACIENTES — dois eixos que saíram do produto — e mandavam nomes de
+          plano que o checkout novo não conhece. É o MESMO componente do site:
+          uma tela só para a mesma compra, e a conta do preço num arquivo só. */}
+      <EscadaDeMensagens
+        className="mt-4"
+        tema="claro"
+        ocupado={busy === "checkout"}
+        onEscolher={checkout}
+      />
 
       {isTeam ? null : (
         <p className="mt-3 text-center text-xs text-muted-foreground">
@@ -6326,123 +8893,16 @@ function DoctorBilling({
 }
 
 /** Card de convites premium (Elite/Black): gera código na hora + cota do mês. */
-function DoctorInviteCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
-  const [info, setInfo] = useState<{
-    eligible: boolean;
-    limit: number;
-    used: number;
-    remaining: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [code, setCode] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
+/* ─── O CARTÃO DE CONVITES PREMIUM SAIU ──────────────────────────────────
+   Ele dava a ASSINATURA INTEIRA da paciente de graça — a receita que a
+   plataforma vive de vender — e não funcionava nos apps, porque desconto de
+   assinatura no iOS e no Android é a loja quem dá, não nós.
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const tk = await tokenFn();
-        const { getMyInviteInfo } = await import("@/lib/invites.functions");
-        const res = await getMyInviteInfo({ data: { accessToken: tk } });
-        if (res.ok) setInfo(res);
-      } finally {
-        setLoading(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (loading || !info || !info.eligible) return null;
-
-  async function generate() {
-    setGenerating(true);
-    setCopied(false);
-    try {
-      const tk = await tokenFn();
-      const { generateInviteCode } = await import("@/lib/invites.functions");
-      const res = await generateInviteCode({ data: { accessToken: tk } });
-      if (res.ok) {
-        setCode(res.code);
-        setInfo((prev) => (prev ? { ...prev, used: res.used, remaining: res.remaining } : prev));
-        // Copia automaticamente para facilitar o envio.
-        try {
-          await navigator.clipboard.writeText(res.code);
-          setCopied(true);
-        } catch {
-          /* sem clipboard: a paciente copia manualmente */
-        }
-      } else {
-        toast.error(
-          res.error === "cota_esgotada"
-            ? "Você já gerou todos os convites deste mês."
-            : "Não foi possível gerar o código. Tente novamente.",
-        );
-      }
-    } catch {
-      toast.error("Não foi possível gerar o código.");
-    }
-    setGenerating(false);
-  }
-
-  const copy = async () => {
-    if (!code) return;
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Não foi possível copiar. Código: " + code);
-    }
-  };
-
-  const esgotado = info.remaining <= 0;
-
-  return (
-    <div className="rounded-3xl border border-amber-300 bg-amber-50 p-6">
-      <p className="font-serif text-lg text-amber-900">🎟️ Convites premium</p>
-      <p className="mt-1 text-sm text-amber-800">
-        Gere um código na hora e envie para a sua paciente do jeito que quiser (WhatsApp, e-mail…).
-        Cada código vale para <strong>uma paciente</strong> e libera o Obstétrica Premium completo —
-        por sua conta.
-      </p>
-
-      {code && (
-        <button
-          onClick={copy}
-          className="press mt-4 flex w-full items-center justify-between gap-2 rounded-2xl border-2 border-amber-300 bg-white px-4 py-3 font-mono text-xl font-black tracking-[0.3em] text-amber-900"
-        >
-          <span>{code}</span>
-          <span className="font-sans text-xs font-bold text-amber-600">
-            {copied ? "copiado ✓" : "copiar"}
-          </span>
-        </button>
-      )}
-
-      <button
-        onClick={generate}
-        disabled={generating || esgotado}
-        className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-50"
-      >
-        {generating
-          ? "Gerando…"
-          : esgotado
-            ? "Cota do mês esgotada"
-            : code
-              ? "Gerar outro código"
-              : "Gerar código para uma paciente"}
-      </button>
-
-      <div className="mt-3 flex items-center justify-between text-sm">
-        <span className="text-amber-800">
-          Gerados este mês: <strong>{info.used}</strong> de {info.limit}
-        </span>
-        <span className="rounded-full bg-amber-200 px-3 py-1 text-xs font-bold text-amber-800">
-          {info.remaining} restantes
-        </span>
-      </div>
-    </div>
-  );
-}
+   Quem ocupa o lugar é `MesadaDoMedico`: Sementinhas, que não passam por
+   Stripe, Apple nem Google, funcionam igual nas três plataformas e custam
+   ZERO à plataforma — compram conteúdo estático. E aceleram a conversão em
+   vez de adiá-la: quanto mais generoso ele é, mais rápido ela zera a loja
+   grátis e passa a olhar os 57 itens que só o Premium abre. */
 
 /**
  * "Indique um colega": link de indicação (/medicos/cadastro?ref=<meuId>) +
@@ -6629,19 +9089,540 @@ function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
-function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+/**
+ * Endereços de atendimento — vários, com um principal.
+ *
+ * Um médico com dois consultórios é a regra, não a exceção, e a paciente
+ * precisa saber em qual dos dois ele atende no dia e para qual telefone ligar.
+ * Um campo de texto com "Savassi e Nova Lima" não responde nenhuma das duas
+ * perguntas.
+ */
+/**
+ * O que você já usou do seu plano.
+ *
+ * Existia o teto (Free = 5 pacientes) e existia a checagem que o aplica, mas
+ * não existia lugar nenhum que dissesse ao médico onde ele está. Ele descobria
+ * o limite ao tentar aceitar a sexta paciente e receber um erro — que é o pior
+ * momento possível, porque já havia alguém esperando do outro lado.
+ *
+ * Também mostra quando o teste acaba: `plan_expires_at` já estava no banco e
+ * simplesmente não era lido, então o trial de 14 dias virava Free sem aviso.
+ */
+/**
+ * O que este plano não inclui — dito de frente.
+ *
+ * Antes, uma aba fora do plano não avisava nada: o Cérebro abria normal e cada
+ * tentativa de treinar devolvia "Não foi possível. Tente novamente", e a
+ * Clínica oferecia um botão "Criar clínica" que errava sempre. Um paywall
+ * disfarçado de defeito é pior que um paywall: o médico conclui que o produto
+ * está quebrado e para de tentar, sem nunca descobrir que bastaria mudar de
+ * plano.
+ */
+function TrancadoCard({
+  titulo,
+  texto,
+  plano,
+  onIrParaPlanos,
+}: {
+  titulo: string;
+  texto: string;
+  plano: string;
+  onIrParaPlanos: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-xl rounded-3xl border border-border bg-card p-8 text-center">
+      <p className="text-4xl">🔒</p>
+      <h2 className="mt-3 font-serif text-xl text-foreground">{titulo}</h2>
+      <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{texto}</p>
+      {plano && (
+        <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+          Seu plano atual: {plano}
+        </p>
+      )}
+      <button
+        onClick={onIrParaPlanos}
+        className="press mt-6 block w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
+      >
+        Ver os planos
+      </button>
+    </div>
+  );
+}
+
+function ConsumoCard({
+  uso,
+  plano,
+  onUpgrade,
+  onVerPacientes,
+}: {
+  uso: { pacientes: number; maxPacientes: number | null; rotulo: string; expira: string | null };
+  plano: string;
+  /** Leva para a cobrança — é o clique que o momento do teto pede. */
+  onUpgrade: () => void;
+  /** Leva para a lista, onde agora dá para encerrar um acompanhamento. */
+  onVerPacientes: () => void;
+}) {
+  const semTeto = uso.maxPacientes == null;
+  const pct = semTeto ? 0 : Math.min(100, Math.round((uso.pacientes / uso.maxPacientes!) * 100));
+  const cheio = !semTeto && uso.pacientes >= uso.maxPacientes!;
+  const perto = !semTeto && !cheio && pct >= 80;
+
+  const diasRestantes = (() => {
+    if (!uso.expira || plano !== "trial") return null;
+    const ms = new Date(uso.expira).getTime() - Date.now();
+    return ms > 0 ? Math.ceil(ms / 86400000) : 0;
+  })();
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="font-serif text-lg">Seu plano: {uso.rotulo}</p>
+        {diasRestantes != null && (
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-bold ${
+              diasRestantes <= 3
+                ? "bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300"
+                : "bg-primary/12 text-primary"
+            }`}
+          >
+            {diasRestantes === 0
+              ? "Teste encerrado"
+              : `${diasRestantes} ${diasRestantes === 1 ? "dia" : "dias"} de teste`}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-4">
+        <div className="flex items-baseline justify-between text-sm">
+          <span className="text-muted-foreground">Pacientes</span>
+          <span className="font-bold text-foreground">
+            {uso.pacientes}
+            {semTeto ? " · sem limite" : ` de ${uso.maxPacientes}`}
+          </span>
+        </div>
+        {!semTeto && (
+          <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-secondary">
+            <div
+              className={`h-full rounded-full transition-[width] duration-500 ${
+                cheio ? "bg-rose-500" : perto ? "bg-amber-500" : "bg-primary"
+              }`}
+              style={{ width: `${Math.max(4, pct)}%` }}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* O TETO É O MOMENTO DA VENDA, e ele estava passando em branco.
+
+          Este é o instante exato em que o valor já foi provado (ele tem
+          pacientes de verdade aqui) e a dor é agora (quer aceitar mais uma e não
+          pode). Um aviso de texto aqui é a mensagem certa sem a ação certa — o
+          botão de mudar de plano ficava três blocos abaixo, e ele precisava
+          procurar.
+
+          A frase também mudou: "abrir uma vaga" era uma instrução impossível
+          quando escrevi, porque não existia como soltar uma paciente. Agora
+          existe, e as duas saídas aparecem juntas. */}
+      {cheio && (
+        <div className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-3 dark:bg-rose-500/10">
+          <p className="text-[12.5px] leading-snug text-rose-900 dark:text-rose-200">
+            <strong>Você está no limite de {uso.maxPacientes} pacientes.</strong> A próxima que
+            pedir para te acompanhar não poderá ser aceita.
+          </p>
+          <div className="mt-2.5 flex flex-wrap gap-2">
+            <button
+              onClick={onUpgrade}
+              className="press rounded-full bg-rose-600 px-4 py-2 text-xs font-bold text-white"
+            >
+              Aumentar meu limite →
+            </button>
+            <button
+              onClick={onVerPacientes}
+              className="rounded-full border border-rose-300 px-4 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300"
+            >
+              Encerrar um acompanhamento
+            </button>
+          </div>
+        </div>
+      )}
+      {perto && (
+        <div className="mt-3 rounded-2xl bg-amber-50 px-3.5 py-3 dark:bg-amber-500/10">
+          <p className="text-[12.5px] leading-snug text-amber-900 dark:text-amber-200">
+            {uso.maxPacientes! - uso.pacientes === 1
+              ? "Falta 1 vaga no seu plano."
+              : `Faltam ${uso.maxPacientes! - uso.pacientes} vagas no seu plano.`}{" "}
+            Depois disso, quem pedir para te acompanhar fica esperando.
+          </p>
+          <button
+            onClick={onUpgrade}
+            className="press mt-2.5 rounded-full bg-amber-600 px-4 py-2 text-xs font-bold text-white"
+          >
+            Ver planos
+          </button>
+        </div>
+      )}
+      {diasRestantes != null && diasRestantes <= 3 && (
+        <p className="mt-3 rounded-2xl bg-rose-50 px-3.5 py-2.5 text-[12.5px] leading-snug text-rose-900 dark:bg-rose-500/10 dark:text-rose-200">
+          Quando o teste acabar, o plano vira <strong>Free</strong>: 5 pacientes e sem IA no app. As
+          pacientes acima de 5 continuam vinculadas, mas você não recebe novas.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function EnderecosCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
+  /* As mesmas classes do formulário de perfil, repetidas aqui de propósito:
+     este card é um componente irmão, não um filho, e herdar as constantes
+     por escopo criaria uma dependência invisível entre os dois. */
+  const input =
+    "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
+  const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
+
+  const [lista, setLista] = useState<DoctorAddress[]>([]);
+  const [carregando, setCarregando] = useState(true);
+  const [editando, setEditando] = useState<Partial<DoctorAddress> | null>(null);
+  const [salvando, setSalvando] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  async function carregar() {
+    try {
+      const r = await listMyAddresses({ data: { accessToken: await tokenFn() } });
+      setLista(r.addresses);
+    } catch {
+      setLista([]);
+    } finally {
+      setCarregando(false);
+    }
+  }
+  useEffect(() => {
+    void carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function salvar() {
+    if (!editando) return;
+    if (!(editando.street ?? "").trim()) {
+      toast.error("Informe o endereço.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      const r = await saveMyAddress({
+        data: {
+          accessToken: await tokenFn(),
+          address: {
+            id: editando.id,
+            label: editando.label ?? "",
+            street: editando.street ?? "",
+            city: editando.city ?? "",
+            state: (editando.state ?? "").toUpperCase(),
+            zip: editando.zip ?? "",
+            phone: editando.phone ?? "",
+            notes: editando.notes ?? "",
+            /* O primeiro endereço nasce principal: sem isso o médico salva um
+               só e a paciente não vê nenhum marcado como o principal. */
+            is_primary: editando.is_primary ?? lista.length === 0,
+            position: editando.position ?? lista.length,
+          },
+        },
+      });
+      if (!r.ok) {
+        toast.error("Não foi possível salvar o endereço. Rode o APLICAR_MEDICO.sql no Supabase.");
+        return;
+      }
+      toast.success("Endereço salvo ✓");
+      setEditando(null);
+      await carregar();
+    } catch {
+      /* Sem catch, uma queda de rede aqui virava uma Promise rejeitada sem dono
+         e o formulário ficava aberto sem dizer nada — o médico achava que tinha
+         salvado. */
+      toast.error("Sem conexão para salvar o endereço. Tente de novo.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function apagar(id: string) {
+    try {
+      const r = await deleteMyAddress({ data: { accessToken: await tokenFn(), id } });
+      if (!r.ok) {
+        toast.error("Não foi possível apagar o endereço.");
+        return;
+      }
+      await carregar();
+    } catch {
+      toast.error("Sem conexão para apagar o endereço.");
+    }
+  }
+
+  return (
+    <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-serif text-lg">Onde você atende</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A paciente vê o endereço principal ao escolher você, e todos eles antes da consulta.
+          </p>
+        </div>
+        {!editando && (
+          <button
+            onClick={() => setEditando({})}
+            className="shrink-0 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground"
+          >
+            + Endereço
+          </button>
+        )}
+      </div>
+
+      {carregando ? (
+        <p className="mt-4 text-sm text-muted-foreground">Carregando…</p>
+      ) : (
+        <div className="mt-4 space-y-2">
+          {lista.length === 0 && !editando && (
+            <p className="rounded-2xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              Nenhum endereço cadastrado. A paciente não tem como saber onde você atende.
+            </p>
+          )}
+          {lista.map((a) => (
+            <div
+              key={a.id}
+              className="flex items-start justify-between gap-3 rounded-2xl border border-border p-3"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">
+                  {a.label || "Consultório"}
+                  {a.is_primary && (
+                    <span className="ml-2 rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary">
+                      principal
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {[a.street, a.city && `${a.city}${a.state ? `/${a.state}` : ""}`, a.zip]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {(a.phone || a.notes) && (
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {[a.phone, a.notes].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  onClick={() => setEditando(a)}
+                  className="rounded-full border border-border px-3 py-1 text-[11px]"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => void apagar(a.id)}
+                  className="rounded-full border border-border px-3 py-1 text-[11px] text-muted-foreground"
+                >
+                  Apagar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editando && (
+        <div className="mt-4 space-y-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <label className={label}>Nome do local</label>
+              <input
+                value={editando.label ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, label: e.target.value }))}
+                placeholder="Consultório Savassi"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Endereço *</label>
+              <input
+                value={editando.street ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, street: e.target.value }))}
+                placeholder="Rua Antônio de Albuquerque, 156 — sala 302"
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>Cidade</label>
+              <input
+                value={editando.city ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, city: e.target.value }))}
+                className={input}
+              />
+            </div>
+            <div>
+              <label className={label}>UF</label>
+              <select
+                value={(editando.state ?? "").toUpperCase()}
+                onChange={(e) => setEditando((v) => ({ ...v, state: e.target.value }))}
+                className={input}
+              >
+                <option value="">UF</option>
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={label}>CEP</label>
+              {/* Preenche rua, bairro, cidade e UF sozinho.
+              
+                  Não é só conforto: a CIDADE digitada à mão é o que a busca por
+                  proximidade compara, e "Belo Horizonte", "belo horizonte" e
+                  "BH" são três cidades diferentes para um `ilike`. Vindo do CEP,
+                  ela sai sempre escrita igual. */}
+              <input
+                value={formatarCep(editando.zip ?? "")}
+                onChange={async (e) => {
+                  const bruto = e.target.value;
+                  setEditando((v) => (v ? { ...v, zip: formatarCep(bruto) } : v));
+                  if (digitosCep(bruto).length !== 8) return;
+                  setBuscandoCep(true);
+                  try {
+                    const end = await buscarCep(bruto);
+                    if (!end) {
+                      toast.error("CEP não encontrado — preencha à mão.");
+                      return;
+                    }
+                    setEditando((v) =>
+                      v
+                        ? {
+                            ...v,
+                            // Não sobrescreve o que ele já digitou: se a rua
+                            // está preenchida, quem manda é ele.
+                            street: (v.street ?? "").trim() || end.rua,
+                            city: (v.city ?? "").trim() || end.cidade,
+                            state: (v.state ?? "").trim() || end.uf,
+                          }
+                        : v,
+                    );
+                    toast.success(`${end.cidade}/${end.uf} ✓`);
+                  } finally {
+                    setBuscandoCep(false);
+                  }
+                }}
+                placeholder="30140-071"
+                inputMode="numeric"
+                className={input}
+              />
+              {buscandoCep && (
+                <p className="mt-1 text-[11px] text-muted-foreground">Buscando endereço…</p>
+              )}
+            </div>
+            <div>
+              <label className={label}>Telefone deste local</label>
+              <input
+                value={editando.phone ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, phone: e.target.value }))}
+                placeholder="(31) 3333-3333"
+                className={input}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className={label}>Observação</label>
+              <input
+                value={editando.notes ?? ""}
+                onChange={(e) => setEditando((v) => ({ ...v, notes: e.target.value }))}
+                placeholder="3º andar · estacionamento no prédio"
+                className={input}
+              />
+            </div>
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={editando.is_primary ?? lista.length === 0}
+              onChange={(e) => setEditando((v) => ({ ...v, is_primary: e.target.checked }))}
+              className="h-4 w-4 accent-primary"
+            />
+            Este é o endereço principal
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void salvar()}
+              disabled={salvando}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {salvando ? "Salvando…" : "Salvar endereço"}
+            </button>
+            <button
+              onClick={() => setEditando(null)}
+              className="rounded-full border border-border px-5 py-2 text-sm"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MeuPerfilSection({
+  tokenFn,
+  onIrParaPacientes,
+}: {
+  tokenFn: () => Promise<string>;
+  /** Trocar de aba mora no painel; esta seção só pede. */
+  onIrParaPacientes: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [exists, setExists] = useState(false);
   const [plan, setPlan] = useState("trial");
+  /* Consumo e teto do plano, mais a data em que o teste acaba. O painel tinha
+     tudo isso disponível em `getMyDoctor` e não mostrava nada: o médico via o
+     nome do plano e descobria o limite como um erro. */
+  const [uso, setUso] = useState<{
+    pacientes: number;
+    maxPacientes: number | null;
+    rotulo: string;
+    expira: string | null;
+  } | null>(null);
   const [active, setActive] = useState(false);
   const [slug, setSlug] = useState<string | null>(null);
+  /* O que falta para ele poder receber paciente, calculado no SERVIDOR pela
+     mesma regra que a busca usa (`doctor-required.ts`). Vem de lá e não daqui
+     de propósito: uma checagem de tela que discorda do servidor é pior do que
+     nenhuma — o médico "completa" o cadastro e continua invisível na busca. */
+  const [pendencias, setPendencias] = useState<Pendencia[]>([]);
+  /* As duas metades do CRM NÃO são derivadas de `form.crm` a cada render.
+
+     `juntarCrm` devolve vazio quando falta uma das partes, e derivar as metades
+     da string junta significava que trocar a UF antes de ter número (ou apagar o
+     número) zerava a string e a tela voltava para "UF" sozinha — a escolha não
+     tinha onde existir. O formato canônico é bom para o banco e não sabe
+     representar "meio preenchido", que é metade do tempo de um formulário.
+
+     `form.crm` continua sendo a string única do banco (`CRM-MG 12345`), escrita
+     pelos handlers abaixo — é dela que a carteirinha e o aviso do SOS vivem. */
+  const [crmUf, setCrmUf] = useState("");
+  const [crmNum, setCrmNum] = useState("");
+  /* Moeda e valor, pelo mesmo motivo do CRM: o texto formatado é o estado da
+     tela, e os centavos só existem na hora de salvar. */
+  const [moeda, setMoeda] = useState<MoedaChave>("BRL");
+  const [valorTexto, setValorTexto] = useState("");
+  const [conferindo, setConferindo] = useState(false);
+  const [crmConferido, setCrmConferido] = useState("");
   const [form, setForm] = useState({
     display_name: "",
     title: "",
     specialty: "",
     crm: "",
     whatsapp: "",
+    personal_phone: "",
+    accepts_insurance: false,
+    accepts_private: true,
     pix_key: "",
     bio: "",
     subspecialty: "",
@@ -6661,6 +9642,8 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     approach: "",
     consultation_price_brl: null as number | null,
     offers_telehealth: false,
+    focos: [] as string[],
+    photo_url: "",
   });
 
   useEffect(() => {
@@ -6674,12 +9657,22 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
           setPlan(d.plan);
           setActive(d.active);
           setSlug(d.slug);
+          setUso({
+            pacientes: res.patientCount ?? 0,
+            maxPacientes: res.entitlements?.maxPatients ?? null,
+            rotulo: res.entitlements?.label ?? d.plan,
+            expira: d.plan_expires_at ?? null,
+          });
+          setPendencias((res as { pendencias?: Pendencia[] }).pendencias ?? []);
           setForm({
             display_name: d.display_name,
             title: d.title,
             specialty: d.specialty,
             crm: d.crm,
             whatsapp: d.whatsapp,
+            personal_phone: d.personal_phone ?? "",
+            accepts_insurance: !!d.accepts_insurance,
+            accepts_private: d.accepts_private ?? true,
             pix_key: d.pix_key,
             bio: d.bio ?? "",
             subspecialty: d.subspecialty ?? "",
@@ -6698,7 +9691,22 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
             approach: d.approach ?? "",
             consultation_price_brl: d.consultation_price_brl ?? null,
             offers_telehealth: !!d.offers_telehealth,
+            focos: Array.isArray(d.focos) ? d.focos : [],
+            photo_url: d.photo_url ?? "",
           });
+          /* Semeia as duas metades a partir do que veio do banco: o
+             formulário mostra o CRM já existente, e a partir daí quem manda são
+             as metades. */
+          {
+            const partes = separarCrm(d.crm);
+            setCrmUf(partes.uf);
+            setCrmNum(partes.numero);
+            setMoeda(((d.consultation_currency as MoedaChave) ?? "BRL") || "BRL");
+            /* Cai na coluna antiga (unidades inteiras) para quem cadastrou o
+               preço antes de a coluna de centavos existir. */
+            const cents = d.consultation_price_cents ?? (d.consultation_price_brl ?? 0) * 100;
+            setValorTexto(cents ? digitandoDinheiro(String(cents), d.consultation_currency) : "");
+          }
         }
       } finally {
         setLoading(false);
@@ -6707,25 +9715,75 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* Os três obrigatórios existem por causa do SOS, não por burocracia: sem
+     nome, CRM e WhatsApp, a Central de Emergência das pacientes deste médico
+     fica sem para quem ligar — e o app é obrigado a esconder os botões dele.
+     Barrar o salvamento é o único momento em que dá para cobrar isso antes de
+     a falta virar um problema às 3h da manhã. */
   async function save() {
-    if (form.display_name.trim().length < 2) {
-      toast.error("Informe seu nome.");
-      return;
+    /* Duas regras diferentes conforme o caminho, e de propósito.
+
+       Perfil que JÁ EXISTE (`updateMyDoctor`): só o mínimo para a carteirinha e
+       o SOS não quebrarem. Ele pode salvar um campo por vez, e barrar aqui
+       trancaria o médico fora do próprio painel.
+
+       Perfil NOVO (`registerDoctor`): a regra completa, a MESMA que o servidor
+       aplica. Sem isso o botão ficava impossível: a tela exigia três campos, o
+       servidor exigia sete, e o erro era descartado — um "Não foi possível
+       salvar o perfil" sem dizer o quê. Quem cai aqui é o gestor de clínica
+       (admitido sem linha em `doctors`) e o médico cujo perfil não carregou. */
+    if (!exists) {
+      const faltas = pendenciasDoMedico(
+        { ...form, consultation_price_brl: unidadesInteirasDe(centavosDe(valorTexto)) },
+        { temEndereco: true },
+      );
+      if (faltas.length) {
+        toast.error(`${faltas[0].rotulo}: ${faltas[0].porque}`);
+        return;
+      }
+    } else {
+      if (form.display_name.trim().length < 2) {
+        toast.error("Informe seu nome.");
+        return;
+      }
+      if (!form.crm.trim()) {
+        toast.error("Informe o CRM — ele vai na carteirinha de emergência da paciente.");
+        return;
+      }
+      if (form.whatsapp.replace(/\D/g, "").length < 10) {
+        toast.error("Informe o WhatsApp de emergência — é o número que o SOS das pacientes usa.");
+        return;
+      }
     }
     setSaving(true);
     try {
       const tk = await tokenFn();
+      /* O dinheiro é montado aqui, num lugar só: centavos como fonte de verdade
+         e a coluna antiga como espelho arredondado, para as telas e o cálculo de
+         receita que ainda a leem. */
+      const cents = centavosDe(valorTexto);
+      const perfil = {
+        ...form,
+        consultation_currency: moeda,
+        consultation_price_cents: cents,
+        consultation_price_brl: unidadesInteirasDe(cents),
+        focos: Array.from(new Set((form.focos ?? []).filter(Boolean))),
+      };
       // Equipe da instalação pode ainda não ter linha em doctors: cria na hora
       if (exists) {
-        const res = await updateMyDoctor({ data: { accessToken: tk, profile: form } });
+        const res = await updateMyDoctor({ data: { accessToken: tk, profile: perfil } });
         if (!res.ok) {
           toast.error("Não foi possível salvar o perfil.");
           return;
         }
       } else {
-        const res = await registerDoctor({ data: { accessToken: tk, profile: form } });
+        const res = await registerDoctor({ data: { accessToken: tk, profile: perfil } });
         if (!res.ok || !res.doctor) {
-          toast.error("Não foi possível salvar o perfil.");
+          // O servidor diz POR QUE recusou; descartar isso é o que fazia o
+          // botão parecer quebrado.
+          toast.error(
+            "error" in res && res.error ? res.error : "Não foi possível salvar o perfil.",
+          );
           return;
         }
         setExists(true);
@@ -6744,12 +9802,133 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
     "mt-1 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary";
   const label = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
 
+  /* O bloqueio do SOS é o mais grave e continua com destaque próprio; o resto
+     das pendências vira uma lista abaixo dele. */
+  const faltaEmergencia = !form.crm.trim() || form.whatsapp.replace(/\D/g, "").length < 10;
+  const outrasPendencias = pendencias.filter((p) => p.campo !== "crm" && p.campo !== "whatsapp");
+  /* O servidor já respondeu sobre o endereço: se ele não está entre as
+     pendências, existe. Reconsultar aqui seria uma segunda fonte de verdade. */
+  const temEndereco = !pendencias.some((p) => p.campo === "endereco");
+
   return (
-    <div className="max-w-2xl space-y-4">
-      <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
-      <DoctorInviteCard tokenFn={tokenFn} />
+    /* LARGURA: a seção inteira, e não uma coluna estreita dentro dela.
+       Isto era `max-w-2xl` (672px) dentro do `max-w-5xl` (1024px) do painel —
+       ou seja, os cartões ocupavam dois terços da tela e o resto ficava vazio,
+       com a fita de abas acima deles chegando até a borda. Lido de longe,
+       parecia tela cortada pela metade, e era: nenhuma outra aba do painel
+       encolhe assim.
+       A medida de leitura não se perde porque ela mora nos PARÁGRAFOS
+       (`max-w-prose`), não no contêiner, e o formulário abaixo já é
+       `md:grid-cols-2` — com a largura toda ele vira duas colunas de verdade
+       em vez de uma fileira de campos meio vazios. */
+    <div className="space-y-4">
+      {/* O aviso fica no TOPO da seção, acima até da cobrança: enquanto ele
+          estiver aqui, as pacientes deste médico abrem o SOS e não encontram
+          nenhum caminho até ele. */}
+      {!loading && faltaEmergencia && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:bg-rose-500/10">
+          <p className="text-sm font-bold text-rose-700 dark:text-rose-300">
+            Suas pacientes estão sem você no botão de emergência
+          </p>
+          <p className="mt-1 max-w-prose text-[13px] leading-snug text-rose-900/85 dark:text-rose-200/85">
+            Falta {!form.crm.trim() ? "o CRM" : ""}
+            {!form.crm.trim() && form.whatsapp.replace(/\D/g, "").length < 10 ? " e " : ""}
+            {form.whatsapp.replace(/\D/g, "").length < 10 ? "o WhatsApp de emergência" : ""}. Sem
+            eles, a Central de Emergência esconde os seus botões e sobra o 192 para a paciente — o
+            app não coloca o telefone de outro médico no lugar do seu.
+          </p>
+        </div>
+      )}
+      {/* Progresso do perfil, com o EFEITO de cada campo faltando. Fica acima do
+          aviso de pendências porque responde outra pergunta: aquele diz "o que
+          falta", este diz "quanto falta e o que isso te custa". */}
+      {!loading && (
+        <PerfilProgresso
+          itens={itensDoPerfil({
+            display_name: form.display_name,
+            crm: form.crm,
+            whatsapp: form.whatsapp,
+            education: form.education,
+            bio: form.bio,
+            specialty: form.specialty,
+            accepts_insurance: form.accepts_insurance,
+            accepts_private: form.accepts_private,
+            insurances: form.insurances,
+            precoCentavos: centavosDe(valorTexto),
+            /* O endereço vem da lista do card abaixo; a foto ainda não existe
+               como campo, então não é cobrada. */
+            temEndereco: temEndereco,
+            temFoto: !!form.photo_url,
+          })}
+        />
+      )}
+
+      {/* Cadastro incompleto não tranca o painel — só empurra ele para baixo na
+          busca da paciente. Trancar seria repetir o erro que deixou o médico
+          preso na tela de dados: o caminho certo é dizer o que falta e por quê,
+          e deixar ele decidir a ordem. */}
+      {!loading && outrasPendencias.length > 0 && (
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+          <p className="text-sm font-bold text-amber-800 dark:text-amber-200">
+            Faltam {outrasPendencias.length}{" "}
+            {outrasPendencias.length === 1 ? "informação" : "informações"} no seu cadastro
+          </p>
+          {/* `max-w-prose` aqui e não no contêiner: com a seção agora ocupando
+              a largura toda, é o parágrafo que precisa de medida de leitura —
+              o cartão pode ser largo, a linha de texto não. */}
+          <p className="mt-1 max-w-prose text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+            Seu perfil aparece na busca, mas <strong>abaixo</strong> de quem preencheu tudo — uma
+            paciente que abre um card sem valor, sem convênio e sem formação volta para a lista.
+          </p>
+          <ul className="mt-3 space-y-2">
+            {outrasPendencias.map((p) => (
+              <li key={p.campo} className="text-[13px] leading-snug">
+                <span className="font-semibold text-amber-900 dark:text-amber-100">{p.rotulo}</span>
+                <span className="text-amber-900/70 dark:text-amber-100/70"> — {p.porque}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {/* AS RESPOSTAS DA IA, AO LADO DAS PACIENTES.
+          O mesmo card que fica na aba Cérebro. Decisão do Clóvis: os dois
+          lugares. Faz sentido — na aba Cérebro ele lê "quanto do meu trabalho
+          rendeu"; aqui, junto do teto de pacientes e da cobrança, ele lê
+          "quanto do meu plano estou usando". É a mesma medida respondendo a
+          duas perguntas diferentes, e o card já sabe carregar sozinho. */}
+      <ConsumoDaIACard
+        tokenFn={tokenFn}
+        onIrParaPlanos={() => {
+          document
+            .getElementById("cobranca")
+            ?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      />
+      {uso && (
+        <ConsumoCard
+          uso={uso}
+          plano={plan}
+          onUpgrade={() => {
+            /* A cobrança vive nesta mesma aba, logo abaixo: rolar até ela é
+               mais honesto que abrir outra tela e perder o contexto do número
+               que ele acabou de ler. */
+            document
+              .getElementById("cobranca")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          onVerPacientes={onIrParaPacientes}
+        />
+      )}
+      {/* Âncora para o botão do teto: "aumentar meu limite" rola até aqui. */}
+      <div id="cobranca">
+        <DoctorBilling tokenFn={tokenFn} plan={plan} active={active} exists={exists} />
+      </div>
+      <EnderecosCard tokenFn={tokenFn} />
       <ReferralCard tokenFn={tokenFn} />
-      <GoogleCalendarCard tokenFn={tokenFn} />
+      {/* O cartão do Google Agenda saiu daqui e foi para a aba Calendário
+          (ago/2026). Ele decide como as teleconsultas viram evento com sala do
+          Meet — é assunto de agenda, e enterrado entre cobrança e endereços
+          ninguém o achava. */}
 
       <div className="rounded-3xl border border-border bg-card p-6">
         <div className="flex items-start justify-between gap-3">
@@ -6769,6 +9948,14 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
+            <CampoFoto
+              url={form.photo_url}
+              onChange={(u) => setForm((f) => ({ ...f, photo_url: u }))}
+              nome={form.display_name}
+              classeLabel={label}
+            />
+          </div>
+          <div className="md:col-span-2">
             <label className={label}>Nome completo *</label>
             <input
               value={form.display_name}
@@ -6776,38 +9963,172 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               className={input}
             />
           </div>
+          {/* UF primeiro, número depois: o registro é estadual, e "CRM 12345"
+              sozinho não identifica ninguém. Em dois controles não há como
+              gravar "crm mg 12345" ou "12345/MG" — o formato sai sempre igual e
+              dá para conferir no portal do conselho. */}
           <div>
-            <label className={label}>CRM</label>
-            <input
-              value={form.crm}
-              onChange={(e) => setForm((f) => ({ ...f, crm: e.target.value }))}
-              className={input}
-            />
+            <label className={label}>CRM *</label>
+            {/* Grid com a coluna da UF fixa, igual ao cadastro: com `flex` +
+                `w-[92px] shrink-0` o campo do número herda o `mt-1` do `input` e
+                fica um degrau abaixo do select. Em grid os dois compartilham a
+                linha e o `mt-0` tira a margem dupla. */}
+            <div className="mt-1 grid grid-cols-[96px_1fr] gap-2">
+              <select
+                value={crmUf}
+                onChange={(e) => {
+                  setCrmUf(e.target.value);
+                  setForm((f) => ({ ...f, crm: juntarCrm(e.target.value, crmNum) }));
+                }}
+                className={`${input} mt-0`}
+                aria-label="Estado do CRM"
+              >
+                <option value="">UF</option>
+                {UFS.map((uf) => (
+                  <option key={uf} value={uf}>
+                    {uf}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={crmNum}
+                onChange={(e) => {
+                  const n = e.target.value.replace(/\D/g, "");
+                  setCrmNum(n);
+                  setForm((f) => ({ ...f, crm: juntarCrm(crmUf, n) }));
+                }}
+                className={`${input} mt-0`}
+                placeholder="Número — ex.: 12345"
+                inputMode="numeric"
+                aria-label="Número do CRM"
+              />
+            </div>
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {form.crm
+                ? `Vai impresso como "${form.crm}" na carteirinha de emergência da paciente.`
+                : "Vai impresso na carteirinha de emergência que a paciente mostra no hospital."}
+            </p>
+            {/* Conferência no conselho. O botão só aparece com CRM completo, e o
+                resultado NUNCA é apresentado como selo — o selo é outra coisa,
+                que só o super-admin dá. Aqui é informação: o conselho reconhece
+                este registro, e com que nome. */}
+            {form.crm && (
+              <div className="mt-2">
+                <button
+                  type="button"
+                  disabled={conferindo}
+                  onClick={async () => {
+                    setConferindo(true);
+                    try {
+                      const r = await conferirMeuCrm({ data: { accessToken: await tokenFn() } });
+                      if (!r.ok || !r.resultado) {
+                        toast.error("Não foi possível conferir agora.");
+                        return;
+                      }
+                      const res = r.resultado;
+                      if (res.status === "confirmado") {
+                        setCrmConferido(
+                          `${res.nome}${res.situacao ? ` · ${res.situacao}` : ""}${
+                            r.nomeDivergente ? " · nome diferente do cadastrado" : ""
+                          }`,
+                        );
+                        toast.success("Registro encontrado no conselho ✓");
+                      } else if (res.status === "nao_encontrado") {
+                        setCrmConferido("não encontrado no conselho");
+                        toast.error("Esse CRM não foi encontrado. Confira a UF e o número.");
+                      } else {
+                        setCrmConferido("");
+                        toast.error(
+                          res.motivo === "sem_provedor"
+                            ? "A conferência automática ainda não está ligada nesta instalação."
+                            : "O conselho não respondeu agora. Tente mais tarde.",
+                        );
+                      }
+                    } finally {
+                      setConferindo(false);
+                    }
+                  }}
+                  className="rounded-full border border-primary/40 px-3 py-1.5 text-xs font-medium text-primary disabled:opacity-50"
+                >
+                  {conferindo ? "Conferindo…" : "Conferir no conselho"}
+                </button>
+                {crmConferido && (
+                  <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                    Conselho respondeu: <strong className="text-foreground">{crmConferido}</strong>
+                  </p>
+                )}
+              </div>
+            )}
           </div>
           <div>
-            <label className={label}>WhatsApp</label>
+            <label className={label}>WhatsApp para pacientes *</label>
             <input
               value={form.whatsapp}
               onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.value }))}
               className={input}
+              placeholder="(31) 98634-2903"
             />
+            {/* O médico costuma ter dois números. Este campo precisa dizer, sem
+                rodeio, qual dos dois ele está cadastrando — é o que toca às
+                3h da manhã quando uma paciente aperta o SOS. */}
+            <p className="mt-1 text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+              <strong>Atenção:</strong> este é o número que aparece no botão SOS das suas pacientes.
+              Elas vão ligar e chamar no WhatsApp por aqui em uma emergência, a qualquer hora.
+              Cadastre o número em que você quer ser encontrado nessa situação.
+            </p>
           </div>
+          {/* O segundo número. Existe porque o de cima é PÚBLICO para as suas
+              pacientes; este a plataforma usa para falar com você, e ele nunca
+              aparece no app delas. Sem a separação, ou você expõe o pessoal ou
+              a emergência fica sem destino. */}
           <div>
-            <label className={label}>Título</label>
+            <label className={label}>Telefone pessoal</label>
             <input
-              value={form.title}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              placeholder="Ginecologista e Obstetra"
+              value={form.personal_phone}
+              onChange={(e) => setForm((f) => ({ ...f, personal_phone: e.target.value }))}
               className={input}
+              placeholder="(31) 90000-0000"
             />
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Privado. Só a plataforma usa — nunca aparece para as pacientes.
+            </p>
           </div>
-          <div>
-            <label className={label}>Especialidade / foco</label>
-            <input
-              value={form.specialty}
-              onChange={(e) => setForm((f) => ({ ...f, specialty: e.target.value }))}
-              placeholder="Gestação de alto risco"
-              className={input}
+          <CampoComOutro
+            label="Título"
+            opcoes={TITULOS_MEDICO}
+            valor={form.title}
+            onChange={(v) => setForm((f) => ({ ...f, title: v }))}
+            placeholderOutro="Ex.: Especialista em Endometriose"
+            ajuda="Aparece embaixo do seu nome, no card e na carteirinha."
+            classeInput={input}
+            classeLabel={label}
+          />
+          {/* Mesmos componentes do cadastro: lista curada + "Outro" no
+              principal, chips nos demais. Campos diferentes nas duas telas
+              produziriam dados diferentes para o mesmo médico. */}
+          <CampoComOutro
+            label="Especialidade / foco principal"
+            opcoes={ESPECIALIDADES_MEDICO}
+            valor={form.specialty}
+            onChange={(v) =>
+              setForm((f) => ({
+                ...f,
+                specialty: v,
+                focos: v && !f.focos.includes(v) ? [...f.focos, v] : f.focos,
+              }))
+            }
+            placeholderOutro="Ex.: Gestação gemelar"
+            ajuda="Aparece embaixo do seu nome no card."
+            classeInput={input}
+            classeLabel={label}
+          />
+          <div className="md:col-span-2">
+            <CampoFocos
+              valor={form.focos}
+              onChange={(v) => setForm((f) => ({ ...f, focos: v }))}
+              principal={form.specialty}
+              classeInput={input}
+              classeLabel={label}
             />
           </div>
           <div className="md:col-span-2">
@@ -6922,15 +10243,54 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
                 className={`${input} resize-none`}
               />
             </div>
-            <div>
-              <label className={label}>Convênios aceitos</label>
-              <textarea
-                value={form.insurances}
-                onChange={(e) => setForm((f) => ({ ...f, insurances: e.target.value }))}
-                rows={2}
-                placeholder="Ex: Unimed, Bradesco Saúde, particular"
-                className={`${input} resize-none`}
-              />
+            {/* Como você atende — a primeira pergunta que a paciente faz.
+                
+                Antes havia só a lista de convênios em texto livre, e uma lista
+                vazia era ambígua: podia significar "só particular" ou "ainda
+                não preenchi". Duas caixas respondem sem ambiguidade, e a busca
+                passa a poder filtrar por elas. */}
+            <div className="md:col-span-2 rounded-2xl border border-border bg-secondary/30 p-4">
+              <p className="text-sm font-semibold">Como você atende</p>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.accepts_insurance}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, accepts_insurance: e.target.checked }))
+                    }
+                    className="h-4 w-4 accent-primary"
+                  />
+                  🏥 Atendo por convênio
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.accepts_private}
+                    onChange={(e) => setForm((f) => ({ ...f, accepts_private: e.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  💳 Atendo particular
+                </label>
+              </div>
+              {form.accepts_insurance && (
+                <div className="mt-3">
+                  <label className={label}>Quais convênios</label>
+                  <textarea
+                    value={form.insurances}
+                    onChange={(e) => setForm((f) => ({ ...f, insurances: e.target.value }))}
+                    rows={2}
+                    placeholder="Ex: Unimed, Bradesco Saúde, Amil"
+                    className={`${input} resize-none`}
+                  />
+                </div>
+              )}
+              {!form.accepts_insurance && !form.accepts_private && (
+                <p className="mt-2 text-[11.5px] leading-snug text-amber-700 dark:text-amber-400">
+                  Sem convênio e sem particular, a paciente não tem como saber como marcar com você.
+                  Marque pelo menos um.
+                </p>
+              )}
             </div>
             <div className="md:col-span-2">
               <label className={label}>Sua abordagem (filosofia de cuidado)</label>
@@ -6952,20 +10312,40 @@ function MeuPerfilSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
               />
             </div>
             <div>
-              <label className={label}>Consulta particular (R$, opcional)</label>
-              <input
-                type="number"
-                min={0}
-                value={form.consultation_price_brl ?? ""}
-                onChange={(e) =>
-                  setForm((f) => ({
-                    ...f,
-                    consultation_price_brl: e.target.value === "" ? null : Number(e.target.value),
-                  }))
-                }
-                placeholder="Ex: 450"
-                className={input}
-              />
+              <label className={label}>Consulta particular (opcional)</label>
+              {/* Moeda antes do valor, igual ao cadastro: o mesmo campo nos dois
+                  lugares, senão ele edita num e o outro contradiz. */}
+              <div className="mt-1 grid grid-cols-[132px_1fr] gap-2">
+                <select
+                  value={moeda}
+                  onChange={(e) => {
+                    const nova = e.target.value as MoedaChave;
+                    setMoeda(nova);
+                    setValorTexto((t) => digitandoDinheiro(t, nova));
+                  }}
+                  className={`${input} mt-0`}
+                  aria-label="Moeda da consulta"
+                >
+                  {MOEDAS.map((m) => (
+                    <option key={m.chave} value={m.chave}>
+                      {m.rotulo}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={valorTexto}
+                  onChange={(e) => setValorTexto(digitandoDinheiro(e.target.value, moeda))}
+                  placeholder="450,00"
+                  inputMode="numeric"
+                  className={`${input} mt-0`}
+                  aria-label="Valor da consulta"
+                />
+              </div>
+              {centavosDe(valorTexto) ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  A paciente vê {formatarDinheiro(centavosDe(valorTexto), moeda)}.
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="mt-3 flex flex-wrap gap-4 text-sm">
@@ -7215,7 +10595,7 @@ function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   return (
     <div className="space-y-6">
       {missingTable && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-200 dark:border-amber-500/30">
           A tabela <code>lives</code> ainda não existe no banco — rode o{" "}
           <strong>APLICAR_PENDENTES.sql</strong> no Supabase para ativar o gerenciador.
         </div>
@@ -7300,7 +10680,55 @@ function LivesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   );
 }
 
-function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
+function PacientesSection({
+  tokenFn,
+  onVinculoRespondido,
+  abrirPacienteId,
+  onAbriu,
+  onDesfechoRegistrado,
+  preForms = [],
+  onMarkSeenPreConsulta,
+  onIrParaAgenda,
+}: {
+  tokenFn: () => Promise<string>;
+  /**
+   * Avisa o painel que a lista de solicitações mudou.
+   *
+   * Sem isto, a seção respondia o pedido no estado INTERNO dela e a fila de
+   * trabalho — que fica na mesma tela, logo acima — continuava dizendo "Ana
+   * quer ser acompanhada por você" depois de o médico aceitar a Ana. Duas
+   * afirmações contraditórias ao mesmo tempo, e o fantasma só saía com F5.
+   */
+  onVinculoRespondido?: () => void;
+  /** Paciente que a fila de trabalho mandou abrir direto. */
+  abrirPacienteId?: string | null;
+  onAbriu?: () => void;
+  /**
+   * Avisa o painel que um evento clínico foi resolvido dentro do modal.
+   *
+   * Mesma história do `onVinculoRespondido` logo acima: o modal marcava o
+   * desfecho no estado INTERNO dele, e a fila de trabalho — que fica na mesma
+   * tela — continuava listando "Fulana · Pressão em faixa grave" depois de o
+   * médico ter registrado que cuidou. O item só sumia no tique de 3 minutos,
+   * ou com F5.
+   *
+   * Numa fila cujo propósito é dizer o que ainda precisa dele, um item
+   * resolvido que não sai é ruído — e ruído numa fila clínica é o começo de
+   * parar de olhar para ela.
+   */
+  onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
+  /**
+   * As pré-consultas de TODAS as pacientes dele — não mais uma seção própria
+   * nesta aba (ago/2026). O selo "Pré-consulta nova" no quadro dela e o
+   * relatório completo dentro da ficha dela são a MESMA lista, só que lida
+   * por paciente em vez de uma lista solta: pedido do dono, "não tem que
+   * estar escrito ali na aba de pacientes".
+   */
+  preForms?: AdminPreConsulta[];
+  onMarkSeenPreConsulta?: (id: string) => void;
+  /** Ver `AcoesDaPaciente`. */
+  onIrParaAgenda?: () => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState<PatientRequest[]>([]);
   const [patients, setPatients] = useState<LinkedPatient[]>([]);
@@ -7309,34 +10737,93 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
   // Modal "+ adicionar paciente" (convite) e modal de detalhe da paciente
   const [inviteOpen, setInviteOpen] = useState(false);
   const [selected, setSelected] = useState<LinkedPatient | null>(null);
+  /* O que ele digitou na busca. A régua (acento, ordem das palavras, termo
+     vazio) mora em `busca-paciente`, testada — aqui fica só o campo. */
+  const [busca, setBusca] = useState("");
+
+  /* A fila mandou abrir uma paciente. Espera a lista carregar — o efeito roda
+     de novo quando `patients` chega, então o item clicado durante o
+     carregamento não se perde. */
+  useEffect(() => {
+    if (!abrirPacienteId || patients.length === 0) return;
+    const alvo = patients.find((x) => x.id === abrirPacienteId);
+    if (alvo) {
+      setSelected(alvo);
+      onAbriu?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirPacienteId, patients]);
+
+  /* "Não consegui ler" não pode ter a cara de "você não tem paciente". */
+  const [falhouLista, setFalhouLista] = useState(false);
 
   async function loadPatients() {
     const tk = await tokenFn();
     const res = await listMyPatients({ data: { accessToken: tk } });
-    if (res.ok) setPatients(res.patients);
+    if (res.ok) {
+      setPatients(res.patients);
+      setFalhouLista(false);
+    } else {
+      /* NÃO chama `setPatients([])`: apagar a lista que já está na tela por
+         causa de uma leitura que falhou é a mesma mentira, só que destruindo
+         dado bom. Mantém o que havia e avisa. */
+      setFalhouLista(true);
+    }
   }
 
   // Ativa/desativa o premium do quiz (após o PIX, o médico libera aqui)
-  const [premiumBusyId, setPremiumBusyId] = useState<string | null>(null);
-  async function togglePremium(p: LinkedPatient) {
-    setPremiumBusyId(p.id);
+  const [encerrandoId, setEncerrandoId] = useState<string | null>(null);
+  const [confirmarEncerrar, setConfirmarEncerrar] = useState<string | null>(null);
+  const armado = useRef<number | null>(null);
+  const armadoEm = useRef(0);
+  useEffect(() => () => void (armado.current && clearTimeout(armado.current)), []);
+
+  /* Encerrar o acompanhamento. Dois toques: o primeiro arma, o segundo executa,
+     e a confirmação some sozinha em 4s para não ficar armada esperando um toque
+     errado depois. */
+  async function encerrar(p: LinkedPatient) {
+    if (confirmarEncerrar !== p.id) {
+      setConfirmarEncerrar(p.id);
+      /* Marca do instante do armamento: um duplo toque — reflexo quando o
+         primeiro parece não responder — armava e confirmava no mesmo gesto,
+         desfazendo um vínculo real sem que o médico tivesse lido a palavra
+         "Confirmar?". Ele não consegue reverter sozinho: só a paciente pode
+         religar. Meio segundo de carência resolve. */
+      armadoEm.current = Date.now();
+      /* Guardado para poder ser cancelado: trocar de aba dentro dos 4 s
+         desmonta a seção e o timer disparava `setState` no vazio. */
+      if (armado.current) clearTimeout(armado.current);
+      armado.current = setTimeout(
+        () => setConfirmarEncerrar((c) => (c === p.id ? null : c)),
+        4000,
+      ) as unknown as number;
+      return;
+    }
+    if (Date.now() - armadoEm.current < 500) return;
+    setConfirmarEncerrar(null);
+    setEncerrandoId(p.id);
     try {
-      const tk = await tokenFn();
-      const res = await setPatientQuizPremium({
-        data: { accessToken: tk, patientId: p.id, premium: !p.quiz_premium },
+      const r = await encerrarAcompanhamento({
+        data: { accessToken: await tokenFn(), pacienteId: p.id },
       });
-      if (!res.ok) {
-        toast.error(res.error ?? "Não foi possível alterar o premium.");
+      if (!r.ok) {
+        /* `ok:false` também sai quando o UPDATE não achou linha — ou seja,
+           quando a paciente JÁ não é mais dele (segunda aba, retry depois de
+           timeout com a escrita aplicada). Dizer "não foi possível" para uma
+           ação que já deu certo faz o médico tentar de novo sem parar. Por isso
+           a lista é recarregada antes de acusar falha. */
+        await loadPatients();
+        toast.error("Não foi possível encerrar agora — confira a lista.");
         return;
       }
-      setPatients((ps) =>
-        ps.map((x) => (x.id === p.id ? { ...x, quiz_premium: !p.quiz_premium } : x)),
+      setPatients((ps) => ps.filter((x) => x.id !== p.id));
+      toast.success(
+        `Acompanhamento de ${(p.display_name ?? "").split(" ")[0] || "a paciente"} encerrado. A vaga do seu plano voltou.`,
       );
-      toast.success(!p.quiz_premium ? "Aulas premium ativadas ⭐" : "Premium desativado.");
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
-      setPremiumBusyId(null);
+      setEncerrandoId(null);
     }
   }
 
@@ -7350,6 +10837,16 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         ]);
         if (reqRes.ok) setRequests(reqRes.requests);
         if (patRes.ok) setPatients(patRes.patients);
+        /* As duas listas compartilham a faixa: as duas vêm da mesma tela e o
+           médico precisa saber que o que ele está vendo pode estar incompleto,
+           venha a falha de qual das duas vier. */
+        setFalhouLista(!reqRes.ok || !patRes.ok);
+      } catch {
+        /* Havia `try/finally` SEM `catch`: `token()` devolve string vazia com a
+           sessão expirada, o validador exige `min(10)`, a chamada é rejeitada —
+           e a rejeição subia sem ninguém tratar. A tela saía do "carregando"
+           por causa do `finally` e ficava vazia, calada, para sempre. */
+        setFalhouLista(true);
       } finally {
         setLoading(false);
       }
@@ -7365,15 +10862,16 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         data: { accessToken: tk, requestId: req.id, accept },
       });
       if (!res.ok) {
-        toast.error(
-          "reason" in res && res.reason === "limit"
-            ? `Limite do plano ${res.plan} atingido (${res.limit} pacientes). Faça upgrade em Meu Perfil para aceitar mais pacientes.`
-            : "Não foi possível responder à solicitação. Tente novamente.",
-        );
+        /* O ramo `reason === "limit"` saiu junto com o teto de pacientes:
+           `maxPatients` é `null` em todos os planos, o servidor não devolve
+           mais esse motivo, e a frase mandava o médico "fazer upgrade para
+           aceitar mais pacientes" — um upgrade que não existe. */
+        toast.error("Não foi possível responder à solicitação. Tente novamente.");
         return;
       }
       // Remove o card otimisticamente e, ao aceitar, atualiza as pacientes.
       setRequests((rs) => rs.filter((r) => r.id !== req.id));
+      onVinculoRespondido?.();
       if (accept) {
         toast.success("Paciente vinculada ✓");
         await loadPatients();
@@ -7396,8 +10894,214 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         })
       : null;
 
+  /* A busca filtra a GRADE e a lista de baixo pelo mesmo recorte — duas
+     respostas diferentes para o mesmo termo na mesma tela seria pior que não
+     ter busca. */
+  const visiveis = filtrarPacientes(patients, busca);
+  const preFormsPendentes = new Set(
+    preForms.filter((f) => !f.seen_by_doctor).map((f) => f.user_id),
+  );
+
   return (
     <div className="space-y-8">
+      {/* ─── A GRADE VEM PRIMEIRO ─────────────────────────────────────────
+          As solicitações pendentes abriam a aba. Faz sentido no dia em que
+          existe uma — e nos outros trezentos e sessenta o médico via um quadro
+          de "📭 Nenhuma solicitação pendente" ocupando a primeira dobra antes
+          de chegar nas pacientes dele, que é o motivo de ele abrir esta aba.
+          Elas continuam logo abaixo, com o contador na fita chamando quando há
+          alguma. Pedido do dono: "puxei ele como o primeiro elemento a aparecer
+          na aba das pacientes". */}
+      {/* Minhas pacientes */}
+      <div>
+        <div className="flex items-center gap-2">
+          <h2 className="font-serif text-xl">Minhas pacientes</h2>
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            {patients.length}
+          </span>
+        </div>
+
+        {/* ─── LEITURA QUE FALHOU NÃO É CONSULTÓRIO VAZIO ────────────────────
+            A cascata de selects de `listMyPatients` saía com `rows = null` num
+            erro real e a tela dizia "Você ainda não tem pacientes vinculadas" —
+            com um botão convidando a adicionar a primeira. Para um médico com
+            duzentas, isso não parece um erro: parece que o produto perdeu tudo. */}
+        {falhouLista && (
+          <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/70 px-4 py-3 text-[12px] leading-snug text-amber-900">
+            📡 Não consegui carregar a sua lista de pacientes agora. Isto <strong>não</strong> quer
+            dizer que ela está vazia — atualize a página antes de concluir qualquer coisa a partir
+            desta tela.
+          </p>
+        )}
+
+        {patients.length === 0 && !falhouLista ? (
+          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
+            <p className="text-3xl">👩‍🍼</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
+              encontrem você e enviem uma solicitação.
+            </p>
+            <button
+              onClick={() => setInviteOpen(true)}
+              className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
+            >
+              + Adicionar paciente
+            </button>
+          </div>
+        ) : (
+          <>
+            {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
+                do bebê cresce com a semana — identificação visual rápida.
+                2 por linha no celular, 4 no computador. Toque abre o detalhe
+                com a conversa dela com a IA. O último quadro é o "+". */}
+            <p className="mt-3 text-xs text-muted-foreground">
+              Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
+              Toque para ver os detalhes, pedir exame, marcar consulta e receitar.
+            </p>
+
+            {/* ─── A BUSCA ────────────────────────────────────────────────
+                O quadro do bebê é ótimo para RECONHECER e péssimo para
+                PROCURAR: com duzentas pacientes são duzentos quadros do mesmo
+                tamanho, e achar a Fernanda vira rolagem.
+                Só aparece a partir de oito: abaixo disso a lista inteira cabe
+                na tela, e um campo de busca ali é um controle que não serve
+                para nada ocupando a primeira dobra. */}
+            {patients.length >= 8 && (
+              <div className="relative mt-3">
+                <input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar paciente pelo nome…"
+                  aria-label="Buscar paciente pelo nome"
+                  className="w-full rounded-full border border-border bg-background py-2.5 pl-10 pr-9 text-sm outline-none focus:border-primary/60"
+                />
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  🔎
+                </span>
+                {busca && (
+                  <button
+                    onClick={() => setBusca("")}
+                    aria-label="Limpar busca"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground hover:text-primary"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* ─── TRÊS POR LINHA, E MAIORES ──────────────────────────────
+                Eram quatro por linha no computador e dois no celular. Pedido do
+                dono: três por linha, com cada quadro maior.
+                No celular ficam DOIS, e isso não é desobediência: três colunas
+                em 390px dão 115px por quadro — menores, e o pedido era
+                justamente que aumentassem. Três é o desenho da tela em que ele
+                estava olhando. */}
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {visiveis.map((p) => (
+                <PatientMirrorCard
+                  key={p.id}
+                  p={p}
+                  onOpen={() => setSelected(p)}
+                  temPreConsultaNova={preFormsPendentes?.has(p.id) ?? false}
+                />
+              ))}
+              {/* "+" — adicionar paciente (convite). Some enquanto ele está
+                  buscando: entre resultados de uma busca, um quadro de
+                  "adicionar" é a única coisa que NÃO é resultado dela. */}
+              <button
+                hidden={busca.trim().length > 0}
+                onClick={() => setInviteOpen(true)}
+                className="flex aspect-[4/3] flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
+              >
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
+                  +
+                </span>
+                <span className="px-2 text-center text-xs font-semibold">Adicionar paciente</span>
+              </button>
+            </div>
+
+            {/* Nenhum resultado NÃO é "você não tem pacientes". Sem esta
+                frase, buscar por um nome errado devolve a mesma tela vazia do
+                consultório sem ninguém — e o botão de limpar é o caminho de
+                volta. */}
+            {visiveis.length === 0 && busca.trim() && (
+              <div className="mt-4 rounded-2xl border border-border bg-card p-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma paciente com “{busca.trim()}” entre as suas {patients.length}.
+                </p>
+                <button
+                  onClick={() => setBusca("")}
+                  className="mt-3 rounded-full border border-border px-4 py-1.5 text-xs font-medium hover:border-primary/50"
+                >
+                  Limpar busca
+                </button>
+              </div>
+            )}
+
+            <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
+              <ul className="divide-y divide-border">
+                {visiveis.map((p) => {
+                  const due = fmtDate(p.due_date);
+                  return (
+                    <li
+                      key={p.id}
+                      className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-5 py-4"
+                    >
+                      {/* LINHA INTEIRA no celular, e isto não é preferência de
+                          layout. `flex-1` é `flex: 1 1 0%` — base zero —, então
+                          o bloco do nome nunca provoca quebra: ele é esmagado
+                          até sumir e só depois um botão desce. Medido: com três
+                          controles ao lado, o nome ficava com 0 px a 360 e 390.
+                          O médico escolhia qual vínculo encerrar — ação que só
+                          a paciente pode desfazer — olhando para uma inicial e
+                          uma data. */}
+                      <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                          {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium">
+                            {p.display_name ?? "Sem nome"}
+                          </p>
+                          {due && (
+                            <p className="truncate whitespace-nowrap text-xs text-muted-foreground">
+                              DPP {due}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {/* BPM fetal da consulta → "Sentir o coração" da família */}
+                      <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
+                      {/* Encerrar acompanhamento. Confirmação em DOIS toques e
+                          não um `confirm()` do navegador: o segundo toque é o
+                          mesmo botão dizendo o que vai acontecer, o que é mais
+                          claro no celular e não pode ser dispensado por engano. */}
+                      <button
+                        onClick={() => encerrar(p)}
+                        disabled={encerrandoId === p.id}
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                          confirmarEncerrar === p.id
+                            ? "bg-rose-600 text-white"
+                            : "border border-border text-muted-foreground hover:border-rose-400 hover:text-rose-600"
+                        }`}
+                        title="Encerrar o acompanhamento desta paciente"
+                      >
+                        {encerrandoId === p.id
+                          ? "…"
+                          : confirmarEncerrar === p.id
+                            ? "Confirmar?"
+                            : "Encerrar"}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Solicitações pendentes */}
       <div>
         <div className="flex items-center gap-2">
@@ -7467,126 +11171,61 @@ function PacientesSection({ tokenFn }: { tokenFn: () => Promise<string> }) {
         )}
       </div>
 
-      {/* Minhas pacientes */}
-      <div>
-        <div className="flex items-center gap-2">
-          <h2 className="font-serif text-xl">Minhas pacientes</h2>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-            {patients.length}
-          </span>
-        </div>
-
-        {patients.length === 0 ? (
-          <div className="mt-4 rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-            <p className="text-3xl">👩‍🍼</p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Você ainda não tem pacientes vinculadas. Compartilhe seu perfil para que elas
-              encontrem você e enviem uma solicitação.
-            </p>
-            <button
-              onClick={() => setInviteOpen(true)}
-              className="mt-4 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground"
-            >
-              + Adicionar paciente
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Espelho: cada paciente pelo bebê que ela vê no app. O tamanho
-                do bebê cresce com a semana — identificação visual rápida.
-                2 por linha no celular, 4 no computador. Toque abre o detalhe
-                com a conversa dela com a IA. O último quadro é o "+". */}
-            <p className="mt-3 text-xs text-muted-foreground">
-              Cada quadro é o espelho da tela do bebê da paciente — o bebê cresce com a semana.
-              Toque para ver os detalhes e a conversa com a IA.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {patients.map((p) => (
-                <PatientMirrorCard key={p.id} p={p} onOpen={() => setSelected(p)} />
-              ))}
-              {/* "+" — adicionar paciente (convite) */}
-              <button
-                onClick={() => setInviteOpen(true)}
-                className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-primary/40 bg-primary/5 text-primary transition-colors hover:border-primary hover:bg-primary/10"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/15 text-3xl font-light leading-none">
-                  +
-                </span>
-                <span className="px-2 text-center text-xs font-semibold">Adicionar paciente</span>
-              </button>
-            </div>
-
-            <div className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-[var(--shadow-card)]">
-              <ul className="divide-y divide-border">
-                {patients.map((p) => {
-                  const due = fmtDate(p.due_date);
-                  return (
-                    <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-4">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                          {(p.display_name?.trim().charAt(0) || "?").toUpperCase()}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {p.display_name ?? "Sem nome"}
-                          </p>
-                          {due && <p className="text-xs text-muted-foreground">DPP {due}</p>}
-                        </div>
-                      </div>
-                      {/* BPM fetal da consulta → "Sentir o coração" da família */}
-                      <FetalBpmChip p={p} tokenFn={tokenFn} onSaved={loadPatients} />
-                      {/* Premium do quiz: liberar após confirmar o PIX da paciente */}
-                      <button
-                        onClick={() => togglePremium(p)}
-                        disabled={premiumBusyId === p.id}
-                        title={
-                          p.quiz_premium
-                            ? "Aulas premium ativas — clique para desativar"
-                            : "Ativar aulas premium (após confirmar o PIX)"
-                        }
-                        className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold transition disabled:opacity-50 ${
-                          p.quiz_premium
-                            ? "bg-amber-100 text-amber-700"
-                            : "border border-border text-muted-foreground hover:border-amber-400 hover:text-amber-600"
-                        }`}
-                      >
-                        {premiumBusyId === p.id ? "…" : p.quiz_premium ? "⭐ Premium" : "☆ Premium"}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          </>
-        )}
-      </div>
-
       {/* Modais: convite de paciente e detalhe (dados + conversa com a IA) */}
       {inviteOpen && <InvitePatientModal tokenFn={tokenFn} onClose={() => setInviteOpen(false)} />}
       {selected && (
-        <PatientDetailModal p={selected} tokenFn={tokenFn} onClose={() => setSelected(null)} />
+        <PatientDetailModal
+          p={selected}
+          tokenFn={tokenFn}
+          onClose={() => setSelected(null)}
+          onDesfechoRegistrado={onDesfechoRegistrado}
+          onIrParaAgenda={onIrParaAgenda}
+          preForms={preForms}
+          onMarkSeenPreConsulta={onMarkSeenPreConsulta}
+        />
       )}
     </div>
   );
 }
 
 /**
- * Espelho da tela do bebê da paciente (mini). Mesmo céu dia/noite do app e o
- * bebê no tamanho da semana dela — o médico reconhece a paciente pelo bebê.
+ * Espelho da tela do bebê da paciente. Mesmo céu dia/noite do app e o bebê no
+ * tamanho da semana dela — o médico reconhece a paciente pelo bebê.
+ *
+ * ─── O RODAPÉ SAIU DE CIMA DO CÉU (ago/2026) ────────────────────────────────
+ * Nome branco sobre o gradiente é bonito e ilegível em metade dos céus — e era
+ * a ÚNICA informação nítida do quadro, com o resto reduzido a um selinho de
+ * semanas. Agora nome da paciente e nome do bebê vivem fora da imagem, em
+ * texto normal do cartão: legíveis em qualquer hora do dia, sem depender de
+ * contraste contra um fundo que muda.
  */
-function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => void }) {
+function PatientMirrorCard({
+  p,
+  onOpen,
+  temPreConsultaNova = false,
+}: {
+  p: LinkedPatient;
+  onOpen?: () => void;
+  temPreConsultaNova?: boolean;
+}) {
   const period = periodFor(new Date().getHours());
   const dark = period === "madrugada" || period === "noite";
   const weeks = p.weeks ?? null;
+  const idade = weeks != null ? `${weeks}s${p.days ?? 0}d` : null;
   return (
     <button
       onClick={onOpen}
-      className="overflow-hidden rounded-2xl border border-border text-left shadow-[var(--shadow-card)] transition-transform duration-200 hover:-translate-y-0.5 active:scale-[0.98]"
+      className="group overflow-hidden rounded-2xl border border-border bg-card text-left shadow-[var(--shadow-card)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.98]"
     >
       <div
-        className="relative flex aspect-square items-center justify-center"
+        className="relative flex aspect-[4/3] items-center justify-center"
         style={{ background: gradientFor(period, 1) }}
       >
+        {temPreConsultaNova && (
+          <span className="absolute right-2 top-2 rounded-full bg-primary px-2 py-0.5 text-[10px] font-bold text-primary-foreground shadow-sm">
+            Pré-consulta nova
+          </span>
+        )}
         {weeks ? (
           <>
             <BabyIllustration
@@ -7594,14 +11233,14 @@ function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => voi
               tone={p.baby_skin_tone ?? 0}
               showSac={false}
               showInfo={false}
-              className="h-[70%] w-[70%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)]"
+              className="h-[74%] w-[74%] drop-shadow-[0_8px_20px_rgba(0,0,0,0.18)] transition-transform duration-300 group-hover:scale-105"
             />
             <span
-              className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                dark ? "bg-white/15 text-white/90" : "bg-white/70 text-foreground"
+              className={`absolute left-2 top-2 rounded-full px-2.5 py-1 text-[11px] font-bold tabular-nums backdrop-blur-sm ${
+                dark ? "bg-white/15 text-white/90" : "bg-white/75 text-foreground"
               }`}
             >
-              {weeks} sem
+              {idade}
             </span>
           </>
         ) : (
@@ -7611,12 +11250,12 @@ function PatientMirrorCard({ p, onOpen }: { p: LinkedPatient; onOpen?: () => voi
             Sem data de gestação
           </span>
         )}
-        {/* Nome sobre um véu escuro na base — legível em qualquer céu */}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/50 to-transparent px-2.5 py-2">
-          <p className="truncate text-[11px] font-semibold text-white">
-            {p.display_name ?? "Paciente"}
-          </p>
-        </div>
+      </div>
+      <div className="space-y-0.5 px-3 py-2.5">
+        <p className="truncate text-sm font-semibold text-foreground">
+          {p.display_name ?? "Paciente"}
+        </p>
+        {p.baby_name && <p className="truncate text-xs text-muted-foreground">{p.baby_name}</p>}
       </div>
     </button>
   );
@@ -7634,7 +11273,11 @@ function InvitePatientModal({
   tokenFn: () => Promise<string>;
   onClose: () => void;
 }) {
-  const [doctorName, setDoctorName] = useState<string>(DOCTOR.name);
+  const [doctorName, setDoctorName] =
+    /* Começa vazio: mostrar o nome do dono da instalação por meio segundo faz o
+     médico copiar uma mensagem assinada por outra pessoa — os botões de copiar
+     e de WhatsApp já estão vivos no primeiro quadro. */
+    useState<string>("");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -7720,30 +11363,344 @@ function InvitePatientModal({
  * CONVERSA dela com a IA (somente leitura) — o mesmo acesso individual da aba
  * Cérebro, agora a um toque do quadro dela.
  */
+/**
+ * O QUE O MÉDICO FAZ COM ESTA PACIENTE — dentro da ficha dela.
+ *
+ * ─── O QUE ISTO SUBSTITUI ───────────────────────────────────────────────────
+ *
+ * Receituário e solicitação de exame moravam numa aba "Ferramentas", separada
+ * das pacientes. O caminho era: abrir Ferramentas, escolher o modelo, e então
+ * procurar a paciente numa lista de duzentos nomes — depois de já ter estado na
+ * ficha dela. Escolher a paciente DUAS vezes, no fim do fluxo, é onde se erra a
+ * paciente; e o erro aqui é uma receita no celular de quem não devia recebê-la.
+ *
+ * Pedido do dono (ago/2026): "quando clicar na paciente vai abrir a solicitação
+ * de exame, a solicitação de consulta e o receituário rápido, com as opções que
+ * a plataforma já dá de dica, e ele edita da maneira que quiser".
+ *
+ * ─── AS DUAS COISAS QUE NÃO PODEM SUMIR ─────────────────────────────────────
+ *
+ * **O texto continua editável.** O modelo é ponto de partida, não prescrição
+ * pronta: dose, via e duração mudam com a paciente. Campo travado faria ele
+ * copiar para outro lugar, editar lá, e o registro voltaria a não existir — que
+ * é o defeito que `EnviarParaPaciente` nasceu para consertar.
+ *
+ * **A confirmação continua.** Os modelos são escritos para o médico ("Opção 1 /
+ * Opção 2", faixas de dose); lidos por uma gestante como instrução de casa,
+ * isso é auto-medicação. A tela de conferência é a mesma de antes.
+ */
+function AcoesDaPaciente({
+  p,
+  tokenFn,
+  onIrParaAgenda,
+}: {
+  p: LinkedPatient;
+  tokenFn: () => Promise<string>;
+  /**
+   * O atalho para o Calendário. "Pedir consulta" manda um convite — quem
+   * escolhe o horário continua sendo SÓ a paciente, no Agendamento dela; o
+   * médico não marca por aqui. O atalho é só para ele ACOMPANHAR: pular
+   * direto para onde o pedido dela vai aparecer quando ela responder, em vez
+   * de sair da ficha e procurar a aba Calendário sozinho.
+   */
+  onIrParaAgenda?: () => void;
+}) {
+  const [escolhendo, setEscolhendo] = useState<"exame" | "prescricao" | null>(null);
+  const [envio, setEnvio] = useState<{
+    tipo: TipoDeEmissao;
+    titulo: string;
+    conteudo: string;
+  } | null>(null);
+
+  /* A DICA. O painel do trimestre em que ela está aparece marcado; nas semanas
+     entre as faixas não há sugestão nenhuma, de propósito — ver
+     `exame-sugerido`. */
+  const sugerido = exameSugerido(EXAM_PANELS, p.weeks);
+
+  const primeiroNome = (p.display_name ?? "").trim().split(/\s+/)[0] || "";
+
+  function pedirConsulta() {
+    setEnvio({
+      tipo: "orientacao",
+      titulo: "Pedido de consulta",
+      /* Editável como todo o resto. Sai do jeito que ele mandaria no WhatsApp,
+         com o nome dela e a semana já preenchidos — o que ele teria de digitar
+         de novo em cada uma das duzentas. */
+      conteudo:
+        `${primeiroNome ? `${primeiroNome}, ` : ""}gostaria de te ver em consulta` +
+        `${p.weeks != null ? ` — você está com ${p.weeks} semanas` : ""}.\n\n` +
+        `Abra o aplicativo em Agendamento e escolha o horário que funcionar para você. ` +
+        `Se preferir, me responda por aqui com os dias em que consegue vir.`,
+    });
+  }
+
+  const MODELOS =
+    escolhendo === "prescricao"
+      ? PRESCRIPTIONS.map((rx, i) => ({ i, titulo: rx.title, icone: rx.icon, texto: rx.text }))
+      : EXAM_PANELS.map((ex, i) => ({
+          i,
+          titulo: ex.title,
+          icone: ex.icon,
+          texto: ex.exams.join("\n"),
+        }));
+
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setEscolhendo("exame")}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          🔬 Pedir exame
+        </button>
+        <button
+          onClick={() => setEscolhendo("prescricao")}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          💊 Receituário
+        </button>
+        <button
+          onClick={pedirConsulta}
+          className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+        >
+          📅 Pedir consulta
+        </button>
+        {onIrParaAgenda && (
+          <button
+            onClick={onIrParaAgenda}
+            className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold text-muted-foreground hover:border-primary/50 hover:text-primary"
+            title="Ir para o Calendário — é lá que o pedido dela aparece quando ela escolher o horário"
+          >
+            🗓️ Ver na Agenda
+          </button>
+        )}
+      </div>
+
+      {/* ── Escolher o modelo ── */}
+      {escolhendo && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 p-0 sm:items-center sm:p-4"
+          onClick={() => setEscolhendo(null)}
+        >
+          <div
+            className="flex max-h-[80svh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-card shadow-xl sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground">
+                  {escolhendo === "prescricao" ? "Receituário rápido" : "Solicitação de exames"}
+                </p>
+                <p className="truncate font-serif text-lg">
+                  {p.display_name?.trim() || "Paciente"}
+                </p>
+              </div>
+              <button
+                onClick={() => setEscolhendo(null)}
+                className="shrink-0 text-sm text-muted-foreground"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3">
+              {MODELOS.map((m) => {
+                const ehSugerido = escolhendo === "exame" && m.i === sugerido;
+                return (
+                  <button
+                    key={m.i}
+                    onClick={() => {
+                      setEnvio({
+                        tipo: escolhendo === "prescricao" ? "prescricao" : "exame",
+                        titulo: m.titulo,
+                        conteudo: m.texto,
+                      });
+                      setEscolhendo(null);
+                    }}
+                    className={`mb-2 flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors ${
+                      ehSugerido
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40"
+                    }`}
+                  >
+                    <span className="text-xl">{m.icone}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{m.titulo}</span>
+                      {ehSugerido && (
+                        <span className="text-[11px] font-semibold text-primary">
+                          Sugerido para {p.weeks} semanas
+                        </span>
+                      )}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">›</span>
+                  </button>
+                );
+              })}
+              <p className="px-1 pb-1 pt-2 text-[11px] leading-snug text-muted-foreground">
+                ⚕️ Modelos baseados nos protocolos FEBRASGO/SBD/SBH 2022–2024. O texto abre editável
+                — ajuste ao quadro dela antes de enviar.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Editar e enviar. A paciente já vai escolhida: ele está na ficha
+             dela, e escolher de novo numa lista é onde se erra a pessoa. ── */}
+      {envio && (
+        <EnviarParaPaciente
+          tipo={envio.tipo}
+          titulo={envio.titulo}
+          conteudoInicial={envio.conteudo}
+          tokenFn={tokenFn}
+          paciente={p}
+          onFechar={() => setEnvio(null)}
+        />
+      )}
+    </>
+  );
+}
+
 function PatientDetailModal({
   p,
   tokenFn,
   onClose,
+  onDesfechoRegistrado,
+  onIrParaAgenda,
+  preForms = [],
+  onMarkSeenPreConsulta,
 }: {
   p: LinkedPatient;
   tokenFn: () => Promise<string>;
   onClose: () => void;
+  /** Sobe o desfecho para a fila de trabalho do painel. Ver PacientesSection. */
+  onDesfechoRegistrado?: (fonte: string, fonteId: string) => void;
+  /** Ver `AcoesDaPaciente`. Fecha a ficha antes de trocar de aba. */
+  onIrParaAgenda?: () => void;
+  /** Todas as pré-consultas do médico — aqui só a dela é usada. Ver `PreConsultaCard`. */
+  preForms?: AdminPreConsulta[];
+  onMarkSeenPreConsulta?: (id: string) => void;
 }) {
   const [messages, setMessages] = useState<BrainChatMessage[] | null>(null);
+  /* A ficha clínica dela. O espelho do bebê já estava aqui, mas a aba
+     "Pacientes" era justamente a que tinha MENOS dado clínico do painel: peso,
+     pressão, glicemia, diário e chutes só apareciam em Pré-consultas e
+     Engajamento, dois lugares que o médico não abre para olhar uma paciente
+     específica. Quem clica numa paciente quer a paciente inteira. */
+  const [ficha, setFicha] = useState<any | null>(null);
+  const [sosDela, setSosDela] = useState<AcionamentoSos[]>([]);
+  /* O PRONTUÁRIO. Vem do fluxo unificado de eventos clínicos, que enxerga onze
+     fontes — contra as seis que o relatório antigo lia, e sem a janela de
+     catorze dias que fazia uma medida de vinte dias atrás aparecer como "—",
+     indistinguível de "ela nunca registrou". */
+  const [prontuario, setProntuario] = useState<EventoClinico[]>([]);
+  const [fichaClin, setFichaClin] = useState<FichaClinica | null>(null);
+  const [carregandoProntuario, setCarregandoProntuario] = useState(true);
+  const [prontuarioIncompleto, setProntuarioIncompleto] = useState(false);
+  const [registrandoDesfecho, setRegistrandoDesfecho] = useState<string | null>(null);
+  const [consultasDela, setConsultasDela] = useState<Consulta[]>([]);
+  /* ─── AS TRÊS ABAS DO CARTÃO ────────────────────────────────────────────
+     Abrir uma paciente entregava uma rolagem de ~440 linhas — bebê, ações,
+     prontuário de cinco seções, chips, emergências, ficha e a conversa com a
+     IA — sempre na mesma ordem. Quem abre às 13h50 para decidir uma conduta
+     rolava por cima de meses de história para chegar no que aconteceu esta
+     semana. A régua (o que vai em cada aba, e o contador) mora em
+     `abas-da-paciente`, testada. */
+  const [abaDaFicha, setAbaDaFicha] = useState<AbaDaPaciente>(ABA_INICIAL_DA_PACIENTE);
+  /* A folha para levar — encaminhamento, segunda opinião, internação de
+     madrugada. Nesses momentos o sistema não está com ele: está o papel. */
+  const [folhaAberta, setFolhaAberta] = useState(false);
+  /* Modo consulta: a tela dos quinze minutos com ela na frente. */
+  const [emConsulta, setEmConsulta] = useState(false);
 
   useEffect(() => {
     (async () => {
+      const tk = await tokenFn();
       try {
-        const res = await getBrainConversation({
-          data: { accessToken: await tokenFn(), patientId: p.id },
-        });
+        const res = await getBrainConversation({ data: { accessToken: tk, patientId: p.id } });
         setMessages(res.ok ? res.messages : []);
       } catch {
         setMessages([]);
       }
+      try {
+        const rep = await getPatientReport({ data: { accessToken: tk, userId: p.id } });
+        setFicha(rep.ok ? rep : null);
+      } catch {
+        setFicha(null);
+      }
+      /* Acionamentos de SOS dela. Fica na ficha e não numa aba separada porque
+         é dado clínico: quantas vezes ela acionou, por quê e quando, ao lado do
+         peso e da pressão. Numa gestação de alto risco isso é prontuário. */
+      try {
+        const so = await acionamentosDaPaciente({ data: { accessToken: tk, pacienteId: p.id } });
+        setSosDela(so.ok ? so.acionamentos : []);
+      } catch {
+        setSosDela([]);
+      }
+      try {
+        const [pr, fc, cs] = await Promise.all([
+          prontuarioDaPaciente({ data: { accessToken: tk, pacienteId: p.id } }),
+          fichaClinica({ data: { accessToken: tk, pacienteId: p.id } }),
+          consultasDaPaciente({ data: { accessToken: tk, pacienteId: p.id } }),
+        ]);
+        setProntuario(pr.ok ? pr.eventos : []);
+        setProntuarioIncompleto(!pr.ok || pr.incompleto);
+        setFichaClin(fc.ok ? fc.ficha : null);
+        setConsultasDela(cs.ok ? cs.consultas : []);
+      } catch {
+        setProntuarioIncompleto(true);
+      } finally {
+        setCarregandoProntuario(false);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.id]);
+
+  /* Último de cada medida. O médico não quer a série inteira num modal — quer
+     o valor mais recente e a data, que é o que ele olharia na consulta.
+     
+     `health_logs` guarda uma LINHA POR DIA com várias medidas (peso, sistólica,
+     diastólica, glicemia), e cada uma pode estar vazia naquele dia. Então o
+     "último peso" não é a última linha: é a última linha em que o peso foi
+     preenchido. Procurar na linha mais recente daria "—" para quem mediu a
+     pressão hoje e o peso ontem. */
+  const ultimoOnde = (tem: (l: any) => boolean, ler: (l: any) => string) => {
+    const l = (ficha?.healthLogs ?? []).find((x: any) => tem(x));
+    return l ? { valor: ler(l), quando: l.log_date ?? l.created_at } : null;
+  };
+  const medidas = [
+    {
+      rot: "Peso",
+      v: ultimoOnde(
+        (l) => l.weight_kg != null,
+        (l) => `${l.weight_kg} kg`,
+      ),
+    },
+    {
+      rot: "Pressão",
+      v: ultimoOnde(
+        (l) => l.systolic != null && l.diastolic != null,
+        (l) => {
+          /* A marca vem da MESMA regra que a aba de Engajamento usa. Duas
+             faixas diferentes na mesma tela ensinariam o médico a ignorar a
+             cor — que é o pior desfecho possível para um alerta. */
+          const sn = sinalPressao(l.systolic, l.diastolic);
+          const m = sn?.gravidade === "grave" ? "🔴 " : sn?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${m}${l.systolic}/${l.diastolic}`;
+        },
+      ),
+    },
+    {
+      rot: "Glicemia",
+      v: ultimoOnde(
+        (l) => l.glucose_mg_dl != null,
+        (l) => {
+          const sn = sinalGlicemia(l.glucose_mg_dl);
+          const m = sn?.gravidade === "grave" ? "🔴 " : sn?.gravidade === "atencao" ? "⚠️ " : "";
+          return `${m}${l.glucose_mg_dl}`;
+        },
+      ),
+    },
+  ];
 
   const period = periodFor(new Date().getHours());
   const weeks = p.weeks ?? null;
@@ -7753,19 +11710,30 @@ function PatientDetailModal({
         month: "long",
       })
     : null;
+  /* A pré-consulta DELA, se houver — ver `PreConsultaCard`. */
+  const preConsulta = preForms.find((f) => f.user_id === p.id) ?? null;
 
+  /* ─── QUASE A TELA INTEIRA (ago/2026) ───────────────────────────────────
+     Era um modal de 3xl centralizado — quem abre uma paciente para decidir
+     conduta via um quadradinho no meio da tela, com o resto do painel escuro
+     ao redor. Pedido do dono: "eu quero uma tela que ocupe basicamente a tela
+     inteira do computador". No celular já não havia margem a devolver: some
+     o padding e o cantinho arredondado, e ela ocupa o viewport igual a uma
+     página própria — só a "✕" no canto para voltar. */
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-stretch justify-center bg-black/50 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="flex max-h-[88svh] w-full max-w-lg flex-col overflow-hidden rounded-3xl bg-card shadow-xl"
+        className="flex h-[100dvh] w-full flex-col overflow-hidden bg-card shadow-xl sm:h-[95svh] sm:w-[95vw] sm:max-w-6xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Cabeçalho: espelho do céu + bebê da semana */}
+        {/* Cabeçalho: espelho do céu + bebê da semana.
+            Mais baixo do que era: ocupava metade da altura útil do modal, e
+            quem abre a ficha de uma paciente às 13h50 não veio ver o desenho. */}
         <div
-          className="relative flex h-40 shrink-0 items-center justify-center"
+          className="relative flex h-24 shrink-0 items-center justify-center"
           style={{ background: gradientFor(period, 1) }}
         >
           {weeks ? (
@@ -7790,75 +11758,423 @@ function PatientDetailModal({
           </div>
         </div>
 
-        {/* Dados rápidos */}
-        <div className="flex flex-wrap gap-2 px-4 pt-3">
-          {weeks != null && (
-            <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-              {weeks} semanas
-            </span>
-          )}
-          {due && (
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
-              DPP {due}
-            </span>
-          )}
-          {p.fetal_bpm != null && (
-            <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
-              💓 {p.fetal_bpm} bpm
-            </span>
-          )}
-          {p.quiz_premium && (
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-              ⭐ Premium
-            </span>
-          )}
+        {/* ─── O QUE ELE FAZ COM ELA ─────────────────────────────────────
+            Uma linha só, acima do prontuário: exame, receita e pedido de
+            consulta. Estavam numa aba separada que obrigava a escolher a
+            paciente de novo, no fim do fluxo, depois de já ter estado na ficha
+            dela. */}
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-4 py-2.5">
+          <AcoesDaPaciente
+            p={p}
+            tokenFn={tokenFn}
+            onIrParaAgenda={
+              onIrParaAgenda
+                ? () => {
+                    onClose();
+                    onIrParaAgenda();
+                  }
+                : undefined
+            }
+          />
+          <button
+            onClick={() => setFolhaAberta(true)}
+            className="press rounded-full border border-border bg-background px-3.5 py-1.5 text-xs font-semibold hover:border-primary/50"
+          >
+            📄 Folha para levar
+          </button>
+          {/* Em destaque: é a ação do momento em que ele mais usa esta tela. */}
+          <button
+            onClick={() => setEmConsulta(true)}
+            className="press rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground"
+          >
+            🩺 Modo consulta
+          </button>
         </div>
 
-        {/* Conversa com a IA (somente leitura) */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
-            💬 Conversa com a IA
-          </p>
-          {messages === null ? (
-            <div className="mt-2 space-y-2">
-              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
-              <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+        {/* ─── A FITA DA FICHA ──────────────────────────────────────────
+            O contador SOBE PARA A ABA, e essa é a parte que não pode se
+            perder: empurrar "registros fora de faixa sem desfecho" para dentro
+            de uma aba faria o número que leva o médico até lá sumir da tela — a
+            divisão que era para organizar passaria a esconder trabalho
+            clínico. É a mesma lição da fita principal do painel. */}
+        <div
+          role="tablist"
+          aria-label="Seções da paciente"
+          className="flex shrink-0 gap-1 border-b border-border px-4"
+        >
+          {ABAS_DA_PACIENTE.map((ab) => {
+            const n = contadorDaAba(ab, {
+              pendentes: prontuario.filter((e) => e.gravidade !== "normal" && !e.tratado_em).length,
+              sosAbertos: sosDela.filter((a) => !a.atendido_em).length,
+              preConsultaNova: !!preConsulta && !preConsulta.seen_by_doctor,
+            });
+            const ativo = ab === abaDaFicha;
+            return (
+              <button
+                key={ab}
+                role="tab"
+                aria-selected={ativo}
+                onClick={() => setAbaDaFicha(ab)}
+                className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+                  ativo
+                    ? "border-primary text-primary"
+                    : "border-transparent text-muted-foreground hover:text-primary"
+                }`}
+              >
+                {ab}
+                {n > 0 && (
+                  <span className="ml-1.5 rounded-full bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+                    {n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* O PRONTUÁRIO — primeiro, porque é o que ele veio ver. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+          {/* A pré-consulta dela vive em "Agora": é trabalho que precisa dele
+              HOJE, não histórico. Sai antes do prontuário — mesma lógica de
+              "o que pede olhar" — porque é frequentemente o motivo de ele ter
+              aberto esta ficha. */}
+          {abaDaFicha === "Agora" && preConsulta && (
+            <div className="mb-4">
+              <PreConsultaCard
+                form={preConsulta}
+                ficha={ficha}
+                onMarkSeen={onMarkSeenPreConsulta ?? (() => {})}
+              />
             </div>
-          ) : messages.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">
-              Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no banco).
-            </p>
-          ) : (
-            <div className="mt-2 space-y-2">
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                >
+          )}
+          <ProntuarioPaciente
+            secoes={SECOES_DA_ABA[abaDaFicha]}
+            ficha={fichaClin}
+            eventos={prontuario}
+            carregando={carregandoProntuario}
+            incompleto={prontuarioIncompleto}
+            registrando={registrandoDesfecho}
+            consultas={consultasDela}
+            aoRegistrarConsulta={
+              <RegistrarConsulta
+                pacienteId={p.id}
+                tokenFn={tokenFn}
+                /* O que ela registrou vira o rascunho do campo de achados —
+                   ele acabou de ler tudo isso na tela ao lado e digitaria de
+                   memória. Só o TEXTO: as medidas da consulta são as que ele
+                   afere. */
+                eventos={prontuario}
+                desdeAConsulta={consultasDela[0]?.occurred_at ?? null}
+                onSalvou={async () => {
+                  /* Recarrega só as consultas: o resto da ficha não mudou, e
+                     recarregar tudo faria a tela piscar inteira depois de uma
+                     ação pequena. */
+                  try {
+                    const cs = await consultasDaPaciente({
+                      data: { accessToken: await tokenFn(), pacienteId: p.id },
+                    });
+                    if (cs.ok) setConsultasDela(cs.consultas);
+                  } catch {
+                    /* fica com a lista anterior; o registro já foi salvo */
+                  }
+                }}
+              />
+            }
+            onRegistrarDesfecho={async (fonte, fonteId) => {
+              const chave = `${fonte}:${fonteId}`;
+              setRegistrandoDesfecho(chave);
+              try {
+                const r = await registrarDesfecho({
+                  data: { accessToken: await tokenFn(), fonte, fonteId, pacienteId: p.id },
+                });
+                if (!r.ok) throw new Error("recusado");
+                /* Some da lista de pendentes na hora, sem recarregar tudo: o
+                   `tratado_em` é o que a tela usa para filtrar. */
+                setProntuario((es) =>
+                  es.map((e) =>
+                    e.fonte === fonte && e.fonte_id === fonteId
+                      ? { ...e, tratado_em: new Date().toISOString() }
+                      : e,
+                  ),
+                );
+                /* E na fila do painel também: os dois estados mostram o MESMO
+                   evento, e atualizar só um deixava a tela se contradizendo. */
+                onDesfechoRegistrado?.(fonte, fonteId);
+              } catch {
+                toast.error("Não consegui registrar. Tente de novo.");
+              } finally {
+                setRegistrandoDesfecho(null);
+              }
+            }}
+          />
+
+          {/* Dados rápidos — semana, DPP, BPM. Ficam em "Agora" porque é o que
+              muda a leitura de qualquer número da tela: 135/88 em 22 semanas e
+              em 38 semanas são duas conversas diferentes. */}
+          {abaDaFicha === "Agora" && (
+            <div className="flex flex-wrap gap-2 px-4 pt-3">
+              {weeks != null ? (
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {/* Com os dias: conduta em 36s0d não é conduta em 36s6d, e a tela
+                  dela sempre mostrou os dois. */}
+                  {weeks} semanas{p.days != null ? ` e ${p.days}d` : ""}
+                </span>
+              ) : p.birth_date ? (
+                /* Puérpera: antes o painel dizia "Sem data de gestação" para quem
+               já teve o bebê, enquanto a tela dela contava os dias de vida. */
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  🍼{" "}
+                  {(() => {
+                    const dias = Math.floor(
+                      (Date.now() - new Date(`${p.birth_date}T00:00:00`).getTime()) / 86400000,
+                    );
+                    if (dias < 0) return "recém-nascido";
+                    if (dias < 14) return `${dias} ${dias === 1 ? "dia" : "dias"} de vida`;
+                    const sem = Math.floor(dias / 7);
+                    return `${sem} ${sem === 1 ? "semana" : "semanas"} de vida`;
+                  })()}
+                </span>
+              ) : null}
+              {due && (
+                <span className="rounded-full bg-secondary px-3 py-1 text-xs text-muted-foreground">
+                  DPP {due}
+                </span>
+              )}
+              {p.fetal_bpm != null && (
+                <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-600">
+                  💓 {p.fetal_bpm} bpm
+                </span>
+              )}
+              {p.quiz_premium && (
+                <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                  ⭐ Premium
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Histórico de emergências ANTES dos registros: se ela acionou o SOS,
+              é a primeira coisa que o médico precisa ver ao abrir a ficha. */}
+          {abaDaFicha === "Agora" && sosDela.length > 0 && (
+            <div className="px-4 pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-rose-600 dark:text-rose-300">
+                🆘 Acionamentos de emergência ({sosDela.length})
+              </p>
+              <div className="mt-1.5 space-y-1.5">
+                {sosDela.slice(0, 5).map((a) => (
                   <div
-                    className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
-                      m.role === "user"
-                        ? "rounded-br-sm bg-primary/10 text-foreground"
-                        : "rounded-bl-sm bg-secondary"
-                    }`}
+                    key={a.id}
+                    className="rounded-xl border border-rose-200 bg-rose-50/60 p-2.5 dark:border-rose-500/30 dark:bg-rose-500/10"
                   >
-                    {m.content}
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {m.role === "user" ? "Paciente" : "IA"} ·{" "}
-                      {new Date(m.created_at).toLocaleString("pt-BR", {
+                    <p className="text-[12px] font-semibold text-foreground">
+                      {new Date(a.created_at).toLocaleString("pt-BR", {
                         day: "2-digit",
                         month: "2-digit",
+                        year: "2-digit",
                         hour: "2-digit",
                         minute: "2-digit",
                       })}
+                      {a.motivo ? ` · ${a.motivo}` : ""}
+                      {a.ficha?.semana ? ` · ${a.ficha.semana}` : ""}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                      {a.atendido_em
+                        ? `Atendido em ${new Date(a.atendido_em).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}`
+                        : "Sem desfecho registrado"}
+                      {a.address ? ` · ${a.address}` : ""}
                     </p>
                   </div>
-                </div>
-              ))}
+                ))}
+                {sosDela.length > 5 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    + {sosDela.length - 5} mais antigos
+                  </p>
+                )}
+              </div>
             </div>
+          )}
+
+          {/* Ficha clínica — quem ela é. Vai para a aba "Ficha": é leitura de
+              fundo, não decisão de hoje. */}
+          {abaDaFicha === "Ficha" && (
+            <>
+              {/* Ficha clínica — o que ela registrou no app */}
+              {ficha && (
+                <div className="px-4 pt-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                    🩺 Registros dela
+                  </p>
+                  {/* Sem esta linha, "sem etiqueta" era lido como "está tudo bem" — e
+                cobre também "não mediu" e "mediu errado". A tela nunca deve
+                deixar o médico concluir nada a partir da AUSÊNCIA de marca. */}
+                  <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                    Medidas informadas por ela no app, não aferidas em consultório. Sem etiqueta
+                    significa dentro da faixa de referência ou sem registro — não é diagnóstico.
+                  </p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {medidas.map(({ rot, v }) => (
+                      <div key={rot} className="rounded-2xl border border-border p-2.5 text-center">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {rot}
+                        </p>
+                        <p className="mt-0.5 text-sm font-bold text-foreground">
+                          {v ? v.valor : "—"}
+                        </p>
+                        {v?.quando && (
+                          <p className="text-[9.5px] text-muted-foreground">
+                            {new Date(
+                              `${String(v.quando).slice(0, 10)}T00:00:00`,
+                            ).toLocaleDateString("pt-BR")}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      📓 {(ficha.journals ?? []).length} no diário
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      🦶 {(ficha.kicks ?? []).length} sessões de chutes
+                    </span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-muted-foreground">
+                      ❓ {(ficha.pendingQuestions ?? []).length} perguntas
+                    </span>
+                  </div>
+                  {/* Dados clínicos do perfil: o que ela levaria escrito na
+                carteirinha. É o que muda a conduta numa emergência. */}
+                  {(ficha.profile?.blood_type ||
+                    ficha.profile?.allergies ||
+                    ficha.profile?.medications) && (
+                    <div className="mt-2 rounded-2xl bg-secondary/50 p-2.5 text-[11.5px] leading-snug">
+                      {ficha.profile?.blood_type && (
+                        <p>
+                          <span className="font-semibold">Sangue:</span> {ficha.profile.blood_type}
+                        </p>
+                      )}
+                      {ficha.profile?.allergies && (
+                        <p>
+                          <span className="font-semibold">Alergias:</span> {ficha.profile.allergies}
+                        </p>
+                      )}
+                      {ficha.profile?.medications && (
+                        <p>
+                          <span className="font-semibold">Medicamentos:</span>{" "}
+                          {ficha.profile.medications}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Conversa com a IA (somente leitura) */}
+              <div className="py-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  💬 Conversa com a IA
+                </p>
+                {messages === null ? (
+                  <div className="mt-2 space-y-2">
+                    <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+                    <div className="h-12 animate-pulse rounded-xl bg-secondary" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Ela ainda não conversou com a IA (ou o histórico ainda não foi ativado no
+                    banco).
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {messages.map((m, i) => (
+                      <div
+                        key={i}
+                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+                      >
+                        <div
+                          className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm ${
+                            m.role === "user"
+                              ? "rounded-br-sm bg-primary/10 text-foreground"
+                              : "rounded-bl-sm bg-secondary"
+                          }`}
+                        >
+                          {m.content}
+                          <p className="mt-1 text-[10px] text-muted-foreground">
+                            {m.role === "user" ? "Paciente" : "IA"} ·{" "}
+                            {new Date(m.created_at).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* A folha, por cima de tudo. Fora da rolagem do cartão de propósito: ela
+          é uma PÁGINA, e o `print:` dela precisa de um contêiner que não seja
+          filho de um `overflow-y-auto` — senão o navegador imprime só a parte
+          visível. */}
+      {/* ─── MODO CONSULTA ────────────────────────────────────────────────
+          Fora da rolagem do cartão: é uma TELA, não uma seção. O formulário é
+          o MESMO `RegistrarConsulta` — um segundo formulário de consulta seria
+          o segundo lugar onde a validação e o rascunho divergem. */}
+      {emConsulta && (
+        <ModoConsulta
+          nome={p.display_name ?? "Paciente"}
+          ficha={fichaClin}
+          eventos={prontuario}
+          consultas={consultasDela}
+          onFechar={() => setEmConsulta(false)}
+          formulario={
+            <RegistrarConsulta
+              pacienteId={p.id}
+              tokenFn={tokenFn}
+              eventos={prontuario}
+              desdeAConsulta={consultasDela[0]?.occurred_at ?? null}
+              onSalvou={async () => {
+                try {
+                  const cs = await consultasDaPaciente({
+                    data: { accessToken: await tokenFn(), pacienteId: p.id },
+                  });
+                  if (cs.ok) setConsultasDela(cs.consultas);
+                } catch {
+                  /* o registro já foi salvo; a lista atualiza no próximo abrir */
+                }
+                /* Sai do modo consulta ao salvar: a consulta acabou, e deixar a
+                   tela aberta faria o próximo registro nascer em cima do
+                   rascunho desta. */
+                setEmConsulta(false);
+              }}
+            />
+          }
+        />
+      )}
+
+      {folhaAberta && (
+        <FolhaDaPaciente
+          nome={p.display_name ?? "Paciente"}
+          ficha={fichaClin}
+          eventos={prontuario}
+          consultas={consultasDela}
+          semanas={p.weeks ?? null}
+          dpp={p.due_date ?? null}
+          medico={null}
+          onFechar={() => setFolhaAberta(false)}
+        />
+      )}
     </div>
   );
 }

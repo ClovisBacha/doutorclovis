@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { paraLike } from "@/lib/like-seguro";
 import { z } from "zod";
 
 /** Escapa texto do usuário antes de interpolar em HTML de e-mail (anti-injeção). */
@@ -12,6 +13,14 @@ function esc(s: string | null | undefined): string {
 }
 
 const Schema = z.object({
+  /* Token da sessão, quando a paciente está logada.
+     
+     Sem ele, o médico era resolvido pelo E-MAIL DIGITADO no formulário — e
+     quem se cadastrou com um e-mail e digitou outro tinha o pedido gravado com
+     `doctor_id` nulo. Como o painel filtra por `doctor_id`, esse pedido caía
+     no painel de NINGUÉM: a paciente esperava resposta e o médico via a lista
+     vazia. O token diz de quem é a sessão sem depender do que foi digitado. */
+  accessToken: z.string().optional(),
   patient_name: z.string().min(2).max(120),
   patient_email: z.string().email().max(160),
   patient_phone: z.string().min(8).max(40),
@@ -48,6 +57,24 @@ async function resolveDoctorIdForEmail(email: string): Promise<string | null> {
   }
 }
 
+/** Médico da paciente pela SESSÃO — não depende do e-mail digitado. */
+async function resolveDoctorIdForSession(accessToken?: string): Promise<string | null> {
+  if (!accessToken || accessToken.length < 10) return null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(accessToken);
+    if (!u.user) return null;
+    const { data: profile } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .select("doctor_id")
+      .eq("id", u.user.id)
+      .maybeSingle();
+    return (profile?.doctor_id as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export const submitAppointmentRequest = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Schema.parse(input))
   .handler(async ({ data }) => {
@@ -56,7 +83,12 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
     if (data.website) return { ok: true as const };
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const doctorId = await resolveDoctorIdForEmail(data.patient_email);
+    /* Primeiro pela SESSÃO (quem está de fato logada), depois pelo e-mail
+       digitado. A ordem é o conserto: o e-mail do formulário é o que ela
+       escreveu agora, não necessariamente o da conta dela. */
+    const doctorId =
+      (await resolveDoctorIdForSession(data.accessToken)) ??
+      (await resolveDoctorIdForEmail(data.patient_email));
     const { error } = await (supabaseAdmin as any).from("appointment_requests").insert({
       patient_name: data.patient_name,
       patient_email: data.patient_email.toLowerCase(),
@@ -79,6 +111,13 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
     // fluxo se o e-mail falhar ou não estiver configurado).
     try {
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
+      const { avisarMedico } = await import("@/lib/doctor-mail.server");
+      /* O aviso vai para o MÉDICO DELA. Antes ia para ADMIN_EMAILS: nome,
+         telefone, e-mail e motivo da consulta de paciente de qualquer médico
+         caíam na caixa da plataforma, e o médico que precisava confirmar o
+         horário nunca era avisado. `plataformaSeOrfa` cobre o formulário
+         público do site, onde ainda não existe médico para avisar. */
+      const aviso = await avisarMedico(doctorId, { plataformaSeOrfa: true });
       const dataBr = new Date(data.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
       const resumo = `
         <p style="margin:0 0 6px"><strong>Data preferida:</strong> ${dataBr} às ${esc(data.preferred_time)}</p>
@@ -87,23 +126,24 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
 
       await sendEmail({
         to: data.patient_email,
-        replyTo: process.env.ADMIN_EMAILS?.split(",")[0]?.trim(),
+        replyTo: aviso.para[0],
         subject: "Recebemos seu pedido de consulta 💛",
         html: emailLayout(
           `Olá, ${esc(data.patient_name.split(" ")[0])}!`,
-          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. Nossa equipe vai confirmar o horário disponível com o seu médico em até 1 dia útil.</p>
+          `<p style="margin:0 0 14px">Recebemos sua solicitação de consulta. ${
+            aviso.nome
+              ? `${esc(aviso.nome)} vai confirmar o horário disponível`
+              : "Vamos confirmar o horário disponível com o seu médico"
+          } em até 1 dia útil.</p>
            ${resumo}
            <p style="margin:14px 0 0;font-size:13px;color:#9b8178">Em caso de urgência, ligue 192 (SAMU) ou procure o pronto-socorro.</p>`,
+          aviso.marca,
         ),
       });
 
-      const notify = (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
-      if (notify.length) {
+      if (aviso.para.length) {
         await sendEmail({
-          to: notify,
+          to: aviso.para,
           replyTo: data.patient_email,
           subject: `Novo pedido de consulta — ${data.patient_name}`,
           html: emailLayout(
@@ -112,11 +152,33 @@ export const submitAppointmentRequest = createServerFn({ method: "POST" })
              <p style="margin:0 0 6px"><strong>Contato:</strong> ${esc(data.patient_phone)} · ${esc(data.patient_email)}</p>
              ${resumo}
              <p style="margin:14px 0 0"><a href="https://www.obstetrica.com.br/painel" style="color:#a85a44">Abrir o painel do médico →</a></p>`,
+            aviso.marca,
           ),
         });
       }
     } catch (e) {
       console.error("appointment email failed", e);
+    }
+
+    /* Push para o MÉDICO. Este pedido só ia por e-mail — e "marcar consulta"
+       é justamente o que ele resolve pelo celular, entre uma paciente e
+       outra. E-mail ele lê quando senta no computador; o pedido esfria até lá.
+
+       Bloco próprio, depois do try dos e-mails: falha de e-mail não pode
+       engolir o push, e falha de push não pode derrubar o pedido — do ponto de
+       vista da paciente, o agendamento JÁ foi aceito quando chegou aqui. */
+    if (doctorId) {
+      try {
+        const { sendPushToUser } = await import("@/lib/push.server");
+        const dataBr = new Date(data.preferred_date + "T00:00:00").toLocaleDateString("pt-BR");
+        await sendPushToUser(doctorId, {
+          title: `📅 ${data.patient_name.split(" ")[0]} pediu uma consulta`,
+          body: `${dataBr} às ${data.preferred_time} · ${data.reason}`,
+          url: "/painel",
+        });
+      } catch (e) {
+        console.error("appointment push failed", e);
+      }
     }
 
     return { ok: true as const };
@@ -157,6 +219,29 @@ export const getMyAppointments = createServerFn({ method: "POST" })
     } catch {
       /* fila é secundária ao carregar consultas */
     }
+    /* ⚠️ **OS LEMBRETES GANHARAM A MESMA REDUNDÂNCIA, e por um motivo medido:**
+       `vercel.json` agenda só o `push-weekly-tick`. O `lembretes-tick` depende
+       de cron EXTERNO, e enquanto ele não existir o recurso fica escuro — o
+       aviso de 24 h, o de 4 h e o pedido de pré-consulta de 48 h simplesmente
+       não saem. A fila de espera já tinha resolvido isto, e o comentário dela
+       diz por quê: "assim ela progride mesmo que o cron não esteja
+       configurado".
+
+       ⚠️ **O que torna seguro chamar aqui não é a varredura, é a
+       IDEMPOTÊNCIA:** a régua não repete o que está em `appointment_reminders`
+       e o índice único recusa a segunda gravação. O pior caso é leitura a mais,
+       nunca push repetido — que é o que faria a paciente desligar as
+       notificações do app, o mesmo canal do aviso de emergência.
+
+       E `varrerLembretes` tem estrangulador próprio, porque a varredura é
+       GLOBAL: sem ele, cada visita leria os compromissos da plataforma
+       inteira. */
+    try {
+      const { varrerLembretes } = await import("@/lib/lembretes.server");
+      await varrerLembretes();
+    } catch {
+      /* lembrete é secundário ao carregar consultas — nunca derruba a tela */
+    }
     const { data: rows, error } = await (supabaseAdmin as any)
       .from("appointment_requests")
       .select(
@@ -165,7 +250,7 @@ export const getMyAppointments = createServerFn({ method: "POST" })
       // ilike mantém a insensibilidade a maiúsculas para linhas antigas, mas o
       // e-mail precisa ter %/_ escapados: sem isso viram curingas LIKE e uma
       // conta maria_jose@ leria as consultas de maria.jose@ (vazamento).
-      .ilike("patient_email", email.replace(/([\\%_])/g, "\\$1"))
+      .ilike("patient_email", paraLike(email))
       .order("created_at", { ascending: false })
       .limit(50);
     if (error) {
@@ -218,18 +303,20 @@ export const respondToProposedTime = createServerFn({ method: "POST" })
       // Avisa o consultório que a paciente recusou (best-effort).
       try {
         const { sendEmail, emailLayout } = await import("@/lib/email.server");
-        const notify = (process.env.ADMIN_EMAILS || "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (notify.length) {
+        const { avisarMedico } = await import("@/lib/doctor-mail.server");
+        /* Quem sugeriu o horário foi o médico dela — é ele que precisa saber
+           que foi recusado. Sem `plataformaSeOrfa`: consulta dentro do app
+           sempre tem médico, e se não tiver, ninguém precisa do dado. */
+        const aviso = await avisarMedico(row.doctor_id);
+        if (aviso.para.length) {
           await sendEmail({
-            to: notify,
+            to: aviso.para,
             replyTo: row.patient_email,
             subject: `Horário sugerido recusado — ${row.patient_name ?? "paciente"}`,
             html: emailLayout(
               "Contraproposta recusada",
               `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} recusou o horário sugerido. Talvez queira sugerir outro.</p>`,
+              aviso.marca,
             ),
           });
         }
@@ -291,19 +378,18 @@ export const respondToProposedTime = createServerFn({ method: "POST" })
     // Avisa o consultório que a paciente aprovou (best-effort).
     try {
       const { sendEmail, emailLayout } = await import("@/lib/email.server");
-      const notify = (process.env.ADMIN_EMAILS || "")
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean);
+      const { avisarMedico } = await import("@/lib/doctor-mail.server");
+      const aviso = await avisarMedico(row.doctor_id);
       const dataBr = new Date(row.proposed_date + "T00:00:00").toLocaleDateString("pt-BR");
-      if (notify.length) {
+      if (aviso.para.length) {
         await sendEmail({
-          to: notify,
+          to: aviso.para,
           replyTo: row.patient_email,
           subject: `Horário confirmado pela paciente — ${row.patient_name ?? "paciente"}`,
           html: emailLayout(
             "Consulta confirmada",
             `<p style="margin:0 0 6px">${esc(row.patient_name ?? "A paciente")} aprovou o horário sugerido: ${dataBr} às ${esc(row.proposed_time)}.</p>`,
+            aviso.marca,
           ),
         });
       }

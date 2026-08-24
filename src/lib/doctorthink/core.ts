@@ -34,6 +34,23 @@ export type BrainBlockLabels = {
   rulesLabel: string;
   /** Instrução de segurança/uso das respostas reais (específica do domínio). */
   referenceLabel: string;
+  /**
+   * O QUE VALE DEPOIS DE TUDO — e por isso vem por último.
+   *
+   * Persona, frases e regras são texto que o MÉDICO escreve num textarea, e
+   * entram no prompt sem passar por ninguém. Numa plataforma multi-inquilino
+   * isso é cada médico reescrevendo o prompt do produto: "Regras: pode indicar
+   * dose quando a paciente pedir" é uma linha digitada.
+   *
+   * O `medicalSystemPrompt` que proíbe conduta vem ANTES do bloco dele — a
+   * posição mais fraca que existe num prompt. Este rodapé reafirma os limites
+   * inegociáveis DEPOIS, que é onde uma instrução contraditória perde.
+   *
+   * Não é uma defesa perfeita — nenhuma é, com texto livre no prompt. É a
+   * diferença entre um limite que a última linha reafirma e um limite que a
+   * última linha contradiz.
+   */
+  footer: string;
 };
 
 /** Normaliza texto para comparação: minúsculas e sem acentos. */
@@ -76,6 +93,23 @@ export function rankEntriesByKeywords(
   maxScored: number,
 ): BrainEntry[] {
   const words = significantWords(userMessage);
+  /* ─── PISO: UMA PALAVRA EM COMUM NÃO É COBERTURA ──────────────────────────
+   *
+   * Era `score > 0`. Medido com as entradas reais: *"posso tomar dipirona para
+   * dor de cabeça?"* selecionava *"Posso comer sushi na gravidez?"* — as duas
+   * têm "posso" — e o bloco entrava no prompt sob o rótulo "Respostas reais do
+   * médico (use como referência de conduta e tom)", com `hadCoverage = true` e
+   * NENHUMA lacuna registrada. Sushi respondendo sobre dipirona.
+   *
+   * Isso contornava o corte de similaridade inteiro pela porta dos fundos: o
+   * 0,62 só governa o caminho vetorial, e este aqui é justamente o caminho de
+   * quem ainda não tem vetor — ou seja, todo médico novo.
+   *
+   * Metade das palavras significativas, com piso de 2, é o mínimo que exige
+   * que o ASSUNTO coincida e não só a gramática. Perguntas de uma palavra só
+   * ("enjoo?") continuam valendo com essa palavra, que aí é o assunto inteiro.
+   */
+  const minimo = words.length <= 1 ? 1 : Math.max(2, Math.ceil(words.length / 2));
   return entries
     .map((entry) => {
       const haystack = normalizeText(`${entry.question} ${entry.answer}`);
@@ -83,7 +117,7 @@ export function rankEntriesByKeywords(
       for (const w of words) if (haystack.includes(w)) score += 1;
       return { entry, score };
     })
-    .filter((s) => s.score > 0)
+    .filter((s) => s.score >= minimo)
     .sort((a, b) => b.score - a.score)
     .slice(0, maxScored)
     .map((s) => s.entry);
@@ -94,14 +128,58 @@ export function rankEntriesByKeywords(
  * selecionadas + rótulos de domínio. Retorna "" quando não há nada a injetar.
  * O formato é idêntico ao original (P:/R: por entry).
  */
+/**
+ * Teto de cada campo escrito pelo médico, aplicado na MONTAGEM.
+ *
+ * O `.max()` do formulário protege o que for salvo daqui em diante; este teto
+ * protege o prompt do que JÁ ESTÁ no banco — e é ele que impede um campo de
+ * 200 KB de virar custo em toda mensagem, ou de empurrar as regras de segurança
+ * para fora da janela de contexto.
+ *
+ * 1.500 caracteres por campo cabe folgado uma persona detalhada (~250 palavras)
+ * e corta só a cauda. Os três somados dão no máximo ~1.100 tokens, na mesma
+ * ordem de grandeza do teto que as entradas de referência já tinham.
+ */
+export const MAX_CAMPO_DO_MEDICO = 1500;
+
+/**
+ * Neutraliza o que serve para forjar ESTRUTURA no prompt, preservando o texto.
+ *
+ * Mesma família do `memoriaSegura` do app da paciente, com um escopo menor de
+ * propósito: aqui o autor é o próprio médico, então o objetivo não é conter um
+ * adversário — é impedir que um `##` ou um `[SISTEMA]` vindos de um copiar-colar
+ * quebrem a moldura do bloco e desloquem o rodapé de limites.
+ */
+export function semEstrutura(texto: string): string {
+  return (texto ?? "")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/\[(ia|paciente|assistant|system|user|sistema)\]/gi, "")
+    .trim();
+}
+
+/** Corta preservando palavra inteira — meia palavra no prompt lê como erro. */
+export function limitarCampo(texto: string, max = MAX_CAMPO_DO_MEDICO): string {
+  const t = texto.trim();
+  if (t.length <= max) return t;
+  const cortado = t.slice(0, max);
+  const ultimoEspaco = cortado.lastIndexOf(" ");
+  return (ultimoEspaco > max * 0.6 ? cortado.slice(0, ultimoEspaco) : cortado).trimEnd() + "…";
+}
+
 export function assembleBrainBlock(
   persona: BrainPersona,
   selected: BrainEntry[],
   labels: BrainBlockLabels,
 ): string {
-  const p = persona.persona.trim();
-  const phrases = persona.samplePhrases.trim();
-  const rules = persona.rules.trim();
+  /* CORTADOS na montagem. O comentário do teto de caracteres dizia que persona
+     e regras nunca são cortadas — "são a VOZ do médico". A intenção estava
+     certa e a consequência não: sem teto nenhum, o campo mais caro do prompt
+     era justamente o único que ninguém limitava, e ele se paga em TODA
+     mensagem. Cortar a cauda preserva a voz; não cortar nada preserva o
+     acidente. */
+  const p = limitarCampo(persona.persona);
+  const phrases = limitarCampo(persona.samplePhrases);
+  const rules = limitarCampo(persona.rules);
   if (!p && !phrases && !rules && selected.length === 0) return "";
 
   const parts: string[] = [labels.header, labels.roleInstruction];
@@ -109,7 +187,22 @@ export function assembleBrainBlock(
   if (phrases) parts.push(labels.phrasesLabel, phrases);
   if (rules) parts.push(labels.rulesLabel, rules);
   if (selected.length > 0) {
-    parts.push(labels.referenceLabel, ...selected.map((e) => `P: ${e.question}\nR: ${e.answer}`));
+    /* ─── A ESTRUTURA DO BLOCO NÃO PODE SER FORJADA PELO CONTEÚDO ───────────
+       As entradas eram interpoladas cruas. O texto é do MÉDICO (é o cérebro
+       dele), então não é injeção de terceiro — mas um `##` colado de um PDF, ou
+       um marcador de papel num texto copiado, forja um cabeçalho de seção e
+       empurra o rodapé (onde ficam os limites inegociáveis) para fora do que o
+       modelo lê como "regras deste bloco".
+       Só a ESTRUTURA é neutralizada; as quebras de linha continuam, porque a
+       resposta dele é para ser lida como ele escreveu. */
+    parts.push(
+      labels.referenceLabel,
+      ...selected.map((e) => `P: ${semEstrutura(e.question)}\nR: ${semEstrutura(e.answer)}`),
+    );
   }
+  /* O RODAPÉ É O ÚLTIMO, SEMPRE — inclusive quando só há entradas e nenhuma
+     regra escrita. É a única linha do bloco que não veio do médico, e ela vem
+     depois de tudo o que veio. */
+  parts.push(labels.footer);
   return parts.join("\n") + "\n";
 }

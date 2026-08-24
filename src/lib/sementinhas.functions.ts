@@ -3,8 +3,15 @@ import { z } from "zod";
 import { typedDb, type SementinhasLedgerRow } from "@/integrations/supabase/types.extended";
 import { isCareModeActive } from "@/lib/care-mode.functions";
 import { COURSE_MODULES } from "@/lib/course-modules";
-import { quizForDay } from "@/lib/daily-quizzes";
+import { carregarQuizDoDia } from "@/lib/daily-quizzes";
+import {
+  RAZAO_PRESENTE_AMIGA,
+  RAZAO_PRESENTE_INFLUENCIADORA,
+  RAZAO_PRESENTE_MEDICO,
+} from "@/lib/economia-sementinhas";
 import { computeGestation } from "@/lib/gestacao";
+import { nomeDoMedico } from "@/lib/nome-do-medico";
+import { PREFIXO_ATIVIDADE, trofeusDasChaves } from "@/lib/trofeus";
 
 /**
  * Sementinhas 🌱 — moeda de recompensa da paciente.
@@ -15,6 +22,15 @@ import { computeGestation } from "@/lib/gestacao";
  * - Sem streak punitivo, sem aleatoriedade, sem FOMO.
  * - O ganho é concedido SÓ no servidor; o cliente jamais escreve no ledger
  *   (a tabela é server-only), pra ninguém "imprimir" moeda.
+ *
+ * Desde ago/2026 existe uma SEGUNDA porta de entrada: os pacotes pagos
+ * (`pacotes-sementinhas.ts`, creditados pelo webhook do Stripe). Isso não
+ * revoga nada acima — o ganho por jogar continua inteiro e o pacote é atalho,
+ * nunca condição. O limite que sustenta as duas portas convivendo é um só, e
+ * ele é inegociável: **a Sementinha compra enfeite, nunca cuidado**. Nenhuma
+ * aula, exame, alerta ou conduta clínica pode passar a depender dela. No dia
+ * em que isso acontecer, o app terá começado a cobrar por saúde — que é outro
+ * negócio, e não este.
  */
 
 /** Valores de ganho — transparentes e calibráveis sem migração. */
@@ -45,9 +61,14 @@ export async function grantSementinhas(db: Db, userId: string, grants: Grant[]):
       dedupe_key: g.dedupeKey,
     }));
   if (rows.length === 0) return;
-  await db
+  const { error } = await db
     .from("sementinhas_ledger")
     .upsert(rows, { onConflict: "user_id,dedupe_key", ignoreDuplicates: true });
+  /* `dedupe_key` torna a concessão idempotente, então repetir é seguro — o que
+     não existe é alguém para repetir. Falhando aqui, ela cumpre o desafio, vê
+     a animação e o saldo não muda; e como todo chamador ignora o retorno, o
+     único lugar onde isso pode aparecer é o log. */
+  if (error) console.error("[sementinhas] concessão não gravou", userId, error);
 }
 
 /** Saldo atual = SUM(amount). Server-only. */
@@ -98,7 +119,191 @@ async function loadCycleAndGestation(
   return { cycle, gest };
 }
 
-async function walletPayload(db: Db, userId: string) {
+/**
+ * O PRESENTE QUE ALGUÉM DEU A ELA — e por que ele precisava existir.
+ *
+ * ─── O DEFEITO QUE ISTO CONSERTA ────────────────────────────────────────────
+ *
+ * O médico presenteava, o servidor gravava a linha no ledger, o saldo dela
+ * subia — e **nada, em lugar nenhum do app dela, dizia que aquilo aconteceu**.
+ * Ela abriria o Caminho um dia e teria 100 🌱 a mais que ontem, sem explicação.
+ *
+ * Do lado do médico o recurso parecia inteiro: o botão dizia "Enviado ✓" e a
+ * mesada descia. Do lado dela, presente sem remetente é indistinguível de bug —
+ * e presente que ninguém percebe não é presente, é uma linha de banco. O ponto
+ * inteiro do desenho (ele dá, ela vê que foi ELE, ela volta) morria no silêncio.
+ *
+ * ─── MODO CUIDADO É BARRADO AQUI, NÃO NO CHAMADOR ───────────────────────────
+ *
+ * `presentearPaciente` já recusa enviar para quem está em Modo Cuidado, mas o
+ * modo pode ser ligado DEPOIS de um presente legítimo. Anunciar moedinha e
+ * confete para quem acabou de perder a gestação é exatamente o que o Modo
+ * Cuidado existe para impedir — então o portão mora dentro desta função, e não
+ * em cada tela que a chama. É a mesma lição de `recado-da-bolha.ts`: nove
+ * pontos de uso lembram e o décimo esquece.
+ *
+ * ─── A JANELA DE 30 DIAS ────────────────────────────────────────────────────
+ *
+ * Sem ela, uma paciente que ficasse dois meses fora voltaria e receberia o
+ * anúncio de um presente de abril como se fosse de hoje. Trinta dias cobre com
+ * folga o ciclo da mesada, que é o intervalo em que um presente ainda é notícia.
+ */
+export type PresenteRecebido = {
+  /** Quantas Sementinhas. */
+  quantidade: number;
+  /** ISO — também é o que a tela usa para lembrar que já anunciou este. */
+  quando: string;
+  /** Quem deu: o médico dela, a amiga que a trouxe, ou a criadora do código. */
+  de: "medico" | "amiga" | "criadora";
+  /** Primeiro nome de quem deu, quando dá para saber. */
+  nome: string | null;
+};
+
+const JANELA_DO_PRESENTE_MS = 30 * 24 * 60 * 60 * 1000;
+
+async function presenteRecente(
+  db: Db,
+  userId: string,
+  careMode: boolean,
+): Promise<PresenteRecebido | null> {
+  if (careMode) return null;
+
+  const desde = new Date(Date.now() - JANELA_DO_PRESENTE_MS).toISOString();
+  const { data, error } = await db
+    .from("sementinhas_ledger")
+    .select("amount, reason, created_at")
+    .eq("user_id", userId)
+    .in("reason", [RAZAO_PRESENTE_MEDICO, RAZAO_PRESENTE_AMIGA, RAZAO_PRESENTE_INFLUENCIADORA])
+    .gte("created_at", desde)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  const linha = (data ?? [])[0] as
+    | Pick<SementinhasLedgerRow, "amount" | "reason" | "created_at">
+    | undefined;
+  /* Falha de leitura → nenhum anúncio. O saldo dela já está certo de qualquer
+     jeito; o que se perde é a festa, e festa errada é pior que festa ausente. */
+  if (error || !linha) return null;
+
+  const de =
+    linha.reason === RAZAO_PRESENTE_MEDICO
+      ? "medico"
+      : linha.reason === RAZAO_PRESENTE_INFLUENCIADORA
+        ? "criadora"
+        : "amiga";
+  return {
+    quantidade: linha.amount ?? 0,
+    quando: linha.created_at as string,
+    de,
+    nome: await nomeDeQuemDeu(db, userId, de),
+  };
+}
+
+/**
+ * O NOME DE QUEM DEU — lido do VÍNCULO, nunca gravado no presente.
+ *
+ * A linha do ledger não carrega quem deu (o `dedupe_key` carrega, mas ele é
+ * chave técnica e não deve virar fonte de exibição). O médico sai de
+ * `patient_profiles.doctor_id` e a amiga de `referred_by` — os mesmos campos que
+ * autorizaram o presente lá atrás.
+ *
+ * `null` é resposta legítima: o vínculo pode ter sido encerrado depois. Aí o
+ * anúncio diz "do seu médico" em vez de inventar um nome.
+ */
+async function nomeDeQuemDeu(
+  db: Db,
+  userId: string,
+  de: "medico" | "amiga" | "criadora",
+): Promise<string | null> {
+  const sb = db as unknown as {
+    from: (t: string) => {
+      select: (c: string) => {
+        eq: (c: string, v: string) => { maybeSingle: () => Promise<{ data: unknown }> };
+      };
+    };
+  };
+  try {
+    const { data: perfil } = await sb
+      .from("patient_profiles")
+      .select("doctor_id, referred_by, ref_code")
+      .eq("id", userId)
+      .maybeSingle();
+    const p = perfil as {
+      doctor_id?: string | null;
+      referred_by?: string | null;
+      ref_code?: string | null;
+    } | null;
+
+    /* ⚠️ A criadora sai de `ref_code` → `affiliates.name`, e não de
+       `referred_by`: aquele é o grafo de AMIZADE, e o código foi tirado dele
+       de propósito — uma criadora com três mil seguidoras viraria amiga de
+       três mil gestantes. É a decisão que `influenciadora.functions.ts`
+       registra com todas as letras. */
+    if (de === "criadora") {
+      const codigo = p?.ref_code;
+      if (!codigo) return null;
+      const { data: aff } = await sb
+        .from("affiliates")
+        .select("name")
+        .eq("code", codigo)
+        .maybeSingle();
+      const nome = ((aff as { name?: string | null } | null)?.name ?? "").trim();
+      return nome.split(/\s+/)[0] || null;
+    }
+
+    const quem = de === "medico" ? p?.doctor_id : p?.referred_by;
+    if (!quem) return null;
+
+    const { data: dono } = await sb
+      .from(de === "medico" ? "doctors" : "patient_profiles")
+      .select("display_name")
+      .eq("id", quem)
+      .maybeSingle();
+    const bruto = (dono as { display_name?: string | null } | null)?.display_name ?? "";
+    /* O médico volta como "Dr. Clóvis" (título + primeiro nome, régua única em
+       `nome-do-medico.ts`); a amiga, só o primeiro nome. Nome inteiro estoura
+       o título do aviso, e o cadastro do médico já traz o título dentro do
+       `display_name` — daí o `Dr(a). ${nome}` que eu tinha escrito virar
+       "Dr(a). Dr. Clóvis Bacha" na primeira foto. */
+    if (de === "medico") return nomeDoMedico(bruto);
+    return bruto.trim().split(/\s+/)[0] || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * QUANTOS TROFÉUS ELA TEM — uma linha `day_stars:` por dia de cinco estrelas.
+ *
+ * A contagem sai do LEDGER e não de `doneDays`, e a diferença é o que permite o
+ * troféu destrancar item da loja: `doneDays` mora no `localStorage` da paciente
+ * e sobe no blob do `journey_state`, então quem o escreve é o navegador.
+ * `grantDayStarsBonus` só grava a linha depois de o ledger confirmar as cinco
+ * atividades do dia — é escrita de servidor, e é a única aqui que não se forja.
+ *
+ * `head: true` com `count`: o PostgREST devolve só o número, sem trazer as
+ * linhas. Quem fecha o dia por 300 dias tem 300 linhas, e elas não têm nada a
+ * dizer além de existirem.
+ */
+export async function contarTrofeus(db: Db, userId: string): Promise<number> {
+  const { data, error } = await db
+    .from("sementinhas_ledger")
+    .select("dedupe_key")
+    .eq("user_id", userId)
+    .like("dedupe_key", `${PREFIXO_ATIVIDADE}%`)
+    .limit(5000);
+
+  /* Falha de leitura → ZERO, nunca um palpite. O número destranca item pago:
+     errar para cima entrega de graça o que ela ainda não conquistou, e errar
+     para baixo só adia. */
+  if (error) return 0;
+  return trofeusDasChaves(
+    ((data ?? []) as { dedupe_key: string | null }[]).map((r) => r.dedupe_key),
+    WELLNESS_ACTIVITIES,
+  );
+}
+
+async function walletPayload(db: Db, userId: string, careMode: boolean) {
   const balance = await computeBalance(db, userId);
   const { data: recent } = await db
     .from("sementinhas_ledger")
@@ -109,6 +314,10 @@ async function walletPayload(db: Db, userId: string) {
   return {
     balance,
     recent: (recent ?? []) as Pick<SementinhasLedgerRow, "amount" | "reason" | "created_at">[],
+    presente: await presenteRecente(db, userId, careMode),
+    /* Fora do Modo Cuidado: o troféu é gamificação, e no luto ela some junto
+       com o resto. Zero aqui esconde o contador — não apaga nada no banco. */
+    trofeus: careMode ? 0 : await contarTrofeus(db, userId),
   };
 }
 
@@ -135,7 +344,7 @@ export const claimDailyAndGetWallet = createServerFn({ method: "POST" })
         },
       ]);
     }
-    return { ok: true as const, careMode, ...(await walletPayload(db, uid)) };
+    return { ok: true as const, careMode, ...(await walletPayload(db, uid, careMode)) };
   });
 
 /** Só lê a carteira (sem conceder nada). */
@@ -146,7 +355,8 @@ export const getWallet = createServerFn({ method: "POST" })
     const db = typedDb(supabaseAdmin);
     const { data: u, error } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (error || !u.user) return { ok: false as const, error: "Não autenticado" };
-    return { ok: true as const, ...(await walletPayload(db, u.user.id)) };
+    const careMode = await isCareModeActive(supabaseAdmin, u.user.id);
+    return { ok: true as const, ...(await walletPayload(db, u.user.id, careMode)) };
   });
 
 /**
@@ -229,7 +439,10 @@ export const grantDailyQuizReward = createServerFn({ method: "POST" })
     const uid = u.user.id;
     if (await isCareModeActive(supabaseAdmin, uid)) return { ok: true as const, granted: 0 };
 
-    const quiz = quizForDay(data.day);
+    /* `await` porque o banco de aulas virou `import()` dinâmico (ver
+       daily-quizzes.ts). No servidor o arquivo é local — o custo é o primeiro
+       acesso do processo, não uma ida à rede. */
+    const quiz = await carregarQuizDoDia(data.day);
     if (!quiz || quiz.questions.length === 0) return { ok: true as const, granted: 0 };
     const correct = Math.max(0, Math.min(data.correct, quiz.questions.length));
 
@@ -328,12 +541,12 @@ export const grantWellnessReward = createServerFn({ method: "POST" })
     const doneCount = WELLNESS_ACTIVITIES.filter((a) => doneSet.has(keyFor(a))).length;
     const allDone = doneCount === WELLNESS_ACTIVITIES.length;
 
-    // (O bônus do dia é por fechar as 3 ESTRELAS — os 6 jogos, cada um valendo
-    // meia — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
+    // (O bônus do dia é por fechar as 5 ESTRELAS — a aula + os 4 jogos, uma
+    // estrela cada — via grantDayStarsBonus. Aqui cada atividade só rende a sua.)
     return { ok: true as const, granted, doneCount, allDone };
   });
 
-/** Bônus por fechar as 3 estrelas do dia (6 jogos × meia estrela). 1x/dia. */
+/** Bônus por fechar as 5 estrelas do dia (a aula + os 4 jogos). 1x/dia. */
 export const grantDayStarsBonus = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), day: z.number().int().min(1).max(400) }).parse(i),
@@ -369,18 +582,16 @@ export const grantDayStarsBonus = createServerFn({ method: "POST" })
       .maybeSingle();
     if (had) return { ok: true as const, granted: 0 };
     const amount = 20;
-    await grantSementinhas(db, uid, [{ amount, reason: "3 estrelas do dia! 🌟", dedupeKey }]);
+    await grantSementinhas(db, uid, [{ amount, reason: "5 estrelas do dia! 🌟", dedupeKey }]);
     return { ok: true as const, granted: amount };
   });
 
 /** Atividades do desafio diário de bem-estar (ordem = ordem no jogo). */
-const WELLNESS_ACTIVITIES = [
-  "breathing",
-  "movement",
-  "meditation",
-  "bonding",
-  "gratitude",
-] as const;
+/* ─── QUATRO, E NÃO MAIS CINCO (ago/2026) ────────────────────────────────
+   "breathing" saiu: a respiração guiada virou um tema da meditação, e uma
+   chave que ninguém mais grava faria `allDone` nunca ser verdade — o bônus do
+   dia deixaria de existir em silêncio, sem erro nenhum a apontar. */
+const WELLNESS_ACTIVITIES = ["movement", "meditation", "bonding", "gratitude"] as const;
 
 /** Progresso do desafio de bem-estar de HOJE (quais atividades já foram feitas). */
 export const getWellnessProgress = createServerFn({ method: "POST" })
@@ -419,3 +630,68 @@ export const getWellnessProgress = createServerFn({ method: "POST" })
 // (ver cantinho.functions.ts) — com advisory lock por usuário, sem risco de
 // saldo negativo. Não há função genérica de gasto de propósito, pra evitar um
 // caminho não-atômico que furasse essa garantia.
+
+/**
+ * O BÔNUS DE VINCULAR UM MÉDICO — pago uma vez, por médico.
+ *
+ * ─── POR QUE UMA FUNÇÃO, E NÃO TRÊS LINHAS ──────────────────────────────────
+ *
+ * Existem TRÊS caminhos que gravam `patient_profiles.doctor_id`:
+ *
+ *   · `chooseDoctor`        — ela escolhe no diretório;
+ *   · `respondPatientRequest` — ele aceita o pedido dela;
+ *   · `redeemInviteCode`    — ela resgata o código dele.
+ *
+ * Copiar a concessão nos três é a receita de divergência que esta base já viveu
+ * mais de uma vez (o teto de pacientes existia em dois e vazava no terceiro; a
+ * régua de vencimento tinha quatro cópias discordantes). Uma função, três
+ * chamadas.
+ *
+ * ─── UMA VEZ NA VIDA DELA, E ESSA FOI UMA CORREÇÃO ──────────────────────────
+ *
+ * A `dedupeKey` é fixa (`vinculo-medico`), não carrega o médico. A primeira
+ * versão carregava, com o argumento de que "trocar de médico é um vínculo novo"
+ * — e isso abria um farm de um minuto pela busca pública. Ver o comentário no
+ * corpo. O bônus é do evento "ela passou a ter um médico", que acontece uma vez.
+ *
+ * Nunca lança e nunca bloqueia o vínculo: um bônus que falha é um bônus a
+ * menos; um vínculo que falha por causa do bônus é uma paciente sem médico.
+ */
+export async function bonusDeVinculo(
+  supabaseAdmin: unknown,
+  patientId: string,
+  doctorId: string,
+): Promise<void> {
+  try {
+    const { BONUS_VINCULO_MEDICO } = await import("@/lib/economia-sementinhas");
+    /* Modo Cuidado não recebe gamificação — mesma regra do resto do arquivo.
+       Dar Sementinhas a quem acabou de perder a gestação é o oposto do cuidado
+       que o Modo Cuidado existe para prestar. */
+    if (await isCareModeActive(supabaseAdmin as never, patientId)) return;
+    /* ─── UMA VEZ POR PACIENTE, NÃO POR MÉDICO ────────────────────────────
+     *
+     * A chave era `vinculo:${doctorId}` — única por PAR. Um verificador mediu o
+     * buraco: `/encontrar-medico` é rota pública e a troca de médico é livre e
+     * sem carência, então quatro toques na lista pagavam quatro bônus. Com o
+     * bônus em 200, isso dá 800 🌱 — mais que a loja grátis inteira (704), em
+     * menos de um minuto. A parede de quinze dias, que é a razão de existir de
+     * todo este desenho, caía antes de existir.
+     *
+     * (E cada toque ainda dispara push e e-mail "Nova paciente" para um médico
+     * que a perde no toque seguinte.)
+     *
+     * A chave passa a ser fixa: `vinculo-medico`. O bônus é do EVENTO "ela
+     * passou a ter um médico", que acontece uma vez na vida dela no app — não
+     * de cada médico. Trocar de médico continua livre; o que não se repete é o
+     * pagamento. */
+    await grantSementinhas(typedDb(supabaseAdmin as never), patientId, [
+      {
+        amount: BONUS_VINCULO_MEDICO,
+        reason: "vinculo-medico",
+        dedupeKey: "vinculo-medico",
+      },
+    ]);
+  } catch (e) {
+    console.error("[sementinhas] bônus de vínculo não foi pago", patientId, doctorId, e);
+  }
+}

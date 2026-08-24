@@ -1,0 +1,10 @@
+# Intermediários do pipeline — descartáveis, e pesados.
+#
+# `brutas/`     saída direta do modelo, com fundo cinza (~4 MB cada)
+# `recortadas/` depois do recorte de fundo, antes de normalizar (~4 MB cada)
+#
+# O que o app usa é `src/assets/bebes/semana-NN.webp` (~21 KB cada), e o que
+# torna tudo reproduzível é `especificacao.mjs`. Guardar 39 PNGs de 4 MB para
+# regerar o que um comando regera seria 160 MB parados no histórico.
+brutas/
+recortadas/

@@ -53,7 +53,7 @@ export const saveEpdsLog = createServerFn({ method: "POST" })
         const { data: du } = await supabaseAdmin.auth.admin.getUserById(doctorId);
         const doctorEmail = du?.user?.email;
         if (doctorEmail) {
-          const { sendEmail, emailLayout } = await import("@/lib/email.server");
+          const { sendEmail, emailLayout, escEmail } = await import("@/lib/email.server");
           const nome = (prof?.display_name as string | null) ?? "Uma paciente sua";
           const urgente = data.level === "urgente";
           await sendEmail({
@@ -63,7 +63,8 @@ export const saveEpdsLog = createServerFn({ method: "POST" })
               : `⚠️ EPDS positivo — ${nome} (escore ${data.score})`,
             html: emailLayout(
               "Alerta de rastreio EPDS",
-              `<p style="margin:0 0 8px"><strong>Paciente:</strong> ${nome}</p>
+              // Nome é campo livre da paciente — escapado antes de virar HTML.
+              `<p style="margin:0 0 8px"><strong>Paciente:</strong> ${escEmail(nome)}</p>
                <p style="margin:0 0 8px"><strong>Escore:</strong> ${data.score}/30 · <strong>Nível:</strong> ${data.level}</p>
                ${
                  urgente

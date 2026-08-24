@@ -4,6 +4,25 @@
 -- e fila de espera.
 -- ════════════════════════════════════════════════════════════════════
 
+-- ── As colunas de que este arquivo DEPENDE ────────────────────────────────
+-- Elas nascem em `20260610010000_doctor_scheduling.sql`, que é POSTERIOR a
+-- 20260608120000 — ou seja, está entre as migrations pendentes em produção.
+--
+-- Sem estas duas linhas, o índice `appt_confirmed_slot` mais abaixo falhava
+-- com 42703 (coluna não existe). E o SQL Editor do Supabase roda o arquivo
+-- inteiro numa transação: o erro derrubava TUDO junto, inclusive a
+-- `appointment_waitlist` criada depois. O dono rodava o arquivo que o
+-- CLAUDE.md manda rodar, via um erro, e ficava sem fila de espera nenhuma —
+-- exatamente o que ele estava tentando ligar.
+--
+-- Um arquivo "APLICAR" precisa bastar-se: quem o roda não sabe quais
+-- migrations o banco dele já viu.
+ALTER TABLE public.appointment_requests
+  ADD COLUMN IF NOT EXISTS confirmed_date date;
+
+ALTER TABLE public.appointment_requests
+  ADD COLUMN IF NOT EXISTS confirmed_time text;
+
 -- ── Contraproposta: o médico sugere outro horário e a paciente aprova ──────
 ALTER TABLE public.appointment_requests
   ADD COLUMN IF NOT EXISTS proposed_date date;

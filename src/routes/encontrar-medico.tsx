@@ -8,6 +8,7 @@ import {
   type DirectoryDoctor,
 } from "@/lib/doctors.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { formatarDinheiro } from "@/lib/dinheiro";
 import { DoctorBadge } from "@/components/doctor-badge";
 import { InviteDoctorCTA } from "@/components/invite-doctor-cta";
 
@@ -64,6 +65,13 @@ function EncontrarMedicoPage() {
   const [masters, setMasters] = useState(false);
   const [doctorate, setDoctorate] = useState(false);
   const [results, setResults] = useState<DirectoryDoctor[]>([]);
+  /* Três estados diferentes que antes eram um só ("lista vazia"): não achou o
+     nome mas há médicos, não há resultado nenhum, e a busca falhou. Cada um
+     pede uma frase diferente — e a última pede um botão. */
+  const [semMatch, setSemMatch] = useState(false);
+  /** A lista veio SEM os filtros dela (banco sem as colunas do perfil). */
+  const [filtrosFora, setFiltrosFora] = useState(false);
+  const [erro, setErro] = useState<"rede" | "falha" | null>(null);
   const [loading, setLoading] = useState(true);
   const [choosing, setChoosing] = useState<string | null>(null);
   const [loggedIn, setLoggedIn] = useState(false);
@@ -120,8 +128,20 @@ function EncontrarMedicoPage() {
         },
       });
       setResults(res.ok ? res.doctors : []);
+      /* `semCorrespondencia` = o nome não casou com ninguém, então a lista é o
+         diretório inteiro. Sem esse sinal a tela mostraria os outros médicos
+         como se fossem o resultado da busca dela. */
+      setSemMatch(res.ok ? !!res.semCorrespondencia : false);
+      setFiltrosFora(res.ok ? !!res.filtrosIgnorados : false);
+      setErro(res.ok ? null : "falha");
     } catch {
       setResults([]);
+      setSemMatch(false);
+      setFiltrosFora(false);
+      /* Falha de rede não é "seus filtros são estreitos". Antes as duas
+         situações davam a mesma frase, e ela ficava mexendo nos filtros para
+         resolver uma queda de conexão. */
+      setErro("rede");
     } finally {
       setLoading(false);
     }
@@ -150,11 +170,11 @@ function EncontrarMedicoPage() {
       toast.success(`${d.display_name} agora é o seu médico 💛`);
       navigate({ to: "/minha-conta" });
     } else {
-      toast.error(
-        res.error === "medico_lotado"
-          ? "Este médico já atingiu o limite de pacientes. Escolha outro."
-          : "Não foi possível escolher este médico agora.",
-      );
+      /* "Este médico já atingiu o limite de pacientes. Escolha outro." saiu
+         com o teto: nenhum plano tem limite de pacientes, o servidor não
+         devolve mais esse erro, e mandar a gestante procurar OUTRO obstetra
+         por um limite que não existe é o pior desfecho possível desta tela. */
+      toast.error("Não foi possível escolher este médico agora.");
     }
   }
 
@@ -270,6 +290,20 @@ function EncontrarMedicoPage() {
         <div className="mt-5 space-y-3">
           {loading ? (
             <div className="skeleton h-28 rounded-2xl" />
+          ) : erro ? (
+            <div className="space-y-4 py-6">
+              <p className="text-center text-sm text-muted-foreground">
+                {erro === "rede"
+                  ? "Sem conexão para buscar agora."
+                  : "A busca falhou por um instante."}
+              </p>
+              <button
+                onClick={run}
+                className="mx-auto block rounded-full border border-primary/40 px-4 py-2 text-sm font-semibold text-primary"
+              >
+                Tentar de novo
+              </button>
+            </div>
           ) : results.length === 0 ? (
             <div className="space-y-5 py-6">
               <p className="text-center text-sm text-muted-foreground">
@@ -279,10 +313,66 @@ function EncontrarMedicoPage() {
               {loggedIn && <InviteDoctorCTA variant="hero" />}
             </div>
           ) : (
+            <>
+              {/* A lista ignorou os filtros: dizer, em vez de deixá-la achar que
+                  "São Paulo + doutorado" devolveu o país inteiro. */}
+              {filtrosFora && (
+                <div className="rounded-2xl border border-border bg-secondary/60 p-4">
+                  <p className="text-sm font-semibold text-foreground">
+                    Mostrando todos os obstetras
+                  </p>
+                  <p className="mt-1 text-[13px] leading-snug text-muted-foreground">
+                    Os filtros de cidade, estado e formação estão indisponíveis no momento — esta
+                    lista não está filtrada.
+                  </p>
+                </div>
+              )}
+              {/* Não achou o nome que ela digitou: dizer isso, e então mostrar
+                  quem existe — em vez de "amplie sua busca" e uma tela vazia. */}
+              {semMatch && (
+                <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                    Não encontramos “{q.trim()}” no app
+                  </p>
+                  <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                    Talvez o seu médico ainda não esteja aqui. Estes são os obstetras que já atendem
+                    pelo app — e você também pode convidar o seu.
+                  </p>
+                  {loggedIn && (
+                    <div className="mt-3">
+                      <InviteDoctorCTA />
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+          {!loading &&
+            !erro &&
+            results.length > 0 &&
             results.map((d) => (
               <div key={d.id} className="rounded-2xl border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  {/* A foto abre o card. Um rosto é a maior diferença isolada
+                      entre dois cards num diretório de saúde — e quem não tem
+                      mostra a inicial, que é honesto sobre a ausência em vez de
+                      desenhar um avatar genérico. */}
+                  {d.photo_url ? (
+                    <img
+                      src={d.photo_url}
+                      alt={d.display_name}
+                      loading="lazy"
+                      className="size-14 shrink-0 rounded-full object-cover ring-2 ring-primary/15"
+                    />
+                  ) : (
+                    <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 font-serif text-lg text-primary ring-2 ring-primary/15">
+                      {(d.display_name ?? "")
+                        .replace(/^(Dr|Dra)\.?\s*/i, "")
+                        .charAt(0)
+                        .toUpperCase() || "?"}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-serif text-lg">{d.display_name}</p>
                       <DoctorBadge plan={d.plan} />
@@ -305,11 +395,34 @@ function EncontrarMedicoPage() {
                       </div>
                     )}
                     <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px]">
-                      {d.city || d.state ? (
+                      {d.city || d.state || d.endereco_cidade ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
-                          📍 {[d.city, d.state].filter(Boolean).join("/")}
+                          📍 {[d.city || d.endereco_cidade, d.state].filter(Boolean).join("/")}
                         </span>
                       ) : null}
+                      {/* Convênio/particular ANTES do resto: é a primeira
+                          pergunta dela, e antes o card só dizia o preço — o que
+                          fazia um médico de convênio parecer sem informação. */}
+                      {d.accepts_insurance ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">💳 Convênio</span>
+                      ) : null}
+                      {d.accepts_private ? (
+                        <span className="rounded-full bg-secondary px-2 py-0.5">💰 Particular</span>
+                      ) : null}
+                      {/* Focos extras: sem mostrá-los, marcar não muda nada para
+                          ela — e é justamente por eles que ela chegou aqui. O
+                          principal já está na linha do título, então sai. */}
+                      {(d.focos ?? [])
+                        .filter((f) => f && f !== d.specialty)
+                        .slice(0, 4)
+                        .map((f) => (
+                          <span
+                            key={f}
+                            className="rounded-full bg-primary/10 px-2 py-0.5 text-primary"
+                          >
+                            {f}
+                          </span>
+                        ))}
                       {d.years_experience ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
                           {d.years_experience} anos de experiência
@@ -328,9 +441,17 @@ function EncontrarMedicoPage() {
                           💻 Teleconsulta
                         </span>
                       ) : null}
-                      {d.consultation_price_brl ? (
+                      {/* Formatado com a MOEDA do médico. "R$" fixo no código
+                          mostrava US$ 250 como "R$ 250" — erro de leitura por um
+                          fator de cinco. `?? brl*100` cobre quem cadastrou antes
+                          da coluna de centavos existir. */}
+                      {(d.consultation_price_cents ?? d.consultation_price_brl) ? (
                         <span className="rounded-full bg-secondary px-2 py-0.5">
-                          💰 R$ {d.consultation_price_brl}
+                          💰{" "}
+                          {formatarDinheiro(
+                            d.consultation_price_cents ?? (d.consultation_price_brl ?? 0) * 100,
+                            d.consultation_currency,
+                          )}
                         </span>
                       ) : null}
                     </div>
@@ -341,6 +462,13 @@ function EncontrarMedicoPage() {
                       <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
                         <span className="font-semibold text-foreground/70">Abordagem:</span>{" "}
                         {d.approach}
+                      </p>
+                    ) : null}
+                    {/* Endereço do consultório: o médico cadastra desde a
+                        migração do cadastro completo e a paciente nunca via. */}
+                    {d.endereco ? (
+                      <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                        📍 {d.endereco}
                       </p>
                     ) : null}
                     {d.hospitals ? (
@@ -386,8 +514,7 @@ function EncontrarMedicoPage() {
                       : "Entrar e escolher"}
                 </button>
               </div>
-            ))
-          )}
+            ))}
         </div>
       </section>
     </div>

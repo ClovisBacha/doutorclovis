@@ -13,6 +13,25 @@
   }
 }
 
+/* Tela DEITADA — o celular virado, e só ele.
+ *
+ * 520px é escolhido para ficar entre os dois mundos, com folga dos dois lados:
+ * o menor iPhone EM PÉ tem 667 (SE) e o maior DEITADO tem 430 (Pro Max). Não
+ * dá para reaproveitar `short` (max-height 849) aqui: ele pega o SE em pé e o
+ * 15 Pro no Safari, que são justamente os casos que a composição já resolve.
+ *
+ * Existe por um defeito medido: em paisagem, a bolha é centrada na tela INTEIRA
+ * enquanto a barra de baixo come 117px do pé, e o vão que sobra para o número
+ * da semana fica em ~5px. Com `items-center`, o número transbordava para cima e
+ * caía EM CIMA do bebê (medido: 20px de sobreposição no 15 Pro deitado, 12px no
+ * SE). O manifesto pede `portrait-primary`, mas o iOS ignora orientação de
+ * manifesto — então o caso acontece de verdade, no navegador. */
+@custom-variant deitada {
+  @media (max-height: 520px) {
+    @slot;
+  }
+}
+
 /*
  * Design system definition.
  *
@@ -120,9 +139,22 @@
   --shadow-float:
     0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
 
-  /* Headlines na mesma família arredondada da logo (Nunito) — o corpo segue
-     em DM Sans. Isso amarra a tipografia do site à identidade da marca. */
-  --font-serif: "Nunito", "DM Sans", system-ui, sans-serif;
+  /* ── Tipografia: a fonte do SISTEMA primeiro ──────────────────────
+     `ui-rounded` é a palavra-chave do CSS que resolve para a face
+     arredondada nativa da plataforma — no iPhone e no Mac, a SF Pro Rounded,
+     que é exatamente a tipografia do Liquid Glass da Apple.
+     Isso ganha de qualquer webfont por três motivos, nesta ordem:
+       1. É a MESMA fonte do relógio e dos widgets do sistema, então o app
+          deixa de parecer um site dentro do celular.
+       2. Não baixa nada. Nunito e DM Sans vinham do Google Fonts, e com elas
+          o primeiro parágrafo aparecia numa fonte e trocava depois.
+       3. Vem com o ajuste óptico do sistema — o mesmo texto fica mais legível
+          em corpo pequeno sem precisar de tabela de tamanhos.
+     Nunito e DM Sans continuam como plano B para quem não está no ecossistema
+     Apple: lá o desenho arredondado se mantém, só não é o nativo. */
+  --font-serif:
+    ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Nunito", "DM Sans", system-ui,
+    sans-serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -206,7 +238,10 @@
         );
     background-attachment: fixed;
     color: var(--color-foreground);
-    font-family: "DM Sans", system-ui, sans-serif;
+    /* Corpo na face de texto do sistema (SF Pro no Apple), com DM Sans de
+       reserva. Casa com os títulos arredondados do mesmo jeito que a Apple
+       casa SF Pro Rounded no relógio com SF Pro na data logo acima. */
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
     font-feature-settings: "ss01", "cv11";
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -968,11 +1003,59 @@ button:active > .duo3d {
   }
 }
 
-/* ── Safe areas do iPhone (notch/Dynamic Island) ─────────────────────────────
-   Com viewport-fit=cover (PWA standalone), a página desenha SOB a barra de
-   status. Elementos fixos/sticky no topo compensam com --safe-top. */
+/* ── Safe areas do aparelho (notch, Dynamic Island, barra de gestos) ─────────
+   Com viewport-fit=cover (PWA standalone ou casca nativa), a página desenha SOB
+   a barra de status. Elementos fixos/sticky no topo compensam com --safe-top.
+
+   POR QUE SÃO DUAS FONTES, E NÃO SÓ `env()`
+
+   `env(safe-area-inset-*)` é a API da web, e no iPhone ela funciona — tanto no
+   Safari quanto dentro do `WKWebView` do app. **No Android ela vale zero.** O
+   WebView do Android nunca expôs os insets do sistema por `env()`; quem os
+   conhece é a Activity, do lado nativo.
+
+   O Capacitor resolve isso medindo os insets de verdade e escrevendo
+   `--safe-area-inset-top/right/bottom/left` como estilo inline no `<html>`
+   (`SystemBars.insetsHandling: "css"`, ligado por padrão — ver
+   `capacitor.config.ts`). São outros nomes, de propósito: `env()` é reservado à
+   plataforma e não dá para um plugin preenchê-lo.
+
+   Daí o `max()` das duas: no iPhone ganha o `env()`, no Android ganha a
+   variável injetada, e no navegador comum sobra `0px` nos dois lados. Uma conta
+   só, e nenhuma tela precisa saber onde está rodando.
+
+   Sem isto, todo `pt-[calc(… + var(--safe-top))]` do app virava zero no Android:
+   o relógio do sistema deitava em cima do conteúdo em cima, e o botão de baixo
+   subia por dentro da barra de gestos. */
 :root {
-  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  /* O par de baixo. Existir como VARIÁVEL e não como `env()` solto em cada
+     lugar tem três razões: a conta do rodapé aparece em quatro pontos e
+     precisa bater entre eles, um teste automatizado consegue redefinir a
+     variável para medir o layout com a geometria real de um iPhone — coisa que
+     `env()` não permite, porque no navegador de teste ele vale zero —, e é
+     aqui, num lugar só, que as duas fontes de inset se juntam. */
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
+  --safe-left: max(env(safe-area-inset-left, 0px), var(--safe-area-inset-left, 0px));
+  --safe-right: max(env(safe-area-inset-right, 0px), var(--safe-area-inset-right, 0px));
+}
+
+/* ── Dentro da casca nativa, o SITE não aparece ──────────────────────────────
+   A classe `.nativo` é posta no `<html>` por `prepararNativo()`, no escopo do
+   módulo do router — antes de o React hidratar, para não haver um quadro com o
+   cabeçalho errado.
+
+   O que ela esconde é o cabeçalho, o rodapé e os botões flutuantes do SITE.
+   Dentro do app eles são estranhos de três jeitos ao mesmo tempo: oferecem um
+   menu para páginas que a casca nem navega (`allowNavigation` só libera o
+   próprio domínio), empilham uma segunda marca sobre a do app, e são o sinal
+   mais óbvio de "site embrulhado" — a diretriz 4.2 da Apple, que é o risco de
+   reprovação que este projeto já assumiu por carregar a URL publicada.
+
+   As telas do app (`/minha-conta`, `/painel`) já escondiam isso por conta
+   própria; o que sobrava era a de LOGIN, que é a primeira que o app abre. */
+.nativo .chrome-publico {
+  display: none;
 }
 
 /* ── Segundo Cérebro: visual tecnológico do card de score ─────────────── */
@@ -1143,6 +1226,23 @@ button:active > .duo3d {
 .dc-float {
   animation: dc-float 3.2s ease-in-out infinite;
 }
+/* O ponto que pisca enquanto o microfone está aberto.
+   ⚠️ Ele NÃO some com `prefers-reduced-motion` (ver o bloco abaixo): é o único
+   sinal na tela de que o microfone está ligado, e apagá-lo deixaria alguém
+   gravando sem saber. O que a preferência faz é parar a piscada, mantendo o
+   ponto aceso — a mesma decisão da chama da sequência. */
+@keyframes dc-rec-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.dc-rec-dot {
+  animation: dc-rec-dot 1.1s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .dc-quiz-in,
   .dc-q-slide,
@@ -1151,18 +1251,227 @@ button:active > .duo3d {
   .dc-float {
     animation: none !important;
   }
+  /* ⚠️ O ponto de gravação PARA, mas fica ACESO. `animation: none` no
+     `.dc-float` esconde um enfeite; aqui esconderia a única indicação de que o
+     microfone está aberto. */
+  .dc-rec-dot {
+    animation: none !important;
+    opacity: 1 !important;
+  }
 }
 
-/* ── O céu da home respira devagar ───────────────────────────────────
-   A bolha que envolve o bebê é PINTADA na arte, não desenhada por cima:
-   uma esfera de UI sobre a esfera da arte dava duas bolas, com centros e
-   diâmetros diferentes, e a interseção virava uma silhueta de ovo. Elas
-   não têm como ficar alinhadas — `cover` move a da arte conforme a
-   proporção da tela, e a de UI fica presa ao container.
+/* ── AS TRÊS ANIMAÇÕES DO JOGO ───────────────────────────────────────
+   Check verde (atividade feita) · estrela (uma por atividade) · cinco
+   estrelas (o dia inteiro fechado).
 
-   Então quem se move é a arte inteira. A escala parte de 1.04 para a
-   folga do zoom nunca revelar borda, e 16s deixa o movimento no limiar
-   do perceptível — a bolha parece viva sem parecer animação. */
+   ─── UMA RÉGUA PARA AS TRÊS ──────────────────────────────────────────
+   As três folhas saíram em 6×4 de propósito: assim o par de `@keyframes` é
+   um só, e o que muda entre elas é a IMAGEM e a DURAÇÃO. Três pares de
+   keyframes quase iguais divergiriam no primeiro ajuste — foi o que quase
+   aconteceu com a chama e o troféu.
+
+   ─── POR QUE FOLHA DE SPRITES, DE NOVO ───────────────────────────────
+   **WebM com alfa não tem transparência no motor do Safari**, e o app é
+   instalado na tela de início do iPhone. As três apareceriam dentro de um
+   retângulo preto, só nos iPhones — a categoria de defeito que nenhuma
+   máquina de desenvolvimento mostra.
+
+   ─── ⚠️ `jump-none`, E NÃO O `to` ESTICADO ───────────────────────────
+   A chama e o troféu usam `steps(6)` com o `to` em 120%: `steps` padrão
+   (`jump-end`) amostra em i/n, então 120% entrega 0/20/40/60/80/100 — os seis
+   quadros. Isso vale para animação em LAÇO.
+
+   Aqui não vale, e o defeito é invisível até alguém olhar: com `forwards`, o
+   valor que fica depois do fim é o `to` LITERAL — 120%. Com `background-size:
+   600%`, a faixa válida vai de 0% a 100%; em 120% a folha inteira sai da caixa
+   e o elemento fica VAZIO. Medido: `background-position: 120% 33.3333%` e nada
+   desenhado na tela.
+
+   `steps(n, jump-none)` reparte de 0% a 100% INCLUSIVE — 0/20/40/60/80/100 em
+   seis colunas —, então o último passo já é o último quadro, e é ele que o
+   `forwards` segura. O `to` volta a ser 100%, que é o que ele deveria ser numa
+   animação que para.
+
+   ─── E POR QUE `forwards`, E NÃO `infinite` ──────────────────────────
+   As três são CONQUISTA, não decoração: elas acontecem uma vez, no instante
+   em que a paciente fez alguma coisa. Em laço, o check verde ficaria
+   explodindo confete para sempre ao lado de uma tarefa que ela concluiu há
+   dez minutos. Param no último quadro — que, nas três, é justamente a pose
+   de repouso (o check pousado, a estrela cheia, as cinco enfileiradas). */
+@keyframes dcSpriteX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 100%;
+  }
+}
+@keyframes dcSpriteY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 100%;
+  }
+}
+.dc-sprite {
+  display: inline-block;
+  background-repeat: no-repeat;
+  /* 600% × 400% = a folha inteira medida em quadros. */
+  background-size: 600% 400%;
+  animation:
+    dcSpriteX var(--sprite-x) steps(6, jump-none) 4 forwards,
+    dcSpriteY var(--sprite-dur) steps(4, jump-none) forwards;
+}
+/* Com "menos movimento" ela PULA para o último quadro em vez de sumir: o
+   quadro final é o estado (feito, estrela cheia), e some-lo apagaria a
+   informação junto com o movimento. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-sprite {
+    animation: none;
+    background-position: 100% 100%;
+  }
+}
+
+/* ── O ITEM DA BARRA QUE O TUTORIAL ESTÁ EXPLICANDO ──────────────────
+   Um anel que pulsa atrás do ícone. É `::before` e não uma borda: borda
+   empurraria o conteúdo e faria a barra inteira dançar a cada passo.
+
+   `scale` e `opacity` só — as duas propriedades que o compositor anima sem
+   recalcular layout. Numa barra de vidro com `backdrop-filter`, animar
+   qualquer coisa que peça layout custa um repaint do desfoque a cada quadro.
+
+   Com "menos movimento" o anel PARA aceso, em vez de sumir: ele é o que diz
+   de qual ícone o personagem está falando, e sem ele o tutorial vira um texto
+   solto apontando para lugar nenhum. */
+@keyframes dcNavDestaque {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.12);
+    opacity: 0.95;
+  }
+}
+.dc-nav-destaque::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  border: 2px solid var(--primary);
+  background: color-mix(in oklch, var(--primary) 14%, transparent);
+  transform: translate(-50%, -50%);
+  animation: dcNavDestaque 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-nav-destaque::before {
+    animation: none;
+    opacity: 0.95;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ── AS BOLINHAS DE ATALHO DA BARRA ──────────────────────────────────
+   Elas NASCEM do ícone da aba: começam pequenas, um pouco abaixo, e sobem.
+   O atraso em escada vem por `style` (de baixo para cima — a mais perto do
+   dedo primeiro), e é o que faz a nuvem "abrir" em vez de aparecer. */
+@keyframes dcAtalhoSobe {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.86);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.dc-atalho-sobe {
+  animation: dcAtalhoSobe 220ms var(--ease-spring, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  transform-origin: bottom right;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-atalho-sobe {
+    /* PARA, não some: quem pediu menos movimento continua precisando dos
+       atalhos. Mesma decisão da chama da sequência. */
+    animation-duration: 1ms;
+    animation-delay: 0ms !important;
+  }
+}
+
+/* ── O BALÃO DE FALA DO BEBÊ BOLHA ───────────────────────────────────
+   Ele NASCE do mascote, e não do nada: começa pequeno e ancorado no canto
+   superior direito (`transform-origin`), que é exatamente onde a personagem
+   está. Um balão que aparece por opacidade lê como aviso do sistema; um que
+   cresce a partir de quem falou lê como fala.
+
+   O passo de escala é curto (0,86 → 1) e o tempo também: é a entrada de um
+   elemento pequeno, e amplitude grande num objeto de 40px lê como salto. */
+@keyframes dcFalaEntra {
+  from {
+    opacity: 0;
+    transform: scale(0.86) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.dc-fala-entra {
+  transform-origin: top right;
+  animation: dcFalaEntra 260ms var(--ease-out-expo, ease-out) both;
+}
+/* Com "menos movimento" o balão APARECE, e não some: ele carrega o recado.
+   O que sai é o crescimento — fica só o esmaecer, que é o mínimo para o olho
+   perceber que algo novo entrou na tela. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-fala-entra {
+    animation: dcFalaEntra 1ms linear both;
+    transform: none !important;
+  }
+}
+
+/* ── A ALTURA DE UMA TELA, PARA O CÉU DA HOME ────────────────────────
+   Duas declarações da MESMA propriedade, e isso é o recurso — não descuido.
+   O motor que não conhece `lvh` fica com a primeira; o que conhece usa a
+   segunda. Não há como escrever isso numa classe utilitária.
+
+   ⚠️ Por que `lvh` e não `svh`, que era o que estava aqui: o dono fotografou o
+   app duas vezes com uma faixa do creme da página aparecendo POR BAIXO do céu,
+   embaixo da barra flutuante. A caixa estava em `100svh` e começa em y=0, então
+   sobrar tela só é possível se o `svh` daquele aparelho for MENOR que a tela
+   visível — que é justamente o que `svh` quer dizer: o viewport quando as
+   barras do navegador estão TODAS visíveis. Nem todo iOS trata um app instalado
+   como "sem barras".
+
+   `lvh` é o viewport GRANDE (barras recolhidas): é o maior dos três e, ao
+   contrário de `dvh`, não muda enquanto se rola — `dvh` faria a bolha pular de
+   lugar a cada aparecer/sumir da barra do Safari.
+
+   Sobrar céu por baixo do conteúdo seguinte é invisível (o hero tem
+   `overflow-hidden` e o que vem depois só começa mais abaixo); faltar céu é o
+   defeito que ele viu duas vezes. Na dúvida, sobra. */
+.dc-hero-tela {
+  height: 100svh;
+  height: 100lvh;
+}
+
+/* ── O céu da home respirava devagar ─────────────────────────────────
+   ⚠️ SEM USO desde ago/2026, e guardado de propósito.
+
+   A escala parte de 1.04 para a folga do zoom nunca revelar borda, e 16s
+   deixa o movimento no limiar do perceptível.
+
+   Saiu quando a arte do dia passou a ser colada no fundo em vez de
+   esticada: um zoom de 4% a 7,5% é recorte lento de uma imagem que o dono
+   disse já estar no tamanho exato. Fica escrito aqui porque a régua vale
+   para qualquer céu que volte a respirar um dia — e porque a razão de ela
+   ter saído não é "não prestava". */
 @keyframes dcSkyBreathe {
   0%,
   100% {
@@ -1177,21 +1486,314 @@ button:active > .duo3d {
   will-change: transform;
 }
 
-/* A bolha desenhada pelo app (quando a arte vier sem esfera): mesma
-   respiração, aplicada ao elemento em vez do céu inteiro. */
+/* ─── QUEM SE MEXE É O BEBÊ, NÃO O VIDRO (ago/2026) ──────────────────
+   A versão anterior subia e descia a `.dc-orb` inteira 3px, e o desenho do
+   bebê — que é IRMÃO dela no DOM, não filho — ficava parado. Na tela isso
+   lia ao contrário do mundo: a casca de vidro balançava e o que boia dentro
+   do líquido não. Ninguém sabe dizer o que está errado, mas a cena para de
+   convencer.
+   Agora são duas animações separadas, e a que tem amplitude é a do bebê. */
+
+/* A BOLHA: tensão superficial, não flutuação. Só escala — sem `translateY`,
+   que era justamente o balanço de casca. */
 @keyframes dcOrbBreathe {
   0%,
   100% {
-    transform: translateY(0) scale(1);
+    transform: scale(1);
   }
   50% {
-    transform: translateY(-3px) scale(1.015);
+    transform: scale(1.016);
   }
 }
 .dc-orb {
-  animation: dcOrbBreathe 16s ease-in-out infinite;
+  animation: dcOrbBreathe 19s ease-in-out infinite;
   will-change: transform;
 }
+
+/* O BEBÊ: deriva. Sobe, desce e gira um grau — o movimento de quem está
+   suspenso em líquido, sem peso apoiado em lugar nenhum.
+   `rotate` junto com `translate` porque subir e descer em linha reta lê como
+   elevador; é a inclinação que faz virar deriva.
+
+   ─── POR QUE 13s CONTRA OS 19s DA BOLHA ─────────────────────────────
+   Períodos próximos (ou múltiplos) sincronizam, e sincronizados os dois
+   voltam a parecer UM bloco se mexendo — que é o defeito que este par de
+   animações existe para desfazer. 13 e 19 são primos entre si: o ciclo
+   conjunto só se repete a cada 247s, e nesse meio-tempo o bebê passa por
+   toda posição relativa dentro da bolha. */
+@keyframes dcBebeDeriva {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(0.7%, -1.6%) rotate(0.9deg);
+  }
+  66% {
+    transform: translate(-0.6%, 1.1%) rotate(-0.7deg);
+  }
+}
+.dc-bebe-deriva {
+  animation: dcBebeDeriva 13s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* ══════════════ A chama da sequência ══════════════════════════════
+   Folha de sprites 6×6 (36 quadros) animada por `steps()`. Ver
+   `src/components/chama-sequencia.tsx` para por que não é o `.webm` que
+   chegou: WebM com alfa não tem transparência no Safari, e o app é instalado
+   no iPhone.
+
+   Duas animações porque a folha é 2D: X varre as seis colunas de uma linha, Y
+   desce uma linha quando X fecha a volta — daí a de X durar um SEXTO da de Y.
+
+   O `to` vai a 120%: `steps(6)` amostra em i/6 do percurso, então 120% dá
+   exatamente 0/20/40/60/80/100% — os seis quadros. Parando em 100%, o último
+   nunca apareceria e o primeiro apareceria duas vezes. */
+@keyframes dcChamaX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 120%;
+  }
+}
+@keyframes dcChamaY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 120%;
+  }
+}
+.dc-chama {
+  display: inline-block;
+  /* 600% = as seis colunas e as seis linhas da folha dentro de um quadro. */
+  background-size: 600% 600%;
+  background-repeat: no-repeat;
+  background-position: 0% 0%;
+  animation:
+    dcChamaX 0.5s steps(6) infinite,
+    dcChamaY 3s steps(6) infinite;
+}
+
+/* MENOS MOVIMENTO: a chama PARA, e não some. Ela é o indicador de que a
+   sequência está viva — apagá-la sob `prefers-reduced-motion` diria à paciente
+   que ela perdeu a sequência. Fica no quadro mais cheio (o do meio da folha),
+   que é o que lê como fogo estando parado. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-chama {
+    animation: none;
+    background-position: 60% 40%;
+  }
+}
+
+/* ══════════════ O troféu das cinco estrelas ═══════════════════════
+   Folha 10×6 (60 quadros, 5 s, 12 fps). Ver `src/components/trofeu.tsx`.
+
+   A conta do `to` é a mesma da chama, com outros números: para N colunas,
+   `steps(N)` amostra em i/N, então o percurso tem de ir a 100%·N/(N−1) para
+   que os pontos caiam em 0…100%. Com 10 colunas dá 111.111%; com 6 linhas,
+   120%. Errar isso não quebra nada visivelmente — só engole o último quadro e
+   repete o primeiro, que num troféu é justamente a estrela final. */
+@keyframes dcTrofeuX {
+  from {
+    background-position-x: 0%;
+  }
+  to {
+    background-position-x: 100%;
+  }
+}
+@keyframes dcTrofeuY {
+  from {
+    background-position-y: 0%;
+  }
+  to {
+    background-position-y: 100%;
+  }
+}
+
+.dc-trofeu-anim,
+.dc-trofeu-fim {
+  display: inline-block;
+  background-size: 1000% 600%;
+  background-repeat: no-repeat;
+}
+
+/* A ANIMAÇÃO: uma vez só, e PARA no último quadro.
+   `forwards` é o que segura o troféu pronto na tela depois dos 5 s — sem ele a
+   propriedade volta ao início e o troféu SOME no instante em que a última
+   estrela acende. X repete uma vez por linha (6×), Y desce uma vez só.
+
+   ⚠️ `jump-none`, E NÃO O `to` ESTICADO — o defeito que este comentário dizia
+   ter consertado e não consertava. `steps(n)` padrão (`jump-end`) com o `to` em
+   111,111%/120% entrega os quadros certos DURANTE a animação, mas o `forwards`
+   segura o `to` LITERAL, que está fora da folha (`background-size: 1000% 600%`
+   só aceita 0–100%). Medido no navegador: aos 5,6 s a posição era
+   `111.111% 120%` e o troféu estava INVISÍVEL — meio segundo de comemoração
+   vazia, e o quadro final, que é o que a tela existe para mostrar, nunca
+   aparecia parado.
+
+   `jump-none` reparte de 0% a 100% inclusive: os mesmos quadros durante, e o
+   último quadro no fim. */
+.dc-trofeu-anim {
+  background-position: 0% 0%;
+  animation:
+    dcTrofeuX 0.83333s steps(10, jump-none) 6 forwards,
+    dcTrofeuY 5s steps(6, jump-none) 1 forwards;
+}
+
+/* O ÍCONE: o último quadro, parado. Não é laço de propósito — o quadro 0 da
+   folha está VAZIO, então repetir a animação num ícone de 22px faria o troféu
+   sumir e renascer a cada 5 s, que lê como imagem quebrada. */
+.dc-trofeu-fim {
+  background-position: 100% 100%;
+}
+
+/* MENOS MOVIMENTO: o troféu aparece PRONTO, sem a construção. A conquista
+   continua sendo anunciada — o que sai é o movimento, não a notícia. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-trofeu-anim {
+    animation: none;
+    background-position: 100% 100%;
+  }
+}
+
+/* ══════════════ Vida por cima da arte do céu ══════════════════════
+   Ver `src/components/ceu-efeitos.tsx` para as cinco regras. Em resumo: só
+   `transform` e `opacity`, ciclos longos, e nada cruzando a faixa do bebê. */
+
+/* O halo do astro respira. 11s é o limiar em que o olho sente que está vivo
+   sem conseguir dizer que é animação. */
+@keyframes dcAstroBrilho {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.dc-astro-brilho {
+  animation: dcAstroBrilho 11s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* A estrela pisca pela OPACIDADE, nunca pelo tamanho: estrela que incha e
+   murcha lê como bolha pulsando. O valor de base de cada uma vem do `style`
+   e este `opacity` MULTIPLICA em cima dele. */
+@keyframes dcPisca {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.dc-pisca {
+  animation: dcPisca 4.6s ease-in-out infinite;
+}
+
+/* A CADENTE.
+   O elemento é o próprio risco: 2px de altura, largura que cresce do nada.
+   O gradiente morre nas duas pontas porque cadente não tem começo nem fim —
+   tem passagem. Ela vive 5% do ciclo: com 15s de volta, são 0,75s de brilho
+   e catorze segundos de céu parado, que é o que a faz ser um acontecimento.
+   O ângulo é -32°, descendo para a esquerda, como quase toda chuva de
+   meteoros vista do hemisfério sul. */
+@keyframes dcCadente {
+  0%,
+  100% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(0) scaleX(0.2);
+  }
+  1% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(0) scaleX(0.2);
+  }
+  2.2% {
+    opacity: 0.9;
+    transform: rotate(-32deg) translateX(-3vw) scaleX(1);
+  }
+  5% {
+    opacity: 0;
+    transform: rotate(-32deg) translateX(-16vw) scaleX(0.6);
+  }
+}
+.dc-cadente {
+  width: 12vw;
+  height: 2px;
+  border-radius: 2px;
+  transform-origin: right center;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 245, 255, 0.55) 55%,
+    rgba(255, 255, 255, 0.95) 88%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: drop-shadow(0 0 4px rgba(214, 226, 255, 0.9));
+  animation: dcCadente 15s linear infinite;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+
+/* A aurora: uma faixa fraquíssima que atravessa a banda das ondas de um lado
+   ao outro. `opacity` no teto de 0,5 de propósito — passando disso ela vira
+   um holofote correndo pela tela em vez de um brilho que atravessa. */
+@keyframes dcAurora {
+  0% {
+    opacity: 0;
+    transform: translateX(-60%);
+  }
+  35% {
+    opacity: 0.5;
+  }
+  65% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60%);
+  }
+}
+.dc-aurora {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(226, 214, 255, 0.14) 40%,
+    rgba(255, 255, 255, 0.2) 52%,
+    rgba(214, 226, 255, 0.12) 62%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(14px);
+  animation: dcAurora 26s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A cadente some por inteiro: ela é MOVIMENTO, não decoração — parada, é
+     um risco branco atravessado no céu. As outras congelam num quadro bom. */
+  .dc-cadente,
+  .dc-aurora {
+    animation: none;
+    opacity: 0;
+  }
+  .dc-astro-brilho {
+    animation: none;
+    opacity: 0.8;
+  }
+  .dc-pisca {
+    animation: none;
+  }
+}
+
+/* `.dc-estrela` saiu junto com as cenas em SVG (ago/2026). As estrelas
+   voltaram a ser pintadas DENTRO da arte, e pixel pintado não cintila — o
+   preço de usar a imagem que o dono aprovou em vez de um desenho meu. */
 
 @media (prefers-reduced-motion: reduce) {
   .dc-sky-breathe {
@@ -1200,6 +1802,129 @@ button:active > .duo3d {
   }
   .dc-orb {
     animation: none;
+  }
+  .dc-bebe-deriva {
+    animation: none;
+  }
+}
+
+/* ─── O AMBIENTE DO CÉU SAIU DAQUI (ago/2026) ────────────────────────
+   Eram ~520 linhas: estrela cadente, satélite, névoa, vaga-lumes,
+   passarinhos, dente-de-leão, borboletas — um efeito por faixa de hora, e
+   dez faixas. Saíram com as dez artes e com `sky-ambience.tsx`, no
+   rebranding que trocou os céus por quatro cenas em SVG.
+   A vida do céu novo mora DENTRO da cena (`ceu-do-dia.tsx`): as estrelas
+   respira por `.dc-sky-breathe`, logo acima. */
+/* ─── O TEXTO DE VIDRO SAIU (ago/2026) ───────────────────────────────
+   `.dc-glass-text` era o material do relógio da tela bloqueada do iOS:
+   preenchimento translúcido com o céu atravessando a letra. O próprio bloco
+   avisava que só valia para TEXTO GRANDE — "num rótulo de 13px o mesmo
+   tratamento apaga a forma".
+
+   O rebranding tirou o vidro do nome do bebê e do número da semana (a
+   referência os traz nítidos, em cor sólida), e sobrou aplicado num único
+   lugar: o número de graus da pílula do clima, com 15px. Medido pixel a
+   pixel, dava 1,98:1 no amanhecer e 2,00:1 no dia — contra o mínimo de 4,5
+   que este app cobra. Era o caso exato que o comentário do bloco descrevia.
+   Com a cor sólida, o mesmo número passa a 8,3:1. */
+
+/* ══════════════ Chuva na home ══════════════════════════════════════
+   Duas camadas: riscos caindo ao fundo e gotas na vidraça. A regra de peso é
+   a mesma do resto do ambiente — só `transform` e `opacity`, porque isso a
+   GPU compõe sem repintar. Chuva bonita que trava o scroll é pior que chuva
+   nenhuma, e este efeito roda sobre uma foto em tela cheia, num celular,
+   durante rolagem. */
+
+/* O risco cai e some antes de encostar embaixo: chuva de verdade não
+   "aterrissa" no meio da tela, ela sai do enquadramento. A leve inclinação
+   evita que pareça listra de interface. */
+@keyframes dcRainLinha {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12vh, 0) rotate(6deg);
+  }
+  12%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(6vh, 112vh, 0) rotate(6deg);
+  }
+}
+.dc-rain-linha {
+  animation-name: dcRainLinha;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/* A gota do vidro NÃO cai — ela junta água. O ciclo é longo e o que muda é
+   a opacidade e um leve inchar; parada demais viraria sujeira na lente,
+   animada demais viraria bolha subindo. */
+@keyframes dcRainGota {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  14%,
+  76% {
+    opacity: 0.85;
+    transform: scale(1);
+  }
+  90% {
+    opacity: 0.5;
+    transform: scale(1.06);
+  }
+}
+/* Longhand de propósito: a duração fica aqui e o atraso vem inline, e o React
+   avisa quando se mistura o atalho `animation` com uma propriedade solta do
+   mesmo grupo — a que chegar depois apaga a outra. */
+.dc-rain-gota {
+  animation-name: dcRainGota;
+  animation-duration: 9s;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+/* A escorrida: a gota desce puxando o rastro. Devagar (6–13s) porque água
+   em vidro escorre devagar mesmo — acelerar isso é o erro mais comum e o que
+   faz o efeito parecer videogame. */
+@keyframes dcRainEscorre {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0);
+  }
+  8%,
+  84% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 62vh, 0);
+  }
+}
+.dc-rain-escorre {
+  animation-name: dcRainEscorre;
+  animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35);
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Os riscos e as escorridas SÓ existem em movimento — somem. As gotas
+     paradas no vidro continuam: vidro molhado parado ainda é vidro molhado,
+     e é o que sobra de chuva para quem pediu menos movimento. */
+  .dc-rain-linha,
+  .dc-rain-escorre {
+    animation: none;
+    opacity: 0;
+  }
+  .dc-rain-gota {
+    animation: none;
+    opacity: 0.75;
   }
 }
 
@@ -1310,9 +2035,15 @@ button:active > .duo3d {
   }
 }
 
-/* ── Decorações do Caminho (itens do Cantinho) — vida por TIPO ──
-   Céu deriva no alto, plantas balançam, bichinhos passeiam, objetos flutuam
-   e especiais pulsam com brilho. Transform/opacity apenas (zero repaint). */
+/* ── Vida dos enfeites da trilha (itens do Cantinho) ──────────────
+   Vida por TIPO: plantas balançam, bichinhos passeiam, o resto flutua e os
+   especiais pulsam com brilho. Só transform/opacity — zero repaint.
+
+   Estas amplitudes já foram reduzidas uma vez, quando se achou que ELAS
+   causavam a queixa de "ícones voando pela tela". Não causavam: o que voava
+   era uma faixa `sticky` separada, que pegava os itens do tipo céu e os
+   arrastava pelo cenário sem deixar tocar. Essa faixa foi removida, e os
+   valores originais voltaram — o enfeite posicionado sempre esteve certo. */
 @keyframes dcHover {
   0%,
   100% {
@@ -1357,17 +2088,1359 @@ button:active > .duo3d {
     transform: scale(1.3);
   }
 }
-@keyframes dcSkyDrift {
-  0% {
-    transform: translateX(-15vw);
-  }
+
+/* ── Luzes: acendem e apagam, sem sair do lugar ──────────────────────────
+   Mexe em `opacity` e numa escala mínima. Luz que se DESLOCA vira vaga-lume
+   — e vaga-lume já existe, é outro item. O período (5,3s) é primo com os
+   demais (7s do bicho, 5,5s da planta, 4s do hover) de propósito: períodos
+   parecidos sincronizam depois de alguns ciclos, e a tela inteira passa a
+   pulsar junto como um alarme. */
+@keyframes dcTwinkle {
+  0%,
   100% {
-    transform: translateX(110vw);
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+  45% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  70% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}
+
+/* ── Águas: sobem e descem, com um leve estica-encolhe ───────────────────
+   O ponto é o PESO. A planta balança presa pelo pé (`transform-origin` em
+   50% 90%); a água não tem pé — ela boia. Por isso o movimento é vertical e
+   o corpo se deforma um pouco no topo do curso, como coisa que flutua. */
+@keyframes dcRipple {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  30% {
+    transform: translateY(-6px) scale(0.97, 1.04);
+  }
+  60% {
+    transform: translateY(-2px) scale(1.03, 0.98);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .dc-decor,
   .dc-decor * {
     animation: none !important;
+  }
+}
+
+/* ── O cartão de conquista que ainda tem prêmio a pegar ──────────────────
+   Um pulso lento e discreto. É o único estado da grade que PEDE uma ação, e
+   sem ele o cartão desbloqueado-mas-não-resgatado lê igual ao já resgatado —
+   o prêmio ficaria esperando para sempre, sem ninguém saber que está lá.
+
+   Lento (2,4 s) e de amplitude curta (opacidade 1 → 0,72): é uma grade que
+   pode ter dez cartões nesse estado ao mesmo tempo, e dez piscadas rápidas
+   viram alarme. */
+@keyframes dc-pulso-lento {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+.animate-pulse-slow {
+  animation: dc-pulso-lento 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* PARA, não some: o anel verde e o botão continuam dizendo o que fazer. */
+  .animate-pulse-slow {
+    animation: none;
+  }
+}
+
+/* ── No ar: as partículas do tipo `clima` ────────────────────────────────
+   Ver `src/lib/clima-do-cantinho.ts` — a régua (quantas, quão rápido, para
+   onde) mora lá; aqui só o percurso.
+
+   ⚠️ O deslocamento vertical é `--dc-fim` (hoje `calc(100svh + 4rem)`), e
+   NUNCA `100%`: numa `translate3d`, a porcentagem do eixo Y é da PRÓPRIA
+   partícula — que tem 1rem. A pétala andaria dezesseis pixels e voltaria.
+
+   ⚠️ E a caixa que hospeda tudo isto é uma tela grudada no topo (`sticky`),
+   não a trilha inteira. A primeira versão passava aqui a altura real da
+   trilha, e o navegador mediu o resultado: de 42 partículas, UMA estava
+   dentro da tela. Ver `ClimaNoAr`.
+
+   ⚠️ A translação lateral em `%` também seria da própria partícula, então a
+   deriva vem em `vw` — que é a única unidade aqui que fala da largura certa. */
+@keyframes dcClimaCai {
+  from {
+    transform: translate3d(0, -3rem, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--dc-deriva, 0px), var(--dc-fim, 100vh), 0)
+      rotate(var(--dc-giro, 0deg));
+  }
+}
+@keyframes dcClimaSobe {
+  from {
+    transform: translate3d(0, var(--dc-fim, 100vh), 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--dc-deriva, 0px), -3rem, 0) rotate(var(--dc-giro, 0deg));
+  }
+}
+/* Nasce e morre transparente: partícula que some de repente na borda de baixo
+   lê como um elemento que foi apagado, e não como algo que passou. */
+@keyframes dcClimaFade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  12%,
+  86% {
+    opacity: var(--dc-op, 0.8);
+  }
+}
+.dc-clima {
+  position: absolute;
+  top: 0;
+  will-change: transform;
+  animation:
+    var(--dc-percurso) var(--dc-dur) linear infinite,
+    dcClimaFade var(--dc-dur) linear infinite;
+  animation-delay: var(--dc-atraso), var(--dc-atraso);
+}
+/* ⚠️ PARA, não some. Quem pediu menos movimento continua vendo o item que
+   comprou — espalhado e imóvel. Esconder faria a paciente achar que a Chuva
+   de pétalas de 90 🌱 não veio. */
+@media (prefers-reduced-motion: reduce) {
+  .dc-clima {
+    animation: none !important;
+    opacity: var(--dc-op, 0.8);
+    transform: translate3d(0, var(--dc-parada, 40vh), 0);
+  }
+}
+
+/* ── Folha que sobe (oferta do Premium, e o que mais vier) ───────────────
+   Sobe a folha INTEIRA a partir de baixo, e não os 20px do `slideUp` já
+   existente: uma folha que aparece a 20px do lugar final lê como um card
+   piscando, não como algo que veio da beira da tela. A curva desacelera no
+   fim (nada de bounce — isto é informação de preço, não brinquedo).
+   No desktop a folha centraliza, e aí a subida vira só um respiro curto. */
+@keyframes dcSheetUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dc-sheet-up {
+  animation: dcSheetUp 0.28s cubic-bezier(0.22, 0.8, 0.3, 1) both;
+}
+@media (min-width: 640px) {
+  @keyframes dcSheetUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-sheet-up {
+    animation-duration: 0.001ms;
+  }
+}
+
+/* ══════════════ Chat da IA — atmosfera ═══════════════════════════════
+   Esta é a aba que mais fala "tecnologia" no app, e o desafio dela é fazer
+   isso sem virar ficção científica: a paciente está aqui para perguntar se
+   pode tomar dipirona, não para admirar efeito.
+
+   A regra é a mesma do ambiente do céu: só `transform` e `opacity`, ciclos
+   longos, poucos elementos. Três manchas de luz derivando devagar atrás do
+   gradiente do céu — o bastante para a tela respirar e nunca o bastante para
+   competir com o texto. */
+@keyframes dcAuroraA {
+  0%,
+  100% {
+    transform: translate3d(-8%, -6%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.18);
+  }
+}
+@keyframes dcAuroraB {
+  0%,
+  100% {
+    transform: translate3d(10%, 6%, 0) scale(1.1);
+  }
+  50% {
+    transform: translate3d(-6%, -8%, 0) scale(0.92);
+  }
+}
+@keyframes dcAuroraC {
+  0%,
+  100% {
+    transform: translate3d(0, 10%, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(-10%, -4%, 0) scale(1.22);
+  }
+}
+.dc-aurora-a {
+  animation: dcAuroraA 34s ease-in-out infinite;
+}
+.dc-aurora-b {
+  animation: dcAuroraB 46s ease-in-out infinite;
+}
+.dc-aurora-c {
+  animation: dcAuroraC 40s ease-in-out infinite;
+}
+
+/* O cursor do texto que se digita sozinho no campo de mensagem. */
+@keyframes dcCaret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0;
+  }
+}
+.dc-caret {
+  animation: dcCaret 1.1s steps(1, end) infinite;
+}
+
+/* Brilho que atravessa a bolha enquanto a IA pensa — sinal de que a máquina
+   está trabalhando, no lugar dos três pontinhos de sempre. */
+@keyframes dcThinkSweep {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+.dc-think-sweep {
+  animation: dcThinkSweep 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* As auroras ficam PARADAS, não invisíveis: elas são cor de fundo, e some
+     a cor a tela fica chapada. O que sai é o movimento. */
+  .dc-aurora-a,
+  .dc-aurora-b,
+  .dc-aurora-c,
+  .dc-caret,
+  .dc-think-sweep {
+    animation: none;
+  }
+  /* Sem varredura, o sinal de "pensando" tem que existir de outro jeito. */
+  .dc-think-sweep {
+    opacity: 0.5;
+  }
+}
+
+/* ══════════════ Enfeites boiando na tela das atividades ══════════════
+   Os itens que a paciente comprou na loja, atrás do conteúdo. O movimento é
+   propositalmente lento e curto — 14 a 23 segundos por ciclo, 10px de sobe e
+   desce, 3 graus de giro. Num emoji de 130px isso é quase imperceptível, que
+   é o ponto: a tela precisa parecer viva sem que nada peça atenção.
+   Só `transform`, para não custar layout. */
+@keyframes dcFlutua {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translate3d(4px, -10px, 0) rotate(1.5deg);
+  }
+}
+.dc-flutua {
+  animation-name: dcFlutua;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Param, não somem: eles são cor de fundo. O que sai é o movimento. */
+  .dc-flutua {
+    animation: none;
+  }
+}
+
+/* ── Figura do Movimento do dia ────────────────────────────────────────────
+   Animações do desenho de linha que demonstra cada exercício
+   (`src/components/figura-movimento.tsx`). Cada uma anima UM grupo do SVG.
+
+   Duas famílias:
+   · transformações (girar/transladar) para o que muda de ângulo;
+   · `dc-mv-gato1/2`, um par de opacidades cruzadas, para o que muda de POSE
+     — interpolar o `d` de um <path> entre duas formas não é confiável entre
+     navegadores, e cruzar dois desenhos o olho lê como a mesma figura se
+     movendo.
+
+   Todas param em `prefers-reduced-motion`: a figura congela na primeira pose,
+   que continua sendo um desenho correto do exercício. */
+
+@keyframes dc-mv-ombros {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(0, -4px);
+  }
+  50% {
+    transform: translate(-3px, -1px);
+  }
+  75% {
+    transform: translate(0, 3px);
+  }
+}
+
+@keyframes dc-mv-pescoco {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-19deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+  75% {
+    transform: rotate(19deg);
+  }
+}
+
+@keyframes dc-mv-pelve {
+  0%,
+  100% {
+    transform: rotate(0deg) translateY(0);
+  }
+  30% {
+    transform: rotate(-7deg) translateY(-2px);
+  }
+  70% {
+    transform: rotate(7deg) translateY(2px);
+  }
+}
+
+@keyframes dc-mv-torcao {
+  0%,
+  100% {
+    transform: rotate(0deg) scaleX(1);
+  }
+  25% {
+    transform: rotate(-11deg) scaleX(0.86);
+  }
+  50% {
+    transform: rotate(0deg) scaleX(1);
+  }
+  75% {
+    transform: rotate(11deg) scaleX(0.86);
+  }
+}
+
+@keyframes dc-mv-tornozelo {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dc-mv-joelhoE {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-11deg);
+  }
+}
+
+@keyframes dc-mv-joelhoD {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(11deg);
+  }
+}
+
+@keyframes dc-mv-balanco {
+  0%,
+  100% {
+    transform: translateX(-7px);
+  }
+  50% {
+    transform: translateX(7px);
+  }
+}
+
+/* Par de opacidades cruzadas: a pose A ocupa a primeira metade do ciclo, a
+   pose B a segunda, com uma passagem suave no meio. */
+@keyframes dc-mv-gato1 {
+  0%,
+  38% {
+    opacity: 1;
+  }
+  50%,
+  88% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes dc-mv-gato2 {
+  0%,
+  38% {
+    opacity: 0;
+  }
+  50%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* A figura para na primeira pose — que já é um desenho correto do
+     exercício, então nada de informação se perde. */
+  [style*="dc-mv-"] {
+    animation: none !important;
+  }
+}
+/* ── O MASCOTE ────────────────────────────────────────────────────────────
+   A sensação de "app muito bem feito" que se atribui a 3D não vem de 3D. O
+   Duolingo é vetor chapado e o Candy Crush usa 3D pré-renderizado achatado em
+   sprite — nenhum dos dois roda motor 3D no celular. O que produz a sensação
+   são mola, peso e deformação, e as três cabem aqui. */
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   A BOLHA VIVA
+
+   Três camadas, uma transformação em cada. CSS aplica UMA animação por
+   propriedade: duas escrevendo `transform` no mesmo elemento fazem a última
+   declarada vencer e a outra some. Como flutuar, tocar, pular e respirar todos
+   querem `transform`, empilhar num elemento só é impossível — e era por isso
+   que cada animação nova exigia desligar outra.
+
+     .bolha-viva          gira      (inclinação ociosa · negar)
+       └ .bolha-palco     translada (flutuar · pular · atenção)
+           └ .bolha-corpo escala    (tocar · respirar · chegar)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.bolha-viva {
+  position: relative;
+  display: inline-block;
+  /* A bolha deforma a partir da BASE. Escalar pelo centro faz o objeto
+     atravessar o próprio chão quando encolhe — o olho lê como flutuando, não
+     como pousando. */
+  transform-origin: 50% 100%;
+}
+
+.bolha-palco {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+.bolha-corpo {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transform-origin: 50% 100%;
+}
+
+/* A sombra vive FORA das três camadas: precisa encolher enquanto o corpo
+   estica, e dentro dele herdaria a mesma deformação — o oposto do que dá peso. */
+.bolha-sombra {
+  position: absolute;
+  left: 50%;
+  bottom: -6%;
+  width: 62%;
+  height: 10%;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: radial-gradient(ellipse, rgba(90, 60, 55, 0.26), transparent 72%);
+  /* Todo keyframe de repouso vale 0,85, e a base valia 1. A classe da acao sai
+     40ms DEPOIS da animacao terminar (`DURACAO_ACAO + 40`), e nessa janela a
+     base reaparecia: medido um flash de +17,6% por 1-2 quadros no fim do
+     `atencao` e do `chegar`. O `pulo` escapava por 5ms de sorte. */
+  opacity: 0.85;
+  transition:
+    transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    opacity 220ms ease;
+}
+
+/* ── AÇÃO SECUNDÁRIA: a iridescência viva ──────────────────────────────────
+   O que faz uma bolha de sabão ser reconhecível não é a forma — é a cor que
+   escorrega pela superfície. Um `hue-rotate` lento devolve isso sem arte nova,
+   e fica perfeitamente recortado porque é filtro sobre a própria imagem.
+
+   13,7s: mais um período que não é múltiplo de nenhum outro daqui. */
+.bolha-brilho {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+}
+
+.bolha-iris .bolha-brilho {
+  animation: bolhaIris 13.7s ease-in-out infinite;
+}
+
+@keyframes bolhaIris {
+  0%,
+  100% {
+    filter: hue-rotate(0deg) saturate(1);
+  }
+  34% {
+    filter: hue-rotate(-8deg) saturate(1.07);
+  }
+  67% {
+    filter: hue-rotate(10deg) saturate(0.96);
+  }
+}
+
+/* ── TOQUE: esmaga e assenta AMORTECIDO ────────────────────────────────────
+   Era uma transição só, com mola na curva: ia, voltava passando do ponto, e
+   parava. Uma oscilação única lê como interpolação de software.
+
+   Agora são três quiques, cada um MENOR que o anterior — 12%, 5%, 2%. É a
+   progressão decrescente que o olho lê como matéria perdendo energia; sem ela
+   o movimento é correto e mesmo assim parece falso.
+
+   E o volume se conserva: quando achata em Y, alarga em X. Achatar nos dois
+   eixos leria como encolher, não como amassar. */
+.bolha-apertada .bolha-corpo {
+  animation: bolhaToque 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* Especificidade subida de proposito. `.bolha-flutua .bolha-sombra` tem o mesmo
+   peso e vem DEPOIS na folha, entao a sombra do toque nunca rodava — e
+   `flutua` e o padrao de todos os usos do app. A interacao mais frequente era a
+   unica sem resposta de chao, por acidente de ordem de arquivo. */
+.bolha-viva.bolha-apertada .bolha-sombra {
+  animation: bolhaToqueSombra 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes bolhaToque {
+  0% {
+    transform: scale(1, 1);
+  }
+  18% {
+    transform: scale(1.12, 0.85);
+  }
+  38% {
+    transform: scale(0.937, 1.0675);
+  }
+  58% {
+    transform: scale(1.03, 0.9696);
+  }
+  78% {
+    transform: scale(0.9865, 1.0137);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes bolhaToqueSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  18% {
+    transform: translateX(-50%) scale(1.24, 1);
+    opacity: 1;
+  }
+  38% {
+    transform: translateX(-50%) scale(0.9, 1);
+    opacity: 0.72;
+  }
+  58% {
+    transform: translateX(-50%) scale(1.08, 1);
+    opacity: 0.92;
+  }
+}
+
+/* ── FLUTUAR: sobe pouco, e ao subir a sombra encolhe e clareia ────────────
+   É essa troca — e não o deslocamento — que o cérebro lê como massa suspensa. */
+.bolha-flutua .bolha-palco {
+  animation: bolhaSobe 3.6s ease-in-out infinite;
+}
+.bolha-flutua .bolha-sombra {
+  animation: bolhaSombra 3.6s ease-in-out infinite;
+}
+
+@keyframes bolhaSobe {
+  0%,
+  100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  50% {
+    transform: translateY(-9%) scale(0.985, 1.015);
+  }
+}
+
+@keyframes bolhaSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translateX(-50%) scale(0.76, 0.8);
+    opacity: 0.5;
+  }
+}
+
+/* ── OCIOSIDADE QUE NÃO SE REPETE ──────────────────────────────────────────
+   O flutuar sozinho é um laço PERFEITO de 3,6s, e o olho decora um laço
+   perfeito em poucos segundos. A partir daí ele para de ler "bicho" e passa a
+   ler "GIF" — que é a diferença entre o Duo e um adesivo animado.
+
+   O truque não é animar mais: é um SEGUNDO ciclo cujo período não é múltiplo
+   do primeiro. 8,3s contra 3,6s só coincidem de novo depois de ~299 segundos,
+   então cada volta do flutuar pega a inclinação num ponto diferente e nenhuma
+   volta sai igual à anterior. Com a iridescência de 13,7s entrando, o padrão
+   composto passa de uma hora. */
+.bolha-flutua {
+  animation: bolhaOlha 8.3s ease-in-out infinite;
+}
+
+@keyframes bolhaOlha {
+  0%,
+  62%,
+  100% {
+    transform: rotate(0deg);
+  }
+  70% {
+    transform: rotate(-3.5deg);
+  }
+  84% {
+    transform: rotate(2deg);
+  }
+}
+
+/* ── PULO: o princípio que faltava em tudo ─────────────────────────────────
+   ANTECIPAÇÃO. Antes de subir ela AGACHA — um movimento contrário, curto, que
+   mostra de onde vem a força. Sem ele o objeto some do chão e reaparece no ar:
+   correto na física, e mesmo assim lido como teletransporte, porque nenhum
+   corpo salta sem primeiro dobrar.
+
+   Depois: estica ao subir (volume conservado, afina em X), relaxa no ápice
+   (no ar não há força atuando), ACHATA na aterrissagem, e assenta em dois
+   quiques cada vez menores.
+
+   A sombra faz o caminho inverso o tempo todo: aperta quando ela agacha,
+   some quase toda no ápice, e espalha forte no impacto. */
+/* A camada `.bolha-viva` fica livre durante o pulo (o flutuar sai), e era
+   justamente a acao que mais precisava dela: o corpo subia e descia numa reta
+   vertical perfeita, aprumado em 0,00° do primeiro ao ultimo quadro. Nenhum
+   corpo salta assim. Inclina na decolagem, contra-inclina no ar, endireita no
+   pouso. */
+.bolha-pulo {
+  animation: bolhaPuloGiro 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+.bolha-pulo .bolha-palco {
+  animation: bolhaPulo 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+.bolha-pulo .bolha-corpo {
+  animation: bolhaPuloCorpo 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+/* Sem atraso. Eu tinha posto 45ms achando que era sobreposicao — e sobreposicao
+   vale para apendice com INERCIA (orelha, cauda, cabelo). Sombra de contato e
+   projecao geometrica: nao tem massa, nao pode chegar depois. Medido, os 45ms
+   eram o chao informando por 2,7 quadros uma altura que o corpo ja nao tinha.
+   A sobreposicao real do pulo vem das quatro camadas atingindo seus extremos
+   em 234 / 414 / 458 / 630ms — 396ms de espalhamento, sem truque de fase. */
+.bolha-pulo .bolha-sombra {
+  animation: bolhaPuloSombra 900ms cubic-bezier(0.33, 0, 0.28, 1);
+}
+
+@keyframes bolhaPulo {
+  0% {
+    transform: translateY(0);
+  }
+  12% {
+    transform: translateY(2%);
+  } /* agacha */
+  46% {
+    transform: translateY(-52%);
+  } /* ápice */
+  68% {
+    transform: translateY(0);
+  } /* aterrissa */
+  80% {
+    transform: translateY(-15.6%);
+  } /* quique 1 — 0,30 do apice */
+  90% {
+    transform: translateY(0);
+  }
+  95% {
+    transform: translateY(-4.7%);
+  } /* quique 2 — 0,30 do quique 1 */
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bolhaPuloGiro {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  12% {
+    transform: rotate(1.5deg);
+  } /* agachada: pesa para tras */
+  26% {
+    transform: rotate(-5deg);
+  } /* decolagem: joga para a frente */
+  46% {
+    transform: rotate(3.5deg);
+  } /* no ar: contra-inclina */
+  70% {
+    transform: rotate(-2deg);
+  } /* pouso */
+  86% {
+    transform: rotate(1deg);
+  }
+}
+
+@keyframes bolhaPuloCorpo {
+  0% {
+    transform: scale(1, 1);
+  }
+  12% {
+    transform: scale(1.1, 0.86);
+  } /* agachada: larga e baixa */
+  26% {
+    transform: scale(0.9, 1.16);
+  } /* impulso: fina e alta */
+  46% {
+    transform: scale(1, 1);
+  } /* ápice: relaxada */
+  62% {
+    transform: scale(0.94, 1.08);
+  } /* caindo: estica de novo */
+  70% {
+    transform: scale(1.16, 0.82);
+  } /* impacto */
+  82% {
+    transform: scale(0.97, 1.04);
+  }
+  92% {
+    transform: scale(1.03, 0.98);
+  }
+  100% {
+    transform: scale(1, 1);
+  }
+}
+
+@keyframes bolhaPuloSombra {
+  0% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  12% {
+    transform: translateX(-50%) scale(1.16, 1);
+    opacity: 1;
+  }
+  46% {
+    transform: translateX(-50%) scale(0.5, 0.6);
+    opacity: 0.28;
+  }
+  70% {
+    transform: translateX(-50%) scale(1.3, 1);
+    opacity: 1;
+  }
+  80% {
+    transform: translateX(-50%) scale(0.86, 0.9);
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+}
+
+/* ── NEGAR: o "ainda não" ──────────────────────────────────────────────────
+   Balanço de cabeça amortecido: 9°, 7°, 4°, 2°. A antecipação aqui é o
+   primeiro giro ser para o lado CONTRÁRIO ao que o olho espera de uma negativa
+   — ela recua antes de negar, pelo mesmo motivo do agachar. */
+.bolha-nao {
+  animation: bolhaNao 620ms ease-out;
+}
+
+@keyframes bolhaNao {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(3deg);
+  } /* antecipação */
+  28% {
+    transform: rotate(-9deg);
+  }
+  46% {
+    transform: rotate(5.4deg);
+  }
+  64% {
+    transform: rotate(-3.24deg);
+  }
+  82% {
+    transform: rotate(1.94deg);
+  }
+}
+
+/* ── CHEGAR: entrada em cena ───────────────────────────────────────────────
+   Surge pequena, PASSA do tamanho final e volta. Chegar no tamanho certo de
+   primeira lê como um elemento sendo montado; passar do ponto lê como algo
+   que chegou com impulso próprio. */
+.bolha-chega .bolha-corpo {
+  animation: bolhaChega 720ms ease-out;
+}
+.bolha-chega .bolha-sombra {
+  animation: bolhaChegaSombra 720ms ease-out;
+}
+
+@keyframes bolhaChega {
+  0% {
+    transform: scale(0.2, 0.2);
+    opacity: 0;
+  }
+  35% {
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1.12, 0.9);
+  }
+  74% {
+    transform: scale(0.95, 1.06);
+  }
+  88% {
+    transform: scale(1.03, 0.97);
+  }
+  100% {
+    transform: scale(1, 1);
+    opacity: 1;
+  }
+}
+
+@keyframes bolhaChegaSombra {
+  0% {
+    transform: translateX(-50%) scale(0.2, 1);
+    opacity: 0;
+  }
+  55% {
+    transform: translateX(-50%) scale(1.05, 1);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+}
+
+/* ── ATENÇÃO: o cutucão ────────────────────────────────────────────────────
+   Dois saltinhos curtos, do tamanho de um "psiu". Discreto de propósito: o app
+   é de uma gestante de alto risco, e um mascote que pula pedindo toque a cada
+   pausa vira mais uma coisa cobrando atenção de quem já tem demais. */
+.bolha-atencao .bolha-palco {
+  animation: bolhaAtencao 800ms ease-in-out;
+}
+.bolha-atencao .bolha-sombra {
+  animation: bolhaAtencaoSombra 800ms ease-in-out;
+}
+
+@keyframes bolhaAtencao {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  8% {
+    transform: translateY(1.5%);
+  } /* antecipação */
+  24% {
+    transform: translateY(-16%);
+  }
+  40% {
+    transform: translateY(0);
+  }
+  46% {
+    transform: translateY(1%);
+  }
+  60% {
+    transform: translateY(-9%);
+  }
+  76% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes bolhaAtencaoSombra {
+  0%,
+  100% {
+    transform: translateX(-50%) scale(1, 1);
+    opacity: 0.85;
+  }
+  24% {
+    transform: translateX(-50%) scale(0.78, 0.82);
+    opacity: 0.52;
+  }
+  60% {
+    transform: translateX(-50%) scale(0.88, 0.9);
+    opacity: 0.68;
+  }
+}
+
+/* ── RESPIRANDO ────────────────────────────────────────────────────────────
+   Quem manda no `transform` do corpo é o React, por estilo inline, com a
+   duração da fase em curso. Aqui só entra a transição — sem ela, o inline
+   trocaria de valor sem interpolar e a bolha saltaria de tamanho. */
+.bolha-respira .bolha-corpo {
+  transform: scale(var(--respiro-escala, 1));
+}
+.bolha-respira .bolha-sombra {
+  transform: translateX(-50%) scale(var(--respiro-sombra, 1), 1);
+  opacity: var(--respiro-sombra-op, 0.85);
+}
+.bolha-respira .bolha-corpo,
+.bolha-respira .bolha-sombra {
+  transition-property: transform, opacity;
+  /* `!important` porque a regra universal de `prefers-reduced-motion` lá em
+     cima zera TODA transicao com `!important`, e a respiracao guiada e
+     conteudo: sem duracao ela nao vira "parada", vira SALTO de 27px num quadro
+     so — o estimulo mais agressivo da tela indo justamente para quem pediu
+     menos movimento. */
+  transition-duration: var(--respiro-ms, 0ms) !important;
+  transition-timing-function: linear !important;
+}
+
+/* ── MENOS MOVIMENTO ───────────────────────────────────────────────────────
+   Quem liga esta preferência tem enxaqueca ou labirintite, e uma boa parte das
+   pacientes tem. Some tudo que é AMBIENTE — flutuar, inclinar, iridescência —
+   porque isso acontece sem ela pedir e é o que provoca enjoo.
+
+   O que RESPONDE a uma ação dela fica: o toque, o pulo da comemoração, o negar
+   de um erro. Esses ela causou, e sumir com eles tiraria a resposta do próprio
+   gesto — a tela pareceria travada, que é pior. Amplitude reduzida resolve o
+   enjoo sem tirar a resposta. */
+@media (prefers-reduced-motion: reduce) {
+  /* A respiracao continua respirando, com 35% do curso. Some-la deixaria o
+     exercicio sem referencia visual; mante-la inteira enjoaria. */
+  .bolha-respira .bolha-corpo {
+    transform: scale(var(--respiro-escala-suave, 1));
+  }
+  .bolha-flutua,
+  .bolha-flutua .bolha-palco,
+  .bolha-flutua .bolha-sombra,
+  .bolha-iris .bolha-brilho {
+    animation: none;
+  }
+  /* `animation-name` sozinho nao basta: a regra universal la em cima poe
+     `animation-duration: 0.001ms !important`, que vence. Medido: as quatro
+     acoes rodavam 1 quadro distinto em 300ms — inertes. Os keyframes suaves
+     eram codigo morto, e o comentario acima afirmava o contrario do que o
+     navegador fazia. A duracao precisa voltar com o mesmo peso. */
+  .bolha-pulo .bolha-palco,
+  .bolha-atencao .bolha-palco {
+    animation-name: bolhaPuloSuave;
+    animation-duration: 620ms !important;
+  }
+  .bolha-nao {
+    animation-name: bolhaNaoSuave;
+    animation-duration: 420ms !important;
+  }
+  .bolha-apertada .bolha-corpo,
+  .bolha-viva.bolha-apertada .bolha-sombra {
+    animation-duration: 320ms !important;
+  }
+}
+
+@keyframes bolhaPuloSuave {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  46% {
+    transform: translateY(-10%);
+  }
+}
+
+@keyframes bolhaNaoSuave {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  30% {
+    transform: rotate(-2.5deg);
+  }
+  65% {
+    transform: rotate(1.5deg);
+  }
+}
+
+/* ══════════ Círculos guiados: respiração e meditação ══════════════════════
+   Mesmo problema que a Bolha já resolvia, nos dois lugares onde ele dói mais.
+
+   A regra universal de `prefers-reduced-motion` (bem no alto deste arquivo)
+   zera TODA transição com `!important`. Estilo inline não vence `!important`
+   de folha — então os anéis do Respirar e o círculo do Meditar, que escrevem
+   `transitionDuration` inline, perdiam a duração e passavam a SALTAR de
+   `scale(0.5)` para `scale(1)` num quadro só. Quinze saltos numa respiração,
+   uns cinquenta numa meditação de dez minutos.
+
+   Quem liga "menos movimento" tem enxaqueca ou labirintite, e recebia
+   exatamente o estímulo mais agressivo da tela. A duração vem da variável que
+   o componente escreve; o `!important` é o que a faz sobreviver. */
+/* Os aneis que cercam a bolha na meditacao.
+   ⚠️ `linear`, e nao uma curva suavizada: e a MESMA funcao de tempo de
+   `.bolha-respira`, que fica no centro deles. Com curvas diferentes os tres
+   circulos concentricos deslizam um dentro do outro — medido, aos 13,1s a
+   bolha tinha andado 26% do percurso e o anel 19%. E o pulmao enche em ritmo
+   constante mesmo; a suavizacao fazia o comeco da inspiracao parecer travado. */
+.dc-guiado {
+  transition-property: transform !important;
+  transition-duration: var(--guiado-ms, 0ms) !important;
+  transition-timing-function: linear !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* A amplitude também cai: o movimento continua legível como compasso, sem
+     um círculo de 288px dobrando de tamanho. */
+  .dc-guiado {
+    transform: scale(calc(1 + (var(--guiado-escala, 1) - 1) * 0.35)) !important;
+  }
+}
+
+/* ══════════ Sons para dormir: as três barrinhas de "está tocando" ══════════
+   Sinal de que o som está no ar — a tela é escura e o ladrilho aceso pode não
+   bastar, principalmente se o celular estiver no silencioso. Anima ALTURA e
+   não escala: escalar deixaria as barras borradas no meio do movimento. */
+@keyframes dc-onda {
+  0%,
+  100% {
+    height: 5px;
+  }
+  50% {
+    height: 14px;
+  }
+}
+.dc-onda {
+  height: 5px;
+  animation: dc-onda 1.1s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Fica de pé, parada: apagá-la tiraria a única confirmação visual de que o
+     som está tocando de quem pediu menos movimento. */
+  .dc-onda {
+    animation: none;
+    height: 10px;
+  }
+}
+
+/* ══════════ Sessão do casal: as duas respirações que se encontram ══════════
+   A de trás entra com atraso e alcança a da frente — é o desenho da regra que
+   a voz dá ("quem manda no ritmo é ela"). Amplitude igual nas duas: o que as
+   separa é a fase, não o tamanho. */
+@keyframes dc-casal-respira {
+  0%,
+  100% {
+    transform: scale(0.9);
+  }
+  45% {
+    transform: scale(1.08);
+  }
+}
+.dc-casal-respira {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dc-casal-respira 7s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-casal-respira {
+    animation: none;
+  }
+}
+
+/* ══════════ Movimentos novos: deitada de lado e de frente para a parede ═════
+   Mesma gramática dos `dc-mv-` que já existiam — amplitude pequena, ciclo
+   longo, e tudo para em `prefers-reduced-motion`. O desenho ensina o que o
+   texto não ensina: "bem embaixo, na base da coluna" é ambíguo escrito e
+   óbvio visto. */
+@keyframes dc-mv-respira {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+@keyframes dc-mv-fecha {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+}
+@keyframes dc-mv-joelhopeito {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-22deg);
+  }
+}
+@keyframes dc-mv-eleva {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-9deg);
+  }
+}
+@keyframes dc-mv-aperta {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.78);
+  }
+}
+@keyframes dc-mv-agacha {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(14px);
+  }
+}
+@keyframes dc-mv-costelas {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(6px) rotate(-3deg);
+  }
+}
+@keyframes dc-mv-panturrilha {
+  0%,
+  100% {
+    transform: skewX(0deg);
+  }
+  50% {
+    transform: skewX(-5deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [style*="dc-mv-"] {
+    animation: none !important;
+  }
+}
+
+/* ─── A BARRINHA DE PROGRESSO DO STORY ────────────────────────────────────
+   Uma passada só (`forwards`), e quem a pausa é `animationPlayState` no
+   próprio elemento — o dedo na tela pausa a barra e o relógio do `setTimeout`
+   juntos. Sem isso a barra correria sozinha e chegaria ao fim antes de a foto
+   trocar, o que lê como travamento. */
+@keyframes dc-story-barra {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS REAÇÕES DO FEED (ago/2026)
+
+   Pedido do dono: "adicione recursos de reação mais legais na imagem, como
+   like clicando duas vezes… pense em como melhorar isso, ficar mais
+   interativo, profissional e legal".
+
+   ⚠️ Toda animação daqui PARA em `prefers-reduced-motion`, nunca some: o
+   coração do toque duplo é a ÚNICA confirmação de que o gesto funcionou, e
+   apagá-lo deixaria a paciente tocando duas vezes de novo achando que falhou.
+   Sem movimento ele aparece e desaparece, sem crescer.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* O coração que estoura no meio da foto no toque duplo. */
+@keyframes dc-coracao-estoura {
+  0% {
+    transform: scale(0.2) rotate(-14deg);
+    opacity: 0;
+  }
+  18% {
+    transform: scale(1.25) rotate(-4deg);
+    opacity: 1;
+  }
+  38% {
+    transform: scale(0.92) rotate(0deg);
+    opacity: 1;
+  }
+  55% {
+    transform: scale(1.03) rotate(0deg);
+    opacity: 1;
+  }
+  75% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.12) rotate(0deg);
+    opacity: 0;
+  }
+}
+.dc-coracao-estoura {
+  animation: dc-coracao-estoura 1000ms var(--ease-out-expo) forwards;
+}
+
+/* Cada emoji da barra entra de baixo, em escada. O atraso vai por
+   `--dc-atraso`, escrito no elemento — a escada é o que faz a barra parecer
+   uma coisa que ABRIU, e não um bloco que apareceu. */
+@keyframes dc-reacao-entra {
+  from {
+    transform: translateY(12px) scale(0.55);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.dc-reacao-entra {
+  animation: dc-reacao-entra 300ms var(--ease-spring) backwards;
+  animation-delay: var(--dc-atraso, 0ms);
+}
+
+/* O pulo de quem acabou de ser escolhida. */
+@keyframes dc-pop {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.dc-pop {
+  animation: dc-pop 340ms var(--ease-spring);
+}
+
+/* A barra da enquete cresce até a fatia dela — `--dc-fatia` vem do elemento. */
+@keyframes dc-fatia-cresce {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.dc-fatia {
+  transform-origin: left center;
+  animation: dc-fatia-cresce 620ms var(--ease-out-expo) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-coracao-estoura {
+    /* Aparece e some, sem crescer — a confirmação continua existindo. */
+    animation: dc-coracao-estoura 1000ms linear forwards;
+    animation-name: dc-so-some;
+  }
+  @keyframes dc-so-some {
+    0%,
+    70% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: none;
+    }
+  }
+  .dc-reacao-entra,
+  .dc-pop,
+  .dc-fatia {
+    animation: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O ESQUELETO — a forma da tela antes do conteúdo
+   ══════════════════════════════════════════════════════════════════════════
+
+   ⚠️ Ele existe porque a tela do perfil não tinha estado de carregamento
+   NENHUM: `onde.t === "perfil"` com `perfil` nulo não casava com ramo algum e a
+   árvore caía de volta no FEED. A paciente tocava no avatar de quem publicou, a
+   tela não mudava, e segundos depois saltava para o perfil — que é o relato do
+   dono ("demora cinco segundos, ou até mais"). Meio segundo com resposta visual
+   é rápido; meio segundo de tela imóvel é um app quebrado, e a reação natural é
+   tocar de novo, o que dispara outra busca e piora o que já estava ruim.
+
+   ⚠️ `prefers-reduced-motion` PARA o brilho e deixa o bloco cinza — nunca o
+   esconde. Um esqueleto invisível devolve a tela imóvel que ele veio consertar.
+   É a mesma decisão da chama da sequência. */
+.dc-esqueleto {
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklch, var(--muted) 75%, transparent) 25%,
+    color-mix(in oklch, var(--muted) 40%, transparent) 37%,
+    color-mix(in oklch, var(--muted) 75%, transparent) 63%
+  );
+  background-size: 400% 100%;
+  animation: dc-esqueleto-brilho 1.4s ease-in-out infinite;
+}
+
+@keyframes dc-esqueleto-brilho {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-esqueleto {
+    animation: none;
+    background: color-mix(in oklch, var(--muted) 60%, transparent);
   }
 }

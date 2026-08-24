@@ -1,0 +1,112 @@
+/**
+ * O BACKFILL DE VETORES NÃO PODE GASTAR AS VAGAS COM RASCUNHO.
+ *
+ * `match_brain_entries` filtra `AND e.approved = true`: rascunho não é
+ * encontrável, nem por vetor nem por palavra. Mas o backfill pegava qualquer
+ * `embedding IS NULL`, sem ordem, 20 por visita — e o kit de partida instala
+ * ~30 entradas como RASCUNHO.
+ *
+ * Duas visitas inteiras à Base de conhecimento podiam ser gastas vetorizando
+ * exatamente o que a busca nunca vai devolver, enquanto a orientação APROVADA
+ * do médico seguia invisível e a paciente ouvia "registrei para ele ver" sobre
+ * um assunto que ele já tinha escrito. É a causa a mais do sintoma do sushi.
+ *
+ * ─── POR QUE ESTE ARQUIVO EXISTE ────────────────────────────────────────────
+ *
+ * Uma bateria de mutação mediu que REMOVER a priorização não quebrava teste
+ * nenhum. A ordenação acontece no Postgres, então não havia comportamento em
+ * memória para exercitar — e a única alternativa era casar string no arquivo,
+ * que quebra quando alguém renomeia e passa quando alguém inverte a lógica.
+ *
+ * A saída foi extrair o juízo para uma função e dar a ela um construtor de
+ * consulta de mentira. O que se testa é a cláusula que vai ao banco.
+ */
+
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { priorizarAprovadas } from "./embeddings.server";
+
+type Ordem = { coluna: string; ascendente: boolean };
+
+function consultaFalsa() {
+  const ordens: Ordem[] = [];
+  const q: any = {
+    order: (coluna: string, o: { ascending: boolean }) => {
+      ordens.push({ coluna, ascendente: o.ascending });
+      return q;
+    },
+    is: () => q,
+    limit: () => q,
+  };
+  return { q, ordens };
+}
+
+describe("a prioridade do backfill", () => {
+  const { q, ordens } = consultaFalsa();
+  priorizarAprovadas(q);
+
+  test("ordena por `approved` antes de qualquer outra coisa", () => {
+    expect(ordens[0]?.coluna).toBe("approved");
+  });
+
+  test("DESCENDENTE — em Postgres `false < true`", () => {
+    /* `ascending: true` poria os rascunhos na frente, ou seja, inverteria
+       exatamente o conserto: o backfill gastaria as 20 vagas com o que a busca
+       nunca devolve. */
+    expect(ordens[0]?.ascendente).toBe(false);
+  });
+
+  test("desempata pela mais ANTIGA", () => {
+    /* Entre duas aprovadas sem vetor, a que espera há mais tempo é a que está
+       invisível há mais tempo. Descendente aqui atenderia primeiro quem acabou
+       de ser criada, e a entrada antiga nunca sairia da fila numa base grande. */
+    expect(ordens[1]).toEqual({ coluna: "created_at", ascendente: true });
+  });
+
+  test("duas ordenações, não mais — a cadeia continua para quem chama", () => {
+    expect(ordens).toHaveLength(2);
+    expect(priorizarAprovadas(q)).toBe(q);
+  });
+});
+
+describe("e o CHAMADOR realmente a usa", () => {
+  /**
+   * Tudo acima prova a função EXTRAÍDA e nada prova quem a chama. Um
+   * verificador mediu: trocando, em `backfillBrainEmbeddings`,
+   *
+   *   await priorizarAprovadas(sb.from("brain_entries").select(...).eq(...))
+   * por
+   *   sb.from("brain_entries").select(...).eq(...)
+   *
+   * — ou seja, o backfill volta a pegar qualquer entrada, gastando as 20 vagas
+   * com rascunhos que a busca nunca devolve — a suíte inteira continuava verde.
+   * Remover a priorização de novo era de graça.
+   *
+   * O chamador está dentro de uma função que fala com o Gemini e com o banco;
+   * exercitá-la aqui custaria um dublê para cada um. A asserção é sobre a
+   * LIGAÇÃO, que é o que estava sem prova nenhuma.
+   */
+  const fonte = readFileSync("src/lib/embeddings.server.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  test("o backfill lê `brain_entries` através de `priorizarAprovadas`", () => {
+    const i = fonte.indexOf("export async function backfillBrainEmbeddings");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = fonte.slice(i);
+    expect(corpo).toContain('priorizarAprovadas(\n      sb.from("brain_entries")');
+  });
+
+  test("e não existe uma segunda leitura de `brain_entries` sem prioridade", () => {
+    /* A forma da regressão: `sb.from("brain_entries").select(...)` solto, fora
+       da chamada. Se aparecer, é o caminho sem prioridade voltando. */
+    const i = fonte.indexOf("export async function backfillBrainEmbeddings");
+    const corpo = fonte.slice(i);
+    const leituras = [...corpo.matchAll(/sb\.from\("brain_entries"\)\s*\.select/g)];
+    /* Exatamente UMA leitura, e ela e' a que esta' DENTRO da chamada. Uma
+       segunda seria o caminho sem prioridade voltando por outra porta. */
+    expect(leituras).toHaveLength(1);
+    const antes = corpo.slice(Math.max(0, leituras[0].index - 40), leituras[0].index);
+    expect(antes).toContain("priorizarAprovadas(");
+  });
+});

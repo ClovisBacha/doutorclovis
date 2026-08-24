@@ -133,19 +133,34 @@ export const attributeReferral = createServerFn({ method: "POST" })
     const referrerId: string | undefined = ref?.id;
     if (!referrerId || referrerId === uid) return { ok: true as const, attributed: false };
 
-    // Fixa a indicação SÓ se ainda está nula (evita corrida / troca posterior).
-    const { data: claimed } = await sb
+    /* Fixa a indicação SÓ se ainda está nula (evita corrida / troca posterior).
+       Já falhava seguro — sem linha de volta, ninguém é recompensado. O que
+       faltava era distinguir "outra pessoa chegou antes" (normal) de "a
+       escrita foi recusada" (defeito), porque os dois davam exatamente o mesmo
+       silêncio e o segundo custa a recompensa de uma indicação real.
+       O `retry: true` faz a tela tentar de novo mais tarde. */
+    const { data: claimed, error: claimErr } = await sb
       .from("patient_profiles")
       .update({ referred_by: referrerId })
       .eq("id", uid)
       .is("referred_by", null)
       .select("id");
+    if (claimErr) {
+      console.error("[indicação] atribuição recusada pelo banco", uid, claimErr);
+      return { ok: true as const, attributed: false, retry: true };
+    }
     if (!claimed || claimed.length === 0) return { ok: true as const, attributed: false };
 
     // Credita a indicadora: 100 🌱 por amiga (dedupe pelo id da amiga), fora do
     // Modo Cuidado da indicadora. Best-effort — a atribuição já está fixada.
+    /* ⚠️ UMA leitura do Modo Cuidado da indicadora, e não três. Ela decide a
+       moeda, o push e o seguir — e este caminho roda no PRIMEIRO login de toda
+       conta nova. Ler a mesma linha três vezes seguidas é desperdício num
+       lugar em que ele custa a primeira impressão do app. */
+    const refEmCuidado = await isCareModeActive(supabaseAdmin, referrerId);
+
     try {
-      if (!(await isCareModeActive(supabaseAdmin, referrerId))) {
+      if (!refEmCuidado) {
         await grantSementinhas(typedDb(supabaseAdmin), referrerId, [
           {
             amount: REFERRAL_REWARD,
@@ -157,5 +172,113 @@ export const attributeReferral = createServerFn({ method: "POST" })
     } catch (e) {
       console.error("[referral] reward failed", e);
     }
+
+    /* ─── ⚠️ E A INDICADORA PRECISA SABER QUE A AMIGA CHEGOU ─────────────
+       As 100 🌱 caíam em silêncio: o saldo dela subia e nada dizia por quê.
+       Este é o momento de maior afeto do recurso inteiro — alguém aceitou o
+       convite dela — e ele passava em branco.
+
+       É a mesma lição do presente do médico ("saldo que sobe sozinho é
+       indistinguível de bug"), e aqui há um segundo motivo: o push é o que faz
+       ela ABRIR a aba das Amigas e encontrar a recém-chegada lá, que é onde a
+       dupla e o presente vivem. Sem ele, a amiga entra e as duas nunca se
+       encontram dentro do app.
+
+       ⚠️ Modo Cuidado: o `isCareModeActive` acima já barrou a moeda. O aviso
+       vai DENTRO do mesmo portão pela mesma razão — quem acabou de perder a
+       gestação não recebe festa nenhuma.
+
+       Best-effort: a atribuição já está fixada e não depende disto. */
+    try {
+      if (!refEmCuidado) {
+        const { data: amiga } = await sb
+          .from("patient_profiles")
+          .select("display_name")
+          .eq("id", uid)
+          .maybeSingle();
+        const nome =
+          ((amiga?.display_name as string | null) ?? "").trim().split(/\s+/)[0] || "Uma amiga";
+        const { sendPushToUser } = await import("@/lib/push.server");
+        await sendPushToUser(referrerId, {
+          title: `${nome} entrou pelo seu convite 💛`,
+          body: `Vocês já estão conectadas — e você ganhou ${REFERRAL_REWARD} Sementinhas.`,
+          url: "/minha-conta?tab=Amigas",
+        });
+      }
+    } catch (e) {
+      console.error("[referral] push failed", e);
+    }
+
+    /* ─── ⚠️ E AS DUAS PASSAM A SE SEGUIR NA COMUNIDADE ──────────────────
+       A atribuição entregava a AMIZADE (Cantinho, dupla, presente, a camada
+       `amigas` do feed) e não entregava a única coisa que faz um feed existir:
+       ter alguém para ver. Na aba da Comunidade as duas continuavam invisíveis
+       uma para a outra, e a indicadora tinha de ir à BUSCA procurar pelo nome
+       da amiga que ela mesma acabou de trazer.
+
+       Seguir é estritamente MENOS que o vínculo recém-criado — a régua inteira
+       está em `seguir-apos-convite.ts`, com o portão de Modo Cuidado dentro.
+
+       Best-effort, como a moeda e o push: a atribuição já está fixada, e
+       derrubá-la por causa de duas linhas decorativas faria a amiga tentar de
+       novo e o `referred_by` já estar preenchido — ou seja, perder a indicação
+       de vez. */
+    try {
+      const { deveLigarNaRede, paresDoSeguir } = await import("@/lib/seguir-apos-convite");
+      if (
+        deveLigarNaRede({
+          indicadoraEmCuidado: refEmCuidado,
+          /* ⚠️ A recém-chegada também é conferida: a atribuição pode acontecer
+             semanas depois (o código fica 60 dias no navegador), e nesse meio
+             tempo ela pode ter ligado o Modo Cuidado. */
+          novaEmCuidado: await isCareModeActive(supabaseAdmin, uid),
+          mesmaPessoa: referrerId === uid,
+          /* ⚠️ **A leitura FALHA FECHADA.** `bloquear` desfaz o seguir de
+             propósito; ressuscitá-lo aqui desfaria a proteção dela em
+             silêncio, porque o bloqueio é calado. Um erro de rede vale
+             "bloqueada": um seguir a menos é um incômodo, um seguir por cima
+             de um bloqueio não tem conserto. */
+          bloqueada: await haBloqueioEntre(sb, referrerId, uid),
+        })
+      ) {
+        for (const par of paresDoSeguir(referrerId, uid)) {
+          /* ⚠️ `insert` e não `upsert`: quem dedupa é o índice único do par, e
+             `23505` aqui é sucesso repetido — a amiga pode já seguir a
+             indicadora por conta própria. */
+          const { error } = await sb.from("rede_seguidores").insert(par);
+          if (error && (error as any).code !== "23505") {
+            console.warn("[referral] seguir não gravou", error);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      console.error("[referral] seguir falhou", e);
+    }
+
     return { ok: true as const, attributed: true };
   });
+
+/**
+ * Existe bloqueio entre as duas, em qualquer sentido?
+ *
+ * ⚠️ **FALHA FECHADA (`true`).** É a mesma decisão de `conjuntoDeBloqueio` na
+ * rede, e pela mesma razão: todo ponto de uso pergunta isto para ESCONDER ou
+ * para NÃO ligar, então um erro que devolvesse `false` faria a proteção sumir
+ * exatamente quando o banco está instável. Aqui o custo do lado seguro é uma
+ * amiga que precisa tocar em "Seguir" à mão; o custo do outro lado é um
+ * bloqueio desfeito sem que ninguém seja avisado.
+ */
+async function haBloqueioEntre(sb: any, a: string, b: string): Promise<boolean> {
+  try {
+    const { data, error } = await sb
+      .from("rede_bloqueios")
+      .select("quem_id")
+      .or(`and(quem_id.eq.${a},bloqueado_id.eq.${b}),and(quem_id.eq.${b},bloqueado_id.eq.${a})`)
+      .limit(1);
+    if (error) return true;
+    return ((data ?? []) as unknown[]).length > 0;
+  } catch {
+    return true;
+  }
+}

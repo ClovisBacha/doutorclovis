@@ -45,7 +45,65 @@ const trimestres = [
   },
 ];
 
+/**
+ * ⚠️ ESTA PÁGINA É PÚBLICA, E ERA O TERCEIRO LUGAR QUE TOCAVA O BATIMENTO.
+ *
+ * Os outros dois (a aba do Bebê e o painel do acompanhante) ganharam portão de
+ * Modo Cuidado; este não tinha nenhum — e ele está no cabeçalho do site, a um
+ * toque de distância de dentro do app.
+ *
+ * O cenário: paciente em Modo Cuidado sai da área logada ou toca "Batimentos"
+ * no menu, e ouve o coração fetal a 140 bpm com vibração no ritmo. É a mesma
+ * coisa que a prosa da aba do Bebê chama de "a coisa mais dolorosa que este app
+ * consegue fazer", só que pela porta da frente.
+ *
+ * ⚠️ Não dá para resolver com um `!careMode` local: aqui não há sessão no
+ * servidor. A página PERGUNTA ao cliente se há alguém logado e, se essa pessoa
+ * estiver em Modo Cuidado, não desenha nem o `HeartbeatFeel` nem o player por
+ * trimestre. Visitante sem conta continua vendo tudo, que é o público desta
+ * página.
+ *
+ * A leitura é otimista: enquanto ela não volta, nada é desenhado. Um instante a
+ * mais de página vazia custa muito menos que o batimento tocando uma vez.
+ */
 function BatimentosPage() {
+  const [luto, setLuto] = useState<boolean | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const { data } = await supabase.auth.getUser();
+        if (!data.user) {
+          if (vivo) setLuto(false);
+          return;
+        }
+        /* ⚠️ O cast é o mesmo de todo o repositório: `src/integrations/supabase/
+           types.ts` cobre 27 das 112 tabelas e nem conhece `user_id` em
+           `patient_profiles`. Está documentado no CLAUDE.md, junto com o
+           comando que regenera. */
+        const { data: perfil } = await (supabase as any)
+          .from("patient_profiles")
+          .select("care_mode")
+          /* ⚠️ `id`, e NÃO `user_id`. A chave de `patient_profiles` É o id do
+             usuário — escrever `user_id` aqui não daria erro: o PostgREST
+             devolveria 42703, o `data` viria nulo, `luto` ficaria `false` e o
+             batimento tocaria no luto. Um teste do repositório já vigia isso e
+             foi ele que pegou. */
+          .eq("id", data.user.id)
+          .maybeSingle();
+        if (vivo) setLuto(Boolean((perfil as { care_mode?: boolean } | null)?.care_mode));
+      } catch {
+        /* Sem sessão, sem rede, sem tabela: é uma página pública, e o visitante
+           sem conta é o caso comum. Falhar para "não é luto" aqui é o certo —
+           quem está em luto TEM conta e a leitura acima responde. */
+        if (vivo) setLuto(false);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [active, setActive] = useState<number | null>(null);
   const ctxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,46 +164,58 @@ function BatimentosPage() {
         </p>
       </Reveal>
 
-      <div className="mx-auto mt-10 max-w-lg">
-        <HeartbeatFeel defaultBpm={140} />
-      </div>
+      {luto === false && (
+        <div className="mx-auto mt-10 max-w-lg">
+          <HeartbeatFeel defaultBpm={140} />
+        </div>
+      )}
 
-      <h2 className="mt-14 font-serif text-2xl">O ritmo em cada trimestre</h2>
-      <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-        Uma simulação suave do ritmo cardíaco fetal. O som real é ouvido no Doppler a partir da
-        10ª-12ª semana.
-      </p>
-      <div className="mt-6 grid gap-5 md:grid-cols-3">
-        {trimestres.map((t, i) => (
-          <div
-            key={t.label}
-            className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
-          >
-            <Heart className={`h-8 w-8 text-primary ${active === i ? "animate-pulse" : ""}`} />
-            <p className="mt-3 font-serif text-2xl">{t.label}</p>
-            <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{t.semanas}</p>
-            <p className="mt-3 font-serif text-3xl text-primary">
-              {t.bpm} <span className="text-sm text-muted-foreground">bpm</span>
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">{t.desc}</p>
-            <button
-              type="button"
-              onClick={() => (active === i ? stop() : play(i))}
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
-            >
-              {active === i ? (
-                <>
-                  <Pause className="h-4 w-4" /> Pausar
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4" /> Ouvir
-                </>
-              )}
-            </button>
+      {/* ⚠️ O player por trimestre é um SEGUNDO motor de batimento, próprio
+          desta página — `AudioContext` mais `setInterval` tocando lub-dub —,
+          fora do sistema de som do app e de qualquer noção de luto. Ele
+          entra no mesmo portão. */}
+      {luto === false && (
+        <>
+          <h2 className="mt-14 font-serif text-2xl">O ritmo em cada trimestre</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Uma simulação suave do ritmo cardíaco fetal. O som real é ouvido no Doppler a partir da
+            10ª-12ª semana.
+          </p>
+          <div className="mt-6 grid gap-5 md:grid-cols-3">
+            {trimestres.map((t, i) => (
+              <div
+                key={t.label}
+                className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+              >
+                <Heart className={`h-8 w-8 text-primary ${active === i ? "animate-pulse" : ""}`} />
+                <p className="mt-3 font-serif text-2xl">{t.label}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                  {t.semanas}
+                </p>
+                <p className="mt-3 font-serif text-3xl text-primary">
+                  {t.bpm} <span className="text-sm text-muted-foreground">bpm</span>
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">{t.desc}</p>
+                <button
+                  type="button"
+                  onClick={() => (active === i ? stop() : play(i))}
+                  className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+                >
+                  {active === i ? (
+                    <>
+                      <Pause className="h-4 w-4" /> Pausar
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4" /> Ouvir
+                    </>
+                  )}
+                </button>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
       <p className="mt-8 text-xs text-muted-foreground">
         * Simulação educativa via síntese de áudio. Não substitui a ausculta clínica.
       </p>

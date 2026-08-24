@@ -9,6 +9,26 @@ export const Route = createFileRoute("/api/carta-semanal")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        /* O TERCEIRO PROXY ABERTO.
+           `api-auth.server.ts` foi criado para fechar `nutrition` e
+           `transcribe`, e o cabeçalho dele diz "estes dois ficaram para trás" —
+           mas eram TRÊS. Esta rota chamava o Gemini na chave do consultório para
+           qualquer POST da internet, e é a pior das três nesse aspecto:
+           `babyDesc` não tem teto de tamanho (não há zod aqui, só um cast) e
+           entra cru no prompt.
+
+           O limitador de taxa em memória não conta: na Vercel cada instância
+           tem o próprio Map, então N invocações concorrentes valem N × o
+           limite. É o que o próprio `api-auth.server.ts` já explica. */
+        const { naoAutorizado, usuarioDaRequisicao } = await import("@/lib/api-auth.server");
+        /* O USUÁRIO É GUARDADO, e não descartado. Estava escrito
+           `if (!(await usuarioDaRequisicao(request)))` — o id existia e ia para
+           o lixo, e por isso a linha em `ai_usage` nascia sem `doctor_id`: o
+           gasto aparecia no total da plataforma e em médico nenhum. Existe um
+           `custo-sem-dono.test.ts` nesta base sobre exatamente esse padrão. */
+        const usuaria = await usuarioDaRequisicao(request);
+        if (!usuaria) return naoAutorizado();
+
         const ip = clientIp(request);
 
         if (rateLimited(ip)) {
@@ -39,8 +59,16 @@ export const Route = createFileRoute("/api/carta-semanal")({
           });
         }
 
-        const babyName = body.babyName?.trim() || null;
-        const babyDesc = body.babyDesc?.trim() || "";
+        /* ─── OS DOIS TETOS QUE FALTAVAM ────────────────────────────────────
+           O comentário do topo deste arquivo já dizia: "é a pior das três nesse
+           aspecto: `babyDesc` não tem teto de tamanho (não há zod aqui, só um
+           cast) e entra cru no prompt". Metade do conserto foi feita nos outros
+           endpoints e este ficou: qualquer pessoa logada mandava um `babyDesc`
+           de um megabyte e ele ia inteiro para o modelo, na nossa chave.
+           Os dois campos são DESCRITIVOS — nome de bebê e uma frase sobre a
+           semana. Estes tetos não cortam nada que o app mande de verdade. */
+        const babyName = (body.babyName?.trim() || "").slice(0, 60) || null;
+        const babyDesc = (body.babyDesc?.trim() || "").slice(0, 600);
 
         const addressee = babyName ? `Mamãe ${babyName}` : "Mamãe";
 
@@ -60,11 +88,46 @@ Regras:
 - NÃO use formatação markdown, apenas texto simples com quebras de linha`;
 
         const google = createChatProvider(key);
-        const { text } = await generateText({
+        const { text, usage } = await generateText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
           prompt,
+          /* E O TETO DE SAÍDA. O prompt pede "máximo 180 palavras", mas isso é
+             pedido, não limite: um modelo que entra em laço gera até o teto do
+             provedor e a conta é nossa. 180 palavras cabem folgadamente aqui. */
+          maxOutputTokens: 800,
         });
 
+        /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que
+       ninguém media — esta era uma delas. Canal próprio: a cota conta só
+       `app`, então isto aparece no consumo sem comer a franquia clínica. */
+        const { registrarUsoAgora } = await import("@/lib/uso-ia.server");
+        await registrarUsoAgora({
+          especie: "chat",
+          modelo: process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL,
+          /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+             com zero e a tabela media a RESPOSTA, nunca o custo. */
+          inputTokens: usage?.inputTokens,
+          outputTokens: usage?.outputTokens,
+          canal: "carta-semanal",
+          /* O DONO DO GASTO. `patient_profiles.doctor_id` é o vínculo ATUAL —
+             a mesma régua do resto da base. Sem médico vinculado, a linha
+             continua sem dono, e aí ela É da plataforma de verdade: é o card
+             de custo sem dono que existe justamente para mostrar isso. */
+          doctorId: await (async () => {
+            try {
+              const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+              const { data } = await (supabaseAdmin as any)
+                .from("patient_profiles")
+                .select("doctor_id")
+                .eq("id", usuaria.id)
+                .maybeSingle();
+              return (data?.doctor_id as string | null) ?? null;
+            } catch {
+              return null;
+            }
+          })(),
+          patientId: usuaria.id,
+        });
         return new Response(JSON.stringify({ ok: true, letter: text.trim() }), {
           headers: { "Content-Type": "application/json" },
         });

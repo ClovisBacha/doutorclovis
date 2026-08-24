@@ -1,4 +1,3 @@
-import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { typedDb } from "@/integrations/supabase/types.extended";
@@ -40,6 +39,15 @@ export type PrivateConsultation = {
   pix_qr_code: string | null;
   pix_qr_code_base64: string | null;
   amount_cents: number | null;
+  /**
+   * Quando a consulta FOI COMBINADA. `null` = ainda sem horário.
+   *
+   * `preferred_dates` é o que ELA preferiria; isto é o que ficou marcado. Sem
+   * este campo, a consulta particular era a única fonte da agenda que não sabia
+   * dizer quando acontece — e o calendário do mês tinha de mostrá-la como
+   * preferência, tracejada.
+   */
+  scheduled_for?: string | null;
   created_at: string;
 };
 
@@ -93,14 +101,38 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
       };
 
     const consultType = CONSULT_TYPES.find((ct) => ct.key === data.consultType);
-    const amount = consultType?.priceNumber ?? 0;
+
+    /* Médico da paciente resolvido ANTES do preço e da cobrança — as duas
+       coisas dependem dele. Antes o preço era tabelado para a plataforma
+       inteira e a cobrança saía descrita com o nome do fundador. */
+    const doctorId = await patientDoctorId(u.user.id);
+    const { supabaseAdmin: sbPreco } = await import("@/integrations/supabase/client.server");
+    let medNome = "";
+    let precoDoMedico: number | null = null;
+    if (doctorId) {
+      const { data: doc } = await (sbPreco as any)
+        .from("doctors")
+        .select("display_name,consultation_price_brl")
+        .eq("id", doctorId)
+        .maybeSingle();
+      medNome = ((doc?.display_name as string | null) ?? "").trim();
+      const p = doc?.consultation_price_brl as number | null | undefined;
+      precoDoMedico = typeof p === "number" && p > 0 ? p : null;
+    }
+    /* O valor do médico manda. A tabela de CONSULT_TYPES só entra quando ele
+       não preencheu — e aí é uma sugestão da plataforma, não o preço dele. */
+    const amount = precoDoMedico ?? consultType?.priceNumber ?? 0;
 
     // Try to create PIX charge via Mercado Pago
     let mpPaymentId: string | null = null;
     let pixQrCode: string | null = null;
     let pixQrCodeBase64: string | null = null;
 
-    const mpToken = process.env.MERCADO_PAGO_ACCESS_TOKEN;
+    /* A conta do Mercado Pago é UMA, da plataforma. Gerar PIX por ela para a
+       consulta de outro médico manda o dinheiro dele para a conta errada —
+       então a cobrança automática só sai quando não há outro médico envolvido.
+       Nos demais casos cai no PIX manual, que usa a chave do próprio médico. */
+    const mpToken = doctorId ? null : process.env.MERCADO_PAGO_ACCESS_TOKEN;
     if (mpToken && amount > 0 && u.user.email) {
       try {
         const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
@@ -112,7 +144,7 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
           },
           body: JSON.stringify({
             transaction_amount: amount,
-            description: `${consultType?.label ?? data.consultType} — ${DOCTOR.name}`,
+            description: `${consultType?.label ?? data.consultType}${medNome ? ` — ${medNome}` : ""}`,
             payment_method_id: "pix",
             payer: { email: u.user.email },
           }),
@@ -133,8 +165,7 @@ export const requestPrivateConsultation = createServerFn({ method: "POST" })
       }
     }
 
-    // Vincula a consulta ao médico da paciente (recorte multi-inquilino).
-    const doctorId = await patientDoctorId(u.user.id);
+    // `doctorId` (o recorte multi-inquilino) já veio resolvido lá acima.
     const baseRow = {
       patient_user_id: u.user.id,
       consult_type: data.consultType,
@@ -255,4 +286,56 @@ export const confirmPaymentForDoctor = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .eq("doctor_id", user.id);
     return { ok: !error };
+  });
+
+/**
+ * MARCA a data e a hora de uma consulta particular.
+ *
+ * ─── POR QUE ISTO PRECISOU EXISTIR ──────────────────────────────────────────
+ *
+ * `private_consultations` guardava `preferred_dates` — o que ELA preferiria — e
+ * nada sobre o que ficou combinado. Era a única das três fontes da agenda que
+ * não sabia dizer quando acontece, e o calendário do mês tinha de mostrá-la
+ * como preferência, tracejada.
+ *
+ * ─── O QUE CHEGA AQUI ───────────────────────────────────────────────────────
+ *
+ * Um instante ISO com fuso, montado no NAVEGADOR a partir do que ele digitou —
+ * `datetime-local` entrega string sem fuso, e mandá-la crua para uma coluna
+ * `timestamptz` foi exatamente o defeito de três horas que a teleconsulta já
+ * teve nesta base. Aqui o validador exige o `Z`/offset, então a string crua nem
+ * passa.
+ *
+ * `null` desmarca — o médico combinou e depois desmarcou, e a consulta volta a
+ * aparecer na agenda como preferência em vez de sumir.
+ */
+export const marcarHoraDaConsulta = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        /* `datetime()` do zod exige fuso. É a trava que impede a string crua do
+           `datetime-local` de entrar. */
+        scheduledFor: z.string().datetime({ offset: true }).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const, motivo: "sem_permissao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("private_consultations")
+      .update({ scheduled_for: data.scheduledFor })
+      .eq("id", data.id)
+      .eq("doctor_id", user.id);
+    if (!error) return { ok: true as const };
+    /* Coluna ainda não migrada: diz O QUE FAZER, em vez de "não foi possível
+       salvar". É o mesmo recuo que o resto da base usa — e `colunaAusente`
+       cobre PGRST204, que é o código que um UPDATE devolve (42703 é de
+       SELECT). */
+    const { colunaAusente } = await import("./postgrest");
+    if (colunaAusente(error)) return { ok: false as const, motivo: "sem_coluna" as const };
+    return { ok: false as const, motivo: "falhou" as const };
   });

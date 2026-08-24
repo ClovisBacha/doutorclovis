@@ -479,6 +479,7 @@ export type Database = {
           created_at: string;
           id: string;
           image_data: string | null;
+          image_path: string | null;
           name: string;
           notes: string | null;
           user_id: string;
@@ -489,6 +490,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           image_data?: string | null;
+          image_path?: string | null;
           name: string;
           notes?: string | null;
           user_id: string;
@@ -499,6 +501,7 @@ export type Database = {
           created_at?: string;
           id?: string;
           image_data?: string | null;
+          image_path?: string | null;
           name?: string;
           notes?: string | null;
           user_id?: string;
@@ -514,6 +517,7 @@ export type Database = {
           emoji: string | null;
           id: string;
           image_data: string | null;
+          image_path: string | null;
           patient_user_id: string;
         };
         Insert: {
@@ -523,6 +527,7 @@ export type Database = {
           emoji?: string | null;
           id?: string;
           image_data?: string | null;
+          image_path?: string | null;
           patient_user_id: string;
         };
         Update: {
@@ -532,6 +537,7 @@ export type Database = {
           emoji?: string | null;
           id?: string;
           image_data?: string | null;
+          image_path?: string | null;
           patient_user_id?: string;
         };
         Relationships: [];

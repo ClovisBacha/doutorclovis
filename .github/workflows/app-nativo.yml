@@ -1,0 +1,117 @@
+name: App nativo
+
+# Existe porque NÃO HÁ como compilar para iOS sem macOS — é regra da Apple, não
+# escolha nossa. Quem escreve o código aqui roda em Linux e não consegue gerar o
+# app. Este runner é a única prova de que a casca compila.
+#
+# E ele roda SEM conta de desenvolvedor: build para SIMULADOR não exige
+# assinatura. Isso separa duas perguntas que costumam vir emboladas —
+# "o projeto compila?" (respondida aqui, de graça, a cada push) e
+# "o app pode ir para a loja?" (que aí sim precisa dos US$ 99).
+#
+# O que este workflow pega, e nenhum teste em Linux pega: um plugin declarado no
+# package.json e ausente do projeto nativo, uma permissão faltando no manifesto,
+# uma chave faltando no Info.plist, um erro de Swift no AppDelegate.
+
+on:
+  push:
+    paths:
+      - "capacitor.config.ts"
+      - "native/**"
+      - "ios/**"
+      - "android/**"
+      - "package.json"
+      - "bun.lock"
+      - ".github/workflows/app-nativo.yml"
+  workflow_dispatch:
+
+jobs:
+  android:
+    name: Android — gera o APK de debug
+    # Primeiro na lista de propósito: Android compila em Linux, é barato, e
+    # quando os dois quebram junto o problema é da configuração compartilhada —
+    # quando só o iOS quebra, é do Xcode. Ter o barato respondendo primeiro
+    # encurta o diagnóstico.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      # `--frozen-lockfile`, igual ao `ci.yml`. Ele falha em QUALQUER divergência
+      # entre package.json e lockfile — e foi exatamente assim que a primeira
+      # tentativa de instalar o Capacitor derrubou os três jobs do CI principal.
+      # Aqui a rigidez é o que queremos: se o lockfile não bate, o app que este
+      # job constrói não é o app que o site publica.
+      - run: bun install --frozen-lockfile
+
+      # Só `sync`, NUNCA `cap add`.
+      #
+      # `cap add` regenera o projeto nativo do zero, e o projeto no repositório
+      # tem coisas que só existem porque foram escritas à mão: as permissões de
+      # localização, a POST_NOTIFICATIONS, o texto do Info.plist e o repasse do
+      # token de push no AppDelegate. Regenerar apagaria tudo isso em silêncio, e
+      # o build passaria — com um app que não pede localização nem recebe push.
+      # Se a pasta sumir, é melhor este passo falhar barulhento.
+      - name: Sincronizar a casca
+        run: bunx cap sync android
+
+      - name: Compilar o APK de debug
+        run: cd android && ./gradlew assembleDebug --no-daemon
+
+      # O APK sai como artefato: dá para instalar num Android de verdade sem
+      # loja nenhuma, o que adianta o teste de campo em semanas.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: obstetrica-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 14
+
+  ios:
+    name: iOS — compila no simulador
+    # `macos-latest` é o único runner com Xcode, e custa 10x os minutos do Linux.
+    # É por isso que o `paths:` lá em cima existe: sem ele, todo commit de CSS
+    # gastaria cota de macOS à toa.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      - name: Sincronizar a casca
+        run: bunx cap sync ios
+
+      - name: Compilar para o simulador
+        # `-project`, e não `-workspace`.
+        #
+        # Capacitor 8 usa **Swift Package Manager** (`ios/App/CapApp-SPM`), não
+        # CocoaPods — e é o CocoaPods que cria o `.xcworkspace`. Apontar para um
+        # workspace aqui falha na primeira linha dizendo só que o arquivo não
+        # existe. Vale saber, porque quase todo tutorial de Capacitor na internet
+        # ainda mostra `-workspace`, e era o que estava escrito aqui.
+        #
+        # `CODE_SIGNING_ALLOWED=NO` é o que dispensa a conta de desenvolvedor:
+        # sem assinatura o binário não roda em aparelho de verdade, mas compila —
+        # e compilar é a pergunta que este job responde.
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -sdk iphonesimulator \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build

@@ -1,25 +1,49 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
-  createRootRouteWithContext,
+  createRootRoute,
   useRouter,
   useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, lazy, Suspense, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { ChatbotWidget } from "@/components/chatbot-widget";
-import { WhatsAppFloating } from "@/components/whatsapp-button";
 import { DOCTOR } from "@/lib/doctor.config";
 import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
 import { PublicBottomNav } from "@/components/public-bottom-nav";
+import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
+
+/**
+ * ⚠️ O CHATBOT DO SITE SAIU DO PACOTE DE ENTRADA — e isso é a maior conta do app.
+ *
+ * Ele era `import` estático aqui, no `__root`. O componente já sabia se
+ * esconder em `/minha-conta` e `/painel` (`return null`), e por isso parecia
+ * inofensivo — mas **esconder não é não baixar**: um import estático no root
+ * entra no chunk de ENTRADA, que toda página carrega antes de qualquer coisa
+ * aparecer.
+ *
+ * E o que ele arrasta é pesado: `@ai-sdk/react`, `ai` e o `react-markdown`
+ * inteiro (unified + remark). Medido: o `index.js` tinha **1,18 MB / 356 KB
+ * comprimidos**, baixados, interpretados e EXECUTADOS antes de a paciente poder
+ * tocar em qualquer coisa. É esse trecho de linha do tempo em que o toque não
+ * responde — o "lerdo já na hora de clicar" que o dono relatou.
+ *
+ * Agora são DOIS portões, e eles existem por razões diferentes:
+ *   · o de FORA (`semChromePublico`) decide se o código é BAIXADO;
+ *   · o de DENTRO (o `return null` do próprio componente) decide se ele
+ *     DESENHA, e continua sendo a fonte da verdade sobre onde ele aparece.
+ * Tirar o de dentro deixaria o widget nascer numa rota nova do site sem
+ * ninguém decidir; tirar o de fora traz a conta de volta.
+ */
+const ChatbotWidget = lazy(() =>
+  import("@/components/chatbot-widget").then((m) => ({ default: m.ChatbotWidget })),
+);
 
 const jsonLd = {
   "@context": "https://schema.org",
@@ -56,19 +80,74 @@ function NotFoundComponent() {
   );
 }
 
+/** Recarrega UMA vez por sessão — sem isto, um erro de rede vira laço de F5. */
+const CHAVE_RECARGA = "dc-recarreguei-por-pedaco-antigo";
+
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
+  const { location } = useRouterState();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
 
+  /* ⚠️ **A recarga acontece SOZINHA**, e não atrás de um botão. Quem abriu o
+     app não tem por que saber o que é um "pedaço do aplicativo": para ela isso
+     é o app não abrir. Uma vez por sessão (`sessionStorage`), porque um erro de
+     rede de verdade viraria laço de recarga — e aí a tela de erro, que é o
+     último recurso, deixaria de aparecer. */
+  useEffect(() => {
+    if (typeof window === "undefined" || !ehPedacoQueSumiu(error)) return;
+    try {
+      if (sessionStorage.getItem(CHAVE_RECARGA)) return;
+      sessionStorage.setItem(CHAVE_RECARGA, "1");
+    } catch {
+      /* modo privado: recarrega assim mesmo, uma vez — o `catch` só impede o
+         `sessionStorage` de derrubar a recuperação. */
+    }
+    window.location.reload();
+  }, [error]);
+
+  /**
+   * ⚠️ **QUEM ESTAVA NO APP NÃO É DEVOLVIDA AO SITE.**
+   *
+   * A saída era `href="/"` para todo mundo, e no app instalado isso é a pior
+   * coisa que a tela de erro pode fazer: a paciente toca em "voltar" e cai numa
+   * página institucional, com cabeçalho, rodapé e botão de "Criar minha conta" —
+   * como se o app tivesse desaparecido e ela fosse uma visitante. Pedido do
+   * dono, com todas as letras: "não é pra mais voltar para o site".
+   *
+   * Do app, a saída é o próprio app; se a sessão for o problema, `/auth` é quem
+   * resolve, e é para lá que `_authenticated` a mandaria de qualquer forma.
+   */
+  const noApp =
+    location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
+  const saida = noApp ? "/auth" : "/";
+
+  /* ⚠️ Nome + mensagem + PÁGINA, e a pilha por último. A página é o que diz
+     em qual tela aconteceu — sem ela, "TypeError: undefined" não localiza
+     nada. A pilha vem no fim porque em produção ela é minificada e vale
+     menos que as três primeiras linhas. */
+  const detalhe = [
+    `${error?.name ?? "Error"}: ${error?.message ?? "(sem mensagem)"}`,
+    `em ${location.pathname}`,
+    error?.stack ? `\n${error.stack}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
   return (
     <div className="flex min-h-[60vh] items-center justify-center px-4">
       <div className="max-w-md text-center">
-        <h1 className="font-serif text-2xl text-foreground">Algo deu errado</h1>
+        <h1 className="font-serif text-2xl text-foreground">
+          {ehPedacoQueSumiu(error) ? "Atualizando o app…" : "Algo deu errado"}
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Ocorreu um erro inesperado. Tente novamente ou volte para o início.
+          {ehPedacoQueSumiu(error)
+            ? "Saiu uma versão nova enquanto você estava aqui. Estou recarregando — se não voltar sozinho, toque em Tentar novamente."
+            : `Ocorreu um erro inesperado. Tente novamente${
+                noApp ? " ou entre de novo na sua conta." : " ou volte para o início."
+              }`}
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
@@ -81,18 +160,51 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             Tentar novamente
           </button>
           <a
-            href="/"
+            href={saida}
             className="inline-flex items-center justify-center rounded-full border border-border bg-background px-5 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
-            Ir para o início
+            {noApp ? "Entrar na minha conta" : "Ir para o início"}
           </a>
         </div>
+
+        {/* ⚠️ **O DETALHE DO ERRO PRECISA SER ALCANÇÁVEL, e não estava.**
+            A tela dizia "erro inesperado" e mandava o motivo para o
+            `console.error` — que num iPhone, dentro do app instalado, não
+            existe para ninguém. Três rodadas de conserto foram gastas
+            DEDUZINDO qual era o erro a partir de capturas de tela, porque a
+            única testemunha era a paciente e a tela não deixava ela contar.
+
+            Fica RECOLHIDO: quem abre o app não quer ler pilha de execução, e
+            um erro cru na cara de uma gestante é ruído assustador. Mas quem
+            precisa dele — ela mandando um print para o consultório, o médico
+            no painel — alcança em um toque. */}
+        <details className="mt-6 text-left">
+          <summary className="cursor-pointer text-center text-xs text-muted-foreground">
+            Ver detalhes do erro
+          </summary>
+          <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 text-[11px] leading-snug text-muted-foreground">
+            {detalhe}
+          </pre>
+          <button
+            type="button"
+            onClick={() => {
+              try {
+                void navigator.clipboard?.writeText(detalhe);
+              } catch {
+                /* sem área de transferência: o texto está aí para ler */
+              }
+            }}
+            className="mt-2 w-full rounded-full border border-border px-4 py-2 text-xs font-medium"
+          >
+            Copiar
+          </button>
+        </details>
       </div>
     </div>
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -187,14 +299,21 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * ⚠️ **`@tanstack/react-query` SAIU, e ele nunca foi usado.**
+ *
+ * Ele vinha do template do TanStack Start: o `QueryClient` era criado no router,
+ * viajava no contexto da rota e envolvia a árvore num `QueryClientProvider` — e
+ * NENHUM componente deste app chama `useQuery` ou `useMutation` (varrido: zero
+ * ocorrências fora dessas duas linhas de encanamento). Eram ~24 kB crus no chunk
+ * de ENTRADA, que é o que TODA página baixa antes de qualquer coisa aparecer,
+ * para uma biblioteca que não fazia nada.
+ *
+ * Se um dia o app buscar dados por `useQuery`, o provider volta — junto com o
+ * primeiro `useQuery` de verdade, e não antes dele.
+ */
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <SiteShell />
-    </QueryClientProvider>
-  );
+  return <SiteShell />;
 }
 
 function CanonicalLink() {
@@ -283,6 +402,22 @@ export function storedReferralCode(): string | null {
   }
 }
 
+/**
+ * Limpa o código da influenciadora depois de atribuído.
+ *
+ * ⚠️ SÓ QUANDO O SERVIDOR CONFIRMA que não precisa repetir. Ele é o único
+ * rastro da indicação até a paciente confirmar o e-mail e o perfil existir —
+ * apagar antes disso faz a influenciadora perder a venda em silêncio, e a
+ * paciente perder o bônus sem nunca saber que havia um.
+ */
+export function clearStoredAffiliateCode(): void {
+  try {
+    localStorage.removeItem("obst_ref");
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Limpa o código de indicação após a atribuição (evita re-tentar sempre). */
 export function clearStoredReferralCode(): void {
   try {
@@ -325,6 +460,16 @@ function SiteShell() {
   useAffiliateCapture();
   useReferralCapture();
   useScrollToTop();
+  const { location } = useRouterState();
+  /* O app da paciente e o painel do médico têm cabeçalho, navegação e rodapé
+     próprios. O shell público por cima disso empilhava duas marcas e dois ☰:
+     a paciente via a faixa "Obstetrica" com o menu do SITE logo acima do menu
+     do APP, dentro da própria tela do bebê.
+     A barra pública, o chatbot e o WhatsApp já se escondiam sozinhos aqui —
+     cabeçalho e rodapé eram os dois que faltavam. A regra passa a morar num
+     lugar só, em vez de repetida dentro de cada componente. */
+  const semChromePublico =
+    location.pathname.startsWith("/minha-conta") || location.pathname.startsWith("/painel");
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground">
       <a
@@ -334,23 +479,39 @@ function SiteShell() {
         Pular para o conteúdo principal
       </a>
       <CanonicalLink />
-      <div className="print:hidden">
-        <ScrollProgress />
-        <SiteHeader />
-      </div>
+      {!semChromePublico && (
+        <div className="chrome-publico print:hidden">
+          <ScrollProgress />
+          <SiteHeader />
+        </div>
+      )}
       <main id="main-content" className="flex-1 pb-[72px] md:pb-0">
         <Outlet />
       </main>
+      {!semChromePublico && (
+        <div className="chrome-publico print:hidden">
+          <SiteFooter />
+        </div>
+      )}
+      {!semChromePublico && (
+        <div className="chrome-publico print:hidden">
+          {/* `fallback={null}`: o balão aparecer um instante depois é invisível
+              para quem chega ao site; o que se ganha é o app abrir sem ele. */}
+          <Suspense fallback={null}>
+            <ChatbotWidget />
+          </Suspense>
+        </div>
+      )}
       <div className="print:hidden">
-        <SiteFooter />
+        {/* O botão flutuante de WhatsApp saiu.
+            Ele levava TODO visitante da plataforma para o número pessoal de um
+            médico específico, cravado no código — numa página onde a paciente
+            deveria estar escolhendo o obstetra dela no diretório. Além disso,
+            a medição no iPhone mostrou o botão inteiramente atrás do banner de
+            instalação: inclicável desde sempre. O contato de cada médico vive
+            no perfil dele. */}
       </div>
-      <div className="print:hidden">
-        <ChatbotWidget />
-      </div>
-      <div className="print:hidden">
-        <WhatsAppFloating />
-      </div>
-      <div className="print:hidden">
+      <div className="chrome-publico print:hidden">
         <PublicBottomNav />
       </div>
       <Toaster position="bottom-right" richColors mobileOffset={{ bottom: 96 }} />
@@ -402,10 +563,25 @@ function PWAInstallBanner() {
 
   if (!visible) return null;
 
+  /**
+   * O banner sobe para cima da barra "Entrar no app" em vez de flutuar sobre
+   * o conteúdo.
+   *
+   * A medição no iPhone mostrou três camadas fixas ocupando de 678 a 844 —
+   * 19,7% da tela, permanentemente. O botão do WhatsApp ficava INTEIRO atrás
+   * deste banner, inclicável, e a legenda do hero era cortada ao meio. Ao
+   * longo da rolagem o par decapitava títulos e um CTA por completo.
+   */
   return (
-    <div className="fixed bottom-20 left-4 right-4 z-50 mx-auto max-w-sm animate-[slideUp_0.4s_ease-out] rounded-2xl bg-primary p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] md:bottom-6">
+    <div className="fixed bottom-24 left-4 right-4 z-50 mx-auto max-w-sm animate-[slideUp_0.4s_ease-out] rounded-2xl bg-primary p-4 shadow-[0_8px_32px_rgba(0,0,0,0.25)] md:bottom-6">
       <div className="flex items-start gap-3">
-        <img src="/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl" />
+        <img
+          src="/icon-192.png"
+          alt=""
+          width={48}
+          height={48}
+          className="h-12 w-12 shrink-0 rounded-xl"
+        />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-primary-foreground">Instalar o app</p>
           {isIOS ? (

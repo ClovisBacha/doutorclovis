@@ -4,6 +4,7 @@ import { DefaultChatTransport } from "ai";
 import { MessageCircle, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { avisoQuePodeAparecer } from "@/lib/chat-stream";
 
 const transport = new DefaultChatTransport({ api: "/api/chat" });
 
@@ -11,7 +12,10 @@ export function ChatbotWidget() {
   const { location } = useRouterState();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
-  const { messages, sendMessage, status } = useChat({ transport });
+  /* `error` sai do `useChat` porque falha ANTES do stream abrir (rede, 500)
+     nunca vira mensagem — sem isto ela é engolida e a visitante fica olhando
+     "digitando…" que some sem nada aparecer. */
+  const { messages, sendMessage, status, error, stop } = useChat({ transport });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // O botão só aparece quando a visitante rola PARA CIMA (sinal de que procura
@@ -91,7 +95,52 @@ export function ChatbotWidget() {
                 </div>
               );
             })}
-            {loading && <p className="text-xs italic text-muted-foreground">digitando…</p>}
+            {/* "digitando…" em itálico era o único feedback, contra a bolha de
+                varredura de luz do chat da paciente. Mesma espera, dois
+                produtos diferentes — e esta é a primeira tela que uma gestante
+                nova vê. `role="status"` porque sem live region o leitor de tela
+                não anuncia que algo está acontecendo. */}
+            {loading && (
+              <div className="flex items-center gap-2" role="status">
+                <span className="flex gap-1" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary/60"
+                      style={{ animationDelay: `${i * 160}ms` }}
+                    />
+                  ))}
+                </span>
+                <span className="sr-only">Pensando</span>
+                <button
+                  type="button"
+                  onClick={() => stop()}
+                  className="text-xs text-muted-foreground underline"
+                >
+                  Parar
+                </button>
+              </div>
+            )}
+            {/* A BOLHA VAZIA DO SITE PÚBLICO.
+                O `error` do `useChat` era desestruturado fora e nunca lido:
+                qualquer falha — rede, 500, cota do provedor, o 429 do limitador
+                local — fazia o "digitando…" sumir e NADA aparecer no lugar. A
+                visitante ficava olhando uma conversa que não respondeu, sem uma
+                palavra explicando. É o mesmo sintoma que foi corrigido no chat
+                da paciente; aqui tinha ficado.
+                Quando o servidor manda um texto útil (o `onError` de
+                `api/chat.ts` escreve um para cota estourada, por exemplo), é ele
+                que aparece; senão, uma frase honesta e um caminho. */}
+            {!loading && error && (
+              <p className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                {/* FILTRADO. `DefaultChatTransport` lança
+                    `new Error(await response.text())`, então um 500 mandava
+                    "Missing GOOGLE_GENERATIVE_AI_API_KEY" — o nome de uma
+                    variável de ambiente — para a visitante do site público. */}
+                {avisoQuePodeAparecer(error.message ?? "") ??
+                  "Não consegui responder agora. Tente de novo em instantes — se persistir, fale com o consultório."}
+              </p>
+            )}
           </div>
           <form
             onSubmit={(e) => {

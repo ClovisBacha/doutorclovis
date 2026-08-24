@@ -1,0 +1,6 @@
+{
+  "_leia": "Numeros que so podem DESCER. Se um teste falhar porque voce baixou o numero, baixe aqui junto — e' assim que a divida nao volta a crescer em silencio. Subir exige mudar este arquivo de proposito, o que aparece no diff e no code review.",
+  "escritasSemChecagemDeError": 6,
+  "medidoEm": "2026-08-06",
+  "_sobreOsSeis": "As 41 que sairam eram divida real: pagamento do Mercado Pago sem retry, cupom queimado sem premium, consentimento retirado que nao apagava o token, resposta marcada como entregue sem ter sido inserida. As 6 que ficam sao o piso honesto do detector: 3 no webhook do Stripe estao declaradas e justificadas no proprio teste, e 3 sao escritas dentro de funcoes que DEVOLVEM o construtor (`doUpsert`, `insert`) ou cujo `{ error }` e' lido fora da janela de 14 linhas. Baixar mais exigiria reescrever codigo correto para agradar a regex."
+}

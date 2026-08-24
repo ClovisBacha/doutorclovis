@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { codigoParaConvite } from "@/lib/convite.functions";
+import { codigoLimpo } from "@/lib/quem-convidou";
 import { z } from "zod";
 
 // ─── Album ────────────────────────────────────────────────────────────────────
@@ -8,10 +10,28 @@ export type AlbumPost = {
   patient_user_id: string;
   author_name: string;
   caption: string | null;
-  image_data: string | null;
+  /**
+   * O que a tag `<img>` deve usar — URL assinada quando a foto está no
+   * Storage, a data URL antiga enquanto a linha não migrou.
+   *
+   * Chamava-se `image_data` e carregava base64 cru. O nome mudou de propósito
+   * em vez de o campo passar a carregar uma URL calado: assim o compilador
+   * aponta cada tela que lê isto, e nenhuma fica servindo a coluna velha
+   * depois que a linha migrou.
+   */
+  image_url: string | null;
   emoji: string | null;
   created_at: string;
 };
+
+/**
+ * O álbum visto por QUEM TEM O LINK — sem o uuid dela.
+ *
+ * `AlbumPost` carrega `patient_user_id` porque na tela dela isso é o próprio
+ * id. Na rota por token, o público é o grupo da família, e o id de
+ * `auth.users` não tem o que fazer ali.
+ */
+export type AlbumPostPublico = Omit<AlbumPost, "patient_user_id">;
 
 export const createAlbumPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -29,40 +49,117 @@ export const createAlbumPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
-    const { error } = await supabaseAdmin.from("family_album_posts").insert({
-      patient_user_id: u.user.id,
-      author_name: data.authorName,
-      caption: data.caption,
-      image_data: data.imageData,
-      emoji: data.emoji,
-    });
+    const { error } = await gravarPost(u.user.id, data);
     return { ok: !error, error: error?.message };
   });
+
+/**
+ * A parte da linha que carrega a foto — no Storage quando dá, em base64 quando
+ * não dá.
+ *
+ * As duas inserções do álbum (a dela e a do acompanhante com link) precisam da
+ * MESMA decisão. Escrevê-la duas vezes é como as duas telas do álbum acabaram
+ * com `select("*")` numa e colunas nomeadas na outra: a correção foi feita num
+ * lado só e o uuid dela continuou vazando pelo outro por meses.
+ *
+ * O `null` de `guardarImagem` não é erro a tratar: é a instrução para gravar
+ * como sempre se gravou. Se o balde ainda não existe em produção — e o banco
+ * de lá está atrás do repositório há meses —, a foto entra em base64 e ninguém
+ * percebe. Quando o balde aparece, a economia começa sozinha, sem novo deploy.
+ */
+async function gravarPost(
+  donoId: string,
+  data: {
+    authorName: string;
+    caption: string | null;
+    imageData: string | null;
+    emoji: string | null;
+  },
+) {
+  const { gravarLinhaComImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
+  return await gravarLinhaComImagem({
+    tabela: "family_album_posts",
+    balde: BALDE_ALBUM,
+    donoId,
+    dataUrl: data.imageData,
+    resto: {
+      patient_user_id: donoId,
+      author_name: data.authorName,
+      caption: data.caption,
+      emoji: data.emoji,
+    },
+  });
+}
 
 export const getAlbumByToken = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ token: z.string() }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Validate companion token → get patient_user_id
-    const { data: invite } = await supabaseAdmin
+    /* ⚠️ `album_token`, NUNCA `token`. Os dois vivem na mesma linha e têm
+       privilégios diferentes: `token` abre o painel do acompanhante E os SOS
+       dos últimos 30 minutos, com latitude e longitude
+       (`getRecentPanicByToken`). O link do álbum é o que ela manda para o
+       grupo da família — e numa influenciadora, para muito mais gente.
+
+       Isto já foi UM token só, e o comentário da criação do convite dizia com
+       todas as letras: "dá acesso ao painel do papai, álbum e alerta de
+       pânico". Era desenho conhecido; o que o tornou errado foi o álbum virar
+       link de circulação ampla. Ver APLICAR_SOS_SO_PARA_QUEM_DEVE.sql, que
+       REBAIXA o token antigo para `album_token` e sorteia um novo para o
+       acompanhante — assim todo link já espalhado para de abrir o SOS. */
+    const { data: invite } = await (supabaseAdmin as any)
       .from("companion_invites")
       .select("user_id, expires_at")
-      .eq("token", data.token)
+      .eq("album_token", data.token)
       .single();
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
       return { ok: false as const, error: "Convite expirado." };
-    const { data: posts } = await supabaseAdmin
-      .from("family_album_posts")
-      .select("*")
-      .eq("patient_user_id", invite.user_id)
-      .order("created_at", { ascending: false });
+    /* COLUNAS NOMEADAS, E SEM O uuid DELA.
+       `select("*")` trazia `patient_user_id` em CADA post, e o retorno o
+       repetia no topo — o uuid de `auth.users` dela entregue a quem tem o link
+       do álbum, que é o grupo da família inteiro. A tela do álbum
+       (`album.$token.tsx`) nunca usou esse campo: era dado morto viajando.
+
+       É exatamente o que foi removido de `getPublicNameSession`, com o
+       comentário certo, 190 linhas abaixo neste mesmo arquivo. A correção não
+       tinha sido propagada para o irmão. */
+    const { lerComCaminho } = await import("@/lib/imagens.server");
+    const { data: posts } = await lerComCaminho<any[]>(
+      "family_album_posts",
+      "id, created_at, author_name, caption, image_data, emoji",
+      (q) => q.eq("patient_user_id", invite.user_id).order("created_at", { ascending: false }),
+    );
     return {
       ok: true as const,
-      posts: (posts ?? []) as AlbumPost[],
-      patientUserId: invite.user_id,
+      posts: (await comUrlDeImagem(posts ?? [])) as AlbumPostPublico[],
+      /* ⚠️ O código dela, para o rodapé de convite — `null` em Modo Cuidado.
+         O ÁLBUM continua de pé no luto (as fotos são a memória do que houve, e
+         escondê-las seria o app apagar o bebê dela); o que some é só o convite,
+         que fala de gestação em curso. A régua está em `codigoParaConvite`. */
+      codigoDeConvite: await codigoParaConvite(supabaseAdmin as any, invite.user_id as string),
     };
   });
+
+/**
+ * Troca (image_path, image_data) por uma `image_url` só, para a tela.
+ *
+ * As assinaturas saem em paralelo. Em série, um álbum de trinta fotos faria
+ * trinta idas ao Storage uma depois da outra — o tipo de espera que aparece
+ * como "o álbum demora a abrir" e ninguém liga à causa.
+ */
+async function comUrlDeImagem<T extends { image_data?: string | null; image_path?: string | null }>(
+  linhas: T[],
+): Promise<Array<Omit<T, "image_data" | "image_path"> & { image_url: string | null }>> {
+  const { imagemDaLinha, BALDE_ALBUM } = await import("@/lib/imagens.server");
+  return Promise.all(
+    linhas.map(async (l) => {
+      const { image_data: _d, image_path: _p, ...resto } = l;
+      return { ...resto, image_url: await imagemDaLinha(BALDE_ALBUM, l) };
+    }),
+  );
+}
 
 export const addAlbumPostPublic = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
@@ -80,21 +177,30 @@ export const addAlbumPostPublic = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: invite } = await supabaseAdmin
+    /* ⚠️ `album_token`, NUNCA `token`. Os dois vivem na mesma linha e têm
+       privilégios diferentes: `token` abre o painel do acompanhante E os SOS
+       dos últimos 30 minutos, com latitude e longitude
+       (`getRecentPanicByToken`). O link do álbum é o que ela manda para o
+       grupo da família — e numa influenciadora, para muito mais gente.
+
+       Isto já foi UM token só, e o comentário da criação do convite dizia com
+       todas as letras: "dá acesso ao painel do papai, álbum e alerta de
+       pânico". Era desenho conhecido; o que o tornou errado foi o álbum virar
+       link de circulação ampla. Ver APLICAR_SOS_SO_PARA_QUEM_DEVE.sql, que
+       REBAIXA o token antigo para `album_token` e sorteia um novo para o
+       acompanhante — assim todo link já espalhado para de abrir o SOS. */
+    const { data: invite } = await (supabaseAdmin as any)
       .from("companion_invites")
       .select("user_id, expires_at")
-      .eq("token", data.token)
+      .eq("album_token", data.token)
       .single();
     if (!invite) return { ok: false as const, error: "Token inválido." };
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
       return { ok: false as const, error: "Convite expirado." };
-    const { error } = await supabaseAdmin.from("family_album_posts").insert({
-      patient_user_id: invite.user_id,
-      author_name: data.authorName,
-      caption: data.caption,
-      image_data: data.imageData,
-      emoji: data.emoji,
-    });
+    /* A pasta é a DELA, não de quem postou: o acompanhante não tem conta, e o
+       arquivo pertence ao álbum dela — inclusive para a hora de apagar tudo a
+       pedido dela, que a LGPD exige que seja possível. */
+    const { error } = await gravarPost(String(invite.user_id), data);
     return { ok: !error, error: error?.message };
   });
 
@@ -106,11 +212,25 @@ export const deleteAlbumPost = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const };
+    /* O caminho ANTES do delete — depois a linha não existe mais e o arquivo
+       ficaria no balde para sempre, pago e invisível. `.eq(patient_user_id)`
+       nas duas consultas: sem isso, um id de outra pessoa devolveria o caminho
+       da foto dela e o arquivo seria apagado por quem não podia. */
+    const { lerComCaminho } = await import("@/lib/imagens.server");
+    const { data: linha } = await lerComCaminho<{ image_path?: string | null }>(
+      "family_album_posts",
+      "id",
+      (q) => q.eq("id", data.id).eq("patient_user_id", u.user.id).maybeSingle(),
+    );
     const { error } = await supabaseAdmin
       .from("family_album_posts")
       .delete()
       .eq("id", data.id)
       .eq("patient_user_id", u.user.id);
+    if (!error && linha?.image_path) {
+      const { apagarImagem, BALDE_ALBUM } = await import("@/lib/imagens.server");
+      await apagarImagem(BALDE_ALBUM, linha.image_path as string);
+    }
     return { ok: !error };
   });
 
@@ -125,7 +245,7 @@ export const getMyAlbumPosts = createServerFn({ method: "POST" })
       .select("*")
       .eq("patient_user_id", u.user.id)
       .order("created_at", { ascending: false });
-    return { ok: true as const, posts: (posts ?? []) as AlbumPost[] };
+    return { ok: true as const, posts: (await comUrlDeImagem(posts ?? [])) as AlbumPost[] };
   });
 
 // ─── Baby Name Voting ─────────────────────────────────────────────────────────
@@ -252,9 +372,13 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ shareToken: z.string() }).parse(i))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    /* Sem `patient_user_id`: o `select("*")` entregava o uuid de `auth.users`
+       dela para qualquer anônimo com o link de votação. Não é explorável
+       sozinho — a RLS não aceita uuid como credencial —, mas é o identificador
+       que aparece em toda outra tabela, e não há motivo para ele sair daqui. */
     const { data: session } = await supabaseAdmin
       .from("baby_name_sessions")
-      .select("*")
+      .select("id,share_token,is_active,reveal_winner,created_at,patient_user_id")
       .eq("share_token", data.shareToken)
       .single();
     if (!session) return { ok: false as const, error: "Link inválido." };
@@ -272,15 +396,31 @@ export const getPublicNameSession = createServerFn({ method: "POST" })
     // Also get patient's baby name for display
     const { data: profile } = await supabaseAdmin
       .from("patient_profiles")
-      .select("display_name, baby_name")
+      /* ⚠️ `referral_code` e `care_mode` entram AQUI, e não numa segunda
+         consulta: o perfil já está sendo lido para achar o nome dela, e a
+         página de votação é a QUARTA página pública do app — o link vai para o
+         grupo da família inteiro e ela era a única sem convite nenhum. */
+      .select("display_name, baby_name, referral_code, care_mode")
       .eq("id", session.patient_user_id)
       .single();
+    /* `patient_user_id` é usado ACIMA para achar o nome dela, e sai do retorno.
+       O uuid de `auth.users` não tem por que chegar a um anônimo com o link de
+       votação — não é credencial, mas é o identificador que aparece em toda
+       outra tabela. */
+    const { patient_user_id: _uuidDela, ...sessaoPublica } = session as Record<string, unknown>;
     return {
       ok: true as const,
-      session: session as NameSession,
+      session: sessaoPublica as unknown as NameSession,
       entries: enriched as NameEntry[],
       motherName: (profile as any)?.display_name ?? null,
       babyName: (profile as any)?.baby_name ?? null,
+      /* ⚠️ `null` em Modo Cuidado — a votação continua de pé (é a família dela
+         escolhendo, e a página não é do app), mas o convite fala de gestação em
+         curso. Mesma régua de `codigoParaConvite`, aplicada sobre o perfil que
+         já está em mãos. */
+      codigoDeConvite: (profile as any)?.care_mode
+        ? null
+        : codigoLimpo((profile as any)?.referral_code),
     };
   });
 

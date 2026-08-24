@@ -46,29 +46,14 @@ export const markModuleComplete = createServerFn({ method: "POST" })
     return { ok: !error };
   });
 
-export const savePanicEvent = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        accessToken: z.string().min(10),
-        latitude: z.number().nullable(),
-        longitude: z.number().nullable(),
-        address: z.string().nullable(),
-      })
-      .parse(i),
-  )
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
-    if (authErr || !u.user) return { ok: false as const };
-    const { error } = await supabaseAdmin.from("panic_events").insert({
-      user_id: u.user.id,
-      latitude: data.latitude,
-      longitude: data.longitude,
-      address: data.address,
-    });
-    return { ok: !error };
-  });
+/* `savePanicEvent` foi REMOVIDA daqui.
+
+   Ela gravava um `panic_events` e não avisava ninguém — um segundo SOS, com
+   regras próprias, exposto como endpoint HTTP vivo mesmo depois de perder o
+   último chamador. Duas emergências com comportamentos diferentes no mesmo app
+   é o tipo de coisa que só se descobre no dia em que a errada é chamada.
+   O caminho único é `dispararEmergencia` (`emergencia.functions.ts`), que
+   registra o evento E aciona os canais. */
 
 export const getRecentPanicByToken = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ token: z.string() }).parse(i))
@@ -83,9 +68,23 @@ export const getRecentPanicByToken = createServerFn({ method: "POST" })
     if (invite.expires_at && new Date(invite.expires_at) < new Date())
       return { ok: false as const };
     const since = new Date(Date.now() - 30 * 60 * 1000).toISOString(); // last 30 min
+    /* SÓ ONDE ELA ESTÁ, e nada mais.
+    
+       Este `select` era `*`, e `panic_events` ganhou colunas depois que ele foi
+       escrito: `ficha` é o retrato clínico congelado no disparo — tipo
+       sanguíneo, alergias, medicamentos, telefone dela, nome e telefone do
+       contato de emergência, nome e CRM do médico. Mais `motivo`, `channels` e
+       `doctor_id`.
+
+       Quem tem este token é quem recebeu o link do ÁLBUM DO BEBÊ: a cunhada, a
+       vizinha, o grupo da família. O acompanhante precisa saber que ela acionou
+       e para onde ir — não da lista de medicamentos dela.
+
+       Um `select("*")` só é seguro no dia em que é escrito. Colunas novas entram
+       sozinhas, e ninguém revisita a linha. */
     const { data: events } = await supabaseAdmin
       .from("panic_events")
-      .select("*")
+      .select("id, created_at, latitude, longitude, address")
       .eq("user_id", invite.user_id)
       .gte("created_at", since)
       .order("created_at", { ascending: false })

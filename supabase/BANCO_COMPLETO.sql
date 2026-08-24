@@ -135,11 +135,21 @@ DROP POLICY IF EXISTS "own checklist all" ON public.checklist_items;
 CREATE POLICY "own checklist all" ON public.checklist_items FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
 -- Auto-create profile on signup
+--
+-- Pula quem chega marcado como medico: o gatilho roda em CADA insercao em
+-- auth.users, e criar perfil de gestante para um obstetra e o que fazia o app
+-- pedir o nome do bebe a quem se cadastrou como medico. A marca vem do
+-- formulario de cadastro, no raw_user_meta_data, antes de existir perfil algum.
+-- ON CONFLICT porque o cadastro tambem pode ter criado a linha.
 CREATE OR REPLACE FUNCTION public.handle_new_patient()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
+  IF COALESCE(NEW.raw_user_meta_data->>'role', '') = 'doctor' THEN
+    RETURN NEW;
+  END IF;
   INSERT INTO public.patient_profiles (id, display_name)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)));
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'display_name', split_part(NEW.email, '@', 1)))
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
@@ -1320,7 +1330,41 @@ DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 DROP POLICY IF EXISTS "doctor updates own profile" ON public.doctors;
 CREATE POLICY "doctor updates own profile" ON public.doctors
   FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
-GRANT SELECT, UPDATE ON public.doctors TO authenticated;
+-- ATENCAO: UPDATE nao e mais concedido na tabela inteira.
+--
+-- Um `GRANT UPDATE ON public.doctors` sem lista de colunas deixa o proprio
+-- medico escrever `plan`, `plan_expires_at`, `verified` e `active` — as colunas
+-- que `entitlements.server.ts` le como fonte de verdade do que ele pagou. Com
+-- uma linha no console do navegador ele viraria plano Black e ganharia o selo da
+-- plataforma. O gatilho `protect_doctor_billing` cobre plan/active/expires, mas
+-- NAO cobre `verified`; o grant por coluna cobre os quatro.
+--
+-- Concedido em bloco tolerante porque, neste ponto do arquivo, algumas colunas
+-- do perfil podem ainda nao existir — a lista real e filtrada pelo catalogo.
+GRANT SELECT ON public.doctors TO authenticated;
+DO $grant_doctors$
+DECLARE
+  cols text;
+BEGIN
+  SELECT string_agg(quote_ident(column_name), ', ')
+    INTO cols
+    FROM information_schema.columns
+   WHERE table_schema = 'public'
+     AND table_name   = 'doctors'
+     AND column_name IN (
+       'display_name','title','specialty','crm','whatsapp','personal_phone','pix_key',
+       'bio','subspecialty','years_experience','has_masters','has_doctorate',
+       'city','state','accepting_patients',
+       'instagram','rqe','education','hospitals','insurances','languages','approach',
+       'consultation_price_brl','offers_telehealth',
+       'accepts_insurance','accepts_private','updated_at'
+     );
+  EXECUTE 'REVOKE UPDATE ON public.doctors FROM authenticated';
+  IF cols IS NOT NULL THEN
+    EXECUTE format('GRANT UPDATE (%s) ON public.doctors TO authenticated', cols);
+  END IF;
+END
+$grant_doctors$;
 GRANT ALL ON public.doctors TO service_role;
 
 -- 2. Cada paciente pertence a um médico (null = médico dono da instalação,

@@ -570,3 +570,166 @@ export const getChurnAlerts = createServerFn({ method: "POST" })
     };
     return { ok: true as const, result };
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O FUNIL DA INDICAÇÃO
+   A régua (e o que ele NÃO mede) mora em `src/lib/funil-de-indicacao.ts`.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantas contas vieram por convite, e o que elas fizeram depois.
+ *
+ * ⚠️ **Super-admin, como todo o resto deste arquivo.** É o retrato do
+ * crescimento da plataforma inteira; nenhum médico e nenhuma criadora vê isto.
+ *
+ * ⚠️ **Contagens com `head: true`, e nunca as listas.** O funil precisa de
+ * números — carregar as linhas traria para a memória do servidor os nomes e os
+ * uuids de todas as pacientes indicadas, para desenhar quatro barras.
+ */
+export const getFunilDeIndicacao = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => TokenSchema.parse(i))
+  .handler(async ({ data }) => {
+    const user = await requireSuperAdmin(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Falha ao contar devolve ZERO, e não derruba o painel — mesma decisão
+       de `safe()` no resto do arquivo. Um degrau a menos é melhor que a tela
+       inteira em branco; e o `comoFoiContado` de cada degrau já diz o que ele
+       significa. */
+    const conta = async (montar: (q: any) => any): Promise<number> => {
+      const r = await safe(
+        async () =>
+          await montar(sb.from("patient_profiles").select("id", { count: "exact", head: true })),
+        { count: 0 } as { count: number | null },
+      );
+      return (r as { count: number | null })?.count ?? 0;
+    };
+
+    /* ⚠️ **`chegaram` é UMA CONTAGEM PRÓPRIA, e nunca a soma das duas.** Os dois
+       campos convivem na mesma linha: quem entrou pelo link de uma amiga
+       (`referred_by`) pode digitar depois o código de uma embaixadora
+       (`ref_code`) no Perfil — é exatamente para isso que o cartão da rede de
+       segurança existe. Somando, essa paciente entrava duas vezes no degrau de
+       cima e INFLAVA O DENOMINADOR de todas as taxas abaixo: o painel mostraria
+       um funil vazando onde ele não vaza, e a decisão que ele existe para
+       apoiar seria tomada sobre um número inventado. */
+    const [porAmiga, porCriadora, chegaram, comCodigo] = await Promise.all([
+      conta((q) => q.not("referred_by", "is", null)),
+      conta((q) => q.not("ref_code", "is", null)),
+      conta((q) => q.or("referred_by.not.is.null,ref_code.not.is.null")),
+      conta((q) => q.not("referral_code", "is", null)),
+    ]);
+
+    /* ⚠️ **Os dois degraus de baixo precisam do CRUZAMENTO**, e o PostgREST não
+       faz junção entre tabelas numa contagem. A saída é ler só os IDS das
+       indicadas (uuid e mais nada) e intersectar com os autores de posts e com
+       quem segue alguém. É o mínimo que responde à pergunta — e continua sem
+       trazer nome nenhum. */
+    const indicadas = new Set<string>();
+    await safe(async () => {
+      const { data: linhas } = await sb
+        .from("patient_profiles")
+        .select("id")
+        .or("referred_by.not.is.null,ref_code.not.is.null")
+        .limit(MAX_ROWS);
+      for (const l of (linhas ?? []) as { id: string }[]) indicadas.add(l.id);
+      return null;
+    }, null);
+
+    /**
+     * Quantas linhas cada pessoa tem numa tabela, já FILTRADA.
+     *
+     * ⚠️ **O filtro é parâmetro, e não era.** A versão anterior lia a tabela
+     * crua, então "publicaram ao menos uma vez" contava post ARQUIVADO — e
+     * arquivar é a paciente tirando do ar o que ela publicou. O painel dizia
+     * que ela tinha publicado sobre uma publicação que não existe mais, e o
+     * `comoFoiContado` do degrau afirmava, por escrito, "publicação não
+     * arquivada". O rótulo estava certo; a consulta é que não.
+     */
+    const contarPor = async (
+      tabela: string,
+      coluna: string,
+      filtrar: (q: any) => any,
+    ): Promise<Map<string, number>> => {
+      const quantas = new Map<string, number>();
+      await safe(async () => {
+        const { data: linhas } = await filtrar(sb.from(tabela).select(coluna)).limit(MAX_ROWS);
+        for (const l of (linhas ?? []) as Record<string, string>[]) {
+          const id = l[coluna];
+          if (id) quantas.set(id, (quantas.get(id) ?? 0) + 1);
+        }
+        return null;
+      }, null);
+      return quantas;
+    };
+
+    const { SEGUIR_AUTOMATICO } = await import("@/lib/funil-de-indicacao");
+    const [autores, seguidos] = await Promise.all([
+      contarPor("rede_posts", "autor_id", (q) => q.is("arquivado_em", null)),
+      contarPor("rede_seguidores", "seguidor_id", (q) => q.eq("estado", "ativo")),
+    ]);
+
+    let publicaram = 0;
+    let conectaram = 0;
+    for (const id of indicadas) {
+      if ((autores.get(id) ?? 0) > 0) publicaram += 1;
+      /* ⚠️ **DOIS, e não um — porque o app escreve o primeiro.** Desde P3, a
+         atribuição do convite já grava um seguir automático da recém-chegada
+         para a indicadora. Contando "segue ao menos uma pessoa", este degrau
+         mediria a escrita do próprio app e daria ~100% para sempre: um número
+         que sobe sozinho e não informa nada. A partir do segundo, o gesto é
+         dela. Ver `SEGUIR_AUTOMATICO`. */
+      if ((seguidos.get(id) ?? 0) > SEGUIR_AUTOMATICO) conectaram += 1;
+    }
+
+    const { JANELA_DE_VISITAS, montarFunil } = await import("@/lib/funil-de-indicacao");
+
+    /* ─── O TOPO DO FUNIL, e ele é uma JANELA ────────────────────────────────
+       ⚠️ **`null` quando a tabela não existe, e nunca zero.** Zero é uma
+       medida ("ninguém abriu"); a ausência da tabela é "ainda não medimos", e
+       o degrau tem texto próprio para cada um. Confundi-los faria o painel
+       afirmar que o link da criadora não circula, no dia seguinte ao deploy e
+       antes de o dono rodar o SQL. */
+    const desde = new Date(Date.now() - JANELA_DE_VISITAS * 86400_000).toISOString().slice(0, 10);
+    let visitas: number | null = null;
+    try {
+      const { data: linhas, error } = await sb
+        .from("visitas_de_convite")
+        .select("contagem")
+        .gte("dia", desde)
+        .limit(MAX_ROWS);
+      if (!error) {
+        visitas = ((linhas ?? []) as { contagem: number }[]).reduce(
+          (t, l) => t + (l.contagem ?? 0),
+          0,
+        );
+      }
+    } catch {
+      /* Segue com `null`: métrica ausente não derruba o painel. */
+    }
+
+    /* O par da taxa: contas por convite criadas DENTRO da mesma janela. Sem
+       ele, "visitas de 30 dias" contra "contas de sempre" daria uma taxa
+       acima de 3.000%. */
+    const chegaramNaJanela =
+      visitas === null
+        ? null
+        : await conta((q) =>
+            q.or("referred_by.not.is.null,ref_code.not.is.null").gte("created_at", desde),
+          );
+    return {
+      ok: true as const,
+      funil: montarFunil({
+        porAmiga,
+        porCriadora,
+        chegaram,
+        publicaram,
+        conectaram,
+        comCodigo,
+        visitas,
+        chegaramNaJanela,
+      }),
+    };
+  });

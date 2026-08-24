@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Obstétrica</string>
+    <string name="title_activity_main">Obstétrica</string>
+    <string name="package_name">br.com.obstetrica.app</string>
+    <string name="custom_url_scheme">br.com.obstetrica.app</string>
+</resources>

@@ -19,7 +19,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { handleWhatsAppMessage } from "@/lib/whatsapp-agent.server";
-import { waMarkRead, extractMessageText } from "@/lib/whatsapp.server";
+import { waMarkRead, waSendText, extractMessageText } from "@/lib/whatsapp.server";
 
 /** Valida o HMAC-SHA256 que a Meta envia em X-Hub-Signature-256 ("sha256=<hex>"). */
 function verifyMetaSignature(raw: string, header: string | null, secret: string): boolean {
@@ -141,8 +141,30 @@ async function processWebhook(body: unknown): Promise<void> {
         // Extrai texto da mensagem
         const text = extractMessageText(m);
         if (!text) {
-          // Mensagem sem texto suportado (imagem, sticker, etc.)
-          // Poderíamos responder pedindo texto, mas por ora ignoramos
+          /* ─── SILÊNCIO ABSOLUTO ERA A RESPOSTA ANTIGA ────────────────────
+             O comentário aqui dizia "por ora ignoramos". Na prática: a
+             paciente manda um arquivo pelo WhatsApp do consultório, e não
+             acontece NADA — nem resposta, nem registro, nem sequer o
+             duplo-check azul, porque o `continue` acontecia antes do
+             `waMarkRead`. Ela vê a mensagem entregue e não lida, e fica
+             esperando. O que NÃO pode continuar é o silêncio: marcar como
+             lida e dizer o que fazer custa duas linhas.
+
+             O texto não aponta mais para "envie pelo app em Exames" — a
+             plataforma parou de guardar exame enviado pela paciente (ago/2026,
+             "não vamos ter essa responsabilidade em guardar os exames"), e
+             mandar para um caminho que não existe mais seria pior que o
+             silêncio que este bloco veio consertar. */
+          waMarkRead(messageId);
+          const tipo = String((m as Record<string, unknown>).type ?? "");
+          if (tipo === "image" || tipo === "document") {
+            await waSendText(
+              fromPhone,
+              "Recebi seu arquivo aqui, mas por este canal eu ainda não consigo abri-lo. " +
+                "Leve o exame (impresso ou por e-mail) na sua próxima consulta — " +
+                "por aqui eu já ajudo se você me contar por texto o que ele mostra. 💛",
+            ).catch(() => {});
+          }
           continue;
         }
 

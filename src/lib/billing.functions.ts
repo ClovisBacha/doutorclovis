@@ -13,19 +13,11 @@ import { z } from "zod";
 import { DOCTOR } from "@/lib/doctor.config";
 
 const PRODUCTS = ["quiz_premium", "doctor_plan"] as const;
-// quiz: monthly|annual · médico: starter|pro (+ _annual)
-const PLANS = [
-  "monthly",
-  "annual",
-  "starter",
-  "starter_annual",
-  "pro",
-  "pro_annual",
-  "elite",
-  "elite_annual",
-  "black",
-  "black_annual",
-] as const;
+/* quiz: monthly|annual · médico: `mensagens`, e só.
+   Os cinco nomeados foram apagados: não havia médico assinado em nenhum, e uma
+   lista de planos que o checkout aceita mas ninguém compra é superfície de
+   erro sem receita do outro lado. */
+const PLANS = ["monthly", "annual", "mensagens"] as const;
 
 function siteUrl(): string {
   return (process.env.SITE_URL || DOCTOR.siteUrl || "https://www.obstetrica.com.br").replace(
@@ -45,12 +37,39 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         returnPath: z.string().default("/minha-conta"),
         // código de afiliado (influenciador) capturado do link ?ref= no site
         refCode: z.string().max(40).optional(),
+        /**
+         * Quantas mensagens de IA por mês ele está comprando (plano `mensagens`).
+         *
+         * A faixa é validada de novo no servidor, contra a MESMA escada que
+         * calcula o preço — não contra números escritos aqui. O Stripe cobra
+         * pelo Price graduado, então mandar 99.999 não daria um plano de graça;
+         * daria uma fatura de milhares de reais e um teto de IA que a plataforma
+         * não consegue pagar. A trava existe para o segundo caso.
+         */
+        mensagens: z.number().int().positive().optional(),
       })
       .parse(i),
   )
   .handler(async ({ data }) => {
     const { stripeConfigured, priceIdFor, createCheckoutSession, ensurePercentCoupon } =
       await import("@/lib/stripe.server");
+    /* ── A divisão, aplicada no servidor ──────────────────────────────
+       Um checkout do Stripe É o canal "site", por definição — não há como
+       criar um a partir do app. Então esta checagem não depende de nenhum
+       campo que o cliente mande, e não há requisição forjada que a contorne:
+       `premium_paciente` tem canal "app" e é recusado aqui, ponto.
+
+       É o que garante que a compra da paciente não escape para o Stripe
+       enquanto o app estiver em revisão — que é o cenário que reprova. */
+    const { podeComprar } = await import("@/lib/canal-de-venda");
+    const veredito = podeComprar(
+      data.product === "doctor_plan" ? "plano_medico" : "premium_paciente",
+      "site",
+    );
+    if (!veredito.pode) {
+      return { ok: false as const, error: "canal_errado" as const, texto: veredito.texto };
+    }
+
     if (!stripeConfigured()) {
       return { ok: false as const, error: "pagamento_indisponivel" };
     }
@@ -60,6 +79,33 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
 
     const priceId = priceIdFor(data.product, data.plan);
     if (!priceId) return { ok: false as const, error: "plano_indisponivel" };
+
+    /* ─── A QUANTIDADE, QUE É O PLANO ────────────────────────────────────────
+     *
+     * Este é o elo que faltava. `createCheckoutSession` ganhou `quantity` e o
+     * webhook aprendeu a ler `items.data[0].quantity` — mas ninguém MANDAVA a
+     * quantidade, então todo checkout ia com 1. Uma mensagem de IA por mês, ao
+     * preço da faixa fixa: o médico paga R$ 29,90 e recebe uma resposta.
+     *
+     * É a quinta vez nesta base que o teste prova a função extraída e não o
+     * CHAMADOR. Por isso `cadeia-do-stripe.test.ts` agora afirma esta linha.
+     *
+     * A faixa vem da escada, nunca de literais: um número escrito aqui seria a
+     * segunda tabela de preços, e é assim que a tela e a fatura divergem.
+     */
+    let quantity: number | undefined;
+    let quantityRange: { min: number; max: number } | undefined;
+    if (data.product === "doctor_plan" && data.plan === "mensagens") {
+      const { ENTRADA_MENSAGENS, TETO_AUTOATENDIMENTO } = await import("@/lib/planos-medico");
+      const pedido = data.mensagens ?? ENTRADA_MENSAGENS;
+      if (pedido < ENTRADA_MENSAGENS || pedido > TETO_AUTOATENDIMENTO) {
+        /* Acima do teto do autoatendimento é contrato de Clínica, provisionado
+           à mão — não é um checkout que alguém fecha sozinho no site. */
+        return { ok: false as const, error: "fora_da_escada" as const };
+      }
+      quantity = pedido;
+      quantityRange = { min: ENTRADA_MENSAGENS, max: TETO_AUTOATENDIMENTO };
+    }
 
     // ── Afiliado (Premium da paciente): valida o código contra a tabela e
     // carimba na assinatura — o webhook credita 50% de cada fatura paga.
@@ -74,12 +120,17 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
           .maybeSingle();
         if (aff?.active) {
           refCode = aff.code as string;
-          // Atribuição persistida na paciente (relatório por influenciador).
-          await (supabaseAdmin as any)
+          /* Atribuição persistida na paciente (relatório por influenciador).
+             Não derruba a compra — o `refCode` segue para a metadata da
+             Stripe e é dela que o webhook credita a comissão. Mas o relatório
+             por influenciador sai errado, e sem log ninguém descobre: é uma
+             divergência entre duas fontes que ninguém compara. */
+          const { error: refErr } = await (supabaseAdmin as any)
             .from("patient_profiles")
             .update({ ref_code: refCode })
             .eq("id", u.user.id)
             .is("ref_code", null); // 1º afiliado vence; não sobrescreve
+          if (refErr) console.error("[afiliado] atribuição não gravou", code, refErr);
         }
       } catch {
         /* tabela ausente → segue sem afiliado */
@@ -103,6 +154,17 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         /* coluna ausente → segue sem desconto */
       }
     }
+
+    /* ─── O CUPOM DO MÉDICO SAIU DAQUI (ago/2026) ─────────────────────
+       Ele aplicava 20% ao Premium da paciente nos dois planos. O médico não dá
+       mais desconto: dá Sementinhas. As razões estão no cabeçalho de
+       `promo.ts`, e a que fecha o assunto é operacional — a paciente compra
+       DENTRO do app iOS/Android, e cupom de Stripe não existe ali. Este bloco
+       só teria efeito na venda web, que o `canal-de-venda` recusa para ela.
+
+       O cupom de convite-de-paciente, acima, é OUTRO produto: é o desconto que
+       o MÉDICO ganha por ter sido convidado por uma paciente, no plano dele,
+       comprado no site. Esse continua. */
 
     // Reaproveita o customer do Stripe se o usuário já assinou algo antes.
     const { data: existing } = await (supabaseAdmin as any)
@@ -128,6 +190,8 @@ export const createSubscriptionCheckout = createServerFn({ method: "POST" })
         cancelUrl: `${base}${ret}?assinatura=cancelada`,
         refCode,
         discountCoupon,
+        quantity,
+        quantityRange,
       });
       if (!url) return { ok: false as const, error: "checkout_sem_url" };
       return { ok: true as const, url };

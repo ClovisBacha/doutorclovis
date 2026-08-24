@@ -1,20 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { voltouDepoisDoResgate } from "@/lib/cupons";
 import {
   getPlatformOverview,
+  custoDaPlataforma,
+  type CustoSemDono,
   getPlatformInsights,
   getRetentionMetrics,
   setDoctorStatus,
   listPlatformCoupons,
   createPlatformCoupon,
   togglePlatformCoupon,
+  listCouponRedemptions,
   type PlatformOverview,
   type PlatformDoctor,
   type PlatformInsights,
   type RetentionMetrics,
   type PlatformCoupon,
+  type CouponRedeemer,
 } from "@/lib/platform.functions";
 import {
   listAffiliates,
@@ -139,7 +144,14 @@ function LinkCard({ path, label }: { path: string; label: string }) {
   );
 }
 
-const PLANS = ["trial", "free", "starter", "pro", "clinica", "elite", "black"] as const;
+const PLANS = [
+  "trial",
+  "free",
+  /* O único que ainda se vende. Sem ele aqui, o console não consegue corrigir à
+     mão o plano de quem comprou a escada nova. */
+  "mensagens",
+  "clinica",
+] as const;
 
 type AdminTab =
   | "visao"
@@ -244,7 +256,10 @@ function AdminConsole() {
       </section>
     );
 
-  const activeLabel = NAV_GROUPS.flatMap((g) => g.items).find((i) => i.key === tab)?.label ?? "";
+  const ativo = NAV_GROUPS.flatMap((g) => g.items.map((i) => ({ ...i, grupo: g.group }))).find(
+    (i) => i.key === tab,
+  );
+  const activeLabel = ativo?.label ?? "";
 
   return (
     <section className="mx-auto max-w-7xl px-4 py-8 md:px-6 md:py-12">
@@ -283,25 +298,41 @@ function AdminConsole() {
       </div>
 
       <div className="mt-6 flex gap-8">
-        {/* Sidebar desktop: grupos */}
-        <nav className="hidden w-52 shrink-0 md:block">
+        {/* ── Barra lateral do PC ─────────────────────────────────────────
+            `sticky` com rolagem própria, e isso conserta um defeito que só
+            aparece no computador: são 17 abas e páginas longas — Financeiro,
+            Médicos, Auditoria têm tabelas que passam de várias telas. A barra
+            rolava junto e sumia, então quem descia numa tabela ficava sem
+            navegação nenhuma e tinha que voltar ao topo para trocar de aba.
+
+            `max-h` + `overflow-y-auto` porque a própria lista pode não caber:
+            num notebook de 768px de altura, 17 itens com títulos de grupo
+            estouram a tela. Sem isso, os últimos ficariam inalcançáveis. */}
+        <nav
+          aria-label="Seções do console"
+          className="hidden w-56 shrink-0 md:block md:sticky md:top-6 md:max-h-[calc(100vh-3rem)] md:overflow-y-auto md:pr-1"
+        >
           {NAV_GROUPS.map((g) => (
             <div key={g.group} className="mb-5">
               <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {g.group}
               </p>
+              {/* `aria-current` além da cor: quem usa leitor de tela não
+                  enxerga o realce, e sem ele a lista soa como 17 botões
+                  iguais. */}
               <div className="space-y-0.5">
                 {g.items.map((i) => (
                   <button
                     key={i.key}
                     onClick={() => setTab(i.key)}
+                    aria-current={tab === i.key ? "page" : undefined}
                     className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition-colors ${
                       tab === i.key
                         ? "bg-primary/10 font-medium text-primary"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                     }`}
                   >
-                    <span>{i.icon}</span>
+                    <span aria-hidden>{i.icon}</span>
                     {i.label}
                   </button>
                 ))}
@@ -312,7 +343,17 @@ function AdminConsole() {
 
         {/* Conteúdo */}
         <div className="min-w-0 flex-1">
-          <h2 className="mb-5 hidden font-serif text-2xl md:block">{activeLabel}</h2>
+          {/* O grupo antes do nome — "Financeiro · Reembolsos". Com 17 abas em
+              seis grupos, o nome sozinho não diz onde se está: "Alertas" pode
+              ser de crescimento ou de sistema, e a barra lateral já rolou. */}
+          <div className="mb-5 hidden md:block">
+            {ativo && (
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {ativo.grupo}
+              </p>
+            )}
+            <h2 className="font-serif text-2xl">{activeLabel}</h2>
+          </div>
           {tab === "visao" && data && <OverviewTab data={data} />}
           {tab === "consultor" && <ConsultorTab />}
           {tab === "crescimento" && <CrescimentoTab />}
@@ -398,7 +439,82 @@ function OverviewTab({ data }: { data: PlatformOverview }) {
         referência por plano (ajustáveis em <code>platform.functions.ts</code>).
       </p>
 
+      <CustoSemDonoCard />
       <RetentionCard />
+    </div>
+  );
+}
+
+/**
+ * O QUE A PLATAFORMA PAGA SOZINHA.
+ *
+ * `ai_usage` grava `doctor_id = null` para tudo que não pertence a consultório
+ * nenhum — paciente sem médico vinculado, widget do site, suporte. Toda leitura
+ * de consumo que existia era POR MÉDICO, então essas linhas eram escritas e
+ * nunca lidas: não havia tela nenhuma dizendo quanto gastamos com quem ainda
+ * não é paciente de ninguém.
+ *
+ * Por canal, e não só o total: "gastamos X" não permite decidir nada; "o widget
+ * do site gastou X e o suporte gastou Y" permite desligar um dos dois.
+ */
+function CustoSemDonoCard() {
+  const [canais, setCanais] = useState<CustoSemDono[] | null>(null);
+  const [falhou, setFalhou] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await custoDaPlataforma({ data: { accessToken: await token() } });
+        if (res.ok) setCanais(res.canais);
+        else setFalhou(true);
+      } catch {
+        setFalhou(true);
+      }
+    })();
+  }, []);
+
+  if (falhou) return null;
+  if (!canais) return null;
+
+  const total = canais.reduce((s, c) => s + c.entrada + c.saida, 0);
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <p className="font-medium">🧾 IA sem dono — o que a plataforma paga</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">
+        Ciclo atual. Linhas de <code>ai_usage</code> sem médico: paciente ainda sem vínculo, widget
+        do site e suporte. Nenhum consultório é cobrado por isto.
+      </p>
+      {canais.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">Nada neste ciclo.</p>
+      ) : (
+        <>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-1 font-medium">Canal</th>
+                  <th className="pb-1 text-right font-medium">Respostas</th>
+                  <th className="pb-1 text-right font-medium">Tokens</th>
+                </tr>
+              </thead>
+              <tbody>
+                {canais.map((c) => (
+                  <tr key={c.canal} className="border-t border-border/60">
+                    <td className="py-1.5">{c.canal}</td>
+                    <td className="py-1.5 text-right tabular-nums">{c.respostas}</td>
+                    <td className="py-1.5 text-right tabular-nums">
+                      {(c.entrada + c.saida).toLocaleString("pt-BR")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Total: {total.toLocaleString("pt-BR")} tokens no ciclo.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -412,11 +528,11 @@ const brl = (cents: number) =>
   `R$ ${(cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const brl0 = (cents: number) => `R$ ${Math.round(cents / 100).toLocaleString("pt-BR")}`;
 
+/* Quatro planos. Os cinco nomeados foram apagados — não havia médico em
+   nenhum. Um nome antigo que sobre no banco cai no `?? plano` abaixo e aparece
+   cru, que é melhor que um rótulo bonito para um plano que não existe. */
 const PLAN_LABEL: Record<string, string> = {
-  starter: "Starter",
-  pro: "Pro",
-  elite: "Reconhecido",
-  black: "Black",
+  mensagens: "Obstetrícia",
   clinica: "Clínica",
   trial: "Trial",
   free: "Grátis",
@@ -895,12 +1011,26 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
       data: { accessToken: await token(), doctorId: d.id, ...patch },
     });
     setBusy(false);
-    if (res.ok) {
-      toast.success("Atualizado ✓");
-      onChanged();
-    } else {
+    if (!res.ok) {
       toast.error("Não foi possível atualizar.");
+      return;
     }
+    /* ─── O AVISO DIZ O QUE VALE, NÃO O QUE FOI PEDIDO ─────────────────────
+       "Atualizado ✓" era verdade sobre a ESCRITA e mentira sobre o efeito: o
+       plano concedido a um médico desativado (ou com data vencida no banco)
+       era rebaixado para `free` pela régua de capacidades, e esta tela
+       comemorava. O servidor agora devolve o plano EFETIVO — passado pela
+       mesma régua — e quando ele não bate com o pedido, isso aparece. */
+    const efetivo = "planoEfetivo" in res ? (res.planoEfetivo as string | null) : null;
+    if (patch.plan && efetivo && efetivo !== patch.plan) {
+      toast.warning(`Salvo, mas vale como "${efetivo}"`, {
+        description:
+          "O médico está inativo ou o plano está vencido. Reative a conta para o plano valer.",
+      });
+    } else {
+      toast.success("Atualizado ✓");
+    }
+    onChanged();
   }
 
   return (
@@ -976,6 +1106,35 @@ function CuponsTab() {
   const [note, setNote] = useState("");
   const [maxUses, setMaxUses] = useState("");
   const [creating, setCreating] = useState(false);
+  /* Detalhe de quem resgatou. `null` na entrada = carregando; o cache por id
+     evita refazer a consulta (e o log de auditoria) a cada abre-e-fecha. */
+  const [aberto, setAberto] = useState<string | null>(null);
+  const [detalhe, setDetalhe] = useState<
+    Record<string, { redeemers: CouponRedeemer[]; total: number } | null>
+  >({});
+
+  async function abrir(c: PlatformCoupon) {
+    if (aberto === c.id) {
+      setAberto(null);
+      return;
+    }
+    setAberto(c.id);
+    if (detalhe[c.id] !== undefined) return;
+    setDetalhe((d) => ({ ...d, [c.id]: null }));
+    try {
+      const res = await listCouponRedemptions({
+        data: { accessToken: await token(), couponId: c.id },
+      });
+      setDetalhe((d) => ({
+        ...d,
+        [c.id]: res.ok
+          ? { redeemers: res.redeemers, total: res.total }
+          : { redeemers: [], total: 0 },
+      }));
+    } catch {
+      setDetalhe((d) => ({ ...d, [c.id]: { redeemers: [], total: 0 } }));
+    }
+  }
 
   async function load() {
     try {
@@ -1116,30 +1275,134 @@ function CuponsTab() {
             </thead>
             <tbody>
               {coupons.map((c) => (
-                <tr key={c.id} className="border-b border-border/60 last:border-0">
-                  <td className="px-4 py-2.5 font-mono font-semibold">{c.code}</td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{c.note ?? "—"}</td>
-                  <td className="px-4 py-2.5 tabular-nums">
-                    {c.redemptions}
-                    {c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <button
-                      onClick={() => toggle(c)}
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                        c.active
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-secondary text-muted-foreground"
-                      }`}
-                    >
-                      {c.active ? "Ativo" : "Inativo"}
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={c.id}>
+                  <tr className="border-b border-border/60 last:border-0">
+                    <td className="px-4 py-2.5 font-mono font-semibold">{c.code}</td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{c.note ?? "—"}</td>
+                    <td className="px-4 py-2.5 tabular-nums">
+                      {c.redemptions > 0 ? (
+                        <button
+                          onClick={() => abrir(c)}
+                          aria-expanded={aberto === c.id}
+                          className="rounded-md px-1.5 py-0.5 font-semibold text-primary underline-offset-2 hover:underline"
+                        >
+                          {c.redemptions}
+                          {c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
+                          <span aria-hidden className="ml-1 text-xs">
+                            {aberto === c.id ? "▾" : "▸"}
+                          </span>
+                        </button>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          0{c.max_redemptions != null ? ` / ${c.max_redemptions}` : " / ∞"}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <button
+                        onClick={() => toggle(c)}
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                          c.active
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {c.active ? "Ativo" : "Inativo"}
+                      </button>
+                    </td>
+                  </tr>
+                  {aberto === c.id && (
+                    <tr className="border-b border-border/60 last:border-0">
+                      <td colSpan={4} className="bg-secondary/30 px-4 py-3">
+                        <CouponRedeemers dados={detalhe[c.id]} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               ))}
             </tbody>
           </table>
         </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Quem usou um cupom — a linha que abre debaixo do contador de usos.
+ *
+ * Sobre a coluna "Último login": ela vem do `last_sign_in_at` do Supabase e
+ * responde à pergunta que interessa numa campanha — a pessoa voltou depois de
+ * pegar o Premium, ou resgatou e sumiu? Mas ela só se move quando há um login
+ * NOVO, e a sessão do app se renova sozinha por semanas. Então "voltou" é
+ * prova de que voltou; a ausência de "voltou" não é prova de que não voltou.
+ * Está escrito na tela porque um número que o dono interpreta ao contrário é
+ * pior que número nenhum.
+ */
+function CouponRedeemers({
+  dados,
+}: {
+  dados: { redeemers: CouponRedeemer[]; total: number } | null | undefined;
+}) {
+  if (dados === undefined || dados === null) return <div className="skeleton h-16 rounded-xl" />;
+  if (dados.redeemers.length === 0)
+    return <p className="text-sm text-muted-foreground">Ninguém resgatou este cupom ainda.</p>;
+
+  const dia = (s: string) => new Date(s).toLocaleDateString("pt-BR");
+  const voltou = (r: CouponRedeemer) => voltouDepoisDoResgate(r.resgatadoEm, r.ultimoAcesso);
+  const quantosVoltaram = dados.redeemers.filter(voltou).length;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        <strong className="text-foreground">{quantosVoltaram}</strong> de {dados.redeemers.length}{" "}
+        voltaram ao app depois de resgatar. Quem não aparece como "voltou" pode ter continuado na
+        mesma sessão — o login só se repete quando a sessão expira.
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <th className="px-3 py-2">Paciente</th>
+              <th className="px-3 py-2">Resgatou</th>
+              <th className="px-3 py-2">Premium</th>
+              <th className="px-3 py-2">Último login</th>
+            </tr>
+          </thead>
+          <tbody>
+            {dados.redeemers.map((r) => (
+              <tr key={r.userId} className="border-b border-border/60 last:border-0">
+                <td className="px-3 py-2">
+                  <span className="font-medium">{r.nome ?? "(sem nome)"}</span>
+                  {r.email && <span className="ml-2 text-xs text-muted-foreground">{r.email}</span>}
+                </td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                  {dia(r.resgatadoEm)}
+                </td>
+                <td className="px-3 py-2">
+                  {r.premium ? (
+                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                      ativo
+                    </span>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">perdido</span>
+                  )}
+                </td>
+                <td className="px-3 py-2 tabular-nums text-muted-foreground">
+                  {r.ultimoAcesso ? dia(r.ultimoAcesso) : "—"}
+                  {voltou(r) && (
+                    <span className="ml-1.5 text-xs font-semibold text-emerald-700">voltou</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {dados.total > dados.redeemers.length && (
+        <p className="text-xs text-muted-foreground">
+          Mostrando os {dados.redeemers.length} resgates mais recentes de {dados.total}.
+        </p>
       )}
     </div>
   );

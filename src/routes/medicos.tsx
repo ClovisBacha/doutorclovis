@@ -6,6 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Reveal } from "@/components/reveal";
 import { SpotlightCard } from "@/components/motion-fx";
 import { PricingGlass, type PricingGlassTier } from "@/components/ui/pricing-glass";
+import { EscadaDeMensagens } from "@/components/escada-mensagens";
+import { SimulacaoDoCerebro } from "@/components/simulacao-do-cerebro";
+import { FUNCOES_PAGAS, SELO_PAGO, precoDeEntrada } from "@/lib/gancho-de-upgrade";
+import {
+  DEGRAUS_DESTAQUE,
+  descontoVsEntrada,
+  gestantesAtendidas,
+  precoDe,
+} from "@/lib/planos-medico";
 
 export const Route = createFileRoute("/medicos")({
   head: () => ({
@@ -23,15 +32,28 @@ export const Route = createFileRoute("/medicos")({
   component: MedicosPage,
 });
 
-// Promoção de lançamento: enquanto ativa, o anual dá 25% off (em vez dos
-// 2 meses grátis ≈ 17%). Basta trocar active para false quando encerrar.
-const LAUNCH_PROMO = { active: true, off: 0.25, label: "🚀 Lançamento" };
+// Não há plano ANUAL: a escada tem um Price graduado só, mensal — mostrar um
+// preço anual sem Price atrás dele seria a tela prometer o que o checkout não
+// cobra.
+/**
+ * Os cartões da escada.
+ *
+ * `monthly` NÃO é escrito à mão: sai de `precoDe`, a mesma função que o
+ * checkout usa e que o teste trava contra as camadas do Stripe. Um número
+ * digitado aqui seria a segunda tabela de preços — e é assim que a tela promete
+ * um valor e a fatura cobra outro.
+ *
+ * São três cartões e dez degraus: o resto vive no seletor logo acima deles
+ * (`EscadaDeMensagens`), onde o médico arrasta e vê preço, desconto e gestantes
+ * mudarem ao vivo.
+ *
+ * Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
+ * entregue com implantação assistida, e diz isso). Nada de promessa vaga,
+ * número inventado ou recurso de roadmap vendido como pronto.
+ */
+const [ENTRADA, MEIO, TOPO] = DEGRAUS_DESTAQUE;
+const reais = (centavos: number) => centavos / 100;
 
-// monthly = preço no plano mensal (0 = grátis). No plano ANUAL o médico paga
-// 10 meses e usa 12 (2 meses grátis ≈ 17% off) → mensal equivalente arredondado.
-// Regra de ouro dos planos: cada bullet é algo que o produto FAZ hoje (ou é
-// entregue com implantação assistida, e diz isso). Nada de promessa vaga,
-// número inventado ou recurso de roadmap vendido como pronto.
 const PLANS = [
   {
     key: "free",
@@ -41,84 +63,69 @@ const PLANS = [
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "Saia do caderno e do zap pessoal — de graça, para sempre.",
+    desc: "A plataforma de gestão inteira, de graça e para sempre. Saia do caderno e do zap pessoal.",
     features: [
-      "👩‍🍼 Até 5 pacientes ativas · 1 médico",
+      "👩‍🍼 Pacientes ILIMITADAS — sem teto, como nos planos pagos",
       "App de pré-natal completo para as suas pacientes",
-      "Solicitações de consulta organizadas em um só lugar",
-      "Calculadoras e ferramentas clínicas básicas",
+      "Consultas, pré-consulta digital e prontuário num lugar só",
+      "Ferramentas clínicas: biometria, EPDS, DMG, pré-eclâmpsia",
+      "Só não tem a IA respondendo pela sua voz — é isso que os pagos abrem",
     ],
     cta: "Criar conta grátis",
   },
   {
-    key: "starter",
-    name: "Starter",
-    tagline: "A sua IA no app",
-    monthly: 149,
+    key: "mensagens_entrada",
+    mensagens: ENTRADA,
+    name: "Consultório",
+    tagline: "A sua IA atendendo",
+    monthly: reais(precoDe(ENTRADA)),
     isFrom: false,
     perSuffix: "",
     highlight: false,
     desc: "Uma IA treinada nas SUAS respostas atende suas pacientes no app — você para de repetir as mesmas orientações.",
     features: [
-      "👩‍🍼 Até 50 pacientes · 🧠 1 cérebro (o seu) — sai a R$ 2,98/paciente",
+      `💬 ${ENTRADA} mensagens de IA por mês · cerca de ${gestantesAtendidas(ENTRADA)} gestantes`,
+      "👩‍🍼 Pacientes ILIMITADAS — o teto é de mensagens, não de gente",
       "IA com as suas respostas, 24h no app",
       "Pré-consulta digital + monitoramento (peso, pressão, chutes)",
-      "Ferramentas clínicas avançadas (biometria, EPDS, DMG, pré-eclâmpsia)",
     ],
-    cta: "Começar grátis por 14 dias",
+    cta: `Começar por R$ ${reais(precoDe(ENTRADA)).toFixed(2).replace(".", ",")}`,
   },
   {
-    key: "pro",
-    name: "Pro",
-    tagline: "A IA também no WhatsApp",
-    monthly: 297,
+    key: "mensagens_meio",
+    mensagens: MEIO,
+    name: "Movimento",
+    tagline: "Para quem já tem volume",
+    monthly: reais(precoDe(MEIO)),
     isFrom: false,
     perSuffix: "",
     highlight: true,
-    desc: "A mesma IA atende e agenda no WhatsApp do consultório — implantada junto com a nossa equipe.",
+    desc: "O mesmo produto inteiro, com muito mais conversa — e a mensagem mais barata a cada degrau que você sobe.",
     features: [
-      "👩‍🍼 Até 150 pacientes · 🧠 1 cérebro — sai a R$ 1,98/paciente",
-      "Tudo do Starter",
-      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
-      "Triagem de urgência com orientação SAMU/UPA",
+      `💬 ${MEIO.toLocaleString("pt-BR")} mensagens por mês · ${descontoVsEntrada(MEIO)}% mais barata cada uma`,
+      `👩‍🍼 Cerca de ${gestantesAtendidas(MEIO)} gestantes ativas · pacientes ilimitadas`,
       "Dashboard do consultório: dúvidas frequentes e engajamento",
+      "🎚️ Qualquer número entre os degraus, no seletor acima",
     ],
-    cta: "Assinar Pro",
+    cta: "Assinar Movimento",
   },
   {
-    key: "elite",
-    name: "Reconhecido",
-    tagline: "Seja encontrado primeiro",
-    monthly: 597,
+    key: "mensagens_topo",
+    mensagens: TOPO,
+    name: "Alto risco",
+    tagline: "Conversa o dia inteiro",
+    monthly: reais(precoDe(TOPO)),
     isFrom: false,
     perSuffix: "",
     highlight: false,
-    desc: "O plano de visibilidade: selo verificado, topo na busca de médicos e convites premium para fidelizar pacientes.",
+    desc: "Para quem acompanha gestação de alto risco: a paciente pergunta quando precisa, e a mensagem chega ao preço mais baixo da escada.",
     features: [
-      "🧠 Até 5 cérebros (R$ 119/médico) · 👩‍🍼 300 pacientes por médico",
-      "Tudo do Pro, para cada médico da equipe",
-      "🎟️ 25 convites premium/mês — gere o código e envie para a paciente",
-      "✓ Selo verificado + prioridade na busca — as pacientes te acham primeiro",
+      `💬 ${TOPO.toLocaleString("pt-BR")} mensagens por mês · ${descontoVsEntrada(TOPO)}% mais barata cada uma`,
+      `👩‍🍼 Cerca de ${gestantesAtendidas(TOPO)} gestantes ativas · triagem de urgência com SAMU/UPA`,
+      "💬 IA atende e agenda no WhatsApp (implantação assistida)",
+      "🎚️ Qualquer número entre os degraus, no seletor acima",
     ],
-    cta: "Assinar Reconhecido",
-  },
-  {
-    key: "black",
-    name: "Black",
-    tagline: "Alto volume",
-    monthly: 1499,
-    isFrom: false,
-    perSuffix: "",
-    highlight: false,
-    desc: "Para equipes grandes: presenteie centenas de pacientes e tenha prioridade máxima.",
-    features: [
-      "🧠 Até 20 cérebros (R$ 75/médico) · 👩‍🍼 500 pacientes por médico",
-      "Tudo do Reconhecido",
-      "🖤 250 convites premium/mês (gerados na hora)",
-      "👤 Gerente de conta dedicado + selo Black + topo absoluto na busca",
-      "🚀 Acesso antecipado a novos recursos + treinamento da equipe",
-    ],
-    cta: "Assinar Black",
+    cta: "Assinar Alto risco",
   },
   {
     key: "enterprise",
@@ -132,9 +139,8 @@ const PLANS = [
     desc: "A clínica inteira num painel só: vários médicos, cada um com o próprio Segundo Cérebro — operados individualmente. Preço personalizado pelo tamanho da sua equipe.",
     features: [
       "🏥 Painel da clínica: opere o cérebro de cada médico individualmente",
-      "🧠 Conversas ilimitadas com a IA para todas as pacientes",
+      `💬 Acima de ${TOPO.toLocaleString("pt-BR")} mensagens/mês, o volume é contratado — não tabelado`,
       "📊 Relatório mensal por médico (cobertura e satisfação da IA)",
-      "💬 Orçamento sob medida pelo número de médicos — fale com a gente",
       "👤 Gerente dedicado + onboarding e migração assistidos",
     ],
     cta: "Pedir orçamento",
@@ -194,7 +200,7 @@ const FAQS = [
   },
   {
     q: "O Segundo Cérebro dá diagnóstico ou conduta médica?",
-    a: "Não. Ele só responde o que você já validou (suas respostas de sempre) e, no Nível 2 (Pro), também agenda e orienta emergências ao SAMU/UPA. Qualquer coisa nova ou fora do que você ensinou, ele encaminha para você — nunca inventa conduta.",
+    a: "Não. Ele só responde o que você já validou (suas respostas de sempre) e, no WhatsApp, também agenda e orienta emergências ao SAMU/UPA. Qualquer coisa nova ou fora do que você ensinou, ele encaminha para você — nunca inventa conduta.",
   },
   {
     q: "Meus dados e os das pacientes ficam seguros?",
@@ -210,18 +216,15 @@ const FAQS = [
   },
   {
     q: "Existe limite de mensagens da IA?",
-    a: "Não. As pacientes conversam com a IA quantas vezes precisarem — sem cota, sem bloqueio. O que muda entre os planos é quantas pacientes e quantos médicos a conta comporta. Para clínicas grandes, o preço é personalizado (fale com a gente).",
+    a: "Existe, e é justamente o que você contrata: o plano é medido em mensagens de IA por mês (150, 1.350, 11.100 — ou qualquer número entre eles, no seletor acima). Quanto mais você contrata, mais barata fica a mensagem: de 20 centavos na entrada a 9 centavos no topo, com o desconto subindo seis pontos a cada degrau. Se o mês acabar antes da cota, a paciente não fica sem resposta nem sem saída: ela é avisada de que o limite é DA PLATAFORMA (nunca seu) e recebe o caminho direto até você. E urgência nunca tem cota — sinal de alarme é sempre respondido e sempre encaminhado.",
   },
   {
     q: "Quantas pacientes posso ter?",
-    a: "Cada plano tem um teto que cresce com você: Free até 5 (para testar), Starter até 50, Pro até 150, Reconhecido até 300 por médico e Black até 500 por médico. No plano Clínica é sob medida, sem teto rígido. Ao chegar perto do limite, é só subir de plano — as solicitações das pacientes ficam guardadas esperando você aceitar.",
+    a: "Quantas você quiser — não há teto de pacientes em nenhum plano, nem no Free. Esse limite existia e foi retirado: cobrar por cabeça punia justamente quem traz mais gestantes para a plataforma. O que você dimensiona é o volume de conversa com a IA, que é o que realmente custa. Uma paciente que não usa o chat não custa nada.",
   },
 ];
 
 function MedicosPage() {
-  // Anual é o padrão: é o melhor negócio para os dois lados (2 meses grátis
-  // ≈ 17% off) e sempre rotulado "cobrado anualmente" — sem pegadinha.
-  const [billing, setBilling] = useState<"mensal" | "anual">("anual");
   const [leadForm, setLeadForm] = useState({
     name: "",
     email: "",
@@ -445,13 +448,14 @@ function MedicosPage() {
                 Um cérebro só, dois alcances
               </p>
               <p className="mx-auto mt-2 max-w-xl text-center text-sm text-muted-foreground">
-                Você treina <strong>uma vez</strong>. Onde ele atende depende só do seu plano — é o
-                mesmo cérebro ficando mais presente, não um segundo recurso para aprender.
+                Você treina <strong>uma vez</strong> e ele atende nos dois lugares — no app e no
+                WhatsApp — <strong>desde o plano de {precoDeEntrada()}</strong>. Não são dois
+                recursos para aprender, nem dois planos para comprar.
               </p>
               <div className="mt-8 grid gap-5 md:grid-cols-2">
                 <div className="rounded-3xl border border-border bg-card p-6">
                   <span className="rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-muted-foreground">
-                    Nível 1 · plano Starter
+                    No app · incluído em todo plano pago
                   </span>
                   <p className="mt-4 text-3xl">📱</p>
                   <p className="mt-2 font-serif text-xl">Atende dentro do app</p>
@@ -468,14 +472,14 @@ function MedicosPage() {
                 </div>
                 <div className="relative rounded-3xl border-2 border-primary/30 bg-primary/5 p-6 shadow-[var(--shadow-card)]">
                   <span className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
-                    Nível 2 · plano Pro
+                    No WhatsApp · incluído em todo plano pago
                   </span>
                   <p className="mt-4 text-3xl">📱 + 💬</p>
                   <p className="mt-2 font-serif text-xl">Atende também no WhatsApp</p>
                   <ul className="mt-4 space-y-2 text-sm text-foreground">
                     <li className="flex items-start gap-2">
-                      <span className="mt-0.5 text-primary">✓</span>Tudo do Nível 1, onde a paciente
-                      já está
+                      <span className="mt-0.5 text-primary">✓</span>Tudo do que ele faz no app, onde
+                      a paciente já está
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="mt-0.5 text-primary">✓</span>Agenda consulta sozinho, sem
@@ -495,11 +499,11 @@ function MedicosPage() {
             </div>
           </Reveal>
 
-          {/* Mock conversation — o Nível 2 em ação */}
+          {/* Mock conversation — o cérebro no WhatsApp */}
           <Reveal delay={0.16}>
             <div className="mx-auto mt-8 max-w-md rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
               <p className="mb-4 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                O Nível 2 em ação, no WhatsApp
+                O cérebro em ação, no WhatsApp
               </p>
               <div className="space-y-3">
                 {[
@@ -739,68 +743,140 @@ function MedicosPage() {
             )}
           </Reveal>
 
+          {/* ─── O QUE É GRÁTIS E O QUE PEDE PLANO ────────────────────────────
+              Pedido do dono: o gancho tem de estar NO SITE, não só numa tela
+              que o médico já pago vê. A linha é a mesma que a medição de custo
+              desenhou — o que chama modelo é pago, o resto é da casa — e dizer
+              isso antes do preço faz o R$ 29,90 parecer o que é: o preço da IA,
+              não o preço da plataforma. */}
+          <Reveal>
+            <div className="mt-10 grid gap-4 md:grid-cols-2">
+              <div className="rounded-3xl border border-white/15 bg-white/[0.04] p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/50">
+                  De graça, para sempre
+                </p>
+                <p className="mt-2 font-serif text-xl text-white">A plataforma inteira</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-white/70">
+                  {[
+                    "Pacientes ilimitadas",
+                    "Agenda, consultas e fila de espera",
+                    "Prontuário e pré-consulta digital",
+                    "Receituário e ferramentas clínicas",
+                    "Exames recebidos e alerta de urgência",
+                    "O app de pré-natal completo para elas",
+                  ].map((t) => (
+                    <li key={t} className="flex gap-2">
+                      <span className="text-white/40">·</span>
+                      {t}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-3xl border border-[rgb(228,150,142)]/40 bg-[rgb(228,150,142)]/10 p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[rgb(228,150,142)]">
+                  {SELO_PAGO} · a partir de {precoDeEntrada()}/mês
+                </p>
+                <p className="mt-2 font-serif text-xl text-white">Tudo que a IA faz por você</p>
+                <ul className="mt-3 space-y-1.5 text-sm text-white/75">
+                  {Object.values(FUNCOES_PAGAS).map((f) => (
+                    <li key={f.nome} className="flex gap-2">
+                      <span className="text-[rgb(228,150,142)]">·</span>
+                      <span>
+                        <strong className="font-semibold text-white">{f.nome}</strong> — {f.oQueFaz}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-xs leading-relaxed text-white/50">
+                  Todos os planos pagos entregam as mesmas funções. O que muda de um para o outro é
+                  só quantas mensagens de IA você tem por mês.
+                </p>
+              </div>
+            </div>
+          </Reveal>
+
+          {/* ─── A SIMULAÇÃO, LOGO DEPOIS DA LINHA ────────────────────────────
+              A coluna da direita acabou de dizer "Segundo Cérebro" a quem nunca
+              viu um. Descrever IA em bullet não vende IA — e o que trava um
+              obstetra não é duvidar que ela responde, é achar que ela responde
+              ERRADO. Por isso a simulação vem aqui, antes do preço, e por isso
+              dois dos três exemplos são a IA se RECUSANDO a responder. */}
+          <Reveal delay={100}>
+            <SimulacaoDoCerebro className="mt-4" />
+          </Reveal>
+
+          {/* ─── O SELETOR, ANTES DOS CARTÕES ──────────────────────────────
+              Os cartões mostram três degraus; a escada tem dez. Sem isto, quem
+              queria 1.250 mensagens não via o preço em lugar nenhum antes de
+              abrir o Stripe — e o meio da escada é exatamente onde ela foi
+              desenhada para levar a pessoa. */}
+          <Reveal>
+            <EscadaDeMensagens
+              className="mt-8"
+              onEscolher={(mensagens) => {
+                /* Carrega a quantidade para o cadastro; de lá ela segue para o
+                   checkout. Sem isto o botão do seletor levaria a pessoa para
+                   um fluxo que esquece o número que ela acabou de escolher. */
+                window.location.href = `/medicos/cadastro?mensagens=${mensagens}`;
+              }}
+            />
+          </Reveal>
+
           {(() => {
-            const annual = billing === "anual";
-            const promo = LAUNCH_PROMO.active;
-            // Anual: com promoção de lançamento = 25% off; sem = 2 meses grátis (≈17%).
-            const annualFactor = promo ? 1 - LAUNCH_PROMO.off : 10 / 12;
+            /* ─── SEM ALTERNADOR ANUAL, E ISSO É CORREÇÃO ────────────────────
+               A escada de mensagens é MENSAL: existe um Price graduado só, e
+               nenhum Price anual atrás dele. O alternador continuava mostrando
+               "25% OFF no anual" sobre os preços novos — ou seja, a tela
+               anunciava um valor que o checkout não tem como cobrar.
+
+               É o defeito que esta base já perseguiu quatro vezes com outro
+               nome: duas tabelas de preço para a mesma compra. Aqui a segunda
+               tabela era uma multiplicação na hora de renderizar.
+
+               Sem fidelidade continua valendo, e é o que a nota diz. */
             const glassTiers: PricingGlassTier[] = PLANS.map((plan) => {
               const customPrice = (plan as { customPrice?: string }).customPrice;
-              const shown =
-                plan.monthly === 0
-                  ? 0
-                  : annual
-                    ? Math.round(plan.monthly * annualFactor)
-                    : plan.monthly;
-              // Economia no ano inteiro (12 meses do cheio − 12 meses do promocional).
-              const savings = plan.monthly === 0 ? 0 : (plan.monthly - shown) * 12;
+              const shown = plan.monthly;
               return {
                 name: plan.name,
                 tagline: plan.tagline,
-                price: String(shown),
+                price: shown % 1 === 0 ? String(shown) : shown.toFixed(2).replace(".", ","),
                 customPrice,
-                oldPrice:
-                  !customPrice && annual && promo && plan.monthly > 0
-                    ? String(plan.monthly)
-                    : undefined,
                 // O sufixo por assento (ex.: "/médico") vai para a nota — inline,
                 // ao lado do número de 60px, estouraria o card estreito.
                 period: plan.monthly === 0 ? "/sempre" : "/mês",
                 fromPrefix: plan.isFrom,
                 footnote: customPrice
                   ? "orçamento pelo tamanho da equipe"
-                  : (plan.monthly === 0
-                      ? "grátis, para sempre"
-                      : annual
-                        ? `cobrado anualmente · economize R$ ${savings.toLocaleString("pt-BR")}/ano`
-                        : "sem fidelidade") + (plan.perSuffix ? " · por médico" : ""),
+                  : plan.monthly === 0
+                    ? "grátis, para sempre"
+                    : "por mês · sem fidelidade, cancele quando quiser",
                 isPopular: plan.highlight,
                 features: plan.features,
                 ctaLabel: plan.cta,
-                ctaHref: plan.key === "enterprise" ? "#contato" : "/medicos/cadastro",
+                /* O cartão leva a quantidade DELE — senão os três botões caem
+                   no mesmo cadastro sem número e o degrau escolhido se perde. */
+                ctaHref:
+                  plan.key === "enterprise"
+                    ? "#contato"
+                    : "mensagens" in plan
+                      ? `/medicos/cadastro?mensagens=${(plan as { mensagens: number }).mensagens}`
+                      : "/medicos/cadastro",
               };
             });
             return (
               <PricingGlass
                 className="mt-8"
                 tiers={glassTiers}
-                annual={annual}
-                onAnnualChange={(a) => setBilling(a ? "anual" : "mensal")}
-                saveBadge={promo ? "25% OFF" : "2 MESES"}
-                toggleNote={
-                  promo
-                    ? "🚀 Promoção de lançamento — 25% OFF no plano anual, por tempo limitado"
-                    : "💚 No anual, 2 meses grátis — economize ~17%"
-                }
+                toggleNote="🎚️ Qualquer número entre os degraus: use o seletor acima, ou ajuste no próprio checkout."
               />
             );
           })()}
 
           <Reveal>
             <p className="mt-10 text-center text-xs text-white/50">
-              Todo plano pago começa com 14 dias grátis, sem cartão de crédito. · Valores em BRL. ·
-              O WhatsApp usa a conta Meta Business do próprio médico (grátis até 1.000
-              conversas/mês).
+              Valores em BRL. · O WhatsApp usa a conta Meta Business do próprio médico (grátis até
+              1.000 conversas/mês).
             </p>
           </Reveal>
         </div>

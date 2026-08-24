@@ -15,6 +15,16 @@
 
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { colunaAusente } from "./postgrest";
+import { ymdBrasilia } from "./utils";
+
+/** Escapa texto da paciente que vai dentro de HTML de e-mail. */
+function escaparHtml(v: string): string {
+  return v.replace(
+    /[&<>"]/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c] ?? c,
+  );
+}
 
 async function requireUser(accessToken: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -70,6 +80,12 @@ export type LinkedPatient = {
   fetal_bpm_at?: string | null;
   /** Semana gestacional atual (calculada no servidor) — espelho do bebê no painel. */
   weeks?: number | null;
+  /** Dias dentro da semana (0–6). Conduta em 36s0d ≠ 36s6d. */
+  days?: number | null;
+  /** Nascimento, quando já houve: liga o espelho pós-parto. */
+  birth_date?: string | null;
+  /** Nome do bebê — é como ela chama a gestação. */
+  baby_name?: string | null;
   /** Tom de pele do bebê (0–4) escolhido pela paciente — espelho fiel. */
   baby_skin_tone?: number | null;
 };
@@ -77,23 +93,15 @@ export type LinkedPatient = {
 const TokenSchema = z.object({ accessToken: z.string().min(10) });
 
 /** Busca médicos ativos que aceitam pacientes (nome/especialidade). */
-export const searchDoctors = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), query: z.string().max(80) }).parse(i),
-  )
-  .handler(async ({ data }) => {
-    const user = await requireUser(data.accessToken);
-    if (!user) return { ok: false as const, doctors: [] as DoctorPublic[] };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const query = data.query.replace(/[%,()]/g, " ").trim();
-    const { data: rows, error } = await (supabaseAdmin as any).rpc("search_doctors", {
-      p_query: query,
-    });
-    if (error) return { ok: false as const, doctors: [] as DoctorPublic[] };
-    return { ok: true as const, doctors: (rows ?? []) as DoctorPublic[] };
-  });
+/* A busca por RPC (`search_doctors`) foi removida daqui.
+   
+   Ela filtrava `d.verified = true` no SQL — ou seja, escondia todo médico
+   recém-cadastrado — e ordenava por nome, ignorando o plano. Nenhuma tela a
+   usava mais (o app passou a chamar o diretório de `doctors.functions.ts`),
+   mas `createServerFn` publica um endereço HTTP de qualquer jeito: deixá-la
+   exportada mantinha viva uma segunda busca com regras diferentes da que
+   valem. Uma pergunta, uma resposta. */
 
-/** A paciente envia (ou reaproveita) uma solicitação de vínculo a um médico. */
 export const requestDoctor = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -116,7 +124,10 @@ export const requestDoctor = createServerFn({ method: "POST" })
       .select("id,active,accepting_patients,verified")
       .eq("id", data.doctorId)
       .maybeSingle();
-    if (!doc || doc.active === false || doc.accepting_patients === false || doc.verified !== true) {
+    /* O selo (`verified`) saiu da condição: ele é reputação, não permissão.
+       Exigi-lo aqui fazia a paciente achar o médico na busca — que agora
+       mostra os não-conferidos — e receber "indisponível" ao tocar. */
+    if (!doc || doc.active === false || doc.accepting_patients === false) {
       return { ok: false as const, reason: "unavailable" as const };
     }
 
@@ -140,6 +151,19 @@ export const requestDoctor = createServerFn({ method: "POST" })
       .maybeSingle();
     if (existing) return { ok: true as const, status: "pending" as const };
 
+    /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ────────────────────────────────
+       Havia aqui uma contagem de `patient_profiles` que barrava o vínculo
+       quando o médico batia no teto do plano. O eixo "número de pacientes"
+       deixou de existir: `maxPatients` é `null` em todos os planos, inclusive
+       no Free.
+
+       E a medição confirmou que ele nunca protegeu o que se pensava — uma
+       paciente ativa custa R$ 0,024 por mês em banco, egresso e funções
+       somados, menos que UMA mensagem de IA. O que custa é o modelo, e o modelo
+       já está fechado atrás do plano (`chat.ts`: sem plano, sem chamada).
+
+       Ver `docs/custo-de-infraestrutura.md`. */
+
     const { error } = await (supabaseAdmin as any).from("patient_link_requests").insert({
       patient_id: user.id,
       doctor_id: data.doctorId,
@@ -147,6 +171,65 @@ export const requestDoctor = createServerFn({ method: "POST" })
       status: "pending",
     });
     if (error) return { ok: false as const, reason: "db" as const };
+
+    /* AVISA O MÉDICO. Sem isto o pedido era um buraco silencioso: nada de push,
+       nada de e-mail, e ele só descobriria abrindo o painel na aba Pacientes
+       por conta própria. Do lado dela o cartão dizia "aguardando o médico
+       aceitar" para sempre, sem que o médico soubesse que havia alguém
+       esperando. Melhor esforço nos dois canais — falhar aqui não desfaz o
+       pedido, que já está gravado. */
+    /* AGUARDADO, não disparado e esquecido.
+       
+       Isto roda em função serverless (Vercel): quando a resposta é enviada, a
+       execução pode ser congelada e recuperada na hora seguinte. Um
+       `void (async () => …)()` depois do `return` é um envio que às vezes
+       acontece e às vezes não — e "às vezes" aqui significa um pedido de
+       paciente que ninguém fica sabendo, o exato buraco que este trecho existe
+       para fechar. Os poucos milissegundos a mais na resposta valem a certeza.
+       O `try` interno garante que uma falha de push ou de e-mail não desfaz o
+       pedido, que já está gravado. */
+    await (async () => {
+      try {
+        const { data: prof } = await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .select("display_name")
+          .eq("id", user.id)
+          .maybeSingle();
+        const nome = ((prof?.display_name as string) || "Uma gestante").trim();
+
+        try {
+          const { sendPushToUser } = await import("./push.server");
+          await sendPushToUser(data.doctorId, {
+            title: "Nova paciente quer te acompanhar",
+            body: `${nome} enviou uma solicitação. Toque para aceitar.`,
+            url: "/painel",
+          });
+        } catch {
+          /* push é o canal opcional */
+        }
+
+        const { data: dUser } = await supabaseAdmin.auth.admin.getUserById(data.doctorId);
+        const email = dUser?.user?.email;
+        if (email) {
+          const { sendEmail, emailLayout } = await import("./email.server");
+          await sendEmail({
+            to: email,
+            subject: `👩‍🍼 ${nome} quer te acompanhar no app`,
+            /* Escapado: o nome e a mensagem são texto que a paciente digitou, e
+               vão para dentro de um HTML que outra pessoa abre. */
+            html: emailLayout(
+              "Nova solicitação de paciente",
+              `<p style="margin:0 0 10px"><strong>${escaparHtml(nome)}</strong> enviou uma solicitação para ser acompanhada por você no app Obstétrica.</p>
+               ${data.message ? `<p style="margin:0 0 10px;padding:10px 14px;background:#f8fafc;border-radius:10px">"${escaparHtml(data.message)}"</p>` : ""}
+               <p style="margin:0">Aceite (ou recuse) no seu painel, na aba <strong>Pacientes</strong>.</p>`,
+            ),
+          });
+        }
+      } catch {
+        /* melhor esforço — o pedido continua valendo */
+      }
+    })();
+
     return { ok: true as const, status: "pending" as const };
   });
 
@@ -223,13 +306,24 @@ export const listPatientRequests = createServerFn({ method: "POST" })
     if (!user) return { ok: false as const, requests: [] as PatientRequest[] };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: rows } = await (supabaseAdmin as any)
+    const { data: rows, error } = await (supabaseAdmin as any)
       .from("patient_link_requests")
       .select("id,patient_id,message,created_at")
       .eq("doctor_id", user.id)
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(100);
+    /* ─── UMA SOLICITAÇÃO QUE SOME É UMA PACIENTE QUE DESISTE ────────────────
+     *
+     * O `error` era descartado, então tabela ausente, RLS ou timeout viravam
+     * "nenhuma solicitação pendente". Do outro lado há uma gestante que pediu
+     * para ser acompanhada e está esperando o aceite — ela não tem como saber
+     * que o pedido nunca apareceu para ninguém, e depois de alguns dias procura
+     * outro obstetra.
+     *
+     * É o único item desta fila em que o custo do silêncio é um paciente
+     * perdido, não um número errado. */
+    if (error) return { ok: false as const, requests: [] as PatientRequest[] };
 
     const reqs = (rows ?? []) as Omit<PatientRequest, "patient_name">[];
     // Nomes das pacientes numa segunda query (sem FK para embed do PostgREST).
@@ -279,40 +373,201 @@ export const respondPatientRequest = createServerFn({ method: "POST" })
     if (!req) return { ok: false as const };
 
     const now = new Date().toISOString();
-    if (data.accept) {
-      // Escada de planos: cada plano tem um teto de pacientes ativas por
-      // médico (Free 5 → Starter 50 → Pro 150 → Elite 300 → Black/Clínica
-      // 500). Ao atingir o teto, o aceite é bloqueado com o motivo — a
-      // solicitação fica pendente e o médico faz upgrade para aceitar.
-      const { getEntitlements } = await import("./entitlements.server");
-      const ent = await getEntitlements(user);
-      if (ent.maxPatients != null) {
-        const { count, error: cntErr } = await (supabaseAdmin as any)
-          .from("patient_profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("doctor_id", user.id);
-        if (!cntErr && (count ?? 0) >= ent.maxPatients) {
-          return {
-            ok: false as const,
-            reason: "limit" as const,
-            limit: ent.maxPatients,
-            plan: ent.label,
-          };
-        }
-      }
-      // Vincula a paciente ao médico (denormalizado em patient_profiles).
-      const { error: linkErr } = await (supabaseAdmin as any)
-        .from("patient_profiles")
-        .update({ doctor_id: user.id, updated_at: now })
-        .eq("id", req.patient_id);
-      if (linkErr) return { ok: false as const };
-    }
 
-    const { error } = await (supabaseAdmin as any)
+    /* A decisão é RECLAMADA antes de qualquer outra escrita.
+    
+       A ordem anterior era: vincular a paciente, depois marcar a solicitação
+       como aceita. Se a segunda falhasse, a paciente ficava vinculada ao médico
+       com a solicitação ainda "pending" — o cartão dela dizia "aguardando o
+       médico aceitar" para sempre, enquanto ele já a via na lista de pacientes.
+       Reclamar primeiro, com `.eq("status","pending")`, também fecha a corrida
+       de dois cliques: o segundo encontra 0 linhas e desiste. */
+    const { data: claimed, error: claimErr } = await (supabaseAdmin as any)
       .from("patient_link_requests")
       .update({ status: data.accept ? "accepted" : "declined", decided_at: now })
-      .eq("id", req.id);
-    return { ok: !error };
+      .eq("id", req.id)
+      .eq("status", "pending")
+      .select("id");
+    /* Duas causas com o MESMO silêncio: "o outro clique chegou antes" (normal,
+       e a tela recarregada mostra a decisão) e "o banco recusou a escrita"
+       (defeito). Sem separar, o médico clica em Aceitar, nada acontece, e não
+       há nenhum lugar onde isso apareça. */
+    if (claimErr) console.error("[vínculo] decisão recusada pelo banco", req.id, claimErr);
+    if (!claimed?.length) return { ok: false as const };
+
+    /** Devolve a solicitação para pendente quando o passo seguinte falha. */
+    const desfazer = async () => {
+      const { error } = await (supabaseAdmin as any)
+        .from("patient_link_requests")
+        .update({ status: "pending", decided_at: null })
+        .eq("id", req.id);
+      /* Se o desfazer falha, a solicitação fica "accepted" sem vínculo — o
+         estado inconsistente que a ordem acima existe para impedir, e o único
+         que ninguém consegue enxergar da tela. */
+      if (error) console.error("[vínculo] rollback da decisão falhou", req.id, error);
+    };
+
+    if (data.accept) {
+      /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ────────────────────────────────
+         Havia aqui uma contagem de `patient_profiles` que barrava o vínculo
+         quando o médico batia no teto do plano. O eixo "número de pacientes"
+         deixou de existir: `maxPatients` é `null` em todos os planos, inclusive
+         no Free.
+         E a medição confirmou que ele nunca protegeu o que se pensava — uma
+         paciente ativa custa R$ 0,024 por mês em banco, egresso e funções
+         somados, menos que UMA mensagem de IA. O que custa é o modelo, e o modelo
+         já está fechado atrás do plano (`chat.ts`: sem plano, sem chamada).
+         Ver `docs/custo-de-infraestrutura.md`. */
+      /* ─── QUANTAS LINHAS MUDARAM, E NÃO SÓ "DEU ERRO" ─────────────────────
+       *
+       * Um UPDATE que não encontra a linha NÃO é erro no Postgres: afeta zero
+       * linhas e volta limpo. Aqui isso significava o pior estado possível — a
+       * solicitação já tinha sido RECLAMADA como "accepted" logo acima, e o
+       * vínculo não acontecia.
+       *
+       * A paciente fica em limbo: o cartão dela sai de "aguardando o médico" e
+       * ela acredita que foi aceita, enquanto `doctor_id` continua nulo. Ela
+       * não aparece na lista dele, o cérebro dele não a atende, e o SOS dela
+       * não chega a ninguém — sem uma linha de erro em lugar nenhum.
+       *
+       * Acontece quando o perfil dela não existe (conta apagada entre o pedido
+       * e o aceite, perfil nunca criado). O `.select("id")` faz o PostgREST
+       * devolver o que mudou, e aí zero linhas volta a ser tratável. */
+      const { data: vinculada, error: linkErr } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .update({ doctor_id: user.id, updated_at: now })
+        .eq("id", req.patient_id)
+        .select("id");
+      if (linkErr || !vinculada?.length) {
+        if (!linkErr) {
+          console.error("[vínculo] aceite não encontrou o perfil da paciente", req.patient_id);
+        }
+        await desfazer();
+        return { ok: false as const };
+      }
+      /* O bônus de vínculo — mesma função dos outros dois caminhos. */
+      {
+        const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+        await bonusDeVinculo(supabaseAdmin, req.patient_id as string, user.id);
+      }
+    }
+
+    /* AVISA A PACIENTE da decisão.
+       
+       Antes o aceite era silencioso: o cartão dela dizia "aguardando o médico
+       aceitar" e, na próxima vez que ela abrisse a aba, tinha mudado sozinho —
+       sem nenhum momento em que alguém lhe dissesse "ele aceitou". E a recusa
+       era pior: o cartão simplesmente voltava ao estado vazio, como se ela
+       nunca tivesse pedido nada. Uma decisão que ninguém comunica é uma decisão
+       que a pessoa vive como um bug.
+
+       Aguardado (e não fire-and-forget) pelo mesmo motivo do pedido: em
+       serverless não há garantia de que algo rode depois da resposta. */
+    try {
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const medico = ((d?.display_name as string) || "Seu médico").trim();
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(req.patient_id as string, {
+        title: data.accept
+          ? `${medico} aceitou te acompanhar 💛`
+          : "Sua solicitação não foi aceita",
+        body: data.accept
+          ? "A partir de agora o app responde no estilo do consultório dele."
+          : "Você pode escolher outro obstetra no app, em Meu médico.",
+        url: "/minha-conta",
+      });
+    } catch {
+      /* melhor esforço — a decisão já está gravada */
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * Encerra o acompanhamento de uma paciente.
+ *
+ * Não existia, e a falta custava dos dois lados. O médico chegava no teto do
+ * plano com pacientes que já tiveram bebê ocupando vaga, e a única saída era
+ * pagar mais — upgrade pelo motivo errado, que vira cancelamento no mês
+ * seguinte. Do lado dela, ficava presa a um médico que não a acompanha mais e
+ * sem conseguir escolher outro.
+ *
+ * O vínculo é desfeito, não apagado: o histórico dela continua inteiro no app
+ * dela, e os acionamentos de SOS mantêm o `doctor_id` congelado de quando
+ * aconteceram — quem era o responsável naquele dia não muda porque o
+ * acompanhamento terminou depois.
+ */
+export const encerrarAcompanhamento = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireDoctor(data.accessToken);
+    if (!user) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    /* `doctor_id` no próprio WHERE: uma paciente de outro consultório não
+       afeta linha nenhuma, sem checagem separada que abriria corrida. */
+    const { data: mexeu, error } = await (supabaseAdmin as any)
+      .from("patient_profiles")
+      .update({ doctor_id: null, updated_at: new Date().toISOString() })
+      .eq("id", data.pacienteId)
+      .eq("doctor_id", user.id)
+      .select("id");
+    if (error || !mexeu?.length) return { ok: false as const };
+
+    /* O encerramento é a ação que APAGA o rastro de todas as outras: sem
+       vínculo, `pacientesAtuais` deixa de listar a paciente e nenhuma leitura
+       posterior é sequer possível. Se ele não ficar registrado, o prontuário
+       fica órfão de história — ninguém consegue dizer quando o consultório
+       parou de responder por ela, que é exatamente a pergunta de uma disputa.
+       `writeAudit` nunca lança; o vínculo já caiu de qualquer forma. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: user.id, email: user.email }, "vinculo.encerrar", data.pacienteId, null);
+
+    /* A solicitação antiga volta a "declined" e não some: sem isso, o par
+       ficaria com um pedido "accepted" de um vínculo que não existe mais, e ela
+       não conseguiria pedir de novo. */
+    /* O `try/catch` daqui dizia "o vínculo já caiu, que é o que importa" — e
+       contradizia o parágrafo acima, que explica que sem esta linha ela NÃO
+       CONSEGUE PEDIR DE NOVO. Além disso nunca capturou nada: o supabase-js
+       devolve `{ error }`, não lança. */
+    const { error: reqErr } = await (supabaseAdmin as any)
+      .from("patient_link_requests")
+      .update({ status: "declined", decided_at: new Date().toISOString() })
+      .eq("patient_id", data.pacienteId)
+      .eq("doctor_id", user.id)
+      .eq("status", "accepted");
+    if (reqErr) {
+      console.error(
+        "[vínculo] encerrado, solicitação antiga travada em accepted",
+        data.pacienteId,
+        reqErr,
+      );
+    }
+
+    /* AVISA ELA. Descobrir sozinha que o médico sumiu do app é a pior forma de
+       saber — e ela precisa saber para escolher outro. */
+    try {
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const medico = ((d?.display_name as string) || "Seu médico").trim();
+      const { sendPushToUser } = await import("./push.server");
+      await sendPushToUser(data.pacienteId, {
+        title: "Acompanhamento encerrado",
+        body: `${medico} encerrou o acompanhamento no app. Você pode escolher outro obstetra em Meu médico.`,
+        url: "/minha-conta",
+      });
+    } catch {
+      /* melhor esforço — o vínculo já foi desfeito */
+    }
+    return { ok: true as const };
   });
 
 /** Lista as pacientes vinculadas ao médico logado. */
@@ -328,13 +583,28 @@ export const listMyPatients = createServerFn({ method: "POST" })
     // lmp_date/reference_* alimentam a semana gestacional (espelho do bebê).
     const gestCols = "lmp_date,reference_date,reference_weeks,reference_days";
     const selects = [
-      `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,baby_skin_tone,${gestCols}`,
+      `id,display_name,baby_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,baby_skin_tone,birth_date,${gestCols}`,
+      `id,display_name,baby_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,birth_date,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,fetal_bpm,fetal_bpm_at,${gestCols}`,
       `id,display_name,due_date,created_at,quiz_premium,${gestCols}`,
       `id,display_name,due_date,created_at,${gestCols}`,
       "id,display_name,due_date,created_at",
     ];
     let rows: any[] | null = null;
+    /**
+     * SE A CASCATA TERMINOU SEM LER NADA, ISSO NÃO É "ele não tem paciente".
+     *
+     * O laço sai por três portas: achou (rows preenchido), erro real (break), ou
+     * esgotou os selects. Nas duas últimas `rows` fica `null`, e o `(rows ?? [])`
+     * logo abaixo transformava isso em lista vazia com `ok: true` — o médico
+     * abria a aba Pacientes e lia que não tem nenhuma.
+     *
+     * Em produção esse caminho não é hipotético: a última tentativa da cascata
+     * ainda cita `doctor_id` no filtro, e se ESSA coluna faltar todas as seis
+     * falham com 42703 em sequência. A tela então afirma, com todas as letras,
+     * que o consultório está vazio.
+     */
+    let leu = false;
     for (const sel of selects) {
       const res = await (supabaseAdmin as any)
         .from("patient_profiles")
@@ -344,10 +614,12 @@ export const listMyPatients = createServerFn({ method: "POST" })
         .limit(500);
       if (!res.error) {
         rows = res.data;
+        leu = true;
         break;
       }
       if (res.error.code !== "42703") break; // erro real, não coluna ausente
     }
+    if (!leu) return { ok: false as const, patients: [] as LinkedPatient[] };
 
     // Semana gestacional por paciente (mesma função pura do app).
     const { computeGestation } = await import("./gestacao");
@@ -363,10 +635,21 @@ export const listMyPatients = createServerFn({ method: "POST" })
         display_name: r.display_name ?? null,
         due_date: r.due_date ?? null,
         created_at: r.created_at ?? null,
+        // O nome do bebê é como a paciente chama a gestação — e o médico não
+        // via nem isso na lista.
+        baby_name: r.baby_name ?? null,
         quiz_premium: r.quiz_premium ?? null,
         fetal_bpm: r.fetal_bpm ?? null,
         fetal_bpm_at: r.fetal_bpm_at ?? null,
         weeks: g && g.weeks >= 1 && g.weeks <= 44 ? g.weeks : null,
+        /* Os DIAS, não só as semanas. Conduta em 36s0d não é conduta em 36s6d,
+           e o espelho mostrava "36 semanas" para as duas. A tela da paciente
+           sempre disse "36 semanas e 3d" — o painel é que arredondava. */
+        days: g && g.weeks >= 1 && g.weeks <= 44 ? g.days : null,
+        /* Pós-parto. Passando de 44 semanas o `weeks` virava null e o painel
+           dizia "Sem data de gestação" para uma puérpera — enquanto a tela dela
+           mostrava os dias de vida do bebê. `birth_date` nem era selecionado. */
+        birth_date: r.birth_date ?? null,
         baby_skin_tone: r.baby_skin_tone ?? null,
       } as LinkedPatient;
     });
@@ -375,78 +658,22 @@ export const listMyPatients = createServerFn({ method: "POST" })
   });
 
 /**
- * Liga/desliga o premium do quiz diário de UMA paciente do médico logado
- * (ativação manual após o PIX — o médico confirma o pagamento e libera).
+ * ─── O MÉDICO NÃO DÁ NEM TIRA O PREMIUM DA PACIENTE ─────────────────────────
+ *
+ * Existia aqui um `setPatientQuizPremium`: o médico ligava/desligava as aulas
+ * pagas dela pelo painel, "após confirmar o PIX".
+ *
+ * Removido por decisão do dono (ago/2026), e a razão é de fronteira, não de
+ * tela: o Premium é a assinatura DELA, com a plataforma. Quem cobra é a
+ * plataforma, quem decide é ela. Um botão no painel do médico misturava as duas
+ * relações — e criava uma cobrança por fora, sem registro, sem prazo e sem
+ * recibo, com o médico no meio de um pagamento que não é dele.
+ *
+ * A capacidade foi tirada do SERVIDOR, não só o botão da tela. Deixar a função
+ * viva seria manter a porta aberta para quem chamasse o endpoint direto — e
+ * "não tem botão" nunca foi controle de acesso.
  */
-export const setPatientQuizPremium = createServerFn({ method: "POST" })
-  .inputValidator((i: unknown) =>
-    z
-      .object({
-        accessToken: z.string().min(10),
-        patientId: z.string().uuid(),
-        premium: z.boolean(),
-      })
-      .parse(i),
-  )
-  .handler(async ({ data }) => {
-    const user = await requireDoctor(data.accessToken);
-    if (!user) return { ok: false as const, error: "Sem permissão." };
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Proteção: o toggle manual NÃO pode revogar quem tem assinatura ativa
-    // (Stripe) ou convite ativo — o acesso pago é gerido pelo webhook, não
-    // pela mão do médico. (Se a tabela subscriptions ainda não existe, ignora.)
-    if (!data.premium) {
-      try {
-        const { data: subs } = await (supabaseAdmin as any)
-          .from("subscriptions")
-          .select("source,status")
-          .eq("user_id", data.patientId)
-          .eq("product", "quiz_premium")
-          .in("status", ["active", "trialing"]);
-        const paga = (subs ?? []).some(
-          // 'convite' = recompensa da paciente que convidou o médico (webhook)
-          (s: any) =>
-            s.source === "stripe" ||
-            s.source === "doctor_invite" ||
-            s.source === "convite" ||
-            s.source === "cupom",
-        );
-        if (paga) {
-          return {
-            ok: false as const,
-            error:
-              "Esta paciente tem uma assinatura ativa — o acesso é gerido pelo pagamento (cancele pelo Stripe).",
-          };
-        }
-      } catch {
-        /* subscriptions ausente: sem estado pago a proteger */
-      }
-    }
-
-    const { error } = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .update({ quiz_premium: data.premium })
-      .eq("id", data.patientId)
-      .eq("doctor_id", user.id); // tenancy: só as próprias pacientes
-    if (error?.code === "42703") {
-      return {
-        ok: false as const,
-        error: "Aplique a migração quiz_premium no Supabase (APLICAR_PENDENTES.sql).",
-      };
-    }
-    return error
-      ? { ok: false as const, error: error.message }
-      : { ok: true as const, error: null };
-  });
-
-/**
- * Registra o BPM fetal medido na consulta ("Sentir o coração" v2, estilo
- * Trellis): o Painel do Papai e o app da paciente vibram no ritmo EXATO do
- * bebê. Fail-closed: o UPDATE só afeta a linha se a paciente pertence ao
- * médico logado (doctor_id no próprio WHERE) — sem checagem separada que
- * poderia abrir corrida. bpm null limpa o registro.
- */
 export const setPatientFetalBpm = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -466,13 +693,18 @@ export const setPatientFetalBpm = createServerFn({ method: "POST" })
       .from("patient_profiles")
       .update({
         fetal_bpm: data.bpm,
-        fetal_bpm_at: data.bpm === null ? null : new Date().toISOString().slice(0, 10),
+        /* `ymdBrasilia`, não `toISOString().slice(0,10)`: o servidor roda em UTC,
+           e numa teleconsulta das 21h15 o ISO já está no dia seguinte. O
+           cartão do batimento então calculava `days = -1` no aparelho dela e a
+           guarda `days >= 0` o escondia — na noite em que ele acabou de ouvir o
+           coração do bebê. */
+        fetal_bpm_at: data.bpm === null ? null : ymdBrasilia(),
       })
       .eq("id", data.patientId)
       .eq("doctor_id", user.id)
       .select("id");
 
-    if (error?.code === "42703") {
+    if (colunaAusente(error)) {
       return {
         ok: false as const,
         error: "Aplique a migração fetal_bpm no Supabase (APLICAR_PENDENTES.sql).",
@@ -514,6 +746,67 @@ export const getMyDoctorPix = createServerFn({ method: "POST" })
       ok: true as const,
       pix: { key: pixKey, name: (doc?.display_name as string | null) ?? "" },
     };
+  });
+
+/**
+ * Contato do médico DA PACIENTE — o que a Central de Emergência e a
+ * carteirinha precisam saber.
+ *
+ * Existe porque `doctor.config.ts` é um arquivo fixo com o telefone do
+ * Dr. Clóvis, e o app é multi-médico: uma paciente vinculada a outro médico
+ * via com um SOS que liga para o médico errado, e sai do hospital com uma
+ * carteirinha nomeando um profissional que não a acompanha. Numa emergência
+ * isso não é um detalhe de cadastro.
+ *
+ * Devolve `null` — e quem chama cai no `doctor.config` — em três casos, todos
+ * legítimos: a paciente ainda não tem médico vinculado, o médico não
+ * preencheu o WhatsApp, ou a tabela `doctors` ainda não existe no banco (as
+ * migrations multi-tenant são posteriores à instalação atual). Nenhum deles
+ * pode derrubar a tela.
+ */
+export type DoctorContato = {
+  nome: string;
+  title: string;
+  specialty: string;
+  crm: string;
+  /** Como o médico digitou. Quem exibe/normaliza é `lib/telefone`. */
+  whatsapp: string;
+};
+
+export const getMyDoctorContact = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const vazio = { ok: true as const, doctor: null as DoctorContato | null };
+    try {
+      const user = await requireUser(data.accessToken);
+      if (!user) return vazio;
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data: prof } = await (supabaseAdmin as any)
+        .from("patient_profiles")
+        .select("doctor_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!prof?.doctor_id) return vazio;
+      const { data: d } = await (supabaseAdmin as any)
+        .from("doctors")
+        .select("display_name,title,specialty,crm,whatsapp")
+        .eq("id", prof.doctor_id)
+        .maybeSingle();
+      if (!d?.display_name) return vazio;
+      return {
+        ok: true as const,
+        doctor: {
+          nome: d.display_name as string,
+          title: (d.title as string) ?? "",
+          specialty: (d.specialty as string) ?? "",
+          crm: (d.crm as string) ?? "",
+          whatsapp: (d.whatsapp as string) ?? "",
+        } satisfies DoctorContato,
+      };
+    } catch {
+      // Tabela ausente, rede caída, token vencido: a tela usa o padrão.
+      return vazio;
+    }
   });
 
 /* ══════════════════════════════════════════════════════════════════════

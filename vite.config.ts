@@ -22,5 +22,25 @@ export default defineConfig({
       publicDir: ".vercel/output/static",
       serverDir: ".vercel/output/functions/__server.func",
     },
+    /* Teto de execução da função de servidor.
+    
+       Precisa ser AQUI e não em `vercel.json`: com a Build Output API a Vercel
+       lê `functions/__server.func/.vc-config.json`, e a chave `functions` do
+       vercel.json não casa com nada — o deploy falha com erro de padrão que não
+       corresponde a nenhuma função. (Foi o que aconteceu: build local verde,
+       deploy vermelho.) O preset vercel do Nitro escreve este valor no
+       .vc-config.json.
+    
+       30s porque o disparo do SOS é sequencial e pode falar com cinco serviços
+       externos (push, e-mail do médico, e-mail do contato, WhatsApp Cloud e um
+       webhook de SMS configurado pelo usuário). No teto padrão de 10s a função
+       era cortada no meio: o médico já tinha recebido push e e-mail, e a tela
+       dizia "não consegui avisar — ligue 192". */
+    /* O cast existe porque o tipo do preset do Lovable declara só
+       `preset`/`output`/`cloudflare` — mas o Nitro repassa o objeto inteiro para
+       o preset, e o `vercel.functions.maxDuration` é honrado (conferido no
+       `.vc-config.json` gerado). Sem o cast, `tsc --noEmit` reprova uma
+       configuração que funciona. */
+    ...({ vercel: { functions: { maxDuration: 30 } } } as Record<string, unknown>),
   },
 });

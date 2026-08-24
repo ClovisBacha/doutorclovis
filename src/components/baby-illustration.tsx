@@ -1,9 +1,10 @@
-import babyEmbriao from "@/assets/baby-embriao.png";
-import babyInicial from "@/assets/baby-inicial.png";
-import babyFeto from "@/assets/baby-feto.png";
-import babyTardio from "@/assets/baby-tardio.png";
-import babyTermo from "@/assets/baby-termo.png";
+import semana06 from "@/assets/bebes/semana-06.webp";
+import semana10 from "@/assets/bebes/semana-10.webp";
+import semana20 from "@/assets/bebes/semana-20.webp";
+import semana30 from "@/assets/bebes/semana-30.webp";
+import semana40 from "@/assets/bebes/semana-40.webp";
 import { babyStage, babyForWeek, WEEK_MIN, WEEK_MAX, type BabyStage } from "@/lib/gestacao";
+import { semanaDaArte } from "@/lib/arte-do-bebe";
 
 export const STAGE_LABEL: Record<BabyStage, string> = {
   embriao: "Embrião",
@@ -13,32 +14,55 @@ export const STAGE_LABEL: Record<BabyStage, string> = {
   termo: "Bebê a termo",
 };
 
-export const STAGE_RANGES: Record<BabyStage, [number, number]> = {
-  embriao: [4, 9],
-  inicial: [10, 15],
-  feto: [16, 27],
-  tardio: [28, 36],
-  termo: [37, 42],
-};
+/* As faixas e a escolha da arte moram em `lib/arte-do-bebe.ts` (puro, testado):
+   este arquivo abre com cinco `import` de `.webp` e um teste morreria na
+   primeira linha. Reexportado aqui porque quem já importava daqui continua
+   funcionando. */
+export { STAGE_RANGES } from "@/lib/arte-do-bebe";
 
-const STAGE_BASE_SCALE: Record<BabyStage, number> = {
-  embriao: 0.38,
-  inicial: 0.5,
-  feto: 0.46,
-  tardio: 0.68,
-  termo: 0.84,
-};
+/**
+ * AS CINCO ARTES DO DONO — e por que são cinco.
+ *
+ * Pedido dele (ago/2026): "tire todos os bebês e só coloque os que tem no
+ * drive, na qualidade exata deles, não perca a qualidade".
+ *
+ * Saíram daqui DUAS séries: os cinco PNGs por estágio (`baby-embriao` e
+ * companhia) e os 39 `.webp` gerados semana a semana. As 39 tinham a vantagem
+ * de mudar toda semana; nenhuma delas era arte que o dono aprovou, e é ele quem
+ * responde pelo que a paciente vê do próprio filho.
+ *
+ * ─── O QUE AINDA MUDA TODA SEMANA ───────────────────────────────────────────
+ *
+ * O TAMANHO. `escalaDoCorpo` é contínuo na semana, então entre a 20 e a 21 o
+ * bebê cresce um pouco mesmo desenhado pela mesma arte. Cinco desenhos não
+ * viraram cinco tamanhos.
+ *
+ * ─── `tinta`: MEDIDA, NUNCA ESTIMADA ────────────────────────────────────────
+ *
+ * Quanto do maior lado do arquivo a tinta ocupa, medido por
+ * `scripts/bebes/do-drive.mjs` (α ≥ 128, sobre o maior lado — que é o lado que
+ * o `preserveAspectRatio="meet"` faz caber no quadrado de 200).
+ *
+ * É o que impede o bebê de SALTAR de tamanho ao trocar de arte: o salto não
+ * seria crescimento, seria o enquadramento do arquivo mudando. As cinco variam
+ * de 58,6% a 91,4% — mais de 30 pontos —, então sem este número a semana 36
+ * mostraria um bebê 56% maior que a 35 sem nada ter acontecido.
+ *
+ * ⚠️ Trocar um arquivo obriga a medir de novo. O script imprime o valor.
+ */
+const ARTES: { semana: number; src: string; tinta: number }[] = [
+  { semana: 6, src: semana06, tinta: 0.5856 },
+  { semana: 10, src: semana10, tinta: 0.64 },
+  { semana: 20, src: semana20, tinta: 0.8125 },
+  { semana: 30, src: semana30, tinta: 0.7109 },
+  { semana: 40, src: semana40, tinta: 0.9137 },
+];
 
-const STAGE_IMG: Record<BabyStage, string> = {
-  embriao: babyEmbriao,
-  inicial: babyInicial,
-  feto: babyFeto,
-  tardio: babyTardio,
-  termo: babyTermo,
-};
-
-// embriao and termo images have white backgrounds — multiply blends white out on light bg
-const WHITE_BG_STAGES = new Set<BabyStage>(["embriao", "termo"]);
+/** O arquivo da semana. Quem decide QUAL é `semanaDaArte`, em `lib/`. */
+function arteDaSemana(week: number): { src: string; tinta: number } {
+  const alvo = semanaDaArte(week);
+  return ARTES.find((a) => a.semana === alvo) ?? ARTES[0];
+}
 
 /**
  * Tons de pele do bebê (0 = arte original clara → 4 = pele retinta).
@@ -62,6 +86,40 @@ export function clampTone(tone: number | null | undefined): number {
 
 function growth(week: number) {
   return Math.max(0, Math.min(1, (week - WEEK_MIN) / (WEEK_MAX - WEEK_MIN)));
+}
+
+/**
+ * A ESCALA NASCE DA BOLHA, não de um número por estágio.
+ *
+ * O bebê estava SAINDO da bolha nas semanas finais — medido na tela: 312px de
+ * tinta contra 220px de bolha na semana 40, 42% maior. A caixa branca gravada
+ * no PNG escondia isso; quando ela foi removida, a geometria real apareceu.
+ *
+ * A causa: `scale-[1.43]` da home foi calibrado numa semana só (a 19, padrão do
+ * preview), onde a tinta dá ~55% da caixa. O comentário lá diz isso com todas
+ * as letras. Só que a escala interna sobe até 1,1 nas semanas finais e a tinta
+ * de `termo` é 88,7% do arquivo — o produto estoura a bolha.
+ *
+ * Agora a conta é direta e verificável. A bolha da home mede 220px numa caixa
+ * de 320px, ou seja 68,75% dela. Deixando 15% de folga para o bebê respirar
+ * dentro do vidro:
+ *
+ *   tinta máxima na caixa = 0,6875 × 0,85 ≈ 0,585
+ *
+ * `escalaDoCorpo` devolve quanto ESCALAR A IMAGEM para que a tinta atinja o
+ * alvo daquela semana — e por isso divide pela tinta da arte. Trocar a arte
+ * deixa de mexer no tamanho: quem manda é a semana, não o arquivo.
+ *
+ * O expoente 0,65 comprime a curva para a frente porque o crescimento real é
+ * assim: entre 4 e 20 semanas o bebê ganha proporcionalmente muito mais do que
+ * entre 30 e 42. Uma reta faria o primeiro trimestre parecer parado.
+ */
+const TINTA_ALVO_MIN = 0.14;
+const TINTA_ALVO_MAX = 0.585;
+
+function escalaDoCorpo(week: number, tinta: number): number {
+  const alvo = TINTA_ALVO_MIN + (TINTA_ALVO_MAX - TINTA_ALVO_MIN) * Math.pow(growth(week), 0.65);
+  return alvo / tinta;
 }
 
 export function BabyIllustration({
@@ -89,13 +147,15 @@ export function BabyIllustration({
   const sacR = 72 + g * 16;
   const info = babyForWeek(week);
 
-  const [sMin, sMax] = STAGE_RANGES[stage];
-  const t = Math.max(0, Math.min(1, (week - sMin) / (sMax - sMin)));
-  const baseScale = STAGE_BASE_SCALE[stage];
-  const freeBoost = showSac ? 1 : 1.18;
-  const bodyScale = Math.min(1.1, (baseScale + t * (1 - baseScale)) * freeBoost);
+  const arte = arteDaSemana(week);
+  /* Sem `freeBoost`. Ele existia para inchar o bebê 18% quando o componente não
+     desenhava o próprio saco — um ajuste relativo, feito quando o tamanho vinha
+     de um número por estágio. Agora o alvo é ABSOLUTO (fração da caixa) e já
+     cabe nos dois casos: dentro da bolha da home (68,75% da caixa) e dentro do
+     saco que o próprio componente desenha (72% a 88%). Um alvo só, sem exceção
+     que precise ser lembrada. */
+  const bodyScale = Math.min(1.1, escalaDoCorpo(week, arte.tinta));
   const tx = 100 * (1 - bodyScale);
-  const isWhiteBg = WHITE_BG_STAGES.has(stage);
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center justify-center">
@@ -179,14 +239,13 @@ export function BabyIllustration({
           clipPath={showSac ? "url(#sac-clip)" : undefined}
         >
           <image
-            href={STAGE_IMG[stage]}
+            href={arte.src}
             x="0"
             y="0"
             width="200"
             height="200"
             preserveAspectRatio="xMidYMid meet"
             filter={toneIdx > 0 ? `url(#${toneFilterId})` : undefined}
-            style={isWhiteBg ? { mixBlendMode: "multiply" } : undefined}
           />
         </g>
       </svg>

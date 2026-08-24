@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { BONUS_VINCULO_MEDICO } from "@/lib/economia-sementinhas";
+import {
+  ANUAL_CENTAVOS,
+  ANUAL_MENSAL_EQUIV_CENTAVOS,
+  DESCONTO_ANUAL_PCT,
+  MENSAL_CENTAVOS,
+  REFERENCIA_CENTAVOS,
+  brl,
+} from "@/lib/promo";
 import { X, Lock, Sparkles } from "lucide-react";
 import {
   BabyIllustration,
@@ -8,6 +17,7 @@ import {
   clampTone,
 } from "@/components/baby-illustration";
 import { babyForWeek, babyStage, type BabyStage } from "@/lib/gestacao";
+import { semanaTipicaDoEstagio } from "@/lib/arte-do-bebe";
 
 /**
  * Jornada do Bebê — o gatilho de Premium pedido pelo produto:
@@ -95,6 +105,22 @@ export function BabyJourneyModal({
                 // passados/futuros, o meio do intervalo (arte mais típica).
                 const showWeek = isCurrent ? currentWeek : Math.round((wMin + wMax) / 2);
                 const info = babyForWeek(showWeek);
+                /* ⚠️ A ARTE VEM DO ESTÁGIO, NUNCA DA SEMANA REAL.
+                   As cinco artes do Drive são 6 · 10 · 20 · 30 · 40, e
+                   `BabyIllustration` escolhe a MAIS PRÓXIMA da semana pedida —
+                   régua certa na bolha da home, errada numa lista em que cada
+                   linha é rotulada por estágio. Na 27ª semana (fim do "feto"),
+                   a arte mais próxima é a de 30, que é a do "tardio": a linha
+                   "você está aqui · feto" e a linha seguinte mostravam O MESMO
+                   desenho, e a jornada — que existe para mostrar a mudança —
+                   passava a negá-la. Vale para 26–27 e para a 36.
+                   O meio do intervalo cai na arte daquele estágio nos cinco
+                   casos, então as cinco linhas ficam com cinco desenhos
+                   diferentes, sempre. A semana real continua no cabeçalho e no
+                   tamanho/peso, que é onde ela informa.
+                   A régua é `semanaTipicaDoEstagio` (pura, testada) — a conta
+                   escrita aqui divergiria no dia em que uma faixa mudasse. */
+                const semanaDaArte = semanaTipicaDoEstagio(stage);
 
                 return (
                   <button
@@ -122,7 +148,7 @@ export function BabyJourneyModal({
                     >
                       {unlocked ? (
                         <BabyIllustration
-                          week={showWeek}
+                          week={semanaDaArte}
                           tone={clampTone(tone)}
                           showSac={false}
                           showInfo={false}
@@ -195,8 +221,8 @@ export function BabyJourneyModal({
 }
 
 /**
- * Popup do Premium — bonito, tecnológico e direto: ancoragem "de 19,90 por
- * 9,90", os desbloqueios visuais, e o campo de CUPOM no rodapé (o código
+ * Popup do Premium — bonito, tecnológico e direto: a comparação com pagar mês
+ * a mês, os desbloqueios visuais, e o campo do CÓDIGO do médico no rodapé (o
  * que o médico gera libera o Premium na hora; futuramente, cupons de
  * desconto). Reutiliza a identidade tech (brain-tech/grid/scanline).
  */
@@ -205,7 +231,7 @@ export function PremiumUpsellModal({
   onUnlocked,
 }: {
   onClose: () => void;
-  /** Chamado quando o Premium foi liberado por cupom (recarregar o perfil). */
+  /** Chamado quando o código do médico foi resgatado (recarregar o perfil). */
   onUnlocked: () => void;
 }) {
   const [busy, setBusy] = useState<"annual" | "monthly" | null>(null);
@@ -225,6 +251,21 @@ export function PremiumUpsellModal({
   async function checkout(plan: "annual" | "monthly") {
     setBusy(plan);
     try {
+      /* Portão da loja: assinatura digital dentro do app nativo tem de passar
+         pela Apple/Google (diretriz 3.1.1). Abrir o Stripe aqui reprova o app
+         na revisão. Mesma regra da OfertaPremium, do QuizPaywall e da
+         LojaSementinhas — esta era a última porta de pagamento da área da
+         paciente que ainda estava aberta. */
+      /* A regra vem de `canal-de-venda.ts`, com a frase junto. A versão
+         anterior desta mensagem mandava assinar pelo site — sugerir caminho
+         de pagamento fora do app é justamente o que a loja proíbe. */
+      const { ehNativo } = await import("@/lib/nativo");
+      const { podeComprarAqui } = await import("@/lib/canal-de-venda");
+      const veredito = podeComprarAqui("premium_paciente", ehNativo());
+      if (!veredito.pode) {
+        toast(veredito.texto, { duration: 6000 });
+        return;
+      }
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) {
@@ -265,7 +306,7 @@ export function PremiumUpsellModal({
     // Mesmo formato do servidor (4–16 chars): valida aqui para o erro ser
     // claro ("código inválido") e não um falso "falha de conexão".
     if (code.length < 4 || code.length > 16) {
-      toast.error("Código inválido — confira o cupom que você recebeu (4 a 16 caracteres).");
+      toast.error("Código inválido — confira o código do seu médico (4 a 16 caracteres).");
       return;
     }
     setRedeeming(true);
@@ -273,7 +314,7 @@ export function PremiumUpsellModal({
       const { supabase } = await import("@/integrations/supabase/client");
       const { data: s } = await supabase.auth.getSession();
       if (!s.session) {
-        toast.error("Entre na sua conta para usar o cupom.");
+        toast.error("Entre na sua conta para usar o código.");
         return;
       }
       const { redeemInviteCode } = await import("@/lib/invites.functions");
@@ -281,7 +322,20 @@ export function PremiumUpsellModal({
         data: { accessToken: s.session.access_token, code },
       });
       if (res.ok) {
-        toast.success("Premium liberado pelo seu médico! 💛");
+        /* Ela dizia "Premium liberado". O resgate parou de dar Premium quando
+           o médico deixou de dar a assinatura; hoje ele vincula e paga o bônus
+           de Sementinhas. Anunciar Premium e entregar outra coisa faz a
+           paciente ir procurar o que não existe. */
+        /* ─── A FRASE DEPENDE DE QUAL CÓDIGO FOI ─────────────────────────
+           O mesmo campo aceita o cupom da PLATAFORMA (concede Premium) e o
+           código do MÉDICO (vincula e paga Sementinhas). Anunciar um pelo outro
+           manda a paciente procurar o que não existe — e já errou nas duas
+           direções nesta base. Quem sabe qual foi é o servidor: `res.tipo`. */
+        toast.success(
+          res.tipo === "convite"
+            ? `Médico vinculado! Você ganhou ${BONUS_VINCULO_MEDICO} Sementinhas 🌱`
+            : "Premium liberado! 💛",
+        );
         onUnlocked();
         onClose();
         return;
@@ -338,34 +392,46 @@ export function PremiumUpsellModal({
             </li>
           </ul>
 
-          {/* ancoragem de preço: de X por X */}
+          {/* ─── OS TRÊS NÚMEROS ERAM ESCRITOS À MÃO, E OS TRÊS ESTAVAM ERRADOS
+              "de R$ 19,90 por R$ 9,90/mês, no plano anual (R$ 118,80/ano)".
+
+              O anual passou a R$ 109,90 (equivalente de R$ 9,16), e esta tela
+              ficou com a tabela antiga — cobrando um valor e anunciando outro,
+              que é a reclamação mais cara que existe.
+
+              Agora os três saem de `promo.ts`. E o riscado é o preço REAL de
+              pagar mês a mês por doze meses, com a legenda dizendo o que ele é:
+              riscar um número que ninguém cobra é o "preço de referência" que o
+              CDC proíbe. */}
           <div className="mt-5 rounded-2xl border border-white/15 bg-white/5 p-4 text-center backdrop-blur-sm">
             <p className="text-xs text-white/60">
-              de <span className="font-semibold line-through">R$ 19,90/mês</span> por
+              <span className="font-semibold line-through">{brl(REFERENCIA_CENTAVOS)}</span> pagando
+              mês a mês · por
             </p>
-            <p className="mt-0.5 font-serif text-4xl font-bold">
-              R$ 9,90<span className="text-base font-medium text-white/70">/mês</span>
+            <p className="mt-0.5 font-serif text-4xl font-bold">{brl(ANUAL_CENTAVOS)}</p>
+            <p className="text-[11px] text-white/55">
+              no plano anual · equivale a {brl(ANUAL_MENSAL_EQUIV_CENTAVOS)}/mês ·{" "}
+              {DESCONTO_ANUAL_PCT}% de desconto
             </p>
-            <p className="text-[11px] text-white/55">no plano anual (R$ 118,80/ano)</p>
             <div className="mt-3 grid gap-2">
               <button
                 onClick={() => checkout("annual")}
                 disabled={busy !== null}
                 className="w-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-5 py-3 text-sm font-bold text-white shadow-[0_8px_30px_rgba(167,139,250,0.4)] transition-transform hover:scale-[1.02] disabled:opacity-60"
               >
-                {busy === "annual" ? "Abrindo…" : "Assinar anual — 50% OFF"}
+                {busy === "annual" ? "Abrindo…" : `Assinar anual — ${DESCONTO_ANUAL_PCT}% OFF`}
               </button>
               <button
                 onClick={() => checkout("monthly")}
                 disabled={busy !== null}
                 className="w-full rounded-full border border-white/25 px-5 py-2.5 text-xs font-semibold text-white/85 disabled:opacity-60"
               >
-                {busy === "monthly" ? "Abrindo…" : "Prefiro mensal — R$ 19,90"}
+                {busy === "monthly" ? "Abrindo…" : `Prefiro mensal — ${brl(MENSAL_CENTAVOS)}`}
               </button>
             </div>
           </div>
 
-          {/* cupom do médico */}
+          {/* Código do médico: vincula e paga Sementinhas — não dá Premium. */}
           <div className="mt-4 text-center">
             {couponOpen ? (
               <div className="flex gap-2">
@@ -391,11 +457,12 @@ export function PremiumUpsellModal({
                 onClick={() => setCouponOpen(true)}
                 className="text-xs font-semibold text-cyan-200 underline underline-offset-4"
               >
-                🎟️ Tenho um cupom
+                🌱 Tenho o código do meu médico
               </button>
             )}
             <p className="mt-2 text-[10px] text-white/40">
-              Cancele quando quiser · tem um cupom? Aplique acima e libere na hora
+              Cancele quando quiser · tem o código do seu médico? Aplique acima e ganhe{" "}
+              {BONUS_VINCULO_MEDICO} Sementinhas
             </p>
           </div>
         </div>

@@ -127,7 +127,12 @@ export const saveLive = createServerFn({ method: "POST" })
       : // insert: carimba o dono
         (supabaseAdmin as any).from("lives").insert({ ...row, doctor_id: user.id });
     const { error } = await q;
-    if (error?.code === "42P01" || error?.code === "42703") {
+    /* `faltaNoBanco` cobre os QUATRO: 42P01/PGRST205 (tabela) e 42703/PGRST204
+       (coluna). Isto é insert/update, então o código que de fato chega aqui por
+       coluna ausente é PGRST204 — que a comparação crua não pegava, e aí o
+       médico via "não foi possível salvar" em vez da instrução de rodar o SQL. */
+    const { faltaNoBanco } = await import("./postgrest");
+    if (faltaNoBanco(error)) {
       return {
         ok: false as const,
         error: "Aplique a migração 'lives' no Supabase (APLICAR_PENDENTES.sql).",

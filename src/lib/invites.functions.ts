@@ -11,7 +11,6 @@
  */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { entitlementsFor } from "@/lib/entitlements";
 
 /** Início do mês corrente (UTC) em ISO — para contar a cota do mês. */
 function monthStartISO(): string {
@@ -30,13 +29,28 @@ function genCode(): string {
 async function loadDoctor(accessToken: string) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: u } = await supabaseAdmin.auth.getUser(accessToken);
-  if (!u.user) return { supabaseAdmin, user: null, doc: null as any };
+  if (!u.user) return { supabaseAdmin, user: null, doc: null as any, convitesPorMes: 0 };
   const { data: doc } = await (supabaseAdmin as any)
     .from("doctors")
     .select("id,plan,active")
     .eq("id", u.user.id)
     .maybeSingle();
-  return { supabaseAdmin, user: u.user, doc };
+  /* ─── O TETO VEM DO RESOLVEDOR, NÃO DA COLUNA CRUA ──────────────────────────
+   * Era `entitlementsFor(doc.plan)` nos dois pontos que leem a cota. A coluna
+   * `plan` sozinha ignora TRÊS coisas que só o resolvedor conhece:
+   *   · o vencimento (`plan_expires_at` nem era selecionado aqui) — um Elite
+   *     com o cartão recusado seguia com 25 convites premium por mês;
+   *   · o assento de clínica — um membro cuja clínica é Clínica não recebia;
+   *   · o dono da instalação (ADMIN_EMAILS).
+   * A assimetria estava no MESMO arquivo: o caminho de RESGATE já consultava o
+   * resolvedor. Duas verdades sobre o mesmo médico, uma em cada ponta do
+   * mesmo recurso.
+   * Calculado UMA vez aqui para que os dois chamadores não possam divergir —
+   * foi assim que eles divergiram do resgate. */
+  const { getEntitlements } = await import("./entitlements.server");
+  const ent = doc ? await getEntitlements(u.user) : null;
+  const convitesPorMes: number = doc?.active && ent ? (ent.premiumInvitesPerMonth ?? 0) : 0;
+  return { supabaseAdmin, user: u.user, doc, convitesPorMes };
 }
 
 async function monthlyUsed(supabaseAdmin: any, doctorId: string): Promise<number> {
@@ -58,9 +72,9 @@ export type InviteInfo = {
 export const getMyInviteInfo = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }): Promise<{ ok: false } | ({ ok: true } & InviteInfo)> => {
-    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
+    const { supabaseAdmin, doc, convitesPorMes } = await loadDoctor(data.accessToken);
     if (!doc) return { ok: false as const };
-    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
+    const limit = convitesPorMes;
     if (limit <= 0) return { ok: true as const, eligible: false, limit: 0, used: 0, remaining: 0 };
     const used = await monthlyUsed(supabaseAdmin, doc.id);
     return {
@@ -75,9 +89,9 @@ export const getMyInviteInfo = createServerFn({ method: "POST" })
 export const generateInviteCode = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
-    const { supabaseAdmin, doc } = await loadDoctor(data.accessToken);
+    const { supabaseAdmin, doc, convitesPorMes } = await loadDoctor(data.accessToken);
     if (!doc) return { ok: false as const, error: "sem_perfil" };
-    const limit = doc.active ? entitlementsFor(doc.plan).premiumInvitesPerMonth : 0;
+    const limit = convitesPorMes;
     if (limit <= 0) return { ok: false as const, error: "sem_convites" };
 
     const used = await monthlyUsed(supabaseAdmin, doc.id);
@@ -150,25 +164,60 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
             }
           }
         }
-        await sb.from("patient_profiles").update({ quiz_premium: true }).eq("id", u.user.id);
+        /* O RESGATE JÁ FOI GRAVADO acima. Se a concessão do premium falhar em
+           silêncio, o cupom foi QUEIMADO e ela não recebeu nada — e, sendo
+           uso único, tentar de novo devolve "codigo_usado". Ou o premium
+           entra, ou o resgate volta atrás. */
+        const { error: premErr } = await sb
+          .from("patient_profiles")
+          .update({ quiz_premium: true })
+          .eq("id", u.user.id);
+        if (premErr) {
+          await sb
+            .from("platform_coupon_redemptions")
+            .delete()
+            .eq("coupon_id", pc.id)
+            .eq("user_id", u.user.id);
+          console.error("[cupom] falha ao liberar premium; resgate desfeito", premErr);
+          return { ok: false as const, error: "falha_ao_liberar" };
+        }
         // Origem 'cupom' → o premium sobrevive ao toggle manual (mesma
         // proteção de stripe/doctor_invite/convite).
-        try {
-          await sb.from("subscriptions").upsert(
-            {
-              user_id: u.user.id,
-              product: "quiz_premium",
-              plan: "cupom",
-              source: "cupom",
-              status: "active",
-              stripe_subscription_id: `cupom_${pc.id}_${u.user.id}`,
-            },
-            { onConflict: "stripe_subscription_id" },
-          );
-        } catch {
-          /* opcional */
+        /* O `try/catch` que estava aqui dizia "opcional" e não protegia nada:
+           o supabase-js não LANÇA quando o Postgres recusa, ele devolve
+           `{ error }`. O catch nunca disparou uma vez sequer.
+           E o efeito de perder esta linha não é nenhum: o premium concedido
+           acima passa a ser revogável por um toggle manual, silenciosamente.
+           Não derruba o resgate — ela ficou premium —, mas precisa aparecer. */
+        const { error: subErr } = await sb.from("subscriptions").upsert(
+          {
+            user_id: u.user.id,
+            product: "quiz_premium",
+            plan: "cupom",
+            source: "cupom",
+            status: "active",
+            stripe_subscription_id: `cupom_${pc.id}_${u.user.id}`,
+          },
+          { onConflict: "stripe_subscription_id" },
+        );
+        if (subErr) {
+          console.error("[cupom] premium concedido sem marca de origem", u.user.id, subErr);
         }
-        return { ok: true as const };
+        /* ─── O `tipo` EXISTE PORQUE UM CAMPO ATENDE DOIS CÓDIGOS ───────────
+           A paciente digita no mesmo lugar o cupom da PLATAFORMA (que concede
+           Premium de verdade, aqui) e o código do MÉDICO (que vincula e paga
+           Sementinhas, abaixo). Os dois devolviam `ok: true` e nada mais, e a
+           tela tinha de adivinhar qual foi.
+
+           Ela adivinhava errado nas duas direções: uma tela anunciava "Premium
+           liberado" para quem só vinculou o médico, e as outras duas passaram a
+           anunciar "Médico vinculado + Sementinhas" para quem resgatou cupom de
+           plataforma. Um verificador adversarial achou as duas metades.
+
+           NÃO inferir pelo `semVaga`: ele é `false` num ramo e `undefined` no
+           outro, e isso é acoplamento acidental — quebra no dia em que o ramo do
+           cupom ganhar a flag. */
+        return { ok: true as const, tipo: "cupom" as const };
       }
     } catch {
       /* tabela ausente → segue para o convite do médico */
@@ -202,12 +251,21 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       }
     }
 
-    // Libera o premium.
-    await (supabaseAdmin as any)
-      .from("patient_profiles")
-      .update({ quiz_premium: true })
-      .eq("id", u.user.id);
+    /* ─── O CÓDIGO DO MÉDICO VIROU DESCONTO, NÃO PREMIUM DE GRAÇA ─────────
+       DECISÃO DO DONO (ago/2026). Aqui havia um
+       `patient_profiles.update({ quiz_premium: true })`: o médico dava a
+       assinatura inteira, de graça, para um punhado de pacientes por mês.
 
+       Agora ele dá 20% de desconto, nos dois planos, enquanto ela for
+       assinante. Nada é concedido neste ponto — `redeemed_by`, marcado logo
+       acima, É o cupom: `lerPrecos` procura por ele e o checkout aplica a
+       porcentagem no Stripe.
+
+       Ou seja, esta etapa deixou de ter uma escrita que podia falhar em
+       silêncio e deixar o convite consumido sem ela receber nada. O que ela
+       ganha passou a ser consequência da MESMA linha que marca o resgate. */
+
+    let semVaga = false;
     // Vincula ao médico só se a paciente ainda não tem um (não "rouba").
     const { data: prof } = await (supabaseAdmin as any)
       .from("patient_profiles")
@@ -215,28 +273,71 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
       .eq("id", u.user.id)
       .maybeSingle();
     if (prof && !prof.doctor_id) {
-      await (supabaseAdmin as any)
-        .from("patient_profiles")
-        .update({ doctor_id: row.doctor_id })
-        .eq("id", u.user.id);
+      /* ─── O TETO DE PACIENTES SAIU DO PRODUTO ─────────────────────────────
+         Havia aqui uma contagem que recusava o vínculo quando o médico batia no
+         teto do plano — e o comentário contava com orgulho que este era o
+         terceiro caminho, antes o único sem a checagem.
+
+         O eixo "número de pacientes" deixou de existir: `maxPatients` é `null`
+         em todos os planos, inclusive no Free. A medição mostrou que ele nunca
+         protegeu o que se pensava (R$ 0,024 por paciente/mês, menos que UMA
+         mensagem de IA); o que custa é o modelo, e o modelo já está fechado
+         atrás do plano. Ver `docs/custo-de-infraestrutura.md`.
+
+         `semVaga` continua no retorno e continua sendo `true` quando a ESCRITA
+         do vínculo falha — que é o outro motivo, real, de ela sair sem médico. */
+      {
+        /* O vínculo é o que o médico comprou ao distribuir o código. Se ele
+           não gravar, ela sai "premium sem médico" e ninguém fica sabendo —
+           nem ela, que viu "código aplicado", nem ele, que contou com a
+           paciente. `semVaga` já existe para dizer "premium sim, vínculo não";
+           é exatamente esse estado, e a tela dela já sabe explicá-lo. */
+        const { error: vincErr } = await (supabaseAdmin as any)
+          .from("patient_profiles")
+          .update({ doctor_id: row.doctor_id })
+          .eq("id", u.user.id);
+        if (vincErr) {
+          console.error("[convite] premium liberado, vínculo não gravou", row.id, vincErr);
+          semVaga = true;
+        } else {
+          /* ─── O BÔNUS SÓ DEPOIS DE O VÍNCULO GRAVAR ────────────────────────
+           * Estava ANTES do `if (vincErr)`, e os outros dois caminhos já
+           * conferiam o erro primeiro — a divergência entre os três que a
+           * própria `bonusDeVinculo` existe para impedir, reaparecendo na
+           * ORDEM em vez de no conteúdo.
+           *
+           * O estrago era duplo e silencioso: com falha de escrita ela recebia
+           * 200 🌱 sem médico nenhum, E a chave `vinculo:${doctorId}` ficava
+           * gravada — então quando ela vinculasse de verdade AQUELE médico, o
+           * dedupe engoliria o bônus e ela o perderia para sempre, sem log e
+           * sem tela. */
+          const { bonusDeVinculo } = await import("@/lib/sementinhas.functions");
+          await bonusDeVinculo(supabaseAdmin, u.user.id, row.doctor_id as string);
+        }
+      }
     }
 
-    // Registro em subscriptions (origem convite) — não trava se faltar a tabela.
-    try {
-      await (supabaseAdmin as any).from("subscriptions").upsert(
-        {
-          user_id: u.user.id,
-          product: "quiz_premium",
-          plan: "invite",
-          source: "doctor_invite",
-          status: "active",
-          stripe_subscription_id: `invite_${row.id}`,
-        },
-        { onConflict: "stripe_subscription_id" },
-      );
-    } catch {
-      /* opcional */
-    }
+    /* ─── O REGISTRO EM `subscriptions` SAIU DAQUI ──────────────────────────
+     *
+     * Havia um upsert de `{product: "quiz_premium", source: "doctor_invite",
+     * status: "active"}`, e o comentário dele dizia que era "o que faz o premium
+     * dela sobreviver a um toggle manual". Só que este ramo PAROU de conceder
+     * Premium quando o convite do médico virou vínculo + Sementinhas — o bloco
+     * ficou órfão, gravando assinatura ativa para quem não recebeu nada.
+     *
+     * Um verificador adversarial reproduziu os dois estragos:
+     *
+     *  · o médico via a paciente como não-premium (a lista lê
+     *    `patient_profiles.quiz_premium`), ligava o Premium na mão pelo painel,
+     *    e ao tentar DESLIGAR era recusado com "esta paciente tem uma assinatura
+     *    ativa — cancele pelo Stripe". Não existe assinatura no Stripe para
+     *    cancelar: o toggle ficava travado ligado para sempre;
+     *  · e o console da plataforma contava essa linha como premium
+     *    (`ACCESS_STATUS` tem "active"), inflando a KPI de pacientes premium com
+     *    gente que não tem Premium nenhum.
+     *
+     * Sem concessão não há o que marcar. O vínculo já está em
+     * `patient_profiles.doctor_id` e o bônus, no ledger. */
 
-    return { ok: true as const };
+    return { ok: true as const, tipo: "convite" as const, semVaga };
   });

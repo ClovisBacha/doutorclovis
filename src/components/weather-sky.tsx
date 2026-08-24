@@ -47,6 +47,28 @@ export function periodFor(h: number): SkyTheme["period"] {
   return "noite";
 }
 
+/**
+ * A COR CHAPADA DO TOPO do Céu Clássico — a que encosta na barra de status.
+ *
+ * No iPhone instalado, o iOS não pinta a página fora da área segura: pinta o
+ * fundo do DOCUMENTO. A home escreve essa cor na raiz, e vinha usando a
+ * `corDeTopo` das cenas NOVAS mesmo quando a paciente comprou o Céu Clássico —
+ * duas paletas diferentes encostando uma na outra, com a emenda passando
+ * exatamente atrás do relógio do sistema. Num tema PAGO.
+ *
+ * Sai do PRÓPRIO gradiente, e não de uma segunda tabela de cores: a primeira
+ * parada de `gradientFor` é, por construção, o pixel de cima. Uma tabela
+ * paralela divergiria na primeira troca de paleta — que é a mesma lição que
+ * `corDeTopo` já carrega nas cenas novas.
+ */
+export function corDeTopoClassica(period: SkyTheme["period"], code: number): string {
+  const m = /linear-gradient\(180deg,\s*([^),]*\([^)]*\)|[^,)]+)/.exec(gradientFor(period, code));
+  /* Sem casar (alguém trocou o formato do gradiente), a raiz fica sem cor
+     declarada e o iOS volta ao creme do documento — o estado ANTERIOR a esta
+     função, e não uma cor inventada que poderia ficar pior que ele. */
+  return m ? m[1].trim() : "";
+}
+
 export function gradientFor(period: SkyTheme["period"], code: number): string {
   const cloudy = code === 3 || code === 45 || code === 48;
   const rainy = (code >= 51 && code <= 67) || (code >= 80 && code <= 99);

@@ -6,3 +6,8 @@ pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+
+# Projetos nativos gerados pelo Capacitor: formatar Java/Gradle/Swift daqui
+# só criaria ruído no diff a cada `cap sync`.
+android
+ios

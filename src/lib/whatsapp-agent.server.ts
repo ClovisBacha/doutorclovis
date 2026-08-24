@@ -16,7 +16,7 @@ import { createChatProvider, DEFAULT_CHAT_MODEL } from "./ai-gateway.server";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { DOCTOR } from "./doctor.config";
 import { waSendText, waSendButtons } from "./whatsapp.server";
-import { getBrainContextResolved } from "./secondbrain.server";
+import { registrarUsoAgora } from "./uso-ia.server";
 
 /* ------------------------------------------------------------------ */
 /* Tipos                                                                */
@@ -111,7 +111,7 @@ LÍNGUA: Português brasileiro coloquial mas educado.
 REGRAS:
 - Você é uma INTELIGÊNCIA ARTIFICIAL de apoio — NÃO é o médico e NÃO substitui a consulta. Se a paciente tratar você como médica, esclareça com gentileza.
 - NUNCA dê diagnóstico, prescrição, dose de medicamento ou conduta clínica.
-- Responda SOMENTE dentro do que o médico já validou (bloco de estilo/conduta, se houver). Fora disso, NÃO improvise: diga que vai encaminhar ao médico e sugira consulta.
+- Este canal é de AGENDA e informação geral do consultório. Você NÃO tem acesso às orientações clínicas que o médico validou — elas vivem no app. Não improvise conduta: diga que vai encaminhar ao médico e sugira consulta ou o chat do app.
 - Para sintomas preocupantes → oriente urgência: SAMU 192 ou UPA/pronto-socorro AGORA.
 - Para perguntas clínicas → informação geral acolhedora e sugira consulta com o médico.
 - Seja CONCISA: máx 3 frases por mensagem no fluxo de agendamento.
@@ -139,19 +139,29 @@ async function callAgent(
   const google = createChatProvider(key);
   const history = conv.context.history ?? [];
 
-  // Segundo Cérebro: contexto adicional de estilo/conduta do médico.
-  // getBrainContext é safe (falha vira block vazio) — nunca derruba o agente.
-  // O block só influencia o TOM do campo "reply"; o formato JSON da resposta
-  // e o fluxo de estados continuam regidos pelo prompt abaixo.
-  const [brain, identity] = await Promise.all([
-    getBrainContextResolved(userMessage, doctorId ?? undefined, "whatsapp"),
-    resolveDoctorIdentity(doctorId),
-  ]);
-  const baseSystem = buildSystem(identity);
-  const system =
-    brain.enabledWhatsapp && brain.block
-      ? `${baseSystem}\n\n${brain.block}\nO bloco acima orienta apenas o estilo e a conduta do texto enviado ao paciente. Continue seguindo o fluxo de estados e o formato de resposta em JSON exigidos na mensagem do usuário.`
-      : baseSystem;
+  /* ─── O SEGUNDO CÉREBRO SAIU DAQUI (decisão do Clóvis, ago/2026) ──────────
+   *
+   * Este agente é de AGENDA: coleta nome, motivo e preferência de horário num
+   * fluxo de estados com resposta em JSON. O cérebro entrava só para dar tom —
+   * e trazia junto o pacote inteiro que o app tem e este canal não:
+   *
+   *   · lacunas gravadas na fila do médico a partir de uma conversa de
+   *     marcação, misturadas com as dúvidas clínicas reais do chat;
+   *   · a promessa "registrei aqui para ele ver" saindo de um bot que não tem
+   *     onde entregar a resposta — o WhatsApp não tem a aba Perguntas dela;
+   *   · nenhum 👎, então nada do que saísse errado por aqui voltava para a
+   *     fila de revisão;
+   *   · o portão de cota esvaziava o bloco e a chamada paga acontecia igual.
+   *
+   * O cérebro é conduta clínica assinada com o nome do médico. Isso pede o
+   * ciclo completo — cobertura medida, lacuna que vira resposta, correção que
+   * volta para quem reclamou — e esse ciclo só existe dentro do app.
+   *
+   * `enabled_whatsapp` continua na tabela e na tela como estava, mas deixou de
+   * mandar aqui: a coluna vira histórico, não comportamento.
+   */
+  const identity = await resolveDoctorIdentity(doctorId);
+  const system = buildSystem(identity);
 
   const stateInstructions: Record<ConvState, string> = {
     start: `O paciente acabou de mandar a primeira mensagem. Cumprimenta-o pelo nome se disponível, apresente-se brevemente e pergunte como pode ajudar. Se a intenção for agendamento, mova para collecting_name.`,
@@ -195,11 +205,38 @@ Responda OBRIGATORIAMENTE em JSON válido com este formato exato:
   "create_appointment": <true se next_state é "done" E paciente confirmou, senão false>
 }`;
 
+  const modelo = process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL;
   const result = await generateText({
-    model: google(process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL),
+    model: google(modelo),
     system,
     prompt,
     maxOutputTokens: 512, // AI SDK v5+ renomeou maxTokens → maxOutputTokens
+  });
+
+  /* ─── ESTA CHAMADA ERA GRÁTIS PARA QUEM MEDE ─────────────────────────────
+   *
+   * Toda mensagem de WhatsApp acionava o modelo e NÃO passava por
+   * `registrarUsoAgora`. O consumo do canal não existia em `ai_usage`: nem no
+   * card de consumo, nem em "quem consome mais", nem na projeção do mês. Um
+   * consultório podia estar gastando o dobro do que a tela mostrava.
+   *
+   * `canal: "agenda-whatsapp"` e não `"whatsapp"`, de propósito: a cota do
+   * plano conta RESPOSTAS DE IA À PACIENTE, e isto é um bot de marcação. Fazer
+   * a marcação de horário consumir a franquia de dúvidas clínicas seria trocar
+   * uma medição ausente por uma medição errada — e deixaria a gestante sem
+   * resposta clínica porque alguém pediu horário.
+   *
+   * Aguardado, e não disparado: o webhook responde 200 antes, então o que não
+   * for aguardado aqui morre com o congelamento da invocação. É o mesmo
+   * defeito de servidor sem servidor que já matou três recursos nesta base.
+   */
+  await registrarUsoAgora({
+    especie: "chat",
+    modelo,
+    inputTokens: result.usage?.inputTokens,
+    outputTokens: result.usage?.outputTokens,
+    doctorId: doctorId ?? null,
+    canal: "agenda-whatsapp",
   });
 
   try {
@@ -270,11 +307,15 @@ async function getOrCreateConversation(
       .eq("phone", phone)
       .maybeSingle();
     if (legacy) return legacy as WaConversation;
-    const { data: legacyCreated } = await sb
+    const { data: legacyCreated, error: legacyErr } = await sb
       .from("whatsapp_conversations")
       .insert({ phone, state: "start", context: {} })
       .select()
       .single();
+    /* Último recurso do último recurso. Falhando aqui, o `as WaConversation`
+       devolve `null` disfarçado de objeto e quem chama estoura no primeiro
+       campo — longe daqui, com uma mensagem que não diz nada sobre o banco. */
+    if (legacyErr) console.error("[whatsapp] conversa não pôde ser criada", phone, legacyErr);
     return legacyCreated as WaConversation;
   }
   return created as WaConversation;
@@ -288,7 +329,7 @@ async function saveConversation(
 ): Promise<void> {
   const sb = supabaseAdmin;
   // Por id: nunca atualiza a conversa do mesmo telefone com OUTRO médico.
-  await (sb as any)
+  const { error } = await (sb as any)
     .from("whatsapp_conversations")
     .update({
       state,
@@ -297,6 +338,11 @@ async function saveConversation(
       last_message_at: new Date().toISOString(),
     })
     .eq("id", conv.id);
+  /* O estado é a memória inteira desta conversa. Se ele não gravar, o próximo
+     "oi" dela reencontra a conversa no passo anterior: o bot pergunta de novo
+     o que ela acabou de responder, e ela fica presa num loop que, do lado
+     dela, é o consultório não estar ouvindo. */
+  if (error) console.error("[whatsapp] estado da conversa não gravou", conv.id, error);
 }
 
 async function createAppointmentRequest(
@@ -322,9 +368,27 @@ async function createAppointmentRequest(
   const { error } = await (sb as any)
     .from("appointment_requests")
     .insert(targetDoctor ? { ...row, doctor_id: targetDoctor } : row);
-  if (error?.code === "42703" && targetDoctor) {
+  /* ─── `colunaAusente`, E NÃO `42703` CRU ──────────────────────────────────
+   *
+   * Isto é um INSERT: um payload com coluna fora do schema cache volta
+   * PGRST204, do PostgREST — nunca 42703, que é do Postgres num SELECT. O recuo
+   * portanto NUNCA rodava, e a consequência não é cosmética: num banco sem
+   * `doctor_id` em `appointment_requests`, o insert falhava, o recuo não
+   * acontecia, e nada era devolvido nem registrado. A paciente pedia consulta
+   * pelo WhatsApp, o agente respondia que estava agendado, e o pedido não
+   * chegava a painel nenhum.
+   *
+   * Sexta ocorrência desta mesma classe nesta madrugada — o `postgrest.ts`
+   * existe justamente para ela. */
+  const { colunaAusente } = await import("./postgrest");
+  if (colunaAusente(error) && targetDoctor) {
     // Coluna doctor_id ainda não migrada: registra sem atribuição.
-    await (sb as any).from("appointment_requests").insert(row);
+    const { error: e2 } = await (sb as any).from("appointment_requests").insert(row);
+    if (e2) console.error("[whatsapp] pedido de consulta não gravou", e2);
+  } else if (error) {
+    /* O silêncio aqui era total: sem log, um pedido perdido não deixava rastro
+       em lugar nenhum. */
+    console.error("[whatsapp] pedido de consulta não gravou", error);
   }
 }
 

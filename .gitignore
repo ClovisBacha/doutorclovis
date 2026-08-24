@@ -36,3 +36,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Originais guardados antes da limpeza de fundo — materia-prima, nao entram no build.
+src/assets/*.png.original
+
+# Carrosseis gerados para as redes — dezenas de PNGs por dia, refazíveis com
+# `bun run social`. O que precisa versionar é o gerador, não a saída dele.
+saida/
+scripts/social/.usado.json
+# Ilustracoes dos carrosseis: versiona o .webp, nao o PNG de 1,2 MB que sai do
+# gerador. O PNG e materia-prima descartavel; o WebP e o que o build usa.
+src/assets/social/*.png
+
+# Rascunho dos agentes de auditoria — some quando eles terminam.
+.tmp-audit/
+
+# Pastas de trabalho dos agentes verificadores (screenshots, scripts de medição)
+.verif*/
+.claude/worktrees/

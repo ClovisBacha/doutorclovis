@@ -1,4 +1,3 @@
-import { DOCTOR } from "@/lib/doctor.config";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
@@ -40,15 +39,39 @@ function scopedBy(qb: any, scope: TeleScope) {
   return scope.isTeam ? qb : qb.eq("doctor_id", scope.doctorId);
 }
 
-/** Fail-closed: a linha `id` pertence ao chamador? Equipe sempre; assinante só se doctor_id bate. */
+/**
+ * Fail-closed: a linha `id` é dele HOJE?
+ *
+ * ─── POR QUE NÃO BASTA O CARIMBO ────────────────────────────────────────────
+ *
+ * `teleconsulta_sessions.doctor_id` é gravado quando a sessão é criada.
+ * `encerrarAcompanhamento` zera `patient_profiles.doctor_id` e não toca em
+ * carimbo nenhum — é uma tabela só.
+ *
+ * A LISTA já tinha sido corrigida para o vínculo atual, e é isso que tornava
+ * esta função pior do que parecia: a sessão da ex-paciente sumia da tela do
+ * médico anterior, mas as AÇÕES continuavam autorizando por id. Ele não vê mais
+ * a linha, e ainda assim pode abrir a sala dela e gravar nota clínica nela — só
+ * precisa do id, que ele já teve na mão enquanto ela era paciente.
+ *
+ * Autorização assimétrica em relação à leitura é a pior forma disto: some da
+ * tela, e por isso ninguém percebe que continua permitido.
+ */
 async function ownsTele(sb: any, id: string, scope: TeleScope): Promise<boolean> {
   if (scope.isTeam) return true;
   const { data } = await sb
     .from("teleconsulta_sessions")
-    .select("doctor_id")
+    .select("doctor_id,patient_user_id")
     .eq("id", id)
     .maybeSingle();
-  return !!data && data.doctor_id === scope.doctorId;
+  if (!data || data.doctor_id !== scope.doctorId) return false;
+  /* O carimbo bate. Falta a pergunta que a lista já faz: ela ainda é paciente
+     dele? `vinculadasAgora` devolve conjunto VAZIO quando não há médico
+     resolvido — falha fechando, que é o que se quer numa autorização. */
+  const { vinculadasAgora } = await import("./vinculo.server");
+  const atuais = await vinculadasAgora(sb, { isTeam: false, doctorId: scope.doctorId });
+  if (atuais === null) return true;
+  return atuais.has(String(data.patient_user_id));
 }
 
 export type TeleconsultaSession = {
@@ -140,7 +163,17 @@ export const getTeleconsultasAdmin = createServerFn({ method: "POST" })
       for (const p of (profiles ?? []) as { id: string; display_name: string | null }[])
         nameById.set(p.id, p.display_name);
     }
-    const sessions: TeleconsultaSession[] = (rows ?? []).map((r: any) => ({
+    /* Vínculo ATUAL, não o carimbo da linha: sem isto o médico anterior seguia
+       lendo `patient_notes` (o que ELA escreveu antes da consulta),
+       `clinical_note` e o `meet_url` da sala. Ver `./vinculo.server`. */
+    const { vinculadasAgora, soVinculadas } = await import("./vinculo.server");
+    const atuais = await vinculadasAgora(supabaseAdmin as any, scope);
+
+    const sessions: TeleconsultaSession[] = soVinculadas(
+      (rows ?? []) as any[],
+      atuais,
+      (r) => r.patient_user_id as string,
+    ).map((r: any) => ({
       ...r,
       patient_name: nameById.get(r.patient_user_id) ?? null,
     }));
@@ -153,7 +186,7 @@ export const updateTeleconsultaStatus = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         id: z.string().uuid(),
-        status: z.enum(["agendada", "sala_aberta", "encerrada"]),
+        status: z.enum(["agendada", "sala_aberta", "encerrada", "cancelada"]),
       })
       .parse(i),
   )
@@ -175,14 +208,26 @@ export const getMyTeleconsultas = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, error: "Não autenticado" };
+    /* A NOTA CLÍNICA NÃO TRAFEGA PARA O NAVEGADOR DELA.
+    
+       `select("*")` levava `clinical_note` — a nota SOAP, muitas vezes gerada
+       por IA e ainda não revisada pelo médico — e `doctor_notes` para o cliente
+       dela. Não era renderizado, o que é pior: um vazamento à espera de um
+       `console.log`, de uma extensão ou de qualquer um abrindo a aba de rede.
+
+       `doctor_notes` FICA (é o recado que ele escreve para ela ao criar a
+       sessão). `clinical_note` sai. É a mesma decisão de `consultations`, onde
+       o prontuário nunca sai do servidor e só o resumo vai. */
     const { data: rows, error } = await supabaseAdmin
       .from("teleconsulta_sessions")
-      .select("*")
+      .select(
+        "id,patient_user_id,scheduled_for,room_name,status,doctor_notes,patient_notes,created_at,meet_url",
+      )
       .eq("patient_user_id", u.user.id)
       .neq("status", "encerrada")
       .order("scheduled_for", { ascending: true, nullsFirst: false });
     if (error) return { ok: false as const, error: error.message };
-    return { ok: true as const, sessions: (rows ?? []) as TeleconsultaSession[] };
+    return { ok: true as const, sessions: (rows ?? []) as unknown as TeleconsultaSession[] };
   });
 
 export const saveDoctorClinicalNote = createServerFn({ method: "POST" })
@@ -231,6 +276,23 @@ export const generateClinicalNote = createServerFn({ method: "POST" })
     const scope = await requireScope(data.accessToken);
     if (!scope) return { ok: false as const, error: "Não autorizado" };
 
+    /* ─── PLANO, ANTES DE GASTAR ─────────────────────────────────────────────
+     *
+     * Havia sessão, e só. Um médico no Free abria Teleconsultas — a aba não é
+     * filtrada por plano, o `podeIA` do painel cobre só a aba Cérebro — e
+     * gerava nota SOAP à vontade, na nossa chave.
+     *
+     * É a mesma régua da transcrição, e pelo mesmo motivo: o que chama modelo é
+     * do produto de IA; o resto da plataforma é da casa. `getEntitlements`
+     * resolve o assento de clínica sozinho, então o médico de uma clínica que
+     * paga passa por aqui pelo plano do dono. */
+    const { getEntitlementsByDoctorId } = await import("./entitlements.server");
+    const ent = await getEntitlementsByDoctorId(scope.doctorId ?? "", scope.isTeam);
+    if (!ent.aiApp) {
+      const { fraseDoGancho } = await import("./gancho-de-upgrade");
+      return { ok: false as const, error: fraseDoGancho("cerebro") };
+    }
+
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) return { ok: false as const, error: "API key não configurada" };
 
@@ -265,6 +327,20 @@ Gere a nota SOAP. Use formatação clara com cabeçalhos em negrito. Seja espec�
       maxOutputTokens: 600,
     });
 
+    /* MEDIDO. Uma trava mecânica achou oito chamadas pagas de modelo que ninguém
+     media — esta era uma delas. O consumo não existia em `ai_usage`: nem no
+     card, nem na projeção do mês. Canal próprio, e a cota conta só `app`. */
+    const { registrarUsoAgora } = await import("./uso-ia.server");
+    await registrarUsoAgora({
+      especie: "chat",
+      modelo: process.env.CHAT_MODEL ?? DEFAULT_CHAT_MODEL,
+      doctorId: scope.doctorId,
+      /* OS TOKENS, que estavam na mao e nao eram passados: a linha era gravada
+         com zero e a tabela media a RESPOSTA, nunca o custo. */
+      inputTokens: result.usage?.inputTokens,
+      outputTokens: result.usage?.outputTokens,
+      canal: "teleconsulta",
+    });
     return { ok: true as const, note: result.text };
   });
 
@@ -286,35 +362,41 @@ async function createGoogleMeetRoom(refreshOverride?: string | null): Promise<st
   }
 }
 
+/**
+ * Convite da sala por e-mail.
+ *
+ * `doctorId` é quem assina: antes o e-mail dizia "Dr. Clóvis Bacha —
+ * Ginecologista e Obstetra" para paciente de qualquer médico da plataforma.
+ * Sem médico resolvido, ninguém assina — a moldura vira a da plataforma.
+ */
 async function sendPatientMeetEmail(
   patientEmail: string,
   patientName: string,
   meetUrl: string,
   scheduledFor: string | null,
+  doctorId: string | null,
 ): Promise<void> {
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) return;
   const dateStr = scheduledFor
     ? new Date(scheduledFor).toLocaleString("pt-BR", { dateStyle: "full", timeStyle: "short" })
     : "hoje";
-  await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${resendKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      from: process.env.MAIL_FROM ?? `${DOCTOR.name} <onboarding@resend.dev>`,
-      to: patientEmail,
-      subject: `Sua teleconsulta está pronta — ${DOCTOR.name}`,
-      html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto">
-        <h2 style="color:#7c3aed">Sua teleconsulta está pronta</h2>
-        <p>Olá, ${patientName}!</p>
-        <p>Seu médico abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
-        <p>Clique no botão abaixo para entrar:</p>
-        <a href="${meetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:16px 0">Entrar na teleconsulta</a>
-        <p style="color:#666;font-size:12px">Ou acesse o portal → Minha Conta → Teleconsulta e clique no link da sessão.</p>
-        <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
-        <p style="color:#666;font-size:12px">${DOCTOR.name} — Ginecologista e Obstetra</p>
-      </div>`,
-    }),
+  const { sendEmail, emailLayout, escEmail } = await import("@/lib/email.server");
+  const { destinoMedico } = await import("@/lib/doctor-mail.server");
+  const med = await destinoMedico(doctorId);
+  const quem = med.nome ? escEmail(med.nome) : "Seu médico";
+  await sendEmail({
+    to: patientEmail,
+    replyTo: med.email || undefined,
+    subject: med.nome
+      ? `Sua teleconsulta está pronta — ${med.nome}`
+      : "Sua teleconsulta está pronta",
+    html: emailLayout(
+      "Sua teleconsulta está pronta",
+      `<p style="margin:0 0 10px">Olá, ${escEmail(patientName)}!</p>
+       <p style="margin:0 0 14px">${quem} abriu sua sala de teleconsulta para <strong>${dateStr}</strong>.</p>
+       <p style="margin:0 0 6px"><a href="${meetUrl}" style="display:inline-block;background:#a85a44;color:#fff;padding:12px 24px;border-radius:999px;text-decoration:none;font-weight:600;margin:8px 0">Entrar na teleconsulta</a></p>
+       <p style="margin:10px 0 0;font-size:13px;color:#9b8178">Ou abra o app → Minha Conta → Teleconsulta e toque no link da sessão.</p>`,
+      med.marca,
+    ),
   });
 }
 
@@ -436,7 +518,19 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!sess) return { ok: false as const, error: "Sessão não encontrada" };
-    if (!scope.isTeam && sess.doctor_id !== scope.doctorId)
+    /* ─── ABRIR A SALA TAMBÉM PASSA PELO VÍNCULO ─────────────────────────────
+     *
+     * Esta linha checava só o CARIMBO, e ficou de fora quando `ownsTele` ganhou
+     * o vínculo atual. O commit que fez aquilo afirmou, no texto, ter fechado
+     * "abrir a sala dela" — e fechou só `updateTeleconsultaStatus` e
+     * `saveDoctorClinicalNote`. Abrir a sala, que é a ação de que a frase
+     * falava, continuou autorizando por id.
+     *
+     * É a pior forma do defeito: a sala é uma chamada de vídeo COM a paciente,
+     * e o convite sai por e-mail e push para ela. O médico anterior podia
+     * convocar para uma consulta por vídeo alguém que já é de outro
+     * consultório. */
+    if (!(await ownsTele(supabaseAdmin as any, data.id, scope)))
       return { ok: false as const, error: "Não autorizado" };
     const patientUserId = sess.patient_user_id as string;
     const scheduledFor = (sess.scheduled_for as string | null) ?? null;
@@ -489,7 +583,7 @@ export const openTeleconsultaRoom = createServerFn({ method: "POST" })
     // 3) E-mail ao paciente: se o convite da Agenda já saiu (convida os dois),
     //    não duplica; senão manda o link por Resend (comportamento antigo).
     if (!invitedViaCalendar && patientEmail) {
-      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, scheduledFor);
+      await sendPatientMeetEmail(patientEmail, patientName, meetUrl, scheduledFor, admin.id);
     }
 
     return { ok: true as const, meetUrl, invited: invitedViaCalendar };

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { getAlbumByToken, addAlbumPostPublic, type AlbumPost } from "@/lib/family.functions";
+import { getAlbumByToken, addAlbumPostPublic, type AlbumPostPublico } from "@/lib/family.functions";
+import { ConviteDoApp } from "@/components/convite-do-app";
 
 export const Route = createFileRoute("/album/$token")({
   head: () => ({
@@ -15,7 +16,9 @@ export const Route = createFileRoute("/album/$token")({
 
 function AlbumPage() {
   const { token } = Route.useParams();
-  const [posts, setPosts] = useState<AlbumPost[]>([]);
+  const [posts, setPosts] = useState<AlbumPostPublico[]>([]);
+  /** O código dela, para o rodapé de convite. `null` em Modo Cuidado. */
+  const [codigoDeConvite, setCodigoDeConvite] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,6 +43,7 @@ function AlbumPage() {
         return;
       }
       setPosts(res.posts);
+      setCodigoDeConvite(res.codigoDeConvite ?? null);
     } catch {
       // Falha de rede: sem isso a tela ficava em "Carregando álbum..." p/ sempre.
       setError("Não foi possível carregar o álbum. Verifique a conexão e recarregue.");
@@ -217,9 +221,9 @@ function AlbumPage() {
                   key={post.id}
                   className="rounded-2xl border border-border bg-card overflow-hidden"
                 >
-                  {post.image_data && (
+                  {post.image_url && (
                     <img
-                      src={post.image_data}
+                      src={post.image_url}
                       alt={post.caption ?? "Foto"}
                       className="w-full object-cover max-h-80"
                     />
@@ -235,6 +239,10 @@ function AlbumPage() {
               ))}
             </div>
           )}
+          {/* ⚠️ DEPOIS das fotos, no pé — ver `convite-do-app.ts`. O álbum é da
+              família dela, e um cartão no meio das memórias seria o app se
+              convidando para a sala. */}
+          <ConviteDoApp onde="album" codigo={codigoDeConvite} />
         </div>
       </div>
     </div>

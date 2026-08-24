@@ -116,6 +116,48 @@ export function extractMessageText(message: Record<string, unknown>): string | n
   return null;
 }
 
+/**
+ * Envia uma mensagem de MODELO (template) aprovado no Meta Business.
+ *
+ * A diferença importa e é a razão de esta função existir: `waSendText` só
+ * chega se a pessoa tiver escrito para o número nas últimas 24h. O contato de
+ * emergência de uma paciente nunca escreveu — então, para o aviso do SOS, o
+ * texto livre falha com erro 131047 e o modelo é o único caminho.
+ *
+ * `params` preenche os {{1}}, {{2}}… do corpo aprovado, na ordem.
+ */
+export async function waSendTemplate(
+  to: string,
+  name: string,
+  lang: string,
+  params: string[],
+): Promise<void> {
+  const res = await fetch(`${GRAPH}/${phoneId()}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token()}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name,
+        language: { code: lang },
+        components: params.length
+          ? [{ type: "body", parameters: params.map((text) => ({ type: "text", text })) }]
+          : [],
+      },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[WhatsApp] Erro ao enviar template:", err);
+    throw new Error(`WhatsApp template error ${res.status}: ${err}`);
+  }
+}
+
 /** Verifica se o webhook está configurado corretamente */
 export function waConfigured(): boolean {
   return !!(process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_ACCESS_TOKEN);

@@ -5,6 +5,33 @@ on:
     branches: ["**"]
   pull_request:
     branches: ["**"]
+  # Gatilho manual. Existe por um episódio concreto: três commits seguidos não
+  # geraram execução nenhuma — nem falha, nem fila, nada — e não havia como
+  # distinguir "o Actions está fora" de "o gatilho de push não disparou". Sem um
+  # botão, o único caminho era empurrar mais um commit para ver o que acontecia,
+  # que é adivinhação com custo.
+  workflow_dispatch:
+
+# ─── POR QUE ESTE BLOCO EXISTE ───────────────────────────────────────────────
+#
+# Sem ele, cada push abre uma execução nova E o push do mesmo branch dispara uma
+# segunda por `pull_request`. Com os runners demorando, os jobs ficavam quinze
+# minutos na fila (`runner_id: 0`, nenhum runner atribuído) e eram cancelados
+# quando o commit seguinte chegava.
+#
+# O estrago não é gastar minuto: é o SINAL. O GitHub reporta `conclusion:
+# failure` para um job cancelado, então uma sequência de commits saudáveis
+# aparecia como uma sequência de reprovações — e eu passei a diagnosticar
+# "instabilidade do GitHub" em cima de execuções que simplesmente nunca
+# rodaram. Um vermelho que não quer dizer nada ensina a ignorar o vermelho, que
+# é o pior desfecho possível para um portão de CI.
+#
+# `github.ref` como grupo: um branch por vez. `cancel-in-progress` torna o
+# cancelamento DELIBERADO — o commit velho é superado de propósito, e o único
+# resultado que importa é o do commit mais novo, que é o que vai para produção.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   typecheck:
@@ -18,6 +45,25 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bunx tsc --noEmit
 
+  # Os testes são o portão de LÓGICA. `tsc` vê tipo, `eslint` vê estilo, o build
+  # vê compilação — e todo defeito que as revisões deste projeto encontraram foi
+  # de lógica. O hook de pre-commit pode ser pulado com `--no-verify`; este não.
+  test:
+    name: Testes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test src/
+      # A auditoria de conteúdo existia, era boa (cobertura de dias, gabarito
+      # fora de faixa, "marque todos" degenerado, enunciado repetido em 14
+      # dias) — e não estava em portão nenhum. Um verificador só a encontrou
+      # lendo o package.json. Script que ninguém roda é documentação.
+      - run: bun run audit:conteudo
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -28,3 +74,78 @@ jobs:
           bun-version: latest
       - run: bun install --frozen-lockfile
       - run: bun run lint
+
+  bancadas:
+    name: Bancadas — abre as telas e lê o console
+    runs-on: ubuntu-latest
+    # ⚠️ ESTE JOB EXISTE POR UM DEFEITO CONCRETO: um `getServerSnapshot`
+    # devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço
+    # infinito e DEIXOU O APP SEM ABRIR. Ele viveu vários commits com `tsc`
+    # limpo, lint limpo e 3.900 testes verdes — porque nenhum deles abre uma
+    # página. A varredura que o achou era manual, e por isso não aconteceu.
+    #
+    # O que este job pega e o teste unitário não pega: erro de hidratação, laço
+    # de render, `undefined` no caminho de desenho, import quebrado, e a tela
+    # que simplesmente não desenha nada.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+
+      # O Chromium do Playwright, e só ele — os outros dois navegadores
+      # dobrariam o tempo do job sem pegar nada a mais.
+      - run: bunx playwright install --with-deps chromium
+
+      # ⚠️ O servidor de DESENVOLVIMENTO, e não o build: o build gera
+      # `.vercel/output` (Build Output API), que o `vite preview` não serve —
+      # medido. E o dev serve as rotas de bancada do mesmo jeito.
+      #
+      # ⚠️ E com `--host 127.0.0.1`: o Vite tenta IPv6 (`:::8080`) por padrão, e
+      # o runner não resolve isso.
+      # ⚠️ **AS BANCADAS PRECISAM DAS CHAVES PÚBLICAS DO SUPABASE.**
+      #
+      # Sem elas o cliente do Supabase LANÇA na importação ("Missing Supabase
+      # environment variable(s)") e **toda** página falha — foi assim que este
+      # job ficou vermelho nas primeiras execuções, com 42 de 42 quebradas.
+      # Aqui na máquina de desenvolvimento existe um `.env`, então a varredura
+      # passava; no runner, não.
+      #
+      # ⚠️ **E as duas SÃO públicas por desenho** — vão para o pacote do
+      # navegador em todo deploy, e o `.env.example` (versionado) as traz
+      # preenchidas justamente por isso. Conferido: os quatro segredos de
+      # verdade (`SERVICE_ROLE`, `GOOGLE_GENERATIVE_AI`, `RESEND`, `STRIPE`)
+      # estão VAZIOS nesse arquivo. Copiar `.env.example` não expõe nada, e é o
+      # mesmo conjunto que qualquer visitante do site já recebe.
+      - name: Chaves públicas para as bancadas
+        run: cp .env.example .env
+
+      # ⚠️ A ESPERA É POR HTTP, e não por texto no log.
+      #
+      # A primeira versão fazia `grep -q "Local:"` e NUNCA casava: a saída
+      # colorida do Vite insere um escape ANSI entre `Local` e `:`
+      # (`\e[1mLocal\e[22m:`). O servidor subia em 1,8 s, o laço esperava os
+      # 120 s inteiros, e o job falhava com "o servidor não subiu" impresso
+      # logo acima de uma linha do próprio log dizendo que ele subiu.
+      #
+      # É a mesma família dos casamentos frouxos que este repo já pagou —
+      # procurar um texto que não está literalmente lá. Perguntar ao SERVIDOR
+      # testa a condição que importa: ele está servindo?
+      - name: Sobe o servidor
+        run: |
+          bun run dev --host 127.0.0.1 --port 8080 > /tmp/dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf -o /dev/null http://127.0.0.1:8080/ && break
+            sleep 2
+          done
+          curl -sf -o /dev/null http://127.0.0.1:8080/ || {
+            echo "o servidor não respondeu em 120s"; cat /tmp/dev.log; exit 1; }
+
+      - run: bun run varrer:bancadas
+
+      # O log do servidor ajuda a diagnosticar quando o job falha — sem ele,
+      # "a página não desenhou nada" não diz se foi a tela ou o servidor.
+      - name: Log do servidor
+        if: failure()
+        run: tail -60 /tmp/dev.log

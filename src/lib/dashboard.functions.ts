@@ -53,7 +53,10 @@ export type DoctorDashboard = {
   };
   questions: {
     pending: number;
+    /** Total histórico. NÃO use em nada rotulado "este mês". */
     answered: number;
+    /** Respondidas DENTRO do mês corrente — é esta que a prova de valor lê. */
+    answeredThisMonth: number;
     recentPending: { id: string; question: string; created_at: string }[];
     topThemes: { theme: string; count: number }[];
   };
@@ -63,6 +66,12 @@ export type DoctorDashboard = {
     enabledApp: boolean;
     enabledWhatsapp: boolean;
     hitsThisMonth: number;
+    /**
+     * Minutos que UMA resposta dele custaria, estimados pelo tamanho mediano do
+     * que ele já escreveu. É o que transforma "a IA economizou 50h suas" de
+     * chute em conta — ver `src/lib/tempo-poupado.ts`.
+     */
+    minutosPorResposta: number;
   };
   appointments: {
     pending: number;
@@ -205,8 +214,9 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // janela aqui — precisamos da última atividade "de sempre" para o risco de
     // abandono (>10 dias sem registro).
     const activityMap = await safe<Map<string, number>>(async () => {
-      // O mapa é consultado por p.id; como `profiles` já vem recortado por
-      // doctor_id no caminho do assinante, só as pacientes DELE são reveladas.
+      /* `profiles` já vem recortado por doctor_id no caminho do assinante, e
+         agora esse recorte também vale para a LEITURA — ver o bloco de lotes
+         logo abaixo. Antes ele valia só para a consulta ao mapa. */
       if (profiles.length === 0) return new Map<string, number>();
       const map = new Map<string, number>();
       const record = (uid: string, ts: string | null) => {
@@ -215,22 +225,50 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
         const prev = map.get(uid);
         if (prev == null || ms > prev) map.set(uid, ms);
       };
+      /* ─── RECORTADO PELAS PACIENTES DELE, EM LOTES ────────────────────────
+       *
+       * Isto lia as 5000 linhas mais recentes de CADA tabela na plataforma
+       * INTEIRA e depois consultava o mapa pelos ids dele. Nenhum dado de
+       * outro consultório chegava à tela — mas a conta ficava errada, e cada
+       * vez mais errada: bastava a plataforma ter 5000 registros mais novos
+       * que a última atividade de uma paciente dele para ela sumir do mapa. E
+       * sumir do mapa não a marca como sumida: `lastMs == null` a exclui do
+       * risco de abandono, então ela some do cartão "Oportunidade de
+       * reengajar" — que é onde ele iria procurá-la.
+       *
+       * Com o recorte, o volume passa a ser o do consultório dele, e a conta
+       * para de depender de quantos OUTROS médicos usam o produto.
+       *
+       * ─── POR QUE EM LOTES DE 100 ──────────────────────────────────────────
+       *
+       * `.in()` vai na query string, e cada uuid custa 39 caracteres depois do
+       * percent-encoding. Acima de ~206 pacientes a request line passa dos 8 KB
+       * do proxy e volta 414 — com `data` nula e um `error` que ninguém lê. É o
+       * mesmo raciocínio (e o mesmo número) de `getEngagementData` em
+       * `admin.functions.ts`, onde o modo de falha está documentado por
+       * extenso.
+       *
+       * O limite por lote continua existindo, mas agora cobre 100 pacientes em
+       * vez da plataforma: são ~30 registros por paciente antes de apertar. */
+      const LOTE = 100;
+      const ids = profiles.map((p: { id: string }) => p.id);
+      const porLotes = async (tabela: string, coluna: string) => {
+        const partes: any[] = [];
+        for (let i = 0; i < ids.length; i += LOTE) {
+          const { data } = await sb
+            .from(tabela)
+            .select(`user_id,${coluna}`)
+            .in("user_id", ids.slice(i, i + LOTE))
+            .order(coluna, { ascending: false })
+            .limit(3000);
+          partes.push(...(data ?? []));
+        }
+        return { data: partes };
+      };
       const [health, journals, kicks] = await Promise.all([
-        sb
-          .from("health_logs")
-          .select("user_id,created_at")
-          .order("created_at", { ascending: false })
-          .limit(5000),
-        sb
-          .from("journal_entries")
-          .select("user_id,created_at")
-          .order("created_at", { ascending: false })
-          .limit(5000),
-        sb
-          .from("kick_sessions")
-          .select("user_id,started_at")
-          .order("started_at", { ascending: false })
-          .limit(5000),
+        porLotes("health_logs", "created_at"),
+        porLotes("journal_entries", "created_at"),
+        porLotes("kick_sessions", "started_at"),
       ]);
       (health.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
       (journals.data ?? []).forEach((r: any) => record(r.user_id, r.created_at));
@@ -259,11 +297,16 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     const emptyQuestions = {
       pending: 0,
       answered: 0,
+      /* Precisa existir AQUI: `safe<T>` infere `T` do fallback, então um campo
+         que só aparece no caminho feliz é apagado do tipo em silêncio — foi
+         assim que a métrica mensal ficou pronta no servidor e nunca chegou à
+         tela, sem o `tsc` reclamar de nada. */
+      answeredThisMonth: 0,
       recentPending: [] as { id: string; question: string; created_at: string }[],
       topThemes: [] as { theme: string; count: number }[],
     };
     const questions = await safe(async () => {
-      const [pendingRes, answeredRes, recentRes, textsRes] = await Promise.all([
+      const [pendingRes, answeredRes, recentRes, textsRes, answeredMonthRes] = await Promise.all([
         scoped(
           sb
             .from("doctor_questions")
@@ -291,10 +334,29 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
             .order("created_at", { ascending: false })
             .limit(500),
         ),
+        /* RESPONDIDAS NESTE MÊS.
+
+           `answered` acima não tem janela nenhuma — é o total histórico. Um
+           médico de catorze meses de casa carregava 380 ali, e o card "Valor
+           gerado ESTE MÊS" somava as 380 no dia 2. Pior: como o contador nunca
+           desce, quem parou de usar continuava vendo o mês cheio para sempre —
+           justamente quem está prestes a cancelar.
+
+           `answered_at` pode não existir em banco não migrado: nesse caso a
+           consulta falha, `count` fica nulo e a tela cai para zero, que é o
+           erro na direção honesta (não inventa mês). */
+        scoped(
+          sb
+            .from("doctor_questions")
+            .select("*", { count: "exact", head: true })
+            .eq("answered", true)
+            .gte("answered_at", monthStart),
+        ),
       ]);
       return {
         pending: (pendingRes.count ?? 0) as number,
         answered: (answeredRes.count ?? 0) as number,
+        answeredThisMonth: (answeredMonthRes?.count ?? 0) as number,
         recentPending: (recentRes.data ?? []) as {
           id: string;
           question: string;
@@ -309,7 +371,7 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
     // ── Segundo Cérebro: entradas, aprovadas, canais ligados, usos no mês ─────
     const brain = await safe(
       async () => {
-        const [entriesRes, approvedRes, settingsRes, hitsRes] = await Promise.all([
+        const [entriesRes, approvedRes, settingsRes, hitsRes, respostasRes] = await Promise.all([
           sb
             .from("brain_entries")
             .select("*", { count: "exact", head: true })
@@ -331,16 +393,36 @@ export const getDoctorDashboard = createServerFn({ method: "POST" })
             .eq("doctor_id", doctorId)
             .neq("channel", "teste")
             .gte("created_at", monthStart),
+          /* As respostas que ELE escreveu — daqui sai o tempo por resposta. Sem
+             recorte de período: quanto mais amostra, mais estável a mediana, e
+             o jeito de escrever de um médico não muda de um mês para o outro. */
+          sb
+            .from("doctor_questions")
+            .select("answer")
+            .eq("doctor_id", doctorId)
+            .not("answer", "is", null)
+            .limit(200),
         ]);
+        const { minutosPorResposta } = await import("./tempo-poupado");
         return {
           entries: (entriesRes.count ?? 0) as number,
           approved: (approvedRes.count ?? 0) as number,
           enabledApp: (settingsRes.data?.enabled_app ?? true) as boolean,
           enabledWhatsapp: (settingsRes.data?.enabled_whatsapp ?? true) as boolean,
           hitsThisMonth: (hitsRes.count ?? 0) as number,
+          minutosPorResposta: minutosPorResposta(
+            ((respostasRes.data ?? []) as { answer: string | null }[]).map((r) => r.answer ?? ""),
+          ),
         };
       },
-      { entries: 0, approved: 0, enabledApp: true, enabledWhatsapp: true, hitsThisMonth: 0 },
+      {
+        entries: 0,
+        approved: 0,
+        enabledApp: true,
+        enabledWhatsapp: true,
+        hitsThisMonth: 0,
+        minutosPorResposta: 3,
+      },
     );
 
     // ── Consultas: pendentes, confirmadas futuras, próxima ────────────────────
