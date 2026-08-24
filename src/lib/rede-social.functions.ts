@@ -25,6 +25,7 @@ import { ehContaOficial, fileiraComOficial } from "@/lib/conta-oficial";
 import { z } from "zod";
 import * as filhosRegua from "./filhos";
 import { MARCO_POR_ID } from "./marcos";
+import { caminhoEhDoDono } from "./video-do-post";
 import {
   aoSeguir,
   avisoMandaPush,
@@ -192,6 +193,14 @@ export type PostNaTela = {
    * contando a idade daquele dia.
    */
   marco: { tipo: string; dias: number | null } | null;
+  /**
+   * O vídeo da publicação, já com URL assinada, ou `null`.
+   *
+   * ⚠️ Campo PRÓPRIO, e não mais uma entrada em `imagens`: a tela desenha
+   * `<video>` e não `<img>`, e misturar os dois faria o carrossel tentar
+   * pintar um vídeo como foto — que é um quadrado quebrado, sem erro nenhum.
+   */
+  videoUrl: string | null;
   /**
    * Guardei este post?
    *
@@ -700,7 +709,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias";
+  "marco_tipo, marco_dias, video_path";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -741,6 +750,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     miniatura_path: null,
     marco_tipo: null,
     marco_dias: null,
+    video_path: null,
   }));
 }
 
@@ -1242,7 +1252,10 @@ async function montarPosts(
   const { urlsAssinadas } = await import("@/lib/imagens.server");
   const todosOsCaminhos = visiveis.flatMap(
     (p) =>
-      [p.imagem_path, p.miniatura_path, ...((p.imagens ?? []) as string[])].filter(
+      /* ⚠️ O VÍDEO ENTRA NA MESMA ONDA DE ASSINATURA das fotos. Assinar à parte
+         seria uma segunda ida ao Storage por feed, para um campo que quase
+         sempre é nulo — e `urlsAssinadas` já manda um POST por balde. */
+      [p.imagem_path, p.miniatura_path, p.video_path, ...((p.imagens ?? []) as string[])].filter(
         Boolean,
       ) as string[],
   );
@@ -1297,6 +1310,8 @@ async function montarPosts(
           : null,
         aula: aulaValida(p.aula) ? p.aula : null,
         marco: p.marco_tipo ? { tipo: String(p.marco_tipo), dias: p.marco_dias ?? null } : null,
+        /* Assinado na MESMA onda das fotos — ver `todosOsCaminhos`. */
+        videoUrl: p.video_path ? (assinadas.get(p.video_path) ?? null) : null,
         pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
       };
     }),
@@ -1939,6 +1954,42 @@ function recadoDeConteudo(d: "clinica" | "emergencia"): string {
   return "Aqui a gente conta a própria experiência, sem dizer o que a outra deve fazer. Quem orienta é o médico dela.";
 }
 
+/**
+ * A URL ASSINADA PARA SUBIR O VÍDEO.
+ *
+ * ⚠️ **É O QUE TORNA O VÍDEO VIÁVEL.** As fotos viajam como data URL dentro da
+ * chamada do servidor; trinta segundos de vídeo de celular são 10 a 30 MB e em
+ * base64 ficam 1,4× maiores — estouraria o corpo da requisição, e o que a
+ * paciente veria é "não deu para publicar" depois de esperar um minuto no 4G.
+ *
+ * ⚠️ **O CAMINHO É MONTADO NO SERVIDOR, com a pasta dela.** Se o cliente
+ * escolhesse o caminho, escolheria a pasta — e a URL assinada viraria permissão
+ * para escrever por cima do arquivo de outra paciente. O `crypto.randomUUID`
+ * segue a mesma razão de `guardarImagem`: nome adivinhável somado a um balde
+ * mal configurado no futuro é a diferença entre privado e enumerável.
+ */
+export const urlParaSubirVideo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), tipo: z.string().max(60) }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    /* ⚠️ O TIPO É CONFERIDO AQUI TAMBÉM. A tela já recusa, mas um corpo montado
+       à mão pediria URL para subir um `.exe` na pasta dela. */
+    const { TIPOS_ACEITOS, extensaoDoTipo } = await import("./video-do-post");
+    if (!(TIPOS_ACEITOS as readonly string[]).includes(data.tipo)) {
+      return { ok: false as const, motivo: "tipo" as const };
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const caminho = `${eu}/${crypto.randomUUID()}.${extensaoDoTipo(data.tipo)}`;
+    const { data: assinada, error } = await (supabaseAdmin as any).storage
+      .from("rede")
+      .createSignedUploadUrl(caminho);
+    if (error || !assinada?.token) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const, caminho, token: assinada.token as string };
+  });
+
 export const publicarPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -1992,6 +2043,21 @@ export const publicarPost = createServerFn({ method: "POST" })
          */
         marco: z
           .object({ tipo: z.string().max(40), dias: z.number().int().min(0).max(15000).nullable() })
+          .nullable()
+          .optional(),
+        /**
+         * O caminho do vídeo já subido, e a duração medida no navegador.
+         *
+         * ⚠️ **O CAMINHO VEM DO CLIENTE, e é conferido no handler contra a
+         * pasta dela.** O vídeo sobe direto para o Storage; se este campo
+         * fosse aceito como veio, bastaria trocar a string para anexar o vídeo
+         * de outra paciente à própria publicação.
+         */
+        video: z
+          .object({
+            caminho: z.string().max(300),
+            segundos: z.number().min(0).max(3600).nullable(),
+          })
           .nullable()
           .optional(),
         /**
@@ -2152,6 +2218,13 @@ export const publicarPost = createServerFn({ method: "POST" })
            rótulo com o texto que o cliente mandou. */
         ...(data.marco && MARCO_POR_ID[data.marco.tipo]
           ? { marco_tipo: data.marco.tipo, marco_dias: data.marco.dias }
+          : {}),
+        /* ⚠️ **A PASTA É CONFERIDA AQUI, e é a única trava que existe.** O
+           vídeo sobe direto para o Storage e só o caminho volta; sem isto,
+           trocar a string anexaria o vídeo de outra paciente. Caminho de fora
+           vira publicação SEM vídeo, nunca com o vídeo alheio. */
+        ...(data.video && caminhoEhDoDono(data.video.caminho, eu)
+          ? { video_path: data.video.caminho, video_segundos: data.video.segundos }
           : {}),
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a

@@ -244,6 +244,13 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   comparacao: i === 2 ? { antes: "18s", agora: "32s" } : null,
   /* O post 3 é um mesversário: é ele que prova o rótulo do marco no cartão. */
   marco: i === 3 ? { tipo: "mesversario", dias: 91 } : null,
+  /* O post 1 vira vídeo — é ele que prova o player no cartão.
+
+     ⚠️ **ARQUIVO DO PRÓPRIO SITE, nunca um host externo.** A primeira versão
+     apontava para um vídeo de exemplo na internet: a bancada passava a depender
+     de rede alheia, e a varredura da CI roda sem ela. Este `.webm` já é
+     embarcado (é um dos sons de ambiente) e serve para provar o player. */
+  videoUrl: i === 1 ? "/sons/riacho.webm" : null,
   /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
   editadoEm: i === 0 ? atras(20) : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do

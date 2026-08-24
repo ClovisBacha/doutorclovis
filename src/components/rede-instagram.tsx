@@ -29,6 +29,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
 import { type Filho, diasEntre, linhaDoPerfil, mesesEntre } from "@/lib/filhos";
 import { marcosSugeridos, mesversarioDeHoje, textoDoMarco } from "@/lib/marcos";
+import { SEGUNDOS_MAX, recadoDaRecusa, recusaDoVideo } from "@/lib/video-do-post";
 import { MAXIMO_DE_FILHOS } from "@/lib/filhos.functions";
 import {
   ABAS_DO_PERFIL,
@@ -893,7 +894,9 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
-      {post.imagemUrl && (
+      {/* ⚠️ `!post.videoUrl` — o vídeo tem prioridade e o carrossel se cala.
+          Ver o comentário do player, logo abaixo. */}
+      {post.imagemUrl && !post.videoUrl && (
         <Carrossel
           urls={fotos}
           comparacao={post.comparacao}
@@ -1161,6 +1164,29 @@ export const PostInstagram = memo(function PostInstagram({
             📚 Fiz a aula de hoje — sobre <span className="font-semibold">{post.aula.tema}</span>
           </p>
         </div>
+      )}
+
+      {/* ⚠️ **O VÍDEO SUBSTITUI O CARROSSEL, nunca convive com ele.** Um post
+          é uma coisa ou outra; deixar os dois faria a paciente rolar fotos e
+          encontrar um vídeo tocando no meio, com o som do anterior ainda
+          rodando. O compositor já impede escolher os dois. */}
+
+      {/* ⚠️ `playsInline` É OBRIGATÓRIO — sem ele o iPhone abre o vídeo em TELA
+          CHEIA ao tocar, tirando a paciente do feed. `muted` porque autoplay
+          com som é recusado por todo navegador e, aqui, seria pior se
+          funcionasse: som saindo sozinho numa sala de espera. `preload` só dos
+          metadados: o feed não pode baixar todo vídeo que passa pela tela no
+          4G dela. */}
+      {post.videoUrl && (
+        <video
+          src={post.videoUrl}
+          className="mt-1 w-full bg-black"
+          controls
+          loop
+          muted
+          playsInline
+          preload="metadata"
+        />
       )}
 
       {/* ⚠️ O MARCO É CALCULADO NA PINTURA, a partir dos DIAS que o banco
@@ -4277,6 +4303,8 @@ export function RedeNoApp({
     aula: AulaNoPost | null;
     /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
     marco?: { tipo: string; dias: number | null } | null;
+    /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
+    video?: { caminho: string; segundos: number | null } | null;
   }): Promise<boolean> {
     try {
       const t = await token();
@@ -4296,6 +4324,7 @@ export function RedeNoApp({
           enquete: p.enquete,
           aula: p.aula,
           marco: p.marco ?? null,
+          video: p.video ?? null,
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
         },
@@ -6675,6 +6704,8 @@ export function NovoPost({
     aula: AulaNoPost | null;
     /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
     marco?: { tipo: string; dias: number | null } | null;
+    /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
+    video?: { caminho: string; segundos: number | null } | null;
     /** Os ids de quem estava junto. O servidor confere cada um. */
     marcadas: string[];
     /** O post antigo que vira a primeira foto, ou `null`. */
@@ -6779,6 +6810,10 @@ export function NovoPost({
    * post que a família inteira vai ver.
    */
   const [filhosDela, setFilhosDela] = useState<Filho[]>(filhosDeMentira ?? []);
+  /** O vídeo já subido: `{caminho, segundos}`. `null` = publicação de foto. */
+  const [video, setVideo] = useState<{ caminho: string; segundos: number | null } | null>(null);
+  const [subindoVideo, setSubindoVideo] = useState(false);
+  const arquivoDeVideo = useRef<HTMLInputElement>(null);
   const [marco, setMarco] = useState<string | null>(null);
 
   useEffect(() => {
@@ -6897,6 +6932,7 @@ export function NovoPost({
       /* ⚠️ Os DIAS vão junto, e é isso que faz o post não envelhecer: a tela
          recalcula "3 meses" a cada pintura, em vez de repetir um texto salvo. */
       marco: marco && bebeNascido ? { tipo: marco, dias: diasDoBebe } : null,
+      video,
       marcadas,
       comparacaoCom: entao,
     });
@@ -7358,6 +7394,176 @@ export function NovoPost({
             {VISIBILIDADES.find((v) => v.chave === vis)?.sub}
           </p>
         </div>
+
+        {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
+            deixar escolher ambos faria a paciente montar um post que a tela não
+            sabe pintar. O botão some quando já há foto, e vice-versa. */}
+        {fotos.length === 0 && (
+          <button
+            type="button"
+            disabled={subindoVideo}
+            onClick={() => arquivoDeVideo.current?.click()}
+            className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+              video ? "border-primary bg-primary/10 text-primary" : "border-border"
+            }`}
+          >
+            {subindoVideo
+              ? "Enviando o vídeo…"
+              : video
+                ? "Vídeo anexado ✓ (tocar para trocar)"
+                : `🎬 Anexar um vídeo (até ${SEGUNDOS_MAX}s)`}
+          </button>
+        )}
+
+        <input
+          ref={arquivoDeVideo}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setErro(null);
+
+            /* ⚠️ A DURAÇÃO É MEDIDA ANTES DE SUBIR. Subir 40 MB para descobrir
+               que passa de um minuto é gastar o 4G dela para nada — e a recusa
+               chegaria depois da espera, que é a pior ordem possível. */
+            const segundos = await new Promise<number | null>((ok) => {
+              try {
+                const v = document.createElement("video");
+                v.preload = "metadata";
+                v.onloadedmetadata = () => ok(Number.isFinite(v.duration) ? v.duration : null);
+                v.onerror = () => ok(null);
+                v.src = URL.createObjectURL(f);
+              } catch {
+                ok(null);
+              }
+            });
+
+            const recusa = recusaDoVideo({ tipo: f.type, bytes: f.size, segundos });
+            if (recusa) {
+              setErro(recadoDaRecusa(recusa));
+              return;
+            }
+
+            setSubindoVideo(true);
+            try {
+              /* ⚠️ Sessão lida AQUI: o `token()` do `RedeNoApp` não alcança
+                 este componente, e importar por prop só para isto acrescentaria
+                 uma assinatura a um compositor que já tem quinze. */
+              const { supabase: sb } = await import("@/integrations/supabase/client");
+              const t = (await sb.auth.getSession()).data.session?.access_token;
+              if (!t) return;
+              const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+              const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+              if (!r.ok) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              const { supabase } = await import("@/integrations/supabase/client");
+              /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — não
+                 passa pelo servidor. É o ponto todo desta mudança. */
+              const up = await supabase.storage
+                .from("rede")
+                .uploadToSignedUrl(r.caminho, r.token, f);
+              if (up.error) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              setVideo({ caminho: r.caminho, segundos });
+            } catch {
+              setErro("Não deu para enviar o vídeo agora.");
+            } finally {
+              setSubindoVideo(false);
+            }
+          }}
+        />
+
+        {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
+            deixar escolher ambos faria a paciente montar um post que a tela não
+            sabe pintar. O botão some quando já há foto, e vice-versa. */}
+        {fotos.length === 0 && (
+          <button
+            type="button"
+            disabled={subindoVideo}
+            onClick={() => arquivoDeVideo.current?.click()}
+            className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+              video ? "border-primary bg-primary/10 text-primary" : "border-border"
+            }`}
+          >
+            {subindoVideo
+              ? "Enviando o vídeo…"
+              : video
+                ? "Vídeo anexado ✓ (tocar para trocar)"
+                : `🎬 Anexar um vídeo (até ${SEGUNDOS_MAX}s)`}
+          </button>
+        )}
+
+        <input
+          ref={arquivoDeVideo}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setErro(null);
+
+            /* ⚠️ A DURAÇÃO É MEDIDA ANTES DE SUBIR. Subir 40 MB para descobrir
+               que passa de um minuto é gastar o 4G dela para nada — e a recusa
+               chegaria depois da espera, que é a pior ordem possível. */
+            const segundos = await new Promise<number | null>((ok) => {
+              try {
+                const v = document.createElement("video");
+                v.preload = "metadata";
+                v.onloadedmetadata = () => ok(Number.isFinite(v.duration) ? v.duration : null);
+                v.onerror = () => ok(null);
+                v.src = URL.createObjectURL(f);
+              } catch {
+                ok(null);
+              }
+            });
+
+            const recusa = recusaDoVideo({ tipo: f.type, bytes: f.size, segundos });
+            if (recusa) {
+              setErro(recadoDaRecusa(recusa));
+              return;
+            }
+
+            setSubindoVideo(true);
+            try {
+              /* ⚠️ Sessão lida AQUI: o `token()` do `RedeNoApp` não alcança
+                 este componente, e importar por prop só para isto acrescentaria
+                 uma assinatura a um compositor que já tem quinze. */
+              const { supabase: sb } = await import("@/integrations/supabase/client");
+              const t = (await sb.auth.getSession()).data.session?.access_token;
+              if (!t) return;
+              const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+              const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+              if (!r.ok) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              const { supabase } = await import("@/integrations/supabase/client");
+              /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — não
+                 passa pelo servidor. É o ponto todo desta mudança. */
+              const up = await supabase.storage
+                .from("rede")
+                .uploadToSignedUrl(r.caminho, r.token, f);
+              if (up.error) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              setVideo({ caminho: r.caminho, segundos });
+            } catch {
+              setErro("Não deu para enviar o vídeo agora.");
+            } finally {
+              setSubindoVideo(false);
+            }
+          }}
+        />
 
         <input
           ref={arquivo}
