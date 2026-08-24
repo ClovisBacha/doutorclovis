@@ -604,6 +604,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoReagir,
   aoAbrirPerfil,
   aoSalvar,
+  aoRepublicar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -629,6 +630,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoVer?: (id: string) => void;
   /** Guardar/desguardar. Sem ele o marcador não aparece. */
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: (post: PostNaTela) => void;
   /**
@@ -988,13 +991,32 @@ export const PostInstagram = memo(function PostInstagram({
         {/* O marcador fica na PONTA DIREITA, separado das reações pelo vão que
             sobra — é o arranjo deles, e ele diz uma coisa verdadeira: guardar é
             gesto privado (ninguém vê, nem a autora), reagir é gesto social. */}
+        {/* ⚠️ **REPUBLICAR SÓ APARECE ONDE ELE CABE**, e as três condições são
+            as três formas de o botão mentir: no post DELA seria uma cópia de si
+            mesma; num post que não é público, republicar ampliaria a audiência
+            que a autora escolheu; e num post que JÁ é republicação, o quadro
+            apontaria para outro quadro. O servidor confere as três de novo. */}
+        {aoRepublicar && !post.souAAutora && post.visibilidade === "publico" && !post.ehRepost && (
+          <button
+            type="button"
+            onClick={() => aoRepublicar(post)}
+            aria-label="Republicar"
+            className="press ml-auto leading-none text-[15px]"
+          >
+            ↻
+          </button>
+        )}
         {aoSalvar && (
           <button
             type="button"
             onClick={() => aoSalvar(post, !post.salvo)}
             aria-label={post.salvo ? "Tirar dos salvos" : "Salvar"}
             aria-pressed={post.salvo}
-            className="press ml-auto leading-none"
+            className={`press leading-none ${
+              aoRepublicar && !post.souAAutora && post.visibilidade === "publico" && !post.ehRepost
+                ? "ml-2"
+                : "ml-auto"
+            }`}
           >
             <IconeMarcador cheio={post.salvo} />
           </button>
@@ -1166,6 +1188,45 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
+      {/* ⚠️ **A ORIGINAL VEM NUM QUADRO, e o que ela NÃO tem importa.** Sem
+          reações, sem botão de salvar, sem comentário: quem interage é a
+          republicação. Repetir os controles faria a paciente reagir ao quadro
+          achando que reage à autora original — e o número iria para o lugar
+          errado.
+
+          ⚠️ E "publicação não disponível" NÃO é uma falha a esconder: é o
+          estado de quando a autora arquivou. Mostrar uma cópia do texto faria a
+          republicação sobreviver à decisão dela de tirar do ar. */}
+      {post.ehRepost && (
+        <div className="mx-4 mt-2 rounded-xl border border-border p-3">
+          {post.repost ? (
+            <>
+              <button
+                type="button"
+                onClick={() => aoAbrirPerfil?.(post.repost!.autorId)}
+                className="press text-[12px] font-semibold"
+              >
+                {post.repost.autorNome}
+              </button>
+              {post.repost.texto && (
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-snug">
+                  {post.repost.texto}
+                </p>
+              )}
+              {post.repost.imagemUrl && (
+                <img
+                  src={post.repost.imagemUrl}
+                  alt=""
+                  className="mt-2 w-full rounded-lg object-cover"
+                />
+              )}
+            </>
+          ) : (
+            <p className="text-[12px] text-muted-foreground">Publicação não disponível.</p>
+          )}
+        </div>
+      )}
+
       {/* ⚠️ **O VÍDEO SUBSTITUI O CARROSSEL, nunca convive com ele.** Um post
           é uma coisa ou outra; deixar os dois faria a paciente rolar fotos e
           encontrar um vídeo tocando no meio, com o som do anterior ainda
@@ -1329,6 +1390,7 @@ export function TelaPrincipal({
   aoSeguirPessoa,
   aoReagir,
   aoSalvar,
+  aoRepublicar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -1388,6 +1450,8 @@ export function TelaPrincipal({
   aoSeguirPessoa?: (id: string) => void;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -1565,6 +1629,7 @@ export function TelaPrincipal({
                mudou-se para DENTRO do cartão, que já tem `post.souAAutora`. */
             aoReagir={aoReagir}
             aoSalvar={aoSalvar}
+            aoRepublicar={aoRepublicar}
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
@@ -1624,6 +1689,7 @@ export function TelaPrincipal({
                   sugerido
                   aoReagir={aoReagir}
                   aoSalvar={aoSalvar}
+                  aoRepublicar={aoRepublicar}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
                   aoEditar={aoEditar}
@@ -2845,6 +2911,8 @@ export function RedeNoApp({
   /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
   const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
   const [conversaAberta, setConversaAberta] = useState<ConversaNaTela | null>(null);
+  /** A publicação que ela está republicando, enquanto o compositor está aberto. */
+  const [repostando, setRepostando] = useState<PostNaTela | null>(null);
   /**
    * A escolha dela: `true` = só quem eu sigo.
    *
@@ -3970,6 +4038,33 @@ export function RedeNoApp({
    * divergência apareceria como um botão que abre uma tela vazia, ou como um
    * botão escondido de quem tinha direito a ele.
    */
+  /**
+   * ⚠️ **LIMPA A REPUBLICAÇÃO AO SAIR DO COMPOSITOR, e num EFEITO.**
+   *
+   * Sem isto, a publicação seguinte nasceria republicando algo que ninguém
+   * pediu. E a primeira versão fazia `setRepostando(null)` no meio do render —
+   * o `tsc` pegou pelo lado errado (a comparação já estava estreitada), mas o
+   * defeito real é outro: mudar estado durante a pintura é anti-padrão do React
+   * e custa um render a mais em toda troca de tela.
+   */
+  useEffect(() => {
+    if (onde.t !== "novo") setRepostando(null);
+  }, [onde.t]);
+
+  /**
+   * REPUBLICAR — abre o compositor já com a original anexada.
+   *
+   * ⚠️ **NÃO PUBLICA DIRETO.** Republicar sem escrever nada é o gesto que enche
+   * o feed de cópias sem contexto; o compositor obriga a passar pela tela, e é
+   * ali que ela decide o texto e a camada da própria publicação. E é o mesmo
+   * caminho de qualquer post, então a régua clínica e a triagem continuam
+   * valendo — um repost sem compositor as pularia.
+   */
+  function republicar(post: PostNaTela) {
+    setRepostando(post);
+    setOnde({ t: "novo" });
+  }
+
   async function abrirConversaCom(alvoId: string) {
     try {
       const t = await token();
@@ -4305,6 +4400,8 @@ export function RedeNoApp({
     marco?: { tipo: string; dias: number | null } | null;
     /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
     video?: { caminho: string; segundos: number | null } | null;
+    /** A publicação republicada. Conferida no servidor. */
+    repostDe?: string | null;
   }): Promise<boolean> {
     try {
       const t = await token();
@@ -4325,6 +4422,7 @@ export function RedeNoApp({
           aula: p.aula,
           marco: p.marco ?? null,
           video: p.video ?? null,
+          repostDe: p.repostDe ?? null,
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
         },
@@ -4943,6 +5041,9 @@ export function RedeNoApp({
   if (onde.t === "novo") {
     return (
       <NovoPost
+        /* ⚠️ A original vai ao compositor, e sai de lá ao fechar: sem limpar,
+           a próxima publicação nasceria republicando algo sem ninguém pedir. */
+        repostando={repostando}
         aoSugerirLegenda={sugerirLegenda}
         amigasParaMarcar={paraMarcar}
         rascunho={rascunho}
@@ -5232,6 +5333,7 @@ export function RedeNoApp({
       <TelaPrincipal
         posts={posts}
         soSeguindo={soSeguindo}
+        aoRepublicar={republicar}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -5907,6 +6009,7 @@ export function TelaDoPost({
   post,
   aoReagir,
   aoSalvar,
+  aoRepublicar,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -5920,6 +6023,8 @@ export function TelaDoPost({
   /* As ações carregam o POST — ver a nota de desempenho em `PostInstagram`. */
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -5953,6 +6058,7 @@ export function TelaDoPost({
         post={post}
         aoReagir={aoReagir}
         aoSalvar={aoSalvar}
+        aoRepublicar={aoRepublicar}
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
@@ -6680,6 +6786,7 @@ const FOTOS_POR_POST = 10;
 export function NovoPost({
   aoFechar,
   aoPublicar,
+  repostando,
   aulaDeHoje,
   filhosDeMentira,
   aoSugerirLegenda,
@@ -6694,6 +6801,8 @@ export function NovoPost({
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
   /** Só a bancada preenche — a tira de marcos precisa de um bebê nascido. */
   filhosDeMentira?: Filho[];
+  /** A publicação sendo republicada, quando o compositor abriu por ela. */
+  repostando?: PostNaTela | null;
   aoPublicar: (p: {
     texto: string | null;
     fotos: string[];
@@ -6706,6 +6815,8 @@ export function NovoPost({
     marco?: { tipo: string; dias: number | null } | null;
     /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
     video?: { caminho: string; segundos: number | null } | null;
+    /** A publicação republicada. Conferida no servidor. */
+    repostDe?: string | null;
     /** Os ids de quem estava junto. O servidor confere cada um. */
     marcadas: string[];
     /** O post antigo que vira a primeira foto, ou `null`. */
@@ -6933,6 +7044,7 @@ export function NovoPost({
          recalcula "3 meses" a cada pintura, em vez de repetir um texto salvo. */
       marco: marco && bebeNascido ? { tipo: marco, dias: diasDoBebe } : null,
       video,
+      repostDe: repostando?.id ?? null,
       marcadas,
       comparacaoCom: entao,
     });
@@ -7395,6 +7507,21 @@ export function NovoPost({
           </p>
         </div>
 
+        {/* ⚠️ A ORIGINAL À VISTA NO COMPOSITOR. Sem ela, a paciente escreve
+            sem lembrar o que está republicando — e o quadro só apareceria
+            depois de publicado, quando não dá mais para mudar de ideia. */}
+        {repostando && (
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Republicando
+            </p>
+            <p className="mt-0.5 text-[12px] font-semibold">{repostando.autorNome}</p>
+            {repostando.texto && (
+              <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
+            )}
+          </div>
+        )}
+
         {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
             deixar escolher ambos faria a paciente montar um post que a tela não
             sabe pintar. O botão some quando já há foto, e vice-versa. */}
@@ -7479,6 +7606,21 @@ export function NovoPost({
             }
           }}
         />
+
+        {/* ⚠️ A ORIGINAL À VISTA NO COMPOSITOR. Sem ela, a paciente escreve
+            sem lembrar o que está republicando — e o quadro só apareceria
+            depois de publicado, quando não dá mais para mudar de ideia. */}
+        {repostando && (
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Republicando
+            </p>
+            <p className="mt-0.5 text-[12px] font-semibold">{repostando.autorNome}</p>
+            {repostando.texto && (
+              <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
+            )}
+          </div>
+        )}
 
         {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
             deixar escolher ambos faria a paciente montar um post que a tela não

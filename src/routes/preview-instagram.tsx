@@ -251,6 +251,21 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      de rede alheia, e a varredura da CI roda sem ela. Este `.webm` já é
      embarcado (é um dos sons de ambiente) e serve para provar o player. */
   videoUrl: i === 1 ? "/sons/riacho.webm" : null,
+  /* O post 4 é uma republicação — prova o quadro da original no cartão. */
+  /* ⚠️ O ÍNDICE 0, e não o último: o feed da bancada desenha só as primeiras
+     publicações (`POSTS.slice`), então uma fixture no fim NUNCA aparece — foi
+     assim que este quadro passou uma rodada inteira sem ser visto. */
+  ehRepost: i === 0,
+  repost:
+    i === 0
+      ? {
+          id: "orig",
+          autorId: "u9",
+          autorNome: "Juliana",
+          texto: "chegou o enxoval 💛",
+          imagemUrl: null,
+        }
+      : null,
   /* O post 0 nasce EDITADO — é ele que prova o selo "editado" ao lado da hora. */
   editadoEm: i === 0 ? atras(20) : null,
   /* O post 1 nasce GUARDADO: é ele que prova o marcador aceso ao lado do
@@ -479,6 +494,11 @@ function Bancada() {
       /* ⚠️ A bancada GRAVA a edição no estado, e não num alert: o que precisa
          ser olhado é o texto trocando e o selo "editado" nascendo — com um
          alert, a tela nunca mostraria nem um nem outro. */
+      /* ⚠️ **A BANCADA PASSA `republicar`, senão o botão NUNCA aparece.** Ele
+         só nasce quando a prop existe — e uma bancada sem ela mediria uma tela
+         que a produção não tem, que é o defeito que `acoesDaBancada` já
+         documenta para as outras ações. */
+      republicar: (_p: PostNaTela) => alert("abriria o compositor republicando"),
       editar: async (p: PostNaTela, t: string) => {
         setEdicoes((m) => ({ ...m, [p.id]: t }));
         return true;
@@ -1198,6 +1218,7 @@ function Bancada() {
           /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
              tinha denúncia e o canal com mais alcance não tinha. */
           aoDenunciar={acoesDaBancada.denunciar}
+          aoRepublicar={acoesDaBancada.republicar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
           aoEditar={acoesDaBancada.editar}
           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}

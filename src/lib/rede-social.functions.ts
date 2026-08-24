@@ -202,6 +202,23 @@ export type PostNaTela = {
    */
   videoUrl: string | null;
   /**
+   * A publicação republicada, quando este post é um repost.
+   *
+   * ⚠️ **`null` TAMBÉM QUANDO A ORIGINAL SAIU DO AR**, e a tela distingue os
+   * dois: `ehRepost` continua verdadeiro. Mostrar uma cópia do texto faria a
+   * republicação sobreviver à decisão da autora de arquivar — que é justamente
+   * o que ela não pode fazer.
+   */
+  repost: {
+    id: string;
+    autorNome: string;
+    autorId: string;
+    texto: string | null;
+    imagemUrl: string | null;
+  } | null;
+  /** Este post É uma republicação (mesmo que a original tenha saído do ar). */
+  ehRepost: boolean;
+  /**
    * Guardei este post?
    *
    * ⚠️ Vem do servidor junto com o post, e não de uma segunda consulta que a
@@ -709,7 +726,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path";
+  "marco_tipo, marco_dias, video_path, repost_de";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -751,6 +768,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     marco_tipo: null,
     marco_dias: null,
     video_path: null,
+    repost_de: null,
   }));
 }
 
@@ -1260,6 +1278,47 @@ async function montarPosts(
       ) as string[],
   );
   const assinadas = await urlsAssinadas("rede", todosOsCaminhos, 3600);
+
+  /**
+   * AS PUBLICAÇÕES REPUBLICADAS, numa consulta só.
+   *
+   * ⚠️ **SÓ AS PÚBLICAS SÃO MONTADAS.** A conferência de visibilidade acontece
+   * na PUBLICAÇÃO (só público pode ser republicado), mas ela é refeita aqui: se
+   * a autora fechou o perfil depois, a republicação para de mostrar o conteúdo.
+   * Confiar só na trava da escrita deixaria a cópia viva depois de a decisão
+   * dela mudar.
+   */
+  const idsRepost = [...new Set(visiveis.map((p) => p.repost_de).filter(Boolean))] as string[];
+  const originais = new Map<string, any>();
+  if (idsRepost.length > 0) {
+    const { data: orig } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, texto, imagem_path, visibilidade, arquivado_em")
+      .in("id", idsRepost);
+    const autoresOrig = await perfisPorId(
+      sb,
+      [...new Set(((orig ?? []) as any[]).map((o) => o.autor_id))],
+      ctx?.perfis,
+    );
+    const urlsOrig = await urlsAssinadas(
+      "rede",
+      ((orig ?? []) as any[]).map((o) => o.imagem_path).filter(Boolean) as string[],
+      3600,
+    );
+    for (const o of (orig ?? []) as any[]) {
+      const a = autoresOrig.get(o.autor_id);
+      /* ⚠️ Arquivada, não pública, ou autora em Modo Cuidado → não monta. A tela
+         mostra "publicação não disponível", nunca a cópia. */
+      if (o.arquivado_em || o.visibilidade !== "publico" || a?.care_mode) continue;
+      originais.set(o.id, {
+        id: o.id,
+        autorId: o.autor_id,
+        autorNome: ((a?.display_name ?? "") as string).trim() || "Alguém",
+        texto: o.texto ?? null,
+        imagemUrl: o.imagem_path ? (urlsOrig.get(o.imagem_path) ?? null) : null,
+      });
+    }
+  }
   return Promise.all(
     visiveis.map(async (p) => {
       const a = autores.get(p.autor_id);
@@ -1312,6 +1371,8 @@ async function montarPosts(
         marco: p.marco_tipo ? { tipo: String(p.marco_tipo), dias: p.marco_dias ?? null } : null,
         /* Assinado na MESMA onda das fotos — ver `todosOsCaminhos`. */
         videoUrl: p.video_path ? (assinadas.get(p.video_path) ?? null) : null,
+        ehRepost: !!p.repost_de,
+        repost: p.repost_de ? (originais.get(p.repost_de) ?? null) : null,
         pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
       };
     }),
@@ -2060,6 +2121,8 @@ export const publicarPost = createServerFn({ method: "POST" })
           })
           .nullable()
           .optional(),
+        /** A publicação que está sendo republicada. Conferida no handler. */
+        repostDe: z.string().uuid().nullable().optional(),
         /**
          * Quem estava junto.
          *
@@ -2200,6 +2263,32 @@ export const publicarPost = createServerFn({ method: "POST" })
       miniatura = null;
     }
 
+    /**
+     * ⚠️ **SÓ PUBLICAÇÃO PÚBLICA PODE SER REPUBLICADA — e esta é a regra
+     * inteira do recurso.**
+     *
+     * A aba tem camadas: um post pode ser só para quem a segue, ou só para as
+     * amigas. Republicar uma dessas ampliaria a audiência escolhida pela
+     * autora, e ela nunca saberia — é a porta dos fundos da visibilidade.
+     *
+     * ⚠️ E a conferência é do SERVIDOR: o `repostDe` vem do corpo do pedido, e
+     * a tela só oferece o botão onde ele cabe. Confiar na tela seria confiar em
+     * quem manda o pedido.
+     */
+    let repostValido = false;
+    if (data.repostDe) {
+      const { data: orig } = await sb
+        .from("rede_posts")
+        .select("id, visibilidade, arquivado_em, autor_id")
+        .eq("id", data.repostDe)
+        .maybeSingle();
+      /* ⚠️ E não deixa republicar a PRÓPRIA publicação: seria uma cópia de si
+         mesma no feed, com o quadro apontando para o post de cima. */
+      repostValido =
+        !!orig && !orig.arquivado_em && orig.visibilidade === "publico" && orig.autor_id !== eu;
+      if (!repostValido) return { ok: false as const, motivo: "repost_invalido" as const };
+    }
+
     const { data: post, error } = await sb
       .from("rede_posts")
       .insert({
@@ -2226,6 +2315,7 @@ export const publicarPost = createServerFn({ method: "POST" })
         ...(data.video && caminhoEhDoDono(data.video.caminho, eu)
           ? { video_path: data.video.caminho, video_segundos: data.video.segundos }
           : {}),
+        ...(repostValido ? { repost_de: data.repostDe } : {}),
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a
            foto antiga na frente do carrossel, e então DESCARTADO: a coluna

@@ -56,3 +56,26 @@ SELECT
   (SELECT EXISTS (SELECT 1 FROM information_schema.columns
      WHERE table_name='rede_posts' AND column_name='video_segundos')) AS dur_ok,
   (SELECT EXISTS (SELECT 1 FROM storage.buckets WHERE id='rede'))     AS balde_ok;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- REPUBLICAR (repost)
+--
+-- ⚠️ **SÓ PUBLICAÇÃO PÚBLICA PODE SER REPUBLICADA, e essa é a regra inteira.**
+-- A aba tem camadas: um post pode ser para "quem me segue" ou só para as
+-- amigas. Republicar uma dessas ampliaria a audiência escolhida pela autora —
+-- e ela nunca saberia. É a porta dos fundos da visibilidade, e a única forma de
+-- fechá-la é não deixar sair do público.
+--
+-- ⚠️ `ON DELETE SET NULL`: arquivar a original não pode derrubar a republicação
+-- de quem republicou. O que a tela mostra então é "publicação não disponível",
+-- nunca uma cópia velha do texto — cópia sobreviveria à decisão da autora de
+-- tirar do ar.
+-- ─────────────────────────────────────────────────────────────────────────────
+ALTER TABLE public.rede_posts
+  ADD COLUMN IF NOT EXISTS repost_de uuid REFERENCES public.rede_posts(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS rede_posts_repost ON public.rede_posts(repost_de)
+  WHERE repost_de IS NOT NULL;
+
+SELECT (SELECT EXISTS (SELECT 1 FROM information_schema.columns
+  WHERE table_name='rede_posts' AND column_name='repost_de')) AS repost_ok;
