@@ -7839,3 +7839,28 @@ Sem ele nada quebra — todo caminho novo tem degrau de recuo, inclusive
 **Bancadas:** `/preview-instagram?tela=conversa` (✓✓, foto, anexo, ⋯) ·
 `?tela=conversas` (a fileira da mesma fase) · `?tela=conversas&sugeridas=0` ·
 `?tela=mandar` · `?tela=mandar&vazio=1`.
+
+### ⚠️ O `tsc` LOCAL NÃO É O `tsc` DA CI
+
+O portão local passou verde e a CI reprovou:
+`TS2339: Property 'toMatchObject' does not exist on type 'Matchers'`.
+
+`toMatchObject` **não é tipado no `bun:test`** — e isso já estava escrito em
+`lacunas-parecidas.test.ts`, com a razão ao lado. Eu o reintroduzi num arquivo
+novo, e o `tsc` daqui não reclamou porque resolve o mesmo nome de tipo
+(`Matchers`) a partir de **`playwright/types/test.d.ts`**, que vive no
+`node_modules` de desenvolvimento e não existe do mesmo jeito na instalação
+limpa da CI.
+
+É o pior caso possível de portão: **verde onde eu olho, vermelho onde importa.**
+Da mesma família do `node_modules` remendado que quebrou o `vite` nesta sessão
+(`Yallist is not a constructor`).
+
+**`src/lib/matchers-do-bun.test.ts`** é a catraca: varre todo `*.test.ts(x)` do
+`src/`, tira os comentários antes de procurar (os dois arquivos CITAM o nome
+proibido para explicar a regra) e falha em segundos no `bun test`, que é o
+portão que eu de fato rodo. Conferida por mutação.
+
+⚠️ **Se o `bun:test` um dia tipar um destes, TIRE-O da lista** — nunca relaxe a
+asserção. Catraca que proíbe o que já é permitido é catraca que a próxima pessoa
+aprende a contornar.

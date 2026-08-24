@@ -44,7 +44,13 @@ describe("juntarMensagens", () => {
     const depois = [m("x", 5, { texto: null, apagada: true })];
     const r = juntarMensagens(antes, depois);
     expect(r).toHaveLength(1);
-    expect(r[0]).toMatchObject({ apagada: true, texto: null });
+    /* ⚠️ **`toMatchObject` NÃO É TIPADO no `bun:test`, e o `tsc` da CI reprova.**
+       Já estava escrito em `lacunas-parecidas.test.ts` e eu reintroduzi — o
+       `tsc` local passou porque este contêiner tem um `node_modules` remendado,
+       e a CI instala limpo. Comparar campo a campo é equivalente e não prende o
+       teste ao formato inteiro do objeto. */
+    expect(r[0]?.apagada).toBe(true);
+    expect(r[0]?.texto).toBeNull();
   });
 
   test("⚠️ e o ✓✓ que chega depois também vence", () => {
