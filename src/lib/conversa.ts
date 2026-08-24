@@ -104,6 +104,56 @@ export function minhaColunaDeLeitura(euId: string, aId: string): "lida_a" | "lid
 }
 
 /**
+ * A MESMA PERGUNTA, para as colunas que nasceram depois (silenciar e sair).
+ *
+ * ⚠️ **É UM SÓ LUGAR de propósito.** São três pares de colunas com o mesmo
+ * sufixo `_a`/`_b`, e escrever `euId === aId ? "silenciada_a" : "silenciada_b"`
+ * à mão em cada ponto de uso é a receita para um deles sair invertido — e um
+ * invertido silencia a conversa da OUTRA pessoa, que é o pior desfecho: ela
+ * para de receber aviso sem ter pedido, e não há nada na tela dela que explique.
+ */
+export function minhaColuna<P extends string>(
+  prefixo: P,
+  euId: string,
+  aId: string,
+): `${P}_a` | `${P}_b` {
+  return euId === aId ? `${prefixo}_a` : `${prefixo}_b`;
+}
+
+/** E a coluna DA OUTRA — para saber se ela leu, ou se ela saiu. */
+export function colunaDoOutro<P extends string>(
+  prefixo: P,
+  euId: string,
+  aId: string,
+): `${P}_a` | `${P}_b` {
+  return euId === aId ? `${prefixo}_b` : `${prefixo}_a`;
+}
+
+/**
+ * ELA JÁ LEU A MINHA MENSAGEM? — o ✓✓.
+ *
+ * ⚠️ **AS DUAS COLUNAS SEMPRE EXISTIRAM E NINGUÉM AS LIA para isto.**
+ * `lida_a`/`lida_b` alimentavam só o emblema de não lidas; do lado de quem
+ * MANDOU não havia nada. Numa conversa entre duas gestantes isso não é vaidade
+ * de interface: quem escreve "acho que estou sentindo contração" e não sabe se
+ * a outra viu fica olhando uma tela que não responde.
+ *
+ * ⚠️ **Só vale para mensagem MINHA.** Perguntar "a outra leu a mensagem dela?"
+ * não quer dizer nada, e desenhar ✓✓ do lado dela seria o app afirmando que EU
+ * li — informação que quem está do outro lado não tem como conferir.
+ */
+export function foiLidaPeloOutro(v: {
+  souEu: boolean;
+  criadaEm: string;
+  /** O carimbo de leitura DA OUTRA pessoa. */
+  leituraDoOutro: string | null;
+}): boolean {
+  if (!v.souEu) return false;
+  if (!v.leituraDoOutro) return false;
+  return new Date(v.leituraDoOutro).getTime() >= new Date(v.criadaEm).getTime();
+}
+
+/**
  * Tem mensagem não lida?
  *
  * ⚠️ **A MINHA PRÓPRIA MENSAGEM NUNCA CONTA COMO NÃO LIDA.** Sem esta regra, o
@@ -143,9 +193,65 @@ export const MENSAGENS_POR_DIA = 200;
  * perde a última linha e volta a mostrar a anterior faz a paciente achar que a
  * mensagem que ela viu chegar não existiu.
  */
-export function previaDaMensagem(texto: string | null, apagada: boolean, limite = 60): string {
+export function previaDaMensagem(
+  texto: string | null,
+  apagada: boolean,
+  limite = 60,
+  /**
+   * O que a mensagem carrega além do texto.
+   *
+   * ⚠️ **SEM ISTO, UMA MENSAGEM QUE É SÓ FOTO APARECIA COMO LINHA EM BRANCO** na
+   * lista de conversas — a paciente veria o nome da amiga, a hora, e nada. E ela
+   * não teria como saber se aquilo é um defeito ou uma mensagem vazia de
+   * verdade.
+   */
+  carrega?: { imagem?: boolean; ref?: "post" | "story" | null },
+): string {
   if (apagada) return "Mensagem apagada";
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
-  if (!t) return "";
+  if (!t) {
+    if (carrega?.imagem) return "📷 Foto";
+    if (carrega?.ref === "post") return "Publicação";
+    if (carrega?.ref === "story") return "Respondeu ao seu story";
+    return "";
+  }
   return t.length <= limite ? t : `${t.slice(0, limite - 1)}…`;
+}
+
+/**
+ * Quantas mensagens vêm por vez, e quantas a tela pede ao rolar para cima.
+ *
+ * ⚠️ **A CONVERSA NÃO PAGINAVA: eram 50 e acabou.** Uma dupla que se escreve
+ * todo dia passa disso na primeira semana, e o começo da conversa — que é
+ * justamente o que se procura quando se rola para cima — ficava inalcançável
+ * para sempre, sem nada na tela dizendo que havia mais.
+ */
+export const MENSAGENS_POR_PAGINA = 50;
+
+/**
+ * O TETO DA FOTO DA CONVERSA.
+ *
+ * ⚠️ **Menor que o do post (1080), e maior que o do avatar (512).** A foto de um
+ * direct é olhada uma vez, no celular, dentro de um balão — e cada uma que sobe
+ * fica no balde para sempre, pago por conta do app. 1080 aqui seria guardar
+ * qualidade de publicação para um conteúdo que ninguém vai reabrir.
+ */
+export const LADO_DA_FOTO = 900;
+
+/** Teto do arquivo, conferido NO SERVIDOR. Relógio e tela de cliente mentem. */
+export const BYTES_DA_FOTO = 8 * 1024 * 1024;
+
+/**
+ * O caminho da foto é de quem mandou?
+ *
+ * ⚠️ **A MESMA TRAVA DE `caminhoEhDoDono` DO VÍDEO, e ela existe porque o
+ * cliente escolhe o caminho ao subir pela URL assinada.** Sem conferir, uma
+ * paciente monta um caminho apontando para a pasta de outra e a mensagem dela
+ * passa a exibir — dentro de uma conversa privada — um arquivo que não é dela.
+ * A barra final é obrigatória: sem ela, `<uuid-de-alguem>` casaria
+ * `<uuid-de-alguem-outro>` por prefixo.
+ */
+export function fotoEhDeQuemMandou(caminho: string, autorId: string): boolean {
+  if (!caminho || caminho.includes("..") || caminho.includes("//")) return false;
+  return caminho.startsWith(`${autorId}/`);
 }

@@ -7699,3 +7699,143 @@ e confira em que porta ele subiu, que é a armadilha já registrada aqui.
 **Bancadas:** `/preview-rede` (o cartão "Seu @", as três opções de quem marca) ·
 `/preview-instagram` (a legenda com `@` e `#` clicáveis) ·
 `/preview-instagram?tela=tag&tag=trigemeas`.
+
+## O direct ficou 100%, e ganhou o que o WhatsApp não tem (ago/2026)
+
+Pedido do dono: _"como hoje está nossa interação de texto entre seguidores,
+estilo nosso direct, temos que deixar isso 100%"_ e _"pensar em diferenciais de
+por que eles conversariam aqui e não no Instagram ou no WhatsApp"_.
+
+A auditoria achou **sete buracos**. O direct funcionava — abria, mandava,
+apagava, avisava por push — e ainda assim não era um direct.
+
+### ⚠️ 1. A CONVERSA NÃO SE ATUALIZAVA SOZINHA
+
+`carregar()` rodava UMA vez, na montagem. Se a outra respondesse com a tela
+aberta — que é o caso normal de uma conversa —, **nada aparecia**. A paciente
+ficava olhando a própria mensagem sem saber se a amiga tinha lido, sumido ou se
+o app tinha quebrado. Uma caixa de entrada que só mostra o passado não é
+conversa.
+
+⚠️ **É SONDAGEM, e não `realtime`, e a escolha é deliberada.** O canal ao vivo
+do Supabase abre um WebSocket por conversa, exige **RLS de leitura em
+`rede_mensagens`** — que essa tabela NÃO TEM de propósito, porque ali o texto é
+o segredo inteiro — e morre em segundo plano no iOS sem avisar, deixando a tela
+parada com cara de funcionando.
+
+⚠️ **E ela PARA quando o app sai da frente** (`visibilitychange`). Sem isso, um
+celular no bolso com a conversa aberta consultaria o servidor a noite inteira.
+Ao voltar, busca IMEDIATAMENTE e só então retoma o ritmo — senão ela abre o app
+e espera seis segundos olhando o estado velho.
+
+⚠️ **`juntarMensagens` é o que impede a sondagem de ENCOLHER a conversa.** Ela
+devolve só as últimas 50; sobrescrever apagaria as antigas que a paciente
+carregou ao subir, e o trecho que ela estava lendo sumiria debaixo dela. A
+versão NOVA de cada id vence — uma mensagem apagada pela outra volta como
+`apagada: true`, e manter a antiga deixaria na tela o texto que ela apagou.
+
+### ⚠️ 2. A RÉGUA CLÍNICA NÃO RODAVA NA MENSAGEM
+
+O comentário passa por `triarTexto`. A caixinha passa. A mensagem direta — o
+canal **mais íntimo** e o mais provável de carregar "no seu lugar eu esperava" —
+não passava por nada. É exatamente o cenário dos 5,5% de respostas
+potencialmente danosas.
+
+⚠️ **E o desfecho aqui é DIFERENTE do do comentário.** Lá a régua RECUSA. Aqui
+só a **emergência** é recusada: conversa privada entre duas adultas que se
+escolheram não é um comentário público, e bloquear "toma chá de camomila" ali
+seria o app censurando as duas. O que ele faz é mandar e **avisar quem
+escreveu**. A recusa da emergência dá o caminho ("use o botão de emergência"),
+nunca só o "não".
+
+⚠️ **Falha ao TRIAR não impede a mensagem** — trocar um risco por uma avaria
+certa seria pior.
+
+### 3 a 7 — o resto do que faltava
+
+- **✓✓** — `lida_a`/`lida_b` sempre existiram e alimentavam só o emblema; do
+  lado de quem MANDOU não havia nada. ⚠️ Nunca na mensagem DELA: seria o app
+  afirmando que EU li. ⚠️ E o mesmo instante conta como lida — com `>` estrito, a
+  última mensagem de toda conversa ficaria eternamente sem ✓✓.
+- **Foto** — balde `conversas` PRÓPRIO e privado (nunca o `rede`, cuja régua é
+  `podeVerPost`), URL assinada de uma hora, e `fotoEhDeQuemMandou` conferindo a
+  pasta. ⚠️ **NÃO corta em quadrado** como o avatar: a foto mais provável é uma
+  ULTRASSOM em pé, e o recorte central comeria o bebê inteiro.
+- **Paginação** — eram 50 e acabou; uma dupla que se escreve todo dia passa
+  disso na primeira semana. ⚠️ Pede UMA a mais para saber se há mais, em vez de
+  um `count: exact` que varre a tabela a cada abertura. ⚠️ E carregar o antigo
+  **não rola para o fim**: a dependência era `mensagens.length`, que sobe nos
+  dois casos e jogava a paciente fora do trecho que ela subiu para ler.
+- **Silenciar** — ⚠️ e ele **desliga o push de verdade**: sem ler
+  `colunaDoOutro("silenciada")` no envio, seria um interruptor decorativo, que é
+  pior que não ter o botão. ⚠️ A coluna sai de `minhaColuna`/`colunaDoOutro`,
+  nunca de um `? :` à mão — invertida, eu silencio o celular DELA.
+- **Sair** — ESCONDE, nunca apaga: apagar as mensagens apagaria as dela junto. E
+  a conversa **volta se a outra escrever** — quem quer que ela não escreva mais
+  tem o bloqueio, que a folha oferece com o nome certo.
+
+### Os três diferenciais, escolhidos pelo dono
+
+**1. "Estão na mesma fase que você"** (`conversa-sugerida.ts`) — é a única coisa
+que este app sabe e que o WhatsApp e o Instagram não têm como saber.
+
+⚠️ **A FASE, NUNCA A SEMANA**, e por duas razões: semana é dado clínico
+governado por `mostrar_semana`, e emparelhar por semana exata cria uma coorte de
+poucas pessoas onde **a ausência vira informação** — quem some da semana 31
+sumiu por um motivo adivinhável.
+
+⚠️ **Engajamento não é sinal — nenhum.** A mesma proibição de `sugestoes.ts`:
+numa base de alto risco, o post que mais engaja é o da EMERGÊNCIA.
+
+⚠️ **`doctor_id` nunca vira grafo social** — seria usar o prontuário para
+sugerir amizade.
+
+⚠️ **Mínimo de DUAS candidatas.** Com uma, a fileira deixa de ser sobre a fase e
+vira identificação.
+
+⚠️ **A assinatura de `bloqueadas` é `{ has }`, e não `ReadonlySet`** — o
+`ConjuntoDeBloqueio` do app FALHA FECHADO, e exigir um `Set` obrigaria uma
+conversão que perde exatamente essa propriedade.
+
+**2. A conversa que nasce do app** — responder ao story (a origem nº 1 de DM no
+modelo, e ela não existia: o direct só nascia pelo botão do PERFIL, ou seja, ela
+precisava decidir escrever ANTES de ter assunto) e mandar uma publicação.
+
+⚠️ **A folha de mandar só oferece conversas que JÁ EXISTEM.** Uma busca ali
+abriria um segundo caminho para escrever a desconhecidas, contornando a trava de
+pedido pela porta mais inocente do app.
+
+⚠️ **E o anexo NÃO amplia a visibilidade**: quem abrir passa por `postQueEuVejo`
+como em qualquer lugar. ⚠️ O anexo é um CARTÃO, não o conteúdo — um story vive
+24 h, e desenhá-lo deixaria um buraco na conversa no dia seguinte. Só o POST
+abre; o story não, porque o id deixa de resolver.
+
+**3. Foto na conversa** — ver acima.
+
+### ⚠️ Dois testes MEUS travavam implementação, e os dois reprovavam código melhor
+
+- `expect(trecho).toContain("if (aceitaAgora)")` ficou vermelho no dia em que a
+  guarda virou `if (aceitaAgora && !outroSilenciou)` — **estritamente mais
+  forte**. Hoje ele cobra o portão por regex.
+- `expect(juntarMensagens([], novas)).toBe(novas)` cobrava a IDENTIDADE do array
+  e reprovava a versão sem o atalho, que é comportamentalmente idêntica.
+
+Um teste que reprova código igualmente correto é um teste que ensina a
+relaxá-lo — e é assim que ele começa a mentir.
+
+⚠️ **E a mutação achou duas travas novas SEM TESTE NENHUM** (a pasta da foto e a
+recusa da emergência), no mesmo commit que as criou. As duas ganharam cobertura,
+com o corpo de `enviarMensagem` recortado e **sem os comentários** — a prosa
+deste arquivo cita o que ele proíbe.
+
+⚠️ **Uma armadilha de substring no meu próprio script**: `minhaColuna` casou
+dentro de `minhaColunaDeLeitura` e o import saiu faltando. Mesma família do
+`bloquear`/`bloquearPeriodo` da catraca de portas.
+
+**Aplicar no Supabase:** `supabase/APLICAR_DIRECT_COMPLETO.sql` (idempotente).
+Sem ele nada quebra — todo caminho novo tem degrau de recuo, inclusive
+`minhaConversa`, que é a porta de TODAS as outras funções.
+
+**Bancadas:** `/preview-instagram?tela=conversa` (✓✓, foto, anexo, ⋯) ·
+`?tela=conversas` (a fileira da mesma fase) · `?tela=conversas&sugeridas=0` ·
+`?tela=mandar` · `?tela=mandar&vazio=1`.

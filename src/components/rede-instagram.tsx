@@ -75,7 +75,7 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
-import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
+import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
 import { Comentarios } from "@/components/rede-comentarios";
 import type { ConversaNaTela } from "@/lib/conversa.functions";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
@@ -607,6 +607,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoRepublicar,
   aoCompartilhar,
   aoAbrirTag,
+  aoMandarParaConversa,
   aoAbrirArroba,
   aoApagar,
   aoDenunciar,
@@ -639,6 +640,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoCompartilhar?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
   /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
   aoAbrirArroba?: (handle: string) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
@@ -1030,6 +1033,23 @@ export const PostInstagram = memo(function PostInstagram({
             ↗
           </button>
         )}
+        {/* ⚠️ **MANDAR PARA UMA AMIGA VALE PARA QUALQUER PUBLICAÇÃO — inclusive
+            a de outra pessoa — e isso NÃO contradiz a régua do ↗ acima.** São
+            duas coisas diferentes: o ↗ tira a FOTO do app e a solta no mundo
+            (irreversível, e por isso só a própria); este manda o ENDEREÇO do
+            post para dentro de uma conversa, onde quem abrir passa por
+            `postQueEuVejo` como em qualquer outro lugar. Se a pessoa não podia
+            ver o post, continua não podendo. */}
+        {aoMandarParaConversa && (
+          <button
+            type="button"
+            onClick={() => aoMandarParaConversa(post)}
+            aria-label="Mandar para uma conversa"
+            className="press leading-none text-[15px]"
+          >
+            ✈
+          </button>
+        )}
         {aoSalvar && (
           <button
             type="button"
@@ -1417,6 +1437,7 @@ export function TelaPrincipal({
   aoRepublicar,
   aoCompartilhar,
   aoAbrirTag,
+  aoMandarParaConversa,
   aoAbrirArroba,
   aoApagar,
   aoDenunciar,
@@ -1483,6 +1504,8 @@ export function TelaPrincipal({
   aoCompartilhar?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
   /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
   aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
@@ -1665,6 +1688,7 @@ export function TelaPrincipal({
             aoRepublicar={aoRepublicar}
             aoCompartilhar={aoCompartilhar}
             aoAbrirTag={aoAbrirTag}
+            aoMandarParaConversa={aoMandarParaConversa}
             aoAbrirArroba={aoAbrirArroba}
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
@@ -1728,6 +1752,7 @@ export function TelaPrincipal({
                   aoRepublicar={aoRepublicar}
                   aoCompartilhar={aoCompartilhar}
                   aoAbrirTag={aoAbrirTag}
+                  aoMandarParaConversa={aoMandarParaConversa}
                   aoAbrirArroba={aoAbrirArroba}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
@@ -2958,6 +2983,18 @@ export function RedeNoApp({
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
   const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
+  /**
+   * A primeira linha, já escrita, quando a conversa nasce de uma sugestão.
+   *
+   * ⚠️ **Mora AQUI e não dentro de `Conversa`.** Aquele componente é montado e
+   * desmontado ao trocar de tela; com o rascunho lá dentro, voltar do perfil da
+   * pessoa e reabrir a conversa reescreveria a frase por cima do que ela já
+   * tivesse digitado. É a mesma lição do passo do tutorial e do `sub` do
+   * `RegistrosHub`.
+   */
+  const [rascunhoDaConversa, setRascunhoDaConversa] = useState<string | null>(null);
+  /** A publicação que ela está mandando para alguém. `null` = folha fechada. */
+  const [mandandoPost, setMandandoPost] = useState<string | null>(null);
   const [conversaAberta, setConversaAberta] = useState<ConversaNaTela | null>(null);
   /** A publicação que ela está republicando, enquanto o compositor está aberto. */
   const [repostando, setRepostando] = useState<PostNaTela | null>(null);
@@ -3189,6 +3226,7 @@ export function RedeNoApp({
     abrirPerfil: (_id: string) => {},
     abrirArroba: (_handle: string) => {},
     abrirTag: (_tag: string) => {},
+    mandarParaConversa: (_p: PostNaTela) => {},
     ver: (_id: string) => {},
   });
   /* ─── O LOTE DE "VISTOS" ─────────────────────────────────────────────────
@@ -3246,6 +3284,7 @@ export function RedeNoApp({
     abrirPerfil: (id) => void abrirPerfil(id),
     abrirArroba: (h) => void abrirPorArroba(h),
     abrirTag: (t) => void abrirTag(t),
+    mandarParaConversa: (p) => setMandandoPost(p.id),
     ver: (id) => marcarPostVisto(id),
   };
   useEffect(() => {
@@ -3284,6 +3323,7 @@ export function RedeNoApp({
          232 ms por reação nesta lista. */
       abrirArroba: (h: string) => ultimas.current.abrirArroba(h),
       abrirTag: (t: string) => ultimas.current.abrirTag(t),
+      mandarParaConversa: (p: PostNaTela) => ultimas.current.mandarParaConversa(p),
       ver: (id: string) => ultimas.current.ver(id),
     }),
     [],
@@ -4179,7 +4219,7 @@ export function RedeNoApp({
     setOnde({ t: "novo" });
   }
 
-  async function abrirConversaCom(alvoId: string) {
+  async function abrirConversaCom(alvoId: string, rascunho?: string) {
     try {
       const t = await token();
       if (!t) return;
@@ -4200,11 +4240,60 @@ export function RedeNoApp({
       const lista = await minhasConversas({ data: { accessToken: t } });
       const c = lista.ok ? lista.conversas.find((x) => x.id === r.id) : null;
       if (!c) return;
+      setRascunhoDaConversa(rascunho ?? null);
       setConversaAberta(c);
       setOnde({ t: "conversa" });
     } catch {
       const { toast } = await import("sonner");
       toast.error("Não deu para abrir a conversa agora.");
+    }
+  }
+
+  /**
+   * RESPONDER AO STORY — vira mensagem direta, com o story anexado.
+   *
+   * ⚠️ **NÃO abre a conversa.** No modelo, responder a um story manda e devolve
+   * a pessoa ao story seguinte: ela está assistindo, não conversando. Abrir a
+   * caixa aqui tiraria a paciente do meio de uma sequência que ela escolheu ver.
+   *
+   * ⚠️ **A recusa é DITA, e nunca em silêncio.** A trava de uma-mensagem-antes-
+   * do-aceite vale aqui também: quem não é seguida de volta manda uma e espera.
+   * Sem o recado, o "Enviado 💛" já pintado na tela viraria mentira.
+   */
+  async function responderAoStory(autorId: string, storyId: string, texto: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/conversa.functions");
+      const abriu = await mod.abrirConversa({ data: { accessToken: t, alvoId: autorId } });
+      const { toast } = await import("sonner");
+      if (!abriu.ok) {
+        toast.error("Não é possível enviar mensagem para esta pessoa.");
+        return;
+      }
+      const r = await mod.enviarMensagem({
+        data: {
+          accessToken: t,
+          conversaId: abriu.id,
+          texto,
+          refTipo: "story",
+          refId: storyId,
+        },
+      });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "aguardando_aceite"
+            ? "Você já mandou uma mensagem. Espere a resposta."
+            : r.motivo === "emergencia"
+              ? "Isso precisa de atendimento. Use o botão de emergência."
+              : "Não deu para enviar agora.",
+        );
+        return;
+      }
+      void contarNaoLidas();
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para enviar agora.");
     }
   }
 
@@ -5172,6 +5261,7 @@ export function RedeNoApp({
       <VisorDeStory
         aoVotarNoStory={votarNoStory}
         aoReagirAoStory={reagirNoStory}
+        aoResponderStory={(a, sid, t) => void responderAoStory(a, sid, t)}
         aoPerguntarNoStory={perguntarNoStory}
         bolha={vendoStory}
         aoFechar={() => setVendoStory(null)}
@@ -5225,8 +5315,16 @@ export function RedeNoApp({
     return (
       <Conversa
         conversa={conversaAberta}
+        rascunho={rascunhoDaConversa}
+        /* ⚠️ Só o POST abre. O story vive 24 h e o id dele deixa de resolver —
+           levar a paciente a uma tela de "não existe mais" é pior que um cartão
+           que só conta o que aconteceu. */
+        aoAbrirRef={(tipo, id) => {
+          if (tipo === "post") abrirPost(id);
+        }}
         aoVoltar={() => {
           setConversaAberta(null);
+          setRascunhoDaConversa(null);
           setOnde({ t: "conversas" });
           /* ⚠️ Recarrega o emblema ao SAIR da conversa, não ao entrar: quem
              acabou de ler não pode voltar para a lista com o ponto ainda
@@ -5246,6 +5344,12 @@ export function RedeNoApp({
           setConversaAberta(c);
           setOnde({ t: "conversa" });
         }}
+        /* ⚠️ **O RASCUNHO CAI NO CAMPO, e o app NUNCA manda sozinho.** Escrever
+           para uma estranha é o degrau que faz a maioria desistir, e oferecer a
+           primeira linha derruba esse degrau; mandar por ela seria pôr o nome
+           dela numa frase que ela não escolheu — a mesma decisão do
+           agradecimento do chá de bebê e da transcrição do diário. */
+        aoFalarCom={(id, rascunho) => void abrirConversaCom(id, rascunho)}
       />
     );
   }
@@ -5504,6 +5608,7 @@ export function RedeNoApp({
         aoAbrirPerfil={acoes.abrirPerfil}
         aoAbrirArroba={acoes.abrirArroba}
         aoAbrirTag={acoes.abrirTag}
+        aoMandarParaConversa={acoes.mandarParaConversa}
         /* ⚠️ Referência estável, como as outras: um fecho por post faria o
            `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
            do app. */
@@ -5542,6 +5647,13 @@ export function RedeNoApp({
           }
         }}
       />
+      {/* ⚠️ **A FOLHA VIVE FORA da `<TelaPrincipal>`, como as irmãs.** Ela é
+          `fixed inset-0`; dentro da lista, um `overflow` de qualquer ancestral
+          a recortaria — e ela apareceria pela metade, sem erro nenhum. */}
+      {mandandoPost && (
+        <MandarPublicacao postId={mandandoPost} aoFechar={() => setMandandoPost(null)} />
+      )}
+
       {/* ⚠️ FORA da `<TelaPrincipal>`: a folha é `fixed` e cobre a tela inteira,
           e dentro da lista ela herdaria o empilhamento do cartão. */}
       {quemReagiu && (
@@ -6236,6 +6348,7 @@ export function TelaDoPost({
   aoRepublicar,
   aoCompartilhar,
   aoAbrirTag,
+  aoMandarParaConversa,
   aoAbrirArroba,
   aoApagar,
   aoDenunciar,
@@ -6256,6 +6369,8 @@ export function TelaDoPost({
   aoCompartilhar?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
   /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
   aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
@@ -6294,6 +6409,7 @@ export function TelaDoPost({
         aoRepublicar={aoRepublicar}
         aoCompartilhar={aoCompartilhar}
         aoAbrirTag={aoAbrirTag}
+        aoMandarParaConversa={aoMandarParaConversa}
         aoAbrirArroba={aoAbrirArroba}
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
@@ -6330,6 +6446,7 @@ export function VisorDeStory({
   aoVotarNoStory,
   aoPerguntarNoStory,
   aoReagirAoStory,
+  aoResponderStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -6345,8 +6462,13 @@ export function VisorDeStory({
   aoPerguntarNoStory?: (donaId: string, texto: string, storyId: string) => Promise<string | null>;
   /** Reagir a este story. `null` tira a reação. */
   aoReagirAoStory?: (storyId: string, tipo: TipoDeReacao | null) => void;
+  /** Manda a resposta como mensagem direta, com o story anexado. */
+  aoResponderStory?: (autorId: string, storyId: string, texto: string) => void;
 }) {
   const [i, setI] = useState(0);
+  const [resposta, setResposta] = useState("");
+  /** Por story: já respondi este? A bolha tem vários. */
+  const [respondido, setRespondido] = useState<Record<string, boolean>>({});
   /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
      rede — a mesma decisão otimista da reação. */
   const [voteiAgora, setVoteiAgora] = useState<Record<string, number>>({});
@@ -6581,14 +6703,58 @@ export function VisorDeStory({
                 );
               })}
             </div>
-            {/* ⚠️ Diz PARA ONDE VAI. No modelo a reação vira mensagem direta;
-                aqui não existe mensagem direta, e sem esta frase ela acha que
-                mandou um recado que ninguém vai ler. */}
+            {/* ⚠️ Diz PARA ONDE VAI. Sem esta frase ela acha que mandou um
+                recado que ninguém vai ler. */}
             <p className="mt-1 text-center text-[11px] text-white/75">
               {(reagiAgora[atual.id] ?? atual.minhaReacao)
                 ? "Ela vai ver na caixa dela 💛"
                 : "Toque para reagir — ela vê o seu nome"}
             </p>
+
+            {/* ─── RESPONDER AO STORY ────────────────────────────────────────
+                ⚠️ **É A ORIGEM Nº 1 DE MENSAGEM DIRETA no modelo, e ela não
+                existia.** O direct só nascia pelo botão do PERFIL — ou seja,
+                ela precisava decidir escrever ANTES de ter assunto. Aqui o
+                assunto está na tela: é a foto que a amiga acabou de publicar.
+
+                ⚠️ **A mensagem carrega o STORY como anexo** (`ref_tipo`), e não
+                o texto "sobre o seu story de hoje": em 24 h o story some, e uma
+                frase solta na conversa perderia o contexto para sempre. */}
+            {aoResponderStory && (
+              <div className="mt-2">
+                {respondido[atual.id] ? (
+                  <p className="rounded-full bg-black/45 px-4 py-2 text-center text-[12px] text-white backdrop-blur-sm">
+                    Enviado 💛
+                  </p>
+                ) : (
+                  <div className="flex items-center gap-1.5 rounded-full bg-black/40 p-1 backdrop-blur-sm">
+                    <input
+                      value={resposta}
+                      onChange={(e) => setResposta(e.target.value.slice(0, 500))}
+                      placeholder="Responder…"
+                      aria-label={`Responder ao story de ${bolha.autorNome}`}
+                      className="min-h-[40px] flex-1 rounded-full bg-transparent px-3 text-[13px] text-white placeholder:text-white/60 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      disabled={!resposta.trim()}
+                      onClick={() => {
+                        const t = resposta.trim();
+                        if (!t) return;
+                        /* ⚠️ Marca ANTES de a rede responder: a paciente precisa
+                           ver que o toque valeu, e o story continua correndo. */
+                        setRespondido((r) => ({ ...r, [atual.id]: true }));
+                        setResposta("");
+                        aoResponderStory(bolha.autorId, atual.id, t);
+                      }}
+                      className="press min-h-[40px] shrink-0 rounded-full bg-white/90 px-3.5 text-[13px] font-semibold text-black disabled:opacity-40"
+                    >
+                      Enviar
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

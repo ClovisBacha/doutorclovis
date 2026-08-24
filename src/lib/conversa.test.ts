@@ -17,6 +17,10 @@ import {
   podeIniciarConversa,
   previaDaMensagem,
   temNaoLida,
+  foiLidaPeloOutro,
+  colunaDoOutro,
+  minhaColuna,
+  fotoEhDeQuemMandou,
 } from "./conversa";
 
 const EU = "aaa";
@@ -190,8 +194,34 @@ describe("⚠️ quem avisa, e quem NÃO avisa", () => {
     /* O ponto delicado: uma desconhecida poderia acordar a paciente às três da
        manhã com uma mensagem que ela nunca pediu. Sem esta distinção, a trava
        de uma-mensagem viraria uma trava de um-push, que não é a mesma coisa. */
-    const trecho = FONTE_MSG.slice(FONTE_MSG.indexOf("sendPushToUser") - 900);
-    expect(trecho).toContain("if (aceitaAgora)");
+    /* ⚠️ **COBRA O PORTÃO, e não o texto exato do `if`.** A primeira versão
+       exigia a string `if (aceitaAgora)` e ficou VERMELHA no dia em que a
+       condição virou `if (aceitaAgora && !outroSilenciou)` — uma guarda
+       estritamente mais forte. Um teste que reprova código melhor é um teste
+       que ensina a relaxá-lo, e é assim que ele começa a mentir. */
+    const i = FONTE_MSG.indexOf("await sendPushToUser(");
+    const antes = FONTE_MSG.slice(Math.max(0, i - 900), i);
+    const guarda = /if \(\s*aceitaAgora\b[^)]*\)\s*\{/.exec(antes);
+    expect({ temGuarda: !!guarda }).toEqual({ temGuarda: true });
+  });
+
+  test("⚠️ e conversa SILENCIADA não manda push", () => {
+    /* Sem isto, "silenciar" seria um interruptor decorativo: a conversa ficaria
+       marcada como silenciada na tela dela e o celular continuaria tocando —
+       pior que não ter o botão, porque ela para de procurar outra saída achando
+       que resolveu. */
+    const i = FONTE_MSG.indexOf("await sendPushToUser(");
+    const antes = FONTE_MSG.slice(Math.max(0, i - 900), i);
+    expect(antes).toContain("!outroSilenciou");
+  });
+
+  test("⚠️ e o silêncio lido é o DA OUTRA, nunca o meu", () => {
+    /* Com `minhaColuna` aqui, eu silenciaria o celular dela ao silenciar o meu
+       — o mesmo par de colunas invertido que `minhaColuna`/`colunaDoOutro`
+       existem para não deixar acontecer. */
+    expect(FONTE_MSG).toContain('colunaDoOutro("silenciada"');
+    const i = FONTE_MSG.indexOf("const outroSilenciou");
+    expect(FONTE_MSG.slice(i, i + 120)).not.toContain('minhaColuna("silenciada"');
   });
 
   test("⚠️ o TEXTO da mensagem não vai na notificação", () => {
@@ -228,5 +258,180 @@ describe("⚠️ quem avisa, e quem NÃO avisa", () => {
     /* As duas armadilhas daquele helper (o `insert` em vez de `upsert`, e o
        `23505` que é sucesso repetido) já custaram a caixa ♡ inteira uma vez. */
     expect(FONTE_COM).not.toContain('from("rede_atividade")');
+  });
+});
+
+describe("o ✓✓ — ela já leu?", () => {
+  test("lida quando o carimbo do outro é posterior ao envio", () => {
+    expect(
+      foiLidaPeloOutro({
+        souEu: true,
+        criadaEm: "2026-08-24T10:00:00Z",
+        leituraDoOutro: "2026-08-24T10:05:00Z",
+      }),
+    ).toBe(true);
+  });
+
+  test("não lida quando o carimbo é anterior", () => {
+    expect(
+      foiLidaPeloOutro({
+        souEu: true,
+        criadaEm: "2026-08-24T10:00:00Z",
+        leituraDoOutro: "2026-08-24T09:00:00Z",
+      }),
+    ).toBe(false);
+  });
+
+  test("o mesmo instante conta como lida", () => {
+    /* `marcarConversaLida` carimba `now()` e a mensagem pode ter o mesmo
+       instante ao milissegundo. Com `>` estrito, a última mensagem de cada
+       conversa ficaria eternamente sem ✓✓. */
+    expect(
+      foiLidaPeloOutro({
+        souEu: true,
+        criadaEm: "2026-08-24T10:00:00Z",
+        leituraDoOutro: "2026-08-24T10:00:00Z",
+      }),
+    ).toBe(true);
+  });
+
+  test("⚠️ NUNCA desenha ✓✓ na mensagem DELA", () => {
+    /* Seria o app afirmando que EU li — informação que quem está do outro lado
+       não tem como conferir, e que ela não pediu para publicar. */
+    expect(
+      foiLidaPeloOutro({
+        souEu: false,
+        criadaEm: "2026-08-24T10:00:00Z",
+        leituraDoOutro: "2026-08-24T23:00:00Z",
+      }),
+    ).toBe(false);
+  });
+
+  test("sem carimbo nenhum, não lida", () => {
+    expect(
+      foiLidaPeloOutro({ souEu: true, criadaEm: "2026-08-24T10:00:00Z", leituraDoOutro: null }),
+    ).toBe(false);
+  });
+});
+
+describe("as colunas com sufixo _a/_b", () => {
+  test("a minha e a da outra são opostas, sempre", () => {
+    const eu = "aaa";
+    const outra = "bbb";
+    for (const [euId, aId] of [
+      [eu, eu],
+      [eu, outra],
+    ] as const) {
+      expect(minhaColuna("silenciada", euId, aId)).not.toBe(colunaDoOutro("silenciada", euId, aId));
+    }
+  });
+
+  test("⚠️ concorda com `minhaColunaDeLeitura`, que já existia", () => {
+    /* Duas funções respondendo à mesma pergunta é como uma delas sai invertida
+       — e uma invertida silencia a conversa da OUTRA pessoa. */
+    expect(minhaColuna("lida", "x", "x")).toBe(minhaColunaDeLeitura("x", "x"));
+    expect(minhaColuna("lida", "x", "y")).toBe(minhaColunaDeLeitura("x", "y"));
+  });
+});
+
+describe("a prévia de uma mensagem sem texto", () => {
+  test("⚠️ foto vira 📷 Foto, nunca linha em branco", () => {
+    /* Sem isto, a paciente vê o nome da amiga, a hora e NADA — e não tem como
+       saber se é defeito ou mensagem vazia. */
+    expect(previaDaMensagem("", false, 60, { imagem: true })).toBe("📷 Foto");
+  });
+
+  test("publicação e story anexados também se anunciam", () => {
+    expect(previaDaMensagem(null, false, 60, { ref: "post" })).toBe("Publicação");
+    expect(previaDaMensagem(null, false, 60, { ref: "story" })).toBe("Respondeu ao seu story");
+  });
+
+  test("com texto, o texto vence o anexo", () => {
+    expect(previaDaMensagem("olha isso", false, 60, { imagem: true })).toBe("olha isso");
+  });
+
+  test("apagada vence tudo", () => {
+    expect(previaDaMensagem("olha", true, 60, { imagem: true })).toBe("Mensagem apagada");
+  });
+});
+
+describe("o caminho da foto", () => {
+  test("aceita a pasta de quem mandou", () => {
+    expect(fotoEhDeQuemMandou("abc/1.jpg", "abc")).toBe(true);
+  });
+
+  test("⚠️ recusa a pasta de outra pessoa", () => {
+    /* O cliente escolhe o caminho ao subir pela URL assinada: sem esta trava,
+       a mensagem exibiria dentro de uma conversa privada um arquivo alheio. */
+    expect(fotoEhDeQuemMandou("outra/1.jpg", "abc")).toBe(false);
+  });
+
+  test("⚠️ a barra final é obrigatória", () => {
+    /* Sem ela, `abc` casaria `abcdef` por prefixo. */
+    expect(fotoEhDeQuemMandou("abcdef/1.jpg", "abc")).toBe(false);
+    expect(fotoEhDeQuemMandou("abc", "abc")).toBe(false);
+  });
+
+  test("recusa travessia e barra dupla", () => {
+    expect(fotoEhDeQuemMandou("abc/../outra/1.jpg", "abc")).toBe(false);
+    expect(fotoEhDeQuemMandou("abc//1.jpg", "abc")).toBe(false);
+  });
+});
+
+describe("⚠️ as travas do envio que a mutação pegou sem teste", () => {
+  /**
+   * ⚠️ **Recorta o CORPO de `enviarMensagem` e tira os comentários ANTES de
+   * procurar.** Sem o recorte, uma trava escrita em qualquer outra função do
+   * arquivo satisfaria a asserção; sem tirar a prosa, o próprio comentário que
+   * descreve a trava a faria passar — as duas armadilhas já custaram uma volta
+   * neste repo, em arquivos diferentes.
+   */
+  const corpoDoEnvio = (() => {
+    const fonte = readFileSync("src/lib/conversa.functions.ts", "utf8");
+    const i = fonte.indexOf("export const enviarMensagem");
+    const resto = fonte.slice(i + 10);
+    const j = resto.indexOf("\nexport const");
+    return (j === -1 ? resto : resto.slice(0, j))
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+  })();
+
+  test("⚠️ a foto é conferida contra a pasta de quem manda", () => {
+    /* O caminho vem do CLIENTE (ele sobe pela URL assinada). Sem esta
+       conferência, uma paciente aponta para a pasta de outra e a mensagem passa
+       a exibir, dentro de uma conversa privada, um arquivo que não é dela. */
+    expect(corpoDoEnvio).toContain("fotoEhDeQuemMandou(data.imagemPath, eu)");
+    expect(corpoDoEnvio).toContain('motivo: "foto_invalida"');
+  });
+
+  test("⚠️ a régua clínica roda no texto da mensagem", () => {
+    /* O comentário passa por `triarTexto`, a caixinha passa, e a mensagem
+       direta — o canal mais íntimo e o mais provável de carregar "no seu lugar
+       eu esperava" — não passava por nada. */
+    expect(corpoDoEnvio).toContain("triarTexto(texto)");
+  });
+
+  test("⚠️ EMERGÊNCIA é recusada, e o resto só avisa", () => {
+    /* A recusa aqui é estreita de propósito: bloquear "toma chá de camomila"
+       numa conversa privada entre duas adultas que se escolheram seria o app
+       censurando as duas. O que ele faz é o que pode fazer sem mentir — manda,
+       e avisa quem escreveu. */
+    expect(corpoDoEnvio).toContain('desfecho === "emergencia"');
+    expect(corpoDoEnvio).toContain('motivo: "emergencia"');
+    expect(corpoDoEnvio).toContain('avisoClinico = "conduta"');
+  });
+
+  test("⚠️ falha ao triar NÃO derruba a mensagem", () => {
+    /* A régua é proteção adicional, não condição de existir da conversa:
+       derrubar o direct inteiro porque um módulo não carregou seria trocar um
+       risco por uma avaria certa. */
+    const i = corpoDoEnvio.indexOf("triarTexto");
+    expect(corpoDoEnvio.slice(i, i + 500)).toContain("catch");
+  });
+
+  test("⚠️ anexo pela metade é recusado", () => {
+    /* `refTipo` sem `refId` (ou o contrário) viraria uma mensagem que anuncia
+       uma publicação e não abre nada. */
+    expect(corpoDoEnvio).toContain("!!data.refTipo !== !!data.refId");
   });
 });

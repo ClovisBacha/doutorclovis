@@ -49,7 +49,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Comentarios } from "@/components/rede-comentarios";
-import { CaixaDeEntrada, Conversa } from "@/components/rede-conversa";
+import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
 import { createFileRoute } from "@tanstack/react-router";
@@ -872,12 +872,52 @@ function Bancada() {
   }
 
   if (tela === "conversas") {
+    /**
+     * ⚠️ **A FILEIRA "MESMA FASE" É IMPOSSÍVEL DE OLHAR SEM ISTO.** Ela exige
+     * DUAS contas reais na mesma fase, com perfil aberto, sem conversa entre si
+     * e sem bloqueio — e a régua ainda esconde a fileira abaixo de duas
+     * candidatas. `?sugeridas=0` mostra a caixa sem ela, que é o estado da
+     * maioria; `?conversa=pedido` abre a caixa de pedidos, onde a fileira NÃO
+     * pode aparecer.
+     */
+    const daFase =
+      semSugestoes || conversa === "pedido"
+        ? []
+        : [
+            {
+              id: "s1",
+              nome: "Marina Costa",
+              avatarUrl: null,
+              fase: "t2" as const,
+              ultimaVez: null,
+            },
+            { id: "s2", nome: "Bruna", avatarUrl: null, fase: "t2" as const, ultimaVez: null },
+            { id: "s3", nome: "Ana Paula", avatarUrl: null, fase: "t2" as const, ultimaVez: null },
+          ];
     return (
       <div className="mx-auto max-w-[430px]">
         <CaixaDeEntrada
           aoVoltar={() => history.back()}
           aoAbrir={() => {}}
+          aoFalarCom={(id, rascunho) => alert(`abriria conversa com ${id}\n\n"${rascunho}"`)}
           bancada={CONVERSAS_DE_MENTIRA}
+          sugeridasDeBancada={daFase}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "mandar") {
+    /* ⚠️ A folha só sabe desenhar com conversas que JÁ existem — e é essa a
+       trava do recurso (nada de busca aqui, ou o botão de compartilhar viraria
+       um segundo caminho para escrever a desconhecidas). `?vazio=1` mostra o
+       estado de quem ainda não tem conversa, que é o que ensina a régua. */
+    return (
+      <div className="mx-auto max-w-[430px]">
+        <MandarPublicacao
+          postId="p1"
+          aoFechar={() => history.back()}
+          bancada={vazio ? [] : CONVERSAS_DE_MENTIRA}
         />
       </div>
     );
@@ -933,6 +973,42 @@ function Bancada() {
                       texto: "vou levar o exame na consulta",
                       criadaEm: "2026-08-24T10:00:00Z",
                       apagada: false,
+                    },
+                    /* ⚠️ **A FOTO, o ✓✓ e o ANEXO precisam estar aqui.** Os três
+                       só existem em conversa de verdade, com upload feito e
+                       carimbo de leitura — sem a bancada, o único jeito de
+                       olhá-los seria duas contas reais trocando mensagem, que é
+                       exatamente como uma tela passa meses sem revisão. */
+                    {
+                      id: "m5",
+                      souEu: true,
+                      texto: "olha o ultrassom de hoje 🥹",
+                      criadaEm: "2026-08-24T10:20:00Z",
+                      apagada: false,
+                      /* ⚠️ Data URL, e nunca um endereço de fora: a bancada roda
+                         na CI, que não tem rede aberta — e uma foto externa já
+                         custou um mismatch de hidratação neste repo. */
+                      imagemUrl: foto("#f7c8d8", "#c9e4f5", "🤍"),
+                      lidaPelaOutra: true,
+                    },
+                    {
+                      id: "m6",
+                      souEu: true,
+                      texto: "essa aqui me lembrou você",
+                      criadaEm: "2026-08-24T10:30:00Z",
+                      apagada: false,
+                      refTipo: "post" as const,
+                      refId: "p1",
+                      lidaPelaOutra: false,
+                    },
+                    {
+                      id: "m7",
+                      souEu: false,
+                      texto: "que linda 💛",
+                      criadaEm: "2026-08-24T10:40:00Z",
+                      apagada: false,
+                      refTipo: "story" as const,
+                      refId: "s1",
                     },
                   ],
           }}
