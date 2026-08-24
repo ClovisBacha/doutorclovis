@@ -606,6 +606,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoSalvar,
   aoRepublicar,
   aoCompartilhar,
+  aoAbrirTag,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -635,6 +637,10 @@ export const PostInstagram = memo(function PostInstagram({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: (post: PostNaTela) => void;
   /**
@@ -1286,7 +1292,7 @@ export const PostInstagram = memo(function PostInstagram({
           <span className="font-semibold">{post.autorNome}</span>
           {post.autorOficial && <SeloOficial />}
           {post.autorPremium && <SeloPremium />}{" "}
-          <span className="whitespace-pre-wrap">{post.texto}</span>
+          <TextoComLinks texto={post.texto} aoAbrirArroba={aoAbrirArroba} aoAbrirTag={aoAbrirTag} />
         </p>
       )}
 
@@ -1410,6 +1416,8 @@ export function TelaPrincipal({
   aoSalvar,
   aoRepublicar,
   aoCompartilhar,
+  aoAbrirTag,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -1473,6 +1481,10 @@ export function TelaPrincipal({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -1652,6 +1664,8 @@ export function TelaPrincipal({
             aoSalvar={aoSalvar}
             aoRepublicar={aoRepublicar}
             aoCompartilhar={aoCompartilhar}
+            aoAbrirTag={aoAbrirTag}
+            aoAbrirArroba={aoAbrirArroba}
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
@@ -1713,6 +1727,8 @@ export function TelaPrincipal({
                   aoSalvar={aoSalvar}
                   aoRepublicar={aoRepublicar}
                   aoCompartilhar={aoCompartilhar}
+                  aoAbrirTag={aoAbrirTag}
+                  aoAbrirArroba={aoAbrirArroba}
                   aoVotar={aoVotar}
                   aoTirarMarcacao={aoTirarMarcacao}
                   aoEditar={aoEditar}
@@ -2583,6 +2599,14 @@ export function TelaDePerfil({
           <p className="mt-2 text-[13px] font-medium leading-snug">{perfil.linhaDosFilhos}</p>
         )}
 
+        {/* ⚠️ **O `@` FICA ABAIXO DO NOME, e é texto — não botão.** Ele é o
+            ENDEREÇO desta pessoa, e quem já está no perfil dela não tem para
+            onde ir tocando nele. Some inteiro sem `@`: quem nunca escolheu não
+            precisa ver um espaço vazio, e a linha nunca vira "sem apelido". */}
+        {perfil.handle && (
+          <p className="mt-0.5 text-[13px] text-muted-foreground">@{perfil.handle}</p>
+        )}
+
         {(perfil.seloSemana || perfil.seloBebe) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {/* ⚠️ `text-primary` sobre `primary/12` media 3,87:1 — abaixo do piso
@@ -2857,6 +2881,7 @@ type Onde =
   | { t: "caixinha" }
   | { t: "conversas" }
   | { t: "conversa" }
+  | { t: "tag"; tag: string }
   | { t: "espelho" };
 
 export function RedeNoApp({
@@ -3162,6 +3187,8 @@ export function RedeNoApp({
     editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
+    abrirArroba: (_handle: string) => {},
+    abrirTag: (_tag: string) => {},
     ver: (_id: string) => {},
   });
   /* ─── O LOTE DE "VISTOS" ─────────────────────────────────────────────────
@@ -3217,6 +3244,8 @@ export function RedeNoApp({
     editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
+    abrirArroba: (h) => void abrirPorArroba(h),
+    abrirTag: (t) => void abrirTag(t),
     ver: (id) => marcarPostVisto(id),
   };
   useEffect(() => {
@@ -3249,6 +3278,12 @@ export function RedeNoApp({
       editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
+      /* ⚠️ **Referência estável, como as irmãs.** Um fecho novo por render
+         faria o `memo` do cartão errar em TODO post do feed — e a legenda com
+         `@` e `#` está em cada um deles. É o mesmo defeito que já custou
+         232 ms por reação nesta lista. */
+      abrirArroba: (h: string) => ultimas.current.abrirArroba(h),
+      abrirTag: (t: string) => ultimas.current.abrirTag(t),
       ver: (id: string) => ultimas.current.ver(id),
     }),
     [],
@@ -4274,6 +4309,37 @@ export function RedeNoApp({
     return null;
   }
 
+  /**
+   * O `@` DE UMA MENÇÃO VIRA UM PERFIL.
+   *
+   * ⚠️ **A resolução é do SERVIDOR, e um `@` que não existe não é erro de
+   * app.** Legenda é texto livre: qualquer pessoa escreve `@` seguido de
+   * qualquer coisa, e transformar isso num alerta vermelho faria a tela gritar
+   * por causa de uma palavra. Um aviso curto e a tela fica onde estava.
+   */
+  async function abrirPorArroba(handle: string) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { perfilPorHandle } = await import("@/lib/mencoes.functions");
+      const r = await perfilPorHandle({ data: { accessToken: token, handle } });
+      if (r.ok) {
+        void abrirPerfil(r.id);
+        return;
+      }
+      const { toast } = await import("sonner");
+      toast(r.motivo === "nao_achei" ? `Não encontrei @${handle}.` : "Não deu para abrir agora.");
+    } catch {
+      /* Sem rede, o toque não leva a lugar nenhum — e é melhor que um erro. */
+    }
+  }
+
+  async function abrirTag(tag: string) {
+    setOnde({ t: "tag", tag });
+  }
+
   async function abrirPerfil(id: string) {
     setPerfil(null);
     /* ⚠️ O ESBOÇO ANTES DA IDA AO SERVIDOR. Sem ele, `onde.t === "perfil"` com
@@ -5184,6 +5250,17 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "tag") {
+    return (
+      <TelaDaTag
+        tag={onde.tag}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrirPost={abrirPost}
+        acoes={acoes}
+      />
+    );
+  }
+
   if (onde.t === "busca") {
     return (
       <TelaDeBusca
@@ -5312,6 +5389,8 @@ export function RedeNoApp({
     return (
       <TelaDoPost
         post={oPost}
+        aoAbrirTag={acoes.abrirTag}
+        aoAbrirArroba={acoes.abrirArroba}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
         aoVotar={acoes.votar}
@@ -5423,6 +5502,8 @@ export function RedeNoApp({
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoVerQuemReagiu={acoes.verQuemReagiu}
         aoAbrirPerfil={acoes.abrirPerfil}
+        aoAbrirArroba={acoes.abrirArroba}
+        aoAbrirTag={acoes.abrirTag}
         /* ⚠️ Referência estável, como as outras: um fecho por post faria o
            `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
            do app. */
@@ -6085,12 +6166,77 @@ export function FolhaDeQuemReagiu({
   );
 }
 
+/**
+ * O TEXTO COM `@` E `#` VIRANDO LINK.
+ *
+ * ⚠️ **NÃO USA `dangerouslySetInnerHTML`.** A legenda é texto de terceiro — a
+ * única forma segura de destacar pedaços dela é quebrar em nós de React, nunca
+ * montar HTML a partir do que a paciente escreveu.
+ *
+ * ⚠️ **E O `@` VIRA LINK MESMO SEM SABER SE O PERFIL EXISTE.** Conferir cada
+ * menção contra o banco custaria uma consulta por publicação do feed; quem
+ * descobre que não existe é a tela de destino, que já sabe dizer "perfil
+ * indisponível". O pior caso é um toque que não leva a lugar nenhum — contra
+ * uma legenda que carrega o feed inteiro.
+ */
+function TextoComLinks({
+  texto,
+  aoAbrirArroba,
+  aoAbrirTag,
+}: {
+  texto: string;
+  /**
+   * ⚠️ **RECEBE O `@`, NUNCA UM id — e por isso é prop PRÓPRIA.** A primeira
+   * versão reaproveitava `aoAbrirPerfil`, que espera um uuid: o toque numa
+   * menção pediria ao servidor o perfil de id "marina" e a tela responderia
+   * "indisponível", que é o pior desfecho possível — a menção existe, a pessoa
+   * existe, e o app diz que não. Quem traduz `@` em id é `perfilPorHandle`.
+   */
+  aoAbrirArroba?: (handle: string) => void;
+  aoAbrirTag?: (tag: string) => void;
+}) {
+  const pedacos = texto.split(/(@[a-z0-9._]{1,30}|#[\p{L}\p{N}_]{1,60})/giu);
+  return (
+    <span className="whitespace-pre-wrap">
+      {pedacos.map((p, i) => {
+        if (/^@/.test(p) && aoAbrirArroba) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => aoAbrirArroba(p.slice(1).toLowerCase())}
+              className="press font-semibold text-primary"
+            >
+              {p}
+            </button>
+          );
+        }
+        if (/^#/.test(p) && aoAbrirTag) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => aoAbrirTag(p.slice(1).toLowerCase())}
+              className="press font-semibold text-primary"
+            >
+              {p}
+            </button>
+          );
+        }
+        return <span key={i}>{p}</span>;
+      })}
+    </span>
+  );
+}
+
 export function TelaDoPost({
   post,
   aoReagir,
   aoSalvar,
   aoRepublicar,
   aoCompartilhar,
+  aoAbrirTag,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
@@ -6108,6 +6254,10 @@ export function TelaDoPost({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -6143,6 +6293,8 @@ export function TelaDoPost({
         aoSalvar={aoSalvar}
         aoRepublicar={aoRepublicar}
         aoCompartilhar={aoCompartilhar}
+        aoAbrirTag={aoAbrirTag}
+        aoAbrirArroba={aoAbrirArroba}
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
@@ -7972,6 +8124,94 @@ export function TelaDosSalvos({
           na borda no modelo, e uma das duas com respiro faria a mesma grade
           parecer duas. */}
       <GradeDePosts posts={posts} vazio="Você ainda não guardou nada." aoAbrirPost={aoAbrirPost} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A PÁGINA DE UMA #
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O QUE UMA `#` REÚNE.
+ *
+ * ⚠️ **SÓ POST PÚBLICO, por decisão explícita do dono.** É o ponto inteiro da
+ * régua: a `#` é um lugar aberto, e quem chega nela não segue ninguém. Um post
+ * de camada `amigas` aparecendo aqui seria a porta dos fundos da visibilidade —
+ * o recorte está na CONSULTA (`postsDaTag`), antes de `montarPosts`, e nunca
+ * num filtro depois.
+ *
+ * ⚠️ **E É GRADE, NÃO FEED.** Uma tag reúne desconhecidas por assunto; em
+ * formato de feed, com legenda e reações à mostra, ela leria como "pessoas que
+ * eu sigo" — que é exatamente a confusão que o rótulo "Sugerido para você"
+ * existe para impedir. A grade é uma vitrine: quem quiser ler, abre.
+ */
+export function TelaDaTag({
+  tag,
+  aoVoltar,
+  aoAbrirPost,
+  acoes,
+}: {
+  tag: string;
+  aoVoltar: () => void;
+  aoAbrirPost?: (id: string) => void;
+  /** Só para a bancada poder injetar posts sem servidor. */
+  acoes?: unknown;
+}) {
+  const [posts, setPosts] = useState<PostNaTela[] | null>(null);
+  void acoes;
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const s = await supabase.auth.getSession();
+        const token = s.data.session?.access_token;
+        if (!token) {
+          if (vivo) setPosts([]);
+          return;
+        }
+        const { postsDaTag } = await import("@/lib/mencoes.functions");
+        const r = await postsDaTag({ data: { accessToken: token, tag } });
+        if (vivo) setPosts(r.ok ? (r.posts as PostNaTela[]) : []);
+      } catch {
+        if (vivo) setPosts([]);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [tag]);
+
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-1 text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="truncate text-[16px] font-semibold">#{tag}</h1>
+      </header>
+      {/* ⚠️ A régua é DITA. Sem esta linha, quem publicou para as amigas e não
+          se vê aqui conclui que a tag está quebrada — e quem publicou em
+          público não sabe que a foto dela virou vitrine aberta. */}
+      <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+        Aqui aparecem só as publicações abertas a qualquer pessoa no app.
+      </p>
+      {posts === null ? (
+        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Carregando…</p>
+      ) : (
+        <GradeDePosts
+          posts={posts}
+          vazio={`Ninguém publicou em #${tag} ainda.`}
+          aoAbrirPost={aoAbrirPost}
+        />
+      )}
     </div>
   );
 }

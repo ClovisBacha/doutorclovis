@@ -26,6 +26,8 @@ import { z } from "zod";
 import * as filhosRegua from "./filhos";
 import { MARCO_POR_ID } from "./marcos";
 import { caminhoEhDoDono } from "./video-do-post";
+import { QUEM_MENCIONA_PADRAO, type QuemMenciona } from "./mencoes";
+import { processarTextoDoPost } from "./mencoes.functions";
 import {
   aoSeguir,
   avisoMandaPush,
@@ -285,6 +287,22 @@ export type PerfilNaTela = {
    * `null` só quando o perfil não é visível para quem pergunta.
    */
   seguidores: number | null;
+  /**
+   * O `@` dela — **público**, e é o endereço pelo qual as menções resolvem.
+   *
+   * ⚠️ `null` é o caso NORMAL de quem nunca escolheu (a coluna nasce vazia) e
+   * também o de um banco que ainda não rodou o SQL. A tela precisa dos dois
+   * casos lendo igual: sem `@`, o perfil mostra só o nome, e nada quebra.
+   */
+  handle?: string | null;
+  /**
+   * Quem pode mencioná-la. **Só a DONA recebe.**
+   *
+   * ⚠️ É configuração, não informação de perfil: se viajasse no perfil dos
+   * outros, qualquer pessoa descobriria que foi ela quem fechou as menções —
+   * a mesma razão pela qual o silenciar e o bloqueio são mudos.
+   */
+  quemPodeMencionar?: QuemMenciona;
   /** Quantas pessoas ela acompanha. Mesma régua de `seguidores`. */
   seguindo: number | null;
   /**
@@ -661,7 +679,7 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAColunaDoFeed(sb, faltando) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaDoArroba(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -776,7 +794,7 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
-  "feed_so_seguindo, " +
+  "feed_so_seguindo, handle, quem_pode_mencionar, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
 
 /**
@@ -799,10 +817,9 @@ const COLUNAS_DO_PERFIL =
  * Derivada e não copiada porque duas listas escritas à mão divergem no primeiro
  * ajuste — e aqui a divergência apareceria como recurso sumindo, sem erro.
  */
-const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "").replace(
-  "feed_so_seguindo, ",
-  "",
-);
+const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")
+  .replace("feed_so_seguindo, ", "")
+  .replace("handle, quem_pode_mencionar, ", "");
 
 /**
  * Degrau 1,5: o banco tem tudo do selo e ainda NÃO tem `feed_so_seguindo`.
@@ -824,7 +841,39 @@ const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "").rep
  * remover a coluna dele não serve num banco que rodou meio SQL — a mesma lição
  * de `marcarConsultaNoDia`, citada ali embaixo.
  */
-const COLUNAS_SEM_FEED = COLUNAS_DO_PERFIL.replace("feed_so_seguindo, ", "");
+const COLUNAS_SEM_FEED = COLUNAS_DO_PERFIL.replace("feed_so_seguindo, ", "").replace(
+  "handle, quem_pode_mencionar, ",
+  "",
+);
+
+/**
+ * Degrau 1,25: o banco tem tudo até o feed e ainda NÃO tem o `@`.
+ *
+ * ⚠️ **O degrau vem ANTES da coluna existir em produção, e é essa a ordem
+ * certa.** `handle` e `quem_pode_mencionar` nascem em `APLICAR_MENCOES_E_TAGS`,
+ * que o dono roda à mão — e o deploy chega primeiro, sempre. Sem este degrau,
+ * o `42703` derrubaria `perfisPorId` e `montarPosts` descartaria todo post cujo
+ * autor não está no Map: feed vazio, nenhum perfil abrindo, busca sem
+ * resultado. É o defeito de `miniatura_path` inteiro, que já apagou cinco
+ * recursos de uma vez nesta mesma função.
+ */
+const COLUNAS_SEM_ARROBA = COLUNAS_DO_PERFIL.replace("handle, quem_pode_mencionar, ", "");
+
+async function semAColunaDoArroba(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_SEM_ARROBA)
+    .in("id", ids);
+  if (error) return semAColunaDoFeed(sb, ids);
+  console.warn("[rede] sem handle — rode APLICAR_MENCOES_E_TAGS.sql");
+  /* Sem `@`, a menção simplesmente não resolve — e `quem_pode_mencionar` cai no
+     padrão que a própria régua declara, nunca num valor inventado aqui. */
+  return ((data ?? []) as any[]).map((p) => ({
+    ...p,
+    handle: null,
+    quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
+  }));
+}
 
 async function semAColunaDoFeed(sb: any, ids: string[]): Promise<any[]> {
   const { data, error } = await sb.from("patient_profiles").select(COLUNAS_SEM_FEED).in("id", ids);
@@ -832,7 +881,12 @@ async function semAColunaDoFeed(sb: any, ids: string[]): Promise<any[]> {
   console.warn("[rede] sem feed_so_seguindo — rode APLICAR_COMUNIDADE_VIVA.sql");
   /* Ausente vale `false`, que é o padrão da coluna: o feed misturado é o modo
      de quem nunca escolheu, e é o que o banco passará a guardar. */
-  return ((data ?? []) as any[]).map((p) => ({ ...p, feed_so_seguindo: false }));
+  return ((data ?? []) as any[]).map((p) => ({
+    ...p,
+    feed_so_seguindo: false,
+    handle: null,
+    quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
+  }));
 }
 
 const COLUNAS_SEM_SELO =
@@ -849,7 +903,12 @@ async function semAColunaNova(sb: any, ids: string[]): Promise<any[]> {
   console.warn("[rede] sem conta_oficial — rode APLICAR_CONTA_OFICIAL.sql");
   /* Ausente vale `false`: é o que `ehContaOficial` já assume, e o pior caso é a
      fileira de sugeridas ficar como era antes de a conta oficial existir. */
-  return ((data ?? []) as any[]).map((p) => ({ ...p, conta_oficial: false }));
+  return ((data ?? []) as any[]).map((p) => ({
+    ...p,
+    conta_oficial: false,
+    handle: null,
+    quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
+  }));
 }
 
 /** Degrau 3: o banco ainda não rodou o SQL do selo. */
@@ -863,6 +922,8 @@ async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
     mostrar_semana: false,
     mostrar_bebe: false,
     conta_oficial: false,
+    handle: null,
+    quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
   }));
 }
 
@@ -1161,7 +1222,14 @@ async function marcacoesDe(
   return fora;
 }
 
-async function montarPosts(
+/**
+ * ⚠️ **EXPORTADA PARA A PÁGINA DA TAG, e nunca copiada.** Ela é quem aplica
+ * `podeVerPost`, assina as URLs, monta as reações, os salvos, o marco e a
+ * republicação. Uma segunda montagem em `mencoes.functions.ts` teria de repetir
+ * a régua de visibilidade — e a cópia que divergisse apareceria como post
+ * vazando numa página que qualquer pessoa alcança digitando uma palavra.
+ */
+export async function montarPosts(
   sb: any,
   eu: string,
   brutos: any[],
@@ -1450,6 +1518,13 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         seloBebe: selo.bebe,
         mostrarSemana: !!(p as any)?.mostrar_semana,
         mostrarBebe: !!(p as any)?.mostrar_bebe,
+        handle: (p as any)?.handle ?? null,
+        /* ⚠️ **Só aqui.** É configuração dela — ver `quemPodeMencionar`. E o
+           padrão vem da régua, nunca de um literal repetido: a coluna nasce
+           `todos`, e um `"todos"` escrito à mão aqui divergiria no dia em que
+           o padrão mudasse. */
+        quemPodeMencionar: ((p as any)?.quem_pode_mencionar ??
+          QUEM_MENCIONA_PADRAO) as QuemMenciona,
         bebe: await bebeDe(p, true),
       } as PerfilNaTela,
       emCuidado: !!(p as any)?.care_mode,
@@ -1793,6 +1868,7 @@ export const verPerfil = createServerFn({ method: "POST" })
         : (((vinculo as any)?.estado as "ativo" | "pendente") ?? null),
       souEu: persona ? false : data.alvoId === eu,
       silenciado: persona ? false : ctx.silenciados.has(data.alvoId),
+      handle: (a as any)?.handle ?? null,
       /* ⚠️ Público agora, por decisão do dono — ver `NUMEROS_PUBLICOS`, que
          guarda o argumento contrário para quem reabrir o assunto. */
       seguidores,
@@ -2352,6 +2428,11 @@ export const publicarPost = createServerFn({ method: "POST" })
         .single();
       if (erro2 || !p2) return { ok: false as const, motivo: "banco" as const };
       await gravarMarcacoes(sb, eu, p2.id, data.marcadas ?? []);
+      await processarTextoDoPost(sb, {
+        postId: p2.id,
+        autorId: eu,
+        texto: data.texto?.trim() || null,
+      });
       return { ok: true as const, postId: p2.id };
     }
     if (!post) return { ok: false as const, motivo: "banco" as const };
@@ -2360,6 +2441,13 @@ export const publicarPost = createServerFn({ method: "POST" })
        aconteceu, e devolver "não deu para publicar" por causa de uma linha
        decorativa faria ela tentar de novo e publicar duas vezes. */
     await gravarMarcacoes(sb, eu, post.id, data.marcadas ?? []);
+    /* ⚠️ As tags e os avisos de menção, DEPOIS de o post existir e sem
+       derrubá-lo: a mesma decisão das marcações logo acima. */
+    await processarTextoDoPost(sb, {
+      postId: post.id,
+      autorId: eu,
+      texto: data.texto?.trim() || null,
+    });
 
     return { ok: true as const, postId: post.id };
   });

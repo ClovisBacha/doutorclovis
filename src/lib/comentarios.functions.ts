@@ -237,6 +237,16 @@ export const comentar = createServerFn({ method: "POST" })
      * ⚠️ O `catch` engole de propósito: o comentário JÁ existe, e derrubar a
      * resposta por causa do aviso diria "não deu" sobre algo que deu.
      */
+    /* ⚠️ A menção dentro do COMENTÁRIO também avisa — e passa pela mesma
+       configuração de cada mencionada. Um `@` que só funcionasse na legenda
+       seria metade do recurso, e a metade que falta é a mais usada. */
+    try {
+      const { avisarMencionadas } = await import("./mencoes.functions");
+      await avisarMencionadas(sb, { texto, quemId: eu, postId: data.postId });
+    } catch {
+      /* O comentário está publicado. */
+    }
+
     if (post.autor_id !== eu) {
       try {
         const { registrarAtividade } = await import("./rede-social.functions");

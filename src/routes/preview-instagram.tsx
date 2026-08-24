@@ -73,6 +73,7 @@ import {
   type PerguntaNaTela,
   type PessoaNaLista,
   type Story,
+  TelaDaTag,
 } from "@/components/rede-instagram";
 import type {
   AtividadeNaTela,
@@ -89,6 +90,8 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined`: o router serializa e revalida, e na
        segunda passada chega `null`. Mesma armadilha de `preview-saude`. */
     tela: q.tela == null ? "feed" : String(q.tela),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    tag: q.tag == null ? "28semanas" : String(q.tag),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
@@ -189,9 +192,14 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      em vez de um buraco cinza. */
   texto:
     i === 5
-      ? "Hoje ela mexeu tanto que acordei rindo 🥹"
+      ? "Hoje ela mexeu tanto que acordei rindo 🥹 #trigemeas"
       : i === 0
-        ? "Ultrassom de hoje — a mãozinha no rosto bem na hora da foto"
+        ? /* ⚠️ **A LEGENDA DE EXEMPLO CARREGA UM `@` E UMA `#`, e não é
+             enfeite.** Elas só viram link dentro de `TextoComLinks`, e sem uma
+             legenda que as contenha a bancada desenharia o caso que NUNCA
+             falha — texto puro — enquanto o único caminho novo do recurso
+             ficava sem ninguém nunca ter olhado. */
+          "Ultrassom de hoje — a mãozinha no rosto 💛 obrigada @marina.costa #28semanas"
         : null,
   imagemUrl: i === 5 ? null : foto(c[0], c[1], c[2]),
   /* ⚠️ Metade COM miniatura e metade SEM, de propósito: o recuo é permanente
@@ -357,6 +365,7 @@ function Bancada() {
     remover,
     filhos,
     conversa,
+    tag,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -392,6 +401,11 @@ function Bancada() {
     publico: true,
     meuVinculo: meu ? null : "ativo",
     souEu: meu,
+    /* ⚠️ O `@` tem de estar aqui, e a primeira verificação no navegador achou
+       a linha VAZIA: sem ele a bancada desenha o perfil de quem nunca
+       escolheu — o único estado que já era certo — e o endereço novo ficava
+       sem ninguém nunca ter olhado. */
+    handle: meu ? "marina.costa" : "carol.andrade",
     silenciado: false,
     seguidores: meu ? 137 : 412,
     seguindo: meu ? 208 : 190,
@@ -1061,6 +1075,17 @@ function Bancada() {
     );
   }
 
+  if (tela === "tag") {
+    /* ⚠️ A página da `#` pede posts ao servidor e por isso mostraria "vazio"
+       sem sessão — a bancada existe para o cabeçalho, a frase da régua e a
+       grade poderem ser olhados sem duas contas e um post público real. */
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <TelaDaTag tag={tag} aoVoltar={() => history.back()} />
+      </div>
+    );
+  }
+
   if (tela === "caixinha") {
     /* ⚠️ A caixa da DONA. Ela é impossível de olhar numa conta de verdade sem
        uma segunda pessoa disposta a escrever — e é justamente por isso que uma
@@ -1185,6 +1210,15 @@ function Bancada() {
           sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
           pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
           aoSeguirPessoa={(id) => console.log("seguiria", id)}
+          /* ⚠️ **AS DUAS PRECISAM VIR DA BANCADA, e a falta delas foi medida.**
+             `@` e `#` só viram link quando `TextoComLinks` recebe estes dois —
+             sem eles a legenda desenha texto puro, que é exatamente o caso que
+             nunca falha. A primeira verificação no navegador achou ZERO links
+             na legenda com o recurso inteiro pronto: a bancada estava passando
+             props num formato diferente do da produção, que é a mesma lição
+             que o `memo` do cartão já custou uma medição falsa. */
+          aoAbrirArroba={(h) => alert(`abriria o perfil de @${h}`)}
+          aoAbrirTag={(t) => alert(`abriria a página de #${t}`)}
           /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
              nasce no servidor — sem a bancada, olhar este cartão exigiria uma
              conta de verdade. `?semcodigo=1` prova o estado em que ele NÃO

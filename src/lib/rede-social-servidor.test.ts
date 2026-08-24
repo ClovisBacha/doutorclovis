@@ -454,24 +454,35 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
     /* Um degrau que ainda pede a coluna que fez o degrau anterior falhar não é
        degrau nenhum: os dois caem juntos, e a escada vira um tobogã até o
        último — que é onde os recursos somem. */
-    expect(listaDe("COLUNAS_SEM_FEED")).toContain('replace("feed_so_seguindo, ", "")');
+    expect(listaDe("COLUNAS_SEM_ARROBA")).toContain('replace("handle, quem_pode_mencionar, ", "")');
+    const semFeed = listaDe("COLUNAS_SEM_FEED");
+    expect(semFeed).toContain('replace("feed_so_seguindo, ", "")');
+    expect(semFeed).toContain('"handle, quem_pode_mencionar, "');
     const semOficial = listaDe("COLUNAS_SEM_OFICIAL");
     expect(semOficial).toContain('replace("conta_oficial, ", "")');
     expect(semOficial).toContain('"feed_so_seguindo, "');
+    expect(semOficial).toContain('"handle, quem_pode_mencionar, "');
   });
 
   test("⚠️ as listas de recuo são DERIVADAS, nunca copiadas à mão", () => {
     /* Duas listas escritas à mão divergem no primeiro ajuste — e aqui a
        divergência aparece como recurso sumindo, sem erro nenhum. */
-    expect(listaDe("COLUNAS_SEM_FEED")).toContain("COLUNAS_DO_PERFIL");
-    expect(listaDe("COLUNAS_SEM_OFICIAL")).toContain("COLUNAS_DO_PERFIL");
+    for (const lista of ["COLUNAS_SEM_ARROBA", "COLUNAS_SEM_FEED", "COLUNAS_SEM_OFICIAL"]) {
+      expect({ lista, derivada: listaDe(lista).includes("COLUNAS_DO_PERFIL") }).toEqual({
+        lista,
+        derivada: true,
+      });
+    }
   });
 
   test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
     const c = CODIGO_REDE.replace(/\s+/g, " ");
     /* A entrada cai no degrau mais ALTO, não direto no fundo. */
-    expect(c).toContain("error ? await semAColunaDoFeed(sb, faltando)");
-    /* E cada degrau conhece o seguinte. */
+    expect(c).toContain("error ? await semAColunaDoArroba(sb, faltando)");
+    /* E cada degrau conhece o seguinte. Um degrau que não chama o de baixo é
+       um degrau que devolve lista vazia — e `montarPosts` descarta todo post
+       cujo autor não está no Map: feed vazio, sem erro nenhum. */
+    expect(c).toContain("if (error) return semAColunaDoFeed(sb, ids)");
     expect(c).toContain("if (error) return semAColunaNova(sb, ids)");
     expect(c).toContain("if (error) return semAsColunasDoSelo(sb, ids)");
   });
@@ -486,9 +497,21 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
       .map((x) => x.trim())
       .filter(Boolean);
     /* As que nasceram depois do degrau do selo têm de aparecer num `replace`. */
-    for (const nova of ["conta_oficial", "feed_so_seguindo"]) {
+    for (const nova of ["conta_oficial", "feed_so_seguindo", "handle", "quem_pode_mencionar"]) {
       expect({ nova, naPrincipal: principais.includes(nova) }).toEqual({ nova, naPrincipal: true });
-      expect({ nova, temDegrau: CODIGO_REDE.includes(`replace("${nova}, ", "")`) }).toEqual({
+      /* ⚠️ **PROCURA DENTRO DOS `replace(...)`, e não no arquivo inteiro.**
+         A primeira versão desta linha era `CODIGO_REDE.includes("handle, ")` —
+         e passava com ZERO degraus, porque `handle, ` está escrito na própria
+         `COLUNAS_DO_PERFIL` três linhas acima. Um teste que casa a palavra em
+         qualquer lugar do arquivo é um teste que fica verde exatamente quando
+         a coluna nova é acrescentada sem degrau, que é o defeito que ele
+         existe para pegar.
+
+         ⚠️ E não é "um `replace` POR coluna": `handle` e `quem_pode_mencionar`
+         nascem no MESMO SQL e saem juntas num `replace` só. O que se cobra é
+         que a coluna apareça em ALGUM recorte. */
+      const recortes = [...CODIGO_REDE.matchAll(/\.replace\(\s*"([^"]+)"/g)].map((m) => m[1]);
+      expect({ nova, temDegrau: recortes.some((r) => r.includes(nova)) }).toEqual({
         nova,
         temDegrau: true,
       });

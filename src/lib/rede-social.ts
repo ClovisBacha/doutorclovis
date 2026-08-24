@@ -379,7 +379,9 @@ export type EspecieDeAviso =
    * "Fulana comentou", e dez linhas iguais seriam a mesma informação repetida
    * com cara de dez pessoas.
    */
-  | "comentou";
+  | "comentou"
+  /** Mencionou ela num post ou comentário. */
+  | "mencionou";
 
 /**
  * ⚠️ **Reação NÃO manda push — só o pedido para seguir manda.**
@@ -405,6 +407,10 @@ export function avisoMandaPush(e: EspecieDeAviso): boolean {
 
 export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
   switch (e) {
+    case "mencionou":
+      /* ⚠️ Também sem o texto: o comentário ou a legenda onde ela foi
+         mencionada pode ser justamente o que ela não deve ler sem contexto. */
+      return `${quem} mencionou você`;
     case "comentou":
       /* ⚠️ O TEXTO NÃO TRAZ O COMENTÁRIO. Um trecho na caixa faria a frase de
          quem escreveu aparecer numa tela que ela abre por reflexo — e é

@@ -28,6 +28,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  HANDLE_MAX,
+  JANELA_DE_TROCA_DIAS,
+  QUEM_MENCIONA_PADRAO,
+  RESERVA_DO_ANTIGO_DIAS,
+  TROCAS_POR_JANELA,
+  normalizarHandle,
+  recusaDoHandle,
+  type QuemMenciona,
+} from "@/lib/mencoes";
 import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
 import { LIMITE_DA_BIO } from "@/lib/rede-social";
@@ -123,6 +133,204 @@ function ChaveDoPerfil({
         />
       </button>
     </div>
+  );
+}
+
+/**
+ * O `@` DA PACIENTE, E QUEM PODE MENCIONÁ-LA.
+ *
+ * ⚠️ **A REGRA DA TROCA É A DO INSTAGRAM, por decisão do dono** ("faça
+ * exatamente como o Instagram faz hoje"): duas trocas por 14 dias, e o apelido
+ * antigo fica RESERVADO por mais 14 — ninguém o toma no dia seguinte e passa a
+ * responder pelas menções antigas dela. A régua e os números moram em
+ * `mencoes.ts`; quem os aplica é `escolherHandle`.
+ *
+ * ⚠️ **A DISPONIBILIDADE NÃO É CONFERIDA AQUI.** Entre uma leitura de "está
+ * livre" e a gravação cabe outra paciente pedindo o mesmo `@` — quem decide é
+ * o índice único do banco, e a tela mostra o veredito dele. Uma segunda régua
+ * no cliente diria "livre" sobre um apelido que o servidor recusaria.
+ */
+function ArrobaDoPerfil({
+  handle,
+  quemPodeMencionar,
+  aoTrocar,
+  bancada,
+}: {
+  handle: string | null;
+  quemPodeMencionar: QuemMenciona;
+  aoTrocar: (h: string | null, q: QuemMenciona) => void;
+  bancada: boolean;
+}) {
+  const [editando, setEditando] = useState(false);
+  const [campo, setCampo] = useState(handle ?? "");
+  const [ocupado, setOcupado] = useState(false);
+
+  /* A recusa é calculada no CAMPO, e serve só para desabilitar o botão e
+     explicar — o veredito continua sendo o do servidor. */
+  const recusa = campo.trim() ? recusaDoHandle(campo) : null;
+
+  async function salvarHandle() {
+    if (ocupado || recusa) return;
+    if (bancada) {
+      aoTrocar(normalizarHandle(campo), quemPodeMencionar);
+      setEditando(false);
+      return;
+    }
+    setOcupado(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { escolherHandle } = await import("@/lib/mencoes.functions");
+      const r = await escolherHandle({ data: { accessToken: token, handle: campo } });
+      if (r.ok) {
+        aoTrocar(r.handle ?? null, quemPodeMencionar);
+        setEditando(false);
+        toast.success("Pronto 💛");
+        return;
+      }
+      /* ⚠️ Cada recusa diz O QUE FAZER. "Não deu" num campo de apelido faz ela
+         tentar o mesmo texto de novo, indefinidamente. */
+      toast.error(
+        r.motivo === "ocupado"
+          ? "Esse @ já é de outra pessoa. Tente uma variação."
+          : r.motivo === "reservado"
+            ? "Esse @ está guardado. Escolha outro."
+            : r.motivo === "muitas_trocas"
+              ? `Você já trocou ${TROCAS_POR_JANELA} vezes nos últimos ${JANELA_DE_TROCA_DIAS} dias.`
+              : r.motivo === "sessao" || r.motivo === "banco"
+                ? "Não deu para salvar."
+                : `Use letras, números, ponto e _ (até ${HANDLE_MAX}).`,
+      );
+    } catch {
+      toast.error("Não deu para salvar.");
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function salvarQuem(q: QuemMenciona) {
+    aoTrocar(handle, q);
+    if (bancada) return;
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { salvarQuemMenciona } = await import("@/lib/mencoes.functions");
+      await salvarQuemMenciona({ data: { accessToken: token, valor: q } });
+    } catch {
+      toast.error("Não deu para salvar.");
+    }
+  }
+
+  return (
+    <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <h3 className="font-semibold">Seu @</h3>
+
+      {!editando ? (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="min-w-0 truncate text-sm">
+            {handle ? (
+              <span className="font-semibold text-primary">@{handle}</span>
+            ) : (
+              <span className="text-muted-foreground">
+                Você ainda não escolheu — sem @, ninguém consegue te marcar.
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setCampo(handle ?? "");
+              setEditando(true);
+            }}
+            className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+          >
+            {handle ? "Trocar" : "Escolher"}
+          </button>
+        </div>
+      ) : (
+        <div className="mt-2">
+          <div className="flex items-center gap-2 rounded-2xl border border-border px-3">
+            <span className="text-sm text-muted-foreground">@</span>
+            <input
+              value={campo}
+              onChange={(e) => setCampo(e.target.value)}
+              maxLength={HANDLE_MAX}
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              placeholder="seunome"
+              aria-label="Escolher o seu @"
+              className="min-h-[44px] w-full bg-transparent text-sm outline-none"
+            />
+          </div>
+          {recusa && (
+            <p className="mt-1.5 text-[12px] leading-snug text-destructive">
+              {recusa === "curto"
+                ? "Muito curto."
+                : recusa === "longo"
+                  ? `No máximo ${HANDLE_MAX} caracteres.`
+                  : recusa === "reservado"
+                    ? "Esse @ é reservado ao consultório."
+                    : recusa === "so_pontos"
+                      ? "Precisa ter ao menos uma letra ou número."
+                      : "Use letras, números, ponto e _ ."}
+            </p>
+          )}
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            Dá para trocar {TROCAS_POR_JANELA} vezes a cada {JANELA_DE_TROCA_DIAS} dias. O @ antigo
+            fica guardado por {RESERVA_DO_ANTIGO_DIAS} dias — ninguém assume o seu lugar.
+          </p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              disabled={ocupado || !!recusa || !campo.trim()}
+              onClick={() => void salvarHandle()}
+              className="press min-h-[44px] flex-1 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {ocupado ? "Salvando…" : "Salvar"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditando(false)}
+              className="press min-h-[44px] rounded-full border border-border px-4 text-[14px] font-semibold"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ **As três opções são as do Instagram**, por decisão do dono:
+          todo mundo (padrão), só quem eu sigo, ninguém. */}
+      <div className="mt-4 border-t border-border pt-3">
+        <p className="text-[13px] font-semibold">Quem pode te marcar</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(
+            [
+              ["todos", "Todo mundo"],
+              ["sigo", "Só quem eu sigo"],
+              ["ninguem", "Ninguém"],
+            ] as [QuemMenciona, string][]
+          ).map(([v, rotulo]) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={quemPodeMencionar === v}
+              onClick={() => void salvarQuem(v)}
+              className={`press min-h-[44px] rounded-full border px-4 text-[13px] font-semibold ${
+                quemPodeMencionar === v
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -299,6 +507,20 @@ export function ConfiguracoesDoPerfil({
           </button>
         </div>
       </section>
+
+      {/* ─── O @ E QUEM PODE MENCIONAR ──────────────────────────────────
+          ⚠️ **AS DUAS COISAS NO MESMO CARTÃO, e não em dois.** O `@` é o
+          endereço; a chave decide quem pode usá-lo. Separá-los faria a
+          paciente escolher um apelido sem nunca ver que existe controle sobre
+          quem a chama por ele. */}
+      <ArrobaDoPerfil
+        handle={perfil.handle ?? null}
+        quemPodeMencionar={perfil.quemPodeMencionar ?? QUEM_MENCIONA_PADRAO}
+        aoTrocar={(h, q) =>
+          setPerfil((pf) => (pf ? { ...pf, handle: h, quemPodeMencionar: q } : pf))
+        }
+        bancada={!!bancada}
+      />
 
       {/* ─── O FEED: misturado ou fechado ──────────────────────────────────
           ⚠️ **O PADRÃO É O MISTURADO, e o interruptor existe para FECHAR.**

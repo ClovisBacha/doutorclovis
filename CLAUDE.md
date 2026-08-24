@@ -481,7 +481,6 @@ não `ativa`: bancada que abre no caso raro ensina o caso errado. ⚠️ A da as
 tela** — é a lição do dia aplicada na hora, depois de o campo do onboarding e o
 cartão do Perfil terem sido escritos às cegas e só ganharem bancada num remendo.
 
-
 ## O som do app inteiro, e a bancada que faltava (ago/2026)
 
 Pedido do dono: vistoriar todos os efeitos sonoros, acrescentar muitos, cuidar
@@ -562,7 +561,7 @@ O que a pesquisa em fontes primárias achou:
   por Horowitz em 1999, por redução numerológica (todas reduzem a 3, 6 ou 9).
   Não vêm de Guido d'Arezzo — o solfejo dele é RELATIVO, e não havia como medir
   frequência absoluta antes de 1834. E 528 Hz não é dó em afinação nenhuma.
-- **O estudo-âncora é piloto**: Calamassi & Pomponi 2019, *Explore*, n = 33,
+- **O estudo-âncora é piloto**: Calamassi & Pomponi 2019, _Explore_, n = 33,
   frequência cardíaca −4,79 bpm com **p = 0,05 exato** em 12+ desfechos sem
   correção. Sem replicação independente.
 - **E o achado mais decisivo é de percepção**: Van Hedger & Bongiovanni 2023 —
@@ -577,7 +576,7 @@ de SEMITONS A OITAVAS, e aqui a diferença é de 0,32 de semitom. A razão que
 sobra é de engenharia — **uma referência só, para drone, sinos, música e
 interface não brigarem entre si** —, e ela basta. É gosto, não é remédio.
 
-⚠️ **O que move fisiologia de verdade** (Bernardi, *Heart* 2006) é ANDAMENTO,
+⚠️ **O que move fisiologia de verdade** (Bernardi, _Heart_ 2006) é ANDAMENTO,
 dinâmica e SILÊNCIO — a pausa derruba frequência cardíaca e pressão abaixo do
 basal. O desenho da sessão importa mais que a afinação dela.
 
@@ -610,7 +609,6 @@ são as duas pessoas para quem esta tela existe. Ataque de 900 ms, corte descend
 de 260 para 70 Hz ao longo de sete segundos — trovão longe não tem estouro.
 
 #### O que separa um som bom de um chiado
-
 
 ⚠️ **O que separa um som bom de um chiado** não é o filtro: é o EVENTO. Chuva é
 densidade de impactos; riacho é a BOLHA (frequência de Minnaert, com o deslize
@@ -716,7 +714,7 @@ cores conforme onde o drone pousa. ⚠️ A mais escura (sobre mi) é barrada no
 Cuidado — a diferença entre "recolhido" e "escuro" é a diferença entre acolher e
 afirmar a perda.
 
-O mecanismo é o do Eno em *Music for Airports*: seis vozes com períodos PRIMOS
+O mecanismo é o do Eno em _Music for Airports_: seis vozes com períodos PRIMOS
 (19·23·29·31·37·41), MMC de **595.973.171 s ≈ dezenove anos**. ⚠️ 17 foi
 descartado de propósito: contra o ciclo de 16 s ele deriva um segundo por
 respiração e atravessa o ciclo em 16 delas — uma varredura que o ouvido pega.
@@ -7597,3 +7595,107 @@ de escrever o filtro.** Foi assim que este erro foi achado.
 ⚠️ **Isto entra na lista de coisas para o dono:** o `types.ts` desatualizado não
 é só um teste que não dá para escrever — é o autocompletar e a checagem de tipo
 do Supabase valendo para um quarto do banco.
+
+## O `@` e a `#` (ago/2026)
+
+Pedido do dono, junto com o compartilhar e o vídeo/repost — e sobre as duas
+decisões de política ele foi específico: **"Como o Instagram faz hj? Aplique
+exatamente como ele faz"** (troca de apelido) e **"Faça exatamente como o
+Instagram faz hj"** (quem pode marcar). Sobre a hashtag: **"Sim, só posts
+públicos."**
+
+Régua em `src/lib/mencoes.ts` (pura, 18 testes); servidor em
+`mencoes.functions.ts`; tela no cartão "Seu @" das configurações, na legenda do
+post e em `TelaDaTag`.
+
+### A regra da troca é a do Instagram, conferida e não lembrada
+
+Duas trocas por **14 dias**, e o apelido antigo fica **reservado por mais 14**
+(`rede_handles_antigos`). A reserva não é cortesia: sem ela, trocar de `@`
+**quebraria toda menção já publicada** — quem escreveu `@marina` ontem apontaria
+para quem quer que tomasse o nome hoje. Por isso `perfilPorHandle` lê **duas**
+tabelas: o apelido atual e, se não achar, a reserva ainda válida.
+
+⚠️ **`_` É CURINGA NO `LIKE`, E `_` É LETRA VÁLIDA NUM `@`.** Sem escapar,
+`@marina_c` casaria `marinaXc` e o toque na menção abriria o perfil de OUTRA
+PESSOA. É o vazamento do e-mail da influenciadora de novo, aqui com mais chance
+de acontecer, porque `_` é comum em apelido. Passa por `paraLike`, e a catraca
+de `like-seguro.test.ts` cobra.
+
+⚠️ **O `23505` aqui é RECUSA, não sucesso repetido** — ao contrário de
+`rede_atividade`. Duas pacientes podem pedir `@marina` no mesmo segundo, e a
+conferência de disponibilidade é uma LEITURA: entre ela e a gravação cabe a
+outra. Quem decide é o índice único; uma segunda régua no cliente diria "livre"
+sobre um apelido que o servidor recusaria.
+
+### O texto vira link sem virar HTML
+
+⚠️ **`TextoComLinks` NÃO usa `dangerouslySetInnerHTML`.** Legenda é texto de
+terceiro; a única forma segura de destacar pedaços dela é quebrar em nós de
+React.
+
+⚠️ **O `@` recebe uma prop PRÓPRIA (`aoAbrirArroba`), e não `aoAbrirPerfil`.**
+A primeira versão reaproveitava aquela, que espera um **uuid**: o toque numa
+menção pediria o perfil de id `"marina"` e a tela responderia "indisponível" — a
+menção existe, a pessoa existe, e o app diz que não.
+
+⚠️ **E as duas entram em `acoes`, com referência estável.** Um fecho novo por
+render faria o `memo` do cartão errar em TODO post do feed — e a legenda está em
+cada um deles. É o defeito que já custou 232 ms por reação nesta lista.
+
+### A `#` é grade, e só de post público
+
+O recorte está na **consulta** (`postsDaTag`), antes de `montarPosts`, nunca num
+filtro depois: um post de camada `amigas` aparecendo ali seria a porta dos
+fundos da visibilidade. **E a régua é DITA na tela** — sem a frase, quem
+publicou para as amigas conclui que a tag está quebrada, e quem publicou em
+público não sabe que a foto virou vitrine aberta.
+
+⚠️ **Grade e não feed.** Uma tag reúne desconhecidas por assunto; em formato de
+feed, com legenda e reações à mostra, leria como "pessoas que eu sigo" — a
+confusão que o rótulo "Sugerido para você" existe para impedir.
+
+### ⚠️ O degrau do `@`, e o teste que o cobra
+
+`handle` e `quem_pode_mencionar` nascem num `APLICAR_` que o dono roda à mão, e
+**o deploy chega primeiro, sempre**. Sem degrau, o `42703` derruba
+`perfisPorId` e `montarPosts` descarta todo post cujo autor não está no Map:
+feed vazio, nenhum perfil abrindo, busca sem resultado. É o defeito de
+`miniatura_path` inteiro. `semAColunaDoArroba` é o degrau 1,25, e todos os
+degraus abaixo preenchem `handle: null` + o padrão da régua.
+
+⚠️ **E o teste da escada quase virou mentira nas MINHAS mãos.** Escrevi
+`CODIGO.includes("handle, ")` — e ele passava com ZERO degraus, porque
+`handle, ` está escrito na própria `COLUNAS_DO_PERFIL` três linhas acima. Um
+teste que casa a palavra em qualquer lugar do arquivo fica verde exatamente
+quando a coluna nova é acrescentada sem degrau, que é o defeito que ele existe
+para pegar. Hoje ele procura **dentro dos `replace(...)`**, e não é "um
+`replace` por coluna": as duas nascem no mesmo SQL e saem juntas num recorte só.
+Conferido por mutação (tirar o degrau → vermelho).
+
+### ⚠️ A BANCADA DESENHAVA O CASO QUE NUNCA FALHA
+
+A primeira verificação no navegador, com o recurso inteiro pronto, achou **zero
+links na legenda** e **nenhum `@` no perfil**. Nada estava quebrado no app: a
+bancada não passava `aoAbrirArroba`/`aoAbrirTag` e o perfil de exemplo não tinha
+`handle` — então ela pintava texto puro e uma linha vazia, que são os dois
+únicos estados que já eram certos.
+
+É a irmã da regra que já estava escrita ("a bancada injeta o DADO nos mesmos
+`useState` da produção"), agora valendo também para a FORMA das props — a mesma
+lição que já tinha produzido uma medição de desempenho falsa.
+
+**Medido depois:** os dois toques levam ao destino certo, `@marina.costa` e
+`@carol.andrade` aparecem nos dois perfis, `Marina.C` vira `@marina.c` (a
+normalização é do servidor), `obstetrica` é recusado como reservado com o botão
+desabilitado, os quatro alvos têm 44px e o console fica limpo.
+
+⚠️ **E o servidor de dev estava quebrado por `node_modules`, não por código**
+("Yallist is not a constructor": `lru-cache@5` do Babel com o `yallist@5`
+içado). Antes de investigar uma tela que não responde, leia o log do `vite` —
+e confira em que porta ele subiu, que é a armadilha já registrada aqui.
+
+**Aplicar:** `supabase/APLICAR_MENCOES_E_TAGS.sql`.
+**Bancadas:** `/preview-rede` (o cartão "Seu @", as três opções de quem marca) ·
+`/preview-instagram` (a legenda com `@` e `#` clicáveis) ·
+`/preview-instagram?tela=tag&tag=trigemeas`.
