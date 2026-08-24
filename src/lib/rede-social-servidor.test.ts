@@ -429,6 +429,73 @@ describe("reagir ao story", () => {
   });
 });
 
+describe("⚠️ a escada de recuo das colunas do perfil", () => {
+  /**
+   * ⚠️ **ESTE TESTE NASCEU DE UM DEFEITO MEU, EM PRODUÇÃO.**
+   *
+   * Acrescentei `feed_so_seguindo` à lista principal e não à escada. O banco do
+   * dono — que já tinha o selo, a conta oficial e a caixinha — falhava no
+   * degrau 1 E no 2 (que ainda pedia a coluna nova) e caía no 3, apagando em
+   * silêncio o selo da semana, o selo do bebê e a caixinha: três recursos que
+   * ele já usava, sumindo por uma coluna que ele nem sabia que existia.
+   *
+   * O comentário de `COLUNAS_SEM_OFICIAL` já descrevia esse cenário palavra por
+   * palavra. Faltava alguém cobrando.
+   */
+  const CODIGO_REDE = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+
+  function listaDe(nome: string): string {
+    const m = new RegExp(`const ${nome} =([\\s\\S]*?);`).exec(CODIGO_REDE);
+    if (!m) throw new Error(`lista não encontrada: ${nome}`);
+    return m[1];
+  }
+
+  test("⚠️ cada degrau REMOVE de verdade a coluna do degrau acima", () => {
+    /* Um degrau que ainda pede a coluna que fez o degrau anterior falhar não é
+       degrau nenhum: os dois caem juntos, e a escada vira um tobogã até o
+       último — que é onde os recursos somem. */
+    expect(listaDe("COLUNAS_SEM_FEED")).toContain('replace("feed_so_seguindo, ", "")');
+    const semOficial = listaDe("COLUNAS_SEM_OFICIAL");
+    expect(semOficial).toContain('replace("conta_oficial, ", "")');
+    expect(semOficial).toContain('"feed_so_seguindo, "');
+  });
+
+  test("⚠️ as listas de recuo são DERIVADAS, nunca copiadas à mão", () => {
+    /* Duas listas escritas à mão divergem no primeiro ajuste — e aqui a
+       divergência aparece como recurso sumindo, sem erro nenhum. */
+    expect(listaDe("COLUNAS_SEM_FEED")).toContain("COLUNAS_DO_PERFIL");
+    expect(listaDe("COLUNAS_SEM_OFICIAL")).toContain("COLUNAS_DO_PERFIL");
+  });
+
+  test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
+    const c = CODIGO_REDE.replace(/\s+/g, " ");
+    /* A entrada cai no degrau mais ALTO, não direto no fundo. */
+    expect(c).toContain("error ? await semAColunaDoFeed(sb, faltando)");
+    /* E cada degrau conhece o seguinte. */
+    expect(c).toContain("if (error) return semAColunaNova(sb, ids)");
+    expect(c).toContain("if (error) return semAsColunasDoSelo(sb, ids)");
+  });
+
+  test("⚠️ toda coluna nova do perfil precisa de degrau", () => {
+    /* A regra que faltava. `COLUNAS_DO_PERFIL` cresce a cada recurso, e o
+       deploy chega SEMPRE antes de o dono rodar o SQL — uma coluna sem degrau
+       derruba a escada inteira até o fundo. */
+    const principais = listaDe("COLUNAS_DO_PERFIL")
+      .replace(/["+\n]/g, " ")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    /* As que nasceram depois do degrau do selo têm de aparecer num `replace`. */
+    for (const nova of ["conta_oficial", "feed_so_seguindo"]) {
+      expect({ nova, naPrincipal: principais.includes(nova) }).toEqual({ nova, naPrincipal: true });
+      expect({ nova, temDegrau: CODIGO_REDE.includes(`replace("${nova}, ", "")`) }).toEqual({
+        nova,
+        temDegrau: true,
+      });
+    }
+  });
+});
+
 describe("higiene", () => {
   test('nenhum `select("*")`', () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
@@ -1085,14 +1152,24 @@ describe("gravar as marcações", () => {
  * sabia que existia.
  */
 describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
-  test("⚠️ há um degrau entre a lista cheia e a lista sem selo", () => {
-    const p = funcaoInterna("perfisPorId");
-    // O erro do select cheio cai no degrau do meio, nunca direto no de baixo.
-    expect(p).toContain("semAColunaNova(sb, faltando)");
-    expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
+  test("⚠️ há degrau entre a lista cheia e a lista sem selo", () => {
+    /* ⚠️ **ESTE TESTE TRAVAVA O NOME DO DEGRAU, e por isso errou duas vezes.**
+       Ele cravava `semAColunaNova(sb, faltando)` na entrada — então reprovou
+       quando um degrau NOVO (`semAColunaDoFeed`) entrou por cima, que é código
+       correto; e teria PASSADO se eu tivesse acrescentado a coluna sem degrau
+       nenhum, que era o defeito de verdade. Assinatura em vez de intenção, a
+       armadilha que este arquivo documenta em outros três lugares.
 
+       O que ele guarda agora é a INTENÇÃO: a entrada cai no degrau mais alto,
+       nunca direto no fundo. */
+    const p = funcaoInterna("perfisPorId");
+    expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
+    expect(p).toMatch(/error \? await semA[A-Za-z]+\(sb, faltando\)/);
+
+    /* E a escada chega ao fundo passando por todos: cada degrau conhece o
+       seguinte, e o último é o que tira o selo. */
+    expect(funcaoInterna("semAColunaDoFeed")).toContain("semAColunaNova(sb, ids)");
     const meio = funcaoInterna("semAColunaNova");
-    // E o degrau do meio conhece o de baixo: banco sem selo nenhum ainda desce.
     expect(meio).toContain("semAsColunasDoSelo(sb, ids)");
     expect(meio).toContain("COLUNAS_SEM_OFICIAL");
   });

@@ -626,7 +626,7 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAColunaNova(sb, faltando) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaDoFeed(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -762,7 +762,41 @@ const COLUNAS_DO_PERFIL =
  * Derivada e não copiada porque duas listas escritas à mão divergem no primeiro
  * ajuste — e aqui a divergência apareceria como recurso sumindo, sem erro.
  */
-const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "");
+const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "").replace(
+  "feed_so_seguindo, ",
+  "",
+);
+
+/**
+ * Degrau 1,5: o banco tem tudo do selo e ainda NÃO tem `feed_so_seguindo`.
+ *
+ * ⚠️ **ESTE DEGRAU NASCEU DE UM DEFEITO MEU, EM PRODUÇÃO, e o comentário do
+ * degrau de baixo já o previa palavra por palavra.**
+ *
+ * Acrescentei `feed_so_seguindo` à lista principal e não à escada. O banco do
+ * dono — que TEM o selo, a conta oficial e a caixinha — passou a falhar no
+ * degrau 1 e no 2 (que ainda pedia a coluna nova) e caía direto no 3, apagando
+ * em silêncio o selo da semana, o selo do bebê e a caixinha de perguntas:
+ * três recursos que ele já tinha ligado, sumindo por causa de uma coluna que
+ * ele nem sabia que existia.
+ *
+ * É literalmente o parágrafo escrito em `COLUNAS_SEM_OFICIAL`, acontecendo de
+ * novo por eu ter acrescentado a coluna sem subir o degrau.
+ *
+ * ⚠️ E `COLUNAS_SEM_OFICIAL` PRECISOU TIRAR AS DUAS: um degrau que só sabe
+ * remover a coluna dele não serve num banco que rodou meio SQL — a mesma lição
+ * de `marcarConsultaNoDia`, citada ali embaixo.
+ */
+const COLUNAS_SEM_FEED = COLUNAS_DO_PERFIL.replace("feed_so_seguindo, ", "");
+
+async function semAColunaDoFeed(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb.from("patient_profiles").select(COLUNAS_SEM_FEED).in("id", ids);
+  if (error) return semAColunaNova(sb, ids);
+  console.warn("[rede] sem feed_so_seguindo — rode APLICAR_COMUNIDADE_VIVA.sql");
+  /* Ausente vale `false`, que é o padrão da coluna: o feed misturado é o modo
+     de quem nunca escolheu, e é o que o banco passará a guardar. */
+  return ((data ?? []) as any[]).map((p) => ({ ...p, feed_so_seguindo: false }));
+}
 
 const COLUNAS_SEM_SELO =
   "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
