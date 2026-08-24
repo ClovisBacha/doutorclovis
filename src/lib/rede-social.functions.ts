@@ -2796,7 +2796,21 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
               referenceDays: p?.reference_days ?? null,
               today: hojeEmSaoPaulo(),
             });
-            return faseDe(g?.weeks ?? null, !!p?.birth_date);
+            /* ⚠️ A IDADE DO BEBÊ ENTRA AQUI, e é o que separa a mãe de nove
+               dias da mãe de dois anos. Sem ela, `faseDe` devolvia "pos" para
+               as duas e o filtro de fase parecida pareava justamente as duas
+               pessoas com MENOS em comum no app inteiro.
+
+               `birth_date` é a data do parto no perfil; `mesesEntre` lê
+               `YYYY-MM-DD` sem passar por fuso. */
+            const nasc = p?.birth_date ? String(p.birth_date).slice(0, 10) : null;
+            const d = hojeEmSaoPaulo();
+            const hojeStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+              2,
+              "0",
+            )}-${String(d.getDate()).padStart(2, "0")}`;
+            const meses = nasc ? filhosRegua.mesesEntre(nasc, hojeStr) : null;
+            return faseDe(g?.weeks ?? null, !!p?.birth_date, meses);
           };
           const eusPerfis = await perfisPorId(sb, [eu]);
           const minha = faseDaLinha(eusPerfis.get(eu));
