@@ -100,6 +100,23 @@ export const BANDEIRA_VERMELHA = new RegExp(
  * cobre o que aparece num app de gestação, e errar para o lado de ROTEAR uma
  * quantidade é muito mais barato que deixar passar uma pressão de 16 por 11.
  */
+/**
+ * ⚠️ **E O OBJETO ANTES do par também desqualifica.**
+ *
+ * Medido: "o berço é 130 por 70" e "comprei um quadro 20 por 15" abriam a
+ * Central de Emergência — os dois pares caem dentro das faixas plausíveis de
+ * pressão, e a lista de quantidade não ajuda quando não há unidade depois.
+ * Móvel, quadro e tapete têm nome ANTES da medida; pressão não tem.
+ */
+const NAO_TEM_OBJETO_ANTES =
+  /* ⚠️ **A JANELA É LARGA (25 caracteres), e a primeira versão usava `\\s{1,3}`
+     — que não cobria "o berço **é** 130 por 70" nem "o tapete **mede** 200 por
+     150". O objeto e a medida quase nunca ficam colados. O V8 aceita
+     lookbehind de comprimento variável; o `[^.!?\\n]` impede atravessar frase. */
+  "(?<!\\b(?:ber[çc]o|quadro|tapete|mesa|cama|colch(?:ã|a)o|sof(?:á|a)|" +
+  "arm(?:á|a)rio|c(?:ô|o)moda|tela|foto|papel|caixa|banheira|" +
+  "carrinho|manta|len(?:ç|c)ol|cortina|almofada|tapetinho)\\b[^.!?\\n]{0,25})";
+
 const NAO_E_QUANTIDADE =
   "(?!\\s*(?:pessoas?|convidad\\w*|reais|real|d[ií]as?|semanas?|m[eê]s|meses|horas?|" +
   "minutos?|metros?|cm|cent[ií]metros?|unidades?|itens?|item|pacotes?|vezes|vez|" +
@@ -130,8 +147,11 @@ export const PRESSAO_EM_NUMEROS = new RegExp(
      * caso é do ramo de cima. Quem escreve quantidade sempre põe o substantivo
      * depois: pessoas, reais, dias, convidados, unidades.
      */
-    "\\b(?:[89]|1\\d|2[0-5])\\s*por\\s*(?:[4-9]|1[0-6])(?![0-9])" + NAO_E_QUANTIDADE,
-    "\\b(?:[89]\\d|1\\d\\d|2[0-4]\\d|250)\\s*por\\s*(?:[4-9]\\d|1[0-6]\\d)(?![0-9])" +
+    NAO_TEM_OBJETO_ANTES +
+      "\\b(?:[89]|1\\d|2[0-5])\\s*por\\s*(?:[4-9]|1[0-6])(?![0-9])" +
+      NAO_E_QUANTIDADE,
+    NAO_TEM_OBJETO_ANTES +
+      "\\b(?:[89]\\d|1\\d\\d|2[0-4]\\d|250)\\s*por\\s*(?:[4-9]\\d|1[0-6]\\d)(?![0-9])" +
       NAO_E_QUANTIDADE,
   ].join("|"),
   "i",
@@ -254,6 +274,18 @@ export const ENTREGA_DE_CONDUTA = new RegExp(
      */
     "\\bpassou sozinh|\\bn(?:ã|a)o deu nada\\b",
     /**
+     * ⚠️ **"DEU TUDO CERTO" VOLTA — mas só com o ENQUADRAMENTO ANEDÓTICO.**
+     *
+     * A frase saiu inteira porque é como se anuncia um nascimento ("deu tudo
+     * certo, ele nasceu 3,2kg"). Tirá-la abriu buraco: "comigo deu tudo certo"
+     * — tranquilização sobre o risco alheio — passou a sair publicável.
+     *
+     * O que roteia é o "comigo"/"no meu caso" COLADO nela. O post de
+     * nascimento não tem esse enquadramento, e continua passando.
+     */
+    "\\bcomigo\\s+deu tudo certo\\b|\\bdeu tudo certo\\s+comigo\\b",
+    "\\bno meu caso\\s+deu tudo certo\\b",
+    /**
      * Condicional de conselho.
      *
      * ⚠️ **"SE EU FOSSE VOCÊ" ESTAVA COM A PESSOA TROCADA e passava inteira.**
@@ -286,11 +318,29 @@ export const ENTREGA_DE_CONDUTA = new RegExp(
      * roteia é o verbo seguido de coisa de tratamento. Sem o objeto, metade da
      * conversa da aba iria para o consultório.
      */
+    /**
+     * ⚠️ **O PASSADO EM PRIMEIRA PESSOA — a forma MAIS persuasiva, e ela
+     * passava inteira.** Medido: "tomei buscopan e resolveu" saía publicável.
+     * O imperativo manda; o relato CONVENCE ("comigo funcionou"), e é
+     * exatamente o padrão dos 20,9% de conselho errado que fecharam os
+     * comentários por meses.
+     */
+    "\\b(?:tomei|usei|bebi|passei|apliquei|tomava|usava)\\s+" +
+      "(?:um[a]?\\s+|o\\s+|a\\s+|esse\\s+|essa\\s+)?" +
+      "(?:rem(?:é|e)dio|medicament\\w*|comprimid\\w*|antibi(?:ó|o)tic\\w*|" +
+      "buscopan|dipirona|paracetamol|ibuprofen\\w*|dorflex|luftal|omeprazol)\\b",
     "\\b(?:tom[ae]|us[ae]|beb[ae]|passa|aplica|faz(?:\\s+o)?)\\s+" +
       "(?:um[a]?\\s+|o\\s+|a\\s+|esse\\s+|essa\\s+|este\\s+|esta\\s+)?" +
       "(?:rem(?:é|e)dio|medicament\\w*|comprimid\\w*|antibi(?:ó|o)tic\\w*|" +
       "buscopan|dipirona|paracetamol|ibuprofen\\w*|dorflex|luftal|omeprazol|" +
-      "ch(?:á|a)\\s+de\\s+\\w+|pomada|inje(?:ç|c)(?:ã|a)o|soro|vitamina\\s+\\w+)\\b",
+      /* ⚠️ **CHÁ É LISTA FECHADA, e nunca `chá de \\w+`.** Medido: "faz um chá
+         de bebê pra mim" era recusado como conduta clínica — o nome de um
+         recurso INTEIRO deste app. A lista traz o que tem efeito obstétrico
+         (uterotônico, abortivo caseiro, digestivo usado como remédio). */
+      "ch(?:á|a)\\s+de\\s+(?:canela|arruda|buchinha|sene|boldo|camomila|erva[- ]doce|" +
+      "hortel(?:ã|a)|gengibre|losna|artemisia|art(?:e|ê)misia|poejo|carqueja|" +
+      "cavalinha|maca|abacaxi\\s+com\\s+canela)|pomada|inje(?:ç|c)(?:ã|a)o|soro|" +
+      "vitamina\\s+\\w+)\\b",
   ].join("|"),
   "i",
 );

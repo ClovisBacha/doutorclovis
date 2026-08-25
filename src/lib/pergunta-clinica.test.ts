@@ -363,6 +363,14 @@ const ROTEIA = [
   "ficaria em casa e esperaria passar",
   "toma o remédio dela que é o mesmo",
   "não tome nada, espera passar",
+  /* O passado em primeira pessoa: a forma MAIS persuasiva, e passava inteira. */
+  "tomei buscopan e resolveu",
+  "eu tomei dipirona e passou",
+  /* A tranquilização anedótica, que a remoção de "deu tudo certo" reabriu. */
+  "comigo deu tudo certo",
+  "deu tudo certo comigo, relaxa",
+  "beba um chá de camomila",
+  "toma um chá de canela que ajuda",
 ];
 
 /* ══════════════════════════════════════════════════════════════════════════

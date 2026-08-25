@@ -8324,3 +8324,34 @@ Um teste por regra pega o caso que o autor imaginou; quarenta frases pegam o que
 ele não imaginou. A bateria virou teste permanente, nas duas direções — e a de
 falso POSITIVO importa mais, porque o custo dela é a paciente aprender que o
 alarme deste app não vale leitura.
+
+#### ⚠️ A revisão do MEU PRÓPRIO conserto achou quatro defeitos nele
+
+Uma segunda leva de agentes revisou adversarialmente as 3.664 linhas escritas
+nesta noite. Na régua clínica — que eu tinha acabado de "consertar" e coberto com
+uma bateria de 40 frases — havia **mais quatro**:
+
+1. ⚠️ **"faz um chá de bebê pra mim" era RECUSADO como conduta clínica.** O
+   imperativo novo usava `chá de \w+`, e `\w+` casa "bebê". Eu recusei **o nome
+   de um recurso inteiro deste app**. Virou lista fechada de chás com efeito
+   obstétrico.
+2. ⚠️ **"o berço é 130 por 70" abria a Central de Emergência.** O par cai dentro
+   da faixa plausível de pressão, e a lista de quantidade não ajuda quando não há
+   unidade. Móvel, quadro e tapete têm nome ANTES da medida; pressão não tem —
+   entrou um lookbehind com janela larga. ⚠️ **A primeira tentativa usou
+   `\s{1,3}` e não cobria "o berço **é** 130 por 70"**; a segunda não chegou a
+   entrar na expressão, e só o `.source` compilado mostrou isso. Ler o regex
+   FONTE, e não o código que o monta.
+3. ⚠️ **"tomei buscopan e resolveu" passava inteiro.** Eu cobri o imperativo
+   ("toma") e esqueci o PASSADO em primeira pessoa — que é a forma **mais**
+   persuasiva, e exatamente o padrão dos 20,9% de conselho errado.
+4. ⚠️ **Tirar "deu tudo certo" abriu buraco:** "comigo deu tudo certo" — a
+   tranquilização sobre o risco alheio — passou a sair publicável. Ela voltou
+   **com o enquadramento anedótico colado** ("comigo"/"no meu caso"), e o post de
+   nascimento, que não tem esse enquadramento, continua passando.
+
+**A lição de método, e é a mais cara da noite:** _consertar sob teste próprio não
+basta_. Eu tinha os quatro defeitos originais medidos, corrigidos e cobertos por
+uma bateria de 40 frases — e ainda assim introduzi quatro novos, dois deles
+falsos positivos sobre conversa banal. **Quem revisa o conserto não pode ser
+quem o escreveu**, e é para isso que a fase adversarial existe.
