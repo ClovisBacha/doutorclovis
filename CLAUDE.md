@@ -5871,7 +5871,138 @@ marcadores do trabalho recente antes de tocar em qualquer coisa** (`portoes-da
 -rede`: 0 local; `revelavel`: 0 local) e, confirmada a rebobinada, recuperar do
 remoto — nunca commitar por cima.
 
-### ⚠️ SILENCIAR TINHA QUATRO PORTAS, E FECHAVA DUAS (ago/2026)
+### As três que faltavam de verdade — e as três que já existiam (ago/2026)
+
+Pedido do dono: aplicar seis funcionalidades que eu tinha listado como
+faltando. **Conferindo antes de construir, TRÊS já existiam inteiras** —
+comentário avisando na caixa ♡, `@` dentro do comentário e contagem de
+visualizações do post, com texto próprio em `textoDoAviso` e tudo. Eu as tinha
+listado sem verificar, que é o mesmo defeito de prosa desatualizada que este
+arquivo registra três vezes.
+
+### 1. O story ganhou TEXTO — e o servidor esperava por ele desde o dia um
+
+⚠️ **`publicarStory` aceita 200 caracteres, roda a régua clínica neles e grava
+a coluna. A tela mandava `texto: null` CRAVADO.** Era o gênero inteiro
+faltando: um story sem legenda é uma foto muda, e a régua que existe para
+impedir conselho clínico corria sobre uma string vazia.
+
+`TEXTO_DO_STORY_MAX` mora em `rede-social.ts` e é lido pelos DOIS lados — o
+`200` já estava cravado no `zod`, e um segundo `200` na tela seria a
+divergência que aparece como ela digitando até o fim e o servidor recusando sem
+dizer por quê.
+
+### 2. O rascunho do story (`rascunho-do-story.ts`)
+
+O post tinha rascunho; o story, não — e aqui a perda dói MAIS, porque o story
+expira em 24 h: perder o texto de um post custa reescrever, perder o de um
+story custa a janela em que aquilo fazia sentido.
+
+- ⚠️ **A FOTO NÃO ENTRA**, pela mesma razão do post: o data URL de um story vai
+  a 1,5 MB, e a cota de ~5 MB do `localStorage` é compartilhada com o
+  `journey_state`. A gravação é CAMPO A CAMPO — com espalhamento, uma foto
+  acrescentada ao objeto entraria mesmo sem existir no TIPO.
+- ⚠️ **A validade é de UM dia, e não de sete.** Um story é coisa de HOJE; um
+  texto de quatro dias atrás oferecido de volta não é memória, é confusão — e
+  pior aqui, porque ela pode publicá-lo sem reler achando que é o de agora.
+- ⚠️ **Os dois interruptores sozinhos não contam**: oferecer "você tinha um
+  rascunho" para devolver um booleano é como a tela perde a credibilidade.
+- ⚠️ **O PREFIXO DA CHAVE É PRÓPRIO**, e o teste pegou: `dc-rede-rascunho-story-`
+  COMEÇA com a chave do post, e qualquer varredura por prefixo levaria os dois.
+- ⚠️ **E o nome da função também**: `guardarRascunhoDoStory`, nunca
+  `guardarRascunho` — esse já existe no arquivo e é o do POST. Reusá-lo gravaria
+  o story na chave da publicação.
+
+⚠️ **E A FOTO COBRIA O PAINEL — só a bancada pegou.** Com o campo e a faixa do
+rascunho, o painel de baixo cresceu e a imagem passou a pintar por cima da
+primeira coisa dele: a faixa aparecia cortada ao meio e o botão "Recuperar"
+ficava **inalcançável**, porque a foto interceptava o toque. `max-h-full` num
+item flexível só resolve depois do layout; quem conserta é `overflow-hidden`.
+
+### 3. Fixar publicação no perfil — e a armadilha é a PAGINAÇÃO
+
+A grade é cronológica pura, e é isso que faz o primeiro ultrassom afundar.
+
+- **Três**, e o número é de LAYOUT: a grade tem três colunas, então a primeira
+  fileira inteira é o recorte dela. Com quatro, sobra uma sozinha e o recorte
+  deixa de ser legível como recorte.
+- ⚠️ **É um INSTANTE, não um booleano**: com booleano não há como ordenar três
+  fixadas entre si, e a grade mostraria as três em ordem arbitrária. Entre elas
+  a ordem é a de FIXAÇÃO, nunca a de publicação — quem acabou de fixar espera
+  ver aquilo na frente.
+- ⚠️ **AS FIXADAS SÃO UMA CONSULTA À PARTE.** Ordenar a página que chegou faria
+  a fixada flutuar para o topo DA PÁGINA em que ela caiu: uma foto de abril
+  apareceria no meio da rolagem, com o pino, depois de duzentas outras.
+- ⚠️ **Buscadas em TODA página, desenhadas só na primeira.** Elas precisam ser
+  conhecidas sempre para sair da lista cronológica das seguintes — sem isso a
+  mesma foto aparecia no topo E de novo quando a paginação chegasse à data
+  dela, com a mesma chave de React.
+- ⚠️ **E O CURSOR TEVE DE MUDAR DE FONTE.** `brutos` passou a ser "as fixadas na
+  frente + a página", então `brutos.length === POSTS_POR_PAGINA` daria `false`
+  na primeira tela e **a paginação morreria depois da primeira página, em
+  silêncio**. Sai de `cronologicos`.
+- ⚠️ **O teto é conferido no SERVIDOR, contando o que o BANCO tem** — entre a
+  abertura da tela e o toque cabem outros aparelhos. Falha ao contar RECUSA.
+- ⚠️ **O pino é DESENHADO**, e cheio quando aceso: o emoji 📌 tem cor própria em
+  cada sistema e não tem dois estados — e aqui ele precisa distinguir "fixado"
+  de "fixar", que é a diferença entre um toque inofensivo e desfixar sem
+  querer.
+- **E ele aparece na CÉLULA da grade**, para quem visita: sem marca, as três
+  primeiras parecem só as mais recentes, e quem abre o perfil não tem como
+  saber que aquilo é um recorte escolhido. Mesma razão do rótulo "Sugerido
+  para você".
+
+### 4. Compartilhar uma publicação dentro de um story
+
+O risco é de VISIBILIDADE, e tem duas pontas.
+
+- ⚠️ **NA ESCRITA**: um story alcança todas as seguidoras. Só publicação
+  PÚBLICA, **de perfil PÚBLICO** — a camada sozinha não basta, porque um post
+  `publico` de perfil privado alcança apenas quem segue, e o perfil nasce
+  privado. É exatamente o vazamento que o quadro do repost teve e que eu
+  declarei "falso" antes de conferir a régua inteira. E `!!dono &&` vem na
+  FRENTE, para o portão não fechar por acidente.
+- ⚠️ **NA LEITURA**: o quadro passa por `montarPosts` com o contexto de QUEM
+  ABRE — quem assiste pode ter bloqueado a autora, ou ela pode ter fechado o
+  perfil depois. Em LOTE e fora do laço; falha ao ler não derruba a fileira.
+- ⚠️ **O banco guarda SÓ o id**, com `ON DELETE SET NULL`. Copiar texto ou foto
+  faria o quadro sobreviver à decisão de quem escreveu — a mesma decisão do
+  carimbo da semana. E o `SET NULL` é obrigatório: sem ele, apagar o post
+  derrubaria o story de OUTRA pessoa por violação de chave.
+- ⚠️ **A régua do botão é a do ↻ republicar, e não a do ↗**: o ↗ tira a FOTO do
+  app e por isso só vale na própria; isto põe o ENDEREÇO dentro de um story,
+  onde quem abrir passa por `podeVerPost` como em qualquer lugar.
+- ⚠️ **A foto do post vira o FUNDO, e a cópia é deliberada**: a coluna é
+  `SET NULL`, então sem a cópia o story de outra pessoa ficaria em branco por
+  uma decisão que não é dela.
+
+### ⚠️ E as catracas do repositório pegaram TRÊS coisas minhas
+
+1. **`porId.delete(f.id)` entrou na conta de DELETEs de tabela.** A catraca casa
+   `.delete(` por TEXTO, e essa conta é o que impede alguém de apagar dado de
+   paciente sem ninguém reparar. `idsDasAmigas` já usava filtro por esta razão,
+   e eu reintroduzi o `.delete` — virou filtro de novo.
+2. **A dívida de escritas sem checagem subiu**, pelo mesmo `.delete`.
+3. **O medidor de ondas acusou uma cascata que não existe.** Com a latência
+   simulada em 5 ms, a folga de agrupamento era 2,5 ms e o jitter do contêiner
+   (1 a 3 ms dentro do MESMO `Promise.all`) a atravessava. Subiu para 25 ms — e
+   aí o que sempre foram NOVE ondas parou de ser lido como dez. O teto desceu
+   junto, porque folga é dívida pré-aprovada.
+
+⚠️ **E TRÊS TESTES MEUS TRAVARAM A GRAFIA de novo** — o do cursor
+(`brutos.length === …`), o do `porId.delete`, e o do `dono.perfil_publico` sem
+o `as any`. Os três reprovaram consertos que eram obrigatórios. É a sétima vez
+nesta base; a regra continua sendo cobrar a GARANTIA, nunca a escrita.
+
+⚠️ **E o meu script de mutação pegou a ocorrência no COMENTÁRIO**, não no
+código: `!!dono &&` está escrito na prosa que explica por que ele existe. Toda
+mutação por texto ancora no corpo da função, e a prosa sai antes.
+
+**Aplicar no Supabase:** `supabase/APLICAR_FIXAR_E_STORY_DE_POST.sql`.
+**Bancadas:** `?tela=conferir&rascunhoStory=1` · `?tela=perfil&fixados=1` ·
+`?tela=story&quadro=1` — as três entraram na varredura de CI.
+
+## ⚠️ SILENCIAR TINHA QUATRO PORTAS, E FECHAVA DUAS (ago/2026)
 
 Pedido do dono: "aplique o silenciar sem deixar de seguir". **Ele já existia** —
 tabela, `contextoDe` carregando `silenciados`, servidor, botão no perfil e

@@ -1619,15 +1619,29 @@ describe("a grade do perfil pagina", () => {
   });
 
   /**
-   * ⚠️ O CURSOR SAI DE `brutos`, E NÃO DA LISTA JÁ FILTRADA.
+   * ⚠️ O CURSOR SAI DA LISTA CRONOLÓGICA QUE O BANCO DEVOLVEU, e nunca da que
+   * a régua já filtrou nem da que carrega as fixadas na frente.
    *
-   * A régua de visibilidade filtra depois de ler: uma página em que
-   * `podeVerPost` recusou tudo devolveria a lista vazia, o cursor viraria `null`
-   * e a grade pararia ali — escondendo para sempre o que vem depois.
+   * Da lista FILTRADA seria errado porque `podeVerPost` corta depois de ler:
+   * uma página em que a régua recusou tudo devolveria lista vazia, o cursor
+   * viraria `null` e a grade pararia ali — escondendo para sempre o que vem
+   * depois.
+   *
+   * ⚠️ **E de `brutos` PASSOU A SER ERRADO quando as fixadas entraram.** Hoje
+   * `brutos` é "as fixadas na frente + a página cronológica": o comprimento
+   * dele passa de `POSTS_POR_PAGINA` na primeira tela, a comparação por
+   * igualdade daria `false`, e a **paginação morreria depois da primeira
+   * página**, em silêncio. E o último item dele poderia ser uma fixada, cuja
+   * data mandaria a segunda página começar meses atrás.
+   *
+   * ⚠️ A versão anterior deste teste travava a string `brutos.length === …` e
+   * reprovou justamente o conserto. Hoje ele cobra a GARANTIA: a medida vem de
+   * uma lista puramente cronológica, e nunca da já filtrada.
    */
-  test("⚠️ `proximo` é medido pelo que o BANCO devolveu", () => {
-    expect(c).toContain("brutos.length === POSTS_POR_PAGINA");
+  test("⚠️ `proximo` é medido pela lista CRONOLÓGICA que o banco devolveu", () => {
+    expect(c).toContain("cronologicos.length === POSTS_POR_PAGINA");
     expect(c).not.toContain("daGrade.length === POSTS_POR_PAGINA");
+    expect(c).not.toContain("brutos.length === POSTS_POR_PAGINA");
   });
 });
 

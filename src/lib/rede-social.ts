@@ -526,6 +526,20 @@ export function haQuantoPublicou(iso: string, agora: number): string {
 /** Mínimo e máximo de opções. O CHECK do banco repete os dois. */
 export const OPCOES_MIN = 2;
 export const OPCOES_MAX = 4;
+
+/**
+ * O TETO DO TEXTO DO STORY.
+ *
+ * ⚠️ **Um número só, lido pela tela E pelo `zod` do servidor.** Ele já existia
+ * cravado em `publicarStory` (`z.string().max(200)`) e a tela não tinha campo
+ * nenhum — quando o campo nasceu, um `200` digitado nele seria a segunda cópia
+ * do mesmo limite, e a divergência apareceria como a paciente digitando até o
+ * fim e o servidor recusando sem dizer por quê.
+ *
+ * 200 e não mais: o texto pousa POR CIMA da foto, e um parágrafo ali tapa o
+ * conteúdo que o story existe para mostrar.
+ */
+export const TEXTO_DO_STORY_MAX = 200;
 /** Uma opção é um rótulo curto, não um parágrafo. */
 export const LIMITE_DA_OPCAO = 40;
 
@@ -657,4 +671,54 @@ export function conjuntoDeBloqueio(ids: Iterable<string>, degradado: boolean): C
     degradado,
     has: (id: string) => degradado || set.has(id),
   };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   FIXAR PUBLICAÇÃO NO PERFIL
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Quantas publicações cabem fixadas.
+ *
+ * ⚠️ **Três, e o número é de LAYOUT antes de ser de produto.** A grade do
+ * perfil tem três colunas (ver `medidas-instagram.ts`): com três fixadas, a
+ * primeira fileira inteira é o que ela escolheu mostrar e a segunda já é a
+ * ordem cronológica. Com quatro, sobra uma sozinha numa fileira nova e o
+ * recorte deixa de ser legível como recorte — vira "algumas publicações no
+ * começo".
+ */
+export const FIXADOS_MAX = 3;
+
+/**
+ * A ordem da grade do perfil: fixadas primeiro, depois o resto.
+ *
+ * ⚠️ **A ORDEM DENTRO DAS FIXADAS É A DE FIXAÇÃO, não a de publicação.** Fixar
+ * é um gesto de agora: quem acabou de fixar espera ver aquilo na frente. Ordenar
+ * as três fixadas por `criadoEm` faria a mais nova ir para o fim quando ela
+ * fixasse uma foto antiga — e ela não teria como corrigir, porque não há como
+ * reordenar.
+ *
+ * ⚠️ **E é uma ORDENAÇÃO ESTÁVEL sobre a lista que chega.** Ela NÃO reordena o
+ * resto: o que não é fixado mantém exatamente a ordem em que veio do servidor,
+ * que já é cronológica e já carrega a paginação. Reordenar aqui faria a segunda
+ * página aparecer embaralhada em relação à primeira.
+ */
+export function ordenarComFixados<T extends { fixadoEm?: string | null }>(posts: T[]): T[] {
+  const fixados = posts.filter((p) => !!p.fixadoEm);
+  if (fixados.length === 0) return posts;
+  const resto = posts.filter((p) => !p.fixadoEm);
+  fixados.sort((a, b) => Date.parse(b.fixadoEm!) - Date.parse(a.fixadoEm!));
+  return [...fixados, ...resto];
+}
+
+/**
+ * Posso fixar mais uma?
+ *
+ * ⚠️ **Quem já está fixada NÃO conta como "mais uma"** — refixar o que já está
+ * fixado é um toque sem efeito, e recusá-lo com "você já tem três" seria o app
+ * respondendo a uma pergunta que ninguém fez.
+ */
+export function podeFixar(v: { jaFixados: number; esteJaEstaFixado: boolean }): boolean {
+  if (v.esteJaEstaFixado) return true;
+  return v.jaFixados < FIXADOS_MAX;
 }

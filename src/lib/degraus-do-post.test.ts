@@ -1,4 +1,5 @@
 import { describe, test, expect } from "bun:test";
+import { readFileSync } from "node:fs";
 import { postsCrus } from "./rede-social.functions";
 
 /**
@@ -47,28 +48,46 @@ function bancoCom(conhecidas: string[]) {
   };
 }
 
-const TODAS = [
-  "id",
-  "autor_id",
-  "texto",
-  "imagem_path",
-  "imagens",
-  "visibilidade",
-  "criado_em",
-  "enquete_opcoes",
-  "aula",
-  "pergunta",
-  "comparacao_de",
-  "editado_em",
-  "miniatura_path",
-  "marco_tipo",
-  "marco_dias",
-  "video_path",
-  "repost_de",
-  "alt_texto",
-];
+/**
+ * Todas as colunas que a leitura pede — DERIVADAS do fonte, nunca escritas à
+ * mão.
+ *
+ * ⚠️ Uma cópia aqui divergiria da lista real no primeiro ajuste, e a
+ * divergência apareceria como o teste "banco em dia devolve tudo" reprovando
+ * uma coluna que acabou de nascer — que é a forma mais rápida de alguém editar
+ * o teste em vez de ler o que ele garante. Aconteceu na primeira versão deste
+ * arquivo.
+ */
+const TODAS = (() => {
+  const fonte = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+  const i = fonte.indexOf("const COLUNAS_DO_POST =");
+  const lista = fonte.slice(i, fonte.indexOf(";", i));
+  return [...lista.matchAll(/"([^"]+)"/g)]
+    .flatMap((m) => m[1].split(","))
+    .map((c) => c.trim())
+    .filter(Boolean);
+})();
 
 const ler = (sb: any) => postsCrus(sb, (b: any) => b);
+
+/**
+ * Quantos degraus a escada tem hoje — lido do FONTE, nunca cravado.
+ *
+ * ⚠️ Um número à mão aqui reprovaria toda camada de SQL nova, e quem vê um
+ * teste vermelho sobre uma coluna que acabou de acrescentar troca o número sem
+ * ler o que ele garantia.
+ */
+const DEGRAUS = (() => {
+  /* ⚠️ **ANCORADO EM `DEGRAUS_DO_POST`, e não no arquivo inteiro.** A primeira
+     versão contava `aviso: "` solto — e `publicarPost` tem a própria escada
+     (`CAMADAS`), com o mesmo campo. O número saía somando LEITURA e ESCRITA, e
+     o teste reprovava sobre uma escada que estava certa. É a mesma armadilha de
+     substring que já pegou `const fora =` e `minhaColuna` nesta base. */
+  const fonte = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+  const i = fonte.indexOf("const DEGRAUS_DO_POST");
+  const bloco = fonte.slice(i, fonte.indexOf("\n];", i));
+  return (bloco.match(/aviso: "/g) ?? []).length;
+})();
 
 describe("⚠️ postsCrus desce UM degrau por vez", () => {
   test("banco em dia devolve tudo, com UMA consulta só", async () => {
@@ -118,8 +137,10 @@ describe("⚠️ postsCrus desce UM degrau por vez", () => {
     const [p] = await ler(sb);
     expect(p.id).toBe("v:id");
     for (const c of TODAS.slice(7)) expect(p[c]).toBeNull();
-    /* Cinco tentativas: a lista cheia e os quatro degraus. */
-    expect(sb.pedidos.length).toBe(5);
+    /* A lista cheia mais um pedido por degrau. ⚠️ DERIVADO, e não um número
+       cravado: acrescentar uma camada de SQL não pode reprovar um teste que
+       continua descrevendo a mesma garantia. */
+    expect(sb.pedidos.length).toBe(1 + DEGRAUS);
   });
 
   test("⚠️ nem o piso responde → lista VAZIA, nunca uma exceção", async () => {

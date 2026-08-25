@@ -454,3 +454,76 @@ describe('⚠️ o interruptor "Só quem eu sigo"', () => {
     expect(semComentarios.slice(i, semComentarios.indexOf("\n", i))).toContain("convite");
   });
 });
+
+describe("⚠️ o story ganhou texto, e o texto ganhou rascunho", () => {
+  /**
+   * ⚠️ **O COMPOSITOR DE STORY NÃO TINHA CAMPO DE TEXTO, e o servidor esperava
+   * por ele desde o primeiro dia**: `publicarStory` aceita 200 caracteres, roda
+   * a régua clínica neles e grava a coluna — e a tela mandava `texto: null`
+   * cravado. Era o gênero inteiro faltando; um story sem legenda é uma foto
+   * muda. É a mesma família das sete funções de servidor que existiam sem
+   * porta.
+   */
+  test("⚠️ `texto: null` cravado NÃO volta", () => {
+    const i = semComentarios.indexOf("async function publicarStory");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = semComentarios.slice(i, semComentarios.indexOf("\n  }", i));
+    expect(corpo).not.toMatch(/texto:\s*null\s*,/);
+    expect(corpo).toContain("texto.trim() || null");
+  });
+
+  test("o campo lê o teto da régua, e não um número digitado", () => {
+    /* O `200` já existia cravado no `zod` do servidor. Um segundo `200` na tela
+       seria a divergência que aparece como ela digitando até o fim e o servidor
+       recusando sem dizer por quê. */
+    expect(semComentarios).toContain("TEXTO_DO_STORY_MAX");
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 6000);
+    expect(corpo).not.toMatch(/slice\(0,\s*200\)/);
+  });
+
+  test("⚠️ o rascunho OFERECE, e não preenche sozinho", () => {
+    /* Encher o campo com o texto de ontem no momento em que ela abre para
+       publicar outra coisa é como um story sai errado — e story não se edita
+       depois de publicado. */
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 9000);
+    expect(corpo).toContain("Recuperar");
+    expect(corpo).toContain("Descartar");
+    /* O estado inicial é VAZIO: nenhum `useState` do compositor nasce do
+       rascunho. */
+    expect(corpo).toContain('const [texto, setTexto] = useState("")');
+  });
+
+  test("⚠️ a primeira pintura NÃO grava — senão o rascunho é apagado ao abrir", () => {
+    /**
+     * É o defeito que o compositor de post já pagou: sem o `return`, o efeito
+     * roda na montagem com os campos vazios e, 700 ms depois, `paraGuardar`
+     * devolve `guardar: false` (a regra certa: rascunho vazio apaga). A faixa
+     * continuava na tela porque o texto já estava em memória — então quem
+     * tocasse em "Recuperar" na hora não via nada de errado, e quem voltasse
+     * depois perdia o texto para sempre.
+     */
+    const i = semComentarios.indexOf("export function ConferirStory");
+    const corpo = semComentarios.slice(i, i + 9000);
+    expect(corpo).toMatch(
+      /if \(primeiraPintura\.current\) \{\s*primeiraPintura\.current = false;\s*return;/,
+    );
+  });
+
+  test("⚠️ publicar APAGA o rascunho, pela função do STORY", () => {
+    /* Sem isto, a próxima abertura oferece de volta o story que ela acabou de
+       publicar. E o nome importa: `guardarRascunho` (sem sufixo) é o do POST, e
+       chamá-lo aqui apagaria o rascunho da publicação dela. */
+    const i = semComentarios.indexOf("async function publicarStory");
+    const corpo = semComentarios.slice(i, semComentarios.indexOf("\n  }", i));
+    expect(corpo).toContain("guardarRascunhoDoStory(null)");
+  });
+
+  test("⚠️ as duas chaves de rascunho são DIFERENTES", () => {
+    /* Post e story convivem no mesmo aparelho e na mesma conta. Uma chave só
+       faria abrir o compositor de story com o texto de um post. */
+    expect(semComentarios).toContain("chaveDoRascunhoDeStory");
+    expect(semComentarios).toContain("chaveDoRascunho(");
+  });
+});

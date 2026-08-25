@@ -48,6 +48,10 @@ import {
   emojiDaReacao,
   totalDeReacoes,
   REACOES,
+  TEXTO_DO_STORY_MAX,
+  FIXADOS_MAX,
+  podeFixar,
+  ordenarComFixados,
   type AulaNoPost,
   type ConjuntoDeBloqueio,
   type ContagemDeReacoes,
@@ -165,6 +169,15 @@ export type PostNaTela = {
    * ao que estava escrito antes não tem como saber que mudou.
    */
   editadoEm: string | null;
+  /**
+   * Quando ela fixou esta publicação no perfil, ou `null`.
+   *
+   * ⚠️ **Viaja para TODO MUNDO, e não só para a autora** — ao contrário de
+   * `vistas`. Fixar é um gesto PÚBLICO: o ponto do recurso é que quem abre o
+   * perfil dela veja aquelas três primeiro. Esconder de terceiros faria a grade
+   * chegar embaralhada em relação à intenção dela.
+   */
+  fixadoEm: string | null;
   /**
    * A pergunta anônima que este post responde, ou `null`.
    *
@@ -761,7 +774,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path, repost_de, alt_texto";
+  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -828,6 +841,13 @@ const COLUNAS_DO_POST_ANTIGAS =
  * existe para impedir.
  */
 const DEGRAUS_DO_POST: { aviso: string; colunas: string[]; nulos: Record<string, null> }[] = [
+  {
+    aviso: "publicação fixada — rode APLICAR_FIXAR_E_STORY_DE_POST.sql",
+    colunas: ["fixado_em"],
+    /* Sem a coluna ninguém tem publicação fixada, que é o estado de antes do
+       recurso — a grade volta a ser cronológica pura. */
+    nulos: { fixado_em: null },
+  },
   {
     aviso: "descrição da foto — rode APLICAR_COMENTARIOS_E_LIMITES.sql",
     colunas: ["alt_texto"],
@@ -1568,6 +1588,7 @@ export async function montarPosts(
         vistas: p.autor_id === eu ? (vistas.get(p.id) ?? 0) : null,
         comparacao: comparacoes.get(p.id) ?? null,
         editadoEm: p.editado_em ?? null,
+        fixadoEm: p.fixado_em ?? null,
         marcadas: marcadas.get(p.id) ?? [],
         souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
         salvo: salvos.has(p.id),
@@ -1970,7 +1991,26 @@ export const verPerfil = createServerFn({ method: "POST" })
        ⚠️ E as duas rodam DEPOIS do portão de alcance, de propósito: ler as
        publicações de um perfil que a régua vai recusar é trabalho jogado fora e,
        pior, é a ordem que um dia alguém "otimiza" movendo o portão para baixo. */
-    const [marcados, proprios] = await Promise.all([
+    /**
+     * ⚠️ **AS FIXADAS SÃO UMA CONSULTA À PARTE, e SÓ NA PRIMEIRA PÁGINA.**
+     *
+     * A grade é paginada por cursor de `criado_em`. Ordenar a página que
+     * chegou faria a fixada flutuar para o topo DA PÁGINA em que ela caiu, e
+     * não para o topo da grade: uma foto fixada de abril apareceria no meio da
+     * rolagem, com o pino, depois de duzentas outras — que é o oposto exato do
+     * recurso.
+     *
+     * Elas vêm inteiras de uma vez (o teto é três), na abertura, e as páginas
+     * seguintes não as trazem de novo: `antesDe` já as deixou para trás no
+     * tempo, e o `Map` por id remove a que por acaso caísse na primeira leva.
+     *
+     * ⚠️ **E a leitura falha ABERTA de propósito, aqui.** Se a coluna não
+     * existe (o dono ainda não rodou o SQL) ou a consulta tosse, `fixados` fica
+     * vazio e a grade volta a ser cronológica pura — que é exatamente o estado
+     * de antes do recurso. O contrário (derrubar a grade porque o pino não
+     * carregou) trocaria um enfeite por uma tela vazia.
+     */
+    const [marcados, proprios, fixados] = await Promise.all([
       idsMarcadosDe(sb, data.alvoId),
       postsCrus(sb, (base) => {
         const q = base
@@ -1980,6 +2020,21 @@ export const verPerfil = createServerFn({ method: "POST" })
           .limit(POSTS_POR_PAGINA);
         return data.antesDe ? q.lt("criado_em", data.antesDe) : q;
       }),
+      /* ⚠️ Buscadas em TODA página, e não só na primeira. Elas só são
+         DESENHADAS no topo da primeira — mas precisam ser conhecidas sempre,
+         para sair da lista cronológica das páginas seguintes. Sem isso, a foto
+         fixada de abril aparecia no topo da primeira tela E de novo no meio da
+         rolagem, quando a paginação chegasse à data dela: a mesma publicação
+         duas vezes, com a mesma chave de React. São três linhas por um índice
+         parcial — a consulta mais barata desta função. */
+      postsCrus(sb, (base) =>
+        base
+          .eq("autor_id", data.alvoId)
+          .is("arquivado_em", null)
+          .not("fixado_em", "is", null)
+          .order("fixado_em", { ascending: false })
+          .limit(FIXADOS_MAX),
+      ).catch(() => [] as any[]),
     ]);
     const deMarcacao = marcados.length
       ? await postsCrus(sb, (base) => {
@@ -1996,9 +2051,35 @@ export const verPerfil = createServerFn({ method: "POST" })
       : [];
     const porId = new Map<string, any>();
     for (const p of [...proprios, ...deMarcacao]) porId.set(p.id, p);
-    const brutos = [...porId.values()]
+    /* ⚠️ As fixadas SAEM da lista cronológica antes do corte: sem isto, uma
+       fixada recente apareceria duas vezes na primeira tela — uma no topo com o
+       pino e outra no lugar dela na ordem —, e chave repetida derruba a lista
+       inteira do React.
+
+       ⚠️ **Por FILTRO, e não por `porId.delete(...)`.** A catraca de escritas
+       do repositório casa `.delete(` por TEXTO, então um `Map.delete` entra na
+       conta como se fosse um DELETE de tabela — e a conta de DELETEs
+       deliberados é justamente o que impede alguém de apagar dado de paciente
+       sem ninguém reparar. `idsDasAmigas` já usava filtro por esta razão, e eu
+       reintroduzi o `.delete` aqui. */
+    const idsFixados = new Set(fixados.map((f: any) => f.id));
+    const cronologicos = [...porId.values()]
+      .filter((p: any) => !idsFixados.has(p.id))
       .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
       .slice(0, POSTS_POR_PAGINA);
+    /* ⚠️ E as fixadas entram na frente SEM contar no corte de página: elas são
+       no máximo três, e descontá-las do limite faria a primeira tela vir com
+       menos publicação que as seguintes. */
+    /* ⚠️ **Desenhadas SÓ na primeira página.** Repetir o bloco fixado no topo
+       de cada leva faria a grade mostrar as mesmas três a cada rolagem. */
+    const brutos = data.antesDe
+      ? cronologicos
+      : [
+          ...[...fixados].sort((a, b) =>
+            String(b.fixado_em ?? "").localeCompare(String(a.fixado_em ?? "")),
+          ),
+          ...cronologicos,
+        ];
 
     /* ⚠️ O olho da prévia é um SENTINELA, nunca o meu id: `podeVerPost`
        curto-circuita em `euId === post.autorId` ("a dona sempre vê os dela"), e
@@ -2108,18 +2189,39 @@ export const verPerfil = createServerFn({ method: "POST" })
       euSigo: persona ? null : data.alvoId === eu ? await contarSeguindo(sb, eu) : null,
     };
 
-    const daGrade = ordenarFeed(posts);
+    /* ⚠️ **`ordenarComFixados`, e NÃO `ordenarFeed`.** `montarPosts` pode
+       devolver em ordem diferente da que entrou (ele monta em lote), e
+       `ordenarFeed` reordena TUDO por data — o que jogaria a fixada de abril de
+       volta para o fim, desfazendo a consulta à parte lá de cima. A régua nova é
+       estável: fixadas primeiro (pela ordem de FIXAÇÃO), e o resto exatamente
+       como chegou. */
+    const daGrade = ordenarComFixados(ordenarFeed(posts));
     return {
       ok: true as const,
       perfil,
       posts: daGrade,
-      /* ⚠️ O cursor sai de `brutos`, e NÃO de `daGrade`. A régua de visibilidade
-         filtra depois de ler: uma página em que `podeVerPost` recusou tudo
-         devolveria `daGrade` vazio, o cursor viraria `null` e a grade pararia ali
-         — escondendo para sempre o que vem depois. `brutos` é o que o banco de
-         fato entregou, e é ele que diz se ainda há mais. */
+      /**
+       * ⚠️ O cursor sai dos CRONOLÓGICOS, e NÃO de `daGrade` nem de `brutos`.
+       *
+       * De `daGrade` seria errado porque a régua de visibilidade filtra DEPOIS
+       * de ler: uma página em que `podeVerPost` recusou tudo devolveria a lista
+       * vazia, o cursor viraria `null` e a grade pararia ali — escondendo para
+       * sempre o que vem depois.
+       *
+       * ⚠️ **E de `brutos` PASSOU A SER ERRADO quando as fixadas entraram.**
+       * `brutos` hoje é "as fixadas na frente + a página cronológica", então o
+       * comprimento dele passa de `POSTS_POR_PAGINA` na primeira tela — a
+       * comparação por igualdade daria `false` e a **paginação morreria depois
+       * da primeira página**, em silêncio. E o último item dele poderia ser uma
+       * fixada, cuja data mandaria a segunda página começar meses atrás.
+       *
+       * `cronologicos` é o que o banco de fato entregou na ordem do tempo, e é
+       * ele que diz se ainda há mais.
+       */
       proximo:
-        brutos.length === POSTS_POR_PAGINA ? (brutos[brutos.length - 1].criado_em as string) : null,
+        cronologicos.length === POSTS_POR_PAGINA
+          ? (cronologicos[cronologicos.length - 1].criado_em as string)
+          : null,
     };
   });
 
@@ -4064,6 +4166,28 @@ export type StoryNaTela = {
    */
   minhaReacao: TipoDeReacao | null;
   /**
+   * A publicação compartilhada dentro deste story, ou `null`.
+   *
+   * ⚠️ **RESOLVIDA PARA QUEM ASSISTE, e não para quem publicou.** Um story é
+   * visto por todas as seguidoras dela; a publicação compartilhada pode ser de
+   * um perfil fechado, de alguém que a espectadora bloqueou, ou de uma paciente
+   * que entrou em Modo Cuidado depois. O quadro passa por `podeVerPost` com o
+   * contexto de QUEM ABRIU — e quando a régua recusa, ele simplesmente não vem,
+   * com o story continuando inteiro. É o mesmo desenho do quadro de
+   * republicação, e a mesma razão.
+   *
+   * ⚠️ **E o banco guarda SÓ O ID.** Nem texto, nem caminho de foto, nem nome.
+   * Copiar qualquer coisa faria o quadro sobreviver à decisão de quem escreveu:
+   * ela edita a legenda, arquiva, ou fecha o perfil, e a versão antiga
+   * continuaria circulando dentro do story de outra pessoa.
+   */
+  postCompartilhado: {
+    id: string;
+    autorNome: string;
+    imagemUrl: string | null;
+    texto: string | null;
+  } | null;
+  /**
    * A caixinha aberta neste story.
    *
    * ⚠️ **Não é uma segunda caixinha.** A pergunta cai na MESMA `rede_perguntas`
@@ -4097,13 +4221,15 @@ export const publicarStory = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         imagem: z.string().max(1_500_000),
-        texto: z.string().max(200).nullable(),
+        texto: z.string().max(TEXTO_DO_STORY_MAX).nullable(),
         /** A semana no canto da foto. Escolha POR PUBLICAÇÃO — ver a régua. */
         carimbarSemana: z.boolean().optional(),
         /** 2 a 4 opções curtas, ou nada. A régua é a MESMA do post. */
         enquete: z.array(z.string().max(60)).max(6).optional(),
         /** Abrir a caixinha neste story. */
         perguntaAberta: z.boolean().optional(),
+        /** A publicação compartilhada dentro deste story. Conferida no handler. */
+        postDe: z.string().uuid().nullable().optional(),
       })
       .parse(i),
   )
@@ -4127,6 +4253,47 @@ export const publicarStory = createServerFn({ method: "POST" })
       if (desfecho !== "publicavel") {
         return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
       }
+    }
+
+    /**
+     * ⚠️ **A PUBLICAÇÃO COMPARTILHADA PRECISA SER PÚBLICA — a MESMA régua do
+     * repost, e pelo mesmo motivo.**
+     *
+     * Um story alcança todas as seguidoras dela. Deixar compartilhar uma
+     * publicação da camada `amigas` faria o story ser a porta dos fundos da
+     * visibilidade: o desabafo de terça, escrito para seis pessoas, chegaria a
+     * trezentas dentro do quadro.
+     *
+     * ⚠️ **E o PERFIL da autora também tem de ser público**, não só a camada. Um
+     * post `publico` de um perfil PRIVADO alcança apenas quem segue — e o perfil
+     * nasce privado. É exatamente o vazamento que o quadro do repost teve, e que
+     * eu declarei "falso" antes de conferir a régua inteira.
+     *
+     * ⚠️ **E `!!dono &&` vem na FRENTE**: sem o perfil, `!dono?.care_mode` daria
+     * `true` e o portão fecharia por acidente, sustentado só pelo termo
+     * anterior. Depender de acidente é como um portão reabre.
+     */
+    let postDe: string | null = null;
+    if (data.postDe) {
+      const { data: orig } = await sb
+        .from("rede_posts")
+        .select("id, autor_id, visibilidade, arquivado_em")
+        .eq("id", data.postDe)
+        .maybeSingle();
+      const dono = orig
+        ? (await perfisPorId(sb, [(orig as any).autor_id])).get((orig as any).autor_id)
+        : null;
+      const vale =
+        !!orig &&
+        !(orig as any).arquivado_em &&
+        (orig as any).visibilidade === "publico" &&
+        !!dono &&
+        !!(dono as any).perfil_publico &&
+        !(dono as any).care_mode;
+      /* ⚠️ Recusa em vez de publicar sem o quadro: ela escolheu compartilhar
+         AQUELA publicação, e um story sem o quadro é outro story. */
+      if (!vale) return { ok: false as const, motivo: "repost_invalido" as const };
+      postDe = data.postDe;
     }
 
     const { guardarImagem } = await import("@/lib/imagens.server");
@@ -4156,12 +4323,29 @@ export const publicarStory = createServerFn({ method: "POST" })
     /* ⚠️ TRÊS DEGRAUS, um por leva de colunas — o mesmo desenho da leitura.
        Um recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
        carimbo perdê-lo por causa do SQL da enquete. */
-    const { error } = await sb.from("rede_stories").insert({
+    const { error: erroComPost } = await sb.from("rede_stories").insert({
       ...base,
       carimbo_semana: data.carimbarSemana === true,
       enquete_opcoes: enquete,
       pergunta_aberta: data.perguntaAberta === true,
+      post_de: postDe,
     });
+    /* ⚠️ Degrau NOVO, no topo — `post_de` nasce no
+       `APLICAR_FIXAR_E_STORY_DE_POST.sql`. ⚠️ E se ela ESCOLHEU compartilhar,
+       descer sem a coluna publicaria um story diferente do que ela montou: a
+       recusa é honesta, o "ok" mudo não. */
+    if (erroComPost && postDe) {
+      console.warn("[rede] story sem post_de — rode APLICAR_FIXAR_E_STORY_DE_POST.sql");
+      return { ok: false as const, motivo: "sem_suporte" as const };
+    }
+    const { error } = erroComPost
+      ? await sb.from("rede_stories").insert({
+          ...base,
+          carimbo_semana: data.carimbarSemana === true,
+          enquete_opcoes: enquete,
+          pergunta_aberta: data.perguntaAberta === true,
+        })
+      : { error: null };
     if (error) {
       console.warn("[rede] story sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
       const { error: erro2 } = await sb
@@ -4241,6 +4425,19 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
          recuo que pulasse direto para o mínimo apagaria o carimbo da semana de
          quem já rodou aquele SQL, só porque o SQL da enquete ainda não rodou.
          Cada degrau tira exatamente o que faltou. */
+      const comPost = await monta(
+        sb
+          .from("rede_stories")
+          .select(
+            "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta, post_de",
+          ),
+      );
+      if (!comPost.error) return (comPost.data ?? []) as any[];
+
+      /* ⚠️ Degrau NOVO, no topo: `post_de` nasce no
+         `APLICAR_FIXAR_E_STORY_DE_POST.sql`. Sem ele o story continua inteiro —
+         só o quadro da publicação some, que é o estado de antes do recurso. */
+      console.warn("[rede] stories sem post_de — rode APLICAR_FIXAR_E_STORY_DE_POST.sql");
       const cheio = await monta(
         sb
           .from("rede_stories")
@@ -4248,7 +4445,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
             "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta",
           ),
       );
-      if (!cheio.error) return (cheio.data ?? []) as any[];
+      if (!cheio.error) return ((cheio.data ?? []) as any[]).map((l) => ({ ...l, post_de: null }));
 
       console.warn("[rede] stories sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
       const comCarimbo = await monta(
@@ -4261,6 +4458,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           ...l,
           enquete_opcoes: null,
           pergunta_aberta: false,
+          post_de: null,
         }));
       }
 
@@ -4273,6 +4471,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         carimbo_semana: false,
         enquete_opcoes: null,
         pergunta_aberta: false,
+        post_de: null,
       }));
     })();
     const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
@@ -4343,6 +4542,48 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
       linhas.map((l: any) => l.imagem_path).filter(Boolean),
       3600,
     );
+    /**
+     * OS QUADROS DAS PUBLICAÇÕES COMPARTILHADAS.
+     *
+     * ⚠️ **`montarPosts` COM O MEU CONTEXTO — é ele que aplica `podeVerPost`.**
+     * A publicação pode ser de um perfil fechado, de alguém que EU bloqueei, ou
+     * de uma paciente que entrou em Modo Cuidado depois de ela compartilhar. A
+     * régua é a mesma de sempre, com o contexto de quem ABRE — nunca o de quem
+     * publicou o story, que é a versão que vaza.
+     *
+     * ⚠️ **Em LOTE, e fora do laço.** Uma consulta por story seria vinte idas
+     * na fileira que a aba desenha primeiro.
+     *
+     * ⚠️ **Falha ao ler NÃO derruba a fileira**: sem os quadros, os stories
+     * aparecem inteiros e sem o cartão — que é o estado de antes do recurso.
+     */
+    const quadros = new Map<
+      string,
+      { id: string; autorNome: string; imagemUrl: string | null; texto: string | null }
+    >();
+    {
+      const ids = [...new Set(linhas.map((l: any) => l.post_de).filter(Boolean))] as string[];
+      if (ids.length) {
+        try {
+          const crus = await postsCrus(sb, (base) =>
+            base.in("id", ids).is("arquivado_em", null).limit(ids.length),
+          );
+          for (const p of await montarPosts(sb, eu, crus, ctx)) {
+            quadros.set(p.id, {
+              id: p.id,
+              autorNome: p.autorNome,
+              /* A miniatura basta: o quadro desenha pequeno dentro do story, e
+                 a foto de 1080 seria baixada duas vezes na mesma tela. */
+              imagemUrl: p.miniaturaUrl ?? p.imagemUrl,
+              texto: p.texto,
+            });
+          }
+        } catch {
+          /* Sem quadro, o story continua inteiro. */
+        }
+      }
+    }
+
     const porAutor = new Map<string, BolhaDeStory>();
 
     for (const l of linhas) {
@@ -4384,6 +4625,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           : null,
         minhaReacao: minhaReacaoNo.get(l.id) ?? null,
         perguntaAberta: !!l.pergunta_aberta,
+        postCompartilhado: l.post_de ? (quadros.get(l.post_de) ?? null) : null,
       });
       porAutor.set(l.autor_id, b);
     }
@@ -5254,6 +5496,92 @@ export const marcarAtividadeVista = createServerFn({ method: "POST" })
  * antes de o dono rodar o SQL) ou colisão de chave são silêncio: é métrica no
  * meio de uma rolagem.
  */
+/**
+ * FIXAR (ou soltar) UMA PUBLICAÇÃO NO PERFIL.
+ *
+ * A grade do perfil é cronológica pura, e é isso que faz o primeiro ultrassom
+ * afundar embaixo de trezentas fotos. Fixar é o único jeito de a paciente dizer
+ * "isto aqui é o que eu quero que vejam" sem apagar o resto.
+ *
+ * ⚠️ **O TETO É CONFERIDO NO SERVIDOR, contando o que o BANCO tem.** A tela
+ * também confere — para o botão não prometer o que vai ser recusado —, mas um
+ * pedido montado à mão não passa pela tela, e sem esta contagem daria para
+ * fixar a grade inteira e transformar a ordem cronológica em ordem arbitrária.
+ *
+ * ⚠️ **E a contagem é RELIDA aqui, e não recebida do cliente.** Entre a
+ * abertura da tela e o toque cabem outros aparelhos: ela fixa a terceira no
+ * celular e a quarta no computador, com a tela do computador ainda achando que
+ * há duas.
+ *
+ * ⚠️ **Falha ao contar RECUSA.** Liberar por não ter conseguido contar é como
+ * o teto deixa de existir — a mesma régua de `contarTrofeus`.
+ */
+export const fixarPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        fixar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **SÓ A AUTORA FIXA, e a conferência vem ANTES de qualquer escrita.**
+       O `update` filtra por `autor_id` também (cinto e suspensório), mas sem
+       esta leitura o retorno seria "ok" sobre uma publicação que não mudou —
+       e a tela mostraria o pino aceso num post de outra pessoa. */
+    const { data: post, error: erroPost } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, arquivado_em, fixado_em")
+      .eq("id", data.postId)
+      .maybeSingle();
+    if (erroPost) return { ok: false as const, motivo: "sem_suporte" as const };
+    if (!post || (post as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+    /* ⚠️ Arquivada não se fixa: ela não aparece na grade, então o pino seria um
+       controle que promete uma posição numa lista onde o post não está. */
+    if ((post as any).arquivado_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    if (data.fixar) {
+      const { count, error: erroConta } = await sb
+        .from("rede_posts")
+        .select("id", { count: "exact", head: true })
+        .eq("autor_id", eu)
+        .is("arquivado_em", null)
+        .not("fixado_em", "is", null);
+      if (erroConta || typeof count !== "number") {
+        return { ok: false as const, motivo: "sem_suporte" as const };
+      }
+      if (
+        !podeFixar({
+          jaFixados: count,
+          esteJaEstaFixado: !!(post as any).fixado_em,
+        })
+      ) {
+        return { ok: false as const, motivo: "cheio" as const, teto: FIXADOS_MAX };
+      }
+    }
+
+    const { error } = await sb
+      .from("rede_posts")
+      .update({ fixado_em: data.fixar ? new Date().toISOString() : null })
+      .eq("id", data.postId)
+      .eq("autor_id", eu);
+    /* ⚠️ Sem a coluna, o `PGRST204` vira "sem_suporte" e a tela DIZ que o
+       recurso ainda não está pronto no servidor — nunca um "pronto" mudo sobre
+       uma gravação que não aconteceu. */
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const, fixado: data.fixar };
+  });
+
 export const marcarPostsVistos = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z

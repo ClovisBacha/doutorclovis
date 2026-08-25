@@ -27,6 +27,12 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
+import {
+  chaveDoRascunhoDeStory,
+  lerRascunhoDeStory,
+  paraGuardar as guardarRascunhoDeStory,
+  type RascunhoDoStory,
+} from "@/lib/rascunho-do-story";
 import { type Filho, diasEntre, linhaDoPerfil, mesesEntre } from "@/lib/filhos";
 import { marcosSugeridos, mesversarioDeHoje, textoDoMarco } from "@/lib/marcos";
 import { SEGUNDOS_MAX, recadoDaRecusa, recusaDoVideo } from "@/lib/video-do-post";
@@ -72,6 +78,7 @@ import {
   type AulaNoPost,
   type TipoDeReacao,
   type Visibilidade,
+  TEXTO_DO_STORY_MAX,
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
@@ -383,6 +390,61 @@ export function EscolherMotivo({
   );
 }
 
+/**
+ * O PINO.
+ *
+ * ⚠️ **DESENHADO, e não 📌.** O emoji sai com cores próprias em cada sistema
+ * (vermelho no iOS, cinza-azulado no Android) e não tem dois estados — e aqui
+ * ele PRECISA distinguir "fixado" de "fixar", que é a diferença entre um toque
+ * inofensivo e desfixar sem querer. É a mesma lição do 📞 da emergência e do
+ * marcador de salvar.
+ */
+/**
+ * O ícone de "pôr no story" — um retângulo de story com um ⊕.
+ *
+ * ⚠️ Desenhado, e não um emoji: nenhum emoji quer dizer "story", e os
+ * candidatos (📖, ➕, 🔄) já significam outra coisa em outro lugar desta mesma
+ * fileira.
+ */
+function IconeStoryDePost() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="2.5" width="16" height="19" rx="3.5" />
+      <path d="M12 8.5v7M8.5 12h7" />
+    </svg>
+  );
+}
+
+function IconePino({ aceso }: { aceso: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[17px] w-[17px]"
+      /* Cheio quando aceso: a silhueta preenchida lê como "está ligado" à
+         primeira vista, sem depender só da cor — que é o que falta para quem
+         não distingue bem os tons. */
+      fill={aceso ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 3h6l-1 5 3.5 3.5H6.5L10 8z" />
+      <path d="M12 11.5V21" />
+    </svg>
+  );
+}
+
 function IconeLapis() {
   return (
     <svg
@@ -628,6 +690,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoSalvar,
   aoRepublicar,
   aoCompartilhar,
+  aoStoryComPost,
   aoAbrirTag,
   aoMandarParaConversa,
   aoAbrirArroba,
@@ -637,6 +700,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoTirarMarcacao,
   aoVerQuemReagiu,
   aoEditar,
+  aoFixar,
   aoVer,
   sugerido = false,
 }: {
@@ -660,6 +724,8 @@ export const PostInstagram = memo(function PostInstagram({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** Levar esta publicação para o compositor de story. */
+  aoStoryComPost?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
 
@@ -690,6 +756,8 @@ export const PostInstagram = memo(function PostInstagram({
    * quando gravou, senão o texto dela sumiria junto com a recusa.
    */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  /** Fixar (ou soltar) no topo do perfil. Só no post dela. */
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
   /** Ver quem reagiu. Só no post DELA — ver a nota na linha de ações. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** Veio do algoritmo, não de quem ela segue. */
@@ -801,6 +869,27 @@ export const PostInstagram = memo(function PostInstagram({
             className="press grid h-11 w-9 shrink-0 place-items-center text-muted-foreground"
           >
             <IconeLapis />
+          </button>
+        )}
+        {/* 📌 Fixar — só no post DELA, e ao lado do lápis pela mesma razão:
+            é um CONSERTO da vitrine, não uma ação de fim de linha. A grade do
+            perfil é cronológica pura, e é isso que faz o primeiro ultrassom
+            afundar embaixo de trezentas fotos.
+
+            ⚠️ **Aceso quando já está fixado**, com o rótulo dizendo o que o
+            toque faz: um pino que parece igual nos dois estados obriga a tocar
+            para descobrir — e aqui descobrir custa desfixar sem querer. */}
+        {post.souAAutora && aoFixar && (
+          <button
+            type="button"
+            onClick={() => aoFixar(post, !post.fixadoEm)}
+            aria-label={post.fixadoEm ? "Soltar do topo do perfil" : "Fixar no topo do perfil"}
+            aria-pressed={!!post.fixadoEm}
+            className={`press grid h-11 w-9 shrink-0 place-items-center ${
+              post.fixadoEm ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            <IconePino aceso={!!post.fixadoEm} />
           </button>
         )}
         {((post.souAAutora && aoApagar) ||
@@ -1060,6 +1149,35 @@ export const PostInstagram = memo(function PostInstagram({
             ↗
           </button>
         )}
+        {/* 📖 **ADICIONAR AO SEU STORY.**
+
+            ⚠️ **A régua é a do ↻ republicar, e NÃO a do ↗ compartilhar.** O ↗
+            tira a FOTO do app e a solta no mundo, e por isso só vale na própria
+            publicação; isto aqui põe o ENDEREÇO dela dentro de um story, onde
+            quem abrir passa por `podeVerPost` como em qualquer outro lugar — se
+            a pessoa não podia ver, continua não podendo.
+
+            ⚠️ **Só publicação PÚBLICA**, e o servidor reconfere (camada E perfil
+            da autora). Um story alcança todas as seguidoras: deixar
+            compartilhar a camada `amigas` faria o story ser a porta dos fundos
+            da visibilidade — o desabafo escrito para seis chegaria a trezentas.
+
+            ⚠️ **E não vale na própria**: para a dela existe o ↗ e o próprio
+            compositor. Oferecer os dois no mesmo cartão faria a paciente
+            escolher entre duas coisas que ela não tem como distinguir. */}
+        {aoStoryComPost &&
+          !post.souAAutora &&
+          post.visibilidade === "publico" &&
+          !post.ehRepost && (
+            <button
+              type="button"
+              onClick={() => aoStoryComPost(post)}
+              aria-label="Adicionar ao seu story"
+              className="press flex h-11 w-11 items-center justify-center text-[15px] leading-none"
+            >
+              <IconeStoryDePost />
+            </button>
+          )}
         {/* ⚠️ **MANDAR PARA UMA AMIGA VALE PARA QUALQUER PUBLICAÇÃO — inclusive
             a de outra pessoa — e isso NÃO contradiz a régua do ↗ acima.** São
             duas coisas diferentes: o ↗ tira a FOTO do app e a solta no mundo
@@ -1474,6 +1592,8 @@ export function TelaPrincipal({
   aoVotar,
   aoTirarMarcacao,
   aoEditar,
+  aoFixar,
+  aoStoryComPost,
   aoVerQuemReagiu,
   retro,
   aoFecharRetro,
@@ -1556,6 +1676,8 @@ export function TelaPrincipal({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Salvar a legenda editada — ver `PostInstagram`. */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
+  aoStoryComPost?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
@@ -1775,6 +1897,8 @@ export function TelaPrincipal({
             aoVotar={aoVotar}
             aoTirarMarcacao={aoTirarMarcacao}
             aoEditar={aoEditar}
+            aoFixar={aoFixar}
+            aoStoryComPost={aoStoryComPost}
             aoVerQuemReagiu={aoVerQuemReagiu}
             aoAbrirPerfil={aoAbrirPerfil}
             aoVer={aoVer}
@@ -3316,6 +3440,8 @@ export function RedeNoApp({
     apagar: (_p: PostNaTela) => {},
     denunciar: (_p: PostNaTela, _m: MotivoDaDenuncia) => {},
     tirarMarcacao: (_p: PostNaTela) => {},
+    fixar: (_p: PostNaTela, _v: boolean) => {},
+    storyComPost: (_p: PostNaTela) => {},
     editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
@@ -3377,6 +3503,8 @@ export function RedeNoApp({
     apagar: (p) => void apagar(p),
     denunciar: (p, m) => void denunciarPost(p, m),
     tirarMarcacao: (p) => void tirarMarcacao(p),
+    fixar: (p, v) => void fixarNoPerfil(p, v),
+    storyComPost: (p) => void storyComPost(p),
     editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
@@ -3416,6 +3544,9 @@ export function RedeNoApp({
       denunciar: (p: PostNaTela, m: MotivoDaDenuncia) => ultimas.current.denunciar(p, m),
       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
       editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
+      /* ⚠️ Estável, como as irmãs — ver o bloco abaixo sobre o `memo`. */
+      fixar: (p: PostNaTela, v: boolean) => ultimas.current.fixar(p, v),
+      storyComPost: (p: PostNaTela) => ultimas.current.storyComPost(p),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
       /* ⚠️ **Referência estável, como as irmãs.** Um fecho novo por render
@@ -3717,6 +3848,66 @@ export function RedeNoApp({
   );
 
   /**
+   * O RASCUNHO DO STORY — mesmo desenho do rascunho do post, e por isso mesmo
+   * com identificadores PRÓPRIOS.
+   *
+   * ⚠️ **`guardarRascunhoDoStory`, e nunca `guardarRascunho`.** O do post está
+   * dez linhas acima com o nome curto; reusá-lo aqui gravaria o story na chave
+   * da publicação e apagaria o rascunho dela ao publicar um story. Foi só
+   * olhar a lista de ocorrências que isso apareceu.
+   *
+   * ⚠️ **`useCallback` com `[euId]`**, pela mesma razão do irmão: a referência
+   * entra num `useEffect` lá dentro do compositor, e uma nova a cada pintura
+   * reiniciaria o relógio de 700 ms a cada letra — ou seja, nunca gravaria.
+   */
+  const guardarRascunhoDoStory = useCallback(
+    (r: Omit<RascunhoDoStory, "em"> | null) => {
+      if (!euId) return;
+      try {
+        const chave = chaveDoRascunhoDeStory(euId);
+        if (!r) {
+          localStorage.removeItem(chave);
+          return;
+        }
+        const saida = guardarRascunhoDeStory(r, new Date());
+        if (saida.guardar) localStorage.setItem(chave, saida.texto);
+        else localStorage.removeItem(chave);
+      } catch {
+        /* sem armazenamento, ou cota cheia: o compositor segue funcionando */
+      }
+    },
+    [euId],
+  );
+
+  /**
+   * O que estava guardado, lido quando a conferência ABRE.
+   *
+   * ⚠️ Lido no instante em que a tela abre, e não num `useState` inicial: o
+   * compositor de story é montado e desmontado a cada foto escolhida, e um
+   * inicializador leria uma vez só, na primeira.
+   */
+  const [rascunhoDeStory, setRascunhoDeStory] = useState<RascunhoDoStory | null>(null);
+  /**
+   * A publicação que vai dentro do story que está sendo montado.
+   *
+   * ⚠️ Estado do PAI, e não do compositor: `ConferirStory` é montado e
+   * desmontado a cada foto escolhida, e guardar ali faria a referência sumir
+   * numa remontagem — publicando um story com a foto da publicação e sem o
+   * quadro que explica de quem ela é.
+   */
+  const [postNoStory, setPostNoStory] = useState<string | null>(null);
+  useEffect(() => {
+    if (!conferindoStory || !euId) return;
+    try {
+      setRascunhoDeStory(
+        lerRascunhoDeStory(localStorage.getItem(chaveDoRascunhoDeStory(euId)), new Date()),
+      );
+    } catch {
+      setRascunhoDeStory(null);
+    }
+  }, [conferindoStory, euId]);
+
+  /**
    * Quem eu posso marcar — carregada UMA vez, ao abrir o compositor.
    *
    * ⚠️ `null` até responder, e por isso o botão só aparece depois: mostrar um
@@ -3796,6 +3987,93 @@ export function RedeNoApp({
    * `publicar` já tinha resolvido. O texto vem do SERVIDOR: decidir aqui por
    * que foi recusado seria uma segunda régua clínica no navegador.
    */
+  /**
+   * FIXAR (ou soltar) no topo do perfil.
+   *
+   * ⚠️ **A tela pinta DEPOIS do servidor, e não antes.** O teto de três é
+   * conferido lá com o que o BANCO tem — entre a abertura da tela e o toque
+   * cabem outros aparelhos —, e uma pintura otimista mostraria o pino aceso
+   * numa quarta fixada que foi recusada. É o oposto da reação, onde pintar na
+   * hora vale porque nada pode recusar.
+   *
+   * ⚠️ **E o recado do teto vem com o NÚMERO**, que o servidor manda: "no
+   * máximo 3" diz o que fazer; "não foi possível fixar" não diz nada.
+   */
+  /**
+   * LEVAR UMA PUBLICAÇÃO PARA O COMPOSITOR DE STORY.
+   *
+   * ⚠️ **A FOTO DO POST VIRA O FUNDO DO STORY, e a cópia é deliberada.** O
+   * banco guarda só o id (`post_de`), e o quadro é resolvido na leitura — mas o
+   * FUNDO precisa ser um arquivo do story, porque a publicação pode ser
+   * arquivada a qualquer momento e a coluna é `ON DELETE SET NULL`. Sem a
+   * cópia, o story de outra pessoa ficaria em branco por uma decisão que não é
+   * dela. É o mesmo desenho do Instagram, e pela mesma razão.
+   *
+   * ⚠️ **Sem foto, não vai.** Publicação só de texto não tem o que virar fundo,
+   * e um story de fundo cinza com um cartão em cima não é o que ela pediu — a
+   * saída certa aí é o ✈ (mandar para uma conversa), que já existe.
+   */
+  async function storyComPost(post: PostNaTela) {
+    const { toast } = await import("sonner");
+    const url = post.imagemUrl;
+    if (!url) {
+      toast.error("Esta publicação não tem foto para virar story.");
+      return;
+    }
+    try {
+      /* ⚠️ Passa pelo MESMO `prepararFotoDoPost` de sempre — ele reduz e
+         normaliza o formato. Mandar a URL assinada crua faria o servidor
+         receber um endereço em vez de uma imagem. */
+      const r = await fetch(url);
+      const blob = await r.blob();
+      const dataUrl = await prepararFotoDoPost(
+        new File([blob], "story.jpg", { type: blob.type || "image/jpeg" }),
+      );
+      if (!dataUrl) {
+        toast.error("Não deu para preparar a foto.");
+        return;
+      }
+      setPostNoStory(post.id);
+      setConferindoStory(dataUrl);
+    } catch {
+      toast.error("Não deu para abrir o compositor agora.");
+    }
+  }
+
+  async function fixarNoPerfil(post: PostNaTela, fixar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { fixarPost } = await import("@/lib/rede-social.functions");
+      const r = await fixarPost({ data: { accessToken: t, postId: post.id, fixar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "cheio"
+            ? `Você já tem ${"teto" in r ? r.teto : 3} publicações fixadas. Solte uma para fixar outra.`
+            : r.motivo === "sem_suporte"
+              ? "Fixar ainda não está pronto no servidor."
+              : "Não deu para fixar agora.",
+        );
+        return;
+      }
+      /* ⚠️ A grade RECARREGA, e a tela não reordena sozinha: a posição das
+         fixadas é decidida no servidor (consulta à parte, fora da paginação), e
+         reproduzir essa ordem aqui seria a segunda régua que um dia diverge. */
+      const carimbo = fixar ? new Date().toISOString() : null;
+      setPosts((ps) => ps.map((p) => (p.id === post.id ? { ...p, fixadoEm: carimbo } : p)));
+      /* ⚠️ A grade do perfil tem estado PRÓPRIO (`doPerfil`), separado do feed:
+         sem esta linha o pino acenderia no feed e a grade — que é justamente
+         onde a fixação aparece — continuaria mostrando o estado velho até uma
+         recarga. */
+      setDoPerfil((ps) => ps.map((p) => (p.id === post.id ? { ...p, fixadoEm: carimbo } : p)));
+      toast.success(fixar ? "Fixada no topo do seu perfil." : "Solta do topo.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para fixar agora.");
+    }
+  }
+
   async function editarLegenda(post: PostNaTela, texto: string): Promise<boolean> {
     try {
       const t = await token();
@@ -5125,11 +5403,17 @@ export function RedeNoApp({
 
   async function publicarStory(
     dataUrl: string,
+    texto: string,
     carimbar: boolean,
     enquete: string[],
     perguntaAberta: boolean,
   ) {
     setConferindoStory(null);
+    /* ⚠️ Lido ANTES de zerar: o `setPostNoStory(null)` abaixo é assíncrono, e
+       ler o estado depois dele mandaria `null` para o servidor — o story sairia
+       sem o quadro, com a foto de outra pessoa e nada dizendo de quem é. */
+    const comPost = postNoStory;
+    setPostNoStory(null);
     try {
       const t = await token();
       if (!t) return;
@@ -5138,13 +5422,23 @@ export function RedeNoApp({
         data: {
           accessToken: t,
           imagem: dataUrl,
-          texto: null,
+          /* ⚠️ Vazio vira `null`, e não `""`: a coluna é anulável e um string
+             vazio faria a leitura desenhar uma faixa de texto sem texto por
+             cima da foto. */
+          texto: texto.trim() || null,
           carimbarSemana: carimbar,
           enquete,
           perguntaAberta,
+          postDe: comPost,
         },
       });
       if (r.ok) {
+        /* ⚠️ Publicou, o rascunho some — senão a próxima abertura oferece de
+           volta o story que ela ACABOU de publicar.
+           ⚠️ E o nome é `guardarRascunhoDoStory`, NUNCA `guardarRascunho`: esse
+           já existe neste arquivo e é o do POST. Reusá-lo aqui apagaria o
+           rascunho da publicação dela ao publicar um story. */
+        guardarRascunhoDoStory(null);
         void carregarFeed();
         return;
       }
@@ -5444,10 +5738,18 @@ export function RedeNoApp({
         /* ⚠️ A semana vem do MEU perfil, que a tela já carregou — e `null`
            quando não há o que carimbar (sem DUM, pós-parto, Modo Cuidado). */
         semana={semanaDoCarimbo}
-        aoCancelar={() => setConferindoStory(null)}
-        aoPublicar={({ carimbar, enquete, perguntaAberta }) =>
-          void publicarStory(conferindoStory, carimbar, enquete, perguntaAberta)
+        aoCancelar={() => {
+          setConferindoStory(null);
+          /* ⚠️ Desistiu, a referência some: sem isto, a PRÓXIMA foto que ela
+             escolhesse sairia com o quadro de uma publicação que ela já tinha
+             largado. */
+          setPostNoStory(null);
+        }}
+        aoPublicar={({ texto, carimbar, enquete, perguntaAberta }) =>
+          void publicarStory(conferindoStory, texto, carimbar, enquete, perguntaAberta)
         }
+        rascunho={rascunhoDeStory}
+        aoGuardarRascunho={guardarRascunhoDoStory}
       />
     );
   }
@@ -5455,6 +5757,13 @@ export function RedeNoApp({
   if (vendoStory) {
     return (
       <VisorDeStory
+        /* ⚠️ Fecha o visor ANTES de abrir a publicação: o visor é `fixed
+           inset-0`, e navegar por baixo dele deixaria a paciente na tela do
+           post sem conseguir vê-la. */
+        aoAbrirPublicacao={(id) => {
+          setVendoStory(null);
+          acoes.ver(id);
+        }}
         aoVotarNoStory={votarNoStory}
         aoReagirAoStory={reagirNoStory}
         aoResponderStory={(a, sid, t) => void responderAoStory(a, sid, t)}
@@ -5706,6 +6015,8 @@ export function RedeNoApp({
         aoDenunciar={acoes.denunciar}
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoEditar={acoes.editar}
+        aoFixar={acoes.fixar}
+        aoStoryComPost={acoes.storyComPost}
         /* ⚠️ **Faltava, e este é o caminho mais provável do recurso.** A autora
            abre a grade do próprio perfil e toca num post de duas semanas atrás:
            é AQUI que ela quer saber quem reagiu. Sem a prop, o resumo com os
@@ -5826,6 +6137,8 @@ export function RedeNoApp({
            está ali, com o lápis invisível. O ⋯ do post próprio só oferece
            "tirar do ar", que é a decisão oposta. */
         aoEditar={acoes.editar}
+        aoFixar={acoes.fixar}
+        aoStoryComPost={acoes.storyComPost}
         /* ⚠️ Referência estável, como as outras: um fecho por post faria o
            `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
            do app. */
@@ -6572,6 +6885,8 @@ export function TelaDoPost({
   aoVotar,
   aoTirarMarcacao,
   aoEditar,
+  aoFixar,
+  aoStoryComPost,
   aoVerQuemReagiu,
   aoVoltar,
   aoAbrirPerfil,
@@ -6598,6 +6913,8 @@ export function TelaDoPost({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Salvar a legenda editada — ver `PostInstagram`. */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
+  aoStoryComPost?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
@@ -6633,6 +6950,8 @@ export function TelaDoPost({
         aoVotar={aoVotar}
         aoTirarMarcacao={aoTirarMarcacao}
         aoEditar={aoEditar}
+        aoFixar={aoFixar}
+        aoStoryComPost={aoStoryComPost}
         aoVerQuemReagiu={aoVerQuemReagiu}
         aoAbrirPerfil={aoAbrirPerfil}
       />
@@ -6664,6 +6983,7 @@ export function VisorDeStory({
   aoPerguntarNoStory,
   aoReagirAoStory,
   aoResponderStory,
+  aoAbrirPublicacao,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -6672,6 +6992,8 @@ export function VisorDeStory({
   souEu?: boolean;
   /** `null` = não deu para ler (nunca "ninguém viu") — ver `quemViu`. */
   aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[] | null>;
+  /** Abrir a publicação compartilhada dentro do story. */
+  aoAbrirPublicacao?: (postId: string) => void;
   aoApagarStory?: (storyId: string) => void;
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
@@ -6810,6 +7132,59 @@ export function VisorDeStory({
           <span className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded-full bg-black/55 px-4 py-2 text-[15px] font-semibold text-white backdrop-blur-sm">
             🤰 {atual.carimbo}
           </span>
+        )}
+
+        {/* ⚠️ **O QUADRO DA PUBLICAÇÃO COMPARTILHADA.**
+
+            Ele vem RESOLVIDO PARA QUEM ASSISTE — o servidor passa a publicação
+            por `podeVerPost` com o contexto de quem abriu, e quando a régua
+            recusa o campo chega `null` e o story continua inteiro. A tela nunca
+            decide isso: uma segunda régua aqui seria a divergência que aparece
+            como publicação de perfil fechado dentro do story de outra pessoa.
+
+            ⚠️ **`z-20`, acima das metades invisíveis de avançar/voltar** — sem
+            isso, tocar no quadro avançaria o story em vez de abrir a
+            publicação, e o cartão seria um desenho que ninguém consegue usar. É
+            a mesma lição da enquete, três blocos abaixo.
+
+            ⚠️ **E o toque PAUSA o relógio antes de navegar**: sem isso o story
+            avança por baixo enquanto a publicação abre, e ao voltar ela está
+            noutro lugar da fileira. */}
+        {atual.postCompartilhado && (
+          <button
+            type="button"
+            onClick={() => {
+              /* Pausa o relógio ANTES de navegar: sem isso o story avança por
+                 baixo enquanto a publicação abre, e ao voltar ela está noutro
+                 lugar da fileira. */
+              setPausado(true);
+              aoAbrirPublicacao?.(atual.postCompartilhado!.id);
+            }}
+            className="press absolute inset-x-6 bottom-24 z-20 flex items-center gap-3 rounded-2xl bg-black/55 p-2.5 text-left backdrop-blur-sm"
+          >
+            {atual.postCompartilhado.imagemUrl ? (
+              <img
+                src={atual.postCompartilhado.imagemUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15 text-lg">
+                🖼
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-white">
+                {atual.postCompartilhado.autorNome}
+              </span>
+              {atual.postCompartilhado.texto && (
+                <span className="line-clamp-2 block text-[12px] leading-snug text-white/80">
+                  {atual.postCompartilhado.texto}
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 text-[12px] font-semibold text-white/90">Ver</span>
+          </button>
         )}
 
         {/* ⚠️ A ENQUETE E A CAIXINHA vivem ACIMA das metades invisíveis
@@ -8487,6 +8862,22 @@ export function GradeDePosts({
                 {p.texto}
               </span>
             )}
+            {/* ⚠️ **O PINO NA CÉLULA, e ele é para QUEM VISITA.** Sem marca
+                nenhuma, as três primeiras simplesmente parecem as mais
+                recentes — e quem abre o perfil não tem como saber que aquilo é
+                um recorte escolhido. É a mesma razão do rótulo "Sugerido para
+                você": o que muda a ordem tem de se anunciar.
+
+                Sobre o canto e com sombra, porque pousa em cima da FOTO: um
+                ícone sem contorno some numa foto clara. */}
+            {p.fixadoEm && (
+              <span
+                className="pointer-events-none absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/45 text-white"
+                aria-label="Fixada no topo"
+              >
+                <IconePino aceso />
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -8981,13 +9372,24 @@ export function ConferirStory({
   semana,
   aoCancelar,
   aoPublicar,
+  rascunho,
+  aoGuardarRascunho,
 }: {
   /** Data URL da foto já reduzida. */
   imagem: string;
   /** "28 semanas", ou `null` quando não há o que carimbar. */
   semana: string | null;
   aoCancelar: () => void;
-  aoPublicar: (opts: { carimbar: boolean; enquete: string[]; perguntaAberta: boolean }) => void;
+  aoPublicar: (opts: {
+    texto: string;
+    carimbar: boolean;
+    enquete: string[];
+    perguntaAberta: boolean;
+  }) => void;
+  /** O rascunho guardado, quando há um. Ver `rascunho-do-story.ts`. */
+  rascunho?: RascunhoDoStory | null;
+  /** Guardar o que ela digitou. Recebe `null` quando não há mais nada a guardar. */
+  aoGuardarRascunho?: (r: Omit<RascunhoDoStory, "em"> | null) => void;
 }) {
   const [carimbar, setCarimbar] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -8995,6 +9397,49 @@ export function ConferirStory({
      escreveu — a mesma forma do compositor de post. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
   const [caixinha, setCaixinha] = useState(false);
+  /**
+   * ⚠️ **O CAMPO DE TEXTO NÃO EXISTIA, e o servidor esperava por ele desde o
+   * primeiro dia.** `publicarStory` aceita 200 caracteres, passa a régua
+   * clínica neles e grava a coluna — e a tela mandava `texto: null` cravado.
+   * Era o gênero inteiro faltando: um story sem legenda é uma foto muda.
+   */
+  const [texto, setTexto] = useState("");
+  /* ⚠️ **OFERECE, NUNCA PREENCHE SOZINHO** — a decisão do rascunho do post,
+     pela mesma razão: encher o campo com o texto de ontem no momento em que ela
+     abre para publicar outra coisa é como um story sai errado, e story não se
+     edita depois de publicado. */
+  const [ofereceu, setOfereceu] = useState(false);
+  const temRascunho = !!rascunho && !ofereceu;
+
+  /**
+   * Guarda o que ela digitou, com atraso.
+   *
+   * ⚠️ **O `return` da primeira pintura é obrigatório, e a falta dele APAGAVA o
+   * rascunho ao abrir** — é o defeito que o compositor de post já pagou. Sem
+   * ele o efeito roda na montagem com os campos vazios e, 700 ms depois,
+   * `paraGuardar` devolve `guardar: false` (a regra certa: rascunho vazio
+   * apaga). A faixa continuava na tela porque o texto já estava em memória,
+   * então quem tocasse em "Recuperar" na hora não via nada de errado — e quem
+   * voltasse depois perdia o texto para sempre, com a única prova sumindo
+   * junto.
+   */
+  const primeiraPintura = useRef(true);
+  useEffect(() => {
+    if (primeiraPintura.current) {
+      primeiraPintura.current = false;
+      return;
+    }
+    if (!aoGuardarRascunho) return;
+    const t = setTimeout(() => {
+      aoGuardarRascunho({
+        texto,
+        enquete: opcoes,
+        perguntaAberta: caixinha,
+        carimbarSemana: carimbar,
+      });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [texto, opcoes, caixinha, carimbar, aoGuardarRascunho]);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black">
@@ -9020,7 +9465,16 @@ export function ConferirStory({
           desenhava a pílula na tarja preta abaixo da imagem — a moldura ficava
           fora da moldura. A caixa de dentro encolhe até a foto, e o carimbo se
           posiciona contra ela. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center">
+      {/* ⚠️ **`overflow-hidden` NÃO É ENFEITE — sem ele a foto cobre o painel.**
+          O `max-h-full` da imagem resolve contra a altura do contêiner, e num
+          item flexível essa altura só fica definida DEPOIS do layout: no
+          instante em que o painel de baixo cresceu (o campo de texto e a faixa
+          do rascunho entraram), a imagem passou a pintar por cima da primeira
+          coisa do painel. Medido: a faixa "Você tinha começado um story"
+          aparecia cortada ao meio, e o botão "Recuperar" ficava INALCANÇÁVEL —
+          a foto interceptava o toque. Foi a bancada que mostrou; nenhuma
+          asserção estava perto disso. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
         <div className="relative max-h-full">
           <img src={imagem} alt="" className="block max-h-full w-auto object-contain" />
           {carimbar && semana && (
@@ -9035,6 +9489,57 @@ export function ConferirStory({
         className="shrink-0 space-y-3 px-4 pb-4 pt-3"
         style={{ paddingBottom: "max(1rem, var(--safe-bottom))" }}
       >
+        {temRascunho && (
+          /* ⚠️ Pergunta, e não preenche. E o "Descartar" some com o rascunho de
+             vez: sem ele, dizer não uma vez faria a faixa voltar na abertura
+             seguinte, para sempre. */
+          <div className="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5">
+            <p className="min-w-0 flex-1 text-[13px] leading-snug text-white">
+              Você tinha começado um story.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setTexto(rascunho?.texto ?? "");
+                setOpcoes(rascunho?.enquete ?? null);
+                setCaixinha(!!rascunho?.perguntaAberta);
+                setCarimbar(!!rascunho?.carimbarSemana);
+                setOfereceu(true);
+              }}
+              className="press min-h-[44px] shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black"
+            >
+              Recuperar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOfereceu(true);
+                aoGuardarRascunho?.(null);
+              }}
+              className="press min-h-[44px] shrink-0 px-2 text-[13px] text-white/80"
+            >
+              Descartar
+            </button>
+          </div>
+        )}
+
+        {/* ⚠️ O contador aparece a partir de 140 e não desde o zero: um número
+            piscando ao lado de cada letra transforma escrever numa prova. */}
+        <div className="relative">
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value.slice(0, TEXTO_DO_STORY_MAX))}
+            rows={2}
+            placeholder="Escreva alguma coisa (opcional)"
+            className="w-full resize-none rounded-2xl bg-white/95 px-3 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground"
+          />
+          {texto.length >= 140 && (
+            <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-muted-foreground">
+              {TEXTO_DO_STORY_MAX - texto.length}
+            </span>
+          )}
+        </div>
+
         {semana ? (
           <button
             type="button"
@@ -9134,6 +9639,7 @@ export function ConferirStory({
           onClick={() => {
             setEnviando(true);
             aoPublicar({
+              texto: texto.trim(),
               carimbar: carimbar && !!semana,
               /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
                  aqui, que aceitaria o que o servidor recusa. */

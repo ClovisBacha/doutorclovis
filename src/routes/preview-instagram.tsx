@@ -96,6 +96,12 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     restrito: q.restrito == null ? 0 : Number(q.restrito),
     silenciado: q.silenciado == null ? 0 : Number(q.silenciado),
+    /* ⚠️ `rascunhoStory`, e não `rascunho`: este último já existe e é o do
+       compositor de POST. Duas bancadas do mesmo nome mostrariam o estado de
+       uma na tela da outra. */
+    rascunhoStory: q.rascunhoStory == null ? 0 : Number(q.rascunhoStory),
+    fixados: q.fixados == null ? 0 : Number(q.fixados),
+    quadro: q.quadro == null ? 0 : Number(q.quadro),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     instavel: q.instavel == null ? 0 : Number(q.instavel),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
@@ -305,6 +311,11 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
   /* ⚠️ O post 8 é a RESPOSTA de uma pergunta anônima — a única forma de
      fotografar o cabeçalho citado sem duas contas e uma caixinha aberta. */
   pergunta: i === 8 ? "Como você escolheu o nome da Helena? 💛" : null,
+  /* ⚠️ `?fixados=1` acende as duas primeiras — o pino na célula da grade e o
+     botão aceso no cartão são impossíveis de fotografar sem uma conta com
+     publicação fixada de verdade, e a fixação é justamente o que muda a ORDEM
+     da grade. */
+  fixadoEm: null,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
@@ -376,6 +387,9 @@ function Bancada() {
     tag,
     restrito,
     silenciado,
+    rascunhoStory,
+    fixados,
+    quadro,
     instavel,
     fechado,
   } = Route.useSearch();
@@ -537,6 +551,14 @@ function Bancada() {
       /* ⚠️ A bancada precisa da prop, senão o botão NUNCA aparece — a mesma
          lição de `republicar`. */
       compartilhar: (_p: PostNaTela) => alert("abriria a folha do sistema"),
+      /* ⚠️ A bancada precisa da prop, senão o botão NUNCA aparece — a mesma
+         lição de `republicar` e de `compartilhar`. Medido: a primeira
+         verificação no navegador achou ZERO botões "Adicionar ao seu story"
+         justamente por isto. */
+      storyComPost: (p: PostNaTela) => alert(`levaria o post ${p.id} para o compositor de story`),
+      /* ⚠️ Idem para o pino: sem a prop, o botão de fixar não existe na bancada
+         e o estado aceso continuaria sem ninguém ter olhado. */
+      fixar: (p: PostNaTela, v: boolean) => alert(v ? `fixaria ${p.id}` : `soltaria ${p.id}`),
       editar: async (p: PostNaTela, t: string) => {
         setEdicoes((m) => ({ ...m, [p.id]: t }));
         return true;
@@ -720,6 +742,19 @@ function Bancada() {
               }
             : null,
         minhaReacao: null,
+        /* ⚠️ `?quadro=1` põe uma publicação compartilhada DENTRO do story — o
+           cartão só existe quando alguém compartilha de verdade, e ele é
+           resolvido no servidor para quem assiste, então sem a bancada ele
+           nasceria sem ninguém nunca ter olhado. */
+        postCompartilhado:
+          quadro === 1 && n === 0
+            ? {
+                id: "p0",
+                autorNome: "Marina Costa",
+                imagemUrl: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
+                texto: "o ultrassom de hoje 🍼",
+              }
+            : null,
         perguntaAberta: n === 2,
       })),
     };
@@ -771,7 +806,28 @@ function Bancada() {
            carimbar e o controle não existe. */
         semana={selo === 0 ? null : "32 semanas"}
         aoCancelar={() => history.back()}
-        aoPublicar={({ carimbar }) => alert(carimbar ? "publicaria COM carimbo" : "publicaria sem")}
+        aoPublicar={({ texto, carimbar }) =>
+          alert(`publicaria ${carimbar ? "COM" : "sem"} carimbo · texto: ${texto || "(vazio)"}`)
+        }
+        /* ⚠️ `?rascunhoStory=1` fabrica o rascunho guardado — o único jeito de
+           fotografar a faixa "Você tinha começado um story", que no app só
+           existe depois de ela digitar, sair no meio e voltar. É a mesma razão
+           de sempre: sem a bancada, o estado nasce sem ninguém nunca ter
+           olhado. */
+        rascunho={
+          rascunhoStory === 1
+            ? {
+                texto: "hoje o ultrassom mostrou que ela está de ponta-cabeça 🙃",
+                enquete: ["vai virar", "nasce sentada"],
+                perguntaAberta: false,
+                carimbarSemana: true,
+                em: "2026-08-25T10:00:00.000Z",
+              }
+            : null
+        }
+        /* A bancada NÃO grava: ela desenha o estado, e gravar poluiria o
+           `localStorage` de quem só veio olhar. */
+        aoGuardarRascunho={undefined}
       />
     );
   }
@@ -1375,7 +1431,21 @@ function Bancada() {
       ) : tela === "perfil" ? (
         <TelaDePerfil
           perfil={perfil}
-          posts={vazio ? [] : POSTS}
+          /* ⚠️ Com `?fixados=1`, as duas PRIMEIRAS vêm fixadas — e é isso que
+             prova a grade: o pino nas células e a ordem. As datas de fixação
+             são cravadas (a mais recente primeiro), pela mesma razão de todas
+             as datas desta bancada. */
+          posts={
+            vazio
+              ? []
+              : fixados === 1
+                ? POSTS.map((p, i) =>
+                    i < 2
+                      ? { ...p, fixadoEm: i === 0 ? atras(30) : atras(600), souAAutora: true }
+                      : p,
+                  )
+                : POSTS
+          }
           aoVoltar={() => history.back()}
           aoSeguir={() => alert("seguir")}
           aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
@@ -1485,6 +1555,8 @@ function Bancada() {
           aoDenunciar={acoesDaBancada.denunciar}
           aoRepublicar={acoesDaBancada.republicar}
           aoCompartilhar={acoesDaBancada.compartilhar}
+          aoStoryComPost={acoesDaBancada.storyComPost}
+          aoFixar={acoesDaBancada.fixar}
           aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
           aoEditar={acoesDaBancada.editar}
           aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}

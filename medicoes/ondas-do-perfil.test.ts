@@ -29,12 +29,26 @@
  */
 import { describe, expect, mock, test } from "bun:test";
 
-const LATENCIA = 5; // ms artificiais por ida, só para as ondas ficarem distinguíveis
+/**
+ * Latência artificial por ida, só para as ondas ficarem distinguíveis.
+ *
+ * ⚠️ **VINTE E CINCO, e não cinco — e o número é de RELAÇÃO SINAL/RUÍDO.** O
+ * agrupamento junta o que começa a menos de meia latência do carimbo anterior;
+ * com 5 ms, a folga era 2,5 ms, e o jitter do próprio contêiner (medido: 1 a
+ * 3 ms entre chamadas do MESMO `Promise.all`) chegava a atravessá-la. O teste
+ * então acusava uma cascata que não existe — aconteceu, e mandou-me investigar
+ * uma consulta que estava na onda certa.
+ *
+ * Com 25, a folga é 12,5 ms contra um jitter de poucos milissegundos, e uma
+ * onda de verdade continua custando os 25 inteiros. O preço é o teste levar
+ * ~0,5 s a mais, e um teste que às vezes mente custa muito mais que isso.
+ */
+const LATENCIA = 25;
 type Registro = { t: number; alvo: string; detalhe: string; fim?: number };
 const log: Registro[] = [];
 
 /**
- * O teto, e ele é EXATO — 10, que é o medido depois do conserto.
+ * O teto, e ele é EXATO — 9, que é o medido hoje.
  *
  * ⚠️ **Um teto frouxo não trava nada.** Ele começou em 12 "para não atrapalhar
  * trabalho honesto", e a mutação provou o problema na hora: re-serializar as
@@ -46,7 +60,19 @@ const log: Registro[] = [];
  * da economia — o número existe para a mudança ser deliberada, não para ser
  * impossível.
  */
-const TETO_DE_ONDAS = 10;
+/**
+ * ⚠️ **DESCEU DE 10 PARA 9, e não foi conserto nenhum: foi a MEDIÇÃO que ficou
+ * honesta.** Com a latência simulada em 5 ms, duas chamadas do mesmo
+ * `Promise.all` que saíssem com 3 ms de diferença atravessavam a folga de
+ * agrupamento e eram contadas como duas ondas. Subindo a latência para 25 ms
+ * (ver `LATENCIA`), o ruído passou a caber na folga com sobra — e o que sempre
+ * foram nove ondas parou de ser lido como dez.
+ *
+ * ⚠️ Baixar o teto junto é obrigatório: deixá-lo em 10 sobre uma medida de 9 é
+ * folga, e folga é dívida pré-aprovada — a mutação já provou que uma onda de
+ * folga faz a cascata que este teste existe para impedir passar VERDE.
+ */
+const TETO_DE_ONDAS = 9;
 let t0 = 0;
 
 /** Uma URL assinada que vence em um minuto — força a renovação. */
