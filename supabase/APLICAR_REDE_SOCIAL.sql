@@ -643,9 +643,32 @@ CREATE INDEX IF NOT EXISTS rede_atividade_novas
 -- ⚠️ O CHECK acima só vale para banco NOVO — `CREATE TABLE IF NOT EXISTS` não
 -- toca em tabela existente. Sem este bloco, a marcação seria aceita pelo
 -- servidor e o AVISO recusado pelo banco: a marcada nunca saberia.
+-- ⚠️ **ESTE `DROP`+`ADD` ERA UMA MINA, e ela só explodiria na SEGUNDA vez.**
+--
+-- Três arquivos reescrevem este mesmo CHECK: este, o `APLICAR_AVISOS_DA_
+-- COMUNIDADE` (que acrescenta `comentou`) e o `APLICAR_MENCOES_E_TAGS` (que
+-- acrescenta `mencionou`). As listas são cumulativas, então rodá-los em ordem
+-- deixa o banco certo.
+--
+-- Mas este arquivo é o que a documentação manda RE-RODAR sempre que a rede
+-- ganha alguma coisa — e a lista dele estava congelada em seis espécies. Ao
+-- re-rodar, ele DERRUBARIA `comentou` e `mencionou`, e a partir daí toda
+-- linha de atividade de comentário e de menção seria recusada pelo banco.
+--
+-- ⚠️ **E EM SILÊNCIO:** `registrarAtividade` grava dentro de um `try/catch` que
+-- engole (de propósito — um aviso não pode derrubar o comentário). A paciente
+-- comentaria, o comentário apareceria, e a caixa ♡ da autora ficaria vazia
+-- para sempre, sem erro em lugar nenhum.
+--
+-- A lista aqui passou a ser a COMPLETA. Espécie nova entra nos DOIS lugares:
+-- no arquivo que a cria e aqui. `especies-da-atividade.test.ts` cobra que
+-- nenhuma lista de nenhum `APLICAR_` seja menor que esta.
 ALTER TABLE public.rede_atividade DROP CONSTRAINT IF EXISTS rede_atividade_especie_check;
 ALTER TABLE public.rede_atividade ADD CONSTRAINT rede_atividade_especie_check
-  CHECK (especie IN ('seguiu','pediu_para_seguir','aceitou','reagiu','marcou','reagiu_story'));
+  CHECK (especie IN (
+    'seguiu','pediu_para_seguir','aceitou','reagiu','marcou','reagiu_story',
+    'comentou','mencionou'
+  ));
 
 CREATE UNIQUE INDEX IF NOT EXISTS rede_atividade_uma_por_gesto
   ON public.rede_atividade (dono_id, quem_id, especie, coalesce(post_id, dono_id));

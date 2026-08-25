@@ -218,16 +218,38 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
     const palavras = ((minhasPalavras.data as any)?.palavras_ocultas ?? []) as string[];
     const porId = new Map(((perfis ?? []) as any[]).map((p) => [p.id, p]));
     const { renovarUrlsAssinadas, VALIDADE_AVATAR_SEG } = await import("@/lib/imagens.server");
-    const urls = await renovarUrlsAssinadas(
-      linhasArr.map((c) => porId.get(c.autor_id)?.avatar_url ?? null),
-      VALIDADE_AVATAR_SEG,
-    );
+
+    /**
+     * ⚠️ **A URL É INDEXADA PELO AUTOR, e não pela POSIÇÃO — e o defeito que
+     * isto conserta trocava a foto de uma paciente pela de outra.**
+     *
+     * A lista era montada sobre `linhasArr` (todos os comentários) e lida com o
+     * índice do `.map()` — que roda DEPOIS do `.filter()` do bloqueio. Um único
+     * comentário removido desloca todos os índices seguintes em um: o avatar de
+     * quem ela bloqueou aparecia no comentário da pessoa de baixo.
+     *
+     * Numa base em que as pessoas se conhecem da vida real, isso não é um
+     * enfeite trocado — é a foto de alguém sobre a fala de outra.
+     *
+     * ⚠️ **E ficou pior com o filtro novo:** `verDoComentario` também remove
+     * linhas (restrição, palavra escondida), então o deslocamento passou a
+     * acontecer em mais caminhos. Por autor, nenhum filtro pode desalinhar.
+     */
+    const autoresUnicos = [...new Set(linhasArr.map((c) => c.autor_id as string))];
+    const urlsPorAutor = new Map<string, string | null>();
+    {
+      const assinadas = await renovarUrlsAssinadas(
+        autoresUnicos.map((id) => porId.get(id)?.avatar_url ?? null),
+        VALIDADE_AVATAR_SEG,
+      );
+      autoresUnicos.forEach((id, n) => urlsPorAutor.set(id, assinadas[n] ?? null));
+    }
 
     const comentarios: ComentarioNaTela[] = linhasArr
       /* ⚠️ BLOQUEIO SOME DO COMENTÁRIO, como some do feed: quem ela bloqueou não
          pode continuar aparecendo embaixo das fotos que ela abre. */
       .filter((c) => !ctx.bloqueio.has(c.autor_id))
-      .map((c, i) => {
+      .map((c) => {
         /* ⚠️ **A RÉGUA ÚNICA decide o que aparece — a tela só desenha.** Uma
            segunda versão desta decisão no componente divergiria no primeiro
            conserto, e a divergência apareceria como comentário restringido
@@ -245,7 +267,7 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
           id: c.id,
           autorId: c.autor_id,
           autorNome: ((porId.get(c.autor_id)?.display_name ?? "") as string).trim() || "Alguém",
-          autorAvatar: urls[i] ?? null,
+          autorAvatar: urlsPorAutor.get(c.autor_id) ?? null,
           texto: c.texto,
           criadoEm: c.criado_em,
           possoApagar: podeApagarComentario({

@@ -7973,3 +7973,81 @@ como sempre.
 mais", as duas marcas de oculto) · `?tela=filtro` e `?tela=filtro&vazio=1` ·
 `?tela=perfil` → `⋯` (restringir) · `?tela=perfil&restrito=1` → `⋯` (o estado
 ligado) · `?tela=novo&comFoto=1` (a descrição).
+
+### A auditoria da aba, e os primeiros consertos (ago/2026)
+
+Oito auditores em paralelo, cada um numa dimensão, com um cético tentando
+REFUTAR cada achado. **50 candidatos brutos.** O que segue é o que sobreviveu à
+verificação — e um que NÃO sobreviveu, registrado porque é instrutivo.
+
+#### ⚠️ Quatro defeitos na régua clínica, e dois eram falsos POSITIVOS
+
+Achados rodando `triarTexto` contra frases que uma gestante escreve de verdade —
+não lendo o código.
+
+1. **"se eu fosse você" passava inteira.** A regex tinha a pessoa trocada: só
+   reconhecia "se fosse eu" e "se fosse comigo", e a forma mais comum em
+   português era a que faltava.
+   ⚠️ **E a primeira correção falhou pela metade**: com `\b` no fim, a forma COM
+   acento continuava passando — `\b` do JavaScript é ASCII e não enxerga
+   fronteira depois do `ê`. É a mesma armadilha que `temPalavraOculta` documenta
+   em `comentarios.ts`, num arquivo diferente, no mesmo dia.
+2. **O imperativo AFIRMATIVO passava.** A lista só tinha a negativa ("não tome").
+   "Toma buscopan que resolve" saía publicável. ⚠️ O conserto EXIGE objeto de
+   tratamento: sem isso, "toma um café comigo" iria para o consultório.
+3. ⚠️ **O POST DE NASCIMENTO ERA RECUSADO.** `deu tudo certo` estava na lista de
+   tranquilização anedótica — e é também, e sobretudo, a frase com que se
+   anuncia um nascimento. O momento mais feliz da paciente, barrado com um
+   recado que a acusa de dar conselho médico.
+4. ⚠️ **Qualquer `N por N` virava EMERGÊNCIA.** O ramo do par solto não tinha
+   faixa nenhuma: "marcamos o chá pra 12 por 10 pessoas" abria a Central. Esse é
+   o falso positivo mais caro da régua — ela aprende que o alarme dispara por
+   qualquer coisa e passa a ignorá-lo. Hoje há faixa (falada e escrita) e o par
+   não pode ser seguido de palavra.
+
+#### ⚠️ A MINA DO CHECK QUE SÓ EXPLODE NA SEGUNDA VEZ
+
+Três `APLICAR_*.sql` reescrevem `rede_atividade_especie_check` com
+`DROP CONSTRAINT` + `ADD CONSTRAINT`. As listas eram cumulativas, então rodar na
+ordem certa deixava o banco correto.
+
+Mas `APLICAR_REDE_SOCIAL.sql` é o que a documentação manda **RE-RODAR** sempre
+que a rede ganha alguma coisa — e a lista dele estava congelada em seis
+espécies. Re-rodar apagaria `comentou` e `mencionou`, e a partir daí toda linha
+de atividade de comentário e de menção seria recusada pelo banco.
+
+⚠️ **E EM SILÊNCIO:** `registrarAtividade` grava dentro de um `try/catch` que
+engole — de propósito, porque um aviso não pode derrubar o comentário. A
+paciente comentaria, o comentário apareceria, e a caixa ♡ da autora ficaria
+vazia para sempre, sem erro em lugar nenhum.
+
+**Toda lista passou a ser a COMPLETA**, e `especies-da-atividade.test.ts` cobra
+isso nos dois sentidos (nenhuma menor, nenhuma com espécie que o app não grava,
+e o `EspecieDeAviso` do TypeScript batendo com o SQL).
+
+#### ⚠️ A FOTO DE UMA PACIENTE SOBRE A FALA DE OUTRA
+
+`comentariosDoPost` montava as URLs dos avatares sobre a lista COMPLETA e as lia
+pelo índice do `.map()` — que roda **depois** do `.filter()` do bloqueio.
+`.filter()` devolve array NOVO: um comentário removido desloca todos os índices
+seguintes, e o avatar de quem ela bloqueou aparece no comentário de baixo.
+
+⚠️ **E ficou pior com o filtro novo**, porque `verDoComentario` também remove
+linhas. Hoje a URL é indexada por AUTOR.
+
+⚠️ **Os outros três leitores da rede estavam certos**, e a razão é fina: eles
+usam `forEach` com `return` cedo, e o índice do `forEach` **não se move** quando
+uma volta sai. Só a cadeia `.filter().map((x, i))` desalinha —
+`avatar-por-indice.test.ts` proíbe a cadeia inteira nos módulos da rede.
+
+#### ⚠️ E UM ACHADO QUE NÃO SOBREVIVEU — registrado de propósito
+
+Um auditor afirmou, com gravidade ALTA, que "a republicação contorna a camada do
+post: perfil privado vira público pelo repost". **Falso.** A conferência
+`visibilidade === "publico"` existe nos DOIS caminhos — na escrita
+(`repostValido`, em `publicarPost`) e na leitura (o bloco que monta `originais`,
+que ainda checa `arquivado_em` e `care_mode`).
+
+Fica registrado porque é o motivo de a fase de refutação existir: **quatro dos
+dezesseis primeiros achados verificados foram descartados.** Aplicar os 50 sem
+verificar teria "consertado" comportamento correto.
