@@ -283,27 +283,37 @@ export async function avisarMencionadas(
       ? await Promise.all(permitidas.map((p) => contextoDe(sb, p.id)))
       : permitidas.map(() => null);
 
-    for (let k = 0; k < permitidas.length; k++) {
-      const p = permitidas[k];
+    const avisar = permitidas.filter((p, k) => {
       const ctxDela = contextos[k];
-      if (post && ctxDela) {
-        const podeVer = podeVerPost({
-          post: { autorId: post.autorId, visibilidade: post.visibilidade as any },
-          euId: p.id,
-          autor: { emCuidado: post.emCuidado, publico: post.publico },
-          bloqueado: ctxDela.bloqueio.has(post.autorId),
-          sigoAtivo: ctxDela.sigo.has(post.autorId),
-          somosAmigas: ctxDela.amigas.has(post.autorId),
-        });
-        if (!podeVer) continue;
-      }
-      await registrarAtividade(sb, {
-        donoId: p.id,
-        quemId: opts.quemId,
-        especie: "mencionou",
-        postId: opts.postId ?? null,
+      if (!post) return true;
+      /* ⚠️ Sem o contexto DELA não avisa: `podeVerPost` com contexto vazio
+         responderia "não bloqueada, não sigo, não somos amigas" — que para um
+         post público é SIM, e para os outros é não. Errar aqui é mandar aviso
+         com a capa de uma publicação que ela não pode abrir. */
+      if (!ctxDela) return false;
+      return podeVerPost({
+        post: { autorId: post.autorId, visibilidade: post.visibilidade as any },
+        euId: p.id,
+        autor: { emCuidado: post.emCuidado, publico: post.publico },
+        bloqueado: ctxDela.bloqueio.has(post.autorId),
+        sigoAtivo: ctxDela.sigo.has(post.autorId),
+        somosAmigas: ctxDela.amigas.has(post.autorId),
       });
-    }
+    });
+
+    /* ⚠️ Em PARALELO, pela mesma razão das marcações: dez linhas independentes
+       de `rede_atividade` não colidem entre si, e em série eram dez idas
+       somadas penduradas na resposta de publicar. */
+    await Promise.all(
+      avisar.map((p) =>
+        registrarAtividade(sb, {
+          donoId: p.id,
+          quemId: opts.quemId,
+          especie: "mencionou",
+          postId: opts.postId ?? null,
+        }),
+      ),
+    );
   } catch {
     /* A publicação já existe; o aviso é o acessório. */
   }

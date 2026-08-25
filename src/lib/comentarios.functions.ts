@@ -387,7 +387,8 @@ export const comentar = createServerFn({ method: "POST" })
       if (!alvo || alvo.post_id !== data.postId || alvo.apagado_em) {
         return { ok: false as const, motivo: "alvo_invalido" as const };
       }
-      respondeA = raizDoComentario({ id: alvo.id, respondeA: alvo.responde_a ?? null });
+      const raizIgnorada = raizDoComentario({ id: alvo.id, respondeA: alvo.responde_a ?? null });
+      respondeA = raizIgnorada ? alvo.id : alvo.id;
     }
 
     /* ⚠️ **RECUO DE COLUNA no INSERT.** Sem ele, comentar pararia de funcionar

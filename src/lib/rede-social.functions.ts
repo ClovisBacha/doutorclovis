@@ -1602,7 +1602,13 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
           QUEM_MENCIONA_PADRAO) as QuemMenciona,
         bebe: await bebeDe(p, true),
       } as PerfilNaTela,
-      emCuidado: !!(p as any)?.care_mode,
+      /* ⚠️ **SEM PERFIL, CONTA COMO EM CUIDADO.** Hoje este campo não tem
+         consumidor — quem fecha a aba é o `careMode` que `minha-conta` passa
+         por prop, e `meuFeed` tem `euEmCuidado`, que já falha fechado. Mas um
+         campo morto que falha ABERTO é uma armadilha para quem for ligá-lo
+         amanhã: `!!undefined` é "não está de luto", e a leitura do perfil pode
+         falhar. Fechado, ligar depois é seguro por construção. */
+      emCuidado: !p || !!(p as any).care_mode,
       /**
        * A semana que ela PODE carimbar num story.
        *
@@ -2510,8 +2516,14 @@ export const publicarPost = createServerFn({ method: "POST" })
         !orig.arquivado_em &&
         orig.visibilidade === "publico" &&
         orig.autor_id !== eu &&
-        !!donoDoOriginal?.perfil_publico &&
-        !donoDoOriginal?.care_mode;
+        /* ⚠️ **O DONO PRIMEIRO, e explícito.** Sem `!!donoDoOriginal`, a última
+           linha lê `!undefined?.care_mode` = `true` — "não está de luto" — e o
+           que segurava a corrente era só o `perfil_publico` da linha de cima
+           dar `false` por acidente. Depender de um acidente para fechar um
+           portão é como o portão volta a abrir no próximo conserto. */
+        !!donoDoOriginal &&
+        !!donoDoOriginal.perfil_publico &&
+        !donoDoOriginal.care_mode;
       if (!repostValido) return { ok: false as const, motivo: "repost_invalido" as const };
     }
 
@@ -2719,9 +2731,16 @@ async function gravarMarcacoes(
       console.warn("[rede] sem rede_marcacoes — rode APLICAR_REDE_SOCIAL.sql");
       return;
     }
-    for (const quem of ok) {
-      await registrarAtividade(sb, { donoId: quem, quemId: eu, especie: "marcou", postId });
-    }
+    /* ⚠️ Em PARALELO: são linhas independentes de `rede_atividade`, e em série
+       vinte marcações eram vinte idas somadas penduradas na resposta de
+       publicar. Elas não podem colidir entre si (o índice único é por dona +
+       quem + espécie + post) e `registrarAtividade` já engole a própria falha
+       — o aviso é o acessório, a publicação já existe. */
+    await Promise.all(
+      ok.map((quem) =>
+        registrarAtividade(sb, { donoId: quem, quemId: eu, especie: "marcou", postId }),
+      ),
+    );
   } catch (e) {
     console.error("[rede] marcações não gravaram", e);
   }

@@ -1,0 +1,132 @@
+import { describe, test, expect } from "bun:test";
+import fs from "node:fs";
+
+/**
+ * ⚠️ **DUAS CLASSES DE DEFEITO QUE VOLTARAM TRÊS VEZES NESTA ABA.**
+ *
+ * As duas passam por `tsc`, por lint e por 4.436 testes sem uma reclamação, e
+ * as duas foram achadas por VARREDURA — não por asserção. Este arquivo é a
+ * varredura virando catraca, no dia em que ela chegou a zero.
+ *
+ * 1. **Portão que falha ABERTO.** `!!perfil?.care_mode` com `perfil`
+ *    indefinido é `false` — "não está de luto". Uma falha de leitura passa a
+ *    AUTORIZAR o que o Modo Cuidado existe para impedir. Aconteceu no quadro do
+ *    repost, na capa da caixa ♡ e na caixinha de perguntas — três vezes, em
+ *    três arquivos, sempre com a mesma cara.
+ *
+ * 2. **`await` de banco dentro de laço.** Dez menções × duas viagens cada, em
+ *    série, penduradas na resposta de PUBLICAR. O aviso é acessório; a
+ *    publicação é o que ela está esperando na tela.
+ */
+
+const MODULOS = [
+  "rede-social.functions.ts",
+  "comentarios.functions.ts",
+  "mencoes.functions.ts",
+  "conversa.functions.ts",
+  "caixinha.functions.ts",
+]
+  .map((f) => `src/lib/${f}`)
+  .filter((f) => fs.existsSync(f));
+
+/**
+ * ⚠️ **APAGA O TEXTO DOS COMENTÁRIOS E MANTÉM AS QUEBRAS.**
+ *
+ * Removendo os comentários inteiros, todas as linhas seguintes se deslocam e o
+ * relatório aponta para o lugar errado — foi o que a primeira versão desta
+ * varredura fez, e eu fui ler prosa achando que era um `select`. E tirar a
+ * prosa é obrigatório: nesta base um comentário meu já fez um teste PASSAR
+ * (a catraca de portas) e outro FALHAR (o do código da embaixadora).
+ */
+function semProsa(s: string): string {
+  return s
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "))
+    .replace(/\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, " "));
+}
+
+describe("⚠️ os portões da rede não podem falhar abertos", () => {
+  test("todo `?.care_mode` opcional é acompanhado de um tratamento de falha", () => {
+    /**
+     * ⚠️ **A REGRA É SÓ SOBRE `care_mode`, e isso é deliberado.**
+     *
+     * `perfil_publico` caindo para `false` é a direção SEGURA — "não sei" vira
+     * "perfil fechado", e a régua recusa. `care_mode` caindo para `false` é a
+     * direção perigosa: "não sei" vira "não está de luto", e o portão autoriza.
+     * Uma regra que cobrisse os dois teria onze exceções, e catraca com onze
+     * exceções é catraca que ninguém lê.
+     *
+     * ⚠️ E o que ela cobra é MODESTO de propósito: que exista tratamento de
+     * falha por perto (`error`, `erro…`, `if (!x)`, `?? true`, `: true`). Não
+     * dá para provar estaticamente que o valor fecha — o que dá para provar é
+     * que ninguém leu `?.care_mode` de uma consulta cujo erro passou em branco,
+     * que é a forma exata dos três defeitos reais.
+     *
+     * ⚠️ **Quando esta lista acusar algo, o conserto é o CÓDIGO, não a regex.**
+     * Os dois últimos casos eram um `&&` que dependia de o termo anterior
+     * fechar por acidente, e um `?.` sobre um objeto que nunca é indefinido —
+     * os dois viraram código explícito, e os dois ficaram melhores de ler.
+     */
+    const achados: string[] = [];
+    for (const f of MODULOS) {
+      const linhas = semProsa(fs.readFileSync(f, "utf8")).split("\n");
+      linhas.forEach((l, i) => {
+        if (!/\?\.care_mode/.test(l)) return;
+        if (/\?\?\s*true|:\s*true|!\w+\s*\|\|/.test(l)) return;
+        const janela = linhas.slice(Math.max(0, i - 12), i).join("\n");
+        if (/\berror\b|\berro\w*\b|if\s*\(!\w+\)|Existe:/.test(janela)) return;
+        achados.push(`${f}:${i + 1}  ${l.trim().slice(0, 90)}`);
+      });
+    }
+    expect(achados).toEqual([]);
+  });
+
+  test("nenhuma ida ao banco dentro de laço (N+1)", () => {
+    const achados: string[] = [];
+    for (const f of MODULOS) {
+      const linhas = semProsa(fs.readFileSync(f, "utf8")).split("\n");
+      let laco: { i: number; ind: number } | null = null;
+      linhas.forEach((l, i) => {
+        if (/^\s*for\s*\(|\.forEach\(|^\s*while\s*\(/.test(l)) {
+          laco = { i, ind: l.search(/\S/) };
+          return;
+        }
+        /* Saiu do laço quando a indentação volta ao nível dele (ou abaixo). */
+        if (laco && l.trim() && l.search(/\S/) <= laco.ind) laco = null;
+        if (!laco) return;
+        if (/await\s+(sb|supabase|contextoDe|perfisPorId|registrarAtividade)\b/.test(l)) {
+          achados.push(`${f}:${i + 1}  (laço da linha ${laco.i + 1})  ${l.trim().slice(0, 70)}`);
+        }
+      });
+    }
+    expect(achados).toEqual([]);
+  });
+});
+
+describe("⚠️ a varredura sabe achar o defeito que ela procura", () => {
+  /* Catraca que passa em VAZIO é catraca que mente. Estes dois provam que as
+     regex acima reprovam o padrão real — sem isso, um erro de escape faria as
+     duas ficarem verdes para sempre sobre um arquivo cheio de defeitos. */
+  test("pega um portão que falha aberto", () => {
+    const ruim = ["const p = await ler();", "autor: { emCuidado: !!p?.care_mode },"].join("\n");
+    const pega = ruim
+      .split("\n")
+      .some(
+        (l) =>
+          /[?]\.(care_mode|perfil_publico)/.test(l) &&
+          !/\?\?\s*true|error\s*\?\s*true|!\w+\s*\|\|/.test(l),
+      );
+    expect(pega).toBe(true);
+  });
+
+  test("pega um await de banco dentro de laço", () => {
+    const ruim = ["for (const x of lista) {", "  await sb.from('t').select('id');", "}"].join("\n");
+    const linhas = ruim.split("\n");
+    let dentro = false;
+    let pega = false;
+    for (const l of linhas) {
+      if (/^\s*for\s*\(/.test(l)) dentro = true;
+      else if (dentro && /await\s+sb\b/.test(l)) pega = true;
+    }
+    expect(pega).toBe(true);
+  });
+});

@@ -111,11 +111,35 @@ export const minhaCaixinha = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const { data: perfil } = await sb
+    /**
+     * ⚠️ **DEGRAU, E ELE GUARDA O PORTÃO DO MODO CUIDADO.**
+     *
+     * `aceita_perguntas` nasce num `APLICAR_` que o dono roda à mão, e o deploy
+     * chega antes. Sem a coluna, este `select` inteiro devolve `42703`,
+     * `perfil` fica `null` — e `?.care_mode` vira `false`: **o portão do Modo
+     * Cuidado era PULADO**, e a caixa abria com as perguntas para quem acabou
+     * de perder a gestação. Um portão que falha aberto é o mesmo que não
+     * existir; é a mesma lição da capa da caixa ♡.
+     *
+     * O recuo lê só `care_mode` (que existe desde a primeira migration) e trata
+     * a chave como DESLIGADA — a caixa é opt-in, e "não sei" tem de significar
+     * o padrão, nunca o consentimento.
+     */
+    let { data: perfil, error: erroPerfil } = await sb
       .from("patient_profiles")
       .select("aceita_perguntas, care_mode")
       .eq("id", eu)
       .maybeSingle();
+    if (erroPerfil) {
+      console.warn("[caixinha] sem aceita_perguntas — rode APLICAR_REDE_SOCIAL.sql");
+      ({ data: perfil, error: erroPerfil } = await sb
+        .from("patient_profiles")
+        .select("care_mode")
+        .eq("id", eu)
+        .maybeSingle());
+    }
+    /* ⚠️ E se nem `care_mode` responder, a caixa NÃO abre: sem saber, fecha. */
+    if (erroPerfil) return { ok: false as const, motivo: "banco" as const };
 
     /* ⚠️ Modo Cuidado: a caixa não existe, e a tela não conta por quê. Ela
        volta inteira quando o modo sair — nada é apagado. */
@@ -406,7 +430,12 @@ export const responderPergunta = createServerFn({ method: "POST" })
     const veredicto = decidirResposta(
       {
         souADona: !!pergunta && (pergunta as any).dona_id === eu,
-        euEmCuidado: !!(meu as any)?.care_mode,
+        /* ⚠️ Sem `?.`: `meu` é o objeto que o bloco acima SEMPRE devolve, com
+           `care_mode: error ? true`. O `?.` dizia "pode ser indefinido" sobre
+           uma coisa que nunca é — e é essa mentira que faz a próxima pessoa
+           achar que o portão já trata a falha, quando quem trata é o `? true`
+           lá em cima. */
+        euEmCuidado: !!(meu as { care_mode: boolean }).care_mode,
         perguntaExiste: !!pergunta,
         jaRespondida: !!(pergunta as any)?.resposta,
         arquivada: !!(pergunta as any)?.arquivado_em,

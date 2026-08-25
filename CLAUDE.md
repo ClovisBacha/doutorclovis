@@ -5700,6 +5700,60 @@ JavaScript — clicando em botões que ainda não existiam. A causa era
 **Antes de investigar um componente que "não responde", leia o log do servidor
 de dev** — a bancada estava certa o tempo todo.
 
+#### A varredura das duas classes, e o que ela achou depois de tudo verde
+
+Com 4.436 testes verdes, `tsc` limpo e lint zerado, uma varredura mecânica pelos
+cinco módulos da aba achou mais quatro — porque **estas duas classes não têm
+como falhar num teste**: as duas passam por tudo e só aparecem quando o banco
+tosse ou quando alguém cronometra.
+
+- ⚠️ **A CAIXINHA PULAVA O MODO CUIDADO SEM A COLUNA NOVA.** O `select` era
+  `aceita_perguntas, care_mode`; sem `aceita_perguntas` ele falha inteiro,
+  `perfil` fica `null`, e `?.care_mode` vira `false` — a caixa abria com as
+  perguntas para quem acabou de perder a gestação. O recuo lê só `care_mode`
+  (que existe desde a primeira migration) e trata a chave como DESLIGADA: a
+  caixa é opt-in, e "não sei" tem de significar o padrão, nunca o
+  consentimento. Se nem `care_mode` responder, a caixa não abre.
+- ⚠️ **O portão do repost fechava POR ACIDENTE.** `!!x?.perfil_publico &&
+!x?.care_mode`: com `x` indefinido a segunda metade dá `true`, e o que
+  segurava a corrente era a primeira dar `false`. Depender de um acidente para
+  fechar um portão é como ele reabre no próximo conserto. Virou `!!x &&` na
+  frente, explícito.
+- **`emCuidado` de `meuPerfilSocial` não tem consumidor NENHUM** e falhava
+  aberto. Não foi apagado: um campo morto que falha aberto é armadilha para
+  quem for ligá-lo amanhã, e fechá-lo custa uma linha.
+- **Duas gravações em série que são independentes** (as marcações e os avisos de
+  menção) viraram `Promise.all` — vinte idas somadas penduradas na resposta de
+  PUBLICAR.
+
+**`src/lib/portoes-da-rede.test.ts` é a varredura virando catraca**, no dia em
+que ela chegou a zero. Duas regras, e o desenho delas importa:
+
+- ⚠️ **A regra é só sobre `care_mode`.** `perfil_publico` caindo para `false` é a
+  direção SEGURA ("não sei" = perfil fechado); `care_mode` caindo para `false` é
+  a perigosa ("não sei" = não está de luto). Cobrir os dois exigiria onze
+  exceções, e **catraca com onze exceções é catraca que ninguém lê**.
+- ⚠️ **O que ela cobra é modesto de propósito**: que exista tratamento de falha
+  por perto. Não dá para provar estaticamente que o valor fecha — dá para provar
+  que ninguém leu `?.care_mode` de uma consulta cujo erro passou em branco, que
+  é a forma exata dos três defeitos reais.
+- ⚠️ **Quando ela acusa, o conserto é o CÓDIGO, não a regex.** Os dois últimos
+  casos viraram código explícito e ficaram melhores de ler.
+- ⚠️ **E ela tem prova de que morde**: dois testes montam o padrão ruim e cobram
+  que a varredura o pegue. Catraca que passa em vazio é catraca que mente. Os
+  três defeitos reais foram reintroduzidos um a um — os três ficam vermelhos.
+
+⚠️ **E um teste meu travou a GRAFIA outra vez — a sexta nesta leva.**
+`toContain("donoDoOriginal?.perfil_publico")` reprovou o conserto que APERTA o
+portão (pôr `!!donoDoOriginal &&` na frente permite largar o `?.`). Hoje o
+`select` é recortado do trecho e o que se cobra é o USO das duas colunas na
+decisão: as duas grafias passam, e trocar qualquer uma por `true` continua
+reprovando — conferido por mutação.
+
+**Bancada:** `?silenciado=1` passou a existir. O campo estava cravado em
+`false`, então "Deixar de silenciar Fulana" — metade do controle — nunca tinha
+sido olhado. Mesma falta que o `?restrito=1` ao lado já cobria.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

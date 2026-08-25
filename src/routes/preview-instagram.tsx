@@ -95,6 +95,7 @@ export const Route = createFileRoute("/preview-instagram")({
     tag: q.tag == null ? "28semanas" : String(q.tag),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     restrito: q.restrito == null ? 0 : Number(q.restrito),
+    silenciado: q.silenciado == null ? 0 : Number(q.silenciado),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     instavel: q.instavel == null ? 0 : Number(q.instavel),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
@@ -374,6 +375,7 @@ function Bancada() {
     conversa,
     tag,
     restrito,
+    silenciado,
     instavel,
     fechado,
   } = Route.useSearch();
@@ -416,7 +418,12 @@ function Bancada() {
        escolheu — o único estado que já era certo — e o endereço novo ficava
        sem ninguém nunca ter olhado. */
     handle: meu ? "marina.costa" : "carol.andrade",
-    silenciado: false,
+    /* ⚠️ `?silenciado=1` fotografa o botão no estado LIGADO — "Deixar de
+       silenciar Fulana". Ele estava cravado em `false`, então metade do
+       controle nunca tinha sido olhada: o estado que só existe DEPOIS de
+       silenciar alguém de verdade. Mesma falta do `?restrito=1`, no controle
+       ao lado. */
+    silenciado: silenciado === 1,
     /* ⚠️ `?restrito=1` fotografa o botão no estado LIGADO e o texto que ele
        mostra ali — impossível de ver sem uma restrição real, e é o texto que
        explica o recurso inteiro. */

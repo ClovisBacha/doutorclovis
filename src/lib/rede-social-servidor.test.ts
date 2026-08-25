@@ -1653,12 +1653,23 @@ describe("⚠️ o quadro da republicação respeita o PERFIL, não só a camada
     const i = c.indexOf("donoDoOriginal");
     expect(i).toBeGreaterThan(-1);
     const regra = c.slice(i, c.indexOf("if (!repostValido)", i));
-    /* ⚠️ **A LEITURA TEM DE ENTRAR NA DECISÃO, e não só existir.** A primeira
-       versão procurava `perfil_publico` no trecho — e o `select` que traz a
-       coluna já a contém, então trocar o termo da condição por `true` passava
-       verde. Cobra-se o USO do valor lido. */
-    expect(regra).toContain("donoDoOriginal?.perfil_publico");
+    /**
+     * ⚠️ **A LEITURA TEM DE ENTRAR NA DECISÃO, e não só existir.** A primeira
+     * versão procurava `perfil_publico` no trecho — e o `select` que traz a
+     * coluna já a contém, então trocar o termo da condição por `true` passava
+     * verde. Cobra-se o USO do valor lido.
+     *
+     * ⚠️ **E A SEGUNDA VERSÃO TRAVOU A GRAFIA `donoDoOriginal?.perfil_publico`**,
+     * o que reprovou código estritamente MELHOR: pôr `!!donoDoOriginal &&` na
+     * frente da corrente (para o portão não depender de o termo anterior fechar
+     * por acidente) permite largar o `?.`, e o teste ficou vermelho sobre uma
+     * mudança que só apertou o portão. Hoje o `select` é RECORTADO e o que se
+     * cobra é o USO das duas colunas na decisão — as duas grafias passam, e
+     * trocar qualquer uma por `true` continua reprovando.
+     */
+    const semSelect = regra.replace(/\.select\([^)]*\)/g, "");
+    expect(semSelect).toMatch(/donoDoOriginal\??\.perfil_publico/);
+    expect(semSelect).toMatch(/donoDoOriginal\??\.care_mode/);
     expect(regra).toContain('visibilidade === "publico"');
-    expect(regra).toContain("donoDoOriginal?.care_mode");
   });
 });
