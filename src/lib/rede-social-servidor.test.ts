@@ -1063,12 +1063,49 @@ describe("o post comparado", () => {
     expect(checagem).toContain("entao = (velho as any).id as string");
   });
 
-  /* ⚠️ E o recuo por coluna ausente publica SEM o carimbo, nunca sem as fotos:
-     perder a publicação inteira por causa de um enfeite é a troca errada. */
-  test("⚠️ o recuo não carrega `comparacao_de`", () => {
+  /**
+   * ⚠️ **ESTE TESTE FOI REESCRITO, e a versão antiga reprovava código MELHOR.**
+   *
+   * Ela exigia `not.toContain("comparacao_de")` no recuo inteiro — o que era
+   * verdade enquanto havia UM degrau só, que ia direto ao mínimo. A auditoria
+   * mostrou que esse degrau único é o defeito: as colunas do INSERT vêm de
+   * QUATRO `APLICAR_` diferentes, e uma faltando derrubava a enquete, o vídeo e
+   * o marco do bebê junto — em silêncio.
+   *
+   * Com o recuo em camadas, `comparacao_de` continua no recuo (nas tentativas
+   * de cima) e só cai na última. A asserção antiga ficaria vermelha sobre a
+   * correção — e um teste que reprova código melhor é um teste que ensina a
+   * relaxá-lo.
+   *
+   * O que se cobra agora é a INTENÇÃO: existe um piso mínimo com as fotos, e o
+   * carimbo não está nele.
+   */
+  test("⚠️ o piso do recuo tem as fotos e NÃO tem o carimbo", () => {
+    /* Perder a publicação inteira por causa de um enfeite é a troca errada; e
+       publicar sem as fotos não é publicar. */
+    const i = corpo.indexOf("const base: Record<string, unknown> = {");
+    expect(i).toBeGreaterThan(-1);
+    const piso = corpo.slice(i, corpo.indexOf("};", i));
+    expect(piso).toContain("imagem_path: caminho");
+    expect(piso).toContain("visibilidade: data.visibilidade");
+    expect(piso).not.toContain("comparacao_de");
+  });
+
+  test("⚠️ e o recuo desce UMA camada por vez, nunca direto ao piso", () => {
+    /* O degrau único era o defeito: num banco que rodou três dos quatro SQLs,
+       uma coluna faltando levava junto a enquete que ela acabou de montar, o
+       vídeo que ela subiu e o marco do bebê. */
     const recuo = corpo.slice(corpo.indexOf("if (error) {"));
-    expect(recuo).not.toContain("comparacao_de");
-    expect(recuo).toContain("imagem_path: caminho");
+    expect(recuo).toContain("CAMADAS");
+    /* As quatro origens de coluna, cada uma na sua camada. */
+    for (const sql of [
+      "APLICAR_COMENTARIOS_E_LIMITES",
+      "APLICAR_VIDEO_NO_POST",
+      "APLICAR_COMUNIDADE_VIVA",
+      "APLICAR_REDE_SOCIAL",
+    ]) {
+      expect({ sql, tem: recuo.includes(sql) }).toEqual({ sql, tem: true });
+    }
   });
 });
 

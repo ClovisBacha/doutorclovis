@@ -162,14 +162,36 @@ export const minhasConversas = createServerFn({ method: "POST" })
     const ctx = await contextoDe(sb, eu);
 
     /* A última mensagem de cada conversa, numa consulta só. */
-    const { data: msgs } = await sb
-      .from("rede_mensagens")
-      .select("conversa_id, autor_id, texto, criada_em, apagada_em")
-      .in(
-        "conversa_id",
-        conversas.map((c) => c.id),
-      )
-      .order("criada_em", { ascending: false });
+    const lerUltimas = (colunas: string) =>
+      sb
+        .from("rede_mensagens")
+        .select(colunas)
+        .in(
+          "conversa_id",
+          conversas.map((c) => c.id),
+        )
+        .order("criada_em", { ascending: false });
+    /**
+     * ⚠️ **`imagem_path` E `ref_tipo` PRECISAM VIR — e este defeito era MEU.**
+     *
+     * A prévia da lista caía em `""` para toda mensagem que é SÓ foto ou só
+     * anexo: a linha saía com avatar, nome, hora e NADA no meio, e ela não
+     * tinha como saber se era defeito ou mensagem vazia.
+     *
+     * `previaDaMensagem` já sabia responder "📷 Foto" desde o primeiro dia — o
+     * parâmetro `carrega` existia, o único chamador de produção não o passava,
+     * e a suíte ficava VERDE sobre um ramo que só os testes exercitavam.
+     *
+     * ⚠️ E com recuo de coluna: sem ele, um banco sem `imagem_path` derrubaria
+     * a LISTA DE CONVERSAS inteira — um recurso que já funcionava, apagado por
+     * causa de uma prévia.
+     */
+    let { data: msgs, error: erroMsgs } = await lerUltimas(
+      "conversa_id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo",
+    );
+    if (erroMsgs) {
+      ({ data: msgs } = await lerUltimas("conversa_id, autor_id, texto, criada_em, apagada_em"));
+    }
     const ultima = new Map<string, any>();
     for (const m of (msgs ?? []) as any[]) {
       if (!ultima.has(m.conversa_id)) ultima.set(m.conversa_id, m);
@@ -201,7 +223,10 @@ export const minhasConversas = createServerFn({ method: "POST" })
         comId: outro,
         comNome: ((p?.display_name ?? "") as string).trim() || "Alguém",
         comAvatar: avatares[i] ?? null,
-        previa: previaDaMensagem(m?.texto ?? null, !!m?.apagada_em),
+        previa: previaDaMensagem(m?.texto ?? null, !!m?.apagada_em, undefined, {
+          imagem: !!m?.imagem_path,
+          ref: (m?.ref_tipo ?? null) as "post" | "story" | null,
+        }),
         ultimaEm: c.ultima_em ?? null,
         naoLida: temNaoLida({
           ultimaEm: c.ultima_em ?? null,

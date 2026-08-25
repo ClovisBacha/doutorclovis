@@ -786,7 +786,19 @@ const COLUNAS_DO_POST_ANTIGAS =
  * enquete, sem aula e sem a pergunta respondida, que é exatamente o que um
  * banco sem elas tem a dizer.
  */
-async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
+/**
+ * ⚠️ **EXPORTADA porque uma SEXTA cópia da lista de colunas já tinha nascido.**
+ *
+ * `postsDaTag` (em `mencoes.functions.ts`) reescreveu `COLUNAS_DO_POST` à mão —
+ * e a cópia JÁ estava desatualizada quando a auditoria a encontrou: faltava
+ * `alt_texto`. É literalmente o defeito que o comentário de `COLUNAS_DO_POST`
+ * descreve ("acrescentar uma coluna significava lembrar das cinco"),
+ * acontecendo de novo, num arquivo novo.
+ *
+ * A causa é banal: esta função era `private`, então quem precisou dela do lado
+ * de fora copiou o `select`. Exportar é mais barato que uma catraca.
+ */
+export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
   const { data, error } = await monta(sb.from("rede_posts").select(COLUNAS_DO_POST));
   if (!error) return (data ?? []) as any[];
   console.warn("[rede] posts sem enquete/aula/pergunta — rode APLICAR_REDE_SOCIAL.sql");
@@ -2438,25 +2450,83 @@ export const publicarPost = createServerFn({ method: "POST" })
        `publicarStory`: o deploy chega antes do SQL, e sem isto PUBLICAR pararia
        de funcionar para todo mundo — não só a enquete. */
     if (error) {
-      console.warn(
-        "[rede] post sem enquete/aula/comparacao/miniatura — rode APLICAR_REDE_SOCIAL.sql",
-      );
-      /* ⚠️ O recuo publica SEM o carimbo, e não sem a comparação: as duas fotos
-         continuam no carrossel, na ordem certa. O que se perde é o "28s → 34s",
-         que é enfeite — perder a publicação inteira por causa dele seria a
-         troca errada. */
-      const { data: p2, error: erro2 } = await sb
-        .from("rede_posts")
-        .insert({
-          autor_id: eu,
-          texto: data.texto?.trim() || null,
-          imagem_path: caminho,
-          imagens: extras,
-          visibilidade: data.visibilidade,
-        })
-        .select("id")
-        .single();
-      if (erro2 || !p2) return { ok: false as const, motivo: "banco" as const };
+      /**
+       * ⚠️ **O RECUO DESCE UM DEGRAU DE CADA VEZ, e não pulava.**
+       *
+       * Havia UM só, e ele ia direto ao mínimo: `autor_id, texto, imagem_path,
+       * imagens, visibilidade`. As colunas do INSERT vêm de QUATRO `APLICAR_`
+       * diferentes (`enquete_opcoes`/`miniatura_path` do REDE_SOCIAL,
+       * `marco_tipo` do COMUNIDADE_VIVA, `video_path`/`repost_de` do
+       * VIDEO_NO_POST, `alt_texto` do COMENTARIOS_E_LIMITES) — e o dono os roda
+       * à mão, um por vez.
+       *
+       * Num banco que rodou três dos quatro, uma coluna faltando derrubava
+       * TODAS as outras: a enquete que ela acabou de montar, o vídeo que ela
+       * subiu e o marco do bebê sumiam da publicação, em silêncio, e ela só
+       * descobriria olhando o post no feed.
+       *
+       * `publicarStory` já tem três degraus, com este comentário ao lado: "um
+       * recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
+       * carimbo perdê-lo por causa de outra coluna".
+       *
+       * ⚠️ **A ORDEM É DA MAIS NOVA PARA A MAIS VELHA** — a coluna que o dono
+       * tem menos chance de ter aplicado sai primeiro.
+       */
+      const base: Record<string, unknown> = {
+        autor_id: eu,
+        texto: data.texto?.trim() || null,
+        imagem_path: caminho,
+        imagens: extras,
+        visibilidade: data.visibilidade,
+      };
+      const CAMADAS: { aviso: string; campos: Record<string, unknown> }[] = [
+        {
+          aviso: "alt_texto — rode APLICAR_COMENTARIOS_E_LIMITES.sql",
+          campos: { alt_texto: data.altTexto?.trim() || null },
+        },
+        {
+          aviso: "video/repost — rode APLICAR_VIDEO_NO_POST.sql",
+          campos: {
+            ...(data.video && caminhoEhDoDono(data.video.caminho, eu)
+              ? { video_path: data.video.caminho, video_segundos: data.video.segundos }
+              : {}),
+            ...(repostValido ? { repost_de: data.repostDe } : {}),
+          },
+        },
+        {
+          aviso: "marco do bebê — rode APLICAR_COMUNIDADE_VIVA.sql",
+          campos:
+            data.marco && MARCO_POR_ID[data.marco.tipo]
+              ? { marco_tipo: data.marco.tipo, marco_dias: data.marco.dias }
+              : {},
+        },
+        {
+          aviso: "enquete/aula/comparação/miniatura — rode APLICAR_REDE_SOCIAL.sql",
+          campos: {
+            miniatura_path: miniatura,
+            enquete_opcoes: opcoes,
+            aula: data.aula && aulaValida(data.aula) ? data.aula : null,
+            comparacao_de: entao,
+            editado_em: null,
+          },
+        },
+      ];
+
+      /* Começa com tudo e vai tirando uma camada por vez. */
+      let restante = CAMADAS.slice();
+      let p2: { id: string } | null = null;
+      while (restante.length > 0) {
+        restante = restante.slice(1);
+        console.warn(`[rede] post sem ${CAMADAS[CAMADAS.length - restante.length - 1]?.aviso}`);
+        const tentativa: Record<string, unknown> = { ...base };
+        for (const c of restante) Object.assign(tentativa, c.campos);
+        const r = await sb.from("rede_posts").insert(tentativa).select("id").single();
+        if (!r.error && r.data) {
+          p2 = r.data as { id: string };
+          break;
+        }
+      }
+      if (!p2) return { ok: false as const, motivo: "banco" as const };
       await gravarMarcacoes(sb, eu, p2.id, data.marcadas ?? []);
       await processarTextoDoPost(sb, {
         postId: p2.id,
@@ -4698,21 +4768,54 @@ export const minhaAtividade = createServerFn({ method: "POST" })
          capa nenhuma. */
       let ps: any[] | null = null;
       {
-        const cheio = await sb
-          .from("rede_posts")
-          .select("id, imagem_path, miniatura_path")
-          .in("id", postIds)
-          .is("arquivado_em", null);
+        /**
+         * ⚠️ **`autor_id` E `visibilidade` ENTRAM NO SELECT, e é por causa de um
+         * VAZAMENTO DE FOTO.**
+         *
+         * A capa era entregue só por `arquivado_em IS NULL` — nenhuma régua de
+         * visibilidade. Quem fosse MENCIONADA num post da camada `amigas`
+         * recebia a linha na caixa ♡ **com a foto**, sem poder abrir o post.
+         *
+         * ⚠️ **E a foto era a de 1080**, não um recorte: o recuo é
+         * `miniatura_path ?? imagem_path`, e publicação anterior ao recurso de
+         * miniatura não tem a primeira. O que vazava era a imagem inteira.
+         *
+         * ⚠️ **`podeVerPost` roda por post, e não um filtro no SQL**, porque a
+         * régua cruza quatro coisas (Modo Cuidado do autor, bloqueio nos dois
+         * sentidos, o seguir e o grafo de amizade) e é a régua ÚNICA. Uma
+         * segunda versão dela aqui, em SQL, é exatamente como um post vaza.
+         */
+        const COLS = "id, autor_id, visibilidade, imagem_path, miniatura_path";
+        const cheio = await sb.from("rede_posts").select(COLS).in("id", postIds);
         if (cheio.error) {
           const velho = await sb
             .from("rede_posts")
-            .select("id, imagem_path")
-            .in("id", postIds)
-            .is("arquivado_em", null);
+            .select("id, autor_id, visibilidade, imagem_path")
+            .in("id", postIds);
           ps = ((velho.data ?? []) as any[]).map((p) => ({ ...p, miniatura_path: null }));
         } else {
           ps = (cheio.data ?? []) as any[];
         }
+
+        /* ⚠️ O arquivado sai AQUI, junto com a régua — e não no `.is()` do
+           select, que ficaria como a única guarda se alguém mexesse depois. */
+        const autoresDosPosts = await perfisPorId(
+          sb,
+          [...new Set(((ps ?? []) as any[]).map((x) => x.autor_id))],
+          ctx.perfis,
+        );
+        ps = ((ps ?? []) as any[]).filter((x) => {
+          if (x.arquivado_em) return false;
+          const autor = autoresDosPosts.get(x.autor_id);
+          return podeVerPost({
+            post: { autorId: x.autor_id, visibilidade: x.visibilidade },
+            euId: eu,
+            autor: { emCuidado: !!autor?.care_mode, publico: !!autor?.perfil_publico },
+            bloqueado: ctx.bloqueio.has(x.autor_id),
+            sigoAtivo: ctx.sigo.has(x.autor_id),
+            somosAmigas: ctx.amigas.has(x.autor_id),
+          });
+        });
       }
       /* ⚠️ Em lote, e este laço também era SEQUENCIAL: a caixa do coração
          mostra até cinquenta linhas, e cada capa era uma viagem esperando a

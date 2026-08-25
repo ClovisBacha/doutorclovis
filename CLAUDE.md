@@ -8051,3 +8051,55 @@ que ainda checa `arquivado_em` e `care_mode`).
 Fica registrado porque é o motivo de a fase de refutação existir: **quatro dos
 dezesseis primeiros achados verificados foram descartados.** Aplicar os 50 sem
 verificar teria "consertado" comportamento correto.
+
+#### Mais cinco confirmados, e um deles vazava FOTO
+
+**⚠️ A CAPA DA ATIVIDADE ERA ENTREGUE SEM RÉGUA DE VISIBILIDADE.** O bloco que
+monta as capas em `minhaAtividade` filtrava só por `arquivado_em IS NULL`. Quem
+fosse MENCIONADA num post da camada `amigas` recebia a linha na caixa ♡ **com a
+imagem**, sem poder abrir o post.
+
+⚠️ **E a imagem era a de 1080**, não um recorte: o caminho é
+`miniatura_path ?? imagem_path`, e publicação anterior ao recurso de miniatura
+não tem a primeira. O que vazava era a foto inteira.
+
+O conserto é `podeVerPost` por post — a régua ÚNICA, com o contexto de quem
+pergunta. Um filtro em SQL aqui seria a segunda versão dela.
+
+**⚠️ E o outro lado do mesmo defeito:** `avisarMencionadas` nunca conferia a
+visibilidade do post. Agora confere, **com o contexto DA MENCIONADA** — a
+pergunta é "ela pode ver?", e responder com o contexto de quem escreveu seria
+responder outra pergunta.
+
+**⚠️ `postsDaTag` tinha a SEXTA cópia de `COLUNAS_DO_POST`, e ela já divergira.**
+Faltava `alt_texto` — o defeito que o comentário de `COLUNAS_DO_POST` descreve
+("acrescentar uma coluna significava lembrar das cinco") acontecendo de novo, num
+arquivo novo. Sem degrau e descartando o `error`: num banco sem alguma das
+colunas, a página da tag ficava VAZIA em silêncio. A causa era banal —
+`postsCrus` era privada, então quem precisou dela copiou o `select`. Passou a ser
+exportada.
+
+**⚠️ A PRÉVIA DA CONVERSA ERA UMA LINHA EM BRANCO, e o defeito era MEU.** O
+select da última mensagem não trazia `imagem_path` nem `ref_tipo`, então toda
+mensagem que é só foto ou só anexo caía em `""`: a linha saía com avatar, nome,
+hora e nada no meio. `previaDaMensagem` já sabia responder "📷 Foto" desde o
+primeiro dia — o parâmetro `carrega` existia, o único chamador de produção não o
+passava, e **a suíte ficava verde sobre um ramo que só os testes exercitavam.**
+
+**⚠️ `publicarPost` tinha UM degrau, e ele pulava direto ao mínimo.** As colunas
+do INSERT vêm de QUATRO `APLICAR_` diferentes. Num banco que rodou três dos
+quatro, uma coluna faltando derrubava todas as outras: a enquete que ela acabou
+de montar, o vídeo que ela subiu e o marco do bebê sumiam da publicação, em
+silêncio. Agora desce **uma camada por vez**, da mais nova para a mais velha —
+que é o desenho que `publicarStory` já tinha, com o comentário certo ao lado.
+
+#### ⚠️ E OUTRO TESTE MEU REPROVAVA CÓDIGO MELHOR
+
+`expect(recuo).not.toContain("comparacao_de")` era verdade com o degrau único e
+ficou vermelho sobre a correção. É o **terceiro** desta leva (os outros dois
+foram `if (aceitaAgora)` e o `toBe` da junção de mensagens).
+
+O padrão é sempre o mesmo: a asserção descreve **como** o código está escrito em
+vez de **o que** ele garante, e então qualquer melhoria a quebra. Hoje ele cobra
+a intenção — existe um piso mínimo com as fotos, o carimbo não está nele, e o
+recuo cita as quatro origens de coluna.

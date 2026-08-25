@@ -197,6 +197,51 @@ export async function avisarMencionadas(
     const { contextoDe, registrarAtividade } = await import("./rede-social.functions");
     const ctx = await contextoDe(sb, opts.quemId);
 
+    /**
+     * ⚠️ **A MENCIONADA PRECISA PODER VER O POST, e isso não era conferido.**
+     *
+     * Mencionar alguém num post da camada `amigas` mandava o aviso para a caixa
+     * ♡ dela — **com a capa da publicação** — sem ela poder abrir o post. E a
+     * capa cai em `miniatura_path ?? imagem_path`: numa publicação anterior ao
+     * recurso de miniatura, o que vazava era a FOTO DE 1080.
+     *
+     * ⚠️ **A régua é `podeVerPost`, a mesma de sempre.** Ela é chamada com o
+     * contexto DA MENCIONADA, e não com o de quem escreveu — a pergunta é "ela
+     * pode ver?", e responder com o meu contexto seria responder outra
+     * pergunta.
+     *
+     * ⚠️ **Falha ao ler o post NÃO avisa.** Um aviso que aponta para um post
+     * que ninguém conseguiu carregar é, no melhor caso, uma linha morta na
+     * caixa dela; no pior, é este vazamento voltando por um erro de rede.
+     */
+    let post: {
+      autorId: string;
+      visibilidade: string;
+      emCuidado: boolean;
+      publico: boolean;
+    } | null = null;
+    if (opts.postId) {
+      const { data: linha, error: erroPost } = await sb
+        .from("rede_posts")
+        .select("autor_id, visibilidade, arquivado_em")
+        .eq("id", opts.postId)
+        .maybeSingle();
+      if (erroPost || !linha || linha.arquivado_em) return;
+      const { data: autor } = await sb
+        .from("patient_profiles")
+        .select("care_mode, perfil_publico")
+        .eq("id", linha.autor_id)
+        .maybeSingle();
+      post = {
+        autorId: linha.autor_id as string,
+        visibilidade: linha.visibilidade as string,
+        emCuidado: !!autor?.care_mode,
+        publico: !!autor?.perfil_publico,
+      };
+    }
+
+    const { podeVerPost } = await import("./rede-social");
+
     for (const p of gente as any[]) {
       if (p.id === opts.quemId) continue;
       /* ⚠️ Bloqueio dos dois lados barra a menção — quem foi bloqueada não pode
@@ -220,6 +265,20 @@ export async function avisarMencionadas(
         })
       ) {
         continue;
+      }
+
+      /* ⚠️ O contexto é DELA — ver o bloco acima. */
+      if (post) {
+        const ctxDela = await contextoDe(sb, p.id);
+        const podeVer = podeVerPost({
+          post: { autorId: post.autorId, visibilidade: post.visibilidade as any },
+          euId: p.id,
+          autor: { emCuidado: post.emCuidado, publico: post.publico },
+          bloqueado: ctxDela.bloqueio.has(post.autorId),
+          sigoAtivo: ctxDela.sigo.has(post.autorId),
+          somosAmigas: ctxDela.amigas.has(post.autorId),
+        });
+        if (!podeVer) continue;
       }
       await registrarAtividade(sb, {
         donoId: p.id,
@@ -261,23 +320,24 @@ export const postsDaTag = createServerFn({ method: "POST" })
     const ids = ((linhas ?? []) as any[]).map((l) => l.post_id);
     if (ids.length === 0) return { ok: true as const, posts: [] };
 
-    const { montarPosts, contextoDe } = await import("./rede-social.functions");
+    const { montarPosts, contextoDe, postsCrus } = await import("./rede-social.functions");
     const ctx = await contextoDe(sb, eu);
     /* ⚠️ **O `arquivado_em` É FILTRADO AQUI**, e não em `montarPosts`: a página
        da tag lê por id, e um post arquivado continua com a tag na tabela — ela
        guarda a tag de TODA publicação de propósito, porque a autora pode
        reabrir depois. */
-    const { data: crusData } = await sb
-      .from("rede_posts")
-      .select(
-        "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
-          "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-          "marco_tipo, marco_dias, video_path, repost_de",
-      )
-      .in("id", ids)
-      .is("arquivado_em", null)
-      .order("criado_em", { ascending: false });
-    const crus = (crusData ?? []) as any[];
+    /**
+     * ⚠️ **`postsCrus`, e NUNCA um `select` próprio.**
+     *
+     * Este bloco reescrevia `COLUNAS_DO_POST` à mão — a sexta cópia — e a cópia
+     * já tinha divergido: faltava `alt_texto`. Pior, sem degrau de recuo e
+     * descartando o `error`: num banco que ainda não rodou algum dos quatro
+     * `APLICAR_` que criam essas colunas, o `42703` devolvia `data: null` e a
+     * página da tag ficava VAZIA, sem erro em lugar nenhum.
+     */
+    const crus = await postsCrus(sb, (base: any) =>
+      base.in("id", ids).is("arquivado_em", null).order("criado_em", { ascending: false }),
+    );
     /* ⚠️ O filtro de PÚBLICO vem antes de montar: `montarPosts` já aplica
        `podeVerPost`, mas ele deixaria passar o post de uma amiga — e a página
        da tag não é o feed dela. */
