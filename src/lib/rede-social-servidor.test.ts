@@ -1027,6 +1027,63 @@ describe("⚠️ Modo Cuidado de QUEM LÊ, no servidor", () => {
     }
   });
 
+  /**
+   * ⚠️ **A ASSERÇÃO ACIMA MEDE A POSIÇÃO DA CHAMADA, e não que o VALOR gateia
+   * — e a mutação que prova isso aconteceu de verdade, nesta sessão.**
+   *
+   * Trocando `if (await euEmCuidado(sb, eu)) { return … }` por
+   * `await euEmCuidado(sb, eu);`, a chamada continua no mesmo lugar, as duas
+   * asserções de cima continuam verdadeiras, e a suíte inteira fica VERDE —
+   * com a paciente que acabou de perder a gestação voltando a ver o feed
+   * completo.
+   *
+   * Não é hipótese: um agente de verificação aplicou exatamente essa mutação e
+   * não a restaurou. O portão passou horas apagado num checkout limpo, e
+   * nenhum dos 4.400 testes reclamou.
+   *
+   * ⚠️ **Isto continua sendo asserção sobre o FONTE, e isso é o segundo
+   * melhor.** O primeiro seria a régua pura, testável por comportamento — mas
+   * `euEmCuidado` lê o banco, e extrair o portão exigiria mudar as quatro
+   * funções. O que dá para fazer sem refatorar é cobrar a FORMA da guarda, e
+   * conferir por mutação que ela pega.
+   */
+  /**
+   * ⚠️ **O PORTÃO DE ALCANCE DO PERFIL, e ele também estava sem teste.**
+   *
+   * Mutar `perfilPublico: !!a.perfil_publico` para `perfilPublico: true` deixa
+   * a suíte inteira verde — e com o uuid em mãos (ele viaja em toda reação,
+   * todo story visto, todo pedido de seguir) qualquer paciente autenticada
+   * abriria QUALQUER perfil fechado, com a idade gestacional e o nome do bebê
+   * dentro.
+   *
+   * ⚠️ **E o espelho AFIRMA essa tranca para ela**: a paciente lê "ela não
+   * consegue abrir o seu perfil" e liga o selo confiando nisso. Uma tela de
+   * verificação que erra para o lado de "você está protegida" é pior que não
+   * existir — está escrito no CLAUDE.md, e era exatamente o estado do código.
+   */
+  test("⚠️ o alcance do perfil sai da COLUNA, nunca de um literal", () => {
+    const c = corpoDe("verPerfil").replace(/\s+/g, " ");
+    const chamada = /alcancaOPerfil\(\{([^}]*)\}/.exec(c);
+    expect({ tem: !!chamada }).toEqual({ tem: true });
+    const args = chamada?.[1] ?? "";
+    /* Deriva da linha do banco — não de `true`, não de uma constante. */
+    expect(args).toContain("perfilPublico: !!a.perfil_publico");
+    expect(args).not.toMatch(/perfilPublico:\s*(true|false)\b/);
+    /* E a recusa sai da função, em vez de seguir montando o perfil. */
+    const depois = c.slice(c.indexOf("alcancaOPerfil({"));
+    expect(/if \(!alcanca\)\s*\{?[^{}]{0,400}return/.test(depois)).toBe(true);
+  });
+
+  test("⚠️ e o VALOR de `euEmCuidado` gateia — não basta chamar", () => {
+    for (const nome of ["meuFeed", "storiesDoFeed", "sugestoesDoFeed", "minhaAtividade"]) {
+      const c = corpoDe(nome).replace(/\s+/g, " ");
+      /* A chamada tem de estar dentro de um `if`, e o corpo desse `if` tem de
+         sair da função. `[^{]*` impede casar um `if` de outro assunto. */
+      const guarda = /if \(await euEmCuidado\(sb, eu\)\)\s*\{?[^{}]{0,200}return/.exec(c);
+      expect({ nome, gateia: !!guarda }).toEqual({ nome, gateia: true });
+    }
+  });
+
   test("⚠️ falha ao ler o `care_mode` conta como EM CUIDADO", () => {
     /* A única direção segura: errar para um lado é um feed vazio por uma
        abertura; para o outro, é a tela que o Modo Cuidado existe para impedir. */
@@ -1503,5 +1560,61 @@ describe("a grade do perfil pagina", () => {
   test("⚠️ `proximo` é medido pelo que o BANCO devolveu", () => {
     expect(c).toContain("brutos.length === POSTS_POR_PAGINA");
     expect(c).not.toContain("daGrade.length === POSTS_POR_PAGINA");
+  });
+});
+
+describe("⚠️ o quadro da republicação respeita o PERFIL, não só a camada", () => {
+  /**
+   * ⚠️ **ESTE TESTE EXISTE PORQUE EU DECLAREI O DEFEITO FALSO ANTES DE
+   * VERIFICAR DIREITO.**
+   *
+   * Um auditor apontou "a republicação contorna a camada do post". Eu li o
+   * `visibilidade !== "publico"` nos dois caminhos, concluí que estava coberto,
+   * e escrevi no CLAUDE.md que o achado não sobrevivera.
+   *
+   * A camada estava conferida. O PERFIL não. A régua é
+   * `autor.publico || sigoAtivo || somosAmigas` — um post `publico` de perfil
+   * PRIVADO alcança só quem segue, e o perfil nasce privado. O quadro entregava
+   * texto, foto e nome a quem a autora nunca aceitou.
+   *
+   * Conferir metade de uma régua e dizer "está coberto" é como um vazamento
+   * sobrevive a uma auditoria.
+   */
+  test("a leitura exige `perfil_publico` da autora original", () => {
+    const c = CODIGO.replace(/\s+/g, " ");
+    const i = c.indexOf("originais.set(");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = c.slice(Math.max(0, i - 700), i);
+    expect(bloco).toContain("perfil_publico");
+  });
+
+  test("⚠️ e falha FECHADO quando o perfil da autora não veio", () => {
+    /* `a?.care_mode` com `a` indefinido é falsy — o conteúdo era montado por
+       uma falha de leitura. O resto do arquivo falha fechado; aqui a exceção
+       era silenciosa. */
+    const c = CODIGO.replace(/\s+/g, " ");
+    const i = c.indexOf("originais.set(");
+    const bloco = c.slice(Math.max(0, i - 700), i);
+    expect(bloco).toMatch(/if \(!a \|\|/);
+    expect(bloco).not.toContain("a?.care_mode");
+  });
+
+  test("⚠️ e a ESCRITA também confere — as duas pontas", () => {
+    /* A autora pode fechar o perfil DEPOIS de o repost existir (a leitura cobre
+       isso), e pode ter o perfil fechado no momento da republicação (a escrita
+       cobre isso). Uma ponta só deixa metade do caminho aberto. */
+    const c = corpoDe("publicarPost").replace(/\s+/g, " ");
+    /* ⚠️ Recorta da LEITURA do perfil até a decisão: `repostValido` é montado
+       em várias linhas, e `indexOf(";")` cortava na primeira delas. */
+    const i = c.indexOf("donoDoOriginal");
+    expect(i).toBeGreaterThan(-1);
+    const regra = c.slice(i, c.indexOf("if (!repostValido)", i));
+    /* ⚠️ **A LEITURA TEM DE ENTRAR NA DECISÃO, e não só existir.** A primeira
+       versão procurava `perfil_publico` no trecho — e o `select` que traz a
+       coluna já a contém, então trocar o termo da condição por `true` passava
+       verde. Cobra-se o USO do valor lido. */
+    expect(regra).toContain("donoDoOriginal?.perfil_publico");
+    expect(regra).toContain('visibilidade === "publico"');
+    expect(regra).toContain("donoDoOriginal?.care_mode");
   });
 });

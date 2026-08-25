@@ -170,7 +170,25 @@ export const minhasConversas = createServerFn({ method: "POST" })
           "conversa_id",
           conversas.map((c) => c.id),
         )
-        .order("criada_em", { ascending: false });
+        .order("criada_em", { ascending: false })
+        /**
+         * ⚠️ **TETO DE LINHAS, e ele não existia.**
+         *
+         * Esta consulta lia TODAS as mensagens de até 100 conversas para pegar
+         * a ÚLTIMA de cada uma. Uma dupla que se escreve todo dia passa de mil
+         * mensagens em poucos meses; cem conversas assim são cem mil linhas
+         * atravessando a rede a cada abertura da caixa de entrada — e o
+         * PostgREST corta em `db-max-rows` sem avisar, então as conversas mais
+         * antigas simplesmente perderiam a prévia.
+         *
+         * ⚠️ **A irmã `mensagensDaConversa` já tinha teto** (`MENSAGENS_POR_PAGINA
+         * + 1`, com comentário explicando por que pede uma a mais em vez de
+         * contar o total). A assimetria era literal.
+         *
+         * 100 conversas × 3 mensagens é folga de sobra para achar a última de
+         * cada uma, mesmo com várias seguidas na mesma conversa.
+         */
+        .limit(conversas.length * 3);
     /**
      * ⚠️ **`imagem_path` E `ref_tipo` PRECISAM VIR — e este defeito era MEU.**
      *
@@ -186,12 +204,12 @@ export const minhasConversas = createServerFn({ method: "POST" })
      * a LISTA DE CONVERSAS inteira — um recurso que já funcionava, apagado por
      * causa de uma prévia.
      */
-    let { data: msgs, error: erroMsgs } = await lerUltimas(
+    const comCorpo = await lerUltimas(
       "conversa_id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo",
     );
-    if (erroMsgs) {
-      ({ data: msgs } = await lerUltimas("conversa_id, autor_id, texto, criada_em, apagada_em"));
-    }
+    const msgs = comCorpo.error
+      ? (await lerUltimas("conversa_id, autor_id, texto, criada_em, apagada_em")).data
+      : comCorpo.data;
     const ultima = new Map<string, any>();
     for (const m of (msgs ?? []) as any[]) {
       if (!ultima.has(m.conversa_id)) ultima.set(m.conversa_id, m);
@@ -827,11 +845,25 @@ export const conversasSugeridas = createServerFn({ method: "POST" })
       /* ⚠️ Os meses do bebê saem da data de nascimento, e não de `g` — sem
          isso `faseDe` devolvia "pos" para a mãe de dois anos e a fileira
          juntaria recém-nascido com criança. Mesma correção do filtro do feed. */
-      const meses = p?.birth_date
-        ? Math.floor(
-            (Date.now() - new Date(`${p.birth_date}T12:00:00Z`).getTime()) / (30.44 * 86400_000),
-          )
-        : null;
+      /**
+       * ⚠️ **`mesesEntre`, e NUNCA uma divisão por 30,44 — este defeito era MEU.**
+       *
+       * Eu escrevi aqui a segunda régua para "quantos meses o bebê tem": média
+       * de dias por mês contra meses de CALENDÁRIO, que é o que `filhos.ts`
+       * calcula e o que as outras três leituras do app usam (o feed, o perfil e
+       * a linha dos filhos).
+       *
+       * As duas discordam perto das bordas — e as bordas são justamente os
+       * cortes de `fasePosParto` (3 e 12 meses). A mesma mãe podia estar em
+       * "pos_recem" para a fileira de conversa e em "pos_bebe" para o feed, e
+       * nenhuma tela explicaria por quê.
+       */
+      const { mesesEntre } = await import("./filhos");
+      const hoje = hojeEmSaoPauloLocal();
+      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(
+        hoje.getDate(),
+      ).padStart(2, "0")}`;
+      const meses = p?.birth_date ? mesesEntre(p.birth_date as string, hojeStr) : null;
       return faseDe(g?.weeks ?? null, !!p?.birth_date, meses);
     };
 

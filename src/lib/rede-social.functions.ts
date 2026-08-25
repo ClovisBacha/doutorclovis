@@ -1407,9 +1407,32 @@ export async function montarPosts(
     );
     for (const o of (orig ?? []) as any[]) {
       const a = autoresOrig.get(o.autor_id);
-      /* ⚠️ Arquivada, não pública, ou autora em Modo Cuidado → não monta. A tela
-         mostra "publicação não disponível", nunca a cópia. */
-      if (o.arquivado_em || o.visibilidade !== "publico" || a?.care_mode) continue;
+      /**
+       * ⚠️ **`perfil_publico` FALTAVA, e o buraco era um VAZAMENTO REAL.**
+       *
+       * A régua é `autor.publico || sigoAtivo || somosAmigas` — um post
+       * `visibilidade: "publico"` de um perfil PRIVADO alcança só quem segue.
+       * E o perfil nasce privado (`PERFIL_PUBLICO_PADRAO = false`).
+       *
+       * Sem esta conferência: Ana tem perfil fechado e publica na camada
+       * pública; Bea, seguidora aceita, republica; o quadro entrega o texto, a
+       * foto assinada e o NOME de Ana a toda pessoa que vê o post de Bea —
+       * inclusive estranhas que Ana nunca aceitou.
+       *
+       * ⚠️ **E `a?.care_mode` FALHAVA ABERTO.** Com `a` indefinido (o perfil da
+       * autora não veio na leitura), `a?.care_mode` é `undefined` — falsy — e o
+       * conteúdo era montado. O resto deste arquivo falha FECHADO (`if (!a)
+       * return false` na régua principal); aqui a exceção era silenciosa. O
+       * `!a` fecha os dois.
+       *
+       * ⚠️ **EU DECLAREI ESTE ACHADO FALSO ANTES DE VERIFICAR DIREITO.** Li o
+       * `visibilidade !== "publico"` daqui e do `repostValido`, concluí que a
+       * camada estava conferida, e escrevi no CLAUDE.md que o auditor errara. A
+       * camada estava; o PERFIL não. Conferir metade da régua e dizer "está
+       * coberto" é como um vazamento sobrevive a uma auditoria.
+       */
+      if (o.arquivado_em || o.visibilidade !== "publico") continue;
+      if (!a || a.care_mode || !a.perfil_publico) continue;
       originais.set(o.id, {
         id: o.id,
         autorId: o.autor_id,
@@ -2401,8 +2424,33 @@ export const publicarPost = createServerFn({ method: "POST" })
         .maybeSingle();
       /* ⚠️ E não deixa republicar a PRÓPRIA publicação: seria uma cópia de si
          mesma no feed, com o quadro apontando para o post de cima. */
+      /**
+       * ⚠️ **O PERFIL DA AUTORA TAMBÉM PRECISA SER PÚBLICO.**
+       *
+       * `visibilidade === "publico"` não basta: a régua é
+       * `autor.publico || sigoAtivo || somosAmigas`, e o perfil NASCE privado.
+       * Sem isto, republicar era o caminho para tirar da camada restrita o post
+       * de quem tem perfil fechado — e a autora nunca saberia.
+       *
+       * ⚠️ **A leitura também confere** (ver o bloco de `originais`): as duas
+       * pontas, porque a autora pode FECHAR o perfil depois de o repost já
+       * existir — e nesse dia o quadro tem de parar de mostrar o conteúdo, que
+       * é o que o comentário de lá sempre prometeu.
+       */
+      const { data: donoDoOriginal } = orig
+        ? await sb
+            .from("patient_profiles")
+            .select("perfil_publico, care_mode")
+            .eq("id", orig.autor_id)
+            .maybeSingle()
+        : { data: null };
       repostValido =
-        !!orig && !orig.arquivado_em && orig.visibilidade === "publico" && orig.autor_id !== eu;
+        !!orig &&
+        !orig.arquivado_em &&
+        orig.visibilidade === "publico" &&
+        orig.autor_id !== eu &&
+        !!donoDoOriginal?.perfil_publico &&
+        !donoDoOriginal?.care_mode;
       if (!repostValido) return { ok: false as const, motivo: "repost_invalido" as const };
     }
 

@@ -5629,6 +5629,14 @@ export function RedeNoApp({
         post={oPost}
         aoAbrirTag={acoes.abrirTag}
         aoAbrirArroba={acoes.abrirArroba}
+        /* ⚠️ **AS TRÊS FALTAVAM AQUI, e esta é a tela que a GRADE abre.** O
+           componente aceitava as props e as repassava ao cartão; o único
+           chamador não as passava. Quem chega ao post pelo perfil — o caminho
+           mais comum depois do feed — não tinha republicar, compartilhar nem
+           mandar para uma conversa, e nada na tela explicava a diferença. */
+        aoRepublicar={republicar}
+        aoCompartilhar={(p) => void compartilhar(p)}
+        aoMandarParaConversa={acoes.mandarParaConversa}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
         aoVotar={acoes.votar}
@@ -5744,6 +5752,13 @@ export function RedeNoApp({
         aoAbrirArroba={acoes.abrirArroba}
         aoAbrirTag={acoes.abrirTag}
         aoMandarParaConversa={acoes.mandarParaConversa}
+        /* ⚠️ **O LÁPIS NUNCA CHEGAVA AO FEED.** `TelaPrincipal` declarava a
+           prop e a repassava aos cartões; o único chamador não a passava. E
+           `meuFeed` põe os posts DELA primeiro, com comentário explícito de que
+           o teto nunca pode cortar o que ela publicou — então o post editável
+           está ali, com o lápis invisível. O ⋯ do post próprio só oferece
+           "tirar do ar", que é a decisão oposta. */
+        aoEditar={acoes.editar}
         /* ⚠️ Referência estável, como as outras: um fecho por post faria o
            `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
            do app. */

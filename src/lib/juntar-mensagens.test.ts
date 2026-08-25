@@ -88,3 +88,38 @@ describe("juntarMensagens", () => {
     expect(r.map((x) => x.id)).toEqual(["a", "b", "c"]);
   });
 });
+
+describe("⚠️ a URL da foto sobrevive à sondagem", () => {
+  test("a URL antiga é preservada quando a nova também tem foto", () => {
+    /* O servidor reassina toda foto a cada leitura, e a sondagem refaz a página
+       de 6 em 6 segundos. URL nova é chave de cache nova: sem preservar, o
+       navegador baixa a foto de novo para sempre numa conversa aberta. */
+    const antes = [m("x", 5, { imagemUrl: "assinada-A" })];
+    const depois = [m("x", 5, { imagemUrl: "assinada-B" })];
+    expect(juntarMensagens(antes, depois)[0]?.imagemUrl).toBe("assinada-A");
+  });
+
+  test("⚠️ mas o RESTO do objeto continua vindo do novo", () => {
+    /* É assim que a mensagem apagada pela outra pessoa chega como apagada e que
+       o ✓✓ acende. Preservar o objeto inteiro seria congelar a conversa. */
+    const antes = [m("x", 5, { imagemUrl: "A", souEu: true, lidaPelaOutra: false })];
+    const depois = [m("x", 5, { imagemUrl: "B", souEu: true, lidaPelaOutra: true })];
+    const r = juntarMensagens(antes, depois)[0];
+    expect(r?.lidaPelaOutra).toBe(true);
+    expect(r?.imagemUrl).toBe("A");
+  });
+
+  test("⚠️ e a foto NÃO é preservada quando a mensagem foi apagada", () => {
+    /* Apagada não tem foto — manter a antiga deixaria na tela a imagem que a
+       outra pessoa acabou de tirar do ar. */
+    const antes = [m("x", 5, { imagemUrl: "A" })];
+    const depois = [m("x", 5, { imagemUrl: null, apagada: true, texto: null })];
+    expect(juntarMensagens(antes, depois)[0]?.imagemUrl).toBeNull();
+  });
+
+  test("uma mensagem só de texto não ganha foto do nada", () => {
+    const antes = [m("x", 5, { imagemUrl: null })];
+    const depois = [m("x", 5, { imagemUrl: "B" })];
+    expect(juntarMensagens(antes, depois)[0]?.imagemUrl).toBe("B");
+  });
+});

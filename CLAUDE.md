@@ -8040,17 +8040,45 @@ usam `forEach` com `return` cedo, e o índice do `forEach` **não se move** quan
 uma volta sai. Só a cadeia `.filter().map((x, i))` desalinha —
 `avatar-por-indice.test.ts` proíbe a cadeia inteira nos módulos da rede.
 
-#### ⚠️ E UM ACHADO QUE NÃO SOBREVIVEU — registrado de propósito
+#### ⚠️⚠️ EU DECLAREI UM VAZAMENTO REAL COMO "FALSO", E ELE ERA VERDADEIRO
 
 Um auditor afirmou, com gravidade ALTA, que "a republicação contorna a camada do
-post: perfil privado vira público pelo repost". **Falso.** A conferência
-`visibilidade === "publico"` existe nos DOIS caminhos — na escrita
-(`repostValido`, em `publicarPost`) e na leitura (o bloco que monta `originais`,
-que ainda checa `arquivado_em` e `care_mode`).
+post: perfil privado vira público pelo repost". Eu li o código, encontrei
+`visibilidade === "publico"` nos dois caminhos — escrita e leitura —, **declarei
+o achado falso e escrevi isso aqui.**
+
+**Estava errado, e o vazamento era real.**
+
+A régua é `autor.publico || sigoAtivo || somosAmigas`. Um post da camada
+`publico` publicado por um **perfil PRIVADO** alcança só quem segue — e o perfil
+**nasce privado** (`PERFIL_PUBLICO_PADRAO = false`). A camada estava conferida;
+o PERFIL não. O quadro do repost entregava o texto, a foto assinada e o NOME da
+autora a toda pessoa que visse o post de quem republicou, inclusive estranhas
+que ela nunca aceitou.
+
+⚠️ **E `a?.care_mode` FALHAVA ABERTO**: com `a` indefinido (o perfil da autora
+não veio na leitura), `undefined` é falsy e o conteúdo era montado. O resto do
+arquivo falha FECHADO (`if (!a) return false` na régua principal); ali a exceção
+era silenciosa.
+
+**A lição não é sobre o repost.** É que **conferir metade de uma régua e dizer
+"está coberto" é como um vazamento sobrevive a uma auditoria** — e foi a minha
+conferência parcial, não a do auditor, que quase deixou isso passar. O
+comentário que estava ali prometia por escrito a checagem que não existia; eu li
+o comentário e o `visibilidade`, e parei.
+
+Hoje as duas pontas conferem `perfil_publico` **e** `care_mode`, e há teste com
+mutação para cada uma. A ponta da ESCRITA precisou de duas voltas: a primeira
+asserção procurava `perfil_publico` no trecho e o `select` que traz a coluna já
+a continha — trocar o termo da condição por `true` passava verde.
+
+#### E quatro achados que de fato NÃO sobreviveram
 
 Fica registrado porque é o motivo de a fase de refutação existir: **quatro dos
-dezesseis primeiros achados verificados foram descartados.** Aplicar os 50 sem
-verificar teria "consertado" comportamento correto.
+primeiros dezesseis verificados foram descartados**, e aplicar os 50 sem
+verificar teria "consertado" comportamento correto. O saldo da rodada: 50
+candidatos, 24 confirmados, 8 sem verificação (a sessão dos agentes esbarrou no
+limite antes de terminá-los).
 
 #### Mais cinco confirmados, e um deles vazava FOTO
 

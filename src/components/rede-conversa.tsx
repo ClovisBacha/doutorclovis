@@ -68,7 +68,26 @@ export function juntarMensagens(
   if (antigas.length === 0) return novas;
   const por = new Map<string, MensagemNaTela>();
   for (const m of antigas) por.set(m.id, m);
-  for (const m of novas) por.set(m.id, m);
+  for (const m of novas) {
+    /**
+     * ⚠️ **A URL DA FOTO É PRESERVADA, e este defeito era MEU.**
+     *
+     * O servidor reassina TODA foto da página a cada leitura, e a sondagem
+     * refaz a página inteira de 6 em 6 segundos. Trocar o objeto inteiro
+     * arrastava `imagemUrl` junto — URL nova a cada seis segundos, e URL nova é
+     * chave de cache nova: o navegador **baixava a foto de novo**, para sempre,
+     * numa conversa aberta.
+     *
+     * ⚠️ **Mas o resto do objeto TEM de vir do novo**: é assim que uma mensagem
+     * apagada pela outra pessoa chega como `apagada: true` e que o ✓✓ acende.
+     * O que se preserva é só a URL — e só quando as duas apontam para a mesma
+     * foto (a antiga existir prova isso; a nova sumir significa apagada, e aí
+     * a preservação não deve acontecer).
+     */
+    const antiga = por.get(m.id);
+    const mantemFoto = !!antiga?.imagemUrl && !!m.imagemUrl && !m.apagada;
+    por.set(m.id, mantemFoto ? { ...m, imagemUrl: antiga.imagemUrl } : m);
+  }
   return [...por.values()].sort(
     (a, b) => new Date(a.criadaEm).getTime() - new Date(b.criadaEm).getTime(),
   );
