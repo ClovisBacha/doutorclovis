@@ -385,3 +385,40 @@ describe("o lembrete do então e agora", () => {
     expect(semComentarios).toContain("setEntaoEscolhido(null)");
   });
 });
+
+describe('⚠️ o interruptor "Só quem eu sigo"', () => {
+  /**
+   * ⚠️ **A CONDIÇÃO ESTAVA INVERTIDA, e o interruptor fazia o OPOSTO do que
+   * promete.** Com a chave LIGADA, a zona de sugeridas aparecia no rodapé — e o
+   * caminho é o normal: ela abre no modo misturado (as sugestões são buscadas),
+   * liga a chave, o feed principal para de interlaçar, e as publicações de
+   * desconhecidas reaparecem todas juntas embaixo.
+   *
+   * A tela promete por escrito: "Seu feed mostra apenas quem você segue".
+   */
+  test("ligado, a zona de sugeridas NÃO abre", () => {
+    const i = FONTE.indexOf("const sobrouSugestao =");
+    expect(i).toBeGreaterThan(-1);
+    const linha = FONTE.slice(i, FONTE.indexOf(";", i));
+    /* Ligado ⇒ falso. A forma antiga (`soSeguindo === false ? false : …`) dizia
+       o contrário. */
+    expect(linha).toContain("soSeguindo ? false :");
+    expect(linha).not.toContain("soSeguindo === false");
+  });
+
+  test("⚠️ e o feed principal também não interlaça", () => {
+    /* As duas metades precisam concordar: sem esta, a chave fecharia o rodapé e
+       deixaria as desconhecidas costuradas no meio da rolagem. */
+    const i = FONTE.indexOf("intercalarDescobertas(posts, sugestoes)");
+    expect(i).toBeGreaterThan(-1);
+    expect(FONTE.slice(Math.max(0, i - 120), i)).toContain("soSeguindo ? posts :");
+  });
+
+  test("⚠️ mas a fileira de PESSOAS fica", () => {
+    /* A distinção é a do texto: ela é descoberta de gente para seguir, não
+       conteúdo do feed. Sem ela, quem ligou a chave nunca teria como fazer o
+       feed fechado ter conteúdo. */
+    const i = FONTE.indexOf("pessoas.length > 0 || sobrouSugestao");
+    expect(i).toBeGreaterThan(-1);
+  });
+});

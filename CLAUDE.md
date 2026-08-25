@@ -8271,3 +8271,31 @@ altura (`Sim`/`Não`, `Seguindo`, `Publicar`) e nomes clicáveis inline. Os
 primeiros são a convenção do app inteiro — mudá-los é uma revisão de design, não
 um conserto; os segundos são links de texto dentro de um parágrafo, e esticá-los
 quebraria o cartão. Ficam registrados para o dono decidir.
+
+#### ⚠️ O interruptor "Só quem eu sigo" fazia o OPOSTO do que promete
+
+A condição estava invertida: `soSeguindo === false ? false : sugestoes.length > 0`.
+Com o feed MISTURADO a zona de sugeridas sumia (certo — elas já foram costuradas
+no meio); com a chave **LIGADA**, ela aparecia no rodapé.
+
+O caminho é o normal: ela abre a aba no modo misturado (as sugestões são
+buscadas), liga a chave, o feed principal para de interlaçar — e as publicações
+de desconhecidas, que já estavam em estado, **reaparecem todas juntas embaixo**.
+O interruptor tornava as estranhas MAIS visíveis.
+
+E a tela promete por escrito: _"Seu feed mostra apenas quem você segue."_
+
+⚠️ **A fileira de PESSOAS fica**, e a distinção é a do próprio texto: ela é
+descoberta de gente para seguir, não conteúdo do feed. Sem ela, quem ligou a
+chave nunca teria como fazer o feed fechado ter conteúdo.
+
+⚠️ **E a bancada nunca desenhou o estado LIGADO — foi por isso que a inversão
+sobreviveu.** `?fechado=1` existe agora. Medido: misturado mostra 3 rótulos
+"Sugerido para você"; fechado mostra **zero**.
+
+**E as datas da bancada voltaram a ser cravadas.** Quatro `Date.now()` /
+`new Date()` rodavam no RENDER de `preview-instagram` — servidor e cliente
+calculam instantes diferentes, e o texto derivado ("há 34 dias") diverge na
+virada do minuto: o React descarta a árvore. O cabeçalho do próprio arquivo
+declara a regra três seções acima ("datas cravadas, nunca `Date.now()`"). É a
+mesma família do mismatch que já derrubou o app inteiro.

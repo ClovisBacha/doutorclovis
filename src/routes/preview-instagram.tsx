@@ -97,6 +97,8 @@ export const Route = createFileRoute("/preview-instagram")({
     restrito: q.restrito == null ? 0 : Number(q.restrito),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     instavel: q.instavel == null ? 0 : Number(q.instavel),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    fechado: q.fechado == null ? 0 : Number(q.fechado),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
@@ -373,6 +375,7 @@ function Bancada() {
     tag,
     restrito,
     instavel,
+    fechado,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -541,7 +544,7 @@ function Bancada() {
     ps.map((p0) => {
       const p =
         p0.id in edicoes
-          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date().toISOString() }
+          ? { ...p0, texto: edicoes[p0.id] || null, editadoEm: new Date(AGORA).toISOString() }
           : p0;
       if (!(p.id in reacoes)) return p;
       const nova = reacoes[p.id];
@@ -1190,7 +1193,7 @@ function Bancada() {
                   enquete: null,
                   comAula: false,
                   marcadas: ["marina"],
-                  em: new Date().toISOString(),
+                  em: new Date(AGORA).toISOString(),
                 }
               : null
           }
@@ -1414,6 +1417,11 @@ function Bancada() {
              bloqueio ou grafo de amizade caindo —, que não se fabrica numa
              conta de teste. Sem a bancada, o estado ficaria sem ninguém nunca
              ter olhado, que é como ele nasceu. */
+          /* ⚠️ `?fechado=1` fotografa o modo "Só quem eu sigo" LIGADO — o
+             estado em que a zona de sugeridas tem de sumir, e que a bancada
+             nunca desenhou. Foi por essa falta que a condição invertida
+             sobreviveu. */
+          soSeguindo={fechado === 1}
           instavel={instavel === 1}
           aoTentarDeNovo={() => alert("recarregaria o feed")}
           /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
@@ -1432,7 +1440,14 @@ function Bancada() {
               ? {
                   id: "p-antigo",
                   imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
-                  criadoEm: new Date(Date.now() - 34 * 86_400_000).toISOString(),
+                  /* ⚠️ **`AGORA` CRAVADO, e nunca `Date.now()`.** Esta linha
+                     roda no RENDER: o servidor calcula um instante e o cliente
+                     calcula outro, e o texto derivado ("há 34 dias") pode
+                     divergir na virada do minuto — o React descarta a árvore e
+                     redesenha. É a mesma família do mismatch que já derrubou o
+                     app inteiro, e o próprio cabeçalho deste arquivo declara a
+                     regra três seções acima. */
+                  criadoEm: new Date(AGORA - 34 * 86_400_000).toISOString(),
                 }
               : null
           }
@@ -1500,7 +1515,8 @@ function Bancada() {
               : {
                   id: "l1",
                   titulo: "Sinais de trabalho de parto: o que observar",
-                  quando: new Date(Date.now() + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
+                  /* ⚠️ Idem — ver `AGORA`. */
+                  quando: new Date(AGORA + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
                   link: "https://exemplo.com/live",
                   aoVivo: live === "agora",
                 }

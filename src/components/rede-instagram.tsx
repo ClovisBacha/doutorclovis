@@ -1620,7 +1620,26 @@ export function TelaPrincipal({
    * mostraria o mesmo post duas vezes na mesma rolagem — e chave repetida
    * derruba a lista inteira do React.
    */
-  const sobrouSugestao = soSeguindo === false ? false : sugestoes.length > 0;
+  /**
+   * ⚠️ **A CONDIÇÃO ESTAVA INVERTIDA, e o interruptor fazia o OPOSTO do que
+   * promete.**
+   *
+   * Era `soSeguindo === false ? false : sugestoes.length > 0` — ou seja: com o
+   * feed MISTURADO a zona sumia (certo, elas já foram costuradas lá em cima), e
+   * com "Só quem eu sigo" LIGADO ela aparecia.
+   *
+   * O caminho é o normal: ela abre a aba no modo misturado (as sugestões são
+   * buscadas), liga a chave, o feed principal para de interlaçar — e as
+   * publicações de desconhecidas, que já estavam em estado, reaparecem todas
+   * juntas no rodapé. **O interruptor tornava as estranhas mais visíveis.**
+   *
+   * E a tela PROMETE por escrito: "Seu feed mostra apenas quem você segue".
+   *
+   * ⚠️ **A fileira de PESSOAS fica**, e a distinção é a do texto: ela é
+   * descoberta de gente para seguir, não conteúdo do feed. Sem ela, quem ligou
+   * a chave nunca teria como fazer o feed fechado ter conteúdo.
+   */
+  const sobrouSugestao = soSeguindo ? false : sugestoes.length > 0;
 
   const fim = useRef<HTMLDivElement>(null);
 
