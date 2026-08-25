@@ -722,3 +722,81 @@ export function podeFixar(v: { jaFixados: number; esteJaEstaFixado: boolean }): 
   if (v.esteJaEstaFixado) return true;
   return v.jaFixados < FIXADOS_MAX;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A CAMADA DO STORY
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * As camadas que um STORY aceita.
+ *
+ * ⚠️ **É um SUBCONJUNTO de `Visibilidade`, e não um tipo novo.** Duas escadas
+ * de visibilidade no mesmo app divergiriam no primeiro ajuste — e aqui a
+ * divergência apareceria como um story alcançando quem o post equivalente não
+ * alcança, que é o pior jeito de descobrir um bug de privacidade.
+ *
+ * ⚠️ **`publico` FICA DE FORA, de propósito.** Um story público seria visto por
+ * quem ela não conhece — e a fileira de bolinhas não tem rótulo de procedência
+ * nenhum: a paciente abriria achando que é de alguém que ela segue. O post pode
+ * ser público porque toda publicação de fora carrega "Sugerido para você"; o
+ * story não carrega, então não pode.
+ */
+export type VisibilidadeDoStory = Extract<Visibilidade, "seguidores" | "amigas">;
+
+/**
+ * ⚠️ **O padrão é `seguidores`, e é o comportamento que os stories já tinham.**
+ *
+ * Fechar por padrão faria as publicações futuras dela alcançarem menos gente que
+ * as de ontem sem ela ter pedido — e ela descobriria pelo silêncio. Quem quiser
+ * fechar, fecha por publicação.
+ *
+ * ⚠️ Note que isto é o CONTRÁRIO do padrão do post (`amigas`), e a diferença é
+ * deliberada: lá a camada existe desde sempre e nasceu fechada; aqui ela está
+ * chegando a um formato que já era aberto, e mudar o alcance de quem não pediu
+ * nada é pior que oferecer a escolha.
+ */
+export const VISIBILIDADE_DO_STORY_PADRAO: VisibilidadeDoStory = "seguidores";
+
+export const VISIBILIDADES_DO_STORY: {
+  chave: VisibilidadeDoStory;
+  rotulo: string;
+  sub: string;
+}[] = [
+  { chave: "seguidores", rotulo: "Quem me segue", sub: "Como sempre foi" },
+  { chave: "amigas", rotulo: "Só amigas", sub: "Quem você já conhece" },
+];
+
+/**
+ * Limpa o que vem do cliente.
+ *
+ * ⚠️ **Desconhecido cai no PADRÃO, e nunca no mais aberto.** Um valor estranho
+ * (formato antigo, corpo montado à mão) não pode alargar o alcance de um story
+ * — e como o padrão é `seguidores`, que já era o comportamento, o pior caso é
+ * "ficou como antes".
+ */
+export function camadaDoStory(bruto: unknown): VisibilidadeDoStory {
+  return bruto === "amigas" ? "amigas" : VISIBILIDADE_DO_STORY_PADRAO;
+}
+
+/**
+ * Este story alcança quem está olhando?
+ *
+ * ⚠️ **A régua é POR STORY, e o recorte por AUTOR não basta.** A leitura da
+ * fileira monta a lista de autoras (`sigo ∪ amigas`) e busca os stories delas —
+ * mas dentro dessa lista há gente que eu SIGO sem ser amiga, e é justamente
+ * dessa gente que o story `amigas` tem de se esconder. Filtrar só por autora
+ * entregaria o story fechado a toda a fileira.
+ *
+ * ⚠️ **A autora sempre vê o próprio**, inclusive o fechado: sem isto, publicar
+ * em `amigas` faria o story sumir da fileira dela mesma, e ela concluiria que a
+ * publicação falhou.
+ */
+export function storyAlcanca(v: {
+  euId: string;
+  autorId: string;
+  camada: VisibilidadeDoStory;
+  somosAmigas: boolean;
+}): boolean {
+  if (v.euId === v.autorId) return true;
+  return v.camada === "amigas" ? v.somosAmigas : true;
+}

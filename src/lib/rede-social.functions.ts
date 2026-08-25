@@ -49,6 +49,10 @@ import {
   totalDeReacoes,
   REACOES,
   TEXTO_DO_STORY_MAX,
+  VISIBILIDADE_DO_STORY_PADRAO,
+  camadaDoStory,
+  storyAlcanca,
+  type VisibilidadeDoStory,
   FIXADOS_MAX,
   podeFixar,
   ordenarComFixados,
@@ -4206,6 +4210,29 @@ export type EnqueteDoStory = {
   meuVoto: number | null;
 };
 
+/**
+ * Um story no ARQUIVO dela.
+ *
+ * ⚠️ Bem mais magro que `StoryNaTela`: aqui não há enquete, nem reação, nem
+ * carimbo. O arquivo responde "o que eu já publiquei?" — e cada campo a mais é
+ * uma consulta a mais numa lista que pode ter centenas de linhas.
+ */
+export type StoryArquivado = {
+  id: string;
+  imagemUrl: string | null;
+  texto: string | null;
+  criadoEm: string;
+  /** Ainda dentro das 24 h? DERIVADO na leitura — ver o handler. */
+  noAr: boolean;
+  destacado: boolean;
+};
+
+/** Quantos stories cabem destacados no perfil. */
+export const DESTAQUES_MAX = 10;
+
+/** Quantos stories o arquivo devolve por vez. */
+const STORIES_POR_PAGINA = 24;
+
 export type BolhaDeStory = {
   autorId: string;
   autorNome: string;
@@ -4230,6 +4257,12 @@ export const publicarStory = createServerFn({ method: "POST" })
         perguntaAberta: z.boolean().optional(),
         /** A publicação compartilhada dentro deste story. Conferida no handler. */
         postDe: z.string().uuid().nullable().optional(),
+        /**
+         * A camada. ⚠️ Limpa por `camadaDoStory` no handler — o `zod` aqui é só
+         * um freio contra corpo absurdo, e quem decide é a régua, que faz
+         * desconhecido cair no PADRÃO e nunca no mais aberto.
+         */
+        visibilidade: z.string().max(20).optional(),
       })
       .parse(i),
   )
@@ -4319,6 +4352,7 @@ export const publicarStory = createServerFn({ method: "POST" })
       }
     }
 
+    const camada: VisibilidadeDoStory = camadaDoStory(data.visibilidade);
     const base = { autor_id: eu, imagem_path: caminho, texto: data.texto };
     /* ⚠️ TRÊS DEGRAUS, um por leva de colunas — o mesmo desenho da leitura.
        Um recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
@@ -4329,13 +4363,23 @@ export const publicarStory = createServerFn({ method: "POST" })
       enquete_opcoes: enquete,
       pergunta_aberta: data.perguntaAberta === true,
       post_de: postDe,
+      visibilidade: camada,
     });
-    /* ⚠️ Degrau NOVO, no topo — `post_de` nasce no
-       `APLICAR_FIXAR_E_STORY_DE_POST.sql`. ⚠️ E se ela ESCOLHEU compartilhar,
-       descer sem a coluna publicaria um story diferente do que ela montou: a
-       recusa é honesta, o "ok" mudo não. */
-    if (erroComPost && postDe) {
-      console.warn("[rede] story sem post_de — rode APLICAR_FIXAR_E_STORY_DE_POST.sql");
+    /**
+     * ⚠️ Degrau — `post_de` nasce no `APLICAR_FIXAR_E_STORY_DE_POST.sql` e
+     * `visibilidade` no `APLICAR_STORY_CAMADA_E_DESTAQUE.sql`.
+     *
+     * ⚠️ **E DESCER É RECUSA quando ela ESCOLHEU alguma das duas.** Sem a
+     * coluna da camada, um story marcado "só amigas" seria publicado ABERTO —
+     * o oposto exato do que ela pediu, e o tipo de falha que ela só descobre
+     * quando a pessoa errada comenta. E sem `post_de`, o story sairia sem o
+     * quadro que ela montou. Nos dois casos a recusa é honesta; o "ok" mudo
+     * não.
+     */
+    if (erroComPost && (postDe || camada !== VISIBILIDADE_DO_STORY_PADRAO)) {
+      console.warn(
+        "[rede] story sem post_de/visibilidade — rode APLICAR_FIXAR_E_STORY_DE_POST.sql e APLICAR_STORY_CAMADA_E_DESTAQUE.sql",
+      );
       return { ok: false as const, motivo: "sem_suporte" as const };
     }
     const { error } = erroComPost
@@ -4432,9 +4476,17 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
             "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta, post_de",
           ),
       );
-      if (!comPost.error) return (comPost.data ?? []) as any[];
+      if (!comPost.error)
+        /* ⚠️ Sem a camada, todo story é `seguidores` — o comportamento de antes
+           do recurso, e o único seguro: fechar por não saber esconderia da
+           fileira o story de quem sempre o viu. */
+        return ((comPost.data ?? []) as any[]).map((l) => ({
+          ...l,
+          visibilidade: "seguidores",
+          destacado_em: null,
+        }));
 
-      /* ⚠️ Degrau NOVO, no topo: `post_de` nasce no
+      /* ⚠️ Degrau: `post_de` nasce no
          `APLICAR_FIXAR_E_STORY_DE_POST.sql`. Sem ele o story continua inteiro —
          só o quadro da publicação some, que é o estado de antes do recurso. */
       console.warn("[rede] stories sem post_de — rode APLICAR_FIXAR_E_STORY_DE_POST.sql");
@@ -4445,7 +4497,13 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
             "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta",
           ),
       );
-      if (!cheio.error) return ((cheio.data ?? []) as any[]).map((l) => ({ ...l, post_de: null }));
+      if (!cheio.error)
+        return ((cheio.data ?? []) as any[]).map((l) => ({
+          ...l,
+          post_de: null,
+          visibilidade: "seguidores",
+          destacado_em: null,
+        }));
 
       console.warn("[rede] stories sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
       const comCarimbo = await monta(
@@ -4459,6 +4517,8 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           enquete_opcoes: null,
           pergunta_aberta: false,
           post_de: null,
+          visibilidade: "seguidores",
+          destacado_em: null,
         }));
       }
 
@@ -4472,6 +4532,8 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         enquete_opcoes: null,
         pergunta_aberta: false,
         post_de: null,
+        visibilidade: "seguidores",
+        destacado_em: null,
       }));
     })();
     const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
@@ -4590,6 +4652,28 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
       const p = perfis.get(l.autor_id);
       /* Modo Cuidado tira os stories da fileira, como tira tudo o mais. */
       if (!p || p.care_mode) continue;
+      /**
+       * ⚠️ **A CAMADA É CONFERIDA POR STORY, e o recorte por AUTORA não basta.**
+       *
+       * O `recorte` acima monta a lista de autoras (`sigo ∪ amigas`) e busca os
+       * stories delas — mas dentro dessa lista há gente que EU SIGO sem ser
+       * amiga, e é dessa gente que o story `amigas` tem de se esconder.
+       * Filtrar só por autora entregaria o story fechado à fileira inteira, que
+       * é exatamente o que a camada existe para impedir.
+       *
+       * A régua é `storyAlcanca`, em `rede-social.ts` — nunca uma condição
+       * escrita aqui, que aceitaria o que a outra recusa.
+       */
+      if (
+        !storyAlcanca({
+          euId: eu,
+          autorId: l.autor_id,
+          camada: camadaDoStory(l.visibilidade),
+          somosAmigas: ctx.amigas.has(l.autor_id),
+        })
+      ) {
+        continue;
+      }
       const b: BolhaDeStory = porAutor.get(l.autor_id) ?? {
         autorId: l.autor_id,
         autorNome: (p.display_name ?? "").trim() || "Alguém",
@@ -4679,6 +4763,28 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
  * ninguém mais vê — e abriria um caminho para mexer com quem já parou de
  * publicar.
  */
+/**
+ * O story visto por um portão de AÇÃO (reagir, votar).
+ *
+ * ⚠️ **Com degrau, porque `visibilidade` nasce num `APLICAR_` que o dono roda à
+ * mão.** Sem a coluna, o `42703` derrubaria o `select` inteiro e reagir a
+ * QUALQUER story pararia de funcionar — por causa de um recurso que ainda não
+ * existe naquele banco. Sem ela, todo story conta como `seguidores`, que é o
+ * comportamento de antes.
+ */
+async function storyParaPortao(sb: any, storyId: string, extras: string): Promise<any | null> {
+  const base = `id, autor_id, expira_em${extras}`;
+  const cheio = await sb
+    .from("rede_stories")
+    .select(`${base}, visibilidade`)
+    .eq("id", storyId)
+    .maybeSingle();
+  if (!cheio.error) return cheio.data ?? null;
+  console.warn("[rede] story sem camada — rode APLICAR_STORY_CAMADA_E_DESTAQUE.sql");
+  const { data } = await sb.from("rede_stories").select(base).eq("id", storyId).maybeSingle();
+  return data ? { ...data, visibilidade: VISIBILIDADE_DO_STORY_PADRAO } : null;
+}
+
 export const reagirAoStory = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -4708,11 +4814,7 @@ export const reagirAoStory = createServerFn({ method: "POST" })
     }
     if (!reacaoConhecida(data.tipo)) return { ok: false as const, motivo: "tipo" as const };
 
-    const { data: story } = await sb
-      .from("rede_stories")
-      .select("id, autor_id, expira_em")
-      .eq("id", data.storyId)
-      .maybeSingle();
+    const story = await storyParaPortao(sb, data.storyId, "");
     if (!story) return { ok: false as const, motivo: "indisponivel" as const };
     if (new Date((story as any).expira_em).getTime() < Date.now()) {
       return { ok: false as const, motivo: "indisponivel" as const };
@@ -4727,7 +4829,19 @@ export const reagirAoStory = createServerFn({ method: "POST" })
         !!autor &&
         !autor.care_mode &&
         !ctx.bloqueio.has((story as any).autor_id) &&
-        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id));
+        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id)) &&
+        /* ⚠️ **E A CAMADA DO STORY, que este portão não conhecia.** Sem esta
+           linha, quem SEGUE a autora sem ser amiga podia votar/reagir num story
+           marcado "só amigas" — a fileira já o escondia dela, mas o servidor
+           aceitava a ação, e o afago chegava à caixa ♡ da autora vindo de
+           alguém que nunca devia ter visto aquilo. A régua é a mesma da
+           leitura. */
+        storyAlcanca({
+          euId: eu,
+          autorId: (story as any).autor_id,
+          camada: camadaDoStory((story as any).visibilidade),
+          somosAmigas: ctx.amigas.has((story as any).autor_id),
+        });
       if (!podeVer) return { ok: false as const, motivo: "indisponivel" as const };
     }
 
@@ -4768,11 +4882,7 @@ export const votarNoStory = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    const { data: story } = await sb
-      .from("rede_stories")
-      .select("id, autor_id, enquete_opcoes, expira_em")
-      .eq("id", data.storyId)
-      .maybeSingle();
+    const story = await storyParaPortao(sb, data.storyId, ", enquete_opcoes");
     if (!story) return { ok: false as const, motivo: "indisponivel" as const };
 
     const opcoes = ((story as any).enquete_opcoes ?? []) as string[];
@@ -4791,7 +4901,19 @@ export const votarNoStory = createServerFn({ method: "POST" })
         !!autor &&
         !autor.care_mode &&
         !ctx.bloqueio.has((story as any).autor_id) &&
-        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id));
+        (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id)) &&
+        /* ⚠️ **E A CAMADA DO STORY, que este portão não conhecia.** Sem esta
+           linha, quem SEGUE a autora sem ser amiga podia votar/reagir num story
+           marcado "só amigas" — a fileira já o escondia dela, mas o servidor
+           aceitava a ação, e o afago chegava à caixa ♡ da autora vindo de
+           alguém que nunca devia ter visto aquilo. A régua é a mesma da
+           leitura. */
+        storyAlcanca({
+          euId: eu,
+          autorId: (story as any).autor_id,
+          camada: camadaDoStory((story as any).visibilidade),
+          somosAmigas: ctx.amigas.has((story as any).autor_id),
+        });
       if (!podeVer) return { ok: false as const, motivo: "indisponivel" as const };
     }
 
@@ -4803,6 +4925,168 @@ export const votarNoStory = createServerFn({ method: "POST" })
       return { ok: false as const, motivo: "banco" as const };
     }
     return { ok: true as const, repetido: !!error };
+  });
+
+/**
+ * O ARQUIVO DELA — tudo o que ela já publicou em story.
+ *
+ * ⚠️ **NENHUMA COLUNA NOVA FOI PRECISO: os expirados nunca foram apagados.** A
+ * fileira filtra por `expira_em > now()` e a linha fica no banco (a decisão está
+ * escrita em `storiesDoFeed`: "apagar na leitura faria uma consulta de tela
+ * virar escrita"). O que faltava não era guardar — era uma tela que devolvesse a
+ * ela o que ela publicou.
+ *
+ * ⚠️ **E isto importa MAIS aqui que num app de fotos.** Um story de gestação é a
+ * ultrassom que saiu naquela manhã, a primeira vez que o bebê mexeu. Sumir em
+ * 24 horas sem rastro é o app apagar a gestação dela um pedaço por dia.
+ *
+ * ⚠️ **É PRIVADO — só a dona lê o próprio arquivo.** Não há `alvoId`: o recorte
+ * é a sessão, e nada mais. Um parâmetro aqui seria a porta para ler o arquivo de
+ * qualquer paciente trocando um uuid, incluindo os stories que ela publicou em
+ * "só amigas" e os que já expiraram para todo mundo.
+ */
+export const meuArquivoDeStories = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /** Cursor: o `criado_em` do último que chegou. */
+        antesDe: z.string().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Modo Cuidado fecha o arquivo, como fecha a aba: rolar os stories de uma
+       gestação que acabou de terminar é exatamente o que o modo existe para
+       impedir. E ele falha FECHADO. */
+    if (await euEmCuidado(sb, eu)) {
+      return { ok: true as const, stories: [] as StoryArquivado[], proximo: null };
+    }
+
+    const monta = (base: any) => {
+      const q = base
+        .eq("autor_id", eu)
+        .order("criado_em", { ascending: false })
+        .limit(STORIES_POR_PAGINA);
+      return data.antesDe ? q.lt("criado_em", data.antesDe) : q;
+    };
+    /* ⚠️ Degrau, como toda leitura desta aba: `destacado_em` nasce num
+       `APLICAR_` que o dono roda à mão. Sem a coluna o arquivo continua
+       inteiro — só o selo de destacado some. */
+    let linhas: any[] = [];
+    const cheio = await monta(
+      sb.from("rede_stories").select("id, imagem_path, texto, criado_em, expira_em, destacado_em"),
+    );
+    if (!cheio.error) linhas = (cheio.data ?? []) as any[];
+    else {
+      console.warn("[rede] arquivo sem destacado_em — rode APLICAR_STORY_CAMADA_E_DESTAQUE.sql");
+      const { data: velhos, error } = await monta(
+        sb.from("rede_stories").select("id, imagem_path, texto, criado_em, expira_em"),
+      );
+      /* ⚠️ Falha de leitura devolve ERRO, e nunca arquivo vazio: "você nunca
+         publicou nada" é a frase mais errada que esta tela pode dizer para quem
+         publicou trinta stories. */
+      if (error) return { ok: false as const, motivo: "banco" as const };
+      linhas = ((velhos ?? []) as any[]).map((l) => ({ ...l, destacado_em: null }));
+    }
+
+    const { urlsAssinadas } = await import("@/lib/imagens.server");
+    const capas = await urlsAssinadas(
+      "rede",
+      linhas.map((l) => l.imagem_path).filter(Boolean),
+      3600,
+    );
+    const agora = Date.now();
+    return {
+      ok: true as const,
+      stories: linhas.map(
+        (l): StoryArquivado => ({
+          id: l.id,
+          imagemUrl: capas.get(l.imagem_path) ?? null,
+          texto: l.texto ?? null,
+          criadoEm: l.criado_em,
+          /* ⚠️ "No ar" é uma pergunta de AGORA, e por isso é derivada aqui e
+             nunca guardada: um booleano gravado ficaria mentindo 24 h depois. */
+          noAr: new Date(l.expira_em).getTime() > agora,
+          destacado: !!l.destacado_em,
+        }),
+      ),
+      proximo:
+        linhas.length === STORIES_POR_PAGINA
+          ? (linhas[linhas.length - 1].criado_em as string)
+          : null,
+    };
+  });
+
+/**
+ * DESTACAR (ou soltar) um story, para ele viver no perfil.
+ *
+ * ⚠️ **NÃO mexe em `expira_em`.** Duas colunas dizendo quanto tempo a coisa vive
+ * divergiriam no primeiro ajuste. Quem decide se o story aparece na FILEIRA
+ * continua sendo `expira_em`; quem decide se ele aparece no PERFIL é
+ * `destacado_em`. São duas perguntas, e um story destacado sai da fileira em
+ * 24 h como qualquer outro — o que ele ganha é uma segunda casa.
+ */
+export const destacarStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        storyId: z.string().uuid(),
+        destacar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ Só a autora destaca, e a conferência vem ANTES da escrita — sem ela o
+       retorno seria "ok" sobre um story que não mudou, e a tela acenderia o selo
+       num story de outra pessoa. O `update` também filtra, como cinto. */
+    const { data: story, error: erroStory } = await sb
+      .from("rede_stories")
+      .select("id, autor_id")
+      .eq("id", data.storyId)
+      .maybeSingle();
+    if (erroStory) return { ok: false as const, motivo: "banco" as const };
+    if (!story || (story as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    if (data.destacar) {
+      const { count, error: erroConta } = await sb
+        .from("rede_stories")
+        .select("id", { count: "exact", head: true })
+        .eq("autor_id", eu)
+        .not("destacado_em", "is", null);
+      /* ⚠️ Falha ao contar RECUSA — liberar por não ter conseguido contar é como
+         o teto deixa de existir. Mesma régua de `contarTrofeus` e de
+         `fixarPost`. */
+      if (erroConta || typeof count !== "number") {
+        return { ok: false as const, motivo: "sem_suporte" as const };
+      }
+      if (count >= DESTAQUES_MAX) {
+        return { ok: false as const, motivo: "cheio" as const, teto: DESTAQUES_MAX };
+      }
+    }
+
+    const { error } = await sb
+      .from("rede_stories")
+      .update({ destacado_em: data.destacar ? new Date().toISOString() : null })
+      .eq("id", data.storyId)
+      .eq("autor_id", eu);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const, destacado: data.destacar };
   });
 
 export const marcarStoryVisto = createServerFn({ method: "POST" })

@@ -5871,7 +5871,98 @@ marcadores do trabalho recente antes de tocar em qualquer coisa** (`portoes-da
 -rede`: 0 local; `revelavel`: 0 local) e, confirmada a rebobinada, recuperar do
 remoto — nunca commitar por cima.
 
-### As três que faltavam de verdade — e as três que já existiam (ago/2026)
+### O story ganhou camada, arquivo e destaque (ago/2026)
+
+Pedido do dono: "aplique o que ainda falta". A varredura achou quatro lacunas
+reais; duas valiam a pena e são estas.
+
+### ⚠️ 1. O STORY ERA O ÚNICO CONTEÚDO SEM CAMADA — e é o mais íntimo
+
+O post escolhe entre `publico`, `seguidores` e `amigas` desde o primeiro dia. O
+story não escolhia nada: ia sempre para `sigo ∪ amigas`, ou seja, para o público
+MAIS LARGO que ela tem. Num app de gestação de alto risco isso é o contrário do
+que a natureza do formato pede — o story é onde ela põe a ultrassom que acabou
+de sair e o dia ruim, coisas que se contam para seis pessoas e não para
+trezentas.
+
+- ⚠️ **O padrão é `seguidores`, e é o CONTRÁRIO do padrão do post (`amigas`).**
+  A diferença é deliberada: lá a camada nasceu com o recurso e nasceu fechada;
+  aqui ela está chegando a um formato que já era aberto. Fechar por padrão faria
+  as publicações futuras dela alcançarem menos gente que as de ontem sem ela ter
+  pedido — e ela descobriria pelo silêncio.
+- ⚠️ **NÃO existe `publico` no story.** Um story público seria visto por quem ela
+  não conhece — e a fileira de bolinhas não tem rótulo de procedência nenhum: a
+  paciente abriria achando que é de alguém que ela segue. O post pode ser público
+  porque toda publicação de fora carrega "Sugerido para você"; o story não
+  carrega, então não pode.
+- ⚠️ **O RECORTE POR AUTORA NÃO BASTA, e este é o caso inteiro.** A leitura monta
+  a lista de autoras (`sigo ∪ amigas`) e busca os stories delas — mas dentro
+  dessa lista há gente que eu SIGO sem ser amiga, e é dessa gente que o story
+  `amigas` tem de se esconder. `storyAlcanca` roda POR STORY.
+- ⚠️ **E REAGIR E VOTAR também precisavam do portão.** A fileira já escondia,
+  mas o servidor aceitava a ação: o afago chegava à caixa ♡ da autora vindo de
+  alguém que nunca devia ter visto aquilo.
+- ⚠️ **A autora sempre vê o próprio**, inclusive o fechado — sem isto, publicar
+  em "só amigas" faria o story sumir da fileira dela mesma, e ela concluiria que
+  a publicação falhou.
+- ⚠️ **Desconhecido cai no PADRÃO, nunca no mais aberto** (`camadaDoStory`).
+- ⚠️ **E O RASCUNHO GUARDA A CAMADA.** Sem isso, ela escreve um story marcado "só
+  amigas", é interrompida, recupera — e publica ABERTO sem reparar. É o pior
+  desfecho possível de um recurso de conveniência.
+- ⚠️ **Sem a coluna, descer o degrau é RECUSA quando ela escolheu `amigas`**: um
+  story fechado publicado aberto é o oposto exato do que ela pediu, e o tipo de
+  falha que ela só descobre quando a pessoa errada comenta.
+
+### 2. O arquivo e o destaque — e o arquivo JÁ EXISTIA
+
+⚠️ **Os stories expirados nunca foram apagados.** A fileira filtra por
+`expira_em > now()` e a linha fica no banco — a decisão está escrita em
+`storiesDoFeed` ("apagar na leitura faria uma consulta de tela virar escrita").
+O que faltava não era guardar: era uma tela que devolvesse a ela o que ela
+publicou. **Nenhuma coluna nova foi preciso para o arquivo.**
+
+E isto importa mais aqui que num app de fotos: um story de gestação é a ultrassom
+que saiu naquela manhã, a primeira vez que o bebê mexeu. Sumir em 24 horas sem
+rastro é o app apagar a gestação dela um pedaço por dia.
+
+- ⚠️ **É PRIVADO: não existe `alvoId`.** O recorte é a sessão e nada mais — um
+  parâmetro aqui seria a porta para ler o arquivo de qualquer paciente trocando
+  um uuid, incluindo os stories que ela publicou em "só amigas".
+- ⚠️ **Falha de leitura devolve ERRO, e nunca arquivo vazio.** "Você nunca
+  publicou nada" é a frase mais errada que esta tela pode dizer a quem publicou
+  trinta stories.
+- ⚠️ **"No ar" é DERIVADO na leitura**: um booleano gravado ficaria mentindo 24 h
+  depois. E ele muda o que ela faz — um story ainda dentro das 24 h pode ser
+  apagado do visor; um que já saiu, não.
+- ⚠️ **O destaque NÃO mexe em `expira_em`.** Duas colunas dizendo quanto tempo a
+  coisa vive divergiriam no primeiro ajuste. `expira_em` decide a FILEIRA;
+  `destacado_em` decide o PERFIL. Um story destacado sai da fileira em 24 h como
+  qualquer outro — o que ele ganha é uma segunda casa.
+- **Grade QUADRADA, e não a 3:4 do perfil**: ali as células são recortes de fotos
+  de post; aqui cada célula é um story inteiro (9:16), e o recorte 3:4 come a
+  metade de cima — que num story de gestação é onde fica o texto que ela
+  escreveu.
+- ⚠️ **A estrela é DESENHADA**, cheia quando acesa: o emoji ⭐ tem cor própria em
+  cada sistema e não tem dois estados. Mesma lição do pino e do 📞.
+
+### ⚠️ E o medidor de ondas piscava sob carga
+
+Depois de subir a latência simulada de 5 para 25 ms, ele ainda acusou uma
+cascata inexistente **uma vez em cerca de seis execuções** — sempre quando a
+suíte rodava junto com a varredura das bancadas (um Chromium com dezenas de
+páginas). Subiu para 50: a folga de agrupamento virou 25 ms, mais que qualquer
+jitter medido, e uma onda de verdade continua custando os 50 inteiros.
+
+**Um teste que falha uma vez em seis é pior que teste nenhum**: as pessoas
+passam a re-rodar sem ler, e no dia em que o vermelho for de verdade ele é
+ignorado junto. Conferido depois: três execuções da suíte inteira sob a mesma
+carga, zero falhas.
+
+**Aplicar no Supabase:** `supabase/APLICAR_STORY_CAMADA_E_DESTAQUE.sql`.
+**Bancadas:** `?tela=arquivo` · `?tela=arquivo&vazio=1` ·
+`?tela=arquivo&instavel=1` · `?tela=conferir` (os dois chips da camada).
+
+## As três que faltavam de verdade — e as três que já existiam (ago/2026)
 
 Pedido do dono: aplicar seis funcionalidades que eu tinha listado como
 faltando. **Conferindo antes de construir, TRÊS já existiam inteiras** —

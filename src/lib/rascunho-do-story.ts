@@ -58,6 +58,16 @@ export type RascunhoDoStory = {
    * que a régua cala não publica semana nenhuma.
    */
   carimbarSemana: boolean;
+  /**
+   * A camada que ela tinha escolhido.
+   *
+   * ⚠️ **Guardada, e é obrigatório.** Sem ela, quem escreve um story marcado "só
+   * amigas", é interrompida e recupera o rascunho publica ABERTO sem reparar —
+   * o pior desfecho possível de um recurso de conveniência. Na leitura ela passa
+   * por `camadaDoStory`, que faz desconhecido cair no PADRÃO e nunca no mais
+   * aberto.
+   */
+  camada?: string;
   /** Quando foi guardado (ISO). É o que a validade compara. */
   em: string;
 };
@@ -127,6 +137,7 @@ export function lerRascunhoDeStory(bruto: string | null, agora: Date): RascunhoD
       : null,
     perguntaAberta: r.perguntaAberta === true,
     carimbarSemana: r.carimbarSemana === true,
+    camada: typeof r.camada === "string" ? r.camada : undefined,
     em,
   };
   return ehRascunhoUtil(rascunho) ? rascunho : null;
@@ -148,6 +159,7 @@ export function paraGuardar(
     enquete: r.enquete,
     perguntaAberta: r.perguntaAberta,
     carimbarSemana: r.carimbarSemana,
+    camada: r.camada,
     em: agora.toISOString(),
   };
   /* ⚠️ Rascunho vazio APAGA o que estava lá, em vez de gravar um vazio: se ela

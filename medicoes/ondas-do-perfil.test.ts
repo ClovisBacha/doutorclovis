@@ -39,11 +39,18 @@ import { describe, expect, mock, test } from "bun:test";
  * então acusava uma cascata que não existe — aconteceu, e mandou-me investigar
  * uma consulta que estava na onda certa.
  *
- * Com 25, a folga é 12,5 ms contra um jitter de poucos milissegundos, e uma
- * onda de verdade continua custando os 25 inteiros. O preço é o teste levar
- * ~0,5 s a mais, e um teste que às vezes mente custa muito mais que isso.
+ * ⚠️ **E 25 NÃO BASTOU sob carga.** Medido: rodando a suíte ao mesmo tempo que
+ * a varredura das bancadas (um Chromium com dezenas de páginas), o jitter
+ * atravessou os 12,5 ms e o teste acusou uma cascata inexistente — uma vez em
+ * cerca de seis execuções. Um teste que falha uma vez em seis é pior que teste
+ * nenhum: as pessoas passam a re-rodar sem ler, e no dia em que o vermelho for
+ * de verdade ele é ignorado junto.
+ *
+ * Com 50, a folga é 25 ms — mais que qualquer jitter medido —, e uma onda de
+ * verdade continua custando os 50 inteiros. O preço é o teste levar cerca de um
+ * segundo, e é barato.
  */
-const LATENCIA = 25;
+const LATENCIA = 50;
 type Registro = { t: number; alvo: string; detalhe: string; fim?: number };
 const log: Registro[] = [];
 

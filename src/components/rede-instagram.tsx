@@ -79,6 +79,10 @@ import {
   type TipoDeReacao,
   type Visibilidade,
   TEXTO_DO_STORY_MAX,
+  VISIBILIDADES_DO_STORY,
+  VISIBILIDADE_DO_STORY_PADRAO,
+  camadaDoStory,
+  type VisibilidadeDoStory,
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
@@ -138,6 +142,7 @@ import type {
   BolhaDeStory,
   PerfilNaTela,
   PostNaTela,
+  StoryArquivado,
 } from "@/lib/rede-social.functions";
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -3119,6 +3124,7 @@ type Onde =
   | { t: "atividade" }
   | { t: "salvos" }
   | { t: "arquivados" }
+  | { t: "arquivo-stories" }
   | { t: "busca" }
   | { t: "caixinha" }
   | { t: "conversas" }
@@ -3197,6 +3203,10 @@ export function RedeNoApp({
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   /** A gaveta: o que ela tirou do ar. */
   const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
+  /** `null` = ainda carregando · `[]` = ela não publicou nenhum. Ver o handler. */
+  const [arquivoStories, setArquivoStories] = useState<StoryArquivado[] | null>(null);
+  const [arquivoStoriesInstavel, setArquivoStoriesInstavel] = useState(false);
+  const [proximoArquivo, setProximoArquivo] = useState<string | null>(null);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
   const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
@@ -5267,6 +5277,95 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * O ARQUIVO DE STORIES.
+   *
+   * ⚠️ **Estado próprio, e não o de `arquivados`.** São duas listas de tipos
+   * diferentes (`StoryArquivado` contra `PostNaTela`), e reusar o estado faria a
+   * tela dos posts arquivados desenhar stories na volta de uma navegação.
+   *
+   * ⚠️ E `null` é "ainda não carregou", `[]` é "não publicou nenhum": juntar os
+   * dois faria a tela dizer "você ainda não publicou stories" enquanto a lista
+   * vem — para quem tem trinta.
+   */
+  async function abrirArquivoDeStories() {
+    setArquivoStories(null);
+    setArquivoStoriesInstavel(false);
+    setOnde({ t: "arquivo-stories" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuArquivoDeStories } = await import("@/lib/rede-social.functions");
+      const r = await meuArquivoDeStories({ data: { accessToken: t } });
+      if (r.ok) {
+        setArquivoStories(r.stories);
+        setProximoArquivo(r.proximo);
+        return;
+      }
+      /* ⚠️ **"NÃO CARREGOU" NÃO PODE TER A CARA DE "NÃO HÁ NADA"** — a mesma
+         lição do feed instável. Aqui é pior: "você nunca publicou um story" é a
+         frase mais errada que esta tela pode dizer a quem publicou trinta. */
+      setArquivoStoriesInstavel(true);
+    } catch {
+      setArquivoStoriesInstavel(true);
+    }
+  }
+
+  /** A próxima leva do arquivo. */
+  async function maisDoArquivoDeStories() {
+    if (!proximoArquivo) return;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuArquivoDeStories } = await import("@/lib/rede-social.functions");
+      const r = await meuArquivoDeStories({ data: { accessToken: t, antesDe: proximoArquivo } });
+      if (!r.ok) return;
+      /* ⚠️ Junta SEM repetir por id: duas páginas podem se sobrepor, e chave
+         repetida derruba a lista inteira do React. */
+      setArquivoStories((ps) => {
+        const vistos = new Set((ps ?? []).map((x) => x.id));
+        return [...(ps ?? []), ...r.stories.filter((x) => !vistos.has(x.id))];
+      });
+      setProximoArquivo(r.proximo);
+    } catch {
+      /* A lista que já está na tela continua. */
+    }
+  }
+
+  /**
+   * Destacar (ou soltar) um story.
+   *
+   * ⚠️ **Pinta DEPOIS do servidor**, como o fixar: o teto é conferido lá com o
+   * que o banco tem, e uma pintura otimista acenderia o selo num destaque que
+   * foi recusado.
+   */
+  async function destacarNoPerfil(storyId: string, destacar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { destacarStory } = await import("@/lib/rede-social.functions");
+      const r = await destacarStory({ data: { accessToken: t, storyId, destacar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "cheio"
+            ? `Você já tem ${"teto" in r ? r.teto : 10} stories em destaque. Solte um para destacar outro.`
+            : r.motivo === "sem_suporte"
+              ? "Destacar ainda não está pronto no servidor."
+              : "Não deu para destacar agora.",
+        );
+        return;
+      }
+      setArquivoStories((ps) =>
+        (ps ?? []).map((x) => (x.id === storyId ? { ...x, destacado: destacar } : x)),
+      );
+      toast.success(destacar ? "No destaque do seu perfil." : "Fora do destaque.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para destacar agora.");
+    }
+  }
+
   async function abrirArquivados() {
     setArquivados([]);
     setOnde({ t: "arquivados" });
@@ -5404,6 +5503,7 @@ export function RedeNoApp({
   async function publicarStory(
     dataUrl: string,
     texto: string,
+    camada: VisibilidadeDoStory,
     carimbar: boolean,
     enquete: string[],
     perguntaAberta: boolean,
@@ -5430,6 +5530,7 @@ export function RedeNoApp({
           enquete,
           perguntaAberta,
           postDe: comPost,
+          visibilidade: camada,
         },
       });
       if (r.ok) {
@@ -5637,6 +5738,16 @@ export function RedeNoApp({
         aoTocar: () => void abrirArquivados(),
       },
       {
+        /* ⚠️ **Ao lado de "Arquivados", e com nome que os separa.** Os dois
+           guardam o que saiu do ar, e um rótulo genérico faria a paciente abrir
+           um procurando o outro. "Meus stories" diz o formato, que é a única
+           coisa que distingue os dois. */
+        id: "arquivo-stories",
+        rotulo: "Meus stories",
+        icone: "grade",
+        aoTocar: () => void abrirArquivoDeStories(),
+      },
+      {
         id: "caixinha",
         rotulo: "Caixinha",
         icone: "balao",
@@ -5745,8 +5856,8 @@ export function RedeNoApp({
              largado. */
           setPostNoStory(null);
         }}
-        aoPublicar={({ texto, carimbar, enquete, perguntaAberta }) =>
-          void publicarStory(conferindoStory, texto, carimbar, enquete, perguntaAberta)
+        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta }) =>
+          void publicarStory(conferindoStory, texto, camada, carimbar, enquete, perguntaAberta)
         }
         rascunho={rascunhoDeStory}
         aoGuardarRascunho={guardarRascunhoDoStory}
@@ -5886,6 +5997,20 @@ export function RedeNoApp({
         posts={salvos}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
+  if (onde.t === "arquivo-stories") {
+    return (
+      <ArquivoDeStories
+        stories={arquivoStories}
+        instavel={arquivoStoriesInstavel}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDestacar={(id, v) => void destacarNoPerfil(id, v)}
+        aoChegarNoFim={() => void maisDoArquivoDeStories()}
+        temMais={!!proximoArquivo}
+        aoTentarDeNovo={() => void abrirArquivoDeStories()}
       />
     );
   }
@@ -6971,6 +7096,161 @@ export function TelaDoPost({
 
 /** Quanto cada story fica na tela antes de passar sozinho. */
 const DURACAO_DO_STORY = 5000;
+
+/**
+ * O ARQUIVO DE STORIES — tudo o que ela já publicou.
+ *
+ * ⚠️ **Grade quadrada, e não a 3:4 do perfil.** A grade do perfil imita o
+ * Instagram porque ali as células são recortes de FOTOS DE POST; aqui cada
+ * célula é um story inteiro (9:16), e um recorte 3:4 sobre uma imagem vertical
+ * come a metade de cima — que num story de gestação é justamente onde fica o
+ * texto que ela escreveu.
+ */
+export function ArquivoDeStories({
+  stories,
+  instavel,
+  aoVoltar,
+  aoDestacar,
+  aoChegarNoFim,
+  temMais = false,
+  aoTentarDeNovo,
+}: {
+  /** `null` = ainda carregando. `[]` = ela não publicou nenhum. */
+  stories: StoryArquivado[] | null;
+  instavel?: boolean;
+  aoVoltar: () => void;
+  aoDestacar?: (storyId: string, destacar: boolean) => void;
+  aoChegarNoFim?: () => void;
+  temMais?: boolean;
+  aoTentarDeNovo?: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Meus stories</h1>
+      </header>
+
+      {/* ⚠️ A explicação vem ANTES da grade, e diz as duas coisas que a paciente
+          não tem como adivinhar: que o app guardou tudo, e que ninguém mais vê
+          isto. Sem a segunda, ela olha a lista achando que aquilo continua no
+          ar. */}
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+        Tudo o que você publicou fica guardado aqui — só para você. Toque na estrela para deixar um
+        no seu perfil.
+      </p>
+
+      {instavel ? (
+        /* ⚠️ **"Não carregou" NUNCA tem a cara de "não há nada".** "Você ainda
+           não publicou stories" é a frase mais errada que esta tela pode dizer a
+           quem publicou trinta. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar seus stories agora.</p>
+          {aoTentarDeNovo && (
+            <button
+              type="button"
+              onClick={aoTentarDeNovo}
+              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          )}
+        </div>
+      ) : stories === null ? (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto aspect-square w-full" />
+          ))}
+        </div>
+      ) : stories.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Você ainda não publicou nenhum story.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-0.5">
+            {stories.map((st) => (
+              <div key={st.id} className="relative aspect-square overflow-hidden bg-muted/60">
+                {st.imagemUrl ? (
+                  <img
+                    src={st.imagemUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+                    {st.texto}
+                  </span>
+                )}
+
+                {/* ⚠️ **"No ar" é a informação que muda o que ela faz.** Um story
+                    ainda dentro das 24 h pode ser apagado do visor; um que já
+                    saiu, não. Sem a pílula, as duas células são idênticas. */}
+                {st.noAr && (
+                  <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                    no ar
+                  </span>
+                )}
+
+                {aoDestacar && (
+                  <button
+                    type="button"
+                    onClick={() => aoDestacar(st.id, !st.destacado)}
+                    aria-label={st.destacado ? "Tirar do destaque" : "Deixar no perfil"}
+                    aria-pressed={st.destacado}
+                    /* ⚠️ 44px de alvo com o desenho pequeno: a célula tem ~130px
+                       e um botão de 44 visível cobriria a foto. O `after`
+                       estende a área do dedo sem mover o desenho — a mesma
+                       solução do × da linha de comentário. */
+                    className="press absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white after:absolute after:-inset-2.5 after:content-['']"
+                  >
+                    <IconeEstrela cheia={st.destacado} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {aoChegarNoFim && temMais && (
+            <SentinelaDaGrade aoChegar={aoChegarNoFim} quantos={stories.length} />
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A estrela do destaque.
+ *
+ * ⚠️ Desenhada, e não ⭐: o emoji tem cor própria em cada sistema e não tem dois
+ * estados — e aqui ele precisa distinguir "está no perfil" de "pôr no perfil".
+ * Mesma lição do pino e do 📞 da emergência.
+ */
+function IconeEstrela({ cheia }: { cheia: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[13px] w-[13px]"
+      fill={cheia ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
 
 export function VisorDeStory({
   bolha,
@@ -9382,6 +9662,7 @@ export function ConferirStory({
   aoCancelar: () => void;
   aoPublicar: (opts: {
     texto: string;
+    camada: VisibilidadeDoStory;
     carimbar: boolean;
     enquete: string[];
     perguntaAberta: boolean;
@@ -9404,6 +9685,13 @@ export function ConferirStory({
    * Era o gênero inteiro faltando: um story sem legenda é uma foto muda.
    */
   const [texto, setTexto] = useState("");
+  /**
+   * ⚠️ **O STORY ERA O ÚNICO CONTEÚDO SEM CAMADA — e é o mais íntimo.** Ele ia
+   * sempre para o público mais largo que ela tem. A régua e o padrão vivem em
+   * `rede-social.ts`: `seguidores`, que é o comportamento que os stories já
+   * tinham — fechar por padrão mudaria o alcance de quem não pediu nada.
+   */
+  const [camada, setCamada] = useState<VisibilidadeDoStory>(VISIBILIDADE_DO_STORY_PADRAO);
   /* ⚠️ **OFERECE, NUNCA PREENCHE SOZINHO** — a decisão do rascunho do post,
      pela mesma razão: encher o campo com o texto de ontem no momento em que ela
      abre para publicar outra coisa é como um story sai errado, e story não se
@@ -9436,10 +9724,11 @@ export function ConferirStory({
         enquete: opcoes,
         perguntaAberta: caixinha,
         carimbarSemana: carimbar,
+        camada,
       });
     }, 700);
     return () => clearTimeout(t);
-  }, [texto, opcoes, caixinha, carimbar, aoGuardarRascunho]);
+  }, [texto, opcoes, caixinha, carimbar, camada, aoGuardarRascunho]);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black">
@@ -9504,6 +9793,10 @@ export function ConferirStory({
                 setOpcoes(rascunho?.enquete ?? null);
                 setCaixinha(!!rascunho?.perguntaAberta);
                 setCarimbar(!!rascunho?.carimbarSemana);
+                /* ⚠️ A camada volta pelo mesmo caminho: sem isto, ela escreve um
+                   story marcado "só amigas", é interrompida, recupera — e
+                   publica ABERTO sem reparar. */
+                setCamada(camadaDoStory(rascunho?.camada));
                 setOfereceu(true);
               }}
               className="press min-h-[44px] shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black"
@@ -9538,6 +9831,29 @@ export function ConferirStory({
               {TEXTO_DO_STORY_MAX - texto.length}
             </span>
           )}
+        </div>
+
+        {/* ⚠️ **QUEM VÊ, e a escolha é por PUBLICAÇÃO.** Duas opções e não três:
+            `publico` fica de fora porque a fileira de bolinhas não tem rótulo de
+            procedência nenhum — a paciente abriria achando que é de alguém que
+            ela segue. O post pode ser público porque toda publicação de fora
+            carrega "Sugerido para você"; o story não carrega. */}
+        <div className="flex gap-2">
+          {VISIBILIDADES_DO_STORY.map((v) => (
+            <button
+              key={v.chave}
+              type="button"
+              role="radio"
+              aria-checked={camada === v.chave}
+              onClick={() => setCamada(v.chave)}
+              className={`press min-h-[44px] flex-1 rounded-2xl px-3 text-left ${
+                camada === v.chave ? "bg-white text-black" : "bg-white/12 text-white"
+              }`}
+            >
+              <span className="block text-[13px] font-semibold">{v.rotulo}</span>
+              <span className="block text-[11px] opacity-70">{v.sub}</span>
+            </button>
+          ))}
         </div>
 
         {semana ? (
@@ -9640,6 +9956,7 @@ export function ConferirStory({
             setEnviando(true);
             aoPublicar({
               texto: texto.trim(),
+              camada,
               carimbar: carimbar && !!semana,
               /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
                  aqui, que aceitaria o que o servidor recusa. */

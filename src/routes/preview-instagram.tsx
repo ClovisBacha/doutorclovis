@@ -75,6 +75,7 @@ import {
   type PessoaNaLista,
   type Story,
   TelaDaTag,
+  ArquivoDeStories,
 } from "@/components/rede-instagram";
 import type {
   AtividadeNaTela,
@@ -828,6 +829,41 @@ function Bancada() {
         /* A bancada NÃO grava: ela desenha o estado, e gravar poluiria o
            `localStorage` de quem só veio olhar. */
         aoGuardarRascunho={undefined}
+      />
+    );
+  }
+
+  if (tela === "arquivo") {
+    /**
+     * ⚠️ O arquivo só existe numa conta com stories JÁ EXPIRADOS — ou seja,
+     * publicados ontem. Sem a bancada, conferir esta tela exigiria esperar 24 h
+     * com uma conta de verdade, que é como uma tela nasce sem ninguém nunca ter
+     * olhado.
+     *
+     * `?vazio=1` é quem nunca publicou · `?instavel=1` é a falha de leitura, que
+     * NUNCA pode ter a cara do vazio.
+     */
+    return (
+      <ArquivoDeStories
+        stories={
+          instavel === 1
+            ? null
+            : vazio
+              ? []
+              : CORES.slice(0, 7).map((c, n) => ({
+                  id: `st${n}`,
+                  imagemUrl: foto(c[0], c[1], c[2]),
+                  texto: n === 4 ? "primeira vez que ela mexeu 🤍" : null,
+                  criadoEm: atras(60 * 24 * (n + 1)),
+                  /* O primeiro ainda está no ar — é o que prova a pílula. */
+                  noAr: n === 0,
+                  destacado: n === 1 || n === 3,
+                }))
+        }
+        instavel={instavel === 1}
+        aoVoltar={() => history.back()}
+        aoDestacar={(id, v) => alert(v ? `destacaria ${id}` : `soltaria ${id}`)}
+        aoTentarDeNovo={() => alert("tentaria de novo")}
       />
     );
   }

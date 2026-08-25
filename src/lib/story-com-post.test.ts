@@ -75,9 +75,30 @@ describe("⚠️ a ESCRITA: só publicação pública, de perfil público", () =
   });
 
   test("⚠️ sem a coluna E com escolha, RECUSA — nunca um 'ok' mudo", () => {
-    /* Descer o degrau publicaria um story diferente do que ela montou. */
-    expect(C).toMatch(/erroComPost && postDe/);
+    /**
+     * Descer o degrau publicaria um story diferente do que ela montou.
+     *
+     * ⚠️ A primeira versão travava a string `erroComPost && postDe` — e reprovou
+     * o dia em que a CAMADA entrou na mesma condição, que é uma razão ainda mais
+     * forte para recusar: sem a coluna, um story marcado "só amigas" sairia
+     * ABERTO. Hoje se cobra a GARANTIA: a escolha dela entra na decisão de
+     * descer, de qualquer jeito que esteja escrita.
+     */
+    const i = C.indexOf("if (erroComPost");
+    expect(i).toBeGreaterThan(-1);
+    const cond = C.slice(i, C.indexOf(")", C.indexOf("(", i + 3)));
+    expect(cond).toContain("postDe");
     expect(C).toContain('motivo: "sem_suporte"');
+  });
+
+  test("⚠️ e a CAMADA escolhida também impede o degrau", () => {
+    /* Sem a coluna, um story marcado "só amigas" seria publicado ABERTO — o
+       oposto exato do que ela pediu, e o tipo de falha que ela só descobre
+       quando a pessoa errada comenta. */
+    const i = C.indexOf("if (erroComPost");
+    const cond = C.slice(i, C.indexOf("{", i));
+    expect(cond).toContain("camada");
+    expect(cond).toContain("VISIBILIDADE_DO_STORY_PADRAO");
   });
 });
 
