@@ -5841,6 +5841,27 @@ na `<FileiraDePessoas`, a mutação morde.
 EXPLICA a remoção contém a string removida. `semComentarios` subiu para o
 escopo do módulo — toda busca de texto do arquivo passa por ele agora.
 
+#### ⚠️ A varredura de CI cobria 5 das 20 telas da Comunidade
+
+O job "Bancadas — abre as telas e lê o console" nasceu de um defeito que deixou
+o app SEM ABRIR e sobreviveu a `tsc` limpo, lint limpo e 3.900 testes verdes —
+porque nenhum deles abre uma página. A lição estava certa e a cobertura não:
+
+`preview-instagram` é **UMA rota com vinte sub-telas** atrás de `?tela=`. A
+varredura lê as rotas do disco, então pegava a rota e desenhava só o padrão (o
+feed). As outras dezenove ficavam de fora — e é exatamente onde a aba cresceu:
+comentários, filtro de palavras, conversa, story, espelho, busca, salvos,
+atividade, arquivados, esboço. **Ter o job e não ter a cobertura.**
+
+Agora são 70 páginas (de 45), com os estados que a prosa documenta como
+impossíveis de fotografar: `?conversa=fechados`, `?restrito=1`,
+`?silenciado=1`, `?perguntas=0`, `?caixinha=0`, `?trancado=1`, `?remover=0`,
+`?sugeridas=0`. Medido: 70 varridas, 0 com problema, ~2 min de job.
+
+⚠️ **Sub-tela nova entra na lista à mão** — a varredura de disco não tem como
+adivinhar um valor de `?tela=`. `comunidade.test.ts` cobra que todo destino do
+hub exista; quem ABRE a página é esta lista.
+
 #### ⚠️ E o contêiner rebobinou de novo, para `ee24f25`
 
 Terceira vez. O remoto tinha os três commits da noite; a árvore local voltou a

@@ -30,11 +30,51 @@ const rotas = readdirSync("src/routes")
 /* Estados que só existem com parâmetro — os mesmos que a prosa do CLAUDE.md
    documenta como "impossíveis de fotografar" sem eles. */
 const EXTRAS = [
+  /* ⚠️ **A COMUNIDADE INTEIRA, e não cinco telas dela.**
+   *
+   * `preview-instagram` é UMA rota com VINTE sub-telas atrás de `?tela=` — a
+   * varredura de disco pega a rota e desenha só o padrão (o feed). As outras
+   * dezenove ficavam de fora, e é exatamente onde a aba cresceu: comentários,
+   * filtro de palavras, conversa, story, espelho, busca, salvos, atividade.
+   *
+   * Uma leva de defeitos passou por `tsc` limpo, lint limpo e 4.400 testes
+   * verdes e só apareceu quando alguém ABRIU a tela — que é a razão de este job
+   * existir. Cobrir cinco de vinte é ter o job e não ter a cobertura.
+   *
+   * ⚠️ **Sub-tela nova entra aqui à mão.** A varredura de disco não tem como
+   * adivinhar um valor de `?tela=`; `comunidade.test.ts` cobra que todo destino
+   * do hub exista, mas quem abre a página é esta lista. */
   "/preview-instagram?tela=perfil&meu=1",
+  "/preview-instagram?tela=perfil&restrito=1",
+  "/preview-instagram?tela=perfil&silenciado=1",
   "/preview-instagram?tela=caixinha",
+  "/preview-instagram?tela=caixinha&perguntas=0",
+  "/preview-instagram?tela=caixinha&caixinha=0",
+  "/preview-instagram?tela=comentarios",
+  "/preview-instagram?tela=comentarios&conversa=fechados",
+  "/preview-instagram?tela=filtro",
+  "/preview-instagram?tela=conversa",
+  "/preview-instagram?tela=conversas",
+  "/preview-instagram?tela=mandar",
+  "/preview-instagram?tela=story",
+  "/preview-instagram?tela=story&meu=1",
+  "/preview-instagram?tela=conferir",
+  "/preview-instagram?tela=espelho",
+  "/preview-instagram?tela=espelho&trancado=1",
+  "/preview-instagram?tela=busca",
+  "/preview-instagram?tela=salvos",
+  "/preview-instagram?tela=atividade",
+  "/preview-instagram?tela=lista",
+  "/preview-instagram?tela=lista&remover=0",
+  "/preview-instagram?tela=editar",
+  "/preview-instagram?tela=post",
+  "/preview-instagram?tela=tag",
+  "/preview-instagram?tela=esboco",
+  "/preview-instagram?tela=arquivados",
   "/preview-instagram?tela=novo&comFoto=1",
   "/preview-instagram?vazio=1",
   "/preview-instagram?luto=1",
+  "/preview-instagram?sugeridas=0",
   "/preview-presentes?dona=1",
   "/preview-conta?privacidade=1",
   "/preview-sos-medico?magro=1",
