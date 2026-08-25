@@ -662,6 +662,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoCompartilhar?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
+
   /** Abre a folha de mandar esta publicação para uma conversa. */
   aoMandarParaConversa?: (post: PostNaTela) => void;
   /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
@@ -1461,6 +1462,8 @@ export function TelaPrincipal({
   aoRepublicar,
   aoCompartilhar,
   aoAbrirTag,
+  instavel,
+  aoTentarDeNovo,
   aoMandarParaConversa,
   aoAbrirArroba,
   aoApagar,
@@ -1487,6 +1490,16 @@ export function TelaPrincipal({
   aoCompararAgora,
   aoDispensarEntao,
 }: {
+  /**
+   * A leitura do feed FALHOU — diferente de "não há nada".
+   *
+   * ⚠️ Os dois são a mesma imagem e conclusões opostas: no vazio ela convida
+   * uma amiga; na falha ela acha que as amigas sumiram. O servidor distingue
+   * (`ctx.degradado`), e esta prop é o outro lado.
+   */
+  instavel?: boolean;
+  /** Refaz a leitura. Sem a prop, o botão de tentar de novo não aparece. */
+  aoTentarDeNovo?: () => void;
   posts: PostNaTela[];
   /** `true` = a paciente pediu para ver só quem ela segue. Ver `feed_so_seguindo`. */
   soSeguindo?: boolean;
@@ -1681,17 +1694,36 @@ export function TelaPrincipal({
       )}
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
-        <>
-          <p className="pb-4 pt-12 text-center text-sm text-muted-foreground">
-            Ainda não há nada por aqui 💛
-          </p>
-          {/* ⚠️ **O CONVITE MORA NO VAZIO, e é aqui que ele vale.** Uma paciente
+        instavel ? (
+          /* ⚠️ **A TELA DO "NÃO CARREGOU", e ela não existia.** O vazio dizia
+              "Ainda não há nada por aqui 💛" para os dois casos — e oferecia o
+              convite, ou seja, mandava a paciente trazer uma amiga por causa de
+              uma falha de rede. Aqui ela tem o que fazer: tentar de novo. */
+          <div className="pb-4 pt-12 text-center">
+            <p className="text-sm text-muted-foreground">Não consegui carregar o feed agora.</p>
+            {aoTentarDeNovo && (
+              <button
+                type="button"
+                onClick={aoTentarDeNovo}
+                className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[14px] font-semibold"
+              >
+                Tentar de novo
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className="pb-4 pt-12 text-center text-sm text-muted-foreground">
+              Ainda não há nada por aqui 💛
+            </p>
+            {/* ⚠️ **O CONVITE MORA NO VAZIO, e é aqui que ele vale.** Uma paciente
               que abre a Comunidade e não vê nada tem duas saídas: seguir
               alguém que ela não conhece, ou trazer quem ela conhece. A segunda
               é a que faz a aba existir para ela — e é a que traz gente nova
               para o app. O mesmo cartão fecha o feed lá embaixo. */}
-          {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
-        </>
+            {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
+          </>
+        )
       ) : (
         naTela.map((p) => (
           <PostInstagram
@@ -3066,6 +3098,8 @@ export function RedeNoApp({
   const [rascunhoDaConversa, setRascunhoDaConversa] = useState<string | null>(null);
   /** A publicação que ela está mandando para alguém. `null` = folha fechada. */
   const [mandandoPost, setMandandoPost] = useState<string | null>(null);
+  /** A leitura do feed falhou — diferente de "não há nada". */
+  const [feedInstavel, setFeedInstavel] = useState(false);
   const [conversaAberta, setConversaAberta] = useState<ConversaNaTela | null>(null);
   /** A publicação que ela está republicando, enquanto o compositor está aberto. */
   const [repostando, setRepostando] = useState<PostNaTela | null>(null);
@@ -3851,6 +3885,13 @@ export function RedeNoApp({
       if (r.ok) {
         setPosts(r.posts);
         setProximo(r.proximo);
+        setFeedInstavel(false);
+      } else if ("motivo" in r && r.motivo === "instavel") {
+        /* ⚠️ **"NÃO CARREGOU" NÃO PODE TER A CARA DE "NÃO HÁ NADA".** São a
+           mesma imagem e conclusões opostas: no primeiro ela convida uma amiga,
+           no segundo ela acha que as amigas sumiram. O servidor agora distingue
+           (ver `ctx.degradado`); esta linha é o outro lado. */
+        setFeedInstavel(true);
       }
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) {
@@ -5783,6 +5824,11 @@ export function RedeNoApp({
         aoAbrirArroba={acoes.abrirArroba}
         aoAbrirTag={acoes.abrirTag}
         aoMandarParaConversa={acoes.mandarParaConversa}
+        /* ⚠️ **SEM ESTAS DUAS, A TELA DO "NÃO CARREGOU" NUNCA APARECERIA** — e
+           eu teria trocado um vazio silencioso por outro. É a mesma falta que a
+           auditoria achou em `aoEditar` e nas três ações da tela do post. */
+        instavel={feedInstavel}
+        aoTentarDeNovo={() => void carregarFeed()}
         /* ⚠️ **O LÁPIS NUNCA CHEGAVA AO FEED.** `TelaPrincipal` declarava a
            prop e a repassava aos cartões; o único chamador não a passava. E
            `meuFeed` põe os posts DELA primeiro, com comentário explícito de que

@@ -95,6 +95,8 @@ export const Route = createFileRoute("/preview-instagram")({
     tag: q.tag == null ? "28semanas" : String(q.tag),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     restrito: q.restrito == null ? 0 : Number(q.restrito),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    instavel: q.instavel == null ? 0 : Number(q.instavel),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
@@ -370,6 +372,7 @@ function Bancada() {
     conversa,
     tag,
     restrito,
+    instavel,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -1406,6 +1409,13 @@ function Bancada() {
              que o `memo` do cartão já custou uma medição falsa. */
           aoAbrirArroba={(h) => alert(`abriria o perfil de @${h}`)}
           aoAbrirTag={(t) => alert(`abriria a página de #${t}`)}
+          /* ⚠️ **`?instavel=1` É A ÚNICA FORMA DE OLHAR A TELA DO "NÃO
+             CARREGOU".** Ela só nasce de uma falha de leitura no servidor —
+             bloqueio ou grafo de amizade caindo —, que não se fabrica numa
+             conta de teste. Sem a bancada, o estado ficaria sem ninguém nunca
+             ter olhado, que é como ele nasceu. */
+          instavel={instavel === 1}
+          aoTentarDeNovo={() => alert("recarregaria o feed")}
           /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
              nasce no servidor — sem a bancada, olhar este cartão exigiria uma
              conta de verdade. `?semcodigo=1` prova o estado em que ele NÃO

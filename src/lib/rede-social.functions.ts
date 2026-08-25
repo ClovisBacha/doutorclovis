@@ -3051,6 +3051,27 @@ export const meuFeed = createServerFn({ method: "POST" })
       return { ok: true as const, posts: [] as PostNaTela[], proximo: null };
     }
     const ctx = await contextoDe(sb, eu);
+    /**
+     * ⚠️ **O `degradado` PASSOU A TER LEITOR — ele nasceu sem nenhum.**
+     *
+     * O tipo declara, com todas as letras, que "quem lê isto devolve ERRO, e
+     * nunca a tela de 'não há nada'". Nenhum dos 28 chamadores lia. Com a
+     * leitura de bloqueio ou de amizade falhando, `conjuntoDeBloqueio` responde
+     * "bloqueado" para TODO MUNDO (falha fechada, correta), o recorte colapsa
+     * para `[eu]`, a consulta volta `ok: true` — e a tela pinta
+     * "Ainda não há nada por aqui 💛".
+     *
+     * ⚠️ **Um feed vazio e um feed que não carregou são a MESMA IMAGEM e
+     * conclusões opostas.** No primeiro ela convida uma amiga; no segundo ela
+     * acha que as amigas sumiram. E o pior caso é a busca, cujo vazio EXPLICA o
+     * motivo errado ("só aparece quem deixou o perfil público").
+     *
+     * É o mesmo defeito de `parcial: true`, que este projeto já registrou entre
+     * os dezoito da auditoria anterior: um campo escrito, documentado e sem
+     * leitor.
+     */
+    if (ctx.degradado) return { ok: false as const, motivo: "instavel" as const };
+
     /* ⚠️ **O SILÊNCIO É APLICADO AQUI, e SÓ AQUI.** Ele não entra em
        `podeVerPost` de propósito: silenciar é preferência de FEED, não régua de
        visibilidade. Visitar o perfil da silenciada continua mostrando tudo —
@@ -3232,6 +3253,26 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
       return { ok: true as const, posts: [] as PostNaTela[], pessoas: [] as PessoaNaLista[] };
     }
     const ctx = await contextoDe(sb, eu);
+    /**
+     * ⚠️ **O `degradado` PASSOU A TER LEITOR — ele nasceu sem nenhum.**
+     *
+     * O tipo declara, com todas as letras, que "quem lê isto devolve ERRO, e
+     * nunca a tela de 'não há nada'". Nenhum dos 28 chamadores lia. Com a
+     * leitura de bloqueio ou de amizade falhando, `conjuntoDeBloqueio` responde
+     * "bloqueado" para TODO MUNDO (falha fechada, correta), o recorte colapsa
+     * para `[eu]`, a consulta volta `ok: true` — e a tela pinta
+     * "Ainda não há nada por aqui 💛".
+     *
+     * ⚠️ **Um feed vazio e um feed que não carregou são a MESMA IMAGEM e
+     * conclusões opostas.** No primeiro ela convida uma amiga; no segundo ela
+     * acha que as amigas sumiram. E o pior caso é a busca, cujo vazio EXPLICA o
+     * motivo errado ("só aparece quem deixou o perfil público").
+     *
+     * É o mesmo defeito de `parcial: true`, que este projeto já registrou entre
+     * os dezoito da auditoria anterior: um campo escrito, documentado e sem
+     * leitor.
+     */
+    if (ctx.degradado) return { ok: false as const, motivo: "instavel" as const };
 
     /* Pedido pendente também tira da lista — ver o cabeçalho. */
     const { data: pendentesMeus } = await sb
@@ -3645,6 +3686,12 @@ export const buscarPerfis = createServerFn({ method: "POST" })
         ((linhas ?? []) as any[]).map((p) => p.id),
       ),
     ]);
+
+    /* ⚠️ **A BUSCA É O PIOR CASO DO `degradado`**: o vazio dela EXPLICA um
+       motivo errado ("só aparece quem deixou o perfil público"), então a
+       paciente conclui que a irmã fechou o perfil quando o que houve foi uma
+       falha de leitura. Ver o bloco de `meuFeed`. */
+    if (ctx.degradado) return { ok: false as const, motivo: "instavel" as const };
     return {
       ok: true as const,
       perfis: ((linhas ?? []) as any[])

@@ -8162,3 +8162,39 @@ recuo não reatribuía). A primeira correção foi pior que o defeito: eu troque
 `let` por um objeto falso que deixava `erroMsgs` sempre nulo — **o recuo nunca
 dispararia.** Um lint verde sobre lógica quebrada é o pior desfecho possível.
 Hoje é `const comCorpo = await …` e um ternário.
+
+#### ⚠️ "NÃO CARREGOU" TINHA A CARA DE "NÃO HÁ NADA"
+
+`ContextoDaRede.degradado` nasceu com o contrato escrito no próprio tipo —
+_"quem lê isto devolve ERRO, e nunca a tela de 'não há nada'"_ — e **nenhum dos
+28 chamadores lia o campo.**
+
+Com a leitura de bloqueio ou de amizade falhando, `conjuntoDeBloqueio` responde
+"bloqueado" para todo mundo (falha fechada, correta), o recorte do feed colapsa
+para `[eu]`, a consulta volta `ok: true` — e a tela pintava
+"Ainda não há nada por aqui 💛", **com o convite embaixo**. Ou seja: o app
+mandava a paciente trazer uma amiga por causa de uma falha de rede.
+
+⚠️ **A BUSCA ERA O PIOR CASO**, porque o vazio dela EXPLICA um motivo errado
+("só aparece quem deixou o perfil público"): a paciente concluiria que a irmã
+fechou o perfil quando o que houve foi um timeout.
+
+É o mesmo defeito de `parcial: true`, que este projeto já registrou entre os
+dezoito da auditoria anterior — campo escrito, documentado, sem leitor.
+
+Hoje `meuFeed`, `sugestoesDoFeed` e `buscarPerfis` devolvem `motivo: "instavel"`,
+e a tela tem estado próprio: a frase certa e um **"Tentar de novo"**.
+
+⚠️ **E as props precisaram ser LIGADAS no ponto de uso** — a mesma falta que a
+auditoria achou em `aoEditar` e nas três ações da tela do post. Sem isso eu teria
+trocado um vazio silencioso por outro.
+
+**Bancada:** `/preview-instagram?vazio=1&sugeridas=0&instavel=1`. O estado só
+nasce de uma falha de leitura no servidor, que não se fabrica numa conta de
+teste — sem a bancada ele ficaria sem ninguém nunca ter olhado, que é como ele
+nasceu.
+
+⚠️ E um lembrete de método que já custou uma volta hoje: **clique antes da
+hidratação se perde em silêncio.** A primeira verificação deste botão registrou
+"nenhum alerta" e o botão estava certo — faltava esperar o `waitForSelector`
+mais ~1,2 s.
