@@ -810,7 +810,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => setConfirmando(true)}
             aria-label="Opções da publicação"
-            className="press grid h-11 w-9 shrink-0 place-items-center text-lg leading-none text-muted-foreground"
+            className="press grid h-11 w-11 shrink-0 place-items-center text-lg leading-none text-muted-foreground"
           >
             ⋯
           </button>
@@ -836,7 +836,7 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoTirarMarcacao(post)}
-            className="press text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+            className="press inline-flex min-h-[44px] items-center text-[12px] font-medium text-muted-foreground underline underline-offset-2"
           >
             Tirar minha marcação
           </button>
@@ -986,7 +986,9 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoVerQuemReagiu(post)}
-            className="press flex min-w-0 items-center gap-1.5"
+            /* ⚠️ 44px de ALTURA: a fileira de emojis desenha 22px, e é ela que
+               a autora toca para ver quem respondeu ao post dela. */
+            className="press flex min-h-[44px] min-w-0 items-center gap-1.5"
             aria-label={`Ver quem reagiu — ${total}`}
           >
             <span aria-hidden className="flex -space-x-1.5 text-[15px] leading-none">
@@ -1038,7 +1040,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => aoRepublicar(post)}
             aria-label="Republicar"
-            className="press ml-auto leading-none text-[15px]"
+            className="press ml-auto flex h-11 w-11 items-center justify-center leading-none text-[15px]"
           >
             ↻
           </button>
@@ -1053,7 +1055,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => aoCompartilhar(post)}
             aria-label="Compartilhar"
-            className="press ml-auto leading-none text-[15px]"
+            className="press ml-auto flex h-11 w-11 items-center justify-center leading-none text-[15px]"
           >
             ↗
           </button>
@@ -1070,7 +1072,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => aoMandarParaConversa(post)}
             aria-label="Mandar para uma conversa"
-            className="press leading-none text-[15px]"
+            className="press flex h-11 w-11 items-center justify-center leading-none text-[15px]"
           >
             ✈
           </button>
@@ -1081,9 +1083,10 @@ export const PostInstagram = memo(function PostInstagram({
             onClick={() => aoSalvar(post, !post.salvo)}
             aria-label={post.salvo ? "Tirar dos salvos" : "Salvar"}
             aria-pressed={post.salvo}
-            className={`press leading-none ${
+            /* ⚠️ 44px: o marcador desenha 22×22 e o alvo media o desenho. */
+            className={`press flex h-11 w-11 items-center justify-center leading-none ${
               aoRepublicar && !post.souAAutora && post.visibilidade === "publico" && !post.ehRepost
-                ? "ml-2"
+                ? "ml-1"
                 : "ml-auto"
             }`}
           >
@@ -2513,7 +2516,7 @@ export function TelaDePerfil({
             type="button"
             onClick={aoVoltar}
             aria-label="Voltar"
-            className="press -ml-1 text-xl leading-none"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
           >
             ‹
           </button>
@@ -2539,7 +2542,10 @@ export function TelaDePerfil({
             type="button"
             onClick={() => setConfirmandoBloqueio((v) => !v)}
             aria-label="Opções deste perfil"
-            className="press px-1 text-lg leading-none text-muted-foreground"
+            /* ⚠️ 44px: media 26×18 — e é a porta ÚNICA de bloquear, silenciar,
+               restringir e denunciar. O alvo mais importante da tela era o
+               menor. */
+            className="press -mr-2 flex h-11 w-11 items-center justify-center text-lg leading-none text-muted-foreground"
           >
             ⋯
           </button>
@@ -6325,7 +6331,7 @@ export function ListaDeGente({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -6623,7 +6629,7 @@ export function TelaDoPost({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -7196,7 +7202,7 @@ export function TelaDeAtividade({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -7713,7 +7719,7 @@ export function NovoPost({
           type="button"
           onClick={aoFechar}
           aria-label="Fechar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -8100,7 +8106,7 @@ export function NovoPost({
               <button
                 type="button"
                 onClick={() => setOpcoes((os) => [...(os ?? []), ""])}
-                className="press mt-2 text-[13px] font-medium text-primary"
+                className="press mt-1 inline-flex min-h-[44px] items-center text-[13px] font-medium text-primary"
               >
                 + opção
               </button>
@@ -8558,7 +8564,7 @@ export function TelaDosSalvos({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -8641,7 +8647,7 @@ export function TelaDaTag({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -8694,7 +8700,7 @@ export function TelaDosArquivados({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -8799,7 +8805,7 @@ export function TelaDeBusca({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -8906,7 +8912,7 @@ export function EspelhoDoPerfil({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -9323,7 +9329,7 @@ export function TelaDaCaixinha({
             type="button"
             onClick={aoVoltar}
             aria-label="Voltar"
-            className="press -ml-1 text-xl leading-none"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
           >
             ‹
           </button>
@@ -9473,7 +9479,7 @@ export function TelaDaCaixinha({
                       type="button"
                       onClick={() => setMenu((m) => (m === p.id ? null : p.id))}
                       aria-label="Opções desta pergunta"
-                      className="press rounded-xl border border-border px-3 text-[15px] leading-none text-muted-foreground"
+                      className="press flex h-11 min-w-[44px] items-center justify-center rounded-xl border border-border px-3 text-[15px] leading-none text-muted-foreground"
                     >
                       ⋯
                     </button>
@@ -9568,7 +9574,7 @@ export function TelaDaCaixinha({
                   <button
                     type="button"
                     onClick={() => aoAbrirPost(p.postId!)}
-                    className="press mt-2 text-[13px] font-medium text-primary"
+                    className="press mt-1 inline-flex min-h-[44px] items-center text-[13px] font-medium text-primary"
                   >
                     Ver a publicação
                   </button>

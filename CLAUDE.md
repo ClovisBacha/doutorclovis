@@ -8238,3 +8238,36 @@ desliga.**
   nunca asserido: apagando a linha, as três asserções continuavam verdadeiras e o
   rascunho guardado era apagado ao abrir o compositor. Hoje a guarda inteira é
   cobrada por regex, com mutação verificada.
+
+#### ⚠️ Os alvos de toque: o ‹ media 8 PIXELS de largura
+
+A auditoria apontou três; medidos no navegador, eram piores e havia mais. Todos
+dentro da aba, com o rodapé e a navbar do site fora da conta (têm régua própria).
+
+| controle                  | media           | onde       |
+| ------------------------- | --------------- | ---------- |
+| **‹ Voltar**              | **8×20 / 8×28** | seis telas |
+| **Republicar**            | **13×15**       | feed       |
+| Salvar / Tirar dos salvos | 22×22           | feed, post |
+| **⋯ do perfil**           | **26×18**       | perfil     |
+| Ver quem reagiu           | 37×22           | feed       |
+| ⋯ da publicação           | 36×44           | feed       |
+| ⋯ da pergunta             | 41×33           | caixinha   |
+
+⚠️ **O ‹ é o controle mais usado da aba, e era o menor.** Sem caixa, o botão mede
+o GLIFO — e "‹" é um caractere estreito. O padrão certo já existia no mesmo
+arquivo (`flex h-11 w-11 items-center justify-center`); ele só não tinha sido
+aplicado nas telas que nasceram depois.
+
+⚠️ **E o ⋯ do perfil é a porta ÚNICA de bloquear, silenciar, restringir e
+denunciar** — os quatro controles de segurança da aba, atrás de um alvo de
+26×18.
+
+⚠️ **`-ml-2` COMPENSA o padding**, senão o desenho anda para dentro da tela: o
+alvo cresce, o glifo fica onde estava.
+
+**O que NÃO foi mexido, e por quê:** botões de largura total com 36–40px de
+altura (`Sim`/`Não`, `Seguindo`, `Publicar`) e nomes clicáveis inline. Os
+primeiros são a convenção do app inteiro — mudá-los é uma revisão de design, não
+um conserto; os segundos são links de texto dentro de um parágrafo, e esticá-los
+quebraria o cartão. Ficam registrados para o dono decidir.

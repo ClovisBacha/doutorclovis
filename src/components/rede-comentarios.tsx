@@ -478,7 +478,7 @@ function Linha({
           <button
             type="button"
             onClick={aoResponder}
-            className="press min-h-[32px] text-[12px] font-medium text-muted-foreground"
+            className="press min-h-[44px] pr-2 text-[12px] font-medium text-muted-foreground"
           >
             Responder
           </button>
@@ -501,7 +501,8 @@ function Linha({
         onClick={() => aoCurtir(c)}
         aria-label={c.euCurti ? "Tirar a curtida" : "Curtir comentário"}
         aria-pressed={!!c.euCurti}
-        className="press flex h-8 w-8 shrink-0 items-center justify-center"
+        /* ⚠️ 44px: o coração desenha 16px e o alvo media a caixa. */
+        className="press flex h-11 w-11 shrink-0 items-center justify-center"
       >
         <svg
           viewBox="0 0 24 24"
@@ -525,7 +526,7 @@ function Linha({
         <button
           type="button"
           onClick={() => aoApagar(c.id)}
-          className="press h-8 w-6 shrink-0 text-[12px] text-muted-foreground"
+          className="press h-11 w-8 shrink-0 text-[12px] text-muted-foreground"
           aria-label="Apagar comentário"
         >
           ×
@@ -534,7 +535,7 @@ function Linha({
         <button
           type="button"
           onClick={() => aoDenunciar(c.id)}
-          className="press h-8 w-6 shrink-0 text-[12px] text-muted-foreground"
+          className="press h-11 w-8 shrink-0 text-[12px] text-muted-foreground"
           aria-label="Denunciar comentário"
         >
           ⋯

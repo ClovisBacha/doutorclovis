@@ -216,7 +216,12 @@ export function CaixaDeEntrada({
   return (
     <div className="pb-24">
       <header className="flex h-11 items-center gap-3 px-4">
-        <button type="button" onClick={aoVoltar} className="press text-[15px]">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-[15px]"
+        >
           ←
         </button>
         <h1 className="text-[16px] font-semibold">
@@ -636,7 +641,12 @@ export function Conversa({
   return (
     <div className="flex h-[100dvh] flex-col">
       <header className="flex h-11 shrink-0 items-center gap-3 border-b border-border px-4">
-        <button type="button" onClick={aoVoltar} className="press text-[15px]">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-[15px]"
+        >
           ←
         </button>
         <button
@@ -655,7 +665,7 @@ export function Conversa({
           type="button"
           onClick={() => setMenu(true)}
           aria-label="Opções da conversa"
-          className="press ml-auto min-h-[44px] px-2 text-[18px] leading-none"
+          className="press ml-auto flex h-11 w-11 items-center justify-center text-[18px] leading-none"
         >
           ⋯
         </button>
@@ -723,7 +733,7 @@ export function Conversa({
                     <button
                       type="button"
                       onClick={() => m.refId && aoAbrirRef?.(m.refTipo!, m.refId)}
-                      className={`press mb-1 block w-full rounded-xl px-2.5 py-1.5 text-left text-[12px] ${
+                      className={`press mb-1 block min-h-[44px] w-full rounded-xl px-2.5 py-1.5 text-left text-[12px] ${
                         m.souEu ? "bg-white/15" : "bg-background/70"
                       }`}
                     >
