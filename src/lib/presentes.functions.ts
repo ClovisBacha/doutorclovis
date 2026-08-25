@@ -271,7 +271,19 @@ export const salvarItens = createServerFn({ method: "POST" })
         titulo: z.string().max(120).nullable().optional(),
         recado: z.string().max(500).nullable().optional(),
         dataDoCha: z.string().max(10).nullable().optional(),
-        itens: z.array(ItemSchema).max(80),
+        /**
+         * ⚠️ **OPCIONAL, e isso é o que separa os dois assuntos.**
+         *
+         * `salvarItens` grava o CONVITE (título, recado, data) e a LISTA. Com
+         * `itens` obrigatório, salvar só o convite obrigaria a tela a
+         * reenviar a lista inteira — e uma diferença de forma entre o que ela
+         * mandou e o que o banco tem apagaria itens que ninguém pediu para
+         * apagar.
+         *
+         * Ausente = "não mexi na lista". Presente (mesmo vazio) = "esta é a
+         * lista agora", que é como a tela de montar sempre a usou.
+         */
+        itens: z.array(ItemSchema).max(80).optional(),
       })
       .parse(i),
   )
@@ -301,7 +313,10 @@ export const salvarItens = createServerFn({ method: "POST" })
       if (error) return { ok: false as const, motivo: "banco" as const };
     }
 
-    for (const it of data.itens) {
+    /* ⚠️ Sem `itens`, o pedido era só do convite — a lista não é tocada. */
+    if (data.itens === undefined) return { ok: true as const };
+
+    for (const it of data.itens ?? []) {
       const linha = {
         lista_id: lista.id,
         tipo: it.tipo,

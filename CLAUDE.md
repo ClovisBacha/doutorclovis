@@ -8198,3 +8198,43 @@ nasceu.
 hidratação se perde em silêncio.** A primeira verificação deste botão registrou
 "nenhum alerta" e o botão estava certo — faltava esperar o `waitForSelector`
 mais ~1,2 s.
+
+#### O chá de bebê ganhou o convite, e dois testes pararam de mentir
+
+**⚠️ TÍTULO, RECADO E DATA DA LISTA EXISTIAM E NÃO TINHAM PORTA.** `salvarItens`
+aceitava os três, o handler os gravava, `minhaLista` os devolvia — e o único
+chamador mandava só `itens`. A lista abria com o texto padrão para todo mundo, e
+a página que a amiga recebe é justamente onde essas três informações fazem o
+convite parecer um convite.
+
+⚠️ **`itens` virou OPCIONAL no servidor**, e isso separa os dois assuntos:
+ausente = "não mexi na lista". Com ele obrigatório, salvar o convite obrigaria a
+tela a reenviar a lista inteira, e qualquer diferença de forma apagaria itens que
+ninguém pediu para apagar.
+
+⚠️ **E `type="date"`**, nunca texto — a coluna é `date`, e campo livre de data já
+custou três horas nesta base (`confirmed_time` aceitando "manhã").
+
+**⚠️ E EU REINTRODUZI A ARMADILHA DO ARTIGO, na mesma rodada em que reli a
+regra.** O exemplo do campo saiu como **"Chá de bebê do Helena"** — medido no
+navegador. Escolhi "o"/"a" pela PRIMEIRA LETRA, e inicial não é sinal de gênero
+em português; `baby_name` não carrega gênero nenhum.
+
+É a **terceira** aparição: o bolão ("Quando o Helena nasce?"), o agradecimento do
+chá, e agora o título da lista. `artigo-do-nome.test.ts` é a catraca — e ela
+precisou de duas voltas, porque o primeiro padrão casava `` `dc-path-day-d${D}` ``
+da trilha. **Catraca que reprova código correto é catraca que a próxima pessoa
+desliga.**
+
+**Dois testes que mentiam:**
+
+- ⚠️ **"não existe comentário em lugar nenhum"** — o nome afirmava isso e o
+  escopo era UM arquivo. Os comentários entraram no produto por decisão do dono,
+  com régua clínica própria; o teste seguia verde por acidente da separação de
+  módulos. Um teste verde afirmando o contrário do produto é pior que nenhum.
+  Virou a afirmação verdadeira ("este arquivo não conhece comentário") mais a
+  contraprova.
+- ⚠️ **O `return` da primeira pintura do rascunho** era prometido no comentário e
+  nunca asserido: apagando a linha, as três asserções continuavam verdadeiras e o
+  rascunho guardado era apagado ao abrir o compositor. Hoje a guarda inteira é
+  cobrada por regex, com mutação verificada.

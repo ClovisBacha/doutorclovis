@@ -148,11 +148,26 @@ describe("o rascunho do compositor", () => {
     const efeito = FONTE.slice(i, FONTE.indexOf("}, [texto, vis, opcoes", i));
     expect(efeito).toContain("if (primeiraPintura.current)");
     expect(efeito).toContain("primeiraPintura.current = false");
-    /* E o `return` vem ANTES do `setTimeout`, senão o adiamento continua
-       agendado e o rascunho é apagado do mesmo jeito. */
-    expect(efeito.indexOf("primeiraPintura.current = false")).toBeLessThan(
-      efeito.indexOf("setTimeout"),
-    );
+    /**
+     * ⚠️ **O `return` PRECISA SER ASSERIDO, e não só descrito no comentário.**
+     *
+     * A versão anterior media a ORDEM (`= false` antes do `setTimeout`) e
+     * prometia o `return` na prosa. Apagando a linha `return;`, as três
+     * asserções continuavam verdadeiras — a atribuição segue antes do
+     * `setTimeout` — e a suíte ficava verde com o efeito agendando a gravação
+     * na PRIMEIRA passada: o rascunho guardado era apagado ao abrir o
+     * compositor, e a faixa "você tinha um rascunho" continuava na tela porque
+     * o texto já estava em memória. Quem tocasse em "Recuperar" na hora não via
+     * nada de errado; quem voltasse depois perdia o texto para sempre.
+     *
+     * Cobra-se a guarda INTEIRA: o `if`, a marcação e a saída, nessa ordem, sem
+     * nada entre eles.
+     */
+    const guarda =
+      /if \(primeiraPintura\.current\)\s*\{\s*primeiraPintura\.current = false;\s*return;\s*\}/;
+    expect({ temGuardaCompleta: guarda.test(efeito) }).toEqual({ temGuardaCompleta: true });
+    /* E ela vem ANTES do adiamento. */
+    expect(efeito.search(guarda)).toBeLessThan(efeito.indexOf("setTimeout"));
   });
 });
 

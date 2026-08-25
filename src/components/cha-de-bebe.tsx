@@ -56,6 +56,13 @@ export function ChaDeBebe({
   const [dados, setDados] = useState<BancadaDoCha | null>(bancada ?? null);
   const [carregando, setCarregando] = useState(!bancada);
   const [novoTitulo, setNovoTitulo] = useState("");
+  /* ⚠️ **`titulo` É DA LISTA; `novoTitulo` é do ITEM.** Os dois existiam com
+     nomes parecidos e só um tinha tela — foi assim que os três campos do
+     convite passaram despercebidos. */
+  const [titulo, setTitulo] = useState(bancada?.lista?.titulo ?? "");
+  const [recado, setRecado] = useState(bancada?.lista?.recado ?? "");
+  const [dataDoCha, setDataDoCha] = useState(bancada?.lista?.dataDoCha ?? "");
+  const [salvandoConvite, setSalvandoConvite] = useState(false);
   /* ⚠️ **AS COTAS NÃO TINHAM COMO NASCER.** O servidor aceita `tipo: "cota"`,
      a régua está inteira e testada (`cotas.ts`, com o caso do R$ 1.200 ÷ 7), e
      a página pública desenha a reserva de cota — mas o único lugar do `src/`
@@ -94,7 +101,16 @@ export function ChaDeBebe({
         const { minhaLista } = await import("@/lib/presentes.functions");
         const r = await minhaLista({ data: { accessToken: token } });
         if (!vivo) return;
-        if (r.ok) setDados({ lista: r.lista, guardados: r.guardados });
+        if (r.ok) {
+          setDados({ lista: r.lista, guardados: r.guardados });
+          /* ⚠️ **OS CAMPOS SÃO SEMEADOS AQUI, e não no `useState`.** O
+             inicializador roda uma vez, ANTES de a lista chegar — sem esta
+             linha, os três abririam vazios sobre um convite já escrito, e o
+             primeiro salvamento apagaria o que ela tinha. */
+          setTitulo(r.lista.titulo ?? "");
+          setRecado(r.lista.recado ?? "");
+          setDataDoCha(r.lista.dataDoCha ?? "");
+        }
       } catch {
         /* Sem lista a tela mostra o vazio, não um erro: ela não pediu isto
            agora, veio ver o que já tem. */
@@ -304,6 +320,78 @@ export function ChaDeBebe({
     }
   }
 
+  /**
+   * O convite mudou em relação ao que está guardado?
+   *
+   * ⚠️ **É o que impede o botão de prometer trabalho que não existe.** Sem a
+   * comparação, "Salvar convite" fica aceso para sempre — e um botão que
+   * sempre pode ser tocado ensina que tocar nele não significa nada.
+   */
+  const mudouConvite =
+    !!dados &&
+    (titulo.trim() !== (dados.lista.titulo ?? "") ||
+      recado.trim() !== (dados.lista.recado ?? "") ||
+      dataDoCha !== (dados.lista.dataDoCha ?? ""));
+
+  /**
+   * O nome do bebê no exemplo do campo.
+   *
+   * ⚠️ **SEM ARTIGO, e eu reintroduzi essa armadilha nesta mesma rodada.**
+   * Escrevi o artigo saindo da PRIMEIRA LETRA e o resultado medido foi
+   * "Chá de bebê **do** Helena": inicial não é sinal de gênero em português, e
+   * `baby_name` não carrega gênero nenhum. É o mesmo defeito que o bolão teve
+   * ("Quando o Helena nasce?") e que o agradecimento do chá já documenta —
+   * aparecendo pela terceira vez, num arquivo diferente.
+   *
+   * O travessão resolve sem adivinhar nada.
+   */
+  const nomeDoBebe = dados?.lista.bebeNome ?? null;
+  const placeholderDoTitulo = nomeDoBebe ? `Chá de bebê — ${nomeDoBebe}` : "Chá de bebê";
+
+  async function salvarConvite() {
+    if (!dados || salvandoConvite || !mudouConvite) return;
+    setSalvandoConvite(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { salvarItens, minhaLista } = await import("@/lib/presentes.functions");
+      /**
+       * ⚠️ **SEM `itens` — e é o servidor que separa os dois assuntos.**
+       *
+       * `salvarItens` grava o convite E a lista. Reenviar a lista aqui pediria
+       * que a tela remontasse a forma exata que o schema espera, e qualquer
+       * diferença apagaria itens que ninguém pediu para apagar. O campo virou
+       * opcional: ausente quer dizer "não mexi na lista".
+       *
+       * ⚠️ **E vazio vira `null`, nunca `""`.** A coluna é `text` nullable, e a
+       * página pública decide o texto padrão pelo `null`: com string vazia, o
+       * convite abriria com um título em branco em vez do padrão.
+       */
+      const r = await salvarItens({
+        data: {
+          accessToken: token,
+          titulo: titulo.trim() || null,
+          recado: recado.trim() || null,
+          dataDoCha: dataDoCha || null,
+        },
+      });
+      if (!r.ok) {
+        toast.error("Não deu para salvar o convite.");
+        return;
+      }
+      /* Relê do servidor: é ele que decide o que ficou guardado, e pintar o que
+         eu mandei deixaria a tela certa e o banco diferente. */
+      const novo = await minhaLista({ data: { accessToken: token } });
+      if (novo.ok) setDados({ lista: novo.lista, guardados: novo.guardados });
+      toast.success("Convite salvo 💛");
+    } catch {
+      toast.error("Não deu para salvar o convite.");
+    } finally {
+      setSalvandoConvite(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <header>
@@ -312,6 +400,59 @@ export function ChaDeBebe({
           Monte a lista, mande o link. Quem quiser dar escolhe o que ainda cabe.
         </p>
       </header>
+
+      {/* ─── O CONVITE: TÍTULO, RECADO E DATA ──────────────────────────────
+          ⚠️ **AS TRÊS COLUNAS EXISTIAM E NÃO TINHAM PORTA NENHUMA.**
+          `salvarItens` aceita `titulo`, `recado` e `dataDoCha`, o handler as
+          grava e `minhaLista` as devolve — e o único chamador mandava só
+          `itens`. A lista abria com o texto padrão para todo mundo, e a
+          página que a amiga recebe é justamente onde essas três informações
+          fazem o convite parecer um convite.
+
+          ⚠️ **`type="date"`, e não texto.** Data em campo livre já custou três
+          horas nesta base (`confirmed_time` aceitando "manhã"), e aqui ela vai
+          para uma coluna `date`. */}
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          O convite
+        </p>
+        <input
+          value={titulo}
+          onChange={(e) => setTitulo(e.target.value.slice(0, 120))}
+          /* ⚠️ **O NOME DO BEBÊ VAI SEM ARTIGO CRAVADO** — "d{a|o}" sai da
+              primeira letra, senão "A Miguel". É a mesma armadilha que o bolão
+              teve e que o agradecimento do chá já documenta. */
+          placeholder={placeholderDoTitulo}
+          aria-label="Título da lista"
+          className="mt-2 min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-sm"
+        />
+        <textarea
+          value={recado}
+          onChange={(e) => setRecado(e.target.value.slice(0, 500))}
+          rows={2}
+          placeholder="Um recado para quem abrir (opcional)"
+          aria-label="Recado da lista"
+          className="mt-2 w-full resize-none rounded-2xl border border-border bg-background px-3 py-2 text-sm"
+        />
+        <label className="mt-2 flex items-center gap-2 text-sm">
+          <span className="shrink-0 text-muted-foreground">Data do chá</span>
+          <input
+            type="date"
+            value={dataDoCha}
+            onChange={(e) => setDataDoCha(e.target.value)}
+            aria-label="Data do chá"
+            className="min-h-[44px] flex-1 rounded-2xl border border-border bg-background px-3 text-sm"
+          />
+        </label>
+        <button
+          type="button"
+          disabled={salvandoConvite || !mudouConvite}
+          onClick={() => void salvarConvite()}
+          className="press mt-2 min-h-[44px] w-full rounded-2xl bg-primary px-3 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {salvandoConvite ? "Salvando…" : mudouConvite ? "Salvar convite" : "Convite salvo"}
+        </button>
+      </section>
 
       {/* ─── O LINK ────────────────────────────────────────────────────── */}
       <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">

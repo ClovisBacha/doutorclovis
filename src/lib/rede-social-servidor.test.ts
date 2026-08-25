@@ -524,11 +524,36 @@ describe("higiene", () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
   });
 
-  test("⚠️ e não existe comentário em lugar nenhum", () => {
-    // Decisão do dono sobre a pesquisa: 20,9% das respostas com conselho em
-    // fóruns de gestação estavam erradas, e o grupo não se autocorrige.
+  /**
+   * ⚠️ **ESTE TESTE AFIRMAVA UMA MENTIRA, e estava VERDE.**
+   *
+   * O nome dizia "não existe comentário em lugar nenhum" e o escopo era UM
+   * arquivo — `rede-social.functions.ts`. Os comentários entraram no produto por
+   * decisão do dono, com régua clínica própria: existem `comentarios.ts`,
+   * `comentarios.functions.ts`, `rede-comentarios.tsx` e a tabela
+   * `rede_comentarios`. O teste continuava verde por ACIDENTE da separação de
+   * módulos — as ocorrências de "coment" no arquivo medido são todas PROSA, e
+   * `semComentarios` as remove antes da busca.
+   *
+   * Um teste verde afirmando o contrário do produto é pior que nenhum: a
+   * próxima pessoa a ler a suíte conclui que a decisão ainda vale.
+   *
+   * O que sobrou é a afirmação VERDADEIRA e que importa: **este arquivo não
+   * conhece comentário**. A régua e as escritas moram em `comentarios.*`, e
+   * misturá-las aqui recriaria a segunda cópia que o projeto proíbe.
+   */
+  test("⚠️ este arquivo não conhece comentário — eles moram em `comentarios.*`", () => {
     expect(CODIGO).not.toContain("rede_comentarios");
-    expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
+  });
+
+  test("⚠️ e o produto TEM comentários, com régua própria", () => {
+    /* A contraprova, para o teste de cima nunca voltar a ser lido como "a aba
+       não tem comentário". A pesquisa que os barrou por meses (20,9% das
+       respostas com conselho erradas, 5,5% danosas) segue verdadeira — o que
+       mudou é que eles entraram COM triagem, e não sem. */
+    const regua = readFileSync("src/lib/comentarios.ts", "utf8");
+    expect(regua).toContain("triarComentario");
+    expect(readFileSync("src/lib/comentarios.functions.ts", "utf8")).toContain("rede_comentarios");
   });
 
   test("⚠️ cada DELETE do arquivo é deliberado, e eles são onze", () => {
