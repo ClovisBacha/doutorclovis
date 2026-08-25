@@ -8131,3 +8131,34 @@ O padrão é sempre o mesmo: a asserção descreve **como** o código está escr
 vez de **o que** ele garante, e então qualquer melhoria a quebra. Hoje ele cobra
 a intenção — existe um piso mínimo com as fotos, o carimbo não está nele, e o
 recuo cita as quatro origens de coluna.
+
+#### Mais três: a bio sem régua, o `memo` que nunca acertava, e o lint
+
+**⚠️ A BIO ERA O ÚNICO TEXTO LIVRE SEM A RÉGUA CLÍNICA — e é o que vai mais
+longe.** Post, story, comentário, caixinha e opção de enquete passam por
+`triarTexto`. A bio não passava por nada, e ela aparece na vitrine
+`/p/<codigo>`, que abre **na internet aberta, sem conta nenhuma**.
+
+Medido: `triarTexto("Sangrei na 12s e não fui no PS, passou sozinho 💛")` devolve
+`clinica`. A mesma frase que `publicarPost` RECUSA, a bio gravava — e a publicava
+fora do app, com o nome do consultório em volta.
+
+⚠️ **RECUSA, e não "manda e avisa"**: é a decisão do comentário público, não a da
+mensagem privada — a bio é vitrine permanente, lida por quem nunca conversou com
+ela. ⚠️ **Só quando a bio MUDA**, senão trocar a FOTO ficaria impossível para
+quem escreveu algo antes desta trava existir. ⚠️ **E as duas telas mostram o
+recado**: um `false` mudo faz o botão de salvar não fazer nada.
+
+**⚠️ O `memo` DO FEED NUNCA ACERTAVA, e é a lentidão que o dono relatou.**
+`republicar`, `compartilhar` e `verStory` são declarações de função no corpo de
+`RedeNoApp` — identidade nova a cada pintura — e eram passadas a `TelaPrincipal`
+FORA do objeto estável. `PostInstagram` e `FileiraDeStories` são `memo` sem
+comparador: uma prop com identidade nova basta para a comparação rasa falhar, e
+ela falhava em TODO cartão, a cada render. As três entraram em `acoes`.
+**Medido depois: 24 ms para responder ao toque, com a CPU estrangulada em 6×.**
+
+⚠️ **E EU QUEBREI O LINT NO COMMIT ANTERIOR** (`prefer-const` num `let` que o
+recuo não reatribuía). A primeira correção foi pior que o defeito: eu troquei o
+`let` por um objeto falso que deixava `erroMsgs` sempre nulo — **o recuo nunca
+dispararia.** Um lint verde sobre lógica quebrada é o pior desfecho possível.
+Hoje é `const comCorpo = await …` e um ternário.

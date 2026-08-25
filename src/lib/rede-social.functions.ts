@@ -1666,6 +1666,44 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       }
     }
 
+    /**
+     * ⚠️ **A BIO É O ÚNICO TEXTO LIVRE QUE SAÍA SEM A RÉGUA CLÍNICA — e é o que
+     * vai mais longe.**
+     *
+     * O post passa por `triarTexto`, o story passa, o comentário passa, a
+     * caixinha passa, a opção da enquete passa. A bio não passava por nada — e
+     * ela aparece na VITRINE `/p/<codigo>`, que abre na internet aberta, sem
+     * conta nenhuma.
+     *
+     * Medido: `triarTexto("Sangrei na 12s e não fui no PS, passou sozinho 💛")`
+     * devolve `clinica`. A mesma frase que `publicarPost` RECUSA, a bio gravava
+     * — e a publicava fora do app, com o nome do consultório em volta.
+     *
+     * ⚠️ **RECUSA, e não "manda e avisa".** É a decisão do comentário público,
+     * não a da mensagem privada: a bio é uma vitrine permanente, lida por quem
+     * nunca conversou com ela. E o recado da régua diz o que fazer.
+     *
+     * ⚠️ **Só quando a bio MUDA.** Rodar a régua sobre uma bio que ela não
+     * tocou faria salvar a FOTO ficar impossível para quem escreveu algo antes
+     * desta trava existir — e ela não teria como saber por quê.
+     */
+    if (data.bio !== undefined && (data.bio ?? "").trim()) {
+      const { triarTexto } = await import("./pergunta-clinica");
+      const desfecho = triarTexto(data.bio ?? "");
+      if (desfecho !== "publicavel") {
+        return {
+          ok: false as const,
+          motivo: "bio_clinica" as const,
+          /* ⚠️ O recado DIZ O QUE FAZER, e distingue os dois casos. "Não deu
+             para salvar" faria ela tentar de novo com o mesmo texto. */
+          recado:
+            desfecho === "emergencia"
+              ? "Isso precisa de atendimento, não de uma descrição de perfil. Use o botão de emergência."
+              : "Sua descrição fala de sintoma ou de conduta. Ela vira uma página pública — isso é conversa para o seu médico.",
+        };
+      }
+    }
+
     /* O que existe em qualquer banco. */
     const antigas = {
       ...(data.publico !== undefined ? { perfil_publico: data.publico } : {}),

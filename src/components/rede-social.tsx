@@ -412,7 +412,10 @@ export function ConfiguracoesDoPerfil({
       const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
       const r = await salvarPerfilSocial({ data: { accessToken: token, ...mudanca } });
       if (!r.ok) {
-        toast.error("Não deu para salvar.");
+        /* ⚠️ **O RECADO DA RÉGUA VENCE O GENÉRICO.** "Não deu para salvar"
+           sobre uma bio recusada por conteúdo clínico faria ela tentar de novo
+           com o mesmo texto, indefinidamente — e concluir que o app quebrou. */
+        toast.error(("recado" in r && r.recado) || "Não deu para salvar.");
         return;
       }
       /* ⚠️ **`parcial` existe e ninguém lia.** Quando o banco ainda não tem a

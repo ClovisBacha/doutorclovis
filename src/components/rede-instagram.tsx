@@ -3298,6 +3298,9 @@ export function RedeNoApp({
     abrirArroba: (_handle: string) => {},
     abrirTag: (_tag: string) => {},
     mandarParaConversa: (_p: PostNaTela) => {},
+    republicar: (_p: PostNaTela) => {},
+    compartilhar: (_p: PostNaTela) => {},
+    tocarStory: (_autorId: string) => {},
     ver: (_id: string) => {},
   });
   /* ─── O LOTE DE "VISTOS" ─────────────────────────────────────────────────
@@ -3356,6 +3359,9 @@ export function RedeNoApp({
     abrirArroba: (h) => void abrirPorArroba(h),
     abrirTag: (t) => void abrirTag(t),
     mandarParaConversa: (p) => setMandandoPost(p.id),
+    republicar: (p) => republicar(p),
+    compartilhar: (p) => void compartilhar(p),
+    tocarStory: (id) => void verStory(id),
     ver: (id) => marcarPostVisto(id),
   };
   useEffect(() => {
@@ -3395,6 +3401,22 @@ export function RedeNoApp({
       abrirArroba: (h: string) => ultimas.current.abrirArroba(h),
       abrirTag: (t: string) => ultimas.current.abrirTag(t),
       mandarParaConversa: (p: PostNaTela) => ultimas.current.mandarParaConversa(p),
+      /**
+       * ⚠️ **AS TRÊS ÚLTIMAS ENTRARAM AQUI PORQUE O `memo` NUNCA ACERTAVA.**
+       *
+       * `republicar`, `compartilhar` e `verStory` são declarações de função no
+       * corpo de `RedeNoApp` — identidade NOVA a cada pintura — e eram passadas
+       * a `TelaPrincipal` fora deste objeto. `PostInstagram` e
+       * `FileiraDeStories` são `memo` sem comparador próprio: uma prop com
+       * identidade nova basta para a comparação rasa falhar, e ela falhava em
+       * TODO cartão do feed, a cada render.
+       *
+       * É o mesmo defeito que já custou 232 ms por reação nesta lista e que o
+       * dono relatou como "bugado e lerdo".
+       */
+      republicar: (p: PostNaTela) => ultimas.current.republicar(p),
+      compartilhar: (p: PostNaTela) => ultimas.current.compartilhar(p),
+      tocarStory: (autorId: string) => ultimas.current.tocarStory(autorId),
       ver: (id: string) => ultimas.current.ver(id),
     }),
     [],
@@ -4738,7 +4760,16 @@ export function RedeNoApp({
       if (!t) return false;
       const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
       const r = await salvarPerfilSocial({ data: { accessToken: t, ...m } });
-      if (!r.ok) return false;
+      if (!r.ok) {
+        /* ⚠️ **A RECUSA DA BIO PRECISA SER DITA.** Devolver `false` mudo faz o
+           botão de salvar não fazer nada — e ela não tem como adivinhar que a
+           descrição foi recusada por falar de sintoma. */
+        if ("recado" in r && r.recado) {
+          const { toast } = await import("sonner");
+          toast.error(r.recado);
+        }
+        return false;
+      }
       /* Recarrega do servidor em vez de aplicar o que eu mandei: a foto volta
          como URL ASSINADA do balde, e não como a data URL que subiu — pintar a
          data URL aqui deixaria a tela certa e o banco diferente. */
@@ -5634,8 +5665,8 @@ export function RedeNoApp({
            chamador não as passava. Quem chega ao post pelo perfil — o caminho
            mais comum depois do feed — não tinha republicar, compartilhar nem
            mandar para uma conversa, e nada na tela explicava a diferença. */
-        aoRepublicar={republicar}
-        aoCompartilhar={(p) => void compartilhar(p)}
+        aoRepublicar={acoes.republicar}
+        aoCompartilhar={acoes.compartilhar}
         aoMandarParaConversa={acoes.mandarParaConversa}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -5738,8 +5769,8 @@ export function RedeNoApp({
       <TelaPrincipal
         posts={posts}
         soSeguindo={soSeguindo}
-        aoRepublicar={republicar}
-        aoCompartilhar={(p) => void compartilhar(p)}
+        aoRepublicar={acoes.republicar}
+        aoCompartilhar={acoes.compartilhar}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -5777,7 +5808,7 @@ export function RedeNoApp({
         sugestoes={sugestoes}
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
-        aoTocarStory={verStory}
+        aoTocarStory={acoes.tocarStory}
         convite={{ codigo: meuCodigo }}
         lembreteEntao={lembreteEntao}
         aoCompararAgora={() => {
