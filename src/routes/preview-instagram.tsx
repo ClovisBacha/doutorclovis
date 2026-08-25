@@ -853,12 +853,19 @@ function Bancada() {
     /**
      * ⚠️ SEM ISTO OS COMENTÁRIOS SÃO IMPOSSÍVEIS DE OLHAR: a lista vem do
      * servidor e exige sessão MAIS um post com comentários de outras contas.
-     * `?fechados=1` mostra o estado que a dona liga.
+     * `?conversa=fechados` mostra o estado que a dona liga — e nele "Responder"
+     * NÃO existe em linha nenhuma, que é o estado que o botão tinha de ganhar.
      */
     /* ⚠️ **A CONVERSA, O CORAÇÃO E A MARCA DE OCULTO PRECISAM ESTAR AQUI.**
        Os três só existem numa conta de verdade — com três pessoas escrevendo,
        alguém curtindo e uma restrição ativa. Sem a bancada, o estado que a
-       tela passaria meses sem ninguém olhar é justamente o novo. */
+       tela passaria meses sem ninguém olhar é justamente o novo.
+
+       ⚠️ E as duas ocultas vêm com `recolhido: true`, que é o que o servidor
+       manda: sem ele a bancada desenharia o texto à mostra com uma etiqueta
+       embaixo — o estado ANTIGO, que o filtro foi consertado para não ter.
+       Bancada que aprova o que o servidor não produz é pior que bancada
+       nenhuma. */
     const meus = [
       {
         id: "k1",
@@ -946,6 +953,7 @@ function Bancada() {
         curtidas: 0,
         euCurti: false,
         oculto: "restrito" as const,
+        recolhido: true,
       },
       {
         id: "k4",
@@ -959,6 +967,7 @@ function Bancada() {
         curtidas: 0,
         euCurti: false,
         oculto: "palavra" as const,
+        recolhido: true,
       },
     ];
     return (

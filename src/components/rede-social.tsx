@@ -38,7 +38,7 @@ import {
   recusaDoHandle,
   type QuemMenciona,
 } from "@/lib/mencoes";
-import { PALAVRA_OCULTA_MAX } from "@/lib/comentarios";
+import { PALAVRA_OCULTA_MAX, limparPalavrasOcultas } from "@/lib/comentarios";
 import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
 import { LIMITE_DA_BIO } from "@/lib/rede-social";
@@ -753,8 +753,15 @@ export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
     };
   }, [bancada, aberto]);
 
-  async function guardar(nova: string[]) {
+  async function guardar(bruta: string[]) {
     const antes = palavras;
+    /* ⚠️ **A PINTURA OTIMISTA PASSA PELA MESMA RÉGUA DO SERVIDOR.** Ela pintava
+       a lista CRUA: quem digitasse uma palavra repetida a via entrar e sumir
+       meio segundo depois, e quem colasse setenta via as setenta aparecerem e
+       o servidor devolver sessenta. A régua é `limparPalavrasOcultas`, a mesma
+       que o servidor roda — importada, nunca reescrita aqui, senão as duas
+       divergiriam e a tela passaria a discordar do banco. */
+    const nova = limparPalavrasOcultas(bruta);
     setPalavras(nova);
     setSalvando(true);
     try {

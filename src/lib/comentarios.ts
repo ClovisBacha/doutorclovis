@@ -314,29 +314,43 @@ export function verDoComentario(v: {
   donaRestringeOAutor: boolean;
   /** O texto bate com alguma palavra que EU escondi? */
   batePalavraMinha: boolean;
-}): { mostra: boolean; marca: "restrito" | "palavra" | null } {
+}): {
+  /** Aparece na conversa, com o texto à mostra. */
+  mostra: boolean;
+  marca: "restrito" | "palavra" | null;
+  /** Aparece RECOLHIDO, e ela pode abrir se quiser. Só para a dona do post. */
+  revelavel: boolean;
+} {
   /* 1. É meu: vejo sempre, sem marca. É o silêncio que sustenta o recurso. */
-  if (v.euId === v.autorDoComentario) return { mostra: true, marca: null };
+  if (v.euId === v.autorDoComentario) return { mostra: true, marca: null, revelavel: false };
 
-  /* 2. A minha palavra escondida vence tudo o mais — inclusive o meu próprio
-     post. Se eu escondi "perdi", eu não quero ler "perdi" em lugar nenhum. */
+  /* ⚠️ **A DONA NÃO LÊ O QUE ELA MANDOU ESCONDER — ela decide se quer ler.**
+     A primeira versão devolvia `mostra: true` com uma etiqueta embaixo, e isso
+     contradizia a própria razão do recurso, escrita duas linhas acima: se ela
+     escondeu "perdi", o app não pode entregar "perdi" com um aviso de que
+     aquilo devia estar escondido. Entregar o texto e avisar depois é o pior
+     desfecho possível de um filtro — ela já leu.
+
+     E vale igual para a restrição: quem restringe uma pessoa não quer o texto
+     dela na frente, quer poder conferir. Recolhido é `mostra: false` com
+     `revelavel: true`; a tela abre no toque. Para terceiros nada disso existe —
+     nem a linha recolhida —, e é esse silêncio que separa restringir de
+     bloquear. */
   if (v.batePalavraMinha) {
     return v.euId === v.donaDoPost
-      ? { mostra: true, marca: "palavra" }
-      : { mostra: false, marca: null };
+      ? { mostra: false, marca: "palavra", revelavel: true }
+      : { mostra: false, marca: null, revelavel: false };
   }
 
-  /* 3. A restrição da DONA do post é o que esconde de terceiros. Ela vê
-     marcado; todo o resto não vê. */
   if (v.donaRestringeOAutor) {
     return v.euId === v.donaDoPost
-      ? { mostra: true, marca: "restrito" }
-      : { mostra: false, marca: null };
+      ? { mostra: false, marca: "restrito", revelavel: true }
+      : { mostra: false, marca: null, revelavel: false };
   }
 
-  /* 4. E a MINHA restrição esconde de mim, mesmo no post de outra pessoa —
+  /* E a MINHA restrição esconde de mim, mesmo no post de outra pessoa —
      restringir é sobre não ler aquela pessoa, não só sobre o meu post. */
-  if (v.restringiOAutor) return { mostra: false, marca: null };
+  if (v.restringiOAutor) return { mostra: false, marca: null, revelavel: false };
 
-  return { mostra: true, marca: null };
+  return { mostra: true, marca: null, revelavel: false };
 }

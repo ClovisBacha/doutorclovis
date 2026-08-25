@@ -242,34 +242,51 @@ export async function avisarMencionadas(
 
     const { podeVerPost } = await import("./rede-social");
 
-    for (const p of gente as any[]) {
-      if (p.id === opts.quemId) continue;
-      /* ⚠️ Bloqueio dos dois lados barra a menção — quem foi bloqueada não pode
-         chamar a outra pelo nome num post público. */
-      if (ctx.bloqueio.has(p.id)) continue;
-      /* ⚠️ Modo Cuidado: nenhum aviso. Ela saiu da rede sem anunciar. */
-      if (p.care_mode) continue;
+    /* ⚠️ **EM LOTE, e este laço era SEQUENCIAL.** Eram até dez menções × duas
+       viagens cada (o "ela me segue?" e o contexto dela), uma esperando a
+       outra: vinte idas ao banco em série pendurando a resposta de PUBLICAR.
+       O aviso é acessório; a publicação é o que ela está esperando na tela.
 
-      const { data: segue } = await sb
-        .from("rede_seguidores")
-        .select("id")
-        .eq("seguidor_id", p.id)
-        .eq("seguido_id", opts.quemId)
-        .eq("estado", "ativo")
-        .maybeSingle();
+       A ordem da régua não mudou — os portões baratos (eu mesma, bloqueio,
+       Modo Cuidado) recortam ANTES de qualquer viagem, e só quem sobra custa
+       consulta. */
+    const candidatas = (gente as any[]).filter(
+      (p) => p.id !== opts.quemId && !ctx.bloqueio.has(p.id) && !p.care_mode,
+    );
+    if (candidatas.length === 0) return;
 
-      if (
-        !podeMencionar({
-          config: (p.quem_pode_mencionar ?? "todos") as QuemMenciona,
-          mencionadaSegueQuemMenciona: !!segue,
-        })
-      ) {
-        continue;
-      }
+    /* Uma consulta só para "quem, dentre elas, me segue" — antes era uma por
+       pessoa. ⚠️ Falha de leitura vira conjunto VAZIO, e isso é fechar: sem
+       saber quem me segue, quem escolheu "só quem eu sigo" não recebe aviso. */
+    const { data: laços } = await sb
+      .from("rede_seguidores")
+      .select("seguidor_id")
+      .in(
+        "seguidor_id",
+        candidatas.map((p) => p.id),
+      )
+      .eq("seguido_id", opts.quemId)
+      .eq("estado", "ativo");
+    const meSegue = new Set<string>(((laços ?? []) as any[]).map((l) => l.seguidor_id));
 
-      /* ⚠️ O contexto é DELA — ver o bloco acima. */
-      if (post) {
-        const ctxDela = await contextoDe(sb, p.id);
+    const permitidas = candidatas.filter((p) =>
+      podeMencionar({
+        config: (p.quem_pode_mencionar ?? "todos") as QuemMenciona,
+        mencionadaSegueQuemMenciona: meSegue.has(p.id),
+      }),
+    );
+    if (permitidas.length === 0) return;
+
+    /* ⚠️ O contexto é DELA — ver o bloco acima. Em PARALELO: são contextos
+       independentes, e um `await` dentro do laço somava as latências. */
+    const contextos = post
+      ? await Promise.all(permitidas.map((p) => contextoDe(sb, p.id)))
+      : permitidas.map(() => null);
+
+    for (let k = 0; k < permitidas.length; k++) {
+      const p = permitidas[k];
+      const ctxDela = contextos[k];
+      if (post && ctxDela) {
         const podeVer = podeVerPost({
           post: { autorId: post.autorId, visibilidade: post.visibilidade as any },
           euId: p.id,

@@ -5009,6 +5009,11 @@ export const minhaAtividade = createServerFn({ method: "POST" })
         ps = ((ps ?? []) as any[]).filter((x) => {
           if (x.arquivado_em) return false;
           const autor = autoresDosPosts.get(x.autor_id);
+          /* ⚠️ **FALHA FECHADA: sem o perfil da autora, não monta.** Com `autor`
+             indefinido, `!!autor?.care_mode` é `false` — "não está em luto" —, e
+             uma falha de leitura passaria a AUTORIZAR a capa de quem entrou em
+             Modo Cuidado. É o mesmo `a?.` que o quadro do repost tinha. */
+          if (!autor) return false;
           return podeVerPost({
             post: { autorId: x.autor_id, visibilidade: x.visibilidade },
             euId: eu,

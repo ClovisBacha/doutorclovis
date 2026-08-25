@@ -246,7 +246,7 @@ describe("⚠️ verDoComentario — restringir e filtrar", () => {
   };
 
   test("comentário comum aparece sem marca", () => {
-    expect(verDoComentario(base)).toEqual({ mostra: true, marca: null });
+    expect(verDoComentario(base)).toEqual({ mostra: true, marca: null, revelavel: false });
   });
 
   test("⚠️ A PESSOA RESTRINGIDA CONTINUA VENDO O PRÓPRIO COMENTÁRIO", () => {
@@ -260,36 +260,47 @@ describe("⚠️ verDoComentario — restringir e filtrar", () => {
         autorDoComentario: "outra",
         donaRestringeOAutor: true,
       }),
-    ).toEqual({ mostra: true, marca: null });
+    ).toEqual({ mostra: true, marca: null, revelavel: false });
   });
 
-  test("⚠️ a DONA do post vê o restringido, MARCADO", () => {
-    /* Esconder dela seria pior que não ter o recurso: um comentário que ninguém
-       lê e nem ela sabe que existe é um canal cego — e ela precisa poder
-       apagar, denunciar ou mudar de ideia. */
-    expect(verDoComentario({ ...base, euId: "dona", donaRestringeOAutor: true })).toEqual({
-      mostra: true,
-      marca: "restrito",
-    });
+  test("⚠️ A DONA NÃO LÊ O QUE ELA MANDOU ESCONDER — ela decide se quer ler", () => {
+    /* A primeira versão devolvia `mostra: true` com uma etiqueta embaixo, e
+       isso contradizia a razão do recurso: entregar o texto e avisar depois que
+       ele devia estar escondido é o pior desfecho de um filtro, porque ela já
+       leu. Recolhido é `mostra: false` + `revelavel: true`. */
+    for (const caso of [
+      { euId: "dona", donaRestringeOAutor: true, marca: "restrito" },
+      { euId: "dona", batePalavraMinha: true, marca: "palavra" },
+    ]) {
+      const { marca, ...entrada } = caso;
+      const r = verDoComentario({ ...base, ...entrada });
+      expect(r.mostra).toBe(false);
+      expect(r.revelavel).toBe(true);
+      expect(r.marca).toBe(marca as "restrito" | "palavra");
+    }
   });
 
-  test("e um terceiro NÃO vê o restringido", () => {
-    expect(verDoComentario({ ...base, euId: "terceira", donaRestringeOAutor: true })).toEqual({
-      mostra: false,
-      marca: null,
-    });
+  test("⚠️ e para TERCEIROS não sobra nem a linha recolhida", () => {
+    /* Se um terceiro visse "comentário escondido", restringir passaria a
+       ANUNCIAR a restrição para a conversa inteira — que é exatamente o que
+       separa restringir de bloquear. */
+    for (const caso of [{ donaRestringeOAutor: true }, { batePalavraMinha: true }]) {
+      const r = verDoComentario({ ...base, euId: "terceira", ...caso });
+      expect(r.mostra).toBe(false);
+      expect(r.revelavel).toBe(false);
+      expect(r.marca).toBeNull();
+    }
   });
 
   test("⚠️ a MINHA palavra escondida vale inclusive no MEU post", () => {
     /* Se eu escondi "perdi", eu não quero ler "perdi" em lugar nenhum — nem no
-       meu. Ali ele aparece marcado, para eu poder decidir o que fazer. */
-    expect(verDoComentario({ ...base, euId: "dona", batePalavraMinha: true })).toEqual({
-      mostra: true,
-      marca: "palavra",
-    });
+       meu. Ali ele existe recolhido, para eu poder decidir o que fazer. */
+    const minha = verDoComentario({ ...base, euId: "dona", batePalavraMinha: true });
+    expect(minha.revelavel).toBe(true);
     expect(verDoComentario({ ...base, batePalavraMinha: true })).toEqual({
       mostra: false,
       marca: null,
+      revelavel: false,
     });
   });
 
@@ -303,14 +314,17 @@ describe("⚠️ verDoComentario — restringir e filtrar", () => {
         autorDoComentario: "outra",
         batePalavraMinha: true,
       }),
-    ).toEqual({ mostra: true, marca: null });
+    ).toEqual({ mostra: true, marca: null, revelavel: false });
   });
 
   test("⚠️ a minha restrição esconde de mim no post DE OUTRA PESSOA", () => {
-    /* Restringir é sobre não ler aquela pessoa, não só sobre o meu post. */
+    /* Restringir é sobre não ler aquela pessoa, não só sobre o meu post. E aqui
+       NÃO é revelável: eu não sou a dona, e uma linha recolhida no post alheio
+       contaria à conversa que eu restrinjo alguém. */
     expect(verDoComentario({ ...base, restringiOAutor: true })).toEqual({
       mostra: false,
       marca: null,
+      revelavel: false,
     });
   });
 
@@ -323,7 +337,7 @@ describe("⚠️ verDoComentario — restringir e filtrar", () => {
         euId: "dona",
         donaRestringeOAutor: true,
         batePalavraMinha: true,
-      }),
-    ).toEqual({ mostra: true, marca: "palavra" });
+      }).marca,
+    ).toBe("palavra");
   });
 });

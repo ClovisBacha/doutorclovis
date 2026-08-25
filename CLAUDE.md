@@ -5593,6 +5593,113 @@ verdade: 4,54 a 16,83.
 desfechos digitando "to sangrando…", "estou com muita dor nas costas" e uma
 pergunta comum) · `?tela=perfil&caixinha=0`.
 
+### ⚠️ A revisão do meu próprio trabalho, e o que só o OLHAR pegou (ago/2026)
+
+Sete achados de uma revisão adversarial das 3.664 linhas que eu tinha acabado de
+escrever. Nenhum aparecia em teste, `tsc` ou lint — e **dois só apareceram na
+foto da bancada**, depois de todo o resto estar verde.
+
+- ⚠️ **A CAPA DA CAIXA ♡ FALHAVA ABERTA.** `!!autor?.care_mode` com `autor`
+  indefinido é `false` — "não está em luto" —, então uma falha ao ler o perfil
+  AUTORIZAVA a capa de quem entrou em Modo Cuidado. Virou `if (!autor) return
+false`, o mesmo `!a` que o quadro do repost já tinha ganhado no dia anterior:
+  o mesmo defeito, na função ao lado, sobrevivendo ao conserto do irmão.
+- ⚠️ **`comentar` lia `responde_a` SEM DEGRAU.** A coluna nasce num `APLICAR_`
+  que o dono roda à mão, e o deploy chega antes: num banco sem ela o `select`
+  devolve `42703` e a função responde "banco" — **comentar pararia para todo
+  mundo** por causa de um recurso que ninguém ainda usa. O recuo lê sem a coluna
+  e trata o alvo como raiz, que é o que ele é num banco sem árvore.
+- ⚠️ **"Responder" existia com os comentários FECHADOS.** A dona fecha quando
+  quer, e o botão continuava em toda linha: ela tocava, escrevia, e o servidor
+  recusava DEPOIS de ela ter escrito. `aoResponder` virou opcional — `undefined`
+  não desenha nada.
+- ⚠️ **`avisarMencionadas` era N+1, e em SÉRIE.** Até dez menções × duas viagens
+  cada (o "ela me segue?" e o contexto dela), uma esperando a outra: vinte idas
+  ao banco penduradas na resposta de PUBLICAR. Os portões baratos recortam
+  antes, o "quem me segue" virou UMA consulta em lote e os contextos rodam em
+  `Promise.all`. ⚠️ Falha ao ler o lote vira conjunto VAZIO — sem saber quem me
+  segue, quem escolheu "só quem eu sigo" não recebe aviso: fecha, nunca abre.
+- **O filtro de palavras pintava a lista CRUA.** Palavra repetida entrava e
+  sumia meio segundo depois; setenta coladas viravam sessenta na volta do
+  servidor. A pintura otimista passa por `limparPalavrasOcultas`, a mesma régua
+  do servidor — importada, nunca reescrita.
+
+#### ⚠️ O FILTRO ENTREGAVA A PALAVRA QUE ELA MANDOU ESCONDER
+
+O pior dos sete, e ele estava escrito com todas as letras no comentário do
+próprio código: _"se eu escondi 'perdi', eu não quero ler 'perdi' em lugar
+nenhum"_ — e a linha logo abaixo devolvia `mostra: true` para a dona do post,
+com uma etiqueta embaixo dizendo que aquilo devia estar escondido.
+
+**Entregar o texto e avisar depois é o pior desfecho possível de um filtro: ela
+já leu.** Numa base de gestação de alto risco a palavra escondida é "perdi",
+"aborto", "pequeno demais" — a decisão dela sobre o que não aguenta ler hoje.
+
+`verDoComentario` ganhou um terceiro campo: `mostra` · `marca` · **`revelavel`**.
+Recolhido é `mostra: false` + `revelavel: true` — a linha existe, o texto não, e
+ela abre no toque. Vale igual para a RESTRIÇÃO, pela mesma razão: quem restringe
+alguém não quer o texto na frente, quer poder conferir.
+
+- ⚠️ **Para TERCEIROS não sobra nem a linha recolhida.** Uma linha "comentário
+  escondido" visível para a conversa faria restringir ANUNCIAR a restrição — que
+  é exatamente o que separa restringir de bloquear.
+- ⚠️ **O estado de revelar é LOCAL e POR LINHA**, e morre ao fechar a folha:
+  revelar uma não pode revelar as outras, e ela escondeu aquela palavra de
+  propósito. Conferido no navegador — um toque revela uma, a outra continua
+  recolhida.
+
+#### ⚠️ E DUAS COISAS SÓ A FOTO PEGOU
+
+Com os 4.436 testes verdes, o `tsc` limpo e o lint zerado, a bancada mostrou:
+
+1. **O mesmo recado duas vezes.** A etiqueta antiga (`c.oculto`) continuava
+   desenhada embaixo da linha recolhida: "Comentário escondido pelo seu filtro
+   de palavras. Ver mesmo assim" e, logo abaixo, "Escondido pelo seu filtro de
+   palavras." Ela só vale com o texto À MOSTRA — depois de revelar, é a única
+   coisa que lembra por que aquilo estava escondido.
+2. **♡, × e "Responder" oferecidos sobre um texto que ela não leu.** Curtir um
+   comentário recolhido é pedir uma decisão sobre o que ela não viu. Recolhido
+   não oferece ação nenhuma; revelou, as ações voltam inteiras.
+
+**Nenhuma asserção estava perto disso.** É a skill `/tela` outra vez: _se você
+não consegue verificar, não entregue_ — e verificar é fotografar.
+
+#### Os alvos, medidos e corrigidos
+
+Medido a 393px: `×`/`⋯` **32×44** · avatar da linha **28×28** · "Fechar
+comentários" **118×19** · "Ver mais N respostas" **119×36** · "Publicar"
+**84×36**.
+
+⚠️ **`w-11` nos três primeiros roubaria largura do TEXTO**, e a coluna do nome
+já trunca "Marina Costa" a 393px — é a medição que fixou o `gap-1.5` na linha da
+amiga. A área do dedo cresce por `after:absolute` com `-inset`, que estende o
+alvo sem mover um pixel do desenho. Os dois que podiam crescer de verdade
+("Publicar", "Ver mais") foram a `h-11`/`min-h-[44px]`.
+
+⚠️ **E o meu primeiro medidor mentiu:** ele somava só o eixo HORIZONTAL do
+`after` e "reprovou" alvos que eu já tinha corrigido (44×28 num alvo de 44×44).
+Depois de corrigido: nenhum alvo abaixo de 44 na folha.
+
+#### ⚠️ E o medidor de ondas reprovava por 1 ms de jitter
+
+`ondas-do-perfil` contava **carimbos `t` distintos**. Duas chamadas do MESMO
+`Promise.all` saem com microssegundos de diferença e podem cair em 79 e 80 ao
+arredondar — a mesma árvore deu 10 e 11 em execuções seguidas, e o teto reprovou
+uma cascata que não existe. Onda passou a ser AGRUPAMENTO POR FOLGA: uma onda de
+verdade custa `LATENCIA` inteira, então tudo a menos de meia latência do carimbo
+anterior é a mesma onda. Conferido por mutação — desmontando um `Promise.all` de
+verdade, o medidor volta a acusar 11 e reprova.
+
+#### ⚠️ E `node_modules` quebrado parece defeito do código
+
+O servidor de dev subia e servia HTML, mas a hidratação morria com 500 em
+`virtual:tanstack-start-client-entry`, e o Playwright media a página SEM
+JavaScript — clicando em botões que ainda não existiam. A causa era
+`Yallist is not a constructor`: um `lru-cache` antigo do Babel resolvendo para o
+`yallist@5` hasteado, colisão de um `bun install` que a rede interrompeu.
+**Antes de investigar um componente que "não responde", leia o log do servidor
+de dev** — a bancada estava certa o tempo todo.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

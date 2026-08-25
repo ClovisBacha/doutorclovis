@@ -44,6 +44,11 @@ export type ComentarioNaTela = {
    * bloquear. Ver `verDoComentario`.
    */
   oculto?: "restrito" | "palavra" | null;
+  /**
+   * Chega RECOLHIDO: a linha existe, o texto não. Só para a dona do post — ela
+   * abre no toque se quiser conferir. Ver `verDoComentario`.
+   */
+  recolhido?: boolean;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -262,7 +267,7 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
           donaRestringeOAutor: donaRestringe.has(c.autor_id),
           batePalavraMinha: palavras.length ? temPalavraOculta(c.texto ?? "", palavras) : false,
         });
-        if (!visao.mostra) return null;
+        if (!visao.mostra && !visao.revelavel) return null;
         return {
           id: c.id,
           autorId: c.autor_id,
@@ -279,6 +284,7 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
           curtidas: contaCurtidas.get(c.id) ?? 0,
           euCurti: euCurti.has(c.id),
           oculto: visao.marca,
+          recolhido: visao.revelavel,
         };
       })
       .filter(Boolean) as ComentarioNaTela[];
@@ -355,11 +361,26 @@ export const comentar = createServerFn({ method: "POST" })
      */
     let respondeA: string | null = null;
     if (data.respondeA) {
-      const { data: alvo, error: erroAlvo } = await sb
+      const COLUNAS_DO_ALVO = "id, post_id, responde_a, apagado_em";
+      let { data: alvo, error: erroAlvo } = await sb
         .from("rede_comentarios")
-        .select("id, post_id, responde_a, apagado_em")
+        /* ⚠️ **DEGRAU DE RECUO, como toda leitura desta aba.** `responde_a` nasce
+           no `APLICAR_COMENTARIOS_E_LIMITES` que o dono roda à mão: num banco
+           sem a coluna, este `select` devolve `42703` e a função responde
+           "banco" — comentar PARARIA para todo mundo por causa de um recurso
+           novo. O ramo de baixo trata o alvo como raiz, que é o que ele é num
+           banco sem árvore. */
+        .select(COLUNAS_DO_ALVO)
         .eq("id", data.respondeA)
         .maybeSingle();
+      if (erroAlvo) {
+        ({ data: alvo, error: erroAlvo } = await sb
+          .from("rede_comentarios")
+          .select("id, post_id, apagado_em")
+          .eq("id", data.respondeA)
+          .maybeSingle());
+        if (alvo) alvo.responde_a = null;
+      }
       /* Falha de leitura NÃO vira comentário raiz em silêncio: ela responderia a
          alguém e o texto apareceria solto no fim da lista, sem contexto. */
       if (erroAlvo) return { ok: false as const, motivo: "banco" as const };

@@ -296,7 +296,20 @@ test("⚠️ abrir um perfil não pode voltar a ser uma cascata", async () => {
         `  t=${String(l.t).padStart(4)}ms→${String(l.fim ?? "?").padStart(4)}  ${l.alvo.padEnd(17)} ${l.detalhe}`,
     ),
   );
-  const ondas = new Set(log.map((l) => l.t)).size;
+  /* ⚠️ **ONDA É AGRUPAMENTO POR FOLGA, nunca `t` distinto.** Contar carimbos
+     distintos parece equivalente e não é: duas chamadas do MESMO `Promise.all`
+     saem com microssegundos de diferença e podem cair em 79 e 80 ao arredondar
+     — e aí a medição acusa uma cascata que não existe. Medido: a mesma árvore
+     deu 10 e 11 em execuções seguidas, e o teto reprovou por 1 ms de jitter.
+
+     Uma onda de verdade custa `LATENCIA` inteira (é o que a ida anterior
+     esperou). Então tudo que começa a menos de meia latência do carimbo
+     anterior é a MESMA onda, e a fronteira fica bem longe do ruído. */
+  const carimbos = [...new Set(log.map((l) => l.t))].sort((a, b) => a - b);
+  let ondas = carimbos.length ? 1 : 0;
+  for (let i = 1; i < carimbos.length; i++) {
+    if (carimbos[i] - carimbos[i - 1] > LATENCIA / 2) ondas++;
+  }
   console.log(
     `\nTOTAL idas: ${log.length}  |  ONDAS SERIAIS (t distintos): ${ondas}  |  tempo total ${total}ms com ${LATENCIA}ms/ida`,
   );

@@ -255,7 +255,11 @@ export function Comentarios({
           <button
             type="button"
             onClick={() => void trocarAbertura()}
-            className="press text-[12px] text-muted-foreground"
+            /* ⚠️ 44px de ALTURA sem inchar o cabeçalho. Medido: 118×19. Um
+               `min-h-[44px]` aqui empurraria o "8 comentários" ao lado, então o
+               `after` estende só a área do dedo — a mesma solução do × da
+               linha, e pelo mesmo motivo. */
+            className="press relative text-[12px] text-muted-foreground after:absolute after:inset-x-0 after:-inset-y-3.5 after:content-['']"
           >
             {abertos ? "Fechar comentários" : "Reabrir comentários"}
           </button>
@@ -270,7 +274,12 @@ export function Comentarios({
             aoApagar={setApagando}
             aoDenunciar={setDenunciando}
             aoCurtir={curtir}
-            aoResponder={() => responderA(raiz)}
+            /* ⚠️ **COM OS COMENTÁRIOS FECHADOS, "Responder" NÃO EXISTE.** A dona
+               pode fechar a qualquer momento, e o botão continuava em toda
+               linha: tocar nele abria o modo resposta, ela escrevia, e o
+               servidor recusava com "os comentários deste post estão fechados"
+               — depois de ela ter escrito. Botão que promete e não cumpre. */
+            aoResponder={abertos ? () => responderA(raiz) : undefined}
           />
 
           {/* ⚠️ **AS RESPOSTAS RECOLHEM DEPOIS DE TRÊS.** Uma conversa de vinte
@@ -288,7 +297,7 @@ export function Comentarios({
                 /* ⚠️ Responder a uma RESPOSTA cai na mesma conversa — a raiz é
                    sempre a mesma. É o que mantém um nível só. Ver
                    `raizDoComentario`. */
-                aoResponder={() => responderA(r, raiz)}
+                aoResponder={abertos ? () => responderA(r, raiz) : undefined}
               />
             </div>
           ))}
@@ -297,7 +306,7 @@ export function Comentarios({
             <button
               type="button"
               onClick={() => setAbertas((a) => ({ ...a, [raiz.id]: true }))}
-              className="press ml-9 mt-1 min-h-[36px] text-[12px] font-medium text-muted-foreground"
+              className="press ml-9 mt-1 min-h-[44px] text-[12px] font-medium text-muted-foreground"
             >
               Ver mais {respostas.length - RESPOSTAS_VISIVEIS}{" "}
               {respostas.length - RESPOSTAS_VISIVEIS === 1 ? "resposta" : "respostas"}
@@ -381,7 +390,7 @@ export function Comentarios({
                 type="button"
                 onClick={() => setRespondendo(null)}
                 aria-label="Cancelar resposta"
-                className="press min-h-[32px] px-1 text-[13px] text-muted-foreground"
+                className="press flex h-11 w-11 shrink-0 items-center justify-center text-[13px] text-muted-foreground"
               >
                 ×
               </button>
@@ -400,7 +409,7 @@ export function Comentarios({
               type="button"
               onClick={() => void enviar()}
               disabled={!texto.trim() || enviando}
-              className="press h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold text-primary disabled:opacity-40"
+              className="press h-11 shrink-0 rounded-full px-3 text-[13px] font-semibold text-primary disabled:opacity-40"
             >
               Publicar
             </button>
@@ -437,14 +446,24 @@ function Linha({
   aoApagar: (id: string) => void;
   aoDenunciar: (id: string) => void;
   aoCurtir: (c: ComentarioNaTela) => void;
-  aoResponder: () => void;
+  /** `undefined` = não oferece responder (comentários fechados). */
+  aoResponder?: () => void;
 }) {
+  /* ⚠️ Estado LOCAL e por linha: revelar um comentário recolhido não pode
+     revelar os outros, e a escolha não sobrevive ao fechamento da folha — ela
+     escondeu aquela palavra de propósito. */
+  const [revelado, setRevelado] = useState(false);
+  const oculto = !!c.recolhido && !revelado;
+
   return (
     <div className="mt-2.5 flex items-start gap-2">
       <button
         type="button"
         onClick={() => aoAbrirPerfil?.(c.autorId)}
-        className="press shrink-0"
+        /* ⚠️ A bolinha desenha 28px e era o alvo inteiro. Ela abre o PERFIL de
+           outra pessoa — errar por 8px numa lista de seis linhas abre o perfil
+           errado. O `after` leva a área a 44 sem mexer no desenho da conversa. */
+        className="press relative shrink-0 after:absolute after:-inset-2 after:content-['']"
         aria-label={`Abrir perfil de ${c.autorNome}`}
       >
         {c.autorAvatar ? (
@@ -457,16 +476,40 @@ function Linha({
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] leading-snug">
-          <span className="font-semibold">{c.autorNome}</span>{" "}
-          <span className="whitespace-pre-wrap break-words">{c.texto}</span>
-        </p>
+        {/* ⚠️ **RECOLHIDO É O TEXTO FORA DA TELA, não o texto com um aviso.**
+            Um filtro que entrega a palavra e avisa embaixo que ela devia estar
+            escondida já falhou: ela leu. Aqui a dona vê que existe um
+            comentário e decide abrir — e o nome também fica de fora, porque
+            "Fulana escreveu algo que você escondeu" já é metade do recado. */}
+        {oculto ? (
+          <button
+            type="button"
+            onClick={() => setRevelado(true)}
+            className="press min-h-[44px] text-left text-[13px] italic leading-snug text-muted-foreground"
+          >
+            {c.oculto === "restrito"
+              ? "Comentário de alguém que você restringiu."
+              : "Comentário escondido pelo seu filtro de palavras."}{" "}
+            <span className="font-medium not-italic underline">Ver mesmo assim</span>
+          </button>
+        ) : (
+          <p className="text-[13px] leading-snug">
+            <span className="font-semibold">{c.autorNome}</span>{" "}
+            <span className="whitespace-pre-wrap break-words">{c.texto}</span>
+          </p>
+        )}
 
         {/* ⚠️ **A MARCA SÓ APARECE PARA A DONA DO POST**, e é o servidor que
             decide (`verDoComentario`). Quem foi restringida nunca recebe este
             campo preenchido no comentário dela — é esse silêncio que separa
             restringir de bloquear. */}
-        {c.oculto && (
+        {/* ⚠️ **A ETIQUETA SÓ VALE COM O TEXTO À MOSTRA.** Desenhada junto da
+            linha recolhida ela dizia a mesma coisa duas vezes — "escondido pelo
+            seu filtro" dentro do botão e de novo embaixo dele. Depois de
+            revelar, ela é a única coisa que lembra por que aquilo estava
+            escondido, e aí precisa estar. Foi o olhar na bancada que pegou;
+            nenhuma asserção estava perto disso. */}
+        {c.oculto && !oculto && (
           <p className="mt-0.5 text-[11px] text-muted-foreground">
             {c.oculto === "restrito"
               ? "Só você e quem escreveu veem este comentário."
@@ -474,14 +517,20 @@ function Linha({
           </p>
         )}
 
-        <div className="mt-0.5 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={aoResponder}
-            className="press min-h-[44px] pr-2 text-[12px] font-medium text-muted-foreground"
-          >
-            Responder
-          </button>
+        {/* ⚠️ **RECOLHIDO NÃO OFERECE AÇÃO NENHUMA.** Curtir e responder um
+            comentário cujo texto ela escolheu não ler é pedir uma decisão sobre
+            o que ela não viu — e o ♡ ficaria ao lado de uma linha que diz
+            "escondido". Revelou, as ações voltam inteiras. */}
+        <div className={`mt-0.5 flex items-center gap-3 ${oculto ? "hidden" : ""}`}>
+          {aoResponder && (
+            <button
+              type="button"
+              onClick={aoResponder}
+              className="press min-h-[44px] pr-2 text-[12px] font-medium text-muted-foreground"
+            >
+              Responder
+            </button>
+          )}
           {/* ⚠️ O número só aparece com pelo menos uma: um "0" ao lado de todo
               comentário transforma a conversa num placar de quem foi ignorada. */}
           {(c.curtidas ?? 0) > 0 && (
@@ -492,6 +541,8 @@ function Linha({
         </div>
       </div>
 
+      {/* ⚠️ Coração e ⋯ somem junto com as ações de baixo enquanto recolhido —
+          ver o bloco acima. */}
       {/* ⚠️ **O CORAÇÃO É DESENHADO**, e não ❤️. O emoji sai vermelho no iOS e
           cinza no Android, e aqui ele tem DOIS estados que precisam se
           distinguir à primeira vista — a mesma lição do 📞 e do marcador de
@@ -502,7 +553,7 @@ function Linha({
         aria-label={c.euCurti ? "Tirar a curtida" : "Curtir comentário"}
         aria-pressed={!!c.euCurti}
         /* ⚠️ 44px: o coração desenha 16px e o alvo media a caixa. */
-        className="press flex h-11 w-11 shrink-0 items-center justify-center"
+        className={`press flex h-11 w-11 shrink-0 items-center justify-center ${oculto ? "hidden" : ""}`}
       >
         <svg
           viewBox="0 0 24 24"
@@ -522,11 +573,17 @@ function Linha({
           a dona do post) resolve na hora; denunciar é a saída de quem NÃO pode —
           oferecer as duas faria a dona denunciar em vez de apagar, e a fila da
           plataforma encheria de coisa que ela já podia resolver sozinha. */}
-      {c.possoApagar ? (
+      {oculto ? null : c.possoApagar ? (
         <button
           type="button"
           onClick={() => aoApagar(c.id)}
-          className="press h-11 w-8 shrink-0 text-[12px] text-muted-foreground"
+          /* ⚠️ **44px DE LARGURA SEM ROUBAR LARGURA DO TEXTO.** Medido: o alvo
+             saía 32×44, abaixo do mínimo no eixo estreito. Passar para `w-11`
+             tiraria 12px da coluna do nome, que já trunca em "Marina Costa" a
+             393px — a mesma medição que fixou o `gap-1.5` na linha da amiga.
+             O `after` estende a área do dedo 6px para cada lado sem mover um
+             pixel do desenho. */
+          className="press relative h-11 w-8 shrink-0 text-[12px] text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
           aria-label="Apagar comentário"
         >
           ×
@@ -535,7 +592,7 @@ function Linha({
         <button
           type="button"
           onClick={() => aoDenunciar(c.id)}
-          className="press h-11 w-8 shrink-0 text-[12px] text-muted-foreground"
+          className="press relative h-11 w-8 shrink-0 text-[12px] text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
           aria-label="Denunciar comentário"
         >
           ⋯
