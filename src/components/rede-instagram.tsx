@@ -421,11 +421,17 @@ function Carrossel({
   urls,
   aoToqueDuplo,
   comparacao,
+  altTexto,
+  autorNome,
 }: {
   urls: string[];
   aoToqueDuplo?: () => void;
   /** "Então e agora": os rótulos das DUAS primeiras fotos. */
   comparacao?: { antes: string; agora: string } | null;
+  /** A descrição que a autora escreveu. Ver o `alt` abaixo. */
+  altTexto?: string | null;
+  /** Para o `alt` genérico quando não há descrição. */
+  autorNome?: string;
 }) {
   const [i, setI] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
@@ -479,7 +485,23 @@ function Carrossel({
       >
         {urls.map((u, n) => (
           <div key={n} className="relative w-full shrink-0 snap-center overflow-hidden bg-muted/40">
-            <img src={u} alt="" className="h-full w-full object-cover" loading="lazy" />
+            {/* ⚠️ **`alt` NUNCA VAZIO, e a diferença é entre "existe uma foto
+                aqui" e silêncio.** `alt=""` faz o leitor de tela PULAR a imagem:
+                quem navega assim nem saberia que há uma publicação com foto. Com
+                descrição, ela é lida; sem, entra o genérico com o nome de quem
+                publicou — que é pouco, mas é verdade. */}
+            <img
+              src={u}
+              alt={
+                altTexto?.trim()
+                  ? urls.length > 1
+                    ? `${altTexto.trim()} (foto ${n + 1} de ${urls.length})`
+                    : altTexto.trim()
+                  : `Publicação de ${autorNome ?? "alguém"}${urls.length > 1 ? `, foto ${n + 1} de ${urls.length}` : ""}`
+              }
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
             {/* ⚠️ O carimbo pousa DENTRO da foto, e não numa faixa em volta:
                 quem salva a imagem para mandar no WhatsApp leva a semana junto,
                 que é metade do valor do formato. E só nas DUAS primeiras — as
@@ -915,6 +937,8 @@ export const PostInstagram = memo(function PostInstagram({
         <Carrossel
           urls={fotos}
           comparacao={post.comparacao}
+          altTexto={post.altTexto}
+          autorNome={post.autorNome}
           /* ⚠️ O toque duplo SEMPRE dá coração, e nunca TIRA. É assim no modelo,
              e o motivo é o gesto: quem toca duas vezes está dizendo "gostei",
              não "mudei de ideia". Se ele alternasse, tocar duas vezes num post
@@ -2342,6 +2366,7 @@ export function TelaDePerfil({
   aoBloquear,
   aoDenunciarPerfil,
   aoSilenciar,
+  aoRestringir,
   aoAbrirEspelho,
   aoAplicarCodigo,
   aoPerguntar,
@@ -2376,6 +2401,15 @@ export function TelaDePerfil({
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
   /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
   aoSilenciar?: (silenciar: boolean) => void;
+  /**
+   * Restringir (ou liberar) os comentários desta pessoa.
+   *
+   * ⚠️ **NÃO é o bloqueio nem o silenciar.** Silenciar tira as publicações dela
+   * do MEU feed; bloquear corta os dois lados e ela descobre. Restringir não
+   * muda nada do que ela vê — só quem LÊ o comentário dela nas minhas fotos.
+   * O estado atual vem em `perfil.restrito`.
+   */
+  aoRestringir?: (restringir: boolean) => void;
   /** Abre "ver como os outros veem". Só no próprio perfil. */
   aoAbrirEspelho?: () => void;
   /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
@@ -2535,6 +2569,43 @@ export function TelaDePerfil({
               {perfil.silenciado
                 ? "As publicações dela voltam a aparecer no seu feed."
                 : "Você continua seguindo, e o perfil dela continua aqui — só o feed para de trazer as publicações. Ela não é avisada."}
+            </p>
+          )}
+
+          {/* ⚠️ **RESTRINGIR É O DEGRAU ENTRE SILENCIAR E BLOQUEAR, e ele
+              resolve um caso que os outros dois não resolvem.** Silenciar tira
+              as publicações DELA do meu feed; bloquear corta tudo e ela
+              descobre. Restringir não faz nem um nem outro: ela continua
+              seguindo e continua vendo tudo — o que muda é que o COMENTÁRIO
+              dela nas minhas fotos só aparece para ela.
+
+              É a saída para a cunhada que comenta demais: bloquear tem custo
+              social (vira briga de família) e é justamente esse custo que faz a
+              paciente não usar o bloqueio e continuar recebendo o que a
+              machuca. */}
+          {aoRestringir && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoRestringir(!perfil.restrito);
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              {perfil.restrito
+                ? `Deixar de restringir ${perfil.nome}`
+                : `Restringir ${perfil.nome}`}
+            </button>
+          )}
+          {aoRestringir && (
+            /* ⚠️ **O TEXTO DIZ QUE ELA NÃO É AVISADA, e diz o que NÃO muda.**
+               Sem a segunda metade, a paciente lê "restringir" como "bloquear
+               parcial" e não usa — ou usa achando que a pessoa para de ver as
+               fotos dela, o que seria uma promessa falsa. */
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              {perfil.restrito
+                ? "Os comentários dela voltam a aparecer para todo mundo."
+                : "Os comentários dela nas suas publicações passam a aparecer só para ela — e para você, marcados. Ela continua seguindo, continua vendo tudo, e não é avisada."}
             </p>
           )}
 
@@ -3971,6 +4042,43 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * RESTRINGIR — e a tela pinta ANTES, como o silenciar.
+   *
+   * ⚠️ **NÃO recarrega o feed.** Silenciar muda o que aparece no feed e por isso
+   * o recarrega; restringir não tira nada do feed — muda só quem lê o comentário
+   * dela. Recarregar aqui seria uma volta ao servidor por nada, na tela mais
+   * pesada do app.
+   */
+  async function restringirPerfil(alvoId: string, restringirAgora: boolean) {
+    setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: restringirAgora } : p));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { restringir } = await import("@/lib/comentarios.functions");
+      const r = await restringir({
+        data: { accessToken: t, alvoId, restringir: restringirAgora },
+      });
+      const { toast } = await import("sonner");
+      if (r.ok) {
+        toast.success(
+          restringirAgora
+            ? "Restringida. Ela não é avisada."
+            : "Os comentários dela voltam a aparecer.",
+        );
+      } else {
+        setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: !restringirAgora } : p));
+        toast.error(
+          r.motivo === "sem_suporte"
+            ? "Restringir ainda não está pronto no servidor."
+            : "Não deu para mudar agora.",
+        );
+      }
+    } catch {
+      setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: !restringirAgora } : p));
+    }
+  }
+
   async function denunciarUmPerfil(alvoId: string, motivo: MotivoDaDenuncia) {
     try {
       const t = await token();
@@ -4465,6 +4573,29 @@ export function RedeNoApp({
       const r = await verPerfil({ data: { accessToken: t, alvoId: id } });
       if (r.ok) {
         setPerfil(r.perfil);
+        /**
+         * ⚠️ **A RESTRIÇÃO VEM NUMA CONSULTA PRÓPRIA, e não em `verPerfil`.**
+         *
+         * Aquela função monta o perfil que QUALQUER pessoa vê, e um campo
+         * "você me restringe?" ali viajaria no perfil de terceiro — que é
+         * exatamente o vazamento que destruiria o recurso: o silêncio é a única
+         * coisa que separa restringir de bloquear.
+         *
+         * ⚠️ E ela roda DEPOIS de o perfil estar na tela, num `try` próprio: o
+         * botão nasce em "Restringir" (o estado de quem não restringiu) e se
+         * corrige; uma falha aqui não pode segurar a abertura do perfil.
+         */
+        void (async () => {
+          try {
+            const { minhasRestricoes } = await import("@/lib/comentarios.functions");
+            const rr = await minhasRestricoes({ data: { accessToken: t } });
+            if (rr.ok) {
+              setPerfil((p) => (p && p.id === id ? { ...p, restrito: rr.ids.includes(id) } : p));
+            }
+          } catch {
+            /* O botão fica em "Restringir", que é o estado mais comum. */
+          }
+        })();
         setDoPerfil(r.posts);
         setProximoDoPerfil(r.proximo);
         guardarNoCache(chave, { perfil: r.perfil, posts: r.posts, proximo: r.proximo });
@@ -4623,6 +4754,8 @@ export function RedeNoApp({
     marcadas: string[];
     /** O post antigo que vira a primeira foto do "então e agora". */
     comparacaoCom: string | null;
+    /** A descrição da foto, para leitores de tela. */
+    altTexto?: string | null;
     texto: string | null;
     fotos: string[];
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
@@ -4659,6 +4792,7 @@ export function RedeNoApp({
           repostDe: p.repostDe ?? null,
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
+          altTexto: p.altTexto ?? undefined,
         },
       });
       if (!r.ok) {
@@ -5558,6 +5692,7 @@ export function RedeNoApp({
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
         aoDenunciarPerfil={perfil.souEu ? undefined : (m) => void denunciarUmPerfil(perfil.id, m)}
         aoSilenciar={perfil.souEu ? undefined : (v) => void silenciarPerfil(perfil.id, v)}
+        aoRestringir={perfil.souEu ? undefined : (v) => void restringirPerfil(perfil.id, v)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
         /* ⚠️ Bandeira vermelha abre a Central de Emergência — a MESMA que a
@@ -7223,6 +7358,8 @@ export function NovoPost({
     marcadas: string[];
     /** O post antigo que vira a primeira foto, ou `null`. */
     comparacaoCom: string | null;
+    /** A descrição da foto, para leitores de tela. */
+    altTexto?: string | null;
   }) => Promise<boolean>;
   /**
    * A aula que ela fez hoje, para anexar com um toque.
@@ -7301,6 +7438,15 @@ export function NovoPost({
    * sem ela. Desenhar é síncrono e custa milissegundos: `momentoComoDataUrl`
    * é canvas puro, sem rede.
    */
+  /**
+   * A descrição da foto, para leitores de tela.
+   *
+   * ⚠️ **Recolhida por padrão.** É acessibilidade, não legenda: quem precisa
+   * sabe o que é, e um segundo campo aberto entre a foto e o botão faria parte
+   * das pacientes achar que precisa preencher os dois.
+   */
+  const [altTexto, setAltTexto] = useState("");
+  const [altAberto, setAltAberto] = useState(false);
   const [fotos, setFotos] = useState<string[]>(() => {
     if (!momentoInicial || typeof document === "undefined") return [];
     const url = cartaoDoMomento(momentoInicial);
@@ -7383,6 +7529,10 @@ export function NovoPost({
   const enqueteOk = opcoes === null || enqueteValida(opcoesLimpas);
   const temConteudo =
     postEhValido({ texto, temImagem: fotos.length > 0 }) || opcoesLimpas.length >= OPCOES_MIN;
+  /* ⚠️ O campo da descrição segue as FOTOS, e não o vídeo: um vídeo não tem
+     `alt`, e oferecer o campo ali prometeria uma acessibilidade que o
+     elemento não entrega. */
+  const temFoto = fotos.length > 0;
   const podeEnviar = temConteudo && enqueteOk && !enviando;
 
   /* ⚠️ GUARDA COM ATRASO (700 ms). Sem isso, cada letra digitada seria uma
@@ -7449,6 +7599,7 @@ export function NovoPost({
       repostDe: repostando?.id ?? null,
       marcadas,
       comparacaoCom: entao,
+      altTexto: altTexto.trim() || null,
     });
     setEnviando(false);
     if (ok) {
@@ -7536,6 +7687,47 @@ export function NovoPost({
           <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
             {LIMITE_DO_TEXTO - texto.length}
           </p>
+        )}
+
+        {/* ─── A DESCRIÇÃO DA FOTO ────────────────────────────────────────
+            ⚠️ **SÓ COM FOTO, e RECOLHIDA.** É acessibilidade, não legenda: quem
+            precisa dela sabe o que é, e quem não precisa não deve ter um campo
+            a mais entre a foto e o botão de publicar. Um segundo campo aberto
+            aqui faria parte das pacientes achar que precisa preencher os dois.
+
+            ⚠️ **E não é opcional por preguiça.** A diretriz de acessibilidade da
+            Apple cobra isto na revisão, e o app é instalado por quem usa leitor
+            de tela: sem descrição, a foto do ultrassom de uma amiga é uma
+            lacuna silenciosa no meio do feed. */}
+        {temFoto && (
+          <div className="mt-2">
+            {!altAberto ? (
+              <button
+                type="button"
+                onClick={() => setAltAberto(true)}
+                className="press min-h-[36px] text-[12px] font-medium text-muted-foreground"
+              >
+                {altTexto.trim() ? "✓ Descrição escrita" : "Descrever a foto (acessibilidade)"}
+              </button>
+            ) : (
+              <>
+                <input
+                  value={altTexto}
+                  onChange={(e) => setAltTexto(e.target.value.slice(0, 300))}
+                  placeholder="O que a foto mostra"
+                  aria-label="Descrição da foto para leitores de tela"
+                  className="min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+                />
+                {/* ⚠️ Diz PARA QUEM serve. Sem a frase, ela escreve uma segunda
+                    legenda — e o leitor de tela lê as duas, uma atrás da
+                    outra. */}
+                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                  Lida em voz alta por quem usa leitor de tela. Descreva o que aparece, sem repetir
+                  a legenda.
+                </p>
+              </>
+            )}
+          </div>
         )}
 
         {/* ⚠️ SÓ COM FOTO. É uma legenda PARA a imagem: sem imagem o modelo não

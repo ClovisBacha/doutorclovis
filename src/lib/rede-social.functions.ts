@@ -204,6 +204,14 @@ export type PostNaTela = {
    */
   videoUrl: string | null;
   /**
+   * A descrição que a autora escreveu para quem usa leitor de tela.
+   *
+   * ⚠️ **`null` NÃO é "sem alt".** A tela cai num texto genérico ("Publicação de
+   * Fulana"): um `alt=""` faria o leitor de tela PULAR a imagem em silêncio, e
+   * quem navega assim nem saberia que existe uma foto ali.
+   */
+  altTexto?: string | null;
+  /**
    * A publicação republicada, quando este post é um repost.
    *
    * ⚠️ **`null` TAMBÉM QUANDO A ORIGINAL SAIU DO AR**, e a tela distingue os
@@ -276,6 +284,15 @@ export type PerfilNaTela = {
    * é uma visitante inventada e não silenciou ninguém.
    */
   silenciado: boolean;
+  /**
+   * Eu restrinjo esta pessoa?
+   *
+   * ⚠️ **Só a MINHA lista chega aqui — nunca a dela.** Saber quem te restringiu
+   * é exatamente o que destruiria o recurso: o silêncio é a única coisa que
+   * separa restringir de bloquear. Sob a prévia é sempre `false`, como o
+   * silenciar: a persona é uma visitante inventada.
+   */
+  restrito?: boolean;
   /**
    * Quantas pessoas a acompanham. **Público**, para qualquer perfil visível.
    *
@@ -744,7 +761,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path, repost_de";
+  "marco_tipo, marco_dias, video_path, repost_de, alt_texto";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -787,6 +804,9 @@ async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
     marco_dias: null,
     video_path: null,
     repost_de: null,
+    /* Sem a coluna, a foto vai sem descrição — o `alt` cai no genérico, que é
+       o comportamento que a rede sempre teve. */
+    alt_texto: null,
   }));
 }
 
@@ -1439,6 +1459,7 @@ export async function montarPosts(
         marco: p.marco_tipo ? { tipo: String(p.marco_tipo), dias: p.marco_dias ?? null } : null,
         /* Assinado na MESMA onda das fotos — ver `todosOsCaminhos`. */
         videoUrl: p.video_path ? (assinadas.get(p.video_path) ?? null) : null,
+        altTexto: ((p.alt_texto ?? null) as string | null) || null,
         ehRepost: !!p.repost_de,
         repost: p.repost_de ? (originais.get(p.repost_de) ?? null) : null,
         pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
@@ -2133,6 +2154,14 @@ export const publicarPost = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
+        /**
+         * A descrição da foto, para quem usa leitor de tela.
+         *
+         * ⚠️ **Teto PRÓPRIO e curto (300).** Ela descreve o que a foto mostra,
+         * não conta a história — e um `alt` de mil caracteres é lido inteiro,
+         * em voz alta, antes de a pessoa chegar na legenda.
+         */
+        altTexto: z.string().max(300).nullable().optional(),
         /** Data URL. O cliente já reduz para 512px antes de mandar. */
         imagem: z.string().max(1_500_000).nullable(),
         /**
@@ -2392,6 +2421,7 @@ export const publicarPost = createServerFn({ method: "POST" })
           ? { video_path: data.video.caminho, video_segundos: data.video.segundos }
           : {}),
         ...(repostValido ? { repost_de: data.repostDe } : {}),
+        alt_texto: data.altTexto?.trim() || null,
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a
            foto antiga na frente do carrossel, e então DESCARTADO: a coluna
@@ -2633,6 +2663,14 @@ export const editarPost = createServerFn({ method: "POST" })
         accessToken: z.string().min(10),
         postId: z.string().uuid(),
         texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
+        /**
+         * A descrição da foto, para quem usa leitor de tela.
+         *
+         * ⚠️ **Teto PRÓPRIO e curto (300).** Ela descreve o que a foto mostra,
+         * não conta a história — e um `alt` de mil caracteres é lido inteiro,
+         * em voz alta, antes de a pessoa chegar na legenda.
+         */
+        altTexto: z.string().max(300).nullable().optional(),
       })
       .parse(i),
   )

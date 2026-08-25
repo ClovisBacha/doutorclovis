@@ -9,7 +9,17 @@
 
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { podeApagarComentario, recadoDoComentario, triarComentario } from "./comentarios";
+import {
+  podeApagarComentario,
+  recadoDoComentario,
+  triarComentario,
+  raizDoComentario,
+  temPalavraOculta,
+  limparPalavrasOcultas,
+  verDoComentario,
+  PALAVRA_OCULTA_MAX,
+  PALAVRAS_OCULTAS_MAX,
+} from "./comentarios";
 
 describe("⚠️ o alarme — o dano que não tem palavrão", () => {
   const alarmes = [
@@ -144,5 +154,176 @@ describe("quem apaga", () => {
     expect(
       podeApagarComentario({ euId: "terceira", autorDoComentario: "eu", donaDoPost: "dona" }),
     ).toBe(false);
+  });
+});
+
+describe("⚠️ a árvore tem UM nível", () => {
+  test("a raiz de uma raiz é ela mesma", () => {
+    expect(raizDoComentario({ id: "a", respondeA: null })).toBe("a");
+  });
+
+  test("⚠️ responder a uma resposta entra na MESMA conversa", () => {
+    /* Árvore infinita num celular de 393px: o quarto nível tem 40px de largura
+       e ninguém lê. Um nível também faz "responder" ser uma decisão só — a quem
+       eu respondo é a conversa, nunca a linha exata. */
+    expect(raizDoComentario({ id: "c", respondeA: "raiz" })).toBe("raiz");
+  });
+});
+
+describe("o filtro de palavras", () => {
+  test("acha sem acento e sem caixa", () => {
+    /* Quem escreve "PERDI" e "perdí" escreve a mesma palavra, e ela não deveria
+       ter de listar as quatro grafias. */
+    expect(temPalavraOculta("eu PERDÍ o bebê", ["perdi"])).toBe(true);
+    expect(temPalavraOculta("eu perdi o bebê", ["PERDÍ"])).toBe(true);
+  });
+
+  test("⚠️ casa PALAVRA INTEIRA — e é isto que faz o recurso servir", () => {
+    /* Com `includes`, esconder "parto" esconderia "departamento"; esconder
+       "mal" esconderia "mala", "malha", "animal". Ela veria comentários sumindo
+       sem entender e desligaria o filtro — que é o mesmo que não tê-lo, só que
+       depois de ter confiado nele. */
+    expect(temPalavraOculta("trabalho no departamento", ["parto"])).toBe(false);
+    expect(temPalavraOculta("levei a mala", ["mal"])).toBe(false);
+    expect(temPalavraOculta("que animal lindo", ["mal"])).toBe(false);
+    expect(temPalavraOculta("meu parto foi tranquilo", ["parto"])).toBe(true);
+  });
+
+  test("pega a palavra colada em pontuação", () => {
+    expect(temPalavraOculta("e aí, parto?", ["parto"])).toBe(true);
+    expect(temPalavraOculta("parto", ["parto"])).toBe(true);
+    expect(temPalavraOculta("(parto)", ["parto"])).toBe(true);
+  });
+
+  test("expressão com espaço casa como FRASE", () => {
+    expect(temPalavraOculta("eu perdi o bebê ontem", ["perdi o bebê"])).toBe(true);
+    expect(temPalavraOculta("perdi a chave e vi o bebê", ["perdi o bebê"])).toBe(false);
+  });
+
+  test("⚠️ caractere especial na palavra não vira regex", () => {
+    /* Ela digita o que quiser. Sem escapar, um "(" derruba a construção da
+       expressão e o filtro inteiro para de funcionar — em silêncio, porque o
+       erro acontece dentro de um laço. */
+    expect(() => temPalavraOculta("teste", ["a(b"])).not.toThrow();
+    expect(temPalavraOculta("isso e a(b sim", ["a(b"])).toBe(true);
+  });
+
+  test("lista vazia não esconde nada", () => {
+    expect(temPalavraOculta("qualquer coisa", [])).toBe(false);
+    expect(temPalavraOculta("qualquer coisa", ["", "  "])).toBe(false);
+  });
+});
+
+describe("limparPalavrasOcultas", () => {
+  test("tira repetida, vazia e espaço sobrando", () => {
+    expect(limparPalavrasOcultas([" parto ", "PARTO", "", "  ", "perdi"])).toEqual([
+      "parto",
+      "perdi",
+    ]);
+  });
+
+  test("⚠️ a repetida some por NORMALIZAÇÃO, não por igualdade", () => {
+    /* "Perdí" e "perdi" são a mesma entrada para o filtro; guardar as duas
+       faria a lista dela encher de duplicatas que ela não consegue distinguir. */
+    expect(limparPalavrasOcultas(["Perdí", "perdi"])).toHaveLength(1);
+  });
+
+  test("respeita os dois tetos", () => {
+    expect(limparPalavrasOcultas([`${"a".repeat(80)}`])[0]).toHaveLength(PALAVRA_OCULTA_MAX);
+    const muitas = Array.from({ length: 200 }, (_, i) => `p${i}`);
+    expect(limparPalavrasOcultas(muitas)).toHaveLength(PALAVRAS_OCULTAS_MAX);
+  });
+});
+
+describe("⚠️ verDoComentario — restringir e filtrar", () => {
+  const base = {
+    euId: "eu",
+    autorDoComentario: "outra",
+    donaDoPost: "dona",
+    restringiOAutor: false,
+    donaRestringeOAutor: false,
+    batePalavraMinha: false,
+  };
+
+  test("comentário comum aparece sem marca", () => {
+    expect(verDoComentario(base)).toEqual({ mostra: true, marca: null });
+  });
+
+  test("⚠️ A PESSOA RESTRINGIDA CONTINUA VENDO O PRÓPRIO COMENTÁRIO", () => {
+    /* É a regra que separa restringir de bloquear. Com a checagem de autoria
+       depois da restrição, ela escreveria, o comentário sumiria da tela dela, e
+       ela descobriria na hora — e restringir viraria um bloqueio anunciado. */
+    expect(
+      verDoComentario({
+        ...base,
+        euId: "outra",
+        autorDoComentario: "outra",
+        donaRestringeOAutor: true,
+      }),
+    ).toEqual({ mostra: true, marca: null });
+  });
+
+  test("⚠️ a DONA do post vê o restringido, MARCADO", () => {
+    /* Esconder dela seria pior que não ter o recurso: um comentário que ninguém
+       lê e nem ela sabe que existe é um canal cego — e ela precisa poder
+       apagar, denunciar ou mudar de ideia. */
+    expect(verDoComentario({ ...base, euId: "dona", donaRestringeOAutor: true })).toEqual({
+      mostra: true,
+      marca: "restrito",
+    });
+  });
+
+  test("e um terceiro NÃO vê o restringido", () => {
+    expect(verDoComentario({ ...base, euId: "terceira", donaRestringeOAutor: true })).toEqual({
+      mostra: false,
+      marca: null,
+    });
+  });
+
+  test("⚠️ a MINHA palavra escondida vale inclusive no MEU post", () => {
+    /* Se eu escondi "perdi", eu não quero ler "perdi" em lugar nenhum — nem no
+       meu. Ali ele aparece marcado, para eu poder decidir o que fazer. */
+    expect(verDoComentario({ ...base, euId: "dona", batePalavraMinha: true })).toEqual({
+      mostra: true,
+      marca: "palavra",
+    });
+    expect(verDoComentario({ ...base, batePalavraMinha: true })).toEqual({
+      mostra: false,
+      marca: null,
+    });
+  });
+
+  test("⚠️ mas nunca esconde o que EU escrevi", () => {
+    /* Minha própria palavra escondida aparecendo no meu próprio comentário
+       faria a tela apagar o que acabei de escrever. */
+    expect(
+      verDoComentario({
+        ...base,
+        euId: "outra",
+        autorDoComentario: "outra",
+        batePalavraMinha: true,
+      }),
+    ).toEqual({ mostra: true, marca: null });
+  });
+
+  test("⚠️ a minha restrição esconde de mim no post DE OUTRA PESSOA", () => {
+    /* Restringir é sobre não ler aquela pessoa, não só sobre o meu post. */
+    expect(verDoComentario({ ...base, restringiOAutor: true })).toEqual({
+      mostra: false,
+      marca: null,
+    });
+  });
+
+  test("a palavra vence a restrição quando as duas valem", () => {
+    /* Ordem determinística: sem ela, a mesma linha mostraria marcas diferentes
+       entre duas aberturas. */
+    expect(
+      verDoComentario({
+        ...base,
+        euId: "dona",
+        donaRestringeOAutor: true,
+        batePalavraMinha: true,
+      }),
+    ).toEqual({ mostra: true, marca: "palavra" });
   });
 });

@@ -49,6 +49,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Comentarios } from "@/components/rede-comentarios";
+import { FiltroDePalavras } from "@/components/rede-social";
 import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
 import type { Persona } from "@/lib/selo-do-perfil";
@@ -92,6 +93,8 @@ export const Route = createFileRoute("/preview-instagram")({
     tela: q.tela == null ? "feed" : String(q.tela),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     tag: q.tag == null ? "28semanas" : String(q.tag),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    restrito: q.restrito == null ? 0 : Number(q.restrito),
     meu: q.meu == null ? false : !!q.meu,
     vazio: q.vazio == null ? false : !!q.vazio,
     /* ⚠️ `== null` e NÃO `=== undefined` — mesma armadilha de sempre. */
@@ -366,6 +369,7 @@ function Bancada() {
     filhos,
     conversa,
     tag,
+    restrito,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -407,6 +411,10 @@ function Bancada() {
        sem ninguém nunca ter olhado. */
     handle: meu ? "marina.costa" : "carol.andrade",
     silenciado: false,
+    /* ⚠️ `?restrito=1` fotografa o botão no estado LIGADO e o texto que ele
+       mostra ali — impossível de ver sem uma restrição real, e é o texto que
+       explica o recurso inteiro. */
+    restrito: restrito === 1,
     seguidores: meu ? 137 : 412,
     seguindo: meu ? 208 : 190,
     euSigo: meu ? 64 : null,
@@ -841,6 +849,10 @@ function Bancada() {
      * servidor e exige sessão MAIS um post com comentários de outras contas.
      * `?fechados=1` mostra o estado que a dona liga.
      */
+    /* ⚠️ **A CONVERSA, O CORAÇÃO E A MARCA DE OCULTO PRECISAM ESTAR AQUI.**
+       Os três só existem numa conta de verdade — com três pessoas escrevendo,
+       alguém curtindo e uma restrição ativa. Sem a bancada, o estado que a
+       tela passaria meses sem ninguém olhar é justamente o novo. */
     const meus = [
       {
         id: "k1",
@@ -850,6 +862,57 @@ function Bancada() {
         texto: "que linda! 💛",
         criadoEm: "2026-08-24T10:00:00Z",
         possoApagar: false,
+        respondeA: null,
+        curtidas: 3,
+        euCurti: true,
+      },
+      {
+        id: "k1r1",
+        autorId: "u9",
+        autorNome: "Você",
+        autorAvatar: null,
+        texto: "obrigada, Marina 🥹",
+        criadoEm: "2026-08-24T10:02:00Z",
+        possoApagar: true,
+        respondeA: "k1",
+        curtidas: 1,
+        euCurti: false,
+      },
+      {
+        id: "k1r2",
+        autorId: "u3",
+        autorNome: "Ana Paula",
+        autorAvatar: null,
+        texto: "concordo demais",
+        criadoEm: "2026-08-24T10:03:00Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
+      },
+      {
+        id: "k1r3",
+        autorId: "u4",
+        autorNome: "Bruna",
+        autorAvatar: null,
+        texto: "que fofa",
+        criadoEm: "2026-08-24T10:04:00Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
+      },
+      {
+        id: "k1r4",
+        autorId: "u5",
+        autorNome: "Tia Zezé",
+        autorAvatar: null,
+        texto: "linda demais!",
+        criadoEm: "2026-08-24T10:04:30Z",
+        possoApagar: false,
+        respondeA: "k1",
+        curtidas: 0,
+        euCurti: false,
       },
       {
         id: "k2",
@@ -859,6 +922,37 @@ function Bancada() {
         texto: "também estou de 30 semanas, vamos juntas",
         criadoEm: "2026-08-24T10:05:00Z",
         possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+      },
+      /* ⚠️ As DUAS marcas de oculto, que só a dona do post recebe — e que são
+         impossíveis de fotografar sem uma restrição e um filtro ativos. */
+      {
+        id: "k3",
+        autorId: "u6",
+        autorNome: "Cunhada",
+        autorAvatar: null,
+        texto: "seu bebê parece pequeno pra essa idade",
+        criadoEm: "2026-08-24T10:06:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+        oculto: "restrito" as const,
+      },
+      {
+        id: "k4",
+        autorId: "u7",
+        autorNome: "Alguém",
+        autorAvatar: null,
+        texto: "minha prima teve isso e perdi o sono",
+        criadoEm: "2026-08-24T10:07:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 0,
+        euCurti: false,
+        oculto: "palavra" as const,
       },
     ];
     return (
@@ -867,6 +961,17 @@ function Bancada() {
           postId="00000000-0000-0000-0000-000000000001"
           bancada={{ comentarios: meus, abertos: conversa !== "fechados", souADona: true }}
         />
+      </div>
+    );
+  }
+
+  if (tela === "filtro") {
+    /* ⚠️ O cartão do filtro busca a lista do servidor e por isso abriria vazio
+       sem sessão — e vazio é o único estado que ele NÃO precisava provar.
+       `?vazio=1` mostra a lista sem nenhuma palavra. */
+    return (
+      <div className="mx-auto max-w-md py-4">
+        <FiltroDePalavras bancada={vazio ? [] : ["perdi", "aborto", "parto normal"]} />
       </div>
     );
   }
@@ -1261,6 +1366,12 @@ function Bancada() {
              lida com calma antes de existir. */
           aoDenunciarPerfil={meu ? undefined : (m) => alert(`denunciaria o perfil por "${m}"`)}
           aoSilenciar={meu ? undefined : (v) => alert(v ? "silenciaria" : "voltaria a ouvir")}
+          /* ⚠️ Sem esta prop o botão de restringir NÃO desenha, e a bancada
+             aprovaria uma tela sem o controle novo — o defeito que o `@` já
+             produziu uma vez aqui. */
+          aoRestringir={
+            meu ? undefined : (v) => alert(v ? "restringiria" : "deixaria de restringir")
+          }
           /* ⚠️ Sem esta prop o botão "Usar este código" não desenha, e a
              bancada aprovaria a pílula sem o controle que é o ponto dela. */
           aoAplicarCodigo={(c) => alert(`aplicaria o código ${c}`)}

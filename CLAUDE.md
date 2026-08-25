@@ -7864,3 +7864,112 @@ portão que eu de fato rodo. Conferida por mutação.
 ⚠️ **Se o `bun:test` um dia tipar um destes, TIRE-O da lista** — nunca relaxe a
 asserção. Catraca que proíbe o que já é permitido é catraca que a próxima pessoa
 aprende a contornar.
+
+## As cinco da noite: responder, curtir, restringir, filtrar e descrever (ago/2026)
+
+Pedido do dono depois do inventário da aba: aplicar as cinco que faltavam, e
+auditar a Comunidade inteira. Duas são de conversa, três são de controle.
+
+**Aplicar:** `supabase/APLICAR_COMENTARIOS_E_LIMITES.sql` (idempotente).
+
+### 1 e 2 · O comentário virou conversa
+
+Era uma lista PLANA. Com três pessoas comentando num post sobre um susto e a
+autora respondendo, ninguém sabia a quem cada resposta se dirigia — e conversa
+cruzada num assunto sensível é o que gera mal-entendido.
+
+⚠️ **UM NÍVEL SÓ, e a trava é do SERVIDOR.** `raizDoComentario` puxa a resposta
+de uma resposta de volta para a raiz. A coluna aceita qualquer uuid: um pedido
+montado à mão criaria o segundo nível, e a tela — que só desenha raiz e filha —
+deixaria essa resposta ÓRFÃ: gravada, contada, e invisível para todo mundo.
+Árvore infinita num celular de 393px tem 40px de largura no quarto nível.
+
+⚠️ **E o alvo tem de ser do MESMO post.** Sem a conferência, responder a um
+comentário de outro post gravaria uma resposta que aparece numa conversa onde
+ela não faz sentido — e o texto dela vazaria para quem vê aquele outro post.
+
+⚠️ **A resposta órfã ENTRA como raiz, nunca some.** Se a raiz foi apagada ou
+escondida por restrição, a resposta continua existindo; descartá-la faria um
+comentário gravado desaparecer sem nada explicando.
+
+**A curtida é como a autora agradece dez comentários sem escrever dez
+respostas.** Sem ela, ou responde a todos ou ignora todos — e no segundo caso a
+comunidade esfria. ⚠️ **UM tipo só**, contra os treze do post: treze emojis
+embaixo de cada comentário viraria uma parede, e o comentário JÁ É a resposta com
+nuance. ⚠️ A PK garante uma por pessoa; `23505` é sucesso repetido. ⚠️ O número
+só aparece a partir de 1 — um "0" ao lado de todo comentário transforma a
+conversa num placar de quem foi ignorada.
+
+### 3 · Restringir — o degrau que faltava entre silenciar e bloquear
+
+⚠️ **EXISTE POR UM MOTIVO SOCIAL, não técnico:** bloquear a cunhada tem custo —
+ela descobre, e vira briga de família. Numa comunidade onde as pessoas se
+conhecem da vida real, é esse custo que faz a paciente não usar o bloqueio e
+continuar recebendo o que a machuca.
+
+⚠️ **A ORDEM DE `verDoComentario` É O RECURSO INTEIRO.** A checagem de autoria
+vem PRIMEIRO: quem foi restringida continua vendo o próprio comentário
+exatamente como antes. Com ela depois, a pessoa escreveria, o comentário sumiria
+da tela dela, e ela descobriria na hora — restringir viraria um bloqueio
+anunciado.
+
+⚠️ **A DONA DO POST VÊ, MARCADO.** Esconder dela seria pior que não ter o
+recurso: um comentário que ninguém lê e nem ela sabe que existe é um canal cego.
+
+⚠️ **E a leitura da restrição falha ABERTA — a exceção que precisa ser dita.**
+No bloqueio, falhar fechado é o lado seguro. Aqui, "fechado" esconderia
+comentários de gente que ninguém restringiu, e a dona veria a conversa dela
+encolher sem motivo visível.
+
+### 4 · O filtro de palavras
+
+⚠️ **CASA PALAVRA INTEIRA, e é isso que faz o recurso servir.** Com `includes`,
+esconder "parto" esconderia "departamento"; "mal" esconderia "mala", "malha",
+"animal". Ela veria comentários sumindo sem entender e desligaria o filtro — o
+mesmo que não tê-lo, só que depois de ter confiado nele. A tela DIZ a régua.
+
+⚠️ **A palavra que dói é ESPECÍFICA de cada uma**, e por isso o app NÃO sugere
+palavras: para uma é "perdi", para outra é o nome de um hospital. Sugerir seria
+o app escrevendo na tela dela justamente o que ela está tentando não ler.
+
+⚠️ **ESCONDE, NUNCA APAGA**, e vale para a tela DELA — a mesma linha some para
+uma e aparece para outra. ⚠️ A expressão com espaço casa como FRASE. ⚠️ O
+caractere especial é escapado: sem isso, um "(" derruba a construção da
+expressão e o filtro inteiro para em silêncio, dentro de um laço.
+
+⚠️ **A faixa das marcas combinantes vai por ESCAPE (`̀-ͯ`), nunca com
+os caracteres literais** — elas são invisíveis no editor, e quem reformatar o
+arquivo pode apagá-las sem ver.
+
+### 5 · A descrição da foto
+
+⚠️ **`alt` NUNCA VAZIO.** `alt=""` faz o leitor de tela PULAR a imagem: quem
+navega assim nem saberia que existe uma publicação com foto ali. Sem descrição,
+entra o genérico com o nome de quem publicou — que é pouco, mas é verdade.
+
+⚠️ **Recolhido e só com FOTO.** Um segundo campo aberto entre a foto e o botão
+faria parte das pacientes achar que precisa preencher os dois; e vídeo não tem
+`alt`, então oferecer o campo ali prometeria o que o elemento não entrega.
+
+⚠️ **Uma coluna, não uma por foto do carrossel.** A descrição vale a PUBLICAÇÃO;
+o `alt` de cada imagem repete a frase com "foto 2 de 3".
+
+### ⚠️ Duas lições de método desta rodada
+
+**O `ComentarioNaTela` que eu quase duplicei.** Escrevi o tipo em
+`comentarios.ts` sem conferir — ele já existia em `comentarios.functions.ts`.
+Dois tipos com o mesmo nome é a segunda régua que este projeto proíbe desde
+`podeVerPost`, e aqui a divergência apareceria como campo que a tela lê e o
+servidor nunca manda.
+
+⚠️ **E EU ACUSEI UM DEFEITO QUE NÃO EXISTIA.** Procurei
+`setConfirmandoBloqueio(true)`, não achei, e conclui que o painel de segurança
+(bloquear, silenciar, denunciar, restringir) era inalcançável. O botão `⋯`
+existe e usa a **forma funcional** `setConfirmandoBloqueio((v) => !v)`. Grep de
+chamada literal não prova ausência de chamador — foi o navegador que corrigiu,
+como sempre.
+
+**Bancadas:** `/preview-instagram?tela=comentarios` (a conversa, o coração, "ver
+mais", as duas marcas de oculto) · `?tela=filtro` e `?tela=filtro&vazio=1` ·
+`?tela=perfil` → `⋯` (restringir) · `?tela=perfil&restrito=1` → `⋯` (o estado
+ligado) · `?tela=novo&comFoto=1` (a descrição).

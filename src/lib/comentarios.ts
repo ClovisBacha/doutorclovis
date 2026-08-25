@@ -163,3 +163,180 @@ export function podeApagarComentario(v: {
 }): boolean {
   return v.euId === v.autorDoComentario || v.euId === v.donaDoPost;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONDER, CURTIR, RESTRINGIR E FILTRAR — as quatro que entraram depois
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * A RAIZ DE UMA RESPOSTA — e é ela que mantém a árvore com UM nível.
+ *
+ * ⚠️ **Responder a uma resposta entra na MESMA linha da conversa**, como no
+ * Instagram. Sem esta função, `responde_a` apontaria para a resposta e a árvore
+ * cresceria sem fim: num celular de 393px, o quarto nível tem 40px de largura e
+ * ninguém lê. Um nível também é o que faz "responder" ser um gesto de UMA
+ * decisão — a quem eu respondo é sempre a conversa, nunca a linha exata.
+ *
+ * ⚠️ **A trava é do SERVIDOR, não da tela.** A coluna aceita qualquer uuid; um
+ * pedido montado à mão criaria o segundo nível, e a tela desenharia uma resposta
+ * órfã que nenhuma raiz mostra.
+ */
+export function raizDoComentario(alvo: { id: string; respondeA: string | null }): string {
+  return alvo.respondeA ?? alvo.id;
+}
+
+/**
+ * Quantas respostas a tela mostra antes de "ver mais".
+ *
+ * ⚠️ **Três, e não todas.** Uma conversa de vinte respostas empurraria os
+ * outros comentários para fora da tela — e num post sobre um susto, a resposta
+ * que importa costuma ser a da AUTORA, que fica no meio delas.
+ */
+export const RESPOSTAS_VISIVEIS = 3;
+
+/**
+ * ⚠️ **A CURTIDA DO COMENTÁRIO TEM UM TIPO SÓ, e o post tem treze.**
+ *
+ * Não é economia: treze emojis embaixo de cada comentário viraria uma parede, e
+ * o comentário JÁ É a resposta com nuance — quem quer dizer mais escreve. O
+ * coração aqui é o "eu li e agradeço" que permite à autora reconhecer dez
+ * comentários sem escrever dez respostas. Sem ele, ou ela responde a todos ou
+ * ignora todos, e no segundo caso a comunidade esfria.
+ *
+ * ⚠️ **O TIPO `ComentarioNaTela` MORA EM `comentarios.functions.ts`**, onde já
+ * existia — este arquivo NÃO o redeclara. Dois tipos com o mesmo nome é a
+ * segunda régua que este projeto proíbe desde `podeVerPost`, e aqui a
+ * divergência apareceria como campo que a tela lê e o servidor nunca manda.
+ */
+export const CURTIDA_DO_COMENTARIO = "coracao" as const;
+
+/**
+ * ⚠️ O FILTRO DE PALAVRAS — normalização.
+ *
+ * Tira acento e caixa, porque quem escreve "PERDI" e "perdí" está escrevendo a
+ * mesma palavra, e uma paciente que precisou esconder uma palavra não deveria
+ * ter de listar as quatro grafias dela.
+ */
+export function normalizarParaFiltro(t: string): string {
+  return (
+    t
+      .normalize("NFD")
+      /* ⚠️ **A faixa das marcas combinantes vai por ESCAPE, nunca com os
+         caracteres literais.** Elas são INVISÍVEIS no editor: coladas aqui, a
+         próxima pessoa que reformatar o arquivo pode apagá-las sem ver, e o
+         filtro passa a errar todo acento sem nada na tela dizendo por quê. */
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+  );
+}
+
+/**
+ * Este texto contém alguma das palavras que ela escondeu?
+ *
+ * ⚠️ **CASA PALAVRA INTEIRA, e essa é a decisão que faz o recurso servir.** Com
+ * `includes`, esconder "parto" esconderia "departamento" e "aparto"; esconder
+ * "mal" esconderia "mala", "malha", "animal". A paciente veria comentários
+ * sumindo sem entender por quê e desligaria o filtro — que é o mesmo que não
+ * tê-lo, só que depois de ela ter confiado nele.
+ *
+ * ⚠️ **A borda é NÃO-LETRA, e não `\b`.** `\b` do JavaScript é ASCII: em
+ * "gestação", o `ç` já é borda, e `\bmal\b` não casaria "mal-estar" do jeito
+ * esperado em vários casos acentuados. Como o texto e a palavra passam os dois
+ * por `normalizarParaFiltro`, sobra ASCII — mas a borda explícita continua
+ * sendo mais previsível que confiar no que `\b` considera letra.
+ *
+ * ⚠️ **Uma expressão que a paciente digitou com espaço é FRASE**, e casa como
+ * frase: "perdi o bebê" só esconde essa sequência, não cada palavra.
+ */
+export function temPalavraOculta(texto: string, palavras: readonly string[]): boolean {
+  const alvo = normalizarParaFiltro(texto);
+  for (const bruta of palavras) {
+    const p = normalizarParaFiltro(bruta).trim();
+    if (!p) continue;
+    const escapada = p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`(^|[^a-z0-9])${escapada}([^a-z0-9]|$)`).test(alvo)) return true;
+  }
+  return false;
+}
+
+/** Teto da lista. */
+export const PALAVRAS_OCULTAS_MAX = 60;
+/** Teto de cada expressão — é palavra ou frase curta, nunca um parágrafo. */
+export const PALAVRA_OCULTA_MAX = 40;
+
+/**
+ * Limpa a lista que veio da tela.
+ *
+ * ⚠️ **Não recusa a lista inteira por causa de uma entrada ruim.** Ela digita
+ * separando por vírgula ou por linha; recusar tudo porque uma ficou vazia faria
+ * o botão de salvar não fazer nada, sem dizer qual.
+ */
+export function limparPalavrasOcultas(bruto: readonly string[]): string[] {
+  const vistas = new Set<string>();
+  const saida: string[] = [];
+  for (const b of bruto) {
+    const p = String(b ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, PALAVRA_OCULTA_MAX);
+    if (!p) continue;
+    const chave = normalizarParaFiltro(p);
+    if (vistas.has(chave)) continue;
+    vistas.add(chave);
+    saida.push(p);
+    if (saida.length >= PALAVRAS_OCULTAS_MAX) break;
+  }
+  return saida;
+}
+
+/**
+ * QUEM VÊ ESTE COMENTÁRIO — a régua única.
+ *
+ * ⚠️ **`souAAutoraDoComentario` VEM PRIMEIRO, e a ordem é o recurso inteiro.**
+ * Quem foi restringida tem de continuar vendo o próprio comentário exatamente
+ * como antes: é isso que a impede de descobrir. Com a checagem depois, ela
+ * escreveria, o comentário sumiria da tela dela, e ela saberia na hora.
+ *
+ * ⚠️ **A DONA DO POST VÊ, mas MARCADO.** Esconder dela seria pior que não ter o
+ * recurso: um comentário que ninguém pode ler e nem ela sabe que existe é um
+ * canal cego — e ela precisa poder apagar, denunciar ou mudar de ideia.
+ *
+ * ⚠️ **O filtro de palavras é da PESSOA QUE OLHA, nunca do post.** Cada uma tem
+ * a lista dela, e a mesma linha some para uma e aparece para outra.
+ */
+export function verDoComentario(v: {
+  euId: string;
+  autorDoComentario: string;
+  donaDoPost: string;
+  /** Eu (quem olha) restrinjo a autora deste comentário? */
+  restringiOAutor: boolean;
+  /** A dona do post restringe a autora deste comentário? */
+  donaRestringeOAutor: boolean;
+  /** O texto bate com alguma palavra que EU escondi? */
+  batePalavraMinha: boolean;
+}): { mostra: boolean; marca: "restrito" | "palavra" | null } {
+  /* 1. É meu: vejo sempre, sem marca. É o silêncio que sustenta o recurso. */
+  if (v.euId === v.autorDoComentario) return { mostra: true, marca: null };
+
+  /* 2. A minha palavra escondida vence tudo o mais — inclusive o meu próprio
+     post. Se eu escondi "perdi", eu não quero ler "perdi" em lugar nenhum. */
+  if (v.batePalavraMinha) {
+    return v.euId === v.donaDoPost
+      ? { mostra: true, marca: "palavra" }
+      : { mostra: false, marca: null };
+  }
+
+  /* 3. A restrição da DONA do post é o que esconde de terceiros. Ela vê
+     marcado; todo o resto não vê. */
+  if (v.donaRestringeOAutor) {
+    return v.euId === v.donaDoPost
+      ? { mostra: true, marca: "restrito" }
+      : { mostra: false, marca: null };
+  }
+
+  /* 4. E a MINHA restrição esconde de mim, mesmo no post de outra pessoa —
+     restringir é sobre não ler aquela pessoa, não só sobre o meu post. */
+  if (v.restringiOAutor) return { mostra: false, marca: null };
+
+  return { mostra: true, marca: null };
+}

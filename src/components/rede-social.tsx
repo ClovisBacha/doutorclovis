@@ -38,6 +38,7 @@ import {
   recusaDoHandle,
   type QuemMenciona,
 } from "@/lib/mencoes";
+import { PALAVRA_OCULTA_MAX } from "@/lib/comentarios";
 import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
 import { LIMITE_DA_BIO } from "@/lib/rede-social";
@@ -522,6 +523,12 @@ export function ConfiguracoesDoPerfil({
         bancada={!!bancada}
       />
 
+      {/* ⚠️ **O FILTRO MORA NAS CONFIGURAÇÕES, e não na tela de comentários.**
+          É uma decisão que vale para o app inteiro e que ela toma UMA vez —
+          embaixo de um comentário, ela a tomaria com raiva, sobre a palavra
+          daquele momento, e a lista viraria um histórico de brigas. */}
+      <FiltroDePalavras />
+
       {/* ─── O FEED: misturado ou fechado ──────────────────────────────────
           ⚠️ **O PADRÃO É O MISTURADO, e o interruptor existe para FECHAR.**
           Uma rede social que só mostra quem ela já segue não tem como crescer,
@@ -700,5 +707,175 @@ export function ConfiguracoesDoPerfil({
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * O FILTRO DE PALAVRAS — as expressões que ela não quer ler.
+ *
+ * ⚠️ **A LISTA É DELA, e o app NÃO sugere palavras.** Numa gestação de alto
+ * risco não existe lista universal: para uma é "perdi", para outra é o nome de
+ * um hospital, para outra é "aborto". Sugerir seria o app escrevendo na tela
+ * dela justamente as palavras que ela está tentando não ler — e o custo de
+ * errar aqui é alto demais para um palpite.
+ *
+ * ⚠️ **ESCONDE, NUNCA APAGA.** O comentário continua existindo para quem
+ * escreveu e para todo mundo; o que muda é a tela DELA. Apagar seria moderação
+ * feita por uma lista de palavras — e é assim que um filtro começa a censurar
+ * a conversa das outras.
+ */
+export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
+  const [palavras, setPalavras] = useState<string[]>(bancada ?? []);
+  const [campo, setCampo] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [aberto, setAberto] = useState(!!bancada);
+
+  useEffect(() => {
+    if (bancada || !aberto) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const s = await supabase.auth.getSession();
+        const t = s.data.session?.access_token;
+        if (!t) return;
+        const { minhasPalavrasOcultas } = await import("@/lib/comentarios.functions");
+        const r = await minhasPalavrasOcultas({ data: { accessToken: t } });
+        if (vivo && r.ok) setPalavras(r.palavras);
+      } catch {
+        /* Sem a lista, o cartão abre vazio — o estado de quem nunca o usou. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [bancada, aberto]);
+
+  async function guardar(nova: string[]) {
+    const antes = palavras;
+    setPalavras(nova);
+    setSalvando(true);
+    try {
+      if (bancada) return;
+      const s = await supabase.auth.getSession();
+      const t = s.data.session?.access_token;
+      if (!t) return;
+      const { salvarPalavrasOcultas } = await import("@/lib/comentarios.functions");
+      const r = await salvarPalavrasOcultas({ data: { accessToken: t, palavras: nova } });
+      /* ⚠️ **A LISTA QUE VOLTA É A DO SERVIDOR, e não a que eu mandei.** É lá
+         que a limpeza roda (repetida, vazia, teto) — pintar a minha deixaria a
+         tela mostrando uma entrada que o banco não guardou. */
+      if (r.ok) setPalavras(r.palavras);
+      else {
+        setPalavras(antes);
+        toast.error(
+          r.motivo === "sem_suporte"
+            ? "O filtro ainda não está pronto no servidor."
+            : "Não deu para salvar.",
+        );
+      }
+    } catch {
+      setPalavras(antes);
+      toast.error("Não deu para salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  function acrescentar() {
+    /* ⚠️ Aceita vírgula e quebra de linha: ela cola uma lista de uma vez, e
+       exigir uma por vez faria o recurso custar dez toques. */
+    const novas = campo
+      .split(/[,\n]/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+    if (!novas.length) return;
+    setCampo("");
+    void guardar([...palavras, ...novas]);
+  }
+
+  return (
+    <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="font-semibold">Palavras que você não quer ler</h3>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            Comentários com essas palavras ficam escondidos <strong>de você</strong>. Ninguém é
+            avisado, e nada é apagado.
+          </p>
+        </div>
+        {!aberto && (
+          <button
+            type="button"
+            onClick={() => setAberto(true)}
+            className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+          >
+            Abrir
+          </button>
+        )}
+      </div>
+
+      {aberto && (
+        <>
+          <div className="mt-3 flex items-end gap-2">
+            <input
+              value={campo}
+              onChange={(e) => setCampo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  acrescentar();
+                }
+              }}
+              placeholder="uma palavra ou frase"
+              aria-label="Palavra a esconder"
+              maxLength={PALAVRA_OCULTA_MAX}
+              className="min-h-[44px] flex-1 rounded-2xl border border-border bg-background px-3 text-sm"
+            />
+            <button
+              type="button"
+              disabled={!campo.trim() || salvando}
+              onClick={acrescentar}
+              className="press min-h-[44px] shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              Somar
+            </button>
+          </div>
+
+          {palavras.length === 0 ? (
+            <p className="mt-3 text-[12px] text-muted-foreground">
+              Sua lista está vazia. Nada está sendo escondido.
+            </p>
+          ) : (
+            <ul className="mt-3 flex flex-wrap gap-1.5">
+              {palavras.map((p) => (
+                <li key={p}>
+                  <button
+                    type="button"
+                    disabled={salvando}
+                    onClick={() => void guardar(palavras.filter((x) => x !== p))}
+                    aria-label={`Tirar "${p}" da lista`}
+                    className="press flex min-h-[36px] items-center gap-1.5 rounded-full bg-muted px-3 text-[13px] disabled:opacity-50"
+                  >
+                    <span className="max-w-[180px] truncate">{p}</span>
+                    <span aria-hidden className="text-muted-foreground">
+                      ×
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* ⚠️ **DIZ QUE CASA PALAVRA INTEIRA.** Sem esta linha, ela esconde
+              "mal" e estranha que "mala" continue aparecendo — ou o contrário,
+              espera que "parto" esconda "departamento". A régua é
+              `temPalavraOculta`, e a tela a explica em uma frase. */}
+          <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+            Casa a palavra inteira: “parto” não esconde “departamento”. Você pode escrever uma
+            frase, e ela é escondida como frase.
+          </p>
+        </>
+      )}
+    </section>
   );
 }

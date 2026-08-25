@@ -13,9 +13,9 @@
  * campo obriga a redigitar tudo para trocar uma frase.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComentarioNaTela } from "@/lib/comentarios.functions";
-import { LIMITE_DO_COMENTARIO } from "@/lib/comentarios";
+import { LIMITE_DO_COMENTARIO, RESPOSTAS_VISIVEIS } from "@/lib/comentarios";
 
 async function token() {
   const { supabase } = await import("@/integrations/supabase/client");
@@ -42,6 +42,88 @@ export function Comentarios({
   const [apagando, setApagando] = useState<string | null>(null);
   const [indisponivel, setIndisponivel] = useState(false);
   const [denunciando, setDenunciando] = useState<string | null>(null);
+  /** Conversas com as respostas todas à mostra. Por raiz. */
+  const [abertas, setAbertas] = useState<Record<string, boolean>>({});
+  /**
+   * A quem eu estou respondendo.
+   *
+   * ⚠️ **Guarda a RAIZ e o NOME de quem eu toquei, separados.** A raiz é para
+   * onde a resposta vai; o nome é o que aparece na tela ("Respondendo a
+   * Marina"). Quando ela responde a uma RESPOSTA, os dois divergem — e sem
+   * guardar os dois, ou a resposta vai para a conversa errada, ou a tela diz o
+   * nome errado.
+   */
+  const [respondendo, setRespondendo] = useState<{ raizId: string; nome: string } | null>(null);
+  const campo = useRef<HTMLTextAreaElement | null>(null);
+
+  /**
+   * A lista plana vira conversas de UM nível.
+   *
+   * ⚠️ **A resposta órfã ENTRA como raiz, nunca some.** Se a raiz dela foi
+   * apagada (o servidor filtra `apagado_em`) ou escondida por restrição, a
+   * resposta continua existindo — e descartá-la faria um comentário gravado
+   * desaparecer da tela sem nada explicando. Melhor solta no fim que invisível.
+   */
+  const conversas = useMemo(() => {
+    const raizes = new Map<string, { raiz: ComentarioNaTela; respostas: ComentarioNaTela[] }>();
+    for (const c of lista) if (!c.respondeA) raizes.set(c.id, { raiz: c, respostas: [] });
+    const orfas: ComentarioNaTela[] = [];
+    for (const c of lista) {
+      if (!c.respondeA) continue;
+      const dona = raizes.get(c.respondeA);
+      if (dona) dona.respostas.push(c);
+      else orfas.push(c);
+    }
+    const saida = [...raizes.values()];
+    for (const o of orfas) saida.push({ raiz: o, respostas: [] });
+    /* A ordem é a do tempo da RAIZ — a mesma da lista que veio do servidor. */
+    return saida.sort(
+      (a, b) => new Date(a.raiz.criadoEm).getTime() - new Date(b.raiz.criadoEm).getTime(),
+    );
+  }, [lista]);
+
+  function responderA(alvo: ComentarioNaTela, raiz?: ComentarioNaTela) {
+    setRespondendo({ raizId: (raiz ?? alvo).id, nome: alvo.autorNome });
+    /* ⚠️ Foco no campo: sem isto, tocar em "Responder" muda um rótulo pequeno
+       no rodapé e mais nada — ela toca de novo achando que não pegou. */
+    campo.current?.focus();
+  }
+
+  /**
+   * O CORAÇÃO — pinta na hora, e desfaz se o servidor recusar.
+   *
+   * ⚠️ **Pintar ANTES é obrigatório num gesto de um toque.** Esperar a rede
+   * deixaria o coração inerte por meio segundo, e ela tocaria de novo — o que
+   * mandaria "descurtir" logo depois de "curtir".
+   */
+  async function curtir(c: ComentarioNaTela) {
+    const alvo = !c.euCurti;
+    setLista((atual) =>
+      atual.map((x) =>
+        x.id === c.id
+          ? { ...x, euCurti: alvo, curtidas: Math.max(0, (x.curtidas ?? 0) + (alvo ? 1 : -1)) }
+          : x,
+      ),
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { curtirComentario } = await import("@/lib/comentarios.functions");
+      const r = await curtirComentario({
+        data: { accessToken: t, comentarioId: c.id, curtir: alvo },
+      });
+      if (!r.ok) throw new Error("recusado");
+    } catch {
+      setLista((atual) =>
+        atual.map((x) =>
+          x.id === c.id
+            ? { ...x, euCurti: !alvo, curtidas: Math.max(0, (x.curtidas ?? 0) + (alvo ? -1 : 1)) }
+            : x,
+        ),
+      );
+      setRecado("Não deu para curtir agora.");
+    }
+  }
 
   const carregar = useCallback(async () => {
     if (bancada) return;
@@ -80,9 +162,18 @@ export function Comentarios({
       const tk = await token();
       if (!tk) return;
       const { comentar } = await import("@/lib/comentarios.functions");
-      const r = await comentar({ data: { accessToken: tk, postId, texto: t } });
+      const r = await comentar({
+        data: { accessToken: tk, postId, texto: t, respondeA: respondendo?.raizId },
+      });
       if (r.ok) {
         setTexto("");
+        /* ⚠️ **Sai do modo resposta DEPOIS de enviar.** Deixando ligado, a
+           mensagem seguinte iria para a mesma conversa sem ela perceber — e a
+           conversa de alguém acumularia respostas que eram para o post. */
+        setRespondendo(null);
+        /* A conversa que acabou de receber resposta abre inteira: senão a
+           resposta dela pode nascer escondida atrás de "ver mais". */
+        if (respondendo) setAbertas((a) => ({ ...a, [respondendo.raizId]: true }));
         await carregar();
       } else {
         /* ⚠️ O recado da RÉGUA quando existe — ele é o que ensina. O genérico
@@ -93,7 +184,11 @@ export function Comentarios({
               ? "Os comentários deste post estão fechados."
               : r.motivo === "muitos"
                 ? "Muitos comentários hoje. Tente amanhã."
-                : "Não deu para comentar agora."),
+                : r.motivo === "alvo_invalido"
+                  ? "Esse comentário não está mais aqui."
+                  : r.motivo === "sem_suporte"
+                    ? "Responder ainda não está pronto no servidor."
+                    : "Não deu para comentar agora."),
         );
       }
     } finally {
@@ -167,48 +262,45 @@ export function Comentarios({
         )}
       </div>
 
-      {lista.map((c) => (
-        <div key={c.id} className="mt-2.5 flex items-start gap-2">
-          <button
-            type="button"
-            onClick={() => aoAbrirPerfil?.(c.autorId)}
-            className="press shrink-0"
-            aria-label={`Abrir perfil de ${c.autorNome}`}
-          >
-            {c.autorAvatar ? (
-              <img src={c.autorAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
-            ) : (
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[12px] font-semibold">
-                {(c.autorNome.trim()[0] ?? "?").toUpperCase()}
-              </span>
-            )}
-          </button>
-          <p className="min-w-0 flex-1 text-[13px] leading-snug">
-            <span className="font-semibold">{c.autorNome}</span>{" "}
-            <span className="whitespace-pre-wrap break-words">{c.texto}</span>
-          </p>
-          {/* ⚠️ **APAGAR OU DENUNCIAR, NUNCA OS DOIS.** Quem pode apagar (a
-              autora e a dona do post) resolve na hora; denunciar é a saída de
-              quem NÃO pode — oferecer as duas faria a dona denunciar em vez de
-              apagar, e a fila da plataforma encheria de coisa que ela já podia
-              resolver sozinha. */}
-          {c.possoApagar ? (
+      {conversas.map(({ raiz, respostas }) => (
+        <div key={raiz.id}>
+          <Linha
+            c={raiz}
+            aoAbrirPerfil={aoAbrirPerfil}
+            aoApagar={setApagando}
+            aoDenunciar={setDenunciando}
+            aoCurtir={curtir}
+            aoResponder={() => responderA(raiz)}
+          />
+
+          {/* ⚠️ **AS RESPOSTAS RECOLHEM DEPOIS DE TRÊS.** Uma conversa de vinte
+              empurraria os OUTROS comentários para fora da tela — e num post
+              sobre um susto, a resposta que importa costuma ser a da autora, no
+              meio delas. */}
+          {respostas.slice(0, abertas[raiz.id] ? respostas.length : RESPOSTAS_VISIVEIS).map((r) => (
+            <div key={r.id} className="ml-9">
+              <Linha
+                c={r}
+                aoAbrirPerfil={aoAbrirPerfil}
+                aoApagar={setApagando}
+                aoDenunciar={setDenunciando}
+                aoCurtir={curtir}
+                /* ⚠️ Responder a uma RESPOSTA cai na mesma conversa — a raiz é
+                   sempre a mesma. É o que mantém um nível só. Ver
+                   `raizDoComentario`. */
+                aoResponder={() => responderA(r, raiz)}
+              />
+            </div>
+          ))}
+
+          {respostas.length > RESPOSTAS_VISIVEIS && !abertas[raiz.id] && (
             <button
               type="button"
-              onClick={() => setApagando(c.id)}
-              className="press shrink-0 text-[12px] text-muted-foreground"
-              aria-label="Apagar comentário"
+              onClick={() => setAbertas((a) => ({ ...a, [raiz.id]: true }))}
+              className="press ml-9 mt-1 min-h-[36px] text-[12px] font-medium text-muted-foreground"
             >
-              ×
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setDenunciando(c.id)}
-              className="press shrink-0 text-[12px] text-muted-foreground"
-              aria-label="Denunciar comentário"
-            >
-              ⋯
+              Ver mais {respostas.length - RESPOSTAS_VISIVEIS}{" "}
+              {respostas.length - RESPOSTAS_VISIVEIS === 1 ? "resposta" : "respostas"}
             </button>
           )}
         </div>
@@ -276,8 +368,28 @@ export function Comentarios({
         </p>
       ) : (
         <>
+          {/* ⚠️ **A TELA DIZ A QUEM ELA RESPONDE, com saída.** Sem esta linha,
+              tocar em "Responder" muda um estado invisível: ela escreve achando
+              que comenta no post, e o texto nasce dentro da conversa de outra
+              pessoa. E sem o ×, sair do modo exigiria enviar. */}
+          {respondendo && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-1.5">
+              <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+                Respondendo a {respondendo.nome}
+              </span>
+              <button
+                type="button"
+                onClick={() => setRespondendo(null)}
+                aria-label="Cancelar resposta"
+                className="press min-h-[32px] px-1 text-[13px] text-muted-foreground"
+              >
+                ×
+              </button>
+            </div>
+          )}
           <div className="mt-3 flex items-end gap-2">
             <textarea
+              ref={campo}
               value={texto}
               onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DO_COMENTARIO))}
               rows={1}
@@ -301,5 +413,133 @@ export function Comentarios({
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * UMA LINHA DE COMENTÁRIO — raiz ou resposta, o mesmo desenho.
+ *
+ * ⚠️ **UM componente para os dois, e não dois.** A diferença entre raiz e
+ * resposta é o recuo de 36px do pai — tudo o mais (avatar, nome, coração,
+ * responder, apagar) é igual. Duas cópias divergiriam no primeiro ajuste, e a
+ * divergência apareceria como a resposta perdendo um botão que a raiz tem.
+ */
+function Linha({
+  c,
+  aoAbrirPerfil,
+  aoApagar,
+  aoDenunciar,
+  aoCurtir,
+  aoResponder,
+}: {
+  c: ComentarioNaTela;
+  aoAbrirPerfil?: (id: string) => void;
+  aoApagar: (id: string) => void;
+  aoDenunciar: (id: string) => void;
+  aoCurtir: (c: ComentarioNaTela) => void;
+  aoResponder: () => void;
+}) {
+  return (
+    <div className="mt-2.5 flex items-start gap-2">
+      <button
+        type="button"
+        onClick={() => aoAbrirPerfil?.(c.autorId)}
+        className="press shrink-0"
+        aria-label={`Abrir perfil de ${c.autorNome}`}
+      >
+        {c.autorAvatar ? (
+          <img src={c.autorAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
+        ) : (
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[12px] font-semibold">
+            {(c.autorNome.trim()[0] ?? "?").toUpperCase()}
+          </span>
+        )}
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] leading-snug">
+          <span className="font-semibold">{c.autorNome}</span>{" "}
+          <span className="whitespace-pre-wrap break-words">{c.texto}</span>
+        </p>
+
+        {/* ⚠️ **A MARCA SÓ APARECE PARA A DONA DO POST**, e é o servidor que
+            decide (`verDoComentario`). Quem foi restringida nunca recebe este
+            campo preenchido no comentário dela — é esse silêncio que separa
+            restringir de bloquear. */}
+        {c.oculto && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            {c.oculto === "restrito"
+              ? "Só você e quem escreveu veem este comentário."
+              : "Escondido pelo seu filtro de palavras."}
+          </p>
+        )}
+
+        <div className="mt-0.5 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={aoResponder}
+            className="press min-h-[32px] text-[12px] font-medium text-muted-foreground"
+          >
+            Responder
+          </button>
+          {/* ⚠️ O número só aparece com pelo menos uma: um "0" ao lado de todo
+              comentário transforma a conversa num placar de quem foi ignorada. */}
+          {(c.curtidas ?? 0) > 0 && (
+            <span className="text-[12px] text-muted-foreground">
+              {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ⚠️ **O CORAÇÃO É DESENHADO**, e não ❤️. O emoji sai vermelho no iOS e
+          cinza no Android, e aqui ele tem DOIS estados que precisam se
+          distinguir à primeira vista — a mesma lição do 📞 e do marcador de
+          salvar. */}
+      <button
+        type="button"
+        onClick={() => aoCurtir(c)}
+        aria-label={c.euCurti ? "Tirar a curtida" : "Curtir comentário"}
+        aria-pressed={!!c.euCurti}
+        className="press flex h-8 w-8 shrink-0 items-center justify-center"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-4 w-4 ${c.euCurti ? "text-destructive" : "text-muted-foreground"}`}
+          fill={c.euCurti ? "currentColor" : "none"}
+          stroke="currentColor"
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden
+        >
+          <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
+        </svg>
+      </button>
+
+      {/* ⚠️ **APAGAR OU DENUNCIAR, NUNCA OS DOIS.** Quem pode apagar (a autora e
+          a dona do post) resolve na hora; denunciar é a saída de quem NÃO pode —
+          oferecer as duas faria a dona denunciar em vez de apagar, e a fila da
+          plataforma encheria de coisa que ela já podia resolver sozinha. */}
+      {c.possoApagar ? (
+        <button
+          type="button"
+          onClick={() => aoApagar(c.id)}
+          className="press h-8 w-6 shrink-0 text-[12px] text-muted-foreground"
+          aria-label="Apagar comentário"
+        >
+          ×
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => aoDenunciar(c.id)}
+          className="press h-8 w-6 shrink-0 text-[12px] text-muted-foreground"
+          aria-label="Denunciar comentário"
+        >
+          ⋯
+        </button>
+      )}
+    </div>
   );
 }
