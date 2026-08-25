@@ -86,6 +86,25 @@ export const BANDEIRA_VERMELHA = new RegExp(
  * números, ou o par escrito com **"por"** por extenso — que é como se fala
  * pressão e não é como se escreve data.
  */
+/**
+ * ⚠️ **O QUE DESQUALIFICA UM PAR DE NÚMEROS COMO PRESSÃO É O SUBSTANTIVO, e não
+ * "ter palavra depois".**
+ *
+ * A primeira versão desta trava exigia que o par TERMINASSE ali
+ * (`(?!\s*[a-zà-ÿ])`) — e isso derrubou um caso real: **"deu 15 por 10 agora"**
+ * saía publicável, medido numa bateria de 40 frases. Quem relata pressão quase
+ * sempre põe uma palavra de tempo depois ("agora", "hoje", "de manhã").
+ *
+ * Quem escreve QUANTIDADE é que põe o substantivo: "12 por 10 pessoas",
+ * "3 por 2 na farmácia", "1 por 2 metros". A lista é curta de propósito — ela
+ * cobre o que aparece num app de gestação, e errar para o lado de ROTEAR uma
+ * quantidade é muito mais barato que deixar passar uma pressão de 16 por 11.
+ */
+const NAO_E_QUANTIDADE =
+  "(?!\\s*(?:pessoas?|convidad\\w*|reais|real|d[ií]as?|semanas?|m[eê]s|meses|horas?|" +
+  "minutos?|metros?|cm|cent[ií]metros?|unidades?|itens?|item|pacotes?|vezes|vez|" +
+  "anos?|quilos?|kg|litros?|ml|por[çc][õo]es|fraldas?|lugares?)\\b)";
+
 export const PRESSAO_EM_NUMEROS = new RegExp(
   [
     "(?:press(?:ã|a)o|\\bpa\\b)[^0-9]{0,20}\\d{1,3}\\s*(?:por|x|\\/)\\s*\\d{1,3}",
@@ -111,8 +130,9 @@ export const PRESSAO_EM_NUMEROS = new RegExp(
      * caso é do ramo de cima. Quem escreve quantidade sempre põe o substantivo
      * depois: pessoas, reais, dias, convidados, unidades.
      */
-    "\\b(?:[89]|1\\d|2[0-5])\\s*por\\s*(?:[4-9]|1[0-6])(?![0-9]|\\s*[a-zà-ÿ])",
-    "\\b(?:[89]\\d|1\\d\\d|2[0-4]\\d|250)\\s*por\\s*(?:[4-9]\\d|1[0-6]\\d)(?![0-9]|\\s*[a-zà-ÿ])",
+    "\\b(?:[89]|1\\d|2[0-5])\\s*por\\s*(?:[4-9]|1[0-6])(?![0-9])" + NAO_E_QUANTIDADE,
+    "\\b(?:[89]\\d|1\\d\\d|2[0-4]\\d|250)\\s*por\\s*(?:[4-9]\\d|1[0-6]\\d)(?![0-9])" +
+      NAO_E_QUANTIDADE,
   ].join("|"),
   "i",
 );

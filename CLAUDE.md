@@ -8299,3 +8299,28 @@ calculam instantes diferentes, e o texto derivado ("há 34 dias") diverge na
 virada do minuto: o React descarta a árvore. O cabeçalho do próprio arquivo
 declara a regra três seções acima ("datas cravadas, nunca `Date.now()`"). É a
 mesma família do mismatch que já derrubou o app inteiro.
+
+#### ⚠️ A BATERIA DE 40 FRASES achou o que os testes pontuais não pegaram
+
+Depois de consertar os quatro defeitos da régua clínica, rodei-a contra **40
+frases que uma gestante brasileira escreveria de verdade** — posts de
+nascimento, chá de bebê, dúvidas comuns, desabafos, conselho perigoso
+disfarçado, pressão em números, medidas de móveis, preços, horários.
+
+Zero falsos positivos. **Um falso negativo: `"deu 15 por 10 agora"` saía
+publicável.**
+
+A trava que eu tinha escrito exigia que o par de números **terminasse ali**
+(`(?!\s*[a-zà-ÿ])`) — e quem relata pressão quase sempre põe uma palavra de
+tempo depois: "agora", "hoje", "de manhã". Quem escreve QUANTIDADE é que põe o
+substantivo: "12 por 10 pessoas", "3 por 2 na farmácia".
+
+Hoje o que desqualifica é uma **lista curta de substantivos de quantidade**
+(`NAO_E_QUANTIDADE`), e não "ter palavra depois". Errar para o lado de rotear
+uma quantidade é muito mais barato que deixar passar 16 por 11.
+
+**A lição de método:** régua de texto se prova em VOLUME, contra frases reais.
+Um teste por regra pega o caso que o autor imaginou; quarenta frases pegam o que
+ele não imaginou. A bateria virou teste permanente, nas duas direções — e a de
+falso POSITIVO importa mais, porque o custo dela é a paciente aprender que o
+alarme deste app não vale leitura.

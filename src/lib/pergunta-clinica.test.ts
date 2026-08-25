@@ -319,3 +319,79 @@ describe("⚠️ os quatro defeitos que a auditoria mediu (ago/2026)", () => {
     expect(triarTexto("deu 15 por 10")).toBe("emergencia");
   });
 });
+
+const PASSA = [
+  "deu tudo certo, nasceu 3,4kg às 5h da manhã 💛",
+  "nasceu! 48cm, tudo perfeito",
+  "meu chá é dia 12 por volta das 15h",
+  "comprei o berço 1 por 2 metros",
+  "quantas semanas vocês estavam quando sentiram?",
+  "alguém indica maternidade em BH?",
+  "tô com saudade de dormir de barriga pra baixo",
+  "que barriga linda!",
+  "a mala já tá pronta 🧳",
+  "fiz o enxoval todo em promoção 3 por 2",
+  "toma um sorvete comigo hoje?",
+  "usa esse aplicativo, é ótimo",
+  "faz o bolo que eu levo o refri",
+  "passa lá em casa depois",
+  "hoje completei 30 semanas 🎉",
+  "vou de cesárea marcada dia 20",
+  "meu médico é ótimo, recomendo",
+  "cansaço nível 1000 hoje",
+  "aplica o protetor solar sempre",
+  "bebe bastante água nesse calor",
+  "meu parto foi tranquilo, durou 6h",
+  "amanhã tenho ultrassom morfológico",
+  "se eu fosse rica comprava tudo",
+  "alguém já fez chá revelação?",
+];
+const ROTEIA = [
+  "toma buscopan que resolve",
+  "toma dipirona que passa",
+  "usa essa pomada que resolve",
+  "beba um chá de canela pra descer",
+  "se eu fosse você não ia no PS",
+  "se eu fosse voce esperava amanha",
+  "no seu lugar eu ficaria em casa",
+  "não precisa ir no pronto socorro",
+  "comigo foi assim e não precisei ir",
+  "no meu caso passou sozinho",
+  "minha pressão deu 16 por 11",
+  "deu 15 por 10 agora",
+  "pa 160 por 110",
+  "ficaria em casa e esperaria passar",
+  "toma o remédio dela que é o mesmo",
+  "não tome nada, espera passar",
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A BATERIA AMPLA — 40 frases que uma gestante brasileira escreveria
+   ══════════════════════════════════════════════════════════════════════════ */
+/**
+ * ⚠️ **ESTA BATERIA ACHOU UM FALSO NEGATIVO QUE OS TESTES PONTUAIS NÃO
+ * PEGARAM.** "deu 15 por 10 agora" saía publicável — a trava do par de números
+ * exigia que ele TERMINASSE ali, e quem relata pressão quase sempre põe uma
+ * palavra de tempo depois ("agora", "hoje", "de manhã").
+ *
+ * A lição de método: régua de texto se prova em VOLUME, contra frases reais.
+ * Um teste por regra pega o caso que o autor imaginou; quarenta frases pegam o
+ * que ele não imaginou.
+ *
+ * ⚠️ **AS DUAS DIREÇÕES IMPORTAM, e a de cima importa MAIS.** Um falso positivo
+ * é o app acusando a paciente de dar conselho médico no post de nascimento
+ * dela, ou abrindo a Central de Emergência por causa de um chá de bebê — e o
+ * custo é ela aprender que o alarme deste app não vale leitura.
+ */
+describe("⚠️ a régua contra 40 frases reais", () => {
+  test("nenhum falso POSITIVO — o app não acusa quem não deve", () => {
+    const maus = PASSA.filter((t) => triarTexto(t) !== "publicavel").map(
+      (t) => `${triarTexto(t)}: ${t}`,
+    );
+    expect(maus).toEqual([]);
+  });
+  test("nenhum falso NEGATIVO — conduta perigosa não passa", () => {
+    const maus = ROTEIA.filter((t) => triarTexto(t) === "publicavel");
+    expect(maus).toEqual([]);
+  });
+});
