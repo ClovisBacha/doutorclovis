@@ -5754,6 +5754,102 @@ reprovando — conferido por mutação.
 `false`, então "Deixar de silenciar Fulana" — metade do controle — nunca tinha
 sido olhado. Mesma falta que o `?restrito=1` ao lado já cobria.
 
+### ⚠️ DOIS DEFEITOS QUE SÓ APARECIAM NO BANCO DO DONO (ago/2026)
+
+Uma revisão adversarial de 45 agentes sobre as 3.664 linhas da noite confirmou
+três achados. Um já estava consertado; os outros dois são desta seção, e os dois
+têm a mesma assinatura: **o teste não tinha como pegá-los, porque o defeito só
+existe num estado que a máquina de desenvolvimento nunca está.**
+
+#### ⚠️ A LEITURA DE POST DESPENCAVA AO PISO POR UMA COLUNA
+
+`postsCrus` é o caminho único de TODA leitura de post — seis chamadores
+(`meuFeed`, `verPerfil`, `sugestoesDoFeed`, `verPost`, `meusSalvos`,
+`postsDaTag`). O recuo tinha DUAS posições e nada no meio: a lista cheia, ou o
+piso de sete colunas.
+
+`alt_texto` entrou no TOPO da lista e só existe em
+`APLICAR_COMENTARIOS_E_LIMITES.sql` — o SQL que o dono ainda não rodou. Nesse
+banco, o primeiro `select` devolve `42703` por causa de UMA coluna e o recuo
+apagava ONZE que o banco TEM, nas seis leituras ao mesmo tempo: enquete, aula,
+pergunta respondida, o carimbo "28s → 34s", o selo de editado, a miniatura (a
+grade voltava a baixar a foto de 1080), o marco do bebê, o VÍDEO de todo post e
+o quadro de toda republicação.
+
+⚠️ **E o dano passava de enfeite.** Um post de vídeo tem `imagem_path` nulo; com
+`video_path` nulado junto, o carrossel e o player ficam os dois falsos e a
+publicação renderiza **sem mídia nenhuma**. A republicação sem texto próprio
+some inteira, porque `ehRepost` sai de `!!repost_de`.
+
+É o defeito que `publicarPost` consertou no lado da ESCRITA na mesma noite ("o
+recuo desce uma camada de cada vez") deixado de pé na LEITURA, que tem seis
+chamadores em vez de um — e a mesma lição de `perfisPorId` e de
+`marcarConsultaNoDia`: **um recuo que só sabe tirar a primeira coluna quebra de
+novo assim que a segunda faltar num banco que rodou meio SQL.**
+
+`DEGRAUS_DO_POST` são quatro camadas, uma por `APLICAR_`, do SQL mais NOVO para
+o mais antigo — a ordem em que o dono os aplica. ⚠️ **Cada degrau é DERIVADO da
+lista única por remoção, nunca escrito à mão**: duas listas escritas à mão
+divergem no primeiro ajuste, e aqui a divergência apareceria como recurso
+sumindo sem erro nenhum, que é exatamente o que a lista única existe para
+impedir.
+
+⚠️ **`degraus-do-post.test.ts` RODA A FUNÇÃO** contra um Supabase de mentira que
+conhece um conjunto de colunas escolhido — é a única forma de provar a escada,
+porque o defeito só existe num banco que rodou meio SQL. Sete testes, e o mais
+importante é o do banco do dono HOJE (tudo menos `alt_texto`): as outras onze
+sobrevivem. Repondo o recuo de dois passos, quatro dos sete ficam vermelhos.
+E há teste cobrando que nenhum degrau mande `select` com vírgula solta — a
+derivação é por remoção de texto, e um `, ` sobrando faria o recuo passar a
+falhar por SINTAXE em vez de por coluna.
+
+#### ⚠️ A ZONA DE "PUBLICAÇÕES SUGERIDAS" DUPLICAVA O FEED INTEIRO
+
+`sobrouSugestao = soSeguindo ? false : sugestoes.length > 0` — e `soSeguindo`
+nasce `false`, que é o modo de toda paciente. No modo misturado
+`intercalarDescobertas` **empurra todas as sobras para o fim do feed**, então
+quando ela chega ao rodapé as sugestões já estão inteiras na tela: a zona
+mostrava a MESMA publicação duas vezes na mesma rolagem, com a mesma chave de
+React.
+
+⚠️ **A zona não tinha estado válido em modo NENHUM**, e por isso saiu:
+
+- **misturado (o padrão)**: já foram costuradas lá em cima — duplicata pura.
+- **"Só quem eu sigo" ligado**: a tela promete por escrito "Seu feed mostra
+  apenas quem você segue", e a zona entregava o contrário. **O interruptor
+  tornava as estranhas mais visíveis.**
+
+A fileira de PESSOAS fica — ela é descoberta de gente para seguir, não conteúdo
+do feed, e sem ela quem ligou a chave nunca teria como fazer o feed fechado ter
+conteúdo. ⚠️ **E o convite ganhou condição própria**: ele vivia pendurado na
+mesma condição da zona, e tirar `sobrouSugestao` de lá o faria sumir para quem
+não tem nenhuma pessoa sugerida — justamente quem mais precisa trazer alguém.
+
+⚠️ **TRÊS TESTES MEUS TRAVAVAM A GRAFIA DE UM DESENHO DEFEITUOSO**, e os três
+reprovaram a remoção. Um deles já tinha envelhecido DUAS vezes pela mesma razão
+(`toHaveLength(1)` → `>= 2` → e agora 1 de novo), sempre por contar LISTAS em
+vez de cobrar a promessa. Hoje o que se cobra é: nenhuma publicação de fora sem
+o rótulo, a zona do rodapé não existe, a fileira fica, o convite fica.
+
+⚠️ **E uma asserção minha do conserto passava em vazio**: `toMatch(/pessoas
+.length > 0 \|\| mesmaFase/)` casava com a condição da zona de FORA, que tem a
+mesma string — trocar a condição da fileira por `false` ficava verde. Ancorada
+na `<FileiraDePessoas`, a mutação morde.
+
+⚠️ **E a prosa quebrou teste pela TERCEIRA vez nesta base**: o `not.toContain
+("Publicações sugeridas")` ficava vermelho exatamente porque o comentário que
+EXPLICA a remoção contém a string removida. `semComentarios` subiu para o
+escopo do módulo — toda busca de texto do arquivo passa por ele agora.
+
+#### ⚠️ E o contêiner rebobinou de novo, para `ee24f25`
+
+Terceira vez. O remoto tinha os três commits da noite; a árvore local voltou a
+um estado de outra sessão, com cinco arquivos "modificados" que eram na verdade
+trabalho VELHO ressuscitado. **A conferência é sempre a mesma: contar
+marcadores do trabalho recente antes de tocar em qualquer coisa** (`portoes-da
+-rede`: 0 local; `revelavel`: 0 local) e, confirmada a rebobinada, recuperar do
+remoto — nunca commitar por cima.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

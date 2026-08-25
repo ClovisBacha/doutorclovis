@@ -798,28 +798,102 @@ const COLUNAS_DO_POST_ANTIGAS =
  * A causa é banal: esta função era `private`, então quem precisou dela do lado
  * de fora copiou o `select`. Exportar é mais barato que uma catraca.
  */
-export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
-  const { data, error } = await monta(sb.from("rede_posts").select(COLUNAS_DO_POST));
-  if (!error) return (data ?? []) as any[];
-  console.warn("[rede] posts sem enquete/aula/pergunta — rode APLICAR_REDE_SOCIAL.sql");
-  const { data: velhos } = await monta(sb.from("rede_posts").select(COLUNAS_DO_POST_ANTIGAS));
-  return ((velhos ?? []) as any[]).map((p) => ({
-    ...p,
-    enquete_opcoes: null,
-    aula: null,
-    pergunta: null,
-    comparacao_de: null,
-    editado_em: null,
-    /* Sem a coluna, a grade cai na foto cheia — que é o que ela sempre fez. */
-    miniatura_path: null,
-    marco_tipo: null,
-    marco_dias: null,
-    video_path: null,
-    repost_de: null,
+/**
+ * ⚠️ **A ESCADA DA LEITURA, uma camada de SQL por degrau.**
+ *
+ * O recuo tinha DUAS posições e nada no meio: tudo, ou o piso de sete colunas.
+ * `alt_texto` entrou no topo da lista e só existe em
+ * `APLICAR_COMENTARIOS_E_LIMITES.sql` — o SQL que o dono ainda não rodou. Nesse
+ * banco (o dele, agora), o primeiro `select` devolve `42703` por causa de UMA
+ * coluna e o recuo despencava ao piso, apagando ONZE que o banco tem, nas seis
+ * leituras ao mesmo tempo: enquete, aula, pergunta respondida, o carimbo
+ * "28s → 34s", o selo de editado, a miniatura (a grade voltava a baixar a foto
+ * de 1080), o marco do bebê, o VÍDEO de todo post e o quadro de toda
+ * republicação.
+ *
+ * ⚠️ **E o dano passava de enfeite.** Um post de vídeo tem `imagem_path` nulo;
+ * com `video_path` nulado junto, o carrossel e o player ficam os dois falsos e
+ * a publicação renderiza SEM MÍDIA NENHUMA. A republicação sem texto próprio
+ * some inteira, porque `ehRepost` sai de `!!repost_de`.
+ *
+ * É o mesmo defeito que `publicarPost` consertou no lado da ESCRITA ("desce uma
+ * camada por vez") deixado de pé na LEITURA, que tem seis chamadores em vez de
+ * um — e a mesma lição de `perfisPorId` e de `marcarConsultaNoDia`: **um recuo
+ * que só sabe tirar a primeira coluna quebra de novo assim que a segunda faltar
+ * num banco que rodou meio SQL.**
+ *
+ * ⚠️ **Cada degrau é DERIVADO da lista única, nunca escrito à mão.** Duas listas
+ * escritas à mão divergem no primeiro ajuste, e aqui a divergência apareceria
+ * como recurso sumindo sem erro nenhum — que é exatamente o que a lista única
+ * existe para impedir.
+ */
+const DEGRAUS_DO_POST: { aviso: string; colunas: string[]; nulos: Record<string, null> }[] = [
+  {
+    aviso: "descrição da foto — rode APLICAR_COMENTARIOS_E_LIMITES.sql",
+    colunas: ["alt_texto"],
     /* Sem a coluna, a foto vai sem descrição — o `alt` cai no genérico, que é
        o comportamento que a rede sempre teve. */
-    alt_texto: null,
-  }));
+    nulos: { alt_texto: null },
+  },
+  {
+    aviso: "vídeo/republicação — rode APLICAR_VIDEO_NO_POST.sql",
+    colunas: ["video_path", "repost_de"],
+    nulos: { video_path: null, repost_de: null },
+  },
+  {
+    aviso: "marco do bebê — rode APLICAR_COMUNIDADE_VIVA.sql",
+    colunas: ["marco_tipo", "marco_dias"],
+    nulos: { marco_tipo: null, marco_dias: null },
+  },
+  {
+    aviso: "enquete/aula/comparação/miniatura — rode APLICAR_REDE_SOCIAL.sql",
+    colunas: [
+      "enquete_opcoes",
+      "aula",
+      "pergunta",
+      "comparacao_de",
+      "editado_em",
+      "miniatura_path",
+    ],
+    nulos: {
+      enquete_opcoes: null,
+      aula: null,
+      pergunta: null,
+      comparacao_de: null,
+      editado_em: null,
+      /* Sem a coluna, a grade cai na foto cheia — que é o que ela sempre fez. */
+      miniatura_path: null,
+    },
+  },
+];
+
+export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
+  /* Começa com tudo e vai tirando uma camada por vez, do SQL mais NOVO para o
+     mais antigo — a ordem em que o dono os aplica. */
+  let colunas = COLUNAS_DO_POST;
+  const nulos: Record<string, null> = {};
+  for (let i = 0; i <= DEGRAUS_DO_POST.length; i++) {
+    const { data, error } = await monta(sb.from("rede_posts").select(colunas));
+    if (!error) {
+      const linhas = (data ?? []) as any[];
+      /* Nada a preencher no primeiro degrau: o objeto está vazio, e devolver as
+         linhas sem tocar poupa uma cópia por post em toda leitura. */
+      return i === 0 ? linhas : linhas.map((p) => ({ ...nulos, ...p }));
+    }
+    const degrau = DEGRAUS_DO_POST[i];
+    if (!degrau) break;
+    console.warn(`[rede] posts sem ${degrau.aviso}`);
+    /* ⚠️ Derivado por REMOÇÃO da lista única — o `\b` impede que `video_path`
+       coma o começo de outra coluna, e o `, ` some junto para o select não sair
+       com vírgula dupla. */
+    for (const c of degrau.colunas) {
+      colunas = colunas.replace(new RegExp(`,\\s*\\b${c}\\b`), "").replace(`${c}, `, "");
+    }
+    Object.assign(nulos, degrau.nulos);
+  }
+  /* Nem o piso respondeu: aqui o banco não tem sequer as colunas originais, e
+     devolver lista vazia é a única resposta honesta. */
+  return [];
 }
 
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */

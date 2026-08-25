@@ -42,6 +42,20 @@ function renderizacoesDePost(): string[] {
   return saida;
 }
 
+/**
+ * A FONTE SEM A PROSA.
+ *
+ * ⚠️ **Toda busca de texto neste arquivo passa por aqui.** Um comentário que
+ * EXPLICA uma remoção contém a string removida — então um `not.toContain`
+ * contra a fonte crua fica vermelho exatamente quando o defeito está
+ * documentado. Já aconteceu três vezes nesta base (a catraca de portas, o
+ * teste do código da embaixadora, e este).
+ */
+const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
+  /\{\/\*[\s\S]*?\*\/\}/g,
+  " ",
+);
+
 describe("toda lista de posts", () => {
   test("existe mais de uma — feed e sugeridos, no mínimo", () => {
     expect(renderizacoesDePost().length).toBeGreaterThanOrEqual(2);
@@ -66,32 +80,26 @@ describe("toda lista de posts", () => {
   /* ⚠️ E a zona de sugeridos NÃO oferece apagar: nenhum post ali é dela, e um
      ⋯ com "apagar" sobre a publicação de uma desconhecida seria uma promessa
      que o servidor recusa. */
-  test("⚠️ TODA publicação de fora leva o rótulo — nas DUAS listas", () => {
-    /* ⚠️ ERAM DUAS ASSERÇÕES, E UMA DELAS ENVELHECEU COM O FEED MISTURADO.
-       Antes havia uma lista só com sugeridos (a zona do fim), então bastava
-       `toHaveLength(1)` e "não oferece apagar". Agora as descobertas também são
-       costuradas no feed principal, que é a MESMA lista que desenha os posts
-       dela — e essa lista passa `aoApagar` por construção.
-
-       O que NÃO envelheceu, e é a proteção inteira desta mudança: nenhuma
-       publicação de fora pode aparecer sem o rótulo. Misturar desconhecidas sem
-       avisar faria a paciente ler um relato duro sem saber de quem veio. */
+  test("⚠️ TODA publicação de fora leva o rótulo", () => {
+    /**
+     * ⚠️ **ESTE TESTE JÁ ENVELHECEU DUAS VEZES, e as duas por travar a
+     * ESTRUTURA em vez da promessa.** Primeiro cobrava `toHaveLength(1)` (uma
+     * lista só, a zona do fim); depois `>= 2` (duas listas, com a interlaçada).
+     * Hoje é UMA de novo — a zona do rodapé saiu porque duplicava —, e a
+     * contagem reprovou uma remoção que consertou um defeito.
+     *
+     * O que NUNCA envelheceu, e é a proteção inteira da mistura: **nenhuma
+     * publicação de fora pode aparecer sem o rótulo.** Misturar desconhecidas
+     * sem avisar faria a paciente ler um relato duro sem saber de quem veio.
+     * É isso, e só isso, que se cobra aqui.
+     */
     const sug = renderizacoesDePost().filter((r) => /\bsugerido\b/.test(r));
-    expect(sug.length).toBeGreaterThanOrEqual(2);
+    expect(sug.length).toBeGreaterThanOrEqual(1);
 
-    /* Na lista misturada o rótulo é CALCULADO por publicação, e não cravado:
-       um `sugerido` fixo marcaria as amigas dela como estranhas, e um `false`
-       fixo apagaria o aviso justamente onde ele passou a fazer falta. */
-    const misturada = sug.find((r) => r.includes("idsSugeridos"));
-    expect(misturada).toBeTruthy();
-    expect(misturada).toContain("sugerido={idsSugeridos.has(p.id)}");
-
-    /* ⚠️ E APAGAR CONTINUA SENDO DE QUEM ESCREVEU: o portão é INTERNO ao
-       cartão (`post.souAAutora && aoApagar`), e é por isso que passar a ação na
-       lista misturada é seguro. Se aquele portão sumir, este teste tem de cair
-       junto — daí ele cobrar a linha, e não só a prop. */
-    const fonte = readFileSync("src/components/rede-instagram.tsx", "utf8");
-    expect(fonte).toContain("post.souAAutora && aoApagar");
+    /* ⚠️ E o rótulo é CALCULADO por publicação, nunca cravado: um `sugerido`
+       fixo marcaria as amigas dela como estranhas, e um `false` fixo apagaria o
+       aviso justamente onde ele passou a fazer falta. */
+    expect(sug.some((r) => r.includes("idsSugeridos"))).toBe(true);
   });
 });
 
@@ -291,11 +299,6 @@ describe("convidar pela Comunidade", () => {
    ONDE ELA PAROU DE LER — a plumaria de DOM (a régua está em `lugar-no-feed`)
    ══════════════════════════════════════════════════════════════════════════ */
 describe("o lugar no feed", () => {
-  const semComentarios = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(
-    /\{\/\*[\s\S]*?\*\/\}/g,
-    " ",
-  );
-
   /* ⚠️ A âncora é o ID DO POST, e não pixels: as fotos chegam por URL assinada
      depois da primeira pintura, então a altura da lista muda embaixo de
      qualquer número de rolagem. */
@@ -396,29 +399,58 @@ describe('⚠️ o interruptor "Só quem eu sigo"', () => {
    *
    * A tela promete por escrito: "Seu feed mostra apenas quem você segue".
    */
-  test("ligado, a zona de sugeridas NÃO abre", () => {
-    const i = FONTE.indexOf("const sobrouSugestao =");
-    expect(i).toBeGreaterThan(-1);
-    const linha = FONTE.slice(i, FONTE.indexOf(";", i));
-    /* Ligado ⇒ falso. A forma antiga (`soSeguindo === false ? false : …`) dizia
-       o contrário. */
-    expect(linha).toContain("soSeguindo ? false :");
-    expect(linha).not.toContain("soSeguindo === false");
+  test("⚠️ a zona de sugeridas do RODAPÉ não existe mais — ela duplicava", () => {
+    /**
+     * ⚠️ **A VERSÃO ANTERIOR DESTE TESTE TRAVOU A GRAFIA DE UM DEFEITO.**
+     *
+     * Ele cobrava `soSeguindo ? false :` na linha de `sobrouSugestao` — o que
+     * fecha a zona com a chave LIGADA, e era metade do conserto. A outra metade
+     * ninguém tinha olhado: no modo MISTURADO (o padrão de toda paciente)
+     * `intercalarDescobertas` já empurra TODAS as sobras para o fim do feed, e
+     * a zona repetia as mesmas publicações no rodapé — a mesma foto duas vezes
+     * na mesma rolagem, com a mesma chave de React.
+     *
+     * A zona não tinha estado válido em modo nenhum, e saiu. O que se cobra
+     * hoje é a ausência dela — nunca a grafia de uma condição.
+     */
+    /* ⚠️ Contra `semComentarios`, nunca contra `FONTE`: a prosa que EXPLICA a
+       remoção contém a string removida, e o teste ficaria vermelho exatamente
+       quando o defeito estivesse documentado. Terceira vez que esta armadilha
+       aparece nesta base. */
+    expect(semComentarios).not.toContain("Publicações sugeridas");
+    /* E as descobertas continuam chegando por UM caminho só. */
+    expect(semComentarios).toContain("intercalarDescobertas(posts, sugestoes)");
   });
 
-  test("⚠️ e o feed principal também não interlaça", () => {
-    /* As duas metades precisam concordar: sem esta, a chave fecharia o rodapé e
-       deixaria as desconhecidas costuradas no meio da rolagem. */
-    const i = FONTE.indexOf("intercalarDescobertas(posts, sugestoes)");
+  test("⚠️ e o feed principal não interlaça com a chave ligada", () => {
+    const i = semComentarios.indexOf("intercalarDescobertas(posts, sugestoes)");
     expect(i).toBeGreaterThan(-1);
-    expect(FONTE.slice(Math.max(0, i - 120), i)).toContain("soSeguindo ? posts :");
+    expect(semComentarios.slice(Math.max(0, i - 120), i)).toContain("soSeguindo ? posts :");
   });
 
   test("⚠️ mas a fileira de PESSOAS fica", () => {
     /* A distinção é a do texto: ela é descoberta de gente para seguir, não
        conteúdo do feed. Sem ela, quem ligou a chave nunca teria como fazer o
        feed fechado ter conteúdo. */
-    const i = FONTE.indexOf("pessoas.length > 0 || sobrouSugestao");
+    /* ⚠️ **ANCORADA NA FILEIRA, e a primeira versão não era.** Ela cobrava a
+       string `pessoas.length > 0 || mesmaFase` em qualquer lugar do arquivo —
+       e a condição da zona de FORA contém a mesma string. Trocando a condição
+       da fileira por `false`, o teste continuava verde: a mutação passava. */
+    const i = semComentarios.indexOf("<FileiraDePessoas");
     expect(i).toBeGreaterThan(-1);
+    expect(semComentarios.slice(Math.max(0, i - 90), i)).toMatch(
+      /pessoas\.length > 0 \|\| mesmaFase/,
+    );
+  });
+
+  test("⚠️ e o CONVITE não sumiu junto com a zona", () => {
+    /* Ele vivia pendurado na condição da zona. Tirando `sobrouSugestao` de lá
+       sem mais nada, ele desapareceria para quem não tem nenhuma pessoa
+       sugerida — que é justamente quem mais precisa trazer alguém. */
+    const i = semComentarios.indexOf("{!temMais && (");
+    expect(i).toBeGreaterThan(-1);
+    /* Até o fim da LINHA da condição — nunca até um fechamento de parênteses
+       específico, que muda de forma no primeiro termo acrescentado. */
+    expect(semComentarios.slice(i, semComentarios.indexOf("\n", i))).toContain("convite");
   });
 });

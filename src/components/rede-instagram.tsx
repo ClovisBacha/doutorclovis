@@ -1614,32 +1614,34 @@ export function TelaPrincipal({
   );
 
   /**
-   * ⚠️ Sobrou descoberta para a zona do fim? SÓ no modo fechado.
+   * ⚠️ **A ZONA DE "PUBLICAÇÕES SUGERIDAS" NO RODAPÉ SAIU — ela não tinha
+   * estado válido nenhum.**
    *
-   * Com o feed misturado elas já foram costuradas lá em cima; repetir aqui
-   * mostraria o mesmo post duas vezes na mesma rolagem — e chave repetida
-   * derruba a lista inteira do React.
-   */
-  /**
-   * ⚠️ **A CONDIÇÃO ESTAVA INVERTIDA, e o interruptor fazia o OPOSTO do que
-   * promete.**
+   * Ela nasceu no arranjo do "você está em dia": as descobertas só apareciam
+   * DEPOIS que o feed de quem ela segue acabava, abaixo de um divisor. Esse
+   * arranjo foi revertido a pedido do dono (ver o cabeçalho de `sugestoes.ts`)
+   * e hoje `naTela` INTERLAÇA — e `intercalarDescobertas` empurra as sobras
+   * todas para o fim, então **no modo padrão as sugestões já estão inteiras na
+   * tela** quando a paciente chega ao rodapé.
    *
-   * Era `soSeguindo === false ? false : sugestoes.length > 0` — ou seja: com o
-   * feed MISTURADO a zona sumia (certo, elas já foram costuradas lá em cima), e
-   * com "Só quem eu sigo" LIGADO ela aparecia.
+   * Os dois modos, e nenhum deles quer a zona:
    *
-   * O caminho é o normal: ela abre a aba no modo misturado (as sugestões são
-   * buscadas), liga a chave, o feed principal para de interlaçar — e as
-   * publicações de desconhecidas, que já estavam em estado, reaparecem todas
-   * juntas no rodapé. **O interruptor tornava as estranhas mais visíveis.**
-   *
-   * E a tela PROMETE por escrito: "Seu feed mostra apenas quem você segue".
+   * - **misturado (o padrão)**: repetir ali mostrava a MESMA publicação duas
+   *   vezes na mesma rolagem — uma interlaçada e outra no rodapé. E chave
+   *   repetida derruba a lista inteira do React.
+   * - **"Só quem eu sigo" ligado**: a tela promete por escrito "Seu feed
+   *   mostra apenas quem você segue", e a zona entregava exatamente o
+   *   contrário. O interruptor tornava as estranhas MAIS visíveis.
    *
    * ⚠️ **A fileira de PESSOAS fica**, e a distinção é a do texto: ela é
    * descoberta de gente para seguir, não conteúdo do feed. Sem ela, quem ligou
    * a chave nunca teria como fazer o feed fechado ter conteúdo.
+   *
+   * ⚠️ **E o convite ganhou condição PRÓPRIA.** Ele vivia pendurado na mesma
+   * condição da zona: tirando `sobrouSugestao` de lá, ele sumiria junto para
+   * quem não tem nenhuma pessoa sugerida — que é justamente quem mais precisa
+   * trazer alguém.
    */
-  const sobrouSugestao = soSeguindo ? false : sugestoes.length > 0;
 
   const fim = useRef<HTMLDivElement>(null);
 
@@ -1798,7 +1800,7 @@ export function TelaPrincipal({
           esta cláusula a fileira INTEIRA sumia, levando junto o interruptor que
           a desligaria. Beco sem saída, exatamente o que a aba de assinatura já
           pagou uma vez. */}
-      {!temMais && (pessoas.length > 0 || sobrouSugestao || mesmaFase) && (
+      {!temMais && (pessoas.length > 0 || mesmaFase || !!convite) && (
         <>
           {posts.length > 0 && <EmDia />}
 
@@ -1810,43 +1812,6 @@ export function TelaPrincipal({
               mesmaFase={mesmaFase}
               aoTrocarFase={aoTrocarFase}
             />
-          )}
-
-          {/* ⚠️ SÓ NO MODO FECHADO. Com o feed misturado, estas publicações já
-              foram costuradas lá em cima — repeti-las aqui mostraria o mesmo
-              post duas vezes na mesma rolagem, e chave repetida derruba a lista
-              inteira do React. */}
-          {sobrouSugestao && (
-            <>
-              <h2 className="px-0 pb-1 pt-4 text-[14px] font-semibold">Publicações sugeridas</h2>
-              {sugestoes.map((p) => (
-                <PostInstagram
-                  key={p.id}
-                  post={p}
-                  /* O rótulo é OBRIGATÓRIO — ver `PostInstagram`. */
-                  sugerido
-                  aoReagir={aoReagir}
-                  aoSalvar={aoSalvar}
-                  aoRepublicar={aoRepublicar}
-                  aoCompartilhar={aoCompartilhar}
-                  aoAbrirTag={aoAbrirTag}
-                  aoMandarParaConversa={aoMandarParaConversa}
-                  aoAbrirArroba={aoAbrirArroba}
-                  aoVotar={aoVotar}
-                  aoTirarMarcacao={aoTirarMarcacao}
-                  aoEditar={aoEditar}
-                  /* ⚠️ **E ISTO FALTAVA, justamente aqui.** Esta zona é o ÚNICO
-                     lugar do app onde aparece publicação de quem ela não
-                     escolheu seguir — e era o único sem o ⋯ de denunciar. O
-                     post de estranha é exatamente o que a diretriz 1.2 exige
-                     que se possa denunciar, e o feed de quem ela segue, que é o
-                     caso menos provável, tinha o botão. */
-                  aoDenunciar={aoDenunciar}
-                  aoVerQuemReagiu={aoVerQuemReagiu}
-                  aoAbrirPerfil={aoAbrirPerfil}
-                />
-              ))}
-            </>
           )}
 
           {/* ⚠️ **E O CONVITE FECHA O FEED.** Quem chegou até aqui viu tudo que
