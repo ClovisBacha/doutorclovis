@@ -781,9 +781,33 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
   });
 
   test("⚠️ ninguém do círculo dela entra — nem quem ela já pediu para seguir", () => {
-    // Sugerir alguém para quem ela acabou de mandar pedido é o app esquecendo
-    // o que ela fez cinco minutos atrás.
-    expect(C).toContain("id === eu || ctx.sigo.has(id) || ctx.bloqueio.has(id) || jaPedi.has(id)");
+    /**
+     * Sugerir alguém para quem ela acabou de mandar pedido é o app esquecendo o
+     * que ela fez cinco minutos atrás.
+     *
+     * ⚠️ **A VERSÃO ANTERIOR TRAVAVA A CORRENTE INTEIRA numa string só**, e
+     * reprovou o acréscimo de `ctx.silenciados` — que FECHA uma porta por onde
+     * a silenciada voltava. Um teste que exige a lista exata de termos torna
+     * impossível acrescentar um sem editá-lo, e quem edita um teste vermelho
+     * com pressa apaga a asserção em vez de entendê-la.
+     *
+     * Cada termo é cobrado por si. Trocar QUALQUER um por `true` continua
+     * reprovando; acrescentar um sexto passa, que é o comportamento certo.
+     */
+    const i = C.indexOf("const fora =");
+    expect(i).toBeGreaterThan(-1);
+    const pred = C.slice(i, C.indexOf(";", i));
+    for (const termo of [
+      "id === eu",
+      "ctx.sigo.has(id)",
+      "ctx.bloqueio.has(id)",
+      /* ⚠️ O silêncio entrou aqui depois — ver `silenciar.test.ts`, que cobra
+         as quatro portas de uma vez. */
+      "ctx.silenciados.has(id)",
+      "jaPedi.has(id)",
+    ]) {
+      expect(pred).toContain(termo);
+    }
     expect(C).toContain('.eq("estado", "pendente")');
   });
 

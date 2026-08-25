@@ -95,7 +95,16 @@ export function sugerirConversas(v: {
    * Aceitar qualquer coisa com `.has` é o que deixa a versão segura passar
    * intacta.
    */
-  bloqueadas: { has(id: string): boolean };
+  /**
+   * ⚠️ **NÃO É SÓ O BLOQUEIO — é "quem não pode ser sugerida".** O nome mudou
+   * junto com o sentido, de propósito: com `bloqueadas`, quem lesse a chamada
+   * concluiria que só o bloqueio recorta, e foi assim que a SILENCIADA
+   * continuava sendo oferecida aqui depois de o feed e os stories já a terem
+   * tirado. Silenciar é preferência de FEED — mas a fileira de conversa é uma
+   * porta para o feed, e insistir com quem ela pediu para não ouvir é o
+   * contrário do que a palavra promete.
+   */
+  foraDaSugestao: { has(id: string): boolean };
   /** Com quem eu JÁ tenho conversa (aceita, pedida, de qualquer estado). */
   jaConverso: { has(id: string): boolean };
   limite?: number;
@@ -112,7 +121,7 @@ export function sugerirConversas(v: {
   const vivas = v.candidatas.filter(
     (c) =>
       c.id !== v.euId &&
-      !v.bloqueadas.has(c.id) &&
+      !v.foraDaSugestao.has(c.id) &&
       !v.jaConverso.has(c.id) &&
       mesmaFase(v.minhaFase, c.fase),
   );

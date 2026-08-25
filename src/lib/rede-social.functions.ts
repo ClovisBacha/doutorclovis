@@ -3440,8 +3440,34 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
       ((pendentesMeus ?? []) as { seguido_id: string }[]).map((l) => l.seguido_id),
     );
 
+    /**
+     * ⚠️ **O SILÊNCIO ENTRA AQUI, e este era o buraco dele.**
+     *
+     * Silenciar tira do feed e dos stories (ver os dois blocos com "O SILÊNCIO
+     * É APLICADO AQUI"), e não entra em `podeVerPost` de propósito — visitar o
+     * perfil dela continua mostrando tudo. Só que a zona de sugeridos é uma
+     * TERCEIRA porta para o feed, e ela não conhecia o silêncio: bastava
+     * silenciar alguém que eu não sigo para as publicações dela voltarem
+     * marcadas "Sugerido para você", e o rosto dela reaparecer na fileira de
+     * pessoas — o app oferecendo justamente quem ela pediu para não ouvir.
+     *
+     * ⚠️ **E o defeito é pior do que parece pela porta por onde ele entra.** A
+     * fileira sugere quem ela NÃO segue; então o caso comum não é "silenciei e
+     * continuo seguindo", é "silenciei alguém da zona de descoberta" — e a
+     * resposta do app era insistir. Numa base de gestação de alto risco, o
+     * motivo de silenciar costuma ser o conteúdo doer.
+     *
+     * ⚠️ **Um `fora` só governa as DUAS listas** (publicações e pessoas), e é
+     * por isso que o conserto é um termo. Duas condições separadas divergiriam
+     * no primeiro ajuste, e a divergência apareceria como a silenciada sumindo
+     * de uma lista e ficando na outra.
+     */
     const fora = (id: string) =>
-      id === eu || ctx.sigo.has(id) || ctx.bloqueio.has(id) || jaPedi.has(id);
+      id === eu ||
+      ctx.sigo.has(id) ||
+      ctx.bloqueio.has(id) ||
+      ctx.silenciados.has(id) ||
+      jaPedi.has(id);
 
     /* As candidatas a autora: perfil público, fora do meu círculo, sem Modo
        Cuidado. `podeAparecerNaBusca` é a MESMA régua da busca — quem não pode

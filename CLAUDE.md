@@ -5871,6 +5871,67 @@ marcadores do trabalho recente antes de tocar em qualquer coisa** (`portoes-da
 -rede`: 0 local; `revelavel`: 0 local) e, confirmada a rebobinada, recuperar do
 remoto — nunca commitar por cima.
 
+### ⚠️ SILENCIAR TINHA QUATRO PORTAS, E FECHAVA DUAS (ago/2026)
+
+Pedido do dono: "aplique o silenciar sem deixar de seguir". **Ele já existia** —
+tabela, `contextoDe` carregando `silenciados`, servidor, botão no perfil e
+bancada. O que faltava não era o recurso: era ele valer nas outras portas do
+feed.
+
+Silenciar tirava as publicações do FEED e os stories da FILEIRA (os dois blocos
+"O SILÊNCIO É APLICADO AQUI"). Mas o feed tem mais entradas, e nenhuma conhecia
+o silêncio:
+
+- a zona de **publicações sugeridas** (`sugestoesDoFeed`),
+- a **fileira de pessoas** (a mesma função, mesmo predicado),
+- a fileira de **conversas sugeridas** — a porta do direct.
+
+As três ofereciam de volta exatamente quem ela pediu para não ouvir.
+
+⚠️ **E a porta por onde o defeito entra é a pior.** A fileira sugere quem ela
+NÃO segue — então o caso comum não é "silenciei e continuo seguindo", é
+"silenciei alguém da zona de descoberta", e a resposta do app era insistir. Numa
+base de gestação de alto risco, o motivo de silenciar costuma ser o conteúdo
+doer.
+
+- **Um predicado `fora` só governa as DUAS listas de `sugestoesDoFeed`** — por
+  isso um termo fecha as duas. Duas condições separadas divergiriam no primeiro
+  ajuste, e a divergência apareceria como a silenciada sumindo de uma lista e
+  ficando na outra.
+- ⚠️ **`bloqueadas` virou `foraDaSugestao` na régua do direct, e o nome É o
+  conserto.** Com o nome antigo, quem lesse a chamada concluiria que só o
+  bloqueio recorta — foi exatamente assim que a silenciada continuou sendo
+  oferecida ali. Renomear quebrou o `tsc` em todos os chamadores, que é o
+  ponto: obriga cada um a ser relido.
+- ⚠️ **A união é POR PROXY, nunca `new Set([...bloqueio, ...silenciados])`.**
+  `ctx.bloqueio` é `ConjuntoDeBloqueio`, que FALHA FECHADO: leitura degradada
+  responde `true` para todo mundo e ninguém é sugerido. Espalhá-lo num `Set`
+  perderia isso — o embrulho degradado não tem membros para espalhar, então o
+  `Set` sairia VAZIO e responderia `false` para todas, que é o oposto exato. É
+  por isso que a assinatura da régua aceita `{ has }` e não `Set`.
+- ⚠️ **O PERFIL continua de fora, e é deliberado.** Visitar o perfil da
+  silenciada mostra tudo — ela foi até lá para ver. Silenciar é preferência de
+  FEED, não régua de visibilidade: se entrasse em `podeVerPost`, viraria um
+  bloqueio de um lado só e a palavra passaria a mentir. Há teste cobrando que
+  `rede-social.ts` não contenha a string.
+
+`silenciar.test.ts` cobra as quatro portas de uma vez, e os três mutantes
+(tirar o termo dos sugeridos, trocar o proxy por `Set`, pôr o silêncio na régua)
+ficam vermelhos.
+
+⚠️ **E UM TESTE MEU TRAVOU A CORRENTE INTEIRA NUMA STRING SÓ** — a quarta vez
+nesta leva. `toContain("id === eu || ctx.sigo... || jaPedi...")` reprovou o
+acréscimo que FECHA a porta. Um teste que exige a lista exata de termos torna
+impossível acrescentar um sem editá-lo, e **quem edita um teste vermelho com
+pressa apaga a asserção em vez de entendê-la**. Hoje cada termo é cobrado por
+si: trocar qualquer um por `true` reprova, acrescentar um sexto passa.
+
+⚠️ **E o meu script de mutação pegou o `const fora =` de OUTRA função** do mesmo
+arquivo (um `new Map()`), então as quatro mutações "passavam" sem nunca terem
+sido aplicadas. Toda mutação por texto tem de ancorar na função (`indexOf` a
+partir do `export const`) e **falhar alto se o texto não mudou** — é a mesma
+armadilha de substring que `minhaColuna`/`minhaColunaDeLeitura` já custou aqui.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

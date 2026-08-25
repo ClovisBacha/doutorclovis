@@ -919,7 +919,20 @@ export const conversasSugeridas = createServerFn({ method: "POST" })
         euId: eu,
         minhaFase,
         candidatas,
-        bloqueadas: ctx.bloqueio,
+        /**
+         * ⚠️ **UNIÃO POR PROXY, e NUNCA `new Set([...bloqueio, ...silenciados])`.**
+         *
+         * `ctx.bloqueio` é `ConjuntoDeBloqueio`, que FALHA FECHADO: quando a
+         * leitura degrada ele responde `true` para todo mundo e ninguém é
+         * sugerido. Espalhá-lo num `Set` novo perderia exatamente isso — o
+         * embrulho degradado não tem membros para espalhar, então o `Set`
+         * sairia vazio e responderia `false` para todas, que é o oposto. Um
+         * objeto com `.has` que consulta os dois preserva a propriedade, e é
+         * por isso que a assinatura da régua aceita `{ has }` e não `Set`.
+         */
+        foraDaSugestao: {
+          has: (id: string) => ctx.bloqueio.has(id) || ctx.silenciados.has(id),
+        },
         jaConverso,
       }),
     };

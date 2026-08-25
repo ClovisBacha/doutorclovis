@@ -27,7 +27,7 @@ describe("a sugestão de conversa", () => {
       euId: "eu",
       minhaFase: "t2",
       candidatas: [c("a"), c("b"), c("c", { fase: "t3" })],
-      bloqueadas: new Set(),
+      foraDaSugestao: new Set(),
       jaConverso: new Set(),
     });
     expect(r.map((x) => x.id)).toEqual(["a", "b"]);
@@ -48,7 +48,7 @@ describe("a sugestão de conversa", () => {
         euId: "eu",
         minhaFase: null,
         candidatas: [c("a"), c("b"), c("d")],
-        bloqueadas: new Set(),
+        foraDaSugestao: new Set(),
         jaConverso: new Set(),
       }),
     ).toEqual([]);
@@ -64,7 +64,7 @@ describe("a sugestão de conversa", () => {
         euId: "eu",
         minhaFase: null,
         candidatas: [c("a", { fase: null }), c("b", { fase: null })],
-        bloqueadas: new Set(),
+        foraDaSugestao: new Set(),
         jaConverso: new Set(),
       }),
     ).toEqual([]);
@@ -77,7 +77,7 @@ describe("a sugestão de conversa", () => {
       euId: "eu",
       minhaFase: "t2",
       candidatas: [c("a"), c("b"), c("z")],
-      bloqueadas: new Set(["a"]),
+      foraDaSugestao: new Set(["a"]),
       jaConverso: new Set(),
     });
     expect(r.map((x) => x.id)).toEqual(["b", "z"]);
@@ -88,7 +88,7 @@ describe("a sugestão de conversa", () => {
       euId: "eu",
       minhaFase: "t2",
       candidatas: [c("a"), c("b"), c("z")],
-      bloqueadas: new Set(),
+      foraDaSugestao: new Set(),
       jaConverso: new Set(["b"]),
     });
     expect(r.map((x) => x.id)).toEqual(["a", "z"]);
@@ -100,7 +100,7 @@ describe("a sugestão de conversa", () => {
         euId: "eu",
         minhaFase: "t2",
         candidatas: [c("eu"), c("a"), c("b")],
-        bloqueadas: new Set(),
+        foraDaSugestao: new Set(),
         jaConverso: new Set(),
       }).map((x) => x.id),
     ).toEqual(["a", "b"]);
@@ -114,7 +114,7 @@ describe("a sugestão de conversa", () => {
         euId: "eu",
         minhaFase: "t2",
         candidatas: [c("a")],
-        bloqueadas: new Set(),
+        foraDaSugestao: new Set(),
         jaConverso: new Set(),
       }),
     ).toEqual([]);
@@ -130,7 +130,7 @@ describe("a sugestão de conversa", () => {
         c("zzz"),
         c("aaa"),
       ],
-      bloqueadas: new Set(),
+      foraDaSugestao: new Set(),
       jaConverso: new Set(),
       limite: 4,
     });
@@ -144,7 +144,7 @@ describe("a sugestão de conversa", () => {
       euId: "eu",
       minhaFase: "t2" as const,
       candidatas: [c("m"), c("n"), c("o")],
-      bloqueadas: new Set<string>(),
+      foraDaSugestao: new Set<string>(),
       jaConverso: new Set<string>(),
     };
     expect(sugerirConversas(entrada).map((x) => x.id)).toEqual(
@@ -157,7 +157,7 @@ describe("a sugestão de conversa", () => {
       euId: "eu",
       minhaFase: "t2",
       candidatas: ["a", "b", "c", "d", "e", "f"].map((x) => c(x)),
-      bloqueadas: new Set(),
+      foraDaSugestao: new Set(),
       jaConverso: new Set(),
     });
     expect(r).toHaveLength(SUGESTOES_DE_CONVERSA);
@@ -177,7 +177,7 @@ describe("⚠️ o bloqueio que falha FECHADO passa intacto", () => {
         euId: "eu",
         minhaFase: "t2",
         candidatas: [c("a"), c("b"), c("z")],
-        bloqueadas: tudoBloqueado,
+        foraDaSugestao: tudoBloqueado,
         jaConverso: new Set(),
       }),
     ).toEqual([]);
