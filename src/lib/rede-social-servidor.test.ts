@@ -316,7 +316,7 @@ describe("editar a legenda", () => {
   /* ⚠️ Foto, enquete, visibilidade, marcações e comparação NÃO mudam: editar a
      camada de quem vê depois de o post ter sido lido não desfaz a leitura, e
      trocar a foto faria as reações apontarem para uma imagem que ninguém viu. */
-  test("⚠️ só o TEXTO muda", () => {
+  test("⚠️ só o que ela ESCREVE muda — nunca a visibilidade", () => {
     const c = corpoDe("editarPost");
     /* ⚠️ **A ÂNCORA É CONFERIDA ANTES DO RECORTE — e sem isso este teste
        mentia.** `indexOf` devolve **−1** quando a âncora some, e `slice(-1)`
@@ -330,8 +330,18 @@ describe("editar a legenda", () => {
     expect(i).toBeGreaterThan(-1);
     const gravacao = c.slice(i);
     /* E o recorte tem de conter o `update` de verdade, senão ele não mede nada. */
-    expect(gravacao).toContain('.from("rede_posts").update(campos)');
-    expect(gravacao).toContain("gravar({ texto");
+    expect(gravacao).toContain(".update(campos)");
+    /* ⚠️ **O NOME DO TESTE MUDOU DE "só o TEXTO" PARA "só o que ela ESCREVE".**
+       `altTexto` — a descrição da foto para leitores de tela — passou a ser
+       editável, e ela é conteúdo dela como a legenda: um `alt` errado que não
+       se corrige é pior que nenhum. A asserção antiga cobrava `gravar({ texto`
+       colado e ficou vermelha sobre essa adição legítima.
+
+       O que continua proibido é o mesmo, e é o que importa: a EDIÇÃO NÃO
+       REESCREVE A CAMADA DE VISIBILIDADE, a foto, a enquete nem a comparação —
+       nada que mude quem vê o post depois de meia dúzia de pessoas já o terem
+       lido. */
+    expect(gravacao).toContain("texto,");
     for (const proibido of ["visibilidade:", "imagem_path:", "enquete_opcoes:", "comparacao_de:"]) {
       /* O `select` de conferência pode citar as colunas; o que não pode é
          gravá-las. Por isso a busca é pelo trecho do `update`. */
@@ -1004,7 +1014,16 @@ describe("⚠️ a régua clínica roda no CANAL PRINCIPAL", () => {
        quisesse dar o conselho perigoso não usava a caixinha, publicava. */
     const c = corpoDe("publicarPost").replace(/\s+/g, " ");
     expect(c).toContain("triarTexto");
-    expect(c).toContain('for (const trecho of [data.texto ?? "", ...opcoes])');
+    /* ⚠️ **COBRA O CONJUNTO, e não a lista literal.** A versão anterior travava
+       a string exata `[data.texto ?? "", ...opcoes]` e ficou vermelha no dia em
+       que `altTexto` entrou na triagem — uma cobertura ESTRITAMENTE maior. Um
+       teste que reprova mais proteção é um teste que ensina a tirá-la. */
+    const laco = /for \(const trecho of \[([^\]]*)\]\)/.exec(c);
+    expect({ tem: !!laco }).toEqual({ tem: true });
+    const dentro = laco?.[1] ?? "";
+    for (const campo of ["data.texto", "data.altTexto", "...opcoes"]) {
+      expect({ campo, triado: dentro.includes(campo) }).toEqual({ campo, triado: true });
+    }
     expect(c).toContain('desfecho !== "publicavel"');
     /* E RECUSA antes de gravar — depois do insert seria um post publicado com
        erro na tela. */

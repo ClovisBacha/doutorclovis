@@ -8355,3 +8355,44 @@ basta_. Eu tinha os quatro defeitos originais medidos, corrigidos e cobertos por
 uma bateria de 40 frases — e ainda assim introduzi quatro novos, dois deles
 falsos positivos sobre conversa banal. **Quem revisa o conserto não pode ser
 quem o escreveu**, e é para isso que a fase adversarial existe.
+
+#### E mais quatro defeitos MEUS, achados pela mesma revisão
+
+**⚠️ A CAPA DA ATIVIDADE VOLTOU A MOSTRAR POST ARQUIVADO.** Ao mover o filtro do
+`.is("arquivado_em", null)` para o `.filter()` — parte do conserto do vazamento
+—, eu tirei a condição e **esqueci de pedir a coluna**. `x.arquivado_em` passou a
+ler `undefined`, que é falsy, e todo post que ela tirou do ar voltou a mostrar a
+foto na caixa ♡.
+
+**Mover uma condição de camada obriga a mover o DADO junto.**
+
+**⚠️ O QUADRO DO REPOST NÃO CONFERIA BLOQUEIO.** Ele checava arquivo,
+visibilidade, Modo Cuidado e (depois do meu conserto) `perfil_publico` — e não o
+bloqueio. Se uma TERCEIRA republicasse, o nome, o texto e a foto de quem ela
+bloqueou voltavam para a tela dela. É o mesmo defeito que a marcação já teve, e
+que o CLAUDE.md registra: _"bloquear não pode ser uma proteção que a marcação de
+outra pessoa desfaz"_.
+
+**⚠️ `altTexto` ERA ACEITO NO VALIDADOR DE `editarPost` E NUNCA GRAVADO.** A tela
+mandava, o `zod` aceitava, o `update` não o carregava: ela corrigia a descrição,
+via "salvo", e o leitor de tela continuava lendo a antiga. **Campo aceito e
+descartado é pior que campo ausente** — ausente a tela não oferece; aceito, ela
+promete.
+
+**⚠️ E o `altTexto` não passava pela régua clínica**, nem no publicar nem no
+editar. É texto público lido em voz alta: sem isso, quem fosse recusada na
+legenda escreveria a mesma frase ali.
+
+#### ⚠️ Duas catracas do repo pegaram MINHAS edições — e as duas estavam certas
+
+1. **A dívida de escritas sem checagem subiu de 6 para 7.** Não porque eu criei
+   uma escrita insegura, mas porque meu reformato **afastou o `gravar(` da
+   janela de oito linhas** do detector. A escrita sempre esteve checada; o que
+   faltava era a checagem morar perto o bastante para se enxergar. O `error` foi
+   nomeado DENTRO do helper — assim não depende de quantas linhas o chamador
+   ocupa.
+2. **Dois testes travavam listas literais** (`[data.texto ?? "", ...opcoes]` e
+   `gravar({ texto`) e ficaram vermelhos sobre coberturas **estritamente
+   maiores**. É o quarto e o quinto desta noite. Os dois passaram a cobrar o
+   CONJUNTO em vez da string — e o segundo mudou de nome, porque "só o TEXTO
+   muda" deixou de ser verdade quando a descrição da foto virou editável.

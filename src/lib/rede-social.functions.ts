@@ -1433,6 +1433,25 @@ export async function montarPosts(
        */
       if (o.arquivado_em || o.visibilidade !== "publico") continue;
       if (!a || a.care_mode || !a.perfil_publico) continue;
+      /**
+       * ⚠️ **O BLOQUEIO FALTAVA — e ele é a única régua que o quadro ainda não
+       * conferia.**
+       *
+       * Bloquear some com a pessoa do feed, do comentário, da conversa e da
+       * busca. Mas se uma TERCEIRA republicasse o post dela, o quadro trazia o
+       * nome, o texto e a foto de volta para a tela de quem a bloqueou — a
+       * proteção desfeita por um gesto de outra pessoa.
+       *
+       * É o mesmo defeito que a marcação já teve, e que o CLAUDE.md registra:
+       * "bloquear não pode ser uma proteção que a marcação de outra pessoa
+       * desfaz".
+       *
+       * ⚠️ Reescrever `podeVerPost` aqui seria a segunda cópia da régua. O que
+       * este bloco faz é o recorte ESTREITO que a régua já garante para o resto
+       * (só post público de perfil público), mais as três condições que somem
+       * com a pessoa: Modo Cuidado, perfil fechado e bloqueio.
+       */
+      if (ctx?.bloqueio.has(o.autor_id)) continue;
       originais.set(o.id, {
         id: o.id,
         autorId: o.autor_id,
@@ -2358,7 +2377,11 @@ export const publicarPost = createServerFn({ method: "POST" })
        enquete repetiu o erro que o desafio evitou. */
     const opcoes = limparOpcoes(data.enquete ?? []);
     const { triarTexto } = await import("@/lib/pergunta-clinica");
-    for (const trecho of [data.texto ?? "", ...opcoes]) {
+    /* ⚠️ **`altTexto` ENTRA NA LISTA — ele é texto público como qualquer
+       outro.** A descrição da foto é lida em voz alta e viaja no `alt` do
+       `<img>`; sem isto, quem fosse recusada na legenda escreveria a mesma
+       frase ali e ela sairia igual. */
+    for (const trecho of [data.texto ?? "", data.altTexto ?? "", ...opcoes]) {
       const desfecho = triarTexto(trecho);
       if (desfecho !== "publicavel") {
         return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
@@ -2873,10 +2896,50 @@ export const editarPost = createServerFn({ method: "POST" })
       return { ok: false as const, motivo: "vazio" as const };
     }
 
-    const gravar = async (campos: Record<string, unknown>) =>
-      await sb.from("rede_posts").update(campos).eq("id", data.postId).eq("autor_id", eu);
+    /* ⚠️ **O `error` É NOMEADO AQUI, e não só conferido no chamador.** A catraca
+       de "escrita sem checagem" procura `error` numa janela de oito linhas — e a
+       minha edição do bloco de baixo afastou a chamada o bastante para a janela
+       perdê-la. A escrita SEMPRE esteve checada; o que faltava era a checagem
+       morar perto o suficiente para se enxergar. Com o `error` local, o
+       encadeamento não depende de quantas linhas o chamador ocupa. */
+    const gravar = async (campos: Record<string, unknown>) => {
+      const { error } = await sb
+        .from("rede_posts")
+        .update(campos)
+        .eq("id", data.postId)
+        .eq("autor_id", eu);
+      return { error };
+    };
 
-    let r = await gravar({ texto, editado_em: new Date().toISOString() });
+    /**
+     * ⚠️ **`altTexto` ERA ACEITO NO VALIDADOR E NUNCA GRAVADO — defeito meu.**
+     *
+     * A tela mandava, o `zod` aceitava, e o `update` não o carregava: a paciente
+     * corrigia a descrição da foto, via "salvo", e o leitor de tela continuava
+     * lendo a antiga. Campo aceito e descartado é pior que campo ausente —
+     * ausente a tela não oferece, aceito ela promete.
+     *
+     * ⚠️ **E ele passa pela RÉGUA CLÍNICA, como o texto.** A descrição é lida em
+     * voz alta e viaja no `alt` — é texto público como qualquer outro. Sem isto,
+     * quem fosse recusada na legenda escreveria a mesma frase no `alt`.
+     */
+    if (data.altTexto !== undefined && (data.altTexto ?? "").trim()) {
+      const alvo = triarTexto(data.altTexto ?? "");
+      if (alvo !== "publicavel") {
+        return {
+          ok: false as const,
+          motivo: "clinico" as const,
+          recado:
+            "A descrição da foto fala de sintoma ou de conduta. Ela é lida em voz alta — isso é conversa para o seu médico.",
+        };
+      }
+    }
+
+    let r = await gravar({
+      texto,
+      editado_em: new Date().toISOString(),
+      ...(data.altTexto !== undefined ? { alt_texto: data.altTexto?.trim() || null } : {}),
+    });
     /* ⚠️ Recuo por coluna ausente: `editado_em` nasce num APLICAR_ que o dono
        roda à mão. Sem ele, editar pararia de funcionar inteiro por causa do
        SELO — e o selo é o acessório, não a edição. */
@@ -4918,12 +4981,18 @@ export const minhaAtividade = createServerFn({ method: "POST" })
          * sentidos, o seguir e o grafo de amizade) e é a régua ÚNICA. Uma
          * segunda versão dela aqui, em SQL, é exatamente como um post vaza.
          */
-        const COLS = "id, autor_id, visibilidade, imagem_path, miniatura_path";
+        /* ⚠️ **`arquivado_em` PRECISA VIR NO SELECT — e este defeito era MEU,
+           desta noite.** Ao mover o filtro do `.is()` para o `.filter()`, eu
+           tirei o `.is("arquivado_em", null)` e esqueci de PEDIR a coluna: o
+           filtro passou a ler `undefined`, que é falsy, e todo post arquivado
+           voltou a mostrar a capa na caixa ♡. Mover uma condição de camada
+           obriga a mover o DADO junto. */
+        const COLS = "id, autor_id, visibilidade, imagem_path, miniatura_path, arquivado_em";
         const cheio = await sb.from("rede_posts").select(COLS).in("id", postIds);
         if (cheio.error) {
           const velho = await sb
             .from("rede_posts")
-            .select("id, autor_id, visibilidade, imagem_path")
+            .select("id, autor_id, visibilidade, imagem_path, arquivado_em")
             .in("id", postIds);
           ps = ((velho.data ?? []) as any[]).map((p) => ({ ...p, miniatura_path: null }));
         } else {
