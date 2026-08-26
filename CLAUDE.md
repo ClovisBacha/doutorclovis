@@ -9336,6 +9336,28 @@ quatro termos), nunca a grafia.
 `foraDaRede(x) && x.perfil_publico` não é estética — é o que impede um
 `undefined.propriedade`. Esse teste pegou um defeito real duas vezes.
 
+### ⚠️ E A VARREDURA ADVERSARIAL ACHOU UMA REGRESSÃO QUE EU CRIEI
+
+Depois de tudo verde — 4.685 testes, `tsc` limpo, 83 bancadas varridas, CI verde
+—, uma varredura das colunas novas atrás de degrau achou o pior defeito da
+noite, e ele era **uma regressão num recurso que já funcionava**.
+
+`contextoDe` lia `.select("silenciado_id, cala_posts, cala_stories")` **sem
+degrau**. Num banco sem as colunas — o do dono agora, antes de rodar o SQL — o
+`42703` derruba o select inteiro, `calados.data` vem `null`, e os DOIS conjuntos
+saem vazios: **o silenciar que funciona há meses simplesmente deixaria de
+valer.** A silenciada voltaria ao feed e aos stories de todo mundo, sem erro
+nenhum na tela.
+
+⚠️ **É a forma mais cara de defeito deste repositório:** uma coluna nova que,
+faltando, apaga um recurso ANTIGO. E ela não aparece em teste nenhum, porque a
+máquina de desenvolvimento tem o banco em dia. O que a achou foi uma pergunta
+mecânica — _toda coluna nova tem degrau?_ — feita DEPOIS de o resto estar verde.
+
+**A régua que fica:** ao acrescentar coluna a um `select` que já existia,
+pergunte o que a função devolve quando ela falta. Se a resposta for "menos do
+que devolvia antes", o degrau não é opcional.
+
 **Bancadas novas:** `/preview-instagram?tela=conversas&notas=1` (a fileira de
 notas) · `?tela=conversa&oculta=1` (a mensagem recolhida pelo filtro) ·
 `?tela=perfil&favorita=1` (o "Tirar dos favoritos").

@@ -104,6 +104,25 @@ describe("⚠️ os dois conjuntos do contexto", () => {
     expect(s.slice(i, i + 700)).not.toContain("=== true");
   });
 
+  test("⚠️ e a LEITURA tem degrau — senão o silenciar que já existe PARA", () => {
+    /**
+     * ⚠️ **É uma REGRESSÃO que quase entrou.** `cala_posts`/`cala_stories`
+     * nascem num `APLICAR_` que o dono roda à mão, e o deploy chega SEMPRE
+     * antes: sem o recuo, o `42703` derruba o select inteiro, os dois conjuntos
+     * saem vazios, e **o silenciar que funcionava há meses deixa de valer** — a
+     * silenciada volta ao feed de todo mundo, sem erro nenhum na tela.
+     */
+    const s = semProsa(FONTE).replace(/\s+/g, " ");
+    const i = s.indexOf('.from("rede_silenciados") .select("silenciado_id, cala_posts');
+    expect(i).toBeGreaterThan(-1);
+    const bloco = s.slice(i, i + 900);
+    expect(bloco).toContain('.select("silenciado_id").eq("quem_id", eu)');
+    /* ⚠️ E o recuo trata ausente como CALA OS DOIS, que é o que a linha
+       existente sempre significou. */
+    expect(bloco).toContain("cala_posts: true");
+    expect(bloco).toContain("cala_stories: true");
+  });
+
   test("⚠️ o feed de STORIES lê `silenciadosStories`", () => {
     const C = corpoDe(FONTE, "storiesDoFeed");
     expect(C).toContain("ctx.silenciadosStories.has(id)");

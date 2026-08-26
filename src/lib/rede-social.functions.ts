@@ -498,7 +498,36 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
-    sb.from("rede_silenciados").select("silenciado_id, cala_posts, cala_stories").eq("quem_id", eu),
+    /**
+     * ⚠️ **DEGRAU, e ele conserta uma REGRESSÃO que eu tinha acabado de criar.**
+     *
+     * `cala_posts`/`cala_stories` nascem no `APLICAR_DEZ_DA_REDE`, e o deploy
+     * chega SEMPRE antes de o dono rodar o SQL. Sem o recuo, o `42703` derruba
+     * o select inteiro, `calados.data` vem `null`, e os DOIS conjuntos saem
+     * vazios: **o silenciar que já funcionava há meses simplesmente deixaria de
+     * valer** — a silenciada voltaria ao feed e aos stories de todo mundo, sem
+     * erro nenhum na tela.
+     *
+     * Achado varrendo as colunas novas atrás de degrau, DEPOIS de o resto estar
+     * verde. Sem as colunas, a linha existente significa "cala os dois", que é
+     * exatamente o que ela sempre significou.
+     */
+    (async () => {
+      const cheio = await sb
+        .from("rede_silenciados")
+        .select("silenciado_id, cala_posts, cala_stories")
+        .eq("quem_id", eu);
+      if (!cheio.error) return cheio;
+      const velho = await sb.from("rede_silenciados").select("silenciado_id").eq("quem_id", eu);
+      return {
+        ...velho,
+        data: ((velho.data ?? []) as any[]).map((x) => ({
+          ...x,
+          cala_posts: true,
+          cala_stories: true,
+        })),
+      };
+    })(),
     /* ⚠️ Na MESMA onda que as outras — uma consulta a mais dentro de uma onda
        que já existe é de graça; uma onda nova custa uma latência inteira. */
     sb.from("rede_favoritos").select("favorita_id").eq("quem_id", eu),
