@@ -59,6 +59,14 @@ const EXTRAS = [
   "/preview-instagram?tela=bloqueados&vazio=1",
   "/preview-instagram?tela=bloqueados&instavel=1",
   "/preview-instagram?tela=comentarios&conversa=fechados",
+  /* A ordem por curtidas e o rascunho guardado: os dois só se enxergam com o
+     parâmetro — um post com poucos comentários desenha a mesma lista nas duas
+     ordens, e o rascunho exige fechar o app no meio de uma frase. */
+  "/preview-instagram?tela=comentarios&ordem=relevantes",
+  "/preview-instagram?tela=comentarios&rascunhoComent=1",
+  /* Os quatro cartões do primeiro minuto: abrem UMA vez na vida da conta, e o
+     "já vi" viaja na nuvem — sem o parâmetro, ninguém os vê de novo. */
+  "/preview-instagram?onboarding=1",
   "/preview-instagram?tela=filtro",
   "/preview-instagram?tela=conversa",
   "/preview-instagram?tela=conversas",
