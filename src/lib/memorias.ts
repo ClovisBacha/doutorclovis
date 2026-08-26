@@ -8,7 +8,7 @@
  * app, num dia qualquer. Nenhum outro recurso desta aba consegue causar esse
  * dano com um acerto de calendário.
  *
- * As quatro travas abaixo existem por isso, e nenhuma é enfeite. Se alguma
+ * As CINCO travas abaixo existem por isso, e nenhuma é enfeite. Se alguma
  * delas não puder ser garantida, o recurso não deve existir.
  */
 
@@ -52,6 +52,25 @@ export type CandidataAMemoria = {
  * ⚠️ **TRAVA 4 — UMA VEZ SÓ.** `vista` impede a mesma memória de voltar todo
  * dia da janela e virar cobrança.
  *
+ * ⚠️ **TRAVA 5 — SÓ PARA QUEM REGISTROU O NASCIMENTO.**
+ *
+ * As quatro primeiras não fecham o pior caso, e isto foi achado relendo a
+ * promessa deste arquivo. **Modo Cuidado é OPT-IN.** Uma mulher que perdeu a
+ * gestação e não contou ao app fica com o `lmp_date` intacto: o ciclo continua
+ * o mesmo, a Trava 2 não morde, e ~300 dias depois ela receberia
+ * "Há um ano, você publicou isto" com a foto da barriga. **Nenhum outro recurso
+ * desta aba causa esse dano com um acerto de calendário** — é a frase que abre
+ * este arquivo, e ela obriga a fechar isto.
+ *
+ * O conserto não é esperar que ela ligue o Modo Cuidado: é exigir um sinal
+ * POSITIVO de que a gestação terminou em nascimento. `birth_date` é isso, e é
+ * escrito à mão por ela no Perfil.
+ *
+ * ⚠️ E ele não estreita o recurso: uma memória precisa de 300 dias, e uma
+ * gestação dura ~280 — então a única pessoa que já pode ter memória do ciclo
+ * ATUAL é justamente quem já pariu. A trava torna explícito o que a aritmética
+ * já dizia, e fecha o caso em que a aritmética se enganava.
+ *
  * ⚠️ E **UMA POR DIA**, a mais antiga entre as elegíveis: duas memórias na
  * mesma abertura transformam o feed num álbum, e o feed é do presente.
  */
@@ -59,11 +78,19 @@ export function memoriaDeHoje(entrada: {
   posts: readonly CandidataAMemoria[];
   cicloAtual: string | null;
   careMode: boolean | undefined;
+  /**
+   * A data de nascimento registrada por ela, ou `null`.
+   *
+   * ⚠️ É o sinal POSITIVO da Trava 5 — nunca a ausência de Modo Cuidado.
+   */
+  nascimento: string | null;
   agora: Date;
 }): CandidataAMemoria | null {
   /* TRAVA 1. `!== false` e não `=== true`: enquanto o perfil não chegou, o
      valor é `undefined` — e "não sei" tem de significar NÃO MOSTRAR. */
   if (entrada.careMode !== false) return null;
+  /* TRAVA 5. Sem o registro do nascimento, nenhuma memória — ver acima. */
+  if (!entrada.nascimento) return null;
   /* TRAVA 2, primeira metade: sem ciclo atual não há como comparar. */
   if (!entrada.cicloAtual) return null;
 

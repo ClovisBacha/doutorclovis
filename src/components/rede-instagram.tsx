@@ -1642,6 +1642,67 @@ export const PostInstagram = memo(function PostInstagram({
  * duas ficam lado a lado, três ou quatro fecham o quadrado. Uma grade fixa de
  * 2×2 com uma foto só deixaria três buracos cinza.
  */
+/**
+ * O cartão da MEMÓRIA — "há um ano, você publicou isto".
+ *
+ * ⚠️ **NÃO HÁ CONDIÇÃO NENHUMA AQUI.** Quem decide se esta memória pode existir
+ * é `memoriaDeHoje`, com as CINCO travas, no servidor. Uma segunda régua nesta
+ * tela é como a foto da barriga de uma gestação que terminou volta na abertura
+ * do app — e este é o recurso da aba que mais pode machucar com um acerto de
+ * calendário.
+ *
+ * ⚠️ **O texto NÃO COMEMORA.** "Que ano incrível!" cai numa mulher que pode ter
+ * passado o ano no hospital. `textoDaMemoria` diz o FATO e para aí, e ele vem
+ * pronto do servidor — escrevê-lo aqui abriria a porta para o adjetivo.
+ */
+function CartaoDaMemoria({
+  memoria,
+  aoVer,
+}: {
+  memoria: { post: PostNaTela; texto: string };
+  aoVer?: (postId: string) => void;
+}) {
+  /* ⚠️ **A marca de "vista" sai daqui, do MONTAR — e não do servidor.** A tela
+     mostra um cartão de cada vez, então uma memória suprimida pela retrospectiva
+     seria queimada sem nunca ter aparecido. E a Trava 4 vale para a vida toda:
+     ela não voltaria.
+     ⚠️ `useRef` porque o efeito pode rodar duas vezes em desenvolvimento, e o
+     `id` nas deps porque a memória do dia seguinte é outra. */
+  const marcada = useRef<string | null>(null);
+  useEffect(() => {
+    if (marcada.current === memoria.post.id) return;
+    marcada.current = memoria.post.id;
+    aoVer?.(memoria.post.id);
+  }, [memoria.post.id, aoVer]);
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-2xl border border-border">
+      <p className="bg-muted px-3 py-2 text-[13px] font-semibold text-foreground">
+        {memoria.texto}
+      </p>
+      {/* ⚠️ **16:10, e não o 4:5 do feed — a razão é a DOBRA, e foi medida.**
+          Com a proporção do feed o cartão dava ~460px e empurrava o primeiro
+          post para y=839 num aparelho de 852: treze pixels de publicação
+          visível, ou seja, o feed inteiro fora da dobra. É exatamente o arranjo
+          que o dono pediu para corrigir, e a razão pela qual só um cartão
+          aparece por vez.
+          ⚠️ E `cover`, não `contain`: num recorte de 245px o `contain` deixaria
+          a foto vertical com 160px de largura no meio de 393, cercada de vazio.
+          O recorte CENTRAL de uma foto de barriga mostra a barriga. */}
+      {memoria.post.imagemUrl && (
+        <img
+          src={memoria.post.miniaturaUrl ?? memoria.post.imagemUrl}
+          alt={memoria.post.altTexto ?? "A sua publicação de um ano atrás"}
+          className="aspect-[16/10] w-full object-cover"
+        />
+      )}
+      {memoria.post.texto && (
+        <p className="px-3 py-2 text-[13px] text-muted-foreground">{memoria.post.texto}</p>
+      )}
+    </div>
+  );
+}
+
 export function CartaoDaSemana({
   retro,
   aoFechar,
@@ -1727,6 +1788,8 @@ export function TelaPrincipal({
   aoVerQuemReagiu,
   retro,
   aoFecharRetro,
+  memoria,
+  aoVerMemoria,
   aoAbrirPerfil,
   aoVer,
   aoTocarStory,
@@ -1823,6 +1886,16 @@ export function TelaPrincipal({
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
   retro?: Retrospectiva | null;
+  /**
+   * A memória do dia — "há um ano, você publicou isto".
+   *
+   * ⚠️ Quem DECIDE se ela existe é `memoriaDeHoje` (pura, com as CINCO travas),
+   * no servidor. Aqui só se desenha: uma condição a mais nesta tela seria a
+   * segunda régua do recurso mais perigoso da aba.
+   */
+  memoria?: { post: PostNaTela; texto: string } | null;
+  /** Marca a memória como vista. Chamada quando o cartão MONTA. */
+  aoVerMemoria?: (postId: string) => void;
   aoFecharRetro?: () => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
@@ -1988,13 +2061,19 @@ export function TelaPrincipal({
           será os stories"). */}
       {retro && aoFecharRetro && <CartaoDaSemana retro={retro} aoFechar={aoFecharRetro} />}
 
-      {/* ⚠️ **UM CARTÃO DE CADA VEZ.** A retrospectiva de domingo e o lembrete
-          podem cair no mesmo dia, e dois cartões empilhados entre os stories e
-          o primeiro post empurram o feed inteiro para fora da dobra — que é
-          exatamente o arranjo que o dono pediu para corrigir. A retrospectiva
-          ganha: ela só existe aos domingos, e o lembrete volta na semana
-          seguinte por conta própria. */}
-      {!retro && lembreteEntao && aoCompararAgora && aoDispensarEntao && (
+      {/* ⚠️ **UM CARTÃO DE CADA VEZ, e a ordem é por QUEM VOLTA.** Três podem
+          cair no mesmo dia, e empilhados entre os stories e o primeiro post
+          empurram o feed inteiro para fora da dobra — o arranjo que o dono
+          pediu para corrigir.
+
+          A retrospectiva ganha de todos: ela só existe aos domingos. A MEMÓRIA
+          vem em seguida, e nunca depois do lembrete: ela tem janela de três
+          dias e **não volta nunca** (a Trava 4 vale para a vida toda), enquanto
+          o lembrete do "então e agora" reaparece por conta própria. Perder a
+          memória é perder para sempre; perder o lembrete é adiá-lo. */}
+      {!retro && memoria && <CartaoDaMemoria memoria={memoria} aoVer={aoVerMemoria} />}
+
+      {!retro && !memoria && lembreteEntao && aoCompararAgora && aoDispensarEntao && (
         <CartaoDoEntaoEAgora
           foto={lembreteEntao.imagemUrl}
           criadoEm={lembreteEntao.criadoEm}
@@ -3614,6 +3693,15 @@ export function RedeNoApp({
    */
   const [entaoEscolhido, setEntaoEscolhido] = useState<string | null>(null);
 
+  /**
+   * A memória do dia, ou `null`.
+   *
+   * ⚠️ Quem decide é o SERVIDOR (`memoriaDeHoje`, com as cinco travas). A tela
+   * só desenha o que vier — e falha de rede vira `null`, que é o lado seguro
+   * deste recurso: um agrado que não aconteceu, contra devolver a foto de uma
+   * perda.
+   */
+  const [memoria, setMemoria] = useState<{ post: PostNaTela; texto: string } | null>(null);
   const [lembreteEntao, setLembreteEntao] = useState<{
     id: string;
     imagemUrl: string;
@@ -4146,6 +4234,37 @@ export function RedeNoApp({
       /* sem armazenamento: nenhum lembrete, e nada quebra */
     }
   }, [onde.t, euId, paraComparar, careMode]);
+
+  /**
+   * A MEMÓRIA DO DIA.
+   *
+   * ⚠️ **Uma ida por abertura do FEED, e nada é decidido aqui.** As cinco
+   * travas moram em `memoriaDeHoje`, no servidor: uma condição nesta tela seria
+   * a segunda régua do recurso que mais pode machucar nesta aba.
+   *
+   * ⚠️ E falha vira `null` — o lado seguro deste recurso, ao contrário de quase
+   * todo o resto da rede: o pior caso de calar é um agrado que não aconteceu; o
+   * pior caso de mostrar é devolver a foto de uma perda.
+   */
+  useEffect(() => {
+    if (onde.t !== "feed" || !euId) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { memoriaDoFeed } = await import("@/lib/rede-social.functions");
+        const r = await memoriaDoFeed({ data: { accessToken: t } });
+        if (!vivo) return;
+        setMemoria(r.ok ? (r.memoria ?? null) : null);
+      } catch {
+        if (vivo) setMemoria(null);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, euId]);
 
   /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
@@ -7318,6 +7437,15 @@ export function RedeNoApp({
         }}
         aoDispensarEntao={() => setLembreteEntao(null)}
         retro={retro}
+        memoria={memoria}
+        aoVerMemoria={(postId) => {
+          void (async () => {
+            const t = await token();
+            if (!t) return;
+            const { marcarMemoriaVista } = await import("@/lib/rede-social.functions");
+            await marcarMemoriaVista({ data: { accessToken: t, postId } });
+          })();
+        }}
         aoFecharRetro={() => {
           setRetro(null);
           try {

@@ -6726,6 +6726,83 @@ tela, com folga. **Impressão de captura não é medida**; o que decide é o
 **Bancada:** `/preview-instagram?tela=story` (o clipe, a prévia, o × e o relógio
 parando).
 
+### As memórias, e a quinta trava que a própria promessa exigiu (ago/2026)
+
+`memorias.ts` já existia — régua pura, quatro travas, testada — e **sem
+servidor e sem tela**. É a mesma família das sete funções de servidor que
+ficaram sem porta, chegando pelo outro lado.
+
+⚠️ **E relendo a promessa do arquivo antes de ligá-lo, apareceu um buraco.** O
+cabeçalho dele diz: _"Se alguma das travas não puder ser garantida, o recurso
+não deve existir"_ — e a que impede o pior caso não estava garantida.
+
+#### ⚠️ TRAVA 5 — o Modo Cuidado é OPT-IN
+
+A Trava 1 (luto) e a Trava 2 (ciclo atual) parecem fechar o caso terrível. Não
+fecham: **uma mulher que perdeu a gestação e não contou ao app fica com o
+`lmp_date` intacto.** O ciclo continua o mesmo, a Trava 2 não morde, e ~300 dias
+depois ela receberia "Há um ano, você publicou isto" com a foto da barriga.
+
+O conserto não é esperar que ela ligue o Modo Cuidado: é exigir um sinal
+**POSITIVO** de que a gestação terminou em nascimento. `birth_date` é isso, e é
+escrito à mão por ela no Perfil.
+
+⚠️ **E ele não estreita o recurso.** Uma memória precisa de 300 dias e uma
+gestação dura ~280 — então a única pessoa que já pode ter memória do ciclo ATUAL
+é justamente quem já pariu. A trava torna explícito o que a aritmética já dizia,
+e fecha o caso em que a aritmética se enganava.
+
+#### ⚠️ A MARCA DE "VISTA" SAI DA TELA, e não do cálculo
+
+A primeira versão gravava `rede_memorias_vistas` dentro de `memoriaDoFeed`. Mas
+a tela mostra **um cartão de cada vez** e a retrospectiva de domingo ganha da
+memória: marcando no CÁLCULO, uma memória suprimida pela tela seria queimada sem
+nunca ter aparecido — e a **Trava 4 vale para a vida toda**, então ela não
+voltaria nunca.
+
+`marcarMemoriaVista` é função própria, chamada quando o cartão MONTA. ⚠️ E é no
+montar, não no dispensar: quem rolou por cima sem tocar em nada não pode
+reencontrá-la amanhã, e depois de amanhã, até a janela de três dias fechar.
+
+#### ⚠️ A Trava 3 estaria MORTA, e o motivo é uma coluna que ninguém pede
+
+`COLUNAS_DO_POST` não traz `arquivado_em` — nenhuma leitura da rede precisa
+dele, porque todas filtram na consulta. Sem o `.is("arquivado_em", null)`,
+`p.arquivado_em` seria `undefined`, `arquivada` viraria `false` para todo mundo,
+e **o que ela tirou do ar voltaria como memória**. O filtro entrou na consulta; a
+trava fica de pé na régua como segunda linha, para o chamador que amanhã
+esquecer.
+
+#### A ordem dos cartões é por QUEM VOLTA
+
+Três podem cair no mesmo dia. A retrospectiva ganha de todos (só existe aos
+domingos). A **memória** vem em seguida, e nunca depois do lembrete: ela tem
+janela de três dias e **não volta nunca**, enquanto o "então e agora" reaparece
+por conta própria. **Perder a memória é perder para sempre; perder o lembrete é
+adiá-lo.**
+
+#### ⚠️ E a proporção do cartão foi MEDIDA, não escolhida
+
+Com o 4:5 do feed o cartão dava ~460px e empurrava o primeiro post para **y=839
+num aparelho de 852** — treze pixels de publicação visível, ou seja, o feed
+inteiro fora da dobra. É exatamente o arranjo que o dono pediu para corrigir.
+Com 16:10: **y=614**.
+
+⚠️ E `cover`, não `contain`: num recorte de 245px o `contain` deixaria a foto
+vertical com 160px de largura no meio de 393, cercada de vazio. O recorte
+CENTRAL de uma foto de barriga mostra a barriga.
+
+#### E a falha vira `null` — o lado seguro DESTE recurso
+
+Ao contrário de quase toda a rede, onde "não consegui ler" tem de virar ERRO:
+aqui o pior caso de calar é um agrado que não aconteceu, e o pior caso de
+mostrar é devolver a foto de uma perda.
+
+**Bancada:** `/preview-instagram?memoria=1` — a memória só nasce de uma
+publicação de um ano atrás, do mesmo ciclo, de quem já registrou o nascimento, e
+some para sempre depois de aparecer uma vez. Sem ela, olhar este cartão exigiria
+uma conta com um ano de uso e acertar a janela de três dias.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

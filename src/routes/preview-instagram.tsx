@@ -34,6 +34,7 @@
  *   /preview-instagram?tela=story&carimbo=1 → o visor com a moldura
  *   /preview-instagram?tela=story&videoStory=1 → o primeiro story é VÍDEO
  *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
+ *   /preview-instagram?memoria=1 → o cartão "há um ano, você publicou isto"
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -176,6 +177,8 @@ export const Route = createFileRoute("/preview-instagram")({
     videoStory: q.videoStory == null ? 0 : Number(q.videoStory),
     /* O story marcado como sensível: o véu só nasce de uma marca de verdade. */
     sensivelStory: q.sensivelStory == null ? 0 : Number(q.sensivelStory),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    memoria: q.memoria == null ? 0 : Number(q.memoria),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -416,6 +419,7 @@ function Bancada() {
     carimbo,
     videoStory,
     sensivelStory,
+    memoria,
     desafio,
     caixinha,
     perguntas,
@@ -1825,6 +1829,28 @@ function Bancada() {
              aparece, que é o único jeito de conferir que um convite sem
              indicação nunca é oferecido. */
             convite={{ codigo: semCodigo ? null : "MARIA7X" }}
+            /* ⚠️ **A MEMÓRIA só nasce de uma publicação de UM ANO ATRÁS, do
+             mesmo ciclo, de quem já registrou o nascimento — e some para
+             sempre depois de aparecer uma vez.** Sem a bancada, olhá-la exigiria
+             uma conta com um ano de uso e acertar a janela de três dias. É o
+             caso extremo do que as bancadas existem para resolver.
+             ⚠️ E ela vence o lembrete e perde da retrospectiva (um cartão de
+             cada vez): `?memoria=1` implica `?retro=0`. */
+            memoria={
+              memoria === 1
+                ? {
+                    post: {
+                      ...POSTS[0],
+                      /* ⚠️ `AGORA` cravado, nunca `Date.now()` — ver a nota do
+                       lembrete logo abaixo. */
+                      criadoEm: new Date(AGORA - 366 * 86_400_000).toISOString(),
+                      texto: "primeira foto da barriga 🤍",
+                    },
+                    texto: "Há um ano, você publicou isto.",
+                  }
+                : null
+            }
+            aoVerMemoria={() => {}}
             /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
              de 28+ dias e a janela de sete dias vencida — sem a bancada,
              olhá-lo exigiria esperar um mês com uma conta de verdade.
@@ -1875,7 +1901,7 @@ function Bancada() {
              de seis dias em sete), `?retro=1foto` prova a grade de uma foto só
              e `?retro=vazia` o cartão sem foto, que é o da semana que só virou. */
             retro={
-              entao || retroModo === "0"
+              entao || memoria === 1 || retroModo === "0"
                 ? null
                 : {
                     fotos:

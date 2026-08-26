@@ -67,6 +67,11 @@ const EXTRAS = [
   /* Os quatro cartões do primeiro minuto: abrem UMA vez na vida da conta, e o
      "já vi" viaja na nuvem — sem o parâmetro, ninguém os vê de novo. */
   "/preview-instagram?onboarding=1",
+  /* ⚠️ Sub-tela nova entra AQUI à mão — a varredura de disco lê as ROTAS, e não
+     tem como adivinhar um valor de `?tela=`. */
+  "/preview-instagram?tela=story&videoStory=1",
+  "/preview-instagram?tela=story&sensivelStory=1",
+  "/preview-instagram?memoria=1",
   "/preview-instagram?tela=filtro",
   "/preview-instagram?tela=conversa",
   "/preview-instagram?tela=conversas",

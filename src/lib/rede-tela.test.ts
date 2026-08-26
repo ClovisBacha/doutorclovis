@@ -387,8 +387,22 @@ describe("o lembrete do então e agora", () => {
 
   /* ⚠️ Dois cartões empilhados entre os stories e o primeiro post empurram o
      feed para fora da dobra — o arranjo que o dono pediu para corrigir. */
-  test("⚠️ um cartão de cada vez: a retrospectiva ganha", () => {
-    expect(semComentarios).toContain("{!retro && lembreteEntao && aoCompararAgora");
+  test("⚠️ um cartão de cada vez: o lembrete cede aos dois de cima", () => {
+    /**
+     * ⚠️ **A GARANTIA É "o lembrete cede", e não a lista exata de quem passa na
+     * frente.** A asserção travava `{!retro && lembreteEntao` e ficou vermelha
+     * quando a MEMÓRIA entrou na fila — uma cobertura estritamente MAIOR. É a
+     * décima terceira vez que uma âncora de grafia envelhece aqui.
+     *
+     * A ordem é por QUEM VOLTA: a retrospectiva só existe aos domingos, a
+     * memória não volta NUNCA (a Trava 4 vale para a vida toda), e o lembrete
+     * reaparece por conta própria. Perder a memória é perder para sempre.
+     */
+    const i = semComentarios.indexOf("lembreteEntao && aoCompararAgora");
+    expect(i).toBeGreaterThan(-1);
+    const cond = semComentarios.slice(semComentarios.lastIndexOf("{", i), i);
+    expect(cond).toContain("!retro");
+    expect(cond).toContain("!memoria");
   });
 
   /* ⚠️ Sem isto, tocar em "Comparar" abriria o compositor com a comparação

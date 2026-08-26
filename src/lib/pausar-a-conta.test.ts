@@ -62,6 +62,20 @@ describe("⚠️ ela é a régua ÚNICA — nenhum ponto de decisão fica de for
     /* `meuPerfilSocial` devolve os DOIS campos separados para a tela dela: o
        luto tem desenho próprio, a pausa tem outro. */
     "emCuidado: !p || !!(p as any).care_mode,",
+    /**
+     * ⚠️ **A MEMÓRIA: isto NÃO é uma decisão — é o FATO sendo entregue à régua
+     * que decide.**
+     *
+     * `memoriaDeHoje` tem cinco travas e a primeira é o luto; ela falha FECHADA
+     * em `undefined`. O `perfil ?` existe exatamente para que "não sei quem ela
+     * é" chegue como `undefined` (cala) e nunca como `false` (mostra) — trocar
+     * por `!!perfil?.care_mode` é a mutação que este arquivo derruba.
+     *
+     * ⚠️ E a PAUSA não entra aqui de propósito: a memória é mostrada só a ELA
+     * mesma, e pausar é "me esconda dos OUTROS". Suprimir a própria memória de
+     * quem pausou seria a pausa decidindo uma coisa que não é dela.
+     */
+    "careMode: perfil ? !!perfil.care_mode : undefined,",
   ];
 
   test("nenhuma decisão nova lê `care_mode` fora da régua", () => {

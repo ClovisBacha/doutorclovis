@@ -4828,6 +4828,143 @@ export const listaDeGente = createServerFn({ method: "POST" })
  * adivinhado devolveria conteúdo da camada restrita de qualquer pessoa — o
  * caminho mais óbvio para vazar o que o feed protege.
  */
+/**
+ * A MEMÓRIA DO DIA — "há um ano, você publicou isto".
+ *
+ * ⚠️ **A régua inteira mora em `memorias.ts`, e as CINCO travas são dela.** Este
+ * handler só busca o que ela precisa e obedece. Uma condição escrita aqui seria
+ * a segunda régua do recurso mais perigoso da aba — e a divergência apareceria
+ * como a foto da barriga de uma gestação que terminou voltando na abertura do
+ * app, num dia qualquer.
+ *
+ * ⚠️ **SÓ AS MINHAS PUBLICAÇÕES.** Não há `alvoId`: memória de terceiro não
+ * existe, e um parâmetro aqui seria a porta para ler o passado de qualquer
+ * paciente trocando um uuid.
+ *
+ * ⚠️ **Falha de leitura devolve `null`, e é o lado seguro** — ao contrário do
+ * arquivo de stories, onde "não consegui ler" tem de virar ERRO. Aqui o pior
+ * caso de errar para o lado de mostrar é devolver a foto de uma perda; o pior
+ * caso de errar para o lado de calar é um agrado que não aconteceu.
+ */
+export const memoriaDoFeed = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const perfil = (await perfisPorId(sb, [eu])).get(eu);
+    /* ⚠️ Sem o perfil, `careMode` fica `undefined` — e a régua trata isso como
+       "não sei" e cala. Ela é o portão; aqui só não se pode MENTIR o valor. */
+    const { memoriaDeHoje, textoDaMemoria } = await import("@/lib/memorias");
+    const { cicloParaCarimbo } = await import("@/lib/ciclo-da-gestacao");
+
+    /* ⚠️ **A JANELA DA CONSULTA é folgada de propósito.** Recortar por data no
+       SQL exigiria repetir aqui a aritmética do aniversário que a régua já faz
+       — a segunda régua de novo. O `limit` segura o custo. */
+    /* ⚠️ **O ARQUIVADO SAI NA CONSULTA, e não na régua.** `COLUNAS_DO_POST` não
+       traz `arquivado_em` — nenhuma leitura da rede precisa dele, porque todas
+       filtram assim. Sem este `.is(...)`, `p.arquivado_em` seria `undefined`,
+       `arquivada` viraria `false` para todo mundo e a **Trava 3 estaria morta**:
+       o que ela tirou do ar voltaria como memória. A trava fica de pé na régua
+       como segunda linha, para o chamador que amanhã esquecer o filtro. */
+    const crus = await postsCrus(sb, (base: any) =>
+      base
+        .eq("autor_id", eu)
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: true })
+        .limit(200),
+    );
+    if (crus.length === 0) return { ok: true as const, memoria: null };
+
+    /* Quais delas eu já mostrei a ela. Falha aqui trata TODAS como vistas: uma
+       memória a menos é melhor que a mesma memória todo dia da janela. */
+    const vistas = new Set<string>();
+    let naoSeiAsVistas = false;
+    {
+      const { data: v, error } = await sb
+        .from("rede_memorias_vistas")
+        .select("post_id")
+        .eq("quem_id", eu);
+      if (error) naoSeiAsVistas = true;
+      for (const l of (v ?? []) as { post_id: string }[]) vistas.add(l.post_id);
+    }
+    if (naoSeiAsVistas) return { ok: true as const, memoria: null };
+
+    const escolhida = memoriaDeHoje({
+      posts: crus.map((p: any) => ({
+        id: p.id as string,
+        criadoEm: p.criado_em as string,
+        ciclo: (p.ciclo ?? null) as string | null,
+        vista: vistas.has(p.id),
+        arquivada: !!p.arquivado_em,
+      })),
+      cicloAtual: cicloParaCarimbo(perfil),
+      careMode: perfil ? !!perfil.care_mode : undefined,
+      nascimento: (perfil?.birth_date ?? null) as string | null,
+      agora: new Date(),
+    });
+    if (!escolhida) return { ok: true as const, memoria: null };
+
+    /* ⚠️ **ESTE HANDLER NÃO MARCA NADA COMO VISTA — e a separação é o recurso.**
+       A tela mostra UM cartão de cada vez entre os stories e o primeiro post, e
+       a retrospectiva de domingo ganha dela. Se a marca fosse escrita aqui, no
+       CÁLCULO, uma memória suprimida pela tela seria queimada sem nunca ter
+       aparecido — e ela não volta, porque a Trava 4 é para a vida toda.
+       Quem marca é `marcarMemoriaVista`, chamada quando o cartão MONTA. */
+
+    const [post] = await montarPosts(
+      sb,
+      eu,
+      [crus.find((p: any) => p.id === escolhida.id)],
+      await contextoDe(sb, eu),
+    );
+    if (!post) return { ok: true as const, memoria: null };
+
+    const anos = Math.max(
+      1,
+      Math.round((Date.now() - Date.parse(escolhida.criadoEm)) / (365.25 * 86_400_000)),
+    );
+    return { ok: true as const, memoria: { post, texto: textoDaMemoria(anos) } };
+  });
+
+/**
+ * "Eu vi esta memória" — chamada quando o cartão APARECE na tela.
+ *
+ * ⚠️ **Quando APARECE, e não quando ela dispensa.** Quem rolou por cima sem
+ * tocar em nada não pode reencontrá-la amanhã, e depois de amanhã, até a janela
+ * de três dias fechar. É a mesma decisão do carimbo do lembrete de "então e
+ * agora".
+ *
+ * ⚠️ **E é separada de `memoriaDoFeed` porque a TELA decide se o cartão
+ * aparece** (um cartão de cada vez; a retrospectiva de domingo ganha). Marcar
+ * no cálculo queimaria uma memória que ninguém viu — e a Trava 4 vale para a
+ * vida toda, então ela não voltaria nunca.
+ *
+ * ⚠️ **Só as MINHAS**: o par (quem, post) é fechado pela sessão, e o `insert`
+ * carrega o `eu` do servidor. Colidir na chave é sucesso repetido.
+ */
+export const marcarMemoriaVista = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await (supabaseAdmin as any)
+      .from("rede_memorias_vistas")
+      .insert({ quem_id: eu, post_id: data.postId });
+    /* ⚠️ A falha NÃO derruba o cartão que já está na tela: o pior caso é ele
+       voltar uma vez, contra esconder uma memória que existe. */
+    if (error && (error as any).code !== "23505") {
+      console.warn("[rede] memória vista não gravou — rode APLICAR_NOVE_DA_REDE.sql");
+    }
+    return { ok: true as const };
+  });
+
 export const verPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),

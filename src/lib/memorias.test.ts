@@ -11,7 +11,15 @@ const base = (over: Partial<Parameters<typeof memoriaDeHoje>[0]["posts"][number]
   ...over,
 });
 const chamar = (over: Partial<Parameters<typeof memoriaDeHoje>[0]> = {}) =>
-  memoriaDeHoje({ posts: [base()], cicloAtual: "c1", careMode: false, agora: AGORA, ...over });
+  memoriaDeHoje({
+    posts: [base()],
+    cicloAtual: "c1",
+    careMode: false,
+    /* ⚠️ A Trava 5 pede um sinal POSITIVO de nascimento — ver `memorias.ts`. */
+    nascimento: "2025-06-01",
+    agora: AGORA,
+    ...over,
+  });
 
 describe("as quatro travas", () => {
   test("o caso feliz devolve a memória", () => {
@@ -25,6 +33,20 @@ describe("as quatro travas", () => {
   test('⚠️ e "não sei" também não mostra', () => {
     /* Enquanto o perfil não chegou, mostrar e descobrir o luto depois é tarde. */
     expect(chamar({ careMode: undefined })).toBeNull();
+  });
+
+  test("⚠️ TRAVA 5 — sem NASCIMENTO registrado, nenhuma memória", () => {
+    /**
+     * ⚠️ **Modo Cuidado é OPT-IN, e é por isso que esta trava existe.** Uma
+     * mulher que perdeu a gestação e não contou ao app fica com o `lmp_date`
+     * intacto: o ciclo continua o mesmo, a Trava 2 não morde, e ~300 dias
+     * depois ela receberia "Há um ano, você publicou isto" com a foto da
+     * barriga. O conserto não é esperar que ela ligue o Modo Cuidado — é
+     * exigir um sinal POSITIVO de que a gestação terminou em nascimento.
+     */
+    expect(chamar({ nascimento: null })).toBeNull();
+    /* E com ele, a memória volta a existir. */
+    expect(chamar({ nascimento: "2025-06-01" })).not.toBeNull();
   });
 
   test("⚠️ TRAVA 2 — só do ciclo ATUAL", () => {
@@ -83,6 +105,7 @@ describe("a janela", () => {
       posts: [base({ id: "novo" }), base({ id: "velho", criadoEm: "2025-08-26T12:00:00Z" })],
       cicloAtual: "c1",
       careMode: false,
+      nascimento: "2025-06-01",
       agora: AGORA,
     });
     expect(r?.id).toBe("velho");
