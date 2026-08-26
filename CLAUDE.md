@@ -81,6 +81,27 @@ Passo a passo (uma vez):
 Depois disso, cada `git push` atualiza o site: a branch de produção vira a URL
 principal e as outras branches ganham uma URL de **preview** automática.
 
+> ⚠️ **MEDIDO EM AGO/2026: `www.obstetrica.com.br` ESTÁ SERVINDO A BRANCH DE
+> TRABALHO `claude/determined-edison-XSh9l`, e não a `main`.** Conferido contra
+> a fonte primária, e não deduzido do painel: `/pub/<CODIGO>` é uma rota que
+> existe SÓ nesta branch, e a produção responde 200 com o texto dela; e
+> `origin/main` não contém os commits. A PR #117 está ABERTA e EM RASCUNHO.
+>
+> Isso muda três coisas para quem trabalhar aqui:
+>
+> 1. **Não existe preview.** Todo push desta branch vai ao ar para as pacientes
+>    no minuto seguinte — não há degrau entre "empurrei" e "está em produção".
+> 2. **O `APLICAR_*.sql` chega DEPOIS do código, sempre e para valer.** Não é
+>    hipótese de sala de aula: é o estado normal desta produção. Os degraus de
+>    recuo são a única coisa entre uma coluna que falta e um recurso antigo
+>    apagado em silêncio.
+> 3. **A régua de "posso empurrar isto?" fica mais dura**: o que estiver pela
+>    metade fica pela metade NA MÃO DA PACIENTE, não numa URL de teste.
+>
+> Se a intenção era que a produção seguisse a `main`, quem conserta é o dono, no
+> painel da Vercel (a branch de produção do projeto, ou o domínio apontado para
+> esta branch). Não mexa nisso pelo repositório.
+
 ## Estrutura
 
 ```
