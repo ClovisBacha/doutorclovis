@@ -193,6 +193,8 @@ export const MENSAGENS_POR_DIA = 200;
  * perde a última linha e volta a mostrar a anterior faz a paciente achar que a
  * mensagem que ela viu chegar não existiu.
  */
+import { previaDaFigurinha } from "./figurinhas";
+
 export function previaDaMensagem(
   texto: string | null,
   apagada: boolean,
@@ -205,11 +207,18 @@ export function previaDaMensagem(
    * não teria como saber se aquilo é um defeito ou uma mensagem vazia de
    * verdade.
    */
-  carrega?: { imagem?: boolean; ref?: "post" | "story" | null },
+  carrega?: { imagem?: boolean; audio?: boolean; ref?: "post" | "story" | null },
 ): string {
   if (apagada) return "Mensagem apagada";
+  /* ⚠️ **A FIGURINHA VEM ANTES DE TUDO.** Sem isto, a lista mostraria o marcador
+     cru (`:dc-fig:abraco:`) — a paciente veria um código onde deveria ver o que
+     a amiga mandou. É o preço de a figurinha viajar como texto, e a régua que o
+     paga vive em `figurinhas.ts`. */
+  const fig = previaDaFigurinha(texto);
+  if (fig) return fig;
   const t = (texto ?? "").replace(/\s+/g, " ").trim();
   if (!t) {
+    if (carrega?.audio) return "🎤 Mensagem de voz";
     if (carrega?.imagem) return "📷 Foto";
     if (carrega?.ref === "post") return "Publicação";
     if (carrega?.ref === "story") return "Respondeu ao seu story";

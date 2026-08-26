@@ -23,6 +23,7 @@ import {
   TAMANHO_DA_NOTA,
 } from "@/lib/conversa";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { FIGURINHAS, figurinhaDoTexto, textoDaFigurinha } from "@/lib/figurinhas";
 import {
   EXPLICACAO_DA_SUGESTAO,
   RASCUNHO_DA_PRIMEIRA,
@@ -633,6 +634,7 @@ export function Conversa({
   /** ⚠️ Local e por mensagem — ver o bloco do filtro de palavras abaixo. */
   const [reveladas, setReveladas] = useState<Set<string>>(() => new Set());
   const [denunciandoConversa, setDenunciandoConversa] = useState(false);
+  const [abrindoFigurinhas, setAbrindoFigurinhas] = useState(false);
   /** A mensagem que estou citando ao escrever. */
   const [citando, setCitando] = useState<MensagemNaTela | null>(null);
   /** A mensagem que estou denunciando (a folha do motivo). */
@@ -927,6 +929,40 @@ export function Conversa({
     }
   }
 
+  /**
+   * MANDAR UMA FIGURINHA.
+   *
+   * ⚠️ **Ela viaja como TEXTO MARCADO** (`:dc-fig:abraco:`), e por isso passa
+   * por tudo que já existe — citação, encaminhar, busca local, apagar, prévia da
+   * lista — sem uma linha nova em nenhum desses lugares. Ver `figurinhas.ts`.
+   *
+   * ⚠️ **E ela vai SOZINHA, sem o que estava digitado.** A régua só reconhece a
+   * mensagem que É a figurinha; juntá-la ao texto faria a tela ter de decidir
+   * como desenhar as duas coisas, e o formato existe para ser um gesto.
+   */
+  async function mandarFigurinha(id: string) {
+    if (enviando || esperando) return;
+    setAbrindoFigurinhas(false);
+    setEnviando(true);
+    try {
+      const t0 = await token();
+      if (!t0) return;
+      const { enviarMensagem } = await import("@/lib/conversa.functions");
+      const r = await enviarMensagem({
+        data: { accessToken: t0, conversaId: conversa.id, texto: textoDaFigurinha(id) },
+      });
+      if (!r.ok) {
+        setRecado("Não deu para mandar agora.");
+        return;
+      }
+      void carregar();
+    } catch {
+      setRecado("Não deu para mandar agora.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function enviar() {
     const t = texto.trim();
     /* ⚠️ **Foto SEM legenda é mensagem válida.** Exigir texto aqui faria o botão
@@ -1074,14 +1110,17 @@ export function Conversa({
                 isto aqui só evita oferecer o que seria recusado. */}
             <div
               onClick={() => !m.apagada && setAcaoEm(m.id)}
-              className={`max-w-[78%] rounded-2xl px-3 py-2 text-[14px] leading-snug ${
-                !m.apagada ? "cursor-pointer" : ""
-              } ${
-                m.apagada
-                  ? "bg-muted/50 italic text-muted-foreground"
-                  : m.souEu
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
+              className={`max-w-[78%] text-[14px] leading-snug ${
+                figurinhaDoTexto(m.texto) ? "" : "rounded-2xl px-3 py-2"
+              } ${!m.apagada ? "cursor-pointer" : ""} ${
+                figurinhaDoTexto(m.texto)
+                  ? /* ⚠️ Figurinha NÃO tem fundo — ver o comentário na bolha. */
+                    "bg-transparent"
+                  : m.apagada
+                    ? "bg-muted/50 italic text-muted-foreground"
+                    : m.souEu
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted"
               }`}
             >
               {m.apagada ? (
@@ -1141,7 +1180,18 @@ export function Conversa({
                       ⚠️ E o estado é LOCAL e por MENSAGEM (`reveladas`): revelar
                       uma não pode revelar as outras — ela escondeu aquela
                       palavra de propósito. */}
-                  {m.recolhida && !reveladas.has(m.id) ? (
+                  {/* ⚠️ **A FIGURINHA SUBSTITUI A BOLHA, e não vive dentro
+                      dela.** Um emoji de 44px dentro de um balão com fundo lê
+                      como um texto grande; solto, lê como figurinha — é a mesma
+                      distinção que o WhatsApp faz, e ela é o formato inteiro. */}
+                  {figurinhaDoTexto(m.texto) ? (
+                    <span
+                      aria-label={figurinhaDoTexto(m.texto)!.rotulo}
+                      className="block text-[52px] leading-none"
+                    >
+                      {figurinhaDoTexto(m.texto)!.arte}
+                    </span>
+                  ) : m.recolhida && !reveladas.has(m.id) ? (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1561,6 +1611,24 @@ export function Conversa({
                 </button>
               </div>
             )}
+            {/* ⚠️ A grade fica ACIMA do campo e some ao escolher: uma gaveta
+                que continua aberta depois do gesto obriga a fechá-la à mão, e o
+                formato existe para ser um toque. */}
+            {abrindoFigurinhas && (
+              <div className="mb-2 grid grid-cols-6 gap-1 rounded-2xl border border-border p-2">
+                {FIGURINHAS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => void mandarFigurinha(f.id)}
+                    aria-label={f.rotulo}
+                    className="press flex h-11 w-full items-center justify-center text-[24px]"
+                  >
+                    {f.arte}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex items-end gap-2">
               <label
                 className="press flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full border border-border text-[17px]"
@@ -1587,6 +1655,20 @@ export function Conversa({
                   }}
                 />
               </label>
+              {/* ⚠️ **A FIGURINHA É NOSSA, e não um GIF de fora.** Giphy exigiria
+                  abrir a CSP para um host externo, tem custo por chamada e —
+                  o que decide — entrega conteúdo NÃO MODERADO: a busca por
+                  "grávida" lá devolve piada de parto e imagem de teor sexual.
+                  Ver `figurinhas.ts`. */}
+              <button
+                type="button"
+                onClick={() => setAbrindoFigurinhas((v) => !v)}
+                aria-label="Figurinhas"
+                aria-expanded={abrindoFigurinhas}
+                className="press flex h-10 w-10 shrink-0 items-center justify-center text-[18px]"
+              >
+                ☺
+              </button>
               <textarea
                 value={texto}
                 onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DA_MENSAGEM))}

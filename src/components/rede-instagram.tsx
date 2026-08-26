@@ -865,6 +865,15 @@ export const PostInstagram = memo(function PostInstagram({
                 {textoDeMarcadas(post.marcadas.map((m) => m.nome))}
               </span>
             )}
+            {/* ⚠️ **O LUGAR É TEXTO, e NÃO um link para um mapa.** O rótulo é o
+                que ela escreveu; transformá-lo em endereço convidaria a tela a
+                resolver a localização — e é exatamente isso que este campo
+                existe para não fazer. */}
+            {post.lugar && (
+              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+                📍 {post.lugar}
+              </span>
+            )}
           </span>
         </button>
         {/* O ⋯ tem uma ação por lado: apagar no post DELA, denunciar no de
@@ -5540,6 +5549,8 @@ export function RedeNoApp({
     comparacaoCom: string | null;
     /** A descrição da foto, para leitores de tela. */
     altTexto?: string | null;
+    /** ⚠️ Um RÓTULO que ela escreve, nunca coordenada. */
+    lugar?: string | null;
     texto: string | null;
     fotos: string[];
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
@@ -5579,6 +5590,7 @@ export function RedeNoApp({
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
           altTexto: p.altTexto ?? undefined,
+          lugar: p.lugar ?? undefined,
         },
       });
       if (!r.ok) {
@@ -5984,6 +5996,7 @@ export function RedeNoApp({
     enquete: string[],
     perguntaAberta: boolean,
     marcadas: string[],
+    maisFotos: string[],
   ) {
     setConferindoStory(null);
     /* ⚠️ Lido ANTES de zerar: o `setPostNoStory(null)` abaixo é assíncrono, e
@@ -6009,6 +6022,7 @@ export function RedeNoApp({
           postDe: comPost,
           visibilidade: camada,
           marcadas,
+          maisFotos,
         },
       });
       if (r.ok) {
@@ -6359,7 +6373,7 @@ export function RedeNoApp({
              largado. */
           setPostNoStory(null);
         }}
-        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta, marcadas }) =>
+        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta, marcadas, maisFotos }) =>
           void publicarStory(
             conferindoStory,
             texto,
@@ -6368,6 +6382,7 @@ export function RedeNoApp({
             enquete,
             perguntaAberta,
             marcadas,
+            maisFotos,
           )
         }
         /* A MESMA lista do compositor de post — nunca uma busca. */
@@ -8294,8 +8309,43 @@ export function VisorDeStory({
           composição inteira, e cortar as bordas engole texto que a pessoa
           escreveu na foto. */}
       <div className="relative min-h-0 flex-1">
-        {atual.imagemUrl && (
-          <img src={atual.imagemUrl} alt="" className="h-full w-full object-contain" />
+        {/* ⚠️ **ROLAGEM NATIVA com `scroll-snap`, e NUNCA `transform` por
+            estado.** É a mesma decisão do carrossel do post: o deslizar tem
+            inércia e resistência de borda que o sistema calcula, e
+            reimplementar dá sempre um arrasto que parece quase certo e nunca é.
+
+            ⚠️ E o carrossel do story tem uma trava a mais: ele vive DENTRO de
+            uma tela cujas metades avançam e voltam o story. `stopPropagation`
+            no contêiner é o que impede um deslize horizontal de virar um
+            avanço — sem ele, folhear as fotos pularia o story inteiro. */}
+        {(atual.imagens ?? []).length > 1 ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex h-full w-full snap-x snap-mandatory overflow-x-auto"
+          >
+            {(atual.imagens ?? []).map((u, i) => (
+              <img
+                key={`${u}-${i}`}
+                src={u}
+                alt=""
+                className="h-full w-full shrink-0 snap-center object-contain"
+              />
+            ))}
+          </div>
+        ) : (
+          atual.imagemUrl && (
+            <img src={atual.imagemUrl} alt="" className="h-full w-full object-contain" />
+          )
+        )}
+        {/* ⚠️ Os pontinhos ficam ABAIXO da barrinha do tempo, e não no lugar
+            dela: as duas contam coisas diferentes (quantas fotos × quanto falta
+            do story), e juntá-las faria a paciente ler uma como a outra. */}
+        {(atual.imagens ?? []).length > 1 && (
+          <div className="pointer-events-none absolute inset-x-0 top-8 flex justify-center gap-1">
+            {(atual.imagens ?? []).map((_, i) => (
+              <span key={i} className="h-1 w-1 rounded-full bg-white/70" />
+            ))}
+          </div>
         )}
         {atual.texto && (
           <p className="absolute inset-x-0 bottom-8 px-6 text-center text-[16px] font-medium text-white drop-shadow-lg">
@@ -9083,6 +9133,8 @@ export function NovoPost({
   repostando?: PostNaTela | null;
   aoPublicar: (p: {
     texto: string | null;
+    /** ⚠️ Um RÓTULO que ela escreve, nunca coordenada — ver o campo na tela. */
+    lugar?: string | null;
     fotos: string[];
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
     miniatura?: string | null;
@@ -9188,6 +9240,7 @@ export function NovoPost({
    * das pacientes achar que precisa preencher os dois.
    */
   const [altTexto, setAltTexto] = useState("");
+  const [lugar, setLugar] = useState("");
   const [altAberto, setAltAberto] = useState(false);
   const [fotos, setFotos] = useState<string[]>(() => {
     if (!momentoInicial || typeof document === "undefined") return [];
@@ -9330,6 +9383,7 @@ export function NovoPost({
     setErro(null);
     const ok = await aoPublicar({
       texto: texto.trim() || null,
+      lugar: lugar.trim() || null,
       fotos,
       miniatura,
       visibilidade: vis,
@@ -9447,6 +9501,21 @@ export function NovoPost({
             Apple cobra isto na revisão, e o app é instalado por quem usa leitor
             de tela: sem descrição, a foto do ultrassom de uma amiga é uma
             lacuna silenciosa no meio do feed. */}
+        {/* ⚠️ **O LUGAR É UM RÓTULO QUE ELA ESCREVE, e nunca coordenada nem
+            autocompletar.** Guardar latitude e longitude de uma gestante — e
+            devolvê-las a quem abre o post — é dado de localização precisa numa
+            base de alto risco. E um catálogo de endereços transformaria o campo
+            numa lista de maternidades com as pacientes de cada uma, que é
+            exatamente o cruzamento que a régua de "nada clínico no perfil"
+            existe para impedir. */}
+        <input
+          value={lugar}
+          onChange={(e) => setLugar(e.target.value.slice(0, 60))}
+          placeholder="📍 Onde? (opcional)"
+          aria-label="O lugar desta publicação"
+          className="mt-2 min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+        />
+
         {temFoto && (
           <div className="mt-2">
             {!altAberto ? (
@@ -10823,6 +10892,7 @@ export function ConferirStory({
     enquete: string[];
     perguntaAberta: boolean;
     marcadas: string[];
+    maisFotos: string[];
   }) => void;
   /**
    * Quem ela pode marcar — a MESMA lista do compositor de post.
@@ -10841,6 +10911,15 @@ export function ConferirStory({
   const [enviando, setEnviando] = useState(false);
   const [marcadas, setMarcadas] = useState<string[]>([]);
   const [abrindoMarcar, setAbrindoMarcar] = useState(false);
+  /**
+   * As fotos do carrossel além da primeira.
+   *
+   * ⚠️ **Quatro, e não nove como o post.** O story é folheado com o dedo em pé,
+   * com a barrinha correndo: cinco já é uma sequência que muita gente não
+   * termina, e o formato existe para ser rápido.
+   */
+  const [maisFotos, setMaisFotos] = useState<string[]>([]);
+  const arquivoExtra = useRef<HTMLInputElement>(null);
   /* `null` = sem enquete. Duas vazias é o estado de quem abriu e ainda não
      escreveu — a mesma forma do compositor de post. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
@@ -11116,6 +11195,37 @@ export function ConferirStory({
           </p>
         )}
 
+        {/* ⚠️ **O CARROSSEL DE STORY, com teto de cinco.** O botão some quando
+            elas acabam — um botão que não faz nada ensina que os botões desta
+            tela não valem. */}
+        <input
+          ref={arquivoExtra}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f || maisFotos.length >= 4) return;
+            /* ⚠️ **`prepararFotoDoStory`, e não a do post.** O story é 9:16 e o
+               post é 4:5 — usar a preparação errada faria a foto extra sair com
+               enquadramento diferente das outras do mesmo carrossel. */
+            const pronta = await prepararFotoDoStory(f);
+            if (pronta) setMaisFotos((v) => [...v, pronta]);
+          }}
+        />
+        {maisFotos.length < 4 && (
+          <button
+            type="button"
+            onClick={() => arquivoExtra.current?.click()}
+            className="press mb-2 min-h-[44px] w-full rounded-2xl bg-white/15 px-3 text-left text-[13px] text-white"
+          >
+            {maisFotos.length === 0
+              ? "🖼 Juntar mais fotos"
+              : `🖼 ${maisFotos.length + 1} fotos (tocar para mais)`}
+          </button>
+        )}
+
         {/* ⚠️ **MARCAR ALGUÉM NO STORY — e a lista é a MESMA do post.** Só quem
             ela já conhece; não há busca por nome, e nunca haverá. */}
         {amigasParaMarcar && amigasParaMarcar.length > 0 && (
@@ -11163,6 +11273,7 @@ export function ConferirStory({
               texto: texto.trim(),
               camada,
               marcadas,
+              maisFotos,
               carimbar: carimbar && !!semana,
               /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
                  aqui, que aceitaria o que o servidor recusa. */

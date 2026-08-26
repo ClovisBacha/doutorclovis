@@ -9655,3 +9655,88 @@ da busca DENTRO da conversa.
   importa é o resultado.
 
 **Sem SQL:** as quatro saem de tabelas e colunas que já existem.
+
+## O conteúdo: carrossel de story, lugar e figurinhas (ago/2026)
+
+### O carrossel de story
+
+**O mesmo desenho do post** — `imagens` como coluna de array, com `imagem_path`
+continuando a ser a primeira. ⚠️ **Mas o teto é CINCO, e não dez:** o story é
+folheado com o dedo em pé, com a barrinha correndo, e dez fotos viram uma
+sequência que ninguém termina.
+
+- ⚠️ **`imagens` é um DEGRAU PRÓPRIO, e o teste dos três degraus pegou.** A
+  primeira versão a pôs no `base` — e `base` é o que o degrau MÍNIMO insere: num
+  banco sem a coluna, publicar story falharia INTEIRO, inclusive o de foto
+  única, que é o caso de todo mundo hoje.
+- ⚠️ **Uma foto que não sobe RECUSA o story.** Um carrossel com buraco é pior
+  que foto única: ela escolheu quatro, veria três, e não saberia qual sumiu.
+- ⚠️ **O deslize horizontal não avança o story.** Ele vive dentro de uma tela
+  cujas metades avançam e voltam; sem `stopPropagation`, folhear as fotos
+  pularia o story inteiro.
+- **Rolagem NATIVA com `scroll-snap`**, como no post: reimplementar o arrasto dá
+  sempre um deslize que parece quase certo e nunca é.
+
+### ⚠️ O lugar é um RÓTULO, e nunca coordenada
+
+Guardar latitude e longitude de uma gestante — e devolvê-las a quem abre o post —
+é dado de localização precisa numa base de alto risco: **é o que permite a alguém
+saber onde ela mora.** "Maternidade Santa Casa" diz o que ela quer dizer e não
+localiza ninguém.
+
+⚠️ **E NÃO há autocompletar de lugares.** Um catálogo de endereços transformaria
+o campo numa lista de maternidades com as pacientes de cada uma — exatamente o
+cruzamento que a régua de "nada clínico no perfil" existe para impedir. Na tela
+ele é TEXTO, e não link para mapa: transformá-lo em endereço convidaria a tela a
+resolver a localização.
+
+### ⚠️ As figurinhas são NOSSAS, e não um GIF de fora
+
+Três razões, e a terceira decide:
+
+1. **CSP** — um host externo de imagem precisaria ser aberto, e ele passa a poder
+   servir qualquer coisa.
+2. **Custo** por chamada, no formato que mais se usa por conversa.
+3. ⚠️ **Conteúdo NÃO MODERADO.** A busca por "grávida" no Giphy devolve piada de
+   parto e imagem de teor sexual. Num app de gestação de alto risco, onde a
+   paciente pode estar internada, isso não é risco aceitável por conveniência.
+
+- ⚠️ **NENHUMA fala de corpo, exame ou conduta.** Um catálogo de gestação tenta
+  naturalmente incluir "contração", "pressão alta", "dilatação" — e uma figurinha
+  é um jeito de dizer uma coisa sem escrever, o que a torna o pior formato
+  possível para conteúdo clínico. Aqui elas dizem AFETO e PRESENÇA. Sem 😱 e sem
+  😢, pela mesma razão das reações do post.
+- ⚠️ **O catálogo é PEQUENO de propósito** (dezoito). Um catálogo grande vira
+  busca, busca vira campo de texto, e aí o formato deixou de ser o gesto rápido
+  que ele existe para ser.
+- ⚠️ **Ela viaja como TEXTO MARCADO** (`:dc-fig:abraco:`), e por isso passa pela
+  citação, pelo encaminhar, pela busca local, pelo apagar e pela prévia da lista
+  sem uma linha nova em nenhum desses lugares. Uma coluna própria exigiria tocar
+  em seis leituras e num CHECK.
+- ⚠️ **E a prévia da lista NUNCA mostra o marcador cru** — sem a régua, a
+  paciente veria um código onde deveria ver o que a amiga mandou.
+- **Na tela ela SUBSTITUI a bolha**: um emoji de 44px dentro de um balão com
+  fundo lê como texto grande; solto, lê como figurinha.
+
+### ⚠️ Duas coisas da lista original que NÃO foram feitas — e por quê
+
+- **"Comentar no story" saiu**, e o erro foi meu na hora de listar: **o Instagram
+  não tem isso.** O que existe lá é resposta privada, que este app já tem
+  (`responderStory`) junto com a reação. Um comentário público num conteúdo que
+  expira em 24 h seria uma superfície de conselho de leiga com menos rastro que
+  a do post — o oposto do que a decisão de fechar os comentários protegeu.
+- **"Responder story com foto" ficou de fora desta onda.** O caminho existe
+  inteiro (a resposta já é uma mensagem do direct, e a mensagem já aceita foto);
+  falta ligar o seletor no visor. É a única das 28 que fica pendente, e ela está
+  registrada aqui em vez de silenciosamente esquecida.
+
+⚠️ **Três testes MEUS mediram distância entre linhas nesta onda** — 400
+caracteres do texto com indentação, uma ordem entre inserts, e uma âncora num
+campo que aparece antes. **A distância e a ordem nunca são a garantia.** O que
+quebra a publicação num banco atrasado é a coluna nova estar no objeto que o
+ÚLTIMO insert manda, e é isso que o teste passou a cobrar.
+
+⚠️ **E a prosa do SQL quebrou um teste de texto pela décima vez**: a busca por
+"latitude" achava justamente o comentário que explica por que ela NÃO é guardada.
+
+**Aplicar no Supabase:** `supabase/APLICAR_CONTEUDO_DA_REDE.sql`.

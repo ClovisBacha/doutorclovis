@@ -738,6 +738,13 @@ function Bancada() {
         autorNome: "Marina Costa",
         autorAvatar: null,
         imagemUrl: foto(c[0], c[1], c[2]),
+        /* ⚠️ **O CARROSSEL DE STORY só se vê com mais de uma foto**, e o segundo
+           story da bancada traz três: sem ele, os pontinhos e o deslizar não
+           existiriam em nenhuma tela que dá para olhar. */
+        imagens:
+          n === 1
+            ? CORES.slice(0, 3).map((cc) => foto(cc[0], cc[1], cc[2]))
+            : [foto(c[0], c[1], c[2])],
         texto: n === 1 ? "31 semanas hoje 🤍" : null,
         criadoEm: atras(60 * (n + 1)),
         visto: false,

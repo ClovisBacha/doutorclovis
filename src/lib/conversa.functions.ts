@@ -253,9 +253,17 @@ export const minhasConversas = createServerFn({ method: "POST" })
      * a LISTA DE CONVERSAS inteira — um recurso que já funcionava, apagado por
      * causa de uma prévia.
      */
-    const comCorpo = await lerUltimas(
-      "conversa_id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo",
+    /* ⚠️ **UM DEGRAU POR SQL.** `audio_path` nasce no `APLICAR_DIRECT_COMPLETO`
+       e `imagem_path` no `APLICAR_CONVERSA_E_COMENTARIOS` — um recuo de dois
+       passos apagaria a prévia da FOTO por causa de uma coluna de voz. */
+    const comAudio = await lerUltimas(
+      "conversa_id, autor_id, texto, criada_em, apagada_em, imagem_path, audio_path, ref_tipo",
     );
+    const comCorpo = comAudio.error
+      ? await lerUltimas(
+          "conversa_id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo",
+        )
+      : comAudio;
     const msgs = comCorpo.error
       ? (await lerUltimas("conversa_id, autor_id, texto, criada_em, apagada_em")).data
       : comCorpo.data;
@@ -292,6 +300,7 @@ export const minhasConversas = createServerFn({ method: "POST" })
         comAvatar: avatares[i] ?? null,
         previa: previaDaMensagem(m?.texto ?? null, !!m?.apagada_em, undefined, {
           imagem: !!m?.imagem_path,
+          audio: !!m?.audio_path,
           ref: (m?.ref_tipo ?? null) as "post" | "story" | null,
         }),
         ultimaEm: c.ultima_em ?? null,

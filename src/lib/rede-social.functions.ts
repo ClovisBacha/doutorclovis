@@ -245,6 +245,14 @@ export type PostNaTela = {
    */
   altTexto?: string | null;
   /**
+   * O lugar, como ELA escreveu.
+   *
+   * ⚠️ **É um rótulo, e nunca coordenada** — guardar latitude e longitude de uma
+   * gestante e devolvê-las a quem abre o post é dado de localização precisa numa
+   * base de alto risco.
+   */
+  lugar?: string | null;
+  /**
    * A publicação republicada, quando este post é um repost.
    *
    * ⚠️ **`null` TAMBÉM QUANDO A ORIGINAL SAIU DO AR**, e a tela distingue os
@@ -868,7 +876,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em, quem_comenta";
+  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em, quem_comenta, lugar";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -935,6 +943,14 @@ const COLUNAS_DO_POST_ANTIGAS =
  * existe para impedir.
  */
 const DEGRAUS_DO_POST: { aviso: string; colunas: string[]; nulos: Record<string, null> }[] = [
+  {
+    /* ⚠️ O degrau MAIS ALTO é sempre a coluna mais NOVA: um recuo que pulasse
+       daqui para o fundo apagaria recursos antigos por causa do último. */
+    aviso: "o lugar — rode APLICAR_CONTEUDO_DA_REDE.sql",
+    colunas: ["lugar"],
+    /* Sem a coluna, nenhum post tem lugar — o estado de antes do recurso. */
+    nulos: { lugar: null },
+  },
   {
     aviso: "quem pode comentar — rode APLICAR_DEZ_DA_REDE.sql",
     colunas: ["quem_comenta"],
@@ -1815,6 +1831,7 @@ export async function montarPosts(
         /* Assinado na MESMA onda das fotos — ver `todosOsCaminhos`. */
         videoUrl: p.video_path ? (assinadas.get(p.video_path) ?? null) : null,
         altTexto: ((p.alt_texto ?? null) as string | null) || null,
+        lugar: ((p.lugar ?? null) as string | null) || null,
         ehRepost: !!p.repost_de,
         repost: p.repost_de ? (originais.get(p.repost_de) ?? null) : null,
         pergunta: typeof p.pergunta === "string" && p.pergunta.trim() ? p.pergunta : null,
@@ -2688,6 +2705,16 @@ export const publicarPost = createServerFn({ method: "POST" })
          * em voz alta, antes de a pessoa chegar na legenda.
          */
         altTexto: z.string().max(300).nullable().optional(),
+        /**
+         * O lugar, como ELA escreve.
+         *
+         * ⚠️ **É um RÓTULO, e nunca coordenada.** Guardar latitude e longitude
+         * de uma gestante — e devolvê-las a quem abre o post — é dado de
+         * localização precisa numa base de alto risco: é o que permite a alguém
+         * saber onde ela mora. "Maternidade Santa Casa" diz o que ela quer dizer
+         * e não localiza ninguém.
+         */
+        lugar: z.string().trim().max(60).nullable().optional(),
         /** Data URL. O cliente já reduz para 512px antes de mandar. */
         imagem: z.string().max(1_500_000).nullable(),
         /**
@@ -2993,6 +3020,7 @@ export const publicarPost = createServerFn({ method: "POST" })
           : {}),
         ...(repostValido ? { repost_de: data.repostDe } : {}),
         alt_texto: data.altTexto?.trim() || null,
+        lugar: data.lugar?.trim() || null,
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a
            foto antiga na frente do carrossel, e então DESCARTADO: a coluna
@@ -3039,6 +3067,11 @@ export const publicarPost = createServerFn({ method: "POST" })
         visibilidade: data.visibilidade,
       };
       const CAMADAS: { aviso: string; campos: Record<string, unknown> }[] = [
+        {
+          /* ⚠️ O degrau mais alto é a coluna mais NOVA — ver `DEGRAUS_DO_POST`. */
+          aviso: "lugar — rode APLICAR_CONTEUDO_DA_REDE.sql",
+          campos: { lugar: data.lugar?.trim() || null },
+        },
         {
           aviso: "quem_comenta — rode APLICAR_DEZ_DA_REDE.sql",
           campos: {
@@ -4571,6 +4604,14 @@ export type StoryNaTela = {
   /** A enquete de duas a quatro opções, ou `null`. */
   enquete: EnqueteDoStory | null;
   /**
+   * O carrossel inteiro, a PRIMEIRA inclusa.
+   *
+   * ⚠️ Sempre preenchido: um story de foto única é um carrossel de uma. Sem
+   * isso a tela teria de decidir entre `imagemUrl` e `imagens` a cada render, e
+   * é assim que um dos dois acaba esquecido.
+   */
+  imagens: string[];
+  /**
    * Quem aparece marcada neste story.
    *
    * ⚠️ Já filtrada por Modo Cuidado, pausa e bloqueio — a MESMA leitura do post
@@ -4691,6 +4732,14 @@ export const publicarStory = createServerFn({ method: "POST" })
          * base de pacientes numa lista navegável.
          */
         marcadas: z.array(z.string().uuid()).max(10).optional(),
+        /**
+         * As DEMAIS do carrossel — a primeira vai em `imagem`.
+         *
+         * ⚠️ **Quatro, e não nove como o post.** O story é folheado com o dedo
+         * em pé, com a barrinha correndo: cinco fotos já é uma sequência que
+         * muita gente não termina, e o formato existe para ser rápido.
+         */
+        maisFotos: z.array(z.string().max(1_500_000)).max(4).optional(),
       })
       .parse(i),
   )
@@ -4782,7 +4831,30 @@ export const publicarStory = createServerFn({ method: "POST" })
     }
 
     const camada: VisibilidadeDoStory = camadaDoStory(data.visibilidade);
+    /* ⚠️ **AS DEMAIS SOBEM DEPOIS DA PRIMEIRA, e uma falha aqui RECUSA.** Um
+       carrossel com buraco é pior que um story de foto única: ela escolheu
+       quatro fotos, veria três, e não saberia qual sumiu. É a mesma decisão do
+       carrossel do post. */
+    const extras: string[] = [];
+    for (const dataUrl of data.maisFotos ?? []) {
+      /* ⚠️ `guardarImagem` NUNCA lança: ela devolve `null` quando o Storage não
+         responde. Um `try/catch` aqui não pegaria nada — quem cobra é o `if`. */
+      const caminhoExtra = await guardarImagem({ balde: "rede", donoId: eu, dataUrl });
+      if (!caminhoExtra) return { ok: false as const, motivo: "banco" as const };
+      extras.push(caminhoExtra);
+    }
+    /* ⚠️ `imagem_path` continua sendo a PRIMEIRA, e `imagens` traz TODAS —
+       inclusive ela. Um story de foto única nunca precisa olhar o array, e todo
+       código que já lê `imagem_path` continua funcionando. */
+    /* ⚠️ **`imagens` NÃO entra no `base`, e o teste dos três degraus pegou.**
+       `base` é o que o degrau MÍNIMO insere: pondo a coluna nova ali, um banco
+       sem `imagens` faria publicar story falhar INTEIRO — inclusive o story de
+       foto única, que é o caso de todo mundo hoje. A coluna vira um degrau
+       próprio, o mais alto. */
     const base = { autor_id: eu, imagem_path: caminho, texto: data.texto };
+    /* ⚠️ `imagem_path` continua sendo a PRIMEIRA, e `imagens` traz TODAS —
+       inclusive ela. Um story de foto única nunca precisa olhar o array. */
+    const carrossel = { imagens: [caminho, ...extras] };
     /* ⚠️ TRÊS DEGRAUS, um por leva de colunas — o mesmo desenho da leitura.
        Um recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
        carimbo perdê-lo por causa do SQL da enquete. */
@@ -4816,6 +4888,26 @@ export const publicarStory = createServerFn({ method: "POST" })
        aparelhos publicando no mesmo instante marcariam a pessoa no story
        errado. Cada degrau devolve o seu id. */
     let novoId: string | null = null;
+    /* ⚠️ O degrau MAIS ALTO é o do carrossel: a coluna mais nova cai primeiro,
+       e os de baixo continuam entregando o que já entregavam. */
+    const cheio = {
+      ...base,
+      ...carrossel,
+      carimbo_semana: data.carimbarSemana === true,
+      enquete_opcoes: enquete,
+      pergunta_aberta: data.perguntaAberta === true,
+    };
+    const comCarrossel = await sb.from("rede_stories").insert(cheio).select("id").maybeSingle();
+    if (comCarrossel.error) {
+      console.warn("[rede] story sem imagens — rode APLICAR_CONTEUDO_DA_REDE.sql");
+    } else {
+      novoId = ((comCarrossel.data as any)?.id ?? null) as string | null;
+      if (novoId && (data.marcadas ?? []).length > 0) {
+        await gravarMarcacoes(sb, eu, novoId, data.marcadas ?? [], "story");
+      }
+      return { ok: true as const };
+    }
+
     const { data: cheioOk, error } = erroComPost
       ? await sb
           .from("rede_stories")
@@ -4926,7 +5018,8 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         sb
           .from("rede_stories")
           .select(
-            "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta, post_de",
+            "id, autor_id, imagem_path, imagens, texto, criado_em, carimbo_semana, " +
+              "enquete_opcoes, pergunta_aberta, post_de",
           ),
       );
       if (!comPost.error)
@@ -4953,6 +5046,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
       if (!cheio.error)
         return ((cheio.data ?? []) as any[]).map((l) => ({
           ...l,
+          imagens: [],
           post_de: null,
           visibilidade: "seguidores",
           destacado_em: null,
@@ -4969,6 +5063,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
           ...l,
           enquete_opcoes: null,
           pergunta_aberta: false,
+          imagens: [],
           post_de: null,
           visibilidade: "seguidores",
           destacado_em: null,
@@ -4984,6 +5079,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         carimbo_semana: false,
         enquete_opcoes: null,
         pergunta_aberta: false,
+        imagens: [],
         post_de: null,
         visibilidade: "seguidores",
         destacado_em: null,
@@ -5054,7 +5150,11 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     const { urlsAssinadas } = await import("@/lib/imagens.server");
     const capasDosStories = await urlsAssinadas(
       "rede",
-      linhas.map((l: any) => l.imagem_path).filter(Boolean),
+      /* ⚠️ A primeira E as do carrossel, na MESMA onda — ver o comentário na
+         entrega. `flatMap` porque um story pode ter até cinco. */
+      linhas
+        .flatMap((l: any) => [l.imagem_path, ...((l.imagens ?? []) as string[])])
+        .filter(Boolean),
       3600,
     );
     /**
@@ -5151,6 +5251,13 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         autorNome: b.autorNome,
         autorAvatar: b.autorAvatar,
         imagemUrl: capasDosStories.get(l.imagem_path) ?? null,
+        /* ⚠️ **AS DEMAIS PASSAM PELA MESMA ONDA DE ASSINATURA**, e por isso a
+           lista de caminhos entregue a `urlsAssinadas` tem de incluí-las: uma
+           segunda chamada ao Storage por story dobraria a espera da fileira que
+           abre em toda visita à aba. */
+        imagens: ((l.imagens ?? []) as string[])
+          .map((c) => capasDosStories.get(c))
+          .filter(Boolean) as string[],
         texto: l.texto ?? null,
         criadoEm: l.criado_em,
         visto,
