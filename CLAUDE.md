@@ -6476,6 +6476,64 @@ sozinha quando a outra escreve**.
   por causa de um carimbo. Mesma decisão de `editarComentario`.
 - ⚠️ **A dona e a forma são conferidas no BANCO**, nunca no corpo do pedido.
 
+#### O aviso de conteúdo sensível, e a legenda do vídeo
+
+**Uma publicação sobre uma perda embosca quem rola o feed às três da manhã.** O
+filtro de palavras já existia e resolve outro problema: ele exige que a leitora
+ADIVINHE a palavra antes de doer.
+
+- ⚠️ **QUEM MARCA É QUEM PUBLICA, e o app NUNCA marca sozinho.** A tentação é
+  marcar o que a régua clínica reconhece, ou todo post de quem está em luto — e a
+  segunda **contaria o luto dela para quem visse a marca**. `MARCA_AUTOMATICA`
+  existe desligada, com teste.
+- ⚠️ **BORRA, NUNCA ESCONDE.** Esconder seria o app decidindo que aquilo não deve
+  ser lido, e a experiência de quem perdeu uma gestação é exatamente o que esta
+  comunidade não pode calar. O que ele faz é dar UM SEGUNDO para a leitora
+  decidir. Há teste proibindo `filter`/`esconder` na régua.
+- ⚠️ **SOB O VÉU NÃO HÁ IMAGEM NENHUMA — nem borrada.** Borrar com CSS ainda
+  BAIXA a foto e a deixa no DOM: quem quisesse a leria pelo inspetor, e o 4G dela
+  pagaria por uma foto que ela decidiu não ver. Entra uma caixa do MESMO tamanho
+  (`aspect-[4/5]`), e o carrossel só é montado no toque. ⚠️ O tamanho tem de
+  bater: menor, revelar empurraria o feed e ela perderia o lugar onde estava
+  lendo.
+- ⚠️ **O TEXTO TAMBÉM ENTRA NO VÉU.** Numa publicação sobre uma perda é a LEGENDA
+  que carrega a notícia — borrar a foto e deixar a frase à mostra entregaria
+  exatamente o que o aviso existe para poupar. **O NOME fica de fora**: quem
+  publicou não é a parte sensível, e escondê-lo faria o post parecer anônimo.
+- ⚠️ **A AUTORA NUNCA VÊ O PRÓPRIO POST BORRADO** — ela sabe o que escreveu, e
+  borrá-lo seria tratá-la como quem precisa ser protegida do que ela decidiu
+  contar. Mesma razão de o filtro de palavras não valer para o que EU escrevi.
+- ⚠️ **"Revelado" é POR LEITURA, e nunca gravado.** Guardar faria o aviso valer
+  uma vez só — e o segundo encontro com o mesmo post, numa noite pior, chegaria
+  sem aviso nenhum.
+- ⚠️ **O motivo é CATÁLOGO FECHADO.** Campo livre aqui vira o lugar onde alguém
+  escreve o diagnóstico de outra pessoa, ou o detalhe que o aviso existia para
+  poupar. E o rótulo diz o assunto **sem contar a história** — é o que ela lê
+  antes de escolher.
+
+**A legenda do vídeo** é TEXTO no banco, e não um `.vtt` no balde: um arquivo
+exigiria segundo upload, segunda URL assinada e segunda varredura na exclusão de
+conta — três superfícies novas para o que é uma frase. ⚠️ Ela fica ABAIXO do
+vídeo, nunca sobreposta: sobre o quadro, cobre justamente o que a paciente está
+olhando. E o campo só aparece com vídeo escolhido.
+
+#### ⚠️ O CICLO VIROU RÉGUA ÚNICA, e a razão está no próprio CLAUDE.md
+
+A expressão do ciclo (`lmp_date ?? reference_date ?? birth_date ?? "x"`) vivia
+privada em `loadCycleAndGestation`, e este arquivo já avisava: **"se divergir, a
+contagem procura um ciclo que nunca foi gravado e devolve zero"**.
+
+As MEMÓRIAS passaram a carimbar o ciclo na publicação, e ali a divergência é
+pior: uma publicação carimbada com um ciclo e comparada com outro faria a foto de
+uma gestação ANTERIOR voltar como memória da de agora. Virou
+`ciclo-da-gestacao.ts`.
+
+⚠️ **E `cicloParaCarimbo` devolve `null` onde `cicloDoPerfil` devolve `"x"`.** No
+ledger, `"x"` é chave válida — todo mundo precisa de uma. Numa memória, "não sei
+de que gestação isto é" tem de significar NÃO MOSTRAR: carimbar `"x"` faria as
+publicações de todas as gestações sem marco caírem no mesmo balde e voltarem umas
+para as outras.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

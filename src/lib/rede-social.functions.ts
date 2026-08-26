@@ -245,6 +245,17 @@ export type PostNaTela = {
    */
   altTexto?: string | null;
   /**
+   * A autora marcou como sensível.
+   *
+   * ⚠️ Quem decide se BORRA é `deveBorrar`, na tela, cruzando isto com "sou a
+   * autora?" e "já revelei?". O servidor só conta o fato.
+   */
+  sensivel?: boolean;
+  /** O motivo, de catálogo fechado. É o que a leitora lê ANTES de decidir. */
+  motivoSensivel?: string | null;
+  /** A legenda do vídeo, para quem assiste sem som ou com leitor de tela. */
+  videoLegenda?: string | null;
+  /**
    * O lugar, como ELA escreveu.
    *
    * ⚠️ **É um rótulo, e nunca coordenada** — guardar latitude e longitude de uma
@@ -1852,6 +1863,9 @@ export async function montarPosts(
         /* Assinado na MESMA onda das fotos — ver `todosOsCaminhos`. */
         videoUrl: p.video_path ? (assinadas.get(p.video_path) ?? null) : null,
         altTexto: ((p.alt_texto ?? null) as string | null) || null,
+        sensivel: !!p.sensivel,
+        motivoSensivel: ((p.motivo_sensivel ?? null) as string | null) || null,
+        videoLegenda: ((p.video_legenda ?? null) as string | null) || null,
         lugar: ((p.lugar ?? null) as string | null) || null,
         ehRepost: !!p.repost_de,
         repost: p.repost_de ? (originais.get(p.repost_de) ?? null) : null,
@@ -2731,6 +2745,29 @@ export const publicarPost = createServerFn({ method: "POST" })
          */
         altTexto: z.string().max(300).nullable().optional(),
         /**
+         * ⚠️ **QUEM MARCA COMO SENSÍVEL É QUEM PUBLICA.**
+         *
+         * O filtro de palavras já existe e exige que a leitora ADIVINHE a
+         * palavra antes de doer. Aqui a proteção vem de quem escreveu — a única
+         * pessoa que sabe o que o texto carrega —, e ela protege os dois lados:
+         * quem publica sobre uma perda quase nunca quer emboscar ninguém.
+         *
+         * ⚠️ **O motivo é CATÁLOGO FECHADO** (`MOTIVOS_SENSIVEIS`): um campo
+         * livre aqui vira o lugar onde alguém escreve o diagnóstico de outra
+         * pessoa, ou o detalhe que o aviso existia para poupar.
+         */
+        sensivel: z.boolean().optional(),
+        motivoSensivel: z.string().max(40).nullable().optional(),
+        /**
+         * A legenda do vídeo.
+         *
+         * ⚠️ **É TEXTO, e não um `.vtt` no balde.** A legenda de um vídeo de
+         * quinze segundos cabe numa coluna; um arquivo exigiria segundo upload,
+         * segunda URL assinada e segunda varredura na exclusão de conta — três
+         * superfícies novas para o que é uma frase.
+         */
+        videoLegenda: z.string().max(600).nullable().optional(),
+        /**
          * O lugar, como ELA escreve.
          *
          * ⚠️ **É um RÓTULO, e nunca coordenada.** Guardar latitude e longitude
@@ -2917,6 +2954,30 @@ export const publicarPost = createServerFn({ method: "POST" })
          ela escreveu. */
     }
 
+    /**
+     * O ciclo desta gestação, carimbado na publicação.
+     *
+     * ⚠️ **É O QUE TORNA A MEMÓRIA SEGURA.** Sem ele não há como saber se uma
+     * publicação de um ano atrás é da gestação de agora ou de uma que terminou —
+     * e ressuscitar a segunda é o pior desfecho possível daquele recurso.
+     *
+     * ⚠️ **Falha ao ler NÃO derruba a publicação**: o post sai com `ciclo` nulo,
+     * e `memoriaDeHoje` trata nulo como "não sei" e não mostra. Errar para o
+     * lado de não lembrar.
+     */
+    let cicloDaPaciente: string | null = null;
+    try {
+      const { cicloParaCarimbo } = await import("./ciclo-da-gestacao");
+      const { data: perfilDoCiclo } = await sb
+        .from("patient_profiles")
+        .select("lmp_date, reference_date, birth_date")
+        .eq("id", eu)
+        .maybeSingle();
+      cicloDaPaciente = cicloParaCarimbo(perfilDoCiclo ?? null);
+    } catch {
+      /* Sem ciclo, sem memória — nunca sem publicação. */
+    }
+
     let caminho: string | null = null;
     let miniatura: string | null = null;
     const extras: string[] = [];
@@ -3050,6 +3111,16 @@ export const publicarPost = createServerFn({ method: "POST" })
         ...(repostValido ? { repost_de: data.repostDe } : {}),
         alt_texto: data.altTexto?.trim() || null,
         lugar: data.lugar?.trim() || null,
+        /* ⚠️ Só a AUTORA marca — ver `conteudo-sensivel.ts`. E o motivo só faz
+           sentido com a marca ligada: guardá-lo sozinho deixaria um rótulo
+           pendurado num post que não borra. */
+        sensivel: !!data.sensivel,
+        motivo_sensivel: data.sensivel ? data.motivoSensivel?.trim() || null : null,
+        video_legenda: data.videoLegenda?.trim() || null,
+        /* ⚠️ **O CICLO É O QUE TORNA A MEMÓRIA SEGURA.** Sem ele não há como
+           saber se a publicação é da gestação de agora ou de uma que terminou,
+           e `memoriaDeHoje` trata a ausência como "não sei" — não mostra. */
+        ciclo: cicloDaPaciente,
         /* ⚠️ **E ISTO FALTAVA — o carimbo do "então e agora" era código morto.**
            `entao` era resolvido, conferido contra o dono e usado para pôr a
            foto antiga na frente do carrossel, e então DESCARTADO: a coluna
@@ -3097,7 +3168,18 @@ export const publicarPost = createServerFn({ method: "POST" })
       };
       const CAMADAS: { aviso: string; campos: Record<string, unknown> }[] = [
         {
-          /* ⚠️ O degrau mais alto é a coluna mais NOVA — ver `DEGRAUS_DO_POST`. */
+          /* ⚠️ O degrau mais alto é a coluna mais NOVA — ver `DEGRAUS_DO_POST`.
+             Sem estas, o post é publicado SEM a marca de sensível: é o estado
+             de antes do recurso, e nunca uma publicação bloqueada. */
+          aviso: "sensível, legenda e ciclo — rode APLICAR_NOVE_DA_REDE.sql",
+          campos: {
+            sensivel: !!data.sensivel,
+            motivo_sensivel: data.sensivel ? data.motivoSensivel?.trim() || null : null,
+            video_legenda: data.videoLegenda?.trim() || null,
+            ciclo: cicloDaPaciente,
+          },
+        },
+        {
           aviso: "lugar — rode APLICAR_CONTEUDO_DA_REDE.sql",
           campos: { lugar: data.lugar?.trim() || null },
         },

@@ -28,6 +28,7 @@
 import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
+import { MOTIVOS_SENSIVEIS, deveBorrar, rotuloDoMotivo } from "@/lib/conteudo-sensivel";
 import {
   chaveDoRascunhoDeStory,
   lerRascunhoDeStory,
@@ -698,6 +699,45 @@ function IconeMarcador({ cheio }: { cheio: boolean }) {
  * todos os cartões, e `aplicar` já preserva a identidade de quem não mudou
  * (`if (p.id !== post.id) return p`). Aí `memo` funciona: repinta um cartão.
  */
+/**
+ * O véu do conteúdo sensível.
+ *
+ * ⚠️ **BORRA, NUNCA ESCONDE — e essa é a diferença que importa.** Esconder
+ * seria o app decidindo que aquilo não deve ser lido, e a experiência de quem
+ * perdeu uma gestação é exatamente o que esta comunidade não pode calar. O que
+ * ele faz é dar UM SEGUNDO para a leitora decidir.
+ *
+ * ⚠️ **O rótulo diz o ASSUNTO sem contar a história** (catálogo fechado, ver
+ * `conteudo-sensivel.ts`): é o que ela lê ANTES de escolher.
+ */
+function Sensivel({
+  motivo,
+  aoRevelar,
+  children,
+}: {
+  motivo: string | null | undefined;
+  aoRevelar: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      {/* `select-none` e `pointer-events-none`: sob o véu nada é tocável nem
+          copiável — senão o toque atravessaria para o carrossel por baixo. */}
+      <div className="pointer-events-none select-none blur-2xl" aria-hidden>
+        {children}
+      </div>
+      <button
+        type="button"
+        onClick={aoRevelar}
+        className="press absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/40 px-6 text-center"
+      >
+        <span className="text-[13px] font-semibold">{rotuloDoMotivo(motivo)}</span>
+        <span className="text-[12px] text-muted-foreground">Toque para ver</span>
+      </button>
+    </div>
+  );
+}
+
 export const PostInstagram = memo(function PostInstagram({
   post,
   aoReagir,
@@ -780,6 +820,20 @@ export const PostInstagram = memo(function PostInstagram({
 }) {
   const [escolhendo, setEscolhendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  /**
+   * ⚠️ **"REVELADO" É POR LEITURA, e NUNCA é gravado.**
+   *
+   * Guardar que ela já revelou faria o aviso valer uma vez só — e o segundo
+   * encontro com o mesmo post, numa noite pior, chegaria sem aviso nenhum.
+   */
+  const [revelado, setRevelado] = useState(false);
+  /* A régua mora em `conteudo-sensivel.ts`: a AUTORA nunca vê o próprio post
+     borrado, e post não marcado nunca borra. */
+  const borrar = deveBorrar({
+    sensivel: !!post.sensivel,
+    souAAutora: !!post.souAAutora,
+    revelado,
+  });
   /** `null` = não está editando. String = o texto em edição. */
   const [editando, setEditando] = useState<string | null>(null);
   const [salvandoTexto, setSalvandoTexto] = useState(false);
@@ -1047,7 +1101,21 @@ export const PostInstagram = memo(function PostInstagram({
 
       {/* ⚠️ `!post.videoUrl` — o vídeo tem prioridade e o carrossel se cala.
           Ver o comentário do player, logo abaixo. */}
-      {post.imagemUrl && !post.videoUrl && (
+      {/* ⚠️ **SOB O VÉU NÃO HÁ IMAGEM NENHUMA — nem borrada.**
+          Borrar a foto de verdade com CSS ainda a BAIXA e a deixa no DOM: quem
+          quisesse a leria pelo inspetor, e o 4G dela pagaria por uma foto que
+          ela decidiu não ver. Aqui entra uma caixa do MESMO tamanho, e o
+          carrossel só é montado quando ela toca — a foto nem sai do servidor.
+
+          ⚠️ E o tamanho tem de bater (`aspect-[4/5]`, o teto do feed): com uma
+          caixa menor, revelar empurraria o feed inteiro para baixo e ela
+          perderia o lugar onde estava lendo. */}
+      {post.imagemUrl && !post.videoUrl && borrar ? (
+        <Sensivel motivo={post.motivoSensivel} aoRevelar={() => setRevelado(true)}>
+          <div className="aspect-[4/5] w-full bg-muted" />
+        </Sensivel>
+      ) : null}
+      {post.imagemUrl && !post.videoUrl && !borrar && (
         <Carrossel
           urls={fotos}
           comparacao={post.comparacao}
@@ -1452,17 +1520,34 @@ export const PostInstagram = memo(function PostInstagram({
           funcionasse: som saindo sozinho numa sala de espera. `preload` só dos
           metadados: o feed não pode baixar todo vídeo que passa pela tela no
           4G dela. */}
-      {post.videoUrl && (
-        <video
-          src={post.videoUrl}
-          className="mt-1 w-full bg-black"
-          controls
-          loop
-          muted
-          playsInline
-          preload="metadata"
-        />
-      )}
+      {post.videoUrl &&
+        (borrar ? (
+          <Sensivel motivo={post.motivoSensivel} aoRevelar={() => setRevelado(true)}>
+            <div className="mt-1 aspect-[4/5] w-full bg-black" />
+          </Sensivel>
+        ) : (
+          <>
+            <video
+              src={post.videoUrl}
+              className="mt-1 w-full bg-black"
+              controls
+              loop
+              muted
+              playsInline
+              preload="metadata"
+            />
+            {/* ⚠️ **A LEGENDA FICA ABAIXO, e não numa faixa sobre o vídeo.**
+                Sobreposta, ela cobre justamente o que a paciente está olhando —
+                e num vídeo de barriga o centro do quadro é o assunto. Aqui ela
+                serve aos dois casos que motivaram o recurso: quem usa leitor de
+                tela, e a mãe que assiste sem som com o bebê dormindo no colo. */}
+            {post.videoLegenda && (
+              <p className="mx-4 mt-1.5 text-[13px] leading-snug text-muted-foreground">
+                {post.videoLegenda}
+              </p>
+            )}
+          </>
+        ))}
 
       {/* ⚠️ O MARCO É CALCULADO NA PINTURA, a partir dos DIAS que o banco
           guarda — nunca de um texto gravado. Um "3 meses" salvo continuaria
@@ -1477,12 +1562,31 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
+      {/* ⚠️ **O TEXTO TAMBÉM ENTRA NO VÉU, e não só a mídia.** Numa publicação
+          sobre uma perda, é a LEGENDA que carrega a notícia — borrar a foto e
+          deixar a frase à mostra entregaria exatamente o que o aviso existe para
+          poupar. O NOME fica de fora: quem publicou não é a parte sensível, e
+          escondê-lo faria o post parecer anônimo. */}
       {post.texto && (
         <p className="px-4 pt-1.5 text-[14px] leading-snug">
           <span className="font-semibold">{post.autorNome}</span>
           {post.autorOficial && <SeloOficial />}
           {post.autorPremium && <SeloPremium />}{" "}
-          <TextoComLinks texto={post.texto} aoAbrirArroba={aoAbrirArroba} aoAbrirTag={aoAbrirTag} />
+          {borrar ? (
+            <button
+              type="button"
+              onClick={() => setRevelado(true)}
+              className="press italic text-muted-foreground"
+            >
+              {rotuloDoMotivo(post.motivoSensivel)} — toque para ler
+            </button>
+          ) : (
+            <TextoComLinks
+              texto={post.texto}
+              aoAbrirArroba={aoAbrirArroba}
+              aoAbrirTag={aoAbrirTag}
+            />
+          )}
         </p>
       )}
 
@@ -9206,6 +9310,11 @@ export function NovoPost({
     comparacaoCom: string | null;
     /** A descrição da foto, para leitores de tela. */
     altTexto?: string | null;
+    /** A autora marcou como sensível — ver `conteudo-sensivel.ts`. */
+    sensivel?: boolean;
+    motivoSensivel?: string | null;
+    /** A legenda do vídeo, para quem assiste sem som ou com leitor de tela. */
+    videoLegenda?: string | null;
   }) => Promise<boolean>;
   /**
    * A aula que ela fez hoje, para anexar com um toque.
@@ -9292,6 +9401,16 @@ export function NovoPost({
    * das pacientes achar que precisa preencher os dois.
    */
   const [altTexto, setAltTexto] = useState("");
+  /**
+   * ⚠️ **QUEM MARCA É QUEM PUBLICA, e o app NUNCA marca sozinho.**
+   *
+   * A tentação é marcar o que a régua clínica reconhece, ou todo post de quem
+   * está em luto. A segunda contaria o luto dela para quem visse a marca. Ver
+   * `MARCA_AUTOMATICA` em `conteudo-sensivel.ts`.
+   */
+  const [sensivel, setSensivel] = useState(false);
+  const [motivoSensivel, setMotivoSensivel] = useState<string>(MOTIVOS_SENSIVEIS[0].id);
+  const [videoLegenda, setVideoLegenda] = useState("");
   const [lugar, setLugar] = useState("");
   const [altAberto, setAltAberto] = useState(false);
   const [fotos, setFotos] = useState<string[]>(() => {
@@ -9381,6 +9500,7 @@ export function NovoPost({
      `alt`, e oferecer o campo ali prometeria uma acessibilidade que o
      elemento não entrega. */
   const temFoto = fotos.length > 0;
+  const temVideo = !!video;
   const podeEnviar = temConteudo && enqueteOk && !enviando;
 
   /* ⚠️ GUARDA COM ATRASO (700 ms). Sem isso, cada letra digitada seria uma
@@ -9454,6 +9574,11 @@ export function NovoPost({
       marcadas,
       comparacaoCom: entao,
       altTexto: altTexto.trim() || null,
+      sensivel,
+      /* O motivo só viaja com a marca ligada — senão fica um rótulo pendurado
+         num post que não borra. */
+      motivoSensivel: sensivel ? motivoSensivel : null,
+      videoLegenda: videoLegenda.trim() || null,
     });
     setEnviando(false);
     if (ok) {
@@ -9567,6 +9692,68 @@ export function NovoPost({
           aria-label="O lugar desta publicação"
           className="mt-2 min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
         />
+
+        {/* ⚠️ **A MARCA É DELA, e o app nunca a põe sozinho.** Marcar
+            automaticamente o que a régua clínica reconhece — ou todo post de
+            quem está em luto — seria o app decidindo que a história dela é
+            sensível, e a segunda contaria o luto dela para quem visse a marca.
+
+            ⚠️ E o texto diz o que a marca FAZ ("borra, não esconde"): sem isso
+            ela hesita, achando que o post vai sumir do feed. */}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setSensivel((v) => !v)}
+            aria-pressed={sensivel}
+            className="press min-h-[36px] text-[12px] font-medium text-muted-foreground"
+          >
+            {sensivel ? "✓ Marcado como sensível" : "Marcar como conteúdo sensível"}
+          </button>
+          {sensivel && (
+            <>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {MOTIVOS_SENSIVEIS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMotivoSensivel(m.id)}
+                    aria-pressed={motivoSensivel === m.id}
+                    className={`press min-h-[36px] rounded-full border px-3 text-[12px] ${
+                      motivoSensivel === m.id
+                        ? "border-primary bg-primary/10 font-semibold"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {m.rotulo}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                A publicação continua no feed. Ela aparece borrada, com este aviso, e quem quiser
+                toca para ver.
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ⚠️ **A LEGENDA DO VÍDEO só aparece com vídeo escolhido.** Um campo de
+            legenda ao lado de uma foto promete um recurso que o elemento não
+            entrega — a mesma razão pela qual a descrição da foto só aparece com
+            foto. */}
+        {temVideo && (
+          <div className="mt-2">
+            <input
+              value={videoLegenda}
+              onChange={(e) => setVideoLegenda(e.target.value.slice(0, 600))}
+              placeholder="O que é dito no vídeo"
+              aria-label="Legenda do vídeo"
+              className="min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+            />
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              Para quem assiste sem som e para quem usa leitor de tela.
+            </p>
+          </div>
+        )}
 
         {temFoto && (
           <div className="mt-2">

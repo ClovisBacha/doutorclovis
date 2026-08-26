@@ -120,6 +120,11 @@ export const Route = createFileRoute("/preview-instagram")({
        sem a bancada, conferir o desenho exigiria uma conta recém-criada, e
        depois de olhar uma vez ela nunca mais mostraria. */
     onboarding: q.onboarding == null ? 0 : Number(q.onboarding),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. O véu do
+       conteúdo sensível só existe num post que alguém marcou, e a legenda do
+       vídeo exige um post com vídeo: os dois são impossíveis de fotografar sem
+       a bancada. */
+    sensivel: q.sensivel == null ? 0 : Number(q.sensivel),
     /* O rascunho guardado: sem isto ele exige fechar o app no meio de uma
        frase e reabrir — o estado que ninguém confere por acaso. */
     rascunhoComent: q.rascunhoComent == null ? 0 : Number(q.rascunhoComent),
@@ -420,6 +425,7 @@ function Bancada() {
     ordem,
     rascunhoComent,
     onboarding,
+    sensivel,
     quadro,
     instavel,
     fechado,
@@ -1726,7 +1732,38 @@ function Bancada() {
               uma bancada apagaria o tutorial da conta de verdade. */}
           {!!onboarding && <OnboardingDaComunidade careMode={false} bancada />}
           <TelaPrincipal
-            posts={vazio ? [] : comReacoes([...POSTS.slice(0, 4), ...extras])}
+            posts={
+              vazio
+                ? []
+                : comReacoes(
+                    /* ⚠️ **O VÉU E A LEGENDA SÓ EXISTEM COM UM POST QUE OS TENHA.**
+                     Sem isto a bancada desenharia o único estado que já era
+                     certo — o post normal — e o recurso passaria por ela sem
+                     nunca ter sido olhado. É a lição do áudio do direct, que
+                     sobreviveu meses porque a bancada não desenhava nenhum. */
+                    sensivel
+                      ? [
+                          {
+                            ...POSTS[0]!,
+                            id: "p-sens",
+                            sensivel: true,
+                            motivoSensivel: "perda",
+                            texto: "hoje faz um mês. obrigada a quem ficou 💛",
+                          },
+                          {
+                            ...POSTS[2]!,
+                            id: "p-video",
+                            imagemUrl: null,
+                            videoUrl:
+                              "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=",
+                            videoLegenda: "O bebê mexendo — dá para ver o pezinho na direita.",
+                            texto: "olha ele hoje 🥹",
+                          },
+                          ...POSTS.slice(0, 3),
+                        ]
+                      : [...POSTS.slice(0, 4), ...extras],
+                  )
+            }
             stories={vazio ? [] : STORIES}
             /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
              acabou — por isso ela aparece na bancada quando `temMais` some, ou
