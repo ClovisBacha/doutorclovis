@@ -54,3 +54,10 @@ src/assets/social/*.png
 # Pastas de trabalho dos agentes verificadores (screenshots, scripts de medição)
 .verif*/
 .claude/worktrees/
+
+# ⚠️ O remendo que o hook de início de sessão guarda quando o contêiner
+# REBOBINA — ele salva a árvore antes de realinhar com o remoto, para nada ser
+# apagado. É artefato de RECUPERAÇÃO, nunca trabalho: o conteúdo dele ou já está
+# commitado, ou tem de ser conferido à mão e commitado no arquivo certo. Ele
+# nunca entra no repositório.
+restos-*.patch
