@@ -139,9 +139,17 @@ describe("⚠️ encaminhar um story", () => {
   test("a folha de mandar aceita post E story", () => {
     /* Uma segunda folha para story divergiria da primeira no primeiro ajuste —
        e é ela que carrega a trava de só oferecer conversas que já existem. */
+    /**
+     * ⚠️ **A GARANTIA É "uma folha serve os dois", e não a grafia do tipo.** Ela
+     * travava `alvo: { tipo: "post" | "story"; id: string }` e ficou vermelha
+     * quando a MESMA folha passou a servir também o encaminhar de mensagem —
+     * uma união a mais no tipo, que só ampliou o que ela cobre.
+     */
     const c = semProsa(CONVERSA);
-    expect(c).toMatch(/alvo: \{ tipo: "post" \| "story"; id: string \}/);
+    expect(c).toMatch(/tipo: "post" \| "story"/);
     expect(c).toContain("refTipo: alvo.tipo");
+    /* E não nasceu uma segunda folha. */
+    expect((c.match(/export function MandarPublicacao/g) ?? []).length).toBe(1);
   });
 
   test("⚠️ e o ✈ do story é do DONO, e só", () => {

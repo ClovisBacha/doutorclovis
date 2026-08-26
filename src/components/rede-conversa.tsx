@@ -161,6 +161,7 @@ export function CaixaDeEntrada({
   bancada,
   sugeridasDeBancada,
   notasDeBancada,
+  grupos,
 }: {
   aoVoltar: () => void;
   aoAbrir: (conversa: ConversaNaTela) => void;
@@ -183,6 +184,15 @@ export function CaixaDeEntrada({
    * fileira exigiria duas contas reais e uma nota escrita na última hora.
    */
   notasDeBancada?: NotaNaTela[];
+  /**
+   * A lista de grupos, injetada pela tela de fora.
+   *
+   * ⚠️ **É um NÓ, e não uma lista de dados.** `CaixaDeEntrada` não conhece
+   * grupo nenhum: quem sabe abrir, criar e navegar é `RedeNoApp`, que tem os
+   * destinos. Passar os dados aqui obrigaria esta tela a saber o que fazer com
+   * eles, e ela já tem uma responsabilidade.
+   */
+  grupos?: React.ReactNode;
 }) {
   const [lista, setLista] = useState<ConversaNaTela[] | null>(bancada ?? null);
   const [erro, setErro] = useState(false);
@@ -402,6 +412,12 @@ export function CaixaDeEntrada({
         </section>
       )}
 
+      {/* ⚠️ **OS GRUPOS SÓ NA CAIXA PRINCIPAL**, pela mesma razão da fileira de
+          sugeridas: a caixa de pedidos é uma tela de DECISÃO, e uma lista de
+          grupos ali empurra mais conversa para dentro no momento em que ela
+          está filtrando quem entra. */}
+      {!vendoPedidos && grupos}
+
       {/* ⚠️ **A FILEIRA SÓ APARECE NA CAIXA PRINCIPAL, nunca na de pedidos.**
           A caixa de pedidos é uma tela de DECISÃO — alguém está esperando
           resposta —, e uma fileira de desconhecidas ali empurraria mais gente
@@ -579,10 +595,19 @@ export function Conversa({
   bancada,
   rascunho,
   aoAbrirRef,
+  aoEncaminhar,
+  aoFixar,
+  aoDenunciarConversa,
 }: {
   conversa: ConversaNaTela;
   aoVoltar: () => void;
   aoAbrirPerfil?: (id: string) => void;
+  /** Abre a folha de escolher para onde. `undefined` = não oferece. */
+  aoEncaminhar?: (mensagemId: string) => void;
+  /** Fixa (ou tira) a conversa do topo da lista. */
+  aoFixar?: (fixar: boolean) => void;
+  /** Denuncia a conversa INTEIRA — o padrão, não uma frase solta. */
+  aoDenunciarConversa?: (motivo: string) => void;
   bancada?: { mensagens: MensagemNaTela[]; pedido?: boolean; euIniciei?: boolean };
   /**
    * A primeira linha já escrita, quando a conversa nasce de uma sugestão.
@@ -607,6 +632,7 @@ export function Conversa({
   const [acaoEm, setAcaoEm] = useState<string | null>(null);
   /** ⚠️ Local e por mensagem — ver o bloco do filtro de palavras abaixo. */
   const [reveladas, setReveladas] = useState<Set<string>>(() => new Set());
+  const [denunciandoConversa, setDenunciandoConversa] = useState(false);
   /** A mensagem que estou citando ao escrever. */
   const [citando, setCitando] = useState<MensagemNaTela | null>(null);
   /** A mensagem que estou denunciando (a folha do motivo). */
@@ -1210,6 +1236,22 @@ export function Conversa({
                 >
                   Responder
                 </button>
+                {/* ⚠️ **ENCAMINHAR É SÓ TEXTO**, e o botão só aparece quando há
+                    texto: a foto e o áudio que alguém me mandou numa conversa
+                    privada não saem dali — é a mesma razão do ✈ do story ser do
+                    dono. Um botão que o servidor recusa promete e não cumpre. */}
+                {!!m.texto && !m.apagada && aoEncaminhar && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAcaoEm(null);
+                      aoEncaminhar(m.id);
+                    }}
+                    className="press min-h-[44px] rounded-full border border-border px-4 text-[13px] font-medium"
+                  >
+                    Encaminhar
+                  </button>
+                )}
                 {m.souEu ? (
                   <button
                     type="button"
@@ -1340,6 +1382,52 @@ export function Conversa({
 
       {recado && <p className="px-4 pb-1 text-[12px] text-muted-foreground">{recado}</p>}
 
+      {denunciandoConversa && aoDenunciarConversa && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Denunciar esta conversa"
+          className="fixed inset-0 z-[70] flex items-end bg-black/40"
+          onClick={() => setDenunciandoConversa(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full rounded-t-3xl bg-card p-4 pb-[max(1rem,var(--safe-area-inset-bottom))]"
+          >
+            <p className="text-[15px] font-semibold">Denunciar esta conversa</p>
+            {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
+                da plataforma, e prometer remoção seria prometer o que ninguém
+                garante. Mesma decisão das outras seis denúncias. */}
+            <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+              A gente vai olhar as últimas mensagens dela. Só as dela — o que você escreveu não vai
+              junto.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {MOTIVOS.map((mo) => (
+                <button
+                  key={mo.motivo}
+                  type="button"
+                  onClick={() => {
+                    aoDenunciarConversa(mo.motivo);
+                    setDenunciandoConversa(false);
+                  }}
+                  className="press min-h-[44px] rounded-full border border-border px-3 text-[12px]"
+                >
+                  {mo.rotulo}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDenunciandoConversa(false)}
+              className="press mt-3 min-h-[44px] text-[13px] text-muted-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {menu && (
         <div
           role="dialog"
@@ -1367,6 +1455,51 @@ export function Conversa({
               Para de avisar no celular. Ela continua podendo escrever, e você continua vendo aqui.
               Ninguém é avisado.
             </p>
+
+            {/* ⚠️ **FIXAR É PREFERÊNCIA DE QUEM OLHA A LISTA**, e a frase diz
+                isso: sem ela, a paciente imagina que a conversa sobe também na
+                tela da outra — e hesita em fixar a conversa do pior dia. */}
+            {aoFixar && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    aoFixar(!conversa.fixadaEm);
+                    setMenu(false);
+                  }}
+                  className="press flex min-h-[48px] w-full items-center justify-between text-left text-[15px]"
+                >
+                  <span>{conversa.fixadaEm ? "Tirar do topo" : "Fixar no topo"}</span>
+                  <span aria-hidden>📌</span>
+                </button>
+                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                  Só na sua lista. A outra pessoa não vê nem é avisada.
+                </p>
+              </>
+            )}
+
+            {/* ⚠️ **DENUNCIAR A CONVERSA INTEIRA, e não mensagem a mensagem.**
+                O que caracteriza assédio é o PADRÃO — vinte mensagens que, uma a
+                uma, não dizem nada. A denúncia por mensagem existe e continua;
+                esta é a que serve para o caso que importa. */}
+            {aoDenunciarConversa && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenu(false);
+                    setDenunciandoConversa(true);
+                  }}
+                  className="press flex min-h-[48px] w-full items-center justify-between text-left text-[15px] text-destructive"
+                >
+                  <span>Denunciar esta conversa</span>
+                  <span aria-hidden>⚑</span>
+                </button>
+                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                  A gente vai olhar as últimas mensagens dela. Você também pode bloquear.
+                </p>
+              </>
+            )}
 
             <button
               type="button"
@@ -1516,7 +1649,15 @@ export function MandarPublicacao({
   aoFechar,
   bancada,
 }: {
-  alvo: { tipo: "post" | "story"; id: string };
+  /**
+   * ⚠️ **`mensagem` é o terceiro tipo, e ele reusa a MESMA folha de propósito.**
+   * A lista de para-quem-mandar é a mesma (só conversas que já existem), e é
+   * ela que carrega a trava de não abrir conversa nova por este caminho. Uma
+   * folha própria para encaminhar divergiria dela no primeiro ajuste.
+   */
+  alvo:
+    | { tipo: "post" | "story"; id: string }
+    | { tipo: "mensagem"; id: string; deConversaId: string };
   aoFechar: () => void;
   bancada?: ConversaNaTela[];
 }) {
@@ -1549,10 +1690,33 @@ export function MandarPublicacao({
     try {
       const t = await token();
       if (!t) return;
-      const { enviarMensagem } = await import("@/lib/conversa.functions");
-      const r = await enviarMensagem({
-        data: { accessToken: t, conversaId: c.id, refTipo: alvo.tipo, refId: alvo.id },
-      });
+      /**
+       * ⚠️ **ENCAMINHAR É OUTRA FUNÇÃO, e não um `refTipo` a mais.** O servidor
+       * precisa conferir a conversa de ORIGEM (senão um `mensagemId` de
+       * terceiros seria copiado para a minha), e é ele que aplica a régua
+       * clínica de novo no destino. Um `refTipo: "mensagem"` faria a mensagem
+       * virar um CARTÃO que aponta para uma conversa privada — pior ainda.
+       *
+       * ⚠️ **E os dois ramos chamam a função DIRETO.** A primeira versão
+       * escolhia a função numa variável (`const chamar = … ? mod.encaminhar :
+       * mod.enviar`) e a catraca de portas ficou vermelha — com razão: uma
+       * chamada indireta é invisível para quem lê o arquivo procurando quem usa
+       * o quê, que é exatamente o defeito que a catraca existe para pegar.
+       */
+      const { enviarMensagem, encaminharMensagem } = await import("@/lib/conversa.functions");
+      const r =
+        alvo.tipo === "mensagem"
+          ? await encaminharMensagem({
+              data: {
+                accessToken: t,
+                deConversaId: alvo.deConversaId,
+                mensagemId: alvo.id,
+                paraConversaId: c.id,
+              },
+            })
+          : await enviarMensagem({
+              data: { accessToken: t, conversaId: c.id, refTipo: alvo.tipo, refId: alvo.id },
+            });
       /* ⚠️ Só marca "Enviado" se o servidor confirmou — a trava de
          uma-mensagem-antes-do-aceite recusa aqui como recusa em qualquer outro
          lugar, e pintar sucesso sobre a recusa seria mentir na tela. */
@@ -1577,7 +1741,11 @@ export function MandarPublicacao({
         className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl bg-card p-4 pb-[max(1rem,var(--safe-area-inset-bottom))]"
       >
         <p className="text-[15px] font-semibold">
-          {alvo.tipo === "story" ? "Mandar este story para" : "Mandar para"}
+          {alvo.tipo === "story"
+            ? "Mandar este story para"
+            : alvo.tipo === "mensagem"
+              ? "Encaminhar para"
+              : "Mandar para"}
         </p>
         {lista === null ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">Carregando…</p>

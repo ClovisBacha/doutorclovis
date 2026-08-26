@@ -116,6 +116,8 @@ import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import { tagDaBusca } from "@/lib/mencoes";
+import { ChamarParaGrupo, ConversaDoGrupo, CriarGrupo, MeusGrupos } from "@/components/rede-grupo";
+import type { GrupoNaTela } from "@/lib/grupo.functions";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
 import {
   esquecerDoCache,
@@ -3257,6 +3259,9 @@ type Onde =
   | { t: "caixinha" }
   | { t: "conversas" }
   | { t: "conversa" }
+  | { t: "grupo" }
+  | { t: "grupo-novo" }
+  | { t: "grupo-chamar" }
   | { t: "tag"; tag: string }
   | { t: "espelho" };
 
@@ -3341,6 +3346,11 @@ export function RedeNoApp({
   const [favoritas, setFavoritas] = useState<PostNaTela[] | "erro" | null>(null);
   /** O story que está sendo mandado para uma conversa. */
   const [mandandoStory, setMandandoStory] = useState<string | null>(null);
+  const [grupoAberto, setGrupoAberto] = useState<GrupoNaTela | null>(null);
+  const [encaminhando, setEncaminhando] = useState<{
+    deConversaId: string;
+    mensagemId: string;
+  } | null>(null);
   /**
    * ⚠️ **A CONTA PAUSADA PRECISA DE UM AVISO, senão o botão parece quebrado.**
    * Ela pausa nas configurações, volta ao feed e tudo continua igual — porque a
@@ -4575,6 +4585,55 @@ export function RedeNoApp({
         toast.error(
           "motivo" in r && r.motivo === "sem_suporte"
             ? "A denúncia de story ainda não está disponível aqui."
+            : "Não deu para denunciar agora.",
+        );
+        return;
+      }
+      toast.success("Denúncia registrada. A gente vai olhar.");
+    } catch {
+      /* Sem rede, a folha fecha e nada é prometido. */
+    }
+  }
+
+  async function fixarEstaConversa(conversaId: string, fixar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { fixarConversa } = await import("@/lib/conversa.functions");
+      const r = await fixarConversa({ data: { accessToken: t, conversaId, fixar } });
+      const { toast } = await import("sonner");
+      /* ⚠️ `sem_suporte` = o banco ainda não tem a coluna. Dizer "fixado" sobre
+         uma conversa que não vai subir é a tela mentindo sobre a própria
+         lista. */
+      if (!r.ok) {
+        toast.error("Não deu para fixar agora.");
+        return;
+      }
+      toast.success(fixar ? "Fixada no topo. Só na sua lista." : "Tirada do topo.");
+      setConversaAberta((c) =>
+        c && c.id === conversaId ? { ...c, fixadaEm: fixar ? new Date().toISOString() : null } : c,
+      );
+    } catch {
+      /* Sem rede, o menu fecha e nada é prometido. */
+    }
+  }
+
+  async function denunciarEstaConversa(conversaId: string, motivo: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarConversa } = await import("@/lib/conversa.functions");
+      const r = await denunciarConversa({
+        data: { accessToken: t, conversaId, motivo: motivo as never },
+      });
+      const { toast } = await import("sonner");
+      /* ⚠️ **`sem_suporte` NÃO pode virar "fica registrada".** Sem o CHECK novo
+         o banco recusa o alvo `conversa`, e prometer registro sobre uma linha
+         que não gravou é a promessa que este app já quebrou uma vez. */
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "sem_suporte"
+            ? "A denúncia de conversa ainda não está disponível aqui."
             : "Não deu para denunciar agora.",
         );
         return;
@@ -6279,6 +6338,14 @@ export function RedeNoApp({
       <Conversa
         conversa={conversaAberta}
         rascunho={rascunhoDaConversa}
+        aoFixar={(v) => void fixarEstaConversa(conversaAberta.id, v)}
+        aoDenunciarConversa={(m) => void denunciarEstaConversa(conversaAberta.id, m)}
+        /* ⚠️ Guarda a mensagem e abre a folha de escolher PARA ONDE: a lista de
+           conversas é a mesma de `MandarPublicacao`, e reusá-la evita uma
+           segunda régua de "com quem eu posso falar". */
+        aoEncaminhar={(mensagemId) =>
+          setEncaminhando({ deConversaId: conversaAberta.id, mensagemId })
+        }
         /* ⚠️ Só o POST abre. O story vive 24 h e o id dele deixa de resolver —
            levar a paciente a uma tela de "não existe mais" é pior que um cartão
            que só conta o que aconteceu. */
@@ -6299,9 +6366,53 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "grupo" && grupoAberto) {
+    return (
+      <ConversaDoGrupo
+        grupo={grupoAberto}
+        aoVoltar={() => setOnde({ t: "conversas" })}
+        aoConvidar={() => setOnde({ t: "grupo-chamar" })}
+      />
+    );
+  }
+
+  if (onde.t === "grupo-novo") {
+    return (
+      <CriarGrupo
+        /* ⚠️ A MESMA lista de `amigasParaMarcar` — nunca uma busca por nome. */
+        candidatas={paraMarcar ?? []}
+        aoFechar={() => setOnde({ t: "conversas" })}
+        aoCriado={() => setOnde({ t: "conversas" })}
+      />
+    );
+  }
+
+  if (onde.t === "grupo-chamar" && grupoAberto) {
+    return (
+      <ChamarParaGrupo
+        grupo={grupoAberto}
+        candidatas={paraMarcar ?? []}
+        aoFechar={() => setOnde({ t: "grupo" })}
+        aoChamou={() => setOnde({ t: "conversas" })}
+      />
+    );
+  }
+
   if (onde.t === "conversas") {
     return (
       <CaixaDeEntrada
+        /* ⚠️ **A LISTA DE GRUPOS VIVE DENTRO DA CAIXA DE ENTRADA**, e não numa
+           aba própria: um grupo é uma conversa, e separá-los faria a paciente
+           procurar em dois lugares a mesma pergunta ("quem falou comigo?"). */
+        grupos={
+          <MeusGrupos
+            aoAbrir={(g) => {
+              setGrupoAberto(g);
+              setOnde({ t: "grupo" });
+            }}
+            aoCriar={() => setOnde({ t: "grupo-novo" })}
+          />
+        }
         aoVoltar={() => setOnde({ t: "feed" })}
         aoAbrir={(c) => {
           setConversaAberta(c);
@@ -6746,6 +6857,20 @@ export function RedeNoApp({
       {/* ⚠️ A MESMA folha do post — duas divergiriam no primeiro ajuste, e a
           régua que importa (só conversas que JÁ existem) precisaria ser escrita
           duas vezes. */}
+      {/* ⚠️ A MESMA folha do mandar publicação/story — a lista de para-quem é a
+          mesma, e é ela que carrega a trava de só oferecer conversas que já
+          existem. */}
+      {encaminhando && (
+        <MandarPublicacao
+          alvo={{
+            tipo: "mensagem",
+            id: encaminhando.mensagemId,
+            deConversaId: encaminhando.deConversaId,
+          }}
+          aoFechar={() => setEncaminhando(null)}
+        />
+      )}
+
       {mandandoStory && (
         <MandarPublicacao
           alvo={{ tipo: "story", id: mandandoStory }}

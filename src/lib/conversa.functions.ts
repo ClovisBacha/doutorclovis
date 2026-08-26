@@ -31,6 +31,7 @@ import {
   alvoDaCitacao,
   reacaoDeMensagemConhecida,
   TAMANHO_DA_NOTA,
+  AUDIO_SEGUNDOS_MAX,
 } from "./conversa";
 
 export type ConversaNaTela = {
@@ -46,6 +47,13 @@ export type ConversaNaTela = {
   pedido: boolean;
   /** Fui eu quem puxou conversa. Decide o texto da tela do pedido. */
   euIniciei: boolean;
+  /**
+   * Fixada no topo POR MIM. `null` = não fixada.
+   *
+   * ⚠️ É a MINHA coluna: fixar é preferência de quem olha a lista, e uma coluna
+   * só faria a escolha de uma valer para a outra.
+   */
+  fixadaEm?: string | null;
 };
 
 export type MensagemNaTela = {
@@ -54,6 +62,10 @@ export type MensagemNaTela = {
   texto: string | null;
   criadaEm: string;
   apagada: boolean;
+  /** A voz, em URL assinada. `null` quando a mensagem não tem áudio. */
+  audioUrl?: string | null;
+  /** ⚠️ GRAVADA, e não medida na leitura — sem ela a bolha pula ao carregar. */
+  duracaoSeg?: number | null;
   /**
    * Recolhida pelo FILTRO DE PALAVRAS dela — a linha existe, o texto não.
    *
@@ -115,7 +127,11 @@ async function minhaConversa(sb: any, id: string, eu: string): Promise<any | nul
   const ler = (colunas: string) =>
     sb.from("rede_conversas").select(colunas).eq("id", id).maybeSingle();
 
-  let { data, error } = await ler(`${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`);
+  let { data, error } = await ler(
+    `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
+  );
+  /* ⚠️ Um degrau por SQL — ver `minhasConversas`. */
+  if (error) ({ data, error } = await ler(`${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`));
   if (error) ({ data, error } = await ler(BASE));
   if (error || !data) return null;
   if (data.a_id !== eu && data.b_id !== eu) return null;
@@ -159,11 +175,21 @@ export const minhasConversas = createServerFn({ method: "POST" })
         .limit(100);
     const BASE = "id, a_id, b_id, iniciada_por, aceita, ultima_em, lida_a, lida_b";
     let { data: linhas, error } = await lerLista(
-      `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`,
+      `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
     );
+    /* ⚠️ **UM DEGRAU POR SQL.** `fixada_*` nasce no `APLICAR_DIRECT_COMPLETO` e
+       `silenciada_*`/`saiu_*` no `APLICAR_CONVERSA_SILENCIAR` — dois arquivos, e
+       um recuo de dois passos apagaria o SILENCIAR (que já funciona) por causa
+       de uma coluna de fixar. */
+    if (error) {
+      ({ data: linhas, error } = await lerLista(
+        `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`,
+      ));
+      console.warn("[conversa] sem fixada_* — rode APLICAR_DIRECT_COMPLETO.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await lerLista(BASE));
-      console.warn("[conversa] sem saiu_*/silenciada_* — rode APLICAR_DIRECT_COMPLETO.sql");
+      console.warn("[conversa] sem saiu_*/silenciada_* — rode APLICAR_CONVERSA_SILENCIAR.sql");
     }
     if (error) return { ok: false as const, motivo: "banco" as const };
 
@@ -275,6 +301,9 @@ export const minhasConversas = createServerFn({ method: "POST" })
           ultimoAutor: m?.autor_id ?? null,
           euId: eu,
         }),
+        /* ⚠️ A MINHA coluna, por `minhaColuna` — a dela não é da minha conta, e
+           invertida a lista mostraria no topo o que a OUTRA fixou. */
+        fixadaEm: ((c as any)[minhaColuna("fixada", eu, c.a_id)] ?? null) as string | null,
         pedido: !c.aceita,
         euIniciei: c.iniciada_por === eu,
       });
@@ -375,18 +404,41 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
       return q;
     };
     let { data: linhas, error } = await buscar(
-      "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id, responde_a",
+      "id, autor_id, texto, criada_em, apagada_em, imagem_path, audio_path, duracao_seg, " +
+        "ref_tipo, ref_id, responde_a",
     );
     let semCorpo = false;
     /* ⚠️ Degrau NOVO, no topo: `responde_a` nasce no `APLICAR_DEZ_DA_REDE.sql`.
        Sem a coluna a conversa continua inteira — só a citação some, que é o
        estado de antes do recurso. Sem este degrau, o `42703` derrubaria a
        leitura e a conversa pararia de abrir. */
+    /* ⚠️ **UM DEGRAU POR SQL, e o do ÁUDIO é o mais alto.** `audio_path` nasce
+       no `APLICAR_DIRECT_COMPLETO` e `responde_a` no `APLICAR_DEZ_DA_REDE` —
+       dois arquivos, e existe um banco que rodou o segundo e não o primeiro. Um
+       recuo de dois passos apagaria a CITAÇÃO por causa de uma coluna de voz. */
+    if (error) {
+      ({ data: linhas, error } = await buscar(
+        "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id, responde_a",
+      ));
+      if (!error)
+        linhas = ((linhas ?? []) as any[]).map((l) => ({
+          ...l,
+          audio_path: null,
+          duracao_seg: null,
+        }));
+      else console.warn("[conversa] sem audio_path — rode APLICAR_DIRECT_COMPLETO.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await buscar(
         "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id",
       ));
-      if (!error) linhas = ((linhas ?? []) as any[]).map((l) => ({ ...l, responde_a: null }));
+      if (!error)
+        linhas = ((linhas ?? []) as any[]).map((l) => ({
+          ...l,
+          responde_a: null,
+          audio_path: null,
+          duracao_seg: null,
+        }));
       else console.warn("[conversa] sem responde_a — rode APLICAR_DEZ_DA_REDE.sql");
     }
     if (error) {
@@ -413,7 +465,22 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
 
     /* As fotos viram URL assinada aqui, uma vez por página. */
     const comFoto = brutas.filter((m) => m.imagem_path && !m.apagada_em);
+    /* ⚠️ **O ÁUDIO ENTRA NA MESMA ONDA DE ASSINATURA da foto.** Uma segunda
+       chamada ao Storage por conversa dobraria a espera da tela que a paciente
+       abre mais que qualquer outra — e `createSignedUrls` aceita a lista
+       inteira de uma vez. */
+    const comAudio = brutas.filter((m: any) => !!m.audio_path && !m.apagada_em);
     const assinadas = new Map<string, string>();
+    if (comAudio.length) {
+      const { data: urls } = await sb.storage.from("conversas").createSignedUrls(
+        comAudio.map((m: any) => m.audio_path as string),
+        60 * 60,
+      );
+      for (const [i, u] of ((urls ?? []) as any[]).entries()) {
+        const caminho = comAudio[i]?.audio_path;
+        if (u?.signedUrl && caminho) assinadas.set(caminho, u.signedUrl);
+      }
+    }
     if (comFoto.length) {
       const { data: urls } = await sb.storage.from("conversas").createSignedUrls(
         comFoto.map((m) => m.imagem_path as string),
@@ -534,6 +601,10 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
         recolhida: escondeu(m),
         /* ⚠️ A foto da apagada também não viaja — mesma decisão do texto. */
         imagemUrl: m.apagada_em ? null : (assinadas.get(m.imagem_path) ?? null),
+        /* ⚠️ O áudio da apagada também não viaja — mesma decisão do texto e da
+           foto: nada da mensagem apagada sai daqui. */
+        audioUrl: m.apagada_em ? null : (assinadas.get(m.audio_path) ?? null),
+        duracaoSeg: m.apagada_em ? null : ((m.duracao_seg ?? null) as number | null),
         refTipo: m.apagada_em ? null : ((m.ref_tipo ?? null) as "post" | "story" | null),
         refId: m.apagada_em ? null : ((m.ref_id ?? null) as string | null),
         lidaPelaOutra: foiLidaPeloOutro({
@@ -596,6 +667,10 @@ export const enviarMensagem = createServerFn({ method: "POST" })
            mínimo de 1, mandar uma ultrassom sem legenda voltava recusada pelo
            validador — antes de qualquer régua, sem mensagem de erro útil. */
         texto: z.string().max(LIMITE_DA_MENSAGEM).optional(),
+        /** O caminho do áudio no balde `conversas`. Conferido como a foto. */
+        audioPath: z.string().max(300).optional(),
+        /** ⚠️ GRAVADA, e não medida na leitura — ver `duracaoEmTexto`. */
+        duracaoSeg: z.number().int().min(1).max(AUDIO_SEGUNDOS_MAX).optional(),
         imagemPath: z.string().max(300).optional(),
         refTipo: z.enum(["post", "story"]).optional(),
         refId: z.string().uuid().optional(),
@@ -608,7 +683,7 @@ export const enviarMensagem = createServerFn({ method: "POST" })
     const eu = await pacienteDaSessao(data.accessToken);
     if (!eu) return { ok: false as const, motivo: "sessao" as const };
     const texto = (data.texto ?? "").trim();
-    const temCorpo = !!texto || !!data.imagemPath || !!data.refId;
+    const temCorpo = !!texto || !!data.imagemPath || !!data.refId || !!data.audioPath;
     if (!temCorpo) return { ok: false as const, motivo: "vazia" as const };
 
     /* ⚠️ **A FOTO TEM DE SER DA PASTA DE QUEM MANDA.** O caminho vem do
@@ -622,6 +697,13 @@ export const enviarMensagem = createServerFn({ method: "POST" })
        pura e testável, e é ela que impede alguém de anexar à mensagem uma foto
        que subiu para a pasta de OUTRA pessoa. */
     const { pastaDoDono: pastaDe } = await import("@/lib/imagens.server");
+    /* ⚠️ **O ÁUDIO PASSA PELA MESMA TRAVA DA FOTO.** O caminho vem do CLIENTE
+       (ele sobe pela URL assinada); sem a conferência, uma paciente aponta para
+       a pasta de outra e a mensagem passa a TOCAR, dentro de uma conversa
+       privada, um áudio que não é dela. */
+    if (data.audioPath && !fotoEhDeQuemMandou(data.audioPath, pastaDe(eu))) {
+      return { ok: false as const, motivo: "foto_invalida" as const };
+    }
     if (data.imagemPath && !fotoEhDeQuemMandou(data.imagemPath, pastaDe(eu))) {
       return { ok: false as const, motivo: "foto_invalida" as const };
     }
@@ -736,14 +818,25 @@ export const enviarMensagem = createServerFn({ method: "POST" })
       }
     }
 
-    const base = { conversa_id: data.conversaId, autor_id: eu, texto };
+    /* ⚠️ Sem texto (a mensagem é só voz ou só foto), a coluna vai `null` — ela
+       deixou de ser `NOT NULL` no `APLICAR_DIRECT_COMPLETO`. */
+    const base = { conversa_id: data.conversaId, autor_id: eu, texto: texto || null };
     let { error } = await sb.from("rede_mensagens").insert({
       ...base,
       imagem_path: data.imagemPath ?? null,
+      audio_path: data.audioPath ?? null,
+      duracao_seg: data.duracaoSeg ?? null,
       ref_tipo: data.refTipo ?? null,
       ref_id: data.refId ?? null,
       responde_a: respondeA,
     });
+    /* ⚠️ **DEGRAU DO ÁUDIO, e ele vem PRIMEIRO.** `audio_path` nasce no
+       `APLICAR_DIRECT_COMPLETO`; sem ela, uma mensagem de VOZ não pode virar uma
+       linha sem áudio — seria uma bolha vazia, e ela acharia que mandou. Recusa
+       com `sem_suporte`, que a tela sabe explicar. */
+    if (error && data.audioPath) {
+      return { ok: false as const, motivo: "sem_suporte" as const };
+    }
     /* ⚠️ Degrau: `responde_a` nasce no `APLICAR_DEZ_DA_REDE.sql`. Sem ela, a
        mensagem vai SEM a citação — e isso é aceitável porque a citação é
        contexto, não conteúdo: o texto que ela escreveu chega inteiro. */
@@ -1471,4 +1564,194 @@ export const notasDeQuemEuSigo = createServerFn({ method: "POST" })
     /* A minha primeiro: é ela que abre o campo de escrever. */
     notas.sort((a, b) => (a.souEu === b.souEu ? 0 : a.souEu ? -1 : 1));
     return { ok: true as const, notas };
+  });
+
+/**
+ * FIXAR A CONVERSA NO TOPO — e é preferência de quem OLHA a lista.
+ *
+ * ⚠️ **Por isso são DUAS colunas, escolhidas por `minhaColuna`.** Uma coluna só
+ * faria a escolha de uma valer para a outra: a amiga abriria o direct e
+ * encontraria uma conversa presa no topo que ela nunca fixou.
+ */
+export const fixarConversa = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        conversaId: z.string().uuid(),
+        fixar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "nao_e_minha" as const };
+
+    const coluna = minhaColuna("fixada", eu, c.a_id);
+    const { error } = await sb
+      .from("rede_conversas")
+      .update({ [coluna]: data.fixar ? new Date().toISOString() : null })
+      .eq("id", data.conversaId);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * DENUNCIAR A CONVERSA INTEIRA.
+ *
+ * ⚠️ **Denunciar mensagem a mensagem não serve para assédio, e é isso que
+ * faltava.** O que caracteriza assédio é o PADRÃO — vinte mensagens que, uma a
+ * uma, não dizem nada, e juntas dizem tudo. A denúncia da conversa leva um
+ * trecho das últimas para a fila poder VER o padrão; sem isso, quem julga recebe
+ * uma frase solta e arquiva.
+ *
+ * ⚠️ **Só as mensagens DELA entram no trecho.** As minhas não são prova de nada
+ * contra ela — e mandá-las para a fila entregaria o meu lado de uma conversa
+ * privada a quem não precisa dele.
+ */
+export const denunciarConversa = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        conversaId: z.string().uuid(),
+        motivo: z.enum(["assedio", "saude", "imagem", "spam", "outro"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "nao_e_minha" as const };
+    const outro = c.a_id === eu ? c.b_id : c.a_id;
+
+    const { data: linhas } = await sb
+      .from("rede_mensagens")
+      .select("texto, criada_em, autor_id")
+      .eq("conversa_id", data.conversaId)
+      .eq("autor_id", outro)
+      .is("apagada_em", null)
+      .order("criada_em", { ascending: false })
+      .limit(10);
+
+    /* ⚠️ **O TRECHO É CONGELADO**, como em toda denúncia desta aba: se ela
+       apagar as mensagens depois, a fila continua sabendo o que foi denunciado.
+       E é cortado — a fila precisa do padrão, não do histórico inteiro. */
+    const trecho =
+      ((linhas ?? []) as { texto: string | null }[])
+        .map((l) => (l.texto ?? "").trim())
+        .filter(Boolean)
+        .reverse()
+        .join(" / ")
+        .slice(0, 500) || "(sem texto)";
+
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "conversa",
+      alvo_id: data.conversaId,
+      denunciada_id: outro,
+      quem_id: eu,
+      motivo: data.motivo,
+      trecho,
+    });
+    if (error && (error as { code?: string }).code !== "23505") {
+      /* ⚠️ Sem o CHECK novo o banco recusa o alvo `conversa` com `23514` — e a
+         tela DIZ, em vez de prometer "fica registrada". É a promessa que este
+         app já quebrou uma vez, com `denunciado_em` gravado e nunca lido. */
+      if ((error as { code?: string }).code === "23514") {
+        return { ok: false as const, motivo: "sem_suporte" as const };
+      }
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });
+
+/**
+ * ENCAMINHAR UMA MENSAGEM para outra conversa.
+ *
+ * ⚠️ **SÓ TEXTO, e essa é a regra inteira.** Encaminhar a FOTO que alguém me
+ * mandou numa conversa privada é tirar dela a decisão de onde a imagem circula —
+ * é a mesma razão pela qual `compartilhar-post.ts` só deixa compartilhar a
+ * própria publicação, e pela qual o ✈ do story é do dono. Foto que sai de uma
+ * conversa privada não volta.
+ *
+ * ⚠️ **E O TEXTO VAI SEM AUTORIA.** "Fulana disse: …" transformaria o
+ * encaminhar num print — e print de conversa privada é o formato em que uma
+ * frase dita a uma pessoa vira uma frase dita ao grupo. Quem encaminha assume o
+ * que está mandando; se quiser dizer de quem é, escreve.
+ *
+ * ⚠️ **A régua clínica roda DE NOVO no destino.** Sem ela, encaminhar seria a
+ * porta dos fundos de `triarTexto`: "no seu lugar eu não iria ao PS" seria
+ * recusado ao ser escrito e aceito ao ser repassado.
+ */
+export const encaminharMensagem = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /** De onde ela vem — confere que eu estou nessa conversa. */
+        deConversaId: z.string().uuid(),
+        mensagemId: z.string().uuid(),
+        /** Para onde vai — confere que eu estou nessa também. */
+        paraConversaId: z.string().uuid(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **AS DUAS PONTAS SÃO CONFERIDAS, e a de ORIGEM primeiro.** Sem a
+       origem, um `mensagemId` de uma conversa de terceiros seria copiado para a
+       minha — o texto de duas pessoas que não me conhecem, na minha tela e na
+       de quem eu escolher. */
+    const de = await minhaConversa(sb, data.deConversaId, eu);
+    if (!de) return { ok: false as const, motivo: "nao_e_minha" as const };
+    const para = await minhaConversa(sb, data.paraConversaId, eu);
+    if (!para) return { ok: false as const, motivo: "nao_e_minha" as const };
+
+    const { data: m } = await sb
+      .from("rede_mensagens")
+      .select("id, conversa_id, texto, apagada_em")
+      .eq("id", data.mensagemId)
+      .maybeSingle();
+    /* ⚠️ E a mensagem tem de ser DESTA conversa: `minhaConversa` prova que a
+       conversa é minha, não que a mensagem é dela. */
+    if (!m || (m as any).conversa_id !== data.deConversaId) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+    if ((m as any).apagada_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    const texto = (((m as any).texto ?? "") as string).trim();
+    /* Sem texto, não há o que encaminhar — a foto e o áudio ficam onde estão. */
+    if (!texto) return { ok: false as const, motivo: "so_texto" as const };
+
+    const { triarTexto } = await import("./pergunta-clinica");
+    if (triarTexto(texto) === "emergencia") {
+      return { ok: false as const, motivo: "emergencia" as const };
+    }
+
+    const { error } = await sb
+      .from("rede_mensagens")
+      .insert({ conversa_id: data.paraConversaId, autor_id: eu, texto });
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const { error: erroOrdem } = await sb
+      .from("rede_conversas")
+      .update({ ultima_em: new Date().toISOString() })
+      .eq("id", data.paraConversaId);
+    /* A mensagem já foi; o que falha aqui é a ORDEM da lista. Silêncio para a
+       paciente, registro para quem investigar. */
+    if (erroOrdem) console.warn("[conversa] ordem não atualizou", erroOrdem.code);
+    return { ok: true as const };
   });

@@ -195,9 +195,20 @@ describe("⚠️ o servidor: a citação no envio", () => {
   test("⚠️ e sem a coluna, a mensagem VAI — só sem a citação", () => {
     /* A citação é contexto, não conteúdo: o texto que ela escreveu chega
        inteiro. Recusar aqui seria perder a mensagem por causa de um enfeite. */
-    const i = C.indexOf("responde_a: respondeA");
-    expect(i).toBeGreaterThan(-1);
-    expect(C.slice(i, i + 500)).toContain(".insert({");
+    /**
+     * ⚠️ **A GARANTIA É "há um degrau SEM `responde_a`", e não a distância entre
+     * as duas linhas.** Este teste media 500 caracteres a partir do
+     * `responde_a: respondeA` para achar o `insert` do recuo — e ficou vermelho
+     * quando o degrau do ÁUDIO entrou entre os dois. A distância nunca foi a
+     * garantia.
+     */
+    const iCheio = C.indexOf("responde_a: respondeA");
+    expect(iCheio).toBeGreaterThan(-1);
+    const depois = C.slice(iCheio);
+    /* Existe um insert posterior que NÃO manda `responde_a`. */
+    const iRecuo = depois.indexOf(".insert({\n        ...base,\n        imagem_path");
+    expect(iRecuo).toBeGreaterThan(-1);
+    expect(depois.slice(iRecuo, iRecuo + 260)).not.toContain("responde_a");
   });
 });
 

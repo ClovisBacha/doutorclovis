@@ -335,3 +335,85 @@ export function textoDaCitacao(m: {
  * meia embaixo de um avatar de 56px, que é o espaço que existe.
  */
 export const TAMANHO_DA_NOTA = 60;
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A MENSAGEM DE VOZ
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **DOIS MINUTOS, e o teto é o que separa recado de monólogo.**
+ *
+ * O gênero inteiro tem esse problema: sem limite, o áudio de doze minutos vira
+ * a coisa que a outra pessoa adia ouvir — e adiar é o oposto do que o formato
+ * existe para fazer. Dois minutos cabem num recado inteiro e não cabem numa
+ * consulta, que é onde essa conversa deve acontecer.
+ */
+export const AUDIO_SEGUNDOS_MAX = 120;
+
+/**
+ * ⚠️ **`audio/mp4` é o PRIMEIRO da lista, e isso não é preferência.**
+ *
+ * É o único formato que o Safari do iPhone grava. Uma lista começando em `webm`
+ * funciona em toda máquina de desenvolvimento e falha no aparelho onde o app é
+ * instalado — a mesma armadilha que o gravador do diário já documentou.
+ */
+export const AUDIO_TIPOS = ["audio/mp4", "audio/webm", "audio/ogg"] as const;
+
+/** ~1 MB cobre dois minutos com folga na taxa que o navegador grava. */
+export const AUDIO_BYTES_MAX = 1_200_000;
+
+export function extensaoDoAudio(tipo: string): string {
+  if (tipo.startsWith("audio/mp4")) return "m4a";
+  if (tipo.startsWith("audio/ogg")) return "ogg";
+  return "webm";
+}
+
+/**
+ * A duração escrita embaixo da bolha.
+ *
+ * ⚠️ **Ela vem GRAVADA, e não medida na leitura.** Sem o número, a bolha nasce
+ * sem largura e a tela pula quando o áudio carrega — num histórico longo, é a
+ * conversa inteira dançando enquanto ela rola.
+ */
+export function duracaoEmTexto(segundos: number | null | undefined): string {
+  const s = Math.max(0, Math.round(segundos ?? 0));
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+}
+
+/**
+ * ⚠️ **A CONVERSA FIXADA VEM PRIMEIRO, e o resto NÃO reordena.**
+ *
+ * A lista chega ordenada por `ultima_em` do servidor. Reordenar o resto aqui
+ * faria a segunda página aparecer embaralhada em relação à primeira — a mesma
+ * lição de `ordenarComFixados` para publicações.
+ */
+export function ordenarConversasComFixadas<T extends { fixadaEm?: string | null }>(
+  conversas: T[],
+): T[] {
+  const fixadas = conversas.filter((c) => !!c.fixadaEm);
+  if (fixadas.length === 0) return conversas;
+  const resto = conversas.filter((c) => !c.fixadaEm);
+  fixadas.sort((a, b) => Date.parse(b.fixadaEm!) - Date.parse(a.fixadaEm!));
+  return [...fixadas, ...resto];
+}
+
+/**
+ * ⚠️ **A BUSCA DENTRO DA CONVERSA É LOCAL, e é por isso que ela existe assim.**
+ *
+ * Buscar no servidor exigiria mandar o termo pela rede — e o termo é o que ela
+ * está procurando numa conversa privada. "sangramento", o nome de um hospital,
+ * o nome de uma pessoa: o que ela digita aqui é tão sensível quanto o que ela
+ * escreveu. A busca roda sobre as mensagens que a tela JÁ tem.
+ *
+ * ⚠️ **E ela não acha o que está apagado nem recolhido.** O texto dessas não
+ * viaja para a tela de propósito; procurar nelas exigiria trazê-lo de volta.
+ */
+export function acharNaConversa<T extends { texto?: string | null; apagada?: boolean }>(
+  mensagens: readonly T[],
+  termo: string,
+): T[] {
+  const t = termo.trim().toLowerCase();
+  if (t.length < 2) return [];
+  return mensagens.filter((m) => !m.apagada && (m.texto ?? "").toLowerCase().includes(t));
+}

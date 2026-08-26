@@ -49,6 +49,10 @@ const FONTES = [
      diz que "um módulo novo fora desta lista é o buraco que a catraca existe
      para fechar". As oito funções deles têm porta hoje — mas ter porta hoje é
      exatamente o que era verdade das sete que a catraca nasceu para pegar. */
+  /* ⚠️ O grupo do direct entra JUNTO com o módulo — não depois. Foi assim que
+     `influenciadora` e o chá de bebê acabaram com funções mortas: o módulo
+     nasceu, a catraca não soube, e ninguém ficou vermelho. */
+  "src/lib/grupo.functions.ts",
   "src/lib/desafio-em-grupo.functions.ts",
   "src/lib/influenciadora.functions.ts",
   /* ⚠️ **E o chá de bebê ficava de fora, com DUAS funções mortas.**

@@ -9487,3 +9487,100 @@ essa linha ficou verde, e foi assim que o caso apareceu.
   app.
 
 **Aplicar no Supabase:** `supabase/APLICAR_AVISOS_E_DESCOBERTA.sql`.
+
+## O direct ficou completo: grupo, voz, busca, fixar, encaminhar (ago/2026)
+
+### ⚠️ O grupo é APERTADO, e cada trava responde a um jeito de dar errado
+
+Num app de gestação de alto risco, um grupo aberto é onde o conselho de leiga se
+multiplica — os 20,9% de respostas erradas em fóruns de gestação são o número que
+fechou os comentários deste app. O grupo entra com as travas que aquela decisão
+implica:
+
+1. **Só a CRIADORA convida**, e só de dentro do grafo dela. Sem isso, uma pessoa
+   entra e traz outras cinco que ninguém conhece.
+2. **Teto de oito.** Acima disso ninguém lê tudo, e o que sobra é quem fala mais
+   alto.
+3. ⚠️ **Quem entra vê a partir de `entrou_em`.** É a régua que separa "entrar num
+   grupo" de "ler a conversa dos outros": o que veio antes pode ser um susto, um
+   resultado ou uma perda, e quem escreveu escolheu contar para quem estava lá
+   naquele momento. O filtro é aplicado na CONSULTA — o que não é lido não vaza.
+4. **A criadora saindo ENCERRA.** Um grupo sem dona é um grupo sem ninguém
+   responsável por quem entra. Encerrar MARCA; as mensagens ficam, porque são o
+   que as OUTRAS escreveram.
+
+⚠️ **`rede_conversas` NÃO foi mexida.** Ela tem `a_id`/`b_id` `NOT NULL`, um
+`CHECK (a_id < b_id)` e um índice único por par: a forma inteira dela É "duas
+pessoas", e é nela que mora a garantia de que ninguém entra numa conversa de
+duas. Espremer um grupo ali exigiria afrouxar os três.
+
+⚠️ **Mas as MENSAGENS são as mesmas.** `rede_mensagens` ganhou `grupo_id`, com
+`CHECK ((conversa_id IS NULL) <> (grupo_id IS NULL))`. Reusar não é economia: é o
+que faz a citação, as reações, o apagar e a **régua clínica** valerem igual nos
+dois. Uma tabela separada seria seis lugares para divergir, e a divergência
+apareceria como conduta passando no grupo e sendo recusada no direct — no canal
+que tem OITO leitoras em vez de uma.
+
+⚠️ **Quem é reconvidada VOLTA vendo a partir de agora** (`entrou_em` reescrito no
+`upsert`), e **quem saiu não ocupa vaga** — senão um grupo que perdeu metade
+nunca mais aceitaria ninguém.
+
+### A voz
+
+- ⚠️ **`audio/mp4` é o PRIMEIRO da lista.** É o único que o Safari do iPhone
+  grava; uma lista começando em `webm` funciona em toda máquina de
+  desenvolvimento e falha no aparelho onde o app é instalado.
+- ⚠️ **Dois minutos**, e o teto separa recado de monólogo: sem limite, o áudio de
+  doze minutos vira a coisa que a outra adia ouvir.
+- ⚠️ **A duração é GRAVADA, e não medida na leitura.** Sem o número, a bolha
+  nasce sem largura e a tela pula quando o áudio carrega — num histórico longo, é
+  a conversa inteira dançando.
+- ⚠️ **Sem a coluna, a mensagem de VOZ é RECUSADA** — nunca vira linha sem áudio,
+  que seria uma bolha em branco com ela achando que mandou.
+- **O áudio passa pela MESMA trava de pasta da foto**, e é assinado na MESMA onda.
+
+### A busca é LOCAL, e é por isso que ela existe assim
+
+⚠️ Buscar no servidor mandaria o TERMO pela rede — e o termo é o que ela está
+procurando numa conversa privada. "sangramento", o nome de um hospital, o nome de
+uma pessoa: tão sensível quanto o que ela escreveu. A busca roda sobre as
+mensagens que a tela JÁ tem, e não acha o que está apagado nem recolhido.
+
+### Fixar, encaminhar e denunciar a conversa
+
+- **Fixar é preferência de quem OLHA a lista** — por isso são duas colunas, e a
+  tela diz "só na sua lista": sem a frase, ela imagina que a conversa sobe também
+  na tela da outra.
+- ⚠️ **Encaminhar é SÓ TEXTO.** A foto e o áudio que alguém me mandou numa
+  conversa privada não saem dali — a mesma razão do ✈ do story ser do dono. E o
+  texto vai **sem autoria**: "Fulana disse:" transformaria o encaminhar num
+  print. A régua clínica roda DE NOVO no destino, senão encaminhar seria a porta
+  dos fundos de `triarTexto`.
+- ⚠️ **Denunciar mensagem a mensagem não serve para assédio**, e é isso que
+  faltava: o que caracteriza assédio é o PADRÃO — vinte mensagens que, uma a uma,
+  não dizem nada. A denúncia da conversa leva as dez últimas **dela**; as minhas
+  não são prova de nada contra ela, e mandá-las entregaria o meu lado de uma
+  conversa privada a quem não precisa dele.
+
+### ⚠️ Três testes meus travavam a grafia, e um deles a DISTÂNCIA
+
+- Um media 500 caracteres entre duas linhas para achar o degrau de recuo — e
+  ficou vermelho quando o degrau do ÁUDIO entrou no meio. **A distância nunca foi
+  a garantia.**
+- Outro travava o tipo `{ tipo: "post" | "story" }` e reprovou a MESMA folha
+  passando a servir o encaminhar — uma união a mais, que só ampliou o que ela
+  cobre.
+- E a catraca de portas pegou uma **chamada indireta**: eu escolhia a função numa
+  variável (`const chamar = … ? mod.encaminhar : mod.enviar`), e ela ficou
+  vermelha com razão — uma chamada assim é invisível para quem lê o arquivo
+  procurando quem usa o quê, que é exatamente o defeito que ela existe para pegar.
+
+### ⚠️ E a catraca de escritas sem checagem cobrou quatro
+
+O teto ficou em **6** — nenhuma subiu. As quatro escritas novas (a ordem da lista,
+a marca de lida, o encerramento e o rollback do grupo órfão) passaram a
+REGISTRAR a falha: silêncio para a paciente, registro para quem investigar. É a
+resposta do meio que `registrarAtividade` já documenta — _silêncio TOTAL é o que
+a catraca proíbe_.
+
+**Aplicar no Supabase:** `supabase/APLICAR_DIRECT_COMPLETO.sql`.
