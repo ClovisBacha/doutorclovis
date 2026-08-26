@@ -22,7 +22,10 @@ import {
   RASCUNHO_MINIMO,
   RESPOSTAS_VISIVEIS,
   chaveDoRascunhoDeComentario,
+  ehChaveDeRascunhoDeComentario,
+  lerRascunhoGuardado,
   ordenarComentarios,
+  serializarRascunho,
 } from "@/lib/comentarios";
 import type { OrdemDosComentarios } from "@/lib/comentarios";
 
@@ -369,8 +372,24 @@ export function Comentarios({
     if (!euId || rascunhoLido.current) return;
     rascunhoLido.current = true;
     try {
-      const guardado = localStorage.getItem(chaveDoRascunhoDeComentario(euId, postId));
+      const agora = new Date();
+      const guardado = lerRascunhoGuardado(
+        localStorage.getItem(chaveDoRascunhoDeComentario(euId, postId)),
+        agora,
+      );
       if (guardado && !texto.trim()) setTexto(guardado);
+      /* ⚠️ **A VARREDURA VIVE AQUI porque é o único momento em que já estamos
+         no armazenamento.** Sem ela, cada publicação em que ela começou a
+         escrever e desistiu deixa uma chave para sempre — e o que quebra quando
+         a cota estoura é a PRÓXIMA gravação de qualquer coisa, inclusive o
+         `journey_state`. Ler `localStorage.key(i)` de trás para a frente é o que
+         permite remover durante o laço sem pular índice. */
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (!k || !ehChaveDeRascunhoDeComentario(k)) continue;
+        if (lerRascunhoGuardado(localStorage.getItem(k), agora) === null)
+          localStorage.removeItem(k);
+      }
     } catch {
       /* Sem storage (aba anônima, cota estourada): segue sem rascunho. */
     }
@@ -381,7 +400,8 @@ export function Comentarios({
     const chave = chaveDoRascunhoDeComentario(euId, postId);
     const t = setTimeout(() => {
       try {
-        if (texto.trim().length >= RASCUNHO_MINIMO) localStorage.setItem(chave, texto);
+        if (texto.trim().length >= RASCUNHO_MINIMO)
+          localStorage.setItem(chave, serializarRascunho(texto, new Date()));
         else localStorage.removeItem(chave);
       } catch {
         /* Cota estourada: perder o rascunho é melhor que derrubar a tela. */

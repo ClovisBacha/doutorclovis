@@ -411,6 +411,8 @@ export function ordenarComentariosComFixado<
   return [...fixados, ...resto];
 }
 
+import { VALIDADE_DIAS } from "./rascunho-do-post";
+
 /* ══════════════════════════════════════════════════════════════════════════
    A ORDEM DA CONVERSA
    ══════════════════════════════════════════════════════════════════════════ */
@@ -485,3 +487,47 @@ export function chaveDoRascunhoDeComentario(euId: string, postId: string): strin
 
 /** Abaixo disto não vale guardar: é uma palavra começada, não um rascunho. */
 export const RASCUNHO_MINIMO = 3;
+
+/** Reconhece uma chave de rascunho de comentário — usado só pela varredura. */
+export function ehChaveDeRascunhoDeComentario(chave: string): boolean {
+  return chave.startsWith("dc-rede-coment-");
+}
+
+/**
+ * ⚠️ **O RASCUNHO CARREGA O INSTANTE, e sem ele a conta não fecha.**
+ *
+ * É uma chave POR PUBLICAÇÃO: quem começa a escrever em quarenta posts e desiste
+ * deixa quarenta chaves, para sempre. Em bytes é pouco (500 caracteres cada),
+ * mas crescimento sem teto é crescimento sem teto — e o que quebra quando a cota
+ * do `localStorage` estoura é a PRÓXIMA gravação de qualquer coisa, inclusive o
+ * `journey_state`, que carrega a jornada inteira dela. É a mesma razão pela qual
+ * o rascunho do POST não guarda fotos.
+ *
+ * ⚠️ **E a validade é a MESMA `VALIDADE_DIAS` do rascunho do post**, importada e
+ * nunca recopiada: dois números para "quanto tempo um rascunho vive neste app"
+ * divergiriam no primeiro ajuste de um deles.
+ */
+export function serializarRascunho(texto: string, agora: Date): string {
+  return JSON.stringify({ quando: agora.getTime(), texto });
+}
+
+/**
+ * Devolve o texto guardado, ou `null` quando não há, venceu, ou está corrompido.
+ *
+ * ⚠️ **`quando` no FUTURO também vence.** Relógio do aparelho adiantado e depois
+ * corrigido deixaria um rascunho eterno — o mesmo `dias < -1` do rascunho do
+ * post, pela mesma razão.
+ */
+export function lerRascunhoGuardado(cru: string | null, agora: Date): string | null {
+  if (!cru) return null;
+  try {
+    const o = JSON.parse(cru) as { quando?: unknown; texto?: unknown };
+    if (typeof o?.texto !== "string" || typeof o?.quando !== "number") return null;
+    const dias = (agora.getTime() - o.quando) / 86_400_000;
+    if (dias > VALIDADE_DIAS || dias < -1) return null;
+    return o.texto.trim() ? o.texto : null;
+  } catch {
+    /* Formato antigo (texto cru) ou lixo: descarta em vez de mostrar. */
+    return null;
+  }
+}

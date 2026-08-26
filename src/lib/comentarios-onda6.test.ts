@@ -9,7 +9,10 @@ import {
   ORDEM_PADRAO,
   RASCUNHO_MINIMO,
   chaveDoRascunhoDeComentario,
+  ehChaveDeRascunhoDeComentario,
+  lerRascunhoGuardado,
   ordenarComentarios,
+  serializarRascunho,
 } from "./comentarios";
 
 /** ⚠️ Tira a prosa antes de procurar: ela já quebrou teste nos dois sentidos. */
@@ -171,9 +174,85 @@ describe("24 · o rascunho do comentário", () => {
      * O comentário não tem anexo, e guardar `respondeA` faria o rascunho
      * reabrir apontando para um comentário que pode ter sido apagado — o texto
      * iria para a conversa errada.
+     *
+     * ⚠️ A primeira versão disto cobrava "grava texto CRU", que é a grafia e
+     * não a garantia: quebrou no dia em que o rascunho ganhou validade. O que
+     * importa é o que ESTÁ no pacote gravado — dois campos, e nada mais.
      */
-    expect(COMP).not.toMatch(/setItem\(chave,\s*JSON\.stringify/);
-    expect(COMP).toContain("localStorage.setItem(chave, texto)");
+    const pacote = JSON.parse(serializarRascunho("oi", new Date()));
+    expect(Object.keys(pacote).sort()).toEqual(["quando", "texto"]);
+  });
+
+  test("⚠️ o rascunho VENCE — senão é uma chave por post, para sempre", () => {
+    /**
+     * Quem começa a escrever em quarenta posts e desiste deixa quarenta chaves.
+     * O que quebra quando a cota do `localStorage` estoura é a PRÓXIMA gravação
+     * de qualquer coisa, inclusive o `journey_state`.
+     */
+    const agora = new Date("2026-08-26T12:00:00Z");
+    const velho = serializarRascunho("oi", new Date("2026-08-01T12:00:00Z"));
+    const novo = serializarRascunho("oi", new Date("2026-08-25T12:00:00Z"));
+    expect(lerRascunhoGuardado(velho, agora)).toBeNull();
+    expect(lerRascunhoGuardado(novo, agora)).toBe("oi");
+  });
+
+  test("⚠️ e a validade é a MESMA do rascunho do post — um número só", () => {
+    const R = semProsa(readFileSync("src/lib/comentarios.ts", "utf8"));
+    expect(R).toContain('from "./rascunho-do-post"');
+    expect(R).toContain("VALIDADE_DIAS");
+  });
+
+  test("⚠️ instante no FUTURO também vence", () => {
+    /* Relógio adiantado e depois corrigido deixaria um rascunho eterno. */
+    const agora = new Date("2026-08-26T12:00:00Z");
+    const futuro = serializarRascunho("oi", new Date("2026-09-30T12:00:00Z"));
+    expect(lerRascunhoGuardado(futuro, agora)).toBeNull();
+  });
+
+  test("lixo e formato antigo são descartados, nunca mostrados", () => {
+    const agora = new Date();
+    expect(lerRascunhoGuardado("texto cru da versão anterior", agora)).toBeNull();
+    expect(lerRascunhoGuardado("{", agora)).toBeNull();
+    expect(lerRascunhoGuardado(null, agora)).toBeNull();
+    expect(lerRascunhoGuardado(JSON.stringify({ texto: "oi" }), agora)).toBeNull();
+  });
+
+  test("⚠️ a varredura NÃO reconhece chave que não é dela", () => {
+    /**
+     * ⚠️ **ESTA É A ASSERÇÃO PERIGOSA, e a mutação provou que faltava.** A
+     * varredura apaga toda chave que ela reconhece e cujo pacote venceu. Com um
+     * reconhecedor frouxo — e `return true` passava no teste anterior, que só
+     * cobrava que a função fosse CHAMADA — ela varreria o `localStorage`
+     * inteiro: as chaves `dc-path-` da jornada, o rascunho do story, o passo do
+     * tutorial. Apagaria a jornada da paciente para limpar rascunho de
+     * comentário.
+     */
+    expect(ehChaveDeRascunhoDeComentario(chaveDoRascunhoDeComentario("eu", "p1"))).toBe(true);
+    for (const k of [
+      "dc-path-day-12",
+      "dc-path-med-log",
+      "dc-rede-story-rascunho",
+      "dc-path-comunidade-vista",
+      "sb-auth-token",
+      "",
+    ]) {
+      expect(ehChaveDeRascunhoDeComentario(k)).toBe(false);
+    }
+  });
+
+  test("⚠️ a varredura limpa TODA chave vencida, não só a deste post", () => {
+    /**
+     * É o único momento em que já estamos no armazenamento — e a garantia é que
+     * o corpo do laço REMOVA. A primeira versão cobrava só a existência do laço
+     * e do reconhecedor: apagar a linha do `removeItem` deixava uma varredura
+     * que percorre tudo e não limpa nada, e o teste ficava verde.
+     */
+    const inicio = COMP.search(/for \(let i = localStorage\.length - 1; i >= 0; i--\)/);
+    expect(inicio).toBeGreaterThan(0);
+    const corpo = COMP.slice(inicio, COMP.indexOf("\n      }", inicio));
+    expect(corpo).toContain("ehChaveDeRascunhoDeComentario(k)");
+    expect(corpo).toContain("lerRascunhoGuardado(localStorage.getItem(k), agora)");
+    expect(corpo).toContain("localStorage.removeItem(k)");
   });
 });
 

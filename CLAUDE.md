@@ -6208,9 +6208,23 @@ como ausente uma coisa que existe.
   reapareceria na próxima abertura. Mesmo defeito que o rascunho do post pagou.
 - ⚠️ **Não preenche por cima do que ela já digitou**, e o modo EDIÇÃO fica de
   fora — ali o campo já carrega o comentário que ela está corrigindo.
-- ⚠️ **Guarda só o TEXTO.** Guardar `respondeA` faria o rascunho reabrir
-  apontando para um comentário que pode ter sido apagado, e o texto iria para a
-  conversa errada.
+- ⚠️ **Guarda o texto e o INSTANTE — nunca `respondeA`, nunca foto.** Guardar a
+  resposta pendente faria o rascunho reabrir apontando para um comentário que
+  pode ter sido apagado, e o texto iria para a conversa errada.
+- ⚠️ **E ELE VENCE, porque é uma chave POR PUBLICAÇÃO.** Quem começa a escrever
+  em quarenta posts e desiste deixava quarenta chaves, para sempre — e o que
+  quebra quando a cota do `localStorage` estoura é a PRÓXIMA gravação de
+  qualquer coisa, inclusive o `journey_state`. A validade é a MESMA
+  `VALIDADE_DIAS` do rascunho do post, importada e nunca recopiada. Instante no
+  FUTURO também vence: relógio adiantado e depois corrigido deixaria um rascunho
+  eterno.
+- ⚠️ **A VARREDURA PRECISA DISCRIMINAR, e a mutação provou que faltava
+  asserção.** Ela apaga toda chave que reconhece e cujo pacote venceu; com o
+  reconhecedor devolvendo `true` para tudo — o que passava no meu teste, que só
+  cobrava que a função fosse CHAMADA — ela varreria o `localStorage` inteiro:
+  as chaves `dc-path-` da JORNADA, o rascunho do story, o passo do tutorial.
+  Apagaria a jornada da paciente para limpar rascunho de comentário. Conferido
+  também no navegador, com as chaves postas à mão antes de recarregar.
 
 ⚠️ **E A BANCADA MENTIU DE DUAS FORMAS, as duas achadas na FOTO:** o efeito do
 rascunho começava com `if (bancada || …)`, então ela mostrava sempre o campo
@@ -6221,6 +6235,78 @@ aprova qualquer coisa.
 
 **Bancada:** `/preview-instagram?tela=comentarios` · `&ordem=relevantes` ·
 `&rascunhoComent=1` · `&conversa=fechados`.
+
+### O primeiro minuto na Comunidade (ago/2026)
+
+⚠️ **DAS TRÊS COISAS QUE EU TINHA LISTADO COMO FALTANDO NESTA ONDA, DUAS JÁ
+EXISTIAM INTEIRAS** — e é a quarta vez nesta leva. `vistasDosMeus` já contava
+quem viu cada publicação minha (e a tela já desenhava "N pessoas viram"), e
+`favoritar` já tinha botão no perfil, tela própria e `ctx.favoritas`. O que
+faltava mesmo era UMA coisa: a aba não tinha uma linha explicando como ela
+funciona.
+
+**A régua e os quatro textos moram em `src/lib/onboarding-da-comunidade.ts`**,
+nunca no JSX — é o que o dono relê e corrige.
+
+- ⚠️ **NÃO É UM PASSEIO PELOS ÍCONES.** Onde as coisas estão se descobre
+  tocando. O que não se descobre tocando é: que o perfil dela **já nasce
+  fechado** (então publicar não é publicar para o mundo), que **cada publicação
+  escolhe o seu público**, e que **conduta clínica não se pede nem se dá aqui**.
+  Esta última é a razão de a aba não ter conselho livre, e era o único fato
+  central do produto sem nenhum texto no app explicando-o a quem chega.
+- ⚠️ **"Não sei" NÃO abre.** Enquanto o perfil não chegou (`careMode`
+  indefinido), `deveVerOnboarding` devolve `false`: abrir e descobrir o luto
+  meio segundo depois mostraria os quatro cartões para exatamente quem eles não
+  podem alcançar. Falha fechada, como o resto da aba.
+- ⚠️ **A chave leva o prefixo `dc-path-`, e isso é o que faz o "já vi"
+  VIAJAR.** Com uma chave comum de `localStorage`, quem usa celular e computador
+  veria os quatro cartões em cada um — e tutorial que reaparece ensina que os
+  avisos deste app não valem leitura.
+- ⚠️ **E O PULL DA NUVEM RODA ANTES DE LER E DE GRAVAR.** `lsSet` de uma chave
+  `dc-path-` agenda um PUSH do blob da jornada, e `journey-sync` avisa em prosa
+  que empurrar antes do pull **sobrescreve a jornada real por um blob
+  incompleto**. Esta tela vive numa aba irmã, que pode ser a primeira que a
+  paciente abre no dia — era o defeito mais caro possível aqui, e não teria
+  aparecido em teste nenhum.
+- ⚠️ **O VÉU PARA EM `z-38`; a barra de baixo vive em `z-40`.** Mesma solução do
+  tutorial do mascote, e aqui ela conserta também uma incoerência de TEXTO: o
+  terceiro cartão diz "use o SOS na barra de baixo", e com o véu por cima ele
+  apontava para uma barra apagada e coberta pelo próprio cartão. Foi a FOTO que
+  pegou.
+- **Só sobre o FEED**: o componente é renderizado depois de todos os
+  `if (onde.t === …) return`, então nunca abre por cima do perfil, do direct ou
+  da caixinha — telas para as quais ela NAVEGOU, onde quatro cartões de
+  boas-vindas seriam interrupção do que ela foi fazer. Há teste comparando as
+  posições.
+- ⚠️ **ELE ESPERA O RITUAL DE BOAS-VINDAS**, e isso era alcançável de verdade:
+  `OnboardingRitual` não tem portão de aba nenhum, então uma paciente
+  recém-criada que tocasse em Comunidade antes de terminá-lo receberia os quatro
+  cartões por baixo dele. Mesma decisão que `TutorialDaBolha` já toma com
+  `!showOnboarding` — e o tutorial não some: quem adiou o encontra na abertura
+  seguinte, com o app já personalizado.
+- **"Pular" fica visível o tempo todo, e marca como visto**: senão ela é
+  interrompida de novo tendo dito não. E os pontinhos existem porque quatro
+  telas seguidas sem fim à vista fazem qualquer pessoa sair no primeiro toque.
+- ⚠️ **O PASSO NÃO MORA SÓ NO COMPONENTE — é o defeito que o dono já viu no
+  tutorial do mascote, chegando por outro caminho.** A barra de baixo continua
+  clicável de propósito; tocar num item troca a aba, desmonta `RedeNoApp`, e com
+  o índice num `useState` lá dentro voltar à Comunidade recomeçava do primeiro
+  cartão. ⚠️ **E a chave do passo é `localStorage` COMUM, nunca `dc-path-`**: o
+  "já vi" precisa viajar entre aparelhos, o passo não — subir um índice de
+  tutorial no `journey_state` seria empurrar lixo para a nuvem a cada toque em
+  "Continuar". Ele é apagado ao terminar.
+- ⚠️ **`passoValido` é função PRÓPRIA porque `lerPassoDaComunidade` toca
+  `window`**, e num teste de Node ela sai por `typeof window === "undefined"`
+  antes de chegar à conta: a mutação que APAGAVA o limite passava verde. Régua
+  pura em `lib/`, de novo e pela mesma razão de sempre.
+- ⚠️ **Nenhum cartão cobra publicação nem promete resposta de outra paciente** —
+  há teste com regex. Ler o tempo que ela quiser é um uso legítimo da aba, e
+  "alguém vai te responder" é a promessa que a triagem clínica existe para não
+  fazer.
+
+**Bancada:** `/preview-instagram?onboarding=1` — sem ela, conferir os quatro
+cartões exigiria uma conta recém-criada, e depois de olhar uma vez a tela nunca
+mais apareceria.
 
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 

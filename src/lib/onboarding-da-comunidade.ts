@@ -100,6 +100,52 @@ export function deveVerOnboarding(entrada: {
   return true;
 }
 
+/**
+ * ⚠️ **O PASSO NÃO PODE MORAR SÓ NO COMPONENTE, e a razão é a mesma do
+ * tutorial do mascote — onde o dono viu o defeito.**
+ *
+ * O véu para em `z-38` e a barra de baixo continua clicável de propósito
+ * (prender a paciente em quatro telas para poder usar uma aba que ela acabou de
+ * abrir é a definição de tutorial ruim). Mas tocar num item da barra troca a
+ * aba, `RedeNoApp` é desmontado, e com o índice num `useState` lá dentro voltar
+ * à Comunidade recomeçava do primeiro cartão.
+ *
+ * ⚠️ **E a chave é `localStorage` COMUM, nunca `dc-path-`.** O "já vi" precisa
+ * viajar entre aparelhos; o passo, não — ele é transitório e morre em minutos.
+ * Subir um índice de tutorial no `journey_state` seria empurrar lixo para a
+ * nuvem a cada toque em "Continuar".
+ */
+export function chaveDoPassoDaComunidade(uid: string | null): string {
+  return `dc-comunidade-passo:${uid ?? "anon"}`;
+}
+
+/**
+ * Prende o passo na faixa válida.
+ *
+ * ⚠️ **É FUNÇÃO PRÓPRIA porque `lerPassoDaComunidade` toca `window`**, e num
+ * teste de Node ela sai por `typeof window === "undefined"` antes de chegar à
+ * conta — a mutação que APAGAVA o `clamp` passava verde. Régua pura em `lib/`,
+ * de novo, e pela mesma razão de sempre.
+ *
+ * Trata storage adulterado, `"abc"`, e um cartão removido depois de ela guardar
+ * o passo.
+ */
+export function passoValido(cru: unknown): number {
+  const n = Number(cru);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(CARTOES_DA_COMUNIDADE.length - 1, Math.floor(n)));
+}
+
+/** Lê o passo guardado, já preso na faixa válida. */
+export function lerPassoDaComunidade(uid: string | null): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    return passoValido(localStorage.getItem(chaveDoPassoDaComunidade(uid)));
+  } catch {
+    return 0;
+  }
+}
+
 /** O próximo passo, ou `null` quando acabou. Puro, para o teste alcançar. */
 export function passoSeguinte(passo: number): number | null {
   const proximo = passo + 1;

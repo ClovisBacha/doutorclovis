@@ -48,8 +48,9 @@
  * quando o feed de quem ela segue ACABOU — aqui, depois de rolar até o fim.
  */
 import { useEffect, useMemo, useState } from "react";
+import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
 import { Comentarios } from "@/components/rede-comentarios";
-import { chaveDoRascunhoDeComentario } from "@/lib/comentarios";
+import { chaveDoRascunhoDeComentario, serializarRascunho } from "@/lib/comentarios";
 import { FiltroDePalavras } from "@/components/rede-social";
 import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
@@ -114,6 +115,11 @@ export const Route = createFileRoute("/preview-instagram")({
        curtidas só se enxerga com um comentário muito curtido no meio da lista,
        que é exatamente o que não se fabrica numa conta de teste. */
     ordem: q.ordem == null ? "recentes" : String(q.ordem),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. Os quatro
+       cartões só abrem UMA vez na vida da conta, e o "já vi" viaja na nuvem:
+       sem a bancada, conferir o desenho exigiria uma conta recém-criada, e
+       depois de olhar uma vez ela nunca mais mostraria. */
+    onboarding: q.onboarding == null ? 0 : Number(q.onboarding),
     /* O rascunho guardado: sem isto ele exige fechar o app no meio de uma
        frase e reabrir — o estado que ninguém confere por acaso. */
     rascunhoComent: q.rascunhoComent == null ? 0 : Number(q.rascunhoComent),
@@ -413,6 +419,7 @@ function Bancada() {
     fixados,
     ordem,
     rascunhoComent,
+    onboarding,
     quadro,
     instavel,
     fechado,
@@ -1149,7 +1156,7 @@ function Bancada() {
       try {
         localStorage.setItem(
           chaveDoRascunhoDeComentario("bancada", "00000000-0000-0000-0000-000000000001"),
-          "eu ia contar que comigo foi parec",
+          serializarRascunho("eu ia contar que comigo foi parec", new Date()),
         );
       } catch {
         /* Sem storage: a bancada abre sem o rascunho. */
@@ -1695,149 +1702,157 @@ function Bancada() {
           aoAbrirSOS={() => alert("abriria a Central de Emergência")}
         />
       ) : (
-        <TelaPrincipal
-          posts={vazio ? [] : comReacoes([...POSTS.slice(0, 4), ...extras])}
-          stories={vazio ? [] : STORIES}
-          /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
+        <>
+          {/* ⚠️ Na produção ele vive DENTRO de `RedeNoApp`, depois de todos os
+              `if (onde.t === …) return` — ou seja, só sobre o feed. Aqui a
+              bancada renderiza o MESMO componente com `bancada`, que força a
+              abertura sem tocar no blob da jornada: gravar "já vi" a partir de
+              uma bancada apagaria o tutorial da conta de verdade. */}
+          {!!onboarding && <OnboardingDaComunidade careMode={false} bancada />}
+          <TelaPrincipal
+            posts={vazio ? [] : comReacoes([...POSTS.slice(0, 4), ...extras])}
+            stories={vazio ? [] : STORIES}
+            /* ⚠️ A zona de sugestões só abre quando o feed de quem ela segue
              acabou — por isso ela aparece na bancada quando `temMais` some, ou
              seja, depois de rolar até o fim. `?sugeridas=0` mostra o feed sem
              ela; `?vazio=1` mostra a conta nova, em que a fileira de pessoas é
              a única coisa na tela. */
-          sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
-          pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
-          aoSeguirPessoa={(id) => console.log("seguiria", id)}
-          /* ⚠️ **AS DUAS PRECISAM VIR DA BANCADA, e a falta delas foi medida.**
+            sugestoes={semSugestoes ? [] : comReacoes(POSTS.slice(5, 8))}
+            pessoas={semSugestoes || fase === "vazio" ? [] : GENTE}
+            aoSeguirPessoa={(id) => console.log("seguiria", id)}
+            /* ⚠️ **AS DUAS PRECISAM VIR DA BANCADA, e a falta delas foi medida.**
              `@` e `#` só viram link quando `TextoComLinks` recebe estes dois —
              sem eles a legenda desenha texto puro, que é exatamente o caso que
              nunca falha. A primeira verificação no navegador achou ZERO links
              na legenda com o recurso inteiro pronto: a bancada estava passando
              props num formato diferente do da produção, que é a mesma lição
              que o `memo` do cartão já custou uma medição falsa. */
-          aoAbrirArroba={(h) => alert(`abriria o perfil de @${h}`)}
-          aoAbrirTag={(t) => alert(`abriria a página de #${t}`)}
-          /* ⚠️ **`?instavel=1` É A ÚNICA FORMA DE OLHAR A TELA DO "NÃO
+            aoAbrirArroba={(h) => alert(`abriria o perfil de @${h}`)}
+            aoAbrirTag={(t) => alert(`abriria a página de #${t}`)}
+            /* ⚠️ **`?instavel=1` É A ÚNICA FORMA DE OLHAR A TELA DO "NÃO
              CARREGOU".** Ela só nasce de uma falha de leitura no servidor —
              bloqueio ou grafo de amizade caindo —, que não se fabrica numa
              conta de teste. Sem a bancada, o estado ficaria sem ninguém nunca
              ter olhado, que é como ele nasceu. */
-          /* ⚠️ `?fechado=1` fotografa o modo "Só quem eu sigo" LIGADO — o
+            /* ⚠️ `?fechado=1` fotografa o modo "Só quem eu sigo" LIGADO — o
              estado em que a zona de sugeridas tem de sumir, e que a bancada
              nunca desenhou. Foi por essa falta que a condição invertida
              sobreviveu. */
-          soSeguindo={fechado === 1}
-          instavel={instavel === 1}
-          aoTentarDeNovo={() => alert("recarregaria o feed")}
-          /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
+            soSeguindo={fechado === 1}
+            instavel={instavel === 1}
+            aoTentarDeNovo={() => alert("recarregaria o feed")}
+            /* ⚠️ O convite pelo WhatsApp depende do `referral_code` da conta, que
              nasce no servidor — sem a bancada, olhar este cartão exigiria uma
              conta de verdade. `?semcodigo=1` prova o estado em que ele NÃO
              aparece, que é o único jeito de conferir que um convite sem
              indicação nunca é oferecido. */
-          convite={{ codigo: semCodigo ? null : "MARIA7X" }}
-          /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
+            convite={{ codigo: semCodigo ? null : "MARIA7X" }}
+            /* ⚠️ O lembrete do "então e agora" só nasce de uma conta com uma foto
              de 28+ dias e a janela de sete dias vencida — sem a bancada,
              olhá-lo exigiria esperar um mês com uma conta de verdade.
              ⚠️ E ele NÃO aparece junto da retrospectiva (um cartão de cada
              vez), então `?entao=1` implica `?retro=0`. */
-          lembreteEntao={
-            entao
-              ? {
-                  id: "p-antigo",
-                  imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
-                  /* ⚠️ **`AGORA` CRAVADO, e nunca `Date.now()`.** Esta linha
+            lembreteEntao={
+              entao
+                ? {
+                    id: "p-antigo",
+                    imagemUrl: foto(CORES[2][0], CORES[2][1], CORES[2][2]),
+                    /* ⚠️ **`AGORA` CRAVADO, e nunca `Date.now()`.** Esta linha
                      roda no RENDER: o servidor calcula um instante e o cliente
                      calcula outro, e o texto derivado ("há 34 dias") pode
                      divergir na virada do minuto — o React descarta a árvore e
                      redesenha. É a mesma família do mismatch que já derrubou o
                      app inteiro, e o próprio cabeçalho deste arquivo declara a
                      regra três seções acima. */
-                  criadoEm: new Date(AGORA - 34 * 86_400_000).toISOString(),
-                }
-              : null
-          }
-          aoCompararAgora={() => console.log("abriria o compositor comparando")}
-          aoDispensarEntao={() => console.log("dispensou")}
-          /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
+                    criadoEm: new Date(AGORA - 34 * 86_400_000).toISOString(),
+                  }
+                : null
+            }
+            aoCompararAgora={() => console.log("abriria o compositor comparando")}
+            aoDispensarEntao={() => console.log("dispensou")}
+            /* ⚠️ A BANCADA GUARDA A REAÇÃO, e isso não é capricho: com
              `aoReagir={() => {}}` era impossível ver a mecânica INTEIRA — o
              emoji escolhido pousando na linha, o pulo, o resumo se
              reordenando, o toque duplo virando coração. A tela desenhava e
              nunca respondia, que é o estado em que uma tela passa meses sem
              ninguém perceber que ela não funciona. */
-          aoReagir={acoesDaBancada.reagir}
-          aoAbrirPerfil={acoesDaBancada.abrirPerfil}
-          aoSalvar={acoesDaBancada.salvar}
-          aoVotar={acoesDaBancada.votar}
-          aoApagar={acoesDaBancada.apagar}
-          /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
+            aoReagir={acoesDaBancada.reagir}
+            aoAbrirPerfil={acoesDaBancada.abrirPerfil}
+            aoSalvar={acoesDaBancada.salvar}
+            aoVotar={acoesDaBancada.votar}
+            aoApagar={acoesDaBancada.apagar}
+            /* ⚠️ A denúncia do FEED — a lacuna que fechava o círculo: a caixinha
              tinha denúncia e o canal com mais alcance não tinha. */
-          aoDenunciar={acoesDaBancada.denunciar}
-          aoRepublicar={acoesDaBancada.republicar}
-          aoCompartilhar={acoesDaBancada.compartilhar}
-          aoStoryComPost={acoesDaBancada.storyComPost}
-          aoFixar={acoesDaBancada.fixar}
-          aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
-          aoEditar={acoesDaBancada.editar}
-          aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
-          /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
+            aoDenunciar={acoesDaBancada.denunciar}
+            aoRepublicar={acoesDaBancada.republicar}
+            aoCompartilhar={acoesDaBancada.compartilhar}
+            aoStoryComPost={acoesDaBancada.storyComPost}
+            aoFixar={acoesDaBancada.fixar}
+            aoTirarMarcacao={acoesDaBancada.tirarMarcacao}
+            aoEditar={acoesDaBancada.editar}
+            aoVerQuemReagiu={acoesDaBancada.verQuemReagiu}
+            /* ⚠️ O cartão só existe aos DOMINGOS e com semana publicada — sem a
              bancada, olhá-lo exigiria esperar o domingo certo com uma conta que
              publicou naquela semana. `?retro=0` mostra o feed sem ele (o caso
              de seis dias em sete), `?retro=1foto` prova a grade de uma foto só
              e `?retro=vazia` o cartão sem foto, que é o da semana que só virou. */
-          retro={
-            entao || retroModo === "0"
-              ? null
-              : {
-                  fotos:
-                    retroModo === "vazia"
-                      ? []
-                      : retroModo === "1foto"
-                        ? [foto(CORES[0][0], CORES[0][1], CORES[0][2])]
-                        : CORES.slice(0, 4).map((c) => foto(c[0], c[1], c[2])),
-                  publicacoes: retroModo === "vazia" ? 0 : 3,
-                  reacoes: retroModo === "vazia" ? 0 : 12,
-                  semanaQueVirou: 29,
-                }
-          }
-          aoFecharRetro={() => alert("dispensaria o resumo da semana")}
-          /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
+            retro={
+              entao || retroModo === "0"
+                ? null
+                : {
+                    fotos:
+                      retroModo === "vazia"
+                        ? []
+                        : retroModo === "1foto"
+                          ? [foto(CORES[0][0], CORES[0][1], CORES[0][2])]
+                          : CORES.slice(0, 4).map((c) => foto(c[0], c[1], c[2])),
+                    publicacoes: retroModo === "vazia" ? 0 : 3,
+                    reacoes: retroModo === "vazia" ? 0 : 12,
+                    semanaQueVirou: 29,
+                  }
+            }
+            aoFecharRetro={() => alert("dispensaria o resumo da semana")}
+            /* ⚠️ A rolagem infinita só dá para conferir com MAIS de uma página, e
              uma conta de verdade levaria semanas para ter 21 publicações. Aqui
              a sentinela entrega três páginas e então diz que acabou. */
-          desafio={oDesafio}
-          /* ⚠️ A live vem do servidor (`listLivesPublic`), então sem a bancada
+            desafio={oDesafio}
+            /* ⚠️ A live vem do servidor (`listLivesPublic`), então sem a bancada
              o cartão do topo do feed seria impossível de olhar sem cadastrar
              uma live real com data no futuro — que é como um cartão passa
              meses sem ninguém nunca ter visto. `?live=agora` mostra o estado
              "ao vivo". */
-          /* ⚠️ O recorte por fase é decidido no SERVIDOR (ele lê a DUM de cada
+            /* ⚠️ O recorte por fase é decidido no SERVIDOR (ele lê a DUM de cada
              candidata), então sem a bancada o interruptor e o vazio dele
              seriam impossíveis de olhar sem duas contas reais com DUMs
              diferentes. `?fase=1` liga; `?fase=vazio` mostra o estado em que
              ninguém corresponde — que é o que precisa continuar tendo saída. */
-          mesmaFase={fase !== ""}
-          aoTrocarFase={() => {}}
-          live={
-            live === "nao"
-              ? null
-              : {
-                  id: "l1",
-                  titulo: "Sinais de trabalho de parto: o que observar",
-                  /* ⚠️ Idem — ver `AGORA`. */
-                  quando: new Date(AGORA + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
-                  link: "https://exemplo.com/live",
-                  aoVivo: live === "agora",
-                }
-          }
-          aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
-          aoIrParaOJogo={() => alert("iria para o Caminho")}
-          /* ⚠️ Com `?fase=`, a bancada encerra a paginação: a fileira de
+            mesmaFase={fase !== ""}
+            aoTrocarFase={() => {}}
+            live={
+              live === "nao"
+                ? null
+                : {
+                    id: "l1",
+                    titulo: "Sinais de trabalho de parto: o que observar",
+                    /* ⚠️ Idem — ver `AGORA`. */
+                    quando: new Date(AGORA + (live === "agora" ? -5 : 5) * 60_000).toISOString(),
+                    link: "https://exemplo.com/live",
+                    aoVivo: live === "agora",
+                  }
+            }
+            aoEntrarNoDesafio={(e) => alert(e ? "entraria" : "sairia")}
+            aoIrParaOJogo={() => alert("iria para o Caminho")}
+            /* ⚠️ Com `?fase=`, a bancada encerra a paginação: a fileira de
              sugeridas (e o interruptor do recorte) só aparece quando o feed
              acaba, e rolar três páginas para conferir um interruptor é como
              uma tela passa meses sem ninguém nunca ter olhado. */
-          temMais={!vazio && paginas < 3 && fase === ""}
-          aoChegarNoFim={() => {
-            setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
-            setPaginas((n) => n + 1);
-          }}
-        />
+            temMais={!vazio && paginas < 3 && fase === ""}
+            aoChegarNoFim={() => {
+              setExtras((e) => [...e, ...maisUmaPagina(4, paginas + 1)]);
+              setPaginas((n) => n + 1);
+            }}
+          />
+        </>
       )}
       {vendoQuemReagiu && (
         <FolhaDeQuemReagiu

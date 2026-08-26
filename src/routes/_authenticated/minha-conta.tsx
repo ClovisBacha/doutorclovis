@@ -2537,6 +2537,14 @@ function MinhaContaPage() {
                   >
                     <RedeNoApp
                       careMode={careMode}
+                      /* ⚠️ **O TUTORIAL DA ABA ESPERA O RITUAL DE BOAS-VINDAS.**
+                       Duas telas cheias no primeiro minuto seriam dois
+                       tutoriais — é a mesma decisão que `TutorialDaBolha` já
+                       toma com `!showOnboarding`. E aqui era alcançável de
+                       verdade: o ritual não tem portão de aba nenhum, então uma
+                       paciente recém-criada que tocasse em Comunidade antes de
+                       terminá-lo receberia os quatro cartões por baixo dele. */
+                      adiarOnboarding={showOnboarding}
                       /* Ver `onSelect`: sobe a cada toque no ícone da barra. */
                       sinalDeVoltarAoFeed={voltarAoFeed}
                       onAbrirSecoes={() => goToTab("Comunidade")}

@@ -25,6 +25,7 @@
  *  3. **Seguidores e seguindo não são públicos.** A única divergência de
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
+import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
 import {
@@ -3337,6 +3338,8 @@ type Onde =
 
 export function RedeNoApp({
   careMode = false,
+  bancadaOnboarding,
+  adiarOnboarding = false,
   onAbrirSecoes,
   onIrParaOJogo,
   onAbrirSOS,
@@ -3344,6 +3347,16 @@ export function RedeNoApp({
   sinalDeVoltarAoFeed = 0,
 }: {
   careMode?: boolean;
+  /** Só a bancada: força os quatro cartões sem tocar no blob da jornada. */
+  bancadaOnboarding?: boolean;
+  /**
+   * O ritual de boas-vindas está na tela — segure os quatro cartões.
+   *
+   * ⚠️ Duas telas cheias no primeiro minuto seriam dois tutoriais. Ele NÃO
+   * some: quem adiou encontra o tutorial na abertura seguinte, com o app já
+   * personalizado — a mesma decisão do tutorial do mascote.
+   */
+  adiarOnboarding?: boolean;
   onAbrirSecoes?: () => void;
   /**
    * A Central de Emergência.
@@ -7012,6 +7025,14 @@ export function RedeNoApp({
 
   return (
     <>
+      {/* ⚠️ **SÓ SOBRE O FEED, e não sobre a aba inteira.** Esta linha está
+          DEPOIS de todos os `if (onde.t === …) return`, então o tutorial nunca
+          abre por cima do perfil, do direct ou da caixinha — telas para as
+          quais a paciente NAVEGOU, e onde quatro cartões de boas-vindas seriam
+          uma interrupção do que ela foi fazer. */}
+      {!adiarOnboarding && (
+        <OnboardingDaComunidade careMode={careMode} bancada={bancadaOnboarding} />
+      )}
       <input
         ref={arquivoDoStory}
         type="file"
