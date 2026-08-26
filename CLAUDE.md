@@ -6367,6 +6367,33 @@ mecanismo:** `audio.size > AUDIO_BYTES_MAX` aparece em `subirAudio` E em
 `pararEEnviar`, então o `toContain` ficava verde com a checagem da segunda
 apagada. Ancore no corpo da função, nunca no arquivo.
 
+#### ⚠️ E O MICROFONE QUEBROU A HIDRATAÇÃO — só o navegador pegou
+
+Com `tsc` limpo, lint limpo e 4.915 testes verdes, abrir a bancada num navegador
+devolveu **"Hydration failed because the server rendered HTML didn't match the
+client"**.
+
+A causa: eu chamei `podeGravar()` DENTRO do JSX. Ela toca `navigator`, então no
+SSR devolve `false` e no cliente `true` — o HTML do servidor sai SEM o microfone
+e a primeira pintura do cliente sai COM ele, e o React **descarta a árvore
+inteira**. Num app que já ficou SEM ABRIR por um defeito de hidratação, isto não
+é detalhe.
+
+⚠️ **O guarda `typeof window === "undefined"` NÃO resolve** — ele evita o CRASH
+no servidor; a DIVERGÊNCIA continua, porque as duas execuções são exatamente as
+que precisam concordar. Mesma lição do `location.origin` no render, que este
+repositório já pagou duas vezes.
+
+⚠️ **E o padrão certo estava a três arquivos de distância**: o gravador do
+diário (`gestacao-path.tsx`) já fazia `useState(false)` +
+`useEffect(() => setTemMicrofone(podeGravar()), [])`, com o comentário
+explicando por quê. Eu escrevi a versão errada mesmo assim.
+
+`capacidade-fora-do-render.test.ts` é a catraca: nenhuma função de capacidade do
+navegador (`podeGravar`, `podeCompartilhar`, `ehNativo`) pode ser chamada dentro
+de JSX, em `src/components` ou `src/routes`. Ela tem contraprova de que morde —
+catraca que passa em vazio é catraca que mente.
+
 **Bancada:** `/preview-instagram?tela=conversa` (a lupa, a busca, o áudio).
 
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)

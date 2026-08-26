@@ -132,7 +132,20 @@ describe("⚠️ voz no direct — servidor pronto, ZERO tela", () => {
 
   test("⚠️ o microfone só aparece onde o navegador GRAVA", () => {
     /* Microfone desenhado numa tela que não grava promete e não cumpre. */
-    expect(TELA).toMatch(/podeGravar\(\) && !texto\.trim\(\)/);
+    expect(TELA).toMatch(/temMicrofone && !texto\.trim\(\)/);
+  });
+
+  test("⚠️ e `podeGravar()` é lido DEPOIS DE MONTAR, nunca no render", () => {
+    /**
+     * ⚠️ **ISTO QUEBROU A HIDRATAÇÃO, e só o navegador pegou.** `podeGravar()`
+     * toca `navigator`: no SSR devolve `false`, no cliente `true`. Chamado no
+     * render, o HTML do servidor sai SEM o microfone e a primeira pintura do
+     * cliente sai COM ele — o React descarta a árvore inteira. É o mesmo
+     * defeito do `location.origin` no render, que este repositório já pagou
+     * duas vezes, e o padrão certo estava a três arquivos de distância.
+     */
+    expect(TELA).toContain("useEffect(() => setTemMicrofone(podeGravar()), [])");
+    expect(TELA).toContain("const [temMicrofone, setTemMicrofone] = useState(false)");
   });
 
   test("⚠️ e a bolha TOCA o áudio — sem player, ele chega e não abre", () => {

@@ -682,6 +682,20 @@ export function Conversa({
    * é a mesma armadilha do `destravar()` dos Sons para dormir e do gravador do
    * diário.
    */
+  /**
+   * ⚠️ **`podeGravar()` É LIDO UMA VEZ, DEPOIS DE MONTAR — nunca no render.**
+   *
+   * Ele toca `navigator`, e o servidor não tem nenhum: no SSR devolve `false` e
+   * no cliente `true`. Chamado durante o render, o HTML do servidor sai SEM o
+   * microfone e a primeira pintura do cliente sai COM ele — o React descarta a
+   * árvore inteira. É o mesmo defeito do `location.origin` no render, que este
+   * repositório já pagou duas vezes, e o padrão certo estava a três arquivos de
+   * distância (`gestacao-path.tsx`, o gravador do diário).
+   *
+   * Achado abrindo a bancada num navegador e lendo o console: "Hydration failed
+   * because the server rendered HTML didn't match the client".
+   */
+  const [temMicrofone, setTemMicrofone] = useState(false);
   const [gravacao, setGravacao] = useState<Gravacao | null>(null);
   const [segundos, setSegundos] = useState(0);
   const [subindoAudio, setSubindoAudio] = useState(false);
@@ -1041,6 +1055,8 @@ export function Conversa({
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gravacao]);
+
+  useEffect(() => setTemMicrofone(podeGravar()), []);
 
   function comecarAGravar() {
     if (gravacao || enviando) return;
@@ -1937,7 +1953,7 @@ export function Conversa({
                       microfone ao lado de um texto pronto oferece duas saídas
                       para o mesmo toque. Desenhado, nunca 🎤 — emoji tem cor
                       própria em cada sistema. */}
-                  {podeGravar() && !texto.trim() && !foto && (
+                  {temMicrofone && !texto.trim() && !foto && (
                     <button
                       type="button"
                       onClick={comecarAGravar}
