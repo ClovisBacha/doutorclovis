@@ -15,7 +15,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComentarioNaTela } from "@/lib/comentarios.functions";
-import { LIMITE_DO_COMENTARIO, RESPOSTAS_VISIVEIS } from "@/lib/comentarios";
+import {
+  LIMITE_DO_COMENTARIO,
+  RESPOSTAS_VISIVEIS,
+  ordenarComentariosComFixado,
+} from "@/lib/comentarios";
 
 async function token() {
   const { supabase } = await import("@/integrations/supabase/client");
@@ -31,11 +35,32 @@ export function Comentarios({
   postId: string;
   aoAbrirPerfil?: (id: string) => void;
   /** Só a bancada preenche — a lista vem do servidor e exige sessão. */
-  bancada?: { comentarios: ComentarioNaTela[]; abertos?: boolean; souADona?: boolean };
+  bancada?: {
+    comentarios: ComentarioNaTela[];
+    abertos?: boolean;
+    souADona?: boolean;
+    possoComentar?: boolean;
+    quemComenta?: string;
+    /** Só a bancada: a lista de quem curtiu vem do servidor. */
+    curtidas?: { id: string; nome: string; avatarUrl: string | null }[];
+  };
 }) {
   const [lista, setLista] = useState<ComentarioNaTela[]>(bancada?.comentarios ?? []);
   const [abertos, setAbertos] = useState(bancada?.abertos ?? true);
   const [souADona, setSouADona] = useState(bancada?.souADona ?? false);
+  const [curtidasDe, setCurtidasDe] = useState<{
+    id: string;
+    pessoas: { id: string; nome: string; avatarUrl: string | null }[] | "erro" | null;
+  } | null>(null);
+  /**
+   * ⚠️ **Eu posso comentar? Quem responde é o SERVIDOR.**
+   *
+   * Uma segunda régua aqui ofereceria o campo e o servidor recusaria DEPOIS de
+   * ela ter escrito — é o defeito que "Responder" com os comentários fechados já
+   * teve nesta mesma tela.
+   */
+  const [possoComentar, setPossoComentar] = useState(bancada?.possoComentar ?? true);
+  const [quemComenta, setQuemComenta] = useState<string>(bancada?.quemComenta ?? "todos");
   const [texto, setTexto] = useState("");
   const [recado, setRecado] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
@@ -76,10 +101,25 @@ export function Comentarios({
     }
     const saida = [...raizes.values()];
     for (const o of orfas) saida.push({ raiz: o, respostas: [] });
-    /* A ordem é a do tempo da RAIZ — a mesma da lista que veio do servidor. */
-    return saida.sort(
-      (a, b) => new Date(a.raiz.criadoEm).getTime() - new Date(b.raiz.criadoEm).getTime(),
-    );
+    /* A ordem é a do tempo da RAIZ. */
+    saida.sort((a, b) => new Date(a.raiz.criadoEm).getTime() - new Date(b.raiz.criadoEm).getTime());
+
+    /**
+     * ⚠️ **E O FIXADO SOBE DEPOIS — senão esta ordenação DESFAZ a do servidor.**
+     *
+     * `comentariosDoPost` já devolve a lista com o fixado na frente, e esta
+     * linha reordenava tudo por `criadoEm`, jogando-o de volta ao lugar
+     * cronológico: o selo "Fixado" aparecia no meio da conversa, e o recurso
+     * inteiro não funcionava. Foi a FOTO da bancada que pegou — nenhuma
+     * asserção estava perto disso, porque cada metade estava certa sozinha.
+     *
+     * ⚠️ E quem sobe é a MESMA régua do servidor, nunca um comparador próprio:
+     * é ela que garante que uma resposta com `fixadoEm` (gravado por uma versão
+     * anterior, ou por um pedido montado à mão) NÃO seja arrancada da conversa.
+     * Aplicá-la duas vezes é inofensivo — ela é idempotente.
+     */
+    const porId = new Map(saida.map((x) => [x.raiz.id, x]));
+    return ordenarComentariosComFixado(saida.map((x) => x.raiz)).map((r) => porId.get(r.id)!);
   }, [lista]);
 
   function responderA(alvo: ComentarioNaTela, raiz?: ComentarioNaTela) {
@@ -125,6 +165,64 @@ export function Comentarios({
     }
   }
 
+  /**
+   * FIXAR — pinta na hora, e desfaz se o servidor recusar.
+   *
+   * ⚠️ **UM SÓ, e a tela desfixa o outro junto.** O servidor já desfixa o
+   * anterior no mesmo pedido; se a tela não fizesse o mesmo, ela veria DOIS
+   * "Fixado" até a próxima abertura — a tela contradizendo a regra que o
+   * próprio app acabou de aplicar.
+   */
+  async function fixar(c: ComentarioNaTela) {
+    const ligar = !c.fixadoEm;
+    const agora = new Date().toISOString();
+    setLista((atual) =>
+      atual.map((x) => ({
+        ...x,
+        fixadoEm: x.id === c.id ? (ligar ? agora : null) : ligar ? null : x.fixadoEm,
+      })),
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { fixarComentario } = await import("@/lib/comentarios.functions");
+      const r = await fixarComentario({
+        data: { accessToken: t, comentarioId: c.id, fixar: ligar },
+      });
+      if (!r.ok) throw new Error("recusado");
+      /* ⚠️ Relê: a ORDEM é do servidor, e a pintura otimista só mexeu no selo.
+         Sem isto o comentário fixado só subiria ao topo na próxima abertura. */
+      void carregar();
+    } catch {
+      setLista((atual) =>
+        atual.map((x) => (x.id === c.id ? { ...x, fixadoEm: c.fixadoEm ?? null } : x)),
+      );
+      setRecado("Não deu para fixar agora.");
+    }
+  }
+
+  async function verCurtidas(c: ComentarioNaTela) {
+    setCurtidasDe({ id: c.id, pessoas: null });
+    /* ⚠️ Sem isto a bancada trava em "Carregando…" para sempre: a lista vem do
+       servidor e exige sessão, e "carregando" é o único estado que ela NÃO
+       precisava provar. */
+    if (bancada) {
+      setCurtidasDe({ id: c.id, pessoas: bancada.curtidas ?? [] });
+      return;
+    }
+    try {
+      const t = await token();
+      if (!t) return;
+      const { quemCurtiuComentario } = await import("@/lib/comentarios.functions");
+      const r = await quemCurtiuComentario({ data: { accessToken: t, comentarioId: c.id } });
+      /* ⚠️ "Ninguém curtiu" sobre um comentário com o número do lado é a tela se
+         contradizendo — falha vira `"erro"`, e nunca lista vazia. */
+      setCurtidasDe({ id: c.id, pessoas: r.ok ? r.pessoas : "erro" });
+    } catch {
+      setCurtidasDe({ id: c.id, pessoas: "erro" });
+    }
+  }
+
   const carregar = useCallback(async () => {
     if (bancada) return;
     try {
@@ -135,6 +233,8 @@ export function Comentarios({
       if (r.ok) {
         setLista(r.comentarios);
         setAbertos(r.abertos);
+        if ("possoComentar" in r) setPossoComentar(r.possoComentar);
+        if ("quemComenta" in r) setQuemComenta(r.quemComenta);
         setSouADona(r.souADona);
         setIndisponivel(false);
       } else {
@@ -280,6 +380,8 @@ export function Comentarios({
                servidor recusava com "os comentários deste post estão fechados"
                — depois de ela ter escrito. Botão que promete e não cumpre. */
             aoResponder={abertos ? () => responderA(raiz) : undefined}
+            aoFixar={raiz.possoFixar ? () => void fixar(raiz) : undefined}
+            aoVerCurtidas={raiz.souOAutor ? () => void verCurtidas(raiz) : undefined}
           />
 
           {/* ⚠️ **AS RESPOSTAS RECOLHEM DEPOIS DE TRÊS.** Uma conversa de vinte
@@ -298,6 +400,9 @@ export function Comentarios({
                    sempre a mesma. É o que mantém um nível só. Ver
                    `raizDoComentario`. */
                 aoResponder={abertos ? () => responderA(r, raiz) : undefined}
+                /* ⚠️ Resposta NÃO se fixa — a régua do servidor recusa, e
+                   oferecer aqui seria um botão que promete e não cumpre. */
+                aoVerCurtidas={r.souOAutor ? () => void verCurtidas(r) : undefined}
               />
             </div>
           ))}
@@ -317,6 +422,55 @@ export function Comentarios({
 
       {/* ⚠️ Confirmação em MENSAGEM SEPARADA, nunca o × virando "tem certeza?" —
           a mesma decisão do cancelar consulta e do apagar mensagem. */}
+      {/* ⚠️ **QUEM CURTIU É SÓ DE QUEM ESCREVEU** — ver `quemCurtiuComentario`.
+          A lista não vai para a dona do post: a conversa embaixo das fotos dela
+          viraria um painel de quem apoia quem. */}
+      {curtidasDe && (
+        <div className="mt-3 rounded-xl border border-border p-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[13px] font-semibold">Quem curtiu</p>
+            <button
+              type="button"
+              onClick={() => setCurtidasDe(null)}
+              className="press -m-2 flex h-11 w-11 items-center justify-center text-[13px] text-muted-foreground"
+              aria-label="Fechar"
+            >
+              ×
+            </button>
+          </div>
+          {curtidasDe.pessoas === null ? (
+            <p className="mt-1 text-[12px] text-muted-foreground">Carregando…</p>
+          ) : curtidasDe.pessoas === "erro" ? (
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              Não deu para carregar agora. Tente de novo.
+            </p>
+          ) : curtidasDe.pessoas.length === 0 ? (
+            <p className="mt-1 text-[12px] text-muted-foreground">Ninguém ainda.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2">
+              {curtidasDe.pessoas.map((p) => (
+                <li key={p.id}>
+                  <button
+                    type="button"
+                    onClick={() => aoAbrirPerfil?.(p.id)}
+                    className="press flex min-h-[44px] w-full items-center gap-2 text-left"
+                  >
+                    {p.avatarUrl ? (
+                      <img src={p.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+                    ) : (
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[12px] font-semibold">
+                        {(p.nome.trim()[0] ?? "?").toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate text-[13px]">{p.nome}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       {apagando && (
         <div className="mt-3 rounded-xl border border-border p-3">
           <p className="text-[13px]">Apagar este comentário?</p>
@@ -374,6 +528,17 @@ export function Comentarios({
       ) : !abertos ? (
         <p className="mt-3 text-[12px] text-muted-foreground">
           Os comentários deste post estão fechados.
+        </p>
+      ) : !possoComentar ? (
+        /* ⚠️ **DIZ O MOTIVO, e não só "você não pode".** Sem o motivo ela
+            conclui que o app quebrou, ou que foi bloqueada — que é uma
+            conclusão bem pior e sobre outra coisa. E a lista continua VISÍVEL:
+            quem pode ver a publicação continua podendo ler a conversa; o que
+            muda é quem escreve. */
+        <p className="mt-3 text-[12px] leading-snug text-muted-foreground">
+          {quemComenta === "amigas"
+            ? "Só as amigas dela podem comentar nesta publicação."
+            : "Só quem ela acompanha pode comentar nesta publicação."}
         </p>
       ) : (
         <>
@@ -440,6 +605,8 @@ function Linha({
   aoDenunciar,
   aoCurtir,
   aoResponder,
+  aoFixar,
+  aoVerCurtidas,
 }: {
   c: ComentarioNaTela;
   aoAbrirPerfil?: (id: string) => void;
@@ -448,6 +615,10 @@ function Linha({
   aoCurtir: (c: ComentarioNaTela) => void;
   /** `undefined` = não oferece responder (comentários fechados). */
   aoResponder?: () => void;
+  /** `undefined` = não é minha publicação, ou este não pode ser fixado. */
+  aoFixar?: () => void;
+  /** `undefined` = o comentário não é meu, ou ninguém curtiu ainda. */
+  aoVerCurtidas?: () => void;
 }) {
   /* ⚠️ Estado LOCAL e por linha: revelar um comentário recolhido não pode
      revelar os outros, e a escolha não sobrevive ao fechamento da folha — ela
@@ -476,6 +647,19 @@ function Linha({
       </button>
 
       <div className="min-w-0 flex-1">
+        {/* ⚠️ **O SELO DE FIXADO É PARA TODO MUNDO, e o pino é DESENHADO.** Sem
+            ele, o comentário fixado parece só o mais antigo da lista — e quem
+            responde a ele não entende por que ele está no topo. 📌 tem cor
+            própria em cada sistema, a mesma lição do 📞 e da estrela do
+            destaque. */}
+        {!!c.fixadoEm && !oculto && (
+          <span className="mb-0.5 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+            <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden>
+              <path d="M14 2l8 8-3 1-3.5 3.5L14 22l-4-6-6-4 7.5-1.5L15 7l-1-5z" />
+            </svg>
+            Fixado
+          </span>
+        )}
         {/* ⚠️ **RECOLHIDO É O TEXTO FORA DA TELA, não o texto com um aviso.**
             Um filtro que entrega a palavra e avisa embaixo que ela devia estar
             escondida já falhou: ela leu. Aqui a dona vê que existe um
@@ -533,10 +717,34 @@ function Linha({
           )}
           {/* ⚠️ O número só aparece com pelo menos uma: um "0" ao lado de todo
               comentário transforma a conversa num placar de quem foi ignorada. */}
-          {(c.curtidas ?? 0) > 0 && (
-            <span className="text-[12px] text-muted-foreground">
-              {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
-            </span>
+          {(c.curtidas ?? 0) > 0 &&
+            /* ⚠️ **SÓ QUEM ESCREVEU ABRE A LISTA.** Para todo mundo o número é
+               texto, e continua sendo — dar o toque a terceiros prometeria uma
+               tela que o servidor recusa. */
+            (aoVerCurtidas ? (
+              <button
+                type="button"
+                onClick={aoVerCurtidas}
+                className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+              >
+                {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
+              </button>
+            ) : (
+              <span className="text-[12px] text-muted-foreground">
+                {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
+              </span>
+            ))}
+          {/* ⚠️ **FIXAR FICA COM AS AÇÕES, e não num `⋯`.** Um menu a mais numa
+              linha que já tem coração e × seria o quarto alvo de 44px numa
+              largura de 393px. E o rótulo diz o ESTADO, não a promessa. */}
+          {aoFixar && (
+            <button
+              type="button"
+              onClick={aoFixar}
+              className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+            >
+              {c.fixadoEm ? "Desafixar" : "Fixar"}
+            </button>
           )}
         </div>
       </div>

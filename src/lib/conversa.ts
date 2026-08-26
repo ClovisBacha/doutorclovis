@@ -255,3 +255,72 @@ export function fotoEhDeQuemMandou(caminho: string, autorId: string): boolean {
   if (!caminho || caminho.includes("..") || caminho.includes("//")) return false;
   return caminho.startsWith(`${autorId}/`);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   RESPONDER, REAGIR E DENUNCIAR — as três que faltavam no direct
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **A CITAÇÃO NÃO SE ANINHA — um nível só.**
+ *
+ * Responder a uma resposta cita a MESMA mensagem original, e não a resposta.
+ * Numa tela de 393px a citação da citação vira uma faixa de 40px que ninguém
+ * lê, e o histórico deixa de caber. É a mesma decisão de `raizDoComentario`, e
+ * pelo mesmo motivo.
+ *
+ * ⚠️ **A coluna aceita qualquer uuid, então quem garante é o servidor.** Um
+ * pedido montado à mão criaria o segundo nível — e a tela, que só desenha um,
+ * deixaria a citação ÓRFÃ: gravada, contada, e invisível.
+ */
+export function alvoDaCitacao(m: { id: string; respondeA: string | null }): string {
+  return m.respondeA ?? m.id;
+}
+
+/**
+ * As reações de mensagem.
+ *
+ * ⚠️ **SEIS, e não as treze do post.** Embaixo de uma publicação a reação é
+ * pública e escolhe o tom; numa conversa entre duas pessoas ela é um aceno, e
+ * treze opções transformam um aceno numa decisão. Estas seis cobrem o que uma
+ * conversa de apoio precisa: concordar, agradecer, abraçar, emocionar-se, rir e
+ * dizer que é muito.
+ *
+ * ⚠️ **NÃO tem 😢 nem 😱**, pela mesma razão da lista do post: 😢 lê como PENA,
+ * que é a coisa que ela menos quer receber, e 😱 devolve pânico a quem está com
+ * medo — e numa base de alto risco é justamente a mensagem assustada que mais
+ * receberia reação.
+ */
+export const REACOES_DE_MENSAGEM = ["❤️", "🙏", "🤗", "🥹", "😂", "👏"] as const;
+export type ReacaoDeMensagem = (typeof REACOES_DE_MENSAGEM)[number];
+
+export function reacaoDeMensagemConhecida(t: unknown): t is ReacaoDeMensagem {
+  return typeof t === "string" && (REACOES_DE_MENSAGEM as readonly string[]).includes(t);
+}
+
+/**
+ * O que a citação mostra.
+ *
+ * ⚠️ **UMA LINHA, e cortada** — a citação existe para lembrar QUAL mensagem,
+ * não para reler a mensagem. Uma citação de cinco linhas empurra a resposta para
+ * fora da tela e inverte a hierarquia.
+ *
+ * ⚠️ E mensagem apagada vira "mensagem apagada": a coluna é `ON DELETE SET
+ * NULL`, mas apagar MARCA em vez de remover, então a linha continua ali com o
+ * texto nulo — e a citação em branco pareceria defeito.
+ */
+export const CITACAO_MAX = 80;
+
+export function textoDaCitacao(m: {
+  texto: string | null;
+  apagada: boolean;
+  imagemUrl?: string | null;
+  refTipo?: string | null;
+}): string {
+  if (m.apagada) return "mensagem apagada";
+  const t = (m.texto ?? "").trim();
+  if (t) return t.length > CITACAO_MAX ? `${t.slice(0, CITACAO_MAX - 1)}…` : t;
+  if (m.imagemUrl) return "📷 Foto";
+  if (m.refTipo === "post") return "🖼 Publicação";
+  if (m.refTipo === "story") return "↩ Story";
+  return "mensagem";
+}

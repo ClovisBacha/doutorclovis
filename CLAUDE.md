@@ -8957,3 +8957,211 @@ legenda escreveria a mesma frase ali.
    maiores**. É o quarto e o quinto desta noite. Os dois passaram a cobrar o
    CONJUNTO em vez da string — e o segundo mudou de nome, porque "só o TEXTO
    muda" deixou de ser verdade quando a descrição da foto virou editável.
+
+## As dez que faltavam na rede — direct, segurança, story, comentário e conta (ago/2026)
+
+Pedido do dono: aplicar as dez que eu tinha levantado, e depois levantar e
+aplicar outras dez. Estas são as primeiras dez.
+
+**Aplicar no Supabase:** `supabase/APLICAR_DEZ_DA_REDE.sql` (idempotente).
+
+⚠️ **TUDO POR `ALTER ... ADD COLUMN IF NOT EXISTS`, e nunca dentro de um
+`CREATE TABLE IF NOT EXISTS`.** As tabelas já existem no banco do dono, e num
+banco assim o `CREATE` é no-op: a coluna nova nunca nasce, e rodar de novo não
+conserta. Foi exatamente assim que `carimbo_semana` passou a existir só no papel.
+
+### 1 a 3 · O direct: responder, reagir, denunciar
+
+- ⚠️ **A CITAÇÃO NÃO SE ANINHA — um nível só** (`alvoDaCitacao`). Responder a
+  uma resposta cita a MESMA mensagem original. Numa tela de 393px a citação da
+  citação vira uma faixa de 40px que ninguém lê. É a régua de `raizDoComentario`
+  de novo, e a coluna é `ON DELETE SET NULL`: apagar a citada não pode levar
+  junto a resposta de OUTRA pessoa.
+- ⚠️ **Alvo inválido NÃO recusa a mensagem.** A citação é contexto, não
+  conteúdo: derrubar o envio por causa dela seria perder o texto que ela
+  escreveu. `respondeA` nasce `null` e só é preenchido quando o alvo confere —
+  e ele tem de ser da MESMA conversa, senão o trecho de uma conversa privada de
+  terceiros apareceria citado aqui.
+- ⚠️ **SEIS reações, e não as treze do post.** Embaixo de uma publicação a
+  reação é pública e escolhe o tom; numa conversa entre duas pessoas ela é um
+  aceno, e treze opções transformam um aceno numa decisão. **Sem 😢 nem 😱** —
+  a primeira lê como PENA, a segunda devolve pânico a quem está com medo.
+- ⚠️ **A DENÚNCIA DO DIRECT era o buraco mais sério.** Post, comentário, perfil
+  e caixinha já tinham; o canal mais privado, onde o assédio de verdade
+  acontece, não tinha. Bloquear existe, mas **bloquear não deixa rastro nenhum
+  para a plataforma**: a próxima paciente recebe a mesma coisa da mesma pessoa,
+  e ninguém nunca soube. O trecho é congelado (500 caracteres) para a fila
+  continuar sabendo o que foi denunciado se ela apagar depois.
+- ⚠️ **Citação e reações são lidas EM LOTE**, fora do `.map()`: uma consulta por
+  mensagem seriam cinquenta idas ao banco por página, na tela que a paciente
+  abre mais que qualquer outra desta aba.
+
+### 4 e 5 · Segurança: a lista de bloqueados e quem pode comentar
+
+⚠️ **BLOQUEAR ERA UM BECO SEM SAÍDA.** Não havia nenhuma tela listando quem ela
+bloqueou — e, por construção, essa pessoa está escondida dela em todo lugar.
+Desbloquear era impossível sem lembrar o nome e achar o perfil por busca (que
+também a esconde).
+
+- ⚠️ **`meusBloqueados` usa `perfisPorId`, e NÃO a régua de visibilidade.** É a
+  única leitura da aba que ignora o próprio bloqueio, e é de propósito.
+- ⚠️ **Falha de leitura devolve ERRO, e nunca lista vazia.** "Você não bloqueou
+  ninguém" faria ela concluir que o bloqueio não pegou — e bloquear de novo, ou
+  desistir.
+- **`ListaDeBloqueados` virou componente PRÓPRIO por causa da bancada.** Era a
+  única tela de segurança da aba sem bancada, e os três estados que mais
+  importam (falhou · carregando · ninguém) não se fabricam numa conta de teste.
+  Ela não busca nada — recebe tudo por prop, como o alerta de SOS.
+
+**Quem pode comentar** (`quem_comenta`): todos · seguidores · amigas.
+
+- ⚠️ **NUNCA mais aberto que a visibilidade** (`apertarQuemComenta`). Um post
+  `amigas` com "todo mundo comenta" é uma combinação sem sentido — as pessoas a
+  quem "todo mundo" se refere não veem a publicação —, e oferecê-la faria a
+  autora acreditar que abriu a conversa quando não abriu nada.
+- ⚠️ **O padrão é `todos`**, o comportamento de hoje: fechar por padrão
+  emudeceria as conversas já existentes sem ninguém ter pedido.
+- ⚠️ **`possoComentar` vem do SERVIDOR.** Uma segunda régua na tela ofereceria o
+  campo e o servidor recusaria depois de ela ter escrito — o defeito que
+  "Responder" com os comentários fechados já teve aqui.
+
+### 6 e 7 · O story: encaminhar, e silenciar separado
+
+- ⚠️ **O ✈ do story é do DONO, e só.** Encaminhar o story de OUTRA pessoa
+  entregaria a foto dela a quem ela não escolheu, passando por cima da camada de
+  visibilidade que o story acabou de ganhar. O portão é o EMBRULHO
+  `{souEu && atual && (…)}` do rodapé, e não uma condição na prop — quem passa
+  `aoMandarStory` é a tela de fora, que não sabe de quem é o story aberto.
+- **A folha de mandar é a MESMA do post** (`alvo: {tipo, id}`): duas folhas
+  divergiriam no primeiro ajuste, e é ela que carrega a trava de só oferecer
+  conversas que já existem.
+- ⚠️ **Silenciar calava os DOIS de uma vez.** Quem quer descansar só dos stories
+  — o formato mais frequente e mais invasivo — perdia as publicações junto, e
+  acabava não silenciando ninguém. Hoje são `cala_posts` e `cala_stories`, e
+  **as duas nascem `true`**, que é exatamente o comportamento atual: migrar para
+  "só posts" mudaria o silêncio de quem já tinha escolhido.
+- ⚠️ **O teste é `!== false`, e nunca `=== true`.** Num banco sem as colunas o
+  valor é `undefined`, e `=== true` faria toda linha existente deixar de calar.
+- ⚠️ **E o recuo AVISA** (`parcial`): se ela pediu para calar só os stories e o
+  banco calou os dois, dizer "pronto" seria mentir sobre o alcance do próprio
+  silêncio dela — ela concluiria que a amiga parou de publicar.
+- ⚠️ **`ctx.silenciados` virou DOIS conjuntos**, e o feed de stories lê o dele.
+  Um conjunto só faria a escolha existir no banco e não existir na tela.
+
+### 8 e 9 · O comentário: fixar, e quem curtiu o meu
+
+⚠️ **UM COMENTÁRIO FIXADO, e não três como o Instagram.** Lá o pin é curadoria
+de uma grade; aqui a lista é uma CONVERSA, e três comentários grudados no topo
+de uma tela de 393px empurram a conversa de verdade para fora da dobra. E há uma
+razão que só existe neste app: **fixar é ENDOSSO** — num post sobre gestação, o
+comentário que a autora põe no topo é o que as outras leem como "ela concorda
+com isto", e este produto gastou a decisão de não ter comentário aberto por
+causa dos 20,9% de conselho errado. Endossar uma coisa é escolha; endossar três
+é distribuir o endosso.
+
+- ⚠️ **SÓ RAIZ SE FIXA.** Fixar uma resposta a arrancaria da conversa a que
+  responde: subiria ao topo sozinha, citando um comentário que ficou lá embaixo.
+  E `ordenarComentariosComFixado` recusa subir uma resposta mesmo com a coluna
+  preenchida — por uma versão anterior, ou por um pedido montado à mão.
+- ⚠️ **Nem comentário ESCONDIDO se fixa.** Pôr no topo para todo mundo ler um
+  texto que a régua acabou de esconder seria a dona do post desfazendo, sem
+  saber, a restrição que ela mesma pôs.
+- ⚠️ **DESAFIXA O ANTERIOR PRIMEIRO**, e a ordem é o oposto da do bloqueio: ali
+  o intermediário ruim é meio bloqueio; aqui é DOIS fixados, e a tela mostraria
+  dois topos. Limpando primeiro, uma falha deixa nenhum fixado — reversível com
+  um toque. E a limpeza é recortada pelo POST: sem isso, fixar um comentário
+  desafixaria os fixados de todas as publicações da plataforma.
+- ⚠️ **E A TELA DESFAZIA A ORDEM DO SERVIDOR — só a FOTO pegou.** `comentariosDoPost`
+  devolve o fixado na frente, e o `useMemo` das conversas reordenava tudo por
+  `criadoEm`, jogando-o de volta ao lugar cronológico: o selo "Fixado" aparecia
+  no meio da conversa e o recurso não funcionava. Nenhuma asserção estava perto
+  disso, porque **cada metade estava certa sozinha**.
+- ⚠️ **A lista de quem curtiu é de quem ESCREVEU o comentário, não da dona do
+  post.** `quemReagiuAoPost` é da autora do post porque as reações são sobre a
+  publicação dela; aqui as curtidas são sobre a frase de quem comentou. Dar a
+  lista à dona do post transformaria a conversa embaixo das fotos dela num
+  painel de quem apoia quem. E quem ela bloqueou não aparece — a curtida
+  continua contando, porque o número é do comentário, não da lista.
+
+### 10 · Pausar a conta — e a régua única que ela criou
+
+⚠️ **O MEIO-TERMO QUE NÃO EXISTIA.** Havia apagar (a LGPD, irreversível) e o
+Modo Cuidado, que é para o luto e vale no app inteiro. Faltava a coisa mais
+comum: sumir da Comunidade por um tempo e voltar inteira.
+
+- ⚠️ **NADA É APAGADO**, e a tela diz isso. Quem não tem certeza de que as fotos
+  ficam não pausa — vai embora de vez, ou fica sem descansar.
+- ⚠️ **A coluna é REVOGADA do `authenticated`.** `patient_profiles` é escrita
+  direto do navegador com a chave anon em vários pontos do app; sem o `REVOKE`,
+  um pedido montado à mão REATIVARIA a conta sem passar pelo servidor — e quem
+  pausou por um motivo sério é justamente quem não pode ser reativada por
+  acidente.
+- ⚠️ **NINGUÉM É AVISADO**, e a tela diz isso também: sem a frase, ela pausa
+  imaginando que a amiga vai receber "Fulana pausou" — e não pausa.
+- ⚠️ **A FAIXA NO FEED É OBRIGATÓRIA.** A pausa esconde ela dos OUTROS, e o feed
+  é o que ela vê: sem a faixa nada muda na tela dela, a conclusão razoável é que
+  a pausa não pegou, e ela publica imaginando que está invisível. A faixa vem
+  ANTES do desafio — ela muda o significado de tudo que vem abaixo.
+- **Ela continua LENDO enquanto pausada, de propósito.** Cortar a leitura
+  derrubaria conversas abertas com quem está apoiando ela, e é o mesmo desenho
+  que o Modo Cuidado já tem: o que some é ela na rede dos outros, não a rede
+  para ela.
+
+#### ⚠️ `foraDaRede` — vinte e seis decisões viraram uma
+
+`care_mode` (o luto) e `rede_pausada_em` (a pausa) produzem **exatamente o mesmo
+efeito** nesta aba: o perfil não abre, os posts não aparecem, a busca não acha,
+os stories somem. Eram vinte e seis pontos de decisão lendo `care_mode` solto —
+**um `if` a mais em cada um é como um deles fica de fora e a pausa vaza por
+ali.**
+
+- ⚠️ **FALHA FECHADO, e é por isso que o `!perfil` mora dentro da função.** O
+  pior caso é uma publicação não aparecer; o oposto é a publicação de quem
+  acabou de perder a gestação aparecendo no feed de todo mundo por causa de um
+  `undefined`.
+- ⚠️ **E ELA VEM PRIMEIRO NA CORRENTE.** `foraDaRede(x) &&` curto-circuita antes
+  de tocar em `x.perfil_publico`, que num `undefined` ESTOURA. Ao trocar
+  `!!dono && !!dono.perfil_publico && !dono.care_mode` por uma função só, eu
+  inverti a ordem e reintroduzi o estouro — **quem pegou foi o teste que existia
+  para essa exata linha**.
+- ⚠️ **O MOTIVO NUNCA VIAJA.** Quem chama recebe um booleano; a tela responde
+  "indisponível" e nada mais. Contar a perda dela — ou o fato de ela ter pausado
+  — é o app tomando por ela uma decisão que é dela. Por isso `meuPerfilSocial`
+  devolve `pausada` como campo PRÓPRIO: uma tela de luto para quem pausou seria
+  o app dizendo a ela que perdeu a gestação.
+- **Catraca:** `pausar-a-conta.test.ts` varre `rede-social.functions.ts` e
+  recusa `care_mode` entrando numa CONDIÇÃO fora da régua — com três exceções
+  nomeadas e justificadas, e com contraprova de que a varredura morde.
+
+#### ⚠️ O degrau da pausa é o mais ALTO da escada, e os de baixo derivam DELE
+
+`COLUNAS_SEM_PAUSA` é derivada por remoção, e `COLUNAS_SEM_OFICIAL`/
+`COLUNAS_SEM_FEED`/`COLUNAS_SEM_ARROBA` derivam dela — **um degrau que
+continuasse pedindo `rede_pausada_em` falharia pela mesma coluna que o degrau
+acima já provou não existir, e a escada inteira desceria até o chão por causa de
+um `42703` só.**
+
+⚠️ E `postQueEuVejo` (em `comentarios.functions.ts`) precisou de recuo próprio:
+sem `rede_pausada_em` o `42703` cai em `erroAutor` e a função RECUSA — ou seja,
+**COMENTAR pararia de funcionar para todo mundo** por causa de uma coluna que
+ainda não existe naquele banco.
+
+### ⚠️ E DEZ TESTES MEUS TRAVAVAM A GRAFIA, não a garantia
+
+A unificação em `foraDaRede` deixou **treze** testes vermelhos, e **nenhum deles
+apontava um defeito** — todos descreviam COMO o código estava escrito
+(`ctx.silenciados.has(id)`, `!!p.care_mode`, `if (!a ||`,
+`COLUNAS_DO_PERFIL.replace`) em vez do que ele garante. Um deles reprovou uma
+correção que APERTA o portão.
+
+É a oitava vez neste repositório. A régua continua sendo: **cobre a garantia, e
+aceite mais de uma grafia** — `toMatch(/ctx\.silenciados(Stories)?\.has/)` em vez
+de `toContain`, "deriva de ALGUMA lista" em vez de "deriva desta".
+
+⚠️ **A exceção que vale ouro:** o teste do `!!dono &&` estava certo travando a
+ORDEM, e foi o único que pegou um defeito de verdade. Ordem em corrente de `&&`
+não é grafia — é o que impede um `undefined.propriedade`.
+
+**Bancadas novas:** `/preview-instagram?tela=bloqueados` (`&vazio=1`,
+`&instavel=1`) · `?tela=comentarios` (o fixado no topo, "Fixar"/"Desafixar", e o
+número que só vira botão no comentário dela) · `/preview-rede?pausada=1`.

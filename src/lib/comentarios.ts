@@ -354,3 +354,59 @@ export function verDoComentario(v: {
 
   return { mostra: true, marca: null, revelavel: false };
 }
+
+/**
+ * ⚠️ **UM COMENTÁRIO FIXADO, e não três como o Instagram.**
+ *
+ * Lá o pin é curadoria de uma grade; aqui a lista de comentários é uma
+ * CONVERSA, e três comentários grudados no topo de uma tela de 393px empurram
+ * a conversa de verdade para fora da dobra — quem abre para ler as respostas
+ * encontra um segundo mural antes delas.
+ *
+ * ⚠️ **E há uma razão que só existe neste app:** fixar é ENDOSSO. Num post
+ * sobre gestação, o comentário que a autora põe no topo é o que as outras leem
+ * como "ela concorda com isto" — e este produto gastou a decisão de não ter
+ * comentário aberto justamente por causa dos 20,9% de conselho errado. Endossar
+ * uma coisa é uma escolha; endossar três é distribuir o endosso.
+ */
+export const COMENTARIOS_FIXADOS_MAX = 1;
+
+/**
+ * ⚠️ **SÓ RAIZ SE FIXA.** Fixar uma resposta a arrancaria da conversa a que
+ * responde: ela subiria ao topo sozinha, citando um comentário que ficou lá
+ * embaixo, e ninguém entenderia do que ela está falando.
+ *
+ * ⚠️ **E não se fixa comentário RECOLHIDO nem restringido.** Fixar é pôr no
+ * topo para todo mundo ler — sobre um texto que a régua acabou de esconder dos
+ * outros, seria a autora do post desfazendo, sem saber, a restrição que ela
+ * mesma pôs.
+ */
+export function podeFixarComentario(v: {
+  euId: string;
+  donaDoPost: string;
+  ehRaiz: boolean;
+  oculto?: "restrito" | "palavra" | null;
+}): boolean {
+  if (v.euId !== v.donaDoPost) return false;
+  if (!v.ehRaiz) return false;
+  return !v.oculto;
+}
+
+/**
+ * A ordem da conversa: o fixado primeiro, o resto em paz.
+ *
+ * ⚠️ **É ordenação ESTÁVEL, e ela não reordena o resto** — a lista chega
+ * cronológica do servidor e continua assim. É a mesma régua de
+ * `ordenarComFixados` para publicações, escrita à parte porque o que se fixa
+ * aqui é RAIZ: uma resposta nunca sobe, mesmo que a coluna esteja preenchida
+ * por uma versão anterior.
+ */
+export function ordenarComentariosComFixado<
+  T extends { fixadoEm?: string | null; respondeA?: string | null },
+>(comentarios: T[]): T[] {
+  const fixados = comentarios.filter((c) => !!c.fixadoEm && !c.respondeA);
+  if (fixados.length === 0) return comentarios;
+  const resto = comentarios.filter((c) => !(c.fixadoEm && !c.respondeA));
+  fixados.sort((a, b) => Date.parse(b.fixadoEm!) - Date.parse(a.fixadoEm!));
+  return [...fixados, ...resto];
+}

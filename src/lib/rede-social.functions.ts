@@ -54,6 +54,11 @@ import {
   storyAlcanca,
   type VisibilidadeDoStory,
   FIXADOS_MAX,
+  QUEM_COMENTA_PADRAO,
+  apertarQuemComenta,
+  podeComentar,
+  quemComentaDe,
+  type QuemComenta,
   podeFixar,
   ordenarComFixados,
   type AulaNoPost,
@@ -182,6 +187,14 @@ export type PostNaTela = {
    * chegar embaralhada em relação à intenção dela.
    */
   fixadoEm: string | null;
+  /**
+   * Quem pode comentar nesta publicação.
+   *
+   * ⚠️ **Viaja para todo mundo**, porque é o que decide se o campo de comentário
+   * aparece para quem está lendo. Esconder faria a tela oferecer um campo que o
+   * servidor recusa.
+   */
+  quemComenta: QuemComenta;
   /**
    * A pergunta anônima que este post responde, ou `null`.
    *
@@ -446,6 +459,8 @@ type Contexto = {
    * não ver — contra o pior caso do bloqueio, que é vazamento.
    */
   silenciados: Set<string>;
+  /** Quem eu silenciei NOS STORIES. Pode ser diferente de `silenciados`. */
+  silenciadosStories: Set<string>;
   /**
    * Alguma das leituras falhou.
    *
@@ -475,7 +490,7 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
-    sb.from("rede_silenciados").select("silenciado_id").eq("quem_id", eu),
+    sb.from("rede_silenciados").select("silenciado_id, cala_posts, cala_stories").eq("quem_id", eu),
     (async () => {
       try {
         const { idsDasAmigas } = await import("@/lib/amigas.functions");
@@ -524,8 +539,25 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
        E a tabela nasce num APLICAR_ que o dono roda à mão: sem o `?? []`, o
        feed inteiro quebraria na janela entre o deploy e o SQL por causa de uma
        preferência. */
+    /**
+     * ⚠️ **DOIS CONJUNTOS, e não um.** Silenciar calava os DOIS de uma vez —
+     * quem queria só descansar dos stories de alguém (o formato mais frequente
+     * e mais invasivo) perdia as publicações junto, e acabava não silenciando
+     * ninguém.
+     *
+     * ⚠️ **Coluna ausente vale `true` nos dois**, que é exatamente o
+     * comportamento atual: toda linha que já existe calava as duas coisas, e
+     * migrar para "só posts" mudaria o silêncio de quem já tinha escolhido.
+     */
     silenciados: new Set(
-      (((calados as any).data ?? []) as { silenciado_id: string }[]).map((x) => x.silenciado_id),
+      (((calados as any).data ?? []) as any[])
+        .filter((x) => x.cala_posts !== false)
+        .map((x) => x.silenciado_id as string),
+    ),
+    silenciadosStories: new Set(
+      (((calados as any).data ?? []) as any[])
+        .filter((x) => x.cala_stories !== false)
+        .map((x) => x.silenciado_id as string),
     ),
     degradado: bloqueioFalhou || amigasFalhou || !!(seg as any).error,
   };
@@ -688,7 +720,7 @@ async function quemTemSelo(sb: any, ids: string[]): Promise<Set<string>> {
 type MemoriaDePerfis = Map<string, any>;
 
 /** Perfis por id, com o que a rede precisa. */
-async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
+export async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
   if (ids.length === 0) return new Map<string, any>();
   /* O que já foi lido nesta requisição não é lido de novo. */
   const faltando = memoria ? ids.filter((id) => !memoria.has(id)) : ids;
@@ -713,7 +745,7 @@ async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePerfis) {
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAColunaDoArroba(sb, faltando) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaDaPausa(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -778,7 +810,7 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em";
+  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em, quem_comenta";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -845,6 +877,13 @@ const COLUNAS_DO_POST_ANTIGAS =
  * existe para impedir.
  */
 const DEGRAUS_DO_POST: { aviso: string; colunas: string[]; nulos: Record<string, null> }[] = [
+  {
+    aviso: "quem pode comentar — rode APLICAR_DEZ_DA_REDE.sql",
+    colunas: ["quem_comenta"],
+    /* Sem a coluna, todo post aceita comentário de quem o vê — o estado de
+       antes do recurso. */
+    nulos: { quem_comenta: null },
+  },
   {
     aviso: "publicação fixada — rode APLICAR_FIXAR_E_STORY_DE_POST.sql",
     colunas: ["fixado_em"],
@@ -920,12 +959,62 @@ export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any
   return [];
 }
 
+/**
+ * ⚠️ **ELA ESTÁ FORA DA REDE?** — a régua única, e ela vale para as DUAS razões.
+ *
+ * `care_mode` é o LUTO (decidido pela paciente ou pelo médico, e vale no app
+ * inteiro); `rede_pausada_em` é a PAUSA (decidida por ela, e vale só nesta aba).
+ * As duas produzem exatamente o mesmo efeito aqui — o perfil não abre, os posts
+ * não aparecem, a busca não acha, os stories somem — e por isso passam por uma
+ * função só: um `if` a mais em cada um dos vinte e seis pontos de decisão é como
+ * um deles fica de fora e a pausa vaza por ali.
+ *
+ * ⚠️ **FALHA FECHADO, e é por isso que o `!perfil` mora aqui dentro.** Sem o
+ * perfil (leitura degradada, id que não existe), a resposta é "está fora" — o
+ * pior caso é uma publicação não aparecer, contra o pior caso oposto, que é a
+ * publicação de quem acabou de perder a gestação aparecendo no feed de todo
+ * mundo. É o defeito que `!!a.care_mode` com `a` indefinido já teve aqui.
+ *
+ * ⚠️ **E O MOTIVO NUNCA VIAJA.** Quem chama recebe um booleano; a tela responde
+ * "indisponível" e nada mais. Contar a perda dela — ou o fato de ela ter pausado
+ * — é o app tomando por ela uma decisão que é dela.
+ */
+export function foraDaRede(perfil: any): boolean {
+  if (!perfil) return true;
+  return !!perfil.care_mode || !!perfil.rede_pausada_em;
+}
+
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
-  "id, display_name, avatar_url, bio, perfil_publico, care_mode, " +
+  "id, display_name, avatar_url, bio, perfil_publico, care_mode, rede_pausada_em, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
   "feed_so_seguindo, handle, quem_pode_mencionar, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
+
+/**
+ * Degrau 0,5: o banco tem tudo, menos a pausa.
+ *
+ * ⚠️ **DERIVADO por remoção, nunca escrito à mão** — duas listas divergem no
+ * primeiro ajuste, e aqui a divergência apareceria como recurso sumindo em
+ * silêncio. E ele é o degrau MAIS ALTO porque `rede_pausada_em` é a coluna mais
+ * NOVA: um recuo que pulasse daqui direto ao `handle` apagaria o `@` de toda a
+ * rede por causa de uma pausa que ninguém ainda usa.
+ *
+ * ⚠️ **E TODOS OS DEGRAUS DE BAIXO derivam DESTE**, e não da lista cheia: um
+ * degrau que continuasse pedindo `rede_pausada_em` falharia pela mesma coluna
+ * que o degrau acima já provou não existir — a escada inteira desceria até o
+ * chão por causa de um `42703` só.
+ */
+const COLUNAS_SEM_PAUSA = COLUNAS_DO_PERFIL.replace("rede_pausada_em, ", "");
+
+async function semAColunaDaPausa(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb.from("patient_profiles").select(COLUNAS_SEM_PAUSA).in("id", ids);
+  if (error) return semAColunaDoArroba(sb, ids);
+  console.warn("[rede] sem rede_pausada_em — rode APLICAR_DEZ_DA_REDE.sql");
+  /* ⚠️ Ausente = NÃO pausada. É o único padrão possível: tratar "não sei" como
+     pausada esconderia da rede toda paciente de um banco atrasado. */
+  return ((data ?? []) as any[]).map((p) => ({ ...p, rede_pausada_em: null }));
+}
 
 /**
  * A mesma lista sem `conta_oficial` — DERIVADA, nunca copiada à mão.
@@ -947,7 +1036,7 @@ const COLUNAS_DO_PERFIL =
  * Derivada e não copiada porque duas listas escritas à mão divergem no primeiro
  * ajuste — e aqui a divergência apareceria como recurso sumindo, sem erro.
  */
-const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")
+const COLUNAS_SEM_OFICIAL = COLUNAS_SEM_PAUSA.replace("conta_oficial, ", "")
   .replace("feed_so_seguindo, ", "")
   .replace("handle, quem_pode_mencionar, ", "");
 
@@ -971,7 +1060,7 @@ const COLUNAS_SEM_OFICIAL = COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")
  * remover a coluna dele não serve num banco que rodou meio SQL — a mesma lição
  * de `marcarConsultaNoDia`, citada ali embaixo.
  */
-const COLUNAS_SEM_FEED = COLUNAS_DO_PERFIL.replace("feed_so_seguindo, ", "").replace(
+const COLUNAS_SEM_FEED = COLUNAS_SEM_PAUSA.replace("feed_so_seguindo, ", "").replace(
   "handle, quem_pode_mencionar, ",
   "",
 );
@@ -987,7 +1076,7 @@ const COLUNAS_SEM_FEED = COLUNAS_DO_PERFIL.replace("feed_so_seguindo, ", "").rep
  * resultado. É o defeito de `miniatura_path` inteiro, que já apagou cinco
  * recursos de uma vez nesta mesma função.
  */
-const COLUNAS_SEM_ARROBA = COLUNAS_DO_PERFIL.replace("handle, quem_pode_mencionar, ", "");
+const COLUNAS_SEM_ARROBA = COLUNAS_SEM_PAUSA.replace("handle, quem_pode_mencionar, ", "");
 
 async function semAColunaDoArroba(sb: any, ids: string[]): Promise<any[]> {
   const { data, error } = await sb
@@ -1000,6 +1089,7 @@ async function semAColunaDoArroba(sb: any, ids: string[]): Promise<any[]> {
      padrão que a própria régua declara, nunca num valor inventado aqui. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    rede_pausada_em: null,
     handle: null,
     quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
   }));
@@ -1013,6 +1103,7 @@ async function semAColunaDoFeed(sb: any, ids: string[]): Promise<any[]> {
      de quem nunca escolheu, e é o que o banco passará a guardar. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    rede_pausada_em: null,
     feed_so_seguindo: false,
     handle: null,
     quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
@@ -1035,6 +1126,7 @@ async function semAColunaNova(sb: any, ids: string[]): Promise<any[]> {
      fileira de sugeridas ficar como era antes de a conta oficial existir. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    rede_pausada_em: null,
     conta_oficial: false,
     handle: null,
     quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
@@ -1049,6 +1141,7 @@ async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
      banco ainda não sabe guardar. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    rede_pausada_em: null,
     mostrar_semana: false,
     mostrar_bebe: false,
     conta_oficial: false,
@@ -1339,7 +1432,7 @@ async function marcacoesDe(
     /* ⚠️ MODO CUIDADO TIRA O NOME DA LINHA, sem apagar a marcação. Quando ela
        voltar, a marcação volta com ela — é a mesma decisão da dupla das Amigas,
        que some dos dois lados sem apagar a linha. */
-    if (!p || p.care_mode) continue;
+    if (foraDaRede(p)) continue;
     /* ⚠️ **E O BLOQUEIO TAMBÉM, que faltava.** O bloqueio vale nos DOIS
        sentidos e some com a pessoa inteira — mas a linha "com Fulana" embaixo
        da foto de uma terceira continuava dizendo o nome dela, e o toque abria
@@ -1381,7 +1474,7 @@ export async function montarPosts(
     return podeVerPost({
       post: { autorId: p.autor_id, visibilidade: p.visibilidade },
       euId: eu,
-      autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+      autor: { emCuidado: foraDaRede(a), publico: !!a.perfil_publico },
       bloqueado: ctx.bloqueio.has(p.autor_id),
       sigoAtivo: ctx.sigo.has(p.autor_id),
       somosAmigas: ctx.amigas.has(p.autor_id),
@@ -1530,7 +1623,7 @@ export async function montarPosts(
        * coberto" é como um vazamento sobrevive a uma auditoria.
        */
       if (o.arquivado_em || o.visibilidade !== "publico") continue;
-      if (!a || a.care_mode || !a.perfil_publico) continue;
+      if (foraDaRede(a) || !a.perfil_publico) continue;
       /**
        * ⚠️ **O BLOQUEIO FALTAVA — e ele é a única régua que o quadro ainda não
        * conferia.**
@@ -1593,6 +1686,7 @@ export async function montarPosts(
         comparacao: comparacoes.get(p.id) ?? null,
         editadoEm: p.editado_em ?? null,
         fixadoEm: p.fixado_em ?? null,
+        quemComenta: quemComentaDe(p.quem_comenta),
         marcadas: marcadas.get(p.id) ?? [],
         souMarcada: (marcadas.get(p.id) ?? []).some((m) => m.id === eu),
         salvo: salvos.has(p.id),
@@ -1709,6 +1803,15 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
          falhar. Fechado, ligar depois é seguro por construção. */
       emCuidado: !p || !!(p as any).care_mode,
       /**
+       * ⚠️ **A PAUSA É CAMPO PRÓPRIO, e não `emCuidado`.** As duas escondem a
+       * pessoa da rede pela mesma régua (`foraDaRede`), e é aí que a semelhança
+       * acaba: o luto é um estado do app inteiro, com texto e desenho próprios,
+       * e a pausa é uma decisão só desta aba, que ela desfaz num toque. Uma
+       * tela de luto para quem pausou seria o app dizendo a ela que perdeu a
+       * gestação.
+       */
+      pausada: !!(p as any)?.rede_pausada_em,
+      /**
        * A semana que ela PODE carimbar num story.
        *
        * ⚠️ Campo próprio, e não `perfil.seloSemana`: aquele é gated pela chave
@@ -1721,7 +1824,7 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         .map((x) => {
           const q = quemPediu.get(x.seguidor_id);
           /* Quem entrou em Modo Cuidado some da fila de pedidos, sem aviso. */
-          if (!q || q.care_mode) return null;
+          if (foraDaRede(q)) return null;
           return {
             id: x.seguidor_id,
             nome: (q.display_name ?? "").trim() || "Alguém",
@@ -1946,7 +2049,7 @@ export const verPerfil = createServerFn({ method: "POST" })
     /* ⚠️ As três recusas devolvem o MESMO `indisponivel`: perfil inexistente,
        bloqueio e Modo Cuidado. Distinguir contaria à bloqueada que ela foi
        bloqueada, e contaria a perda de quem entrou em luto. */
-    if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu)) {
+    if (foraDaRede(a) || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu)) {
       return { ok: false as const, motivo: "indisponivel" as const };
     }
 
@@ -2256,7 +2359,7 @@ export const seguir = createServerFn({ method: "POST" })
         bio: null,
         avatarUrl: null,
         publico: !!a.perfil_publico,
-        emCuidado: !!a.care_mode,
+        emCuidado: foraDaRede(a),
       },
       fuiBloqueada: ctx.bloqueio.has(data.alvoId),
     });
@@ -2507,6 +2610,12 @@ export const publicarPost = createServerFn({ method: "POST" })
         /** A publicação que está sendo republicada. Conferida no handler. */
         repostDe: z.string().uuid().nullable().optional(),
         /**
+         * Quem pode comentar. ⚠️ APERTADA no handler contra a visibilidade —
+         * um corpo montado à mão não pode abrir a conversa mais que a
+         * publicação.
+         */
+        quemComenta: z.string().max(20).optional(),
+        /**
          * Quem estava junto.
          *
          * ⚠️ **O teto do zod NÃO é a régua** — é só um freio contra um corpo
@@ -2701,9 +2810,13 @@ export const publicarPost = createServerFn({ method: "POST" })
            que segurava a corrente era só o `perfil_publico` da linha de cima
            dar `false` por acidente. Depender de um acidente para fechar um
            portão é como o portão volta a abrir no próximo conserto. */
-        !!donoDoOriginal &&
-        !!donoDoOriginal.perfil_publico &&
-        !donoDoOriginal.care_mode;
+        /* ⚠️ **`foraDaRede` VEM PRIMEIRO, e não é ordem estética.** Ele responde
+           `true` para perfil ausente, então o `&&` curto-circuita ANTES de
+           tocar em `.perfil_publico` — que num `undefined` estouraria. É o
+           mesmo trabalho que o antigo `!!donoDoOriginal &&` fazia, agora numa
+           função só, e o teste desta linha pegou a troca malfeita. */
+        !foraDaRede(donoDoOriginal) &&
+        !!donoDoOriginal.perfil_publico;
       if (!repostValido) return { ok: false as const, motivo: "repost_invalido" as const };
     }
 
@@ -2781,6 +2894,15 @@ export const publicarPost = createServerFn({ method: "POST" })
         visibilidade: data.visibilidade,
       };
       const CAMADAS: { aviso: string; campos: Record<string, unknown> }[] = [
+        {
+          aviso: "quem_comenta — rode APLICAR_DEZ_DA_REDE.sql",
+          campos: {
+            quem_comenta: apertarQuemComenta({
+              visibilidade: data.visibilidade,
+              quemComenta: quemComentaDe(data.quemComenta),
+            }),
+          },
+        },
         {
           aviso: "alt_texto — rode APLICAR_COMENTARIOS_E_LIMITES.sql",
           campos: { alt_texto: data.altTexto?.trim() || null },
@@ -2898,7 +3020,7 @@ async function gravarMarcacoes(
         somosAmigas: id === eu ? false : ctx.amigas.has(id),
         bloqueio: ctx.bloqueio.has(id),
         /* Perfil que não veio conta como indisponível — falhar FECHADO. */
-        emCuidado: !p || !!p.care_mode,
+        emCuidado: foraDaRede(p),
       });
     }
 
@@ -2995,7 +3117,7 @@ export const amigasParaMarcar = createServerFn({ method: "POST" })
       const perfis = await perfisPorId(sb, ids);
       const amigas = ids
         .map((id) => ({ id, p: perfis.get(id) }))
-        .filter(({ id, p }) => p && !p.care_mode && !ctx.bloqueio.has(id))
+        .filter(({ id, p }) => !foraDaRede(p) && !ctx.bloqueio.has(id))
         .map(({ id, p }) => ({
           id,
           nome: (p!.display_name ?? "").trim() || "Alguém",
@@ -3261,6 +3383,12 @@ export const silenciar = createServerFn({ method: "POST" })
         alvoId: z.string().uuid(),
         /** `false` volta a ouvir. */
         silenciar: z.boolean(),
+        /**
+         * O que calar. Ausente = os DOIS, que é o comportamento de sempre —
+         * quem já tinha silenciado continua com as duas coisas caladas.
+         */
+        calaPosts: z.boolean().optional(),
+        calaStories: z.boolean().optional(),
       })
       .parse(i),
   )
@@ -3284,11 +3412,36 @@ export const silenciar = createServerFn({ method: "POST" })
       return { ok: true as const };
     }
 
-    const { error } = await sb
-      .from("rede_silenciados")
-      .upsert({ quem_id: eu, silenciado_id: data.alvoId }, { onConflict: "quem_id,silenciado_id" });
-    if (error) return { ok: false as const, motivo: "banco" as const };
-    return { ok: true as const };
+    const { error } = await sb.from("rede_silenciados").upsert(
+      {
+        quem_id: eu,
+        silenciado_id: data.alvoId,
+        /* ⚠️ **Ausente = os DOIS**, que é o comportamento de sempre. Um
+             `?? false` aqui faria "silenciar" sem escolha não calar nada — o
+             recurso viraria um botão que não faz coisa nenhuma. */
+        cala_posts: data.calaPosts ?? true,
+        cala_stories: data.calaStories ?? true,
+      },
+      { onConflict: "quem_id,silenciado_id" },
+    );
+    /* ⚠️ Degrau: `cala_posts`/`cala_stories` nascem no `APLICAR_DEZ_DA_REDE`.
+       Sem as colunas, silenciar continua calando os dois — o comportamento de
+       antes do recurso, que é o que a linha sem elas já significava. */
+    if (error) {
+      const { error: erro2 } = await sb
+        .from("rede_silenciados")
+        .upsert(
+          { quem_id: eu, silenciado_id: data.alvoId },
+          { onConflict: "quem_id,silenciado_id" },
+        );
+      if (erro2) return { ok: false as const, motivo: "banco" as const };
+      /* ⚠️ E a tela SABE que a escolha não pegou: se ela pediu para calar só os
+         stories e o banco calou os dois, dizer "pronto" seria mentir sobre o
+         alcance do próprio silêncio dela. */
+      const escolheu = data.calaPosts === false || data.calaStories === false;
+      return { ok: true as const, parcial: escolheu };
+    }
+    return { ok: true as const, parcial: false };
   });
 
 /** O feed: posts de quem eu sigo, das minhas amigas, e os meus. */
@@ -3455,8 +3608,14 @@ async function candidatasPublicas(sb: any): Promise<any[]> {
   return ((velhas ?? []) as any[]).map((p) => ({ ...p, conta_oficial: false }));
 }
 
-/** Uma candidata virando linha da fileira de sugeridas. */
-function naFileira(perfil: any): PessoaNaLista {
+/**
+ * Uma candidata virando linha da fileira de sugeridas.
+ *
+ * ⚠️ O perfil que entra aqui tem de vir de `perfisPorId` — é ela que ASSINA o
+ * avatar. Passar uma linha crua de `patient_profiles` devolveria o caminho do
+ * balde no lugar da URL, e a foto sairia quebrada sem erro nenhum.
+ */
+export function naFileira(perfil: any): PessoaNaLista {
   return {
     id: perfil.id,
     nome: (perfil?.display_name ?? "").trim() || "Alguém",
@@ -3584,7 +3743,7 @@ export const sugestoesDoFeed = createServerFn({ method: "POST" })
     const podeAparecer = ((publicos ?? []) as any[]).filter(
       (p) =>
         !fora(p.id) &&
-        podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: !!p.care_mode }),
+        podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: foraDaRede(p) }),
     );
 
     /* ─── ⚠️ O RECORTE POR FASE ──────────────────────────────────────────────
@@ -3774,7 +3933,7 @@ export const reagir = createServerFn({ method: "POST" })
       podeVerPost({
         post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
         euId: eu,
-        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        autor: { emCuidado: foraDaRede(a), publico: !!a.perfil_publico },
         bloqueado: ctx.bloqueio.has((post as any).autor_id),
         sigoAtivo: ctx.sigo.has((post as any).autor_id),
         somosAmigas: ctx.amigas.has((post as any).autor_id),
@@ -3852,7 +4011,7 @@ export const votar = createServerFn({ method: "POST" })
       podeVerPost({
         post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
         euId: eu,
-        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        autor: { emCuidado: foraDaRede(a), publico: !!a.perfil_publico },
         bloqueado: ctx.bloqueio.has((post as any).autor_id),
         sigoAtivo: ctx.sigo.has((post as any).autor_id),
         somosAmigas: ctx.amigas.has((post as any).autor_id),
@@ -3987,7 +4146,7 @@ export const buscarPerfis = createServerFn({ method: "POST" })
           (p) =>
             p.id !== eu &&
             !ctx.bloqueio.has(p.id) &&
-            podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: !!p.care_mode }),
+            podeAparecerNaBusca({ publico: !!p.perfil_publico, emCuidado: foraDaRede(p) }),
         )
         .map((p) => ({
           id: p.id,
@@ -4088,7 +4247,7 @@ export const listaDeGente = createServerFn({ method: "POST" })
         /* ⚠️ Modo Cuidado e bloqueio somem da lista, sem anunciar — a mesma
            régua de `minhasAmigas`. Quem entrou em luto não vira uma linha
            faltando com explicação; vira uma linha que não está lá. */
-        if (!p || p.care_mode || ctx.bloqueio.has(id)) return null;
+        if (foraDaRede(p) || ctx.bloqueio.has(id)) return null;
         return {
           id,
           nome: (p.display_name ?? "").trim() || "Alguém",
@@ -4320,9 +4479,10 @@ export const publicarStory = createServerFn({ method: "POST" })
         !!orig &&
         !(orig as any).arquivado_em &&
         (orig as any).visibilidade === "publico" &&
-        !!dono &&
-        !!(dono as any).perfil_publico &&
-        !(dono as any).care_mode;
+        /* ⚠️ Primeiro o portão, depois a coluna — ver a linha irmã em
+           `publicarPost`: sem a ordem, `undefined.perfil_publico` estoura. */
+        !foraDaRede(dono) &&
+        !!(dono as any).perfil_publico;
       /* ⚠️ Recusa em vez de publicar sem o quadro: ela escolheu compartilhar
          AQUELA publicação, e um story sem o quadro é outro story. */
       if (!vale) return { ok: false as const, motivo: "repost_invalido" as const };
@@ -4438,7 +4598,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
        não oferece, mas um pedido montado à mão sim) não pode esconder os
        próprios posts do próprio feed. */
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
-      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
+      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciadosStories.has(id)),
     );
 
     /* ⚠️ **O `.in()` VAI NA QUERY STRING, e ela tem teto.** Cada uuid custa 37
@@ -4651,7 +4811,7 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     for (const l of linhas) {
       const p = perfis.get(l.autor_id);
       /* Modo Cuidado tira os stories da fileira, como tira tudo o mais. */
-      if (!p || p.care_mode) continue;
+      if (foraDaRede(p)) continue;
       /**
        * ⚠️ **A CAMADA É CONFERIDA POR STORY, e o recorte por AUTORA não basta.**
        *
@@ -4827,7 +4987,7 @@ export const reagirAoStory = createServerFn({ method: "POST" })
       const autor = perfis.get((story as any).autor_id);
       const podeVer =
         !!autor &&
-        !autor.care_mode &&
+        !foraDaRede(autor) &&
         !ctx.bloqueio.has((story as any).autor_id) &&
         (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id)) &&
         /* ⚠️ **E A CAMADA DO STORY, que este portão não conhecia.** Sem esta
@@ -4899,7 +5059,7 @@ export const votarNoStory = createServerFn({ method: "POST" })
       const autor = perfis.get((story as any).autor_id);
       const podeVer =
         !!autor &&
-        !autor.care_mode &&
+        !foraDaRede(autor) &&
         !ctx.bloqueio.has((story as any).autor_id) &&
         (ctx.sigo.has((story as any).autor_id) || ctx.amigas.has((story as any).autor_id)) &&
         /* ⚠️ **E A CAMADA DO STORY, que este portão não conhecia.** Sem esta
@@ -5172,7 +5332,7 @@ export const minhaSemana = createServerFn({ method: "POST" })
     const meu = perfis.get(eu);
     /* ⚠️ Falha ao ler o perfil fecha: sem saber se ela está em Modo Cuidado, o
        cartão mais festivo da aba não aparece. */
-    if (!meu || meu.care_mode) return { ok: true as const, retrospectiva: null };
+    if (foraDaRede(meu)) return { ok: true as const, retrospectiva: null };
 
     const { computeGestation } = await import("@/lib/gestacao");
     const agora = new Date();
@@ -5448,7 +5608,7 @@ export const salvarPost = createServerFn({ method: "POST" })
       podeVerPost({
         post: { autorId: (post as any).autor_id, visibilidade: (post as any).visibilidade },
         euId: eu,
-        autor: { emCuidado: !!a.care_mode, publico: !!a.perfil_publico },
+        autor: { emCuidado: foraDaRede(a), publico: !!a.perfil_publico },
         bloqueado: ctx.bloqueio.has((post as any).autor_id),
         sigoAtivo: ctx.sigo.has((post as any).autor_id),
         somosAmigas: ctx.amigas.has((post as any).autor_id),
@@ -5662,7 +5822,7 @@ export const minhaAtividade = createServerFn({ method: "POST" })
           return podeVerPost({
             post: { autorId: x.autor_id, visibilidade: x.visibilidade },
             euId: eu,
-            autor: { emCuidado: !!autor?.care_mode, publico: !!autor?.perfil_publico },
+            autor: { emCuidado: foraDaRede(autor), publico: !!autor?.perfil_publico },
             bloqueado: ctx.bloqueio.has(x.autor_id),
             sigoAtivo: ctx.sigo.has(x.autor_id),
             somosAmigas: ctx.amigas.has(x.autor_id),
@@ -5707,7 +5867,7 @@ export const minhaAtividade = createServerFn({ method: "POST" })
            "Fulana reagiu" de quem entrou em luto contaria a perda dela pela
            porta dos fundos — e uma de quem ela bloqueou traria a pessoa de
            volta à tela justamente depois de ela ter pedido para não ver. */
-        if (!p || p.care_mode || ctx.bloqueio.has(l.quem_id)) return null;
+        if (foraDaRede(p) || ctx.bloqueio.has(l.quem_id)) return null;
         return {
           id: l.id,
           especie: l.especie as EspecieDeAviso,
@@ -6144,6 +6304,61 @@ export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
  * transformaria uma proteção num confronto, e num app onde as pessoas se
  * conhecem da vida real isso piora a situação que a motivou.
  */
+/**
+ * A LISTA DE QUEM EU BLOQUEEI.
+ *
+ * ⚠️ **SEM ELA, BLOQUEAR ERA UM BECO SEM SAÍDA.** Ela conseguia bloquear e não
+ * conseguia DESBLOQUEAR: a única porta era o `⋯` do perfil da pessoa, e o
+ * bloqueio esconde o perfil. É a mesma classe de defeito que a aba de assinatura
+ * já pagou — um caminho que entra e não sai.
+ *
+ * ⚠️ **É PRIVADA, e o recorte é a sessão.** Não existe `alvoId`: a lista de quem
+ * alguém bloqueou é, por definição, a lista das pessoas com quem ela teve
+ * problema — e num app onde as pacientes se conhecem da vida real, isso é o dado
+ * mais explosivo da aba.
+ *
+ * ⚠️ **E ela mostra NOME e FOTO.** Um bloqueio guardado como uuid seria uma
+ * lista que ela não consegue ler: para desbloquear, precisaria adivinhar quem é
+ * cada linha.
+ */
+export const meusBloqueados = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: linhas, error } = await sb
+      .from("rede_bloqueios")
+      .select("bloqueado_id, criado_em")
+      .eq("quem_id", eu)
+      .order("criado_em", { ascending: false })
+      .limit(200);
+    /* ⚠️ Falha de leitura devolve ERRO, e nunca lista vazia: "você não bloqueou
+       ninguém" faria ela concluir que o bloqueio não pegou — e talvez bloquear
+       de novo, ou pior, desistir de bloquear. */
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const ids = ((linhas ?? []) as any[]).map((l) => l.bloqueado_id);
+    if (ids.length === 0) return { ok: true as const, pessoas: [] as PessoaNaLista[] };
+
+    /* ⚠️ **`perfisPorId` e NÃO a régua de visibilidade.** Quem eu bloqueei está,
+       por construção, escondida de mim em todo lugar — e é justamente aqui que
+       ela PRECISA aparecer, senão a lista vem vazia e o desbloqueio é
+       impossível. É a única leitura da aba que ignora o próprio bloqueio, e é de
+       propósito. */
+    const perfis = await perfisPorId(sb, ids);
+    return {
+      ok: true as const,
+      pessoas: ids
+        .map((id) => perfis.get(id))
+        .filter(Boolean)
+        .map((p: any) => naFileira(p)),
+    };
+  });
+
 export const denunciarPerfil = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
@@ -6186,5 +6401,52 @@ export const denunciarPerfil = createServerFn({ method: "POST" })
       console.error("[rede] denúncia de perfil não gravou", error);
       return { ok: false as const, motivo: "banco" as const };
     }
+    return { ok: true as const };
+  });
+
+/**
+ * PAUSAR A CONTA NA REDE — o meio-termo que não existia.
+ *
+ * ⚠️ **NÃO É APAGAR, e não é o Modo Cuidado.** Apagar é a LGPD, irreversível;
+ * o Modo Cuidado é para o luto e vale no app inteiro, com desenho próprio.
+ * Faltava a coisa mais comum de todas: sumir da rede por um tempo e voltar
+ * inteira. Sem ela, quem quisesse descansar da aba tinha duas saídas, e as duas
+ * eram grandes demais.
+ *
+ * ⚠️ **NADA É APAGADO.** As publicações, os stories, o arquivo, as conversas, as
+ * amizades e o que ela salvou continuam exatamente onde estão, e voltam como
+ * estavam. A diferença entre "não está aqui agora" e "não existe mais" é a que
+ * separa pausar de apagar — a mesma que fez o item aposentado do Cantinho
+ * continuar desenhando para quem o comprou.
+ *
+ * ⚠️ **A ESCRITA É DO SERVIDOR, e a coluna é revogada do `authenticated`.**
+ * `patient_profiles` é escrita direto do navegador com a chave anon em vários
+ * pontos do app; sem o `REVOKE`, um pedido montado à mão REATIVARIA a conta sem
+ * passar por aqui — e quem pausou por um motivo sério é justamente quem não
+ * pode ser reativada por acidente.
+ *
+ * ⚠️ **E NINGUÉM É AVISADO.** Nem quem a segue, nem as amigas. "Fulana pausou a
+ * conta" transformaria uma decisão privada num anúncio — a mesma decisão que o
+ * Modo Cuidado, o bloqueio e a saída de amizade já tomaram aqui.
+ */
+export const pausarMinhaRede = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), pausar: z.boolean() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { error } = await sb
+      .from("patient_profiles")
+      .update({ rede_pausada_em: data.pausar ? new Date().toISOString() : null })
+      .eq("id", eu);
+    /* ⚠️ Sem a coluna, a tela SABE — e nunca um "pausado ✓" mudo. Dizer que
+       pausou sobre uma conta que continua visível é a pior mentira que esta
+       tela pode contar: ela publicaria achando que ninguém está vendo. */
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
     return { ok: true as const };
   });

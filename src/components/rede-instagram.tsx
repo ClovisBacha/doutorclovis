@@ -75,6 +75,10 @@ import {
   textoDoAviso,
   totalDeReacoes,
   VISIBILIDADES,
+  QUEM_COMENTA,
+  QUEM_COMENTA_PADRAO,
+  apertarQuemComenta,
+  type QuemComenta,
   type AulaNoPost,
   type TipoDeReacao,
   type Visibilidade,
@@ -1578,6 +1582,8 @@ export function CartaoDaSemana({
 
 export function TelaPrincipal({
   posts,
+  pausada = false,
+  aoReativar,
   soSeguindo = false,
   stories = [],
   sugestoes = [],
@@ -1628,6 +1634,17 @@ export function TelaPrincipal({
   instavel?: boolean;
   /** Refaz a leitura. Sem a prop, o botão de tentar de novo não aparece. */
   aoTentarDeNovo?: () => void;
+  /**
+   * A conta dela está pausada na rede.
+   *
+   * ⚠️ **A FAIXA É OBRIGATÓRIA, senão o interruptor parece quebrado.** A pausa
+   * esconde ela dos OUTROS — e o feed é o que ela vê, então sem a faixa nada
+   * muda na tela dela e a conclusão razoável é que a pausa não pegou. Aí ela
+   * publica imaginando que está invisível.
+   */
+  pausada?: boolean;
+  /** Sem a prop, a faixa avisa e não oferece o caminho de volta. */
+  aoReativar?: () => void;
   posts: PostNaTela[];
   /** `true` = a paciente pediu para ver só quem ela segue. Ver `feed_so_seguindo`. */
   soSeguindo?: boolean;
@@ -1803,6 +1820,29 @@ export function TelaPrincipal({
           comiam a primeira dobra inteira de um iPhone. As ações não sumiram:
           viraram as bolinhas que sobem ao tocar de novo no ícone da Comunidade
           na barra de baixo (`publicarAtalhos`, em `RedeNoApp`). */}
+      {/* ⚠️ **A FAIXA DA PAUSA VEM ANTES DE TUDO**, inclusive do desafio: ela
+          muda o significado de tudo que vem abaixo — publicar, comentar e
+          reagir continuam funcionando, e ninguém vai ver. Enterrada no meio da
+          rolagem, seria um aviso que ela encontra depois de já ter publicado. */}
+      {pausada && (
+        <div className="mb-3 rounded-2xl border border-border bg-muted/60 p-3">
+          <p className="text-[13px] font-semibold">Sua conta está pausada</p>
+          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+            Ninguém te encontra e as suas publicações não aparecem para mais ninguém. Nada foi
+            apagado.
+          </p>
+          {aoReativar && (
+            <button
+              type="button"
+              onClick={aoReativar}
+              className="press mt-2 min-h-[44px] rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+            >
+              Reativar a minha conta
+            </button>
+          )}
+        </div>
+      )}
+
       {desafio && (
         <CartaoDoDesafio
           desafio={desafio}
@@ -2548,7 +2588,7 @@ export function TelaDePerfil({
   /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
   /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
-  aoSilenciar?: (silenciar: boolean) => void;
+  aoSilenciar?: (silenciar: boolean, quais?: { calaPosts: boolean; calaStories: boolean }) => void;
   /**
    * Restringir (ou liberar) os comentários desta pessoa.
    *
@@ -2701,20 +2741,63 @@ export function TelaDePerfil({
               conhecem da vida real (a irmã, a cunhada, a amiga do trabalho),
               não ter o meio-termo faz alguém bloquear a irmã, ou desistir da
               aba. Aqui o vínculo CONTINUA: some só do feed. */}
-          {aoSilenciar && (
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmandoBloqueio(false);
-                aoSilenciar(!perfil.silenciado);
-              }}
-              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
-            >
-              {perfil.silenciado
-                ? `Voltar a ver ${perfil.nome} no feed`
-                : `Silenciar ${perfil.nome} no feed`}
-            </button>
-          )}
+          {/* ⚠️ **POSTS E STORIES, SEPARADOS — antes calava os dois de uma
+              vez.** Quem quer só descansar dos stories de alguém (o formato mais
+              frequente e mais invasivo) perdia as publicações junto, e acabava
+              não silenciando ninguém.
+
+              ⚠️ **E "silenciar tudo" continua sendo UM toque**, na primeira
+              linha: a escolha fina é para quem quer, e obrigar todo mundo a
+              decidir entre duas caixas transformaria um gesto de alívio numa
+              configuração. */}
+          {aoSilenciar &&
+            (perfil.silenciado ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmandoBloqueio(false);
+                  aoSilenciar(false);
+                }}
+                className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+              >
+                Voltar a ver {perfil.nome}
+              </button>
+            ) : (
+              <div className="mt-2 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoBloqueio(false);
+                    aoSilenciar(true);
+                  }}
+                  className="press min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+                >
+                  Silenciar {perfil.nome}
+                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBloqueio(false);
+                      aoSilenciar(true, { calaPosts: true, calaStories: false });
+                    }}
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-[12px]"
+                  >
+                    Só as publicações
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBloqueio(false);
+                      aoSilenciar(true, { calaPosts: false, calaStories: true });
+                    }}
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-[12px]"
+                  >
+                    Só os stories
+                  </button>
+                </div>
+              </div>
+            ))}
           {aoSilenciar && (
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
               {perfil.silenciado
@@ -3125,6 +3208,7 @@ type Onde =
   | { t: "salvos" }
   | { t: "arquivados" }
   | { t: "arquivo-stories" }
+  | { t: "bloqueados" }
   | { t: "busca" }
   | { t: "caixinha" }
   | { t: "conversas" }
@@ -3207,6 +3291,23 @@ export function RedeNoApp({
   const [arquivoStories, setArquivoStories] = useState<StoryArquivado[] | null>(null);
   const [arquivoStoriesInstavel, setArquivoStoriesInstavel] = useState(false);
   const [proximoArquivo, setProximoArquivo] = useState<string | null>(null);
+  /** `null` = carregando · `[]` = ela não bloqueou ninguém · `"erro"` = não deu. */
+  const [bloqueados, setBloqueados] = useState<PessoaNaLista[] | "erro" | null>(null);
+  /** O story que está sendo mandado para uma conversa. */
+  const [mandandoStory, setMandandoStory] = useState<string | null>(null);
+  /**
+   * ⚠️ **A CONTA PAUSADA PRECISA DE UM AVISO, senão o botão parece quebrado.**
+   * Ela pausa nas configurações, volta ao feed e tudo continua igual — porque a
+   * pausa esconde ela dos OUTROS, e o feed é o que ela vê. Sem a faixa, a
+   * conclusão razoável é que a pausa não pegou, e ela publicaria imaginando que
+   * está invisível.
+   *
+   * ⚠️ **E ela continua LENDO enquanto pausada, de propósito.** Cortar a leitura
+   * derrubaria conversas abertas com quem está apoiando ela — e é o mesmo
+   * desenho que o Modo Cuidado já tem: o que some é ela na rede dos outros, não
+   * a rede para ela.
+   */
+  const [pausada, setPausada] = useState(false);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
   const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
@@ -4174,6 +4275,7 @@ export function RedeNoApp({
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) {
         setEuId(meu.perfil.id);
+        setPausada(!!(meu as { pausada?: boolean }).pausada);
         setMeuAvatar(meu.perfil.avatarUrl ?? null);
         setSemanaDoCarimbo(meu.semanaDoCarimbo);
         /* ⚠️ A preferência chega JUNTO com o feed, na mesma rodada. Buscá-la
@@ -4363,16 +4465,70 @@ export function RedeNoApp({
    * ali no momento do toque faria "silenciar" parecer "bloquear" — que é
    * exatamente a confusão que este botão existe para desfazer.
    */
-  async function silenciarPerfil(alvoId: string, calar: boolean) {
+  /**
+   * REATIVAR — o caminho de volta, a um toque da faixa.
+   *
+   * ⚠️ **A faixa precisa DESTE botão, e não de "vá nas configurações".** Quem
+   * pausou e quer voltar já está olhando o feed; mandá-la procurar um
+   * interruptor três telas adiante é como uma pausa vira uma saída.
+   */
+  async function reativarMinhaConta() {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { pausarMinhaRede } = await import("@/lib/rede-social.functions");
+      const r = await pausarMinhaRede({ data: { accessToken: t, pausar: false } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error("Não deu para reativar agora.");
+        return;
+      }
+      setPausada(false);
+      toast.success("Sua conta voltou 💛");
+      void carregarFeed();
+    } catch {
+      /* Sem rede, a faixa continua — que é a verdade. */
+    }
+  }
+
+  async function silenciarPerfil(
+    alvoId: string,
+    calar: boolean,
+    quais?: { calaPosts: boolean; calaStories: boolean },
+  ) {
     setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: calar } : p));
     try {
       const t = await token();
       if (!t) return;
       const { silenciar } = await import("@/lib/rede-social.functions");
-      const r = await silenciar({ data: { accessToken: t, alvoId, silenciar: calar } });
+      const r = await silenciar({
+        data: {
+          accessToken: t,
+          alvoId,
+          silenciar: calar,
+          calaPosts: quais?.calaPosts,
+          calaStories: quais?.calaStories,
+        },
+      });
       const { toast } = await import("sonner");
       if (r.ok) {
-        toast.success(calar ? "Silenciada. Ela não é avisada." : "Voltou para o seu feed.");
+        /* ⚠️ **`parcial` diz que a ESCOLHA não pegou**, e a tela precisa contar:
+           se ela pediu para calar só os stories e o banco (sem as colunas) calou
+           os dois, dizer "pronto" seria mentir sobre o alcance do próprio
+           silêncio dela. */
+        if ("parcial" in r && r.parcial) {
+          toast.success("Silenciada — por enquanto, publicações e stories.");
+        } else {
+          toast.success(
+            !calar
+              ? "Voltou para o seu feed."
+              : quais && !quais.calaPosts
+                ? "Stories silenciados. Ela não é avisada."
+                : quais && !quais.calaStories
+                  ? "Publicações silenciadas. Ela não é avisada."
+                  : "Silenciada. Ela não é avisada.",
+          );
+        }
         void carregarFeed();
       } else {
         setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: !calar } : p));
@@ -5111,6 +5267,7 @@ export function RedeNoApp({
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
     miniatura?: string | null;
     visibilidade: Visibilidade;
+    quemComenta?: QuemComenta;
     enquete: string[];
     aula: AulaNoPost | null;
     /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
@@ -5135,6 +5292,7 @@ export function RedeNoApp({
           miniatura: p.miniatura ?? null,
           extras: p.fotos.slice(1),
           visibilidade: p.visibilidade,
+          quemComenta: p.quemComenta,
           enquete: p.enquete,
           aula: p.aula,
           marco: p.marco ?? null,
@@ -5288,6 +5446,46 @@ export function RedeNoApp({
    * dois faria a tela dizer "você ainda não publicou stories" enquanto a lista
    * vem — para quem tem trinta.
    */
+  /**
+   * A LISTA DE QUEM EU BLOQUEEI.
+   *
+   * ⚠️ `"erro"` é um estado PRÓPRIO, e não uma lista vazia: "você não bloqueou
+   * ninguém" faria ela concluir que o bloqueio não pegou — e talvez bloquear de
+   * novo, ou desistir de bloquear.
+   */
+  async function abrirBloqueados() {
+    setBloqueados(null);
+    setOnde({ t: "bloqueados" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusBloqueados } = await import("@/lib/rede-social.functions");
+      const r = await meusBloqueados({ data: { accessToken: t } });
+      setBloqueados(r.ok ? r.pessoas : "erro");
+    } catch {
+      setBloqueados("erro");
+    }
+  }
+
+  /** Desbloquear, da própria lista. */
+  async function desbloquear(id: string) {
+    const antes = bloqueados;
+    setBloqueados((b) => (Array.isArray(b) ? b.filter((p) => p.id !== id) : b));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { bloquear } = await import("@/lib/rede-social.functions");
+      const r = await bloquear({ data: { accessToken: t, alvoId: id, bloquear: false } });
+      if (!r.ok) {
+        setBloqueados(antes);
+        const { toast } = await import("sonner");
+        toast.error("Não deu para desbloquear agora.");
+      }
+    } catch {
+      setBloqueados(antes);
+    }
+  }
+
   async function abrirArquivoDeStories() {
     setArquivoStories(null);
     setArquivoStoriesInstavel(false);
@@ -5748,6 +5946,15 @@ export function RedeNoApp({
         aoTocar: () => void abrirArquivoDeStories(),
       },
       {
+        /* ⚠️ **SEM ESTA PORTA, BLOQUEAR ERA UM BECO SEM SAÍDA.** Ela conseguia
+           bloquear e não conseguia DESBLOQUEAR: a única entrada era o `⋯` do
+           perfil da pessoa, e o bloqueio esconde o perfil. */
+        id: "bloqueados",
+        rotulo: "Bloqueados",
+        icone: "pessoa",
+        aoTocar: () => void abrirBloqueados(),
+      },
+      {
         id: "caixinha",
         rotulo: "Caixinha",
         icone: "balao",
@@ -5871,6 +6078,7 @@ export function RedeNoApp({
         /* ⚠️ Fecha o visor ANTES de abrir a publicação: o visor é `fixed
            inset-0`, e navegar por baixo dele deixaria a paciente na tela do
            post sem conseguir vê-la. */
+        aoMandarStory={(id) => setMandandoStory(id)}
         aoAbrirPublicacao={(id) => {
           setVendoStory(null);
           acoes.ver(id);
@@ -5997,6 +6205,17 @@ export function RedeNoApp({
         posts={salvos}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
+  if (onde.t === "bloqueados") {
+    return (
+      <ListaDeBloqueados
+        pessoas={bloqueados}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDesbloquear={(id) => void desbloquear(id)}
+        aoTentarDeNovo={() => void abrirBloqueados()}
       />
     );
   }
@@ -6197,7 +6416,9 @@ export function RedeNoApp({
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
         aoDenunciarPerfil={perfil.souEu ? undefined : (m) => void denunciarUmPerfil(perfil.id, m)}
-        aoSilenciar={perfil.souEu ? undefined : (v) => void silenciarPerfil(perfil.id, v)}
+        aoSilenciar={
+          perfil.souEu ? undefined : (v, quais) => void silenciarPerfil(perfil.id, v, quais)
+        }
         aoRestringir={perfil.souEu ? undefined : (v) => void restringirPerfil(perfil.id, v)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
@@ -6255,6 +6476,8 @@ export function RedeNoApp({
            auditoria achou em `aoEditar` e nas três ações da tela do post. */
         instavel={feedInstavel}
         aoTentarDeNovo={() => void carregarFeed()}
+        pausada={pausada}
+        aoReativar={() => void reativarMinhaConta()}
         /* ⚠️ **O LÁPIS NUNCA CHEGAVA AO FEED.** `TelaPrincipal` declarava a
            prop e a repassava aos cartões; o único chamador não a passava. E
            `meuFeed` põe os posts DELA primeiro, com comentário explícito de que
@@ -6306,7 +6529,19 @@ export function RedeNoApp({
           `fixed inset-0`; dentro da lista, um `overflow` de qualquer ancestral
           a recortaria — e ela apareceria pela metade, sem erro nenhum. */}
       {mandandoPost && (
-        <MandarPublicacao postId={mandandoPost} aoFechar={() => setMandandoPost(null)} />
+        <MandarPublicacao
+          alvo={{ tipo: "post", id: mandandoPost }}
+          aoFechar={() => setMandandoPost(null)}
+        />
+      )}
+      {/* ⚠️ A MESMA folha do post — duas divergiriam no primeiro ajuste, e a
+          régua que importa (só conversas que JÁ existem) precisaria ser escrita
+          duas vezes. */}
+      {mandandoStory && (
+        <MandarPublicacao
+          alvo={{ tipo: "story", id: mandandoStory }}
+          aoFechar={() => setMandandoStory(null)}
+        />
       )}
 
       {/* ⚠️ FORA da `<TelaPrincipal>`: a folha é `fixed` e cobre a tela inteira,
@@ -7264,6 +7499,7 @@ export function VisorDeStory({
   aoReagirAoStory,
   aoResponderStory,
   aoAbrirPublicacao,
+  aoMandarStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -7274,6 +7510,8 @@ export function VisorDeStory({
   aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[] | null>;
   /** Abrir a publicação compartilhada dentro do story. */
   aoAbrirPublicacao?: (postId: string) => void;
+  /** Mandar este story para uma conversa. */
+  aoMandarStory?: (storyId: string) => void;
   aoApagarStory?: (storyId: string) => void;
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
@@ -7726,6 +7964,33 @@ export function VisorDeStory({
               👁 Ver quem viu
             </button>
           )}
+          {/* ✈ **MANDAR O STORY PARA UMA CONVERSA.**
+
+              ⚠️ **SÓ O MEU, e a restrição é de VISIBILIDADE, não de escopo.**
+              Encaminhar o story de outra pessoa é o uso mais comum num app de
+              fotos — e aqui seria a porta dos fundos da camada que os stories
+              acabaram de ganhar: um story marcado "só amigas" chegaria a quem
+              não é amiga dela, pela mão de quem é. O post pode ser mandado
+              porque quem abrir passa por `podeVerPost`; o story não tem esse
+              caminho de leitura por id.
+
+              ⚠️ E ele importa MAIS que no post: o story expira em 24 h, então
+              mandar é justamente o que o salva. */}
+          {aoMandarStory && (
+            <button
+              type="button"
+              onClick={() => {
+                /* Pausa antes de abrir a folha, senão o story avança por baixo
+                   dela e ao voltar ela está noutro. */
+                setPausado(true);
+                aoMandarStory(atual.id);
+              }}
+              aria-label="Mandar este story para uma conversa"
+              className="press text-[15px] text-white/85"
+            >
+              ✈
+            </button>
+          )}
           {aoApagarStory && (
             <button
               type="button"
@@ -8083,6 +8348,7 @@ export function NovoPost({
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
     miniatura?: string | null;
     visibilidade: Visibilidade;
+    quemComenta?: QuemComenta;
     enquete: string[];
     aula: AulaNoPost | null;
     /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
@@ -8191,6 +8457,7 @@ export function NovoPost({
   });
   /* ⚠️ O padrão é o mais FECHADO. O erro possível aqui é publicar para menos
      gente do que ela queria — nunca para mais. */
+  const [quemComenta, setQuemComenta] = useState<QuemComenta>(QUEM_COMENTA_PADRAO);
   const [vis, setVis] = useState<Visibilidade>("amigas");
   /* `null` = sem enquete. Duas opções vazias é o estado inicial de quem abriu
      a enquete e ainda não escreveu — e não uma enquete inválida na tela. */
@@ -8327,6 +8594,11 @@ export function NovoPost({
       fotos,
       miniatura,
       visibilidade: vis,
+      /* ⚠️ Apertada AQUI também, e não só no servidor: a tela pode ter a camada
+         `todos` guardada de quando a visibilidade era `publico` e ela tê-la
+         fechado depois — mandar `todos` faria o servidor apertar em silêncio, e
+         a autora acharia que abriu a conversa. */
+      quemComenta: apertarQuemComenta({ visibilidade: vis, quemComenta }),
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
       /* ⚠️ Os DIAS vão junto, e é isso que faz o post não envelhecer: a tela
@@ -8836,6 +9108,41 @@ export function NovoPost({
           <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
             {VISIBILIDADES.find((v) => v.chave === vis)?.sub}
           </p>
+        </div>
+
+        {/* ⚠️ **QUEM PODE COMENTAR — a camada que faltava.**
+
+            Até agora era tudo ou nada: fechar os comentários para todo mundo.
+            Num app cuja decisão central foi limitar conselho de leiga, "só
+            amigas podem comentar" é a peça que deixa a publicação visível e
+            restringe QUEM opina.
+
+            ⚠️ **A lista é APERTADA contra a camada de visibilidade.** Um post
+            `amigas` com "todo mundo pode comentar" é combinação sem sentido —
+            as pessoas a quem "todo mundo" se refere não veem a publicação —, e
+            oferecê-la faria a autora acreditar que abriu a conversa quando não
+            abriu nada. A régua é `apertarQuemComenta`, e não um `filter` escrito
+            aqui. */}
+        <div className="mt-3">
+          <p className="text-[12px] font-medium text-muted-foreground">Quem pode comentar</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {QUEM_COMENTA.filter(
+              (q) => apertarQuemComenta({ visibilidade: vis, quemComenta: q.chave }) === q.chave,
+            ).map((q) => (
+              <button
+                key={q.chave}
+                type="button"
+                onClick={() => setQuemComenta(q.chave)}
+                className={`press rounded-full px-3 py-1.5 text-[13px] ${
+                  apertarQuemComenta({ visibilidade: vis, quemComenta }) === q.chave
+                    ? "bg-primary/15 font-semibold text-primary"
+                    : "bg-muted/60"
+                }`}
+              >
+                {q.rotulo}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* ⚠️ A ORIGINAL À VISTA NO COMPOSITOR. Sem ela, a paciente escreve
@@ -10494,5 +10801,94 @@ function SeloOficial() {
       />
       <path d="m10.8 15.3-3-3 1.3-1.3 1.7 1.7 4.1-4.1 1.3 1.3-5.4 5.4Z" fill="#fff" />
     </svg>
+  );
+}
+
+/**
+ * A LISTA DE QUEM ELA BLOQUEOU.
+ *
+ * ⚠️ **COMPONENTE PRÓPRIO por causa da BANCADA.** Ela era a única tela de
+ * segurança da aba sem bancada — e os três estados que mais importam (falhou,
+ * carregando, ninguém) não se fabricam numa conta de teste: seria preciso
+ * bloquear alguém de verdade, ou derrubar a rede na hora certa. Enquanto vivia
+ * dentro de `RedeNoApp`, olhar para ela era impossível.
+ *
+ * ⚠️ E ela NÃO busca nada: recebe tudo por prop, como o alerta de SOS e o
+ * prontuário. É o que torna a bancada possível sem uma linha de mudança no
+ * comportamento.
+ */
+export function ListaDeBloqueados({
+  pessoas,
+  aoVoltar,
+  aoDesbloquear,
+  aoTentarDeNovo,
+}: {
+  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = ninguém. */
+  pessoas: PessoaNaLista[] | "erro" | null;
+  aoVoltar: () => void;
+  aoDesbloquear: (id: string) => void;
+  aoTentarDeNovo: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Bloqueados</h1>
+      </header>
+      {/* ⚠️ A explicação diz o que o bloqueio faz e o que ele NÃO faz — a
+          pessoa bloqueada nunca é avisada, e isso é o que separa a proteção do
+          confronto. Sem a frase, ela hesita em bloquear alguém que conhece da
+          vida real. */}
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+        Quem está aqui não vê você na Comunidade, e não é avisada de nada.
+      </p>
+      {pessoas === "erro" ? (
+        /* ⚠️ "Você não bloqueou ninguém" sobre uma falha de leitura a faria
+           bloquear de novo — ou desistir de bloquear. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar a lista agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : pessoas === null ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto h-12 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : pessoas.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Você não bloqueou ninguém.
+        </p>
+      ) : (
+        <ul>
+          {pessoas.map((p) => (
+            <li key={p.id} className="flex items-center gap-2.5 py-2">
+              <Foto url={p.avatarUrl} nome={p.nome} lado={40} />
+              <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.nome}</span>
+              <button
+                type="button"
+                onClick={() => aoDesbloquear(p.id)}
+                className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+              >
+                Desbloquear
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

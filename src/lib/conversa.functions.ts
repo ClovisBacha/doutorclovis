@@ -27,6 +27,9 @@ import {
   podeIniciarConversa,
   previaDaMensagem,
   temNaoLida,
+  textoDaCitacao,
+  alvoDaCitacao,
+  reacaoDeMensagemConhecida,
 } from "./conversa";
 
 export type ConversaNaTela = {
@@ -62,6 +65,18 @@ export type MensagemNaTela = {
    * app afirmando que EU li, informação que ela não tem como conferir.
    */
   lidaPelaOutra?: boolean;
+  /**
+   * A mensagem citada, já resolvida — ou `null`.
+   *
+   * ⚠️ **Resolvida no SERVIDOR, e o texto vem CORTADO.** A citação existe para
+   * lembrar QUAL mensagem, não para reler; e mandar o texto inteiro faria a
+   * mensagem apagada voltar pela citação de outra.
+   */
+  citacao?: { id: string; deQuem: "eu" | "ela"; trecho: string } | null;
+  /** As reações desta mensagem: o emoji e quantas. */
+  reacoes?: { tipo: string; quantas: number }[];
+  /** A MINHA reação, ou `null`. */
+  minhaReacao?: string | null;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -352,11 +367,23 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
       return q;
     };
     let { data: linhas, error } = await buscar(
-      "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id",
+      "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id, responde_a",
     );
     let semCorpo = false;
+    /* ⚠️ Degrau NOVO, no topo: `responde_a` nasce no `APLICAR_DEZ_DA_REDE.sql`.
+       Sem a coluna a conversa continua inteira — só a citação some, que é o
+       estado de antes do recurso. Sem este degrau, o `42703` derrubaria a
+       leitura e a conversa pararia de abrir. */
+    if (error) {
+      ({ data: linhas, error } = await buscar(
+        "id, autor_id, texto, criada_em, apagada_em, imagem_path, ref_tipo, ref_id",
+      ));
+      if (!error) linhas = ((linhas ?? []) as any[]).map((l) => ({ ...l, responde_a: null }));
+      else console.warn("[conversa] sem responde_a — rode APLICAR_DEZ_DA_REDE.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await buscar("id, autor_id, texto, criada_em, apagada_em"));
+      if (!error) linhas = ((linhas ?? []) as any[]).map((l) => ({ ...l, responde_a: null }));
       semCorpo = true;
       console.warn("[conversa] sem imagem_path/ref — rode APLICAR_DIRECT_COMPLETO.sql");
     }
@@ -390,6 +417,58 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
       }
     }
 
+    /**
+     * AS CITAÇÕES E AS REAÇÕES — em LOTE, e fora do `.map()`.
+     *
+     * ⚠️ Uma consulta por mensagem seriam cinquenta idas ao banco por página, na
+     * tela que a paciente abre mais vezes que qualquer outra desta aba.
+     *
+     * ⚠️ **As citadas são buscadas por id, e SEM filtrar por conversa —
+     * porque o `.in()` já vem dos `responde_a` das mensagens DESTA conversa.**
+     * Um id forjado num `responde_a` seria de outra conversa; por isso o
+     * servidor confere no ENVIO (ver `enviarMensagem`), que é onde a coluna é
+     * escrita. Aqui, se por qualquer razão uma citada de fora aparecesse, ela é
+     * descartada logo abaixo pelo `daConversa`.
+     */
+    const idsCitados = [
+      ...new Set(brutas.map((m: any) => m.responde_a).filter(Boolean)),
+    ] as string[];
+    const citadas = new Map<string, any>();
+    if (idsCitados.length) {
+      const { data: cs } = await sb
+        .from("rede_mensagens")
+        .select("id, conversa_id, autor_id, texto, apagada_em, imagem_path, ref_tipo")
+        .in("id", idsCitados);
+      for (const c2 of (cs ?? []) as any[]) {
+        /* ⚠️ **A citada TEM de ser desta conversa.** Sem esta linha, um
+           `responde_a` apontando para outra conversa faria o trecho de uma
+           mensagem privada de terceiros aparecer aqui. */
+        if (c2.conversa_id !== data.conversaId) continue;
+        citadas.set(c2.id, c2);
+      }
+    }
+
+    /* As reações, em uma consulta só. ⚠️ Falha de leitura vira mapa VAZIO: sem
+       as reações a conversa continua inteira, e derrubá-la por um enfeite seria
+       trocar um agrado por uma tela vazia. */
+    const reacoesPor = new Map<string, Map<string, number>>();
+    const minhaReacaoEm = new Map<string, string>();
+    {
+      const { data: rs } = await sb
+        .from("rede_mensagem_reacoes")
+        .select("mensagem_id, quem_id, tipo")
+        .in(
+          "mensagem_id",
+          brutas.map((m: any) => m.id),
+        );
+      for (const r of (rs ?? []) as any[]) {
+        const m = reacoesPor.get(r.mensagem_id) ?? new Map<string, number>();
+        m.set(r.tipo, (m.get(r.tipo) ?? 0) + 1);
+        reacoesPor.set(r.mensagem_id, m);
+        if (r.quem_id === eu) minhaReacaoEm.set(r.mensagem_id, r.tipo);
+      }
+    }
+
     const mensagens: MensagemNaTela[] = brutas
       .map((m) => ({
         id: m.id,
@@ -409,6 +488,32 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
           criadaEm: m.criada_em,
           leituraDoOutro,
         }),
+        /* ⚠️ A citação some quando a PRÓPRIA mensagem é apagada — junto com o
+           texto e a foto, e pela mesma razão: nada da mensagem apagada viaja. */
+        citacao:
+          !m.apagada_em && m.responde_a && citadas.has(m.responde_a)
+            ? (() => {
+                const c2 = citadas.get(m.responde_a);
+                return {
+                  id: c2.id as string,
+                  deQuem: (c2.autor_id === eu ? "eu" : "ela") as "eu" | "ela",
+                  trecho: textoDaCitacao({
+                    texto: c2.texto ?? null,
+                    apagada: !!c2.apagada_em,
+                    /* ⚠️ Só o SINAL de que havia foto, nunca a URL: a citação não
+                       precisa carregar a imagem, e assiná-la seria uma viagem ao
+                       Storage por citação. */
+                    imagemUrl: c2.imagem_path ? "x" : null,
+                    refTipo: c2.ref_tipo ?? null,
+                  }),
+                };
+              })()
+            : null,
+        reacoes: [...(reacoesPor.get(m.id) ?? new Map()).entries()].map(([tipo, quantas]) => ({
+          tipo,
+          quantas: quantas as number,
+        })),
+        minhaReacao: minhaReacaoEm.get(m.id) ?? null,
       }))
       .reverse();
 
@@ -441,6 +546,8 @@ export const enviarMensagem = createServerFn({ method: "POST" })
         imagemPath: z.string().max(300).optional(),
         refTipo: z.enum(["post", "story"]).optional(),
         refId: z.string().uuid().optional(),
+        /** A mensagem citada. ⚠️ Conferida no handler: um nível só, e da MESMA conversa. */
+        respondeA: z.string().uuid().optional(),
       })
       .parse(i),
   )
@@ -539,13 +646,56 @@ export const enviarMensagem = createServerFn({ method: "POST" })
        `APLICAR_` recusa `imagem_path`/`ref_tipo` com `PGRST204` — e sem o
        recuo, ENVIAR pararia de funcionar para todo mundo por causa de um
        recurso novo. É a mesma lição de `marcarConsultaNoDia`. */
+    /**
+     * A CITAÇÃO — conferida aqui, porque a coluna aceita qualquer uuid.
+     *
+     * ⚠️ **DA MESMA CONVERSA, e a checagem é obrigatória.** Um `respondeA`
+     * apontando para outra conversa faria o trecho de uma mensagem privada de
+     * terceiros aparecer citado aqui. A leitura também confere (cinto e
+     * suspensório), mas quem grava é este ponto.
+     *
+     * ⚠️ **E UM NÍVEL SÓ**: `alvoDaCitacao` puxa a resposta de uma resposta de
+     * volta para a mensagem original. Sem isso, o segundo nível ficaria gravado
+     * e a tela — que só desenha um — deixaria a citação órfã.
+     *
+     * ⚠️ **Alvo inválido NÃO recusa a mensagem**: a citação é um enfeite de
+     * contexto, e derrubar o envio por causa dela seria perder o texto que ela
+     * escreveu. Vai sem citação.
+     */
+    let respondeA: string | null = null;
+    if (data.respondeA) {
+      const { data: alvo } = await sb
+        .from("rede_mensagens")
+        .select("id, conversa_id, responde_a")
+        .eq("id", data.respondeA)
+        .maybeSingle();
+      if (alvo && (alvo as any).conversa_id === data.conversaId) {
+        respondeA = alvoDaCitacao({
+          id: (alvo as any).id,
+          respondeA: ((alvo as any).responde_a ?? null) as string | null,
+        });
+      }
+    }
+
     const base = { conversa_id: data.conversaId, autor_id: eu, texto };
     let { error } = await sb.from("rede_mensagens").insert({
       ...base,
       imagem_path: data.imagemPath ?? null,
       ref_tipo: data.refTipo ?? null,
       ref_id: data.refId ?? null,
+      responde_a: respondeA,
     });
+    /* ⚠️ Degrau: `responde_a` nasce no `APLICAR_DEZ_DA_REDE.sql`. Sem ela, a
+       mensagem vai SEM a citação — e isso é aceitável porque a citação é
+       contexto, não conteúdo: o texto que ela escreveu chega inteiro. */
+    if (error) {
+      ({ error } = await sb.from("rede_mensagens").insert({
+        ...base,
+        imagem_path: data.imagemPath ?? null,
+        ref_tipo: data.refTipo ?? null,
+        ref_id: data.refId ?? null,
+      }));
+    }
     if (error) {
       /* ⚠️ Sem as colunas, uma mensagem que é SÓ foto viraria uma linha em
          branco — pior que a recusa, porque ela acha que mandou. */
@@ -771,6 +921,155 @@ export const marcarConversaLida = createServerFn({ method: "POST" })
  * ⚠️ E o TEXTO é apagado de verdade (`texto: ""`), não só marcado — deixar o
  * texto na linha manteria a mensagem legível para qualquer consulta futura.
  */
+/**
+ * REAGIR A UMA MENSAGEM (ou tirar a reação).
+ *
+ * Numa conversa de apoio — "estou com medo" às duas da manhã — um ❤️ custa nada
+ * e diz muito. Hoje ou ela escreve, ou fica em silêncio.
+ *
+ * ⚠️ **UMA POR PESSOA POR MENSAGEM, e quem garante é a chave primária.** Trocar
+ * a reação é um `upsert`; sem a chave, tocar em dois emojis seguidos deixaria os
+ * dois, e a conversa viraria um placar.
+ *
+ * ⚠️ **NÃO manda push.** É o mesmo canal do aviso de emergência, e um coração
+ * de madrugada é exatamente o que faz alguém desligar as notificações — e
+ * desligar leva junto o aviso da consulta e o retorno do SOS. Ela vê ao abrir a
+ * conversa, que é onde a reação tem sentido.
+ */
+export const reagirAMensagem = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        conversaId: z.string().uuid(),
+        mensagemId: z.string().uuid(),
+        /** `null` tira a reação. */
+        tipo: z.string().max(8).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    if (data.tipo !== null && !reacaoDeMensagemConhecida(data.tipo)) {
+      return { ok: false as const, motivo: "tipo" as const };
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **A CONVERSA É MINHA — conferido ANTES de qualquer escrita.** Sem isto,
+       um uuid de mensagem no corpo do pedido poria uma reação numa conversa de
+       terceiros, e a outra veria um emoji de alguém que não está ali. */
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "nao_e_minha" as const };
+
+    /* ⚠️ **E a mensagem tem de ser DESTA conversa.** `minhaConversa` prova que a
+       conversa é minha; sem esta segunda leitura, um `mensagemId` de outra
+       conversa passaria com um `conversaId` legítimo. */
+    const { data: msg, error: erroMsg } = await sb
+      .from("rede_mensagens")
+      .select("id, conversa_id, apagada_em")
+      .eq("id", data.mensagemId)
+      .maybeSingle();
+    if (erroMsg) return { ok: false as const, motivo: "banco" as const };
+    if (!msg || (msg as any).conversa_id !== data.conversaId) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+    /* Reagir a mensagem apagada é reagir ao que não existe mais. */
+    if ((msg as any).apagada_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    if (data.tipo === null) {
+      const { error } = await sb
+        .from("rede_mensagem_reacoes")
+        .delete()
+        .eq("mensagem_id", data.mensagemId)
+        .eq("quem_id", eu);
+      /* ⚠️ Este é um DELETE deliberado, e é o único do arquivo: tirar a própria
+         reação não deixa rastro nenhum a preservar. A linha nem é dela — é o
+         gesto dela sobre a mensagem de outra pessoa. */
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const, tipo: null };
+    }
+
+    const { error } = await sb
+      .from("rede_mensagem_reacoes")
+      .upsert(
+        { mensagem_id: data.mensagemId, quem_id: eu, tipo: data.tipo },
+        { onConflict: "mensagem_id,quem_id" },
+      );
+    /* ⚠️ Sem a tabela, a tela DIZ que não está pronto — nunca um "reagiu" mudo
+       sobre uma gravação que não aconteceu. */
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const, tipo: data.tipo };
+  });
+
+/**
+ * DENUNCIAR UMA MENSAGEM.
+ *
+ * ⚠️ **O DIRECT ERA O ÚNICO CANAL SEM DENÚNCIA — e é o mais privado.** Post,
+ * comentário, perfil e caixinha já tinham. Bloquear existe, mas bloquear não
+ * deixa rastro para a plataforma: a próxima paciente recebe a mesma coisa da
+ * mesma pessoa, e ninguém nunca soube.
+ *
+ * ⚠️ **O TRECHO É CONGELADO aqui**, como na denúncia de post: se ela apagar a
+ * mensagem depois, a fila continua sabendo o que foi denunciado. É a única cópia
+ * do texto que sai da conversa, e ela existe para a fila poder julgar.
+ *
+ * ⚠️ **E quem lê a fila NÃO recebe a conversa inteira** — só esta linha. A
+ * denúncia é sobre uma mensagem, e entregar o histórico seria a plataforma lendo
+ * uma conversa privada por causa de uma frase.
+ */
+export const denunciarMensagem = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        conversaId: z.string().uuid(),
+        mensagemId: z.string().uuid(),
+        motivo: z.enum(["assedio", "saude", "imagem", "spam", "outro"]),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "nao_e_minha" as const };
+
+    const { data: msg, error: erroMsg } = await sb
+      .from("rede_mensagens")
+      .select("id, conversa_id, autor_id, texto")
+      .eq("id", data.mensagemId)
+      .maybeSingle();
+    if (erroMsg) return { ok: false as const, motivo: "banco" as const };
+    if (!msg || (msg as any).conversa_id !== data.conversaId) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+    /* ⚠️ Denunciar a própria mensagem não quer dizer nada, e encheria a fila com
+       linhas que ninguém tem o que julgar. */
+    if ((msg as any).autor_id === eu)
+      return { ok: false as const, motivo: "indisponivel" as const };
+
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "mensagem",
+      alvo_id: data.mensagemId,
+      denunciada_id: (msg as any).autor_id,
+      quem_id: eu,
+      motivo: data.motivo,
+      trecho: ((msg as any).texto ?? "").slice(0, 500) || null,
+    });
+    /* ⚠️ Sem o CHECK novo, o banco recusa o alvo `mensagem` — e a tela DIZ, em
+       vez de prometer "fica registrada" sobre uma linha que não gravou. Esta é
+       a promessa que o app já quebrou uma vez, com `denunciado_em`. */
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
 export const apagarMensagem = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i),

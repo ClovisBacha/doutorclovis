@@ -49,6 +49,16 @@ export type ComentarioNaTela = {
    * abre no toque se quiser conferir. Ver `verDoComentario`.
    */
   recolhido?: boolean;
+  /** Instante em que a dona do post fixou este. `null` = não fixado. */
+  fixadoEm?: string | null;
+  /**
+   * ⚠️ Posso fixar ESTE? Vem do SERVIDOR, com a MESMA régua que `fixarComentario`
+   * aplica — uma segunda decisão na tela ofereceria "Fixar" numa resposta e o
+   * servidor recusaria depois do toque.
+   */
+  possoFixar?: boolean;
+  /** É meu? É ele que decide quem vê a lista de quem curtiu. */
+  souOAutor?: boolean;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -67,7 +77,8 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
  */
 async function postQueEuVejo(sb: any, postId: string, eu: string) {
   const { contextoDe } = await import("./rede-social.functions");
-  const { podeVerPost } = await import("./rede-social");
+  const { podeVerPost, QUEM_COMENTA_PADRAO } = await import("./rede-social");
+  const { foraDaRede } = await import("./rede-social.functions");
   const ctx = await contextoDe(sb, eu);
 
   /**
@@ -83,29 +94,52 @@ async function postQueEuVejo(sb: any, postId: string, eu: string) {
    * decisão — e a dona pode apagar. O inverso (tudo fechado) desligaria o
    * recurso inteiro sem ninguém entender por quê.
    */
-  const cheia = await sb
+  const comQuemComenta = await sb
     .from("rede_posts")
-    .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em")
+    .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em, quem_comenta")
     .eq("id", postId)
     .maybeSingle();
-  let data = cheia.data;
-  if (cheia.error) {
-    console.warn("[rede] sem comentarios_abertos — rode APLICAR_CONVERSA_E_COMENTARIOS.sql");
-    const velho = await sb
+  let data = comQuemComenta.data;
+  if (comQuemComenta.error) {
+    /* ⚠️ Degrau NOVO, no topo: `quem_comenta` nasce no `APLICAR_DEZ_DA_REDE`.
+       Sem ela, todo post aceita comentário de quem o vê — o estado de antes do
+       recurso, e o único seguro: fechar por não saber emudeceria conversas que
+       já existem. */
+    console.warn("[rede] sem quem_comenta — rode APLICAR_DEZ_DA_REDE.sql");
+    const cheia = await sb
       .from("rede_posts")
-      .select("id, autor_id, visibilidade, arquivado_em")
+      .select("id, autor_id, visibilidade, comentarios_abertos, arquivado_em")
       .eq("id", postId)
       .maybeSingle();
-    if (velho.error) return null;
-    data = velho.data ? { ...velho.data, comentarios_abertos: true } : null;
+    data = cheia.data ? { ...cheia.data, quem_comenta: QUEM_COMENTA_PADRAO } : null;
+    if (cheia.error) {
+      console.warn("[rede] sem comentarios_abertos — rode APLICAR_CONVERSA_E_COMENTARIOS.sql");
+      const velho = await sb
+        .from("rede_posts")
+        .select("id, autor_id, visibilidade, arquivado_em")
+        .eq("id", postId)
+        .maybeSingle();
+      if (velho.error) return null;
+      data = velho.data
+        ? { ...velho.data, comentarios_abertos: true, quem_comenta: QUEM_COMENTA_PADRAO }
+        : null;
+    }
   }
   if (!data || data.arquivado_em) return null;
 
-  const { data: autor, error: erroAutor } = await sb
-    .from("patient_profiles")
-    .select("id, care_mode, perfil_publico")
-    .eq("id", data.autor_id)
-    .maybeSingle();
+  /* ⚠️ **DEGRAU, e ele é obrigatório aqui.** Sem `rede_pausada_em` o `42703`
+     cai em `erroAutor` e a função RECUSA — ou seja, COMENTAR pararia de
+     funcionar para todo mundo por causa de uma coluna que ainda não existe
+     naquele banco. O recuo lê sem ela e trata como "não pausada", que é o que
+     um banco sem a coluna significa. */
+  const lerAutor = (colunas: string) =>
+    sb.from("patient_profiles").select(colunas).eq("id", data.autor_id).maybeSingle();
+  let { data: autor, error: erroAutor } = await lerAutor(
+    "id, care_mode, perfil_publico, rede_pausada_em",
+  );
+  if (erroAutor) {
+    ({ data: autor, error: erroAutor } = await lerAutor("id, care_mode, perfil_publico"));
+  }
   /* ⚠️ Falha de leitura do AUTOR recusa. Sem saber se ele está em Modo Cuidado
      ou se o perfil é público, publicar o comentário seria decidir visibilidade
      no escuro — e o lado seguro aqui é não deixar comentar. */
@@ -119,7 +153,7 @@ async function postQueEuVejo(sb: any, postId: string, eu: string) {
   const vejo = podeVerPost({
     post: { autorId: data.autor_id, visibilidade: data.visibilidade },
     euId: eu,
-    autor: { emCuidado: !!autor.care_mode, publico: !!autor.perfil_publico },
+    autor: { emCuidado: foraDaRede(autor), publico: !!autor.perfil_publico },
     bloqueado: ctx.bloqueio.has(data.autor_id),
     sigoAtivo: ctx.sigo.has(data.autor_id),
     somosAmigas: ctx.amigas.has(data.autor_id),
@@ -154,9 +188,21 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
         .is("apagado_em", null)
         .order("criado_em", { ascending: true })
         .limit(200);
+    /* ⚠️ **UM DEGRAU POR SQL, e nunca um salto ao mínimo.** `fixado_em` nasce
+       no `APLICAR_DEZ_DA_REDE` e `responde_a` no `APLICAR_COMENTARIOS_E_LIMITES`
+       — são dois arquivos, e existe um banco real que rodou o segundo e não o
+       primeiro. Um recuo de dois passos apagaria as RESPOSTAS por causa de uma
+       coluna de fixar: a conversa em árvore, que já funciona, viraria uma lista
+       plana em silêncio. */
     let { data: linhas, error } = await lerComentarios(
-      "id, autor_id, texto, criado_em, responde_a",
+      "id, autor_id, texto, criado_em, responde_a, fixado_em",
     );
+    if (error) {
+      ({ data: linhas, error } = await lerComentarios(
+        "id, autor_id, texto, criado_em, responde_a",
+      ));
+      console.warn("[comentarios] sem fixado_em — rode APLICAR_DEZ_DA_REDE.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await lerComentarios("id, autor_id, texto, criado_em"));
       console.warn("[comentarios] sem responde_a — rode APLICAR_COMENTARIOS_E_LIMITES.sql");
@@ -166,6 +212,8 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
     const linhasArr = (linhas ?? []) as any[];
     const autores = [...new Set(linhasArr.map((c) => c.autor_id))];
     const { contextoDe } = await import("./rede-social.functions");
+    const { apertarQuemComenta, podeComentar, quemComentaDe } = await import("./rede-social");
+    const { podeFixarComentario } = await import("./comentarios");
     const ctx = await contextoDe(sb, eu);
 
     const { data: perfis } = await sb
@@ -285,15 +333,51 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
           euCurti: euCurti.has(c.id),
           oculto: visao.marca,
           recolhido: visao.revelavel,
+          fixadoEm: (c.fixado_em ?? null) as string | null,
+          possoFixar: podeFixarComentario({
+            euId: eu,
+            donaDoPost: post.autor_id,
+            ehRaiz: !c.responde_a,
+            oculto: visao.marca,
+          }),
+          souOAutor: c.autor_id === eu,
         };
       })
       .filter(Boolean) as ComentarioNaTela[];
 
+    /* ⚠️ **A ORDEM SAI DO SERVIDOR, e não da tela.** Ordenar no componente
+       faria a lista pular de lugar depois da primeira pintura — e a régua tem
+       de ser a mesma que decide quem PODE fixar, senão um `fixado_em` gravado
+       numa resposta por uma versão anterior a arrancaria da conversa. */
+    const { ordenarComentariosComFixado } = await import("./comentarios");
+
     return {
       ok: true as const,
-      comentarios,
+      comentarios: ordenarComentariosComFixado(comentarios),
       abertos: post.comentarios_abertos !== false,
       souADona: post.autor_id === eu,
+      /**
+       * ⚠️ **EU POSSO COMENTAR NESTE POST?**
+       *
+       * Vem do SERVIDOR, com a MESMA régua que o `comentar` usa — uma segunda
+       * decisão na tela ofereceria o campo e o servidor recusaria depois de ela
+       * ter escrito. É o defeito que "Responder" com os comentários fechados já
+       * teve aqui.
+       */
+      possoComentar: podeComentar({
+        euId: eu,
+        autorId: post.autor_id,
+        quemComenta: apertarQuemComenta({
+          visibilidade: post.visibilidade as any,
+          quemComenta: quemComentaDe((post as any).quem_comenta),
+        }),
+        sigoAtivo: ctx.sigo.has(post.autor_id),
+        somosAmigas: ctx.amigas.has(post.autor_id),
+      }),
+      quemComenta: apertarQuemComenta({
+        visibilidade: post.visibilidade as any,
+        quemComenta: quemComentaDe((post as any).quem_comenta),
+      }),
     };
   });
 
@@ -333,6 +417,35 @@ export const comentar = createServerFn({ method: "POST" })
     /* ⚠️ A dona pode ter FECHADO os comentários daquele post. */
     if (post.comentarios_abertos === false) {
       return { ok: false as const, motivo: "fechados" as const };
+    }
+
+    /**
+     * ⚠️ **E QUEM PODE COMENTAR — a camada que faltava.**
+     *
+     * `podeVerPost` já rodou dentro de `postQueEuVejo`: quem chega aqui VÊ a
+     * publicação. Esta régua recorta DENTRO de quem vê, que é exatamente o que o
+     * app não tinha: até agora era tudo ou nada (fechar para todo mundo).
+     *
+     * ⚠️ **A camada é APERTADA contra a visibilidade antes de decidir.** Um post
+     * `amigas` gravado com `quem_comenta: todos` (versão antiga do app, ou corpo
+     * montado à mão) não pode virar uma porta mais larga que a própria
+     * publicação.
+     */
+    {
+      const { contextoDe } = await import("./rede-social.functions");
+      const { apertarQuemComenta, podeComentar, quemComentaDe } = await import("./rede-social");
+      const ctx = await contextoDe(sb, eu);
+      const permitido = podeComentar({
+        euId: eu,
+        autorId: post.autor_id,
+        quemComenta: apertarQuemComenta({
+          visibilidade: post.visibilidade as any,
+          quemComenta: quemComentaDe((post as any).quem_comenta),
+        }),
+        sigoAtivo: ctx.sigo.has(post.autor_id),
+        somosAmigas: ctx.amigas.has(post.autor_id),
+      });
+      if (!permitido) return { ok: false as const, motivo: "so_convidadas" as const };
     }
 
     const ontem = new Date(Date.now() - 86400_000).toISOString();
@@ -742,4 +855,155 @@ export const minhasPalavrasOcultas = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) return { ok: true as const, palavras: [] as string[] };
     return { ok: true as const, palavras: (p?.palavras_ocultas ?? []) as string[] };
+  });
+
+/**
+ * FIXAR UM COMENTÁRIO — a curadoria da conversa, e ela é da dona do POST.
+ *
+ * ⚠️ **QUEM FIXA É A DONA DO POST, nunca a autora do comentário.** Fixar é pôr
+ * uma frase no topo da conversa DELA; se a autora do comentário pudesse fixar o
+ * próprio, qualquer pessoa poria a própria opinião acima de todas as outras
+ * embaixo da foto de outra — que é o oposto exato de curadoria.
+ *
+ * ⚠️ **E UM SÓ.** Fixar o segundo desafixa o primeiro, no mesmo pedido: uma
+ * recusa ("desafixe o outro antes") faria a dona do post ter de descobrir qual
+ * é o outro, numa lista de oitenta comentários.
+ */
+export const fixarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        comentarioId: z.string().uuid(),
+        fixar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ O comentário é lido COM a coluna `responde_a`: é ela que diz se isto é
+       raiz, e a régua recusa fixar resposta. Sem ela (banco atrás), tratamos
+       como raiz — é o que ele era antes de a árvore existir. */
+    const lerAlvo = (colunas: string) =>
+      sb.from("rede_comentarios").select(colunas).eq("id", data.comentarioId).maybeSingle();
+    let { data: c, error: erroC } = await lerAlvo("id, post_id, autor_id, apagado_em, responde_a");
+    if (erroC) {
+      ({ data: c, error: erroC } = await lerAlvo("id, post_id, autor_id, apagado_em"));
+    }
+    if (erroC) return { ok: false as const, motivo: "banco" as const };
+    if (!c || (c as any).apagado_em) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ **O PORTÃO DE DONO vem antes de qualquer escrita**, e é o `autor_id` do
+       POST, não o do comentário. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id")
+      .eq("id", (c as any).post_id)
+      .maybeSingle();
+    if (!post || (post as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { podeFixarComentario } = await import("./comentarios");
+    if (
+      data.fixar &&
+      !podeFixarComentario({
+        euId: eu,
+        donaDoPost: (post as any).autor_id,
+        ehRaiz: !(c as any).responde_a,
+        oculto: null,
+      })
+    ) {
+      return { ok: false as const, motivo: "so_raiz" as const };
+    }
+
+    if (!data.fixar) {
+      const { error } = await sb
+        .from("rede_comentarios")
+        .update({ fixado_em: null })
+        .eq("id", data.comentarioId);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const };
+    }
+
+    /* ⚠️ **DESAFIXA O ANTERIOR PRIMEIRO, e a ordem importa.** Ao contrário do
+       bloqueio — onde a ordem existe para o estado intermediário ser o gesto
+       MENOR —, aqui o intermediário ruim é o oposto: se a fixação nova falhar
+       depois de a antiga sair, ela fica sem nenhum fixado, que é reversível com
+       um toque. Fixando primeiro, uma falha na limpeza deixaria DOIS fixados e
+       a tela mostraria dois topos. */
+    const { error: erroLimpa } = await sb
+      .from("rede_comentarios")
+      .update({ fixado_em: null })
+      .eq("post_id", (c as any).post_id)
+      .not("fixado_em", "is", null);
+    if (erroLimpa) return { ok: false as const, motivo: "sem_suporte" as const };
+
+    const { error } = await sb
+      .from("rede_comentarios")
+      .update({ fixado_em: new Date().toISOString() })
+      .eq("id", data.comentarioId);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * QUEM CURTIU ESTE COMENTÁRIO — e a lista é de quem ESCREVEU o comentário.
+ *
+ * ⚠️ **NÃO é da dona do post.** O `quemReagiuAoPost` é da autora do post porque
+ * as reações são sobre a publicação DELA; aqui as curtidas são sobre a frase de
+ * quem comentou. Dar a lista à dona do post transformaria a conversa embaixo
+ * das fotos dela num painel de auditoria de quem apoia quem — numa base em que
+ * as pacientes se conhecem da vida real, é a informação que mais gera atrito.
+ *
+ * ⚠️ **E o portão vem ANTES da leitura**, como em toda lista desta aba: com ele
+ * depois, um `comentarioId` qualquer devolveria a lista antes da recusa.
+ */
+export const quemCurtiuComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), comentarioId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c } = await sb
+      .from("rede_comentarios")
+      .select("id, autor_id, apagado_em")
+      .eq("id", data.comentarioId)
+      .maybeSingle();
+    if (!c || (c as any).apagado_em || (c as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { data: linhas, error } = await sb
+      .from("rede_comentario_curtidas")
+      .select("quem_id")
+      .eq("comentario_id", data.comentarioId)
+      .limit(200);
+    /* ⚠️ Falha de leitura devolve ERRO, e nunca lista vazia: "ninguém curtiu"
+       sobre um comentário com o número 12 do lado é a tela se contradizendo. */
+    if (error) return { ok: false as const, motivo: "banco" as const };
+
+    const ids = [...new Set(((linhas ?? []) as any[]).map((l) => l.quem_id as string))];
+    if (ids.length === 0) return { ok: true as const, pessoas: [] };
+
+    const { perfisPorId, naFileira, contextoDe } = await import("./rede-social.functions");
+    /* Duas idas independentes, na mesma onda. */
+    const [perfis, ctx] = await Promise.all([perfisPorId(sb, ids), contextoDe(sb, eu)]);
+    /* ⚠️ **QUEM ELA BLOQUEOU NÃO APARECE.** A curtida continua contando — o
+       número é do comentário, não da lista —, mas ver o nome de quem ela
+       bloqueou é exatamente o que bloquear existe para impedir. */
+    const pessoas = ids
+      .filter((id) => !ctx.bloqueio.has(id))
+      .map((id) => perfis.get(id))
+      .filter(Boolean)
+      .map((p: any) => naFileira(p));
+    return { ok: true as const, pessoas };
   });

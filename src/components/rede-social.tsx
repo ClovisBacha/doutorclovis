@@ -84,6 +84,8 @@ function Avatar({
 export type BancadaDaRede = {
   perfil?: PerfilNaTela;
   pedidos?: { id: string; nome: string; avatarUrl: string | null }[];
+  /** ⚠️ Só a bancada: a pausa nasce do servidor e exige sessão. */
+  pausada?: boolean;
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -380,6 +382,7 @@ export function ConfiguracoesDoPerfil({
         setPerfil(r.perfil);
         setBio(r.perfil.bio ?? "");
         setPedidos(r.pedidos as typeof pedidos);
+        setPausada(!!(r as { pausada?: boolean }).pausada);
       }
     } catch {
       /* Sem perfil a seção some. */
@@ -393,6 +396,40 @@ export function ConfiguracoesDoPerfil({
   }, [careMode]);
 
   const totalPedidos = useMemo(() => pedidos.length, [pedidos]);
+
+  /**
+   * ⚠️ **A PAUSA É ESTADO PRÓPRIO, e não um campo de `perfil`.** `PerfilNaTela`
+   * é o mesmo tipo que descreve o perfil de OUTRA pessoa — e a pausa de
+   * terceiro nunca viaja, de propósito: quem abre um perfil pausado recebe
+   * "indisponível" e nada mais. Um campo no tipo compartilhado seria a porta
+   * para ele vazar um dia.
+   */
+  const [pausada, setPausada] = useState(!!bancada?.pausada);
+
+  async function pausar(ligar: boolean) {
+    setSalvando(true);
+    /* Pinta antes: é um interruptor, e esperar a rede o deixaria inerte. */
+    setPausada(ligar);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) throw new Error("sem sessão");
+      const { pausarMinhaRede } = await import("@/lib/rede-social.functions");
+      const r = await pausarMinhaRede({ data: { accessToken: token, pausar: ligar } });
+      if (!r.ok) throw new Error("recusado");
+      toast.success(
+        ligar ? "Conta pausada. Ninguém te encontra por enquanto." : "Sua conta voltou 💛",
+      );
+    } catch {
+      /* ⚠️ **Desfaz na tela.** Dizer "pausado ✓" sobre uma conta que continua
+         visível é a pior mentira desta tela: ela publicaria achando que
+         ninguém está vendo. */
+      setPausada(!ligar);
+      toast.error("Não deu para mudar agora. Sua conta continua como estava.");
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   if (careMode || !perfil) return null;
 
@@ -629,6 +666,49 @@ export function ConfiguracoesDoPerfil({
           )}
         </section>
       )}
+
+      {/* ─── PAUSAR A CONTA ──────────────────────────────────────────────
+          ⚠️ **O MEIO-TERMO QUE NÃO EXISTIA.** Havia apagar (a LGPD,
+          irreversível) e o Modo Cuidado, que é para o luto. Faltava o mais
+          comum: sumir por um tempo e voltar inteira.
+
+          ⚠️ **O texto diz o que NÃO acontece**, e é a parte que faz alguém usar
+          o botão: quem não tem certeza de que as fotos ficam não pausa — vai
+          embora de vez, ou fica sem descansar. */}
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="font-semibold">Pausar a minha conta</h3>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              {pausada
+                ? "Sua conta está pausada: ninguém te encontra e as suas publicações não aparecem para mais ninguém."
+                : "Você some da Comunidade por um tempo. Nada é apagado — fotos, stories, conversas e amizades ficam, e voltam do jeito que estavam."}
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={pausada}
+            aria-label="Pausar a minha conta"
+            disabled={salvando}
+            onClick={() => void pausar(!pausada)}
+            className={`press mt-0.5 h-7 w-12 shrink-0 rounded-full transition-colors ${
+              pausada ? "bg-primary" : "bg-muted"
+            }`}
+          >
+            <span
+              className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                pausada ? "translate-x-[22px]" : "translate-x-0.5"
+              }`}
+            />
+          </button>
+        </div>
+        {/* ⚠️ **NINGUÉM É AVISADO, e a tela diz isso.** Sem a frase, ela pausa
+            imaginando que a amiga vai receber "Fulana pausou" — e não pausa. */}
+        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+          Ninguém é avisado. É só voltar aqui para reativar.
+        </p>
+      </section>
 
       {/* ─── O QUE O SEU PERFIL CONTA ────────────────────────────────────
           ⚠️ DUAS chaves, e nunca uma. Uma só obrigaria quem quer publicar o

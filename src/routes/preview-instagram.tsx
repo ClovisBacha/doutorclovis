@@ -76,6 +76,7 @@ import {
   type Story,
   TelaDaTag,
   ArquivoDeStories,
+  ListaDeBloqueados,
 } from "@/components/rede-instagram";
 import type {
   AtividadeNaTela,
@@ -317,6 +318,9 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      publicação fixada de verdade, e a fixação é justamente o que muda a ORDEM
      da grade. */
   fixadoEm: null,
+  /* ⚠️ `?soAmigas=1` fecha o comentário do primeiro post — o estado em que a
+     tela mostra "só as amigas dela podem comentar" em vez do campo. */
+  quemComenta: "todos" as const,
 }));
 
 /* A fileira de stories: os dois primeiros ACESOS, o resto apagado — é o
@@ -977,6 +981,10 @@ function Bancada() {
         respondeA: null,
         curtidas: 3,
         euCurti: true,
+        /* ⚠️ Duas raízes com "Fixar" — é o que a produção entrega (o servidor
+           dá `possoFixar` a toda raiz não-oculta), e é a única forma de ver se
+           a linha de ações ainda cabe a 393px com o quarto rótulo. */
+        possoFixar: true,
       },
       {
         id: "k1r1",
@@ -1037,6 +1045,26 @@ function Bancada() {
         respondeA: null,
         curtidas: 0,
         euCurti: false,
+        /* ⚠️ **O SELO DE FIXADO e o "Fixar" só existem para a dona do post** —
+           e a régua roda no servidor, então sem a bancada eles exigiriam uma
+           publicação de verdade com um comentário de verdade fixado nela. */
+        fixadoEm: "2026-08-24T11:00:00Z",
+        possoFixar: true,
+      },
+      {
+        /* ⚠️ **O NÚMERO SÓ VIRA BOTÃO PARA QUEM ESCREVEU.** Este é meu, com
+           curtidas: é o único jeito de fotografar a folha "Quem curtiu". */
+        id: "k5",
+        autorId: "eu",
+        autorNome: "Você",
+        autorAvatar: null,
+        texto: "obrigada, meninas 💛",
+        criadoEm: "2026-08-24T10:08:00Z",
+        possoApagar: true,
+        respondeA: null,
+        curtidas: 3,
+        euCurti: false,
+        souOAutor: true,
       },
       /* ⚠️ As DUAS marcas de oculto, que só a dona do post recebe — e que são
          impossíveis de fotografar sem uma restrição e um filtro ativos. */
@@ -1073,7 +1101,16 @@ function Bancada() {
       <div className="mx-auto max-w-[430px] pt-6">
         <Comentarios
           postId="00000000-0000-0000-0000-000000000001"
-          bancada={{ comentarios: meus, abertos: conversa !== "fechados", souADona: true }}
+          bancada={{
+            comentarios: meus,
+            abertos: conversa !== "fechados",
+            souADona: true,
+            curtidas: [
+              { id: "u2", nome: "Carol", avatarUrl: null },
+              { id: "u3", nome: "Bruna", avatarUrl: null },
+              { id: "u4", nome: "Ana Paula", avatarUrl: null },
+            ],
+          }}
         />
       </div>
     );
@@ -1134,7 +1171,9 @@ function Bancada() {
     return (
       <div className="mx-auto max-w-[430px]">
         <MandarPublicacao
-          postId="p1"
+          /* ⚠️ `?alvo=story` mostra o título próprio do story — a mesma folha
+             serve os dois, e o texto é a única coisa que muda. */
+          alvo={{ tipo: quadro === 1 ? "story" : "post", id: "p1" }}
           aoFechar={() => history.back()}
           bancada={vazio ? [] : CONVERSAS_DE_MENTIRA}
         />
@@ -1353,6 +1392,34 @@ function Bancada() {
           posts={vazio ? [] : POSTS.slice(0, 3)}
           aoVoltar={() => history.back()}
           aoDesarquivar={(p) => alert(`traria de volta o post ${p.id}`)}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "bloqueados") {
+    /**
+     * ⚠️ **A ÚNICA TELA DE SEGURANÇA DA ABA SEM BANCADA, até aqui.** Os três
+     * estados que mais importam não se fabricam numa conta de teste: `?erro=1`
+     * (a leitura falhou — e "você não bloqueou ninguém" sobre uma falha a faria
+     * bloquear de novo), `?vazio=1` (ninguém) e o carregando.
+     */
+    const pessoas =
+      instavel === 1
+        ? ("erro" as const)
+        : vazio
+          ? []
+          : [
+              { id: "b1", nome: "Cunhada", avatarUrl: null, bio: null, sigo: null, souEu: false },
+              { id: "b2", nome: "Alguém", avatarUrl: null, bio: null, sigo: null, souEu: false },
+            ];
+    return (
+      <div className="mx-auto max-w-[430px] px-4 pt-2">
+        <ListaDeBloqueados
+          pessoas={pessoas}
+          aoVoltar={() => history.back()}
+          aoDesbloquear={(id) => alert(`desbloquearia ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria a lista")}
         />
       </div>
     );

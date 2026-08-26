@@ -15,7 +15,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ConversaNaTela, MensagemNaTela } from "@/lib/conversa.functions";
-import { BYTES_DA_FOTO, LIMITE_DA_MENSAGEM } from "@/lib/conversa";
+import {
+  BYTES_DA_FOTO,
+  LIMITE_DA_MENSAGEM,
+  REACOES_DE_MENSAGEM,
+  textoDaCitacao,
+} from "@/lib/conversa";
+import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import {
   EXPLICACAO_DA_SUGESTAO,
   RASCUNHO_DA_PRIMEIRA,
@@ -358,6 +364,12 @@ export function Conversa({
   const [pedido, setPedido] = useState(bancada?.pedido ?? conversa.pedido);
   /** A mensagem que ela tocou, esperando confirmação para apagar. */
   const [apagando, setApagando] = useState<string | null>(null);
+  /** A mensagem cuja folha de ações está aberta. */
+  const [acaoEm, setAcaoEm] = useState<string | null>(null);
+  /** A mensagem que estou citando ao escrever. */
+  const [citando, setCitando] = useState<MensagemNaTela | null>(null);
+  /** A mensagem que estou denunciando (a folha do motivo). */
+  const [denunciando, setDenunciando] = useState<string | null>(null);
   const [euIniciei, setEuIniciei] = useState(bancada?.euIniciei ?? conversa.euIniciei);
   const [silenciada, setSilenciada] = useState(false);
   /** O cursor da página anterior; `null` = já cheguei no começo da conversa. */
@@ -508,6 +520,79 @@ export function Conversa({
    * volta ao rodapé — exatamente fora do trecho que ela subiu para ler. Quem
    * impede é a comparação por ID do efeito, não este bloco.
    */
+  /**
+   * REAGIR — pinta na hora e desfaz se o servidor recusar.
+   *
+   * ⚠️ **Otimista aqui, ao contrário do fixar e do destacar.** Nada pode
+   * recusar uma reação a não ser uma falha de rede: não há teto, não há
+   * contagem a conferir. E numa conversa a resposta precisa ser imediata — um
+   * emoji que só aparece meio segundo depois lê como toque que não pegou.
+   */
+  async function reagir(mensagemId: string, tipo: string | null) {
+    setAcaoEm(null);
+    const antes = mensagens;
+    setMensagens((ms) =>
+      ms.map((m) => {
+        if (m.id !== mensagemId) return m;
+        const semAMinha = (m.reacoes ?? [])
+          .map((r) => (r.tipo === m.minhaReacao ? { ...r, quantas: r.quantas - 1 } : r))
+          .filter((r) => r.quantas > 0);
+        const comANova = tipo
+          ? (() => {
+              const achou = semAMinha.find((r) => r.tipo === tipo);
+              return achou
+                ? semAMinha.map((r) => (r.tipo === tipo ? { ...r, quantas: r.quantas + 1 } : r))
+                : [...semAMinha, { tipo, quantas: 1 }];
+            })()
+          : semAMinha;
+        return { ...m, reacoes: comANova, minhaReacao: tipo };
+      }),
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { reagirAMensagem } = await import("@/lib/conversa.functions");
+      const r = await reagirAMensagem({
+        data: { accessToken: t, conversaId: conversa.id, mensagemId, tipo },
+      });
+      if (!r.ok) {
+        setMensagens(antes);
+        const { toast } = await import("sonner");
+        toast.error(
+          r.motivo === "sem_suporte"
+            ? "Reagir ainda não está pronto no servidor."
+            : "Não deu para reagir agora.",
+        );
+      }
+    } catch {
+      setMensagens(antes);
+    }
+  }
+
+  /** Denunciar uma mensagem. */
+  async function denunciar(mensagemId: string, motivo: MotivoDaDenuncia) {
+    setDenunciando(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarMensagem } = await import("@/lib/conversa.functions");
+      const r = await denunciarMensagem({
+        data: { accessToken: t, conversaId: conversa.id, mensagemId, motivo },
+      });
+      const { toast } = await import("sonner");
+      /* ⚠️ O recado NÃO promete uma providência, e diz o que é verdade: fica
+         registrada, e quem escreveu não é avisada. É a mesma frase da denúncia
+         de post — prometer "vamos remover" seria a promessa que este app já
+         quebrou uma vez. */
+      if (r.ok) toast.success("Denúncia registrada. Quem escreveu não é avisada.");
+      else if (r.motivo === "sem_suporte") toast.error("Denunciar ainda não está pronto aqui.");
+      else toast.error("Não deu para denunciar agora.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para denunciar agora.");
+    }
+  }
+
   async function verAnteriores() {
     if (!antesDe || buscandoAntigas) return;
     setBuscandoAntigas(true);
@@ -601,11 +686,23 @@ export function Conversa({
       }
 
       const r = await mod.enviarMensagem({
-        data: { accessToken: tk, conversaId: conversa.id, texto: t, imagemPath },
+        data: {
+          accessToken: tk,
+          conversaId: conversa.id,
+          texto: t,
+          imagemPath,
+          /* ⚠️ Lido ANTES de zerar: `setCitando(null)` é assíncrono, e ler o
+             estado depois dele mandaria `undefined` — a resposta sairia solta,
+             sem dizer a que ela responde. */
+          respondeA: citando?.id,
+        },
       });
       if (r.ok) {
         setTexto("");
         setFoto(null);
+        /* ⚠️ A citação some SÓ depois de o envio dar certo: numa falha ela
+           continua ali, e o segundo toque manda a resposta certa. */
+        setCitando(null);
         /* ⚠️ **O AVISO CLÍNICO É PARA QUEM ESCREVEU, e a mensagem FOI enviada.**
            A régua não censura conversa privada entre duas adultas — ela lembra
            quem escreveu de que aquilo é experiência, não conduta. Esconder o
@@ -694,15 +791,24 @@ export function Conversa({
           </div>
         )}
         {mensagens.map((m) => (
-          <div key={m.id} className={`mb-1.5 flex ${m.souEu ? "justify-end" : "justify-start"}`}>
-            {/* ⚠️ **SÓ A MINHA MENSAGEM É TOCÁVEL, e o servidor confere de novo.**
-                Apagar a mensagem da outra pessoa não é "apagar para mim" — seria
-                reescrever a conversa dela. O `.eq("autor_id", eu)` do servidor é
-                quem manda; isto aqui só evita oferecer o que seria recusado. */}
+          /* ⚠️ **COLUNA, e não linha.** A reação é irmã do balão e pendura
+             EMBAIXO dele; num `flex` de linha os dois ficariam lado a lado e a
+             reação empurraria o texto. O alinhamento horizontal passou para
+             `items-*`. */
+          <div
+            key={m.id}
+            className={`mb-1.5 flex flex-col ${m.souEu ? "items-end" : "items-start"}`}
+          >
+            {/* ⚠️ **O TOQUE ABRE A FOLHA DE AÇÕES, e não mais só o apagar.**
+                Antes só a MINHA mensagem era tocável, porque a única ação era
+                apagar. Agora toda mensagem viva tem o que fazer — responder e
+                reagir valem para as duas, apagar só para a minha e denunciar só
+                para a dela. Quem confere cada uma continua sendo o servidor;
+                isto aqui só evita oferecer o que seria recusado. */}
             <div
-              onClick={() => m.souEu && !m.apagada && setApagando(m.id)}
+              onClick={() => !m.apagada && setAcaoEm(m.id)}
               className={`max-w-[78%] rounded-2xl px-3 py-2 text-[14px] leading-snug ${
-                m.souEu && !m.apagada ? "cursor-pointer" : ""
+                !m.apagada ? "cursor-pointer" : ""
               } ${
                 m.apagada
                   ? "bg-muted/50 italic text-muted-foreground"
@@ -723,6 +829,24 @@ export function Conversa({
                       alt="Foto enviada na conversa"
                       className="mb-1 max-h-[340px] w-full rounded-xl object-contain"
                     />
+                  )}
+                  {/* ⚠️ **A CITAÇÃO VEM ANTES DE TUDO, e é UMA LINHA.** Ela
+                      existe para lembrar QUAL mensagem, não para reler: uma
+                      citação de cinco linhas empurra a resposta para fora da
+                      tela e inverte a hierarquia. O corte é do servidor
+                      (`textoDaCitacao`), e não daqui — a tela não decide o que
+                      cabe numa citação. */}
+                  {m.citacao && (
+                    <span
+                      className={`mb-1 block border-l-2 pl-2 text-[12px] leading-snug ${
+                        m.souEu ? "border-white/40 opacity-80" : "border-foreground/25 opacity-70"
+                      }`}
+                    >
+                      <span className="block font-semibold">
+                        {m.citacao.deQuem === "eu" ? "Você" : conversa.comNome}
+                      </span>
+                      <span className="line-clamp-1 block">{m.citacao.trecho}</span>
+                    </span>
                   )}
                   {/* ⚠️ **O ANEXO É UM CARTÃO, e não o conteúdo inteiro.** Um
                       story vive 24 h: desenhá-lo aqui faria a conversa mostrar
@@ -756,10 +880,172 @@ export function Conversa({
                 </>
               )}
             </div>
+            {/* ⚠️ **AS REAÇÕES PENDURAM NA BORDA DO BALÃO**, meio para fora: é
+                assim que se lê como "reação AO balão" e não como mais uma
+                mensagem. E elas ficam FORA do `<div>` do balão para não herdar o
+                fundo dele — sobre o roxo da minha mensagem, um emoji some. */}
+            {(m.reacoes ?? []).length > 0 && (
+              <span
+                className={`-mt-1.5 flex gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[12px] shadow-sm ${
+                  m.souEu ? "mr-1 self-end" : "ml-1 self-start"
+                }`}
+              >
+                {(m.reacoes ?? []).map((r) => (
+                  <span key={r.tipo}>
+                    {r.tipo}
+                    {r.quantas > 1 && (
+                      <span className="ml-0.5 align-middle text-[10px] tabular-nums">
+                        {r.quantas}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </span>
+            )}
           </div>
         ))}
         <div ref={fim} />
       </div>
+
+      {/* ─── A FOLHA DE AÇÕES DA MENSAGEM ──────────────────────────────────
+          ⚠️ **Os seis emojis ficam NA PRIMEIRA LINHA, acima dos itens de
+          texto.** Reagir é o gesto mais frequente e o mais barato; pô-lo atrás
+          de um item de lista faria a ação de um toque custar dois. */}
+      {acaoEm &&
+        (() => {
+          const m = mensagens.find((x) => x.id === acaoEm);
+          if (!m) return null;
+          return (
+            <div className="shrink-0 border-t border-border px-4 py-3">
+              <div className="flex justify-between gap-1">
+                {REACOES_DE_MENSAGEM.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    onClick={() => void reagir(m.id, m.minhaReacao === e ? null : e)}
+                    aria-label={m.minhaReacao === e ? `Tirar ${e}` : `Reagir com ${e}`}
+                    aria-pressed={m.minhaReacao === e}
+                    className={`press flex h-11 w-11 items-center justify-center rounded-full text-[20px] ${
+                      m.minhaReacao === e ? "bg-muted" : ""
+                    }`}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-1 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCitando(m);
+                    setAcaoEm(null);
+                  }}
+                  className="press min-h-[44px] rounded-full border border-border px-4 text-[13px] font-medium"
+                >
+                  Responder
+                </button>
+                {m.souEu ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAcaoEm(null);
+                      setApagando(m.id);
+                    }}
+                    className="press min-h-[44px] rounded-full border border-border px-4 text-[13px] font-medium"
+                  >
+                    Apagar
+                  </button>
+                ) : (
+                  /* ⚠️ **Denunciar só na mensagem DELA.** Denunciar a própria não
+                     quer dizer nada e encheria a fila com linhas que ninguém tem
+                     o que julgar — o servidor recusa, e a tela não oferece. */
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAcaoEm(null);
+                      setDenunciando(m.id);
+                    }}
+                    className="press min-h-[44px] rounded-full border border-border px-4 text-[13px] font-medium text-destructive"
+                  >
+                    Denunciar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAcaoEm(null)}
+                  className="press ml-auto min-h-[44px] px-3 text-[13px] text-muted-foreground"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+      {/* ⚠️ **A DENÚNCIA PRECISA DO MOTIVO** — sem ele a fila da plataforma não
+          sabe o que julgar. É a mesma folha da denúncia de post, com a mesma
+          lista fechada: campo aberto numa denúncia de app de gestação é onde
+          alguém escreve a informação clínica de outra pessoa. */}
+      {denunciando && (
+        <div className="shrink-0 border-t border-border px-4 py-3">
+          <p className="text-[13px] font-semibold">Por que você está denunciando?</p>
+          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+            Fica registrada para a gente olhar, e quem escreveu não é avisada.
+          </p>
+          <div className="mt-2 flex flex-col gap-1">
+            {MOTIVOS.map((mo) => (
+              <button
+                key={mo.motivo}
+                type="button"
+                onClick={() => void denunciar(denunciando, mo.motivo)}
+                className="press min-h-[44px] rounded-xl border border-border px-3 text-left"
+              >
+                <span className="block text-[13px] font-medium">{mo.rotulo}</span>
+                <span className="block text-[11px] leading-snug text-muted-foreground">
+                  {mo.explica}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setDenunciando(null)}
+              className="press min-h-[44px] text-[13px] text-muted-foreground"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ⚠️ **A BARRA DA CITAÇÃO FICA COLADA NO COMPOSITOR**, e não no topo da
+          tela: ela descreve o que ESTE texto vai responder, e longe do campo
+          deixaria de ser óbvio o que está sendo citado. O × é o que desiste. */}
+      {citando && (
+        <div className="flex shrink-0 items-center gap-2 border-t border-border bg-muted/40 px-4 py-2">
+          <span className="min-w-0 flex-1 border-l-2 border-foreground/25 pl-2">
+            <span className="block text-[11px] font-semibold">
+              Respondendo {citando.souEu ? "a você" : `a ${conversa.comNome}`}
+            </span>
+            <span className="line-clamp-1 block text-[12px] text-muted-foreground">
+              {textoDaCitacao({
+                texto: citando.texto,
+                apagada: citando.apagada,
+                imagemUrl: citando.imagemUrl,
+                refTipo: citando.refTipo,
+              })}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setCitando(null)}
+            aria-label="Cancelar resposta"
+            className="press flex h-11 w-11 shrink-0 items-center justify-center text-[15px] text-muted-foreground"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* ⚠️ **CONFIRMAÇÃO EM MENSAGEM SEPARADA, e não o mesmo balão virando
           "tem certeza?".** É a mesma decisão do cancelar consulta, pedida pelo
@@ -946,12 +1232,26 @@ export function Conversa({
  * isso, mandar um post da camada `amigas` a quem não é amiga entregaria o
  * conteúdo pela porta dos fundos — e o remetente nem saberia que fez isso.
  */
+/**
+ * A FOLHA DE "MANDAR PARA UMA CONVERSA".
+ *
+ * ⚠️ **Uma folha só, para post E story** — e é por isso que ela recebe `ref` em
+ * vez de `postId`. Duas folhas divergiriam no primeiro ajuste, e a régua que
+ * importa (só conversas que JÁ existem) precisaria ser escrita duas vezes.
+ *
+ * ⚠️ **E o story precisa MAIS disto que o post: ele expira em 24 h.** Mandar é
+ * justamente o que o salva — e antes o post podia ser mandado e o story não.
+ */
 export function MandarPublicacao({
-  postId,
+  /* ⚠️ **`alvo`, e NUNCA `ref`.** `ref` é prop reservada do React: passá-la
+     assim não chega ao componente como uma prop comum, e o `tsc` só reclama
+     porque o tipo não bate — em JavaScript puro isso viraria `undefined` em
+     silêncio. */
+  alvo,
   aoFechar,
   bancada,
 }: {
-  postId: string;
+  alvo: { tipo: "post" | "story"; id: string };
   aoFechar: () => void;
   bancada?: ConversaNaTela[];
 }) {
@@ -986,7 +1286,7 @@ export function MandarPublicacao({
       if (!t) return;
       const { enviarMensagem } = await import("@/lib/conversa.functions");
       const r = await enviarMensagem({
-        data: { accessToken: t, conversaId: c.id, refTipo: "post", refId: postId },
+        data: { accessToken: t, conversaId: c.id, refTipo: alvo.tipo, refId: alvo.id },
       });
       /* ⚠️ Só marca "Enviado" se o servidor confirmou — a trava de
          uma-mensagem-antes-do-aceite recusa aqui como recusa em qualquer outro
@@ -1011,7 +1311,9 @@ export function MandarPublicacao({
         onClick={(e) => e.stopPropagation()}
         className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl bg-card p-4 pb-[max(1rem,var(--safe-area-inset-bottom))]"
       >
-        <p className="text-[15px] font-semibold">Mandar para</p>
+        <p className="text-[15px] font-semibold">
+          {alvo.tipo === "story" ? "Mandar este story para" : "Mandar para"}
+        </p>
         {lista === null ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">Carregando…</p>
         ) : lista.length === 0 ? (

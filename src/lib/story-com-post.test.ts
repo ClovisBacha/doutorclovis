@@ -48,19 +48,28 @@ describe("⚠️ a ESCRITA: só publicação pública, de perfil público", () =
        reprovaria uma limpeza de tipos que não muda garantia nenhuma. É o
        defeito que já custou quatro testes nesta base. */
     expect(regra).toMatch(/dono[^)]*\)?\.perfil_publico/);
-    expect(regra).toMatch(/dono[^)]*\)?\.care_mode/);
+    /* ⚠️ O estado da dona (luto OU pausa) passa pela régua única `foraDaRede`.
+       Travar `care_mode` aqui reprovou a unificação das duas — e as duas
+       precisam esconder o quadro pelo mesmo caminho, senão a pausa vaza por
+       ele. */
+    expect(regra).toMatch(/!foraDaRede\(dono\)/);
   });
 
-  test("⚠️ e `!!dono` vem na FRENTE, para o portão não fechar por acidente", () => {
-    /* Sem ele, `!dono?.care_mode` com `dono` indefinido dá `true` e o que
-       segurava a corrente seria o termo anterior dar `false`. Depender de
-       acidente é como um portão reabre no próximo conserto. */
+  test("⚠️ e o portão do PERFIL vem ANTES de ler a coluna dele", () => {
+    /**
+     * ⚠️ **É proteção contra ESTOURO, e não estética.** `foraDaRede` responde
+     * `true` para perfil ausente, então pô-lo primeiro curto-circuita o `&&`
+     * antes de tocar em `.perfil_publico` — que num `undefined` lança. A versão
+     * anterior fazia o mesmo trabalho com um `!!dono &&` na frente; ao trocar
+     * as duas condições por uma função só, eu inverti a ordem e reintroduzi
+     * exatamente o estouro. Foi este teste que pegou.
+     */
     const i = C.indexOf("const vale =");
     const regra = C.slice(i, C.indexOf(";", i));
-    const iDono = regra.indexOf("!!dono &&");
-    const iCuidado = regra.search(/!\(?dono/);
-    expect(iDono).toBeGreaterThan(-1);
-    expect(iDono).toBeLessThan(iCuidado);
+    const iPortao = regra.indexOf("!foraDaRede(dono)");
+    const iColuna = regra.search(/dono[^)]*\)?\.perfil_publico/);
+    expect(iPortao).toBeGreaterThan(-1);
+    expect(iPortao).toBeLessThan(iColuna);
   });
 
   test("⚠️ arquivada não vale", () => {

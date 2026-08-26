@@ -41,7 +41,22 @@ describe("⚠️ o silêncio fecha as três portas do FEED", () => {
   });
 
   test("a fileira de stories também", () => {
-    expect(corpoDe("storiesDoFeed")).toContain("ctx.silenciados.has(id)");
+    /**
+     * ⚠️ **O QUE SE COBRA É A GARANTIA, e não a grafia.** Este teste travava a
+     * string `ctx.silenciados.has(id)` e ficou vermelho no dia em que os
+     * stories ganharam silêncio PRÓPRIO (`cala_stories`) — reprovando um código
+     * estritamente melhor. É a oitava vez que uma asserção literal reprova uma
+     * melhoria neste repositório: o que importa é que a fileira RECORTE pelo
+     * silêncio, e qual dos dois conjuntos ela usa é decisão do produto.
+     */
+    const c = corpoDe("storiesDoFeed");
+    expect(c).toMatch(/ctx\.silenciados(Stories)?\.has\(id\)/);
+  });
+
+  test("⚠️ e é o conjunto dos STORIES, não o dos posts", () => {
+    /* Um conjunto só faria a escolha existir no banco e não existir na tela:
+       ela silenciaria os stories e continuaria vendo os stories. */
+    expect(corpoDe("storiesDoFeed")).toContain("ctx.silenciadosStories.has(id)");
   });
 
   test("⚠️ e a zona de SUGERIDOS, que era o buraco", () => {

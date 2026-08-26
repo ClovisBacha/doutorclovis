@@ -800,3 +800,88 @@ export function storyAlcanca(v: {
   if (v.euId === v.autorId) return true;
   return v.camada === "amigas" ? v.somosAmigas : true;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   QUEM PODE COMENTAR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **O POST ESCOLHE QUEM VÊ; NINGUÉM ESCOLHIA QUEM RESPONDE.**
+ *
+ * Hoje é tudo ou nada — `comentarios_abertos` fecha para todo mundo. Num app
+ * cuja decisão central foi limitar conselho de leiga (os 20,9% de respostas
+ * erradas medidos em fóruns de gestação), "só amigas podem comentar" é a peça
+ * que faltava: ela deixa a publicação visível e restringe QUEM opina.
+ *
+ * ⚠️ **O padrão é `todos`**, que é o comportamento de hoje. Fechar por padrão
+ * emudeceria as conversas já existentes sem ninguém ter pedido.
+ */
+export type QuemComenta = "todos" | "seguidores" | "amigas";
+
+export const QUEM_COMENTA_PADRAO: QuemComenta = "todos";
+
+export const QUEM_COMENTA: { chave: QuemComenta; rotulo: string; sub: string }[] = [
+  { chave: "todos", rotulo: "Todo mundo", sub: "Quem puder ver a publicação" },
+  { chave: "seguidores", rotulo: "Quem me segue", sub: "Só quem acompanha você" },
+  { chave: "amigas", rotulo: "Só amigas", sub: "Quem você já conhece" },
+];
+
+/** Limpa o que vem do cliente. Desconhecido cai no padrão. */
+export function quemComentaDe(bruto: unknown): QuemComenta {
+  return bruto === "seguidores" || bruto === "amigas" ? bruto : QUEM_COMENTA_PADRAO;
+}
+
+/**
+ * A camada de comentário NUNCA pode ser mais aberta que a de visibilidade.
+ *
+ * ⚠️ **Quem não vê não comenta — e sem esta régua a tela prometeria o
+ * contrário.** Um post da camada `amigas` com "todo mundo pode comentar" é uma
+ * combinação sem sentido: as pessoas a quem "todo mundo" se refere não veem a
+ * publicação. Oferecer a combinação faria a autora acreditar que abriu a
+ * conversa quando não abriu nada.
+ *
+ * A ordem de abertura é `publico` > `seguidores` > `amigas`; a de comentário
+ * usa as duas últimas mais `todos`, que equivale a "todos os que veem".
+ */
+const ABERTURA: Record<Visibilidade, number> = { publico: 3, seguidores: 2, amigas: 1 };
+const ABERTURA_DO_COMENTARIO: Record<QuemComenta, number> = {
+  todos: 3,
+  seguidores: 2,
+  amigas: 1,
+};
+
+export function apertarQuemComenta(v: {
+  visibilidade: Visibilidade;
+  quemComenta: QuemComenta;
+}): QuemComenta {
+  /* ⚠️ `todos` num post `publico` continua `todos` — ali "todos os que veem" É
+     todo mundo. O aperto só acontece quando a publicação é mais fechada. */
+  if (ABERTURA_DO_COMENTARIO[v.quemComenta] <= ABERTURA[v.visibilidade]) return v.quemComenta;
+  return v.visibilidade === "amigas" ? "amigas" : "seguidores";
+}
+
+/**
+ * Esta pessoa pode comentar nesta publicação?
+ *
+ * ⚠️ **A autora sempre pode**, inclusive no próprio post fechado: responder a
+ * quem comentou é o uso mais comum, e uma régua que a barrasse tornaria a opção
+ * "só amigas" inutilizável para quem não tem amigas na rede ainda.
+ *
+ * ⚠️ **E ela NÃO substitui `podeVerPost`.** Quem não vê a publicação não chega
+ * ao campo de comentário; esta régua recorta DENTRO de quem já vê.
+ */
+export function podeComentar(v: {
+  euId: string;
+  autorId: string;
+  quemComenta: QuemComenta;
+  sigoAtivo: boolean;
+  somosAmigas: boolean;
+}): boolean {
+  if (v.euId === v.autorId) return true;
+  if (v.quemComenta === "todos") return true;
+  if (v.quemComenta === "amigas") return v.somosAmigas;
+  /* `seguidores`: quem SEGUE a autora. ⚠️ Amiga entra também — o grafo de
+     amizade deste app é um vínculo mais forte que seguir, e barrar a amiga que
+     não segue seria a régua contradizendo a própria escada. */
+  return v.sigoAtivo || v.somosAmigas;
+}

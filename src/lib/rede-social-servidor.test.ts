@@ -147,14 +147,14 @@ describe("Modo Cuidado", () => {
     // perda de quem entrou em luto.
     const c = corpoDe("verPerfil").replace(/\s+/g, " ");
     expect(c).toContain(
-      "if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu))",
+      "if (foraDaRede(a) || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu))",
     );
     expect(c).toContain('motivo: "indisponivel" as const');
     expect(c).not.toMatch(/motivo: ["'`](luto|bloqueada|cuidado)/);
   });
 
   test("⚠️ quem está em Modo Cuidado some da fila de PEDIDOS", () => {
-    expect(corpoDe("meuPerfilSocial")).toContain("q.care_mode");
+    expect(corpoDe("meuPerfilSocial")).toContain("foraDaRede(q)");
   });
 });
 
@@ -401,7 +401,7 @@ describe("reagir ao story", () => {
   test("⚠️ só reage quem enxerga o story", () => {
     const c = corpoDe("reagirAoStory").replace(/\s+/g, " ");
     expect(c).toContain("const podeVer =");
-    expect(c).toContain("!autor.care_mode");
+    expect(c).toContain("!foraDaRede(autor)");
     expect(c).toContain("ctx.bloqueio.has(");
     const conferiu = c.indexOf("const podeVer =");
     const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
@@ -477,8 +477,20 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
   test("⚠️ as listas de recuo são DERIVADAS, nunca copiadas à mão", () => {
     /* Duas listas escritas à mão divergem no primeiro ajuste — e aqui a
        divergência aparece como recurso sumindo, sem erro nenhum. */
-    for (const lista of ["COLUNAS_SEM_ARROBA", "COLUNAS_SEM_FEED", "COLUNAS_SEM_OFICIAL"]) {
-      expect({ lista, derivada: listaDe(lista).includes("COLUNAS_DO_PERFIL") }).toEqual({
+    /* ⚠️ **DERIVA DE ALGUMA lista, e não obrigatoriamente da CHEIA.** O teste
+       travava `COLUNAS_DO_PERFIL` e ficou vermelho no dia em que um degrau NOVO
+       (a pausa) entrou no topo — e os de baixo passaram a derivar dele, que é
+       exatamente o certo: um degrau que continuasse pedindo a coluna que o
+       degrau acima já provou não existir cairia pela mesma razão. O que importa
+       é a derivação, e nunca de qual constante. */
+    for (const lista of [
+      "COLUNAS_SEM_PAUSA",
+      "COLUNAS_SEM_ARROBA",
+      "COLUNAS_SEM_FEED",
+      "COLUNAS_SEM_OFICIAL",
+    ]) {
+      const corpo = listaDe(lista);
+      expect({ lista, derivada: /COLUNAS_(DO_PERFIL|SEM_\w+)\.replace/.test(corpo) }).toEqual({
         lista,
         derivada: true,
       });
@@ -488,10 +500,11 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
   test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
     const c = CODIGO_REDE.replace(/\s+/g, " ");
     /* A entrada cai no degrau mais ALTO, não direto no fundo. */
-    expect(c).toContain("error ? await semAColunaDoArroba(sb, faltando)");
+    expect(c).toContain("error ? await semAColunaDaPausa(sb, faltando)");
     /* E cada degrau conhece o seguinte. Um degrau que não chama o de baixo é
        um degrau que devolve lista vazia — e `montarPosts` descarta todo post
        cujo autor não está no Map: feed vazio, sem erro nenhum. */
+    expect(c).toContain("if (error) return semAColunaDoArroba(sb, ids)");
     expect(c).toContain("if (error) return semAColunaDoFeed(sb, ids)");
     expect(c).toContain("if (error) return semAColunaNova(sb, ids)");
     expect(c).toContain("if (error) return semAsColunasDoSelo(sb, ids)");
@@ -507,7 +520,13 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
       .map((x) => x.trim())
       .filter(Boolean);
     /* As que nasceram depois do degrau do selo têm de aparecer num `replace`. */
-    for (const nova of ["conta_oficial", "feed_so_seguindo", "handle", "quem_pode_mencionar"]) {
+    for (const nova of [
+      "rede_pausada_em",
+      "conta_oficial",
+      "feed_so_seguindo",
+      "handle",
+      "quem_pode_mencionar",
+    ]) {
       expect({ nova, naPrincipal: principais.includes(nova) }).toEqual({ nova, naPrincipal: true });
       /* ⚠️ **PROCURA DENTRO DOS `replace(...)`, e não no arquivo inteiro.**
          A primeira versão desta linha era `CODIGO_REDE.includes("handle, ")` —
@@ -815,7 +834,7 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
     // Sem isso a sugestão vira a porta dos fundos da busca, e o Modo Cuidado
     // volta à tela de estranhas pela lateral.
     expect(C).toContain("podeAparecerNaBusca({");
-    expect(C).toContain("emCuidado: !!p.care_mode");
+    expect(C).toContain("emCuidado: foraDaRede(p)");
   });
 
   test("⚠️ o post é montado por `montarPosts`, nunca à mão", () => {
@@ -1249,7 +1268,7 @@ describe("a marcação respeita o bloqueio", () => {
     expect(corpo).toContain("bloqueio: { has(id: string): boolean }");
     expect(corpo).toContain("if (bloqueio.has(l.quem_id)) continue;");
     /* E o Modo Cuidado continua ao lado — são dois portões, não um. */
-    expect(corpo).toContain("p.care_mode");
+    expect(corpo).toContain("foraDaRede(p)");
   });
 
   test("⚠️ e quem passa é o `ctx.bloqueio` de quem está vendo", () => {
@@ -1321,7 +1340,7 @@ describe("gravar as marcações", () => {
 
   test("e o bloqueio e o Modo Cuidado continuam fechando", () => {
     expect(corpo).toContain("ctx.bloqueio.has(id)");
-    expect(corpo).toContain("emCuidado: !p || !!p.care_mode");
+    expect(corpo).toContain("emCuidado: foraDaRede(p)");
   });
 });
 
@@ -1362,7 +1381,7 @@ describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
   /* ⚠️ Derivada, nunca copiada: duas listas escritas à mão divergem no primeiro
      ajuste, e aqui a divergência apareceria como recurso sumindo, sem erro. */
   test("⚠️ a lista do meio é DERIVADA da cheia", () => {
-    expect(CODIGO).toContain('COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")');
+    expect(CODIGO).toContain('COLUNAS_SEM_PAUSA.replace("conta_oficial, ", "")');
   });
 
   /* ⚠️ Ausente vale `false` nos DOIS degraus — nunca `undefined` viajando até
@@ -1677,7 +1696,11 @@ describe("⚠️ o quadro da republicação respeita o PERFIL, não só a camada
     const c = CODIGO.replace(/\s+/g, " ");
     const i = c.indexOf("originais.set(");
     const bloco = c.slice(Math.max(0, i - 700), i);
-    expect(bloco).toMatch(/if \(!a \|\|/);
+    /* ⚠️ **`foraDaRede` FALHA FECHADO e vem PRIMEIRO na corrente** — perfil
+       ausente responde `true`, o `||` curto-circuita e a linha nunca toca em
+       `a.perfil_publico` (que num `undefined` lançaria). É o mesmo trabalho que
+       o `if (!a ||` fazia, agora numa régua só, e ela cobre a PAUSA junto. */
+    expect(bloco).toMatch(/if \(foraDaRede\(a\) \|\|/);
     expect(bloco).not.toContain("a?.care_mode");
   });
 
@@ -1707,7 +1730,7 @@ describe("⚠️ o quadro da republicação respeita o PERFIL, não só a camada
      */
     const semSelect = regra.replace(/\.select\([^)]*\)/g, "");
     expect(semSelect).toMatch(/donoDoOriginal\??\.perfil_publico/);
-    expect(semSelect).toMatch(/donoDoOriginal\??\.care_mode/);
+    expect(semSelect).toMatch(/foraDaRede\(donoDoOriginal\)/);
     expect(regra).toContain('visibilidade === "publico"');
   });
 });
