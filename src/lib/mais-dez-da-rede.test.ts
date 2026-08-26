@@ -335,14 +335,19 @@ describe("⚠️ 9 · marcar alguém num story", () => {
   test("⚠️ o `id` volta do INSERT, e não de uma leitura depois", () => {
     /* Reler "o story mais novo dela" seria uma corrida: dois aparelhos
        publicando no mesmo instante marcariam a pessoa no story errado. */
+    /* ⚠️ A garantia é o id vir de QUEM GRAVOU, e não de uma leitura posterior.
+       Ele mudou de casa quando a escada virou `inserirDescendo` — a asserção
+       segue a garantia, e o `.select("id")` é cobrado onde ele mora. */
     const C = corpoDe(REDE, "publicarStory");
-    expect(C).toContain('.select("id")');
-    expect(C).toMatch(/let novoId: string \| null = null/);
+    expect(C).toContain("const novoId = gravado.id");
+    const escada = semProsa(REDE);
+    const i = escada.indexOf("export async function inserirDescendo");
+    expect(escada.slice(i, escada.indexOf("\nexport ", i + 10))).toContain('.select("id")');
   });
 
   test("⚠️ marca DEPOIS de o story existir, e a falha não derruba a publicação", () => {
     const C = corpoDe(REDE, "publicarStory");
-    const iInsert = C.indexOf(".insert({");
+    const iInsert = C.indexOf("inserirDescendo(");
     const iMarcar = C.indexOf('gravarMarcacoes(sb, eu, novoId, data.marcadas ?? [], "story")');
     expect(iMarcar).toBeGreaterThan(iInsert);
     expect(C.slice(iMarcar, iMarcar + 200)).not.toContain("return { ok: false");

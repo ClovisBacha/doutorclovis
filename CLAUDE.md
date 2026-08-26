@@ -6342,6 +6342,7 @@ se perdeu.
 `duracao_seg` com degraus, leitura assinando a URL, `AUDIO_TIPOS` e
 `extensaoDoAudio` prontos — e **nem gravador, nem player**. Um recurso inteiro
 existindo só do lado que ninguém vê.
+
 - ⚠️ **`gravar()` roda DENTRO do toque, sem `await` antes** — `getUserMedia`
   exige gesto no iOS, e depois de uma espera o gesto já passou. Mesma armadilha
   do `destravar()` dos Sons para dormir e do gravador do diário.
@@ -6533,6 +6534,151 @@ ledger, `"x"` é chave válida — todo mundo precisa de uma. Numa memória, "n�
 de que gestação isto é" tem de significar NÃO MOSTRAR: carimbar `"x"` faria as
 publicações de todas as gestações sem marco caírem no mesmo balde e voltarem umas
 para as outras.
+
+### ⚠️ DOIS VAZAMENTOS DE VISIBILIDADE NO STORY, e o vídeo (ago/2026)
+
+Achados ao começar o vídeo no story. Os dois estavam de pé com a suíte inteira
+verde, `tsc` limpo e as bancadas bonitas — e os dois falham em SILÊNCIO.
+
+#### ⚠️ 1. A FILEIRA NUNCA LEU `visibilidade`
+
+A escada de leitura de `storiesDoFeed` era escrita à mão, quatro degraus, e
+**nenhum deles pedia a coluna**: todos preenchiam `visibilidade: "seguidores"`
+por conta própria. **O story marcado "só amigas" era entregue, na fileira, a
+TODA seguidora** — ela abria, lia e via a foto.
+
+⚠️ **E o portão existia.** `storyQueEuVejo` — o caminho da AÇÃO (votar, reagir,
+denunciar) — lê a coluna certinho, e o comentário dele diz com todas as letras
+que a régua única existe para o afago não chegar "vindo de quem nunca devia ter
+visto aquilo". O caminho da ação foi consertado e **o caminho de VER ficou de
+pé**. Consertar metade de uma régua é como um vazamento sobrevive a uma
+auditoria.
+
+Hoje a leitura passa por `COLUNAS_DO_STORY` + `DEGRAUS_DO_STORY` +
+`storiesCrus`, no mesmo desenho de `postsCrus`: uma lista só, degraus derivados
+dela por remoção.
+
+#### ⚠️ 2. `publicarStory` GRAVAVA DUAS VEZES — uma mina armada pelo SQL
+
+Um `insert` com uma leva de colunas e, logo abaixo, **outro** com uma leva
+diferente, sem conferir se o primeiro tinha dado certo. Num banco com as duas
+levas os dois passam: **todo story publicado em duplicata**.
+
+⚠️ **E a segunda cópia não levava `visibilidade`**, então caía no
+`DEFAULT 'seguidores'` do banco: um story marcado "só amigas" ia inteiro para
+TODAS as seguidoras — exatamente o vazamento que o comentário do degrau dizia
+estar impedindo, entrando pela porta do degrau de cima.
+
+⚠️ **Hoje não dispara porque o dono ainda não rodou
+`APLICAR_CONTEUDO_DA_REDE.sql`. Ele se arma no instante em que ele rodar o SQL
+que a documentação manda rodar.** É a forma mais cara de defeito deste
+repositório: uma coluna nova que, CHEGANDO, quebra um recurso antigo.
+
+`inserirDescendo` é a escada única: começa cheia, tira uma camada de SQL por
+vez, e **exatamente um insert dá certo**, porque o laço para no primeiro que não
+devolve erro. ⚠️ E cada degrau sabe se descer é RECUSA — descer por cima de uma
+escolha dela (camada fechada, vídeo, carrossel de quatro fotos) publica outra
+coisa em silêncio.
+
+#### `semAsColunas` — a remoção que INVENTAVA coluna, e a catraca que passava
+
+As duas escadas tinham a própria cópia do par de `replace`. A do story era
+segura **por ACIDENTE**: `motivo_sensivel` calha de ser a última da lista, então
+a forma `alvo, ` não encontrava a vírgula que a arma — e a mutação que tira o
+`\b` **passou verde**. A primeira coluna acrescentada depois dela traria o
+defeito de volta, em silêncio.
+
+Uma função para as duas, e o par adversarial mora sobre ELA, onde a ordem da
+lista é escolhida para expor o defeito.
+
+#### O vídeo no story
+
+- ⚠️ **A CAPA NÃO É ENFEITE.** `imagem_path` é `NOT NULL`: sem ela o story de
+  vídeo não grava. E é ela que a BOLINHA da fileira desenha — a decisão de tocar
+  acontece ali, e um quadrado preto no convite é um story que ninguém abre.
+- ⚠️ **O quadro da capa é o de 0,1 s, nunca o de zero**: em muitos arquivos o
+  primeiro quadro é preto (fade de abertura do próprio celular).
+- ⚠️ **A capa tem TETO DE TEMPO**: arquivo que o navegador não decodifica
+  deixaria a tela presa em "enviando" para sempre, sem erro nenhum. E capa
+  impossível RECUSA o vídeo — nunca um story sem capa.
+- ⚠️ **A régua do arquivo é a MESMA do post** (`recusaDoVideo`): duas réguas
+  para "que vídeo cabe aqui" fariam o app aceitar no story o que recusa no post.
+  A duração vem do decodificador, então a capa (que a devolve) roda ANTES da
+  recusa.
+- ⚠️ **O arquivo vai DIRETO para o Storage**, com URL assinada — 50 MB pelo
+  servidor estouraria o limite de corpo. E o caminho é conferido contra a PASTA
+  dela no servidor: sem isso, um corpo montado à mão penduraria no story dela o
+  vídeo de outra paciente.
+- ⚠️ **Com vídeo, o carrossel não é oferecido**: um story é ou o vídeo, ou a
+  sequência de fotos, e a segunda foto viraria um story que nunca aparece.
+- ⚠️ **`playsInline` e `muted`**: sem o primeiro o iOS abre o player de tela
+  cheia do sistema e o story some por baixo dele; sem o segundo o navegador
+  recusa tocar sozinho, e ela veria um quadro parado sem saber que era vídeo.
+- ⚠️ **O VÍDEO manda no relógio** — cinco segundos cravados cortariam ao meio um
+  vídeo de vinte —, só se a duração for FINITA (`Infinity` faria o story nunca
+  avançar), e a duração ZERA na troca, senão o story seguinte herdaria o relógio
+  do vídeo anterior.
+
+#### ⚠️ E O VÉU DO STORY: dois defeitos que só a FOTO pegou
+
+Com `tsc` limpo, dezenove testes verdes e o console sem uma linha:
+
+1. ⚠️ **Tocar em "Toque para ver" AVANÇAVA o story.** O botão invisível
+   "Próximo" (`inset-y-0 right-0 w-2/3`) fica por cima do véu e engole o toque:
+   ela toca querendo decidir, o story passa, e o seguinte aparece sem véu
+   nenhum. **A decisão que a tela pede nunca acontecia.** É a mesma trava `z-20`
+   que a enquete e a caixinha já tinham, e o véu nasceu sem ela.
+2. ⚠️ **A fileira de emojis ficava à mostra sob o véu.** Ela reagiria a um story
+   que não viu, e o afago chegaria à caixa da autora vindo de quem não leu nada.
+   Sob o véu a tela pede UMA decisão, e mais nada é oferecido — nem reagir, nem
+   votar, nem perguntar, nem responder, nem o texto.
+
+E o véu SEGURA o relógio: um story sensível não pode passar sozinho enquanto ela
+decide se quer ver.
+
+#### ⚠️ APAGAR COMENTÁRIO POR TEXTO NÃO FUNCIONA NUM `.tsx` — as três formas
+
+Este arquivo já registra dez vezes que a prosa quebra teste de texto nos dois
+sentidos. Esta rodada mostrou que o CONSERTO usual também quebra:
+
+1. ⚠️ **Por regex** (`/\/\*[\s\S]*?\*\//g`): `accept="image/*,video/*"` tem um
+   `/*` DENTRO de uma string. O padrão abre um "comentário" ali e o fecha no
+   próximo fim de comentário de verdade, centenas de linhas abaixo. **Medido: o
+   bloco inteiro do vídeo do story sumia do fonte, e sete asserções ficavam
+   vermelhas sobre código correto.**
+2. ⚠️ **Por varredor que conhece strings**: em JSX, `'` e `"` aparecem como
+   TEXTO ("a capa é o primeiro quadro"), e o varredor abre uma string ali,
+   engolindo o que vier até a próxima aspa. **Medido: o `z-20` do véu
+   desaparecia da varredura estando no arquivo.**
+3. ⚠️ **E sem apagar nada, a prosa mente igual**: a fatia `<video …>` começava
+   DENTRO do comentário que escreve `<video>` para explicar o véu, engolindo o
+   elemento inteiro — a mutação que tirava `playsInline` passava verde.
+
+O que serve é mais barato e mais honesto: **ancorar em texto que só existe no
+CÓDIGO** — um `className=` inteiro, uma condição de JSX com as chaves, uma
+chamada com os parênteses. A prosa não escreve `className="absolute inset-0
+z-20`; ela fala de `z-20`. E o arquivo só faz asserção POSITIVA de propósito:
+um `not.toContain` ali é exatamente o caso em que a prosa mente.
+
+#### ⚠️ E a catraca de N+1 ganhou a primeira exceção NOMEADA
+
+`inserirDescendo` tem `await sb…` dentro de um `for`, e não é N+1: é um RECUO —
+a mesma gravação repetida tirando colunas, no máximo tantas vezes quantos
+degraus, **parando na primeira que dá certo**.
+
+⚠️ **A exceção é escrita porque `postsCrus` e `storiesCrus` escapam por
+ACIDENTE** (chamam `await monta(...)`, e o padrão procura `await sb`). Acidente
+não é proteção: nomear é o que impede alguém de "consertar" um falso positivo
+renomeando a variável. E há contraprova de que a varredura continua mordendo.
+
+⚠️ **Nove testes meus travavam a GRAFIA da escada antiga** — `.insert(`,
+`const base = {`, "são TRÊS degraus", a ordem entre os inserts. Os nove
+reprovaram sobre um conserto que só apertou a garantia. É a décima primeira vez
+nesta base; a régua continua sendo cobrar a GARANTIA, nunca a escrita.
+
+**Aplicar no Supabase:** `supabase/APLICAR_NOVE_DA_REDE.sql`.
+**Bancadas:** `/preview-instagram?tela=story&videoStory=1` ·
+`?tela=story&sensivelStory=1`.
 
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 

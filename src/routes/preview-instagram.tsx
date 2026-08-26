@@ -32,6 +32,8 @@
  *   /preview-instagram?tela=conferir → a conferência do story, com a moldura
  *   /preview-instagram?tela=conferir&selo=0 → sem semana para carimbar
  *   /preview-instagram?tela=story&carimbo=1 → o visor com a moldura
+ *   /preview-instagram?tela=story&videoStory=1 → o primeiro story é VÍDEO
+ *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -170,6 +172,10 @@ export const Route = createFileRoute("/preview-instagram")({
     selo: q.selo == null ? 1 : Number(q.selo),
     trancado: q.trancado == null ? false : !!q.trancado,
     carimbo: q.carimbo == null ? false : !!q.carimbo,
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    videoStory: q.videoStory == null ? 0 : Number(q.videoStory),
+    /* O story marcado como sensível: o véu só nasce de uma marca de verdade. */
+    sensivelStory: q.sensivelStory == null ? 0 : Number(q.sensivelStory),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -408,6 +414,8 @@ function Bancada() {
     selo,
     trancado,
     carimbo,
+    videoStory,
+    sensivelStory,
     desafio,
     caixinha,
     perguntas,
@@ -801,6 +809,17 @@ function Bancada() {
               }
             : null,
         perguntaAberta: n === 2,
+        /* ⚠️ **O VÍDEO só no PRIMEIRO story**, e o contraste é o ponto: os
+           outros dois continuam sendo foto, e é assim que dá para ver que o
+           player entra no lugar certo e que a barrinha do tempo passa a durar o
+           vídeo em vez dos cinco segundos cravados. */
+        videoUrl: videoStory === 1 && n === 0 ? "/sons/riacho.webm" : null,
+        /* ⚠️ Idem para o véu: marcado só no primeiro. Sem a bancada, conferir
+           esta tela exigiria uma conta de verdade publicando um story marcado —
+           e o véu some no primeiro toque, então ainda seria preciso acertar o
+           instante. */
+        sensivel: sensivelStory === 1 && n === 0,
+        motivoSensivel: sensivelStory === 1 && n === 0 ? "Perda gestacional" : null,
       })),
     };
     return (

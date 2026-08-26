@@ -1030,6 +1030,39 @@ const DEGRAUS_DO_POST: {
   },
 ];
 
+/**
+ * ⚠️ **TIRAR UMA COLUNA DA LISTA — e ela existe porque a remoção ingênua
+ * INVENTA uma coluna.**
+ *
+ * As duas formas precisam de fronteira. A primeira tira a coluna do meio ou do
+ * fim (`, alvo`); a segunda tira do COMEÇO (`alvo, `). **As duas rodam sempre**,
+ * e é a segunda que morde: depois de a primeira remover `sensivel`, a lista
+ * ainda tem `motivo_sensivel, video_legenda` — e sem `\b` o padrão
+ * `sensivel,\s*` casa DENTRO de `motivo_sensivel`, produzindo
+ * `motivo_video_legenda`. Uma coluna que não existe, fazendo todos os degraus
+ * abaixo falharem: o recuo despenca ao piso e apaga recursos que o banco TEM.
+ *
+ * É a armadilha de substring que este repositório já pagou em
+ * `bloquear`/`bloquearPeriodo` e em `minhaColuna`/`minhaColunaDeLeitura`, agora
+ * dentro de um recuo.
+ *
+ * ⚠️ **UMA função para as DUAS escadas** (posts e stories). A do story tinha a
+ * própria cópia, e ela era segura só por ACIDENTE: `motivo_sensivel` calha de
+ * ser a ÚLTIMA da lista, então a segunda forma não encontrava a vírgula que a
+ * arma. A primeira coluna acrescentada depois dela traria o defeito de volta,
+ * em silêncio — e foi assim que a mutação que tira o `\b` sobreviveu à primeira
+ * versão do teste da escada do story.
+ */
+export function semAsColunas(lista: string, colunas: string[]): string {
+  let saida = lista;
+  for (const c of colunas) {
+    saida = saida
+      .replace(new RegExp(`,\\s*\\b${c}\\b`), "")
+      .replace(new RegExp(`\\b${c}\\b,\\s*`), "");
+  }
+  return saida;
+}
+
 export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
   /* Começa com tudo e vai tirando uma camada por vez, do SQL mais NOVO para o
      mais antigo — a ordem em que o dono os aplica. */
@@ -1046,22 +1079,148 @@ export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any
     const degrau = DEGRAUS_DO_POST[i];
     if (!degrau) break;
     console.warn(`[rede] posts sem ${degrau.aviso}`);
-    /* ⚠️ **AS DUAS FORMAS PRECISAM DE FRONTEIRA, e a segunda não tinha.**
-       A primeira tira a coluna do meio ou do fim (`, alvo`); a segunda tira do
-       COMEÇO (`alvo, `). Sem `\b` na segunda, remover `sensivel` comia o miolo
-       de `motivo_sensivel` e produzia `motivo_video_legenda` — uma coluna que
-       não existe, fazendo TODOS os degraus abaixo falharem. É a armadilha de
-       substring que este repositório já pagou em `bloquear`/`bloquearPeriodo` e
-       em `minhaColuna`/`minhaColunaDeLeitura`, agora dentro de um recuo. */
-    for (const c of degrau.colunas) {
-      colunas = colunas
-        .replace(new RegExp(`,\\s*\\b${c}\\b`), "")
-        .replace(new RegExp(`\\b${c}\\b,\\s*`), "");
-    }
+    /* ⚠️ A fronteira mora em `semAsColunas` — ver o porquê lá. */
+    colunas = semAsColunas(colunas, degrau.colunas);
     Object.assign(nulos, degrau.nulos);
   }
   /* Nem o piso respondeu: aqui o banco não tem sequer as colunas originais, e
      devolver lista vazia é a única resposta honesta. */
+  return [];
+}
+
+/**
+ * As colunas que a fileira lê de `rede_stories`.
+ *
+ * ⚠️ **ELA NASCEU DE UM VAZAMENTO DE VISIBILIDADE, e vale contar qual.** A
+ * escada da fileira era escrita à mão, quatro degraus, e **NENHUM deles pedia
+ * `visibilidade`** — todos preenchiam `visibilidade: "seguidores"` por conta
+ * própria. O story marcado "só amigas" era entregue, na fileira, a TODA
+ * seguidora: ela abria, lia e via a foto.
+ *
+ * ⚠️ E o portão existia — em `storyQueEuVejo`, que é o caminho da AÇÃO (votar,
+ * reagir, denunciar) e lê a coluna certinho. O comentário dele diz, com todas as
+ * letras, que a régua única existe para o afago não chegar "vindo de quem nunca
+ * devia ter visto aquilo": o caminho da ação foi consertado e o caminho de VER
+ * ficou de pé. Consertar metade de uma régua é como um vazamento sobrevive a
+ * uma auditoria.
+ *
+ * Uma lista só, degraus DERIVADOS dela por remoção — o mesmo desenho de
+ * `COLUNAS_DO_POST`, e pela mesma razão: duas listas à mão divergem no primeiro
+ * ajuste, e aqui a divergência aparece como camada ignorada.
+ */
+const COLUNAS_DO_STORY =
+  "id, autor_id, imagem_path, imagens, texto, criado_em, carimbo_semana, " +
+  "enquete_opcoes, pergunta_aberta, post_de, visibilidade, destacado_em, " +
+  "video_path, sensivel, motivo_sensivel";
+
+/**
+ * ⚠️ **A ESCADA DA FILEIRA, uma camada de SQL por degrau.**
+ *
+ * ⚠️ **E o degrau da CAMADA é o único que preenche com um valor que não é
+ * vazio.** Sem a coluna, nenhum story tem camada e todos valem `seguidores` —
+ * o comportamento de antes do recurso, e o único seguro: fechar por não saber
+ * esconderia da fileira o story de quem sempre o viu. Com a coluna presente,
+ * quem manda é o banco — que é exatamente o que faltava.
+ */
+const DEGRAUS_DO_STORY: {
+  aviso: string;
+  colunas: string[];
+  nulos: Record<string, unknown>;
+}[] = [
+  {
+    /* O degrau MAIS ALTO é sempre a coluna mais NOVA. */
+    aviso: "vídeo e aviso de conteúdo — rode APLICAR_NOVE_DA_REDE.sql",
+    colunas: ["video_path", "sensivel", "motivo_sensivel"],
+    /* ⚠️ `sensivel` cai para `false` e não `null`: a coluna é booleana, e sem
+       ela nenhum story está marcado — o estado de antes do recurso. */
+    nulos: { video_path: null, sensivel: false, motivo_sensivel: null },
+  },
+  {
+    aviso: "carrossel — rode APLICAR_CONTEUDO_DA_REDE.sql",
+    /* Sem a coluna, todo story é de foto única — e `imagem_path` já a traz. */
+    colunas: ["imagens"],
+    nulos: { imagens: [] },
+  },
+  {
+    aviso: "camada e destaque — rode APLICAR_STORY_CAMADA_E_DESTAQUE.sql",
+    colunas: ["visibilidade", "destacado_em"],
+    nulos: { visibilidade: VISIBILIDADE_DO_STORY_PADRAO, destacado_em: null },
+  },
+  {
+    aviso: "quadro de publicação — rode APLICAR_FIXAR_E_STORY_DE_POST.sql",
+    /* Sem ele o story continua inteiro — só o quadro da publicação some. */
+    colunas: ["post_de"],
+    nulos: { post_de: null },
+  },
+  {
+    aviso: "enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql",
+    colunas: ["enquete_opcoes", "pergunta_aberta"],
+    nulos: { enquete_opcoes: null, pergunta_aberta: false },
+  },
+  {
+    aviso: "carimbo da semana — rode APLICAR_REDE_SOCIAL.sql",
+    colunas: ["carimbo_semana"],
+    nulos: { carimbo_semana: false },
+  },
+];
+
+/**
+ * ⚠️ **GRAVAR DESCENDO A ESCADA — e ela existe porque a anterior GRAVAVA DUAS
+ * VEZES.**
+ *
+ * `publicarStory` fazia um `insert` com uma leva de colunas e, logo abaixo,
+ * OUTRO com uma leva diferente — sem conferir se o primeiro tinha dado certo.
+ * Num banco com as duas levas (o do dono no instante em que ele rodar o SQL do
+ * carrossel) os dois passavam: **todo story era publicado duas vezes**, e a
+ * segunda cópia, sem a coluna da camada, caía no `DEFAULT 'seguidores'` — um
+ * story marcado "só amigas" ia inteiro para todas as seguidoras.
+ *
+ * Aqui a garantia é estrutural e conferível: **exatamente um insert dá certo**,
+ * porque o laço PARA no primeiro que não devolve erro.
+ *
+ * ⚠️ **E cada degrau sabe se descer é RECUSA.** Descer por cima de uma escolha
+ * dela — a camada fechada, o vídeo, o carrossel de quatro fotos — publica outra
+ * coisa em silêncio. A recusa é honesta; o "ok" mudo não.
+ */
+export async function inserirDescendo(
+  sb: any,
+  tabela: string,
+  linhaCheia: Record<string, unknown>,
+  degraus: { aviso: string; colunas: string[]; exigido: boolean }[],
+): Promise<{ ok: true; id: string | null } | { ok: false; motivo: "banco" | "sem_suporte" }> {
+  let linha = { ...linhaCheia };
+  for (let i = 0; ; i++) {
+    const r = await sb.from(tabela).insert(linha).select("id").maybeSingle();
+    if (!r.error) return { ok: true, id: ((r.data as any)?.id ?? null) as string | null };
+    const degrau = degraus[i];
+    /* Nem o piso respondeu: o banco não tem sequer as colunas originais, e
+       "gravou" seria a resposta mais cara que este handler pode dar. */
+    if (!degrau) return { ok: false, motivo: "banco" };
+    console.warn(`[rede] ${tabela} sem ${degrau.aviso}`);
+    if (degrau.exigido) return { ok: false, motivo: "sem_suporte" };
+    const menos: Record<string, unknown> = { ...linha };
+    for (const c of degrau.colunas) delete menos[c];
+    linha = menos;
+  }
+}
+
+/** A leitura da fileira, com a escada. Ver `postsCrus` — mesmo desenho. */
+export async function storiesCrus(sb: any, monta: (base: any) => any): Promise<any[]> {
+  let colunas = COLUNAS_DO_STORY;
+  const nulos: Record<string, unknown> = {};
+  for (let i = 0; i <= DEGRAUS_DO_STORY.length; i++) {
+    const { data, error } = await monta(sb.from("rede_stories").select(colunas));
+    if (!error) {
+      const linhas = (data ?? []) as any[];
+      return i === 0 ? linhas : linhas.map((l) => ({ ...nulos, ...l }));
+    }
+    const degrau = DEGRAUS_DO_STORY[i];
+    if (!degrau) break;
+    console.warn(`[rede] stories sem ${degrau.aviso}`);
+    /* ⚠️ A fronteira mora em `semAsColunas` — ver o porquê lá. */
+    colunas = semAsColunas(colunas, degrau.colunas);
+    Object.assign(nulos, degrau.nulos);
+  }
   return [];
 }
 
@@ -4718,6 +4877,17 @@ export type StoryNaTela = {
   /** A enquete de duas a quatro opções, ou `null`. */
   enquete: EnqueteDoStory | null;
   /**
+   * O vídeo, quando o story é de vídeo. A capa continua em `imagemUrl`.
+   *
+   * ⚠️ **A CAPA NÃO SOME quando há vídeo** — ela é o que a bolinha da fileira
+   * desenha, e o que o visor mostra enquanto o arquivo carrega. Um story de
+   * vídeo sem capa seria um quadrado preto no convite para abri-lo.
+   */
+  videoUrl?: string | null;
+  /** O véu, e o rótulo do motivo. A régua é `deveBorrar`, a mesma do post. */
+  sensivel?: boolean;
+  motivoSensivel?: string | null;
+  /**
    * O carrossel inteiro, a PRIMEIRA inclusa.
    *
    * ⚠️ Sempre preenchido: um story de foto única é um carrossel de uma. Sem
@@ -4854,6 +5024,21 @@ export const publicarStory = createServerFn({ method: "POST" })
          * muita gente não termina, e o formato existe para ser rápido.
          */
         maisFotos: z.array(z.string().max(1_500_000)).max(4).optional(),
+        /**
+         * O vídeo, já subido pelo cliente com URL assinada. `imagem` continua
+         * obrigatória e vira a CAPA.
+         *
+         * ⚠️ **A capa não é enfeite — `imagem_path` é `NOT NULL`.** E ela é o
+         * que a bolinha da fileira desenha: sem capa, o convite para abrir o
+         * story seria um quadrado vazio, e a decisão de tocar acontece ali.
+         */
+        video: z
+          .object({ caminho: z.string().max(300), segundos: z.number().min(0).max(600) })
+          .nullable()
+          .optional(),
+        /** O véu. A régua é a MESMA do post — ver `conteudo-sensivel.ts`. */
+        sensivel: z.boolean().optional(),
+        motivoSensivel: z.string().max(40).nullable().optional(),
       })
       .parse(i),
   )
@@ -4963,100 +5148,101 @@ export const publicarStory = createServerFn({ method: "POST" })
     /* ⚠️ `imagem_path` continua sendo a PRIMEIRA, e `imagens` traz TODAS —
        inclusive ela. Um story de foto única nunca precisa olhar o array, e todo
        código que já lê `imagem_path` continua funcionando. */
-    /* ⚠️ **`imagens` NÃO entra no `base`, e o teste dos três degraus pegou.**
-       `base` é o que o degrau MÍNIMO insere: pondo a coluna nova ali, um banco
-       sem `imagens` faria publicar story falhar INTEIRO — inclusive o story de
-       foto única, que é o caso de todo mundo hoje. A coluna vira um degrau
-       próprio, o mais alto. */
-    const base = { autor_id: eu, imagem_path: caminho, texto: data.texto };
-    /* ⚠️ `imagem_path` continua sendo a PRIMEIRA, e `imagens` traz TODAS —
-       inclusive ela. Um story de foto única nunca precisa olhar o array. */
-    const carrossel = { imagens: [caminho, ...extras] };
-    /* ⚠️ TRÊS DEGRAUS, um por leva de colunas — o mesmo desenho da leitura.
-       Um recuo que pulasse direto para o mínimo faria quem já rodou o SQL do
-       carimbo perdê-lo por causa do SQL da enquete. */
-    const { error: erroComPost } = await sb.from("rede_stories").insert({
-      ...base,
+
+    /* ⚠️ **O CAMINHO DO VÍDEO É CONFERIDO CONTRA A PASTA DELA.** Ele vem do
+       cliente, e sem esta conferência um corpo montado à mão penduraria no
+       story dela o vídeo de OUTRA paciente. A mesma trava de `publicarPost`, e
+       pela mesma razão. Caminho que não é dela vale como story SEM vídeo — a
+       capa continua de pé, e a recusa cabe ao degrau. */
+    const video = data.video && caminhoEhDoDono(data.video.caminho, eu) ? data.video : null;
+    /* ⚠️ Só a AUTORA marca, e o motivo só faz sentido com a marca — ver
+       `conteudo-sensivel.ts`. O app NUNCA marca sozinho. */
+    const sensivel = !!data.sensivel;
+    const motivoSensivel = sensivel ? data.motivoSensivel?.trim() || null : null;
+
+    /**
+     * ⚠️ **ISTO ERA DOIS INSERTS, E OS DOIS GRAVAVAM.**
+     *
+     * A escada anterior fazia um `insert` com `post_de`/`visibilidade` e, LOGO
+     * ABAIXO, um segundo com `imagens` — sem conferir se o primeiro tinha dado
+     * certo. Num banco com as duas levas de colunas (o do dono no instante em
+     * que ele rodar `APLICAR_CONTEUDO_DA_REDE.sql`) os dois passavam: **todo
+     * story era publicado DUAS vezes**.
+     *
+     * ⚠️ E a segunda cópia não levava `visibilidade`, então caía no `DEFAULT
+     * 'seguidores'` do banco: um story marcado "só amigas" ia inteiro para
+     * TODAS as seguidoras — exatamente o vazamento que o comentário do degrau
+     * dizia estar impedindo, entrando pela porta do degrau de cima.
+     *
+     * Hoje é UMA escada só: começa cheia e tira uma camada de SQL por vez, e
+     * **exatamente um insert dá certo**.
+     *
+     * ⚠️ **E cada degrau sabe se descer é RECUSA.** Descer por cima de uma
+     * escolha dela — a camada fechada, o quadro da publicação, o carrossel de
+     * quatro fotos, o vídeo — publica outra coisa em silêncio. A recusa é
+     * honesta; o "ok" mudo não.
+     */
+    const linhaCheia: Record<string, unknown> = {
+      autor_id: eu,
+      imagem_path: caminho,
+      texto: data.texto,
       carimbo_semana: data.carimbarSemana === true,
       enquete_opcoes: enquete,
       pergunta_aberta: data.perguntaAberta === true,
       post_de: postDe,
       visibilidade: camada,
-    });
-    /**
-     * ⚠️ Degrau — `post_de` nasce no `APLICAR_FIXAR_E_STORY_DE_POST.sql` e
-     * `visibilidade` no `APLICAR_STORY_CAMADA_E_DESTAQUE.sql`.
-     *
-     * ⚠️ **E DESCER É RECUSA quando ela ESCOLHEU alguma das duas.** Sem a
-     * coluna da camada, um story marcado "só amigas" seria publicado ABERTO —
-     * o oposto exato do que ela pediu, e o tipo de falha que ela só descobre
-     * quando a pessoa errada comenta. E sem `post_de`, o story sairia sem o
-     * quadro que ela montou. Nos dois casos a recusa é honesta; o "ok" mudo
-     * não.
-     */
-    if (erroComPost && (postDe || camada !== VISIBILIDADE_DO_STORY_PADRAO)) {
-      console.warn(
-        "[rede] story sem post_de/visibilidade — rode APLICAR_FIXAR_E_STORY_DE_POST.sql e APLICAR_STORY_CAMADA_E_DESTAQUE.sql",
-      );
-      return { ok: false as const, motivo: "sem_suporte" as const };
-    }
-    /* ⚠️ **O `id` VOLTA DO INSERT, e não de uma leitura depois.** Reler "o
-       story mais novo dela" para marcar alguém seria uma corrida: dois
-       aparelhos publicando no mesmo instante marcariam a pessoa no story
-       errado. Cada degrau devolve o seu id. */
-    let novoId: string | null = null;
-    /* ⚠️ O degrau MAIS ALTO é o do carrossel: a coluna mais nova cai primeiro,
-       e os de baixo continuam entregando o que já entregavam. */
-    const cheio = {
-      ...base,
-      ...carrossel,
-      carimbo_semana: data.carimbarSemana === true,
-      enquete_opcoes: enquete,
-      pergunta_aberta: data.perguntaAberta === true,
+      /* ⚠️ `imagem_path` é a PRIMEIRA; `imagens` traz TODAS, inclusive ela. */
+      imagens: [caminho, ...extras],
+      video_path: video?.caminho ?? null,
+      sensivel,
+      motivo_sensivel: motivoSensivel,
     };
-    const comCarrossel = await sb.from("rede_stories").insert(cheio).select("id").maybeSingle();
-    if (comCarrossel.error) {
-      console.warn("[rede] story sem imagens — rode APLICAR_CONTEUDO_DA_REDE.sql");
-    } else {
-      novoId = ((comCarrossel.data as any)?.id ?? null) as string | null;
-      if (novoId && (data.marcadas ?? []).length > 0) {
-        await gravarMarcacoes(sb, eu, novoId, data.marcadas ?? [], "story");
-      }
-      return { ok: true as const };
-    }
 
-    const { data: cheioOk, error } = erroComPost
-      ? await sb
-          .from("rede_stories")
-          .insert({
-            ...base,
-            carimbo_semana: data.carimbarSemana === true,
-            enquete_opcoes: enquete,
-            pergunta_aberta: data.perguntaAberta === true,
-          })
-          .select("id")
-          .maybeSingle()
-      : { data: null, error: null };
-    if (!error) novoId = ((cheioOk as any)?.id ?? null) as string | null;
-    if (error) {
-      console.warn("[rede] story sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
-      const { data: d2, error: erro2 } = await sb
-        .from("rede_stories")
-        .insert({ ...base, carimbo_semana: data.carimbarSemana === true })
-        .select("id")
-        .maybeSingle();
-      if (!erro2) novoId = ((d2 as any)?.id ?? null) as string | null;
-      if (erro2) {
-        console.warn("[rede] story sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
-        const { data: d3, error: erro3 } = await sb
-          .from("rede_stories")
-          .insert(base)
-          .select("id")
-          .maybeSingle();
-        if (erro3) return { ok: false as const, motivo: "banco" as const };
-        novoId = ((d3 as any)?.id ?? null) as string | null;
-      }
-    }
+    const DEGRAUS: { aviso: string; colunas: string[]; exigido: boolean }[] = [
+      {
+        aviso: "vídeo e aviso de conteúdo — rode APLICAR_NOVE_DA_REDE.sql",
+        colunas: ["video_path", "sensivel", "motivo_sensivel"],
+        /* ⚠️ Sem a coluna do vídeo o story sairia SÓ com a capa — um story mudo
+           e parado no lugar do vídeo que ela gravou. E o aviso de conteúdo
+           sumindo é pior: a foto que ela marcou chegaria sem véu nenhum. */
+        exigido: !!video || sensivel,
+      },
+      {
+        aviso: "carrossel — rode APLICAR_CONTEUDO_DA_REDE.sql",
+        colunas: ["imagens"],
+        /* ⚠️ Um carrossel com buraco é pior que foto única: ela escolheu
+           quatro, veria uma, e não saberia quais sumiram. */
+        exigido: extras.length > 0,
+      },
+      {
+        aviso: "camada do story — rode APLICAR_STORY_CAMADA_E_DESTAQUE.sql",
+        colunas: ["visibilidade"],
+        exigido: camada !== VISIBILIDADE_DO_STORY_PADRAO,
+      },
+      {
+        aviso: "quadro de publicação — rode APLICAR_FIXAR_E_STORY_DE_POST.sql",
+        colunas: ["post_de"],
+        exigido: !!postDe,
+      },
+      {
+        aviso: "enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql",
+        colunas: ["enquete_opcoes", "pergunta_aberta"],
+        exigido: !!enquete || data.perguntaAberta === true,
+      },
+      {
+        aviso: "carimbo da semana — rode APLICAR_REDE_SOCIAL.sql",
+        colunas: ["carimbo_semana"],
+        exigido: data.carimbarSemana === true,
+      },
+    ];
+
+    /* ⚠️ **O `id` VOLTA DO INSERT, e não de uma leitura depois.** Reler "o story
+       mais novo dela" para marcar alguém seria uma corrida: dois aparelhos
+       publicando no mesmo instante marcariam a pessoa no story errado. */
+    const gravado = await inserirDescendo(sb, "rede_stories", linhaCheia, DEGRAUS);
+    if (!gravado.ok) return { ok: false as const, motivo: gravado.motivo };
+    const novoId = gravado.id;
+
     /* ⚠️ **DEPOIS de o story existir, e nunca antes.** Marcar alguém num story
        que não gravou poria o nome dela numa linha órfã. E a falha aqui NÃO
        derruba a publicação: a marcação é acessório, a foto já está no ar. */
@@ -5120,88 +5306,17 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
        SQL não a criava: o `CREATE` vira no-op). Sem o recuo, o `42703`
        devolvia `data: null` e a fileira ficava com uma bolinha só — a "Seu
        story", que o cliente sintetiza —, para sempre, sem erro na tela. */
-    const linhas = await (async (): Promise<any[]> => {
-      const monta = (base: any) =>
-        base
-          .in("autor_id", recorte)
-          .gt("expira_em", agora)
-          .order("criado_em", { ascending: true })
-          .limit(200);
-      /* ⚠️ TRÊS DEGRAUS DE RECUO, um por leva de colunas — e não um só. Um
-         recuo que pulasse direto para o mínimo apagaria o carimbo da semana de
-         quem já rodou aquele SQL, só porque o SQL da enquete ainda não rodou.
-         Cada degrau tira exatamente o que faltou. */
-      const comPost = await monta(
-        sb
-          .from("rede_stories")
-          .select(
-            "id, autor_id, imagem_path, imagens, texto, criado_em, carimbo_semana, " +
-              "enquete_opcoes, pergunta_aberta, post_de",
-          ),
-      );
-      if (!comPost.error)
-        /* ⚠️ Sem a camada, todo story é `seguidores` — o comportamento de antes
-           do recurso, e o único seguro: fechar por não saber esconderia da
-           fileira o story de quem sempre o viu. */
-        return ((comPost.data ?? []) as any[]).map((l) => ({
-          ...l,
-          visibilidade: "seguidores",
-          destacado_em: null,
-        }));
-
-      /* ⚠️ Degrau: `post_de` nasce no
-         `APLICAR_FIXAR_E_STORY_DE_POST.sql`. Sem ele o story continua inteiro —
-         só o quadro da publicação some, que é o estado de antes do recurso. */
-      console.warn("[rede] stories sem post_de — rode APLICAR_FIXAR_E_STORY_DE_POST.sql");
-      const cheio = await monta(
-        sb
-          .from("rede_stories")
-          .select(
-            "id, autor_id, imagem_path, texto, criado_em, carimbo_semana, enquete_opcoes, pergunta_aberta",
-          ),
-      );
-      if (!cheio.error)
-        return ((cheio.data ?? []) as any[]).map((l) => ({
-          ...l,
-          imagens: [],
-          post_de: null,
-          visibilidade: "seguidores",
-          destacado_em: null,
-        }));
-
-      console.warn("[rede] stories sem enquete/pergunta — rode APLICAR_REDE_SOCIAL.sql");
-      const comCarimbo = await monta(
-        sb
-          .from("rede_stories")
-          .select("id, autor_id, imagem_path, texto, criado_em, carimbo_semana"),
-      );
-      if (!comCarimbo.error) {
-        return ((comCarimbo.data ?? []) as any[]).map((l) => ({
-          ...l,
-          enquete_opcoes: null,
-          pergunta_aberta: false,
-          imagens: [],
-          post_de: null,
-          visibilidade: "seguidores",
-          destacado_em: null,
-        }));
-      }
-
-      console.warn("[rede] stories sem carimbo_semana — rode APLICAR_REDE_SOCIAL.sql");
-      const { data: velhos } = await monta(
-        sb.from("rede_stories").select("id, autor_id, imagem_path, texto, criado_em"),
-      );
-      return ((velhos ?? []) as any[]).map((l) => ({
-        ...l,
-        carimbo_semana: false,
-        enquete_opcoes: null,
-        pergunta_aberta: false,
-        imagens: [],
-        post_de: null,
-        visibilidade: "seguidores",
-        destacado_em: null,
-      }));
-    })();
+    /* ⚠️ **A ESCADA VIVE EM `storiesCrus`, e ela nasceu de um vazamento.** Esta
+       leitura tinha quatro degraus escritos à mão e NENHUM pedia
+       `visibilidade`: todos cravavam `"seguidores"`, então o story marcado "só
+       amigas" chegava a toda seguidora. Ver o comentário de `COLUNAS_DO_STORY`. */
+    const linhas = await storiesCrus(sb, (base: any) =>
+      base
+        .in("autor_id", recorte)
+        .gt("expira_em", agora)
+        .order("criado_em", { ascending: true })
+        .limit(200),
+    );
     const perfis = await perfisPorId(sb, [...new Set(linhas.map((l) => l.autor_id))]);
 
     const { data: vistos } = await sb
@@ -5269,8 +5384,12 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
       "rede",
       /* ⚠️ A primeira E as do carrossel, na MESMA onda — ver o comentário na
          entrega. `flatMap` porque um story pode ter até cinco. */
+      /* ⚠️ **O VÍDEO ENTRA NA MESMA ONDA.** Uma segunda chamada ao Storage por
+         story de vídeo dobraria a espera da fileira, que é a primeira coisa que
+         a aba desenha — e é exatamente o laço sequencial que este bloco veio
+         desfazer. */
       linhas
-        .flatMap((l: any) => [l.imagem_path, ...((l.imagens ?? []) as string[])])
+        .flatMap((l: any) => [l.imagem_path, l.video_path, ...((l.imagens ?? []) as string[])])
         .filter(Boolean),
       3600,
     );
@@ -5397,6 +5516,9 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
         marcadas: marcadosPorStory.get(l.id) ?? [],
         perguntaAberta: !!l.pergunta_aberta,
         postCompartilhado: l.post_de ? (quadros.get(l.post_de) ?? null) : null,
+        videoUrl: l.video_path ? (capasDosStories.get(l.video_path) ?? null) : null,
+        sensivel: !!l.sensivel,
+        motivoSensivel: ((l.motivo_sensivel ?? null) as string | null) || null,
       });
       porAutor.set(l.autor_id, b);
     }

@@ -47,23 +47,21 @@ describe("⚠️ o carrossel de story", () => {
      * INTEIRO, inclusive o de foto única, que é o caso de todo mundo hoje. O
      * teste dos três degraus pegou.
      */
-    const c = corpoDe("publicarStory").replace(/\s+/g, " ");
-    expect(c).toContain("const base = { autor_id: eu, imagem_path: caminho, texto: data.texto }");
     /**
-     * ⚠️ **A GARANTIA É "o degrau mínimo não pede a coluna nova", e não a ordem
-     * entre os degraus.** Duas tentativas anteriores mediram posição relativa —
-     * a primeira ancorada num `pergunta_aberta` que aparece antes, na validação
-     * da enquete; a segunda numa ordem que a sonda de `post_de` já ocupava. A
-     * distância e a ordem nunca foram a garantia: o que quebra a publicação num
-     * banco atrasado é `imagens` estar no objeto que o ÚLTIMO insert manda.
+     * ⚠️ **A GARANTIA É "faltar `imagens` não derruba o story de foto única", e
+     * nunca a POSIÇÃO do degrau nem a forma da escada.** Três tentativas
+     * anteriores travaram grafia — o `...base, ...carrossel`, o `.insert(base)`
+     * e a ordem entre eles — e as três reprovaram sobre código correto quando a
+     * escada virou uma só.
+     *
+     * O que importa é `imagens` ter degrau PRÓPRIO: junto de colunas de outro
+     * SQL, faltar ela apagaria recursos que o banco tem.
      */
-    const iCarrossel = c.indexOf("...base, ...carrossel,");
-    const iMinimo = c.indexOf(".insert(base)");
-    expect(iCarrossel).toBeGreaterThan(-1);
-    expect(iMinimo).toBeGreaterThan(iCarrossel);
-    /* E o `base` — o que o mínimo insere — não carrega `imagens`. */
-    const iBase = c.indexOf("const base = {");
-    expect(c.slice(iBase, c.indexOf(";", iBase))).not.toContain("imagens");
+    const c = corpoDe("publicarStory").replace(/\s+/g, " ");
+    expect(c).toMatch(/colunas: \["imagens"\][\s\S]{0,120}exigido: extras\.length > 0/);
+    /* ⚠️ E o comportamento inteiro — descer sem gravar duas vezes — tem teste
+       que RODA a escada, em `degraus-do-story.test.ts`. */
+    expect(c).toContain('inserirDescendo(sb, "rede_stories"');
   });
 
   test("⚠️ `imagem_path` continua sendo a PRIMEIRA", () => {

@@ -3741,6 +3741,18 @@ export function RedeNoApp({
   const [persona, setPersona] = useState<Persona>("estranha");
   /** A foto escolhida, esperando a conferência antes de virar story. */
   const [conferindoStory, setConferindoStory] = useState<string | null>(null);
+  /**
+   * O vídeo do story, já subido, esperando publicar.
+   *
+   * ⚠️ **Ele sobe no instante em que ela escolhe o arquivo, e não no publicar.**
+   * Um vídeo de 50 MB no botão "Publicar" deixaria a tela parada meio minuto
+   * depois do gesto que ela lê como "acabou" — e o compositor já tem a capa na
+   * frente dela enquanto o arquivo viaja.
+   */
+  const [videoDoStory, setVideoDoStory] = useState<{
+    caminho: string;
+    segundos: number;
+  } | null>(null);
   /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
   const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
   const [desafio, setDesafio] = useState<DesafioNaTela | null>(null);
@@ -6142,9 +6154,14 @@ export function RedeNoApp({
     setConferindoStory(null);
     /* ⚠️ Lido ANTES de zerar: o `setPostNoStory(null)` abaixo é assíncrono, e
        ler o estado depois dele mandaria `null` para o servidor — o story sairia
-       sem o quadro, com a foto de outra pessoa e nada dizendo de quem é. */
+       sem o quadro, com a foto de outra pessoa e nada dizendo de quem é.
+       ⚠️ E o VÍDEO tem exatamente o mesmo perigo, com uma diferença: o arquivo
+       já está no balde. Ler depois de zerar publicaria um story de capa
+       PARADA, e o vídeo que ela gravou ficaria órfão no Storage. */
     const comPost = postNoStory;
+    const comVideo = videoDoStory;
     setPostNoStory(null);
+    setVideoDoStory(null);
     try {
       const t = await token();
       if (!t) return;
@@ -6164,6 +6181,7 @@ export function RedeNoApp({
           visibilidade: camada,
           marcadas,
           maisFotos,
+          video: comVideo,
         },
       });
       if (r.ok) {
@@ -6511,8 +6529,10 @@ export function RedeNoApp({
           setConferindoStory(null);
           /* ⚠️ Desistiu, a referência some: sem isto, a PRÓXIMA foto que ela
              escolhesse sairia com o quadro de uma publicação que ela já tinha
-             largado. */
+             largado. E o vídeo junto, pela mesma razão: a próxima FOTO sairia
+             com o vídeo de antes pendurado nela. */
           setPostNoStory(null);
+          setVideoDoStory(null);
         }}
         aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta, marcadas, maisFotos }) =>
           void publicarStory(
@@ -6530,6 +6550,7 @@ export function RedeNoApp({
         amigasParaMarcar={paraMarcar}
         rascunho={rascunhoDeStory}
         aoGuardarRascunho={guardarRascunhoDoStory}
+        temVideo={!!videoDoStory}
       />
     );
   }
@@ -7165,12 +7186,53 @@ export function RedeNoApp({
       <input
         ref={arquivoDoStory}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         className="hidden"
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
           if (!f) return;
+          const { toast } = await import("sonner");
+          if (f.type.startsWith("video/")) {
+            /* ⚠️ **A CAPA VEM ANTES DA RECUSA**, e é dela que sai a duração: o
+               `size` e o `type` dão para conferir na hora, mas quantos segundos
+               o arquivo tem só o decodificador sabe. */
+            const capa = await capaDoVideo(f);
+            if (!capa) {
+              toast.error("Não deu para ler esse vídeo.");
+              return;
+            }
+            const { recusaDoVideo, recadoDaRecusa } = await import("@/lib/video-do-post");
+            const recusa = recusaDoVideo({
+              tipo: f.type,
+              bytes: f.size,
+              segundos: capa.segundos,
+            });
+            if (recusa) {
+              toast.error(recadoDaRecusa(recusa));
+              return;
+            }
+            const t = await token();
+            if (!t) return;
+            const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+            const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+            if (!r.ok) {
+              toast.error("Não deu para enviar o vídeo agora.");
+              return;
+            }
+            const { supabase } = await import("@/integrations/supabase/client");
+            /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — o mesmo
+               caminho do vídeo do post. Passar 50 MB pelo servidor seria a
+               função inteira estourando o limite de corpo. */
+            const up = await supabase.storage.from("rede").uploadToSignedUrl(r.caminho, r.token, f);
+            if (up.error) {
+              toast.error("Não deu para enviar o vídeo agora.");
+              return;
+            }
+            setVideoDoStory({ caminho: r.caminho, segundos: capa.segundos });
+            setConferindoStory(capa.capa);
+            return;
+          }
           /* ⚠️ `prepararFotoDoStory`, e não `prepararAvatar`: aquele corta um
              QUADRADO de 512px no centro, e o story é 9:16 exibido inteiro. */
           const d = await prepararFotoDoStory(f);
@@ -8368,6 +8430,23 @@ export function VisorDeStory({
   /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
      rede — a mesma decisão otimista da reação. */
   const [voteiAgora, setVoteiAgora] = useState<Record<string, number>>({});
+  /**
+   * O véu do aviso de conteúdo — POR STORY, e morre ao trocar de story.
+   *
+   * ⚠️ **Revelar um não revela os outros.** Ela marcou aquele; o seguinte pode
+   * ser outra coisa, e uma decisão que vaza para o story de baixo desfaz o
+   * aviso pela lateral. Mesma régua do filtro de palavras nos comentários.
+   */
+  const [reveladoStory, setReveladoStory] = useState<string | null>(null);
+  /**
+   * Quanto dura o vídeo deste story, em ms — lido do próprio arquivo.
+   *
+   * ⚠️ **`null` até o metadado chegar**, e aí vale o padrão de cinco segundos:
+   * cravar a duração antes de saber cortaria o vídeo, e esperar por ela
+   * deixaria o story parado se o arquivo nunca carregasse.
+   */
+  const [duracaoDoVideo, setDuracaoDoVideo] = useState<number | null>(null);
+
   /* A reação que ela acabou de dar, para a tela responder sem esperar a rede. */
   const [reagiAgora, setReagiAgora] = useState<Record<string, TipoDeReacao | null>>({});
   const [pergunta, setPergunta] = useState("");
@@ -8379,7 +8458,28 @@ export function VisorDeStory({
   const [quemViu, setQuemViu] = useState<PessoaNaLista[] | "erro" | null>(null);
   const [confirmando, setConfirmando] = useState(false);
   const [denunciando, setDenunciando] = useState(false);
+  /* ⚠️ Trocou de story: a duração do vídeo anterior não vale mais, e o véu
+     revelado também não — ela marcou AQUELE, e o de baixo pode ser outra
+     coisa. */
+  useEffect(() => {
+    setDuracaoDoVideo(null);
+  }, [i]);
+
   const atual = bolha.stories[i];
+  /**
+   * ⚠️ **A régua é `deveBorrar`, a MESMA do post — nunca uma condição escrita
+   * aqui.** Duas réguas para "esconder ou não" divergiriam no primeiro ajuste,
+   * e a divergência apareceria como o véu valendo no feed e não no story.
+   */
+  const borrado = deveBorrar({
+    sensivel: !!atual?.sensivel,
+    /* ⚠️ `souEu` é a prop de "esta bolha é a MINHA", e uma bolha é de uma
+       autora só — então ela responde exatamente "sou a autora deste story".
+       Ela nunca vê o próprio borrado: sabe o que publicou, e borrar seria
+       tratá-la como quem precisa ser protegida do que decidiu contar. */
+    souAAutora: souEu,
+    revelado: reveladoStory === atual?.id,
+  });
 
   /* ⚠️ Marca como visto ao ENTRAR no story, não ao sair. Quem fecha o app no
      meio já viu aquele — e marcar na saída deixaria o anel aceso para sempre
@@ -8405,12 +8505,23 @@ export function VisorDeStory({
     const enqueteEsperando =
       !!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null;
     if (pausado || quemViu || confirmando || enqueteEsperando || !atual) return;
+    /* ⚠️ **O VÍDEO MANDA NO RELÓGIO, e o véu também.** Cinco segundos cravados
+       cortariam ao meio um vídeo de vinte — e ela nunca veria o fim daquilo que
+       a amiga gravou. E um story marcado como sensível não pode passar sozinho
+       enquanto ela decide se quer ver: o véu SEGURA o relógio, senão a decisão
+       que a tela pede acontece com o story já trocando. */
+    if (borrado) return;
+    /* ⚠️ **A duração é do story ATUAL.** Ela é zerada na troca (abaixo): sem
+       isso, o story seguinte — que pode ser uma foto — herdaria o relógio do
+       vídeo de vinte segundos que veio antes. */
+    const duracao = duracaoDoVideo ?? DURACAO_DO_STORY;
     const t = setTimeout(() => {
       if (i + 1 < bolha.stories.length) setI(i + 1);
       else aoFechar();
-    }, DURACAO_DO_STORY);
+    }, duracao);
     return () => clearTimeout(t);
-  }, [i, pausado, quemViu, confirmando, atual?.id, voteiAgora]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, pausado, quemViu, confirmando, atual?.id, voteiAgora, borrado, duracaoDoVideo]);
 
   if (!atual) return null;
 
@@ -8474,7 +8585,63 @@ export function VisorDeStory({
             uma tela cujas metades avançam e voltam o story. `stopPropagation`
             no contêiner é o que impede um deslize horizontal de virar um
             avanço — sem ele, folhear as fotos pularia o story inteiro. */}
-        {(atual.imagens ?? []).length > 1 ? (
+        {borrado ? (
+          /* ⚠️ **SOB O VÉU NÃO HÁ MÍDIA NENHUMA NO DOM — nem borrada.** Borrar
+              com CSS ainda BAIXA o arquivo e o deixa na página: quem quisesse o
+              leria pelo inspetor, e o 4G dela pagaria por um vídeo que ela
+              decidiu não ver. Aqui não existe `<img>` nem `<video>` até ela
+              tocar. É a mesma decisão do véu do feed.
+              ⚠️ E o TEXTO entra junto: num story sobre uma perda é a frase que
+              carrega a notícia. */
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setReveladoStory(atual.id);
+            }}
+            /* ⚠️ **`z-20`, acima das metades invisíveis de avançar/voltar.**
+                Sem isto o botão "Próximo" (`inset-y-0 right-0 w-2/3`) fica POR
+                CIMA do véu e engole o toque: ela toca querendo decidir, o story
+                AVANÇA, e o seguinte aparece sem véu nenhum — a decisão que a
+                tela pede nunca acontece. É a mesma trava que a enquete e a
+                caixinha já têm, e o véu nasceu sem ela; quem pegou foi a foto
+                da bancada, não o `tsc`. */
+            className="absolute inset-0 z-20 flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-900 px-8 text-center"
+          >
+            {atual.motivoSensivel && (
+              <span className="rounded-full bg-white/15 px-3 py-1 text-[12px] text-white">
+                {atual.motivoSensivel}
+              </span>
+            )}
+            <span className="text-[15px] font-semibold text-white">Toque para ver</span>
+            <span className="text-[12px] text-white/70">
+              Quem publicou marcou este story como sensível.
+            </span>
+          </button>
+        ) : atual.videoUrl ? (
+          /* ⚠️ **`playsInline` e `autoPlay` MUDO.** Sem `playsInline` o iPhone
+              abre o vídeo no player de tela cheia do sistema e o story
+              desaparece por baixo dele; sem `muted` o navegador recusa tocar
+              sozinho, e a paciente veria um quadro parado sem saber que era
+              vídeo. O som ela liga nos controles. */
+          <video
+            key={atual.id}
+            src={atual.videoUrl}
+            poster={atual.imagemUrl ?? undefined}
+            autoPlay
+            muted
+            playsInline
+            controls
+            onClick={(e) => e.stopPropagation()}
+            onLoadedMetadata={(e) => {
+              const d = (e.target as HTMLVideoElement).duration;
+              /* ⚠️ Só um número FINITO manda no relógio: `Infinity` (stream sem
+                 duração) faria o story nunca avançar. */
+              setDuracaoDoVideo(Number.isFinite(d) && d > 0 ? d * 1000 : null);
+            }}
+            className="h-full w-full object-contain"
+          />
+        ) : (atual.imagens ?? []).length > 1 ? (
           <div
             onClick={(e) => e.stopPropagation()}
             className="flex h-full w-full snap-x snap-mandatory overflow-x-auto"
@@ -8496,14 +8663,14 @@ export function VisorDeStory({
         {/* ⚠️ Os pontinhos ficam ABAIXO da barrinha do tempo, e não no lugar
             dela: as duas contam coisas diferentes (quantas fotos × quanto falta
             do story), e juntá-las faria a paciente ler uma como a outra. */}
-        {(atual.imagens ?? []).length > 1 && (
+        {!borrado && (atual.imagens ?? []).length > 1 && !atual.videoUrl && (
           <div className="pointer-events-none absolute inset-x-0 top-8 flex justify-center gap-1">
             {(atual.imagens ?? []).map((_, i) => (
               <span key={i} className="h-1 w-1 rounded-full bg-white/70" />
             ))}
           </div>
         )}
-        {atual.texto && (
+        {!borrado && atual.texto && (
           <p className="absolute inset-x-0 bottom-8 px-6 text-center text-[16px] font-medium text-white drop-shadow-lg">
             {atual.texto}
           </p>
@@ -8585,7 +8752,7 @@ export function VisorDeStory({
             enquete seria um desenho que ninguém consegue usar.
             ⚠️ E as duas PAUSAM o relógio enquanto estão na tela — responder uma
             pergunta leva mais que os cinco segundos do story. */}
-        {atual.enquete && (
+        {!borrado && atual.enquete && (
           <div className="absolute inset-x-6 bottom-24 z-20 space-y-2">
             {(() => {
               const meu = voteiAgora[atual.id] ?? atual.enquete!.meuVoto;
@@ -8659,7 +8826,12 @@ export function VisorDeStory({
 
             ⚠️ `z-20`, acima das metades invisíveis de avançar/voltar — sem
             isso, tocar num emoji avançaria o story. */}
-        {!souEu && aoReagirAoStory && !atual.enquete && !atual.perguntaAberta && (
+        {/* ⚠️ **E NUNCA SOB O VÉU.** A foto da bancada pegou: com o aviso de
+            conteúdo em pé, a fileira de emojis continuava à mostra — ela
+            reagiria a um story que não viu, e o afago chegaria à caixa da
+            autora vindo de quem não leu nada. Sob o véu a tela pede UMA
+            decisão, e mais nada é oferecido. */}
+        {!borrado && !souEu && aoReagirAoStory && !atual.enquete && !atual.perguntaAberta && (
           <div className="absolute inset-x-3 bottom-24 z-20">
             <div className="flex items-center gap-0.5 overflow-x-auto rounded-full bg-black/45 px-1.5 py-1 backdrop-blur-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {REACOES.map((r, n) => {
@@ -8705,7 +8877,7 @@ export function VisorDeStory({
                 ⚠️ **A mensagem carrega o STORY como anexo** (`ref_tipo`), e não
                 o texto "sobre o seu story de hoje": em 24 h o story some, e uma
                 frase solta na conversa perderia o contexto para sempre. */}
-            {aoResponderStory && (
+            {!borrado && aoResponderStory && (
               <div className="mt-2">
                 {respondido[atual.id] ? (
                   <p className="rounded-full bg-black/45 px-4 py-2 text-center text-[12px] text-white backdrop-blur-sm">
@@ -8743,7 +8915,7 @@ export function VisorDeStory({
           </div>
         )}
 
-        {atual.perguntaAberta && !souEu && aoPerguntarNoStory && (
+        {!borrado && atual.perguntaAberta && !souEu && aoPerguntarNoStory && (
           <div className="absolute inset-x-6 bottom-24 z-20">
             {mandada ? (
               /* ⚠️ Não repete a pergunta na tela depois de enviada: a caixinha é
@@ -9261,6 +9433,70 @@ async function prepararFotoDoStory(file: File): Promise<string | null> {
     return canvas.toDataURL("image/jpeg", 0.8);
   } catch {
     return null;
+  }
+}
+
+/**
+ * A CAPA do story de vídeo, tirada do próprio arquivo.
+ *
+ * ⚠️ **`imagem_path` é `NOT NULL` em `rede_stories`, então a capa não é
+ * enfeite** — sem ela o story de vídeo simplesmente não grava. E ela é o que a
+ * BOLINHA da fileira desenha: a decisão de tocar acontece ali, e um quadrado
+ * preto no convite é um story que ninguém abre.
+ *
+ * ⚠️ **O quadro é o de 0,1 s, e nunca o de zero.** Em muitos arquivos o
+ * primeiro quadro é preto (fade de abertura do próprio celular), e a capa
+ * sairia toda escura — exatamente o defeito que ela veio evitar.
+ *
+ * Devolve `null` quando não dá: o chamador recusa o vídeo em vez de publicar um
+ * story sem capa.
+ */
+async function capaDoVideo(file: File): Promise<{ capa: string; segundos: number } | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.src = url;
+    const pronto = await new Promise<boolean>((ok) => {
+      /* ⚠️ Teto de tempo: um arquivo que o navegador não consegue decodificar
+         deixaria a tela presa em "enviando" para sempre, sem erro nenhum. */
+      const desiste = setTimeout(() => ok(false), 8000);
+      v.onerror = () => {
+        clearTimeout(desiste);
+        ok(false);
+      };
+      v.onloadeddata = () => {
+        clearTimeout(desiste);
+        ok(true);
+      };
+      v.onseeked = () => {
+        clearTimeout(desiste);
+        ok(true);
+      };
+      /* Pedir o segundo 0,1 dispara `seeked`; se o arquivo for mais curto que
+         isso, `loadeddata` responde antes. */
+      v.currentTime = 0.1;
+    });
+    if (!pronto || !v.videoWidth) return null;
+    const escala = Math.min(
+      1,
+      LADO_DO_STORY.largura / v.videoWidth,
+      LADO_DO_STORY.altura / v.videoHeight,
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(v.videoWidth * escala);
+    canvas.height = Math.round(v.videoHeight * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const segundos = Number.isFinite(v.duration) ? v.duration : 0;
+    return { capa: canvas.toDataURL("image/jpeg", 0.8), segundos };
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -11118,6 +11354,7 @@ export function ConferirStory({
   amigasParaMarcar,
   rascunho,
   aoGuardarRascunho,
+  temVideo,
 }: {
   /** Data URL da foto já reduzida. */
   imagem: string;
@@ -11145,6 +11382,15 @@ export function ConferirStory({
   rascunho?: RascunhoDoStory | null;
   /** Guardar o que ela digitou. Recebe `null` quando não há mais nada a guardar. */
   aoGuardarRascunho?: (r: Omit<RascunhoDoStory, "em"> | null) => void;
+  /**
+   * O story é de VÍDEO — a `imagem` é a capa tirada do arquivo.
+   *
+   * ⚠️ **Com vídeo, o carrossel não é oferecido.** Um story é ou o vídeo, ou a
+   * sequência de fotos: `imagem_path` é a capa nos dois casos, e acrescentar
+   * fotos a um vídeo faria a segunda foto virar um story que nunca aparece.
+   * Botão que promete e não entrega é pior que botão ausente.
+   */
+  temVideo?: boolean;
 }) {
   const [carimbar, setCarimbar] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -11453,7 +11699,19 @@ export function ConferirStory({
             if (pronta) setMaisFotos((v) => [...v, pronta]);
           }}
         />
-        {maisFotos.length < 4 && (
+        {/* ⚠️ Com vídeo, a faixa DIZ o que está indo. A tela mostra a capa
+            PARADA, e sem esta linha ela pareceria um story de foto — e ela
+            publicaria achando que o vídeo não entrou. */}
+        {temVideo && (
+          <p className="mb-2 rounded-2xl bg-white/15 px-3 py-2 text-[13px] text-white">
+            🎬 Vídeo — a capa é o primeiro quadro
+          </p>
+        )}
+        {/* ⚠️ **Com vídeo, o carrossel NÃO é oferecido.** Um story é ou o
+            vídeo, ou a sequência de fotos: `imagem_path` é a capa nos dois
+            casos, e a segunda foto viraria um story que nunca aparece. Botão
+            que promete e não entrega é pior que botão ausente. */}
+        {!temVideo && maisFotos.length < 4 && (
           <button
             type="button"
             onClick={() => arquivoExtra.current?.click()}

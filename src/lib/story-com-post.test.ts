@@ -87,27 +87,31 @@ describe("⚠️ a ESCRITA: só publicação pública, de perfil público", () =
     /**
      * Descer o degrau publicaria um story diferente do que ela montou.
      *
-     * ⚠️ A primeira versão travava a string `erroComPost && postDe` — e reprovou
-     * o dia em que a CAMADA entrou na mesma condição, que é uma razão ainda mais
-     * forte para recusar: sem a coluna, um story marcado "só amigas" sairia
-     * ABERTO. Hoje se cobra a GARANTIA: a escolha dela entra na decisão de
-     * descer, de qualquer jeito que esteja escrita.
+     * ⚠️ A asserção já envelheceu DUAS vezes por travar grafia: primeiro a string
+     * `erroComPost && postDe`, depois a condição inteira. A escada virou
+     * `inserirDescendo` com um degrau por leva de colunas, e as duas voltaram a
+     * reprovar sobre código que estava CERTO — e mais forte.
+     *
+     * O que se cobra agora é a GARANTIA, e ela é a mesma desde o começo: a
+     * escolha dela entra na decisão de descer.
      */
-    const i = C.indexOf("if (erroComPost");
-    expect(i).toBeGreaterThan(-1);
-    const cond = C.slice(i, C.indexOf(")", C.indexOf("(", i + 3)));
-    expect(cond).toContain("postDe");
-    expect(C).toContain('motivo: "sem_suporte"');
+    const escada = C.slice(C.indexOf("const DEGRAUS"), C.indexOf("inserirDescendo"));
+    expect(escada).toMatch(/colunas: \["post_de"\][\s\S]{0,120}exigido: !!postDe/);
+    /* ⚠️ A recusa vive em `inserirDescendo`, e `publicarStory` a REPASSA — não
+       a reescreve. Cobrar a string aqui travaria o lugar dela; o que importa é
+       que a falha do gravador chegue à paciente com o motivo dele. E o
+       comportamento inteiro tem teste que RODA, em `degraus-do-story.test.ts`. */
+    expect(C).toContain("if (!gravado.ok) return { ok: false as const, motivo: gravado.motivo }");
   });
 
   test("⚠️ e a CAMADA escolhida também impede o degrau", () => {
     /* Sem a coluna, um story marcado "só amigas" seria publicado ABERTO — o
        oposto exato do que ela pediu, e o tipo de falha que ela só descobre
        quando a pessoa errada comenta. */
-    const i = C.indexOf("if (erroComPost");
-    const cond = C.slice(i, C.indexOf("{", i));
-    expect(cond).toContain("camada");
-    expect(cond).toContain("VISIBILIDADE_DO_STORY_PADRAO");
+    const escada = C.slice(C.indexOf("const DEGRAUS"), C.indexOf("inserirDescendo"));
+    expect(escada).toMatch(
+      /colunas: \["visibilidade"\][\s\S]{0,160}camada !== VISIBILIDADE_DO_STORY_PADRAO/,
+    );
   });
 });
 
@@ -145,12 +149,18 @@ describe("⚠️ a LEITURA: o quadro é de quem ASSISTE", () => {
     expect(C.slice(i, i + 1400)).toContain("catch");
   });
 
-  test("⚠️ e a coluna nova tem DEGRAU no topo da escada de leitura", () => {
+  test("⚠️ e a coluna nova tem DEGRAU PRÓPRIO na escada de leitura", () => {
     /* `post_de` nasce no `APLICAR_FIXAR_E_STORY_DE_POST.sql`, que o dono roda à
        mão — e o deploy chega antes. Sem o degrau, o `42703` devolveria a
-       fileira com uma bolinha só. */
-    expect(C).toContain("post_de");
-    expect(C).toContain("APLICAR_FIXAR_E_STORY_DE_POST.sql");
+       fileira com uma bolinha só.
+       ⚠️ A escada mudou de casa (de dentro de `storiesDoFeed` para
+       `DEGRAUS_DO_STORY`) quando ela virou lista única, e a asserção acompanha
+       o lugar — nunca a POSIÇÃO do degrau, que muda a cada `APLICAR_` novo. */
+    const i = semProsa.indexOf("const DEGRAUS_DO_STORY");
+    const escada = semProsa.slice(i, semProsa.indexOf("\n];", i));
+    expect(escada).toMatch(
+      /colunas: \["post_de"\][\s\S]{0,200}APLICAR_FIXAR_E_STORY_DE_POST\.sql|APLICAR_FIXAR_E_STORY_DE_POST\.sql[\s\S]{0,200}colunas: \["post_de"\]/,
+    );
   });
 });
 

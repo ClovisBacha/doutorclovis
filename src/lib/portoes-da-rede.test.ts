@@ -80,25 +80,72 @@ describe("⚠️ os portões da rede não podem falhar abertos", () => {
     expect(achados).toEqual([]);
   });
 
+  /**
+   * ⚠️ **A ÚNICA EXCEÇÃO, e ela é de FORMA, não de conveniência.**
+   *
+   * N+1 é uma consulta por ITEM de uma coleção: vinte stories, vinte idas.
+   * `inserirDescendo` é outra coisa — um RECUO: ela repete a MESMA gravação
+   * tirando uma leva de colunas por vez, no máximo tantas vezes quantos degraus
+   * a escada tem, e **para na primeira que dá certo**. Num banco em dia é uma
+   * ida só; num banco atrasado, umas poucas, uma única vez.
+   *
+   * ⚠️ **A exceção é NOMEADA de propósito.** `postsCrus` e `storiesCrus` têm
+   * exatamente a mesma forma e escapam por ACIDENTE — elas chamam
+   * `await monta(...)`, e o padrão procura `await sb`. Acidente não é proteção:
+   * escrevê-lo aqui é o que impede alguém de "consertar" um falso positivo
+   * renomeando a variável, que é como uma catraca começa a mentir.
+   */
+  const FORA_DO_NMAIS1 = ["inserirDescendo"];
+
+  /** Em que função da lista de exceções esta linha cai, se em alguma. */
+  function excecao(linhas: string[], i: number): boolean {
+    for (let n = i; n >= 0; n--) {
+      const m = linhas[n].match(/^(?:export )?(?:async )?function (\w+)/);
+      if (m) return FORA_DO_NMAIS1.includes(m[1]);
+    }
+    return false;
+  }
+
+  function acharNMais1(fonte: string): number[] {
+    const linhas = semProsa(fonte).split("\n");
+    const achados: number[] = [];
+    let laco: { i: number; ind: number } | null = null;
+    linhas.forEach((l, i) => {
+      if (/^\s*for\s*\(|\.forEach\(|^\s*while\s*\(/.test(l)) {
+        laco = { i, ind: l.search(/\S/) };
+        return;
+      }
+      /* Saiu do laço quando a indentação volta ao nível dele (ou abaixo). */
+      if (laco && l.trim() && l.search(/\S/) <= laco.ind) laco = null;
+      if (!laco) return;
+      if (!/await\s+(sb|supabase|contextoDe|perfisPorId|registrarAtividade)\b/.test(l)) return;
+      if (excecao(linhas, i)) return;
+      achados.push(i + 1);
+    });
+    return achados;
+  }
+
   test("nenhuma ida ao banco dentro de laço (N+1)", () => {
     const achados: string[] = [];
     for (const f of MODULOS) {
-      const linhas = semProsa(fs.readFileSync(f, "utf8")).split("\n");
-      let laco: { i: number; ind: number } | null = null;
-      linhas.forEach((l, i) => {
-        if (/^\s*for\s*\(|\.forEach\(|^\s*while\s*\(/.test(l)) {
-          laco = { i, ind: l.search(/\S/) };
-          return;
-        }
-        /* Saiu do laço quando a indentação volta ao nível dele (ou abaixo). */
-        if (laco && l.trim() && l.search(/\S/) <= laco.ind) laco = null;
-        if (!laco) return;
-        if (/await\s+(sb|supabase|contextoDe|perfisPorId|registrarAtividade)\b/.test(l)) {
-          achados.push(`${f}:${i + 1}  (laço da linha ${laco.i + 1})  ${l.trim().slice(0, 70)}`);
-        }
-      });
+      for (const n of acharNMais1(fs.readFileSync(f, "utf8"))) achados.push(`${f}:${n}`);
     }
     expect(achados).toEqual([]);
+  });
+
+  test("⚠️ e a varredura AINDA MORDE — a exceção não a desligou", () => {
+    /* Catraca com exceção que passa em vazio é catraca que mente. */
+    const ruim = `
+async function qualquerCoisa(sb: any, ids: string[]) {
+  for (const id of ids) {
+    const { data } = await sb.from("rede_posts").select("id").eq("id", id);
+    if (data) console.log(data);
+  }
+}`;
+    expect(acharNMais1(ruim).length).toBe(1);
+    /* E a exceção vale SÓ para o nome nomeado, nunca para o vizinho. */
+    const excetuada = ruim.replace("qualquerCoisa", "inserirDescendo");
+    expect(acharNMais1(excetuada)).toEqual([]);
   });
 });
 

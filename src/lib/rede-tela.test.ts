@@ -180,11 +180,22 @@ describe("o rascunho do compositor", () => {
 });
 
 describe("a enquete do story", () => {
-  const visor = FONTE.slice(FONTE.indexOf("{atual.enquete && ("));
+  /* ⚠️ Ancorado em `atual.enquete && (` SEM a chave: a âncora `{atual.enquete`
+     quebrou no dia em que o bloco ganhou o portão do véu
+     (`{!borrado && atual.enquete && (`), e `indexOf` devolvendo −1 fazia
+     `slice(-1)` entregar UM caractere — o teste reprovava sobre uma tela que
+     estava certa. Décima segunda vez que uma âncora de grafia envelhece aqui. */
+  const iEnquete = FONTE.indexOf("atual.enquete && (");
+  const visor = iEnquete < 0 ? "" : FONTE.slice(iEnquete);
 
   /* ⚠️ "67%" são dois votos de três, e numa base pequena a porcentagem
      transforma três pessoas numa maioria. O post do feed já dizia os dois; o
      story dizia só a fração — a mesma enquete contando duas histórias. */
+  test("a âncora existe (senão o describe inteiro passa em vazio)", () => {
+    expect(iEnquete).toBeGreaterThan(-1);
+    expect(visor.length).toBeGreaterThan(1000);
+  });
+
   test("⚠️ mostra o NÚMERO junto da porcentagem", () => {
     const bloco = visor.slice(0, visor.indexOf("Toque para votar"));
     expect(bloco).toContain("{fatia}%");

@@ -134,9 +134,13 @@ describe("Modo Cuidado", () => {
         'if (await euEmCuidado(sb, eu)) return { ok: false as const, motivo: "indisponivel" as const };',
       );
       expect(c).not.toContain("(meu as any)?.care_mode");
-      /* E ANTES de qualquer escrita. */
+      /* E ANTES de qualquer escrita.
+         ⚠️ A escrita do story deixou de ser um `.insert(` solto e virou uma
+         escada (`inserirDescendo`). A GARANTIA é a ordem — o portão antes de
+         gravar —, nunca a forma de gravar: travar `.insert(` reprovava um
+         código que só ficou melhor. */
       const portao = c.indexOf("euEmCuidado");
-      const escreveu = c.indexOf(".insert(");
+      const escreveu = c.search(/\.insert\(|inserirDescendo\(/);
       expect(portao).toBeGreaterThan(-1);
       expect(escreveu).toBeGreaterThan(portao);
     }
@@ -1040,28 +1044,33 @@ describe("o carimbo do story — Fase 3", () => {
     expect(pub).not.toMatch(/semana: .*(semanas|seloSemana)/);
   });
 
-  test("⚠️ publicar não quebra em banco sem as colunas, e são TRÊS degraus", () => {
-    // O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
-    // falhar INTEIRO — não só o carimbo.
-    //
-    // ⚠️ E são três degraus, um por LEVA de colunas: o cheio (enquete +
-    // pergunta), o do meio (só o carimbo) e o mínimo. Um recuo que pulasse
-    // direto para o mínimo apagaria o carimbo de quem já rodou AQUELE SQL, só
-    // porque o SQL da enquete ainda não rodou.
+  test("⚠️ publicar não quebra em banco sem as colunas: UM degrau por LEVA", () => {
+    /**
+     * O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
+     * falhar INTEIRO — não só o carimbo. E um recuo que pulasse direto para o
+     * mínimo apagaria o carimbo de quem já rodou AQUELE SQL, só porque o SQL da
+     * enquete ainda não rodou.
+     *
+     * ⚠️ **A GARANTIA É "uma leva de SQL por degrau", e não o NÚMERO deles.**
+     * A versão anterior cravava TRÊS e travava a grafia dos três inserts — e
+     * reprovou no dia em que a escada virou uma só, com seis degraus, que é o
+     * conserto de um defeito grave (ela gravava DUAS vezes). Um número à mão
+     * aqui obriga a editar o teste a cada `APLICAR_` novo, e quem edita um
+     * teste vermelho com pressa apaga a asserção em vez de entendê-la.
+     */
     const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
-    expect(pub).toContain("const base = { autor_id: eu, imagem_path: caminho, texto: data.texto }");
-    expect(pub).toContain("enquete_opcoes: enquete");
-    expect(pub).toContain(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
-    expect(pub).toContain(".insert(base)");
-    /* A ordem dos degraus: do mais completo ao mínimo. Os marcadores são os
-       que distinguem um insert do outro — `enquete_opcoes` só existe no
-       primeiro, e o segundo fecha as chaves logo depois do carimbo. */
-    const cheio = pub.indexOf("pergunta_aberta: data.perguntaAberta === true");
-    const meio = pub.indexOf(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
-    const minimo = pub.indexOf(".insert(base)");
-    expect(cheio).toBeGreaterThan(-1);
-    expect(meio).toBeGreaterThan(cheio);
-    expect(minimo).toBeGreaterThan(meio);
+    const escada = pub.slice(pub.indexOf("const DEGRAUS"), pub.indexOf("inserirDescendo"));
+    /* Cada degrau nomeia o SQL que o destrava — é isso que faz a mensagem de
+       recuo dizer à pessoa o que rodar. */
+    const sqls = [...escada.matchAll(/rode (APLICAR_[A-Z_]+\.sql)/g)].map((m) => m[1]);
+    expect(new Set(sqls).size).toBeGreaterThanOrEqual(4);
+    /* E nenhum degrau mistura colunas de SQLs diferentes: faltar uma apagaria
+       recursos que o banco TEM.
+       ⚠️ Conta `colunas: [`, e não `aviso:` — a ANOTAÇÃO DE TIPO da escada
+       também tem um `aviso:`, e contá-lo dava um degrau a mais. É a mesma
+       armadilha de substring que já enganou meia dúzia de testes aqui. */
+    const degraus = escada.split("colunas: [").length - 1;
+    expect(degraus).toBe(sqls.length);
   });
 
   /* ⚠️ A enquete do story passa pela MESMA régua do post e pela MESMA triagem
@@ -1073,8 +1082,11 @@ describe("o carimbo do story — Fase 3", () => {
     expect(pub).toContain("limparOpcoes(data.enquete ?? [])");
     expect(pub).toContain("enqueteValida(opcoes)");
     const triagem = pub.indexOf("for (const o of enquete)");
-    const grava = pub.indexOf("const base = {");
+    /* ⚠️ A âncora é a GRAVAÇÃO, seja qual for a forma dela — a versão anterior
+       usava `const base = {`, que sumiu quando a escada virou uma só. */
+    const grava = pub.indexOf("inserirDescendo(");
     expect(triagem).toBeGreaterThan(-1);
+    expect(grava).toBeGreaterThan(-1);
     expect(triagem).toBeLessThan(grava);
   });
 
