@@ -57,7 +57,12 @@ REVOKE ALL ON public.rede_rascunhos FROM anon, authenticated;
 -- painel, e o desfecho nunca voltava. Denúncia sem retorno é a que ninguém faz
 -- duas vezes — e num app onde a alternativa é o bloqueio cego, isso custa.
 ALTER TABLE public.rede_denuncias ADD COLUMN IF NOT EXISTS desfecho text;
-ALTER TABLE public.rede_denuncias ADD COLUMN IF NOT EXISTS avisada_em timestamptz;
+--
+-- ⚠️ **NÃO existe `avisada_em` aqui, e a ausência é deliberada.** Ela estava
+-- nesta migration e NADA na rede a escrevia ou lia — coluna morta, com a
+-- aparência de que o aviso já é entregue. Quem entrega o desfecho é a TELA
+-- (`meusDesfechos`); no dia em que ele virar push, a coluna nasce junto com
+-- quem a carimba, nunca antes.
 
 -- ── 4. O LINK PÚBLICO DA PUBLICAÇÃO ───────────────────────────────────────
 --
