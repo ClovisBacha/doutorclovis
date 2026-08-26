@@ -6680,6 +6680,52 @@ nesta base; a régua continua sendo cobrar a GARANTIA, nunca a escrita.
 **Bancadas:** `/preview-instagram?tela=story&videoStory=1` ·
 `?tela=story&sensivelStory=1`.
 
+### Responder o story com foto (ago/2026)
+
+A última das nove que eu tinha deixado explicitamente pendente, com a razão
+escrita: _"o caminho existe inteiro — a resposta já é uma mensagem do direct, e
+a mensagem já aceita foto; falta ligar o seletor no visor."_ Era isso mesmo.
+
+- ⚠️ **`subirFoto` foi EXPORTADA, nunca copiada.** Uma segunda função de subir
+  foto divergiria dela no primeiro ajuste — e a divergência apareceria como a
+  foto indo para a PASTA errada, que é a trava que faz `fotoEhDeQuemMandou`
+  valer alguma coisa.
+- ⚠️ **A foto sobe DEPOIS de a conversa existir.** O caminho no balde é
+  conferido contra a conversa (`minhaConversa`): sem o id não há como pedir a
+  URL assinada.
+- ⚠️ **Foto que não sobe NÃO derruba a mensagem** — sai só o texto, com o recado
+  dizendo. Perder o que ela escreveu por causa do anexo seria o pior desfecho, e
+  o story some em 24 h.
+- ⚠️ **ANEXAR PARA O STORY**, e este é o defeito que o recurso teria sem
+  pensar: sem parar o relógio, o story avança enquanto ela olha a prévia, e a
+  foto sai grudada num story que ela já não está vendo — o `refId` da mensagem
+  apontaria para outra coisa, para sempre. A barrinha congela junto, senão ela
+  chega ao fim antes de a foto trocar, que lê como travamento. Mesma razão da
+  enquete e da folha de "visto por".
+- ⚠️ **Trocar de story LARGA a foto**: ela a escolheu para AQUELE.
+- ⚠️ **A prévia é obrigatória, e dá para desistir.** Sem ela, escolher a foto
+  mandaria a mensagem às cegas.
+- ⚠️ **`URL.createObjectURL` precisa de `revokeObjectURL`**: sem isso cada foto
+  trocada deixa o arquivo inteiro preso na memória da aba.
+- ⚠️ **A foto SOZINHA já é mensagem** — o servidor aceita corpo só com imagem.
+  Exigir texto faria o anexo virar enfeite de uma frase obrigatória.
+- ⚠️ **O ícone é DESENHADO, e não 📷** (cor própria em cada sistema, e ele fica
+  sobre a foto de outra pessoa), e **o `alt` nunca é vazio**: `alt=""` faz o
+  leitor de tela PULAR a imagem, e quem navega assim não saberia que há um anexo
+  pendurado na resposta que está prestes a mandar. A mutação que o esvaziava
+  passou verde na primeira versão do teste.
+- **Os três controles da barra foram a 44px** — medido a 393px: campo 231×44,
+  Enviar 74×44, anexar 44×44. ⚠️ **Os dois primeiros já estavam em 40 ANTES
+  deste recurso**; foi a medição do novo que os encontrou.
+
+⚠️ **E a foto da bancada me enganou uma vez:** a barra de resposta _parecia_
+cortada embaixo. Medida, ela vai de y=708 a 752 num viewport de 852 — dentro da
+tela, com folga. **Impressão de captura não é medida**; o que decide é o
+`boundingBox`.
+
+**Bancada:** `/preview-instagram?tela=story` (o clipe, a prévia, o × e o relógio
+parando).
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

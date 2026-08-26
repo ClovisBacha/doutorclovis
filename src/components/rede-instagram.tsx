@@ -93,7 +93,7 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
-import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
+import { CaixaDeEntrada, Conversa, MandarPublicacao, subirFoto } from "@/components/rede-conversa";
 import { Comentarios } from "@/components/rede-comentarios";
 import type { ConversaNaTela } from "@/lib/conversa.functions";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
@@ -5304,7 +5304,12 @@ export function RedeNoApp({
    * do-aceite vale aqui também: quem não é seguida de volta manda uma e espera.
    * Sem o recado, o "Enviado 💛" já pintado na tela viraria mentira.
    */
-  async function responderAoStory(autorId: string, storyId: string, texto: string) {
+  async function responderAoStory(
+    autorId: string,
+    storyId: string,
+    texto: string,
+    foto?: File | null,
+  ) {
     try {
       const t = await token();
       if (!t) return;
@@ -5315,11 +5320,23 @@ export function RedeNoApp({
         toast.error("Não é possível enviar mensagem para esta pessoa.");
         return;
       }
+      /* ⚠️ **A foto sobe DEPOIS de a conversa existir, e não antes.** O caminho
+         no balde é conferido contra a conversa (`minhaConversa`) — sem o id não
+         há como pedir a URL assinada. E se ela falhar, a mensagem SAI mesmo
+         assim, só sem a foto: perder o texto que ela escreveu por causa do
+         anexo seria o pior desfecho, e o story some em 24 h. */
+      let imagemPath: string | undefined;
+      if (foto) {
+        const caminho = await subirFoto(t, abriu.id, foto);
+        if (caminho) imagemPath = caminho;
+        else toast.error("A foto não subiu — mandei só o texto.");
+      }
       const r = await mod.enviarMensagem({
         data: {
           accessToken: t,
           conversaId: abriu.id,
           texto,
+          imagemPath,
           refTipo: "story",
           refId: storyId,
         },
@@ -6568,7 +6585,7 @@ export function RedeNoApp({
         }}
         aoVotarNoStory={votarNoStory}
         aoReagirAoStory={reagirNoStory}
-        aoResponderStory={(a, sid, t) => void responderAoStory(a, sid, t)}
+        aoResponderStory={(a, sid, t, f) => void responderAoStory(a, sid, t, f)}
         aoPerguntarNoStory={perguntarNoStory}
         bolha={vendoStory}
         aoFechar={() => setVendoStory(null)}
@@ -8420,11 +8437,26 @@ export function VisorDeStory({
   aoPerguntarNoStory?: (donaId: string, texto: string, storyId: string) => Promise<string | null>;
   /** Reagir a este story. `null` tira a reação. */
   aoReagirAoStory?: (storyId: string, tipo: TipoDeReacao | null) => void;
-  /** Manda a resposta como mensagem direta, com o story anexado. */
-  aoResponderStory?: (autorId: string, storyId: string, texto: string) => void;
+  /**
+   * Manda a resposta como mensagem direta, com o story anexado.
+   *
+   * ⚠️ A FOTO é opcional e vai pelo MESMO caminho da foto da conversa — nunca
+   * um segundo jeito de subir, que divergiria na regra da pasta.
+   */
+  aoResponderStory?: (autorId: string, storyId: string, texto: string, foto?: File | null) => void;
 }) {
   const [i, setI] = useState(0);
   const [resposta, setResposta] = useState("");
+  /**
+   * A foto que ela anexou à resposta, ainda não enviada.
+   *
+   * ⚠️ **Anexar PARA o story** (ver o efeito do relógio). Sem isso o story
+   * avança enquanto ela olha a prévia, e a foto sairia grudada num story que ela
+   * já não está vendo — o anexo apontaria para outra coisa. É o mesmo motivo
+   * pelo qual a enquete e a folha de "visto por" param o relógio.
+   */
+  const [fotoDaResposta, setFotoDaResposta] = useState<File | null>(null);
+  const escolherFoto = useRef<HTMLInputElement>(null);
   /** Por story: já respondi este? A bolha tem vários. */
   const [respondido, setRespondido] = useState<Record<string, boolean>>({});
   /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
@@ -8463,7 +8495,29 @@ export function VisorDeStory({
      coisa. */
   useEffect(() => {
     setDuracaoDoVideo(null);
+    /* ⚠️ E a foto anexada some junto: ela a escolheu para AQUELE story. Mantê-la
+       faria o anexo seguir para o próximo, e o `refId` da mensagem apontaria
+       para uma coisa que ela nunca quis responder. */
+    setFotoDaResposta(null);
   }, [i]);
+
+  /**
+   * O endereço local da prévia.
+   *
+   * ⚠️ **`URL.createObjectURL` PRECISA de `revokeObjectURL`**: sem isso cada
+   * foto trocada deixa o arquivo inteiro preso na memória da aba até ela
+   * fechar o app — e numa fileira de stories ela troca várias vezes.
+   */
+  const [previaDaFoto, setPreviaDaFoto] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fotoDaResposta) {
+      setPreviaDaFoto(null);
+      return;
+    }
+    const url = URL.createObjectURL(fotoDaResposta);
+    setPreviaDaFoto(url);
+    return () => URL.revokeObjectURL(url);
+  }, [fotoDaResposta]);
 
   const atual = bolha.stories[i];
   /**
@@ -8504,7 +8558,11 @@ export function VisorDeStory({
        continuam funcionando, então nunca há como ficar presa. */
     const enqueteEsperando =
       !!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null;
-    if (pausado || quemViu || confirmando || enqueteEsperando || !atual) return;
+    /* ⚠️ **A FOTO ANEXADA PARA O STORY.** Sem isto ele avança enquanto ela olha
+       a prévia, e a foto sairia grudada num story que ela já não está vendo — o
+       anexo apontaria para outra coisa, para sempre. Mesma razão da enquete e
+       da folha de "visto por". */
+    if (pausado || quemViu || confirmando || enqueteEsperando || fotoDaResposta || !atual) return;
     /* ⚠️ **O VÍDEO MANDA NO RELÓGIO, e o véu também.** Cinco segundos cravados
        cortariam ao meio um vídeo de vinte — e ela nunca veria o fim daquilo que
        a amiga gravou. E um story marcado como sensível não pode passar sozinho
@@ -8521,7 +8579,17 @@ export function VisorDeStory({
     }, duracao);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [i, pausado, quemViu, confirmando, atual?.id, voteiAgora, borrado, duracaoDoVideo]);
+  }, [
+    i,
+    pausado,
+    quemViu,
+    confirmando,
+    atual?.id,
+    voteiAgora,
+    borrado,
+    duracaoDoVideo,
+    fotoDaResposta,
+  ]);
 
   if (!atual) return null;
 
@@ -8548,6 +8616,7 @@ export function VisorDeStory({
                   pausado ||
                   quemViu ||
                   confirmando ||
+                  fotoDaResposta ||
                   (!!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null)
                     ? "paused"
                     : "running",
@@ -8884,31 +8953,95 @@ export function VisorDeStory({
                     Enviado 💛
                   </p>
                 ) : (
-                  <div className="flex items-center gap-1.5 rounded-full bg-black/40 p-1 backdrop-blur-sm">
+                  <>
                     <input
-                      value={resposta}
-                      onChange={(e) => setResposta(e.target.value.slice(0, 500))}
-                      placeholder="Responder…"
-                      aria-label={`Responder ao story de ${bolha.autorNome}`}
-                      className="min-h-[40px] flex-1 rounded-full bg-transparent px-3 text-[13px] text-white placeholder:text-white/60 focus:outline-none"
-                    />
-                    <button
-                      type="button"
-                      disabled={!resposta.trim()}
-                      onClick={() => {
-                        const t = resposta.trim();
-                        if (!t) return;
-                        /* ⚠️ Marca ANTES de a rede responder: a paciente precisa
-                           ver que o toque valeu, e o story continua correndo. */
-                        setRespondido((r) => ({ ...r, [atual.id]: true }));
-                        setResposta("");
-                        aoResponderStory(bolha.autorId, atual.id, t);
+                      ref={escolherFoto}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        e.target.value = "";
+                        if (f) setFotoDaResposta(f);
                       }}
-                      className="press min-h-[40px] shrink-0 rounded-full bg-white/90 px-3.5 text-[13px] font-semibold text-black disabled:opacity-40"
-                    >
-                      Enviar
-                    </button>
-                  </div>
+                    />
+                    {/* ⚠️ **A PRÉVIA É OBRIGATÓRIA.** Sem ela, escolher a foto
+                        mandaria a mensagem às cegas: ela não veria o que
+                        anexou, e não teria como desistir. E o × devolve a
+                        resposta ao texto puro — e destrava o relógio. */}
+                    {previaDaFoto && (
+                      <div className="mb-2 flex items-center gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-sm">
+                        <img
+                          src={previaDaFoto}
+                          alt="A foto que vai junto com a sua resposta"
+                          className="h-14 w-14 rounded-xl object-cover"
+                        />
+                        <span className="flex-1 text-[12px] text-white/85">
+                          Vai junto com a sua resposta
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Tirar a foto da resposta"
+                          onClick={() => setFotoDaResposta(null)}
+                          className="press -m-2 flex h-11 w-11 items-center justify-center text-xl leading-none text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/40 p-1 backdrop-blur-sm">
+                      {/* ⚠️ Desenhado, e não 📷: o emoji tem cor própria em cada
+                          sistema, e este fica sobre a foto de outra pessoa. */}
+                      <button
+                        type="button"
+                        aria-label="Anexar uma foto à resposta"
+                        onClick={() => escolherFoto.current?.click()}
+                        className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          aria-hidden="true"
+                        >
+                          <rect x="3" y="6" width="18" height="14" rx="3" />
+                          <circle cx="12" cy="13" r="3.2" />
+                          <path d="M8.5 6 10 3.6h4L15.5 6" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <input
+                        value={resposta}
+                        onChange={(e) => setResposta(e.target.value.slice(0, 500))}
+                        placeholder="Responder…"
+                        aria-label={`Responder ao story de ${bolha.autorNome}`}
+                        className="min-h-[44px] flex-1 rounded-full bg-transparent px-3 text-[13px] text-white placeholder:text-white/60 focus:outline-none"
+                      />
+                      {/* ⚠️ **A FOTO SOZINHA JÁ É MENSAGEM** — o servidor aceita
+                          corpo só com imagem. Exigir texto faria o anexo virar
+                          um enfeite de uma frase obrigatória. */}
+                      <button
+                        type="button"
+                        disabled={!resposta.trim() && !fotoDaResposta}
+                        onClick={() => {
+                          const t = resposta.trim();
+                          const f = fotoDaResposta;
+                          if (!t && !f) return;
+                          /* ⚠️ Marca ANTES de a rede responder: a paciente
+                             precisa ver que o toque valeu, e o story continua
+                             correndo. */
+                          setRespondido((r) => ({ ...r, [atual.id]: true }));
+                          setResposta("");
+                          setFotoDaResposta(null);
+                          aoResponderStory(bolha.autorId, atual.id, t, f);
+                        }}
+                        className="press min-h-[44px] shrink-0 rounded-full bg-white/90 px-3.5 text-[13px] font-semibold text-black disabled:opacity-40"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </>
                 )}
               </div>
             )}

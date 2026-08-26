@@ -117,7 +117,20 @@ export function juntarMensagens(
  * dentro de um balão — nem o do post (1080), que é publicação, nem o do avatar
  * (512), que é uma bolinha.
  */
-async function subirFoto(token: string, conversaId: string, arquivo: File): Promise<string | null> {
+/**
+ * Sobe a foto para o balde da conversa e devolve o caminho.
+ *
+ * ⚠️ **EXPORTADA porque a resposta ao STORY precisa da mesma.** O visor de
+ * story manda a resposta como mensagem do direct, e uma segunda função de subir
+ * foto divergiria desta no primeiro ajuste — e a divergência apareceria como a
+ * foto do story indo para a PASTA errada, que é a trava que faz
+ * `fotoEhDeQuemMandou` valer alguma coisa. Uma função, dois chamadores.
+ */
+export async function subirFoto(
+  token: string,
+  conversaId: string,
+  arquivo: File,
+): Promise<string | null> {
   try {
     const [mod, { LADO_DA_FOTO }] = await Promise.all([
       import("@/lib/conversa.functions"),

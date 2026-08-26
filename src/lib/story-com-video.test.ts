@@ -172,9 +172,17 @@ describe("⚠️ o visor, e o que o VÉU tem de esconder", () => {
   test("⚠️ trocar de story ZERA a duração", () => {
     /* Senão o story seguinte — que pode ser uma foto — herdaria o relógio do
        vídeo de vinte segundos que veio antes. */
+    /* ⚠️ **Ancorado no EFEITO inteiro, e não numa janela de 60 caracteres.** A
+       primeira versão media a distância até `}, [i])` e ficou vermelha uma hora
+       depois, quando `setFotoDaResposta(null)` entrou no mesmo efeito — pela
+       mesma razão (a foto também é do story ATUAL). A distância nunca foi a
+       garantia: o que importa é a duração ser zerada num efeito que depende de
+       `i`. */
     const i2 = C.indexOf("setDuracaoDoVideo(null)");
     expect(i2).toBeGreaterThan(-1);
-    expect(C.slice(i2, i2 + 60)).toContain("}, [i])");
+    const efeito = C.slice(C.lastIndexOf("useEffect(", i2), C.indexOf("]);", i2) + 3);
+    expect(efeito).toContain("setDuracaoDoVideo(null)");
+    expect(efeito.trimEnd().endsWith("}, [i]);")).toBe(true);
   });
 
   test("⚠️ o VÉU segura o relógio", () => {

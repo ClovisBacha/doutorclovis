@@ -845,6 +845,12 @@ function Bancada() {
         souEu={meu}
         aoQuemViu={async () => GENTE}
         aoApagarStory={() => alert("apagaria o story")}
+        /* ⚠️ A bancada RECEBE a foto e a descreve, em vez de dar `alert`: o que
+           precisa ser olhado é a prévia, o × que a tira e o relógio parando —
+           e nada disso apareceria com um alert. */
+        aoResponderStory={(_a, _sid, texto, foto) =>
+          alert(`responderia: ${JSON.stringify(texto)}${foto ? ` + foto (${foto.name})` : ""}`)
+        }
       />
     );
   }
