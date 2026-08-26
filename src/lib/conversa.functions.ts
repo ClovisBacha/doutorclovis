@@ -127,17 +127,43 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
  * devolver `null` aqui — e o app inteiro responderia "esta conversa não é sua"
  * para as duas donas dela.
  */
+/**
+ * ⚠️ **AS COLUNAS DE `rede_conversas`, do banco em dia ao piso — uma lista só.**
+ *
+ * Elas nascem em TRÊS `APLICAR_` diferentes (`arquivada_*` no
+ * `APLICAR_NOVE_DA_REDE`, `fixada_*` no `APLICAR_DIRECT_COMPLETO`,
+ * `silenciada_*`/`saiu_*` no `APLICAR_CONVERSA_SILENCIAR`) e o dono os roda à
+ * mão, um de cada vez. Um degrau por SQL: pular um apagaria o SILENCIAR, que
+ * funciona há meses, por causa de uma coluna de arquivar que ninguém ainda usa.
+ *
+ * ⚠️ **E a lista é única porque as duas leituras JÁ tinham divergido**: a
+ * singular saltava `fixada_*` enquanto a plural descia de um em um.
+ */
+const BASE_DA_CONVERSA = "id, a_id, b_id, iniciada_por, aceita, ultima_em, lida_a, lida_b";
+const DEGRAUS_DA_CONVERSA = [
+  `${BASE_DA_CONVERSA}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b, arquivada_a, arquivada_b`,
+  `${BASE_DA_CONVERSA}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
+  `${BASE_DA_CONVERSA}, silenciada_a, silenciada_b, saiu_a, saiu_b`,
+  BASE_DA_CONVERSA,
+] as const;
+
 async function minhaConversa(sb: any, id: string, eu: string): Promise<any | null> {
-  const BASE = "id, a_id, b_id, iniciada_por, aceita, ultima_em, lida_a, lida_b";
   const ler = (colunas: string) =>
     sb.from("rede_conversas").select(colunas).eq("id", id).maybeSingle();
 
-  let { data, error } = await ler(
-    `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b, arquivada_a, arquivada_b`,
-  );
-  /* ⚠️ Um degrau por SQL — ver `minhasConversas`. */
-  if (error) ({ data, error } = await ler(`${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`));
-  if (error) ({ data, error } = await ler(BASE));
+  /* ⚠️ **A ESCADA VEM DE `DEGRAUS_DA_CONVERSA`, e antes ela PULAVA um degrau.**
+     A versão anterior descia do topo direto para `silenciada+saiu`, saltando
+     `fixada_*` — enquanto a lista (`minhasConversas`) descia de um em um, e o
+     comentário AQUI mandava "ver `minhasConversas`", afirmando uma coisa que o
+     código não fazia. Nada lia `fixada_*` desta função, então o defeito era
+     latente; latente é como ele sobrevive à revisão. Uma lista só para as duas
+     leituras torna a divergência impossível. */
+  let data: any = null;
+  let error: any = null;
+  for (const colunas of DEGRAUS_DA_CONVERSA) {
+    ({ data, error } = await ler(colunas));
+    if (!error) break;
+  }
   if (error || !data) return null;
   if (data.a_id !== eu && data.b_id !== eu) return null;
   return data;
@@ -178,29 +204,22 @@ export const minhasConversas = createServerFn({ method: "POST" })
         .or(`a_id.eq.${eu},b_id.eq.${eu}`)
         .order("ultima_em", { ascending: false })
         .limit(100);
-    const BASE = "id, a_id, b_id, iniciada_por, aceita, ultima_em, lida_a, lida_b";
-    let { data: linhas, error } = await lerLista(
-      `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b, arquivada_a, arquivada_b`,
-    );
+    let { data: linhas, error } = await lerLista(DEGRAUS_DA_CONVERSA[0]);
     /* ⚠️ **UM DEGRAU POR SQL, e o de ARQUIVAR é o mais alto.** `arquivada_*`
        nasce no `APLICAR_NOVE_DA_REDE`, `fixada_*` no `APLICAR_DIRECT_COMPLETO`
        e `silenciada_*`/`saiu_*` no `APLICAR_CONVERSA_SILENCIAR` — três
        arquivos. Um recuo que pulasse degraus apagaria o SILENCIAR, que funciona
        há meses, por causa de uma coluna de arquivar que ninguém ainda usa. */
     if (error) {
-      ({ data: linhas, error } = await lerLista(
-        `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
-      ));
+      ({ data: linhas, error } = await lerLista(DEGRAUS_DA_CONVERSA[1]));
       console.warn("[conversa] sem arquivada_* — rode APLICAR_NOVE_DA_REDE.sql");
     }
     if (error) {
-      ({ data: linhas, error } = await lerLista(
-        `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`,
-      ));
+      ({ data: linhas, error } = await lerLista(DEGRAUS_DA_CONVERSA[2]));
       console.warn("[conversa] sem fixada_* — rode APLICAR_DIRECT_COMPLETO.sql");
     }
     if (error) {
-      ({ data: linhas, error } = await lerLista(BASE));
+      ({ data: linhas, error } = await lerLista(DEGRAUS_DA_CONVERSA[3]));
       console.warn("[conversa] sem saiu_*/silenciada_* — rode APLICAR_CONVERSA_SILENCIAR.sql");
     }
     if (error) return { ok: false as const, motivo: "banco" as const };

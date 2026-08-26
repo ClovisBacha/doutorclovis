@@ -6873,6 +6873,31 @@ de uma conta com uma gestação inteira publicada, e as seções saem da DUM, qu
 nunca chega ao navegador. `?album=1` SEM `?meu=1` prova que a lista não é
 oferecida a terceiros.
 
+#### ⚠️ E a varredura pós-verde achou uma escada que PULAVA um degrau
+
+Com as nove no ar e tudo verde, a pergunta mecânica de sempre — _toda coluna
+nova tem degrau?_ — encontrou o defeito em `rede_conversas`.
+
+`minhaConversa` (a **singular**) descia do topo direto para `silenciada+saiu`,
+**pulando `fixada_*`**, enquanto `minhasConversas` (a plural) descia de um em
+um. E o comentário da singular mandava "ver `minhasConversas`" — afirmando uma
+coisa que o código não fazia.
+
+⚠️ **Nada lia `fixada_*` daquela função, então o defeito era LATENTE — e latente
+é como um defeito sobrevive à revisão.** Ele acordaria no dia em que o dono
+rodasse `APLICAR_DIRECT_COMPLETO` sem `APLICAR_NOVE_DA_REDE`, ou no dia em que
+alguém lesse `c.fixada_a`.
+
+`DEGRAUS_DA_CONVERSA` é a lista única, e `degraus-da-conversa.test.ts` a catraca
+— com uma invariante que vale para qualquer escada desta base: **cada degrau é
+PREFIXO do de cima**, o que garante que descer só TIRA colunas. Uma lista
+escrita à mão podia trocar uma coluna por outra sem ninguém ver.
+
+⚠️ E a primeira versão da própria catraca contou errado (cinco degraus onde há
+quatro, somando a definição de `BASE_DA_CONVERSA` à conta) e reprovou sobre a
+escada certa. **Teste que conta tem de contar a coisa certa** — é a mesma
+lição do "pós-parto" achado no rodapé do site, no mesmo dia.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta
