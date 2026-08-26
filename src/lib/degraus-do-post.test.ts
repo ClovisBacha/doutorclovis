@@ -136,11 +136,49 @@ describe("⚠️ postsCrus desce UM degrau por vez", () => {
     const sb = bancoCom(TODAS.slice(0, 7));
     const [p] = await ler(sb);
     expect(p.id).toBe("v:id");
-    for (const c of TODAS.slice(7)) expect(p[c]).toBeNull();
+    /**
+     * ⚠️ **O PISO DEVOLVE UM VALOR SEGURO, não necessariamente `null`.**
+     *
+     * Quase toda coluna nova é anulável, e ausente vira `null` — "não sei". A
+     * exceção é `sensivel`, que é booleana `NOT NULL`: sem a coluna, nenhum
+     * post está marcado, e `false` é o estado de antes do recurso. Devolver
+     * `null` ali faria `deveBorrar` receber um valor que ela não espera.
+     */
+    for (const c of TODAS.slice(7)) {
+      expect(c === "sensivel" ? p[c] : (p[c] ?? null)).toBe(c === "sensivel" ? false : null);
+    }
     /* A lista cheia mais um pedido por degrau. ⚠️ DERIVADO, e não um número
        cravado: acrescentar uma camada de SQL não pode reprovar um teste que
        continua descrevendo a mesma garantia. */
     expect(sb.pedidos.length).toBe(1 + DEGRAUS);
+  });
+
+  test("⚠️ remover uma coluna NÃO come o miolo de outra que a contém", async () => {
+    /**
+     * ⚠️ **ISTO FOI UM DEFEITO REAL, e ele veio com `sensivel`.**
+     *
+     * A remoção tem duas formas: `, alvo` (meio ou fim) e `alvo, ` (começo). A
+     * primeira sempre teve `\b`; a SEGUNDA não tinha. Ao remover `sensivel`,
+     * ela comia o miolo de `motivo_sensivel` e produzia `motivo_video_legenda`
+     * — uma coluna que não existe, fazendo TODOS os degraus abaixo falharem e
+     * a leitura chegar ao piso com tudo nulo.
+     *
+     * É a armadilha de substring que este repositório já pagou em
+     * `bloquear`/`bloquearPeriodo` e em `minhaColuna`/`minhaColunaDeLeitura`,
+     * agora dentro de um recuo — o lugar onde ela é mais cara, porque o sintoma
+     * é "recurso sumiu" e não "erro".
+     *
+     * A garantia: com o banco COMPLETO menos uma coluna do meio, as vizinhas
+     * cujo nome a contém sobrevivem.
+     */
+    const sb = bancoCom(TODAS.filter((c) => c !== "lugar"));
+    const [p] = await ler(sb);
+    expect(p.lugar ?? null).toBeNull();
+    /* `motivo_sensivel` contém `sensivel`; `video_legenda` vinha logo depois. */
+    expect(p.motivo_sensivel).toBe("v:motivo_sensivel");
+    expect(p.video_legenda).toBe("v:video_legenda");
+    expect(p.sensivel).toBe("v:sensivel");
+    expect(p.ciclo).toBe("v:ciclo");
   });
 
   test("⚠️ nem o piso responde → lista VAZIA, nunca uma exceção", async () => {

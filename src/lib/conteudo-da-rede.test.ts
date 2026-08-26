@@ -135,13 +135,23 @@ describe("⚠️ o lugar", () => {
     expect(t).not.toContain("geolocation");
   });
 
-  test("⚠️ tem degrau, e ele é o MAIS ALTO", () => {
-    /* Um recuo que pulasse daqui para o fundo apagaria recursos antigos por
-       causa da coluna mais nova. */
+  test("⚠️ tem degrau PRÓPRIO — nunca junto de outro SQL", () => {
+    /**
+     * ⚠️ **A GARANTIA É O DEGRAU SOZINHO, e não a POSIÇÃO dele.**
+     *
+     * A primeira versão cobrava que `lugar` fosse o degrau MAIS ALTO — verdade
+     * enquanto ele era a coluna mais nova, e falsa no dia seguinte, quando
+     * `sensivel` chegou. Um teste que trava posição obriga a editá-lo a cada
+     * `APLICAR_` novo, e quem edita um teste vermelho com pressa apaga a
+     * asserção em vez de entendê-la.
+     *
+     * O que importa é que ele tenha degrau SÓ dele: junto de colunas de outro
+     * SQL, faltar `lugar` apagaria recursos que o banco tem.
+     */
     const s = semProsa(FONTE);
     const i = s.indexOf("const DEGRAUS_DO_POST");
-    const primeiro = s.slice(i, i + 420);
-    expect(primeiro).toContain('colunas: ["lugar"]');
+    const escada = s.slice(i, s.indexOf("\n];", i));
+    expect(escada).toContain('colunas: ["lugar"]');
   });
 
   test("⚠️ na tela é TEXTO, e não link para mapa", () => {

@@ -876,7 +876,8 @@ const AUTORES_NO_FEED = 200;
 const COLUNAS_DO_POST =
   "id, autor_id, texto, imagem_path, imagens, visibilidade, criado_em, " +
   "enquete_opcoes, aula, pergunta, comparacao_de, editado_em, miniatura_path, " +
-  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em, quem_comenta, lugar";
+  "marco_tipo, marco_dias, video_path, repost_de, alt_texto, fixado_em, quem_comenta, lugar, " +
+  "sensivel, motivo_sensivel, video_legenda, ciclo";
 
 /** A mesma lista sem as colunas que o dono ainda pode não ter aplicado. */
 const COLUNAS_DO_POST_ANTIGAS =
@@ -942,10 +943,24 @@ const COLUNAS_DO_POST_ANTIGAS =
  * como recurso sumindo sem erro nenhum — que é exatamente o que a lista única
  * existe para impedir.
  */
-const DEGRAUS_DO_POST: { aviso: string; colunas: string[]; nulos: Record<string, null> }[] = [
+const DEGRAUS_DO_POST: {
+  aviso: string;
+  colunas: string[];
+  nulos: Record<string, null | false>;
+}[] = [
   {
     /* ⚠️ O degrau MAIS ALTO é sempre a coluna mais NOVA: um recuo que pulasse
        daqui para o fundo apagaria recursos antigos por causa do último. */
+    aviso: "sensível, legenda e ciclo — rode APLICAR_NOVE_DA_REDE.sql",
+    colunas: ["sensivel", "motivo_sensivel", "video_legenda", "ciclo"],
+    /* ⚠️ **`sensivel` cai para `false`, e não `null`.** A coluna é booleana
+       `NOT NULL`; sem ela nenhum post está marcado, que é o estado de antes do
+       recurso — e `null` faria `deveBorrar` receber um valor que ela não
+       espera. Sem `ciclo`, nenhuma memória aparece: errar para o lado de não
+       lembrar. */
+    nulos: { sensivel: false, motivo_sensivel: null, video_legenda: null, ciclo: null },
+  },
+  {
     aviso: "o lugar — rode APLICAR_CONTEUDO_DA_REDE.sql",
     colunas: ["lugar"],
     /* Sem a coluna, nenhum post tem lugar — o estado de antes do recurso. */
@@ -1008,7 +1023,7 @@ export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any
   /* Começa com tudo e vai tirando uma camada por vez, do SQL mais NOVO para o
      mais antigo — a ordem em que o dono os aplica. */
   let colunas = COLUNAS_DO_POST;
-  const nulos: Record<string, null> = {};
+  const nulos: Record<string, null | false> = {};
   for (let i = 0; i <= DEGRAUS_DO_POST.length; i++) {
     const { data, error } = await monta(sb.from("rede_posts").select(colunas));
     if (!error) {
@@ -1020,11 +1035,17 @@ export async function postsCrus(sb: any, monta: (base: any) => any): Promise<any
     const degrau = DEGRAUS_DO_POST[i];
     if (!degrau) break;
     console.warn(`[rede] posts sem ${degrau.aviso}`);
-    /* ⚠️ Derivado por REMOÇÃO da lista única — o `\b` impede que `video_path`
-       coma o começo de outra coluna, e o `, ` some junto para o select não sair
-       com vírgula dupla. */
+    /* ⚠️ **AS DUAS FORMAS PRECISAM DE FRONTEIRA, e a segunda não tinha.**
+       A primeira tira a coluna do meio ou do fim (`, alvo`); a segunda tira do
+       COMEÇO (`alvo, `). Sem `\b` na segunda, remover `sensivel` comia o miolo
+       de `motivo_sensivel` e produzia `motivo_video_legenda` — uma coluna que
+       não existe, fazendo TODOS os degraus abaixo falharem. É a armadilha de
+       substring que este repositório já pagou em `bloquear`/`bloquearPeriodo` e
+       em `minhaColuna`/`minhaColunaDeLeitura`, agora dentro de um recuo. */
     for (const c of degrau.colunas) {
-      colunas = colunas.replace(new RegExp(`,\\s*\\b${c}\\b`), "").replace(`${c}, `, "");
+      colunas = colunas
+        .replace(new RegExp(`,\\s*\\b${c}\\b`), "")
+        .replace(new RegExp(`\\b${c}\\b,\\s*`), "");
     }
     Object.assign(nulos, degrau.nulos);
   }

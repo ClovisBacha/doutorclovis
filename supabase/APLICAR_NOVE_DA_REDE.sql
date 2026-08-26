@@ -20,6 +20,15 @@
 ALTER TABLE public.rede_posts   ADD COLUMN IF NOT EXISTS sensivel boolean NOT NULL DEFAULT false;
 ALTER TABLE public.rede_stories ADD COLUMN IF NOT EXISTS sensivel boolean NOT NULL DEFAULT false;
 
+-- O motivo, de um catálogo FECHADO (ver `conteudo-sensivel.ts`).
+--
+-- ⚠️ NUNCA campo livre: um campo aberto aqui vira o lugar onde alguém escreve o
+-- diagnóstico de outra pessoa, ou o detalhe que o aviso existia para poupar. E
+-- o rótulo é o que a leitora lê ANTES de decidir — precisa dizer o assunto sem
+-- contar a história.
+ALTER TABLE public.rede_posts   ADD COLUMN IF NOT EXISTS motivo_sensivel text;
+ALTER TABLE public.rede_stories ADD COLUMN IF NOT EXISTS motivo_sensivel text;
+
 COMMENT ON COLUMN public.rede_posts.sensivel IS
   'A autora marcou como sensível: a tela borra e pede um toque. Nunca esconde.';
 
@@ -111,6 +120,8 @@ BEGIN
     WHERE table_name='rede_posts' AND column_name='sensivel') THEN faltando := faltando || ' posts.sensivel'; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_name='rede_stories' AND column_name='sensivel') THEN faltando := faltando || ' stories.sensivel'; END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+    WHERE table_name='rede_posts' AND column_name='motivo_sensivel') THEN faltando := faltando || ' posts.motivo_sensivel'; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
     WHERE table_name='rede_posts' AND column_name='video_legenda') THEN faltando := faltando || ' posts.video_legenda'; END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns
