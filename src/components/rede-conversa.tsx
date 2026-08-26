@@ -13,16 +13,22 @@
  * aceso para sempre em conversa longa, e o número perde o sentido.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ConversaNaTela, MensagemNaTela, NotaNaTela } from "@/lib/conversa.functions";
 import {
   BYTES_DA_FOTO,
   LIMITE_DA_MENSAGEM,
+  AUDIO_BYTES_MAX,
+  AUDIO_SEGUNDOS_MAX,
   REACOES_DE_MENSAGEM,
+  acharNaConversa,
+  duracaoEmTexto,
+  extensaoDoAudio,
   textoDaCitacao,
   TAMANHO_DA_NOTA,
 } from "@/lib/conversa";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { type Gravacao, gravar, podeGravar, relogio } from "@/lib/gravador";
 import { FIGURINHAS, figurinhaDoTexto, textoDaFigurinha } from "@/lib/figurinhas";
 import {
   EXPLICACAO_DA_SUGESTAO,
@@ -135,7 +141,7 @@ async function subirFoto(token: string, conversaId: string, arquivo: File): Prom
     );
     if (!blob) return null;
 
-    const r = await mod.urlParaSubirFotoDaConversa({
+    const r = await mod.urlParaSubirNaConversa({
       data: { accessToken: token, conversaId, extensao: "jpg" },
     });
     if (!r.ok) return null;
@@ -147,6 +153,35 @@ async function subirFoto(token: string, conversaId: string, arquivo: File): Prom
       method: "PUT",
       body: blob,
       headers: { "content-type": "image/jpeg" },
+    });
+    if (!posta.ok) return null;
+    return r.caminho;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sobe o áudio para o balde da conversa e devolve o caminho.
+ *
+ * ⚠️ **PASSA PELO MESMO `urlParaSubirNaConversa` da foto**, e por isso herda a
+ * regra da PASTA: o caminho no balde não carrega o uuid da paciente, que
+ * vazaria na URL assinada. Uma função irmã divergiria dessa regra no primeiro
+ * conserto.
+ */
+async function subirAudio(token: string, conversaId: string, audio: Blob): Promise<string | null> {
+  try {
+    if (audio.size > AUDIO_BYTES_MAX) return null;
+    const mod = await import("@/lib/conversa.functions");
+    const ext = extensaoDoAudio(audio.type) as "m4a" | "webm" | "ogg";
+    const r = await mod.urlParaSubirNaConversa({
+      data: { accessToken: token, conversaId, extensao: ext },
+    });
+    if (!r.ok) return null;
+    const posta = await fetch(r.url, {
+      method: "PUT",
+      body: audio,
+      headers: { "content-type": audio.type || "audio/webm" },
     });
     if (!posta.ok) return null;
     return r.caminho;
@@ -633,6 +668,32 @@ export function Conversa({
   const [acaoEm, setAcaoEm] = useState<string | null>(null);
   /** ⚠️ Local e por mensagem — ver o bloco do filtro de palavras abaixo. */
   const [reveladas, setReveladas] = useState<Set<string>>(() => new Set());
+  /**
+   * ⚠️ **A BUSCA É LOCAL, e a régua mora em `conversa.ts`.** Buscar no servidor
+   * mandaria o TERMO pela rede — e o termo é o que ela está procurando numa
+   * conversa privada: "sangramento", o nome de um hospital, o nome de uma
+   * pessoa. Ela roda sobre as mensagens que a tela JÁ tem.
+   */
+  /**
+   * A GRAVAÇÃO DE VOZ.
+   *
+   * ⚠️ **`gravar()` roda DENTRO do toque, sem `await` antes.** `getUserMedia`
+   * exige gesto do usuário no iOS, e depois de uma espera o gesto já passou —
+   * é a mesma armadilha do `destravar()` dos Sons para dormir e do gravador do
+   * diário.
+   */
+  const [gravacao, setGravacao] = useState<Gravacao | null>(null);
+  const [segundos, setSegundos] = useState(0);
+  const [subindoAudio, setSubindoAudio] = useState(false);
+  const [buscando, setBuscando] = useState(false);
+  const [termo, setTermo] = useState("");
+  const achadas = useMemo(() => acharNaConversa(mensagens, termo), [mensagens, termo]);
+  /**
+   * ⚠️ **DESTACA, NUNCA FILTRA a lista.** Esconder as outras arrancaria cada
+   * achado do que veio antes e depois dele — e numa conversa é justamente o
+   * redor que dá sentido à frase que ela procurou.
+   */
+  const achadasIds = useMemo(() => new Set(achadas.map((m) => m.id)), [achadas]);
   const [denunciandoConversa, setDenunciandoConversa] = useState(false);
   const [abrindoFigurinhas, setAbrindoFigurinhas] = useState(false);
   /** A mensagem que estou citando ao escrever. */
@@ -963,6 +1024,86 @@ export function Conversa({
     }
   }
 
+  /* O relógio da gravação. Ele PARA sozinho no teto — sem isso, um toque
+     esquecido gravaria até estourar o tamanho e a mensagem seria recusada
+     depois de ela ter falado dois minutos. */
+  useEffect(() => {
+    if (!gravacao) return;
+    const t = setInterval(() => {
+      setSegundos((n) => {
+        if (n + 1 >= AUDIO_SEGUNDOS_MAX) {
+          void pararEEnviar();
+          return AUDIO_SEGUNDOS_MAX;
+        }
+        return n + 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gravacao]);
+
+  function comecarAGravar() {
+    if (gravacao || enviando) return;
+    setRecado(null);
+    setSegundos(0);
+    /* ⚠️ SEM `await` ANTES: `getUserMedia` exige o gesto, e depois de uma
+       espera o gesto já passou no iOS. */
+    gravar()
+      .then((g) => setGravacao(g))
+      .catch(() => setRecado("Não consegui usar o microfone. Ajustes → Obstétrica → Microfone."));
+  }
+
+  function desistirDaGravacao() {
+    gravacao?.cancelar();
+    setGravacao(null);
+    setSegundos(0);
+  }
+
+  async function pararEEnviar() {
+    const g = gravacao;
+    if (!g) return;
+    const duracao = Math.max(1, segundos);
+    setGravacao(null);
+    setSegundos(0);
+    setSubindoAudio(true);
+    try {
+      const audio = await g.parar();
+      const tk = await token();
+      if (!tk) return;
+      /* ⚠️ **Áudio grande é RECUSADO aqui, com recado.** Deixar passar faria o
+         servidor recusar depois de ela ter falado — e o que ela falou some. */
+      if (audio.size > AUDIO_BYTES_MAX) {
+        setRecado("Esse áudio ficou grande demais. Tente um mais curto.");
+        return;
+      }
+      const caminho = await subirAudio(tk, conversa.id, audio);
+      if (!caminho) {
+        setRecado("Não deu para enviar o áudio. Tente de novo.");
+        return;
+      }
+      const mod = await import("@/lib/conversa.functions");
+      const r = await mod.enviarMensagem({
+        data: {
+          accessToken: tk,
+          conversaId: conversa.id,
+          audioPath: caminho,
+          duracaoSeg: duracao,
+          respondeA: citando?.id,
+        },
+      });
+      if (r.ok) {
+        setCitando(null);
+        await carregar();
+      } else {
+        setRecado("Não deu para enviar o áudio. Tente de novo.");
+      }
+    } catch {
+      setRecado("Não deu para enviar o áudio. Tente de novo.");
+    } finally {
+      setSubindoAudio(false);
+    }
+  }
+
   async function enviar() {
     const t = texto.trim();
     /* ⚠️ **Foto SEM legenda é mensagem válida.** Exigir texto aqui faria o botão
@@ -1061,15 +1202,66 @@ export function Conversa({
             </span>
           )}
         </button>
+        {/* ⚠️ **DESENHADA, e não 🔍.** O emoji tem cor própria em cada sistema —
+            a mesma lição do 📞, do 📌 e da estrela do destaque. */}
+        <button
+          type="button"
+          onClick={() => {
+            setBuscando((v) => !v);
+            setTermo("");
+          }}
+          aria-label={buscando ? "Fechar a busca" : "Buscar na conversa"}
+          aria-pressed={buscando}
+          className={`press ml-auto flex h-11 w-11 items-center justify-center ${
+            buscando ? "text-primary" : ""
+          }`}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+            <circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+            <line
+              x1="16"
+              y1="16"
+              x2="21"
+              y2="21"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
         <button
           type="button"
           onClick={() => setMenu(true)}
           aria-label="Opções da conversa"
-          className="press ml-auto flex h-11 w-11 items-center justify-center text-[18px] leading-none"
+          className="press flex h-11 w-11 items-center justify-center text-[18px] leading-none"
         >
           ⋯
         </button>
       </header>
+
+      {buscando && (
+        <div className="shrink-0 border-b border-border px-3 py-2">
+          <input
+            autoFocus
+            value={termo}
+            onChange={(e) => setTermo(e.target.value)}
+            placeholder="Buscar nesta conversa"
+            className="h-11 w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+          />
+          {/* ⚠️ **O QUE ELA DIZ É O QUE A RÉGUA FAZ.** A busca roda sobre o que
+              já está na tela — sem isso, quem sobe procurando uma frase antiga e
+              não acha conclui que a conversa se perdeu. E ela não alcança o que
+              foi apagado nem o que o filtro de palavras recolheu: o texto dessas
+              não viaja para cá de propósito. */}
+          <p className="mt-1.5 px-1 text-[11px] leading-snug text-muted-foreground">
+            {termo.trim().length < 2
+              ? "Procura no que já está carregado — suba para trazer o mais antigo."
+              : achadas.length === 0
+                ? "Nada encontrado no que está carregado."
+                : `${achadas.length} ${achadas.length === 1 ? "mensagem" : "mensagens"}`}
+          </p>
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {pedido && !euIniciei && (
@@ -1100,7 +1292,15 @@ export function Conversa({
              `items-*`. */
           <div
             key={m.id}
-            className={`mb-1.5 flex flex-col ${m.souEu ? "items-end" : "items-start"}`}
+            /* ⚠️ **O ACHADO É DESTACADO, e a lista NÃO é filtrada.** Esconder as
+               outras arrancaria cada resultado do que veio antes e depois — e
+               numa conversa é o redor que dá sentido à frase que ela procurou.
+               O anel some junto com a busca. */
+            className={`mb-1.5 flex flex-col ${m.souEu ? "items-end" : "items-start"} ${
+              buscando && achadasIds.has(m.id)
+                ? "rounded-2xl ring-2 ring-primary/60 ring-offset-2 ring-offset-background"
+                : ""
+            }`}
           >
             {/* ⚠️ **O TOQUE ABRE A FOLHA DE AÇÕES, e não mais só o apagar.**
                 Antes só a MINHA mensagem era tocável, porque a única ação era
@@ -1135,6 +1335,33 @@ export function Conversa({
                       alt="Foto enviada na conversa"
                       className="mb-1 max-h-[340px] w-full rounded-xl object-contain"
                     />
+                  )}
+                  {m.audioUrl && (
+                    /* ⚠️ **`controls` NATIVO, e não um player nosso.** Um player
+                        próprio teria de reimplementar arrastar, velocidade e o
+                        card da tela de bloqueio — e no iOS a barra nativa é a
+                        única que continua funcionando com a tela apagada. A URL
+                        é assinada de uma hora, como a foto.
+
+                        ⚠️ E `preload="none"`: numa conversa com trinta áudios,
+                        `metadata` dispararia trinta requisições ao abrir. */
+                    <span className="mb-1 flex items-center gap-2">
+                      <audio
+                        src={m.audioUrl}
+                        controls
+                        preload="none"
+                        className="h-9 max-w-[210px]"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      {/* A duração vem GRAVADA — sem ela a bolha nasce sem
+                          largura e a conversa inteira pula quando o áudio
+                          carrega. */}
+                      {!!m.duracaoSeg && (
+                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                          {duracaoEmTexto(m.duracaoSeg)}
+                        </span>
+                      )}
+                    </span>
                   )}
                   {/* ⚠️ **A CITAÇÃO VEM ANTES DE TUDO, e é UMA LINHA.** Ela
                       existe para lembrar QUAL mensagem, não para reler: uma
@@ -1669,22 +1896,87 @@ export function Conversa({
               >
                 ☺
               </button>
-              <textarea
-                value={texto}
-                onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DA_MENSAGEM))}
-                rows={1}
-                placeholder="Mensagem…"
-                className="max-h-28 min-h-[40px] flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
-              />
-              <button
-                type="button"
-                onClick={() => void enviar()}
-                /* ⚠️ Foto SEM legenda é mensagem válida — ver `enviar()`. */
-                disabled={(!texto.trim() && !foto) || enviando}
-                className="press h-10 shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-40"
-              >
-                {enviando ? "…" : "Enviar"}
-              </button>
+              {gravacao ? (
+                /* ⚠️ **GRAVANDO, o compositor VIRA a gravação.** Deixar o campo
+                    de texto ao lado ofereceria duas coisas ao mesmo tempo e o
+                    "Enviar" mandaria a mensagem errada. */
+                <div className="flex flex-1 items-center gap-2">
+                  <span className="dc-rec-dot h-2.5 w-2.5 shrink-0 rounded-full bg-red-500" />
+                  <span className="tabular-nums text-[14px] font-semibold">
+                    {relogio(segundos)}
+                  </span>
+                  <span className="text-[12px] text-muted-foreground">
+                    / {relogio(AUDIO_SEGUNDOS_MAX)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={desistirDaGravacao}
+                    className="press ml-auto h-10 shrink-0 rounded-full px-3 text-[13px] text-muted-foreground"
+                  >
+                    Descartar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void pararEEnviar()}
+                    className="press h-10 shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground"
+                  >
+                    Enviar
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    value={texto}
+                    onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DA_MENSAGEM))}
+                    rows={1}
+                    placeholder="Mensagem…"
+                    className="max-h-28 min-h-[40px] flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
+                  />
+                  {/* ⚠️ **O MICROFONE SÓ APARECE ONDE O NAVEGADOR GRAVA**
+                      (`podeGravar`), e some quando ela começa a digitar: um
+                      microfone ao lado de um texto pronto oferece duas saídas
+                      para o mesmo toque. Desenhado, nunca 🎤 — emoji tem cor
+                      própria em cada sistema. */}
+                  {podeGravar() && !texto.trim() && !foto && (
+                    <button
+                      type="button"
+                      onClick={comecarAGravar}
+                      disabled={subindoAudio || enviando}
+                      aria-label="Gravar um áudio"
+                      className="press flex h-10 w-10 shrink-0 items-center justify-center disabled:opacity-40"
+                    >
+                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>
+                        <rect
+                          x="9"
+                          y="3"
+                          width="6"
+                          height="11"
+                          rx="3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <path
+                          d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void enviar()}
+                    /* ⚠️ Foto SEM legenda é mensagem válida — ver `enviar()`. */
+                    disabled={(!texto.trim() && !foto) || enviando || subindoAudio}
+                    className="press h-10 shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-40"
+                  >
+                    {enviando || subindoAudio ? "…" : "Enviar"}
+                  </button>
+                </>
+              )}
             </div>
           </>
         )}

@@ -470,7 +470,7 @@ describe("9. o caminho no balde NÃO carrega o uuid da paciente", () => {
     /**
      * A regra existia para `exames` e `album` desde a migração das imagens, e
      * dois handlers que nasceram DEPOIS a violavam: `urlParaSubirVideo` e
-     * `urlParaSubirFotoDaConversa` subiam em `${eu}/…`. O caminho vaza para a
+     * `urlParaSubirNaConversa` subiam em `${eu}/…`. O caminho vaza para a
      * URL assinada — um uuid de paciente ali é identificador exposto, o mesmo
      * buraco que `AlbumPostPublico` foi criado para fechar.
      */

@@ -219,6 +219,21 @@ const REGUAS = [
   "src/lib/cache-do-feed.ts",
   "src/lib/pergunta-clinica.ts",
   "src/lib/aula-compartilhavel.ts",
+  /**
+   * ⚠️ **ESTES TRÊS ENTRARAM DEPOIS, e a falta deles custou uma régua morta.**
+   *
+   * `acharNaConversa` (a busca dentro da conversa) foi escrita, testada e
+   * documentada em prosa — e passou dias sem UMA linha de tela. A catraca não
+   * pegou porque `conversa.ts` simplesmente não estava nesta lista: ela cobria
+   * onze módulos e a rede tem muito mais.
+   *
+   * A lição não é sobre a busca: é que **uma catraca com lista à mão precisa da
+   * lista crescendo junto com o código**, senão ela dá a sensação de cobertura
+   * exatamente onde não há. Módulo de régua novo entra aqui no mesmo commit.
+   */
+  "src/lib/conversa.ts",
+  "src/lib/comentarios.ts",
+  "src/lib/onboarding-da-comunidade.ts",
 ];
 
 /**

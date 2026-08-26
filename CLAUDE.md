@@ -6308,6 +6308,67 @@ nunca no JSX — é o que o dono relê e corrige.
 cartões exigiria uma conta recém-criada, e depois de olhar uma vez a tela nunca
 mais apareceria.
 
+### ⚠️ A CONFERÊNCIA ITEM A ITEM, e as TRÊS que estavam pela metade (ago/2026)
+
+Pedido do dono depois de eu declarar as 28 aplicadas: _"Verifique se todos os
+novos mais de 20 foram aplicados"_. A conferência mecânica — cada item precisa
+de **régua/servidor E chamador no app**, com bancada não contando — achou três
+recursos que eu tinha reportado como prontos e que **não existiam na tela**.
+
+⚠️ **E os três estavam no MESMO arquivo, `conversa.ts`, porque ele não estava na
+lista da catraca de réguas.** Ela cobria onze módulos e a rede tem muito mais.
+**Catraca com lista à mão dá sensação de cobertura exatamente onde não há** — é
+a lição, e ela vale mais que os três consertos. `conversa.ts`, `comentarios.ts`
+e `onboarding-da-comunidade.ts` entraram; módulo de régua novo entra no mesmo
+commit que o cria.
+
+**1. FIXAR CONVERSA gravava e a lista NÃO se mexia.** O ⋯ dizia "Fixar no topo",
+o servidor gravava a coluna, a leitura devolvia `fixadaEm` — e `minhasConversas`
+ordenava só por `ultima_em`. `ordenarConversasComFixadas` existia, testada, com
+zero chamadores. Ela fixava e nada acontecia. É o defeito do seletor de ordem
+dos comentários outra vez: cada metade certa sozinha, a corrente quebrada.
+⚠️ A ordem entra no SERVIDOR — na tela, a lista pularia depois da primeira
+pintura.
+
+**2. A BUSCA NA CONVERSA era régua morta.** `acharNaConversa` estava escrita,
+testada e documentada em prosa ("a busca é LOCAL, e é por isso que ela existe
+assim") — sem uma linha de tela. Agora há lupa no cabeçalho, campo e destaque.
+⚠️ **DESTACA, nunca filtra**: esconder as outras arrancaria cada achado do redor
+que lhe dá sentido. ⚠️ E o texto diz o que a régua faz ("procura no que já está
+carregado"), senão quem sobe procurando uma frase antiga conclui que a conversa
+se perdeu.
+
+**3. A VOZ NO DIRECT NÃO TINHA TELA NENHUMA.** Servidor aceitando `audio_path` e
+`duracao_seg` com degraus, leitura assinando a URL, `AUDIO_TIPOS` e
+`extensaoDoAudio` prontos — e **nem gravador, nem player**. Um recurso inteiro
+existindo só do lado que ninguém vê.
+- ⚠️ **`gravar()` roda DENTRO do toque, sem `await` antes** — `getUserMedia`
+  exige gesto no iOS, e depois de uma espera o gesto já passou. Mesma armadilha
+  do `destravar()` dos Sons para dormir e do gravador do diário.
+- ⚠️ **A gravação PARA sozinha no teto**: um toque esquecido gravaria até
+  estourar o tamanho, e a mensagem seria recusada depois de ela ter falado.
+- ⚠️ **Áudio grande é recusado ANTES de enviar, com recado ESPECÍFICO** — o
+  genérico de rede não diz o que fazer diferente.
+- ⚠️ **Sobe pela MESMA `urlParaSubirNaConversa` da foto** (renomeada, porque
+  "Foto" passou a mentir): a regra da PASTA é o que impede o uuid da paciente de
+  vazar na URL assinada, e duas funções divergiriam nela no primeiro conserto.
+- ⚠️ **O player é `controls` NATIVO**, com `preload="none"`: um player próprio
+  teria de reimplementar arrastar e o card da tela de bloqueio, e numa conversa
+  com trinta áudios o `metadata` dispararia trinta requisições ao abrir.
+- ⚠️ **O microfone some quando ela começa a digitar** — duas saídas para o mesmo
+  toque —, e só aparece onde `podeGravar()`.
+
+⚠️ **E A BANCADA NÃO DESENHAVA NENHUM ÁUDIO** — foi por isso que o buraco
+sobreviveu. Bancada que não consegue provar o recurso é bancada que aprova
+qualquer coisa; agora há uma mensagem de voz na lista.
+
+⚠️ **Uma asserção minha sobreviveu à mutação pela SÉTIMA vez pelo mesmo
+mecanismo:** `audio.size > AUDIO_BYTES_MAX` aparece em `subirAudio` E em
+`pararEEnviar`, então o `toContain` ficava verde com a checagem da segunda
+apagada. Ancore no corpo da função, nunca no arquivo.
+
+**Bancada:** `/preview-instagram?tela=conversa` (a lupa, a busca, o áudio).
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

@@ -1334,6 +1334,22 @@ function Bancada() {
                       criadaEm: "2026-08-24T10:00:00Z",
                       apagada: false,
                     },
+                    /* ⚠️ **O ÁUDIO precisa estar aqui, e é o que faltava.** A
+                       voz no direct tinha servidor pronto e ZERO tela — nem
+                       gravador, nem player — e passou despercebida justamente
+                       porque a bancada não desenhava nenhuma mensagem de voz.
+                       O `audioUrl` é um WAV mínimo em data URI: um endereço
+                       assinado de verdade não existe sem conta. */
+                    {
+                      id: "m4a",
+                      souEu: false,
+                      texto: null,
+                      audioUrl:
+                        "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=",
+                      duracaoSeg: 37,
+                      criadaEm: "2026-08-24T10:05:00Z",
+                      apagada: false,
+                    },
                     /* ⚠️ **A FOTO, o ✓✓ e o ANEXO precisam estar aqui.** Os três
                        só existem em conversa de verdade, com upload feito e
                        carimbo de leitura — sem a bancada, o único jeito de

@@ -321,7 +321,20 @@ export const minhasConversas = createServerFn({ method: "POST" })
     /* ⚠️ O emblema conta só o que EU preciso responder: pedido que EU mandei
        não é novidade minha, é espera. */
     const naoLidas = saida.filter((c) => c.naoLida && !(c.pedido && c.euIniciei)).length;
-    return { ok: true as const, conversas: saida, naoLidas };
+    /**
+     * ⚠️ **AS FIXADAS SOBEM AQUI, e sem esta linha o recurso não existia.**
+     *
+     * O ⋯ dizia "Fixar no topo", o servidor gravava a coluna e a leitura
+     * devolvia `fixadaEm` — e a lista continuava ordenada só por `ultima_em`.
+     * Ela fixava uma conversa e NADA se mexia na tela. Cada metade estava certa
+     * sozinha; o que faltava era a corrente, exatamente como no seletor de
+     * ordem dos comentários.
+     *
+     * ⚠️ E a ordem sai do SERVIDOR, nunca do componente: ordenar na tela faria a
+     * lista pular de lugar depois da primeira pintura.
+     */
+    const { ordenarConversasComFixadas } = await import("./conversa");
+    return { ok: true as const, conversas: ordenarConversasComFixadas(saida), naoLidas };
   });
 
 export const abrirConversa = createServerFn({ method: "POST" })
@@ -945,13 +958,17 @@ export const enviarMensagem = createServerFn({ method: "POST" })
  * conversa nenhuma — armazenamento de graça pago pelo app, e uma pasta cheia de
  * arquivos que nenhuma mensagem referencia.
  */
-export const urlParaSubirFotoDaConversa = createServerFn({ method: "POST" })
+export const urlParaSubirNaConversa = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z
       .object({
         accessToken: z.string().min(10),
         conversaId: z.string().uuid(),
-        extensao: z.enum(["jpg", "png", "webp"]),
+        /* ⚠️ **ÁUDIO ENTRA AQUI, e não numa função irmã.** A regra da PASTA
+           (`pastaDe`, sha256 do uuid) é o que impede o id da paciente de vazar
+           na URL assinada — duas funções divergiriam nela no primeiro conserto,
+           e a divergência apareceria como um caminho com uuid cru no balde. */
+        extensao: z.enum(["jpg", "png", "webp", "m4a", "webm", "ogg"]),
       })
       .parse(i),
   )
