@@ -4722,6 +4722,30 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * ⚠️ **O RECADO DIZ QUE ELA VOLTA.** Sem isso, "Arquivada" lê como o "Sair"
+   * que está logo acima no mesmo menu — e a paciente que queria só limpar a
+   * caixa acha que encerrou a conversa.
+   */
+  async function arquivarEstaConversa(conversaId: string, arquivar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { arquivarConversa } = await import("@/lib/conversa.functions");
+      const r = await arquivarConversa({ data: { accessToken: t, conversaId, arquivar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error("Não deu para arquivar agora.");
+        return;
+      }
+      toast.success(arquivar ? "Arquivada. Volta se ela escrever." : "De volta para as mensagens.");
+      setOnde({ t: "conversas" });
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para arquivar agora.");
+    }
+  }
+
   async function fixarEstaConversa(conversaId: string, fixar: boolean) {
     try {
       const t = await token();
@@ -6478,6 +6502,7 @@ export function RedeNoApp({
         conversa={conversaAberta}
         rascunho={rascunhoDaConversa}
         aoFixar={(v) => void fixarEstaConversa(conversaAberta.id, v)}
+        aoArquivar={(v) => void arquivarEstaConversa(conversaAberta.id, v)}
         aoDenunciarConversa={(m) => void denunciarEstaConversa(conversaAberta.id, m)}
         /* ⚠️ Guarda a mensagem e abre a folha de escolher PARA ONDE: a lista de
            conversas é a mesma de `MandarPublicacao`, e reusá-la evita uma

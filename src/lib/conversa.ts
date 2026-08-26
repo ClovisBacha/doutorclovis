@@ -426,3 +426,66 @@ export function acharNaConversa<T extends { texto?: string | null; apagada?: boo
   if (t.length < 2) return [];
   return mensagens.filter((m) => !m.apagada && (m.texto ?? "").toLowerCase().includes(t));
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ARQUIVAR A CONVERSA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **ARQUIVAR NÃO É SAIR, e o meio-termo é o recurso.**
+ *
+ * "Sair da conversa" já existe e é nuclear: some para sempre, e voltar exige
+ * que a outra escreva sabendo que a conversa foi embora. Arquivar é o gesto de
+ * quem quer a caixa de entrada limpa sem encerrar nada — a conversa sai da
+ * lista e VOLTA sozinha quando a outra escreve.
+ *
+ * ⚠️ **É por isso que a coluna guarda um INSTANTE, e não um booleano.** É a
+ * comparação com `ultima_em` que faz a conversa voltar; com um booleano,
+ * arquivar seria um sumiço permanente, que é o "sair" de novo.
+ *
+ * ⚠️ **E "arquivada" não some do DIREITO da outra:** ela continua vendo a
+ * conversa normalmente. Duas colunas, uma por lado — a mesma razão de
+ * `fixada_a`/`fixada_b`: arquivar é preferência de quem OLHA a lista.
+ */
+export function conversaArquivada(c: {
+  arquivadaEm?: string | null;
+  ultimaEm?: string | null;
+}): boolean {
+  if (!c.arquivadaEm) return false;
+  const arq = Date.parse(c.arquivadaEm);
+  if (!Number.isFinite(arq)) return false;
+  const ultima = c.ultimaEm ? Date.parse(c.ultimaEm) : NaN;
+  /* Sem `ultima_em` legível, a marca de arquivo vale — o pior caso é a
+     conversa ficar guardada, e não uma conversa reaparecer sozinha. */
+  if (!Number.isFinite(ultima)) return true;
+  /* Mensagem NOVA depois de arquivar traz a conversa de volta. */
+  return ultima <= arq;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   EDITAR A MENSAGEM
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Ela pode editar esta mensagem?
+ *
+ * ⚠️ **SÓ O TEXTO, e só quem escreveu.** Digitar 12 em vez de 21 semanas numa
+ * conversa é o mesmo risco que no comentário, e lá já dá para corrigir. O que
+ * NÃO se edita é foto, áudio, figurinha e anexo: trocar a mídia depois de a
+ * outra ter visto é outra mensagem, não uma correção.
+ *
+ * ⚠️ **E apagada não se edita** — apagar é uma decisão tomada.
+ */
+export function podeEditarMensagem(m: {
+  souEu: boolean;
+  apagada?: boolean;
+  texto?: string | null;
+  imagemUrl?: string | null;
+  audioUrl?: string | null;
+  refId?: string | null;
+}): boolean {
+  if (!m.souEu) return false;
+  if (m.apagada) return false;
+  if (m.imagemUrl || m.audioUrl || m.refId) return false;
+  return !!m.texto?.trim();
+}

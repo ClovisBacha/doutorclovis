@@ -6396,6 +6396,86 @@ catraca que passa em vazio é catraca que mente.
 
 **Bancada:** `/preview-instagram?tela=conversa` (a lupa, a busca, o áudio).
 
+### As nove que faltavam — parte 1: rastro, arquivar e editar (ago/2026)
+
+Pedido do dono depois de eu levantar dez lacunas verificadas: aplicar todas.
+⚠️ **UMA SAIU DA LISTA NA HORA:** ele pediu que "quem pode me mandar mensagem"
+virasse solicitação como no Instagram — e **a solicitação já existe e já é
+exatamente esse modelo**. `podeIniciarConversa` devolve `comoPedido: !alvoMeSegue`
+desde o primeiro dia, com caixa separada e o emblema excluindo os pedidos que EU
+mandei. Quinta vez nesta leva que listo como ausente algo que existe.
+
+**Aplicar:** `supabase/APLICAR_NOVE_DA_REDE.sql` (idempotente).
+
+#### ⚠️ A TRIAGEM CLÍNICA RECUSAVA E NÃO DEIXAVA RASTRO
+
+`triarTexto` barra o post, a paciente vê o recado, e a tentativa desaparece.
+Numa base onde 20,9% do conselho leigo em fóruns de gestação está errado e 5,5%
+é potencialmente danoso, alguém tentando publicar conduta cinco vezes seguidas é
+o sinal mais forte que esta aba produz — e ninguém o via.
+
+- **Sete pontos de barragem registram**: post, bio, edição de post, story, os
+  dois de comentário e a nota. A régua é uma só — **texto PÚBLICO que foi
+  RECUSADO**.
+- ⚠️ **A MENSAGEM DO DIRECT NÃO DEIXA RASTRO, e é a linha do recurso.** Ela é
+  ENVIADA — a régua não censura conversa privada entre duas adultas, só lembra
+  quem escreveu. Registrar mesmo assim seria a plataforma guardando trecho de
+  conversa privada que nem foi barrada.
+- ⚠️ **A EMERGÊNCIA NUNCA CONTA COMO REINCIDÊNCIA.** Quem escreve "estou
+  sangrando" está pedindo socorro no lugar errado, não dando conselho. Se
+  contasse, a paciente que passou mal três vezes apareceria como reincidente na
+  fila de moderação.
+- ⚠️ **UMA TENTATIVA ISOLADA NÃO É CASO.** Toda paciente um dia escreve uma
+  frase que a régua barra — foi para isso que ela foi calibrada contra 40 frases
+  reais. Uma fila de eventos soltos afogaria o administrador em ruído e ensinaria
+  a ignorá-la, que é como uma fila de moderação morre. `agruparPorPessoa` só
+  chama atenção a partir de três.
+- ⚠️ **A PACIENTE NÃO É AVISADA E NÃO PERDE NADA.** Isto é observação, não
+  punição: ela vê o mesmo recado de sempre, e `anotarBarrada` **falha em
+  silêncio** — derrubar a publicação porque o registro não gravou seria trocar um
+  sinal de moderação por uma avaria certa na tela dela.
+- ⚠️ **É MÓDULO PRÓPRIO** (`triagem-barrada.server.ts`) porque a triagem do
+  comentário roda ANTES de qualquer cliente existir — mover a régua para depois
+  do cliente seria o mesmo que não tê-la.
+- ⚠️ **A tabela é SEPARADA de `rede_denuncias`.** Lá `quem_id` é quem denunciou;
+  aqui não há denunciante — é o sistema barrando. Juntar faria a fila misturar
+  "alguém reclamou dela" com "ela tentou publicar algo que a régua barra".
+- ⚠️ **Sem policy nenhuma, e `REVOKE`**: uma policy de linha daria à paciente a
+  própria linha, e saber exatamente o que a régua barra é o mapa para contorná-la.
+
+#### Arquivar a conversa — o meio-termo que faltava
+
+"Sair" já existia e é nuclear. Arquivar tira da lista e **a conversa volta
+sozinha quando a outra escreve**.
+
+- ⚠️ **É por isso que a coluna guarda um INSTANTE, e não um booleano.** É a
+  comparação com `ultima_em` que faz a volta acontecer; com booleano, arquivar
+  seria um sumiço permanente — ou seja, o "sair" de novo.
+- ⚠️ **Duas colunas, uma por lado** (`arquivada_a`/`arquivada_b`), a mesma razão
+  de `fixada_*`: isto é preferência de quem OLHA a lista, e uma coluna só faria a
+  decisão de uma sumir a conversa da tela da outra.
+- ⚠️ **A ARQUIVADA SAI DA LISTA NORMAL, NUNCA DA CAIXA DE PEDIDOS.** Um pedido
+  arquivado sumiria das duas e ela nunca mais o veria — e pedido é justamente o
+  que precisa de decisão.
+- ⚠️ **Sem `ultima_em` legível, a marca VALE.** O pior caso é a conversa ficar
+  guardada; o oposto é ela reaparecer sozinha, que é o defeito.
+- **A gaveta só aparece com algo dentro**, e o texto diz que elas voltam — senão
+  "Arquivada" lê como o "Sair" que está logo acima no mesmo menu.
+
+#### Editar a mensagem
+
+- ⚠️ **A RÉGUA CLÍNICA RODA DE NOVO** — sem ela, editar seria a porta dos fundos
+  do envio: manda-se "que lindo" e troca-se depois por conduta.
+- ⚠️ **SÓ O TEXTO.** Foto, áudio, figurinha e anexo não se editam: trocar a mídia
+  depois de a outra ter visto é outra mensagem, não uma correção. Quem decide é
+  `podeEditarMensagem`, a MESMA régua que a tela usa para oferecer o botão — uma
+  segunda régua ofereceria e o servidor recusaria depois de ela reescrever.
+- ⚠️ **O SELO "editada" É PARA A OUTRA**, não para mim: uma mensagem que muda de
+  texto depois de lida é o app reescrevendo a conversa por baixo dela.
+- ⚠️ **Sem a coluna do selo, a edição VALE** — recusar seria tirar uma correção
+  por causa de um carimbo. Mesma decisão de `editarComentario`.
+- ⚠️ **A dona e a forma são conferidas no BANCO**, nunca no corpo do pedido.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

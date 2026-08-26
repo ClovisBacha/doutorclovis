@@ -22,6 +22,7 @@ import {
   AUDIO_SEGUNDOS_MAX,
   REACOES_DE_MENSAGEM,
   acharNaConversa,
+  podeEditarMensagem,
   duracaoEmTexto,
   extensaoDoAudio,
   textoDaCitacao,
@@ -233,6 +234,7 @@ export function CaixaDeEntrada({
   const [lista, setLista] = useState<ConversaNaTela[] | null>(bancada ?? null);
   const [erro, setErro] = useState(false);
   const [vendoPedidos, setVendoPedidos] = useState(false);
+  const [vendoArquivadas, setVendoArquivadas] = useState(false);
   const [sugeridas, setSugeridas] = useState<CandidataAConversa[]>(sugeridasDeBancada ?? []);
   const [notas, setNotas] = useState<NotaNaTela[]>(notasDeBancada ?? []);
   /** `null` = ninguém aberto. A minha abre o campo; a das outras, o texto. */
@@ -329,8 +331,12 @@ export function CaixaDeEntrada({
      esperando resposta, não um pedido para eu decidir. A caixa de pedidos é só
      do que chegou. */
   const pedidos = (lista ?? []).filter((c) => c.pedido && !c.euIniciei);
-  const normais = (lista ?? []).filter((c) => !(c.pedido && !c.euIniciei));
-  const mostrando = vendoPedidos ? pedidos : normais;
+  /* ⚠️ **A ARQUIVADA SAI DA LISTA NORMAL, e não da caixa de PEDIDOS.** Um
+     pedido arquivado sumiria das duas e ela nunca mais o veria — e pedido é
+     justamente o que precisa de decisão. */
+  const arquivadas = (lista ?? []).filter((c) => c.arquivada && !(c.pedido && !c.euIniciei));
+  const normais = (lista ?? []).filter((c) => !(c.pedido && !c.euIniciei) && !c.arquivada);
+  const mostrando = vendoArquivadas ? arquivadas : vendoPedidos ? pedidos : normais;
 
   return (
     <div className="pb-24">
@@ -344,7 +350,7 @@ export function CaixaDeEntrada({
           ←
         </button>
         <h1 className="text-[16px] font-semibold">
-          {vendoPedidos ? "Pedidos de mensagem" : "Mensagens"}
+          {vendoArquivadas ? "Arquivadas" : vendoPedidos ? "Pedidos de mensagem" : "Mensagens"}
         </h1>
       </header>
 
@@ -359,6 +365,26 @@ export function CaixaDeEntrada({
           </span>
           <span className="text-[13px] text-muted-foreground">ver ›</span>
         </button>
+      )}
+      {/* ⚠️ **A GAVETA SÓ APARECE COM ALGO DENTRO.** Uma porta para uma sala
+          vazia ensina que as portas desta tela não valem — a mesma régua do
+          "Hoje eu não desço ao chão". */}
+      {!vendoPedidos && !vendoArquivadas && arquivadas.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setVendoArquivadas(true)}
+          className="press flex w-full items-center justify-between px-4 py-3 text-left"
+        >
+          <span className="text-[14px] font-medium">
+            {arquivadas.length} {arquivadas.length === 1 ? "arquivada" : "arquivadas"}
+          </span>
+          <span className="text-[13px] text-muted-foreground">ver ›</span>
+        </button>
+      )}
+      {vendoArquivadas && (
+        <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+          Elas voltam para a lista sozinhas se a outra pessoa escrever.
+        </p>
       )}
       {vendoPedidos && (
         <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
@@ -542,10 +568,13 @@ export function CaixaDeEntrada({
         </div>
       ))}
 
-      {vendoPedidos && (
+      {(vendoPedidos || vendoArquivadas) && (
         <button
           type="button"
-          onClick={() => setVendoPedidos(false)}
+          onClick={() => {
+            setVendoPedidos(false);
+            setVendoArquivadas(false);
+          }}
           className="press mt-4 w-full px-4 text-left text-[14px]"
         >
           ‹ voltar para as mensagens
@@ -633,6 +662,7 @@ export function Conversa({
   aoAbrirRef,
   aoEncaminhar,
   aoFixar,
+  aoArquivar,
   aoDenunciarConversa,
 }: {
   conversa: ConversaNaTela;
@@ -642,6 +672,8 @@ export function Conversa({
   aoEncaminhar?: (mensagemId: string) => void;
   /** Fixa (ou tira) a conversa do topo da lista. */
   aoFixar?: (fixar: boolean) => void;
+  /** Arquivar/desarquivar. Sem a prop, o item não aparece. */
+  aoArquivar?: (arquivar: boolean) => void;
   /** Denuncia a conversa INTEIRA — o padrão, não uma frase solta. */
   aoDenunciarConversa?: (motivo: string) => void;
   bancada?: { mensagens: MensagemNaTela[]; pedido?: boolean; euIniciei?: boolean };
@@ -668,6 +700,9 @@ export function Conversa({
   const [acaoEm, setAcaoEm] = useState<string | null>(null);
   /** ⚠️ Local e por mensagem — ver o bloco do filtro de palavras abaixo. */
   const [reveladas, setReveladas] = useState<Set<string>>(() => new Set());
+  /** A mensagem que ela está corrigindo. `null` = escrevendo uma nova. */
+  const [editando, setEditando] = useState<MensagemNaTela | null>(null);
+  const campo = useRef<HTMLTextAreaElement | null>(null);
   /**
    * ⚠️ **A BUSCA É LOCAL, e a régua mora em `conversa.ts`.** Buscar no servidor
    * mandaria o TERMO pela rede — e o termo é o que ela está procurando numa
@@ -1120,6 +1155,38 @@ export function Conversa({
     }
   }
 
+  async function salvarEdicao() {
+    const m = editando;
+    const t = texto.trim();
+    if (!m || !t || enviando) return;
+    setEnviando(true);
+    setRecado(null);
+    try {
+      const tk = await token();
+      if (!tk) return;
+      const mod = await import("@/lib/conversa.functions");
+      const r = await mod.editarMensagem({
+        data: { accessToken: tk, mensagemId: m.id, texto: t },
+      });
+      if (r.ok) {
+        setEditando(null);
+        setTexto("");
+        await carregar();
+        if ("avisoClinico" in r && r.avisoClinico === "conduta") {
+          setRecado("Salvo. Lembre que só o médico dela pode orientar sobre sintoma.");
+        }
+      } else if (r.motivo === "emergencia") {
+        setRecado("Se for urgente, use o botão de emergência — ele avisa o seu médico.");
+      } else {
+        setRecado("Não deu para salvar. Tente de novo.");
+      }
+    } catch {
+      setRecado("Não deu para salvar. Tente de novo.");
+    } finally {
+      setEnviando(false);
+    }
+  }
+
   async function enviar() {
     const t = texto.trim();
     /* ⚠️ **Foto SEM legenda é mensagem válida.** Exigir texto aqui faria o botão
@@ -1453,6 +1520,13 @@ export function Conversa({
                       o app afirmando que EU li — informação que ela não tem como
                       conferir. `foiLidaPeloOutro` já garante isso no servidor;
                       aqui é só o desenho. */}
+                  {/* ⚠️ **O SELO É PARA A OUTRA, não para mim.** Sem ele, uma
+                      mensagem que muda de texto depois de lida é o app
+                      reescrevendo a conversa por baixo dela — e é justamente
+                      isso que faz um recurso de correção virar suspeita. */}
+                  {!!m.editadaEm && (
+                    <span className="ml-1.5 align-baseline text-[11px] opacity-60">editada</span>
+                  )}
                   {m.souEu && (
                     <span
                       aria-label={m.lidaPelaOutra ? "Lida" : "Enviada"}
@@ -1529,6 +1603,25 @@ export function Conversa({
                 >
                   Responder
                 </button>
+                {/* ⚠️ **SÓ O TEXTO SE EDITA**, e quem decide é a MESMA régua do
+                    servidor (`podeEditarMensagem`): trocar a mídia depois de a
+                    outra ter visto é outra mensagem, não uma correção. Uma
+                    segunda régua aqui ofereceria o botão e o servidor recusaria
+                    depois de ela ter reescrito. */}
+                {podeEditarMensagem(m) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditando(m);
+                      setTexto(m.texto ?? "");
+                      setAcaoEm(null);
+                      campo.current?.focus();
+                    }}
+                    className="press min-h-[44px] rounded-full border border-border px-4 text-[13px] font-medium"
+                  >
+                    Editar
+                  </button>
+                )}
                 {/* ⚠️ **ENCAMINHAR É SÓ TEXTO**, e o botão só aparece quando há
                     texto: a foto e o áudio que alguém me mandou numa conversa
                     privada não saem dali — é a mesma razão do ✈ do story ser do
@@ -1771,6 +1864,30 @@ export function Conversa({
               </>
             )}
 
+            {/* ⚠️ **ARQUIVAR NÃO É SAIR, e a frase precisa dizer isso.** "Sair"
+                logo abaixo é nuclear; sem o texto, a paciente não tem como
+                saber a diferença — e na dúvida escolhe a errada. O que ela
+                precisa ler é que a conversa VOLTA. */}
+            {aoArquivar && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    aoArquivar(!conversa.arquivada);
+                    setMenu(false);
+                  }}
+                  className="press flex min-h-[48px] w-full items-center justify-between text-left text-[15px]"
+                >
+                  <span>{conversa.arquivada ? "Tirar do arquivo" : "Arquivar conversa"}</span>
+                  <span aria-hidden>🗄️</span>
+                </button>
+                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                  Sai da sua lista e volta sozinha se {conversa.comNome.split(" ")[0]} escrever. Ela
+                  não é avisada.
+                </p>
+              </>
+            )}
+
             {/* ⚠️ **DENUNCIAR A CONVERSA INTEIRA, e não mensagem a mensagem.**
                 O que caracteriza assédio é o PADRÃO — vinte mensagens que, uma a
                 uma, não dizem nada. A denúncia por mensagem existe e continua;
@@ -1912,6 +2029,28 @@ export function Conversa({
               >
                 ☺
               </button>
+              {editando && (
+                /* ⚠️ **A SAÍDA PRECISA EXISTIR.** Sem o ×, entrar no modo edição é
+                uma armadilha: o campo carrega o texto antigo e o botão diz
+                "Salvar" — ela não tem como voltar a escrever uma mensagem
+                nova sem apagar tudo à mão. */
+                <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
+                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+                    Corrigindo: {editando.texto}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditando(null);
+                      setTexto("");
+                    }}
+                    aria-label="Cancelar a correção"
+                    className="press flex h-11 w-11 shrink-0 items-center justify-center text-[13px] text-muted-foreground"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
               {gravacao ? (
                 /* ⚠️ **GRAVANDO, o compositor VIRA a gravação.** Deixar o campo
                     de texto ao lado ofereceria duas coisas ao mesmo tempo e o
@@ -1942,10 +2081,11 @@ export function Conversa({
               ) : (
                 <>
                   <textarea
+                    ref={campo}
                     value={texto}
                     onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DA_MENSAGEM))}
                     rows={1}
-                    placeholder="Mensagem…"
+                    placeholder={editando ? "Corrija a mensagem…" : "Mensagem…"}
                     className="max-h-28 min-h-[40px] flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
                   />
                   {/* ⚠️ **O MICROFONE SÓ APARECE ONDE O NAVEGADOR GRAVA**
@@ -1984,12 +2124,12 @@ export function Conversa({
                   )}
                   <button
                     type="button"
-                    onClick={() => void enviar()}
+                    onClick={() => void (editando ? salvarEdicao() : enviar())}
                     /* ⚠️ Foto SEM legenda é mensagem válida — ver `enviar()`. */
                     disabled={(!texto.trim() && !foto) || enviando || subindoAudio}
                     className="press h-10 shrink-0 rounded-full bg-primary px-4 text-[14px] font-semibold text-primary-foreground disabled:opacity-40"
                   >
-                    {enviando || subindoAudio ? "…" : "Enviar"}
+                    {enviando || subindoAudio ? "…" : editando ? "Salvar" : "Enviar"}
                   </button>
                 </>
               )}

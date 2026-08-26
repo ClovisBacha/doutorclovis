@@ -2064,6 +2064,10 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       const { triarTexto } = await import("./pergunta-clinica");
       const desfecho = triarTexto(data.bio ?? "");
       if (desfecho !== "publicavel") {
+        await (
+          await import("./triagem-barrada.server")
+        ).anotarBarrada(eu, "bio", desfecho, data.bio ?? "");
+
         return {
           ok: false as const,
           motivo: "bio_clinica" as const,
@@ -2851,6 +2855,10 @@ export const publicarPost = createServerFn({ method: "POST" })
     for (const trecho of [data.texto ?? "", data.altTexto ?? "", ...opcoes]) {
       const desfecho = triarTexto(trecho);
       if (desfecho !== "publicavel") {
+        /* ⚠️ Anota ANTES de devolver — depois do `return` nada roda. */
+        await (
+          await import("./triagem-barrada.server")
+        ).anotarBarrada(eu, "post", desfecho, trecho);
         return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
       }
     }
@@ -3454,6 +3462,9 @@ export const editarPost = createServerFn({ method: "POST" })
     const { triarTexto } = await import("@/lib/pergunta-clinica");
     const desfecho = triarTexto(texto ?? "");
     if (desfecho !== "publicavel") {
+      await (
+        await import("./triagem-barrada.server")
+      ).anotarBarrada(eu, "post", desfecho, texto ?? "");
       return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
     }
 
@@ -4761,6 +4772,9 @@ export const publicarStory = createServerFn({ method: "POST" })
       const { triarTexto } = await import("@/lib/pergunta-clinica");
       const desfecho = triarTexto(data.texto ?? "");
       if (desfecho !== "publicavel") {
+        await (
+          await import("./triagem-barrada.server")
+        ).anotarBarrada(eu, "story", desfecho, data.texto ?? "");
         return { ok: false as const, motivo: desfecho, recado: recadoDeConteudo(desfecho) };
       }
     }

@@ -32,6 +32,7 @@ import {
   reacaoDeMensagemConhecida,
   TAMANHO_DA_NOTA,
   AUDIO_SEGUNDOS_MAX,
+  conversaArquivada,
 } from "./conversa";
 
 export type ConversaNaTela = {
@@ -45,6 +46,8 @@ export type ConversaNaTela = {
   naoLida: boolean;
   /** `true` = ainda é pedido, esperando ela aceitar. */
   pedido: boolean;
+  /** Arquivada por MIM e sem mensagem nova depois disso. */
+  arquivada?: boolean;
   /** Fui eu quem puxou conversa. Decide o texto da tela do pedido. */
   euIniciei: boolean;
   /**
@@ -66,6 +69,8 @@ export type MensagemNaTela = {
   audioUrl?: string | null;
   /** ⚠️ GRAVADA, e não medida na leitura — sem ela a bolha pula ao carregar. */
   duracaoSeg?: number | null;
+  /** Instante da correção. `null` = nunca editada. */
+  editadaEm?: string | null;
   /**
    * Recolhida pelo FILTRO DE PALAVRAS dela — a linha existe, o texto não.
    *
@@ -128,7 +133,7 @@ async function minhaConversa(sb: any, id: string, eu: string): Promise<any | nul
     sb.from("rede_conversas").select(colunas).eq("id", id).maybeSingle();
 
   let { data, error } = await ler(
-    `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
+    `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b, arquivada_a, arquivada_b`,
   );
   /* ⚠️ Um degrau por SQL — ver `minhasConversas`. */
   if (error) ({ data, error } = await ler(`${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`));
@@ -175,12 +180,19 @@ export const minhasConversas = createServerFn({ method: "POST" })
         .limit(100);
     const BASE = "id, a_id, b_id, iniciada_por, aceita, ultima_em, lida_a, lida_b";
     let { data: linhas, error } = await lerLista(
-      `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
+      `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b, arquivada_a, arquivada_b`,
     );
-    /* ⚠️ **UM DEGRAU POR SQL.** `fixada_*` nasce no `APLICAR_DIRECT_COMPLETO` e
-       `silenciada_*`/`saiu_*` no `APLICAR_CONVERSA_SILENCIAR` — dois arquivos, e
-       um recuo de dois passos apagaria o SILENCIAR (que já funciona) por causa
-       de uma coluna de fixar. */
+    /* ⚠️ **UM DEGRAU POR SQL, e o de ARQUIVAR é o mais alto.** `arquivada_*`
+       nasce no `APLICAR_NOVE_DA_REDE`, `fixada_*` no `APLICAR_DIRECT_COMPLETO`
+       e `silenciada_*`/`saiu_*` no `APLICAR_CONVERSA_SILENCIAR` — três
+       arquivos. Um recuo que pulasse degraus apagaria o SILENCIAR, que funciona
+       há meses, por causa de uma coluna de arquivar que ninguém ainda usa. */
+    if (error) {
+      ({ data: linhas, error } = await lerLista(
+        `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b, fixada_a, fixada_b`,
+      ));
+      console.warn("[conversa] sem arquivada_* — rode APLICAR_NOVE_DA_REDE.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await lerLista(
         `${BASE}, silenciada_a, silenciada_b, saiu_a, saiu_b`,
@@ -313,6 +325,13 @@ export const minhasConversas = createServerFn({ method: "POST" })
         /* ⚠️ A MINHA coluna, por `minhaColuna` — a dela não é da minha conta, e
            invertida a lista mostraria no topo o que a OUTRA fixou. */
         fixadaEm: ((c as any)[minhaColuna("fixada", eu, c.a_id)] ?? null) as string | null,
+        /* ⚠️ A MINHA coluna, e a régua compara com `ultima_em`: mensagem nova
+           depois de arquivar traz a conversa de volta. É o que separa arquivar
+           de SAIR. */
+        arquivada: conversaArquivada({
+          arquivadaEm: ((c as any)[minhaColuna("arquivada", eu, c.a_id)] ?? null) as string | null,
+          ultimaEm: c.ultima_em as string | null,
+        }),
         pedido: !c.aceita,
         euIniciei: c.iniciada_por === eu,
       });
@@ -425,10 +444,22 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
       if (data.antes) q = q.lt("criada_em", data.antes);
       return q;
     };
+    /* ⚠️ **`editada_em` É O DEGRAU MAIS ALTO** — nasce no `APLICAR_NOVE_DA_REDE`,
+       o SQL mais recente. Faltando, a conversa continua inteira e só o selo
+       "editada" some; sem o degrau, o `42703` derrubaria a leitura e a conversa
+       pararia de abrir por causa de um carimbo. */
     let { data: linhas, error } = await buscar(
       "id, autor_id, texto, criada_em, apagada_em, imagem_path, audio_path, duracao_seg, " +
-        "ref_tipo, ref_id, responde_a",
+        "ref_tipo, ref_id, responde_a, editada_em",
     );
+    if (error) {
+      ({ data: linhas, error } = await buscar(
+        "id, autor_id, texto, criada_em, apagada_em, imagem_path, audio_path, duracao_seg, " +
+          "ref_tipo, ref_id, responde_a",
+      ));
+      if (!error) linhas = ((linhas ?? []) as any[]).map((l) => ({ ...l, editada_em: null }));
+      else console.warn("[conversa] sem editada_em — rode APLICAR_NOVE_DA_REDE.sql");
+    }
     let semCorpo = false;
     /* ⚠️ Degrau NOVO, no topo: `responde_a` nasce no `APLICAR_DEZ_DA_REDE.sql`.
        Sem a coluna a conversa continua inteira — só a citação some, que é o
@@ -627,6 +658,7 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
            foto: nada da mensagem apagada sai daqui. */
         audioUrl: m.apagada_em ? null : (assinadas.get(m.audio_path) ?? null),
         duracaoSeg: m.apagada_em ? null : ((m.duracao_seg ?? null) as number | null),
+        editadaEm: m.apagada_em ? null : ((m.editada_em ?? null) as string | null),
         refTipo: m.apagada_em ? null : ((m.ref_tipo ?? null) as "post" | "story" | null),
         refId: m.apagada_em ? null : ((m.ref_id ?? null) as string | null),
         lidaPelaOutra: foiLidaPeloOutro({
@@ -758,6 +790,15 @@ export const enviarMensagem = createServerFn({ method: "POST" })
         if (desfecho === "emergencia") {
           return { ok: false as const, motivo: "emergencia" as const };
         }
+        /**
+         * ⚠️ **A MENSAGEM NÃO DEIXA RASTRO, e essa é a linha do recurso.**
+         *
+         * O rastro da triagem existe para texto PÚBLICO que foi RECUSADO. Aqui
+         * a mensagem é ENVIADA — a régua não censura conversa privada entre
+         * duas adultas, ela só lembra quem escreveu. Registrar mesmo assim
+         * seria a plataforma guardando trecho de conversa privada que nem foi
+         * barrada, o que é uma linha que este app não atravessa.
+         */
         if (desfecho !== "publicavel") avisoClinico = "conduta";
       } catch {
         /* ⚠️ Falha ao TRIAR não impede a mensagem. A régua é uma proteção
@@ -1511,6 +1552,9 @@ export const escreverNota = createServerFn({ method: "POST" })
     const { triarTexto } = await import("./pergunta-clinica");
     const desfecho = triarTexto(limpo);
     if (desfecho !== "publicavel") {
+      /* A nota é texto PÚBLICO (todo mundo que a segue vê), e é RECUSADA — as
+         duas condições do rastro. Ver o comentário em `enviarMensagem`. */
+      await (await import("./triagem-barrada.server")).anotarBarrada(eu, "post", desfecho, limpo);
       return { ok: false as const, motivo: "clinico" as const };
     }
 
@@ -1599,6 +1643,122 @@ export const notasDeQuemEuSigo = createServerFn({ method: "POST" })
  * faria a escolha de uma valer para a outra: a amiga abriria o direct e
  * encontraria uma conversa presa no topo que ela nunca fixou.
  */
+/**
+ * Arquiva ou desarquiva a conversa — só do MEU lado.
+ *
+ * ⚠️ **NÃO É SAIR.** "Sair da conversa" já existe e é nuclear. Arquivar é o
+ * gesto de quem quer a caixa limpa sem encerrar nada: a conversa some da lista
+ * e VOLTA sozinha quando a outra escreve, porque a coluna guarda um INSTANTE e
+ * a leitura compara com `ultima_em`.
+ *
+ * ⚠️ **A OUTRA NÃO É AVISADA e não perde nada** — ela continua vendo a conversa
+ * normalmente. É a mesma razão de `fixada_a`/`fixada_b` serem duas colunas:
+ * isto é preferência de quem OLHA a lista.
+ */
+/**
+ * Edita o TEXTO de uma mensagem minha.
+ *
+ * ⚠️ **A RÉGUA CLÍNICA RODA DE NOVO, e é o ponto todo.** Sem ela, editar seria
+ * a porta dos fundos do envio: manda-se "que lindo" e troca-se depois por "no
+ * seu lugar eu não iria ao PS". Mesmo cuidado de `editarComentario`.
+ *
+ * ⚠️ **SÓ O TEXTO.** Foto, áudio, figurinha e anexo não se editam — trocar a
+ * mídia depois de a outra ter visto é outra mensagem, não uma correção. Quem
+ * decide é `podeEditarMensagem`, a mesma régua que a tela usa para oferecer.
+ */
+export const editarMensagem = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        mensagemId: z.string().uuid(),
+        texto: z.string().min(1).max(LIMITE_DA_MENSAGEM),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const texto = data.texto.trim();
+    if (!texto) return { ok: false as const, motivo: "vazio" as const };
+
+    const { triarTexto } = await import("./pergunta-clinica");
+    const desfecho = triarTexto(texto);
+    if (desfecho === "emergencia") {
+      /* ⚠️ Só a EMERGÊNCIA recusa, como no envio: a régua não censura conversa
+         privada. E ela não deixa rastro, pela mesma razão de `enviarMensagem`. */
+      return { ok: false as const, motivo: "emergencia" as const };
+    }
+
+    /* ⚠️ **A DONA E A FORMA são conferidas no BANCO, nunca no corpo do
+       pedido.** Um `mensagemId` forjado editaria a mensagem de outra pessoa. */
+    const { data: m, error: erroLer } = await sb
+      .from("rede_mensagens")
+      .select("id, autor_id, conversa_id, apagada_em, imagem_path, audio_path, ref_id")
+      .eq("id", data.mensagemId)
+      .maybeSingle();
+    if (erroLer) return { ok: false as const, motivo: "banco" as const };
+    if (!m || m.autor_id !== eu) return { ok: false as const, motivo: "indisponivel" as const };
+    if (m.apagada_em) return { ok: false as const, motivo: "apagada" as const };
+    if (m.imagem_path || m.audio_path || m.ref_id) {
+      return { ok: false as const, motivo: "so_texto" as const };
+    }
+
+    const { error } = await sb
+      .from("rede_mensagens")
+      .update({ texto, editada_em: new Date().toISOString() })
+      .eq("id", data.mensagemId)
+      .eq("autor_id", eu);
+    if (error) {
+      /* ⚠️ Sem a coluna do selo a edição VALE — recusar seria tirar uma
+         correção por causa de um carimbo. Mesma decisão de `editarComentario`. */
+      const { error: semSelo } = await sb
+        .from("rede_mensagens")
+        .update({ texto })
+        .eq("id", data.mensagemId)
+        .eq("autor_id", eu);
+      if (semSelo) return { ok: false as const, motivo: "banco" as const };
+      console.warn("[conversa] sem editada_em — rode APLICAR_NOVE_DA_REDE.sql");
+    }
+    return { ok: true as const, avisoClinico: desfecho !== "publicavel" ? "conduta" : null };
+  });
+
+export const arquivarConversa = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        conversaId: z.string().uuid(),
+        arquivar: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ A MINHA coluna, por `minhaColuna` — invertida, eu arquivaria a
+       conversa na lista DELA. */
+    const coluna = minhaColuna("arquivada", eu, c.a_id);
+    const { error } = await sb
+      .from("rede_conversas")
+      .update({ [coluna]: data.arquivar ? new Date().toISOString() : null })
+      .eq("id", data.conversaId);
+    if (error) {
+      console.warn("[conversa] sem arquivada_* — rode APLICAR_NOVE_DA_REDE.sql");
+      return { ok: false as const, motivo: "banco" as const };
+    }
+    return { ok: true as const };
+  });
+
 export const fixarConversa = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
     z

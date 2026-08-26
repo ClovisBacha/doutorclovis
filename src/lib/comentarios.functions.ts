@@ -424,6 +424,9 @@ export const comentar = createServerFn({ method: "POST" })
      */
     const desfecho = triarComentario(texto);
     if (desfecho !== "publicavel") {
+      await (
+        await import("./triagem-barrada.server")
+      ).anotarBarrada(eu, "comentario", desfecho, texto);
       return { ok: false as const, motivo: desfecho, recado: recadoDoComentario(desfecho) };
     }
 
@@ -1075,6 +1078,9 @@ export const editarComentario = createServerFn({ method: "POST" })
        cuidado que `editarPost` tem com a legenda. */
     const desfecho = triarComentario(data.texto);
     if (desfecho !== "publicavel") {
+      await (
+        await import("./triagem-barrada.server")
+      ).anotarBarrada(eu, "comentario", desfecho, data.texto);
       return {
         ok: false as const,
         motivo: "clinico" as const,
