@@ -71,6 +71,7 @@ import {
   type EspecieDeAviso,
   type Visibilidade,
 } from "@/lib/rede-social";
+import { limparPalavrasOcultas, temPalavraOculta } from "@/lib/comentarios";
 import {
   alcancaOPerfil,
   bebeDoPerfil,
@@ -253,6 +254,16 @@ export type PostNaTela = {
   sensivel?: boolean;
   /** O motivo, de catálogo fechado. É o que a leitora lê ANTES de decidir. */
   motivoSensivel?: string | null;
+  /**
+   * Esta publicação bate uma palavra que ELA escondeu.
+   *
+   * ⚠️ **Um booleano, e nunca a palavra.** A lista dela ("perdi", "aborto", o
+   * nome de um hospital) fica no servidor — o que chega é a decisão, já tomada
+   * pela régua única. É a mesma forma do `batePalavraMinha` do comentário.
+   *
+   * ⚠️ E ele é sempre `false` no que ELA escreveu: ela sabe o que digitou.
+   */
+  batePalavraMinha?: boolean;
   /** A legenda do vídeo, para quem assiste sem som ou com leitor de tela. */
   videoLegenda?: string | null;
   /**
@@ -473,6 +484,20 @@ async function pacienteDaSessao(accessToken: string): Promise<string | null> {
 type Contexto = {
   /** A memória de perfis desta requisição. Ver `MemoriaDePerfis`. */
   perfis: Map<string, any>;
+  /**
+   * As palavras que ELA escondeu.
+   *
+   * ⚠️ **A lista é DELA e nunca viaja para o navegador.** Quem aplica a régua é
+   * o servidor (`temPalavraOculta`), e o que chega à tela é um booleano por
+   * publicação — a mesma decisão dos comentários. As palavras dela são "perdi",
+   * "aborto", o nome de um hospital: mandá-las de volta a cada página do feed
+   * seria pôr na rede exatamente o que ela pediu para não ler.
+   *
+   * ⚠️ Falha ABERTA (lista vazia): o pior caso é ela ver uma palavra que
+   * preferia não ver — contra o feed inteiro recolhido por uma falha de rede.
+   * É a mesma direção do filtro no direct.
+   */
+  palavrasOcultas: string[];
   sigo: Set<string>;
   bloqueio: ConjuntoDeBloqueio;
   amigas: Set<string>;
@@ -524,7 +549,7 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
      quatro, em série — e não depende de nenhuma delas. Como `contextoDe` abre
      toda leitura da rede (feed, perfil, post, salvos, sugestões, atividade), a
      espera dobrada aparecia em todas elas de uma vez. */
-  const [seg, meus, deles, calados, favoritas, grafo] = await Promise.all([
+  const [seg, meus, deles, calados, favoritas, ocultas, grafo] = await Promise.all([
     sb.from("rede_seguidores").select("seguido_id").eq("seguidor_id", eu).eq("estado", "ativo"),
     sb.from("rede_bloqueios").select("bloqueado_id").eq("quem_id", eu),
     sb.from("rede_bloqueios").select("quem_id").eq("bloqueado_id", eu),
@@ -561,6 +586,8 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
     /* ⚠️ Na MESMA onda que as outras — uma consulta a mais dentro de uma onda
        que já existe é de graça; uma onda nova custa uma latência inteira. */
     sb.from("rede_favoritos").select("favorita_id").eq("quem_id", eu),
+    /* As palavras que ela escondeu — na mesma onda, pela mesma razão. */
+    sb.from("patient_profiles").select("palavras_ocultas").eq("id", eu).maybeSingle(),
     (async () => {
       try {
         const { idsDasAmigas } = await import("@/lib/amigas.functions");
@@ -635,6 +662,12 @@ export async function contextoDe(sb: any, eu: string): Promise<Contexto> {
        à mão — sem o `?? []`, o `42P01` derrubaria o contexto de toda a aba. */
     favoritas: new Set(
       (((favoritas as any).data ?? []) as { favorita_id: string }[]).map((f) => f.favorita_id),
+    ),
+    /* ⚠️ Passa pela MESMA `limparPalavrasOcultas` da tela e do direct, nunca
+       pela lista crua: uma entrada vazia viraria uma expressão que casa tudo, e
+       o feed inteiro recolheria. */
+    palavrasOcultas: limparPalavrasOcultas(
+      (((ocultas as any).data?.palavras_ocultas ?? []) as string[]) ?? [],
     ),
     degradado: bloqueioFalhou || amigasFalhou || !!(seg as any).error,
   };
@@ -1682,6 +1715,16 @@ type OlhoDeQuemVe = {
    * simplesmente busca como sempre buscou.
    */
   perfis?: Map<string, any>;
+  /**
+   * As palavras que ELA escondeu — para o filtro alcançar o FEED.
+   *
+   * ⚠️ **Opcional pela mesma razão de `perfis`**: nem todo chamador de
+   * `montarPosts` monta um contexto completo (o espelho fabrica um olho de
+   * mentira). Ausente = nenhuma palavra escondida, que é a direção segura: o
+   * pior caso é ela ver algo que preferia não ver, contra o feed recolhido
+   * inteiro por um contexto incompleto.
+   */
+  palavrasOcultas?: string[];
 };
 
 /**
@@ -1782,6 +1825,8 @@ export async function montarPosts(
     [...new Set(brutos.map((p) => p.autor_id))],
     (ctx as OlhoDeQuemVe).perfis,
   );
+  /* A lista dela, já limpa em `contextoDe`. Ver `batePalavraMinha` abaixo. */
+  const palavrasDela = (ctx as OlhoDeQuemVe).palavrasOcultas ?? [];
 
   const visiveis = brutos.filter((p) => {
     const a = autores.get(p.autor_id);
@@ -2024,6 +2069,28 @@ export async function montarPosts(
         altTexto: ((p.alt_texto ?? null) as string | null) || null,
         sensivel: !!p.sensivel,
         motivoSensivel: ((p.motivo_sensivel ?? null) as string | null) || null,
+        /**
+         * ⚠️ **O FILTRO DE PALAVRAS ALCANÇA O FEED — e não alcançava.**
+         *
+         * Ele protegia os comentários e o direct, e o FEED ficava de fora: ela
+         * escondia "perdi" e a palavra a atingia no lugar mais exposto do app,
+         * sem aviso, rolando. Era a maior incoerência do recurso.
+         *
+         * ⚠️ **NUNCA no que ELA escreveu** — ela sabe o que digitou, e recolher
+         * o próprio post seria tratá-la como quem precisa ser protegida da
+         * própria decisão. É a mesma linha do filtro nos comentários.
+         *
+         * ⚠️ E a régua é `temPalavraOculta`, a MESMA dos comentários e do
+         * direct — nunca uma segunda: ela casa PALAVRA INTEIRA, e uma cópia
+         * divergente faria "parto" esconder "departamento" só no feed.
+         */
+        batePalavraMinha:
+          p.autor_id !== eu && palavrasDela.length
+            ? temPalavraOculta(
+                `${p.texto ?? ""} ${((p.alt_texto ?? "") as string) || ""}`,
+                palavrasDela,
+              )
+            : false,
         videoLegenda: ((p.video_legenda ?? null) as string | null) || null,
         lugar: ((p.lugar ?? null) as string | null) || null,
         ehRepost: !!p.repost_de,
@@ -3446,7 +3513,21 @@ export const publicarPost = createServerFn({ method: "POST" })
  * comentário e menção: o que ela publicou pode ser exatamente o que não se lê
  * sem contexto, e a tela de bloqueio do celular é o pior contexto que existe.
  */
-async function avisarQuemMeFavoritou(sb: any, eu: string, visibilidade: string): Promise<void> {
+async function avisarQuemMeFavoritou(
+  sb: any,
+  eu: string,
+  visibilidade: string,
+  /**
+   * ⚠️ **O STORY usa a MESMA função, e não uma cópia.** As duas perguntas são
+   * idênticas — "quem me favoritou, está na rede, e não me bloqueou?" — e duas
+   * versões divergiriam no primeiro conserto, com a divergência aparecendo como
+   * push chegando em quem bloqueou. O que muda é o TEXTO.
+   *
+   * ⚠️ E o story precisava dele MAIS que o post: ele expira em 24 h, então
+   * quem não abrir o app hoje simplesmente não vê. Era a assimetria que faltava.
+   */
+  especie: "post" | "story" = "post",
+): Promise<void> {
   if (visibilidade === "amigas") return;
   try {
     const { data: linhas } = await sb
@@ -3456,6 +3537,33 @@ async function avisarQuemMeFavoritou(sb: any, eu: string, visibilidade: string):
       .limit(200);
     const ids = ((linhas ?? []) as { quem_id: string }[]).map((l) => l.quem_id);
     if (ids.length === 0) return;
+
+    /**
+     * ⚠️ **QUEM ELA ESCONDEU NÃO RECEBE O AVISO DO STORY — e esta é a armadilha
+     * do recurso.**
+     *
+     * Ela escondeu o story da sogra; a sogra a favoritou. Sem este recorte, o
+     * push chegaria com o nome dela na tela de bloqueio da sogra, anunciando um
+     * story que a sogra não pode abrir. Seria o esconder falhando pelo caminho
+     * mais visível possível — e ainda por cima seria o app contando que ela
+     * publicou algo escondido.
+     *
+     * Vale só para o story: o esconder é do story, e o post tem a camada dele.
+     */
+    let escondidos = new Set<string>();
+    if (especie === "story") {
+      try {
+        const { data: esc } = await sb
+          .from("rede_story_escondido")
+          .select("escondido_id")
+          .eq("quem_id", eu);
+        escondidos = new Set(
+          ((esc ?? []) as { escondido_id: string }[]).map((l) => l.escondido_id),
+        );
+      } catch {
+        /* Sem a tabela ainda: ninguém escondeu de ninguém. */
+      }
+    }
 
     const perfis = await perfisPorId(sb, [eu, ...ids]);
     const meuNome = ((perfis.get(eu)?.display_name ?? "") as string).trim() || "Alguém";
@@ -3468,6 +3576,7 @@ async function avisarQuemMeFavoritou(sb: any, eu: string, visibilidade: string):
            bloqueio vale nos DOIS sentidos, e um push meu chegando nela seria o
            bloqueio falhando pelo caminho mais visível possível. */
         if (foraDaRede(dela)) return;
+        if (escondidos.has(id)) return;
         const { data: bloqueio } = await sb
           .from("rede_bloqueios")
           .select("quem_id")
@@ -3478,7 +3587,11 @@ async function avisarQuemMeFavoritou(sb: any, eu: string, visibilidade: string):
         if ((bloqueio ?? []).length > 0) return;
         await sendPushToUser(id, {
           title: "Comunidade",
-          body: `${meuNome} publicou`,
+          /* ⚠️ O texto DIZ o formato, e nada além. "Publicou um story" avisa que
+             a coisa some em 24 h — que é a única informação que muda o que ela
+             faz agora. A legenda continua de fora, pela razão de sempre: a tela
+             de bloqueio é o pior contexto que existe. */
+          body: especie === "story" ? `${meuNome} publicou um story` : `${meuNome} publicou`,
           url: "/minha-conta?tab=Comunidade",
         });
       }),
@@ -4771,6 +4884,27 @@ export const listaDeGente = createServerFn({ method: "POST" })
       .object({
         accessToken: z.string().min(10),
         tipo: z.enum(["seguidores", "seguindo"]),
+        /**
+         * De quem é a lista. Ausente = a minha.
+         *
+         * ⚠️ **ELE NASCEU POR DECISÃO DO DONO, e a decisão anterior fica
+         * registrada porque o argumento contrário continua válido.**
+         *
+         * A lista era do MEU perfil e de mais ninguém — a tela nem oferecia o
+         * toque em perfil de terceiro. O argumento era clínico: a lista de quem
+         * acompanha uma gestante de alto risco é o CÍRCULO SOCIAL dela.
+         *
+         * O argumento que venceu é do dono, e é de produto: *"a lista de pessoas
+         * seguindo também é para estar aparente; em nenhum momento vamos
+         * bloquear isso, é pra usar as mesmas coisas que tem no Instagram."*
+         *
+         * ⚠️ **E "as mesmas coisas que tem no Instagram" é literal, não uma
+         * abertura geral:** lá, a lista de um perfil PÚBLICO abre para qualquer
+         * um, e a de um perfil PRIVADO só para quem já foi aceita. Quem decide
+         * aqui é `alcancaOPerfil` — a MESMA régua de `verPerfil` —, então a
+         * chave de privacidade que ela já controla continua valendo.
+         */
+        alvoId: z.string().uuid().optional(),
       })
       .parse(i),
   )
@@ -4782,15 +4916,39 @@ export const listaDeGente = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
 
     const ctx = await contextoDe(sb, eu);
+    const alvo = data.alvoId ?? eu;
 
-    /* `seguidores` = quem tem `seguido_id = eu`; `seguindo` = o inverso. */
+    /**
+     * ⚠️ **O PORTÃO, e ele FALTAVA por acidente.**
+     *
+     * Enquanto a lista era só a minha, o recorte era a sessão e nada mais —
+     * não havia o que conferir. Com o alvo vindo do cliente, sem este bloco
+     * qualquer uuid devolveria a lista de qualquer paciente, inclusive de perfil
+     * FECHADO. É a régua de `verPerfil`, e é a do Instagram.
+     */
+    if (alvo !== eu) {
+      const dono = (await perfisPorId(sb, [alvo])).get(alvo);
+      /* Fora da rede (luto ou pausa) some inteira, sem contar o motivo. */
+      if (foraDaRede(dono)) return { ok: false as const, motivo: "indisponivel" as const };
+      /* Bloqueio nos dois sentidos: `conjuntoDeBloqueio` falha FECHADO. */
+      if (ctx.bloqueio.has(alvo)) return { ok: false as const, motivo: "indisponivel" as const };
+      const podeVer = alcancaOPerfil({
+        perfilPublico: !!(dono as any).perfil_publico,
+        souEu: false,
+        sigoAtivo: ctx.sigo.has(alvo),
+        somosAmigas: ctx.amigas.has(alvo),
+      });
+      if (!podeVer) return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* `seguidores` = quem tem `seguido_id = alvo`; `seguindo` = o inverso. */
     const coluna = data.tipo === "seguidores" ? "seguido_id" : "seguidor_id";
     const outra = data.tipo === "seguidores" ? "seguidor_id" : "seguido_id";
 
     const { data: linhas } = await sb
       .from("rede_seguidores")
       .select(`${outra}, criado_em`)
-      .eq(coluna, eu)
+      .eq(coluna, alvo)
       .eq("estado", "ativo")
       .order("criado_em", { ascending: false })
       .limit(200);
@@ -5448,6 +5606,11 @@ export const publicarStory = createServerFn({ method: "POST" })
     if (novoId && (data.marcadas ?? []).length > 0) {
       await gravarMarcacoes(sb, eu, novoId, data.marcadas ?? [], "story");
     }
+    /* ⚠️ **O AVISO SAI DEPOIS DE GRAVAR, sempre.** Avisar sobre um story que não
+       existe manda a paciente abrir uma fileira onde não há nada. E é a MESMA
+       função do post — ver `avisarQuemMeFavoritou`: quem ela escondeu não
+       recebe, e a camada `amigas` não avisa ninguém. */
+    await avisarQuemMeFavoritou(sb, eu, camada, "story");
     return { ok: true as const };
   });
 
@@ -5463,6 +5626,384 @@ export const publicarStory = createServerFn({ method: "POST" })
  * consulta de tela virar escrita, e uma tela que apaga dado é uma tela que
  * apaga dado quando não devia.
  */
+/**
+ * ESCONDER O MEU STORY DE UMA PESSOA — o "Ocultar story de" do Instagram.
+ *
+ * ⚠️ **A camada (`seguidores` / `amigas`) é GROSSA.** O que faltava é o
+ * "esconder do fulano": a sogra, a chefe, a colega. É o controle que faz ela
+ * publicar — sem ele, a escolha é entre mostrar a todo mundo e não publicar.
+ *
+ * ⚠️ **É EXCLUSÃO, e nunca uma lista de permissão.** A lista de permissão já
+ * existe e é a camada; duas listas de permissão para o mesmo story seriam duas
+ * réguas de visibilidade a divergir.
+ *
+ * ⚠️ **E é CALADO**, como o silenciar e o bloqueio: ninguém é avisado de que
+ * está escondido. Anunciar transforma um gesto privado numa briga, e num app
+ * onde as pessoas se conhecem da vida real isso piora o que a motivou.
+ */
+export const esconderStoryDe = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        alvoId: z.string().uuid(),
+        esconder: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    /* ⚠️ Esconder de si mesma não existe: a autora sempre vê o próprio story,
+       e uma linha assim tiraria a fileira dela da tela dela. */
+    if (data.alvoId === eu) return { ok: false as const, motivo: "eu_mesma" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (data.esconder) {
+      const { error } = await sb
+        .from("rede_story_escondido")
+        .insert({ quem_id: eu, escondido_id: data.alvoId });
+      /* Colidir na chave é sucesso repetido — ela já estava escondida. */
+      if (error && (error as any).code !== "23505") {
+        return { ok: false as const, motivo: "sem_suporte" as const };
+      }
+      return { ok: true as const };
+    }
+
+    const { error } = await sb
+      .from("rede_story_escondido")
+      .delete()
+      .eq("quem_id", eu)
+      .eq("escondido_id", data.alvoId);
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * De quem eu escondi o meu story.
+ *
+ * ⚠️ **Sem esta tela o recurso é um beco sem saída** — esconder é calado e a
+ * pessoa some da lista, então desfazer exigiria lembrar de quem foi. É o mesmo
+ * defeito que o bloqueio teve até ganhar a lista de bloqueados.
+ *
+ * ⚠️ **Falha de leitura devolve ERRO, e nunca lista vazia.** "Você não escondeu
+ * de ninguém" faria ela concluir que o esconder não pegou — e esconder de novo,
+ * ou desistir.
+ */
+export const meusEscondidosDoStory = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: linhas, error } = await sb
+      .from("rede_story_escondido")
+      .select("escondido_id")
+      .eq("quem_id", eu);
+    if (error) return { ok: false as const, motivo: "instavel" as const };
+
+    const ids = ((linhas ?? []) as { escondido_id: string }[]).map((l) => l.escondido_id);
+    /* ⚠️ Como a lista de bloqueados, esta NÃO passa pela régua de
+       visibilidade: é a única leitura em que a pessoa escondida precisa
+       aparecer, senão não há como desfazer. */
+    const perfis = await perfisPorId(sb, ids);
+    const gente: PessoaNaLista[] = ids.map((id) => {
+      const p = perfis.get(id);
+      return {
+        id,
+        nome: ((p?.display_name ?? "") as string).trim() || "Alguém",
+        bio: (p?.bio ?? null) as string | null,
+        avatarUrl: (p?.avatar_url ?? null) as string | null,
+        sigo: null,
+        souEu: false,
+        oficial: ehContaOficial(p as any),
+        premium: (p as any)?.tem_selo === true,
+      };
+    });
+    return { ok: true as const, gente };
+  });
+
+/**
+ * O RASCUNHO DA PUBLICAÇÃO, NO SERVIDOR.
+ *
+ * ⚠️ **Hoje ele vive no `localStorage` e MORRE ao trocar de aparelho.** E o
+ * app recusa guardar as FOTOS ali de propósito: a cota de ~5 MB é
+ * compartilhada com o `journey_state`, e estourá-la derruba a próxima gravação
+ * de qualquer coisa — inclusive a jornada inteira dela.
+ *
+ * ⚠️ **AS FOTOS CONTINUAM DE FORA, e por outra razão.** Subir a foto de um
+ * rascunho poria no balde um arquivo que talvez nunca seja publicado, sem nada
+ * que o apague — e o que ela mais rascunha é o TEXTO. O que viaja é o texto, a
+ * camada e o lugar.
+ *
+ * ⚠️ **UM por pessoa** (o autor é a chave): uma lista viraria uma segunda caixa
+ * de publicações não publicadas, com o peso de tela que isso tem.
+ *
+ * ⚠️ **E o rascunho do aparelho NÃO SAI.** Ele é mais rápido (não espera rede) e
+ * guarda o que este não guarda; o do servidor é a rede de segurança da TROCA DE
+ * CELULAR. Quem manda na tela é o do aparelho, e este só entra quando ele não
+ * existe — senão o texto de meia hora atrás voltaria por cima do de agora.
+ */
+export const salvarRascunho = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        texto: z.string().max(LIMITE_DO_TEXTO).nullable(),
+        visibilidade: z.string().max(20).nullable().optional(),
+        lugar: z.string().trim().max(60).nullable().optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const texto = (data.texto ?? "").trim();
+    /* ⚠️ **Rascunho vazio APAGA**, e não grava uma linha em branco: senão a
+       próxima abertura ofereceria "você tinha um rascunho" para devolver nada.
+       É a mesma régua do rascunho do aparelho. */
+    if (!texto) {
+      await sb.from("rede_rascunhos").delete().eq("autor_id", eu);
+      return { ok: true as const };
+    }
+
+    const { error } = await sb.from("rede_rascunhos").upsert(
+      {
+        autor_id: eu,
+        texto,
+        visibilidade: data.visibilidade ?? null,
+        lugar: data.lugar?.trim() || null,
+        atualizado_em: new Date().toISOString(),
+      },
+      { onConflict: "autor_id" },
+    );
+    /* ⚠️ Falha aqui é SILENCIOSA para a paciente: o rascunho do aparelho já
+       guardou o texto, e um erro na tela sobre uma rede de segurança faria ela
+       achar que perdeu o que está vendo escrito na frente dela. */
+    if (error) console.warn("[rede] rascunho não gravou — rode APLICAR_MAIS_DA_REDE.sql");
+    return { ok: true as const };
+  });
+
+/**
+ * O rascunho guardado no servidor, ou `null`.
+ *
+ * ⚠️ **Falha vira `null`** — o pior caso é ela não reencontrar um texto que o
+ * aparelho provavelmente ainda tem; o oposto seria um erro na tela por causa de
+ * uma rede de segurança.
+ */
+export const meuRascunho = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: r } = await (supabaseAdmin as any)
+      .from("rede_rascunhos")
+      .select("texto, visibilidade, lugar, atualizado_em")
+      .eq("autor_id", eu)
+      .maybeSingle();
+    if (!r?.texto) return { ok: true as const, rascunho: null };
+    return {
+      ok: true as const,
+      rascunho: {
+        texto: r.texto as string,
+        visibilidade: (r.visibilidade ?? null) as string | null,
+        lugar: (r.lugar ?? null) as string | null,
+        em: r.atualizado_em as string,
+      },
+    };
+  });
+
+/**
+ * ABRIR (ou fechar) O LINK PÚBLICO DE UMA PUBLICAÇÃO.
+ *
+ * ⚠️ **SÓ A AUTORA, e SÓ para publicação PÚBLICA.** Um link para um post da
+ * camada `amigas` seria a porta dos fundos da visibilidade: o desabafo escrito
+ * para seis pessoas passaria a abrir sem conta nenhuma, para quem tivesse o
+ * endereço. A camada manda, aqui como em toda a aba.
+ *
+ * ⚠️ **E FECHAR é possível.** Um link que não se desfaz é um link que ela nunca
+ * abre: apagar o código derruba o endereço na hora, e um novo "abrir" sorteia
+ * OUTRO — quem tinha o antigo fica de fora, que é o ponto de revogar.
+ */
+export const linkPublicoDoPost = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        abrir: z.boolean(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ A dona e a CAMADA são conferidas no BANCO, nunca no corpo do pedido. */
+    const { data: post } = await sb
+      .from("rede_posts")
+      .select("id, autor_id, visibilidade, arquivado_em")
+      .eq("id", data.postId)
+      .maybeSingle();
+    if (!post || (post as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "nao_e_sua" as const };
+    }
+    if (!data.abrir) {
+      const { error } = await sb
+        .from("rede_posts")
+        .update({ codigo_publico: null })
+        .eq("id", data.postId);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const, codigo: null };
+    }
+    if ((post as any).arquivado_em) return { ok: false as const, motivo: "arquivado" as const };
+    if ((post as any).visibilidade !== "publico") {
+      return { ok: false as const, motivo: "nao_e_publico" as const };
+    }
+
+    const { codigoDaPublicacao } = await import("@/lib/link-da-publicacao");
+    /* ⚠️ **Três tentativas, e não uma.** O índice é único: uma colisão é
+       astronomicamente improvável (32^10) e mesmo assim tem de ter saída — sem
+       o laço, ela veria "não deu para gerar" sem nada a fazer. */
+    for (let n = 0; n < 3; n++) {
+      const codigo = codigoDaPublicacao();
+      const { error } = await sb
+        .from("rede_posts")
+        .update({ codigo_publico: codigo })
+        .eq("id", data.postId);
+      if (!error) return { ok: true as const, codigo };
+      if ((error as any).code !== "23505") {
+        console.warn("[rede] link público — rode APLICAR_MAIS_DA_REDE.sql");
+        return { ok: false as const, motivo: "sem_suporte" as const };
+      }
+    }
+    return { ok: false as const, motivo: "sem_suporte" as const };
+  });
+
+/**
+ * A PUBLICAÇÃO PELO CÓDIGO — a página que abre SEM CONTA.
+ *
+ * ⚠️ **É a segunda função da rede sem sessão, e a régua tem de ser inteira
+ * aqui**: não há `contextoDe`, não há bloqueio a consultar, não há nada além do
+ * que esta função conferir. Os quatro portões são explícitos.
+ *
+ * ⚠️ **UM `null` SÓ para todos os motivos** — código inexistente, link
+ * fechado, publicação arquivada, camada fechada, autora fora da rede. Distinguir
+ * contaria, a quem colou o link no grupo da família, que ali existe alguém.
+ */
+export const postPublicoPorCodigo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ codigo: z.string().max(40) }).parse(i))
+  .handler(async ({ data }) => {
+    const { codigoDaPublicacaoLimpo } = await import("@/lib/link-da-publicacao");
+    const codigo = codigoDaPublicacaoLimpo(data.codigo);
+    if (!codigo) return { ok: true as const, post: null };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const crus = await postsCrus(sb, (base: any) =>
+      base.eq("codigo_publico", codigo).is("arquivado_em", null).limit(1),
+    );
+    const cru = crus[0];
+    if (!cru) return { ok: true as const, post: null };
+    /* ⚠️ A CAMADA de novo, na leitura: ela pode ter fechado a publicação DEPOIS
+       de abrir o link, e o código continuaria gravado. */
+    if ((cru as any).visibilidade !== "publico") return { ok: true as const, post: null };
+
+    const dono = (await perfisPorId(sb, [(cru as any).autor_id])).get((cru as any).autor_id);
+    /* ⚠️ Luto e pausa fecham a página, sem contar qual dos dois. */
+    if (foraDaRede(dono)) return { ok: true as const, post: null };
+
+    /* ⚠️ **`montarPosts` com o olho da PRÓPRIA autora**, e nunca um olho vazio:
+       é ele que assina as URLs. E o `eu` é a autora porque não há visitante com
+       conta — o que a régua de visibilidade decidiria já foi decidido pelos
+       portões acima. */
+    const [post] = await montarPosts(sb, (cru as any).autor_id, [cru], {
+      sigo: new Set<string>(),
+      amigas: new Set<string>(),
+      bloqueio: { has: () => false },
+    });
+    if (!post) return { ok: true as const, post: null };
+    return {
+      ok: true as const,
+      post: {
+        autorNome: post.autorNome,
+        autorAvatar: post.autorAvatar,
+        texto: post.texto,
+        imagemUrl: post.imagemUrl,
+        imagens: post.imagens,
+        videoUrl: post.videoUrl ?? null,
+        altTexto: post.altTexto ?? null,
+        criadoEm: post.criadoEm,
+      },
+    };
+  });
+
+/**
+ * O QUE EU REAGI — a lista que faltava ao lado dos salvos.
+ *
+ * ⚠️ **Existe "salvos" e não existia "o que eu curti".** São coisas
+ * diferentes: salvar é um gesto DELIBERADO de guardar; reagir é o gesto rápido
+ * de quem passou por ali. É por esta lista que se reencontra a publicação que
+ * ela viu, achou linda, e não guardou.
+ *
+ * ⚠️ **É PRIVADA — não existe `alvoId`.** Saber no que outra pessoa reagiu é
+ * uma leitura de comportamento que o app inteiro decidiu não ter: a lista de
+ * quem reagiu a um POST é da autora dele, e a lista do que EU reagi é minha.
+ *
+ * ⚠️ **E ela passa pela régua de visibilidade DE NOVO**, como os salvos: ela
+ * pode ter reagido e a autora ter fechado o perfil depois. Reação é marcador,
+ * não cópia — e marcador não sobrevive à decisão de quem escreveu.
+ */
+export const meusCurtidos = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: linhas, error } = await sb
+      .from("rede_reacoes")
+      .select("post_id, criado_em")
+      .eq("quem_id", eu)
+      .order("criado_em", { ascending: false })
+      .limit(POSTS_POR_PAGINA);
+    /* ⚠️ Falha vira ERRO, e nunca lista vazia: "você não reagiu a nada" é a
+       frase mais errada para quem reagiu a duzentas publicações. */
+    if (error) return { ok: false as const, motivo: "instavel" as const };
+
+    const ids = ((linhas ?? []) as { post_id: string }[]).map((l) => l.post_id);
+    if (ids.length === 0) return { ok: true as const, posts: [] as PostNaTela[] };
+
+    const ctx = await contextoDe(sb, eu);
+    const crus = await postsCrus(sb, (base: any) =>
+      base.in("id", ids).is("arquivado_em", null).limit(ids.length),
+    );
+    const montados = await montarPosts(sb, eu, crus, ctx);
+    /* ⚠️ **A ordem é a das REAÇÕES, e não a do banco.** `in()` devolve na ordem
+       que quiser; sem isto a lista sairia embaralhada a cada abertura, e o que
+       ela acabou de curtir não estaria no topo. */
+    const ordem = new Map(ids.map((id, n) => [id, n]));
+    montados.sort((a, b) => (ordem.get(a.id) ?? 0) - (ordem.get(b.id) ?? 0));
+    return { ok: true as const, posts: montados };
+  });
+
 export const storiesDoFeed = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
   .handler(async ({ data }) => {
@@ -5484,8 +6025,37 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
        ⚠️ E `|| id === eu` protege o caso bobo: silenciar a si mesma (que a tela
        não oferece, mas um pedido montado à mão sim) não pode esconder os
        próprios posts do próprio feed. */
+    /**
+     * ⚠️ **QUEM ESCONDEU O STORY DE MIM sai do recorte, e sai ANTES da leitura.**
+     *
+     * A busca é reversa: quem me pôs na lista dela. Filtrar depois de ler
+     * traria a foto e a URL assinada de um story que ela escondeu de mim — o
+     * arquivo já teria saído do servidor, que é o defeito exato que o véu do
+     * conteúdo sensível existe para não cometer.
+     *
+     * ⚠️ **Falha vira conjunto VAZIO, e essa é a direção honesta aqui**: o pior
+     * caso é um story aparecer para quem ela escondeu (o estado de antes do
+     * recurso), contra a fileira inteira sumir por uma consulta lenta. E a
+     * tabela nasce num `APLICAR_` que o dono roda à mão — sem isto, o `42P01`
+     * derrubaria a fileira toda na janela entre o deploy e o SQL.
+     */
+    const escondeuDeMim = new Set<string>();
+    try {
+      const { data: esc } = await sb
+        .from("rede_story_escondido")
+        .select("quem_id")
+        .eq("escondido_id", eu);
+      for (const l of (esc ?? []) as { quem_id: string }[]) escondeuDeMim.add(l.quem_id);
+    } catch {
+      /* Sem a tabela ainda: ninguém escondeu de ninguém. */
+    }
+
     const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
-      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciadosStories.has(id)),
+      /* ⚠️ `id === eu` primeiro, sempre: nem o bloqueio nem o esconder podem
+         tirar a autora da própria fileira. */
+      (id) =>
+        id === eu ||
+        (!ctx.bloqueio.has(id) && !ctx.silenciadosStories.has(id) && !escondeuDeMim.has(id)),
     );
 
     /* ⚠️ **O `.in()` VAI NA QUERY STRING, e ela tem teto.** Cada uuid custa 37
@@ -7224,7 +7794,20 @@ export const denunciasDaRede = createServerFn({ method: "POST" })
 /** Marcar uma denúncia como olhada. */
 export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), denunciaId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        denunciaId: z.string().uuid(),
+        /**
+         * O que foi feito — CATÁLOGO FECHADO.
+         *
+         * ⚠️ Campo livre aqui é onde alguém escreve o nome da pessoa
+         * denunciada, ou um detalhe do caso, num texto que volta para quem
+         * denunciou. O desfecho diz O QUE ACONTECEU e nada mais.
+         */
+        desfecho: z.enum(["removido", "avisado", "sem_acao"]).optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -7242,12 +7825,95 @@ export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
     /* ⚠️ MARCA, não apaga: a linha resolvida continua contando para a
        reincidência da conta. Apagar faria a quinta denúncia parecer a
        primeira. */
-    const { error } = await sb
+    const agora = new Date().toISOString();
+    /* ⚠️ **O DESFECHO É UM DEGRAU PRÓPRIO.** A coluna nasce no
+       `APLICAR_MAIS_DA_REDE.sql`, que o dono roda à mão, e o deploy chega
+       antes: sem o recuo, RESOLVER uma denúncia pararia de funcionar — um
+       recurso antigo apagado por uma coluna nova, que é a forma mais cara de
+       defeito deste repositório. */
+    let { error } = await sb
       .from("rede_denuncias")
-      .update({ resolvido_em: new Date().toISOString() })
+      .update({ resolvido_em: agora, desfecho: data.desfecho ?? "sem_acao" })
       .eq("id", data.denunciaId);
+    if (error) {
+      console.warn("[rede] denúncia sem desfecho — rode APLICAR_MAIS_DA_REDE.sql");
+      ({ error } = await sb
+        .from("rede_denuncias")
+        .update({ resolvido_em: agora })
+        .eq("id", data.denunciaId));
+    }
     if (error) return { ok: false as const, motivo: "banco" as const };
     return { ok: true as const };
+  });
+
+/**
+ * O QUE ACONTECEU COM O QUE EU DENUNCIEI.
+ *
+ * ⚠️ **A tela prometia "fica registrada para a gente olhar", e o desfecho nunca
+ * voltava.** A fila existe no painel, o administrador resolve, e quem denunciou
+ * nunca soube — **denúncia sem retorno é a que ninguém faz duas vezes**, e num
+ * app onde a alternativa é o bloqueio cego isso custa: o padrão vira bloquear
+ * sem denunciar, e a plataforma deixa de enxergar quem reincide.
+ *
+ * ⚠️ **O QUE VOLTA É O DESFECHO, e NUNCA a pessoa.** Nem o nome, nem o id, nem
+ * o texto denunciado. Devolver quem foi transformaria a denúncia num canal de
+ * confronto — e a denúncia é justamente o caminho para quem não quer confrontar.
+ *
+ * ⚠️ **E nem "removido" nomeia alguém**: ele diz que a publicação saiu, não de
+ * quem ela era.
+ */
+export const meusDesfechos = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **`quem_id = eu` é o recorte inteiro** — sem ele, esta função
+       devolveria os desfechos das denúncias de todo mundo. E o `select` NÃO
+       pede `alvo_id` nem `trecho`: o que não é lido não vaza. */
+    const { data: linhas, error } = await sb
+      .from("rede_denuncias")
+      .select("id, alvo, motivo, criado_em, resolvido_em, desfecho")
+      .eq("quem_id", eu)
+      .not("resolvido_em", "is", null)
+      .order("resolvido_em", { ascending: false })
+      .limit(50);
+    /* ⚠️ Sem a coluna do desfecho (o banco antes do SQL), a lista continua —
+       só sem o "o que aconteceu". Derrubá-la seria esconder as denúncias
+       resolvidas por causa de um campo novo. */
+    if (error) {
+      const { data: velhas, error: e2 } = await sb
+        .from("rede_denuncias")
+        .select("id, alvo, motivo, criado_em, resolvido_em")
+        .eq("quem_id", eu)
+        .not("resolvido_em", "is", null)
+        .order("resolvido_em", { ascending: false })
+        .limit(50);
+      if (e2) return { ok: false as const, motivo: "instavel" as const };
+      return {
+        ok: true as const,
+        desfechos: ((velhas ?? []) as any[]).map((l) => ({
+          id: l.id as string,
+          alvo: l.alvo as string,
+          motivo: l.motivo as string,
+          em: l.resolvido_em as string,
+          desfecho: null as string | null,
+        })),
+      };
+    }
+    return {
+      ok: true as const,
+      desfechos: ((linhas ?? []) as any[]).map((l) => ({
+        id: l.id as string,
+        alvo: l.alvo as string,
+        motivo: l.motivo as string,
+        em: l.resolvido_em as string,
+        desfecho: (l.desfecho ?? null) as string | null,
+      })),
+    };
   });
 
 /**

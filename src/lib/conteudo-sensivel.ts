@@ -70,4 +70,38 @@ export function deveBorrar(entrada: {
  * história dela é sensível — e a segunda contaria o luto dela para quem visse a
  * marca. A marca é sempre um gesto da autora.
  */
+/**
+ * ⚠️ **POR QUE ESTE POST ESTÁ RECOLHIDO — e são DUAS razões, um véu só.**
+ *
+ * A primeira é a MARCA DA AUTORA (`sensivel`): ela avisou que aquilo é duro. A
+ * segunda é o FILTRO DELA (`batePalavra`): ela escondeu uma palavra, e a
+ * publicação a contém.
+ *
+ * O véu é o mesmo porque o gesto é o mesmo — uma caixa do tamanho da foto, sem
+ * mídia nenhuma no DOM, e um toque para decidir. O que muda é o RÓTULO, e é ele
+ * que ela lê antes de escolher.
+ *
+ * ⚠️ **A marca da autora VENCE quando as duas valem.** "Perda gestacional" diz
+ * à leitora O QUE é; "você escondeu uma palavra" diz apenas que existe motivo.
+ * O rótulo mais informativo é o que serve a decisão.
+ *
+ * ⚠️ **E a AUTORA nunca vê o próprio recolhido, por nenhuma das duas razões** —
+ * ela sabe o que escreveu, e o filtro é sobre o que os OUTROS escrevem. É a
+ * mesma linha do filtro nos comentários.
+ */
+export type RazaoDoVeu = "sensivel" | "palavra";
+
+export function veuDoPost(entrada: {
+  sensivel: boolean;
+  batePalavra: boolean;
+  souAAutora: boolean;
+  revelado: boolean;
+}): RazaoDoVeu | null {
+  if (entrada.souAAutora) return null;
+  if (entrada.revelado) return null;
+  if (entrada.sensivel) return "sensivel";
+  if (entrada.batePalavra) return "palavra";
+  return null;
+}
+
 export const MARCA_AUTOMATICA = false;

@@ -36,6 +36,8 @@
  *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
  *   /preview-instagram?memoria=1 → o cartão "há um ano, você publicou isto"
  *   /preview-instagram?tela=perfil&meu=1&album=1 → a grade agrupada por semana
+ *   /preview-instagram?palavraOculta=1 → o feed com um post recolhido pelo filtro
+ *   /preview-instagram?tela=perfil&meu=1 → o ♡ dos curtidos e o "Story escondido de…"
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -83,6 +85,8 @@ import {
   TelaDaTag,
   ArquivoDeStories,
   ListaDeBloqueados,
+  GradeSimples,
+  MeusDesfechos,
 } from "@/components/rede-instagram";
 import type {
   AtividadeNaTela,
@@ -182,6 +186,8 @@ export const Route = createFileRoute("/preview-instagram")({
     memoria: q.memoria == null ? 0 : Number(q.memoria),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     album: q.album == null ? 0 : Number(q.album),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    palavraOculta: q.palavraOculta == null ? 0 : Number(q.palavraOculta),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -312,6 +318,11 @@ const POSTS: PostNaTela[] = CORES.map((c, i) => ({
      de rede alheia, e a varredura da CI roda sem ela. Este `.webm` já é
      embarcado (é um dos sons de ambiente) e serve para provar o player. */
   videoUrl: i === 1 ? "/sons/riacho.webm" : null,
+  /* ⚠️ **O FILTRO DE PALAVRAS NO FEED só se vê com um post que bate.** O
+     servidor calcula (a lista dela nunca viaja), então sem a bancada olhar o
+     véu exigiria uma conta com palavra escondida e um post de outra pessoa que
+     a contenha. */
+  batePalavraMinha: false,
   /* O post 4 é uma republicação — prova o quadro da original no cartão. */
   /* ⚠️ O ÍNDICE 0, e não o último: o feed da bancada desenha só as primeiras
      publicações (`POSTS.slice`), então uma fixture no fim NUNCA aparece — foi
@@ -424,6 +435,7 @@ function Bancada() {
     sensivelStory,
     memoria,
     album,
+    palavraOculta,
     desafio,
     caixinha,
     perguntas,
@@ -1601,6 +1613,122 @@ function Bancada() {
     );
   }
 
+  /**
+   * ⚠️ **AS TRÊS TELAS NOVAS SÓ NASCEM DE UMA CONTA COM HISTÓRIA** — esconder
+   * o story de alguém, reagir a publicações de semanas atrás, denunciar e
+   * esperar a plataforma responder. Sem a bancada, olhar qualquer uma delas
+   * exigiria duas contas e uma denúncia de verdade.
+   *
+   * `?instavel=1` é o estado que mais importa nas três: "não consegui ler" NÃO
+   * pode ter a cara de "não há nada" — nesta lista o vazio faria a paciente
+   * esconder o story de novo, e nos desfechos a faria concluir que a denúncia
+   * dela foi ignorada.
+   */
+  if (tela === "escondidos") {
+    return (
+      <div className="mx-auto max-w-[430px] px-4 pt-2">
+        <ListaDeBloqueados
+          titulo="Story escondido de"
+          explicacao="Quem está aqui não vê os seus stories. O resto continua igual, e ninguém é avisada."
+          vazio="Você não escondeu seu story de ninguém."
+          rotuloDaAcao="Voltar a mostrar"
+          pessoas={
+            instavel === 1
+              ? ("erro" as const)
+              : vazio
+                ? []
+                : [
+                    {
+                      id: "e1",
+                      nome: "Tia Zezé",
+                      avatarUrl: null,
+                      bio: null,
+                      sigo: null,
+                      souEu: false,
+                    },
+                    {
+                      id: "e2",
+                      nome: "Chefe",
+                      avatarUrl: null,
+                      bio: null,
+                      sigo: null,
+                      souEu: false,
+                    },
+                  ]
+          }
+          aoVoltar={() => history.back()}
+          aoDesbloquear={(id) => alert(`voltaria a mostrar para ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria a lista")}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "curtidos") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <GradeSimples
+          titulo="O que você reagiu"
+          vazio="Você ainda não reagiu a nada."
+          posts={instavel === 1 ? ("erro" as const) : vazio ? [] : POSTS.slice(0, 6)}
+          aoVoltar={() => history.back()}
+          aoAbrirPost={(id) => alert(`abriria o post ${id}`)}
+          aoTentarDeNovo={() => alert("recarregaria")}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "desfechos") {
+    return (
+      <div className="mx-auto max-w-md py-2">
+        <MeusDesfechos
+          desfechos={
+            instavel === 1
+              ? ("erro" as const)
+              : vazio
+                ? []
+                : [
+                    /* ⚠️ Os QUATRO estados numa tela só, porque é a diferença
+                       entre eles que a tela existe para mostrar — inclusive o
+                       "ainda não olhamos", que é o mais comum. */
+                    {
+                      id: "d1",
+                      alvo: "post",
+                      motivo: "conselho médico",
+                      em: "2026-08-19T10:00:00Z",
+                      desfecho: "removido",
+                    },
+                    {
+                      id: "d2",
+                      alvo: "perfil",
+                      motivo: "se passa por outra pessoa",
+                      em: "2026-08-17T10:00:00Z",
+                      desfecho: "avisado",
+                    },
+                    {
+                      id: "d3",
+                      alvo: "comentario",
+                      motivo: "ofensa",
+                      em: "2026-08-15T10:00:00Z",
+                      desfecho: "sem_acao",
+                    },
+                    {
+                      id: "d4",
+                      alvo: "story",
+                      motivo: "conteúdo impróprio",
+                      em: "2026-08-14T10:00:00Z",
+                      desfecho: null,
+                    },
+                  ]
+          }
+          aoVoltar={() => history.back()}
+          aoTentarDeNovo={() => alert("recarregaria")}
+        />
+      </div>
+    );
+  }
+
   if (tela === "salvos") {
     return (
       <div className="mx-auto max-w-md py-2">
@@ -1749,11 +1877,25 @@ function Bancada() {
           aoAbrirSalvos={meu ? () => alert("abriria os salvos") : undefined}
           aoAbrirEspelho={meu ? () => alert("abriria o espelho") : undefined}
           aoBloquear={meu ? undefined : () => alert("bloquearia")}
+          /* ⚠️ **AS TRÊS PROPS NOVAS PRECISAM ESTAR AQUI, e a bancada provou
+             por quê**: sem elas o ♡ e o "Story escondido de…" não desenham, e
+             a bancada aprovaria a tela sem os controles — o defeito que o `@` e
+             o áudio do direct já produziram aqui. Foi ao passá-las que apareceu
+             o defeito de verdade: o "Story escondido de…" vivia dentro de um ⋯
+             que só existe no perfil dos OUTROS. */
+          aoAbrirCurtidos={meu ? () => alert("abriria o que você reagiu") : undefined}
+          aoAbrirEscondidos={meu ? () => alert("abriria a lista de escondidos") : undefined}
+          aoEsconderStory={meu ? undefined : () => alert("esconderia o story desta pessoa")}
           /* ⚠️ Sem a bancada, olhar o seletor de motivo exigiria duas contas e
              uma denúncia de verdade — e é justamente a tela que precisa ser
              lida com calma antes de existir. */
           aoDenunciarPerfil={meu ? undefined : (m) => alert(`denunciaria o perfil por "${m}"`)}
           aoSilenciar={meu ? undefined : (v) => alert(v ? "silenciaria" : "voltaria a ouvir")}
+          /* ⚠️ `?favorita=1` estava documentado como "o 'Tirar dos favoritos'"
+             e o botão NUNCA desenhou: a bancada cravava a bandeira e não
+             passava a ação. Bancada que anuncia um controle que ela não desenha
+             é pior que bancada nenhuma. */
+          aoFavoritar={meu ? undefined : (v) => alert(v ? "favoritaria" : "tiraria dos favoritos")}
           /* ⚠️ Sem esta prop o botão de restringir NÃO desenha, e a bancada
              aprovaria uma tela sem o controle novo — o defeito que o `@` já
              produziu uma vez aqui. */
@@ -1791,27 +1933,41 @@ function Bancada() {
                      certo — o post normal — e o recurso passaria por ela sem
                      nunca ter sido olhado. É a lição do áudio do direct, que
                      sobreviveu meses porque a bancada não desenhava nenhum. */
-                    sensivel
+                    palavraOculta === 1
                       ? [
                           {
                             ...POSTS[0]!,
-                            id: "p-sens",
-                            sensivel: true,
-                            motivoSensivel: "perda",
-                            texto: "hoje faz um mês. obrigada a quem ficou 💛",
+                            id: "p-palavra",
+                            /* ⚠️ O véu do FILTRO tem rótulo próprio ("Escondido
+                               pelo seu filtro de palavras") e NÃO diz qual
+                               palavra — ela escondeu aquilo de propósito. */
+                            batePalavraMinha: true,
+                            souAAutora: false,
+                            texto: "não foi dessa vez. obrigada a quem escreveu 💛",
                           },
-                          {
-                            ...POSTS[2]!,
-                            id: "p-video",
-                            imagemUrl: null,
-                            videoUrl:
-                              "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=",
-                            videoLegenda: "O bebê mexendo — dá para ver o pezinho na direita.",
-                            texto: "olha ele hoje 🥹",
-                          },
-                          ...POSTS.slice(0, 3),
+                          ...POSTS.slice(1, 4),
                         ]
-                      : [...POSTS.slice(0, 4), ...extras],
+                      : sensivel
+                        ? [
+                            {
+                              ...POSTS[0]!,
+                              id: "p-sens",
+                              sensivel: true,
+                              motivoSensivel: "perda",
+                              texto: "hoje faz um mês. obrigada a quem ficou 💛",
+                            },
+                            {
+                              ...POSTS[2]!,
+                              id: "p-video",
+                              imagemUrl: null,
+                              videoUrl:
+                                "data:video/mp4;base64,AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDE=",
+                              videoLegenda: "O bebê mexendo — dá para ver o pezinho na direita.",
+                              texto: "olha ele hoje 🥹",
+                            },
+                            ...POSTS.slice(0, 3),
+                          ]
+                        : [...POSTS.slice(0, 4), ...extras],
                   )
             }
             stories={vazio ? [] : STORIES}

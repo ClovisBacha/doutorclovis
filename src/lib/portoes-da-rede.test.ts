@@ -95,12 +95,35 @@ describe("⚠️ os portões da rede não podem falhar abertos", () => {
    * escrevê-lo aqui é o que impede alguém de "consertar" um falso positivo
    * renomeando a variável, que é como uma catraca começa a mentir.
    */
-  const FORA_DO_NMAIS1 = ["inserirDescendo"];
+  const FORA_DO_NMAIS1 = [
+    "inserirDescendo",
+    /**
+     * ⚠️ **`linkPublicoDoPost` é um RECUO POR COLISÃO, não um N+1.**
+     *
+     * O índice de `codigo_publico` é único. O laço sorteia um código, tenta
+     * gravar, e só repete no `23505` — no MÁXIMO três vezes, parando na
+     * primeira que dá certo. Com 32^10 combinações, a segunda volta praticamente
+     * nunca acontece; ela existe para que uma colisão não vire "não deu para
+     * gerar" sem nada a fazer.
+     *
+     * É a mesma FORMA de `inserirDescendo`: a mesma escrita repetida, limitada,
+     * parando no sucesso — e não uma consulta por item de uma coleção.
+     */
+    "linkPublicoDoPost",
+  ];
 
   /** Em que função da lista de exceções esta linha cai, se em alguma. */
   function excecao(linhas: string[], i: number): boolean {
     for (let n = i; n >= 0; n--) {
-      const m = linhas[n].match(/^(?:export )?(?:async )?function (\w+)/);
+      /* ⚠️ **As DUAS formas de declarar.** A primeira versão só reconhecia
+         `function NOME`, e uma função de servidor é
+         `export const NOME = createServerFn(...)` — então a exceção nomeada
+         simplesmente não era encontrada, e a catraca acusava mesmo com o nome
+         na lista. É a armadilha de "o reconhecedor não reconhece o código real"
+         que este repositório já pagou na catraca de portas. */
+      const m =
+        linhas[n].match(/^(?:export )?(?:async )?function (\w+)/) ??
+        linhas[n].match(/^export const (\w+) = createServerFn/);
       if (m) return FORA_DO_NMAIS1.includes(m[1]);
     }
     return false;

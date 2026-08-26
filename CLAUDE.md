@@ -10484,3 +10484,144 @@ quebra a publicação num banco atrasado é a coluna nova estar no objeto que o
 "latitude" achava justamente o comentário que explica por que ela NÃO é guardada.
 
 **Aplicar no Supabase:** `supabase/APLICAR_CONTEUDO_DA_REDE.sql`.
+
+## As sete da rede, e a contagem de seguidores que eu tinha escondido (ago/2026)
+
+Pedido do dono depois das dez sugestões, e ele **recusou uma delas por escrito**:
+
+> "vai ter sim vantagem de seguidores em nenhum momento é pra esconder isso, vai
+> ter contagem de seguidores sim, se tiver isso está errado. (…) a lista de
+> pessoas seguindo também é para estar aparente. Em nenhum momento vamos
+> bloquear isso, é pra usar as mesmas coisas que tem no Instagram."
+
+### ⚠️ UMA DECISÃO MINHA FOI DESFEITA, e ela estava escrita em três lugares
+
+`NUMEROS_PUBLICOS` guardava a decisão de não mostrar seguidores/seguindo, com o
+argumento registrado ("ele mede popularidade num momento em que ela já está
+sendo medida clinicamente") — e `listaDeGente` só aceitava a lista do PRÓPRIO
+perfil. Os números e a lista voltaram, no modelo do Instagram.
+
+⚠️ **E "aparente" NÃO quer dizer "sem régua".** Quem decide é `alcancaOPerfil`,
+que é literalmente a regra do Instagram: **perfil público → qualquer pessoa;
+perfil privado → só quem já foi aceita, mais a dona.** Sem esse portão, a lista
+de quem acompanha uma gestante de alto risco ficaria legível para qualquer
+paciente autenticada trocando um uuid — e o perfil NASCE privado. O argumento
+antigo fica no arquivo ao lado do novo, porque a decisão é do dono e o
+contra-argumento continua valendo se ele quiser revê-la.
+
+⚠️ **Bloqueio e `foraDaRede` vêm ANTES**, e respondem `indisponivel` — nunca
+"lista vazia", que faria a paciente concluir que a pessoa não tem ninguém.
+
+### O filtro de palavras chegou ao FEED — e o véu passou a ter dois motivos
+
+A lista que ela escreveu ("perdi", o nome de um hospital) valia no comentário e
+no direct, e **não valia na publicação** — que é o texto mais longo e o mais
+provável de carregar a palavra. `veuDoPost` (`conteudo-sensivel.ts`) unificou os
+dois casos numa régua só, e ela tem ORDEM:
+
+1. **a autora nunca vê o próprio post velado** — ela sabe o que escreveu;
+2. revelado é revelado;
+3. `sensivel` (o aviso que a autora marcou) ganha de `palavra`, porque é o que
+   ela quis dizer sobre o conteúdo dela.
+
+⚠️ **E o véu do filtro NÃO diz qual palavra bateu.** Ele diz "Escondido pelo seu
+filtro de palavras", e mais nada: escrever a palavra na tela é entregar
+exatamente o que ela mandou esconder — o mesmo defeito que o filtro do
+comentário já pagou aqui.
+
+⚠️ **`palavrasOcultas` entra em `contextoDe`, na MESMA onda** do resto: uma
+consulta por post seriam vinte idas ao banco por página. E `batePalavraMinha` é
+calculado no servidor, nunca na tela — a lista dela não precisa viajar.
+
+### Esconder o story de pessoas específicas
+
+⚠️ **A exclusão acontece ANTES da leitura** — `storiesDoFeed` monta a lista de
+quem me escondeu (busca reversa em `escondido_id = eu`) e essas autoras nem
+entram na consulta. Filtrar depois deixaria o story viajar pela rede.
+
+⚠️ **E é CALADO**, como o silenciar e o bloqueio: a pessoa some da fileira e não
+é avisada de nada.
+
+### ⚠️ "STORY ESCONDIDO DE…" NÃO TINHA PORTA — e só a bancada mostrou
+
+A lista de quem eu escondi (o desfazer do recurso acima) vivia dentro do menu ⋯
+do perfil. E o ⋯ era gateado por `bloquear`, que no MEU perfil é `undefined`:
+**a lista sobre os MEUS stories era oferecida num menu que só existe no perfil
+DOS OUTROS.** Escrita, testada, alcançável em zero telas.
+
+⚠️ **`tsc`, lint e a suíte inteira estavam verdes**, e `rede-tem-porta.test.ts`
+não tinha como pegar: o botão É renderizado no código — ele só nunca aparece
+onde é oferecido. É a família do `escadaDeTrofeus` com zero chamadores, chegando
+por dentro de um `&&`.
+
+O ⋯ passou a existir sempre que houver o que oferecer (`temOpcoes`), e **a
+confirmação de bloqueio continua sendo a única parte que exige `bloquear`** — no
+meu próprio perfil o painel abre sem ela.
+
+⚠️ **E o texto da lista MENTIA**: ela reusa `ListaDeBloqueados`, cujo padrão diz
+"quem está aqui não vê você na Comunidade". Quem está nesta lista continua vendo
+o perfil, as publicações e tudo o mais — perde só o story. Herdar a frase do
+bloqueio faria a paciente achar que escondeu muito mais do que escondeu.
+
+### O link público da publicação
+
+`/pub/<CODIGO>` — dez caracteres de um alfabeto de 32 sem `I`, `O`, `0` e `1`
+(`link-da-publicacao.ts`), que são os quatro que alguém erra ao ler em voz alta.
+
+- ⚠️ **`loader`, e não `useEffect`**: WhatsApp e Instagram **não rodam
+  JavaScript** ao buscar o cartão de um link. É a mesma lição da vitrine.
+- ⚠️ **O cartão é GENÉRICO — sem legenda e sem foto.** Ele é COPIADO e fica no
+  histórico de toda conversa em que o link for colado, muito depois de ela
+  arquivar o post.
+- ⚠️ **O mesmo silêncio para todos os motivos** (código inexistente, post
+  arquivado, perfil fechado, Modo Cuidado): "publicação indisponível" contaria,
+  a quem colou o link no grupo da família, que ali existe alguma coisa.
+- ⚠️ **`noindex`**, e ele NÃO impede a prévia — são duas coisas diferentes, e a
+  rota precisa das duas.
+
+### O aviso do story de quem ela favoritou
+
+`avisarQuemMeFavoritou` já existia para o POST e ganhou `especie`. ⚠️ **Quem eu
+escondi não recebe** — o push carregaria o meu nome anunciando um story que ela
+não pode ver, que é o esconder falhando pelo caminho mais visível possível.
+
+### O rascunho no servidor
+
+O rascunho da publicação vivia só no aparelho. ⚠️ **E o do aparelho continua
+vencendo** (`if (doAparelho) return;`): ele é mais novo por construção — foi
+escrito no aparelho em que ela está agora.
+
+⚠️ **As FOTOS não entram**, aqui pela mesma razão de sempre e mais uma: subir a
+foto de um rascunho é subir um arquivo que talvez nunca vire publicação.
+
+### A denunciante fica sabendo o desfecho
+
+⚠️ **Denúncia sem retorno é a que ninguém faz duas vezes.** `resolverDenuncia`
+ganhou `desfecho` (removido · avisado · sem_ação) e a paciente tem tela.
+
+⚠️ **"Ainda não olhamos" é um estado à mostra**, e não uma linha ausente: sem
+ele, a denúncia de ontem seria indistinguível de uma que se perdeu.
+⚠️ **E o nome de quem foi denunciada NUNCA aparece** — a denúncia é justamente o
+caminho de quem não quer confrontar.
+
+### O que ela reagiu
+
+⚠️ **É OUTRA coisa que os salvos**, e por isso tem botão próprio: salvar é o
+gesto deliberado de guardar; reagir é o gesto rápido de quem passou por ali. É
+por esta lista que se reencontra a publicação que ela viu, achou linda e não
+guardou. A régua de visibilidade roda DE NOVO na leitura — ela pode ter reagido
+e a autora ter fechado o perfil depois.
+
+### ⚠️ E a bancada anunciava um controle que nunca desenhou
+
+`?tela=perfil&favorita=1` está documentado aqui como "o 'Tirar dos favoritos'"
+desde que o favoritar existe — e a bancada cravava a bandeira **sem passar
+`aoFavoritar`**, então o botão nunca apareceu. Bancada que anuncia um controle
+que ela não desenha é pior que bancada nenhuma; foi ao ligar as props do perfil
+que o defeito do ⋯ apareceu.
+
+**Aplicar no Supabase:** `supabase/APLICAR_MAIS_DA_REDE.sql` (idempotente).
+**Bancadas:** `?palavraOculta=1` (o véu do filtro no feed) · `?tela=escondidos`
+(`&vazio=1`, `&instavel=1`) · `?tela=curtidos` · `?tela=desfechos` (os quatro
+estados, inclusive o "ainda não olhamos") · `?tela=perfil&meu=1` (o ♡ e o ⋯ que
+não existia) · `/pub/<CODIGO>`.

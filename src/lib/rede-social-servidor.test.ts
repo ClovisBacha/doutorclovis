@@ -668,7 +668,7 @@ describe("higiene", () => {
     expect(readFileSync("src/lib/comentarios.functions.ts", "utf8")).toContain("rede_comentarios");
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são doze", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são catorze", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -750,7 +750,26 @@ describe("higiene", () => {
     expect(fav).toContain('.eq("quem_id", eu)');
     expect(fav).toContain('.eq("favorita_id", data.alvoId)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(12);
+    /* ⚠️ E o DÉCIMO TERCEIRO: voltar a MOSTRAR o story a quem ela escondeu.
+       Mesma natureza do silêncio — a linha não guarda história, e um
+       "escondido: false" marcado faria a lista crescer para sempre com o
+       registro de quem ela um dia escondeu. `.eq("quem_id", eu)` é o portão:
+       sem ele, um id no corpo do pedido desfaria o esconder de OUTRA. */
+    const esc = corpoDe("esconderStoryDe").replace(/\s+/g, " ");
+    expect(esc).toContain(".delete(");
+    expect(esc).toContain('.eq("quem_id", eu)');
+    expect(esc).toContain('.eq("escondido_id", data.alvoId)');
+
+    /* ⚠️ E o DÉCIMO QUARTO: o RASCUNHO vazio apaga a linha. Guardar um rascunho
+       em branco faria a próxima abertura oferecer "você tinha um rascunho" para
+       devolver nada — e ele é o oposto do post, que é arquivado: aqui não há o
+       que preservar, porque nada foi publicado. `.eq("autor_id", eu)` é o
+       portão. */
+    const ras = corpoDe("salvarRascunho").replace(/\s+/g, " ");
+    expect(ras).toContain(".delete(");
+    expect(ras).toContain('.eq("autor_id", eu)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(14);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {

@@ -28,7 +28,13 @@
 import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
-import { MOTIVOS_SENSIVEIS, deveBorrar, rotuloDoMotivo } from "@/lib/conteudo-sensivel";
+import {
+  MOTIVOS_SENSIVEIS,
+  deveBorrar,
+  rotuloDoMotivo,
+  veuDoPost,
+  type RazaoDoVeu,
+} from "@/lib/conteudo-sensivel";
 import {
   chaveDoRascunhoDeStory,
   lerRascunhoDeStory,
@@ -712,10 +718,19 @@ function IconeMarcador({ cheio }: { cheio: boolean }) {
  */
 function Sensivel({
   motivo,
+  razao,
   aoRevelar,
   children,
 }: {
   motivo: string | null | undefined;
+  /**
+   * Por que está recolhido.
+   *
+   * ⚠️ **`"palavra"` NÃO diz QUAL palavra**, e isso é o recurso: ela escondeu
+   * aquilo de propósito, e escrever a palavra no rótulo entregaria exatamente o
+   * que o filtro existe para não entregar.
+   */
+  razao?: RazaoDoVeu;
   aoRevelar: () => void;
   children: React.ReactNode;
 }) {
@@ -731,7 +746,9 @@ function Sensivel({
         onClick={aoRevelar}
         className="press absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/40 px-6 text-center"
       >
-        <span className="text-[13px] font-semibold">{rotuloDoMotivo(motivo)}</span>
+        <span className="text-[13px] font-semibold">
+          {razao === "palavra" ? "Escondido pelo seu filtro de palavras" : rotuloDoMotivo(motivo)}
+        </span>
         <span className="text-[12px] text-muted-foreground">Toque para ver</span>
       </button>
     </div>
@@ -745,6 +762,7 @@ export const PostInstagram = memo(function PostInstagram({
   aoSalvar,
   aoRepublicar,
   aoCompartilhar,
+  aoLinkPublico,
   aoStoryComPost,
   aoAbrirTag,
   aoMandarParaConversa,
@@ -779,6 +797,18 @@ export const PostInstagram = memo(function PostInstagram({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /**
+   * Abre (ou fecha) o LINK PÚBLICO desta publicação.
+   *
+   * ⚠️ **É OUTRA coisa que o ↗.** O ↗ tira a FOTO do app (`navigator.share`
+   * com o arquivo); isto entrega um ENDEREÇO que abre sem conta nenhuma — é
+   * assim que uma publicação chega ao WhatsApp da família.
+   *
+   * ⚠️ **Só na própria, e só na camada `publico`** — quem confere é o servidor.
+   * Um link para um post `amigas` seria a porta dos fundos da visibilidade: o
+   * desabafo escrito para seis pessoas passaria a abrir sem conta nenhuma.
+   */
+  aoLinkPublico?: (post: PostNaTela) => void;
   /** Levar esta publicação para o compositor de story. */
   aoStoryComPost?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
@@ -827,13 +857,22 @@ export const PostInstagram = memo(function PostInstagram({
    * encontro com o mesmo post, numa noite pior, chegaria sem aviso nenhum.
    */
   const [revelado, setRevelado] = useState(false);
-  /* A régua mora em `conteudo-sensivel.ts`: a AUTORA nunca vê o próprio post
-     borrado, e post não marcado nunca borra. */
-  const borrar = deveBorrar({
+  /**
+   * A régua mora em `conteudo-sensivel.ts`, e ela tem DUAS razões: a marca da
+   * autora e o FILTRO DE PALAVRAS dela.
+   *
+   * ⚠️ **O filtro não alcançava o feed** — protegia comentários e direct, e a
+   * palavra que ela escondeu a atingia rolando, no lugar mais exposto do app. O
+   * véu é o mesmo (caixa do tamanho da foto, sem mídia no DOM); o que muda é o
+   * rótulo, e é ele que ela lê antes de decidir.
+   */
+  const razaoDoVeu = veuDoPost({
     sensivel: !!post.sensivel,
+    batePalavra: !!post.batePalavraMinha,
     souAAutora: !!post.souAAutora,
     revelado,
   });
+  const borrar = razaoDoVeu !== null;
   /** `null` = não está editando. String = o texto em edição. */
   const [editando, setEditando] = useState<string | null>(null);
   const [salvandoTexto, setSalvandoTexto] = useState(false);
@@ -1111,7 +1150,11 @@ export const PostInstagram = memo(function PostInstagram({
           caixa menor, revelar empurraria o feed inteiro para baixo e ela
           perderia o lugar onde estava lendo. */}
       {post.imagemUrl && !post.videoUrl && borrar ? (
-        <Sensivel motivo={post.motivoSensivel} aoRevelar={() => setRevelado(true)}>
+        <Sensivel
+          motivo={post.motivoSensivel}
+          razao={razaoDoVeu ?? undefined}
+          aoRevelar={() => setRevelado(true)}
+        >
           <div className="aspect-[4/5] w-full bg-muted" />
         </Sensivel>
       ) : null}
@@ -1239,6 +1282,18 @@ export const PostInstagram = memo(function PostInstagram({
             className="press ml-auto flex h-11 w-11 items-center justify-center leading-none text-[15px]"
           >
             ↗
+          </button>
+        )}
+        {/* ⚠️ O LINK só aparece na PRÓPRIA publicação e na camada `publico` — e
+            o servidor reconfere as duas coisas. */}
+        {aoLinkPublico && post.souAAutora && post.visibilidade === "publico" && (
+          <button
+            type="button"
+            onClick={() => aoLinkPublico(post)}
+            aria-label="Link da publicação"
+            className="press flex h-11 w-11 items-center justify-center leading-none text-[15px]"
+          >
+            🔗
           </button>
         )}
         {/* 📖 **ADICIONAR AO SEU STORY.**
@@ -1522,7 +1577,11 @@ export const PostInstagram = memo(function PostInstagram({
           4G dela. */}
       {post.videoUrl &&
         (borrar ? (
-          <Sensivel motivo={post.motivoSensivel} aoRevelar={() => setRevelado(true)}>
+          <Sensivel
+            motivo={post.motivoSensivel}
+            razao={razaoDoVeu ?? undefined}
+            aoRevelar={() => setRevelado(true)}
+          >
             <div className="mt-1 aspect-[4/5] w-full bg-black" />
           </Sensivel>
         ) : (
@@ -1866,6 +1925,8 @@ export function TelaPrincipal({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** O link público desta publicação — ver `PostInstagram`. */
+  aoLinkPublico?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
   /** Abre a folha de mandar esta publicação para uma conversa. */
@@ -2750,6 +2811,9 @@ export function TelaDePerfil({
   temMais = false,
   aoAbrirLista,
   aoAbrirSalvos,
+  aoAbrirCurtidos,
+  aoAbrirEscondidos,
+  aoEsconderStory,
   aoBloquear,
   aoDenunciarPerfil,
   aoFavoritar,
@@ -2796,6 +2860,17 @@ export function TelaDePerfil({
   aoAbrirLista?: (tipo: "seguidores" | "seguindo") => void;
   /** Só no próprio perfil — a coleção é privada e não existe a de ninguém. */
   aoAbrirSalvos?: () => void;
+  /** Abre "o que eu reagi". Só no próprio perfil, como os salvos. */
+  aoAbrirCurtidos?: () => void;
+  /** Abre a lista de quem NÃO vê o meu story. Só no próprio perfil. */
+  aoAbrirEscondidos?: () => void;
+  /**
+   * Esconde o meu story DESTA pessoa — o "Ocultar story de" do Instagram.
+   *
+   * ⚠️ `undefined` no próprio perfil: esconder de si mesma tiraria a fileira
+   * dela da tela dela, e o servidor recusa de qualquer jeito.
+   */
+  aoEsconderStory?: () => void;
   /** Só no perfil de terceiro. */
   aoBloquear?: () => void;
   /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
@@ -2883,6 +2958,24 @@ export function TelaDePerfil({
   const abrirLista = agir(aoAbrirLista);
   const abrirSalvos = agir(aoAbrirSalvos);
   const bloquear = agir(aoBloquear);
+  /**
+   * ⚠️ **O ⋯ NÃO PODE SER GATEADO POR `bloquear`.** Ele era — e por isso
+   * "Story escondido de…", que é uma lista sobre os MEUS stories, morava
+   * dentro de um menu que só existe no perfil DOS OUTROS: no meu, onde ela
+   * é oferecida, não havia ⋯ nenhum. Recurso escrito, testado e sem porta.
+   *
+   * Achado abrindo a bancada — `tsc`, lint e a suíte inteira estavam verdes,
+   * porque o botão É renderizado no código; ele só nunca aparece onde importa.
+   */
+  const temOpcoes = !!(
+    bloquear ||
+    agir(aoEsconderStory) ||
+    agir(aoAbrirEscondidos) ||
+    aoSilenciar ||
+    aoFavoritar ||
+    aoRestringir ||
+    aoDenunciarPerfil
+  );
   const perguntar = agir(aoPerguntar);
 
   /* Só os POSTS aparecem na grade; o "Do bebê" é a aba própria. */
@@ -2927,7 +3020,21 @@ export function TelaDePerfil({
             <IconeMarcador cheio={false} />
           </button>
         )}
-        {bloquear && (
+        {/* ⚠️ **"O que eu reagi" é OUTRA coisa que os salvos**, e por isso tem
+            botão próprio: salvar é um gesto DELIBERADO de guardar; reagir é o
+            gesto rápido de quem passou por ali. É por esta lista que se
+            reencontra a publicação que ela viu, achou linda, e não guardou. */}
+        {agir(aoAbrirCurtidos) && (
+          <button
+            type="button"
+            onClick={aoAbrirCurtidos}
+            aria-label="O que você reagiu"
+            className="press flex h-11 w-11 items-center justify-center text-[15px] leading-none"
+          >
+            ♡
+          </button>
+        )}
+        {temOpcoes && (
           <button
             type="button"
             onClick={() => setConfirmandoBloqueio((v) => !v)}
@@ -2946,31 +3053,38 @@ export function TelaDePerfil({
           faz antes de fazer: desfaz o seguir nos dois sentidos e some com um
           do outro. Um "Bloquear" sem essa frase parece reversível — e é, mas
           o vínculo que ele desfez não volta sozinho. */}
-      {confirmandoBloqueio && bloquear && (
+      {confirmandoBloqueio && temOpcoes && (
         <div className="mx-4 mt-2 rounded-2xl border border-border bg-muted/40 p-3">
-          <p className="text-[13px] leading-snug">
-            Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
-            seguir.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmandoBloqueio(false)}
-              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
-            >
-              Não
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmandoBloqueio(false);
-                bloquear();
-              }}
-              className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
-            >
-              Bloquear
-            </button>
-          </div>
+          {/* ⚠️ **A CONFIRMAÇÃO DE BLOQUEIO É A ÚNICA PARTE QUE EXIGE
+              `bloquear`** — no meu próprio perfil o painel abre sem ela, com
+              as opções que são minhas. */}
+          {bloquear && (
+            <>
+              <p className="text-[13px] leading-snug">
+                Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
+                seguir.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBloqueio(false)}
+                  className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                >
+                  Não
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoBloqueio(false);
+                    bloquear();
+                  }}
+                  className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+                >
+                  Bloquear
+                </button>
+              </div>
+            </>
+          )}
 
           {/* ⚠️ **SILENCIAR É O DEGRAU DE BAIXO, e ele faltava.** Só existia
               bloquear — que desfaz o seguir nos dois sentidos e que a própria
@@ -3001,6 +3115,34 @@ export function TelaDePerfil({
               className="press block min-h-[44px] w-full text-left text-[14px]"
             >
               {perfil.favorita ? "Tirar dos favoritos" : "Adicionar aos favoritos"}
+            </button>
+          )}
+          {/* ⚠️ **ESCONDER O STORY é o degrau entre "nada" e "silenciar".** A
+              camada (`seguidores`/`amigas`) é grossa; isto é o "não quero que
+              ESTA pessoa veja". E o texto diz que é calado — sem a frase, ela
+              imagina que a pessoa é avisada, e não esconde. */}
+          {agir(aoEsconderStory) && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoEsconderStory?.();
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              Esconder meus stories de {perfil.nome}
+            </button>
+          )}
+          {agir(aoAbrirEscondidos) && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoAbrirEscondidos?.();
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              Story escondido de…
             </button>
           )}
           {aoSilenciar &&
@@ -3575,6 +3717,12 @@ type Onde =
   | { t: "arquivados" }
   | { t: "arquivo-stories" }
   | { t: "bloqueados" }
+  /** De quem eu escondi o meu story — o "Ocultar story de" do Instagram. */
+  | { t: "escondidos" }
+  /** O que eu reagi. É a lista que faltava ao lado dos salvos. */
+  | { t: "curtidos" }
+  /** O que aconteceu com o que eu denunciei. */
+  | { t: "desfechos" }
   | { t: "favoritas" }
   | { t: "busca" }
   | { t: "caixinha" }
@@ -3675,6 +3823,11 @@ export function RedeNoApp({
   const [arquivoStoriesInstavel, setArquivoStoriesInstavel] = useState(false);
   const [proximoArquivo, setProximoArquivo] = useState<string | null>(null);
   /** `null` = carregando · `[]` = ela não bloqueou ninguém · `"erro"` = não deu. */
+  const [escondidos, setEscondidos] = useState<PessoaNaLista[] | null>(null);
+  const [curtidos, setCurtidos] = useState<PostNaTela[] | null>(null);
+  const [desfechos, setDesfechos] = useState<
+    { id: string; alvo: string; motivo: string; em: string; desfecho: string | null }[] | null
+  >(null);
   const [bloqueados, setBloqueados] = useState<PessoaNaLista[] | "erro" | null>(null);
   /** A lista "ver primeiro". `"erro"` = a leitura falhou; `null` = carregando. */
   const [favoritas, setFavoritas] = useState<PostNaTela[] | "erro" | null>(null);
@@ -3991,6 +4144,7 @@ export function RedeNoApp({
     mandarParaConversa: (_p: PostNaTela) => {},
     republicar: (_p: PostNaTela) => {},
     compartilhar: (_p: PostNaTela) => {},
+    linkPublico: (_p: PostNaTela) => {},
     tocarStory: (_autorId: string) => {},
     ver: (_id: string) => {},
   });
@@ -4054,6 +4208,7 @@ export function RedeNoApp({
     mandarParaConversa: (p) => setMandandoPost(p.id),
     republicar: (p) => republicar(p),
     compartilhar: (p) => void compartilhar(p),
+    linkPublico: (p) => void abrirLinkPublico(p),
     tocarStory: (id) => void verStory(id),
     ver: (id) => marcarPostVisto(id),
   };
@@ -4112,6 +4267,9 @@ export function RedeNoApp({
        */
       republicar: (p: PostNaTela) => ultimas.current.republicar(p),
       compartilhar: (p: PostNaTela) => ultimas.current.compartilhar(p),
+      /* ⚠️ Pelo objeto estável, como as irmãs: um fecho novo por render faria o
+         `memo` errar em todo cartão do feed. */
+      linkPublico: (p: PostNaTela) => ultimas.current.linkPublico(p),
       tocarStory: (autorId: string) => ultimas.current.tocarStory(autorId),
       ver: (id: string) => ultimas.current.ver(id),
     }),
@@ -4412,11 +4570,50 @@ export function RedeNoApp({
 
   useEffect(() => {
     if (onde.t !== "novo" || !euId) return;
+    let doAparelho: RascunhoDoPost | null = null;
     try {
-      setRascunho(lerRascunho(localStorage.getItem(chaveDoRascunho(euId)), new Date()));
+      doAparelho = lerRascunho(localStorage.getItem(chaveDoRascunho(euId)), new Date());
     } catch {
-      setRascunho(null);
+      doAparelho = null;
     }
+    setRascunho(doAparelho);
+    /**
+     * ⚠️ **O DO APARELHO VENCE, sempre — e o do servidor só entra quando não há
+     * nenhum.**
+     *
+     * O do servidor pode ser de meia hora atrás, escrito no outro celular;
+     * sobrepô-lo ao que ela acabou de digitar aqui seria trocar o texto de agora
+     * pelo de antes, sem ela pedir. Ele existe para o caso que o `localStorage`
+     * não cobre: ela escreve no celular, o celular acaba, e ela abre no
+     * computador.
+     */
+    if (doAparelho) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { meuRascunho } = await import("@/lib/rede-social.functions");
+        const r = await meuRascunho({ data: { accessToken: t } });
+        if (!vivo || !r.ok || !r.rascunho) return;
+        /* ⚠️ Só o que o servidor guarda: os outros campos vêm do tipo, e
+           inventar enquete/marcadas a partir de um rascunho que não as tem
+           ofereceria de volta algo que ela nunca escreveu. */
+        setRascunho({
+          texto: r.rascunho.texto,
+          visibilidade: (r.rascunho.visibilidade ?? "amigas") as Visibilidade,
+          enquete: null,
+          comAula: false,
+          marcadas: [],
+          em: r.rascunho.em,
+        });
+      } catch {
+        /* Sem rede: fica o que o aparelho tem, que é o caso normal. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
     /* Só ao ENTRAR na tela: `euId` não muda dentro dela. */
   }, [onde.t, euId]);
 
@@ -4446,6 +4643,39 @@ export function RedeNoApp({
       } catch {
         /* sem armazenamento, ou cota cheia: o compositor segue funcionando */
       }
+      /**
+       * ⚠️ **E O SERVIDOR TAMBÉM — é a rede de segurança da TROCA DE CELULAR.**
+       *
+       * O rascunho do aparelho é mais rápido (não espera rede) e guarda o que o
+       * do servidor não guarda; ele CONTINUA sendo quem manda na tela. O do
+       * servidor existe para o caso que o `localStorage` não cobre: ela escreve
+       * no celular, o celular acaba, e ela abre no computador.
+       *
+       * ⚠️ **Sem `await`, e sem recado na tela.** O texto já está guardado no
+       * aparelho e está escrito na frente dela: um erro sobre uma rede de
+       * segurança faria ela achar que perdeu o que está vendo.
+       */
+      void (async () => {
+        try {
+          const t = await token();
+          if (!t) return;
+          const { salvarRascunho } = await import("@/lib/rede-social.functions");
+          await salvarRascunho({
+            data: {
+              accessToken: t,
+              texto: r?.texto ?? null,
+              visibilidade: r?.visibilidade ?? null,
+              /* ⚠️ O LUGAR não está no rascunho do aparelho (`RascunhoDoPost`
+                 guarda texto, camada, enquete, aula e marcadas). Mandar `null`
+                 aqui é honesto — a coluna existe para quando ele entrar, e
+                 inventar um campo que o tipo não tem só quebraria o `tsc`. */
+              lugar: null,
+            },
+          });
+        } catch {
+          /* Idem: o do aparelho já guardou. */
+        }
+      })();
     },
     [euId],
   );
@@ -5834,14 +6064,135 @@ export function RedeNoApp({
     }
   }
 
-  async function abrirLista(tipo: "seguidores" | "seguindo") {
+  /**
+   * ABRE O LINK PÚBLICO e o entrega pronto para colar.
+   *
+   * ⚠️ **Vai o LINK para a área de transferência, e não uma URL crua num
+   * `share` de arquivo.** Colado no WhatsApp, um endereço sozinho já diz o que
+   * é (o cartão do link mostra a foto); e é o mesmo caminho do convite das
+   * Amigas, que aprendeu isso da forma cara.
+   */
+  async function abrirLinkPublico(post: PostNaTela) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { linkPublicoDoPost } = await import("@/lib/rede-social.functions");
+      const r = await linkPublicoDoPost({ data: { accessToken: t, postId: post.id, abrir: true } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        /* ⚠️ Cada recusa tem recado PRÓPRIO: "não deu" sobre uma publicação que
+           ela fechou para as amigas não diz o que fazer diferente. */
+        return toast.error(
+          r.motivo === "nao_e_publico"
+            ? "Só publicação aberta a todo mundo tem link."
+            : r.motivo === "arquivado"
+              ? "Esta publicação está arquivada."
+              : "Não deu para gerar o link agora.",
+        );
+      }
+      const { linkDaPublicacao } = await import("@/lib/link-da-publicacao");
+      const url = linkDaPublicacao(r.codigo);
+      if (!url) return toast.error("Não deu para gerar o link agora.");
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copiado. Qualquer pessoa com ele abre esta publicação.");
+      } catch {
+        /* ⚠️ Sem área de transferência (navegador antigo, permissão negada), o
+           link NÃO se perde: ele aparece no recado para ela copiar à mão. */
+        toast.success(url);
+      }
+    } catch {
+      /* Sem rede: o botão continua ali. */
+    }
+  }
+
+  async function abrirEscondidos() {
+    setEscondidos(null);
+    setOnde({ t: "escondidos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusEscondidosDoStory } = await import("@/lib/rede-social.functions");
+      const r = await meusEscondidosDoStory({ data: { accessToken: t } });
+      /* ⚠️ Falha vira `"erro"`, e NUNCA lista vazia: "você não escondeu de
+         ninguém" faria ela esconder de novo, ou desistir. */
+      setEscondidos(r.ok ? r.gente : ("erro" as any));
+    } catch {
+      setEscondidos("erro" as any);
+    }
+  }
+
+  async function mostrarStoryDeNovo(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { esconderStoryDe } = await import("@/lib/rede-social.functions");
+      const r = await esconderStoryDe({ data: { accessToken: t, alvoId, esconder: false } });
+      const { toast } = await import("sonner");
+      if (!r.ok) return toast.error("Não deu para desfazer agora.");
+      /* A lista se corrige na tela sem esperar outra ida à rede. */
+      setEscondidos((v) => (Array.isArray(v) ? v.filter((p) => p.id !== alvoId) : v));
+      toast.success("Ela volta a ver seus stories.");
+    } catch {
+      /* Fica como está; o botão continua ali. */
+    }
+  }
+
+  async function esconderMeuStoryDe(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { esconderStoryDe } = await import("@/lib/rede-social.functions");
+      const r = await esconderStoryDe({ data: { accessToken: t, alvoId, esconder: true } });
+      const { toast } = await import("sonner");
+      /* ⚠️ O recado NÃO nomeia ninguém e diz que é calado: sem a segunda
+         frase, ela imagina que a pessoa foi avisada — e não esconde. */
+      if (!r.ok) return toast.error("Não deu para esconder agora.");
+      toast.success("Pronto. Ela não é avisada.");
+    } catch {
+      /* Idem. */
+    }
+  }
+
+  async function abrirCurtidos() {
+    setCurtidos(null);
+    setOnde({ t: "curtidos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusCurtidos } = await import("@/lib/rede-social.functions");
+      const r = await meusCurtidos({ data: { accessToken: t } });
+      setCurtidos(r.ok ? r.posts : ("erro" as any));
+    } catch {
+      setCurtidos("erro" as any);
+    }
+  }
+
+  async function abrirDesfechos() {
+    setDesfechos(null);
+    setOnde({ t: "desfechos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusDesfechos } = await import("@/lib/rede-social.functions");
+      const r = await meusDesfechos({ data: { accessToken: t } });
+      setDesfechos(r.ok ? r.desfechos : ("erro" as any));
+    } catch {
+      setDesfechos("erro" as any);
+    }
+  }
+
+  async function abrirLista(tipo: "seguidores" | "seguindo", alvoId?: string) {
     setGente([]);
     setOnde({ t: "lista", tipo });
     try {
       const t = await token();
       if (!t) return;
       const { listaDeGente } = await import("@/lib/rede-social.functions");
-      const r = await listaDeGente({ data: { accessToken: t, tipo } });
+      /* ⚠️ O alvo vai como está; quem confere se ela pode ver é o SERVIDOR
+         (`alcancaOPerfil`). Uma segunda régua aqui diria "indisponível" sobre um
+         perfil que o servidor abriria — ou o contrário, que é pior. */
+      const r = await listaDeGente({ data: { accessToken: t, tipo, alvoId } });
       if (r.ok) setGente(r.gente);
     } catch {
       /* Lista vazia; a tela já diz "ninguém por aqui ainda". */
@@ -6669,6 +7020,17 @@ export function RedeNoApp({
         aoTocar: () => void abrirBloqueados(),
       },
       {
+        /* ⚠️ **A DENÚNCIA PROMETIA "fica registrada para a gente olhar" e o
+           desfecho nunca voltava.** Denúncia sem retorno é a que ninguém faz
+           duas vezes — e aqui a alternativa é o bloqueio cego, que não deixa
+           rastro nenhum para a plataforma: a reincidente segue reincidindo, e a
+           próxima paciente recebe a mesma coisa. */
+        id: "desfechos",
+        rotulo: "Suas denúncias",
+        icone: "pessoa",
+        aoTocar: () => void abrirDesfechos(),
+      },
+      {
         id: "caixinha",
         rotulo: "Caixinha",
         icone: "balao",
@@ -7171,6 +7533,51 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "escondidos") {
+    /* ⚠️ **Sem esta tela o esconder é um beco sem saída.** Ele é CALADO e a
+       pessoa some da fileira dela, então desfazer exigiria lembrar de quem foi.
+       É o mesmo defeito que o bloqueio teve até ganhar a lista de bloqueados. */
+    return (
+      <ListaDeBloqueados
+        titulo="Story escondido de"
+        /* ⚠️ **O TEXTO PADRÃO É O DO BLOQUEIO, e aqui ele MENTE**: quem está
+           nesta lista continua vendo o perfil, as publicações e tudo o mais —
+           o que ela não vê é o story. Herdar "não vê você na Comunidade" faria
+           a paciente achar que escondeu muito mais do que escondeu. */
+        explicacao="Quem está aqui não vê os seus stories. O resto continua igual, e ninguém é avisada."
+        vazio="Você não escondeu seu story de ninguém."
+        rotuloDaAcao="Voltar a mostrar"
+        pessoas={escondidos}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDesbloquear={(id) => void mostrarStoryDeNovo(id)}
+        aoTentarDeNovo={() => void abrirEscondidos()}
+      />
+    );
+  }
+
+  if (onde.t === "curtidos") {
+    return (
+      <GradeSimples
+        titulo="O que você reagiu"
+        vazio="Você ainda não reagiu a nada."
+        posts={curtidos}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrirPost={(id) => void abrirPost(id)}
+        aoTentarDeNovo={() => void abrirCurtidos()}
+      />
+    );
+  }
+
+  if (onde.t === "desfechos") {
+    return (
+      <MeusDesfechos
+        desfechos={desfechos}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoTentarDeNovo={() => void abrirDesfechos()}
+      />
+    );
+  }
+
   if (onde.t === "bloqueados") {
     return (
       <ListaDeBloqueados
@@ -7313,6 +7720,7 @@ export function RedeNoApp({
            mandar para uma conversa, e nada na tela explicava a diferença. */
         aoRepublicar={acoes.republicar}
         aoCompartilhar={acoes.compartilhar}
+        aoLinkPublico={acoes.linkPublico}
         aoMandarParaConversa={acoes.mandarParaConversa}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -7385,8 +7793,18 @@ export function RedeNoApp({
         aoSeguirParecida={(id) => void seguirPessoa(id)}
         aoVerParecida={(id) => void abrirPerfil(id)}
         aoAbrirPost={abrirPost}
-        aoAbrirLista={perfil.souEu ? abrirLista : undefined}
+        /* ⚠️ **A LISTA ABRE EM QUALQUER PERFIL QUE ELA CONSEGUE VER** — decisão
+           do dono: "é pra usar as mesmas coisas que tem no Instagram". Ela era
+           oferecida só no próprio perfil. Quem decide de verdade é
+           `alcancaOPerfil`, no SERVIDOR: perfil público abre para qualquer uma,
+           fechado só para quem já foi aceita. */
+        aoAbrirLista={(tipo) => void abrirLista(tipo, perfil.id)}
         aoAbrirSalvos={perfil.souEu ? abrirSalvos : undefined}
+        aoAbrirCurtidos={perfil.souEu ? () => void abrirCurtidos() : undefined}
+        aoAbrirEscondidos={perfil.souEu ? () => void abrirEscondidos() : undefined}
+        /* ⚠️ Só no perfil de TERCEIRO: esconder de si mesma tiraria a fileira
+           dela da tela dela, e o servidor recusa de qualquer jeito. */
+        aoEsconderStory={perfil.souEu ? undefined : () => void esconderMeuStoryDe(perfil.id)}
         aoAbrirEspelho={
           perfil.souEu
             ? () => {
@@ -7490,6 +7908,7 @@ export function RedeNoApp({
         soSeguindo={soSeguindo}
         aoRepublicar={acoes.republicar}
         aoCompartilhar={acoes.compartilhar}
+        aoLinkPublico={acoes.linkPublico}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -8350,6 +8769,8 @@ export function TelaDoPost({
   aoRepublicar?: (post: PostNaTela) => void;
   /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
   aoCompartilhar?: (post: PostNaTela) => void;
+  /** O link público desta publicação — ver `PostInstagram`. */
+  aoLinkPublico?: (post: PostNaTela) => void;
   /** Abrir a página de uma `#`. */
   aoAbrirTag?: (tag: string) => void;
   /** Abre a folha de mandar esta publicação para uma conversa. */
@@ -12695,16 +13116,37 @@ function SeloOficial() {
  * prontuário. É o que torna a bancada possível sem uma linha de mudança no
  * comportamento.
  */
-export function ListaDeBloqueados({
-  pessoas,
+/**
+ * A lista de quem foi tirada de perto — bloqueadas, ou com o story escondido.
+ *
+ * ⚠️ **UMA tela para as duas, e não duas cópias.** O desenho é idêntico (lista
+ * com foto, nome e um botão de desfazer) e as duas existem pela MESMA razão:
+ * bloquear e esconder são gestos CALADOS, então sem uma lista a pessoa some e
+ * desfazer exigiria lembrar de quem foi. Duas cópias divergiriam no primeiro
+ * ajuste — e o estado que mais importa aqui (`"erro"`, que nunca pode virar
+ * "você não tem ninguém") ficaria certo numa e errado na outra.
+ */
+/**
+ * Uma grade com cabeçalho — os salvos, o que ela reagiu.
+ *
+ * ⚠️ **A grade é a MESMA `GradeDePosts` de todo lugar**, e não uma nova: a
+ * proporção da célula já mudou uma vez (1:1 → 3:4, em 2025), e duas cópias
+ * divergiriam na próxima.
+ */
+export function GradeSimples({
+  titulo,
+  vazio,
+  posts,
   aoVoltar,
-  aoDesbloquear,
+  aoAbrirPost,
   aoTentarDeNovo,
 }: {
-  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = ninguém. */
-  pessoas: PessoaNaLista[] | "erro" | null;
+  titulo: string;
+  vazio: string;
+  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = nada. */
+  posts: PostNaTela[] | "erro" | null;
   aoVoltar: () => void;
-  aoDesbloquear: (id: string) => void;
+  aoAbrirPost: (id: string) => void;
   aoTentarDeNovo: () => void;
 }) {
   return (
@@ -12718,15 +13160,163 @@ export function ListaDeBloqueados({
         >
           ‹
         </button>
-        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Bloqueados</h1>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">{titulo}</h1>
+      </header>
+      {posts === "erro" ? (
+        /* ⚠️ "Você não reagiu a nada" sobre uma falha de leitura é a frase mais
+           errada possível para quem reagiu a duzentas publicações. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : posts === null ? (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto aspect-[3/4] w-full" />
+          ))}
+        </div>
+      ) : (
+        <GradeDePosts posts={posts} vazio={vazio} aoAbrirPost={aoAbrirPost} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * O QUE ACONTECEU COM O QUE ELA DENUNCIOU.
+ *
+ * ⚠️ **A tela prometia "fica registrada para a gente olhar" e o desfecho nunca
+ * voltava.** Denúncia sem retorno é a que ninguém faz duas vezes — e aqui a
+ * alternativa é o bloqueio cego, que não deixa rastro nenhum para a plataforma:
+ * a reincidente segue reincidindo, e a próxima paciente recebe a mesma coisa.
+ *
+ * ⚠️ **NADA aqui nomeia a pessoa denunciada.** Nem o nome, nem a foto, nem o
+ * texto. Devolver quem foi transformaria a denúncia num canal de confronto — e
+ * a denúncia é justamente o caminho de quem NÃO quer confrontar.
+ */
+export function MeusDesfechos({
+  desfechos,
+  aoVoltar,
+  aoTentarDeNovo,
+}: {
+  desfechos:
+    | { id: string; alvo: string; motivo: string; em: string; desfecho: string | null }[]
+    | "erro"
+    | null;
+  aoVoltar: () => void;
+  aoTentarDeNovo: () => void;
+}) {
+  const oQueFoi = (d: string | null) =>
+    d === "removido"
+      ? "A publicação saiu do ar."
+      : d === "avisado"
+        ? "A conta foi avisada."
+        : d === "sem_acao"
+          ? "Olhamos e não encontramos motivo para agir."
+          : /* ⚠️ Sem a coluna do desfecho (banco antes do SQL), a linha continua
+               à mostra — só sem o "o que aconteceu". Esconder as denúncias
+               resolvidas por causa de um campo novo seria pior. */
+            "Já foi analisada.";
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Suas denúncias</h1>
+      </header>
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+        O que a gente fez com o que você denunciou. Ninguém sabe que foi você.
+      </p>
+      {desfechos === "erro" ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : desfechos === null ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto h-14 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : desfechos.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Nada por aqui. O que você denunciar aparece assim que a gente olhar.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {desfechos.map((d) => (
+            <li key={d.id} className="rounded-xl border border-border p-3">
+              <p className="text-[13px] font-semibold">{oQueFoi(d.desfecho)}</p>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                {d.alvo === "perfil" ? "Perfil" : d.alvo === "story" ? "Story" : "Publicação"} ·{" "}
+                {haQuantoPublicou(d.em, Date.now())}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function ListaDeBloqueados({
+  pessoas,
+  aoVoltar,
+  aoDesbloquear,
+  aoTentarDeNovo,
+  titulo = "Bloqueados",
+  explicacao = "Quem está aqui não vê você na Comunidade, e não é avisada de nada.",
+  vazio = "Você não bloqueou ninguém.",
+  rotuloDaAcao = "Desbloquear",
+}: {
+  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = ninguém. */
+  pessoas: PessoaNaLista[] | "erro" | null;
+  aoVoltar: () => void;
+  aoDesbloquear: (id: string) => void;
+  aoTentarDeNovo: () => void;
+  titulo?: string;
+  /** ⚠️ Diz o que a lista faz E o que ela NÃO faz — é o que separa a proteção
+      do confronto. Sem a frase, ela hesita em usar com alguém que conhece. */
+  explicacao?: string;
+  vazio?: string;
+  rotuloDaAcao?: string;
+}) {
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">{titulo}</h1>
       </header>
       {/* ⚠️ A explicação diz o que o bloqueio faz e o que ele NÃO faz — a
           pessoa bloqueada nunca é avisada, e isso é o que separa a proteção do
           confronto. Sem a frase, ela hesita em bloquear alguém que conhece da
           vida real. */}
-      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
-        Quem está aqui não vê você na Comunidade, e não é avisada de nada.
-      </p>
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">{explicacao}</p>
       {pessoas === "erro" ? (
         /* ⚠️ "Você não bloqueou ninguém" sobre uma falha de leitura a faria
            bloquear de novo — ou desistir de bloquear. */
@@ -12747,9 +13337,7 @@ export function ListaDeBloqueados({
           ))}
         </div>
       ) : pessoas.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">
-          Você não bloqueou ninguém.
-        </p>
+        <p className="py-16 text-center text-sm text-muted-foreground">{vazio}</p>
       ) : (
         <ul>
           {pessoas.map((p) => (
@@ -12761,7 +13349,7 @@ export function ListaDeBloqueados({
                 onClick={() => aoDesbloquear(p.id)}
                 className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
               >
-                Desbloquear
+                {rotuloDaAcao}
               </button>
             </li>
           ))}

@@ -74,6 +74,7 @@ import { Route as AcompanhanteRouteImport } from './routes/acompanhante'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VotarNomeTokenRouteImport } from './routes/votar-nome.$token'
+import { Route as PubCodigoRouteImport } from './routes/pub.$codigo'
 import { Route as PresenteTokenRouteImport } from './routes/presente.$token'
 import { Route as PCodigoRouteImport } from './routes/p.$codigo'
 import { Route as MedicosGoogleCallbackRouteImport } from './routes/medicos_.google-callback'
@@ -425,6 +426,11 @@ const VotarNomeTokenRoute = VotarNomeTokenRouteImport.update({
   path: '/votar-nome/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PubCodigoRoute = PubCodigoRouteImport.update({
+  id: '/pub/$codigo',
+  path: '/pub/$codigo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PresenteTokenRoute = PresenteTokenRouteImport.update({
   id: '/presente/$token',
   path: '/presente/$token',
@@ -638,6 +644,7 @@ export interface FileRoutesByFullPath {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -729,6 +736,7 @@ export interface FileRoutesByTo {
   '/medicos/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -822,6 +830,7 @@ export interface FileRoutesById {
   '/medicos_/google-callback': typeof MedicosGoogleCallbackRoute
   '/p/$codigo': typeof PCodigoRoute
   '/presente/$token': typeof PresenteTokenRoute
+  '/pub/$codigo': typeof PubCodigoRoute
   '/votar-nome/$token': typeof VotarNomeTokenRoute
   '/api/doctorthink/ask': typeof ApiDoctorthinkAskRoute
   '/api/doctorthink/train': typeof ApiDoctorthinkTrainRoute
@@ -915,6 +924,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1006,6 +1016,7 @@ export interface FileRouteTypes {
     | '/medicos/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1098,6 +1109,7 @@ export interface FileRouteTypes {
     | '/medicos_/google-callback'
     | '/p/$codigo'
     | '/presente/$token'
+    | '/pub/$codigo'
     | '/votar-nome/$token'
     | '/api/doctorthink/ask'
     | '/api/doctorthink/train'
@@ -1188,6 +1200,7 @@ export interface RootRouteChildren {
   MedicosGoogleCallbackRoute: typeof MedicosGoogleCallbackRoute
   PCodigoRoute: typeof PCodigoRoute
   PresenteTokenRoute: typeof PresenteTokenRoute
+  PubCodigoRoute: typeof PubCodigoRoute
   VotarNomeTokenRoute: typeof VotarNomeTokenRoute
   ApiDoctorthinkAskRoute: typeof ApiDoctorthinkAskRoute
   ApiDoctorthinkTrainRoute: typeof ApiDoctorthinkTrainRoute
@@ -1650,6 +1663,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VotarNomeTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pub/$codigo': {
+      id: '/pub/$codigo'
+      path: '/pub/$codigo'
+      fullPath: '/pub/$codigo'
+      preLoaderRoute: typeof PubCodigoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/presente/$token': {
       id: '/presente/$token'
       path: '/presente/$token'
@@ -1928,6 +1948,7 @@ const rootRouteChildren: RootRouteChildren = {
   MedicosGoogleCallbackRoute: MedicosGoogleCallbackRoute,
   PCodigoRoute: PCodigoRoute,
   PresenteTokenRoute: PresenteTokenRoute,
+  PubCodigoRoute: PubCodigoRoute,
   VotarNomeTokenRoute: VotarNomeTokenRoute,
   ApiDoctorthinkAskRoute: ApiDoctorthinkAskRoute,
   ApiDoctorthinkTrainRoute: ApiDoctorthinkTrainRoute,
