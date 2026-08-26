@@ -7799,7 +7799,13 @@ export function FolhaDeQuemReagiu({
  * indisponível". O pior caso é um toque que não leva a lugar nenhum — contra
  * uma legenda que carrega o feed inteiro.
  */
-function TextoComLinks({
+/**
+ * ⚠️ **EXPORTADA para o COMENTÁRIO, e não copiada.** O `@` já virava link na
+ * legenda do post e continuava texto cru embaixo dela — no lugar onde a menção
+ * é mais usada. Uma segunda implementação divergiria da primeira, e a
+ * divergência apareceria como o mesmo `@` sendo link num lugar e não no outro.
+ */
+export function TextoComLinks({
   texto,
   aoAbrirArroba,
   aoAbrirTag,

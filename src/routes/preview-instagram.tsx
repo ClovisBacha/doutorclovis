@@ -49,6 +49,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { Comentarios } from "@/components/rede-comentarios";
+import { chaveDoRascunhoDeComentario } from "@/lib/comentarios";
 import { FiltroDePalavras } from "@/components/rede-social";
 import { CaixaDeEntrada, Conversa, MandarPublicacao } from "@/components/rede-conversa";
 import type { Filho } from "@/lib/filhos";
@@ -109,6 +110,13 @@ export const Route = createFileRoute("/preview-instagram")({
        uma na tela da outra. */
     rascunhoStory: q.rascunhoStory == null ? 0 : Number(q.rascunhoStory),
     fixados: q.fixados == null ? 0 : Number(q.fixados),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. A ordem por
+       curtidas só se enxerga com um comentário muito curtido no meio da lista,
+       que é exatamente o que não se fabrica numa conta de teste. */
+    ordem: q.ordem == null ? "recentes" : String(q.ordem),
+    /* O rascunho guardado: sem isto ele exige fechar o app no meio de uma
+       frase e reabrir — o estado que ninguém confere por acaso. */
+    rascunhoComent: q.rascunhoComent == null ? 0 : Number(q.rascunhoComent),
     quadro: q.quadro == null ? 0 : Number(q.quadro),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     instavel: q.instavel == null ? 0 : Number(q.instavel),
@@ -403,6 +411,8 @@ function Bancada() {
     oculta,
     rascunhoStory,
     fixados,
+    ordem,
+    rascunhoComent,
     quadro,
     instavel,
     fechado,
@@ -1113,15 +1123,56 @@ function Bancada() {
         oculto: "palavra" as const,
         recolhido: true,
       },
+      /* ⚠️ **ESTE EXISTE PARA A ORDEM PODER MUDAR.** Sem um comentário TARDIO e
+         MUITO curtido, as duas ordens desenham exatamente a mesma lista — os
+         dados da bancada já vinham em curtidas decrescentes — e o seletor
+         parecia inerte na foto. Bancada que não consegue provar o recurso é
+         bancada que aprova qualquer coisa. */
+      {
+        id: "k5",
+        autorId: "u9",
+        autorNome: "Juliana",
+        autorAvatar: null,
+        texto: "@marina o meu passou depois da 32ª, aguenta firme 💛 #30semanas",
+        criadoEm: "2026-08-24T10:30:00Z",
+        possoApagar: false,
+        respondeA: null,
+        curtidas: 12,
+        euCurti: false,
+      },
     ];
+    /* ⚠️ **ESCREVE O STORAGE ANTES DE MONTAR, e não num efeito.** O componente
+       lê o rascunho na primeira renderização; gravado depois, a bancada
+       mostraria sempre o campo vazio — que é o único estado que ela não
+       precisava provar. Mesma lição da bancada do ritual de boas-vindas. */
+    if (rascunhoComent) {
+      try {
+        localStorage.setItem(
+          chaveDoRascunhoDeComentario("bancada", "00000000-0000-0000-0000-000000000001"),
+          "eu ia contar que comigo foi parec",
+        );
+      } catch {
+        /* Sem storage: a bancada abre sem o rascunho. */
+      }
+    }
     return (
       <div className="mx-auto max-w-[430px] pt-6">
         <Comentarios
           postId="00000000-0000-0000-0000-000000000001"
+          /* ⚠️ Sem os dois, `TextoComLinks` desenha o `@` como TEXTO — e a
+             bancada aprovaria uma menção que não vira link, que é justamente o
+             que faltava. */
+          aoAbrirArroba={(h) => alert(`abrir @${h}`)}
+          aoAbrirTag={(t) => alert(`abrir #${t}`)}
           bancada={{
             comentarios: meus,
             abertos: conversa !== "fechados",
             souADona: true,
+            /* ⚠️ A ordem vem por prop porque quem ordena é o SERVIDOR: sem
+               sessão, trocar o seletor não recarregaria nada e a bancada
+               mostraria um controle que não faz efeito. */
+            ordem: ordem === "relevantes" ? ("relevantes" as const) : ("recentes" as const),
+            euId: "bancada",
             curtidas: [
               { id: "u2", nome: "Carol", avatarUrl: null },
               { id: "u3", nome: "Bruna", avatarUrl: null },

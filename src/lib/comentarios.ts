@@ -410,3 +410,78 @@ export function ordenarComentariosComFixado<
   fixados.sort((a, b) => Date.parse(b.fixadoEm!) - Date.parse(a.fixadoEm!));
   return [...fixados, ...resto];
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A ORDEM DA CONVERSA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type OrdemDosComentarios = "recentes" | "relevantes";
+
+/**
+ * ⚠️ **"RELEVANTES" AQUI É CURTIDA, e o piso existe por isso.**
+ *
+ * É a única peça desta aba que ordena por engajamento — e ela é defensável
+ * porque o alcance é UM POST, e não o feed: aqui não há como um comentário
+ * "bombar" e chegar a quem não abriu a publicação. A régua que proíbe
+ * ranqueamento (o feed, o Explorar, as tags) protege contra o post da EMERGÊNCIA
+ * virar descoberta; um comentário nunca sai do post onde vive.
+ *
+ * ⚠️ **MAS O PADRÃO CONTINUA SENDO O TEMPO.** Conversa se lê na ordem em que
+ * aconteceu, e um post com poucos comentários — o caso de quase todos — fica
+ * IDÊNTICO nas duas ordens. Trocar o padrão só embaralharia a leitura para
+ * ganhar nada.
+ */
+export const ORDEM_PADRAO: OrdemDosComentarios = "recentes";
+
+/**
+ * ⚠️ **O FIXADO CONTINUA NO TOPO nas DUAS ordens.**
+ *
+ * Ele é curadoria da dona do post — uma decisão explícita —, e deixá-lo cair
+ * para o meio ao trocar a ordem transformaria a escolha dela em algo que a
+ * ordenação desfaz. Por isso a ordenação por relevância roda ANTES de
+ * `ordenarComentariosComFixado`, e nunca depois.
+ *
+ * ⚠️ **E o desempate é o TEMPO, sempre.** Sem ele, dois comentários com a mesma
+ * contagem trocam de lugar entre duas aberturas — e uma conversa que se mexe
+ * sozinha faz a paciente perder a linha do que estava lendo.
+ */
+export function ordenarComentarios<
+  T extends {
+    criadoEm: string;
+    curtidas?: number;
+    fixadoEm?: string | null;
+    respondeA?: string | null;
+  },
+>(comentarios: T[], ordem: OrdemDosComentarios): T[] {
+  if (ordem === "recentes") return ordenarComentariosComFixado(comentarios);
+  const porRelevancia = [...comentarios].sort((a, b) => {
+    const ca = a.curtidas ?? 0;
+    const cb = b.curtidas ?? 0;
+    if (ca !== cb) return cb - ca;
+    return Date.parse(a.criadoEm) - Date.parse(b.criadoEm);
+  });
+  return ordenarComentariosComFixado(porRelevancia);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   O RASCUNHO DO COMENTÁRIO
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **UM RASCUNHO POR PUBLICAÇÃO, e a chave carrega os DOIS ids.**
+ *
+ * O post, porque escrever numa publicação e encontrar aquele texto em OUTRA
+ * seria pior que perder o rascunho — ela mandaria para a pessoa errada. E a
+ * conta, porque o aparelho é compartilhado: o comentário que a mãe começou a
+ * escrever não pode aparecer para a filha que usa o mesmo celular.
+ *
+ * ⚠️ **E ele guarda SÓ O TEXTO.** O comentário não tem foto nem anexo; guardar
+ * a resposta pendente (`respondeA`) faria o rascunho reabrir apontando para um
+ * comentário que pode ter sido apagado — e o texto iria para a conversa errada.
+ */
+export function chaveDoRascunhoDeComentario(euId: string, postId: string): string {
+  return `dc-rede-coment-${euId}-${postId}`;
+}
+
+/** Abaixo disto não vale guardar: é uma palavra começada, não um rascunho. */
+export const RASCUNHO_MINIMO = 3;

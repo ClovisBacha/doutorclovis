@@ -6154,6 +6154,74 @@ sido aplicadas. Toda mutação por texto tem de ancorar na função (`indexOf` a
 partir do `export const`) e **falhar alto se o texto não mudou** — é a mesma
 armadilha de substring que `minhaColuna`/`minhaColunaDeLeitura` já custou aqui.
 
+### A conversa embaixo do post: menção, ordem e rascunho (ago/2026)
+
+⚠️ **PRECISO CORRIGIR A MINHA PRÓPRIA AUDITORIA: a menção JÁ EXISTIA no
+servidor.** `comentar` chama `avisarMencionadas` desde o primeiro dia — quem
+escreve `@fulana` num comentário sempre avisou a mencionada. O que faltava era
+a outra metade: na tela, o `@` continuava TEXTO CRU, no lugar onde a menção é
+mais usada. Metade do recurso funcionava e a outra metade não tinha como ser
+tocada. Minha varredura procurou por `acharMencoes` perto de `coment` e não
+achou o que estava escrito com outro nome — terceira vez nesta leva que listo
+como ausente uma coisa que existe.
+
+- **`TextoComLinks` foi EXPORTADA, nunca copiada** (`rede-instagram.tsx`). Duas
+  implementações do mesmo `@` divergiriam no primeiro conserto, e a divergência
+  apareceria como a menção virando link na legenda e não no comentário — sem
+  erro nenhum.
+- ⚠️ **Sem `aoAbrirArroba`, ela desenha texto.** A prop é opcional de propósito
+  (ver o comentário dela: `@` é handle, nunca id), então a bancada precisou
+  passar as duas — senão aprovaria uma menção que não vira link, que é
+  exatamente o que faltava.
+
+**A ordem por curtidas** (`ordenarComentarios`, `comentarios.ts`).
+
+- ⚠️ **É a única peça desta aba que ordena por ENGAJAMENTO, e é defensável
+  porque o alcance é UM POST.** A régua que proíbe ranqueamento (o feed, o
+  Explorar, as tags) existe para o post da EMERGÊNCIA não virar descoberta; um
+  comentário nunca sai do post onde vive.
+- ⚠️ **O padrão continua sendo o TEMPO.** Conversa se lê na ordem em que
+  aconteceu, e num post com poucos comentários — quase todos — as duas ordens
+  desenham a mesma lista.
+- ⚠️ **O FIXADO fica no topo nas DUAS ordens.** Ele é curadoria explícita da
+  dona; deixá-lo cair ao trocar a ordem faria a ordenação desfazer a escolha
+  dela. Por isso a relevância roda ANTES de `ordenarComentariosComFixado`.
+- ⚠️ **O desempate é o tempo, sempre** — sem ele, dois comentários com a mesma
+  contagem trocam de lugar entre duas aberturas, e uma conversa que se mexe
+  sozinha faz a leitora perder a linha.
+- ⚠️ **E o COMPONENTE desfazia a ordem do servidor.** A montagem da conversa
+  ordenava as raízes por `criadoEm` de forma incondicional, depois da resposta:
+  o seletor mudaria de cor e a lista ficaria idêntica. Foi LER a cadeia inteira
+  que pegou — cada metade estava certa sozinha, e nenhuma asserção chegava
+  perto. Hoje a régua da ordem é aplicada na montagem, com a ordem dentro.
+- **O seletor só aparece com 3+ comentários**: controle que não muda nada
+  ensina que os controles desta tela não valem — a mesma régua do "Hoje eu não
+  desço ao chão" da aba de exercícios.
+
+**O rascunho** (`chaveDoRascunhoDeComentario`).
+
+- ⚠️ **A chave carrega os DOIS ids.** O post, porque o texto reaparecer noutra
+  publicação faria ela mandar para a pessoa errada; a conta, porque o aparelho
+  é compartilhado.
+- ⚠️ **APAGA ANTES de limpar o campo.** O efeito de gravar tem 700 ms de
+  atraso: limpando primeiro, ele regravaria o comentário RECÉM PUBLICADO, que
+  reapareceria na próxima abertura. Mesmo defeito que o rascunho do post pagou.
+- ⚠️ **Não preenche por cima do que ela já digitou**, e o modo EDIÇÃO fica de
+  fora — ali o campo já carrega o comentário que ela está corrigindo.
+- ⚠️ **Guarda só o TEXTO.** Guardar `respondeA` faria o rascunho reabrir
+  apontando para um comentário que pode ter sido apagado, e o texto iria para a
+  conversa errada.
+
+⚠️ **E A BANCADA MENTIU DE DUAS FORMAS, as duas achadas na FOTO:** o efeito do
+rascunho começava com `if (bancada || …)`, então ela mostrava sempre o campo
+vazio — o único estado que não precisava provar; e os dados de exemplo já vinham
+em curtidas DECRESCENTES, então as duas ordens desenhavam a mesma lista e o
+seletor parecia inerte. Bancada que não consegue provar o recurso é bancada que
+aprova qualquer coisa.
+
+**Bancada:** `/preview-instagram?tela=comentarios` · `&ordem=relevantes` ·
+`&rascunhoComent=1` · `&conversa=fechados`.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

@@ -15,11 +15,16 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComentarioNaTela } from "@/lib/comentarios.functions";
+import { TextoComLinks } from "@/components/rede-instagram";
 import {
   LIMITE_DO_COMENTARIO,
+  ORDEM_PADRAO,
+  RASCUNHO_MINIMO,
   RESPOSTAS_VISIVEIS,
-  ordenarComentariosComFixado,
+  chaveDoRascunhoDeComentario,
+  ordenarComentarios,
 } from "@/lib/comentarios";
+import type { OrdemDosComentarios } from "@/lib/comentarios";
 
 async function token() {
   const { supabase } = await import("@/integrations/supabase/client");
@@ -30,10 +35,16 @@ async function token() {
 export function Comentarios({
   postId,
   aoAbrirPerfil,
+  aoAbrirArroba,
+  aoAbrirTag,
   bancada,
 }: {
   postId: string;
   aoAbrirPerfil?: (id: string) => void;
+  /** Abrir o perfil por trás de um `@` do comentário. */
+  aoAbrirArroba?: (handle: string) => void;
+  /** Abrir a página de uma `#` do comentário. */
+  aoAbrirTag?: (tag: string) => void;
   /** Só a bancada preenche — a lista vem do servidor e exige sessão. */
   bancada?: {
     comentarios: ComentarioNaTela[];
@@ -43,6 +54,9 @@ export function Comentarios({
     quemComenta?: string;
     /** Só a bancada: a lista de quem curtiu vem do servidor. */
     curtidas?: { id: string; nome: string; avatarUrl: string | null }[];
+    ordem?: OrdemDosComentarios;
+    /** Só a bancada: sem isto o rascunho não teria chave e ficaria invisível. */
+    euId?: string;
   };
 }) {
   const [lista, setLista] = useState<ComentarioNaTela[]>(bancada?.comentarios ?? []);
@@ -81,6 +95,9 @@ export function Comentarios({
    * nome errado.
    */
   const [respondendo, setRespondendo] = useState<{ raizId: string; nome: string } | null>(null);
+  const [ordem, setOrdem] = useState<OrdemDosComentarios>(bancada?.ordem ?? ORDEM_PADRAO);
+  /** Quem sou eu, para a chave do rascunho. Sem id, não guarda nada. */
+  const [euId, setEuId] = useState<string | null>(bancada?.euId ?? null);
   const campo = useRef<HTMLTextAreaElement | null>(null);
 
   /**
@@ -120,9 +137,25 @@ export function Comentarios({
      * anterior, ou por um pedido montado à mão) NÃO seja arrancada da conversa.
      * Aplicá-la duas vezes é inofensivo — ela é idempotente.
      */
+    /**
+     * ⚠️ **E A ORDEM ESCOLHIDA ENTRA AQUI, senão o `sort` acima a DESFAZ.**
+     *
+     * Esta linha ordenava as raízes por `criadoEm` de forma incondicional. Com
+     * o servidor devolvendo "mais curtidos", o componente reordenava tudo de
+     * volta por tempo assim que pintava: o seletor mudaria de cor e a lista
+     * ficaria idêntica — um controle que promete e não faz nada. Foi LER a
+     * cadeia inteira que pegou; nenhuma asserção estava perto disso, porque
+     * cada metade estava certa sozinha.
+     *
+     * Em "recentes" o comportamento é byte a byte o de antes: a régua só levanta
+     * o fixado e preserva a ordem que o `sort` de tempo acabou de estabelecer.
+     */
     const porId = new Map(saida.map((x) => [x.raiz.id, x]));
-    return ordenarComentariosComFixado(saida.map((x) => x.raiz)).map((r) => porId.get(r.id)!);
-  }, [lista]);
+    return ordenarComentarios(
+      saida.map((x) => x.raiz),
+      ordem,
+    ).map((r) => porId.get(r.id)!);
+  }, [lista, ordem]);
 
   function responderA(alvo: ComentarioNaTela, raiz?: ComentarioNaTela) {
     setRespondendo({ raizId: (raiz ?? alvo).id, nome: alvo.autorNome });
@@ -282,7 +315,7 @@ export function Comentarios({
       const t = await token();
       if (!t) return;
       const { comentariosDoPost } = await import("@/lib/comentarios.functions");
-      const r = await comentariosDoPost({ data: { accessToken: t, postId } });
+      const r = await comentariosDoPost({ data: { accessToken: t, postId, ordem } });
       if (r.ok) {
         setLista(r.comentarios);
         setAbertos(r.abertos);
@@ -300,11 +333,78 @@ export function Comentarios({
     } catch {
       /* A lista fica com o que já tinha. */
     }
-  }, [bancada, postId]);
+  }, [bancada, postId, ordem]);
 
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /* ⚠️ **A CHAVE PRECISA DE QUEM EU SOU, e por isso resolvo o id aqui.** O
+     aparelho é compartilhado: sem o id da conta, o comentário que a mãe começou
+     a escrever reabriria para a filha que usa o mesmo celular. */
+  useEffect(() => {
+    if (bancada) return;
+    let vivo = true;
+    void (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const u = await supabase.auth.getUser();
+      if (vivo) setEuId(u.data.user?.id ?? null);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [bancada]);
+
+  /* ⚠️ **OFERECE, NUNCA PREENCHE POR CIMA.** Se ela já começou a digitar antes
+     de o id resolver, o rascunho guardado não pode apagar o que está na tela —
+     é a mesma decisão do rascunho do post. E o modo edição fica de fora: ali o
+     campo já carrega o comentário que ela está corrigindo. */
+  const rascunhoLido = useRef(false);
+  useEffect(() => {
+    /* ⚠️ **A BANCADA NÃO É EXCLUÍDA AQUI, de propósito.** O rascunho é uma
+       leitura do storage local — não pede sessão nem servidor —, e com o
+       `bancada ||` na guarda a bancada mostrava SEMPRE o campo vazio: o único
+       estado que ela não precisava provar. A chave carrega o id da conta, e o
+       da bancada ("bancada") nunca colide com um uuid de verdade. */
+    if (!euId || rascunhoLido.current) return;
+    rascunhoLido.current = true;
+    try {
+      const guardado = localStorage.getItem(chaveDoRascunhoDeComentario(euId, postId));
+      if (guardado && !texto.trim()) setTexto(guardado);
+    } catch {
+      /* Sem storage (aba anônima, cota estourada): segue sem rascunho. */
+    }
+  }, [bancada, euId, postId, texto]);
+
+  useEffect(() => {
+    if (!euId || editando) return;
+    const chave = chaveDoRascunhoDeComentario(euId, postId);
+    const t = setTimeout(() => {
+      try {
+        if (texto.trim().length >= RASCUNHO_MINIMO) localStorage.setItem(chave, texto);
+        else localStorage.removeItem(chave);
+      } catch {
+        /* Cota estourada: perder o rascunho é melhor que derrubar a tela. */
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [bancada, euId, postId, texto, editando]);
+
+  /**
+   * ⚠️ **APAGA ANTES DE LIMPAR O CAMPO, nunca depois.** O efeito acima tem 700ms
+   * de atraso: limpando o campo primeiro, ele ainda regravaria — e como o texto
+   * já teria ido embora, o que ficaria guardado seria o comentário RECÉM
+   * PUBLICADO, reaparecendo na próxima abertura do post. Mesmo defeito que o
+   * rascunho do post pagou.
+   */
+  const esquecerRascunho = useCallback(() => {
+    if (!euId) return;
+    try {
+      localStorage.removeItem(chaveDoRascunhoDeComentario(euId, postId));
+    } catch {
+      /* Nada a fazer. */
+    }
+  }, [euId, postId]);
 
   async function enviar() {
     const t = texto.trim();
@@ -319,6 +419,7 @@ export function Comentarios({
         data: { accessToken: tk, postId, texto: t, respondeA: respondendo?.raizId },
       });
       if (r.ok) {
+        esquecerRascunho();
         setTexto("");
         /* ⚠️ **Sai do modo resposta DEPOIS de enviar.** Deixando ligado, a
            mensagem seguinte iria para a mesma conversa sem ela perceber — e a
@@ -419,6 +520,36 @@ export function Comentarios({
         )}
       </div>
 
+      {/* ⚠️ **O SELETOR SÓ APARECE COM CONVERSA PARA ORDENAR.** Num post com
+          dois comentários as duas ordens são a mesma lista, e um controle que
+          não muda nada ensina que os controles desta tela não valem — a mesma
+          régua do "Hoje eu não desço ao chão" da aba de exercícios, que só
+          aparece quando há chão a tirar. */}
+      {lista.length >= 3 && (
+        <div className="mb-2 flex items-center gap-1.5 text-[12px]">
+          <span className="text-muted-foreground">Ordenar por</span>
+          {(
+            [
+              ["recentes", "mais recentes"],
+              ["relevantes", "mais curtidos"],
+            ] as const
+          ).map(([valor, rotulo]) => (
+            <button
+              key={valor}
+              type="button"
+              onClick={() => setOrdem(valor)}
+              aria-pressed={ordem === valor}
+              /* 44px de alvo sem inchar a linha, como o "Fechar comentários". */
+              className={`press relative rounded-full px-2 py-1 after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-[''] ${
+                ordem === valor ? "bg-muted font-semibold text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
       {conversas.map(({ raiz, respostas }) => (
         <div key={raiz.id}>
           <Linha
@@ -427,6 +558,8 @@ export function Comentarios({
             aoApagar={setApagando}
             aoDenunciar={setDenunciando}
             aoCurtir={curtir}
+            aoAbrirArroba={aoAbrirArroba}
+            aoAbrirTag={aoAbrirTag}
             /* ⚠️ **COM OS COMENTÁRIOS FECHADOS, "Responder" NÃO EXISTE.** A dona
                pode fechar a qualquer momento, e o botão continuava em toda
                linha: tocar nele abria o modo resposta, ela escrevia, e o
@@ -459,6 +592,8 @@ export function Comentarios({
                 aoApagar={setApagando}
                 aoDenunciar={setDenunciando}
                 aoCurtir={curtir}
+                aoAbrirArroba={aoAbrirArroba}
+                aoAbrirTag={aoAbrirTag}
                 /* ⚠️ Responder a uma RESPOSTA cai na mesma conversa — a raiz é
                    sempre a mesma. É o que mantém um nível só. Ver
                    `raizDoComentario`. */
@@ -698,6 +833,8 @@ function Linha({
   aoApagar,
   aoDenunciar,
   aoCurtir,
+  aoAbrirArroba,
+  aoAbrirTag,
   aoResponder,
   aoFixar,
   aoEditar,
@@ -708,6 +845,10 @@ function Linha({
   aoApagar: (id: string) => void;
   aoDenunciar: (id: string) => void;
   aoCurtir: (c: ComentarioNaTela) => void;
+  /** Abrir o perfil por trás de um `@`. Sem a prop, o `@` fica texto. */
+  aoAbrirArroba?: (handle: string) => void;
+  /** Abrir a página de uma `#`. Sem a prop, a tag fica texto. */
+  aoAbrirTag?: (tag: string) => void;
   /** `undefined` = não oferece responder (comentários fechados). */
   aoResponder?: () => void;
   /** `undefined` = não é minha publicação, ou este não pode ser fixado. */
@@ -776,7 +917,18 @@ function Linha({
         ) : (
           <p className="text-[13px] leading-snug">
             <span className="font-semibold">{c.autorNome}</span>{" "}
-            <span className="whitespace-pre-wrap break-words">{c.texto}</span>
+            {/* ⚠️ **O `@` VIRA LINK AQUI TAMBÉM.** O servidor já avisava a
+                mencionada desde o primeiro dia (`avisarMencionadas` roda em
+                `comentar`), mas na tela o `@fulana` continuava texto cru — no
+                lugar onde a menção é MAIS usada. Metade do recurso funcionava e
+                a outra metade não tinha como ser tocada. */}
+            <span className="break-words">
+              <TextoComLinks
+                texto={c.texto}
+                aoAbrirArroba={aoAbrirArroba}
+                aoAbrirTag={aoAbrirTag}
+              />
+            </span>
             {/* ⚠️ **O SELO DE EDITADO NÃO É ENFEITE.** Quem respondeu respondeu
                 ao texto que estava lá; sem ele, uma edição posterior faz as
                 respostas parecerem sem sentido — ou faz a autora parecer ter

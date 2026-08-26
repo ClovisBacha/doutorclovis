@@ -166,7 +166,16 @@ async function postQueEuVejo(sb: any, postId: string, eu: string) {
 
 export const comentariosDoPost = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), postId: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        postId: z.string().uuid(),
+        /* ⚠️ **A ORDEM VEM DA TELA, e o padrão é o TEMPO.** Sem o `.catch`, um
+           valor estranho no corpo do pedido derrubaria os comentários inteiros
+           — uma lista que some por causa de um parâmetro de ordenação. */
+        ordem: z.enum(["recentes", "relevantes"]).catch("recentes").optional(),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
@@ -358,11 +367,11 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
        faria a lista pular de lugar depois da primeira pintura — e a régua tem
        de ser a mesma que decide quem PODE fixar, senão um `fixado_em` gravado
        numa resposta por uma versão anterior a arrancaria da conversa. */
-    const { ordenarComentariosComFixado } = await import("./comentarios");
+    const { ordenarComentarios, ORDEM_PADRAO } = await import("./comentarios");
 
     return {
       ok: true as const,
-      comentarios: ordenarComentariosComFixado(comentarios),
+      comentarios: ordenarComentarios(comentarios, data.ordem ?? ORDEM_PADRAO),
       abertos: post.comentarios_abertos !== false,
       souADona: post.autor_id === eu,
       /**

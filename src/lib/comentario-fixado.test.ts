@@ -182,8 +182,21 @@ describe("⚠️ a leitura entrega o que a tela precisa", () => {
     expect(C).toContain("souOAutor: c.autor_id === eu");
   });
 
-  test("⚠️ a ORDEM sai do servidor", () => {
-    expect(C).toContain("ordenarComentariosComFixado(comentarios)");
+  test("⚠️ a ORDEM sai do servidor, e passa pela régua", () => {
+    /**
+     * ⚠️ **A GARANTIA É "não devolve lista crua", nunca o nome da função.** A
+     * primeira versão deste teste cobrava `ordenarComentariosComFixado(...)`
+     * escrito à letra, e quebrou no dia em que a ordenação ganhou um segundo
+     * modo — reprovando uma mudança correta. O que importa é que a lista
+     * devolvida seja o RETORNO de uma ordenação vinda de `./comentarios`:
+     * ordenar na tela faria a lista pular de lugar depois da primeira pintura.
+     */
+    const devolvida = /comentarios:\s*(\w+)\(/.exec(C);
+    expect(devolvida).not.toBeNull();
+    const ordenador = devolvida![1];
+    expect(ordenador).toMatch(/^ordenarComentarios/);
+    expect(C).toContain(`{ ${ordenador}`);
+    expect(C).toContain('await import("./comentarios")');
   });
 
   test("⚠️ e o degrau desce UMA coluna por vez", () => {
