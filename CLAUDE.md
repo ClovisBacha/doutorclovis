@@ -101,6 +101,24 @@ principal e as outras branches ganham uma URL de **preview** automática.
 > Se a intenção era que a produção seguisse a `main`, quem conserta é o dono, no
 > painel da Vercel (a branch de produção do projeto, ou o domínio apontado para
 > esta branch). Não mexa nisso pelo repositório.
+>
+> ⚠️ **E ISSO DESTAPA UM BURACO DE VERIFICAÇÃO QUE JÁ EXISTIA:** a varredura de
+> bancadas da CI abre o servidor de DESENVOLVIMENTO, nunca o build de produção.
+> Enquanto havia preview isso era aceitável; sem preview, o build que a paciente
+> recebe é o único que ninguém abre num navegador.
+>
+> O que dá para conferir daqui, e foi conferido (ago/2026): as seis rotas
+> públicas respondem 200 e o HTML do SSR não traz a fronteira de erro ("Algo deu
+> errado"). O que **NÃO** dá: hidratação no build de produção — o Chromium não
+> atravessa o proxy do agente (`ERR_CONNECTION_RESET`), e o preset do Nitro é
+> `vercel`, cuja saída o `vite preview` não serve. Um `useSyncExternalStore`
+> devolvendo `[]` novo já deixou este app SEM ABRIR, e essa classe de defeito
+> mora exatamente aí.
+>
+> Quem quiser fechar o buraco: um preset `node-server` paralelo, servido em
+> 127.0.0.1 (que não passa pelo proxy), com a mesma varredura por cima. Não fiz
+> porque mexe na configuração de build para uma capacidade que ninguém pediu —
+> fica escrito para ser uma decisão, e não um esquecimento.
 
 ## Estrutura
 
