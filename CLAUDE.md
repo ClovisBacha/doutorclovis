@@ -9584,3 +9584,74 @@ resposta do meio que `registrarAtividade` já documenta — _silêncio TOTAL é 
 a catraca proíbe_.
 
 **Aplicar no Supabase:** `supabase/APLICAR_DIRECT_COMPLETO.sql`.
+
+## A descoberta: Explorar, tags em alta, parecidas e recentes (ago/2026)
+
+⚠️ **AS TRÊS PRIMEIRAS, no modelo do Instagram, SAEM DE ENGAJAMENTO. Aqui
+NENHUMA sai.** Numa base de gestação de alto risco, o post que mais engaja é o da
+EMERGÊNCIA — o sangramento, o susto, a internação. Um ranking que aprende isso põe
+o pior dia de uma paciente como a primeira coisa que as outras veem, e com
+desconhecidas. É a mesma decisão que fez o feed ser cronológico e a zona de
+sugestões existir sem placar.
+
+### Explorar
+
+A grade sai de `sugestoesDoFeed` — que **já é** a régua desta aba: perfil
+público, publicação pública, `podeVerPost` por cima, e ordenação por elos em
+comum e recência. Uma consulta própria aqui abriria a porta para "o que está
+bombando".
+
+- ⚠️ **A régua é DITA na tela** ("nada aqui é escolhido por número de reações").
+  Sem a frase, a paciente lê o Explorar como o Explorar que ela conhece.
+- ⚠️ **As tags vêm ANTES da grade**: elas são o caminho para um assunto, a grade é
+  o acaso. Quem abre com uma pergunta na cabeça encontra a pergunta primeiro.
+- ⚠️ **Post só de texto não vira quadrado cinza** — `postEhValido` aceita post sem
+  foto, e sem o ramo do texto ele apareceria vazio na grade.
+
+### As tags em alta
+
+⚠️ **"Em alta" aqui é FREQUÊNCIA** — quantas publicações usaram a tag. Uma tag é
+um assunto; quantas pessoas escreveram sobre ele é a única pergunta que a lista
+responde.
+
+- ⚠️ **PISO de duas publicações.** Uma tag usada uma vez não é assunto: é a frase
+  de uma pessoa, e pô-la numa lista de "em alta" a expõe a desconhecidas por
+  acidente.
+- ⚠️ **O empate desempata pela TAG.** Sem desempate fixo, a mesma lista troca de
+  ordem entre duas aberturas — e uma lista que se mexe sozinha ensina que ela não
+  significa nada.
+- ⚠️ **SÓ CONTA O QUE ELA PODERIA VER**, e a contagem passa por `montarPosts`.
+  Sobre a tabela inteira, a lista diria "#trigemeas (14)" e a página da tag
+  mostraria três — as outras onze são de perfis fechados, de quem a bloqueou ou de
+  quem está em luto. **O número tem de bater com o que a página entrega.**
+- Falha vira lista vazia, nunca erro: é acessório do Explorar.
+
+### ⚠️ "Contas parecidas" NÃO derivam do perfil aberto
+
+O Instagram monta essa fileira a partir de **quem a pessoa que você seguiu
+segue** — e isso, aqui, vazaria o grafo dela. A lista de seguidores deste app não
+é pública de propósito: num app de gestação de alto risco, quem acompanha quem é
+o círculo social da pessoa, e **"parecidas com a Ana" é a lista de amigas da Ana
+com outro nome**.
+
+O que chega são as sugeridas do MEU feed, ordenadas por elos COMIGO. É menos
+preciso, e é o único que não conta a vida de terceiro.
+
+⚠️ **E só aparecem DEPOIS de seguir.** Num perfil que ela ainda está decidindo se
+acompanha, a fileira vira uma vitrine de outras pessoas e a decisão que ela veio
+tomar fica em segundo plano.
+
+### As buscas recentes ficam no APARELHO
+
+⚠️ O que ela procura é nome de pessoas e de assuntos — e "quem eu procurei" é um
+dado que não precisa existir em lugar nenhum além da tela dela. É a mesma decisão
+da busca DENTRO da conversa.
+
+- ⚠️ **A chave carrega o id da conta**: o aparelho é compartilhado, e a lista de
+  quem a mãe procurou não pode aparecer para a filha que usa o mesmo celular.
+- ⚠️ **Guarda só o que ACHOU alguém.** Guardar toda tecla encheria o histórico com
+  prefixos ("a", "an", "ana"), e ele existe para ela voltar a uma busca que valeu.
+- **O histórico só aparece com o campo vazio** — enquanto ela digita, o que
+  importa é o resultado.
+
+**Sem SQL:** as quatro saem de tabelas e colunas que já existem.

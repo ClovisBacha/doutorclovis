@@ -244,3 +244,78 @@ export function intercalarDescobertas<T>(
   for (; fila < descobertas.length; fila++) saida.push(descobertas[fila]);
   return saida;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS TAGS EM ALTA
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type TagEmAlta = { tag: string; quantas: number };
+
+/**
+ * ⚠️ **"EM ALTA" AQUI É FREQUÊNCIA, e NUNCA engajamento.**
+ *
+ * É a mesma linha que a zona de sugestões traçou: numa base de gestação de alto
+ * risco, o post que mais engaja é o da EMERGÊNCIA — o sangramento, o susto, a
+ * internação. Uma lista de assuntos ordenada por reação poria o pior dia de
+ * alguém como "o que está bombando", e para desconhecidas.
+ *
+ * O que conta é quantas PUBLICAÇÕES usaram a tag. Uma tag é um assunto; quantas
+ * pessoas escreveram sobre ele é a única pergunta que a lista responde.
+ *
+ * ⚠️ **E há um PISO de duas publicações.** Uma tag usada uma vez não é assunto —
+ * é uma frase de uma pessoa, e pô-la numa lista de "em alta" a expõe a
+ * desconhecidas por acidente.
+ */
+export const MINIMO_PARA_ESTAR_EM_ALTA = 2;
+
+/**
+ * ⚠️ **A ORDEM DESEMPATA PELA TAG, e isso não é detalhe.** Sem desempate fixo, a
+ * mesma lista troca de ordem entre duas aberturas — e uma lista que se mexe
+ * sozinha ensina que ela não significa nada.
+ */
+export function ordenarTagsEmAlta(
+  contagem: ReadonlyMap<string, number> | Record<string, number>,
+  teto = 12,
+): TagEmAlta[] {
+  const entradas =
+    contagem instanceof Map ? [...contagem.entries()] : Object.entries(contagem ?? {});
+  return entradas
+    .map(([tag, quantas]) => ({ tag, quantas }))
+    .filter((t) => t.tag.trim().length > 0 && t.quantas >= MINIMO_PARA_ESTAR_EM_ALTA)
+    .sort((a, b) => (b.quantas === a.quantas ? a.tag.localeCompare(b.tag) : b.quantas - a.quantas))
+    .slice(0, teto);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AS BUSCAS RECENTES
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * ⚠️ **AS BUSCAS RECENTES FICAM NO APARELHO, e nunca no servidor.**
+ *
+ * O que ela procura na busca é o nome de pessoas e o nome de assuntos — e num
+ * app de gestação de alto risco, "quem eu procurei" é um dado que não precisa
+ * existir em lugar nenhum além da tela dela. É a mesma decisão da busca DENTRO
+ * da conversa, que roda local pelo mesmo motivo.
+ *
+ * ⚠️ **E a chave carrega o id da conta**: o aparelho é compartilhado, e a lista
+ * de quem a mãe procurou não pode aparecer para a filha que usa o mesmo
+ * celular.
+ */
+export const BUSCAS_RECENTES_MAX = 8;
+
+export function chaveDasBuscasRecentes(euId: string): string {
+  return `dc-rede-buscas-${euId}`;
+}
+
+/**
+ * ⚠️ **O TERMO NOVO VAI PARA O TOPO, e o repetido SOBE em vez de duplicar.**
+ * Sem a deduplicação, procurar "ana" três vezes enche a lista inteira com a
+ * mesma palavra — e o resto do histórico some por causa do teto.
+ */
+export function comBuscaNova(recentes: readonly string[], termo: string): string[] {
+  const t = termo.trim();
+  if (t.length < 2) return [...recentes];
+  const semEle = recentes.filter((r) => r.toLowerCase() !== t.toLowerCase());
+  return [t, ...semEle].slice(0, BUSCAS_RECENTES_MAX);
+}

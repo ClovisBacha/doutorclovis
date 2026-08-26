@@ -116,6 +116,7 @@ import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import { tagDaBusca } from "@/lib/mencoes";
+import { BUSCAS_RECENTES_MAX, chaveDasBuscasRecentes, comBuscaNova } from "@/lib/sugestoes";
 import { ChamarParaGrupo, ConversaDoGrupo, CriarGrupo, MeusGrupos } from "@/components/rede-grupo";
 import type { GrupoNaTela } from "@/lib/grupo.functions";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
@@ -2558,6 +2559,9 @@ export function TelaDePerfil({
   aoBloquear,
   aoDenunciarPerfil,
   aoFavoritar,
+  parecidas,
+  aoSeguirParecida,
+  aoVerParecida,
   aoSilenciar,
   aoRestringir,
   aoAbrirEspelho,
@@ -2594,6 +2598,17 @@ export function TelaDePerfil({
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
   /** Favoritar (ou tirar). O estado atual vem em `perfil.favorita`. */
   aoFavoritar?: (favoritar: boolean) => void;
+  /**
+   * Contas para descobrir depois de seguir alguém.
+   *
+   * ⚠️ **Elas NÃO derivam do perfil aberto** — ver o comentário no ponto de uso.
+   * A lista de seguidores deste app não é pública, e "parecidas com a Ana" seria
+   * a lista de amigas da Ana com outro nome.
+   */
+  parecidas?: PessoaNaLista[];
+  aoSeguirParecida?: (id: string) => void;
+  /** Abre o perfil de uma sugerida. Sem a prop, o cartão só oferece "Seguir". */
+  aoVerParecida?: (id: string) => void;
   /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
   aoSilenciar?: (silenciar: boolean, quais?: { calaPosts: boolean; calaStories: boolean }) => void;
   /**
@@ -2999,6 +3014,51 @@ export function TelaDePerfil({
             NOSSA aba para onde quiser — com a paciente achando que continua no
             app. E o texto mostra o endereço SEM o esquema, que é como as
             pessoas leem um link. */}
+        {/* ⚠️ **SÓ DEPOIS DE SEGUIR, e nunca antes.** A fileira existe para o
+            momento em que ela acabou de escolher alguém — mostrá-la num perfil
+            que ela ainda está decidindo se acompanha transforma a tela numa
+            vitrine de outras pessoas, e a decisão que ela veio tomar fica em
+            segundo plano. */}
+        {perfil.meuVinculo === "ativo" && !perfil.souEu && (parecidas ?? []).length > 0 && (
+          <section className="mt-3">
+            <h3 className="text-[13px] font-semibold">Talvez você conheça</h3>
+            {/* ⚠️ A régua é DITA: sem a frase, ela lê a fileira como "parecidas
+                com esta pessoa" — e este app não deriva nada do grafo de
+                terceiro. */}
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              Contas abertas com gente em comum com você.
+            </p>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {(parecidas ?? []).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex w-[104px] shrink-0 flex-col items-center gap-1 rounded-2xl border border-border p-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => aoVerParecida?.(p.id)}
+                    className="press flex flex-col items-center gap-1"
+                  >
+                    <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
+                    <span className="w-full truncate text-center text-[12px] font-medium">
+                      {p.nome}
+                    </span>
+                  </button>
+                  {aoSeguirParecida && (
+                    <button
+                      type="button"
+                      onClick={() => aoSeguirParecida(p.id)}
+                      className="press min-h-[44px] w-full rounded-full bg-primary px-2 text-[12px] font-semibold text-primary-foreground"
+                    >
+                      Seguir
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
         {perfil.bioLink && (
           <a
             href={perfil.bioLink}
@@ -3259,6 +3319,7 @@ type Onde =
   | { t: "caixinha" }
   | { t: "conversas" }
   | { t: "conversa" }
+  | { t: "explorar" }
   | { t: "grupo" }
   | { t: "grupo-novo" }
   | { t: "grupo-chamar" }
@@ -3347,6 +3408,15 @@ export function RedeNoApp({
   /** O story que está sendo mandado para uma conversa. */
   const [mandandoStory, setMandandoStory] = useState<string | null>(null);
   const [grupoAberto, setGrupoAberto] = useState<GrupoNaTela | null>(null);
+  /** A grade do Explorar. `"erro"` = a leitura falhou; `null` = carregando. */
+  const [explorar, setExplorar] = useState<
+    | {
+        posts: PostNaTela[];
+        tags: { tag: string; quantas: number }[];
+      }
+    | "erro"
+    | null
+  >(null);
   const [encaminhando, setEncaminhando] = useState<{
     deConversaId: string;
     mensagemId: string;
@@ -4592,6 +4662,41 @@ export function RedeNoApp({
       toast.success("Denúncia registrada. A gente vai olhar.");
     } catch {
       /* Sem rede, a folha fecha e nada é prometido. */
+    }
+  }
+
+  /**
+   * O EXPLORAR — e ele NÃO é um feed por relevância.
+   *
+   * ⚠️ **A grade sai de `sugestoesDoFeed`, que já é a régua desta aba:** perfil
+   * público, publicação pública, `podeVerPost` por cima, e ordenação por elos em
+   * comum e recência — nunca por engajamento. Uma consulta própria aqui abriria
+   * a porta para "o que está bombando", e numa base de alto risco o que mais
+   * engaja é o post da EMERGÊNCIA.
+   */
+  async function abrirExplorar() {
+    setOnde({ t: "explorar" });
+    setExplorar(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/rede-social.functions");
+      /* Grade e tags na MESMA onda: são independentes, e em série a lista de
+         assuntos só apareceria depois da grade inteira. */
+      const [sug, tg] = await Promise.all([
+        mod.sugestoesDoFeed({ data: { accessToken: t } }),
+        mod.tagsEmAlta({ data: { accessToken: t } }),
+      ]);
+      /* ⚠️ "Não há nada para descobrir" e "não carregou" são a mesma imagem e
+         conclusões opostas — a primeira faz ela convidar uma amiga, a segunda
+         faz ela achar que a rede morreu. */
+      if (!sug.ok) {
+        setExplorar("erro");
+        return;
+      }
+      setExplorar({ posts: sug.posts, tags: tg.ok ? tg.tags : [] });
+    } catch {
+      setExplorar("erro");
     }
   }
 
@@ -6125,6 +6230,12 @@ export function RedeNoApp({
            feed.** O feed continua cronológico — a razão está em `favoritar`:
            ranquear exigiria engajamento como sinal, e numa base de alto risco o
            post que mais engaja é o da EMERGÊNCIA. */
+        id: "explorar",
+        rotulo: "Explorar",
+        icone: "buscar",
+        aoTocar: () => void abrirExplorar(),
+      },
+      {
         id: "favoritas",
         rotulo: "Favoritas",
         icone: "coracao",
@@ -6446,6 +6557,7 @@ export function RedeNoApp({
         aoBuscar={buscar}
         aoAbrirPerfil={abrirPerfil}
         aoAbrirTag={acoes.abrirTag}
+        euId={euId}
       />
     );
   }
@@ -6457,6 +6569,114 @@ export function RedeNoApp({
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
       />
+    );
+  }
+
+  if (onde.t === "explorar") {
+    return (
+      <div className="mx-auto max-w-md pb-24">
+        <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "feed" })}
+            aria-label="Voltar"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+          >
+            ‹
+          </button>
+          <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Explorar</h1>
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "busca" })}
+            aria-label="Buscar"
+            className="press flex h-11 w-11 items-center justify-center text-[16px]"
+          >
+            🔍
+          </button>
+        </header>
+
+        {/* ⚠️ **A RÉGUA É DITA, e ela é o recurso.** Sem a frase, a paciente lê o
+            Explorar como "o que está bombando" — e este app decidiu não ter isso:
+            numa base de alto risco, o post que mais engaja é o da EMERGÊNCIA. */}
+        <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+          Publicações de quem deixou o perfil aberto. Nada aqui é escolhido por número de reações.
+        </p>
+
+        {explorar === "erro" ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+            <button
+              type="button"
+              onClick={() => void abrirExplorar()}
+              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        ) : explorar === null ? (
+          <div className="grid grid-cols-3 gap-0.5">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="dc-esqueleto aspect-[3/4] w-full" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* ⚠️ **AS TAGS VÊM ANTES DA GRADE**, e não depois: elas são o
+                caminho para um assunto, e a grade é o acaso. Quem abre o
+                Explorar com uma pergunta na cabeça encontra a pergunta
+                primeiro. */}
+            {explorar.tags.length > 0 && (
+              <div className="mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+                {explorar.tags.map((t) => (
+                  <button
+                    key={t.tag}
+                    type="button"
+                    onClick={() => acoes.abrirTag(t.tag)}
+                    className="press min-h-[44px] shrink-0 rounded-full border border-border px-3 text-[13px]"
+                  >
+                    #{t.tag}{" "}
+                    {/* ⚠️ O número é o de PUBLICAÇÕES, e ele bate com o que a
+                        página da tag entrega — a contagem passa pela mesma
+                        régua de visibilidade. */}
+                    <span className="tabular-nums text-muted-foreground">{t.quantas}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {explorar.posts.length === 0 ? (
+              <p className="px-6 py-16 text-center text-[13px] leading-snug text-muted-foreground">
+                Ainda não há nada para descobrir. Só aparece aqui quem deixou o perfil aberto.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-0.5">
+                {explorar.posts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => acoes.ver(p.id)}
+                    className="press relative aspect-[3/4] w-full overflow-hidden bg-muted"
+                  >
+                    {p.miniaturaUrl || p.imagemUrl ? (
+                      <img
+                        src={p.miniaturaUrl ?? p.imagemUrl ?? ""}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      /* ⚠️ Post só de texto existe (`postEhValido`), e sem este
+                         ramo ele viraria um quadrado cinza vazio na grade. */
+                      <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug">
+                        {p.texto}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
     );
   }
 
@@ -6722,6 +6942,24 @@ export function RedeNoApp({
         aoMandarMensagem={(id) => void abrirConversaCom(id)}
         aoVoltar={() => setOnde({ t: "feed" })}
         aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
+        /**
+         * ⚠️ **"CONTAS PARECIDAS" AQUI NÃO DERIVA DO PERFIL ABERTO, e essa é a
+         * decisão inteira.**
+         *
+         * O Instagram monta essa fileira a partir de quem a pessoa que você
+         * acabou de seguir segue — e isso, aqui, VAZARIA O GRAFO DELA. A lista
+         * de seguidores deste app não é pública de propósito: num app de
+         * gestação de alto risco, quem acompanha quem é o círculo social da
+         * pessoa, e "parecidas com a Ana" é a lista de amigas da Ana com outro
+         * nome.
+         *
+         * O que chega aqui são as sugeridas do MEU feed — as mesmas de
+         * `sugestoesDoFeed`, ordenadas por elos COMIGO e nunca por audiência. É
+         * menos preciso e é o único que não conta a vida de terceiro.
+         */
+        parecidas={pessoas.filter((p) => p.id !== perfil.id).slice(0, 6)}
+        aoSeguirParecida={(id) => void seguirPessoa(id)}
+        aoVerParecida={(id) => void abrirPerfil(id)}
         aoAbrirPost={abrirPost}
         aoAbrirLista={perfil.souEu ? abrirLista : undefined}
         aoAbrirSalvos={perfil.souEu ? abrirSalvos : undefined}
@@ -10228,7 +10466,10 @@ export function TelaDeBusca({
   aoBuscar,
   aoAbrirPerfil,
   aoAbrirTag,
+  euId,
 }: {
+  /** Só para a chave do histórico local — ver `chaveDasBuscasRecentes`. */
+  euId?: string | null;
   aoVoltar: () => void;
   aoBuscar: (termo: string) => Promise<PessoaNaLista[]>;
   aoAbrirPerfil?: (id: string) => void;
@@ -10238,6 +10479,37 @@ export function TelaDeBusca({
   const [termo, setTermo] = useState("");
   const [achados, setAchados] = useState<PessoaNaLista[]>([]);
   const [buscando, setBuscando] = useState(false);
+  /**
+   * ⚠️ **AS BUSCAS RECENTES FICAM NO APARELHO, e nunca no servidor.**
+   *
+   * O que ela procura é o nome de pessoas e de assuntos — e num app de gestação
+   * de alto risco, "quem eu procurei" é um dado que não precisa existir em lugar
+   * nenhum além da tela dela. É a mesma decisão da busca DENTRO da conversa.
+   *
+   * ⚠️ E a chave carrega o id da conta: o aparelho é compartilhado, e a lista de
+   * quem a mãe procurou não pode aparecer para a filha que usa o mesmo celular.
+   */
+  const [recentes, setRecentes] = useState<string[]>([]);
+  useEffect(() => {
+    if (!euId) return;
+    try {
+      const cru = localStorage.getItem(chaveDasBuscasRecentes(euId));
+      setRecentes(cru ? (JSON.parse(cru) as string[]).slice(0, BUSCAS_RECENTES_MAX) : []);
+    } catch {
+      /* Storage bloqueado (janela privada) — a busca funciona sem histórico. */
+    }
+  }, [euId]);
+
+  function guardarBusca(t: string) {
+    if (!euId) return;
+    const nova = comBuscaNova(recentes, t);
+    setRecentes(nova);
+    try {
+      localStorage.setItem(chaveDasBuscasRecentes(euId), JSON.stringify(nova));
+    } catch {
+      /* Sem storage, o histórico vive só nesta sessão. */
+    }
+  }
   /* ⚠️ Descarta resposta ATRASADA: quem digita "ana" dispara três buscas, e a
      de "an" pode voltar depois da de "ana". Mesma trava do `contatoDaPaciente`
      no painel do médico. */
@@ -10259,6 +10531,10 @@ export function TelaDeBusca({
       if (daVez.current !== meu) return;
       setAchados(r);
       setBuscando(false);
+      /* ⚠️ **GUARDA SÓ O QUE ACHOU ALGUÉM.** Guardar toda tecla digitada encheria
+         o histórico com prefixos ("a", "an", "ana") — e o histórico existe para
+         ela voltar a uma busca que valeu. */
+      if (r.length > 0) guardarBusca(t);
     }, 450);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -10327,11 +10603,50 @@ export function TelaDeBusca({
            abriu o perfil aparece na busca. Sem isso, procurar a irmã e não
            achar lê como app quebrado — quando na verdade a irmã está protegida
            exatamente como escolheu. */
-        <p className="px-6 py-10 text-center text-[13px] leading-snug text-muted-foreground">
-          {termo.trim()
-            ? "Ninguém com esse nome por aqui. Só aparece na busca quem deixou o perfil público."
-            : "Procure por alguém que você já conhece."}
-        </p>
+        <>
+          {/* ⚠️ **O HISTÓRICO SÓ APARECE COM O CAMPO VAZIO.** Enquanto ela
+              digita, o que importa é o resultado — e uma lista de buscas antigas
+              embaixo de "ninguém com esse nome" competiria com a explicação que
+              ensina a régua. */}
+          {!termo.trim() && recentes.length > 0 && (
+            <div className="px-4 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-semibold text-muted-foreground">Recentes</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecentes([]);
+                    try {
+                      if (euId) localStorage.removeItem(chaveDasBuscasRecentes(euId));
+                    } catch {
+                      /* Sem storage, some só desta sessão. */
+                    }
+                  }}
+                  className="press min-h-[44px] text-[12px] text-muted-foreground"
+                >
+                  Limpar
+                </button>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {recentes.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTermo(r)}
+                    className="press min-h-[44px] rounded-full border border-border px-3 text-[13px]"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="px-6 py-10 text-center text-[13px] leading-snug text-muted-foreground">
+            {termo.trim()
+              ? "Ninguém com esse nome por aqui. Só aparece na busca quem deixou o perfil público."
+              : "Procure por alguém que você já conhece."}
+          </p>
+        </>
       ) : (
         <ul>
           {achados.map((p) => (

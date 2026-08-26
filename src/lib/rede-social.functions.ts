@@ -6983,3 +6983,71 @@ export const favoritar = createServerFn({ method: "POST" })
     }
     return { ok: true as const };
   });
+
+/**
+ * AS TAGS EM ALTA — frequência, e nunca engajamento.
+ *
+ * ⚠️ **A régua vive em `sugestoes.ts`**, junto com a decisão que a explica:
+ * numa base de gestação de alto risco, o post que mais engaja é o da
+ * EMERGÊNCIA, e uma lista de assuntos ordenada por reação poria o pior dia de
+ * alguém como "o que está bombando".
+ *
+ * ⚠️ **SÓ CONTA PUBLICAÇÃO QUE ELA PODERIA VER.** Uma contagem sobre a tabela
+ * inteira diria "#trigemeas (14)" e a página da tag mostraria três — porque as
+ * outras onze são de perfis fechados, de quem a bloqueou ou de quem está em
+ * luto. O número tem de bater com o que a página entrega.
+ */
+export const tagsEmAlta = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    if (await euEmCuidado(sb, eu)) return { ok: true as const, tags: [] };
+
+    /* ⚠️ **A JANELA É DE 30 DIAS**, e o corte é de gestação: um assunto de
+       quatro meses atrás é de OUTRO trimestre. É a mesma janela da zona de
+       sugestões, pela mesma razão. */
+    const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const { data: recentes, error } = await sb
+      .from("rede_posts")
+      .select("id")
+      .eq("visibilidade", "publico")
+      .is("arquivado_em", null)
+      .gte("criado_em", desde)
+      .order("criado_em", { ascending: false })
+      .limit(400);
+    /* Sem a tabela ou sem posts, a lista simplesmente não existe — nunca um
+       erro na tela por causa de um acessório. */
+    if (error) return { ok: true as const, tags: [] };
+
+    const ids = ((recentes ?? []) as { id: string }[]).map((p) => p.id);
+    if (ids.length === 0) return { ok: true as const, tags: [] };
+
+    const { data: linhas, error: erroTags } = await sb
+      .from("rede_tags")
+      .select("post_id, tag")
+      .in("post_id", ids);
+    if (erroTags) return { ok: true as const, tags: [] };
+
+    /* ⚠️ **A RÉGUA DE VISIBILIDADE roda por CIMA**, e é ela que faz o número
+       bater com a página. `montarPosts` é quem aplica `podeVerPost`, assina as
+       URLs e filtra bloqueio e luto — reusá-la é mais caro que contar direto, e
+       é a única forma de o "(14)" não ser mentira. */
+    const ctx = await contextoDe(sb, eu);
+    const comTag = [...new Set(((linhas ?? []) as { post_id: string }[]).map((l) => l.post_id))];
+    const crus = await postsCrus(sb, (base) =>
+      base.in("id", comTag.slice(0, 200)).is("arquivado_em", null),
+    );
+    const visiveis = new Set((await montarPosts(sb, eu, crus, ctx)).map((p) => p.id));
+
+    const contagem = new Map<string, number>();
+    for (const l of (linhas ?? []) as { post_id: string; tag: string }[]) {
+      if (!visiveis.has(l.post_id)) continue;
+      contagem.set(l.tag, (contagem.get(l.tag) ?? 0) + 1);
+    }
+    const { ordenarTagsEmAlta } = await import("./sugestoes");
+    return { ok: true as const, tags: ordenarTagsEmAlta(contagem) };
+  });
