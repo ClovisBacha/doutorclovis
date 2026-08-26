@@ -2742,6 +2742,7 @@ export function PerfilCarregando({
 export function TelaDePerfil({
   perfil,
   posts,
+  album,
   aoSeguir,
   aoVoltar,
   aoAbrirPost,
@@ -2766,6 +2767,16 @@ export function TelaDePerfil({
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
+  /**
+   * O álbum da gestação — as MESMAS publicações, do começo, por semana.
+   *
+   * ⚠️ **Só no perfil DELA.** Agrupar por semana carimba uma linha do tempo
+   * gestacional em cada publicação; num perfil que outra pessoa abre, os
+   * títulos "22 semanas" publicariam a semana de TODO post, por cima da chave
+   * `mostrar_semana`. Quem monta é `meuAlbum`, no servidor, que não tem
+   * `alvoId` — aqui a lista simplesmente não chega para terceiros.
+   */
+  album?: { chave: string; titulo: string; posts: PostNaTela[] }[] | null;
   aoSeguir?: () => void;
   aoVoltar?: () => void;
   aoAbrirPost?: (id: string) => void;
@@ -2850,6 +2861,17 @@ export function TelaDePerfil({
   aoMandarMensagem?: (id: string) => void;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
+  /**
+   * Grade ou álbum.
+   *
+   * ⚠️ **Um seletor DENTRO de "Publicações", e não uma terceira aba.** Uma aba
+   * que só existe no perfil dela mudaria a barra entre um perfil e outro — e
+   * este repositório já decidiu que a barra tem DUAS abas, porque "três abas
+   * vazias ao lado de uma cheia entregam a sensação de um app pela metade". O
+   * álbum é a MESMA coleção lida de outro jeito, que é exatamente a relação que
+   * o seletor de ordem dos comentários já modela.
+   */
+  const [comoAlbum, setComoAlbum] = useState(false);
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
   const [denunciandoPerfil, setDenunciandoPerfil] = useState(false);
   const [confirmandoCodigo, setConfirmandoCodigo] = useState(false);
@@ -3418,16 +3440,62 @@ export function TelaDePerfil({
       </div>
 
       {aba === "grade" ? (
-        /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
-           divergiriam na primeira vez que a proporção da célula mudasse, e ela
-           já mudou uma vez (1:1 → 3:4, em 2025). */
-        <GradeDePosts
-          posts={naGrade}
-          vazio="Nenhuma publicação ainda."
-          aoAbrirPost={abrirPost}
-          aoChegarNoFim={aoChegarNoFim}
-          temMais={temMais}
-        />
+        <>
+          {/* ⚠️ **O SELETOR SÓ APARECE QUANDO MUDA ALGUMA COISA.** Com menos de
+              duas seções o álbum é a grade com um título em cima, e um controle
+              que não muda nada ensina que os controles desta tela não valem —
+              a mesma régua do "Hoje eu não desço ao chão" e do seletor de ordem
+              dos comentários. */}
+          {(album?.length ?? 0) >= 2 && (
+            <div className="flex gap-1 px-3 pt-3">
+              {[
+                { v: false, r: "Grade" },
+                { v: true, r: "Álbum" },
+              ].map((o) => (
+                <button
+                  key={o.r}
+                  type="button"
+                  onClick={() => setComoAlbum(o.v)}
+                  aria-pressed={comoAlbum === o.v}
+                  className={`press min-h-[44px] rounded-full px-4 text-[13px] font-medium ${
+                    comoAlbum === o.v
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {o.r}
+                </button>
+              ))}
+            </div>
+          )}
+          {comoAlbum && album ? (
+            /* ⚠️ **A MESMA `GradeDePosts` por seção**, e nunca uma grade nova:
+                a proporção da célula já mudou uma vez (1:1 → 3:4, em 2025), e
+                duas cópias divergiriam na próxima.
+                ⚠️ E sem sentinela aqui — o álbum vem inteiro do servidor numa
+                consulta só; a paginação é da grade cronológica. */
+            <div>
+              {album.map((s) => (
+                <section key={s.chave}>
+                  <h2 className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted-foreground">
+                    {s.titulo}
+                  </h2>
+                  <GradeDePosts posts={s.posts} vazio="" aoAbrirPost={abrirPost} />
+                </section>
+              ))}
+            </div>
+          ) : (
+            /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
+               divergiriam na primeira vez que a proporção da célula mudasse. */
+            <GradeDePosts
+              posts={naGrade}
+              vazio="Nenhuma publicação ainda."
+              aoAbrirPost={abrirPost}
+              aoChegarNoFim={aoChegarNoFim}
+              temMais={temMais}
+            />
+          )}
+        </>
       ) : perfil.bebe ? (
         /* ⚠️ Esta aba existia VAZIA desde o primeiro dia, prometendo "os marcos
             da gestação vão aparecer aqui 💛" — em qualquer perfil, inclusive o
@@ -3702,6 +3770,16 @@ export function RedeNoApp({
    * perda.
    */
   const [memoria, setMemoria] = useState<{ post: PostNaTela; texto: string } | null>(null);
+  /**
+   * O álbum da gestação — só do MEU perfil.
+   *
+   * ⚠️ Quem monta é `meuAlbum`, que não tem `alvoId`: mesmo que esta tela
+   * pedisse o álbum de outra pessoa, o servidor devolveria o dela. Aqui a
+   * consulta nem sai quando o perfil aberto não é o meu.
+   */
+  const [album, setAlbum] = useState<
+    { chave: string; titulo: string; posts: PostNaTela[] }[] | null
+  >(null);
   const [lembreteEntao, setLembreteEntao] = useState<{
     id: string;
     imagemUrl: string;
@@ -4265,6 +4343,37 @@ export function RedeNoApp({
       vivo = false;
     };
   }, [onde.t, euId]);
+
+  /**
+   * O ÁLBUM — buscado só quando o perfil aberto é o MEU.
+   *
+   * ⚠️ **A consulta nem sai para o perfil de terceiro**, e isso é cinto sobre
+   * suspensório: `meuAlbum` não tem `alvoId`, então ela devolveria o MEU álbum
+   * de qualquer jeito — e desenhá-lo no perfil de outra pessoa seria pior que
+   * não tê-lo. Aqui a corrente fecha nos dois lados.
+   */
+  useEffect(() => {
+    if (onde.t !== "perfil" || !perfil?.souEu) {
+      setAlbum(null);
+      return;
+    }
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { meuAlbum } = await import("@/lib/rede-social.functions");
+        const r = await meuAlbum({ data: { accessToken: t } });
+        if (!vivo) return;
+        setAlbum(r.ok ? r.secoes : null);
+      } catch {
+        if (vivo) setAlbum(null);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, perfil?.souEu, perfil?.id]);
 
   /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
@@ -7251,6 +7360,7 @@ export function RedeNoApp({
       <TelaDePerfil
         perfil={perfil}
         posts={doPerfil}
+        album={perfil.souEu ? album : null}
         aoChegarNoFim={maisDoPerfil}
         temMais={!!proximoDoPerfil}
         aoMandarMensagem={(id) => void abrirConversaCom(id)}

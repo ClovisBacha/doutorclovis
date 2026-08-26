@@ -6803,6 +6803,76 @@ publicação de um ano atrás, do mesmo ciclo, de quem já registrou o nasciment
 some para sempre depois de aparecer uma vez. Sem ela, olhar este cartão exigiria
 uma conta com um ano de uso e acertar a janela de três dias.
 
+### O álbum da gestação — a grade lida do começo (ago/2026)
+
+A grade do perfil é cronológica INVERSA, como toda grade: o mais novo primeiro.
+Isso serve para "o que ela andou publicando" e é péssimo para a pergunta que
+este app promete responder — **"como foi a minha gestação?"**. O álbum é a mesma
+coleção lida do começo, agrupada pela semana em que cada publicação nasceu.
+
+#### ⚠️ É SÓ DELA, e isso não é preferência: é o que impede um vazamento
+
+Agrupar por semana carimba uma linha do tempo GESTACIONAL em cada publicação.
+Num perfil que outra pessoa abre, os títulos "22 semanas" / "30 semanas"
+publicariam a semana de TODO post — **passando por cima da chave
+`mostrar_semana`**, que existe exatamente para essa decisão ser dela, por
+publicação.
+
+A corrente fecha em TRÊS pontos, e os três têm teste: `meuAlbum` **não tem
+`alvoId`** (o recorte é a sessão e nada mais), a tela **não pede** o álbum
+quando o perfil aberto não é o dela, e a **prop não é passada** nesse caso.
+
+⚠️ **E a semana é calculada no SERVIDOR.** `lmp_date` nunca viaja para o
+navegador — é o que sustenta a chave. A tela recebe títulos prontos.
+
+#### As recusas da régua
+
+- ⚠️ **`semanaDoPost` devolve `null` em vez de chutar.** Publicação anterior à
+  DUM (a conta é mais velha que a gestação) ou posterior à 42ª semana não tem
+  semana gestacional; chutar uma poria "38 semanas" numa foto tirada depois do
+  parto.
+- ⚠️ **O título é "Depois", e NUNCA "Pós-parto".** O app não sabe se houve
+  parto: só que a publicação nasceu passada a 42ª semana. Nomear o desfecho é o
+  tipo de afirmação que este app não faz.
+- ⚠️ **Semana VAZIA não vira seção.** Um "17 semanas" em branco transforma a
+  ausência em cobrança — houve semanas em que ela não teve o que publicar.
+- ⚠️ **Sem DUM não há álbum**: toda semana seria chute.
+- **Uma seção por SEMANA, não por trimestre**: trimestre daria três blocos
+  gigantes, ou seja, a mesma grade com três títulos.
+
+#### ⚠️ NADA em Modo Cuidado — e a distinção importa
+
+As publicações dela continuam na grade: esconder o que ela escreveu seria o app
+apagar o bebê dela (a mesma linha que manteve `podeVerPost` devolvendo `true`
+para a autora em luto). O que não é oferecido é o app **ORGANIZAR** aquilo numa
+narrativa gestacional semana a semana. O que some é a moldura, não a memória.
+
+#### Um SELETOR, e não uma terceira aba
+
+Uma aba que só existisse no perfil dela mudaria a barra entre um perfil e
+outro — e este repositório já decidiu que a barra tem DUAS abas, porque "três
+abas vazias ao lado de uma cheia entregam a sensação de um app pela metade". O
+álbum é a MESMA coleção lida de outro jeito, que é exatamente a relação que o
+seletor de ordem dos comentários já modela.
+
+⚠️ **E ele só aparece com duas seções ou mais**: com uma, o álbum é a grade com
+um título em cima, e um controle que não muda nada ensina que os controles desta
+tela não valem. ⚠️ **Começa em GRADE** — o álbum é a escolha, não o padrão.
+
+⚠️ **A MESMA `GradeDePosts` por seção**, nunca uma grade nova: a proporção da
+célula já mudou uma vez (1:1 → 3:4, em 2025), e duas cópias divergiriam na
+próxima.
+
+⚠️ **E uma lição de verificação:** a primeira checagem no navegador varria a
+PÁGINA INTEIRA atrás de "pós-parto" e acusou — era o rodapé do site ("do
+positivo ao pós-parto"). A asserção certa olha os **títulos das seções**, não o
+documento. Medir a coisa errada dá o mesmo vermelho que medir a certa.
+
+**Bancada:** `/preview-instagram?tela=perfil&meu=1&album=1` — o álbum só nasce
+de uma conta com uma gestação inteira publicada, e as seções saem da DUM, que
+nunca chega ao navegador. `?album=1` SEM `?meu=1` prova que a lista não é
+oferecida a terceiros.
+
 ## ⚠️ A AUDITORIA DA COMUNIDADE, e os dezoito defeitos que ela achou (ago/2026)
 
 Pedido do dono: _"rode um loop de agentes verificando cada etapa e se ela conecta

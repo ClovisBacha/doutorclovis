@@ -16,9 +16,21 @@ const SERVIDOR = readFileSync("src/lib/rede-social.functions.ts", "utf8");
 const TELA = readFileSync("src/components/rede-instagram.tsx", "utf8");
 const REGUA = readFileSync("src/lib/memorias.ts", "utf8");
 
+/**
+ * Recorta uma função, **sem o bloco de doc do vizinho**.
+ *
+ * ⚠️ A primeira versão fatiava até o próximo `export const` — e o bloco `/**`
+ * que EXPLICA a função seguinte fica antes dela, dentro da fatia. Quando
+ * `meuAlbum` nasceu ao lado, o comentário dele ("NÃO EXISTE `alvoId`") entrou
+ * no corpo de `memoriaDoFeed` e reprovou um `not.toContain("alvoId")` sobre
+ * código que está correto. É a décima primeira vez que a prosa quebra um teste
+ * de texto nesta base, agora pela porta do VIZINHO.
+ */
 const corpo = (fonte: string, abre: string, fecha: string) => {
   const i = fonte.indexOf(abre);
-  return i < 0 ? "" : fonte.slice(i, fonte.indexOf(fecha, i + 10));
+  if (i < 0) return "";
+  const fins = [fonte.indexOf(fecha, i + 10), fonte.indexOf("\n/**", i + 10)].filter((n) => n > 0);
+  return fonte.slice(i, fins.length ? Math.min(...fins) : undefined);
 };
 
 const HANDLER = corpo(SERVIDOR, "export const memoriaDoFeed", "\nexport const ");

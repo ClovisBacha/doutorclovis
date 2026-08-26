@@ -72,6 +72,7 @@ const EXTRAS = [
   "/preview-instagram?tela=story&videoStory=1",
   "/preview-instagram?tela=story&sensivelStory=1",
   "/preview-instagram?memoria=1",
+  "/preview-instagram?tela=perfil&meu=1&album=1",
   "/preview-instagram?tela=filtro",
   "/preview-instagram?tela=conversa",
   "/preview-instagram?tela=conversas",

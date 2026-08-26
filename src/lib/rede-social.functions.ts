@@ -4931,6 +4931,68 @@ export const memoriaDoFeed = createServerFn({ method: "POST" })
   });
 
 /**
+ * O ÁLBUM DA GESTAÇÃO — as publicações dela, do começo, por semana.
+ *
+ * ⚠️ **NÃO EXISTE `alvoId`, e isso é o recurso inteiro.** Agrupar por semana
+ * carimba uma linha do tempo GESTACIONAL em cada publicação; num perfil que
+ * outra pessoa abre, os títulos "22 semanas" / "30 semanas" publicariam a
+ * semana de TODO post — passando por cima da chave `mostrar_semana`, que existe
+ * para essa decisão ser dela, por publicação. O recorte é a sessão e nada mais.
+ *
+ * ⚠️ **E a semana é calculada AQUI** porque `lmp_date` nunca viaja para o
+ * navegador — é o que sustenta a chave. A tela recebe títulos prontos.
+ *
+ * ⚠️ **NADA EM MODO CUIDADO.** As publicações dela continuam à mostra na grade
+ * (esconder o que ela escreveu seria o app apagar o bebê dela); o que não é
+ * oferecido é o app ORGANIZAR aquilo numa narrativa gestacional semana a
+ * semana. É a mesma linha de "o que some é a rede em volta, não a memória dela".
+ */
+export const meuAlbum = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const perfil = (await perfisPorId(sb, [eu])).get(eu);
+    /* ⚠️ Sem perfil, `foraDaRede` responde `true` — falha FECHADA, e aqui isso
+       significa "sem álbum", que é o lado seguro. */
+    if (foraDaRede(perfil)) return { ok: true as const, secoes: [] };
+
+    const lmp = (perfil?.lmp_date ?? null) as string | null;
+    if (!lmp) return { ok: true as const, secoes: [] };
+
+    const crus = await postsCrus(sb, (base: any) =>
+      base
+        .eq("autor_id", eu)
+        .is("arquivado_em", null)
+        .order("criado_em", { ascending: true })
+        .limit(500),
+    );
+    /* ⚠️ **PASSA POR `montarPosts`** — é ele que assina as URLs e aplica a régua
+       de visibilidade. Montar o cartão à mão a partir da linha do banco seria a
+       segunda régua, e aqui ela entregaria a foto sem URL assinada. */
+    const posts = await montarPosts(sb, eu, crus, await contextoDe(sb, eu));
+
+    const { montarAlbum } = await import("@/lib/album-da-gestacao");
+    const secoes = montarAlbum(
+      posts.map((p) => ({ id: p.id, criadoEm: p.criadoEm })),
+      lmp,
+    );
+    const porId = new Map(posts.map((p) => [p.id, p]));
+    return {
+      ok: true as const,
+      secoes: secoes.map((s) => ({
+        chave: s.chave,
+        titulo: s.titulo,
+        posts: s.posts.map((x) => porId.get(x.id)!).filter(Boolean),
+      })),
+    };
+  });
+
+/**
  * "Eu vi esta memória" — chamada quando o cartão APARECE na tela.
  *
  * ⚠️ **Quando APARECE, e não quando ela dispensa.** Quem rolou por cima sem

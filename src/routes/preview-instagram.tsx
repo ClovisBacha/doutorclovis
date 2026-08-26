@@ -35,6 +35,7 @@
  *   /preview-instagram?tela=story&videoStory=1 → o primeiro story é VÍDEO
  *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
  *   /preview-instagram?memoria=1 → o cartão "há um ano, você publicou isto"
+ *   /preview-instagram?tela=perfil&meu=1&album=1 → a grade agrupada por semana
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
  *   /preview-instagram?tela=perfil&meu=1&selo=0 → o perfil sem os selos
  *   /preview-instagram?vazio=1      → conta NOVA: a fileira de pessoas é tudo
@@ -179,6 +180,8 @@ export const Route = createFileRoute("/preview-instagram")({
     sensivelStory: q.sensivelStory == null ? 0 : Number(q.sensivelStory),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     memoria: q.memoria == null ? 0 : Number(q.memoria),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    album: q.album == null ? 0 : Number(q.album),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -420,6 +423,7 @@ function Bancada() {
     videoStory,
     sensivelStory,
     memoria,
+    album,
     desafio,
     caixinha,
     perguntas,
@@ -1720,6 +1724,23 @@ function Bancada() {
                       : p,
                   )
                 : POSTS
+          }
+          /* ⚠️ **O ÁLBUM só nasce de uma conta com uma gestação inteira
+             publicada** — as seções saem da DUM, que nunca chega ao navegador.
+             Sem a bancada, olhar esta tela exigiria um ano de uso.
+             ⚠️ E ele só vale no MEU perfil: `?album=1` sem `?meu=1` prova que a
+             lista não é oferecida a terceiros. As seções são CRAVADAS, nunca
+             derivadas de `Date.now()` — a régua roda no servidor, e aqui o que
+             se olha é o desenho. */
+          album={
+            album === 1 && meu
+              ? [
+                  { chave: "semana:8", titulo: "8 semanas", posts: POSTS.slice(0, 1) },
+                  { chave: "semana:20", titulo: "20 semanas", posts: POSTS.slice(1, 4) },
+                  { chave: "semana:34", titulo: "34 semanas", posts: POSTS.slice(4, 6) },
+                  { chave: "depois", titulo: "Depois", posts: POSTS.slice(6, 7) },
+                ]
+              : null
           }
           aoVoltar={() => history.back()}
           aoSeguir={() => alert("seguir")}
