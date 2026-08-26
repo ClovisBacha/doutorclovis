@@ -195,6 +195,12 @@ describe("⚠️ a leitura entrega o que a tela precisa", () => {
      * funciona, viraria uma lista plana em silêncio.
      */
     const comFixado = C.indexOf('"id, autor_id, texto, criado_em, responde_a, fixado_em"');
+    /* ⚠️ E o degrau de cima é o de `editado_em`, que nasce noutro SQL. */
+    const comEditado = C.indexOf(
+      '"id, autor_id, texto, criado_em, responde_a, fixado_em, editado_em"',
+    );
+    expect(comEditado).toBeGreaterThan(-1);
+    expect(comFixado).toBeGreaterThan(comEditado);
     const soResponde = C.indexOf('"id, autor_id, texto, criado_em, responde_a"');
     const minimo = C.indexOf('"id, autor_id, texto, criado_em"');
     expect(comFixado).toBeGreaterThan(-1);

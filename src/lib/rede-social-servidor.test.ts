@@ -399,21 +399,43 @@ describe("reagir ao story", () => {
      ele. Sem isso, um uuid sorteado que respondesse `ok` confirmaria a
      existência de um story privado. */
   test("⚠️ só reage quem enxerga o story", () => {
+    /**
+     * ⚠️ **A GARANTIA É "o portão roda antes da escrita", e não a grafia dele.**
+     * As vinte linhas do portão viviam DUPLICADAS aqui e em `votarNoStory` — e
+     * a terceira cópia ia nascer em `denunciarStory`. Hoje são uma régua só
+     * (`storyQueEuVejo`), e este teste travava o bloco inline: ficou vermelho
+     * sobre uma unificação que só APERTOU a garantia. Nona vez nesta base.
+     */
     const c = corpoDe("reagirAoStory").replace(/\s+/g, " ");
-    expect(c).toContain("const podeVer =");
-    expect(c).toContain("!foraDaRede(autor)");
-    expect(c).toContain("ctx.bloqueio.has(");
-    const conferiu = c.indexOf("const podeVer =");
-    const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
+    const conferiu = c.indexOf("storyQueEuVejo(sb, data.storyId, eu");
     expect(conferiu).toBeGreaterThan(-1);
+    const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
     expect(gravou === -1 ? c.indexOf(".upsert(") : gravou).toBeGreaterThan(conferiu);
+  });
+
+  test("⚠️ e a régua ÚNICA cruza os quatro portões", () => {
+    /* Autora fora da rede (luto ou pausa), bloqueio, o vínculo (sigo ou amiga)
+       e a CAMADA do story. Uma cópia divergente apareceria como ação aceita
+       sobre um story que a fileira esconde. */
+    const s = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\s+/g, " ");
+    const i = s.indexOf("async function storyQueEuVejo");
+    const regra = s.slice(i, i + 1400);
+    expect(regra).toContain("!foraDaRede(autor)");
+    expect(regra).toContain("ctx.bloqueio.has(autorId)");
+    expect(regra).toContain("ctx.sigo.has(autorId) || ctx.amigas.has(autorId)");
+    expect(regra).toContain("storyAlcanca({");
+    /* ⚠️ E a autora sempre enxerga o próprio, inclusive o fechado. */
+    expect(regra).toContain("(story as any).autor_id === eu) return story");
   });
 
   /* ⚠️ Story vencido não recebe reação: ele some da tela em 24h, e aceitar
      depois encheria a Atividade dela com afagos a uma coisa que ninguém mais
      vê — e abriria caminho para mexer com quem já parou de publicar. */
   test("⚠️ story vencido é recusado", () => {
-    expect(corpoDe("reagirAoStory").replace(/\s+/g, " ")).toContain(
+    /* A regra vive na régua única — ver o teste acima. */
+    const s = FONTE.replace(/\s+/g, " ");
+    const i = s.indexOf("async function storyQueEuVejo");
+    expect(s.slice(i, i + 900)).toContain(
       "new Date((story as any).expira_em).getTime() < Date.now()",
     );
   });
@@ -585,7 +607,7 @@ describe("higiene", () => {
     expect(readFileSync("src/lib/comentarios.functions.ts", "utf8")).toContain("rede_comentarios");
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são onze", () => {
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são doze", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -657,7 +679,17 @@ describe("higiene", () => {
     expect(rs).toContain('.eq("story_id", data.storyId)');
     expect(rs).toContain('.eq("quem_id", eu)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(11);
+    /* ⚠️ E o DÉCIMO SEGUNDO: tirar alguém dos FAVORITOS. Mesma natureza do
+       silêncio e da reação — a linha não guarda história nenhuma, e um
+       "favorita: false" marcado faria a lista crescer para sempre com o
+       registro de quem ela um dia quis ver primeiro. `.eq("quem_id", eu)` é o
+       portão: sem ele, um id no corpo do pedido tiraria a favorita de OUTRA. */
+    const fav = corpoDe("favoritar").replace(/\s+/g, " ");
+    expect(fav).toContain(".delete(");
+    expect(fav).toContain('.eq("quem_id", eu)');
+    expect(fav).toContain('.eq("favorita_id", data.alvoId)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(12);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {

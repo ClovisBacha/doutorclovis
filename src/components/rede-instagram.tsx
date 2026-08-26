@@ -114,6 +114,7 @@ import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { tagDaBusca } from "@/lib/mencoes";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
 import {
   esquecerDoCache,
@@ -2553,6 +2554,7 @@ export function TelaDePerfil({
   aoAbrirSalvos,
   aoBloquear,
   aoDenunciarPerfil,
+  aoFavoritar,
   aoSilenciar,
   aoRestringir,
   aoAbrirEspelho,
@@ -2587,6 +2589,8 @@ export function TelaDePerfil({
   aoBloquear?: () => void;
   /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
+  /** Favoritar (ou tirar). O estado atual vem em `perfil.favorita`. */
+  aoFavoritar?: (favoritar: boolean) => void;
   /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
   aoSilenciar?: (silenciar: boolean, quais?: { calaPosts: boolean; calaStories: boolean }) => void;
   /**
@@ -2750,6 +2754,22 @@ export function TelaDePerfil({
               linha: a escolha fina é para quem quer, e obrigar todo mundo a
               decidir entre duas caixas transformaria um gesto de alívio numa
               configuração. */}
+          {/* ⚠️ **FAVORITAR É O OPOSTO DE SILENCIAR, e fica ao lado dele.**
+              Num feed cronológico, quem segue trinta pessoas perde a publicação
+              da amiga que está passando por alguma coisa. E ele é CALADO, como
+              o silenciar — o rótulo diz isso, senão ela hesita. */}
+          {aoFavoritar && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoFavoritar(!perfil.favorita);
+              }}
+              className="press block min-h-[44px] w-full text-left text-[14px]"
+            >
+              {perfil.favorita ? "Tirar dos favoritos" : "Adicionar aos favoritos"}
+            </button>
+          )}
           {aoSilenciar &&
             (perfil.silenciado ? (
               <button
@@ -3209,6 +3229,7 @@ type Onde =
   | { t: "arquivados" }
   | { t: "arquivo-stories" }
   | { t: "bloqueados" }
+  | { t: "favoritas" }
   | { t: "busca" }
   | { t: "caixinha" }
   | { t: "conversas" }
@@ -3293,6 +3314,8 @@ export function RedeNoApp({
   const [proximoArquivo, setProximoArquivo] = useState<string | null>(null);
   /** `null` = carregando · `[]` = ela não bloqueou ninguém · `"erro"` = não deu. */
   const [bloqueados, setBloqueados] = useState<PessoaNaLista[] | "erro" | null>(null);
+  /** A lista "ver primeiro". `"erro"` = a leitura falhou; `null` = carregando. */
+  const [favoritas, setFavoritas] = useState<PostNaTela[] | "erro" | null>(null);
   /** O story que está sendo mandado para uma conversa. */
   const [mandandoStory, setMandandoStory] = useState<string | null>(null);
   /**
@@ -4472,6 +4495,73 @@ export function RedeNoApp({
    * pausou e quer voltar já está olhando o feed; mandá-la procurar um
    * interruptor três telas adiante é como uma pausa vira uma saída.
    */
+  /**
+   * A LISTA DAS FAVORITAS — cronológica, como o feed.
+   *
+   * ⚠️ Ela reusa `meuFeed` com um recorte, e não uma consulta própria: uma
+   * segunda montagem de post repetiria `podeVerPost`, as assinaturas de URL e as
+   * reações — e a divergência apareceria como post vazando numa lista e não na
+   * outra.
+   */
+  async function marcarFavorita(alvoId: string, ligar: boolean) {
+    /* Pinta antes, como o silenciar: é um toque num menu. */
+    setPerfil((p) => (p && p.id === alvoId ? { ...p, favorita: ligar } : p));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { favoritar } = await import("@/lib/rede-social.functions");
+      const r = await favoritar({ data: { accessToken: t, alvoId, favoritar: ligar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) throw new Error("recusado");
+      toast.success(
+        ligar ? "Adicionada aos favoritos. Ela não é avisada." : "Tirada dos favoritos.",
+      );
+    } catch {
+      setPerfil((p) => (p && p.id === alvoId ? { ...p, favorita: !ligar } : p));
+    }
+  }
+
+  async function abrirFavoritas() {
+    setOnde({ t: "favoritas" });
+    setFavoritas(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuFeed } = await import("@/lib/rede-social.functions");
+      const r = await meuFeed({ data: { accessToken: t, soFavoritas: true } });
+      /* ⚠️ "Você não tem favoritas" sobre uma falha de leitura a faria
+         favoritar de novo alguém que já está lá. */
+      setFavoritas(r.ok ? r.posts : "erro");
+    } catch {
+      setFavoritas("erro");
+    }
+  }
+
+  async function denunciarUmStory(storyId: string, motivo: MotivoDaDenuncia) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarStory } = await import("@/lib/rede-social.functions");
+      const r = await denunciarStory({ data: { accessToken: t, storyId, motivo } });
+      const { toast } = await import("sonner");
+      /* ⚠️ **`sem_suporte` NÃO pode virar "fica registrada".** Sem o CHECK novo
+         o banco recusa o alvo `story`, e prometer registro sobre uma linha que
+         não gravou é a promessa que este app já quebrou uma vez, com
+         `denunciado_em` escrito e nunca lido. */
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "sem_suporte"
+            ? "A denúncia de story ainda não está disponível aqui."
+            : "Não deu para denunciar agora.",
+        );
+        return;
+      }
+      toast.success("Denúncia registrada. A gente vai olhar.");
+    } catch {
+      /* Sem rede, a folha fecha e nada é prometido. */
+    }
+  }
+
   async function reativarMinhaConta() {
     try {
       const t = await token();
@@ -5537,12 +5627,12 @@ export function RedeNoApp({
    * que o banco tem, e uma pintura otimista acenderia o selo num destaque que
    * foi recusado.
    */
-  async function destacarNoPerfil(storyId: string, destacar: boolean) {
+  async function destacarNoPerfil(storyId: string, destacar: boolean, titulo?: string | null) {
     try {
       const t = await token();
       if (!t) return;
       const { destacarStory } = await import("@/lib/rede-social.functions");
-      const r = await destacarStory({ data: { accessToken: t, storyId, destacar } });
+      const r = await destacarStory({ data: { accessToken: t, storyId, destacar, titulo } });
       const { toast } = await import("sonner");
       if (!r.ok) {
         toast.error(
@@ -5705,6 +5795,7 @@ export function RedeNoApp({
     carimbar: boolean,
     enquete: string[],
     perguntaAberta: boolean,
+    marcadas: string[],
   ) {
     setConferindoStory(null);
     /* ⚠️ Lido ANTES de zerar: o `setPostNoStory(null)` abaixo é assíncrono, e
@@ -5729,6 +5820,7 @@ export function RedeNoApp({
           perguntaAberta,
           postDe: comPost,
           visibilidade: camada,
+          marcadas,
         },
       });
       if (r.ok) {
@@ -5946,6 +6038,16 @@ export function RedeNoApp({
         aoTocar: () => void abrirArquivoDeStories(),
       },
       {
+        /* ⚠️ **"VER PRIMEIRO" É UMA LISTA À PARTE, e não uma reordenação do
+           feed.** O feed continua cronológico — a razão está em `favoritar`:
+           ranquear exigiria engajamento como sinal, e numa base de alto risco o
+           post que mais engaja é o da EMERGÊNCIA. */
+        id: "favoritas",
+        rotulo: "Favoritas",
+        icone: "coracao",
+        aoTocar: () => void abrirFavoritas(),
+      },
+      {
         /* ⚠️ **SEM ESTA PORTA, BLOQUEAR ERA UM BECO SEM SAÍDA.** Ela conseguia
            bloquear e não conseguia DESBLOQUEAR: a única entrada era o `⋯` do
            perfil da pessoa, e o bloqueio esconde o perfil. */
@@ -6063,9 +6165,19 @@ export function RedeNoApp({
              largado. */
           setPostNoStory(null);
         }}
-        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta }) =>
-          void publicarStory(conferindoStory, texto, camada, carimbar, enquete, perguntaAberta)
+        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta, marcadas }) =>
+          void publicarStory(
+            conferindoStory,
+            texto,
+            camada,
+            carimbar,
+            enquete,
+            perguntaAberta,
+            marcadas,
+          )
         }
+        /* A MESMA lista do compositor de post — nunca uma busca. */
+        amigasParaMarcar={paraMarcar}
         rascunho={rascunhoDeStory}
         aoGuardarRascunho={guardarRascunhoDoStory}
       />
@@ -6093,6 +6205,9 @@ export function RedeNoApp({
         souEu={vendoStory.autorId === euId}
         aoQuemViu={quemViu}
         aoApagarStory={apagarStory}
+        /* ⚠️ A denúncia é do story DELA — `souEu` já esconde o botão, e o
+           servidor recusa o próprio de qualquer forma. */
+        aoDenunciarStory={(id, motivo) => void denunciarUmStory(id, motivo)}
       />
     );
   }
@@ -6195,6 +6310,7 @@ export function RedeNoApp({
         aoVoltar={() => setOnde({ t: "feed" })}
         aoBuscar={buscar}
         aoAbrirPerfil={abrirPerfil}
+        aoAbrirTag={acoes.abrirTag}
       />
     );
   }
@@ -6206,6 +6322,74 @@ export function RedeNoApp({
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
       />
+    );
+  }
+
+  if (onde.t === "favoritas") {
+    return (
+      <div className="mx-auto max-w-md pb-24">
+        <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "feed" })}
+            aria-label="Voltar"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+          >
+            ‹
+          </button>
+          <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Favoritas</h1>
+        </header>
+        {/* ⚠️ A régua é DITA: sem a frase, quem favoritou alguém e não vê nada
+            conclui que o recurso quebrou, quando ela só não publicou ainda. E a
+            segunda frase é a que impede o mal-entendido de sempre — favoritar
+            NÃO avisa ninguém. */}
+        <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+          Só quem você marcou como favorita, na ordem do tempo. Ninguém é avisada.
+        </p>
+        {favoritas === "erro" ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+            <button
+              type="button"
+              onClick={() => void abrirFavoritas()}
+              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        ) : favoritas === null ? (
+          <div className="space-y-3 px-1">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="dc-esqueleto h-64 w-full rounded-2xl" />
+            ))}
+          </div>
+        ) : favoritas.length === 0 ? (
+          <p className="px-1 py-16 text-center text-sm text-muted-foreground">
+            Você ainda não marcou ninguém como favorita. No perfil de alguém, toque em ⋯.
+          </p>
+        ) : (
+          /* ⚠️ **AS AÇÕES SÃO AS MESMAS DO FEED, e vêm do objeto ESTÁVEL.**
+             Passar fechos inline aqui faria o `memo` do cartão errar em toda
+             pintura — o defeito que já custou 232 ms por reação nesta lista. E
+             um cartão sem ações seria uma publicação que ela vê e não pode
+             tocar, o que lê como app quebrado. */
+          favoritas.map((p) => (
+            <PostInstagram
+              key={p.id}
+              post={p}
+              aoReagir={acoes.reagir}
+              aoSalvar={acoes.guardar}
+              aoAbrirPerfil={acoes.abrirPerfil}
+              aoVer={acoes.ver}
+              aoAbrirArroba={acoes.abrirArroba}
+              aoAbrirTag={acoes.abrirTag}
+              aoDenunciar={acoes.denunciar}
+              aoVotar={acoes.votar}
+              aoMandarParaConversa={acoes.mandarParaConversa}
+            />
+          ))
+        )}
+      </div>
     );
   }
 
@@ -6226,7 +6410,7 @@ export function RedeNoApp({
         stories={arquivoStories}
         instavel={arquivoStoriesInstavel}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
-        aoDestacar={(id, v) => void destacarNoPerfil(id, v)}
+        aoDestacar={(id, v, titulo) => void destacarNoPerfil(id, v, titulo)}
         aoChegarNoFim={() => void maisDoArquivoDeStories()}
         temMais={!!proximoArquivo}
         aoTentarDeNovo={() => void abrirArquivoDeStories()}
@@ -6419,6 +6603,7 @@ export function RedeNoApp({
         aoSilenciar={
           perfil.souEu ? undefined : (v, quais) => void silenciarPerfil(perfil.id, v, quais)
         }
+        aoFavoritar={perfil.souEu ? undefined : (v) => void marcarFavorita(perfil.id, v)}
         aoRestringir={perfil.souEu ? undefined : (v) => void restringirPerfil(perfil.id, v)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
@@ -7354,11 +7539,13 @@ export function ArquivoDeStories({
   stories: StoryArquivado[] | null;
   instavel?: boolean;
   aoVoltar: () => void;
-  aoDestacar?: (storyId: string, destacar: boolean) => void;
+  aoDestacar?: (storyId: string, destacar: boolean, titulo?: string | null) => void;
   aoChegarNoFim?: () => void;
   temMais?: boolean;
   aoTentarDeNovo?: () => void;
 }) {
+  /** O story que está ganhando nome. `null` = a folha está fechada. */
+  const [nomeando, setNomeando] = useState<{ id: string; titulo: string } | null>(null);
   return (
     <div className="mx-auto max-w-md pb-24">
       <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
@@ -7436,10 +7623,35 @@ export function ArquivoDeStories({
                   </span>
                 )}
 
+                {/* ⚠️ **O NOME DO DESTAQUE, e ele é o recurso.** Sem ele o
+                    perfil mostra uma grade de imagens: "Ultrassons" e "Chá de
+                    bebê" são o que faz alguém tocar. */}
+                {st.destacado && st.destaqueTitulo && (
+                  <span className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-full bg-black/55 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+                    {st.destaqueTitulo}
+                  </span>
+                )}
+
                 {aoDestacar && (
                   <button
                     type="button"
-                    onClick={() => aoDestacar(st.id, !st.destacado)}
+                    onClick={() => {
+                      /* ⚠️ **O NOME É PEDIDO NO ATO DE DESTACAR, e nunca depois.**
+                         Um segundo passo ("agora dê um nome") é um passo que a
+                         maioria pula — e aí o destaque volta a ser uma grade de
+                         imagens. Nomear continua OPCIONAL: um destaque sem nome
+                         é melhor que nenhum.
+
+                         ⚠️ E é uma folha da PRÓPRIA tela, nunca `window.prompt`:
+                         no app instalado o diálogo do sistema abre com o nome do
+                         domínio em cima, que é a cara de "site embrulhado" que a
+                         diretriz 4.2 da Apple reprova. */
+                      if (st.destacado) {
+                        aoDestacar(st.id, false, null);
+                        return;
+                      }
+                      setNomeando({ id: st.id, titulo: st.texto ?? "" });
+                    }}
                     aria-label={st.destacado ? "Tirar do destaque" : "Deixar no perfil"}
                     aria-pressed={st.destacado}
                     /* ⚠️ 44px de alvo com o desenho pequeno: a célula tem ~130px
@@ -7458,6 +7670,41 @@ export function ArquivoDeStories({
             <SentinelaDaGrade aoChegar={aoChegarNoFim} quantos={stories.length} />
           )}
         </>
+      )}
+
+      {nomeando && aoDestacar && (
+        <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-border bg-card p-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
+          <p className="text-[14px] font-semibold">Nome do destaque</p>
+          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+            É o que aparece no seu perfil — "Ultrassons", "Chá de bebê". Pode deixar em branco.
+          </p>
+          <input
+            value={nomeando.titulo}
+            onChange={(e) => setNomeando({ ...nomeando, titulo: e.target.value.slice(0, 24) })}
+            maxLength={24}
+            placeholder="Ultrassons"
+            className="mt-2 w-full rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNomeando(null)}
+              className="press min-h-[44px] text-[13px] text-muted-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                aoDestacar(nomeando.id, true, nomeando.titulo.trim() || null);
+                setNomeando(null);
+              }}
+              className="press min-h-[44px] rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+            >
+              Deixar no perfil
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -7494,6 +7741,7 @@ export function VisorDeStory({
   souEu = false,
   aoQuemViu,
   aoApagarStory,
+  aoDenunciarStory,
   aoVotarNoStory,
   aoPerguntarNoStory,
   aoReagirAoStory,
@@ -7513,6 +7761,8 @@ export function VisorDeStory({
   /** Mandar este story para uma conversa. */
   aoMandarStory?: (storyId: string) => void;
   aoApagarStory?: (storyId: string) => void;
+  /** `undefined` = é o story dela, ou a tela de fora não liga a denúncia. */
+  aoDenunciarStory?: (storyId: string, motivo: MotivoDaDenuncia) => void;
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
   /** Mandar uma pergunta pela caixinha aberta neste story. */
@@ -7539,6 +7789,7 @@ export function VisorDeStory({
   /** `null` = folha fechada · `"erro"` = não deu para ler · lista = a verdade. */
   const [quemViu, setQuemViu] = useState<PessoaNaLista[] | "erro" | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [denunciando, setDenunciando] = useState(false);
   const atual = bolha.stories[i];
 
   /* ⚠️ Marca como visto ao ENTRAR no story, não ao sair. Quem fecha o app no
@@ -8001,6 +8252,76 @@ export function VisorDeStory({
               🗑
             </button>
           )}
+        </div>
+      )}
+
+      {/* ⚠️ **DENUNCIAR — e o story era a ÚLTIMA superfície sem isto.**
+          Post, perfil, comentário, pergunta e mensagem já tinham. E aqui pesa
+          mais que em todas: o story EXPIRA em 24 h, então o que não for
+          denunciado agora nunca chega à plataforma — a próxima paciente recebe
+          a mesma coisa da mesma pessoa, e ninguém soube. Bloquear existe, e
+          bloquear não deixa rastro nenhum.
+
+          ⚠️ Só no story DELA: denunciar o próprio não quer dizer nada. */}
+      {/* ⚠️ **"com Fulana" no story, e é a MESMA régua do post** — quem está em
+          Modo Cuidado, quem pausou e quem ela bloqueou já saíram da lista no
+          servidor. Aqui é só o desenho. */}
+      {atual && (atual.marcadas ?? []).length > 0 && (
+        <span className="pointer-events-none absolute inset-x-4 bottom-16 z-10 truncate rounded-full bg-black/45 px-3 py-1 text-center text-[12px] text-white">
+          com {(atual.marcadas ?? []).map((m) => m.nome).join(", ")}
+        </span>
+      )}
+
+      {!souEu && atual && aoDenunciarStory && (
+        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center px-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
+          <button
+            type="button"
+            onClick={() => {
+              setPausado(true);
+              setDenunciando(true);
+            }}
+            className="press ml-auto min-h-[44px] text-[13px] text-white/70"
+          >
+            Denunciar
+          </button>
+        </div>
+      )}
+
+      {denunciando && atual && aoDenunciarStory && (
+        <div className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-card p-4">
+          <p className="text-[14px] font-semibold">Denunciar este story?</p>
+          {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
+              da plataforma, e prometer remoção seria prometer o que ninguém
+              garante. Mesma decisão das outras cinco denúncias. */}
+          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+            A gente vai olhar. O story some em 24 horas; a denúncia fica.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {MOTIVOS.map((m) => (
+              <button
+                key={m.motivo}
+                type="button"
+                onClick={() => {
+                  aoDenunciarStory(atual.id, m.motivo);
+                  setDenunciando(false);
+                  setPausado(false);
+                }}
+                className="press min-h-[44px] rounded-full border border-border px-3 text-[12px]"
+              >
+                {m.rotulo}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDenunciando(false);
+              setPausado(false);
+            }}
+            className="press mt-3 min-h-[44px] text-[13px] text-muted-foreground"
+          >
+            Cancelar
+          </button>
         </div>
       )}
 
@@ -9726,10 +10047,13 @@ export function TelaDeBusca({
   aoVoltar,
   aoBuscar,
   aoAbrirPerfil,
+  aoAbrirTag,
 }: {
   aoVoltar: () => void;
   aoBuscar: (termo: string) => Promise<PessoaNaLista[]>;
   aoAbrirPerfil?: (id: string) => void;
+  /** Abre a página da tag. Sem a prop, a linha da `#` não aparece. */
+  aoAbrirTag?: (tag: string) => void;
 }) {
   const [termo, setTermo] = useState("");
   const [achados, setAchados] = useState<PessoaNaLista[]>([]);
@@ -9779,6 +10103,35 @@ export function TelaDeBusca({
           className="h-9 min-w-0 flex-1 rounded-xl bg-muted/60 px-3 text-[14px]"
         />
       </header>
+
+      {/* ⚠️ **A BUSCA ACHAVA PERFIL E MAIS NADA.** Quem ouviu falar de
+          `#trigemeas` numa conversa não tinha caminho nenhum até lá — a página
+          da tag existia e só se chegava nela tocando numa legenda que já a
+          continha: só quem já a tinha encontrado conseguia encontrá-la.
+
+          ⚠️ E ela NÃO consulta o servidor: `tagDaBusca` responde pelo FORMATO do
+          termo. Uma consulta "existe esta tag?" por tecla digitada seria uma ida
+          ao banco para uma pergunta que a própria página da tag responde melhor
+          — com o vazio dela, que explica a régua ("só publicações públicas"). */}
+      {tagDaBusca(termo) && aoAbrirTag && (
+        <button
+          type="button"
+          onClick={() => aoAbrirTag(tagDaBusca(termo)!)}
+          className="press flex w-full items-center gap-3 border-b border-border px-4 py-2.5 text-left"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-[18px] font-semibold">
+            #
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-semibold leading-tight">
+              #{tagDaBusca(termo)}
+            </span>
+            <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+              Ver publicações com esta tag
+            </span>
+          </span>
+        </button>
+      )}
 
       {termo.trim().length > 0 && termo.trim().length < MINIMO_DA_BUSCA ? (
         <p className="py-10 text-center text-[13px] text-muted-foreground">
@@ -9959,6 +10312,7 @@ export function ConferirStory({
   semana,
   aoCancelar,
   aoPublicar,
+  amigasParaMarcar,
   rascunho,
   aoGuardarRascunho,
 }: {
@@ -9973,7 +10327,16 @@ export function ConferirStory({
     carimbar: boolean;
     enquete: string[];
     perguntaAberta: boolean;
+    marcadas: string[];
   }) => void;
+  /**
+   * Quem ela pode marcar — a MESMA lista do compositor de post.
+   *
+   * ⚠️ **Só dentro do grafo já conectado, e NUNCA uma busca.** Buscar por nome
+   * transformaria a base de pacientes numa lista navegável, e num app de
+   * gestação de alto risco esse é o dado que menos pode vazar.
+   */
+  amigasParaMarcar?: { id: string; nome: string; avatar: string | null }[] | null;
   /** O rascunho guardado, quando há um. Ver `rascunho-do-story.ts`. */
   rascunho?: RascunhoDoStory | null;
   /** Guardar o que ela digitou. Recebe `null` quando não há mais nada a guardar. */
@@ -9981,6 +10344,8 @@ export function ConferirStory({
 }) {
   const [carimbar, setCarimbar] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [abrindoMarcar, setAbrindoMarcar] = useState(false);
   /* `null` = sem enquete. Duas vazias é o estado de quem abriu e ainda não
      escreveu — a mesma forma do compositor de post. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
@@ -10256,6 +10621,44 @@ export function ConferirStory({
           </p>
         )}
 
+        {/* ⚠️ **MARCAR ALGUÉM NO STORY — e a lista é a MESMA do post.** Só quem
+            ela já conhece; não há busca por nome, e nunca haverá. */}
+        {amigasParaMarcar && amigasParaMarcar.length > 0 && (
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={() => setAbrindoMarcar((v) => !v)}
+              className="press min-h-[44px] w-full rounded-2xl bg-white/15 px-3 text-left text-[13px] text-white"
+            >
+              {marcadas.length === 0
+                ? "👭 Marcar alguém"
+                : `👭 ${marcadas.length} marcada${marcadas.length > 1 ? "s" : ""}`}
+            </button>
+            {abrindoMarcar && (
+              <div className="mt-1 max-h-40 overflow-y-auto rounded-2xl bg-black/40 p-1">
+                {amigasParaMarcar.map((a) => {
+                  const marcada = marcadas.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() =>
+                        setMarcadas((v) => (marcada ? v.filter((x) => x !== a.id) : [...v, a.id]))
+                      }
+                      className={`press flex min-h-[44px] w-full items-center gap-2 rounded-xl px-2 text-left text-[13px] ${
+                        marcada ? "bg-white/20 text-white" : "text-white/85"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                      {marcada && <span aria-hidden>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         <button
           type="button"
           disabled={enviando || (opcoes !== null && !enqueteValida(limparOpcoes(opcoes)))}
@@ -10264,6 +10667,7 @@ export function ConferirStory({
             aoPublicar({
               texto: texto.trim(),
               camada,
+              marcadas,
               carimbar: carimbar && !!semana,
               /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
                  aqui, que aceitaria o que o servidor recusa. */

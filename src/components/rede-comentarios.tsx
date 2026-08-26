@@ -48,6 +48,8 @@ export function Comentarios({
   const [lista, setLista] = useState<ComentarioNaTela[]>(bancada?.comentarios ?? []);
   const [abertos, setAbertos] = useState(bancada?.abertos ?? true);
   const [souADona, setSouADona] = useState(bancada?.souADona ?? false);
+  /** A que está sendo editada. O campo do rodapé assume o texto dela. */
+  const [editando, setEditando] = useState<ComentarioNaTela | null>(null);
   const [curtidasDe, setCurtidasDe] = useState<{
     id: string;
     pessoas: { id: string; nome: string; avatarUrl: string | null }[] | "erro" | null;
@@ -198,6 +200,57 @@ export function Comentarios({
         atual.map((x) => (x.id === c.id ? { ...x, fixadoEm: c.fixadoEm ?? null } : x)),
       );
       setRecado("Não deu para fixar agora.");
+    }
+  }
+
+  /**
+   * EDITAR — e o campo do rodapé vira o campo de edição.
+   *
+   * ⚠️ **UM CAMPO SÓ, e não um segundo dentro da linha.** Um `textarea` no meio
+   * da lista empurraria a conversa inteira para baixo e, num celular, o teclado
+   * cobriria justamente a linha que ela está corrigindo. O rodapé já é o lugar
+   * onde ela escreve, já tem o contador e já sobe com o teclado.
+   */
+  async function salvarEdicao() {
+    const alvo = editando;
+    if (!alvo) return;
+    const novo = texto.trim();
+    if (!novo || novo === alvo.texto) {
+      setEditando(null);
+      setTexto("");
+      return;
+    }
+    setEnviando(true);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { editarComentario } = await import("@/lib/comentarios.functions");
+      const r = await editarComentario({
+        data: { accessToken: t, comentarioId: alvo.id, texto: novo },
+      });
+      if (!r.ok) {
+        /* ⚠️ **O TEXTO NÃO É APAGADO NA RECUSA** — ela acabou de escrever, e
+           limpar o campo obriga a redigitar tudo para trocar uma frase. É a
+           mesma decisão que o `comentar` já tinha. */
+        setRecado(("recado" in r && r.recado) || "Não deu para salvar agora. Tente de novo.");
+        return;
+      }
+      /* Pinta na hora: o servidor já aceitou. O selo só aparece quando o banco
+         soube guardá-lo — `semSelo` diz que a edição valeu e o carimbo não. */
+      setLista((atual) =>
+        atual.map((x) =>
+          x.id === alvo.id
+            ? { ...x, texto: novo, editadoEm: r.semSelo ? null : new Date().toISOString() }
+            : x,
+        ),
+      );
+      setEditando(null);
+      setTexto("");
+      setRecado(null);
+    } catch {
+      setRecado("Não deu para salvar agora. Tente de novo.");
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -382,6 +435,16 @@ export function Comentarios({
             aoResponder={abertos ? () => responderA(raiz) : undefined}
             aoFixar={raiz.possoFixar ? () => void fixar(raiz) : undefined}
             aoVerCurtidas={raiz.souOAutor ? () => void verCurtidas(raiz) : undefined}
+            aoEditar={
+              raiz.souOAutor
+                ? () => {
+                    setRespondendo(null);
+                    setEditando(raiz);
+                    setTexto(raiz.texto);
+                    campo.current?.focus();
+                  }
+                : undefined
+            }
           />
 
           {/* ⚠️ **AS RESPOSTAS RECOLHEM DEPOIS DE TRÊS.** Uma conversa de vinte
@@ -403,6 +466,16 @@ export function Comentarios({
                 /* ⚠️ Resposta NÃO se fixa — a régua do servidor recusa, e
                    oferecer aqui seria um botão que promete e não cumpre. */
                 aoVerCurtidas={r.souOAutor ? () => void verCurtidas(r) : undefined}
+                aoEditar={
+                  r.souOAutor
+                    ? () => {
+                        setRespondendo(null);
+                        setEditando(r);
+                        setTexto(r.texto);
+                        campo.current?.focus();
+                      }
+                    : undefined
+                }
               />
             </div>
           ))}
@@ -546,7 +619,28 @@ export function Comentarios({
               tocar em "Responder" muda um estado invisível: ela escreve achando
               que comenta no post, e o texto nasce dentro da conversa de outra
               pessoa. E sem o ×, sair do modo exigiria enviar. */}
-          {respondendo && (
+          {/* ⚠️ **EDITANDO VENCE RESPONDENDO** — os dois usam o MESMO campo, e
+              desenhar as duas faixas juntas diria que ela está fazendo as duas
+              coisas. Entrar no modo edição limpa a resposta pendente. */}
+          {editando && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-1.5">
+              <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+                Editando o seu comentário
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEditando(null);
+                  setTexto("");
+                }}
+                aria-label="Cancelar edição"
+                className="press flex h-11 w-11 shrink-0 items-center justify-center text-[13px] text-muted-foreground"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          {respondendo && !editando && (
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-1.5">
               <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
                 Respondendo a {respondendo.nome}
@@ -567,16 +661,16 @@ export function Comentarios({
               value={texto}
               onChange={(e) => setTexto(e.target.value.slice(0, LIMITE_DO_COMENTARIO))}
               rows={1}
-              placeholder="Escreva um comentário…"
+              placeholder={editando ? "Corrija o seu comentário…" : "Escreva um comentário…"}
               className="max-h-24 min-h-[36px] flex-1 resize-none rounded-2xl border border-border bg-background px-3 py-2 text-[13px]"
             />
             <button
               type="button"
-              onClick={() => void enviar()}
+              onClick={() => void (editando ? salvarEdicao() : enviar())}
               disabled={!texto.trim() || enviando}
               className="press h-11 shrink-0 rounded-full px-3 text-[13px] font-semibold text-primary disabled:opacity-40"
             >
-              Publicar
+              {editando ? "Salvar" : "Publicar"}
             </button>
           </div>
           {recado && (
@@ -606,6 +700,7 @@ function Linha({
   aoCurtir,
   aoResponder,
   aoFixar,
+  aoEditar,
   aoVerCurtidas,
 }: {
   c: ComentarioNaTela;
@@ -617,6 +712,8 @@ function Linha({
   aoResponder?: () => void;
   /** `undefined` = não é minha publicação, ou este não pode ser fixado. */
   aoFixar?: () => void;
+  /** `undefined` = o comentário não é meu. */
+  aoEditar?: () => void;
   /** `undefined` = o comentário não é meu, ou ninguém curtiu ainda. */
   aoVerCurtidas?: () => void;
 }) {
@@ -680,6 +777,13 @@ function Linha({
           <p className="text-[13px] leading-snug">
             <span className="font-semibold">{c.autorNome}</span>{" "}
             <span className="whitespace-pre-wrap break-words">{c.texto}</span>
+            {/* ⚠️ **O SELO DE EDITADO NÃO É ENFEITE.** Quem respondeu respondeu
+                ao texto que estava lá; sem ele, uma edição posterior faz as
+                respostas parecerem sem sentido — ou faz a autora parecer ter
+                dito uma coisa que ninguém leu. */}
+            {c.editadoEm && (
+              <span className="ml-1 text-[11px] text-muted-foreground">· editado</span>
+            )}
           </p>
         )}
 
@@ -744,6 +848,18 @@ function Linha({
               className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
             >
               {c.fixadoEm ? "Desafixar" : "Fixar"}
+            </button>
+          )}
+          {/* ⚠️ **SÓ QUEM ESCREVEU EDITA — nem a dona do post.** Ela pode
+              APAGAR, que é a decisão dela sobre a própria conversa; reescrever
+              a frase de outra pessoa é pôr palavras na boca dela. */}
+          {aoEditar && (
+            <button
+              type="button"
+              onClick={aoEditar}
+              className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+            >
+              Editar
             </button>
           )}
         </div>

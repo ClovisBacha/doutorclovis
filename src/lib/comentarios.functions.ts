@@ -57,8 +57,10 @@ export type ComentarioNaTela = {
    * servidor recusaria depois do toque.
    */
   possoFixar?: boolean;
-  /** É meu? É ele que decide quem vê a lista de quem curtiu. */
+  /** É meu? É ele que decide quem vê a lista de quem curtiu — e quem edita. */
   souOAutor?: boolean;
+  /** Instante da última edição. `null` = nunca editado. */
+  editadoEm?: string | null;
 };
 
 async function pacienteDaSessao(accessToken: string): Promise<string | null> {
@@ -195,8 +197,14 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
        coluna de fixar: a conversa em árvore, que já funciona, viraria uma lista
        plana em silêncio. */
     let { data: linhas, error } = await lerComentarios(
-      "id, autor_id, texto, criado_em, responde_a, fixado_em",
+      "id, autor_id, texto, criado_em, responde_a, fixado_em, editado_em",
     );
+    if (error) {
+      ({ data: linhas, error } = await lerComentarios(
+        "id, autor_id, texto, criado_em, responde_a, fixado_em",
+      ));
+      console.warn("[comentarios] sem editado_em — rode APLICAR_MAIS_DEZ_DA_REDE.sql");
+    }
     if (error) {
       ({ data: linhas, error } = await lerComentarios(
         "id, autor_id, texto, criado_em, responde_a",
@@ -341,6 +349,7 @@ export const comentariosDoPost = createServerFn({ method: "POST" })
             oculto: visao.marca,
           }),
           souOAutor: c.autor_id === eu,
+          editadoEm: (c.editado_em ?? null) as string | null,
         };
       })
       .filter(Boolean) as ComentarioNaTela[];
@@ -1006,4 +1015,82 @@ export const quemCurtiuComentario = createServerFn({ method: "POST" })
       .filter(Boolean)
       .map((p: any) => naFileira(p));
     return { ok: true as const, pessoas };
+  });
+
+/**
+ * EDITAR UM COMENTÁRIO — corrigir sem apagar a conversa.
+ *
+ * ⚠️ **APAGAR E ESCREVER DE NOVO NÃO É A MESMA COISA.** Apagar leva junto as
+ * RESPOSTAS que penduraram nele (elas viram órfãs e entram como raiz), e o
+ * comentário volta ao fim da lista. Quem digitou "12 semanas" no lugar de "21"
+ * embaixo de um post sobre saúde tinha de escolher entre deixar o erro ou
+ * desmontar a conversa.
+ *
+ * ⚠️ **SÓ O TEXTO MUDA.** Nada de trocar o post, o alvo da resposta ou o
+ * autor: um `update` largo aqui seria a porta para mover um comentário de uma
+ * publicação para outra.
+ *
+ * ⚠️ **E SÓ QUEM ESCREVEU EDITA** — nem a dona do post. Ela pode APAGAR
+ * (`podeApagarComentario`), que é a decisão dela sobre a própria conversa;
+ * reescrever a frase de outra pessoa é pôr palavras na boca dela.
+ */
+export const editarComentario = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        comentarioId: z.string().uuid(),
+        texto: z.string().min(1).max(LIMITE_DO_COMENTARIO),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { data: c, error: erroC } = await sb
+      .from("rede_comentarios")
+      .select("id, autor_id, apagado_em")
+      .eq("id", data.comentarioId)
+      .maybeSingle();
+    if (erroC) return { ok: false as const, motivo: "banco" as const };
+    if (!c || (c as any).apagado_em || (c as any).autor_id !== eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    /* ⚠️ **A RÉGUA CLÍNICA RODA DE NOVO, e é o ponto todo desta função.** Sem
+       ela, editar seria a porta dos fundos do `comentar`: publica-se "que
+       lindo" e troca-se depois por "no seu lugar eu não iria ao PS". É o mesmo
+       cuidado que `editarPost` tem com a legenda. */
+    const desfecho = triarComentario(data.texto);
+    if (desfecho !== "publicavel") {
+      return {
+        ok: false as const,
+        motivo: "clinico" as const,
+        recado: recadoDoComentario(desfecho),
+      };
+    }
+
+    /* ⚠️ **O SELO DE EDITADO NÃO É ENFEITE.** Quem respondeu respondeu ao texto
+       que estava lá; sem ele, trocar o texto depois faz as respostas parecerem
+       sem sentido — ou faz a autora parecer ter dito uma coisa que ninguém leu.
+       Sem a coluna, a edição VALE e só o selo falta: recusar seria tirar uma
+       correção por causa de um carimbo. */
+    const { error } = await sb
+      .from("rede_comentarios")
+      .update({ texto: data.texto, editado_em: new Date().toISOString() })
+      .eq("id", data.comentarioId)
+      .eq("autor_id", eu);
+    if (error) {
+      const { error: erro2 } = await sb
+        .from("rede_comentarios")
+        .update({ texto: data.texto })
+        .eq("id", data.comentarioId)
+        .eq("autor_id", eu);
+      if (erro2) return { ok: false as const, motivo: "banco" as const };
+      return { ok: true as const, semSelo: true as const };
+    }
+    return { ok: true as const, semSelo: false as const };
   });

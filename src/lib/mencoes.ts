@@ -158,3 +158,27 @@ export function acharTags(texto: string | null | undefined): string[] {
 /** Teto por publicação, contra a legenda que é só um monte de tag. */
 export const TAGS_POR_POST = 15;
 export const MENCOES_POR_POST = 10;
+
+/**
+ * ⚠️ **A BUSCA POR HASHTAG NÃO PRECISA DE TABELA — e é por isso que ela não
+ * tem uma.**
+ *
+ * As tags não são guardadas em lugar nenhum: `postsDaTag` procura o texto na
+ * legenda. Uma tabela de tags exigiria manter índice na publicação, na edição e
+ * no arquivamento — três lugares para divergir — para responder uma pergunta
+ * que o próprio termo digitado já responde: **se o que ela escreveu é uma tag
+ * válida, a página daquela tag existe.**
+ *
+ * Devolve a tag limpa (sem `#`, minúscula, com acento preservado) ou `null`
+ * quando o que ela digitou não pode ser tag.
+ */
+export function tagDaBusca(termo: string): string | null {
+  const t = (termo ?? "").trim().replace(/^#+/, "").toLowerCase();
+  if (!t) return null;
+  /* ⚠️ **UMA RÉGUA SÓ: quem decide é `acharTags`.** A primeira versão repetia
+     aqui o teste de "tem letra?" — e a mutação provou que era código morto:
+     `acharTags` já recusa `#2026`, então a linha nunca mudava a resposta. Regra
+     duplicada que ninguém exercita é a que diverge no primeiro conserto. */
+  const so = acharTags(`#${t}`);
+  return so.length === 1 && so[0] === t ? t : null;
+}

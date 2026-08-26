@@ -98,6 +98,12 @@ export const Route = createFileRoute("/preview-instagram")({
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     restrito: q.restrito == null ? 0 : Number(q.restrito),
     silenciado: q.silenciado == null ? 0 : Number(q.silenciado),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    favorita: q.favorita == null ? 0 : Number(q.favorita),
+    /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
+    notas: q.notas == null ? 0 : Number(q.notas),
+    /* Uma mensagem recolhida pelo filtro de palavras DELA. */
+    oculta: q.oculta == null ? 0 : Number(q.oculta),
     /* ⚠️ `rascunhoStory`, e não `rascunho`: este último já existe e é o do
        compositor de POST. Duas bancadas do mesmo nome mostrariam o estado de
        uma na tela da outra. */
@@ -392,6 +398,9 @@ function Bancada() {
     tag,
     restrito,
     silenciado,
+    favorita,
+    notas,
+    oculta,
     rascunhoStory,
     fixados,
     quadro,
@@ -443,6 +452,7 @@ function Bancada() {
        silenciar alguém de verdade. Mesma falta do `?restrito=1`, no controle
        ao lado. */
     silenciado: silenciado === 1,
+    favorita: favorita === 1,
     /* ⚠️ `?restrito=1` fotografa o botão no estado LIGADO e o texto que ele
        mostra ali — impossível de ver sem uma restrição real, e é o texto que
        explica o recurso inteiro. */
@@ -1157,6 +1167,33 @@ function Bancada() {
           aoAbrir={() => {}}
           aoFalarCom={(id, rascunho) => alert(`abriria conversa com ${id}\n\n"${rascunho}"`)}
           bancada={CONVERSAS_DE_MENTIRA}
+          /* ⚠️ **AS NOTAS vivem 24 h e dependem do grafo.** Sem a bancada,
+             fotografar a fileira exigiria duas contas reais e uma nota escrita
+             na última hora. `?notas=1`. */
+          notasDeBancada={
+            notas === 1
+              ? [
+                  {
+                    autor: { id: "eu", nome: "Você", avatarUrl: null },
+                    texto: "hoje foi um dia bom 💛",
+                    criadaEm: "2026-08-25T20:00:00Z",
+                    souEu: true,
+                  },
+                  {
+                    autor: { id: "u2", nome: "Carol", avatarUrl: null },
+                    texto: "não consigo dormir 😅",
+                    criadaEm: "2026-08-25T23:10:00Z",
+                    souEu: false,
+                  },
+                  {
+                    autor: { id: "u3", nome: "Bruna", avatarUrl: null },
+                    texto: "enjoo voltou",
+                    criadaEm: "2026-08-25T18:00:00Z",
+                    souEu: false,
+                  },
+                ]
+              : []
+          }
           sugeridasDeBancada={daFase}
         />
       </div>
@@ -1268,6 +1305,25 @@ function Bancada() {
                       refTipo: "story" as const,
                       refId: "s1",
                     },
+                    /* ⚠️ **A MENSAGEM RECOLHIDA pelo filtro de palavras DELA.**
+                       Ela só nasce de uma lista de palavras escrita numa conta
+                       de verdade e de uma mensagem que caia nela — sem a
+                       bancada, o único jeito de olhar seria duas contas reais e
+                       a palavra certa. `?oculta=1`. */
+                    ...(oculta === 1
+                      ? [
+                          {
+                            id: "m8",
+                            souEu: false,
+                            /* ⚠️ O texto NÃO viaja quando está recolhido — o
+                               servidor manda `null`, e a bancada imita isso. */
+                            texto: null,
+                            criadaEm: "2026-08-24T10:50:00Z",
+                            apagada: false,
+                            recolhida: true,
+                          },
+                        ]
+                      : []),
                   ],
           }}
         />

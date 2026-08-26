@@ -324,3 +324,13 @@ export function textoDaCitacao(m: {
   if (m.refTipo === "story") return "↩ Story";
   return "mensagem";
 }
+
+/**
+ * ⚠️ **A NOTA É CURTA POR DESENHO, e 60 é o número.**
+ *
+ * O valor dela é ser lida de relance, numa fileira de bolinhas no topo do
+ * direct. Com 200 caracteres ela vira um post pequeno — e aí concorre com o
+ * post, que é o lugar certo para um texto longo. Sessenta cabe numa linha e
+ * meia embaixo de um avatar de 56px, que é o espaço que existe.
+ */
+export const TAMANHO_DA_NOTA = 60;

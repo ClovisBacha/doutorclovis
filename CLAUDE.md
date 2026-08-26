@@ -9165,3 +9165,177 @@ não é grafia — é o que impede um `undefined.propriedade`.
 **Bancadas novas:** `/preview-instagram?tela=bloqueados` (`&vazio=1`,
 `&instavel=1`) · `?tela=comentarios` (o fixado no topo, "Fixar"/"Desafixar", e o
 número que só vira botão no comentário dela) · `/preview-rede?pausada=1`.
+
+## E mais dez na rede — as que sobraram (ago/2026)
+
+Pedido do dono, na mesma noite: aplicar as dez acima e **levantar e aplicar
+outras dez**. Estas são as segundas dez, e cada uma foi CONFERIDA contra o
+código antes de entrar na lista — a lição das "três de seis que já existiam".
+
+**Aplicar no Supabase:** `supabase/APLICAR_MAIS_DEZ_DA_REDE.sql` (idempotente).
+
+### 1 · Denunciar um story — a última superfície sem denúncia
+
+Post, perfil, comentário, pergunta e mensagem já tinham. ⚠️ **E o story é o que
+MAIS precisa, porque ele EXPIRA:** o que não for denunciado em 24 h nunca chega
+à plataforma, e a próxima paciente recebe a mesma coisa da mesma pessoa.
+Bloquear existe, e bloquear não deixa rastro nenhum.
+
+- ⚠️ **O TRECHO é congelado, e aqui isso é o recurso inteiro** — sem a cópia, a
+  linha da administração apontaria para uma coisa que não existe mais.
+- ⚠️ **Sem o CHECK novo o banco recusa o alvo `story` com `23514`**, e a tela
+  DIZ isso em vez de prometer "fica registrada". É a promessa que este app já
+  quebrou uma vez, com `denunciado_em` gravado e nunca lido.
+
+⚠️ **E ela obrigou a régua do story a virar UMA.** O portão de visibilidade
+(vinte linhas cruzando `foraDaRede`, bloqueio, o vínculo e a CAMADA) vivia
+DUPLICADO em `votarNoStory` e `reagirAoStory`, e a terceira cópia ia nascer
+aqui. Virou `storyQueEuVejo` — e três testes que travavam o bloco inline ficaram
+vermelhos sobre uma unificação que só apertou a garantia.
+
+### 2 · O filtro de palavras passou a valer no DIRECT
+
+A lista que ela escreveu ("perdi", o nome de um hospital) existia só para a
+conversa PÚBLICA embaixo das fotos. ⚠️ **A mensagem privada é justamente onde o
+texto duro chega** — e onde ela não tem como saber o que vem antes de abrir.
+
+- **A MESMA lista e a MESMA régua** (`temPalavraOculta`), nunca uma segunda.
+- ⚠️ **O texto NÃO viaja recolhido**: mandá-lo com uma marca "esconda isto"
+  deixaria a palavra dentro da resposta da rede.
+- ⚠️ **A LINHA continua**, ao contrário do comentário: a conversa é de duas
+  pessoas, e uma mensagem que desaparece faz a conversa deixar de fazer sentido.
+- ⚠️ **Não vale para o que EU escrevi** — ela sabe o que digitou.
+- ⚠️ **Falha ao ler a lista NÃO esconde nada.** O pior caso é ela ver uma
+  palavra que preferia não ver, contra a conversa inteira recolhida por uma
+  falha de rede.
+
+### 3 · Editar um comentário
+
+⚠️ **APAGAR E ESCREVER DE NOVO NÃO É A MESMA COISA:** apagar leva junto as
+RESPOSTAS que penduraram nele, e o comentário volta ao fim da lista. Quem
+digitou "12 semanas" no lugar de "21" embaixo de um post sobre saúde tinha de
+escolher entre deixar o erro ou desmontar a conversa.
+
+- ⚠️ **A régua clínica roda DE NOVO** — sem ela, editar seria a porta dos fundos
+  do `comentar`: publica-se "que lindo" e troca-se depois por conduta.
+- ⚠️ **SÓ O TEXTO muda**, e **só quem escreveu edita** (nem a dona do post: ela
+  pode APAGAR, que é a decisão dela sobre a própria conversa).
+- ⚠️ **Sem a coluna do selo a edição VALE** — recusar seria tirar uma correção
+  por causa de um carimbo.
+
+### 4 · Marcar a conversa como não lida — e ela não precisou de coluna
+
+⚠️ **É a LIMPEZA do carimbo de leitura.** `lida_a`/`lida_b` guardam o INSTANTE
+da última leitura; apagá-lo é literalmente o que "não lida" significa, e um
+booleano ao lado seria uma segunda verdade sobre a mesma coisa. O caso de uso é
+o desta base: ela lê às três da manhã, não consegue responder, e quer lembrar.
+
+### 5 · As Notas — o recado curto que vive 24 h no topo do direct
+
+⚠️ **É o formato de MENOR risco da aba, e ele faltava.** "Não consigo dormir 😅"
+às três da manhã é exatamente o que ninguém publica como POST — post é para
+sempre e tem plateia — e é o que começa uma conversa.
+
+- ⚠️ **UMA por pessoa** (a chave primária é o autor): uma lista viraria um
+  segundo feed.
+- ⚠️ **Passa pela régua clínica** — é texto curto em que "toma buscopan que
+  passa" cabe inteiro.
+- ⚠️ **A validade é CALCULADA no `upsert`**, e não deixada no `DEFAULT`: o
+  `DEFAULT` só vale no INSERT, então a nota nova herdaria o `expira_em` da
+  anterior e sumiria antes da hora.
+- ⚠️ **60 caracteres**, e não 200: com 200 ela vira um post pequeno, e aí
+  concorre com o post.
+- ⚠️ **As vencidas nunca são apagadas na leitura** — abrir o direct viraria uma
+  escrita. Mesma decisão de `storiesDoFeed`.
+- ⚠️ **O BALÃO FICA ACIMA DO AVATAR, e não por cima dele.** A primeira versão o
+  pendurava em `absolute -top-3` sobre uma coluna de 68px: o texto quebrava em
+  cinco linhas, cobria o avatar inteiro e deixava o nome ilegível atrás.
+  **Foi a FOTO da bancada que pegou** — nenhuma asserção estava perto disso.
+
+### 6 · Favoritos — "ver primeiro", o oposto de silenciar
+
+Silenciar já existia; num feed CRONOLÓGICO, quem segue trinta pessoas perde a
+publicação da amiga que está passando por alguma coisa.
+
+⚠️ **E ele NÃO reordena o feed.** O feed continua cronológico, e isso é decisão
+escrita: um feed por "relevância" precisaria de engajamento como sinal, e numa
+base de alto risco **o post que mais engaja é o da EMERGÊNCIA**. Favoritar abre
+uma LISTA À PARTE, também cronológica, e a escolha é dela — explícita, nunca
+inferida do que ela toca.
+
+- ⚠️ **A lista não inclui os posts DELA**: no feed normal eles entram; aqui a
+  pergunta é "o que as minhas favoritas publicaram".
+- ⚠️ **É CALADO**, como o silenciar e o bloqueio.
+
+### 7 · Coleções nos salvos
+
+⚠️ **UMA COLUNA, e não uma tabela de coleções.** A coleção é um RÓTULO que ela
+escreve; uma tabela exigiria criar a pasta antes de salvar, e o gesto de salvar
+tem de continuar sendo um toque só. `NULL` = "Salvos", onde tudo que já foi
+salvo continua.
+
+⚠️ **E ela viaja À PARTE do post** (`colecaoDe`): `PostNaTela` é o mesmo tipo do
+feed, e um campo "colecao" ali sugeriria que a pasta é propriedade da
+PUBLICAÇÃO — ela é da linha de salvos, e é privada dela.
+
+### 8 · O título do destaque
+
+⚠️ **DESTAQUE SEM NOME É UMA GRADE DE IMAGENS.** O recurso existia desde
+ago/2026 e o perfil mostrava só os quadradinhos; "Ultrassons" e "Chá de bebê"
+são o que faz alguém tocar.
+
+- ⚠️ **Tirar do destaque LIMPA o título** — guardá-lo faria o nome antigo
+  reaparecer no dia em que ela destacasse outra coisa.
+- ⚠️ **O nome é pedido NO ATO de destacar**, nunca depois: um segundo passo é um
+  passo que a maioria pula.
+- ⚠️ **E numa FOLHA da própria tela, nunca `window.prompt`.** Eu escrevi o
+  `prompt` primeiro — no app instalado o diálogo do sistema abre com o nome do
+  domínio em cima, que é a cara de "site embrulhado" da diretriz 4.2 da Apple, e
+  é a lição que este repositório já tinha registrado para `alert`/`confirm`.
+
+### 9 · Marcar alguém num story
+
+⚠️ **TABELA PRÓPRIA, e não `story_id` em `rede_marcacoes`.** Lá o `post_id` é
+`NOT NULL` e faz parte da CHAVE PRIMÁRIA: torná-lo opcional exigiria trocar a
+chave, e a chave é o que impede a marcação duplicada.
+
+- ⚠️ **A régua de permissão é a MESMA do post** (`marcadasPermitidas`): copiá-la
+  faria as duas divergirem, e a divergência apareceria como o nome de quem
+  encerrou a amizade voltando a aparecer embaixo de uma foto de barriga.
+- ⚠️ **O story NÃO grava linha na caixa ♡**: ele vive 24 h, e um aviso
+  permanente sobre uma coisa que some no dia seguinte deixaria a caixa cheia de
+  linhas que não resolvem em nada.
+- ⚠️ **O `id` volta do INSERT**, e não de uma leitura depois: reler "o story mais
+  novo dela" seria uma corrida, e dois aparelhos publicando no mesmo instante
+  marcariam a pessoa no story errado.
+
+### 10 · A busca de hashtag — e ela não precisou de tabela
+
+Quem ouviu falar de `#trigemeas` numa conversa não tinha caminho nenhum até lá:
+a página da tag existia e só se chegava nela tocando numa legenda que já a
+continha — **só quem já a tinha encontrado conseguia encontrá-la**.
+
+⚠️ **`tagDaBusca` responde pelo FORMATO do termo, e não consulta o servidor.**
+Uma consulta "existe esta tag?" por tecla digitada seria uma ida ao banco para
+uma pergunta que a própria página da tag responde melhor — com o vazio dela, que
+explica a régua ("só publicações públicas").
+
+⚠️ **E a mutação achou uma regra DUPLICADA que eu tinha acabado de escrever:** o
+teste de "tem letra?" já mora em `acharTags`, então a linha repetida aqui nunca
+mudava a resposta. Regra duplicada que ninguém exercita é a que diverge no
+primeiro conserto — saiu.
+
+### ⚠️ E a nona vez do mesmo erro de teste
+
+Três testes travavam o bloco inline do portão do story e ficaram vermelhos sobre
+a unificação em `storyQueEuVejo`. **Nona vez neste repositório.** A régua não
+muda: cobre a GARANTIA (o portão roda antes da escrita, e a régua única cruza os
+quatro termos), nunca a grafia.
+
+⚠️ **A exceção que vale ouro** continua sendo a ORDEM numa corrente de `&&`:
+`foraDaRede(x) && x.perfil_publico` não é estética — é o que impede um
+`undefined.propriedade`. Esse teste pegou um defeito real duas vezes.
+
+**Bancadas novas:** `/preview-instagram?tela=conversas&notas=1` (a fileira de
+notas) · `?tela=conversa&oculta=1` (a mensagem recolhida pelo filtro) ·
+`?tela=perfil&favorita=1` (o "Tirar dos favoritos").

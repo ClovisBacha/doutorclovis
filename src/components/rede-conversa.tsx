@@ -14,12 +14,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ConversaNaTela, MensagemNaTela } from "@/lib/conversa.functions";
+import type { ConversaNaTela, MensagemNaTela, NotaNaTela } from "@/lib/conversa.functions";
 import {
   BYTES_DA_FOTO,
   LIMITE_DA_MENSAGEM,
   REACOES_DE_MENSAGEM,
   textoDaCitacao,
+  TAMANHO_DA_NOTA,
 } from "@/lib/conversa";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
 import {
@@ -159,6 +160,7 @@ export function CaixaDeEntrada({
   aoFalarCom,
   bancada,
   sugeridasDeBancada,
+  notasDeBancada,
 }: {
   aoVoltar: () => void;
   aoAbrir: (conversa: ConversaNaTela) => void;
@@ -174,11 +176,22 @@ export function CaixaDeEntrada({
    * é exatamente assim que uma tela passa meses sem ninguém nunca ter olhado.
    */
   sugeridasDeBancada?: CandidataAConversa[];
+  /**
+   * As notas, injetadas pela bancada.
+   *
+   * ⚠️ Elas vivem 24 h e dependem do grafo — sem a bancada, fotografar a
+   * fileira exigiria duas contas reais e uma nota escrita na última hora.
+   */
+  notasDeBancada?: NotaNaTela[];
 }) {
   const [lista, setLista] = useState<ConversaNaTela[] | null>(bancada ?? null);
   const [erro, setErro] = useState(false);
   const [vendoPedidos, setVendoPedidos] = useState(false);
   const [sugeridas, setSugeridas] = useState<CandidataAConversa[]>(sugeridasDeBancada ?? []);
+  const [notas, setNotas] = useState<NotaNaTela[]>(notasDeBancada ?? []);
+  /** `null` = ninguém aberto. A minha abre o campo; a das outras, o texto. */
+  const [notaAberta, setNotaAberta] = useState<NotaNaTela | null>(null);
+  const [rascunhoDaNota, setRascunhoDaNota] = useState("");
 
   const carregar = useCallback(async () => {
     if (bancada) return;
@@ -197,11 +210,17 @@ export function CaixaDeEntrada({
          `conversasSugeridas` já devolve lista vazia em vez de erro, pela mesma
          razão. */
       try {
-        const { conversasSugeridas } = await import("@/lib/conversa.functions");
-        const sug = await conversasSugeridas({ data: { accessToken: t } });
+        const mod = await import("@/lib/conversa.functions");
+        /* ⚠️ Notas e sugeridas na MESMA onda: são duas consultas independentes,
+           e em série a fileira só apareceria depois da outra. */
+        const [sug, nt] = await Promise.all([
+          mod.conversasSugeridas({ data: { accessToken: t } }),
+          mod.notasDeQuemEuSigo({ data: { accessToken: t } }),
+        ]);
         if (sug.ok) setSugeridas(sug.sugeridas);
+        if (nt.ok) setNotas(nt.notas as NotaNaTela[]);
       } catch {
-        /* Sem fileira, a caixa continua inteira. */
+        /* Sem fileira e sem notas, a caixa continua inteira. */
       }
     } catch {
       setErro(true);
@@ -211,6 +230,54 @@ export function CaixaDeEntrada({
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  const [recadoDaNota, setRecadoDaNota] = useState<string | null>(null);
+
+  async function marcarNaoLida(conversaId: string) {
+    /* Pinta na hora: é um toque, e esperar a rede deixaria o ponto apagado. */
+    setLista((atual) =>
+      (atual ?? []).map((c) => (c.id === conversaId ? { ...c, naoLida: true } : c)),
+    );
+    try {
+      const t = await token();
+      if (!t) return;
+      const { marcarConversaNaoLida } = await import("@/lib/conversa.functions");
+      const r = await marcarConversaNaoLida({ data: { accessToken: t, conversaId } });
+      if (!r.ok) throw new Error("recusado");
+    } catch {
+      /* ⚠️ Desfaz: um ponto aceso sobre uma conversa que o servidor considera
+         lida some sozinho na próxima abertura, e ela acharia que o app perde
+         a marcação. */
+      setLista((atual) =>
+        (atual ?? []).map((c) => (c.id === conversaId ? { ...c, naoLida: false } : c)),
+      );
+    }
+  }
+
+  async function salvarNota(texto: string | null) {
+    setRecadoDaNota(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { escreverNota } = await import("@/lib/conversa.functions");
+      const r = await escreverNota({ data: { accessToken: t, texto } });
+      if (!r.ok) {
+        /* ⚠️ **A recusa clínica é DITA, e o texto NÃO é apagado.** É a mesma
+           decisão do comentário: ela acabou de escrever, e limpar o campo
+           obriga a redigitar tudo para trocar uma frase. */
+        setRecadoDaNota(
+          "motivo" in r && r.motivo === "clinico"
+            ? "Essa frase parece pedir ou dar uma orientação de saúde. Fale com o seu médico — aqui a gente guarda o resto."
+            : "Não deu para publicar agora.",
+        );
+        return;
+      }
+      setNotaAberta(null);
+      void carregar();
+    } catch {
+      setRecadoDaNota("Não deu para publicar agora.");
+    }
+  }
 
   /* ⚠️ Pedido que EU mandei fica na lista NORMAL: ele é uma conversa minha
      esperando resposta, não um pedido para eu decidir. A caixa de pedidos é só
@@ -251,6 +318,88 @@ export function CaixaDeEntrada({
         <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
           Elas não podem escrever de novo até você responder.
         </p>
+      )}
+
+      {/* ─── AS NOTAS ────────────────────────────────────────────────────
+          ⚠️ **O FORMATO DE MENOR RISCO DA ABA, e ele faltava.** "Não consigo
+          dormir 😅" às três da manhã é exatamente o que ninguém publica como
+          POST — post é para sempre e tem plateia — e é o que começa uma
+          conversa numa comunidade de gestação.
+
+          ⚠️ **E ela fica na caixa PRINCIPAL, nunca na de pedidos**, pela mesma
+          razão da fileira de sugeridas logo abaixo. */}
+      {!vendoPedidos && (
+        <section className="border-b border-border px-4 pb-3 pt-1">
+          {/* ⚠️ **O BALÃO FICA ACIMA DO AVATAR, e não POR CIMA dele.** A
+              primeira versão pendurava o balão em `absolute -top-3` sobre uma
+              coluna de 68px: "hoje foi um dia bom 💛" quebrava em cinco linhas
+              dentro de 92px, cobria o avatar inteiro e deixava o nome ilegível
+              atrás dele. Foi a FOTO da bancada que pegou — nenhuma asserção
+              estava perto disso.
+
+              O `pt-9` reserva a faixa do balão, e o balão ocupa a largura
+              inteira da coluna: o avatar aparece limpo embaixo, e o texto que
+              não couber em duas linhas é cortado — quem quiser o resto toca, e
+              a folha mostra inteiro. */}
+          <div className="flex gap-2 overflow-x-auto pt-9">
+            {/* A minha vem primeiro: é ela que abre o campo de escrever. */}
+            {!notas.some((n) => n.souEu) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRascunhoDaNota("");
+                  setNotaAberta({
+                    autor: { id: "eu", nome: "Você", avatarUrl: null },
+                    texto: "",
+                    criadaEm: "",
+                    souEu: true,
+                  });
+                }}
+                className="press flex w-[84px] shrink-0 flex-col items-center gap-1"
+              >
+                <span className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed border-border text-[18px] text-muted-foreground">
+                  ＋
+                </span>
+                <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+                  Sua nota
+                </span>
+              </button>
+            )}
+            {notas.map((n) => (
+              <button
+                key={n.autor.id}
+                type="button"
+                onClick={() => {
+                  setRascunhoDaNota(n.souEu ? n.texto : "");
+                  setNotaAberta(n);
+                }}
+                className="press relative flex w-[84px] shrink-0 flex-col items-center gap-1"
+              >
+                {/* ⚠️ `-top-9` casa com o `pt-9` do container: o balão vive na
+                    faixa reservada, e nunca sobre o avatar. */}
+                <span className="absolute -top-9 left-0 right-0 rounded-xl bg-muted px-1.5 py-1 text-[10px] leading-tight">
+                  <span className="line-clamp-2 block break-words">{n.texto}</span>
+                </span>
+                <span className="relative">
+                  {n.autor.avatarUrl ? (
+                    <img
+                      src={n.autor.avatarUrl}
+                      alt=""
+                      className="h-14 w-14 rounded-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-[16px] font-semibold">
+                      {(n.autor.nome.trim()[0] ?? "?").toUpperCase()}
+                    </span>
+                  )}
+                </span>
+                <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+                  {n.souEu ? "Você" : n.autor.nome}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* ⚠️ **A FILEIRA SÓ APARECE NA CAIXA PRINCIPAL, nunca na de pedidos.**
@@ -298,26 +447,47 @@ export function CaixaDeEntrada({
       )}
 
       {mostrando.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          onClick={() => aoAbrir(c)}
-          className="press flex w-full items-center gap-3 px-4 py-2.5 text-left"
-        >
-          <Avatar url={c.comAvatar} nome={c.comNome} />
-          <span className="min-w-0 flex-1">
-            <span className="flex items-center gap-1.5">
-              <span className="truncate text-[15px] font-semibold">{c.comNome}</span>
-              {c.pedido && c.euIniciei && (
-                <span className="shrink-0 text-[11px] text-muted-foreground">aguardando</span>
-              )}
+        /* ⚠️ **A LINHA VIROU `div`, e o botão está DENTRO dela.** Um `<button>`
+            dentro de outro é HTML inválido — o navegador desmonta a árvore, e o
+            botão de dentro simplesmente não recebe o toque. */
+        <div key={c.id} className="flex w-full items-center gap-1 px-4 py-2.5">
+          <button
+            type="button"
+            onClick={() => aoAbrir(c)}
+            className="press flex min-w-0 flex-1 items-center gap-3 text-left"
+          >
+            <Avatar url={c.comAvatar} nome={c.comNome} />
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5">
+                <span className="truncate text-[15px] font-semibold">{c.comNome}</span>
+                {c.pedido && c.euIniciei && (
+                  <span className="shrink-0 text-[11px] text-muted-foreground">aguardando</span>
+                )}
+              </span>
+              <span className="block truncate text-[13px] text-muted-foreground">{c.previa}</span>
             </span>
-            <span className="block truncate text-[13px] text-muted-foreground">{c.previa}</span>
-          </span>
-          {/* ⚠️ O ponto, e não um número: numa conversa "quantas não li" não
-              muda o que ela vai fazer — ela vai abrir do mesmo jeito. */}
-          {c.naoLida && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />}
-        </button>
+            {/* ⚠️ O ponto, e não um número: numa conversa "quantas não li" não
+                muda o que ela vai fazer — ela vai abrir do mesmo jeito. */}
+            {c.naoLida && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />}
+          </button>
+          {/* ⚠️ **MARCAR COMO NÃO LIDA — e o caso de uso é o desta base.** Ela lê
+              a mensagem às três da manhã, não consegue responder, e quer
+              lembrar. Sem isto o emblema zera no instante em que ela abre, e a
+              conversa some do topo da cabeça dela junto.
+
+              ⚠️ Só aparece no que ela JÁ leu: num ponto aceso o botão não teria
+              o que fazer. */}
+          {!c.naoLida && !c.pedido && (
+            <button
+              type="button"
+              onClick={() => void marcarNaoLida(c.id)}
+              aria-label={`Marcar a conversa com ${c.comNome} como não lida`}
+              className="press flex h-11 w-8 shrink-0 items-center justify-center text-[13px] text-muted-foreground"
+            >
+              ⌾
+            </button>
+          )}
+        </div>
       ))}
 
       {vendoPedidos && (
@@ -328,6 +498,75 @@ export function CaixaDeEntrada({
         >
           ‹ voltar para as mensagens
         </button>
+      )}
+      {/* ─── A FOLHA DA NOTA ─────────────────────────────────────────────
+          ⚠️ **A MINHA abre o CAMPO; a das outras, só o texto.** Não há
+          responder, curtir nem reagir — uma nota é um sinal, e transformá-la
+          em conversa criaria um segundo direct dentro do direct. Quem quer
+          responder abre a conversa, que está logo abaixo na mesma tela. */}
+      {notaAberta && (
+        <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-border bg-card p-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-[14px] font-semibold">
+              {notaAberta.souEu ? "Sua nota" : `Nota de ${notaAberta.autor.nome}`}
+            </p>
+            <button
+              type="button"
+              onClick={() => setNotaAberta(null)}
+              aria-label="Fechar"
+              className="press -m-2 flex h-11 w-11 shrink-0 items-center justify-center text-[13px] text-muted-foreground"
+            >
+              ×
+            </button>
+          </div>
+
+          {notaAberta.souEu ? (
+            <>
+              <textarea
+                value={rascunhoDaNota}
+                onChange={(e) => setRascunhoDaNota(e.target.value.slice(0, TAMANHO_DA_NOTA))}
+                rows={2}
+                placeholder="Uma frase que some em 24 horas…"
+                className="mt-2 w-full resize-none rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
+              />
+              <div className="mt-1 flex items-center justify-between">
+                {/* ⚠️ O contador diz o LIMITE, e não só quantos faltam: sem ele
+                    ela digita e o campo para de aceitar sem explicar. */}
+                <span className="text-[11px] text-muted-foreground">
+                  {rascunhoDaNota.length}/{TAMANHO_DA_NOTA} · some em 24 horas
+                </span>
+                <div className="flex gap-2">
+                  {notaAberta.texto && (
+                    <button
+                      type="button"
+                      onClick={() => void salvarNota(null)}
+                      className="press min-h-[44px] text-[13px] text-muted-foreground"
+                    >
+                      Apagar
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!rascunhoDaNota.trim()}
+                    onClick={() => void salvarNota(rascunhoDaNota)}
+                    className="press min-h-[44px] rounded-full px-3 text-[13px] font-semibold text-primary disabled:opacity-40"
+                  >
+                    Publicar
+                  </button>
+                </div>
+              </div>
+              {recadoDaNota && (
+                <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-[12px] leading-snug">
+                  {recadoDaNota}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="mt-2 whitespace-pre-wrap break-words text-[14px] leading-snug">
+              {notaAberta.texto}
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
@@ -366,6 +605,8 @@ export function Conversa({
   const [apagando, setApagando] = useState<string | null>(null);
   /** A mensagem cuja folha de ações está aberta. */
   const [acaoEm, setAcaoEm] = useState<string | null>(null);
+  /** ⚠️ Local e por mensagem — ver o bloco do filtro de palavras abaixo. */
+  const [reveladas, setReveladas] = useState<Set<string>>(() => new Set());
   /** A mensagem que estou citando ao escrever. */
   const [citando, setCitando] = useState<MensagemNaTela | null>(null);
   /** A mensagem que estou denunciando (a folha do motivo). */
@@ -864,7 +1105,31 @@ export function Conversa({
                       {m.refTipo === "story" ? "↩ Respondeu ao story" : "🖼 Publicação"}
                     </button>
                   )}
-                  {m.texto && <span className="whitespace-pre-wrap break-words">{m.texto}</span>}
+                  {/* ⚠️ **RECOLHIDA PELO FILTRO DE PALAVRAS: a linha existe, o
+                      texto não.** Entregar o texto e avisar depois é o pior
+                      desfecho possível de um filtro — ela já leu. Aqui, ao
+                      contrário do comentário, a linha NÃO some: a conversa é de
+                      duas pessoas, e uma mensagem que desaparece faria a
+                      conversa deixar de fazer sentido. Ela abre no toque.
+
+                      ⚠️ E o estado é LOCAL e por MENSAGEM (`reveladas`): revelar
+                      uma não pode revelar as outras — ela escondeu aquela
+                      palavra de propósito. */}
+                  {m.recolhida && !reveladas.has(m.id) ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReveladas((v) => new Set(v).add(m.id));
+                      }}
+                      className="press block text-left italic opacity-80"
+                    >
+                      Mensagem escondida pelo seu filtro de palavras.{" "}
+                      <span className="font-medium not-italic underline">Ver mesmo assim</span>
+                    </button>
+                  ) : (
+                    m.texto && <span className="whitespace-pre-wrap break-words">{m.texto}</span>
+                  )}
                   {/* ⚠️ **O ✓✓ SÓ EXISTE NA MINHA MENSAGEM.** Do lado dela seria
                       o app afirmando que EU li — informação que ela não tem como
                       conferir. `foiLidaPeloOutro` já garante isso no servidor;

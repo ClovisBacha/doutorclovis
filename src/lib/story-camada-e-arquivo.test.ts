@@ -102,9 +102,16 @@ describe("⚠️ o servidor aplica a camada em TODOS os portões", () => {
      * mas o servidor aceitava a ação, e o afago chegava à caixa ♡ da autora
      * vindo de alguém que nunca devia ter visto aquilo.
      */
+    /* ⚠️ A camada mora na régua ÚNICA (`storyQueEuVejo`) desde que as duas
+       cópias inline viraram uma — o que se cobra é que os dois portões PASSEM
+       por ela, e que ela cruze a camada. Travar `storyAlcanca({` dentro de cada
+       função reprovou a unificação, que só apertou a garantia. */
     for (const fn of ["reagirAoStory", "votarNoStory"]) {
-      expect(corpoDe(fn)).toContain("storyAlcanca({");
+      expect(corpoDe(fn)).toContain("storyQueEuVejo(sb, data.storyId, eu");
     }
+    const fonte = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+    const i = fonte.indexOf("async function storyQueEuVejo");
+    expect(fonte.slice(i, i + 1600)).toContain("storyAlcanca({");
   });
 
   test("⚠️ a leitura dos portões tem DEGRAU — senão reagir para de funcionar", () => {

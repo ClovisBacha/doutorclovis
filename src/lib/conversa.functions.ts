@@ -30,6 +30,7 @@ import {
   textoDaCitacao,
   alvoDaCitacao,
   reacaoDeMensagemConhecida,
+  TAMANHO_DA_NOTA,
 } from "./conversa";
 
 export type ConversaNaTela = {
@@ -53,6 +54,13 @@ export type MensagemNaTela = {
   texto: string | null;
   criadaEm: string;
   apagada: boolean;
+  /**
+   * Recolhida pelo FILTRO DE PALAVRAS dela — a linha existe, o texto não.
+   *
+   * ⚠️ Vale só para o que a OUTRA escreveu: esconder a própria mensagem seria o
+   * app escondendo dela a própria voz.
+   */
+  recolhida?: boolean;
   /** Já assinada, e só por uma hora. `null` quando a mensagem é só texto. */
   imagemUrl?: string | null;
   /** O que ela anexa, quando nasceu de dentro do app. */
@@ -469,6 +477,49 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
       }
     }
 
+    /**
+     * ⚠️ **O FILTRO DE PALAVRAS PASSOU A VALER NO DIRECT — e ele é mais
+     * necessário aqui do que nos comentários.**
+     *
+     * A lista que ela escreveu ("perdi", o nome de um hospital) existia só para
+     * a conversa PÚBLICA embaixo das fotos. A mensagem privada é justamente
+     * onde o texto duro chega — e onde ela não tem como saber o que vem antes
+     * de abrir. É a MESMA lista e a MESMA régua (`temPalavraOculta`), nunca uma
+     * segunda: duas divergiriam no primeiro conserto, e a divergência
+     * apareceria como a palavra escondida num lugar e à mostra no outro.
+     *
+     * ⚠️ **ESCONDE, NUNCA APAGA, e o texto NÃO viaja recolhido.** Diferente do
+     * comentário (onde a linha recolhida some para terceiros), aqui a conversa
+     * é de duas pessoas: a linha continua, sem o texto, e ela abre no toque se
+     * quiser. Mandar o texto com uma marca "esconda isto" deixaria a palavra
+     * dentro da resposta da rede.
+     *
+     * ⚠️ **E o filtro NÃO vale para o que EU escrevi.** Ela sabe o que digitou;
+     * esconder a própria mensagem seria o app escondendo dela a própria voz.
+     */
+    const palavras = await (async () => {
+      try {
+        const { data: p } = await sb
+          .from("patient_profiles")
+          .select("palavras_ocultas")
+          .eq("id", eu)
+          .maybeSingle();
+        const { limparPalavrasOcultas } = await import("./comentarios");
+        return limparPalavrasOcultas(((p as any)?.palavras_ocultas ?? []) as string[]);
+      } catch {
+        /* ⚠️ Falha ao ler a lista NÃO esconde nada — o pior caso é ela ver uma
+           palavra que preferia não ver, contra o caso oposto, que é a conversa
+           inteira recolhida por uma falha de rede. */
+        return [] as string[];
+      }
+    })();
+    const { temPalavraOculta } = await import("./comentarios");
+    const escondeu = (m: any) =>
+      m.autor_id !== eu &&
+      !m.apagada_em &&
+      palavras.length > 0 &&
+      temPalavraOculta((m.texto ?? "") as string, palavras);
+
     const mensagens: MensagemNaTela[] = brutas
       .map((m) => ({
         id: m.id,
@@ -476,9 +527,11 @@ export const mensagensDaConversa = createServerFn({ method: "POST" })
         /* ⚠️ O TEXTO DA APAGADA NÃO VIAJA. Mandá-lo com um `apagada: true` para
            a tela esconder deixaria a mensagem apagada dentro da resposta da
            rede — visível para quem abrisse o inspetor. */
-        texto: m.apagada_em ? null : (m.texto ?? null),
+        texto: m.apagada_em || escondeu(m) ? null : (m.texto ?? null),
         criadaEm: m.criada_em,
         apagada: !!m.apagada_em,
+        /** Recolhida pelo filtro de palavras DELA. O texto não viaja. */
+        recolhida: escondeu(m),
         /* ⚠️ A foto da apagada também não viaja — mesma decisão do texto. */
         imagemUrl: m.apagada_em ? null : (assinadas.get(m.imagem_path) ?? null),
         refTipo: m.apagada_em ? null : ((m.ref_tipo ?? null) as "post" | "story" | null),
@@ -1241,3 +1294,171 @@ export const conversasSugeridas = createServerFn({ method: "POST" })
 function hojeEmSaoPauloLocal(): Date {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
 }
+
+/**
+ * MARCAR COMO NÃO LIDA — e ela NÃO precisou de coluna nenhuma.
+ *
+ * ⚠️ **É a LIMPEZA do carimbo de leitura**, e não um booleano novo. `lida_a`/
+ * `lida_b` guardam o INSTANTE da última leitura; apagá-lo é literalmente o que
+ * "não lida" significa, e um booleano ao lado seria uma segunda verdade sobre a
+ * mesma coisa — no dia em que os dois discordassem, o emblema diria um número e
+ * a lista mostraria outro.
+ *
+ * ⚠️ **E o caso de uso é o desta base:** ela lê uma mensagem às três da manhã,
+ * não consegue responder, e quer lembrar. Sem isto, o emblema zera no instante
+ * em que ela abre — e a conversa some do topo da cabeça dela junto.
+ *
+ * ⚠️ **Só do MEU lado**, por `minhaColuna`: invertida, ela marcaria a conversa
+ * da OUTRA como não lida, e o celular da amiga acenderia sozinho.
+ */
+export const marcarConversaNaoLida = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z.object({ accessToken: z.string().min(10), conversaId: z.string().uuid() }).parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const c = await minhaConversa(sb, data.conversaId, eu);
+    if (!c) return { ok: false as const, motivo: "nao_e_minha" as const };
+
+    const coluna = minhaColunaDeLeitura(eu, c.a_id);
+    const { error } = await sb
+      .from("rede_conversas")
+      .update({ [coluna]: null })
+      .eq("id", data.conversaId);
+    if (error) return { ok: false as const, motivo: "banco" as const };
+    return { ok: true as const };
+  });
+
+/**
+ * AS NOTAS — o recado curto que vive 24 h no topo do direct.
+ *
+ * ⚠️ **É o formato de MENOR risco da aba, e ele faltava.** "Não consigo dormir
+ * 😅" às três da manhã é exatamente o que ninguém publica como POST — post é
+ * para sempre e tem plateia —, e é o que começa uma conversa numa comunidade de
+ * gestação. O custo de escrever é uma frase; o de ler, um relance.
+ *
+ * ⚠️ **UMA POR PESSOA: a nota SUBSTITUI a anterior.** Uma lista viraria um
+ * segundo feed, e o valor dela é justamente ser uma frase só.
+ *
+ * ⚠️ **E ELA PASSA PELA RÉGUA CLÍNICA.** É texto curto e público para o círculo
+ * dela — o formato em que "toma buscopan que passa" cabe inteiro. A recusa é a
+ * mesma do comentário: não publica, e diz por quê.
+ */
+export const escreverNota = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        /** `null` apaga a nota. */
+        texto: z.string().max(TAMANHO_DA_NOTA).nullable(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    /* ⚠️ **Modo Cuidado e pausa NÃO escrevem nota.** A régua é a mesma de tudo
+       nesta aba: quem está fora da rede não aparece nela. */
+    const { foraDaRede, perfisPorId } = await import("./rede-social.functions");
+    const perfis = await perfisPorId(sb, [eu]);
+    if (foraDaRede(perfis.get(eu))) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const limpo = (data.texto ?? "").trim();
+    if (!limpo) {
+      const { error } = await sb.from("rede_notas").delete().eq("autor_id", eu);
+      if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+      return { ok: true as const };
+    }
+
+    const { triarTexto } = await import("./pergunta-clinica");
+    const desfecho = triarTexto(limpo);
+    if (desfecho !== "publicavel") {
+      return { ok: false as const, motivo: "clinico" as const };
+    }
+
+    const { error } = await sb.from("rede_notas").upsert(
+      {
+        autor_id: eu,
+        texto: limpo,
+        criada_em: new Date().toISOString(),
+        /* ⚠️ **A validade é CALCULADA aqui, e não deixada no `DEFAULT`.** O
+           `DEFAULT` só vale no INSERT: num `upsert` que atualiza, a nota nova
+           herdaria o `expira_em` da anterior e sumiria antes da hora. */
+        expira_em: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+      },
+      { onConflict: "autor_id" },
+    );
+    if (error) return { ok: false as const, motivo: "sem_suporte" as const };
+    return { ok: true as const };
+  });
+
+/** Uma nota, já pronta para a fileira do topo do direct. */
+export type NotaNaTela = {
+  autor: { id: string; nome: string; avatarUrl: string | null };
+  texto: string;
+  criadaEm: string;
+  souEu: boolean;
+};
+
+/**
+ * AS NOTAS DE QUEM ELA CONHECE.
+ *
+ * ⚠️ **O RECORTE É O GRAFO, e nunca "todo mundo".** Uma nota é uma frase solta
+ * sem contexto nenhum; vinda de uma desconhecida, ela não diz nada e ainda
+ * ocupa o topo do direct. Só quem ela SEGUE ou de quem é AMIGA — e a dela
+ * primeiro, para ela ver o que escreveu.
+ *
+ * ⚠️ **E as vencidas nunca são APAGADAS na leitura.** Apagar numa consulta de
+ * tela transformaria abrir o direct numa escrita — a mesma decisão de
+ * `storiesDoFeed` com os stories expirados. Elas ficam, e o filtro é a data.
+ */
+export const notasDeQuemEuSigo = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const eu = await pacienteDaSessao(data.accessToken);
+    if (!eu) return { ok: false as const, motivo: "sessao" as const };
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const sb = supabaseAdmin as any;
+
+    const { contextoDe, perfisPorId, foraDaRede, naFileira } =
+      await import("./rede-social.functions");
+    const ctx = await contextoDe(sb, eu);
+    const de = [...new Set([eu, ...ctx.sigo, ...ctx.amigas])].filter(
+      (id) => id === eu || (!ctx.bloqueio.has(id) && !ctx.silenciados.has(id)),
+    );
+
+    const { data: linhas, error } = await sb
+      .from("rede_notas")
+      .select("autor_id, texto, criada_em")
+      .in("autor_id", de.slice(0, 200))
+      .gt("expira_em", new Date().toISOString())
+      .order("criada_em", { ascending: false })
+      .limit(50);
+    /* ⚠️ Sem a tabela, a fileira simplesmente não existe — nunca um erro na
+       tela por causa de um recurso que aquele banco ainda não tem. */
+    if (error) return { ok: true as const, notas: [] };
+
+    const ids = ((linhas ?? []) as any[]).map((l) => l.autor_id as string);
+    const perfis = await perfisPorId(sb, ids);
+    const notas = ((linhas ?? []) as any[])
+      /* ⚠️ Quem entrou em luto ou pausou some daqui como some de tudo. */
+      .filter((l) => !foraDaRede(perfis.get(l.autor_id)))
+      .map((l) => ({
+        autor: naFileira(perfis.get(l.autor_id)),
+        texto: l.texto as string,
+        criadaEm: l.criada_em as string,
+        souEu: l.autor_id === eu,
+      }));
+    /* A minha primeiro: é ela que abre o campo de escrever. */
+    notas.sort((a, b) => (a.souEu === b.souEu ? 0 : a.souEu ? -1 : 1));
+    return { ok: true as const, notas };
+  });

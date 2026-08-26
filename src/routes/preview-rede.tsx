@@ -43,6 +43,7 @@ const PERFIL: PerfilNaTela = {
   meuVinculo: null,
   souEu: true,
   silenciado: false,
+  favorita: false,
   seguidores: 137,
   seguindo: 64,
   euSigo: 64,
