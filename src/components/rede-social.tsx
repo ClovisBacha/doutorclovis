@@ -41,7 +41,7 @@ import {
 import { PALAVRA_OCULTA_MAX, limparPalavrasOcultas } from "@/lib/comentarios";
 import { TEXTO_PERFIL_PUBLICO } from "@/lib/chaves-do-perfil";
 import { linkDaVitrine } from "@/lib/perfil-publico";
-import { LIMITE_DA_BIO } from "@/lib/rede-social";
+import { AVISOS_QUE_ELA_DESLIGA, LIMITE_DA_BIO } from "@/lib/rede-social";
 import type { PerfilNaTela } from "@/lib/rede-social.functions";
 
 function Avatar({
@@ -86,6 +86,8 @@ export type BancadaDaRede = {
   pedidos?: { id: string; nome: string; avatarUrl: string | null }[];
   /** ⚠️ Só a bancada: a pausa nasce do servidor e exige sessão. */
   pausada?: boolean;
+  /** ⚠️ Só a bancada: as preferências nascem do servidor e exigem sessão. */
+  avisosDesligados?: string[];
 };
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -383,6 +385,7 @@ export function ConfiguracoesDoPerfil({
         setBio(r.perfil.bio ?? "");
         setPedidos(r.pedidos as typeof pedidos);
         setPausada(!!(r as { pausada?: boolean }).pausada);
+        setAvisosDesligados((r as { avisosDesligados?: string[] }).avisosDesligados ?? []);
       }
     } catch {
       /* Sem perfil a seção some. */
@@ -405,6 +408,45 @@ export function ConfiguracoesDoPerfil({
    * para ele vazar um dia.
    */
   const [pausada, setPausada] = useState(!!bancada?.pausada);
+
+  /**
+   * ⚠️ **ESTADO PRÓPRIO, e não um campo de `perfil`.** `PerfilNaTela` descreve
+   * também o perfil de OUTRA pessoa — e o que eu escolho receber não é da conta
+   * de ninguém.
+   */
+  const [avisosDesligados, setAvisosDesligados] = useState<string[]>(
+    bancada?.avisosDesligados ?? [],
+  );
+
+  async function mudarAviso(chave: string, ligar: boolean) {
+    const antes = avisosDesligados;
+    const depois = ligar ? antes.filter((c) => c !== chave) : [...antes, chave];
+    /* Pinta antes: é um interruptor, e esperar a rede o deixaria inerte. */
+    setAvisosDesligados(depois);
+    setSalvando(true);
+    try {
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) throw new Error("sem sessão");
+      const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
+      const r = await salvarPerfilSocial({
+        data: { accessToken: token, avisosDesligados: depois },
+      });
+      if (!r.ok) throw new Error("recusado");
+      /* ⚠️ `parcial` = o banco não tem a coluna, e o recuo salvou o resto.
+         Deixar a chave apagada aqui faria a tela afirmar que o aviso parou
+         enquanto ele continua chegando. */
+      if ("parcial" in r && r.parcial) {
+        setAvisosDesligados(antes);
+        toast.error("Essa preferência ainda não está pronta no servidor.");
+      }
+    } catch {
+      setAvisosDesligados(antes);
+      toast.error("Não deu para mudar agora.");
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   async function pausar(ligar: boolean) {
     setSalvando(true);
@@ -666,6 +708,52 @@ export function ConfiguracoesDoPerfil({
           )}
         </section>
       )}
+
+      {/* ─── O QUE VOCÊ QUER SABER ───────────────────────────────────────
+          ⚠️ **"OU TUDO, OU NADA" ERA A ÚNICA ESCOLHA.** Até aqui, parar de
+          receber aviso da Comunidade significava desligar a notificação do app
+          INTEIRO — o mesmo canal por onde chega o aviso de emergência e o
+          lembrete de consulta. Numa gestação de alto risco isso é uma escolha
+          que ninguém deveria ter de fazer.
+
+          ⚠️ **A lista só mostra o que MANDA push.** Reação e "começou a te
+          acompanhar" não aparecem porque nunca empurram nada — pôr um
+          interruptor desligado ao lado deles prometeria controle sobre um aviso
+          que não existe. */}
+      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <h3 className="font-semibold">Avisos da Comunidade</h3>
+        <p className="mt-1 text-xs leading-snug text-muted-foreground">
+          Só isto. Os avisos do seu médico, das consultas e da emergência não passam por aqui — e
+          continuam chegando de qualquer jeito.
+        </p>
+        <div className="mt-3 flex flex-col gap-2">
+          {AVISOS_QUE_ELA_DESLIGA.map((a) => {
+            const ligado = !avisosDesligados.includes(a.chave);
+            return (
+              <div key={a.chave} className="flex items-center justify-between gap-3">
+                <span className="min-w-0 flex-1 text-[13px] leading-snug">{a.rotulo}</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={ligado}
+                  aria-label={a.rotulo}
+                  disabled={salvando}
+                  onClick={() => void mudarAviso(a.chave, !ligado)}
+                  className={`press h-7 w-12 shrink-0 rounded-full transition-colors ${
+                    ligado ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`block h-6 w-6 rounded-full bg-white shadow transition-transform ${
+                      ligado ? "translate-x-[22px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* ─── PAUSAR A CONTA ──────────────────────────────────────────────
           ⚠️ **O MEIO-TERMO QUE NÃO EXISTIA.** Havia apagar (a LGPD,

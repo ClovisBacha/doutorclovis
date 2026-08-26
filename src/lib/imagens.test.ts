@@ -310,9 +310,20 @@ describe("7. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
   /* `mod` mora no escopo do describe 2 — aqui precisa do seu próprio. */
   const mod = semComentarios("src/lib/imagens.server.ts");
 
-  test("os dois baldes são varridos", () => {
-    expect(conta).toContain("apagarPastaDoDono(BALDE_EXAMES, uid)");
-    expect(conta).toContain("apagarPastaDoDono(BALDE_ALBUM, uid)");
+  test("os QUATRO baldes são varridos", () => {
+    /**
+     * ⚠️ **ERAM DOIS, e a Comunidade acrescentou mais dois sem ninguém voltar
+     * aqui.** `rede` (fotos e vídeos das publicações e dos stories) e
+     * `conversas` (as fotos do direct) ficaram meses fora da varredura: a
+     * paciente pedia a exclusão, o produto respondia que apagou, e a ultrassom
+     * dela continuava no nosso disco.
+     */
+    for (const balde of ["BALDE_EXAMES", "BALDE_ALBUM", "BALDE_REDE", "BALDE_CONVERSAS"]) {
+      expect({ balde, varre: conta.includes(`apagarTudoDoDono(${balde}, uid)`) }).toEqual({
+        balde,
+        varre: true,
+      });
+    }
   });
 
   test("e ANTES do deleteUser, não depois", () => {
@@ -321,7 +332,7 @@ describe("7. excluir a conta apaga os ARQUIVOS, não só as linhas", () => {
      * caminho carrega o uuid, mas quem relaciona uuid a pessoa é a linha que
      * acabou de sumir.
      */
-    const iArquivos = conta.indexOf("apagarPastaDoDono(BALDE_EXAMES, uid)");
+    const iArquivos = conta.indexOf("apagarTudoDoDono(BALDE_EXAMES, uid)");
     const iDelete = conta.indexOf("auth.admin.deleteUser(uid)");
     expect(iArquivos).toBeGreaterThan(-1);
     expect(iDelete).toBeGreaterThan(iArquivos);
@@ -440,11 +451,37 @@ describe("9. o caminho no balde NÃO carrega o uuid da paciente", () => {
 
   test("e TODO caminho passa por ela — upload, listagem e exclusão", () => {
     expect(mod).toContain("`${pastaDoDono(opts.donoId)}/${crypto.randomUUID()}");
-    expect(mod).toContain(".list(pastaDoDono(donoId), { limit: 100 })");
-    expect(mod).toContain("`${pastaDoDono(donoId)}/${a.name}`");
-    /* Nenhum resquício do uuid cru montando caminho. */
+    /**
+     * ⚠️ **A LISTAGEM RECEBE A PASTA, e é ela que faz a varredura da LGPD
+     * funcionar.** Este teste travava `.list(pastaDoDono(donoId), …)` e ficou
+     * vermelho quando a pasta virou PARÂMETRO — uma mudança que a exclusão de
+     * conta exigiu: os baldes da Comunidade têm arquivos ANTIGOS na pasta com
+     * uuid cru (os uploads por URL assinada nasceram assim), e varrer só a
+     * derivada deixaria metade deles no disco.
+     */
+    expect(mod).toContain(".list(pasta, { limit: 100 })");
+    expect(mod).toContain("`${pasta}/${a.name}`");
+    expect(mod).toContain("pasta: string = pastaDoDono(donoId)");
+    /* Nenhum resquício do uuid cru montando caminho de UPLOAD. */
     expect(mod).not.toContain("`${opts.donoId}/");
-    expect(mod).not.toContain("`${donoId}/");
+  });
+
+  test("⚠️ e NENHUM upload da Comunidade monta caminho com o uuid cru", () => {
+    /**
+     * A regra existia para `exames` e `album` desde a migração das imagens, e
+     * dois handlers que nasceram DEPOIS a violavam: `urlParaSubirVideo` e
+     * `urlParaSubirFotoDaConversa` subiam em `${eu}/…`. O caminho vaza para a
+     * URL assinada — um uuid de paciente ali é identificador exposto, o mesmo
+     * buraco que `AlbumPostPublico` foi criado para fechar.
+     */
+    for (const arq of ["src/lib/rede-social.functions.ts", "src/lib/conversa.functions.ts"]) {
+      const fonte = semComentarios(arq);
+      expect({ arq, cru: fonte.includes("`${eu}/${crypto.randomUUID()}") }).toEqual({
+        arq,
+        cru: false,
+      });
+      expect(fonte).toContain("pastaDoDono");
+    }
   });
 
   test("o backfill deriva IGUAL — senão a varredura da LGPD não acha nada", () => {

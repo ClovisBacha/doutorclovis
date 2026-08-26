@@ -180,9 +180,28 @@ export const excluirMinhaConta = createServerFn({ method: "POST" })
      * a exclusão por causa de um órfão seria um problema de LGPD maior que o
      * órfão. */
     {
-      const { apagarPastaDoDono, BALDE_EXAMES, BALDE_ALBUM } = await import("@/lib/imagens.server");
-      await apagarPastaDoDono(BALDE_EXAMES, uid);
-      await apagarPastaDoDono(BALDE_ALBUM, uid);
+      /**
+       * ⚠️ **A COMUNIDADE ENTROU AQUI DEPOIS, e por meses ficou de fora.**
+       *
+       * Este bloco existia com dois baldes, e o comentário acima descreve
+       * exatamente o defeito que ele conserta: "a linha some, o arquivo fica".
+       * Quando a Comunidade nasceu, ela criou mais DOIS baldes — `rede` (fotos e
+       * vídeos das publicações e dos stories) e `conversas` (as fotos do direct)
+       * — e ninguém voltou aqui. A paciente pedia a exclusão, o produto
+       * respondia que apagou, e a ultrassom dela continuava no nosso disco.
+       *
+       * ⚠️ **E é `apagarTudoDoDono`, nunca `apagarPastaDoDono`:** os baldes da
+       * Comunidade usam DUAS convenções de pasta (o hash, nas fotos que passam
+       * por `guardarImagem`; o uuid cru, nos vídeos e nas fotos de conversa, que
+       * sobem por URL assinada). Varrer só uma delas apagaria as fotos e
+       * deixaria os vídeos — e o produto continuaria dizendo "apagamos".
+       */
+      const { apagarTudoDoDono, BALDE_EXAMES, BALDE_ALBUM, BALDE_REDE, BALDE_CONVERSAS } =
+        await import("@/lib/imagens.server");
+      await apagarTudoDoDono(BALDE_EXAMES, uid);
+      await apagarTudoDoDono(BALDE_ALBUM, uid);
+      await apagarTudoDoDono(BALDE_REDE, uid);
+      await apagarTudoDoDono(BALDE_CONVERSAS, uid);
     }
 
     /* `deleteUser` derruba `auth.users`, e o restante sai pelos `ON DELETE

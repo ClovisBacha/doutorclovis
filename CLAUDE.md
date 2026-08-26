@@ -9361,3 +9361,129 @@ que devolvia antes", o degrau não é opcional.
 **Bancadas novas:** `/preview-instagram?tela=conversas&notas=1` (a fileira de
 notas) · `?tela=conversa&oculta=1` (a mensagem recolhida pelo filtro) ·
 `?tela=perfil&favorita=1` (o "Tirar dos favoritos").
+
+## ⚠️ OS DOIS BURACOS DE LGPD DA COMUNIDADE (ago/2026)
+
+Achados numa varredura pedida pelo dono ("veja tudo que ainda pode estar
+faltando"). Os dois são a mesma forma de defeito: **a aba nasceu depois das duas
+funções e ninguém voltou a elas.**
+
+### 1 · A exclusão de conta não apagava as fotos da Comunidade
+
+`excluirMinhaConta` varria `exames` e `album`. A Comunidade usa **`rede`** (fotos
+e vídeos das publicações e dos stories) e **`conversas`** (as fotos do direct) —
+nenhum dos dois. As linhas somem pelo `ON DELETE CASCADE`; os arquivos ficavam.
+A paciente pedia a exclusão, o produto respondia que apagou, e a ultrassom dela
+continuava no nosso disco.
+
+⚠️ **É literalmente o defeito que o comentário ao lado descreve** ("a linha some,
+o arquivo fica"), acontecendo de novo com os baldes criados depois dele.
+
+⚠️ **E existem DUAS CONVENÇÕES DE PASTA.** `guardarImagem` põe tudo em
+`pastaDoDono` (sha256 do uuid); o VÍDEO do post e a FOTO da conversa sobem por
+URL assinada, e ali a pasta era o **uuid cru**. Varrer só uma apagaria as fotos e
+deixaria os vídeos — com o produto dizendo "apagamos" do mesmo jeito. Daí
+`apagarTudoDoDono`, que varre as duas.
+
+#### ⚠️ E isso destapou uma regra que dois handlers violavam
+
+`imagens.test.ts` cobra desde a migração das imagens que **o caminho no balde
+NÃO carrega o uuid da paciente** — ele vaza para a URL assinada, e é o mesmo
+buraco que `AlbumPostPublico` foi criado para fechar. `urlParaSubirVideo` e
+`urlParaSubirFotoDaConversa` nasceram DEPOIS da regra e subiam em `${eu}/…`.
+
+Os dois passaram para `pastaDoDono`. ⚠️ **E `fotoEhDeQuemMandou` teve de
+acompanhar**: ela comparava com `autorId` e recusaria TODA foto nova. Hoje
+recebe a PASTA pronta — a régua vive em `conversa.ts`, que roda no navegador, e
+`pastaDoDono` usa `node:crypto`. Os arquivos antigos continuam na pasta crua, e
+é por isso que a varredura continua olhando as duas.
+
+### 2 · O exportador LGPD ignorava a rede inteira
+
+Vinte e sete tabelas `rede_*` no banco, **zero** no export. Ela baixava "todos os
+meus dados" e não vinha uma publicação, um comentário, uma mensagem nem um story.
+O direito de portabilidade cobre o que ela ESCREVEU, e a Comunidade é hoje onde
+ela mais escreve.
+
+Entraram cinco, **sempre por AUTORIA dela** e coluna a coluna (nunca `*`): um
+recorte por `dona_id` traria o que outras pessoas escreveram PARA ela, num
+arquivo que ela pode mandar por WhatsApp.
+
+⚠️ **A caixinha fica de fora INTEIRA, e a catraca já a proibia.** É a tabela mais
+sensível da aba porque o anonimato é o recurso; exportar até a metade dela cria
+mais uma superfície por onde o autor pode vazar — hoje, ou no dia em que alguém
+trocar a coluna do recorte por engano.
+
+⚠️ **E a exclusão NÃO era uma lacuna**: o `CASCADE` para `auth.users` já derruba
+as linhas. Conferir isso antes de afirmar evitou um "achado" falso — a lição do
+"três de seis que já existiam", aplicada na direção contrária.
+
+## A rede era quase muda, e "ou tudo, ou nada" era a única escolha (ago/2026)
+
+### O push existia em DOIS eventos, com o texto escrito para OITO
+
+`textoDoAviso` tinha frase pronta para as oito espécies. `avisoMandaPush`
+devolvia `true` só para `pediu_para_seguir`, e o bloco de envio vivia **solto
+dentro de `seguir`** — então comentar, mencionar e marcar gravavam na caixa ♡ e
+não avisavam ninguém. Numa aba cuja graça inteira é alguém te responder.
+
+- ⚠️ **A correção é CENTRALIZAR, e não repetir o bloco em cada chamador.** O push
+  mudou-se para dentro de `registrarAtividade` — o único caminho por onde um
+  aviso nasce. A espécie que alguém acrescentar amanhã já sai avisando, e quem
+  decide continua sendo uma régua pura.
+- **A ordem é: gravou → fora da rede? → régua → push.** Avisar sobre uma linha
+  que não gravou manda a paciente abrir uma caixa onde não há nada.
+- ⚠️ **O corte não é "o que é importante", é "o que PEDE".** `reagiu` e
+  `reagiu_story` ficam de fora — são afago, e afago espera ela abrir. O push
+  deste app é o mesmo canal do aviso de emergência.
+- ⚠️ **`aceitou` também ficou de fora, e o teste pegou minha inconsistência.** Eu
+  escrevi o critério "o que PEDE" e em seguida incluí `aceitou`, que não pede
+  nada: ela mandou o pedido e vai encontrar a resposta quando abrir. A decisão já
+  estava tomada e testada; o critério novo, aplicado direito, chega nela sozinho.
+
+### As preferências, e a frase que faz elas serem usadas
+
+Até aqui, parar de receber aviso da Comunidade significava desligar a
+notificação do app INTEIRO — o mesmo canal do aviso de emergência e do lembrete
+de consulta. Numa gestação de alto risco, "ou tudo, ou nada" é uma escolha que
+ninguém deveria ter de fazer.
+
+- ⚠️ **A lista é do que ela DESLIGOU, e não do que ligou.** Guardar o que está
+  ligado faria toda espécie nova nascer desligada para quem já usa o app.
+- ⚠️ **Só aparece o que MANDA push.** Um interruptor ao lado de um aviso que
+  nunca sai prometeria controle sobre coisa nenhuma.
+- ⚠️ **E a tela DIZ o que não passa por ali.** Sem a frase, desligar aqui parece
+  desligar o aviso do médico junto — e aí ela não desliga nada.
+- **`podeAvisar` falha ABERTO**: sem saber o que ela desligou, o aviso vai. O
+  pior caso é um push indesejado; o oposto é silêncio, que some sem rastro.
+
+### O aviso de quem publicou — só para FAVORITAS
+
+⚠️ **"Fulana publicou" para todo mundo que segue é o pior push possível aqui.**
+Quem segue trinta pessoas receberia trinta interrupções por dia e desligaria a
+notificação inteira — com ela o SOS. Favoritar é a única forma de pedir por ele.
+
+⚠️ **A camada `amigas` não avisa ninguém**: quem favoritou pode não ser amiga, e
+o push carregaria o NOME de quem publicou um desabafo restrito para fora da
+camada que o restringe. E quem me bloqueou não recebe — o bloqueio vale nos dois
+sentidos, e um push meu chegando nela seria o bloqueio falhando pelo caminho
+mais visível possível.
+
+### ⚠️ O link da bio, e o XSS que só a mutação achou
+
+O `href` é **o único lugar do app onde texto de uma paciente vira comportamento
+na tela de outra**. Quem limpa é o servidor (`limparLinkDaBio`); a tela pinta o
+que chega e não confere nada — uma segunda régua divergiria da primeira.
+
+⚠️ **A minha primeira versão deixava passar `javascript://exemplo.com/%0aalert(1)`.**
+Ele tem hostname `exemplo.com`, então passa pela conferência de "tem ponto?" e
+pela de "tem esquema?" — só o teste de PROTOCOLO o pega. A mutação que apagava
+essa linha ficou verde, e foi assim que o caso apareceu.
+
+- **Campo PRÓPRIO, e não um link solto dentro da bio**: varrer a bio atrás de
+  `http` transformaria qualquer texto com endereço num link.
+- **`rel="noopener"`**: sem ele, a página aberta ganha `window.opener` e pode
+  navegar a NOSSA aba para onde quiser, com a paciente achando que continua no
+  app.
+
+**Aplicar no Supabase:** `supabase/APLICAR_AVISOS_E_DESCOBERTA.sql`.

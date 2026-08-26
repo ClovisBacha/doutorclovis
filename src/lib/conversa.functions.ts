@@ -616,7 +616,13 @@ export const enviarMensagem = createServerFn({ method: "POST" })
        paciente aponta para a pasta de outra e a mensagem passa a exibir, dentro
        de uma conversa privada, um arquivo que não é dela. Mesma trava do vídeo
        do post. */
-    if (data.imagemPath && !fotoEhDeQuemMandou(data.imagemPath, eu)) {
+    /* ⚠️ **A PASTA ESPERADA É A DERIVADA, e quem a calcula é o SERVIDOR.** A
+       régua vive em `conversa.ts`, que roda no navegador também — e
+       `pastaDoDono` usa `node:crypto`. Passar a pasta pronta mantém a régua
+       pura e testável, e é ela que impede alguém de anexar à mensagem uma foto
+       que subiu para a pasta de OUTRA pessoa. */
+    const { pastaDoDono: pastaDe } = await import("@/lib/imagens.server");
+    if (data.imagemPath && !fotoEhDeQuemMandou(data.imagemPath, pastaDe(eu))) {
       return { ok: false as const, motivo: "foto_invalida" as const };
     }
     /* Anexo pela metade não existe: os dois campos andam juntos. */
@@ -858,7 +864,11 @@ export const urlParaSubirFotoDaConversa = createServerFn({ method: "POST" })
 
     /* ⚠️ O nome do arquivo é sorteado no servidor, e a pasta é a de quem manda —
        é o par que faz `fotoEhDeQuemMandou` valer alguma coisa no envio. */
-    const caminho = `${eu}/${crypto.randomUUID()}.${data.extensao}`;
+    /* ⚠️ **A PASTA É DERIVADA, e nunca o uuid cru** — a mesma regra do balde de
+       exames, que `imagens.test.ts` cobra: o caminho vaza para a URL assinada, e
+       um uuid de paciente ali é identificador exposto. */
+    const { pastaDoDono } = await import("@/lib/imagens.server");
+    const caminho = `${pastaDoDono(eu)}/${crypto.randomUUID()}.${data.extensao}`;
     const { data: assinada, error } = await sb.storage
       .from("conversas")
       .createSignedUploadUrl(caminho);

@@ -402,7 +402,65 @@ export type EspecieDeAviso =
  * que fica esperando resposta.
  */
 export function avisoMandaPush(e: EspecieDeAviso): boolean {
-  return e === "pediu_para_seguir";
+  /**
+   * ⚠️ **O QUE PEDE ALGUMA COISA DELA, e nada mais.**
+   *
+   * A régua devolvia `true` só para `pediu_para_seguir`, e as outras sete
+   * espécies tinham texto de push escrito e NENHUM uso: comentar, mencionar e
+   * marcar não avisavam ninguém. A caixa ♡ gravava e a pessoa só ficava sabendo
+   * se abrisse o app por conta própria — numa aba cuja graça inteira é alguém
+   * te responder.
+   *
+   * ⚠️ **E o corte não é "o que é importante", é "o que PEDE".** O push deste
+   * app é o mesmo canal do aviso de emergência: gastá-lo com o coraçãozinho de
+   * madrugada ensina a ignorá-lo, e quem desliga por causa disso desliga o SOS
+   * junto. Por isso `reagiu` e `reagiu_story` ficam de fora — são afago, e
+   * afago espera ela abrir. `seguiu` também: ninguém precisa fazer nada.
+   *
+   * Entram: o pedido (decisão dela), o comentário (é conversa dirigida a ela),
+   * a menção (chamaram pelo nome) e a marcação (o nome dela numa foto de outra
+   * pessoa — e ela pode querer tirar).
+   *
+   * ⚠️ **`aceitou` FICOU DE FORA, e o teste pegou minha inconsistência.** Eu
+   * escrevi "o que PEDE alguma coisa dela" e em seguida incluí `aceitou`, que
+   * não pede nada: ela mandou o pedido, e vai encontrar a resposta quando
+   * abrir. A decisão já estava tomada e testada; o critério novo, aplicado
+   * direito, chega nela sozinho.
+   */
+  return e === "pediu_para_seguir" || e === "comentou" || e === "mencionou" || e === "marcou";
+}
+
+/**
+ * ⚠️ **O QUE ELA PODE DESLIGAR, e o que NÃO.**
+ *
+ * Antes disto o único jeito de parar de receber aviso da Comunidade era
+ * desligar a notificação do app inteiro — o mesmo canal por onde chega o aviso
+ * de emergência e o lembrete de consulta. "Ou tudo, ou nada" numa gestação de
+ * alto risco é uma escolha que ninguém deveria ter de fazer.
+ *
+ * ⚠️ **A lista é do que ela DESLIGOU, e não do que ligou.** Guardar o que está
+ * ligado faria toda espécie nova nascer DESLIGADA para quem já usava o app — e
+ * um recurso que nasce mudo para a base inteira é um recurso que ninguém
+ * descobre. Desligado é sempre escolha explícita.
+ */
+export const AVISOS_QUE_ELA_DESLIGA: { chave: EspecieDeAviso; rotulo: string }[] = [
+  { chave: "pediu_para_seguir", rotulo: "Pedidos para te acompanhar" },
+  { chave: "comentou", rotulo: "Comentários nas suas publicações" },
+  { chave: "mencionou", rotulo: "Quando te mencionam" },
+  { chave: "marcou", rotulo: "Quando te marcam numa foto" },
+];
+
+/**
+ * ⚠️ **FALHA ABERTO: sem saber o que ela desligou, o aviso VAI.**
+ *
+ * O pior caso aqui é um push que ela preferia não receber; o oposto é o
+ * silêncio — e silêncio numa leitura degradada some sem deixar rastro nenhum,
+ * exatamente como o defeito que fez esta régua existir.
+ */
+export function podeAvisar(e: EspecieDeAviso, desligados: readonly string[] | null): boolean {
+  if (!avisoMandaPush(e)) return false;
+  if (!desligados) return true;
+  return !desligados.includes(e);
 }
 
 export function textoDoAviso(e: EspecieDeAviso, quem: string): string {
@@ -885,3 +943,36 @@ export function podeComentar(v: {
      não segue seria a régua contradizendo a própria escada. */
   return v.sigoAtivo || v.somosAmigas;
 }
+
+/**
+ * ⚠️ **O LINK DA BIO É LIMPO NO SERVIDOR, e não confiado ao campo.**
+ *
+ * `javascript:alert(1)` numa bio é XSS na tela de quem VISITA o perfil — e o
+ * `href` é o único lugar do app onde texto de uma paciente vira comportamento
+ * na tela de outra. Só `http` e `https` passam; qualquer outra coisa (`data:`,
+ * `javascript:`, `file:`) vira `null`.
+ *
+ * ⚠️ **E `//exemplo.com` NÃO é aceito como atalho.** Um esquema-relativo herda
+ * o esquema da página e passa despercebido em toda revisão; se ela quer um
+ * link, ela escreve o endereço inteiro — e sem esquema nenhum a gente COMPLETA
+ * com `https://`, que é o caso comum de quem cola "instagram.com/fulana".
+ */
+export function limparLinkDaBio(bruto: string | null | undefined): string | null {
+  const t = (bruto ?? "").trim();
+  if (!t) return null;
+  if (t.startsWith("//")) return null;
+  const comEsquema = /^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(t) ? t : `https://${t}`;
+  try {
+    const u = new URL(comEsquema);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    /* Um endereço sem ponto no host não leva a lugar nenhum — e `https://oi`
+       renderizado como link é uma promessa que o toque não cumpre. */
+    if (!u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+/** ⚠️ Teto de tamanho: um `href` gigantesco é a outra forma de abusar do campo. */
+export const LINK_DA_BIO_MAX = 200;

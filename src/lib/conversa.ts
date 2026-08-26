@@ -251,9 +251,10 @@ export const BYTES_DA_FOTO = 8 * 1024 * 1024;
  * A barra final é obrigatória: sem ela, `<uuid-de-alguem>` casaria
  * `<uuid-de-alguem-outro>` por prefixo.
  */
-export function fotoEhDeQuemMandou(caminho: string, autorId: string): boolean {
+export function fotoEhDeQuemMandou(caminho: string, pastaDela: string): boolean {
   if (!caminho || caminho.includes("..") || caminho.includes("//")) return false;
-  return caminho.startsWith(`${autorId}/`);
+  if (!pastaDela) return false;
+  return caminho.startsWith(`${pastaDela}/`);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

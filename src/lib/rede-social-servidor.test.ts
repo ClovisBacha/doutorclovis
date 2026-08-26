@@ -178,23 +178,77 @@ describe("reagir", () => {
 });
 
 describe("os avisos", () => {
-  test("⚠️ SÓ o pedido para seguir manda push", () => {
-    // O push deste app é o mesmo canal do aviso de emergência. Um coraçãozinho
-    // de madrugada gasta o canal que um dia vai avisar de uma consulta.
-    expect(corpoDe("reagir")).not.toContain("sendPushToUser");
-    expect(corpoDe("publicarPost")).not.toContain("sendPushToUser");
+  test("⚠️ o push sai de UMA porta, e passa pela régua", () => {
+    /**
+     * ⚠️ **A GARANTIA É "uma porta só, depois da régua", e não ONDE ela fica.**
+     *
+     * Este teste travava o bloco de push dentro de `seguir`, e foi assim que
+     * SETE das oito espécies ficaram mudas: `textoDoAviso` tinha frase escrita
+     * para todas, e só o pedido empurrava. Centralizar em `registrarAtividade`
+     * — o único caminho por onde um aviso nasce — deixou o teste vermelho sobre
+     * uma mudança que só apertou a garantia. Décima vez nesta base.
+     */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    expect(corpo).toContain("sendPushToUser(opts.donoId");
+    /* A régua decide, e vem ANTES. */
+    const iRegua = corpo.indexOf("podeAvisar(opts.especie, desligados)");
+    const iPush = corpo.indexOf("sendPushToUser(");
+    expect(iRegua).toBeGreaterThan(-1);
+    expect(iPush).toBeGreaterThan(iRegua);
+  });
+
+  test("⚠️ e NENHUM handler tem uma segunda opinião sobre push", () => {
+    /* Duas réguas para "isto merece push?" divergem no primeiro aviso novo — e
+       a divergência gasta o canal por onde chega o aviso de emergência. */
+    /**
+     * ⚠️ **`corpoDe` vai até o próximo `export const`, e `avisarQuemMeFavoritou`
+     * é uma função NÃO exportada logo depois de `publicarPost`** — a fatia a
+     * engolia inteira, e o teste acusava um push que não é do handler. O
+     * recorte para no primeiro `\nasync function` também.
+     *
+     * E o aviso das favoritas é a exceção declarada: ele nasce de PUBLICAR, não
+     * de um aviso na caixa ♡, e por isso não passa por `registrarAtividade`.
+     * Quem o cobra é `avisos-da-rede.test.ts`.
+     */
+    const ate = (fn: string) => {
+      const c = corpoDe(fn);
+      const i = c.indexOf("\nasync function ");
+      return i < 0 ? c : c.slice(0, i);
+    };
+    for (const fn of ["reagir", "publicarPost", "seguir", "votar"]) {
+      expect({ fn, temPush: ate(fn).includes("sendPushToUser") }).toEqual({
+        fn,
+        temPush: false,
+      });
+    }
+  });
+
+  test("⚠️ o push NÃO chega a quem está fora da rede", () => {
+    /* Luto ou pausa: o Modo Cuidado existe para o app parar de cutucar, e o
+       push é a cutucada mais direta que existe. */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    const iFora = corpo.indexOf("foraDaRede(dono)");
+    expect(iFora).toBeGreaterThan(-1);
+    expect(corpo.indexOf("sendPushToUser(")).toBeGreaterThan(iFora);
+  });
+
+  test("⚠️ e o aviso só sai DEPOIS de a linha gravar", () => {
+    /* Avisar sobre uma linha que não gravou manda a paciente abrir uma caixa
+       onde não há nada — o defeito que o presente do médico já teve. */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    const iGuarda = corpo.indexOf("if (error) return;");
+    expect(iGuarda).toBeGreaterThan(-1);
+    expect(corpo.indexOf("sendPushToUser(")).toBeGreaterThan(iGuarda);
+  });
+
+  test("a espécie que vai ao push é a MESMA que foi à caixa", () => {
     const c = corpoDe("seguir").replace(/\s+/g, " ");
-    /* ⚠️ **Pela RÉGUA, e não por um `if` local.** `avisoMandaPush` existia com a
-       decisão escrita e ZERO chamadores, enquanto aqui morava um
-       `estado === "pendente"` que dizia a mesma coisa por acaso — duas réguas
-       para "isto merece push?", que divergem no primeiro aviso novo. O QUE ela
-       decide está testado por comportamento em `rede-social.test.ts`; aqui só se
-       cobra que o servidor não tenha uma segunda opinião. */
-    expect(c).toContain("if (avisoMandaPush(especie)) {");
-    expect(c).not.toContain('if (estado === "pendente") {');
-    expect(c.indexOf("sendPushToUser")).toBeGreaterThan(c.indexOf("avisoMandaPush(especie)"));
-    /* E a espécie que vai para o push é a MESMA que foi para a caixa — não uma
-       segunda derivação do estado. */
     expect(c).toContain(
       "await registrarAtividade(sb, { donoId: data.alvoId, quemId: eu, especie })",
     );
@@ -522,7 +576,8 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
   test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
     const c = CODIGO_REDE.replace(/\s+/g, " ");
     /* A entrada cai no degrau mais ALTO, não direto no fundo. */
-    expect(c).toContain("error ? await semAColunaDaPausa(sb, faltando)");
+    expect(c).toContain("error ? await semAsColunasDosAvisos(sb, faltando)");
+    expect(c).toContain("if (error) return semAColunaDaPausa(sb, ids)");
     /* E cada degrau conhece o seguinte. Um degrau que não chama o de baixo é
        um degrau que devolve lista vazia — e `montarPosts` descarta todo post
        cujo autor não está no Map: feed vazio, sem erro nenhum. */
@@ -543,6 +598,8 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
       .filter(Boolean);
     /* As que nasceram depois do degrau do selo têm de aparecer num `replace`. */
     for (const nova of [
+      "bio_link",
+      "avisos_desligados",
       "rede_pausada_em",
       "conta_oficial",
       "feed_so_seguindo",

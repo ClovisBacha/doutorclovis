@@ -400,7 +400,12 @@ describe("⚠️ as travas do envio que a mutação pegou sem teste", () => {
     /* O caminho vem do CLIENTE (ele sobe pela URL assinada). Sem esta
        conferência, uma paciente aponta para a pasta de outra e a mensagem passa
        a exibir, dentro de uma conversa privada, um arquivo que não é dela. */
-    expect(corpoDoEnvio).toContain("fotoEhDeQuemMandou(data.imagemPath, eu)");
+    /* ⚠️ **A PASTA É A DERIVADA, e não o uuid cru.** O upload passou a usar
+       `pastaDoDono` porque o caminho vaza para a URL assinada e um uuid de
+       paciente ali é identificador exposto — a regra que `imagens.test.ts` já
+       cobrava para os outros baldes. A conferência acompanhou: comparar com
+       `eu` recusaria TODA foto nova. */
+    expect(corpoDoEnvio).toContain("fotoEhDeQuemMandou(data.imagemPath, pastaDe(eu))");
     expect(corpoDoEnvio).toContain('motivo: "foto_invalida"');
   });
 

@@ -31,7 +31,10 @@ import { processarTextoDoPost } from "./mencoes.functions";
 import {
   aoSeguir,
   avisoMandaPush,
+  AVISOS_QUE_ELA_DESLIGA,
   LIMITE_DA_BIO,
+  LINK_DA_BIO_MAX,
+  limparLinkDaBio,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
   normalizarBusca,
@@ -316,6 +319,14 @@ export type PerfilNaTela = {
   silenciado: boolean;
   /** Marcada como favorita — "ver primeiro". Ver `favoritar`. */
   favorita: boolean;
+  /**
+   * O link da bio, JÁ LIMPO pelo servidor.
+   *
+   * ⚠️ A tela pinta o que chega e não confere nada: quem confere é
+   * `limparLinkDaBio`, no salvamento. Uma segunda régua no `href` divergiria da
+   * primeira, e a divergência aparece como `javascript:` clicável.
+   */
+  bioLink?: string | null;
   /**
    * Eu restrinjo esta pessoa?
    *
@@ -792,7 +803,7 @@ export async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePer
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAColunaDaPausa(sb, faltando) : ((data ?? []) as any[]);
+  const linhas = error ? await semAsColunasDosAvisos(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -1033,7 +1044,8 @@ export function foraDaRede(perfil: any): boolean {
 
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
-  "id, display_name, avatar_url, bio, perfil_publico, care_mode, rede_pausada_em, " +
+  "id, display_name, avatar_url, bio, bio_link, avisos_desligados, " +
+  "perfil_publico, care_mode, rede_pausada_em, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
   "feed_so_seguindo, handle, quem_pode_mencionar, " +
   "lmp_date, reference_date, reference_weeks, reference_days, birth_date, doctor_id";
@@ -1052,7 +1064,29 @@ const COLUNAS_DO_PERFIL =
  * que o degrau acima já provou não existir — a escada inteira desceria até o
  * chão por causa de um `42703` só.
  */
-const COLUNAS_SEM_PAUSA = COLUNAS_DO_PERFIL.replace("rede_pausada_em, ", "");
+/**
+ * Degrau 0,25: o banco tem tudo, menos os avisos e o link da bio.
+ *
+ * ⚠️ **AS DUAS SAEM JUNTAS**, porque nascem no MESMO `APLICAR_` — um degrau por
+ * SQL, e não um por coluna: separá-las criaria um degrau que só falha num banco
+ * que não existe. E ele é o mais alto da escada por ser o mais novo.
+ */
+const COLUNAS_SEM_AVISOS = COLUNAS_DO_PERFIL.replace("bio_link, avisos_desligados, ", "");
+
+async function semAsColunasDosAvisos(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_SEM_AVISOS)
+    .in("id", ids);
+  if (error) return semAColunaDaPausa(sb, ids);
+  console.warn("[rede] sem avisos_desligados — rode APLICAR_AVISOS_E_DESCOBERTA.sql");
+  /* ⚠️ Ausente = NADA desligado, e nunca "tudo desligado": tratar "não sei"
+     como silêncio emudeceria a aba inteira num banco atrasado. E o link da bio
+     ausente é simplesmente link nenhum. */
+  return ((data ?? []) as any[]).map((p) => ({ ...p, bio_link: null, avisos_desligados: [] }));
+}
+
+const COLUNAS_SEM_PAUSA = COLUNAS_SEM_AVISOS.replace("rede_pausada_em, ", "");
 
 async function semAColunaDaPausa(sb: any, ids: string[]): Promise<any[]> {
   const { data, error } = await sb.from("patient_profiles").select(COLUNAS_SEM_PAUSA).in("id", ids);
@@ -1060,7 +1094,12 @@ async function semAColunaDaPausa(sb: any, ids: string[]): Promise<any[]> {
   console.warn("[rede] sem rede_pausada_em — rode APLICAR_DEZ_DA_REDE.sql");
   /* ⚠️ Ausente = NÃO pausada. É o único padrão possível: tratar "não sei" como
      pausada esconderia da rede toda paciente de um banco atrasado. */
-  return ((data ?? []) as any[]).map((p) => ({ ...p, rede_pausada_em: null }));
+  return ((data ?? []) as any[]).map((p) => ({
+    ...p,
+    bio_link: null,
+    avisos_desligados: [],
+    rede_pausada_em: null,
+  }));
 }
 
 /**
@@ -1136,6 +1175,8 @@ async function semAColunaDoArroba(sb: any, ids: string[]): Promise<any[]> {
      padrão que a própria régua declara, nunca num valor inventado aqui. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    bio_link: null,
+    avisos_desligados: [],
     rede_pausada_em: null,
     handle: null,
     quem_pode_mencionar: QUEM_MENCIONA_PADRAO,
@@ -1150,6 +1191,8 @@ async function semAColunaDoFeed(sb: any, ids: string[]): Promise<any[]> {
      de quem nunca escolheu, e é o que o banco passará a guardar. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    bio_link: null,
+    avisos_desligados: [],
     rede_pausada_em: null,
     feed_so_seguindo: false,
     handle: null,
@@ -1173,6 +1216,8 @@ async function semAColunaNova(sb: any, ids: string[]): Promise<any[]> {
      fileira de sugeridas ficar como era antes de a conta oficial existir. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    bio_link: null,
+    avisos_desligados: [],
     rede_pausada_em: null,
     conta_oficial: false,
     handle: null,
@@ -1188,6 +1233,8 @@ async function semAsColunasDoSelo(sb: any, ids: string[]): Promise<any[]> {
      banco ainda não sabe guardar. */
   return ((data ?? []) as any[]).map((p) => ({
     ...p,
+    bio_link: null,
+    avisos_desligados: [],
     rede_pausada_em: null,
     mostrar_semana: false,
     mostrar_bebe: false,
@@ -1832,6 +1879,7 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
         id: eu,
         nome: ((p as any)?.display_name ?? "").trim() || "Você",
         bio: (p as any)?.bio ?? null,
+        bioLink: ((p as any)?.bio_link ?? null) as string | null,
         avatarUrl: (p as any)?.avatar_url ?? null,
         publico: !!(p as any)?.perfil_publico,
         oficial: ehContaOficial(p as any),
@@ -1872,6 +1920,16 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
        * gestação.
        */
       pausada: !!(p as any)?.rede_pausada_em,
+      /**
+       * O que ela desligou.
+       *
+       * ⚠️ Campo próprio, e não `perfil.avisosDesligados`: `PerfilNaTela` é o
+       * mesmo tipo que descreve o perfil de OUTRA pessoa, e o que eu escolho
+       * receber não é da conta de ninguém.
+       */
+      avisosDesligados: (((p as any)?.avisos_desligados ?? []) as string[]).filter((c) =>
+        AVISOS_QUE_ELA_DESLIGA.some((a) => a.chave === c),
+      ),
       /**
        * A semana que ela PODE carimbar num story.
        *
@@ -1916,6 +1974,16 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
            "qualquer pessoa NO APP"; a vitrine abre fora dele, sem conta. */
         vitrine: z.boolean().optional(),
         bio: z.string().max(LIMITE_DA_BIO).nullable().optional(),
+        /** ⚠️ Limpo por `limparLinkDaBio` no handler — o zod aqui é só o teto. */
+        bioLink: z.string().max(LINK_DA_BIO_MAX).nullable().optional(),
+        /**
+         * As espécies de aviso que ela DESLIGOU.
+         *
+         * ⚠️ Filtradas contra o catálogo no handler: uma chave inventada no
+         * corpo do pedido viraria um desligamento que nenhuma tela sabe mostrar
+         * — e que ela não teria como religar.
+         */
+        avisosDesligados: z.array(z.string().max(30)).max(20).optional(),
         nome: z.string().max(60).optional(),
         /** Data URL. O cliente já corta o quadrado e reduz para 512px. */
         avatar: z.string().max(1_500_000).nullable().optional(),
@@ -2006,6 +2074,20 @@ export const salvarPerfilSocial = createServerFn({ method: "POST" })
       ...(data.aceitaPerguntas !== undefined ? { aceita_perguntas: data.aceitaPerguntas } : {}),
       ...(data.feedSoSeguindo !== undefined ? { feed_so_seguindo: data.feedSoSeguindo } : {}),
       ...(data.vitrine !== undefined ? { vitrine_publica: data.vitrine } : {}),
+      /* ⚠️ **O LINK É LIMPO AQUI, e nunca no campo.** `javascript:` numa bio é
+         XSS na tela de QUEM VISITA — o `href` é o único lugar do app onde texto
+         de uma paciente vira comportamento na tela de outra. */
+      ...(data.bioLink !== undefined ? { bio_link: limparLinkDaBio(data.bioLink) } : {}),
+      /* ⚠️ **Filtrado contra o catálogo.** Uma chave inventada no corpo do
+         pedido viraria um desligamento que nenhuma tela sabe mostrar — e que ela
+         não teria como religar. */
+      ...(data.avisosDesligados !== undefined
+        ? {
+            avisos_desligados: data.avisosDesligados.filter((c) =>
+              AVISOS_QUE_ELA_DESLIGA.some((a) => a.chave === c),
+            ),
+          }
+        : {}),
     };
 
     const { error } = await sb
@@ -2296,6 +2378,10 @@ export const verPerfil = createServerFn({ method: "POST" })
       id: data.alvoId,
       nome: (a.display_name ?? "").trim() || "Alguém",
       bio: a.bio ?? null,
+      /* ⚠️ Já limpo na GRAVAÇÃO (`limparLinkDaBio`) — aqui é só entrega. Uma
+         segunda régua no `href` divergiria da primeira, e a divergência aparece
+         como `javascript:` clicável na tela de quem visita. */
+      bioLink: (a.bio_link ?? null) as string | null,
       avatarUrl: a.avatar_url ?? null,
       publico: !!a.perfil_publico,
       oficial: ehContaOficial(a as any),
@@ -2451,19 +2537,9 @@ export const seguir = createServerFn({ method: "POST" })
        `estado === "pendente"` que dizia a mesma coisa por acaso. Duas réguas
        para "isto merece push?" divergem no primeiro aviso novo — e a divergência
        gasta o canal por onde chega o aviso de emergência. */
-    if (avisoMandaPush(especie)) {
-      try {
-        const { sendPushToUser } = await import("@/lib/push.server");
-        const meu = (await perfisPorId(sb, [eu])).get(eu);
-        await sendPushToUser(data.alvoId, {
-          title: "Novo pedido",
-          body: `${(meu?.display_name ?? "Alguém").trim()} quer te acompanhar`,
-          url: "/minha-conta?tab=Comunidade",
-        });
-      } catch {
-        /* Push é enfeite aqui: o pedido já está gravado e aparece na tela. */
-      }
-    }
+    /* ⚠️ **O PUSH DAQUI SAIU, e não foi esquecimento.** Ele agora mora dentro
+       de `registrarAtividade`, que é o único caminho por onde um aviso nasce —
+       manter a cópia aqui mandaria DOIS pushes pelo mesmo pedido. */
 
     return { ok: true as const, estado };
   });
@@ -2585,7 +2661,12 @@ export const urlParaSubirVideo = createServerFn({ method: "POST" })
       return { ok: false as const, motivo: "tipo" as const };
     }
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const caminho = `${eu}/${crypto.randomUUID()}.${extensaoDoTipo(data.tipo)}`;
+    /* ⚠️ **A PASTA É DERIVADA, e nunca o uuid cru.** `imagens.test.ts` cobra
+       isto desde a migração das imagens: o caminho do arquivo vaza para a URL
+       assinada, e um uuid de paciente ali é identificador exposto. Este handler
+       nasceu depois da regra e a violava — subia em `${eu}/…`. */
+    const { pastaDoDono } = await import("@/lib/imagens.server");
+    const caminho = `${pastaDoDono(eu)}/${crypto.randomUUID()}.${extensaoDoTipo(data.tipo)}`;
     const { data: assinada, error } = await (supabaseAdmin as any).storage
       .from("rede")
       .createSignedUploadUrl(caminho);
@@ -3035,9 +3116,74 @@ export const publicarPost = createServerFn({ method: "POST" })
       autorId: eu,
       texto: data.texto?.trim() || null,
     });
+    await avisarQuemMeFavoritou(sb, eu, data.visibilidade);
 
     return { ok: true as const, postId: post.id };
   });
+
+/**
+ * AVISA QUEM ME MARCOU COMO FAVORITA — e SÓ ela.
+ *
+ * ⚠️ **"FULANA PUBLICOU" PARA TODO MUNDO É O PIOR PUSH POSSÍVEL neste app.** O
+ * canal é o mesmo do aviso de emergência; uma paciente que segue trinta pessoas
+ * receberia trinta interrupções por dia e desligaria a notificação inteira — e
+ * com ela o SOS e o lembrete de consulta. É por isso que este aviso NÃO existe
+ * para quem só segue.
+ *
+ * Favoritar é a única forma de pedir por ele: ela escolheu, explicitamente, não
+ * querer perder o que aquela pessoa publica. Sem isso, "ver primeiro" só valia
+ * quando ela abria o app por conta própria — que é justamente quando ela não
+ * precisava de ajuda para achar.
+ *
+ * ⚠️ **SÓ PUBLICAÇÃO PÚBLICA OU DE SEGUIDORAS.** A camada `amigas` fica de fora:
+ * quem favoritou pode não ser amiga, e o push carregaria o NOME de quem
+ * publicou um desabafo restrito para fora da camada que o restringe.
+ *
+ * ⚠️ **E o texto não traz a legenda.** É a mesma decisão de `textoDoAviso` para
+ * comentário e menção: o que ela publicou pode ser exatamente o que não se lê
+ * sem contexto, e a tela de bloqueio do celular é o pior contexto que existe.
+ */
+async function avisarQuemMeFavoritou(sb: any, eu: string, visibilidade: string): Promise<void> {
+  if (visibilidade === "amigas") return;
+  try {
+    const { data: linhas } = await sb
+      .from("rede_favoritos")
+      .select("quem_id")
+      .eq("favorita_id", eu)
+      .limit(200);
+    const ids = ((linhas ?? []) as { quem_id: string }[]).map((l) => l.quem_id);
+    if (ids.length === 0) return;
+
+    const perfis = await perfisPorId(sb, [eu, ...ids]);
+    const meuNome = ((perfis.get(eu)?.display_name ?? "") as string).trim() || "Alguém";
+    const { sendPushToUser } = await import("@/lib/push.server");
+    await Promise.all(
+      ids.map(async (id) => {
+        const dela = perfis.get(id);
+        /* ⚠️ Quem está em luto ou pausou não recebe — a mesma régua de tudo
+           nesta aba. E quem me bloqueou depois de favoritar também não: o
+           bloqueio vale nos DOIS sentidos, e um push meu chegando nela seria o
+           bloqueio falhando pelo caminho mais visível possível. */
+        if (foraDaRede(dela)) return;
+        const { data: bloqueio } = await sb
+          .from("rede_bloqueios")
+          .select("quem_id")
+          .or(
+            `and(quem_id.eq.${id},bloqueado_id.eq.${eu}),and(quem_id.eq.${eu},bloqueado_id.eq.${id})`,
+          )
+          .limit(1);
+        if ((bloqueio ?? []).length > 0) return;
+        await sendPushToUser(id, {
+          title: "Comunidade",
+          body: `${meuNome} publicou`,
+          url: "/minha-conta?tab=Comunidade",
+        });
+      }),
+    );
+  } catch {
+    /* Push é enfeite: a publicação já existe e aparece no feed. */
+  }
+}
 
 /**
  * Grava as marcações de um post recém-publicado.
@@ -5955,6 +6101,45 @@ export async function registrarAtividade(
        valeu), registro para quem for investigar por que a caixa de alguém
        está vazia. Silêncio TOTAL é o que a catraca proíbe. */
     if (error) console.warn("[atividade] não gravou", error.code, error.message);
+    if (error) return;
+
+    /* ─── E O PUSH SAI DAQUI, de uma porta só ────────────────────────────────
+     *
+     * ⚠️ **ANTES ELE MORAVA SOLTO EM `seguir`, e por isso sete das oito
+     * espécies eram MUDAS.** `textoDoAviso` tinha frase escrita para todas —
+     * comentar, mencionar, marcar, reagir — e nenhuma delas empurrava nada: a
+     * caixa ♡ gravava e a pessoa só ficava sabendo se abrisse o app por conta
+     * própria, numa aba cuja graça inteira é alguém te responder.
+     *
+     * ⚠️ **CENTRALIZAR É A CORREÇÃO, e não repetir o bloco em cada chamador.**
+     * `registrarAtividade` é o ÚNICO caminho por onde um aviso nasce; com o
+     * push aqui dentro, a espécie que alguém acrescentar amanhã já sai avisando
+     * — e quem decide se ela merece continua sendo `avisoMandaPush`, uma régua
+     * pura e testada.
+     *
+     * ⚠️ **DEPOIS do `if (error) return`, sempre.** Avisar sobre uma linha que
+     * não gravou manda a paciente abrir uma caixa onde não há nada — o mesmo
+     * defeito do presente que avisava antes de gravar. */
+    try {
+      const { podeAvisar, textoDoAviso } = await import("./rede-social");
+      const perfis = await perfisPorId(sb, [opts.donoId, opts.quemId]);
+      const dono = perfis.get(opts.donoId);
+      /* ⚠️ Quem está em luto ou pausou NÃO recebe push da rede — é a mesma
+         régua de tudo nesta aba, e aqui ela importa mais: o Modo Cuidado existe
+         para o app parar de cutucar. */
+      if (foraDaRede(dono)) return;
+      const desligados = (dono?.avisos_desligados ?? null) as string[] | null;
+      if (!podeAvisar(opts.especie, desligados)) return;
+      const quem = ((perfis.get(opts.quemId)?.display_name ?? "") as string).trim() || "Alguém";
+      const { sendPushToUser } = await import("@/lib/push.server");
+      await sendPushToUser(opts.donoId, {
+        title: "Comunidade",
+        body: textoDoAviso(opts.especie, quem),
+        url: "/minha-conta?tab=Comunidade",
+      });
+    } catch {
+      /* Push é enfeite: o aviso já está gravado e aparece na caixa ♡. */
+    }
   } catch (e) {
     console.warn("[atividade] não gravou", e);
   }

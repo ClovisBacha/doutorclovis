@@ -68,8 +68,19 @@ describe("⚠️ ela é a régua ÚNICA — nenhum ponto de decisão fica de for
     const s = semProsa(FONTE)
       .split("\n")
       .filter((l) => /care_mode/.test(l))
-      /* `select`, listas de colunas e o `?.` de tipo não são decisão. */
-      .filter((l) => !/select\(|COLUNAS|"id, display_name|care_mode,\s*$/.test(l))
+      /**
+       * `select`, listas de colunas e o `?.` de tipo não são decisão.
+       *
+       * ⚠️ **A LINHA DE CONTINUAÇÃO conta como lista.** A lista de colunas do
+       * perfil é quebrada em várias linhas com `" +`, e a catraca acusava a
+       * segunda delas como se fosse uma condição. O recorte é sintático: uma
+       * linha que é SÓ um literal de string concatenado não decide nada.
+       */
+      .filter(
+        (l) =>
+          !/select\(|COLUNAS|"id, display_name|care_mode,\s*$/.test(l) &&
+          !/^\s*"[^"]*"\s*\+?\s*;?\s*$/.test(l),
+      )
       .map((l) => l.trim())
       .filter((l) => !PERMITIDO.includes(l));
     expect(s).toEqual([]);

@@ -66,6 +66,7 @@ import {
   OPCOES_MIN,
   rotuloDeVotos,
   LIMITE_DA_BIO,
+  LINK_DA_BIO_MAX,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
   postEhValido,
@@ -2985,6 +2986,28 @@ export function TelaDePerfil({
 
         {perfil.bio && <p className="mt-3 text-[14px] leading-snug">{perfil.bio}</p>}
 
+        {/* ⚠️ **O LINK DA BIO, e ele é o único lugar do app onde texto de uma
+            paciente vira um `href` na tela de outra.** Quem limpa é o SERVIDOR
+            (`limparLinkDaBio`, na gravação): só `http`/`https` chegam aqui. Uma
+            segunda conferência nesta linha divergiria da primeira, e a
+            divergência aparece como `javascript:` clicável.
+
+            ⚠️ `rel="noopener noreferrer nofollow"` e `target="_blank"`: sem
+            `noopener`, a página aberta ganha `window.opener` e pode navegar a
+            NOSSA aba para onde quiser — com a paciente achando que continua no
+            app. E o texto mostra o endereço SEM o esquema, que é como as
+            pessoas leem um link. */}
+        {perfil.bioLink && (
+          <a
+            href={perfil.bioLink}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="press mt-1 block min-h-[44px] truncate text-[14px] font-medium text-primary"
+          >
+            🔗 {perfil.bioLink.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          </a>
+        )}
+
         {/* ─── O CÓDIGO DA EMBAIXADORA ──────────────────────────────────────
             ⚠️ **Nunca num toque só.** `ref_code` é gravado UMA VEZ e nunca
             reescrito — e o MESMO campo carrega o código da médica dela. Um
@@ -5318,6 +5341,7 @@ export function RedeNoApp({
   async function salvarPerfil(m: {
     nome?: string;
     bio?: string | null;
+    bioLink?: string | null;
     avatar?: string | null;
   }): Promise<boolean> {
     try {
@@ -7018,11 +7042,17 @@ export function EditarPerfil({
   perfil: PerfilNaTela;
   /** Só a bancada preenche. Ver `MeusFilhos`. */
   filhosDeMentira?: Filho[];
-  aoSalvar: (m: { nome?: string; bio?: string | null; avatar?: string | null }) => Promise<boolean>;
+  aoSalvar: (m: {
+    nome?: string;
+    bio?: string | null;
+    bioLink?: string | null;
+    avatar?: string | null;
+  }) => Promise<boolean>;
   aoFechar: () => void;
 }) {
   const [nome, setNome] = useState(perfil.nome);
   const [bio, setBio] = useState(perfil.bio ?? "");
+  const [bioLink, setBioLink] = useState(perfil.bioLink ?? "");
   const [avatar, setAvatar] = useState<string | null>(perfil.avatarUrl);
   const [salvando, setSalvando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -7033,6 +7063,9 @@ export function EditarPerfil({
     const ok = await aoSalvar({
       nome: nome.trim() || undefined,
       bio: bio.trim() || null,
+      /* ⚠️ Vazio vira `null`, e não `""`: a coluna é anulável, e um string
+         vazio faria o perfil desenhar um link para lugar nenhum. */
+      bioLink: bioLink.trim() || null,
       /* ⚠️ Só manda a foto se ela MUDOU. Reenviar a mesma URL a cada
          salvamento subiria um arquivo novo no balde toda vez, e o antigo
          ficaria órfão lá dentro — cem edições de bio viram cem fotos. */
@@ -7102,6 +7135,28 @@ export function EditarPerfil({
           />
           <span className="mt-0.5 block text-right text-[11px] tabular-nums text-muted-foreground">
             {bio.length}/{LIMITE_DA_BIO}
+          </span>
+        </label>
+
+        {/* ⚠️ **CAMPO PRÓPRIO, e não um link solto DENTRO da bio.** Varrer a bio
+            atrás de `http` transformaria qualquer texto com endereço num link —
+            inclusive o que ela escreveu sem querer que fosse clicável.
+
+            ⚠️ E a tela NÃO valida nada: quem limpa é `limparLinkDaBio`, no
+            servidor. Uma régua aqui recusaria o que o servidor aceita (ou o
+            contrário), e o `href` é o único lugar do app onde texto de uma
+            paciente vira comportamento na tela de outra. */}
+        <label className="mt-4 block">
+          <span className="text-[12px] font-medium text-muted-foreground">Link</span>
+          <input
+            value={bioLink}
+            onChange={(e) => setBioLink(e.target.value.slice(0, LINK_DA_BIO_MAX))}
+            inputMode="url"
+            placeholder="instagram.com/seu-perfil"
+            className="mt-1 w-full border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
+          />
+          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+            Aparece no seu perfil, embaixo da descrição. Pode deixar em branco.
           </span>
         </label>
 

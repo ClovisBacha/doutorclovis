@@ -49,6 +49,10 @@ import crypto from "node:crypto";
 /** Os dois baldes. Nomes curtos porque entram no caminho de todo arquivo. */
 export const BALDE_ALBUM = "album";
 export const BALDE_EXAMES = "exames";
+/** As fotos e os vídeos das publicações e dos stories. */
+export const BALDE_REDE = "rede";
+/** As fotos trocadas no direct. */
+export const BALDE_CONVERSAS = "conversas";
 
 /** Vida da URL assinada. Uma hora cobre a sessão em que ele abre o laudo, e
     expira antes de virar link compartilhável por engano. */
@@ -307,7 +311,25 @@ export async function apagarImagem(balde: string, caminho: string | null | undef
  * pode parar por causa disso — negar a exclusão seria um problema de LGPD
  * maior que o órfão. O que fica é registro, para dar para varrer depois.
  */
-export async function apagarPastaDoDono(balde: string, donoId: string): Promise<void> {
+export async function apagarPastaDoDono(
+  balde: string,
+  donoId: string,
+  /**
+   * ⚠️ **DUAS CONVENÇÕES DE PASTA CONVIVEM NO PROJETO, e ignorar isso deixa
+   * metade dos arquivos no disco.**
+   *
+   * `guardarImagem` põe tudo em `pastaDoDono` (sha256 do uuid) — é assim nos
+   * baldes `exames`, `album` e nas FOTOS de publicação. Mas o VÍDEO do post e a
+   * FOTO da conversa sobem por URL assinada, e ali a pasta é o **uuid cru**
+   * (`${eu}/…`), porque quem monta o caminho é o handler do upload e não o
+   * `guardarImagem`.
+   *
+   * Varrer só uma das duas apagaria as fotos e deixaria os vídeos — ou o
+   * contrário. Por isso a pasta é um PARÂMETRO, e `apagarTudoDoDono` chama as
+   * duas.
+   */
+  pasta: string = pastaDoDono(donoId),
+): Promise<void> {
   if (!donoId?.trim()) return;
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -317,9 +339,9 @@ export async function apagarPastaDoDono(balde: string, donoId: string): Promise<
     for (;;) {
       const { data: arquivos, error } = await supabaseAdmin.storage
         .from(balde)
-        .list(pastaDoDono(donoId), { limit: 100 });
+        .list(pasta, { limit: 100 });
       if (error || !arquivos?.length) return;
-      const caminhos = arquivos.map((a) => `${pastaDoDono(donoId)}/${a.name}`);
+      const caminhos = arquivos.map((a) => `${pasta}/${a.name}`);
       const { error: eDel } = await supabaseAdmin.storage.from(balde).remove(caminhos);
       if (eDel) return;
       if (arquivos.length < 100) return;
@@ -531,4 +553,19 @@ export async function renovarUrlsAssinadas(
     if (!alvo) return g ?? null;
     return assinadas.get(alvo.balde)?.get(alvo.caminho) ?? g ?? null;
   });
+}
+
+/**
+ * ⚠️ **APAGA TUDO O QUE É DELA NUM BALDE, nas DUAS convenções de pasta.**
+ *
+ * É o que a exclusão de conta chama. Ver `apagarPastaDoDono` para o porquê de
+ * serem duas — e o porquê de varrer só uma ser pior que não varrer nenhuma:
+ * o produto diria "apagamos" com metade dos arquivos ainda no disco.
+ */
+export async function apagarTudoDoDono(balde: string, donoId: string): Promise<void> {
+  if (!donoId?.trim()) return;
+  await apagarPastaDoDono(balde, donoId, pastaDoDono(donoId));
+  /* A pasta crua só existe nos baldes que sobem por URL assinada; nos outros a
+     varredura simplesmente não acha nada, e custa uma listagem vazia. */
+  await apagarPastaDoDono(balde, donoId, donoId);
 }
