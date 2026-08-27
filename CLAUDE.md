@@ -10755,3 +10755,43 @@ razoável é "o botão não funcionou". `scrollIntoView` no efeito: **y=205**.
 **Bancada:** `/preview-instagram?tela=comentarios` → ⋯ em qualquer comentário
 que não seja seu.
 
+### ⚠️ 5. ARQUIVAR UMA CONVERSA NÃO FAZIA NADA
+
+A segunda varredura — promessas de TEMPO — achou o gêmeo do defeito acima.
+
+`arquivarConversa` gravava `arquivada_a`/`arquivada_b`, o `select` de
+`minhasConversas` trazia as duas colunas, e **nenhum leitor as consultava**. O
+filtro da lista tratava `saiu_*` e ignorava `arquivada_*`.
+
+A paciente tocava em "Arquivar", recebia **"Arquivada. Volta se ela escrever."**
+— e a conversa continuava exatamente onde estava. Recurso inteiro decorativo,
+com confirmação de sucesso por cima. E não havia gaveta: nada, em lugar nenhum.
+
+- A régua é a MESMA do "sair", e por isso mora ao lado dele: some da lista
+  enquanto nada novo chegar, e volta sozinha quando a outra escrever. ⚠️ É por
+  isso que a coluna guarda um INSTANTE — com booleano, arquivar seria o "sair"
+  de novo.
+- ⚠️ **O PEDIDO não é arquivável** (`c.aceita` no portão): quem ainda não foi
+  aceita mora na caixa de pedidos, e sumir de lá tiraria da vista justamente o
+  que precisa de decisão.
+
+⚠️ **E a primeira versão do teste passou verde sobre a mutação que troca a
+comparação por um booleano** — a janela de 200 caracteres alcançava o
+`ultima_em` do `saiu_*` vizinho. A âncora começa na declaração e para no
+`return false` dela. É a armadilha de substring, pela enésima vez: **janela
+larga é asserção que mente.**
+
+### O que a varredura NÃO achou
+
+As promessas de **privacidade** e **alcance** estão cumpridas, conferidas uma a
+uma: a busca filtra `perfil_publico` na CONSULTA (mais `podeAparecerNaBusca`
+depois), `escondeuDeMim` recorta os stories ANTES da leitura, e
+`conjuntoDeBloqueio` falha FECHADO. As de TEMPO também: `alvo_id` não tem
+`REFERENCES`, então "o story some em 24 horas; a denúncia fica" é verdade mesmo
+quando ela apaga o story.
+
+⚠️ **E duas acusações minhas caíram na conferência** — o CHECK de `especie`
+(meu `grep` era por linha, a lista é multi-linha) e o portão da busca (meu
+`head -3` cortou a ocorrência que importava). **Varredura mecânica também erra;
+o que não erra é abrir o arquivo antes de acusar.**
+

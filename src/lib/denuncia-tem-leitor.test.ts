@@ -92,3 +92,43 @@ describe("⚠️ toda denúncia tem leitor", () => {
     expect(COM_LEITOR[inventado]).toBeUndefined();
   });
 });
+
+/**
+ * ⚠️ ARQUIVAR UMA CONVERSA TEM DE TIRÁ-LA DA LISTA.
+ *
+ * `arquivarConversa` gravava `arquivada_a`/`arquivada_b`, o `select` trazia as
+ * colunas, e NENHUM leitor as consultava. A tela respondia
+ * "Arquivada. Volta se ela escrever." e a conversa não saía do lugar — recurso
+ * inteiro decorativo, com confirmação de sucesso por cima.
+ *
+ * É a mesma família da denúncia de comentário deste arquivo: escrita com porta,
+ * chamador e toast — e sem ninguém lendo o que ela grava.
+ */
+describe("⚠️ arquivar conversa some da lista, e volta sozinha", () => {
+  const C = readFileSync("src/lib/conversa.functions.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const i = C.indexOf("export const minhasConversas");
+  const corpo = C.slice(i, C.indexOf("\nexport const", i + 10));
+
+  test("a lista CONSULTA a coluna de arquivada", () => {
+    expect(i).toBeGreaterThan(0);
+    expect(corpo).toMatch(/minhaColuna\(\s*"arquivada"/);
+  });
+
+  test("⚠️ e ela VOLTA: compara com `ultima_em`, nunca um booleano", () => {
+    /* ⚠️ A âncora começa NA declaração e para no `return false` DELA. Uma janela
+       mais larga alcança o `ultima_em` do `saiu_*` vizinho, e a mutação que
+       troca a comparação por um booleano passa verde — foi o que aconteceu na
+       primeira versão deste teste. */
+    const j = corpo.indexOf("const arquivadaEm");
+    expect(j).toBeGreaterThan(0);
+    const ramo = corpo.slice(j, corpo.indexOf("return false;", j));
+    expect(ramo).toContain("ultima_em");
+    expect(ramo).toMatch(/getTime\(\)\s*<=/);
+  });
+
+  test("⚠️ o PEDIDO não é arquivado — some da vista o que pede decisão", () => {
+    const j = corpo.indexOf('minhaColuna("arquivada"');
+    const trecho = corpo.slice(Math.max(0, j - 300), j + 100);
+    expect(trecho).toMatch(/c\.aceita/);
+  });
+});

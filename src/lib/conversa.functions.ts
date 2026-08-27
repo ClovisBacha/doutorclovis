@@ -230,8 +230,29 @@ export const minhasConversas = createServerFn({ method: "POST" })
          faz o contrário: sair é limpar a lista, não bloquear. Quem quer que a
          pessoa não escreva mais tem o bloqueio, com o nome certo. */
       const saiuEm = c[minhaColuna("saiu", eu, c.a_id)];
-      if (!saiuEm) return true;
-      return new Date(c.ultima_em).getTime() > new Date(saiuEm).getTime();
+      if (saiuEm && new Date(c.ultima_em).getTime() <= new Date(saiuEm).getTime()) return false;
+
+      /* ⚠️ **ARQUIVAR NÃO FAZIA NADA, e a tela dizia que sim.**
+         `arquivarConversa` gravava a coluna, o `select` a trazia, e NENHUM
+         leitor a consultava: a paciente tocava em "Arquivar", recebia
+         "Arquivada. Volta se ela escrever." — e a conversa continuava
+         exatamente onde estava. Recurso inteiro decorativo.
+
+         A régua é a MESMA do "sair", e por isso mora ao lado dele: a linha some
+         da lista enquanto nada de novo chegar, e VOLTA sozinha no instante em
+         que a outra escrever. É por isso que a coluna guarda um INSTANTE e não
+         um booleano — com booleano, arquivar seria o "sair" de novo.
+
+         ⚠️ **O PEDIDO NÃO É AFETADO**: quem ainda não foi aceita mora na caixa
+         de pedidos, e sumir de lá tiraria da vista justamente o que precisa de
+         decisão. Por isso o portão exige `c.aceita`. */
+      if (c.aceita) {
+        const arquivadaEm = c[minhaColuna("arquivada", eu, c.a_id)];
+        if (arquivadaEm && new Date(c.ultima_em).getTime() <= new Date(arquivadaEm).getTime()) {
+          return false;
+        }
+      }
+      return true;
     });
     if (conversas.length === 0) {
       return { ok: true as const, conversas: [] as ConversaNaTela[], naoLidas: 0 };
