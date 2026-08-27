@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { EscolherMotivo } from "@/components/escolher-motivo";
 import type { DenunciaNaFila } from "@/lib/caixinha.functions";
 
 /**
@@ -19,6 +20,7 @@ export type FichaDeModeracao = {
   total: number;
   porDesfecho: { removido: number; avisado: number; sem_acao: number };
   suspensa: boolean;
+  suspensaPor: string | null;
   historico: {
     alvo: string;
     motivo: string;
@@ -37,7 +39,13 @@ export type BancadaDaFila = {
   /** ⚠️ A ficha vem do servidor: sem isto ela nunca desenha na bancada. */
   ficha?: FichaDeModeracao;
 };
-import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo, PODE_REMOVER } from "@/lib/denuncias";
+import {
+  rotuloDoMotivo,
+  type DenunciaDaRede,
+  rotuloDoAlvo,
+  PODE_REMOVER,
+  type MotivoDaDenuncia,
+} from "@/lib/denuncias";
 
 /**
  * A FILA DE DENÚNCIAS DA CAIXINHA.
@@ -434,6 +442,10 @@ function PainelDaFicha({
 }) {
   const [indo, setIndo] = useState(false);
   const [recado, setRecado] = useState<string | null>(null);
+  /* ⚠️ O motivo é CATÁLOGO FECHADO, como nas outras quatro portas de denúncia:
+     ele é lido depois, na própria ficha, e campo livre aqui vira o texto que
+     alguém escreve às pressas sobre uma paciente. */
+  const [escolhendo, setEscolhendo] = useState(false);
 
   /**
    * ⚠️ **O DEGRAU ACIMA DE REMOVER UMA PEÇA.** Sem ele, uma conta que reincide
@@ -443,7 +455,7 @@ function PainelDaFicha({
    * texto próprio, porque é o único em que a recusa é uma DECISÃO do produto e
    * não uma avaria.
    */
-  async function suspender(ligar: boolean) {
+  async function suspender(ligar: boolean, motivo?: MotivoDaDenuncia) {
     setIndo(true);
     setRecado(null);
     try {
@@ -453,7 +465,7 @@ function PainelDaFicha({
       if (!t) return;
       const { suspenderDaComunidade } = await import("@/lib/moderacao.functions");
       const r = await suspenderDaComunidade({
-        data: { accessToken: t, contaId, suspender: ligar, motivo: "outro" },
+        data: { accessToken: t, contaId, suspender: ligar, motivo: motivo ?? "outro" },
       });
       if (r.ok) {
         aoMudar();
@@ -515,6 +527,13 @@ function PainelDaFicha({
         <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
           perfil {ficha.publica ? "público" : "privado"}
         </span>
+        {/* ⚠️ Sem o motivo, "suspensa" não diz por quê — e rever a decisão, dias
+            depois, vira adivinhação. */}
+        {ficha.suspensa && (
+          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
+            suspensa{ficha.suspensaPor ? ` · ${rotuloDoMotivo(ficha.suspensaPor)}` : ""}
+          </span>
+        )}
       </div>
 
       <p className="mt-2 text-[12px] text-muted-foreground">
@@ -549,7 +568,7 @@ function PainelDaFicha({
           <button
             type="button"
             disabled={indo}
-            onClick={() => void suspender(!ficha.suspensa)}
+            onClick={() => (ficha.suspensa ? void suspender(false) : setEscolhendo(true))}
             className={`press min-h-[38px] rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50 ${
               ficha.suspensa ? "border border-border" : "bg-destructive text-destructive-foreground"
             }`}
@@ -566,6 +585,19 @@ function PainelDaFicha({
               : "Ela some da Comunidade — perfil, publicações, stories e busca — e É AVISADA de que a conta está indisponível. Nada é apagado, e dá para desfazer. O resto do app não muda: consultas, registros e a conversa com o médico continuam."}
           </p>
           {recado && <p className="mt-1 text-[11px] text-destructive">{recado}</p>}
+          {escolhendo && (
+            <div className="mt-2">
+              <EscolherMotivo
+                titulo={`Por que suspender ${ficha.nome} da Comunidade?`}
+                aviso="Ela é avisada de que a conta está indisponível, sem o motivo — o motivo fica aqui, para quem revir a decisão."
+                aoCancelar={() => setEscolhendo(false)}
+                aoEnviar={(m) => {
+                  setEscolhendo(false);
+                  void suspender(true, m as MotivoDaDenuncia);
+                }}
+              />
+            </div>
+          )}
         </div>
       )}
 

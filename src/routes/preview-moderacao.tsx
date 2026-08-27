@@ -143,6 +143,7 @@ function Pagina() {
                   pausada: false,
                   publica: true,
                   suspensa: suspensa === 1,
+                  suspensaPor: suspensa === 1 ? "saude" : null,
                   desde: "2026-03-14T10:00:00Z",
                   abertas: 1,
                   total: 4,

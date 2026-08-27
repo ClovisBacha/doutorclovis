@@ -338,79 +338,17 @@ function CoracaoDoToque() {
  * lápis amarelo-e-marrom ao lado dele lê como adesivo colado ali.
  */
 /**
- * O SELETOR DE MOTIVO — usado no post e no perfil.
+ * ⚠️ `EscolherMotivo` MUDOU DE ARQUIVO — ver `escolher-motivo.tsx`.
  *
- * ⚠️ **Catálogo fechado, e nunca campo livre.** A razão está em `denuncias.ts`:
- * texto aberto num app de gestação é onde alguém escreve a informação clínica
- * de OUTRA pessoa, e esse texto iria para uma tela de administração, gravado,
- * sobre quem nunca soube.
+ * Ela é usada pela Comunidade E pela fila do painel, e importá-la daqui puxava
+ * `rede-instagram.tsx` inteiro para o pacote do painel — junto com a régua
+ * clínica, que tem `(?<!` nas fronteiras e não pode viajar para lá. A catraca
+ * "a régua clínica não entra no pacote do navegador" pegou na hora.
  *
- * ⚠️ **Um componente só, e não duas cópias.** As duas portas (post e perfil)
- * precisam oferecer exatamente os mesmos motivos — duas listas divergiriam no
- * primeiro ajuste, e a fila passaria a receber motivos que a tela do outro lado
- * não sabe nomear.
+ * A re-exportação existe para não quebrar quem já a importava daqui.
  */
-export function EscolherMotivo({
-  titulo,
-  aviso,
-  aoCancelar,
-  aoEnviar,
-}: {
-  titulo: string;
-  aviso: string;
-  aoCancelar: () => void;
-  aoEnviar: (motivo: MotivoDaDenuncia) => void;
-}) {
-  const [motivo, setMotivo] = useState<MotivoDaDenuncia | null>(null);
-  return (
-    <div className="rounded-2xl border border-border bg-muted/40 p-3">
-      <p className="text-[13px] font-semibold leading-snug">{titulo}</p>
-      {/* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra vai
-          saber — a mesma razão pela qual o bloqueio é mudo. */}
-      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{aviso}</p>
-
-      <div className="mt-2.5 space-y-1">
-        {MOTIVOS.map((m) => (
-          <button
-            key={m.motivo}
-            type="button"
-            onClick={() => setMotivo(m.motivo)}
-            aria-pressed={motivo === m.motivo}
-            className={`press block min-h-[44px] w-full rounded-xl border px-3 py-1.5 text-left ${
-              motivo === m.motivo ? "border-primary bg-primary/10" : "border-border"
-            }`}
-          >
-            <span className="block text-[13px] font-medium">{m.rotulo}</span>
-            <span className="block text-[11px] leading-tight text-muted-foreground">
-              {m.explica}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-2.5 flex gap-2">
-        <button
-          type="button"
-          onClick={aoCancelar}
-          className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          /* ⚠️ Só habilita com motivo escolhido: sem isso a fila recebe
-             "outro" por omissão, e o campo que existe para dizer POR QUÊ passa
-             a não dizer nada. */
-          disabled={!motivo}
-          onClick={() => motivo && aoEnviar(motivo)}
-          className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground disabled:opacity-45"
-        >
-          Denunciar
-        </button>
-      </div>
-    </div>
-  );
-}
+import { EscolherMotivo } from "@/components/escolher-motivo";
+export { EscolherMotivo };
 
 /**
  * O PINO.

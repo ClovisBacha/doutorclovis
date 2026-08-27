@@ -137,6 +137,7 @@ export const fichaDeModeracao = createServerFn({ method: "POST" })
       care_mode?: boolean | null;
       rede_pausada_em?: string | null;
       rede_suspensa_em?: string | null;
+      rede_suspensa_motivo?: string | null;
       created_at?: string | null;
     } | null;
 
@@ -151,6 +152,12 @@ export const fichaDeModeracao = createServerFn({ method: "POST" })
         pausada: !!p?.rede_pausada_em,
         publica: !!p?.perfil_publico,
         suspensa: !!p?.rede_suspensa_em,
+        /* ⚠️ **O MOTIVO É LIDO, e não só gravado.** Uma coluna escrita que
+           ninguém lê é dívida com cara de recurso — e foi a catraca de
+           `escrita-tem-leitor` que pegou esta, minutos depois de eu a criar.
+           Aqui ele serve para quem abre a ficha DEPOIS: sem ele, "suspensa" não
+           diz por quê, e rever a decisão vira adivinhação. */
+        suspensaPor: p?.rede_suspensa_motivo ?? null,
         desde: p?.created_at ?? null,
         abertas: linhas.filter((l) => !l.resolvido_em).length,
         total: linhas.length,
