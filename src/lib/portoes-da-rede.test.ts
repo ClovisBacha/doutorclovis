@@ -200,3 +200,55 @@ describe("⚠️ a varredura sabe achar o defeito que ela procura", () => {
     expect(pega).toBe(true);
   });
 });
+
+/**
+ * ⚠️ OS DOIS PORTÕES QUE FALHAVAM ABERTOS, e um deles era desmentido pelo
+ * comentário ao lado.
+ *
+ * 1. **O push da favorita ignorava o bloqueio quando a leitura falhava.** O
+ *    comentário dizia, com todas as letras, que "um push meu chegando nela
+ *    seria o bloqueio falhando pelo caminho mais visível possível" — e o erro
+ *    era descartado, então `bloqueio` vinha `null`, a conta dava zero, e o push
+ *    saía. Push é enfeite; o bloqueio, não.
+ *
+ * 2. **O aviso de menção tratava perfil ilegível como "não está de luto".** Com
+ *    `autor` nulo, `emCuidado` virava `false` e o aviso saía sobre uma
+ *    publicação de quem acabou de perder a gestação. É a classe de falha-aberta
+ *    de `care_mode` que este repositório mais paga.
+ */
+describe("⚠️ os portões de aviso falham FECHADOS", () => {
+  const semProsaDe = (p: string) =>
+    fs
+      .readFileSync(p, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+  test("o push da favorita cala quando não consegue ler o bloqueio", () => {
+    const S = semProsaDe("src/lib/rede-social.functions.ts");
+    const i = S.indexOf("rede_bloqueios");
+    const j = S.indexOf("erroBloqueio");
+    expect(j).toBeGreaterThan(0);
+    /* A guarda cita o erro ANTES de decidir mandar. */
+    const guarda = S.slice(S.indexOf("if (erroBloqueio"), S.indexOf("if (erroBloqueio") + 90);
+    expect(guarda).toContain("return");
+    expect(i).toBeGreaterThan(0);
+  });
+
+  test("⚠️ o aviso de menção não sai com o perfil do autor ilegível", () => {
+    const M = semProsaDe("src/lib/mencoes.functions.ts");
+    /* ⚠️ Âncora na GUARDA, e não na primeira ocorrência do nome: a primeira é
+       a desestruturação, e uma janela a partir dela nunca alcança o `if` — foi
+       assim que a primeira versão deste teste reprovou código correto. */
+    const i = M.indexOf("if (erroAutor");
+    expect(i).toBeGreaterThan(0);
+    expect(M.slice(i, i + 60)).toMatch(/if \(erroAutor \|\| !autor\) return;/);
+  });
+
+  test("⚠️ e a guarda vem ANTES de montar o objeto que vai à régua", () => {
+    const M = semProsaDe("src/lib/mencoes.functions.ts");
+    const guarda = M.indexOf("if (erroAutor || !autor) return;");
+    const monta = M.indexOf("emCuidado: !!autor?.care_mode");
+    expect(guarda).toBeGreaterThan(0);
+    expect(monta).toBeGreaterThan(guarda);
+  });
+});

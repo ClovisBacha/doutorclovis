@@ -227,11 +227,18 @@ export async function avisarMencionadas(
         .eq("id", opts.postId)
         .maybeSingle();
       if (erroPost || !linha || linha.arquivado_em) return;
-      const { data: autor } = await sb
+      const { data: autor, error: erroAutor } = await sb
         .from("patient_profiles")
         .select("care_mode, perfil_publico")
         .eq("id", linha.autor_id)
         .maybeSingle();
+      /* ⚠️ **SEM O PERFIL, NÃO AVISA NINGUÉM.** Com o erro descartado,
+         `autor` vinha `null` e `emCuidado` virava `false` — ou seja, "não está
+         de luto" — e o aviso de menção saía sobre uma publicação de quem
+         acabou de perder a gestação. É a classe de falha-aberta de `care_mode`
+         que este repositório mais paga, e ela some com um `return`: uma menção
+         não avisada é barata; a outra ponta, não. */
+      if (erroAutor || !autor) return;
       post = {
         autorId: linha.autor_id as string,
         visibilidade: linha.visibilidade as string,

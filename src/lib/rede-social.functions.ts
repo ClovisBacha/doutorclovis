@@ -3577,14 +3577,19 @@ async function avisarQuemMeFavoritou(
            bloqueio falhando pelo caminho mais visível possível. */
         if (foraDaRede(dela)) return;
         if (escondidos.has(id)) return;
-        const { data: bloqueio } = await sb
+        const { data: bloqueio, error: erroBloqueio } = await sb
           .from("rede_bloqueios")
           .select("quem_id")
           .or(
             `and(quem_id.eq.${id},bloqueado_id.eq.${eu}),and(quem_id.eq.${eu},bloqueado_id.eq.${id})`,
           )
           .limit(1);
-        if ((bloqueio ?? []).length > 0) return;
+        /* ⚠️ **FALHA AO LER O BLOQUEIO CALA O PUSH**, e o comentário acima
+           dizia isso enquanto o código fazia o contrário: com o erro
+           descartado, `bloqueio` vinha `null`, a conta dava zero e o push SAÍA
+           — o bloqueio falhando pelo caminho mais visível possível.
+           Push é enfeite; o bloqueio, não. */
+        if (erroBloqueio || (bloqueio ?? []).length > 0) return;
         await sendPushToUser(id, {
           title: "Comunidade",
           /* ⚠️ O texto DIZ o formato, e nada além. "Publicou um story" avisa que
