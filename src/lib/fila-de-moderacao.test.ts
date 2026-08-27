@@ -243,3 +243,98 @@ describe("⚠️ os números da Comunidade", () => {
     expect((T.match(/alerta=\{/g) ?? []).length).toBe(1);
   });
 });
+
+/**
+ * ⚠️ SUSPENDER UMA CONTA — o degrau acima de remover uma peça.
+ *
+ * A fila só sabia tirar UMA publicação por vez. Uma conta que reincide continua
+ * publicando, e a única saída era remover peça por peça enquanto ela produz
+ * mais: isso não é moderação, é enxugar gelo.
+ *
+ * ⚠️ **SUSPENSA ≠ EM LUTO ≠ PAUSADA, e as três somem pela MESMA régua.** O que
+ * as separa é quem decidiu — e por isso a suspensão é a ÚNICA em que o app
+ * FALA. Uma conta que some sem uma palavra lê como app quebrado, e num app de
+ * gestação a paciente tem coisa melhor a fazer do que investigar isso.
+ */
+describe("⚠️ a suspensão da Comunidade", () => {
+  const M = semProsa("src/lib/moderacao.functions.ts");
+  const i = M.indexOf("export const suspenderDaComunidade");
+  const corpo = M.slice(i);
+
+  test("entra na régua ÚNICA, e não num `if` por ponto de decisão", () => {
+    const R = semProsa("src/lib/rede-social.functions.ts");
+    const j = R.indexOf("export function foraDaRede");
+    const regua = R.slice(j, R.indexOf("}", j));
+    expect(regua).toContain("rede_suspensa_em");
+    expect(regua).toContain("care_mode");
+    expect(regua).toContain("rede_pausada_em");
+  });
+
+  test("⚠️ NUNCA suspende quem está em Modo Cuidado", () => {
+    expect(i).toBeGreaterThan(0);
+    expect(corpo).toContain("em_cuidado");
+    /* E o estado é conferido no BANCO, não no corpo do pedido. */
+    const j = corpo.indexOf("care_mode");
+    expect(j).toBeGreaterThan(0);
+    expect(corpo.slice(Math.max(0, j - 260), j)).toContain("patient_profiles");
+  });
+
+  test("⚠️ não conseguir ler o estado NÃO suspende", () => {
+    const j = corpo.indexOf("erroP");
+    expect(j).toBeGreaterThan(0);
+    expect(corpo.slice(corpo.indexOf("if (erroP"), corpo.indexOf("if (erroP") + 90)).toContain(
+      "return",
+    );
+  });
+
+  test("⚠️ ela É AVISADA — é a única das três em que o app fala", () => {
+    /* ⚠️ A CHAMADA, e não a linha do import: uma mutação que renomeasse só o
+       import deixaria a string no arquivo e este teste passaria verde sobre um
+       push que nunca sai. */
+    expect(corpo).toContain("await sendPushToUser(");
+    /* Só ao SUSPENDER: o "voltou" chega quando ela abrir e encontrar a aba. */
+    const j = corpo.indexOf("sendPushToUser");
+    expect(corpo.slice(Math.max(0, j - 300), j)).toContain("if (data.suspender)");
+  });
+
+  test("⚠️ e o push NÃO diz o motivo — a tela de bloqueio é o pior contexto", () => {
+    const j = corpo.indexOf("body:");
+    const texto = corpo.slice(j, j + 200);
+    for (const p of ["assedio", "spam", "saude", "violaç", "infraç"]) {
+      expect(texto.toLowerCase()).not.toContain(p);
+    }
+  });
+
+  test("⚠️ é REVERSÍVEL, e nada é apagado", () => {
+    expect(corpo).toContain("rede_suspensa_em: data.suspender ?");
+    expect(corpo).not.toContain(".delete(");
+  });
+
+  test("⚠️ o texto da paciente diz o FATO, dá caminho e NÃO acusa", () => {
+    const T = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    const j = T.indexOf("Sua conta da Comunidade está indisponível");
+    expect(j).toBeGreaterThan(0);
+    const bloco = T.slice(j, j + 900);
+    expect(bloco).toContain("não foi apagado");
+    expect(bloco).toContain("fale com o consultório");
+    /* Um texto de tribunal numa tela de app de saúde é crueldade desnecessária. */
+    for (const p of ["violaç", "infraç", "punid", "banid", "proibid"]) {
+      expect(bloco.toLowerCase()).not.toContain(p);
+    }
+  });
+
+  test("⚠️ a suspensão vem ANTES da pausa, e nunca as duas juntas", () => {
+    /* A pausa ela desfaz num toque; a suspensão não. Ver as duas faria ela
+       tocar em "Reativar" e não acontecer nada. */
+    const T = readFileSync("src/components/rede-instagram.tsx", "utf8");
+    expect(T).toContain("{!suspensa && pausada && (");
+  });
+
+  test("⚠️ a coluna é REVOGADA de `authenticated`", () => {
+    /* `patient_profiles` é escrita direto do navegador; sem o REVOKE, quem foi
+       suspensa levantaria a própria suspensão sem passar pelo servidor. */
+    const sql = readFileSync("supabase/APLICAR_SUSPENDER_DA_REDE.sql", "utf8");
+    expect(sql).toMatch(/REVOKE UPDATE \(rede_suspensa_em/);
+    expect(sql).toContain("authenticated");
+  });
+});

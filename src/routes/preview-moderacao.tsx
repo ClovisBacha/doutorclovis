@@ -16,6 +16,7 @@ import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
  *                                    perigosa que uma fila pode dizer errado.
  *   /preview-moderacao?vazio=1    → nada a olhar
  *   /preview-moderacao?ficha=1    → a ficha de moderação de uma conta
+ *   /preview-moderacao?ficha=1&suspensa=1 → a conta já suspensa (o desfazer)
  *   /preview-moderacao?instavel=1 → ⚠️ os números ilegíveis: "—", nunca 0.
  *                                    Zero AFIRMA que a aba morreu.
  *
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/preview-moderacao")({
     falhou: q.falhou == null ? 0 : Number(q.falhou),
     instavel: q.instavel == null ? 0 : Number(q.instavel),
     ficha: q.ficha == null ? 0 : Number(q.ficha),
+    suspensa: q.suspensa == null ? 0 : Number(q.suspensa),
     vazio: q.vazio == null ? 0 : Number(q.vazio),
   }),
 });
@@ -95,7 +97,7 @@ const CAIXINHA = [
 ];
 
 function Pagina() {
-  const { falhou, vazio, instavel, ficha } = Route.useSearch();
+  const { falhou, vazio, instavel, ficha, suspensa } = Route.useSearch();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <h1 className="text-[15px] font-semibold">Bancada · fila de moderação</h1>
@@ -140,6 +142,7 @@ function Pagina() {
                   emCuidado: false,
                   pausada: false,
                   publica: true,
+                  suspensa: suspensa === 1,
                   desde: "2026-03-14T10:00:00Z",
                   abertas: 1,
                   total: 4,

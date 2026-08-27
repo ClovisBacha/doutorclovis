@@ -1822,6 +1822,7 @@ export function CartaoDaSemana({
 export function TelaPrincipal({
   posts,
   pausada = false,
+  suspensa = false,
   aoReativar,
   soSeguindo = false,
   stories = [],
@@ -1884,6 +1885,13 @@ export function TelaPrincipal({
    * publica imaginando que está invisível.
    */
   pausada?: boolean;
+  /**
+   * ⚠️ **Decisão da PLATAFORMA, e não dela.** As três (luto, pausa, suspensão)
+   * escondem a pessoa pela mesma régua; o que as separa é quem decidiu — e por
+   * isso esta é a ÚNICA em que o app FALA. Uma conta que some da Comunidade sem
+   * uma palavra faz a paciente concluir que o app quebrou.
+   */
+  suspensa?: boolean;
   /** Sem a prop, a faixa avisa e não oferece o caminho de volta. */
   aoReativar?: () => void;
   posts: PostNaTela[];
@@ -2077,7 +2085,29 @@ export function TelaPrincipal({
           muda o significado de tudo que vem abaixo — publicar, comentar e
           reagir continuam funcionando, e ninguém vai ver. Enterrada no meio da
           rolagem, seria um aviso que ela encontra depois de já ter publicado. */}
-      {pausada && (
+      {/* ⚠️ **A SUSPENSÃO VEM ANTES DA PAUSA, e nunca as duas juntas.** Ela
+          muda mais coisa: a pausa ela desfaz num toque, a suspensão não. Ver as
+          duas faria ela tocar em "Reativar" e não acontecer nada.
+
+          ⚠️ **E o texto NÃO acusa.** Ele diz o FATO e o caminho — quem lê isto
+          é uma gestante, e um texto de tribunal numa tela de app de saúde é uma
+          crueldade desnecessária. O motivo detalhado vai por outro canal, com
+          nome e voz humana. */}
+      {suspensa && (
+        <div className="mb-3 rounded-2xl border border-destructive/40 bg-destructive/5 p-3">
+          <p className="text-[13px] font-semibold">Sua conta da Comunidade está indisponível</p>
+          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+            Você não aparece na Comunidade por enquanto, e o que você publicou não foi apagado. Isso
+            vale só para esta aba: as suas consultas, os seus registros e a conversa com o seu
+            médico continuam normais.
+          </p>
+          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+            Se você acha que houve um engano, fale com o consultório — a gente revê.
+          </p>
+        </div>
+      )}
+
+      {!suspensa && pausada && (
         <div className="mb-3 rounded-2xl border border-border bg-muted/60 p-3">
           <p className="text-[13px] font-semibold">Sua conta está pausada</p>
           <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
@@ -3860,6 +3890,8 @@ export function RedeNoApp({
    * a rede para ela.
    */
   const [pausada, setPausada] = useState(false);
+  /** ⚠️ Decisão da PLATAFORMA, e não dela — por isso ela é avisada. */
+  const [suspensa, setSuspensa] = useState(false);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
   /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
   const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
@@ -4998,6 +5030,7 @@ export function RedeNoApp({
       if (meu.ok) {
         setEuId(meu.perfil.id);
         setPausada(!!(meu as { pausada?: boolean }).pausada);
+        setSuspensa(!!(meu as { suspensa?: boolean }).suspensa);
         setMeuAvatar(meu.perfil.avatarUrl ?? null);
         setSemanaDoCarimbo(meu.semanaDoCarimbo);
         /* ⚠️ A preferência chega JUNTO com o feed, na mesma rodada. Buscá-la
@@ -7938,6 +7971,7 @@ export function RedeNoApp({
         instavel={feedInstavel}
         aoTentarDeNovo={() => void carregarFeed()}
         pausada={pausada}
+        suspensa={suspensa}
         aoReativar={() => void reativarMinhaConta()}
         /* ⚠️ **O LÁPIS NUNCA CHEGAVA AO FEED.** `TelaPrincipal` declarava a
            prop e a repassava aos cartões; o único chamador não a passava. E

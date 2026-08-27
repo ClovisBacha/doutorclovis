@@ -36,6 +36,7 @@
  *   /preview-instagram?tela=story&sensivelStory=1 → o véu do aviso de conteúdo
  *   /preview-instagram?memoria=1 → o cartão "há um ano, você publicou isto"
  *   /preview-instagram?tela=perfil&meu=1&album=1 → a grade agrupada por semana
+ *   /preview-instagram?suspensa=1  → a conta suspensa pela plataforma
  *   /preview-instagram?palavraOculta=1 → o feed com um post recolhido pelo filtro
  *   /preview-instagram?tela=perfil&meu=1 → o ♡ dos curtidos e o "Story escondido de…"
  *   /preview-instagram?tela=espelho&trancado=1 → o estado da MAIORIA: perfil fechado
@@ -188,6 +189,7 @@ export const Route = createFileRoute("/preview-instagram")({
     album: q.album == null ? 0 : Number(q.album),
     /* ⚠️ `== null` e NÃO `=== undefined` — a armadilha de sempre. */
     palavraOculta: q.palavraOculta == null ? 0 : Number(q.palavraOculta),
+    suspensa: q.suspensa == null ? 0 : Number(q.suspensa),
     desafio: q.desafio == null ? "" : String(q.desafio),
     /* ⚠️ `== null` e nunca `=== undefined` — a mesma armadilha de sempre. O
        padrão é ABERTA: o estado que a tela existe para mostrar é o botão,
@@ -457,6 +459,7 @@ function Bancada() {
     quadro,
     instavel,
     fechado,
+    suspensa,
   } = Route.useSearch();
 
   /* O desafio da semana. Sem a bancada, conferir o cartão exigiria uma criadora
@@ -1924,6 +1927,12 @@ function Bancada() {
               uma bancada apagaria o tutorial da conta de verdade. */}
           {!!onboarding && <OnboardingDaComunidade careMode={false} bancada />}
           <TelaPrincipal
+            /* ⚠️ **A SUSPENSÃO É DECISÃO DA PLATAFORMA, e a paciente é
+               avisada** — é a única das três (luto, pausa, suspensão) em que o
+               app fala. Sem esta prop o aviso não desenha, e a bancada
+               aprovaria a tela sem a única coisa que impede a conta de sumir em
+               silêncio. */
+            suspensa={suspensa === 1}
             posts={
               vazio
                 ? []

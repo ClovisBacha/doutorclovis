@@ -18,6 +18,7 @@ export type FichaDeModeracao = {
   abertas: number;
   total: number;
   porDesfecho: { removido: number; avisado: number; sem_acao: number };
+  suspensa: boolean;
   historico: {
     alvo: string;
     motivo: string;
@@ -185,9 +186,21 @@ function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
    */
   const [ficha, setFicha] = useState<FichaDeModeracao | null>(bancada?.ficha ?? null);
   const [abrindoFicha, setAbrindoFicha] = useState<string | null>(null);
+  /**
+   * De QUEM é a ficha aberta — o botão de suspender precisa do id.
+   *
+   * ⚠️ **A bancada precisa semeá-lo JUNTO com a ficha.** O painel só desenha
+   * com os dois, e na bancada `verFicha` nunca roda (ela não tem sessão de
+   * administrador): sem isto o painel simplesmente sumia, e a bancada
+   * aprovaria uma fila sem o histórico e sem o botão de suspender.
+   */
+  const [fichaDe, setFichaDe] = useState<string | null>(
+    bancada?.ficha ? (bancada.rede?.[0]?.denunciadaId ?? "bancada") : null,
+  );
 
   async function verFicha(contaId: string) {
     setAbrindoFicha(contaId);
+    setFichaDe(contaId);
     setFicha(null);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
@@ -370,7 +383,14 @@ function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
           </li>
         ))}
       </ul>
-      {ficha && <PainelDaFicha ficha={ficha} aoFechar={() => setFicha(null)} />}
+      {ficha && fichaDe && (
+        <PainelDaFicha
+          ficha={ficha}
+          contaId={fichaDe}
+          aoFechar={() => setFicha(null)}
+          aoMudar={() => void verFicha(fichaDe)}
+        />
+      )}
       {recado && <p className="mt-2 text-[12px] text-destructive">{recado}</p>}
     </div>
   );
@@ -401,7 +421,55 @@ export function FilaDeDenuncias({ bancada }: { bancada?: BancadaDaFila } = {}) {
  * Comunidade é onde ela escreve para o público que ELA escolheu; ler o que
  * ninguém denunciou seria transformar moderação em vigilância.
  */
-function PainelDaFicha({ ficha, aoFechar }: { ficha: FichaDeModeracao; aoFechar: () => void }) {
+function PainelDaFicha({
+  ficha,
+  contaId,
+  aoFechar,
+  aoMudar,
+}: {
+  ficha: FichaDeModeracao;
+  contaId: string;
+  aoFechar: () => void;
+  aoMudar: () => void;
+}) {
+  const [indo, setIndo] = useState(false);
+  const [recado, setRecado] = useState<string | null>(null);
+
+  /**
+   * ⚠️ **O DEGRAU ACIMA DE REMOVER UMA PEÇA.** Sem ele, uma conta que reincide
+   * continua publicando enquanto o administrador remove peça por peça.
+   *
+   * ⚠️ **Falha vira recado, nunca silêncio** — e o caso "em Modo Cuidado" tem
+   * texto próprio, porque é o único em que a recusa é uma DECISÃO do produto e
+   * não uma avaria.
+   */
+  async function suspender(ligar: boolean) {
+    setIndo(true);
+    setRecado(null);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const t = s.data.session?.access_token;
+      if (!t) return;
+      const { suspenderDaComunidade } = await import("@/lib/moderacao.functions");
+      const r = await suspenderDaComunidade({
+        data: { accessToken: t, contaId, suspender: ligar, motivo: "outro" },
+      });
+      if (r.ok) {
+        aoMudar();
+        return;
+      }
+      setRecado(
+        r.motivo === "em_cuidado"
+          ? "Esta conta está em Modo Cuidado — ela já está fora da rede, e suspender seria punir quem acabou de perder a gestação."
+          : r.motivo === "sem_suporte"
+            ? "O banco ainda não tem a coluna da suspensão (APLICAR_SUSPENDER_DA_REDE.sql)."
+            : "Não deu para mudar agora.",
+      );
+    } finally {
+      setIndo(false);
+    }
+  }
   const dia = (iso: string | null) =>
     iso
       ? new Date(iso).toLocaleDateString("pt-BR", {
@@ -467,6 +535,38 @@ function PainelDaFicha({ ficha, aoFechar }: { ficha: FichaDeModeracao; aoFechar:
             </li>
           ))}
         </ul>
+      )}
+
+      {/* ⚠️ **O DEGRAU ACIMA DE REMOVER UMA PEÇA.** Sem ele, uma conta que
+          reincide continua publicando enquanto o administrador remove peça por
+          peça — o que não é moderação, é enxugar gelo.
+
+          ⚠️ E ele NÃO aparece para quem está em Modo Cuidado: ela já está fora
+          da rede, e o servidor recusa de qualquer jeito. Oferecer um botão que
+          o servidor vai recusar é pior que não oferecer. */}
+      {!ficha.emCuidado && (
+        <div className="mt-3 border-t border-border pt-2">
+          <button
+            type="button"
+            disabled={indo}
+            onClick={() => void suspender(!ficha.suspensa)}
+            className={`press min-h-[38px] rounded-xl px-3 py-1.5 text-[12px] font-semibold disabled:opacity-50 ${
+              ficha.suspensa ? "border border-border" : "bg-destructive text-destructive-foreground"
+            }`}
+          >
+            {indo
+              ? "…"
+              : ficha.suspensa
+                ? "Devolver a conta à Comunidade"
+                : "Suspender da Comunidade"}
+          </button>
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            {ficha.suspensa
+              ? "Ela volta a aparecer na Comunidade. Nada do que ela publicou foi apagado."
+              : "Ela some da Comunidade — perfil, publicações, stories e busca — e É AVISADA de que a conta está indisponível. Nada é apagado, e dá para desfazer. O resto do app não muda: consultas, registros e a conversa com o médico continuam."}
+          </p>
+          {recado && <p className="mt-1 text-[11px] text-destructive">{recado}</p>}
+        </div>
       )}
 
       {/* ⚠️ A frase existe para o administrador não procurar o que não está

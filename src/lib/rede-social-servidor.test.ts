@@ -579,8 +579,14 @@ describe("⚠️ a escada de recuo das colunas do perfil", () => {
 
   test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
     const c = CODIGO_REDE.replace(/\s+/g, " ");
-    /* A entrada cai no degrau mais ALTO, não direto no fundo. */
-    expect(c).toContain("error ? await semAsColunasDosAvisos(sb, faltando)");
+    /* ⚠️ A entrada cai no degrau mais ALTO, não direto no fundo — e o teste
+       NÃO trava QUAL é o mais alto: a escada ganha degraus a cada coluna nova
+       (a suspensão entrou por cima dos avisos), e travar o nome faria este
+       teste reprovar toda vez que a rede crescesse, que é exatamente quando
+       ele mais precisa estar verde. O que se cobra é a FORMA: a entrada chama
+       ALGUM degrau, e cada degrau chama o seguinte. */
+    expect(c).toMatch(/error \? await sem[A-Za-z]+\(sb, faltando\)/);
+    expect(c).toContain("if (error) return semAsColunasDosAvisos(sb, ids)");
     expect(c).toContain("if (error) return semAColunaDaPausa(sb, ids)");
     /* E cada degrau conhece o seguinte. Um degrau que não chama o de baixo é
        um degrau que devolve lista vazia — e `montarPosts` descarta todo post

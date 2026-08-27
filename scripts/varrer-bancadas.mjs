@@ -57,6 +57,8 @@ const EXTRAS = [
   "/preview-moderacao?falhou=1",
   "/preview-moderacao?vazio=1",
   "/preview-moderacao?ficha=1",
+  "/preview-moderacao?ficha=1&suspensa=1",
+  "/preview-instagram?suspensa=1",
   "/preview-moderacao?instavel=1",
   "/preview-instagram?tela=escondidos",
   "/preview-instagram?tela=escondidos&vazio=1",

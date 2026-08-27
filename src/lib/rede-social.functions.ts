@@ -855,7 +855,7 @@ export async function perfisPorId(sb: any, ids: string[], memoria?: MemoriaDePer
      pré-consulta nunca enviado, e o mesmo recuo que `marcarConsultaNoDia` já
      tem para `patient_user_id`/`duration_minutes`. Sem as colunas, as duas
      chaves valem `false` — que é o padrão delas de qualquer forma. */
-  const linhas = error ? await semAsColunasDosAvisos(sb, faltando) : ((data ?? []) as any[]);
+  const linhas = error ? await semAColunaDaSuspensao(sb, faltando) : ((data ?? []) as any[]);
   /* ⚠️ **O avatar é RENOVADO na leitura**, e é aqui que a promessa de
      `salvarPerfilSocial` ("a próxima leitura renova") vira código: ela era
      falsa, e no oitavo dia a foto de toda paciente respondia 403 no app
@@ -1279,12 +1279,22 @@ export async function storiesCrus(sb: any, monta: (base: any) => any): Promise<a
  */
 export function foraDaRede(perfil: any): boolean {
   if (!perfil) return true;
-  return !!perfil.care_mode || !!perfil.rede_pausada_em;
+  /* ⚠️ **TRÊS razões, uma régua.** Luto (dela), pausa (dela) e SUSPENSÃO (da
+     plataforma) produzem o mesmo efeito nesta aba: o perfil não abre, as
+     publicações não aparecem, a busca não acha, os stories somem. Um `if` a
+     mais em cada um dos vinte e seis pontos de decisão é como um deles fica de
+     fora e a suspensão vaza por ali.
+
+     ⚠️ **E o MOTIVO nunca viaja daqui.** Quem chama recebe um booleano; contar
+     a terceiros por que alguém sumiu é o que esta função existe para não
+     fazer. Quem é avisada é a própria, na tela dela. */
+  return !!perfil.care_mode || !!perfil.rede_pausada_em || !!perfil.rede_suspensa_em;
 }
 
 /** As colunas que a rede lê de `patient_profiles`. Uma lista só, dois selects. */
 const COLUNAS_DO_PERFIL =
   "id, display_name, avatar_url, bio, bio_link, avisos_desligados, " +
+  "rede_suspensa_em, " +
   "perfil_publico, care_mode, rede_pausada_em, " +
   "baby_name, mostrar_semana, mostrar_bebe, aceita_perguntas, conta_oficial, " +
   "feed_so_seguindo, handle, quem_pode_mencionar, " +
@@ -1305,13 +1315,38 @@ const COLUNAS_DO_PERFIL =
  * chão por causa de um `42703` só.
  */
 /**
+ * Degrau 0,125 — o MAIS ALTO: o banco tem tudo, menos a suspensão.
+ *
+ * ⚠️ `rede_suspensa_em` é a coluna mais NOVA (`APLICAR_SUSPENDER_DA_REDE.sql`),
+ * e por isso ela sai primeiro. Um recuo que pulasse daqui para o degrau de
+ * baixo apagaria os avisos, o link da bio, a pausa e o `@` de toda a rede por
+ * causa de uma coluna de moderação que ninguém ainda usa — a forma mais cara de
+ * defeito deste repositório: uma coluna nova que, FALTANDO, apaga um recurso
+ * antigo.
+ *
+ * ⚠️ **Ausente = NÃO suspensa.** É o único padrão possível: tratar "não sei"
+ * como suspensa esconderia a rede inteira num banco atrasado.
+ */
+const COLUNAS_SEM_SUSPENSAO = COLUNAS_DO_PERFIL.replace("rede_suspensa_em, ", "");
+
+async function semAColunaDaSuspensao(sb: any, ids: string[]): Promise<any[]> {
+  const { data, error } = await sb
+    .from("patient_profiles")
+    .select(COLUNAS_SEM_SUSPENSAO)
+    .in("id", ids);
+  if (error) return semAsColunasDosAvisos(sb, ids);
+  console.warn("[rede] sem rede_suspensa_em — rode APLICAR_SUSPENDER_DA_REDE.sql");
+  return ((data ?? []) as any[]).map((p) => ({ ...p, rede_suspensa_em: null }));
+}
+
+/**
  * Degrau 0,25: o banco tem tudo, menos os avisos e o link da bio.
  *
  * ⚠️ **AS DUAS SAEM JUNTAS**, porque nascem no MESMO `APLICAR_` — um degrau por
  * SQL, e não um por coluna: separá-las criaria um degrau que só falha num banco
  * que não existe. E ele é o mais alto da escada por ser o mais novo.
  */
-const COLUNAS_SEM_AVISOS = COLUNAS_DO_PERFIL.replace("bio_link, avisos_desligados, ", "");
+const COLUNAS_SEM_AVISOS = COLUNAS_SEM_SUSPENSAO.replace("bio_link, avisos_desligados, ", "");
 
 async function semAsColunasDosAvisos(sb: any, ids: string[]): Promise<any[]> {
   const { data, error } = await sb
@@ -2198,6 +2233,17 @@ export const meuPerfilSocial = createServerFn({ method: "POST" })
        * gestação.
        */
       pausada: !!(p as any)?.rede_pausada_em,
+      /**
+       * ⚠️ **A SUSPENSÃO É CAMPO PRÓPRIO, e não `pausada`.** As três escondem a
+       * pessoa pela mesma régua, e o que as separa é QUEM DECIDIU: pausa e luto
+       * são escolha dela; suspensão é decisão da plataforma.
+       *
+       * ⚠️ **E ela precisa SABER.** Uma conta que some da Comunidade sem uma
+       * palavra faz a paciente concluir que o app quebrou — e num app de
+       * gestação ela tem coisa melhor a fazer do que investigar isso. É a
+       * ÚNICA das três em que o app fala; nas outras duas, calar é a decisão.
+       */
+      suspensa: !!(p as any)?.rede_suspensa_em,
       /**
        * O que ela desligou.
        *

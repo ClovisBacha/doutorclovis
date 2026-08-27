@@ -53,8 +53,12 @@ describe("⚠️ ela é a régua ÚNICA — nenhum ponto de decisão fica de for
    * recusa é o campo entrando numa CONDIÇÃO.
    */
   const PERMITIDO = [
-    /* A régua, que por definição lê o campo. */
-    "return !!perfil.care_mode || !!perfil.rede_pausada_em;",
+    /* A régua, que por definição lê o campo.
+       ⚠️ Ela ganhou a SUSPENSÃO (`APLICAR_SUSPENDER_DA_REDE.sql`): luto (dela),
+       pausa (dela) e suspensão (da plataforma) produzem o mesmo efeito nesta
+       aba, e um `if` a mais em cada ponto de decisão é como um deles fica de
+       fora e a suspensão vaza por ali. */
+    "return !!perfil.care_mode || !!perfil.rede_pausada_em || !!perfil.rede_suspensa_em;",
     /* `euEmCuidado` é o LUTO DELA, e não a pausa: quem pausou continua lendo o
        próprio feed, de propósito — cortar a leitura derrubaria conversas
        abertas com quem está apoiando ela. */

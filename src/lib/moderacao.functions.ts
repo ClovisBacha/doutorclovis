@@ -113,7 +113,9 @@ export const fichaDeModeracao = createServerFn({ method: "POST" })
          muda uma decisão de moderação, e tudo isso é dado da paciente. */
       sb
         .from("patient_profiles")
-        .select("display_name, perfil_publico, care_mode, rede_pausada_em, created_at")
+        .select(
+          "display_name, perfil_publico, care_mode, rede_pausada_em, rede_suspensa_em, created_at",
+        )
         .eq("id", data.contaId)
         .maybeSingle(),
     ]);
@@ -134,6 +136,7 @@ export const fichaDeModeracao = createServerFn({ method: "POST" })
       perfil_publico?: boolean | null;
       care_mode?: boolean | null;
       rede_pausada_em?: string | null;
+      rede_suspensa_em?: string | null;
       created_at?: string | null;
     } | null;
 
@@ -147,6 +150,7 @@ export const fichaDeModeracao = createServerFn({ method: "POST" })
         emCuidado: !!p?.care_mode,
         pausada: !!p?.rede_pausada_em,
         publica: !!p?.perfil_publico,
+        suspensa: !!p?.rede_suspensa_em,
         desde: p?.created_at ?? null,
         abertas: linhas.filter((l) => !l.resolvido_em).length,
         total: linhas.length,
@@ -240,4 +244,102 @@ export const numerosDaComunidade = createServerFn({ method: "POST" })
         denunciasNaSemana: conta(denunciasSemana),
       },
     };
+  });
+
+/**
+ * SUSPENDER UMA CONTA DA COMUNIDADE — o degrau acima de remover uma peça.
+ *
+ * ⚠️ **A fila só sabia tirar UMA publicação por vez.** Uma conta que reincide
+ * continua publicando, e a única saída era remover peça por peça enquanto ela
+ * produz mais. Isso não é moderação, é enxugar gelo.
+ *
+ * ⚠️ **SUSPENSA ≠ EM LUTO ≠ PAUSADA, e as três somem do mesmo jeito.**
+ * `foraDaRede` é a régua única; a suspensão entra nela e não em vinte e seis
+ * `if`. O que a distingue é quem decidiu — e por isso ela é a ÚNICA das três em
+ * que a pessoa É AVISADA: pausa e luto são escolha dela; suspensão é decisão da
+ * plataforma, e uma conta que some sem explicação lê como app quebrado.
+ *
+ * ⚠️ **NUNCA suspende quem está em Modo Cuidado.** Ela já está fora da rede, e
+ * suspender seria punir quem acabou de perder a gestação por algo que ela pode
+ * ter escrito antes. A ficha mostra esse estado justamente para o administrador
+ * ver antes de decidir; aqui o servidor recusa, porque tela não é trava.
+ *
+ * ⚠️ **É REVERSÍVEL, e o motivo é catálogo fechado** — campo livre aqui vira o
+ * texto que a paciente lê sobre si mesma, escrito às pressas.
+ */
+export const suspenderDaComunidade = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) =>
+    z
+      .object({
+        accessToken: z.string().min(10),
+        contaId: z.string().uuid(),
+        suspender: z.boolean(),
+        motivo: z.enum(["saude", "assedio", "spam", "imagem", "outro"]).optional(),
+      })
+      .parse(i),
+  )
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+
+    const sb = supabaseAdmin as any;
+
+    if (data.suspender) {
+      /* ⚠️ O ESTADO É CONFERIDO NO BANCO, e não vem do corpo do pedido: a tela
+         mostra a ficha, mas quem decide é isto. */
+      const { data: p, error: erroP } = await sb
+        .from("patient_profiles")
+        .select("care_mode")
+        .eq("id", data.contaId)
+        .maybeSingle();
+      /* ⚠️ Não consegui ler = NÃO suspende. O pior caso aqui é uma suspensão
+         adiada; o oposto é suspender quem está de luto. */
+      if (erroP || !p) return { ok: false as const, motivo: "banco" as const };
+      if ((p as { care_mode?: boolean }).care_mode) {
+        return { ok: false as const, motivo: "em_cuidado" as const };
+      }
+    }
+
+    const { error } = await sb
+      .from("patient_profiles")
+      .update({
+        rede_suspensa_em: data.suspender ? new Date().toISOString() : null,
+        rede_suspensa_motivo: data.suspender ? (data.motivo ?? "outro") : null,
+      })
+      .eq("id", data.contaId);
+    if (error) {
+      console.warn("[rede] sem rede_suspensa_em — rode APLICAR_SUSPENDER_DA_REDE.sql");
+      return { ok: false as const, motivo: "sem_suporte" as const };
+    }
+
+    /* ⚠️ **ELA É AVISADA, e é o que separa suspensão de sumiço.** Uma conta que
+       some da Comunidade sem uma palavra faz a paciente concluir que o app
+       quebrou — e num app de gestação ela tem coisa melhor para fazer do que
+       investigar isso. O push não diz o motivo: o texto completo mora na tela
+       dela, e a tela de bloqueio do celular é o pior contexto que existe.
+
+       Só ao SUSPENDER: o "voltou" chega quando ela abrir e encontrar a aba
+       inteira de novo, que é a notícia se dando sozinha. */
+    if (data.suspender) {
+      try {
+        const { sendPushToUser } = await import("@/lib/push.server");
+        await sendPushToUser(data.contaId, {
+          title: "Comunidade",
+          body: "Sua conta da Comunidade está temporariamente indisponível. Toque para entender.",
+          url: "/minha-conta?tab=Comunidade",
+        });
+      } catch {
+        /* O aviso é acessório; a suspensão já valeu. */
+      }
+    }
+
+    return { ok: true as const };
   });
