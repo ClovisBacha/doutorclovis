@@ -26,6 +26,7 @@
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
 import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
 import {
@@ -463,6 +464,31 @@ function Carrossel({
   const [batida, setBatida] = useState(0);
   const desce = useRef({ x: 0, y: 0 });
   const ultimo = useRef(0);
+  /**
+   * ⚠️ **ATÉ QUE FOTO DO CARROSSEL JÁ PODE BAIXAR** — e este número existe
+   * porque `loading="lazy"` NÃO resolve o eixo horizontal.
+   *
+   * Medido no Chromium, numa página com o mesmo formato deste carrossel: em
+   * seis publicações de cinco fotos, ele baixa **três fotos de cada uma das
+   * cinco primeiras** — quinze arquivos — enquanto a paciente vê UMA. O `lazy`
+   * funciona descendo (as publicações lá embaixo não vêm) e não funciona para
+   * o lado: as fotos 2 e 3 estão fora da tela e vêm assim mesmo.
+   * `width`/`height` no `<img>` não muda nada — medido com e sem.
+   *
+   * ⚠️ **A REGRA É "a da vez MAIS a seguinte", e não só a da vez.** Segurar
+   * tudo menos a primeira economizaria mais e cobraria em outra moeda: a foto
+   * seguinte apareceria EM BRANCO durante o deslize, numa rede ruim, e o
+   * deslize é justamente o gesto com que ela descobre que há mais foto. Numa
+   * publicação de ultrassom isso é péssimo. Com a vizinha pronta, o carrossel
+   * continua instantâneo e ainda assim são DUAS em vez de três.
+   *
+   * A conta com o tamanho real de uma foto nossa em WebP: um carrossel de
+   * cinco custa **170 kB em vez de 255**, sem tirar nitidez de nada.
+   *
+   * Ele só SOBE (`Math.max`): voltar para a primeira não pode descarregar o
+   * que já veio, senão folhear para trás baixaria tudo de novo.
+   */
+  const [ate, setAte] = useState(0);
 
   if (urls.length === 0) return null;
 
@@ -501,6 +527,9 @@ function Carrossel({
           const el = e.currentTarget;
           const n = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
           if (n !== i) setI(n);
+          /* Libera a vizinha assim que o dedo começa a andar — o `scroll`
+             dispara no primeiro pixel, muito antes de o encaixe terminar. */
+          setAte((v) => Math.max(v, n + 1));
         }}
         className="flex w-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ aspectRatio: String(RAZAO_DO_POST) }}
@@ -513,7 +542,10 @@ function Carrossel({
                 descrição, ela é lida; sem, entra o genérico com o nome de quem
                 publicou — que é pouco, mas é verdade. */}
             <img
-              src={u}
+              /* ⚠️ Sem `src` a imagem não é pedida — é isso que segura o
+                 download. O `<div>` continua ocupando a largura inteira, então
+                 a geometria do encaixe não muda e o carrossel não pula. */
+              src={n <= ate + 1 ? u : undefined}
               alt={
                 altTexto?.trim()
                   ? urls.length > 1
@@ -8038,7 +8070,7 @@ async function prepararAvatar(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, sx, sy, lado, lado, 0, 0, LADO_DO_AVATAR, LADO_DO_AVATAR);
-    return canvas.toDataURL("image/jpeg", 0.82);
+    return codificarFoto(canvas, 0.82);
   } catch {
     return null;
   }
@@ -10132,7 +10164,7 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO);
+    return codificarFoto(canvas, QUALIDADE_DA_FOTO);
   } catch {
     return null;
   }
@@ -10167,7 +10199,7 @@ async function prepararMiniatura(file: File): Promise<string | null> {
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     /* 0,75 e não 0,8: num quadrado de 130px o olho não distingue, e a diferença
        de peso é real. */
-    return canvas.toDataURL("image/jpeg", 0.75);
+    return codificarFoto(canvas, 0.75);
   } catch {
     /* Sem miniatura a grade cai na foto cheia — nunca se perde a publicação. */
     return null;
@@ -10202,7 +10234,7 @@ async function reduzirParaIA(dataUrl: string): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.72);
+    return codificarFoto(canvas, 0.72);
   } catch {
     return null;
   }
@@ -10234,7 +10266,7 @@ async function prepararFotoDoStory(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO);
+    return codificarFoto(canvas, QUALIDADE_DA_FOTO);
   } catch {
     return null;
   }
@@ -10296,7 +10328,7 @@ async function capaDoVideo(file: File): Promise<{ capa: string; segundos: number
     if (!ctx) return null;
     ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
     const segundos = Number.isFinite(v.duration) ? v.duration : 0;
-    return { capa: canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO), segundos };
+    return { capa: codificarFoto(canvas, QUALIDADE_DA_FOTO), segundos };
   } catch {
     return null;
   } finally {

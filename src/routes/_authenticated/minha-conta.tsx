@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import {
   Suspense,
   lazy,
@@ -2742,7 +2743,7 @@ export function OnboardingRitual({
           size,
           size,
         );
-        setAvatar(canvas.toDataURL("image/jpeg", 0.82));
+        setAvatar(codificarFoto(canvas, 0.82));
       };
       img.src = ev.target?.result as string;
     };
@@ -5277,7 +5278,7 @@ function ProfileTab({
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setForm((f) => ({ ...f, avatar_url: canvas.toDataURL("image/jpeg", 0.8) }));
+        setForm((f) => ({ ...f, avatar_url: codificarFoto(canvas, 0.8) }));
       };
       img.src = ev.target?.result as string;
     };
@@ -14549,7 +14550,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setImageData(canvas.toDataURL("image/jpeg", 0.75));
+        setImageData(codificarFoto(canvas, 0.75));
       };
       img.src = ev.target?.result as string;
     };

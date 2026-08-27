@@ -262,8 +262,14 @@ describe("4 · a qualidade da foto", () => {
     /* ⚠️ E não menos que 0,70: abaixo disso o JPEG mostra blocagem em pele e
        em céu, que é do que uma foto de gestação é feita. */
     expect(q).toBeGreaterThanOrEqual(0.7);
-    expect(TELA_SEM.match(/toDataURL\("image\/jpeg", QUALIDADE_DA_FOTO\)/g)).toHaveLength(3);
-    expect(TELA_SEM).not.toContain('toDataURL("image/jpeg", 0.8)');
+    /* ⚠️ **COBRA A GARANTIA, NÃO A GRAFIA — e esta asserção JÁ MENTIU uma
+       vez.** Ela travava `toDataURL("image/jpeg", …)` e ficou vermelha no dia
+       em que as três passaram por `codificarFoto`, que é uma melhoria: mesmo
+       número de qualidade, 30% menos bytes. Um teste que reprova código
+       melhor é um teste que ensina a relaxá-lo. O que importa é que as três
+       usem o MESMO número e que ninguém volte a codificar por fora. */
+    expect(TELA_SEM.match(/codificarFoto\([^)]*QUALIDADE_DA_FOTO\)/g)).toHaveLength(3);
+    expect(TELA_SEM).not.toContain('toDataURL("image/jpeg"');
   });
 
   test("⚠️ o LADO continua em 1080 — o corte é de qualidade, não de pixel", () => {

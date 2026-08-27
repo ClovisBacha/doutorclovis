@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getAlbumByToken, addAlbumPostPublic, type AlbumPostPublico } from "@/lib/family.functions";
@@ -67,7 +68,7 @@ function AlbumPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setImageData(canvas.toDataURL("image/jpeg", 0.75));
+        setImageData(codificarFoto(canvas, 0.75));
       };
       img.src = ev.target?.result as string;
     };

@@ -10803,6 +10803,107 @@ Os onze mutantes pegaram as três na primeira rodada:
   aceita. Uma escada de versões por densidade de tela passa por aí, e é a próxima
   economia grande; ela não cabia nesta leva sem desfazer o ganho do lote.
 
+## Duas economias que NÃO custam qualidade (ago/2026)
+
+Pedido do dono: _"faça o que podemos para otimizarmos porém não perder a
+qualidade"_. As duas abaixo são as únicas da lista de custo que passam nessa
+régua — baixar o lado ou a qualidade da foto custa nitidez; estas não custam
+nada.
+
+### 1 · WebP no lugar de JPEG — mesma imagem, 30% a menos
+
+Régua em **`src/lib/codificar-imagem.ts`**, que virou o único caminho por onde
+uma foto do app vira bytes. Medido com imagem parecida com foto (degradê de
+pele e céu, detalhe fino de cabelo e tecido):
+
+| onde | JPEG | WebP | |
+| --- | --- | --- | --- |
+| foto da publicação (1080 · 0,72) | 122 kB | **85 kB** | −30% |
+| capa do vídeo (1080 · 0,72) | 122 kB | **85 kB** | −30% |
+| foto do álbum (800 · 0,75) | 78 kB | **62 kB** | −20% |
+| miniatura da grade (480 · 0,75) | 30 kB | 28 kB | −7% |
+| avatar (512 · 0,82) | 55 kB | 54 kB | −2% |
+
+⚠️ **O ganho mora nas GRANDES.** Miniatura e avatar quase não mudam — não
+custam nada e também não rendem nada. Quem paga a banda é a foto de 1080.
+
+⚠️ **`toDataURL` FALHA EM SILÊNCIO, e é isso que obriga a sonda.** Um navegador
+que não sabe codificar WebP **não devolve erro** — devolve um **PNG**, com o
+mesmo formato de data URL. PNG de foto são megabytes: estouraria o teto do
+servidor e a publicação seria **recusada**, com a paciente sem entender por
+quê. A decisão nunca é "o navegador é moderno?", é **codificar 1×1 e ler o que
+voltou**.
+
+⚠️ **QUEM DECODIFICA NÃO É QUEM CODIFICA** — é o risco de verdade. O piso é
+iOS 14 / Safari 14 (set/2020); Chrome e Android desde 2014, Firefox desde 2019.
+E **este app já exige mais que isso**: o push só funciona em iOS 16.4+, dois
+anos e meio DEPOIS do WebP. O formato não estreita o público — o push já
+estreitou antes.
+
+⚠️ **O NÚMERO DA QUALIDADE NÃO MUDA.** No WebP o mesmo número costuma entregar
+imagem igual ou melhor; manter é o lado conservador — ganha-se banda sem
+apostar em nitidez. Mexer nele é outra decisão, e é a que custa qualidade.
+
+⚠️ **`share-card.ts` fica de FORA, de propósito.** Ele desenha o cartão que a
+paciente MANDA PARA FORA — WhatsApp, Instagram, a galeria. Ali o destino é
+outro app, às vezes outro sistema, e economizar 29% de uma imagem que sai uma
+vez não paga o risco de ela não abrir do outro lado. Há teste cobrando que ele
+continue em JPEG.
+
+⚠️ **E EU TINHA DESCARTADO ISTO POR MEDIR ERRADO.** A primeira medição usou uma
+imagem de RUÍDO puro e deu "9% maior" — ruído é o único conteúdo em que o WebP
+perde, porque não há o que prever. **Medida de compressão com imagem sintética
+mente**; use conteúdo com degradê e textura, ou uma foto de verdade.
+
+### 2 · ⚠️ `loading="lazy"` NÃO SEGURA O EIXO HORIZONTAL
+
+Medido no Chromium, numa página com o mesmo formato do carrossel: em seis
+publicações de cinco fotos, ele baixa **três fotos de cada uma das cinco
+primeiras** — **quinze arquivos** — enquanto a paciente vê UMA. O `lazy`
+funciona descendo (as publicações lá embaixo não vêm) e não funciona para o
+lado: as fotos 2 e 3 estão fora da tela e vêm assim mesmo.
+
+⚠️ **`width`/`height` no `<img>` não muda nada** — medido com e sem, quinze nos
+dois. O comentário que existia no repo sugerindo o contrário vale para outra
+coisa (o pulo de layout), não para isto.
+
+Quem segura é **não ter `src`**: `src={n <= ate + 1 ? u : undefined}`. O `<div>`
+continua ocupando a largura inteira, então a geometria do encaixe não muda e o
+carrossel não pula. **Medido depois: 15 → 10 downloads, −33%.**
+
+⚠️ **A régua é "a da vez MAIS a seguinte", nunca só a da vez.** Segurar tudo
+menos a primeira economizaria o dobro e cobraria em outra moeda: a foto
+seguinte apareceria EM BRANCO durante o deslize numa rede ruim — e o deslize é
+o gesto com que ela descobre que há mais foto. Numa publicação de ultrassom
+isso é péssimo, e **"sem perder qualidade" inclui a resposta ao dedo**.
+
+⚠️ **O limite só SOBE** (`Math.max(v, n + 1)`): com `setAte(n + 1)` cru, voltar
+para a primeira descarregaria as outras, e folhear para trás baixaria tudo de
+novo.
+
+### O efeito somado, medido
+
+Uma publicação de carrossel de cinco fotos, na abertura do feed:
+
+| | antes | agora |
+| --- | --- | --- |
+| fotos baixadas | 3 | **2** |
+| bytes por foto | 122 kB | **85 kB** |
+| **total** | **366 kB** | **170 kB** — −54% |
+
+Nenhum pixel a menos, nenhum lado reduzido, nenhuma qualidade rebaixada.
+
+### ⚠️ E a catraca de ontem travava a GRAFIA — décima primeira vez
+
+`toDataURL("image/jpeg", QUALIDADE_DA_FOTO)` × 3 ficou vermelha no dia em que
+as três passaram por `codificarFoto` — **uma melhoria**: mesmo número de
+qualidade, 30% menos bytes. Um teste que reprova código melhor é um teste que
+ensina a relaxá-lo. Hoje ela cobra que as três usem o mesmo número e que
+ninguém volte a codificar por fora.
+
+**Catraca:** `src/lib/codificar-imagem.test.ts` — sete mutantes em vermelho,
+inclusive o do PNG silencioso e o do carrossel voltando a baixar tudo.
+
 ## A auditoria das promessas da Comunidade (ago/2026)
 
 Pedido do dono: rever se tudo que a aba PROMETE está de fato certo. O método foi
