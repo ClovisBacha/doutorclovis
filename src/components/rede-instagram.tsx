@@ -9277,8 +9277,18 @@ export function VisorDeStory({
                    vazias. `animationPlayState` é o que faz o dedo pausar a
                    barra junto com o relógio — sem isso a barra correria
                    sozinha e chegaria ao fim antes da foto trocar. */
-                animation:
-                  n === i ? `dc-story-barra ${DURACAO_DO_STORY}ms linear forwards` : undefined,
+                /* ⚠️ **LONGHANDS, e NUNCA o atalho `animation`.** Misturar o
+                   atalho com `animationPlayState` no mesmo objeto de estilo faz
+                   o React avisar ("don't mix shorthand and non-shorthand
+                   properties") — e o aviso é sobre um defeito real: numa
+                   repintura o atalho REESCREVE o `animation-play-state`, e a
+                   barra volta a correr sozinha enquanto o dedo a segura. Era
+                   exatamente o travamento que o comentário abaixo diz impedir.
+                   Achado varrendo a Comunidade com INTERAÇÃO, não só carga. */
+                animationName: n === i ? "dc-story-barra" : undefined,
+                animationDuration: n === i ? `${DURACAO_DO_STORY}ms` : undefined,
+                animationTimingFunction: n === i ? "linear" : undefined,
+                animationFillMode: n === i ? "forwards" : undefined,
                 /* A barrinha para JUNTO com o relógio — se ela continuasse
                    correndo, chegaria ao fim antes de a foto trocar, que lê
                    como travamento. */

@@ -416,3 +416,39 @@ describe("⚠️ o menu ⋯ existe onde ele é oferecido", () => {
     for (const t of ["escondidos", "curtidos", "desfechos"]) expect(B).toContain(`tela === "${t}"`);
   });
 });
+
+/**
+ * ⚠️ A BARRINHA DO STORY NÃO MISTURA ATALHO COM LONGHAND.
+ *
+ * `animation` (atalho) e `animationPlayState` no MESMO objeto de estilo fazem o
+ * React avisar — e o aviso é sobre um defeito real: numa repintura o atalho
+ * REESCREVE o `animation-play-state`, e a barra volta a correr sozinha enquanto
+ * o dedo a segura. Era exatamente o travamento que o comentário do bloco diz
+ * impedir: a barra chega ao fim antes de a foto trocar.
+ *
+ * ⚠️ Achado varrendo a Comunidade com INTERAÇÃO (tocar nos controles), não só
+ * com carga — a varredura de bancadas abre e lê o console, e este aviso só
+ * aparece na REPINTURA que o toque provoca.
+ */
+describe("⚠️ a barrinha do story", () => {
+  const T = readFileSync("src/components/rede-instagram.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const i = T.indexOf("animationPlayState");
+  const bloco = T.slice(Math.max(0, i - 700), i + 400);
+
+  test("usa longhands, e nunca o atalho `animation`", () => {
+    expect(i).toBeGreaterThan(0);
+    expect(bloco).toContain("animationName:");
+    expect(bloco).toContain("animationDuration:");
+    expect(bloco).toContain("animationFillMode:");
+    /* O atalho reescreveria o play-state na repintura. */
+    expect(bloco).not.toMatch(/\n\s*animation:/);
+  });
+
+  test("⚠️ e o pausar continua ligado ao relógio", () => {
+    expect(bloco).toContain('"paused"');
+    expect(bloco).toContain("pausado");
+  });
+});
