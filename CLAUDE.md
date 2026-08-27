@@ -10818,3 +10818,132 @@ pode falhar, e quem denuncia um comentário duro não precisa dessa dúvida.
 `head -3` cortou a ocorrência que importava). **Varredura mecânica também erra;
 o que não erra é abrir o arquivo antes de acusar.**
 
+## A noite da moderação: o ciclo fecha, e o admin passa a enxergar (ago/2026)
+
+Pedido do dono: aplicar as sugestões, ampliar o controle de dados no admin, e
+varrer a aba inteira — "que quando eu acordar ela esteja 100% sem erros".
+
+⚠️ **E UMA SUGESTÃO MINHA FOI CANCELADA ANTES DE VIRAR CÓDIGO.** Eu tinha
+sugerido "unificar as duas filas de denúncia, que estão em duas telas". Elas já
+estão numa tela só, em duas seções, separadas de propósito: a da caixinha é
+ANÔNIMA por contrato, e fundi-las obrigaria a esconder o nome de metade das
+linhas sem explicar por quê. Conferir antes de construir, mais uma vez.
+
+### O ciclo da moderação não fechava em três pontos
+
+1. ⚠️ **O DESFECHO NUNCA ERA MANDADO.** O servidor aceita
+   `removido | avisado | sem_acao`; a tela chamava sem nenhum. Toda denúncia era
+   resolvida como "sem ação", e a tela "Suas denúncias" da paciente dizia "ainda
+   não olhamos" **para sempre**.
+2. ⚠️ **"REMOVIDO" NÃO REMOVIA NADA.** O desfecho volta para quem denunciou:
+   dizer "a publicação saiu do ar" sem tirá-la do ar é a plataforma mentindo
+   para quem confiou nela — e a paciente veria, no feed, a mesma publicação.
+   Agora ele dá baixa no alvo, **ARQUIVA e nunca apaga** (remoção por engano tem
+   de ser desfazível), e **falhar em remover NÃO vira "removido"**: a denúncia
+   fica na fila e o administrador sabe.
+3. ⚠️ **A FILA NÃO TINHA CONTADOR.** Ela vive dentro da aba de entrada, então
+   quem estivesse noutra aba não sabia que ela cresceu. `contarDenunciasAbertas`
+   conta as DUAS filas com os mesmos filtros das telas (um número que diga 3
+   sobre uma lista de 2 faz o médico procurar uma denúncia fantasma), com
+   `head: true` — o trecho do que foi dito não precisa viajar para virar um
+   número — e devolve **`null`, nunca zero**.
+
+⚠️ **"Remover" só aparece onde HÁ publicação a tirar do ar** (`PODE_REMOVER`):
+num perfil, numa pergunta ou numa mensagem não há. E o mapa alvo→tabela é DADO
+em `denuncias.ts`, porque `rede-social.functions.ts` **não conhece comentário** —
+o teste que guarda essa separação pegou a primeira versão.
+
+### O controle do admin, e a linha que ele NÃO atravessa
+
+⚠️ **A tentação óbvia ao "dar mais controle de dados" é uma tela com tudo que a
+paciente publicou.** Seria fácil, e transformaria moderação em VIGILÂNCIA: a
+Comunidade é onde ela escreve para o público que ELA escolheu.
+
+A régua: o admin vê **o que foi denunciado** (e que ele já veria na fila), **o
+estado da conta** e **contagens**. Nada mais. O select do perfil não traz bio,
+foto nem semana; a ficha não lê `rede_posts`, `rede_stories` nem
+`rede_mensagens`; e a tela DIZ o que não está ali. Há catraca com mutação.
+
+- **Ficha de moderação** — quantas denúncias, como terminaram, desde quando a
+  conta existe, e em que estado está. Decidir "avisar" ou "remover" sem isso é
+  decidir às cegas: a fila mostra UMA linha, e a conta pode ter cinco resolvidas
+  na semana passada.
+- **Números da Comunidade** — seis contagens no painel. A aba mais movimentada
+  do app não tinha NENHUM número ali, e uma aba social que esfria esfria em
+  silêncio. ⚠️ Só as denúncias são alerta quando sobem; os outros cinco são bons
+  quando crescem, e pintar todos igual ensinaria a não olhar nenhum.
+
+### Suspender uma conta — o degrau acima de remover uma peça
+
+⚠️ **SUSPENSA ≠ EM LUTO ≠ PAUSADA, e as três somem pela MESMA régua.**
+`foraDaRede` ganhou a terceira razão em vez de um `if` em cada um dos vinte e
+seis pontos de decisão. O que as separa é QUEM DECIDIU — e por isso a suspensão
+é a ÚNICA em que o app FALA: pausa e luto são escolha dela, e calar é a decisão
+certa; uma conta suspensa que some sem uma palavra faz a paciente concluir que o
+app quebrou.
+
+- ⚠️ **NUNCA suspende quem está em Modo Cuidado**: ela já está fora da rede, e
+  suspender seria punir quem acabou de perder a gestação por algo escrito antes.
+  O estado é conferido no BANCO, e **não conseguir lê-lo NÃO suspende**.
+- ⚠️ **O texto da paciente diz o FATO, diz que nada foi apagado, diz que o resto
+  do app não muda, e dá um caminho — sem uma palavra de acusação.** Há teste com
+  termos proibidos: um texto de tribunal numa tela de app de saúde é crueldade
+  desnecessária.
+- ⚠️ **A coluna é REVOGADA de `authenticated`** — `patient_profiles` é escrita
+  direto do navegador, e sem o REVOKE quem foi suspensa levantaria a própria
+  suspensão sem passar pelo servidor.
+- ⚠️ **O push não diz o motivo**: a tela de bloqueio é o pior contexto que
+  existe. O motivo fica na FICHA, para quem revir a decisão.
+
+### ⚠️ Dois portões de aviso falhavam ABERTOS, e um era desmentido pelo comentário
+
+- **O push da favorita ignorava o bloqueio quando a leitura falhava.** O
+  comentário dizia, com todas as letras, que "um push meu chegando nela seria o
+  bloqueio falhando pelo caminho mais visível possível" — e o erro era
+  descartado. Push é enfeite; o bloqueio, não.
+- **O aviso de menção tratava perfil ilegível como "não está de luto"**: com
+  `autor` nulo, `emCuidado` virava `false` e o aviso saía sobre uma publicação de
+  quem acabou de perder a gestação.
+
+⚠️ **E DOIS FALSOS ALARMES MEUS, medidos em vez de deduzidos:**
+`patient_profiles` usa `id` corretamente (o `user_id` que meu grep pegou era de
+`health_logs`), e o tempo relativo **não sai no HTML do servidor** — a Comunidade
+é cliente, então não há risco de hidratação ali. Varredura mecânica também erra.
+
+### ⚠️ A VARREDURA PASSOU A TOCAR NOS CONTROLES
+
+`varrer-bancadas` abre cada tela e lê o console. Não pega o que só existe depois
+de um toque — e foi ali que a **barrinha do story** escondeu um defeito: o objeto
+de estilo misturava o atalho `animation` com o longhand `animationPlayState`, e
+numa REPINTURA o atalho REESCREVE o play-state: a barra voltava a correr sozinha
+enquanto o dedo a segurava, chegando ao fim antes de a foto trocar — exatamente
+o travamento que o comentário do bloco diz impedir. Virou cinco longhands.
+
+`scripts/varrer-interacao.mjs` (`bun run varrer:interacao`, e na CI) roda onze
+roteiros e cobra o CONSOLE durante a interação. ⚠️ **Os passos são OPCIONAIS de
+propósito**: um roteiro que exija um controle que mudou de nome fica vermelho
+sobre código correto, e catraca que reprova o certo é catraca que alguém desliga.
+
+### ⚠️ A catraca do padrão, e ela me pegou em minutos
+
+Cinco defeitos da mesma família numa auditoria não é coincidência: é classe.
+`escrita-tem-leitor.test.ts` cobra que toda coluna de estado escrita pelos
+módulos da rede tenha ALGUÉM que a leia — `rede-tem-porta` não pega, porque lá a
+pergunta é "existe chamador?" e nestes casos existia.
+
+⚠️ **Ela reprovou `rede_suspensa_motivo`, que eu tinha criado minutos antes.**
+Virou leitura (a ficha mostra por que a conta foi suspensa — sem isso, rever a
+decisão dias depois vira adivinhação) e o motivo passou a ser ESCOLHIDO, catálogo
+fechado como nas outras quatro portas.
+
+⚠️ **E isso destapou uma restrição de arquitetura:** importar `EscolherMotivo` de
+`rede-instagram.tsx` puxaria a régua clínica para o pacote do PAINEL — ela tem
+`(?<!` nas fronteiras e derruba Safari antigo. A catraca que guarda isso ficou
+vermelha na hora, e o componente virou `escolher-motivo.tsx`.
+
+**Aplicar no Supabase:** `supabase/APLICAR_SUSPENDER_DA_REDE.sql`.
+**Bancadas novas:** `/preview-moderacao` (`?ficha=1`, `?ficha=1&suspensa=1`,
+`?falhou=1`, `?instavel=1`, `?vazio=1`) · `/preview-instagram?suspensa=1`.
+**Medido:** 106 bancadas · 64 telas da Comunidade · 11 roteiros de interação ·
+5.210 testes · zero problemas.
+
