@@ -56,6 +56,22 @@ describe("⚠️ matchers que quebram o tsc da CI", () => {
       for (const m of PROIBIDOS) {
         if (codigo.includes(`.${m}(`)) culpados.push(`${arquivo} → ${m}`);
       }
+      /* ⚠️ **E A ASSINATURA DE DUAS PARTES TAMBÉM QUEBRA.** `expect(valor,
+         "recado")` existe no jest e no vitest e NÃO é tipada no `bun:test`:
+         `TS2554: Expected 1 arguments, but got 2` — verde no `bun test`, que é
+         o portão que eu de fato rodo, e vermelho no `tsc` da CI. Mesma família
+         dos matchers acima, chegando pela outra ponta. */
+      /* ⚠️ Sem `[]` e `{}` no primeiro argumento: `expect(["a", "b"])` é uma
+         LISTA, não um recado, e a primeira versão desta linha acusou um teste
+         correto por causa da vírgula de dentro do array.
+
+         ⚠️ E a etiqueta é montada por CONCATENAÇÃO, nunca com a chamada
+         escrita por extenso: os comentários são apagados antes da busca, mas
+         as strings não — um literal aqui faria a catraca acusar a si mesma, que
+         é a mesma armadilha da prosa, um degrau adiante. */
+      if (/\bexpect\([^()[\]{}]*,\s*[`"']/.test(codigo)) {
+        culpados.push(arquivo + " → recado como segundo argumento do " + "expect");
+      }
     }
     expect(culpados).toEqual([]);
   });

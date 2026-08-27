@@ -428,6 +428,46 @@ export const MARGEM_DE_RENOVACAO_SEG = 12 * 3600;
 export const VALIDADE_AVATAR_SEG = 7 * 24 * 3600;
 
 /**
+ * A VALIDADE DA FOTO DE PUBLICAÇÃO — e por que ela é longa.
+ *
+ * ⚠️ **A URL assinada é a chave do cache do navegador.** Com uma hora, a mesma
+ * paciente baixava as mesmas dez fotos do feed a cada abertura fora daquela
+ * hora — quatro vezes por dia. Medido: dos 396 MB/mês que uma paciente ativa
+ * consome, **321 MB eram re-download da mesma foto**.
+ *
+ * ⚠️ **E ESTICAR A VALIDADE SOZINHA NÃO RESOLVE NADA.** `expiresIn` é relativo
+ * ao agora: duas leituras com um segundo de diferença produzem `exp` diferentes,
+ * logo tokens diferentes, logo URLs diferentes — e o navegador baixa tudo de
+ * novo mesmo com validade de sete dias. O que faz o cache funcionar é a URL ser
+ * **ESTÁVEL**, e é para isso que existe a memória em `urlsAssinadas`.
+ *
+ * ⚠️ **O preço, dito em voz alta:** quem recebeu a URL continua alcançando o
+ * arquivo até ela vencer, mesmo que perca o acesso à publicação nesse meio-tempo
+ * (a autora fecha o perfil, bloqueia, arquiva). Com uma hora essa janela era
+ * curta; com sete dias é uma semana. É a mesma propriedade que o avatar já tem,
+ * e a mesma que toda CDN de rede social tem — a alternativa seria servir os
+ * bytes por uma função nossa, que custa muito mais do que economiza.
+ *
+ * Se um dia a janela incomodar, baixar para 24 h mantém a maior parte do ganho:
+ * a foto passa a ser baixada uma vez por dia em vez de quatro.
+ */
+export const VALIDADE_FOTO_SEG = 7 * 24 * 3600;
+
+/**
+ * A VALIDADE DA CAPA DE STORY — 24 h, e nem um minuto a mais.
+ *
+ * ⚠️ **O STORY PROMETE SUMIR EM 24 HORAS, e a URL não pode sobreviver à
+ * promessa.** Assinar a capa por sete dias, como a foto de publicação, daria a
+ * quem guardou o endereço mais seis dias de acesso a uma coisa que a tela diz
+ * ter acabado. A promessa é do produto; a validade tem de caber dentro dela.
+ *
+ * ⚠️ **E ainda assim é um ganho grande contra a hora de antes**: um story é
+ * visto dentro da própria vida, então uma validade de 24 h significa um download
+ * por pessoa em vez de um por abertura da fileira.
+ */
+export const VALIDADE_STORY_SEG = 24 * 3600;
+
+/**
  * Quando esta URL assinada vence, em segundos-época — ou `null`.
  *
  * O token de uma URL assinada do Storage é um JWT cujo payload traz `exp`.
@@ -456,7 +496,7 @@ export function expiraEmSegundos(assinada: string): number | null {
 }
 
 /** Ainda dura o bastante para ser reaproveitada? */
-function aindaServe(assinada: string, agoraSeg: number): boolean {
+export function aindaServe(assinada: string, agoraSeg: number): boolean {
   const exp = expiraEmSegundos(assinada);
   return exp !== null && exp - agoraSeg > MARGEM_DE_RENOVACAO_SEG;
 }
@@ -475,6 +515,78 @@ function aindaServe(assinada: string, agoraSeg: number): boolean {
  * que silenciosamente entrega a foto de uma paciente no lugar da de outra.
  * O índice entra só como recuo, quando o `path` volta nulo.
  */
+/**
+ * A MEMÓRIA DAS URLS ASSINADAS — o que faz o cache do navegador existir.
+ *
+ * ⚠️ **Sem ela, esticar a validade não serve para nada.** `expiresIn` é relativo
+ * ao agora: cada leitura produz um `exp` diferente e portanto uma URL diferente.
+ * O navegador guarda a foto pela URL — URL nova, download novo. Foi assim que a
+ * mesma paciente baixava as mesmas dez fotos quatro vezes por dia com uma
+ * validade que já era de uma hora.
+ *
+ * ⚠️ **Guardar aqui NÃO vaza nada.** A URL assinada de um caminho é a mesma para
+ * quem quer que a receba, e quem a recebe já passou por `podeVerPost` do outro
+ * lado — a memória não decide quem vê, só evita assinar de novo o que já foi
+ * assinado.
+ *
+ * ⚠️ **É memória de INSTÂNCIA, e é de propósito.** Uma instância fria começa
+ * vazia e re-assina, o que custa uma requisição e nada mais. Guardar isto no
+ * banco seria uma coluna a manter, uma escrita por leitura de feed, e um lugar a
+ * mais para a URL de uma foto privada ficar parada.
+ *
+ * ⚠️ **E ela tem TETO.** Sem o teto, um app que roda semanas na mesma instância
+ * acumula uma entrada por foto já vista por qualquer paciente. Ao encher, a
+ * memória é esvaziada inteira em vez de expulsar item a item: manter ordem de
+ * uso custaria mais que assinar de novo, e o pior caso de esvaziar é uma rodada
+ * de assinaturas.
+ */
+const TETO_DA_MEMORIA = 5000;
+const memoriaDeUrls = new Map<string, string>();
+
+/** Só para o teste: quantas URLs a memória guarda agora. */
+export function tamanhoDaMemoriaDeUrls(): number {
+  return memoriaDeUrls.size;
+}
+
+/** Só para o teste: começar do zero. */
+export function limparMemoriaDeUrls(): void {
+  memoriaDeUrls.clear();
+}
+
+/**
+ * QUEM JÁ ESTÁ NA MEMÓRIA E QUEM PRECISA SER ASSINADO — a decisão, pura.
+ *
+ * ⚠️ **ELA MORA AQUI, E NÃO DENTRO DE `urlsAssinadas`, POR CAUSA DO TESTE.**
+ * Provar que a memória é lida exigiria trocar o módulo do Supabase, e
+ * `mock.module` do bun escreve num registro COMPARTILHADO entre arquivos de
+ * teste — um teste que muda de resposta conforme a ordem é pior que teste
+ * nenhum. Enterrada no `for`, a única asserção possível era sobre o TEXTO do
+ * arquivo, e um `if (false && …)` passava por ela. Pura, a mutação morre.
+ *
+ * É a mesma lição de `assinatura.ts` e de `buscar-paciente.ts`: régua pura em
+ * `lib/`, e o adaptador só liga os fios.
+ *
+ * `olhar` recebe o caminho e devolve a URL guardada (ou `undefined`) — assim a
+ * régua não conhece o formato da chave da memória, que é detalhe do chamador.
+ */
+export function separarGuardadas(
+  olhar: (caminho: string) => string | undefined,
+  caminhos: string[],
+  agoraSeg: number,
+): { prontas: Map<string, string>; faltando: string[] } {
+  const prontas = new Map<string, string>();
+  const faltando: string[] = [];
+  for (const caminho of caminhos) {
+    const guardada = olhar(caminho);
+    /* ⚠️ `aindaServe` e não só "existe": uma URL perto de vencer serviria a
+       leitura de agora e quebraria a foto no meio da rolagem de quem está com
+       o feed aberto. A margem é `MARGEM_DE_RENOVACAO_SEG`. */
+    if (guardada && aindaServe(guardada, agoraSeg)) prontas.set(caminho, guardada);
+    else faltando.push(caminho);
+  }
+  return { prontas, faltando };
+}
+
 export async function urlsAssinadas(
   balde: string,
   caminhos: string[],
@@ -483,15 +595,28 @@ export async function urlsAssinadas(
   const saida = new Map<string, string>();
   const unicos = [...new Set(caminhos.filter(Boolean))];
   if (unicos.length === 0) return saida;
+
+  const { prontas, faltando } = separarGuardadas(
+    (caminho) => memoriaDeUrls.get(`${balde}\n${caminho}`),
+    unicos,
+    Math.floor(Date.now() / 1000),
+  );
+  for (const [caminho, url] of prontas) saida.set(caminho, url);
+  if (faltando.length === 0) return saida;
+
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin.storage
       .from(balde)
-      .createSignedUrls(unicos, segundos);
+      .createSignedUrls(faltando, segundos);
     if (error || !data) return saida;
+    if (memoriaDeUrls.size + faltando.length > TETO_DA_MEMORIA) memoriaDeUrls.clear();
     data.forEach((item, i) => {
-      const caminho = item?.path ?? unicos[i];
-      if (caminho && item?.signedUrl) saida.set(caminho, item.signedUrl);
+      const caminho = item?.path ?? faltando[i];
+      if (caminho && item?.signedUrl) {
+        saida.set(caminho, item.signedUrl);
+        memoriaDeUrls.set(`${balde}\n${caminho}`, item.signedUrl);
+      }
     });
     return saida;
   } catch {

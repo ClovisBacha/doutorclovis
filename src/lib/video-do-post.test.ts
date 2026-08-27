@@ -56,7 +56,13 @@ describe("o que passa e o que não", () => {
   });
 
   test("cada recusa tem recado próprio, com o número", () => {
-    expect(recadoDaRecusa("tamanho")).toContain("50");
+    /* ⚠️ **DERIVADO DE `BYTES_MAX`, e nunca "15" escrito à mão.** Este número
+       desceu de 50 para 15 MB por causa da conta de banda; um literal aqui
+       reprovaria o próximo ajuste sobre um recado que continua certo — e é a
+       mesma armadilha de travar a grafia em vez da garantia. O que se cobra é
+       que o recado DIGA o teto, porque "vídeo pesado demais" sem número não
+       diz a ela o que fazer diferente. */
+    expect(recadoDaRecusa("tamanho")).toContain(String(Math.round(BYTES_MAX / 1024 / 1024)));
     expect(recadoDaRecusa("duracao")).toContain(String(SEGUNDOS_MAX));
     expect(recadoDaRecusa("tipo")).toBeTruthy();
   });

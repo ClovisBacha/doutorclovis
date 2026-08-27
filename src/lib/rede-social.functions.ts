@@ -1953,7 +1953,7 @@ export async function montarPosts(
      de quem publicou e demora cinco segundos"). Um `POST` só resolve o lote
      inteiro. As URLs do post continuam de vida curta (uma hora): quem manda no
      tempo é o parâmetro, não o lote. */
-  const { urlsAssinadas } = await import("@/lib/imagens.server");
+  const { urlsAssinadas, VALIDADE_FOTO_SEG } = await import("@/lib/imagens.server");
   const todosOsCaminhos = visiveis.flatMap(
     (p) =>
       /* ⚠️ O VÍDEO ENTRA NA MESMA ONDA DE ASSINATURA das fotos. Assinar à parte
@@ -1963,7 +1963,12 @@ export async function montarPosts(
         Boolean,
       ) as string[],
   );
-  const assinadas = await urlsAssinadas("rede", todosOsCaminhos, 3600);
+  /* ⚠️ **SETE DIAS, e não uma hora.** A URL assinada é a chave do cache do
+     navegador: com uma hora, a mesma paciente rebaixava as mesmas fotos do feed
+     a cada abertura — 321 dos 396 MB/mês dela eram re-download. Quem torna a URL
+     ESTÁVEL entre leituras é a memória dentro de `urlsAssinadas`; a validade
+     longa é o que dá tempo para essa memória valer. Ver `VALIDADE_FOTO_SEG`. */
+  const assinadas = await urlsAssinadas("rede", todosOsCaminhos, VALIDADE_FOTO_SEG);
 
   /**
    * AS PUBLICAÇÕES REPUBLICADAS, numa consulta só.
@@ -6199,19 +6204,24 @@ export const storiesDoFeed = createServerFn({ method: "POST" })
     /* ⚠️ **EM LOTE, e este laço era SEQUENCIAL.** O `await urlAssinada` morava
        dentro do `for`, então uma fileira de vinte stories eram vinte viagens em
        fila indiana — e a fileira é a primeira coisa que a aba desenha. */
-    const { urlsAssinadas } = await import("@/lib/imagens.server");
+    const { urlsAssinadas, VALIDADE_STORY_SEG } = await import("@/lib/imagens.server");
     const capasDosStories = await urlsAssinadas(
       "rede",
       /* ⚠️ A primeira E as do carrossel, na MESMA onda — ver o comentário na
-         entrega. `flatMap` porque um story pode ter até cinco. */
-      /* ⚠️ **O VÍDEO ENTRA NA MESMA ONDA.** Uma segunda chamada ao Storage por
+         entrega. `flatMap` porque um story pode ter até cinco.
+
+         ⚠️ **O VÍDEO ENTRA NA MESMA ONDA.** Uma segunda chamada ao Storage por
          story de vídeo dobraria a espera da fileira, que é a primeira coisa que
          a aba desenha — e é exatamente o laço sequencial que este bloco veio
          desfazer. */
       linhas
         .flatMap((l: any) => [l.imagem_path, l.video_path, ...((l.imagens ?? []) as string[])])
         .filter(Boolean),
-      3600,
+      /* ⚠️ **24 h, e não os sete dias da foto de publicação.** O story promete
+         sumir em um dia, e a URL assinada não pode sobreviver à promessa: sete
+         dias dariam a quem guardou o endereço mais seis dias de acesso a uma
+         coisa que a tela diz ter acabado. */
+      VALIDADE_STORY_SEG,
     );
     /**
      * OS QUADROS DAS PUBLICAÇÕES COMPARTILHADAS.
@@ -7055,15 +7065,59 @@ export const apagarStory = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const sb = supabaseAdmin as any;
 
-    /* A linha some, e com ela as de `rede_stories_vistos` (ON DELETE CASCADE).
-       O arquivo continua no balde — é o mesmo caminho de `apagarPost`, e a
-       varredura de exclusão de conta é quem limpa o balde. */
+    /* ⚠️ **OS CAMINHOS SÃO LIDOS ANTES DE A LINHA SUMIR** — depois do DELETE
+       não há mais como saber que arquivos eram dela, e eles ficariam no balde
+       para sempre. A leitura passa por `storiesCrus`, que é a escada: um
+       `select` à mão com `imagens`/`video_path` falharia inteiro num banco
+       atrasado, e aí apagar um story deixaria de funcionar por causa de uma
+       coluna que ninguém usou.
+
+       Falhar a leitura NÃO impede o DELETE: o que ela pediu foi apagar o
+       story, e um arquivo órfão é infinitamente melhor que um story que ela
+       mandou sumir e continua na tela. */
+    const antes = await storiesCrus(sb, (q: any) =>
+      q.eq("id", data.storyId).eq("autor_id", eu).limit(1),
+    );
+
+    /* A linha some, e com ela as de `rede_stories_vistos` (ON DELETE CASCADE). */
     const { error } = await sb
       .from("rede_stories")
       .delete()
       .eq("id", data.storyId)
       .eq("autor_id", eu);
     if (error) return { ok: false as const, motivo: "banco" as const };
+
+    /* ⚠️ **O ARQUIVO SAI JUNTO, e isto é o que separa o story do post.** Um post
+       é ARQUIVADO — a linha fica, as reações apontam para ela, e o arquivo tem
+       de continuar existindo. Um story é APAGADO: nada aponta para ele, ele já
+       prometia sumir em 24 horas, e o arquivo que fica é ~270 KB por story que
+       ninguém nunca mais lê e que a plataforma paga todo mês.
+
+       ⚠️ **Nenhum caminho é compartilhado com um post.** `guardarImagem` nomeia
+       por `crypto.randomUUID()`, nunca por hash do conteúdo, e o story feito a
+       partir de uma publicação SOBE UMA CÓPIA (`storyComPost` refaz a foto pelo
+       canvas). Se algum dia a nomeação virar endereçamento por conteúdo, este
+       bloco passa a apagar a foto da publicação junto — e há teste cobrando.
+
+       ⚠️ **Depois do DELETE, e nunca antes**: um `remove` que desse certo com o
+       DELETE falhando em seguida deixaria a linha viva apontando para um
+       arquivo que não existe — o story vira um retângulo quebrado no visor.
+
+       Falha aqui é SILENCIOSA para ela: o story sumiu, que é o que ela pediu.
+       Fica o registro para quem for investigar o balde. */
+    const caminhos = [
+      antes[0]?.imagem_path,
+      antes[0]?.video_path,
+      ...((antes[0]?.imagens as string[] | null) ?? []),
+    ].filter((c): c is string => typeof c === "string" && c.length > 0);
+    if (caminhos.length > 0) {
+      try {
+        const { error: erroBalde } = await sb.storage.from("rede").remove([...new Set(caminhos)]);
+        if (erroBalde) console.warn("[rede] story apagado, arquivo ficou:", erroBalde.message);
+      } catch (e) {
+        console.warn("[rede] story apagado, arquivo ficou:", e);
+      }
+    }
     return { ok: true as const };
   });
 

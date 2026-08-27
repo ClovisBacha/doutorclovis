@@ -10665,6 +10665,144 @@ que o defeito do ⋯ apareceu.
 estados, inclusive o "ainda não olhamos") · `?tela=perfil&meu=1` (o ♡ e o ⋯ que
 não existia) · `/pub/<CODIGO>`.
 
+## A conta do byte: quatro decisões que baixam o custo da Comunidade (ago/2026)
+
+Pergunta do dono, em duas voltas: _"como as redes sociais fazem hj, como iríamos
+reduzir o custo"_ e _"hoje o que o Instagram faz para conseguirmos minimizar os
+custos"_.
+
+⚠️ **O QUE CUSTA NÃO É GUARDAR — É BAIXAR.** Guardar uma foto de 267 KB custa
+frações de centavo por mês; **entregá-la** custa toda vez que alguém abre a
+tela. Uma paciente que rola trinta publicações baixa ~8 MB; trezentas pacientes
+fazendo isso duas vezes por dia são ~144 GB/mês de egresso. É esse número que
+cresce junto com a base, e é nele que as quatro mudanças mordem.
+
+Régua e catraca: **`src/lib/conta-do-byte.test.ts`** — as quatro moram num
+arquivo só de propósito. Elas não têm nada em comum no código (um TTL, um teto,
+um `remove`, um número de qualidade) e têm tudo em comum no efeito, e quem for
+mexer em qualquer uma precisa encontrar o argumento das outras três. Onze
+mutantes conferidos em vermelho.
+
+### 1 · A foto do feed é assinada por DIAS — e a URL passou a ser ESTÁVEL
+
+⚠️ **E AQUI EU ERREI, E O ERRO É A LIÇÃO.** Eu disse ao dono que era "uma linha":
+subir `expiresIn` de 3600 para sete dias. **Não era, e sozinho não resolveria
+nada.** `expiresIn` é RELATIVO: assinar de novo produz outro `exp`, outro token
+e portanto **outro endereço** — e a URL assinada É A CHAVE DE CACHE do
+navegador. Com validade de sete dias e re-assinatura a cada leitura, a segunda
+visita continua baixando tudo igual.
+
+- **`separarGuardadas`** é a régua, e a memória (`Map` de módulo, teto de 5.000)
+  devolve a MESMA URL enquanto ela durar. É isso que faz a segunda visita não
+  custar banda.
+- ⚠️ **`aindaServe`, e não "existe"**: uma URL perto de vencer serviria a leitura
+  de agora e **quebraria a foto no meio da rolagem** de quem está com o feed
+  aberto. A margem é `MARGEM_DE_RENOVACAO_SEG` (12 h).
+- ⚠️ **AS DUAS MUDANÇAS SÃO INSEPARÁVEIS, e isso não estava escrito em lugar
+  nenhum antes deste teste:** com validade de UMA HORA a memória seria **código
+  morto** — a URL já nasce dentro da margem de doze horas, `aindaServe` responde
+  `false` na leitura seguinte, e tudo é re-assinado como antes. TTL sem memória
+  não muda nada; memória sem TTL também não.
+- ⚠️ **O STORY NÃO HERDA OS SETE DIAS** (`VALIDADE_STORY_SEG` = 24 h). Ele
+  **promete sumir em um dia**, e a URL assinada não pode sobreviver à promessa:
+  sete dias dariam a quem guardou o endereço mais seis dias de acesso a uma coisa
+  que a tela diz ter acabado.
+- ⚠️ **A régua saiu de dentro do `for` por causa do TESTE.** Provar que a memória
+  é lida exigiria trocar o módulo do Supabase, e `mock.module` do bun escreve num
+  registro COMPARTILHADO entre arquivos — um teste que muda de resposta conforme
+  a ordem é pior que teste nenhum (é por isso que a medição de ondas mora fora do
+  `src/`). Enterrada, a única asserção possível era sobre o TEXTO, e **um
+  `if (false && …)` passava por ela**. Pura, a mutação morre. Mesma lição de
+  `assinatura.ts` e `buscar-paciente.ts`.
+
+### 2 · O teto do vídeo caiu de 50 MB para 15
+
+⚠️ **Um story de 50 MB visto por vinte pessoas é 1 GB de egresso por
+publicação** — pago toda vez que alguém abre. 15 MB cobrem um minuto de 720p bem
+comprimido, que é o que um celular de verdade produz; é o mesmo teto do WhatsApp,
+e ninguém reclama dele.
+
+⚠️ **A DURAÇÃO SOZINHA NÃO LIMITA NADA**: sessenta segundos podem ser 3 MB ou
+400, conforme o bitrate. Os dois tetos medem coisas diferentes — tempo de atenção
+e tamanho de download.
+
+E o recado passou a dizer **o que fazer diferente** ("tente um trecho mais
+curto"), com o número derivado da constante: "vídeo muito pesado" sozinho deixa
+ela tentando o mesmo arquivo de novo.
+
+### 3 · O story apagado leva o ARQUIVO junto
+
+`apagarStory` apagava a linha e deixava ~270 KB no balde, **para sempre**, com um
+comentário dizendo que "a varredura de exclusão de conta é quem limpa" — o que só
+acontece se ela apagar a conta.
+
+- ⚠️ **É AQUI QUE O STORY DIFERE DO POST, e o nome da função mente sobre isso:**
+  `apagarPost` **ARQUIVA** — as reações apontam para a linha, e o arquivo tem de
+  continuar existindo. Um story é apagado de verdade: nada aponta para ele, e ele
+  já prometia sumir em 24 h.
+- ⚠️ **Os caminhos são lidos ANTES do DELETE**, e por `storiesCrus` (a escada):
+  depois do DELETE não há mais como saber que arquivos eram dela, e um `select` à
+  mão com `imagens`/`video_path` falharia inteiro num banco atrasado — apagar um
+  story deixaria de funcionar por causa de uma coluna que ninguém usou.
+- ⚠️ **O `remove` vem DEPOIS do DELETE.** Invertido, um `remove` que desse certo
+  com o DELETE falhando deixaria a linha viva apontando para um arquivo que não
+  existe: o story vira um retângulo quebrado no visor.
+- ⚠️ **Falha ao ler NÃO impede o DELETE, e falha no balde é SILENCIOSA.** Ela
+  pediu para o story sumir; um arquivo órfão é infinitamente melhor que um story
+  que ela mandou apagar e continua na tela.
+- ⚠️ **A trava que torna isto seguro é a NOMEAÇÃO.** `guardarImagem` usa
+  `crypto.randomUUID()`, nunca hash do conteúdo, e o story feito a partir de uma
+  publicação **sobe uma cópia** (`storyComPost` refaz a foto pelo canvas) — então
+  nenhum caminho é compartilhado com um post. No dia em que a nomeação virar
+  endereçamento por conteúdo, este bloco passa a apagar a foto da publicação
+  junto, e há teste onde isso aparece.
+
+### 4 · A qualidade da foto: 0,80 → 0,72
+
+Medido codificando a mesma imagem no canvas: **266 KB a 0,80 contra 197 KB a
+0,72 — 26% a menos**, numa foto que a paciente vê a 393 pontos de largura. A
+diferença entre as duas existe num monitor, com a imagem ampliada; na tela onde
+esta foto de fato aparece, não.
+
+- ⚠️ **Abaixo de 0,70 o JPEG mostra blocagem em PELE e em CÉU**, que é do que uma
+  foto de gestação é feita. Por isso 0,72 e não menos.
+- ⚠️ **O LADO CONTINUA EM 1080**, e essa foi uma sugestão minha que a verificação
+  derrubou: 1080 é o que uma tela de densidade 3 pede a 393 pontos. Reduzir
+  entregaria foto de bebê borrada, que é exatamente o que ela veio ver. O ganho
+  seguinte não vem de espremer mais — vem de mandar menos PIXELS para quem tem
+  tela de densidade 2, que é a escada de versões, e ela ainda não existe.
+- ⚠️ **Um número só para as TRÊS** (publicação, story e capa de vídeo): aparecem
+  no mesmo tamanho de tela, e três constantes divergiriam no primeiro ajuste.
+
+### ⚠️ E TRÊS ASSERÇÕES MINHAS PASSARAM EM VAZIO — as três já catalogadas aqui
+
+Os onze mutantes pegaram as três na primeira rodada:
+
+1. **`indexOf` devolve −1 quando a linha é APAGADA, e `-1 < x` é verdadeiro.** A
+   asserção "lê os caminhos antes do delete" ficou VERDE sobre um `apagarStory`
+   sem leitura nenhuma. Quem conserta é `onde()`, que reprova o −1.
+2. **Outra ocorrência do mesmo nome.** "O feed pede a validade longa" procurava
+   `VALIDADE_FOTO_SEG` no corpo da função — e ela aparece também no `import`
+   destruturado lá dentro, então tirá-la do ARGUMENTO passava verde. **Décima vez
+   nesta base.**
+3. ⚠️ **E `\([^)]*\)` para no primeiro `)`** — a chamada de `storiesDoFeed` tem
+   um `.flatMap((l) => [...])` no meio, e a asserção "passa a validade certa"
+   ficava verde sem nunca ter chegado ao argumento. Quem resolve é
+   `argumentosDe`, que **conta parênteses**: exato, três linhas, e sem medir
+   distância — que seria a armadilha de sempre.
+
+### O que foi conferido e NÃO virou mudança
+
+- **Reduzir o lado da foto do feed** — ver acima: 1080 está certo.
+- **Apagar story vencido** — o ARQUIVO de stories lê justamente os vencidos;
+  varrer seria apagar o recurso.
+- **WebP em vez de JPEG** — medido 9% MAIOR aqui, mas a imagem do meu teste é
+  cheia de ruído, o que é injusto com o WebP. É o único número desta leva do qual
+  não se deve decidir; refazer com uma foto de verdade antes de mexer.
+- ⚠️ **`createSignedUrls` (o plural) NÃO aceita `transform`** — só o singular
+  aceita. Uma escada de versões por densidade de tela passa por aí, e é a próxima
+  economia grande; ela não cabia nesta leva sem desfazer o ganho do lote.
+
 ## A auditoria das promessas da Comunidade (ago/2026)
 
 Pedido do dono: rever se tudo que a aba PROMETE está de fato certo. O método foi

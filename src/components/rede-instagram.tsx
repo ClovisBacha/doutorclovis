@@ -10102,6 +10102,25 @@ export function TelaDeAtividade({
  * A proporção é PRESERVADA, ao contrário do avatar: o modelo aceita retrato,
  * paisagem e quadrado, e recortar aqui decidiria pelo enquadramento dela.
  */
+/**
+ * A QUALIDADE DE TODA FOTO QUE SOBE DAQUI — publicação, story e capa de vídeo.
+ *
+ * ⚠️ **0,72, e desceu de 0,80 por causa da conta de banda.** Medido, codificando
+ * a mesma imagem no canvas do navegador: **266 KB a 0,80 contra 197 KB a 0,72**
+ * — 26% a menos numa foto que a paciente vê a 393 pontos de largura. A
+ * diferença entre as duas existe num monitor, com a imagem ampliada; na tela
+ * onde esta foto de fato aparece, não.
+ *
+ * ⚠️ **Abaixo de 0,70 o JPEG começa a mostrar blocagem em PELE e em CÉU**, que
+ * é exatamente do que uma foto de gestação é feita — por isso 0,72 e não menos.
+ * O ganho seguinte não vem de espremer mais: vem de mandar menos PIXELS para
+ * quem tem tela de densidade 2, que é a escada de versões.
+ *
+ * ⚠️ **Um número só para as três**: publicação, story e capa de vídeo aparecem
+ * no mesmo tamanho de tela, e três constantes divergiriam no primeiro ajuste.
+ */
+const QUALIDADE_DA_FOTO = 0.72;
+
 const LADO_DA_FOTO = 1080;
 async function prepararFotoDoPost(file: File): Promise<string | null> {
   try {
@@ -10113,7 +10132,7 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO);
   } catch {
     return null;
   }
@@ -10215,7 +10234,7 @@ async function prepararFotoDoStory(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO);
   } catch {
     return null;
   }
@@ -10277,7 +10296,7 @@ async function capaDoVideo(file: File): Promise<{ capa: string; segundos: number
     if (!ctx) return null;
     ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
     const segundos = Number.isFinite(v.duration) ? v.duration : 0;
-    return { capa: canvas.toDataURL("image/jpeg", 0.8), segundos };
+    return { capa: canvas.toDataURL("image/jpeg", QUALIDADE_DA_FOTO), segundos };
   } catch {
     return null;
   } finally {

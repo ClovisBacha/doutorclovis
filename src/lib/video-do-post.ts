@@ -26,15 +26,24 @@
 export const SEGUNDOS_MAX = 60;
 
 /**
- * ⚠️ **CINQUENTA MEGABYTES, medido pelo pior caso real.**
+ * ⚠️ **QUINZE MEGABYTES, e desceu de cinquenta por causa do EGRESSO.**
  *
  * Um iPhone grava 1080p60 a ~7 MB/s; sessenta segundos passam de 400 MB e
- * seriam recusados pelo tempo antes do tamanho. O teto existe para o vídeo
- * JÁ COMPRIMIDO que o navegador manda, e 50 MB cobrem um minuto de 720p com
- * folga. Acima disso é quase sempre um arquivo que ninguém quer esperar
- * baixar.
+ * seriam recusados pelo tempo antes do tamanho. O teto existe para o vídeo JÁ
+ * COMPRIMIDO que o navegador manda.
+ *
+ * ⚠️ **O que decide não é o armazenamento — é quantas vezes o arquivo é
+ * BAIXADO.** Guardar 50 MB custa centavos; um story de 50 MB visto por vinte
+ * pessoas é **1 GB de banda por publicação**, e a plataforma paga isso toda
+ * vez que alguém abre. Quinze cobrem um minuto de 720p bem comprimido, que é o
+ * que um celular de verdade produz ao mandar vídeo — é o mesmo teto que o
+ * WhatsApp aplica, e ninguém reclama dele.
+ *
+ * ⚠️ **A DURAÇÃO SOZINHA NÃO LIMITA NADA**: sessenta segundos podem ser 3 MB
+ * ou 400, conforme o bitrate. Os dois tetos existem porque medem coisas
+ * diferentes — tempo de atenção e tamanho de download.
  */
-export const BYTES_MAX = 50 * 1024 * 1024;
+export const BYTES_MAX = 15 * 1024 * 1024;
 
 /**
  * Os formatos que o navegador de uma paciente realmente produz e toca.
@@ -72,7 +81,11 @@ export function recadoDaRecusa(r: RecusaDoVideo): string {
     case "tipo":
       return "Esse formato de vídeo não dá para publicar aqui.";
     case "tamanho":
-      return `Vídeo muito pesado. O limite é ${Math.round(BYTES_MAX / 1024 / 1024)} MB.`;
+      /* ⚠️ O recado DIZ o que fazer diferente. "Vídeo muito pesado" sozinho
+         deixa ela tentando o mesmo arquivo de novo. */
+      return `Esse vídeo é pesado demais (o limite é ${Math.round(
+        BYTES_MAX / 1024 / 1024,
+      )} MB). Tente um trecho mais curto.`;
     case "duracao":
       return `O vídeo precisa ter até ${SEGUNDOS_MAX} segundos.`;
   }
