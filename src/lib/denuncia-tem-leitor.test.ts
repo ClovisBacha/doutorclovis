@@ -132,3 +132,36 @@ describe("⚠️ arquivar conversa some da lista, e volta sozinha", () => {
     expect(trecho).toMatch(/c\.aceita/);
   });
 });
+
+/**
+ * ⚠️ `{ ok: false }` NÃO É EXCEÇÃO — e o `try/catch` não o pega.
+ *
+ * As funções de servidor desta aba devolvem `{ ok: false }` numa resposta 200
+ * NORMAL. Quem embrulha a chamada num `try/catch` e descarta o resultado pega a
+ * queda de rede e deixa passar exatamente o caso comum: o servidor recusando.
+ *
+ * Em `desarquivar` isso custava caro: a pintura otimista tirava a publicação da
+ * gaveta, o `catch` não disparava, o feed era recarregado sem ela — e ela ficava
+ * sem a publicação nas DUAS listas, sem recado nenhum.
+ */
+describe("⚠️ desarquivar confere o resultado, não só a exceção", () => {
+  const T = readFileSync("src/components/rede-instagram.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+  const i = T.indexOf("async function desarquivar(");
+  const corpo = T.slice(i, T.indexOf("\n  async function", i + 10));
+
+  test("o resultado é guardado e conferido", () => {
+    expect(i).toBeGreaterThan(0);
+    expect(corpo).toMatch(/const r = await desarquivarPost/);
+    expect(corpo).toMatch(/if \(!r\.ok\)/);
+  });
+
+  test("⚠️ e na recusa a gaveta VOLTA — senão a publicação some das duas listas", () => {
+    const j = corpo.indexOf("if (!r.ok)");
+    const ramo = corpo.slice(j, j + 320);
+    expect(ramo).toContain("abrirArquivados");
+    expect(ramo).toMatch(/toast\.error/);
+  });
+});

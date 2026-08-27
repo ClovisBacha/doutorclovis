@@ -10790,6 +10790,29 @@ depois), `escondeuDeMim` recorta os stories ANTES da leitura, e
 `REFERENCES`, então "o story some em 24 horas; a denúncia fica" é verdade mesmo
 quando ela apaga o story.
 
+### ⚠️ 6. E A VARREDURA DO PADRÃO — porque ele apareceu QUATRO vezes
+
+Quatro defeitos da mesma família numa noite não é coincidência: é classe. Duas
+varreduras mecânicas sobre a rede inteira.
+
+**"Coluna escrita e nunca lida"** — uma só sobreviveu, e ela NÃO é defeito:
+`rede_perguntas.respondido_em`. O que a torna diferente de `denunciado_em` é que
+`resposta` é escrita no mesmo `update` e É lida — o estado "respondida" aparece
+na tela por ela. Metadado sem leitor, não promessa quebrada; e removê-la
+custaria um `ALTER` sobre dado vivo. Fica registrada, sem mexer.
+
+**"A tela diz 'pronto' sem olhar a resposta"** — duas, e uma era real.
+
+⚠️ **`desarquivarPost` descartava o resultado, e o `try/catch` NÃO pega
+`{ ok: false }`** — ele vem numa resposta 200 NORMAL. A pintura otimista tirava
+a publicação da gaveta, o `catch` não disparava, o feed recarregava sem ela: a
+paciente ficava sem a publicação nas DUAS listas, **sem nenhum recado**, e a
+conclusão razoável é que ela a perdeu.
+
+A outra (`denunciarComentario`) descarta de propósito e continua assim — o
+comentário ao lado explica: dizer "não deu para denunciar" ensina que a denúncia
+pode falhar, e quem denuncia um comentário duro não precisa dessa dúvida.
+
 ⚠️ **E duas acusações minhas caíram na conferência** — o CHECK de `especie`
 (meu `grep` era por linha, a lista é multi-linha) e o portão da busca (meu
 `head -3` cortou a ocorrência que importava). **Varredura mecânica também erra;

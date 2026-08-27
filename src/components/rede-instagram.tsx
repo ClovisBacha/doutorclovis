@@ -6630,7 +6630,18 @@ export function RedeNoApp({
       const t = await token();
       if (!t) return;
       const { desarquivarPost } = await import("@/lib/rede-social.functions");
-      await desarquivarPost({ data: { accessToken: t, postId: post.id } });
+      const r = await desarquivarPost({ data: { accessToken: t, postId: post.id } });
+      /* ⚠️ **O `try/catch` NÃO PEGA ISTO**, e era o engano: a função devolve
+         `{ ok: false }` numa resposta 200 NORMAL — não lança. Com o resultado
+         descartado, a publicação sumia da gaveta (a pintura otimista da linha
+         de cima), não voltava ao feed, e ela ficava sem ela nas DUAS listas,
+         sem nenhum recado. Concluiria que perdeu a publicação. */
+      if (!r.ok) {
+        const { toast } = await import("sonner");
+        toast.error("Não deu para trazer de volta agora.");
+        void abrirArquivados();
+        return;
+      }
       void carregarFeed();
     } catch {
       void abrirArquivados();
