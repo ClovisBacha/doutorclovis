@@ -663,20 +663,91 @@ export const fecharComentarios = createServerFn({ method: "POST" })
     return { ok: true as const };
   });
 
-/** Denunciar um comentário — a mesma fila do resto da rede. */
+/**
+ * DENUNCIAR UM COMENTÁRIO — e ele precisa CHEGAR na fila.
+ *
+ * ⚠️ **ESTA FUNÇÃO PROMETIA E NÃO CUMPRIA, e o doc dela dizia "a mesma fila do
+ * resto da rede".** Ela gravava `rede_comentarios.denunciado_em` — uma coluna
+ * que NENHUMA consulta do repositório lia — enquanto a tela respondia
+ * "Denunciado. A gente vai olhar." Ninguém ia olhar.
+ *
+ * É palavra por palavra o defeito que o post e o perfil já pagaram aqui
+ * ("`denunciado_em` era gravada e NENHUMA consulta a lia"), consertado num
+ * caminho e deixado de pé no outro — e no canal que mais importa: o comentário
+ * é onde mora o conselho clínico de leiga, que é a razão inteira de esta aba
+ * quase não ter comentários.
+ *
+ * Agora ele entra em `rede_denuncias`, que é o que `denunciasAbertas` lê.
+ *
+ * ⚠️ **O MOTIVO É CATÁLOGO FECHADO**, como nas outras três portas: é ele que
+ * ordena a fila, e campo livre numa denúncia de app de gestação é onde alguém
+ * escreve a informação clínica de outra pessoa.
+ *
+ * ⚠️ **O TRECHO É CONGELADO**: ela pode editar ou apagar o comentário depois, e
+ * sem a cópia a linha da administração apontaria para um texto que já não
+ * existe.
+ *
+ * ⚠️ **A visibilidade do post é conferida ANTES** — a mesma régua da leitura.
+ * Sem ela, um uuid sorteado que respondesse `ok` confirmaria a existência de um
+ * comentário num post que quem pergunta não pode ver.
+ */
 export const denunciarComentario = createServerFn({ method: "POST" })
   .inputValidator((i: unknown) =>
-    z.object({ accessToken: z.string().min(10), id: z.string().uuid() }).parse(i),
+    z
+      .object({
+        accessToken: z.string().min(10),
+        id: z.string().uuid(),
+        motivo: z.string().min(1).max(60),
+      })
+      .parse(i),
   )
   .handler(async ({ data }) => {
     const eu = await pacienteDaSessao(data.accessToken);
     if (!eu) return { ok: false as const, motivo: "sessao" as const };
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any)
+    const sb = supabaseAdmin as any;
+
+    const { motivoConhecido } = await import("@/lib/denuncias");
+    if (!motivoConhecido(data.motivo)) return { ok: false as const, motivo: "motivo" as const };
+
+    const { data: c } = await sb
       .from("rede_comentarios")
-      .update({ denunciado_em: new Date().toISOString() })
-      .eq("id", data.id);
-    if (error) return { ok: false as const, motivo: "banco" as const };
+      .select("id, post_id, autor_id, texto")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!c) return { ok: false as const, motivo: "indisponivel" as const };
+
+    /* ⚠️ Denunciar o PRÓPRIO comentário abriria um jeito barato de encher a
+       fila do administrador. */
+    if ((c as { autor_id: string }).autor_id === eu) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    if (!(await postQueEuVejo(sb, (c as { post_id: string }).post_id, eu))) {
+      return { ok: false as const, motivo: "indisponivel" as const };
+    }
+
+    const { error } = await sb.from("rede_denuncias").insert({
+      alvo: "comentario",
+      alvo_id: (c as { id: string }).id,
+      denunciada_id: (c as { autor_id: string }).autor_id,
+      quem_id: eu,
+      motivo: data.motivo,
+      trecho: ((c as { texto: string | null }).texto ?? "(sem texto)").slice(0, 400),
+    });
+    /* Duplicata é SUCESSO REPETIDO: ela tocou duas vezes, e dizer "erro" a faria
+       tentar de novo. */
+    if (error && (error as { code?: string }).code !== "23505") {
+      console.error("[rede] denúncia de comentário não gravou", error);
+      return { ok: false as const, motivo: "banco" as const };
+    }
+
+    /* ⚠️ **O CARIMBO EM `rede_comentarios.denunciado_em` SAIU.** Nada no
+       repositório o lia — era exatamente a coluna morta que dava ao recurso a
+       aparência de funcionar. A denúncia agora vive em `rede_denuncias`, que a
+       fila lê, e a repetição é barrada pelo índice único de lá
+       (alvo, alvo_id, quem_id), não por um carimbo sem leitor. */
+
     /* ⚠️ Resposta pelada, sem confirmar nada sobre o comentário nem sobre quem
        escreveu — a mesma decisão da denúncia da caixinha. */
     return { ok: true as const };

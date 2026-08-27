@@ -10664,3 +10664,94 @@ que o defeito do ⋯ apareceu.
 (`&vazio=1`, `&instavel=1`) · `?tela=curtidos` · `?tela=desfechos` (os quatro
 estados, inclusive o "ainda não olhamos") · `?tela=perfil&meu=1` (o ♡ e o ⋯ que
 não existia) · `/pub/<CODIGO>`.
+
+## A auditoria das promessas da Comunidade (ago/2026)
+
+Pedido do dono: rever se tudo que a aba PROMETE está de fato certo. O método foi
+mecânico de propósito — este arquivo registra cinco vezes em que afirmei de
+memória e errei —: extrair as promessas que a tela faz POR ESCRITO e conferir
+cada uma contra o código.
+
+**Sete promessas de silêncio conferidas e cumpridas.** Silenciar, restringir,
+favoritar, esconder story, bloquear, tirar seguidor e denunciar dizem "ela não é
+avisada", e nenhuma das sete toca `registrarAtividade` ou `sendPushToUser`.
+
+⚠️ **E uma acusação minha caiu na conferência:** eu ia reportar que o CHECK de
+`rede_atividade.especie` estava incompleto. Estava completo — meu `grep` era por
+LINHA e a lista é multi-linha. A prosa do CLAUDE.md estava certa.
+
+### ⚠️ 1. "A GENTE VAI OLHAR" — e ninguém olhava
+
+`denunciarComentario` gravava `rede_comentarios.denunciado_em`, **coluna que
+nenhuma consulta do repositório lia**, e a tela respondia "Denunciado. A gente
+vai olhar."
+
+É palavra por palavra o defeito que o post e o perfil já pagaram aqui
+("`denunciado_em` era gravada e NENHUMA consulta a lia") — consertado num
+caminho e deixado de pé no outro. E no pior lugar possível: **o comentário é
+onde mora o conselho clínico de leiga**, que é a razão inteira de esta aba quase
+não ter comentários.
+
+⚠️ **`rede-tem-porta.test.ts` não tinha como pegar**: a função TEM porta e TEM
+chamador. O que faltava era leitor do que ela grava — outra pergunta, outra
+catraca (`denuncia-tem-leitor.test.ts`).
+
+- Agora entra em `rede_denuncias`, que é o que `denunciasAbertas` lê.
+- ⚠️ **O motivo virou catálogo fechado**, como nas outras três portas: é ele que
+  ordena a fila, e campo livre numa denúncia de app de gestação é onde alguém
+  escreve a informação clínica de outra pessoa. A folha passou a ser a MESMA
+  `EscolherMotivo` — duas folhas divergiriam no primeiro ajuste de catálogo.
+- ⚠️ **O trecho é congelado**, senão a linha da administração apontaria para um
+  texto que ela pode ter editado ou apagado.
+- ⚠️ **O carimbo sem leitor SAIU.** A catraca nova o acusou no mesmo instante em
+  que nasceu — é o mesmo `avisada_em` removido no dia anterior, e manter os dois
+  critérios diferentes seria incoerência. A repetição é barrada pelo índice
+  único de `rede_denuncias` (alvo, alvo_id, quem_id), não por um carimbo mudo.
+
+### ⚠️ 2. A FILA CHAMAVA MENSAGEM PRIVADA DE "PUBLICAÇÃO"
+
+`fila-de-denuncias.tsx` rotulava `d.alvo === "perfil" ? "perfil" : "publicação"`
+— escrito quando só existiam esses dois alvos. Depois a rede ganhou comentário,
+pergunta, story, mensagem e conversa.
+
+⚠️ **Uma denúncia de MENSAGEM PRIVADA — onde o assédio de verdade acontece —
+chegava ao administrador como "publicação".** Ele procuraria um post público,
+não acharia nada, e descartaria. A denúncia era registrada e ilegível.
+
+`rotuloDoAlvo` dá nome aos sete. ⚠️ **Desconhecido devolve o próprio valor**,
+nunca "publicação": alvo novo mal rotulado é ruído; alvo novo rotulado como
+OUTRA COISA é o defeito de novo com outro nome.
+
+⚠️ **E `AlvoDaDenuncia` ainda era `"post" | "perfil"`** — a união estreita que
+causou tudo isto. Virou a completa, e a catraca cobra TypeScript e SQL juntos.
+
+### ⚠️ 3. A MINA DO CHECK, DE NOVO — e o arquivo que a NOMEIA a cometia
+
+Três `APLICAR_*.sql` reescrevem `rede_denuncias_alvo_check` com DROP+ADD, com
+**três listas diferentes**: 5, 6 e 7 alvos. O dono os roda à mão, em qualquer
+ordem, e a documentação manda re-rodar. O último a rodar manda:
+
+- `APLICAR_MAIS_DEZ` depois de `APLICAR_DIRECT_COMPLETO` → perde `'conversa'`, e
+  denunciar uma CONVERSA passa a ser recusado pelo banco;
+- `APLICAR_DEZ_DA_REDE` por último → perde `'story'` também.
+
+⚠️ **E a ironia está escrita no arquivo:** o comentário de `APLICAR_DEZ_DA_REDE`
+diz "o CHECK é reescrito COM A LISTA COMPLETA … é o defeito que
+`rede_atividade_especie_check` já teve aqui" — e a lista dele envelheceu, porque
+`especie` tinha catraca e `alvo` não.
+
+**A régua vale para qualquer CHECK reescrito por mais de um arquivo: toda lista
+é a COMPLETA, e existe catraca.** `alvos-da-denuncia.test.ts` é a irmã de
+`especies-da-atividade.test.ts` — cobra as três listas, a união do TypeScript, o
+que o app de fato grava, e os rótulos da fila. Dez mutações conferidas em
+vermelho.
+
+### 4. A folha de motivo abria fora da dobra
+
+Medido na bancada: tocar no ⋯ do PRIMEIRO comentário de dez punha a folha em
+y≈840 num viewport de 852 — a paciente toca e nada acontece à vista, e a leitura
+razoável é "o botão não funcionou". `scrollIntoView` no efeito: **y=205**.
+
+**Bancada:** `/preview-instagram?tela=comentarios` → ⋯ em qualquer comentário
+que não seja seu.
+

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DenunciaNaFila } from "@/lib/caixinha.functions";
-import { rotuloDoMotivo, type DenunciaDaRede } from "@/lib/denuncias";
+import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo } from "@/lib/denuncias";
 
 /**
  * A FILA DE DENÚNCIAS DA CAIXINHA.
@@ -201,10 +201,11 @@ function FilaDaRede() {
           <li key={d.id} className="rounded-xl border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[14px] font-semibold">{d.denunciadaNome}</span>
-              {/* ⚠️ O tipo do alvo importa: "o perfil dela" e "uma publicação"
-                  pedem decisões diferentes. */}
+              {/* ⚠️ O tipo do alvo importa: cada um pede uma decisão diferente,
+                  e uma denúncia de MENSAGEM PRIVADA rotulada como "publicação"
+                  manda o administrador procurar um post que não existe. */}
               <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                {d.alvo === "perfil" ? "perfil" : "publicação"}
+                {rotuloDoAlvo(d.alvo)}
               </span>
               <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-[11px] font-medium text-destructive">
                 {rotuloDoMotivo(d.motivo)}

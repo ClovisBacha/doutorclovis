@@ -65,7 +65,7 @@ BEGIN
   ALTER TABLE public.rede_denuncias DROP CONSTRAINT IF EXISTS rede_denuncias_alvo_check;
   ALTER TABLE public.rede_denuncias
     ADD CONSTRAINT rede_denuncias_alvo_check
-    CHECK (alvo IN ('post', 'perfil', 'comentario', 'pergunta', 'mensagem'));
+    CHECK (alvo IN ('post', 'perfil', 'comentario', 'pergunta', 'mensagem', 'story', 'conversa'));
 END $$;
 
 -- ─── 5. QUEM PODE COMENTAR ──────────────────────────────────────────────────

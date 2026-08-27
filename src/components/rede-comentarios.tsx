@@ -15,7 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComentarioNaTela } from "@/lib/comentarios.functions";
-import { TextoComLinks } from "@/components/rede-instagram";
+import { TextoComLinks, EscolherMotivo } from "@/components/rede-instagram";
 import {
   LIMITE_DO_COMENTARIO,
   ORDEM_PADRAO,
@@ -86,6 +86,19 @@ export function Comentarios({
   const [apagando, setApagando] = useState<string | null>(null);
   const [indisponivel, setIndisponivel] = useState(false);
   const [denunciando, setDenunciando] = useState<string | null>(null);
+  /**
+   * ⚠️ **A FOLHA DE MOTIVO NASCE NO FIM DA LISTA.** Quem toca no ⋯ do primeiro
+   * comentário de dez não vê nada acontecer — o controle fica centenas de
+   * pixels abaixo, e a leitura razoável é "o botão não funcionou". Ela toca de
+   * novo, e continua nada.
+   *
+   * Medido na bancada: com dez comentários a folha abre fora da dobra.
+   */
+  const folhaDeMotivo = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!denunciando) return;
+    folhaDeMotivo.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [denunciando]);
   /** Conversas com as respostas todas à mostra. Por raiz. */
   const [abertas, setAbertas] = useState<Record<string, boolean>>({});
   /**
@@ -484,13 +497,13 @@ export function Comentarios({
     }
   }
 
-  async function denunciar(id: string) {
+  async function denunciar(id: string, motivo: string) {
     setDenunciando(null);
     try {
       const t = await token();
       if (!t) return;
       const { denunciarComentario } = await import("@/lib/comentarios.functions");
-      await denunciarComentario({ data: { accessToken: t, id } });
+      await denunciarComentario({ data: { accessToken: t, id, motivo } });
       /* ⚠️ O mesmo recado tenha dado certo ou não: dizer "não deu para
          denunciar" ensina que a denúncia pode falhar, e quem denuncia um
          comentário duro não precisa dessa dúvida. A linha fica marcada de
@@ -722,30 +735,17 @@ export function Comentarios({
       )}
 
       {denunciando && (
-        <div className="mt-3 rounded-xl border border-border p-3">
-          <p className="text-[13px]">Denunciar este comentário?</p>
-          {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
-              da plataforma, e prometer remoção seria prometer o que ninguém
-              garante. Mesma decisão da denúncia da caixinha. */}
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
-            A gente vai olhar. Você também pode bloquear quem escreveu, no perfil dela.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => void denunciar(denunciando)}
-              className="press rounded-full bg-destructive px-3 py-1 text-[12px] font-semibold text-destructive-foreground"
-            >
-              Denunciar
-            </button>
-            <button
-              type="button"
-              onClick={() => setDenunciando(null)}
-              className="press rounded-full border border-border px-3 py-1 text-[12px]"
-            >
-              Cancelar
-            </button>
-          </div>
+        /* ⚠️ **A MESMA `EscolherMotivo` das outras três portas**, e não um
+           Sim/Não próprio: o motivo é o que ORDENA a fila da plataforma, e uma
+           denúncia sem ele chega lá sem dizer do que se trata. Duas folhas de
+           denúncia divergiriam no primeiro ajuste de catálogo. */
+        <div className="mt-3" ref={folhaDeMotivo}>
+          <EscolherMotivo
+            titulo="Por que você está denunciando este comentário?"
+            aviso="A gente vai olhar, e quem escreveu não é avisada. Você também pode bloquear essa pessoa no perfil dela."
+            aoCancelar={() => setDenunciando(null)}
+            aoEnviar={(m) => void denunciar(denunciando, m)}
+          />
         </div>
       )}
 

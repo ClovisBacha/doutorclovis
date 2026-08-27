@@ -7759,7 +7759,10 @@ export const denunciasDaRede = createServerFn({ method: "POST" })
 
     const todas = (linhas ?? []) as {
       id: string;
-      alvo: "post" | "perfil";
+      /* ⚠️ A união COMPLETA de `AlvoDaDenuncia`. Ela era `"post" | "perfil"`,
+         escrita quando só existiam os dois — e foi isso que fez a fila rotular
+         mensagem privada como "publicação". */
+      alvo: import("@/lib/denuncias").AlvoDaDenuncia;
       alvo_id: string;
       denunciada_id: string;
       quem_id: string;

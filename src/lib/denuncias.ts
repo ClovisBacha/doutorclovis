@@ -23,7 +23,25 @@
  * pela mesma razão: campo livre num canal com alcance é risco, não flexibilidade.
  */
 
-export type AlvoDaDenuncia = "post" | "perfil";
+/**
+ * O QUE PODE SER DENUNCIADO.
+ *
+ * ⚠️ **Esta união era `"post" | "perfil"` — escrita quando só existiam os dois**,
+ * e a rede depois ganhou comentário, pergunta, story, mensagem e conversa sem
+ * ninguém voltar aqui. Foi a união estreita que fez a fila do painel rotular
+ * uma denúncia de MENSAGEM PRIVADA como "publicação".
+ *
+ * ⚠️ **Alvo novo entra AQUI, no CHECK de todo `APLICAR_` que o reescreve, e em
+ * `rotuloDoAlvo`** — `alvos-da-denuncia.test.ts` cobra os três de uma vez.
+ */
+export type AlvoDaDenuncia =
+  | "post"
+  | "perfil"
+  | "comentario"
+  | "pergunta"
+  | "mensagem"
+  | "story"
+  | "conversa";
 
 export type MotivoDaDenuncia = "assedio" | "saude" | "imagem" | "spam" | "outro";
 
@@ -109,4 +127,39 @@ export function reincidenciasPorPessoa(
     porAlvo.get(l.denunciadaId)!.add(l.quemId);
   }
   return new Map([...porAlvo].map(([id, quem]) => [id, quem.size]));
+}
+
+/**
+ * O QUE FOI DENUNCIADO, em uma palavra — para a fila da plataforma.
+ *
+ * ⚠️ **A FILA DIZIA "publicação" PARA TUDO QUE NÃO FOSSE PERFIL.** O rótulo era
+ * `d.alvo === "perfil" ? "perfil" : "publicação"`, escrito quando só existiam
+ * esses dois alvos — e depois a rede ganhou comentário, pergunta, story,
+ * mensagem e conversa. Uma denúncia de MENSAGEM PRIVADA, que é onde o assédio
+ * de verdade acontece, chegava ao administrador como "publicação": ele iria
+ * procurar um post público, não acharia nada, e descartaria.
+ *
+ * ⚠️ **Desconhecido devolve o próprio valor**, nunca "publicação": um alvo novo
+ * mal rotulado é ruído; um alvo novo rotulado como OUTRA COISA é o defeito de
+ * novo, com outro nome.
+ */
+export function rotuloDoAlvo(alvo: string): string {
+  switch (alvo) {
+    case "perfil":
+      return "perfil";
+    case "post":
+      return "publicação";
+    case "comentario":
+      return "comentário";
+    case "pergunta":
+      return "pergunta";
+    case "story":
+      return "story";
+    case "mensagem":
+      return "mensagem privada";
+    case "conversa":
+      return "conversa privada";
+    default:
+      return alvo;
+  }
 }
