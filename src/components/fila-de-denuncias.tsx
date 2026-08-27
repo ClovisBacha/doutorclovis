@@ -1,6 +1,21 @@
 import { useEffect, useState } from "react";
 import type { DenunciaNaFila } from "@/lib/caixinha.functions";
-import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo } from "@/lib/denuncias";
+
+/**
+ * O DADO DE BANCADA.
+ *
+ * ⚠️ **A fila de moderação nunca teve bancada**, e é a tela de maior
+ * consequência do painel: ela decide o que sai do ar e o que volta para quem
+ * denunciou. Olhá-la exigia uma denúncia de verdade, feita por outra conta,
+ * numa base com ADMIN_EMAILS configurado — ou seja, ninguém olhava.
+ */
+export type BancadaDaFila = {
+  rede?: DenunciaDaRede[];
+  caixinha?: DenunciaNaFila[];
+  /** O estado que mais importa: "não consegui ler" NÃO é "está tudo limpo". */
+  falhou?: boolean;
+};
+import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo, PODE_REMOVER } from "@/lib/denuncias";
 
 /**
  * A FILA DE DENÚNCIAS DA CAIXINHA.
@@ -21,10 +36,12 @@ import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo } from "@/lib/denunci
  * primeira vez que alguém o colar numa consulta. O servidor conta a
  * reincidência e o id morre lá.
  */
-function FilaDaCaixinha() {
-  const [fila, setFila] = useState<DenunciaNaFila[]>([]);
-  const [falhou, setFalhou] = useState(false);
+function FilaDaCaixinha({ bancada }: { bancada?: BancadaDaFila }) {
+  const [fila, setFila] = useState<DenunciaNaFila[]>(bancada?.caixinha ?? []);
+  const [falhou, setFalhou] = useState(!!bancada?.falhou);
   const [indo, setIndo] = useState<string | null>(null);
+
+  const ehBancada = !!bancada;
 
   async function carregar() {
     try {
@@ -49,8 +66,12 @@ function FilaDaCaixinha() {
   }
 
   useEffect(() => {
+    /* ⚠️ A bancada injeta o DADO nos mesmos `useState` da produção — nunca o
+       desenho — e segura só a BUSCA, que exige sessão de administrador. É a
+       régua do `?streak=41` da folha da chama. */
+    if (ehBancada) return;
     void carregar();
-  }, []);
+  }, [ehBancada]);
 
   async function resolver(id: string) {
     setIndo(id);
@@ -129,10 +150,13 @@ function FilaDaCaixinha() {
  * apertou o botão só abriria caminho para retaliação, e num app onde as pessoas
  * se conhecem da vida real isso é concreto.
  */
-function FilaDaRede() {
-  const [fila, setFila] = useState<DenunciaDaRede[]>([]);
-  const [falhou, setFalhou] = useState(false);
+function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
+  const [fila, setFila] = useState<DenunciaDaRede[]>(bancada?.rede ?? []);
+  const [falhou, setFalhou] = useState(!!bancada?.falhou);
   const [indo, setIndo] = useState<string | null>(null);
+  const [recado, setRecado] = useState<string | null>(null);
+
+  const ehBancada = !!bancada;
 
   async function carregar() {
     try {
@@ -156,19 +180,44 @@ function FilaDaRede() {
   }
 
   useEffect(() => {
+    /* ⚠️ A bancada injeta o DADO nos mesmos `useState` da produção — nunca o
+       desenho — e segura só a BUSCA, que exige sessão de administrador. É a
+       régua do `?streak=41` da folha da chama. */
+    if (ehBancada) return;
     void carregar();
-  }, []);
+  }, [ehBancada]);
 
-  async function resolver(id: string) {
+  /**
+   * ⚠️ **O DESFECHO ERA NUNCA MANDADO.** O servidor aceita
+   * `removido | avisado | sem_acao` e a tela chamava sem nenhum — então toda
+   * denúncia era resolvida como "sem ação", e a tela "Suas denúncias" da
+   * paciente dizia "ainda não olhamos" para sempre. O ciclo que a plataforma
+   * promete fechar não fechava.
+   */
+  async function resolver(id: string, desfecho: "removido" | "avisado" | "sem_acao") {
     setIndo(id);
+    setRecado(null);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const s = await supabase.auth.getSession();
       const t = s.data.session?.access_token;
       if (!t) return;
       const { resolverDenunciaDaRede } = await import("@/lib/rede-social.functions");
-      const r = await resolverDenunciaDaRede({ data: { accessToken: t, denunciaId: id } });
-      if (r.ok) setFila((f) => f.filter((d) => d.id !== id));
+      const r = await resolverDenunciaDaRede({
+        data: { accessToken: t, denunciaId: id, desfecho },
+      });
+      if (r.ok) {
+        setFila((f) => f.filter((d) => d.id !== id));
+        return;
+      }
+      /* ⚠️ **Um desfecho que não corresponde ao que aconteceu é pior que
+         nenhum.** Se a baixa falhou, a linha FICA na fila e o administrador
+         sabe — nada é marcado como resolvido. */
+      setRecado(
+        r.motivo === "nao_removivel"
+          ? "Não há publicação a remover neste alvo — use “avisar” ou “sem ação”."
+          : "Não deu para registrar agora. A denúncia continua na fila.",
+      );
     } finally {
       setIndo(null);
     }
@@ -224,18 +273,44 @@ function FilaDaRede() {
                   ? `${d.reincidencias} pessoas diferentes já denunciaram esta conta`
                   : "1ª denúncia desta conta"}
               </span>
-              <button
-                type="button"
-                disabled={indo === d.id}
-                onClick={() => void resolver(d.id)}
-                className="press shrink-0 rounded-xl border border-border px-3 py-1.5 text-[12px] font-medium disabled:opacity-50"
-              >
-                {indo === d.id ? "…" : "Já olhei"}
-              </button>
+              {/* ⚠️ **TRÊS SAÍDAS, e não um "Já olhei".** O desfecho volta para
+                  quem denunciou — era a metade do ciclo que a plataforma promete
+                  e não entregava. E "Remover" só aparece onde HÁ publicação a
+                  tirar do ar: num perfil, numa pergunta ou numa mensagem não há,
+                  e um botão que promete o que não faz é pior que a ausência. */}
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+                {PODE_REMOVER.includes(d.alvo) && (
+                  <button
+                    type="button"
+                    disabled={indo === d.id}
+                    onClick={() => void resolver(d.id, "removido")}
+                    className="press min-h-[38px] rounded-xl bg-destructive px-3 py-1.5 text-[12px] font-semibold text-destructive-foreground disabled:opacity-50"
+                  >
+                    {indo === d.id ? "…" : "Remover"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  disabled={indo === d.id}
+                  onClick={() => void resolver(d.id, "avisado")}
+                  className="press min-h-[38px] rounded-xl border border-border px-3 py-1.5 text-[12px] font-medium disabled:opacity-50"
+                >
+                  Avisar
+                </button>
+                <button
+                  type="button"
+                  disabled={indo === d.id}
+                  onClick={() => void resolver(d.id, "sem_acao")}
+                  className="press min-h-[38px] rounded-xl border border-border px-3 py-1.5 text-[12px] font-medium text-muted-foreground disabled:opacity-50"
+                >
+                  Sem ação
+                </button>
+              </div>
             </div>
           </li>
         ))}
       </ul>
+      {recado && <p className="mt-2 text-[12px] text-destructive">{recado}</p>}
     </div>
   );
 }
@@ -248,11 +323,11 @@ function FilaDaRede() {
  * obrigaria a tela a esconder o nome de metade das linhas sem explicar por quê
  * — ou, pior, a revelar o de quem escreveu na caixinha.
  */
-export function FilaDeDenuncias() {
+export function FilaDeDenuncias({ bancada }: { bancada?: BancadaDaFila } = {}) {
   return (
     <>
-      <FilaDaRede />
-      <FilaDaCaixinha />
+      <FilaDaRede bancada={bancada} />
+      <FilaDaCaixinha bancada={bancada} />
     </>
   );
 }

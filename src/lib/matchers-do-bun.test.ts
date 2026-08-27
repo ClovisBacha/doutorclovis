@@ -25,7 +25,10 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 /** Os que o `tsc` da CI recusa. Cada entrada nasceu de uma quebra real. */
-const PROIBIDOS = ["toMatchObject"];
+/* ⚠️ `toBeDefined` entrou depois de o `tsc` reprovar um teste meu com
+   "Property 'toBeDefined' does not exist on type 'Matchers'" — a mesma classe
+   do `toMatchObject`. Use `not.toBeUndefined()`. */
+const PROIBIDOS = ["toMatchObject", "toBeDefined"];
 
 function testes(dir: string, achados: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {

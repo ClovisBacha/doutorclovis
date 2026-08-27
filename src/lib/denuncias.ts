@@ -163,3 +163,42 @@ export function rotuloDoAlvo(alvo: string): string {
       return alvo;
   }
 }
+
+/**
+ * OS ALVOS QUE TÊM PUBLICAÇÃO A TIRAR DO AR.
+ *
+ * ⚠️ **Perfil, pergunta, mensagem e conversa NÃO se "removem".** Não há nada a
+ * arquivar: a denúncia de um perfil é sobre a conta, e a de uma mensagem é
+ * sobre uma conversa privada entre duas pessoas. Oferecer "Remover" nesses
+ * casos seria um botão que promete o que não faz — e o desfecho "A publicação
+ * saiu do ar" voltaria para quem denunciou sobre coisa nenhuma.
+ */
+/**
+ * ONDE MORA CADA ALVO REMOVÍVEL, e com que coluna se dá baixa.
+ *
+ * ⚠️ **É DADO, e mora aqui de propósito.** A fila da rede vive em
+ * `rede-social.functions.ts`, e esse arquivo tem uma regra própria: **ele não
+ * conhece comentário** (`rede_comentarios` mora em `comentarios.*`, com régua
+ * de triagem própria). Escrever o nome da tabela lá dentro quebra essa
+ * separação — e o teste que a guarda pegou na hora.
+ *
+ * ⚠️ **Alvo novo removível entra AQUI e em `PODE_REMOVER`**, nunca num `if` no
+ * meio do handler: dois lugares decidindo o que é removível divergem, e a
+ * divergência aparece como um botão "Remover" que não remove.
+ */
+export const BAIXA_DO_ALVO: Readonly<Record<string, { tabela: string; coluna: string }>> = {
+  post: { tabela: "rede_posts", coluna: "arquivado_em" },
+  story: { tabela: "rede_stories", coluna: "arquivado_em" },
+  comentario: { tabela: "rede_comentarios", coluna: "apagado_em" },
+};
+
+/**
+ * OS ALVOS QUE TÊM PUBLICAÇÃO A TIRAR DO AR.
+ *
+ * ⚠️ **Perfil, pergunta, mensagem e conversa NÃO se "removem".** Não há nada a
+ * arquivar: a denúncia de um perfil é sobre a CONTA, e a de uma mensagem é
+ * sobre uma conversa privada entre duas pessoas. Oferecer "Remover" nesses
+ * casos seria um botão que promete o que não faz — e o desfecho "A publicação
+ * saiu do ar" voltaria para quem denunciou sobre coisa nenhuma.
+ */
+export const PODE_REMOVER: readonly string[] = Object.keys(BAIXA_DO_ALVO);

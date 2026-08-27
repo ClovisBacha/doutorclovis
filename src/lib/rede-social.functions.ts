@@ -7829,6 +7829,52 @@ export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
        reincidência da conta. Apagar faria a quinta denúncia parecer a
        primeira. */
     const agora = new Date().toISOString();
+
+    /* ─── "REMOVIDO" TEM DE REMOVER ──────────────────────────────────────────
+     *
+     * ⚠️ **O desfecho volta para quem denunciou.** Dizer "A publicação saiu do
+     * ar" sem tirá-la do ar seria a plataforma mentindo para quem confiou nela
+     * — e a paciente veria, no feed, a mesma publicação que o app acabou de
+     * dizer que removeu.
+     *
+     * ⚠️ **ARQUIVA, nunca APAGA.** É a mesma decisão que o produto já tomou
+     * para a autora ("arquivado, nunca apagado, porque as reações apontam para
+     * ele"), e aqui ela vale duas vezes: uma remoção por engano tem de ser
+     * desfazível, e a linha da denúncia continua apontando para o alvo.
+     *
+     * ⚠️ **Falhar em remover NÃO pode virar "removido".** Se a baixa não
+     * acontece, o desfecho gravado é `sem_acao` e o administrador recebe erro:
+     * um desfecho que não corresponde ao que aconteceu é pior que nenhum,
+     * porque quem denunciou para de olhar. */
+    const desfecho = data.desfecho ?? "sem_acao";
+    if (desfecho === "removido") {
+      const { data: d } = await sb
+        .from("rede_denuncias")
+        .select("alvo, alvo_id")
+        .eq("id", data.denunciaId)
+        .maybeSingle();
+      const alvo = (d as { alvo?: string } | null)?.alvo;
+      const alvoId = (d as { alvo_id?: string } | null)?.alvo_id;
+      /* ⚠️ O mapa é DADO e mora em `denuncias.ts`: este arquivo não conhece
+         comentário (há teste), e escrever o nome da tabela aqui quebraria a
+         separação que mantém a régua de triagem em `comentarios.*`. */
+      const { BAIXA_DO_ALVO } = await import("@/lib/denuncias");
+      const baixa = alvo ? (BAIXA_DO_ALVO[alvo] ?? null) : null;
+      if (!baixa || !alvoId) {
+        /* ⚠️ Perfil, pergunta, mensagem e conversa NÃO se "removem": não há
+           publicação a tirar do ar. Para eles o desfecho honesto é "avisado" ou
+           "sem ação", e a tela não oferece "remover". */
+        return { ok: false as const, motivo: "nao_removivel" as const };
+      }
+      const { error: erroBaixa } = await sb
+        .from(baixa.tabela)
+        .update({ [baixa.coluna]: agora })
+        .eq("id", alvoId);
+      if (erroBaixa) {
+        console.error("[rede] não removeu o alvo da denúncia", erroBaixa);
+        return { ok: false as const, motivo: "banco" as const };
+      }
+    }
     /* ⚠️ **O DESFECHO É UM DEGRAU PRÓPRIO.** A coluna nasce no
        `APLICAR_MAIS_DA_REDE.sql`, que o dono roda à mão, e o deploy chega
        antes: sem o recuo, RESOLVER uma denúncia pararia de funcionar — um
@@ -7836,7 +7882,7 @@ export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
        defeito deste repositório. */
     let { error } = await sb
       .from("rede_denuncias")
-      .update({ resolvido_em: agora, desfecho: data.desfecho ?? "sem_acao" })
+      .update({ resolvido_em: agora, desfecho })
       .eq("id", data.denunciaId);
     if (error) {
       console.warn("[rede] denúncia sem desfecho — rode APLICAR_MAIS_DA_REDE.sql");

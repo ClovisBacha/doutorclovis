@@ -483,6 +483,40 @@ function PainelPage() {
     const novo = sosPendentes.find((a) => !sosAdiados.has(a.id));
     if (novo) setSosAberto(novo);
   }, [sosPendentes, sosAdiados, sosAberto]);
+  /**
+   * ⚠️ **A FILA DE MODERAÇÃO NÃO TINHA CONTADOR EM LUGAR NENHUM.** Ela vive
+   * dentro da aba de entrada, então quem estivesse noutra aba não tinha como
+   * saber que ela cresceu — e uma denúncia de risco clínico pode esperar
+   * semanas sem nada apitar.
+   *
+   * ⚠️ **A busca é PRÓPRIA e independente da aba**: `FilaDeDenuncias` é
+   * desmontada ao trocar de aba, então pendurar o número nela deixaria a fita
+   * mostrando zero exatamente quando ele precisa do aviso.
+   *
+   * ⚠️ **`null` (não consegui contar) NÃO vira 0.** Zero AFIRMA que a fila está
+   * limpa, e é a frase mais perigosa que um painel de moderação pode dizer
+   * errado — a fita simplesmente não desenha número nenhum.
+   */
+  const [denunciasAbertas, setDenunciasAbertas] = useState<number | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const ses = await supabase.auth.getSession();
+        const t = ses.data.session?.access_token;
+        if (!t) return;
+        const { contarDenunciasAbertas } = await import("@/lib/moderacao.functions");
+        const r = await contarDenunciasAbertas({ data: { accessToken: t } });
+        if (vivo && r.ok) setDenunciasAbertas(r.total);
+      } catch {
+        /* Sem número: a fita não desenha nada. Ver o comentário acima. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [privateConsults, setPrivateConsults] = useState<any[]>([]);
   const [engagement, setEngagement] = useState<{
@@ -887,6 +921,7 @@ function PainelPage() {
      não há trabalho. */
   const pendingQs = pendingExato ?? questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
+
   const novasPacientes = pedidosVinculo.length;
   const sosNaoAtendidos = sosPendentes.length;
 
@@ -1149,6 +1184,9 @@ function PainelPage() {
              revelá-lo. */
           "Pacientes 👩‍🍼": novasPacientes + unseenForms,
           Perguntas: pendingQs,
+          /* A fila de moderação mora DENTRO do Painel, que é a aba de entrada —
+             o número na fita é o que chama quem está noutra aba. */
+          "Painel 📊": denunciasAbertas ?? 0,
           /* Salas abertas contam para a AGENDA: "Teleconsultas" deixou de
              ser aba e virou seção do calendário. */
           Calendário: teleconsultas.filter((s) => s.status === "sala_aberta").length,
