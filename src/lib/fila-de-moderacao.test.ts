@@ -164,3 +164,82 @@ describe("⚠️ os rótulos da fila", () => {
     }
   });
 });
+
+/**
+ * ⚠️ O CONTROLE DO ADMIN, E A LINHA QUE ELE NÃO ATRAVESSA.
+ *
+ * A tentação óbvia ao "dar mais controle de dados" é uma tela com tudo que a
+ * paciente publicou. Seria fácil, e transformaria moderação em VIGILÂNCIA — a
+ * Comunidade é onde ela escreve para o público que ELA escolheu.
+ *
+ * A régua: o admin vê **o que foi denunciado** (e que ele já veria na fila),
+ * **o estado da conta** e **contagens**. Nada mais.
+ */
+describe("⚠️ a ficha de moderação não vira vigilância", () => {
+  const M = semProsa("src/lib/moderacao.functions.ts");
+  const i = M.indexOf("export const fichaDeModeracao");
+  const corpo = M.slice(i, M.indexOf("\nexport const", i + 10));
+
+  test("ela lê `rede_denuncias` recortada pela conta, e o PERFIL só pelo estado", () => {
+    expect(i).toBeGreaterThan(0);
+    expect(corpo).toContain('eq("denunciada_id", data.contaId)');
+    expect(corpo).toContain("patient_profiles");
+  });
+
+  test("⚠️ NÃO lê as publicações, os stories nem as mensagens da paciente", () => {
+    for (const t of ["rede_posts", "rede_stories", "rede_mensagens", "rede_comentarios"]) {
+      expect(`ficha lê ${t}`).toBe(corpo.includes(t) ? `ficha NÃO pode ler ${t}` : `ficha lê ${t}`);
+    }
+  });
+
+  test("⚠️ e o select do perfil não traz bio, foto nem semana", () => {
+    const j = corpo.indexOf("patient_profiles");
+    const sel = corpo.slice(j, j + 300);
+    for (const c of ["bio", "avatar_url", "lmp_date", "baby_name"]) {
+      expect(`select traz ${c}`).toBe(
+        sel.includes(c) ? `select NÃO pode trazer ${c}` : `select traz ${c}`,
+      );
+    }
+  });
+
+  test("⚠️ a tela diz o que NÃO está ali", () => {
+    const T = readFileSync("src/components/fila-de-denuncias.tsx", "utf8");
+    expect(T).toContain("O que ninguém denunciou não aparece aqui");
+  });
+
+  test("⚠️ falha ao abrir a ficha vira recado, e nunca ficha vazia", () => {
+    const T = semProsa("src/components/fila-de-denuncias.tsx");
+    const j = T.indexOf("async function verFicha(");
+    const c = T.slice(j, T.indexOf("\n  }", j));
+    expect(c).toMatch(/if \(r\.ok\)/);
+    expect(c).toContain("setRecado");
+  });
+});
+
+describe("⚠️ os números da Comunidade", () => {
+  const M = semProsa("src/lib/moderacao.functions.ts");
+  const i = M.indexOf("export const numerosDaComunidade");
+  const corpo = M.slice(i);
+
+  test("conta sem trazer conteúdo", () => {
+    expect(i).toBeGreaterThan(0);
+    const heads = (corpo.match(/head: true/g) ?? []).length;
+    expect(heads).toBeGreaterThanOrEqual(6);
+  });
+
+  test("⚠️ ilegível vira `null`, e a tela desenha “—” em vez de 0", () => {
+    expect(corpo).toContain("return null");
+    const T = semProsa("src/components/numeros-da-comunidade.tsx");
+    expect(T).toMatch(/x === null \? "—"/);
+  });
+
+  test("⚠️ só as DENÚNCIAS são alerta quando sobem", () => {
+    /* Os outros cinco são bons quando crescem; pintar todos igual ensinaria a
+       não olhar nenhum. */
+    const T = semProsa("src/components/numeros-da-comunidade.tsx");
+    const j = T.indexOf("alerta={");
+    expect(j).toBeGreaterThan(0);
+    expect(T.slice(j, j + 120)).toContain("denunciasNaSemana");
+    expect((T.match(/alerta=\{/g) ?? []).length).toBe(1);
+  });
+});

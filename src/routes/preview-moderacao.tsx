@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
 
 /**
  * BANCADA DA FILA DE MODERAÇÃO.
@@ -14,6 +15,9 @@ import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
  *                                    ler. "Está tudo limpo" é a frase mais
  *                                    perigosa que uma fila pode dizer errado.
  *   /preview-moderacao?vazio=1    → nada a olhar
+ *   /preview-moderacao?ficha=1    → a ficha de moderação de uma conta
+ *   /preview-moderacao?instavel=1 → ⚠️ os números ilegíveis: "—", nunca 0.
+ *                                    Zero AFIRMA que a aba morreu.
  *
  * ⚠️ As datas são CRAVADAS, nunca `Date.now()`: servidor e cliente calculariam
  * instantes diferentes e o texto derivado divergiria na virada do minuto — o
@@ -23,6 +27,8 @@ export const Route = createFileRoute("/preview-moderacao")({
   component: Pagina,
   validateSearch: (q: Record<string, unknown>) => ({
     falhou: q.falhou == null ? 0 : Number(q.falhou),
+    instavel: q.instavel == null ? 0 : Number(q.instavel),
+    ficha: q.ficha == null ? 0 : Number(q.ficha),
     vazio: q.vazio == null ? 0 : Number(q.vazio),
   }),
 });
@@ -89,16 +95,91 @@ const CAIXINHA = [
 ];
 
 function Pagina() {
-  const { falhou, vazio } = Route.useSearch();
+  const { falhou, vazio, instavel, ficha } = Route.useSearch();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <h1 className="text-[15px] font-semibold">Bancada · fila de moderação</h1>
       <p className="mt-1 text-[12px] text-muted-foreground">
         ?falhou=1 · ?vazio=1 — a tela real do painel, com dado fabricado.
       </p>
+      {/* ⚠️ Os números entram na MESMA bancada: eles moram ao lado da fila no
+          painel, e olhar um sem o outro esconde a relação entre "a aba está
+          movimentada" e "a fila cresceu". */}
+      <NumerosDaComunidade
+        bancada={
+          instavel === 1
+            ? {
+                publicacoes: null,
+                publicacoesNaSemana: null,
+                storiesNaSemana: null,
+                comentariosNaSemana: null,
+                perfisPublicos: null,
+                denunciasNaSemana: null,
+              }
+            : {
+                publicacoes: 1284,
+                publicacoesNaSemana: 37,
+                storiesNaSemana: 62,
+                comentariosNaSemana: 118,
+                perfisPublicos: 214,
+                denunciasNaSemana: vazio === 1 ? 0 : 6,
+              }
+        }
+      />
+
       <FilaDeDenuncias
         bancada={{
           falhou: falhou === 1,
+          /* ⚠️ A ficha vem do servidor — sem injetá-la aqui ela nunca desenha,
+             e a bancada aprovaria uma fila sem o histórico que decide entre
+             "avisar" e "remover". */
+          ficha:
+            ficha === 1
+              ? {
+                  nome: "Ana Paula",
+                  emCuidado: false,
+                  pausada: false,
+                  publica: true,
+                  desde: "2026-03-14T10:00:00Z",
+                  abertas: 1,
+                  total: 4,
+                  porDesfecho: { removido: 1, avisado: 1, sem_acao: 1 },
+                  historico: [
+                    {
+                      alvo: "comentario",
+                      motivo: "saude",
+                      trecho: "comigo foi assim, não precisa ir no pronto-socorro",
+                      quando: "2026-08-26T21:00:00Z",
+                      desfecho: null,
+                      resolvida: false,
+                    },
+                    {
+                      alvo: "post",
+                      motivo: "saude",
+                      trecho: "parei o remédio por conta e melhorou",
+                      quando: "2026-08-12T10:00:00Z",
+                      desfecho: "removido",
+                      resolvida: true,
+                    },
+                    {
+                      alvo: "comentario",
+                      motivo: "outro",
+                      trecho: "que exagero, isso é normal",
+                      quando: "2026-07-30T10:00:00Z",
+                      desfecho: "avisado",
+                      resolvida: true,
+                    },
+                    {
+                      alvo: "perfil",
+                      motivo: "spam",
+                      trecho: null,
+                      quando: "2026-07-02T10:00:00Z",
+                      desfecho: "sem_acao",
+                      resolvida: true,
+                    },
+                  ],
+                }
+              : undefined,
           rede: vazio === 1 || falhou === 1 ? [] : (REDE as never),
           caixinha: vazio === 1 || falhou === 1 ? [] : (CAIXINHA as never),
         }}

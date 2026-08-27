@@ -65,6 +65,7 @@ import {
 } from "@/lib/abas-da-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
 import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
 import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
   ESTILO_SINAL,
@@ -1267,6 +1268,11 @@ function PainelPage() {
               ver o cabeçalho do componente. E o lugar é este porque a fila de
               trabalho é onde mora "o que ainda precisa dele". */}
           <FilaDeDenuncias />
+
+          {/* ⚠️ A aba mais movimentada do app não tinha NENHUM número aqui: o
+              dono não tinha como responder "ela está viva?" sem abrir o app de
+              uma paciente, e uma aba social que esfria esfria em silêncio. */}
+          <NumerosDaComunidade />
         </div>
       )}
 

@@ -9,11 +9,32 @@ import type { DenunciaNaFila } from "@/lib/caixinha.functions";
  * denunciou. Olhá-la exigia uma denúncia de verdade, feita por outra conta,
  * numa base com ADMIN_EMAILS configurado — ou seja, ninguém olhava.
  */
+export type FichaDeModeracao = {
+  nome: string;
+  emCuidado: boolean;
+  pausada: boolean;
+  publica: boolean;
+  desde: string | null;
+  abertas: number;
+  total: number;
+  porDesfecho: { removido: number; avisado: number; sem_acao: number };
+  historico: {
+    alvo: string;
+    motivo: string;
+    trecho: string | null;
+    quando: string;
+    desfecho: string | null;
+    resolvida: boolean;
+  }[];
+};
+
 export type BancadaDaFila = {
   rede?: DenunciaDaRede[];
   caixinha?: DenunciaNaFila[];
   /** O estado que mais importa: "não consegui ler" NÃO é "está tudo limpo". */
   falhou?: boolean;
+  /** ⚠️ A ficha vem do servidor: sem isto ela nunca desenha na bancada. */
+  ficha?: FichaDeModeracao;
 };
 import { rotuloDoMotivo, type DenunciaDaRede, rotuloDoAlvo, PODE_REMOVER } from "@/lib/denuncias";
 
@@ -155,6 +176,37 @@ function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
   const [falhou, setFalhou] = useState(!!bancada?.falhou);
   const [indo, setIndo] = useState<string | null>(null);
   const [recado, setRecado] = useState<string | null>(null);
+  /**
+   * A FICHA DE MODERAÇÃO DA CONTA ABERTA.
+   *
+   * ⚠️ **Decidir "avisar" ou "remover" sem histórico é decidir às cegas.** A
+   * fila mostra UMA linha, e a mesma conta pode ter cinco resolvidas na semana
+   * passada. A reincidência já vinha como número; a ficha diz o que aconteceu.
+   */
+  const [ficha, setFicha] = useState<FichaDeModeracao | null>(bancada?.ficha ?? null);
+  const [abrindoFicha, setAbrindoFicha] = useState<string | null>(null);
+
+  async function verFicha(contaId: string) {
+    setAbrindoFicha(contaId);
+    setFicha(null);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const ses = await supabase.auth.getSession();
+      const t = ses.data.session?.access_token;
+      if (!t) return;
+      const { fichaDeModeracao } = await import("@/lib/moderacao.functions");
+      const r = await fichaDeModeracao({ data: { accessToken: t, contaId } });
+      /* ⚠️ Falha vira recado, nunca uma ficha vazia: "esta conta nunca foi
+         denunciada" sobre uma leitura que falhou muda a decisão do
+         administrador para o lado errado. */
+      if (r.ok) setFicha(r.ficha as FichaDeModeracao);
+      else setRecado("Não deu para abrir a ficha desta conta agora.");
+    } catch {
+      setRecado("Não deu para abrir a ficha desta conta agora.");
+    } finally {
+      setAbrindoFicha(null);
+    }
+  }
 
   const ehBancada = !!bancada;
 
@@ -271,7 +323,15 @@ function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
               <span className="text-[12px] text-muted-foreground">
                 {d.reincidencias > 1
                   ? `${d.reincidencias} pessoas diferentes já denunciaram esta conta`
-                  : "1ª denúncia desta conta"}
+                  : "1ª denúncia desta conta"}{" "}
+                <button
+                  type="button"
+                  disabled={abrindoFicha === d.denunciadaId}
+                  onClick={() => void verFicha(d.denunciadaId)}
+                  className="press underline underline-offset-2 disabled:opacity-50"
+                >
+                  {abrindoFicha === d.denunciadaId ? "abrindo…" : "ver ficha"}
+                </button>
               </span>
               {/* ⚠️ **TRÊS SAÍDAS, e não um "Já olhei".** O desfecho volta para
                   quem denunciou — era a metade do ciclo que a plataforma promete
@@ -310,6 +370,7 @@ function FilaDaRede({ bancada }: { bancada?: BancadaDaFila }) {
           </li>
         ))}
       </ul>
+      {ficha && <PainelDaFicha ficha={ficha} aoFechar={() => setFicha(null)} />}
       {recado && <p className="mt-2 text-[12px] text-destructive">{recado}</p>}
     </div>
   );
@@ -329,5 +390,90 @@ export function FilaDeDenuncias({ bancada }: { bancada?: BancadaDaFila } = {}) {
       <FilaDaRede bancada={bancada} />
       <FilaDaCaixinha bancada={bancada} />
     </>
+  );
+}
+
+/**
+ * A FICHA DE UMA CONTA — o histórico que a fila não mostra.
+ *
+ * ⚠️ **Ela NÃO lista o que a paciente publicou.** Só o que já foi denunciado (e
+ * portanto já passou pela fila), mais o estado da conta e as contagens. A
+ * Comunidade é onde ela escreve para o público que ELA escolheu; ler o que
+ * ninguém denunciou seria transformar moderação em vigilância.
+ */
+function PainelDaFicha({ ficha, aoFechar }: { ficha: FichaDeModeracao; aoFechar: () => void }) {
+  const dia = (iso: string | null) =>
+    iso
+      ? new Date(iso).toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        })
+      : "—";
+  return (
+    <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[14px] font-semibold">{ficha.nome}</p>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            Na plataforma desde {dia(ficha.desde)} · {ficha.total} denúncia
+            {ficha.total === 1 ? "" : "s"} no total, {ficha.abertas} em aberto
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={aoFechar}
+          aria-label="Fechar ficha"
+          className="press -mr-1 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center text-lg leading-none text-muted-foreground"
+        >
+          ×
+        </button>
+      </div>
+
+      {/* ⚠️ O ESTADO DA CONTA MUDA A DECISÃO. Uma conta em Modo Cuidado já está
+          fora da rede — suspender seria punir quem acabou de perder a gestação;
+          e uma conta pausada já não aparece para ninguém. */}
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {ficha.emCuidado && (
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+            Modo Cuidado — já está fora da rede
+          </span>
+        )}
+        {ficha.pausada && (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+            conta pausada por ela
+          </span>
+        )}
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+          perfil {ficha.publica ? "público" : "privado"}
+        </span>
+      </div>
+
+      <p className="mt-2 text-[12px] text-muted-foreground">
+        Já resolvidas: {ficha.porDesfecho.removido} removida
+        {ficha.porDesfecho.removido === 1 ? "" : "s"} · {ficha.porDesfecho.avisado} avisada
+        {ficha.porDesfecho.avisado === 1 ? "" : "s"} · {ficha.porDesfecho.sem_acao} sem ação
+      </p>
+
+      {ficha.historico.length > 0 && (
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {ficha.historico.map((h, i) => (
+            <li key={`${h.quando}-${i}`} className="rounded-lg bg-background/60 p-2">
+              <p className="text-[11px] text-muted-foreground">
+                {dia(h.quando)} · {rotuloDoAlvo(h.alvo)} · {rotuloDoMotivo(h.motivo)} ·{" "}
+                {h.resolvida ? (h.desfecho ?? "resolvida") : "em aberto"}
+              </p>
+              {h.trecho && <p className="mt-0.5 text-[12px] leading-snug">{h.trecho}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* ⚠️ A frase existe para o administrador não procurar o que não está
+          aqui — e para deixar registrado que a ausência é decisão, não falta. */}
+      <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+        Esta ficha mostra só o que foi denunciado. O que ninguém denunciou não aparece aqui.
+      </p>
+    </div>
   );
 }
