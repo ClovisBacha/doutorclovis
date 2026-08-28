@@ -11636,3 +11636,77 @@ muitas · vazio · degradado · falhou · carregando` · `/preview-nps?fase=…&
 
 **Medido ao fim:** 5.406 testes · 112 bancadas · 11 roteiros de interação · zero
 problemas.
+
+### ⚠️ A varredura da falha aberta: SETE numa noite, e a régua que as separa
+
+A classe apareceu tantas vezes que virou varredura mecânica da forma exata
+(`const { count } = await` e `const { data } = await` sem o `error`). **Treze
+sítios de contagem no `src/` inteiro; onze são NÚMERO INFORMATIVO** — quatro
+deles já dizem isso no próprio comentário ("contagem é informativa — não derruba
+o perfil"). Mexer nos onze seria churn.
+
+⚠️ **A régua de triagem NÃO é "o erro foi olhado?".** É:
+**"se esta leitura voltar vazia, alguma coisa fica mais PERMITIDA?"**
+
+As sete que ficam:
+
+| onde                                  | o que a falha permitia                                       |
+| ------------------------------------- | ------------------------------------------------------------ |
+| vaga corporativa                      | uma vaga acima do contrato — acesso pago que ninguém comprou |
+| cupom da plataforma                   | resgate acima de `max_redemptions`                           |
+| cota de convites Premium              | um ano de acesso grátis por clique                           |
+| teto diário de convites (amigas)      | o campo de e-mail virando ferramenta de spam                 |
+| mesada da criadora                    | distribuir sem teto enquanto a leitura não voltasse          |
+| arquivar item do chá                  | apagar um item por cima de uma reserva viva                  |
+| **interruptor de emergência do dono** | **o kill switch ficando inoperante**                         |
+
+⚠️ **O do kill switch é o mais fino, e o pior.** A ausência de linha vale
+"ligado" — certo, uma feature nova não pode quebrar num banco atrás das
+migrations. O defeito era tratar **falha de leitura** como ausência e **GRAVAR
+essa falha no cache por trinta segundos**: o dono desliga algo que está causando
+dano, o banco oscila, e cada expiração re-grava a mesma mentira. Hoje a tabela
+ausente continua valendo "ligado" e é cacheada; qualquer outro erro **serve o
+último valor conhecido e não escreve no cache**.
+
+⚠️ **E cada falha ganhou TEXTO PRÓPRIO.** "Limite de vagas atingido", "alguém já
+reservou", "tente de novo amanhã", "o seu bolso acabou" — todas eram a frase da
+recusa LEGÍTIMA, ditas sobre uma leitura que falhou. Cada uma faz a pessoa parar
+de tentar por um dia, um mês, ou de vez.
+
+### ⚠️ E o grupo avisava menos que a conversa de duas
+
+`enviarMensagem` (o direct 1-a-1) devolve `avisoClinico` quando a triagem
+reconhece conduta: manda a mensagem — não é papel do app censurar conversa
+privada entre adultas — e **lembra quem escreveu**. `mandarNoGrupo` rodava a
+MESMA `triarTexto`, recusava só a emergência, e jogava o resto fora.
+
+**O canal com UMA leitora avisava; o canal com até SETE, não.**
+
+⚠️ **E o conserto não é recusar.** Um grupo aqui é criado por uma pessoa, só com
+gente do grafo dela, teto de oito, leitura a partir de `entrou_em`: é conversa
+privada, não publicação. A catraca cobra os dois canais JUNTOS — se um dia o
+direct passar a recusar, ela fica vermelha e obriga a decidir os dois de uma vez.
+
+### ⚠️ Suspender e remover não deixavam rastro
+
+Trocar o plano de um médico, criar um cupom, publicar um comunicado — tudo grava
+em `audit_log`. **Tirar uma paciente da Comunidade, não.** Importa quando ela
+pergunta por que sumiu, quando é preciso reverter, e **numa disputa, onde a
+ausência de linha é lida como "a ação não aconteceu"** — que é o que o log existe
+para desmentir.
+
+### ⚠️ SEIS achados meus NÃO sobreviveram à conferência
+
+A suspensão já era reversível · a ficha já lia o motivo · o filtro de esconder
+story já era lido · a denúncia da caixinha já tinha fila própria no mesmo
+arquivo · o aviso clínico do direct já chegava à tela · e o `if (error) return`
+do `embeddings` já estava certo.
+
+⚠️ **Achado sem cético é hipótese.** Conferir custa minutos; acreditar custa
+mexer em código correto num app que está em produção. E a forma de conferir é
+sempre a mesma: **abrir o arquivo e ler a função certa** — o achado do grupo
+quase morreu porque `enviarMensagem` estava certa, e quem falhava era a função
+irmã.
+
+**Medido ao fim da noite:** 5.434 testes · 112 bancadas · 11 roteiros de
+interação · zero problemas.
