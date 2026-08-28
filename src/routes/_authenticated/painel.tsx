@@ -94,6 +94,7 @@ import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unifica
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
+import { EmissoesDaPaciente } from "@/components/emissoes-da-paciente";
 import { ConvitesDoMedico } from "@/components/convites-do-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
@@ -11468,6 +11469,10 @@ function AcoesDaPaciente({
   onIrParaAgenda?: () => void;
 }) {
   const [escolhendo, setEscolhendo] = useState<"exame" | "prescricao" | null>(null);
+  /* Sobe a cada emissão enviada: a lista do que ele já mandou relê na hora,
+     senão ele acabaria de emitir e continuaria vendo a lista de antes — e o
+     bloco existe justamente para impedir a segunda emissão. */
+  const [emitidas, setEmitidas] = useState(0);
   const [envio, setEnvio] = useState<{
     tipo: TipoDeEmissao;
     titulo: string;
@@ -11537,6 +11542,17 @@ function AcoesDaPaciente({
           </button>
         )}
       </div>
+      {/* ─── O QUE ELE JÁ EMITIU PARA ELA ───────────────────────────────────
+          ⚠️ `emissoesDaPaciente` existia inteira e sem chamador nenhum: ele
+          emitia, o documento chegava na aba dela, e do lado dele o rastro
+          sumia. Na consulta seguinte ele decidia o que pedir sem enxergar o
+          que ELE MESMO pediu no mês passado — exame repetido é agulha à toa,
+          receita repetida é dose dobrada.
+
+          Fica AQUI, ao lado dos botões que emitem, e não numa aba própria: é a
+          mesma decisão que tirou o receituário de aba e o pôs dentro do cartão
+          da paciente já escolhida. */}
+      <EmissoesDaPaciente pacienteId={p.id} tokenFn={tokenFn} recarregar={emitidas} />
 
       {/* ── Escolher o modelo ── */}
       {escolhendo && (
@@ -11615,7 +11631,15 @@ function AcoesDaPaciente({
           conteudoInicial={envio.conteudo}
           tokenFn={tokenFn}
           paciente={p}
-          onFechar={() => setEnvio(null)}
+          onFechar={() => {
+            setEnvio(null);
+            /* ⚠️ A releitura acontece no FECHAMENTO, e não só no sucesso: o
+               componente de envio chama `onFechar` nos dois casos, e o custo de
+               distinguir seria uma prop nova num componente compartilhado. Uma
+               leitura a mais quando ele cancela é mais barata que a lista ficar
+               velha depois de emitir — que é justamente quando ela importa. */
+            setEmitidas((n) => n + 1);
+          }}
         />
       )}
     </>

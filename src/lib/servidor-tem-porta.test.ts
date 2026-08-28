@@ -59,8 +59,6 @@ const DIVIDA_CONHECIDA: Record<string, string> = {
   submitNps: "idem — sem porta, ninguém responde",
   getMyAchievements: "a aba de conquistas usa outro caminho; esta ficou para trás",
   getCareMode: "o Modo Cuidado é lido do perfil em toda tela; esta é redundante",
-  emissoesDaPaciente:
-    "o médico não consegue ver o que ele mesmo receitou/pediu para aquela paciente",
 };
 
 function chamadoresNoApp(nome: string, modulo: string): string[] {

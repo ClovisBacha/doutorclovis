@@ -1150,7 +1150,19 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
     z.object({ accessToken: z.string().min(10), pacienteId: z.string().uuid() }).parse(i),
   )
   .handler(async ({ data }) => {
-    const vazio = { ok: true as const, emissoes: [] as Emissao[] };
+    /* ⚠️ **`degradado` EXISTE PORQUE LISTA VAZIA ERA UMA AFIRMAÇÃO.**
+     *
+     * `if (error) return vazio` fazia "não consegui ler" chegar à tela como
+     * "ele não emitiu nada para ela" — e a tela, com um `ok: true` na mão, não
+     * tinha como saber a diferença. Num cartão clínico isso vale uma receita
+     * repetida ou um exame pedido duas vezes, na consulta em que ele acabou de
+     * abrir a ficha dela para decidir.
+     *
+     * ⚠️ E o campo NÃO é `ok: false`: aquilo já quer dizer "não é sua paciente"
+     * ou "sessão inválida", e a tela responde a isso escondendo o bloco. Um
+     * booleano fazendo dois trabalhos é o defeito que a tela de assinatura já
+     * pagou aqui. */
+    const vazio = { ok: true as const, emissoes: [] as Emissao[], degradado: false };
     const user = await medicoDaSessao(data.accessToken);
     if (!user) return { ...vazio, ok: false as const };
     const pacientes = await pacientesAtuais(user.id);
@@ -1164,9 +1176,10 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
         .eq("doctor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(50);
-      if (error) return vazio;
+      if (error) return { ...vazio, degradado: true };
       return {
         ok: true as const,
+        degradado: false,
         emissoes: ((rows ?? []) as Record<string, unknown>[]).map((r) => ({
           id: String(r.id),
           user_id: String(r.user_id),
@@ -1180,7 +1193,7 @@ export const emissoesDaPaciente = createServerFn({ method: "POST" })
         })),
       };
     } catch {
-      return vazio;
+      return { ...vazio, degradado: true };
     }
   });
 
