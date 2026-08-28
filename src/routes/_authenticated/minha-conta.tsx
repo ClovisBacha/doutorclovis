@@ -20491,6 +20491,22 @@ function MédicoTab() {
   const [semMatch, setSemMatch] = useState(false);
   /** A lista veio sem os filtros (banco sem as colunas do perfil). */
   const [filtrosFora, setFiltrosFora] = useState(false);
+  /**
+   * ⚠️ **"NÃO CONSEGUI LER" TINHA A CARA DE "ELE NÃO ESTÁ AQUI".**
+   *
+   * `searchDoctors` devolve `{ ok: false, error }` quando a leitura falha — e a
+   * tela descartava o sinal, caía em `results: []` com `searched: true`, e
+   * escrevia **"Nenhum médico com esse nome"**. Uma queda de rede fazia o app
+   * afirmar, sobre o mundo real, que o obstetra dela não está na plataforma.
+   *
+   * Nesta aba isso é o pior desfecho possível: ela procura o SEU médico, lê que
+   * ele não existe aqui, e **para de procurar**. O vínculo que liga uma gestação
+   * de alto risco ao obstetra dela morre numa frase que não era verdade.
+   *
+   * ⚠️ É a mesma correção que `meuFeed`, `sugestoesDoFeed` e `buscarPerfis`
+   * ganharam na Comunidade (`motivo: "instavel"`), deixada de pé aqui.
+   */
+  const [falhouABusca, setFalhouABusca] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -20539,10 +20555,14 @@ function MédicoTab() {
          obstetras aleatórios como se fossem o resultado da busca, cada um com
          um botão "Solicitar". Pedir vínculo ao médico errado era o desfecho
          provável. */
+      setFalhouABusca(!res.ok);
       setSemMatch(res.ok ? !!res.semCorrespondencia : false);
       setFiltrosFora(res.ok ? !!res.filtrosIgnorados : false);
       setResults(res.ok ? res.doctors : []);
     } catch {
+      /* Queda de rede é o MESMO caso: o que não pode acontecer é a tela
+         concluir "ele não está aqui" a partir de uma lista que ninguém leu. */
+      setFalhouABusca(true);
       setResults([]);
     }
     setSearched(true);
@@ -20668,7 +20688,26 @@ function MédicoTab() {
             </button>
           </form>
           <div className="mt-4 space-y-2">
-            {searched && results.length === 0 && (
+            {falhouABusca && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:bg-amber-500/10">
+                <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
+                  Não consegui carregar a lista agora
+                </p>
+                <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                  Isso é a nossa conexão, não o cadastro do seu médico — ele pode muito bem estar
+                  aqui.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => doSearch()}
+                  disabled={searching}
+                  className="mt-2 min-h-[44px] rounded-full border border-amber-400 px-4 text-sm font-medium text-amber-900 disabled:opacity-40 dark:text-amber-100"
+                >
+                  {searching ? "Buscando…" : "Tentar de novo"}
+                </button>
+              </div>
+            )}
+            {searched && !falhouABusca && results.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 Nenhum médico com esse nome. Tente só o sobrenome, ou deixe o campo vazio e toque em
                 Buscar para ver todos os obstetras do app.
