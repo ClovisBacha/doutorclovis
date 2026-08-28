@@ -248,10 +248,16 @@ export function ChaDeBebe({
       const { arquivarItem, minhaLista } = await import("@/lib/presentes.functions");
       const r = await arquivarItem({ data: { accessToken: token, itemId } });
       if (!r.ok) {
+        /* ⚠️ "contagem-ilegivel" tem texto PRÓPRIO: dizer "alguém já reservou"
+           sobre uma leitura que falhou faria a mãe procurar uma reserva que
+           talvez não exista, e desistir de tirar um item que ela pode tirar. */
+        const motivo = "motivo" in r ? r.motivo : null;
         toast.error(
-          "motivo" in r && r.motivo === "tem-reserva"
+          motivo === "tem-reserva"
             ? "Alguém já reservou esse item — fale com ela antes de tirar 💛"
-            : "Não deu para tirar o item.",
+            : motivo === "contagem-ilegivel"
+              ? "Não consegui conferir se alguém já reservou — tente de novo."
+              : "Não deu para tirar o item.",
         );
         return;
       }

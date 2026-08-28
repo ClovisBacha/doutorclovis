@@ -380,12 +380,23 @@ export const arquivarItem = createServerFn({ method: "POST" })
       .maybeSingle();
     if (!lista) return { ok: false as const, motivo: "sem-lista" as const };
 
-    const { count } = await sb
+    /* ⚠️ **NÃO CONSEGUIR CONTAR RECUSA.** O `error` era descartado e
+       `(count ?? 0) > 0` virava falso: qualquer falha de leitura ARQUIVAVA o
+       item por cima de uma reserva viva — quebrando, em silêncio, a promessa
+       que o comentário desta função faz três linhas acima ("quem prometeu
+       merece saber antes"). A amiga que reservou o carrinho perde a reserva sem
+       ninguém avisar, e a mãe fica sem o presente achando que ele foi retirado.
+
+       ⚠️ E o motivo é PRÓPRIO: "tem-reserva" sobre uma contagem que falhou
+       faria a mãe procurar uma reserva que talvez não exista. */
+    const { count, error: erroDaContagem } = await sb
       .from("presente_reservas")
       .select("id", { count: "exact", head: true })
       .eq("item_id", data.itemId)
       .is("cancelada_em", null);
-    if ((count ?? 0) > 0) return { ok: false as const, motivo: "tem-reserva" as const };
+    if (erroDaContagem || count === null)
+      return { ok: false as const, motivo: "contagem-ilegivel" as const };
+    if (count > 0) return { ok: false as const, motivo: "tem-reserva" as const };
 
     const { error } = await sb
       .from("presente_itens")

@@ -164,3 +164,78 @@ describe("vaga corporativa: o teto do contrato", () => {
     expect(bloco).not.toMatch(/Limite de vagas atingido/);
   });
 });
+
+/**
+ * ─── ARQUIVAR UM ITEM DO CHÁ ──────────────────────────────────────────────
+ *
+ * ⚠️ O `error` era descartado e `(count ?? 0) > 0` virava falso: qualquer falha
+ * de leitura ARQUIVAVA o item por cima de uma reserva viva — quebrando, em
+ * silêncio, a promessa que o comentário da própria função faz três linhas
+ * acima ("quem prometeu merece saber antes"). A amiga que reservou o carrinho
+ * perde a reserva sem ninguém avisar, e a mãe fica sem o presente achando que
+ * ele foi retirado.
+ */
+describe("chá de bebê: arquivar por cima de uma reserva", () => {
+  const CHA = readFileSync("src/lib/presentes.functions.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+  const TELA = readFileSync("src/components/cha-de-bebe.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ o erro da contagem é NOMEADO e recusa", () => {
+    expect(CHA).toContain("error: erroDaContagem");
+    expect(CHA).toContain("if (erroDaContagem || count === null)");
+    expect(CHA).toContain('motivo: "contagem-ilegivel" as const');
+  });
+
+  test("⚠️ `count ?? 0` sumiu — era ele que abria o portão", () => {
+    expect(CHA).not.toContain("(count ?? 0) > 0");
+    expect(CHA).toContain("if (count > 0) return");
+  });
+
+  test("⚠️ a falha NÃO é dita como 'alguém já reservou'", () => {
+    /* Faria a mãe procurar uma reserva que talvez não exista, e desistir de
+       tirar um item que ela pode tirar. */
+    expect(TELA).toContain('motivo === "contagem-ilegivel"');
+    expect(TELA).toMatch(/Não consegui conferir se alguém já reservou/);
+  });
+});
+
+/**
+ * ─── O INTERRUPTOR DE EMERGÊNCIA DO DONO ──────────────────────────────────
+ *
+ * ⚠️ A ausência de linha vale "ligado", e isso está certo. O defeito era tratar
+ * **falha de leitura** como ausência — e GRAVAR essa falha no cache por trinta
+ * segundos: o dono desliga algo que está causando dano, o banco oscila, e o
+ * interruptor fica inoperante justamente no momento em que é acionado.
+ */
+describe("kill switch: a falha de leitura não desarma", () => {
+  const FLAGS = readFileSync("src/lib/platform-flags.server.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ o `error` é lido, e a tabela ausente é o ÚNICO caso que vira 'ligado'", () => {
+    expect(FLAGS).toContain("const { data, error }");
+    expect(FLAGS).toContain("if (error && !AUSENTE.has(String(error.code)))");
+    expect(FLAGS).toContain('"42P01"');
+  });
+
+  test("⚠️ falha serve o ÚLTIMO VALOR CONHECIDO", () => {
+    /* Mesmo vencido: um valor real de trinta segundos atrás é infinitamente
+       melhor que "ligado" quando o dono acabou de desligar. */
+    const falhas = FLAGS.match(/return hit \? hit\.row : null;/g) ?? [];
+    expect(falhas.length).toBe(2); // o erro do PostgREST e a exceção de rede
+  });
+
+  test("⚠️ e NÃO grava no cache — senão o engano congela por 30s", () => {
+    /* A gravação só acontece no caminho de sucesso. Se ela estivesse depois do
+       try/catch, cada oscilação re-gravaria a mesma mentira e o interruptor
+       ficaria inoperante enquanto a oscilação durasse. */
+    const gravacoes = FLAGS.match(/cache\.set\(key, \{ row/g) ?? [];
+    expect(gravacoes.length).toBe(1);
+    const iGrava = FLAGS.indexOf("cache.set(key, { row");
+    const iCatch = FLAGS.indexOf("} catch {", FLAGS.indexOf("async function readFlag"));
+    expect(iGrava).toBeLessThan(iCatch);
+  });
+});
