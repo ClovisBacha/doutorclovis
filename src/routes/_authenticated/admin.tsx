@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
 import { SaudeClinicaTab } from "@/components/saude-clinica-tab";
 import { CustoTab } from "@/components/custo-da-plataforma-tab";
 import { Fragment, useEffect, useState } from "react";
@@ -160,6 +161,7 @@ type AdminTab =
   | "consultor"
   | "custo"
   | "saude-clinica"
+  | "moderacao"
   | "crescimento"
   | "alertas"
   | "nps"
@@ -185,6 +187,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
       { key: "consultor", label: "Consultor IA", icon: "🤖" },
       { key: "custo", label: "Custo", icon: "🧾" },
       { key: "saude-clinica", label: "Fila clínica", icon: "🩺" },
+      { key: "moderacao", label: "Moderação", icon: "🛡️" },
       { key: "crescimento", label: "Crescimento", icon: "📈" },
       { key: "alertas", label: "Alertas", icon: "🚨" },
       { key: "nps", label: "NPS", icon: "⭐" },
@@ -363,6 +366,21 @@ function AdminConsole() {
           {tab === "visao" && data && <OverviewTab data={data} />}
           {tab === "consultor" && <ConsultorTab />}
           {tab === "custo" && <CustoTab />}
+          {/**
+           * ⚠️ **A FILA DE DENÚNCIAS VIVIA NUM LUGAR QUE NINGUÉM QUE PODE
+           * LÊ-LA ALCANÇA.**
+           *
+           * Ela era desenhada em `/painel`, o console do MÉDICO. Mas
+           * `denunciasAbertas` só admite quem está em `ADMIN_EMAILS` — e
+           * `/painel` REDIRECIONA o super-admin para `/admin` (`if
+           * (sa.isSuperAdmin) window.location.replace("/admin")`).
+           *
+           * Ou seja: a única pessoa autorizada a ver a fila era expulsa da
+           * única tela que a mostrava. Toda denúncia de paciente entrava numa
+           * fila inalcançável, com o app prometendo "a gente vai olhar".
+           *
+           * Aqui é onde ele de fato chega. */}
+          {tab === "moderacao" && <FilaDeDenuncias />}
           {tab === "saude-clinica" && <SaudeClinicaTab />}
           {tab === "crescimento" && <CrescimentoTab />}
           {tab === "alertas" && <AlertasTab />}

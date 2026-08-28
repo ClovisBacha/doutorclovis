@@ -64,7 +64,6 @@ import {
   type AbaDaPaciente,
 } from "@/lib/abas-da-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
-import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
 import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
 import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
@@ -1264,10 +1263,18 @@ function PainelPage() {
             ]}
           />
 
-          {/* ⚠️ A fila de denúncias da caixinha. Ela SÓ desenha quando há algo —
-              ver o cabeçalho do componente. E o lugar é este porque a fila de
-              trabalho é onde mora "o que ainda precisa dele". */}
-          <FilaDeDenuncias />
+          {/**
+           * ⚠️ **A FILA DE DENÚNCIAS SAIU DAQUI, e o motivo é uma corrente
+           * fechada.**
+           *
+           * `denunciasAbertas` só admite quem está em `ADMIN_EMAILS`, e este
+           * painel REDIRECIONA o super-admin para `/admin` algumas centenas de
+           * linhas acima. A única pessoa que podia ler a fila era expulsa da
+           * tela que a mostrava: toda denúncia entrava num lugar inalcançável,
+           * com o app prometendo à paciente "a gente vai olhar".
+           *
+           * Ela mora em `/admin` → Moderação. Um médico comum nunca a viu (o
+           * servidor recusava), então nada foi tirado dele. */}
 
           {/* ⚠️ A aba mais movimentada do app não tinha NENHUM número aqui: o
               dono não tinha como responder "ela está viva?" sem abrir o app de
