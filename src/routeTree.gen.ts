@@ -20,6 +20,7 @@ import { Route as PreviewSosMedicoRouteImport } from './routes/preview-sos-medic
 import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSomRouteImport } from './routes/preview-som'
+import { Route as PreviewSaudeClinicaRouteImport } from './routes/preview-saude-clinica'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
 import { Route as PreviewRegistrarConsultaRouteImport } from './routes/preview-registrar-consulta'
@@ -156,6 +157,11 @@ const PreviewSonsRoute = PreviewSonsRouteImport.update({
 const PreviewSomRoute = PreviewSomRouteImport.update({
   id: '/preview-som',
   path: '/preview-som',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSaudeClinicaRoute = PreviewSaudeClinicaRouteImport.update({
+  id: '/preview-saude-clinica',
+  path: '/preview-saude-clinica',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewSaudeRoute = PreviewSaudeRouteImport.update({
@@ -624,6 +630,7 @@ export interface FileRoutesByFullPath {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -718,6 +725,7 @@ export interface FileRoutesByTo {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -814,6 +822,7 @@ export interface FileRoutesById {
   '/preview-registrar-consulta': typeof PreviewRegistrarConsultaRoute
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
+  '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
   '/preview-sos': typeof PreviewSosRoute
@@ -910,6 +919,7 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -1004,6 +1014,7 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -1099,6 +1110,7 @@ export interface FileRouteTypes {
     | '/preview-registrar-consulta'
     | '/preview-regua'
     | '/preview-saude'
+    | '/preview-saude-clinica'
     | '/preview-som'
     | '/preview-sons'
     | '/preview-sos'
@@ -1195,6 +1207,7 @@ export interface RootRouteChildren {
   PreviewRegistrarConsultaRoute: typeof PreviewRegistrarConsultaRoute
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
+  PreviewSaudeClinicaRoute: typeof PreviewSaudeClinicaRoute
   PreviewSomRoute: typeof PreviewSomRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
   PreviewSosRoute: typeof PreviewSosRoute
@@ -1309,6 +1322,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-som'
       fullPath: '/preview-som'
       preLoaderRoute: typeof PreviewSomRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-clinica': {
+      id: '/preview-saude-clinica'
+      path: '/preview-saude-clinica'
+      fullPath: '/preview-saude-clinica'
+      preLoaderRoute: typeof PreviewSaudeClinicaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-saude': {
@@ -1959,6 +1979,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewRegistrarConsultaRoute: PreviewRegistrarConsultaRoute,
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
+  PreviewSaudeClinicaRoute: PreviewSaudeClinicaRoute,
   PreviewSomRoute: PreviewSomRoute,
   PreviewSonsRoute: PreviewSonsRoute,
   PreviewSosRoute: PreviewSosRoute,
