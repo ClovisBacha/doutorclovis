@@ -365,9 +365,29 @@ export const mandarNoGrupo = createServerFn({ method: "POST" })
        grupo; o resto passa. É a régua estreita de propósito que `enviarMensagem`
        já documenta. */
     const { triarTexto } = await import("./pergunta-clinica");
-    if (triarTexto(texto) === "emergencia") {
+    const desfecho = triarTexto(texto);
+    if (desfecho === "emergencia") {
       return { ok: false as const, motivo: "emergencia" as const };
     }
+    /**
+     * ⚠️ **O GRUPO AVISAVA MENOS QUE O 1-A-1, e a assimetria estava invertida.**
+     *
+     * `enviarMensagem` (o direct de duas pessoas) devolve `avisoClinico` quando
+     * a triagem reconhece conduta: manda a mensagem — não é papel do app
+     * censurar conversa privada — e LEMBRA quem escreveu. Aqui, o mesmo texto
+     * chegava a **até oito leitoras** e ninguém era avisado: nem quem escreveu,
+     * nem quem lia.
+     *
+     * Ou seja: o canal com uma leitora avisava, e o canal com sete não. É o
+     * cenário dos 5,5% de respostas potencialmente danosas multiplicado por
+     * sete — e a frase que abre a decisão de não ter comentários neste app.
+     *
+     * ⚠️ **Continua NÃO recusando.** Um grupo aqui é criado por uma pessoa, só
+     * com gente do grafo dela, com teto de oito e leitura a partir de
+     * `entrou_em`: é conversa privada, não publicação. O que muda é que agora
+     * ela sabe o que acabou de mandar.
+     */
+    const avisoClinico = desfecho !== "publicavel" ? ("conduta" as const) : null;
 
     const agora = new Date().toISOString();
     const { error } = await sb
@@ -386,7 +406,7 @@ export const mandarNoGrupo = createServerFn({ method: "POST" })
        meio: silêncio para a paciente (a mensagem já foi), registro para quem
        investigar por que um grupo vivo aparece no fim da lista. */
     if (erroOrdem) console.warn("[grupo] ordem não atualizou", erroOrdem.code);
-    return { ok: true as const };
+    return { ok: true as const, avisoClinico };
   });
 
 /**

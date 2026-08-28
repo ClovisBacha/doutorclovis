@@ -184,6 +184,15 @@ export function ConversaDoGrupo({
         return;
       }
       setTexto("");
+      /* ⚠️ **O AVISO DA TRIAGEM, que o grupo não dava.** O direct de duas
+         pessoas já avisava quem escreveu; aqui o mesmo texto chega a até oito
+         leitoras e não avisava ninguém.
+
+         ⚠️ E a frase é a do GRUPO, não a do 1-a-1: "só o médico DELA" não faz
+         sentido quando são sete pessoas — cada uma tem o seu. */
+      if ("avisoClinico" in r && r.avisoClinico === "conduta") {
+        setRecado("Enviado. Lembre que só o médico de cada uma pode orientar sobre sintoma.");
+      }
       void carregar();
     } catch {
       setRecado("Não deu para mandar agora.");
