@@ -16201,28 +16201,65 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
     return milestones.some((m) => m.milestone_key === key);
   }
 
+  /**
+   * ⚠️ **A MESMA RÉGUA DA CADERNETA DE VACINAS, que vive logo abaixo nesta tela.**
+   *
+   * `setMilestone` e `removeMilestone` devolvem `{ ok: false }` numa resposta
+   * **200 NORMAL** — sessão expirada, RLS, coluna faltando —, e um `try/catch`
+   * em volta não pega nada disso. A tela pintava o marco na hora e nunca
+   * corrigia: a mãe registrava o primeiro sorriso, via o ✓, fechava o app, e na
+   * abertura seguinte não havia nada.
+   *
+   * ⚠️ **E aqui dói mais que em quase todo lugar: isto é o livro de memórias do
+   * bebê.** O primeiro sorriso não volta para ser registrado de novo — quando
+   * ela descobrir que não gravou, a data já passou.
+   *
+   * ⚠️ E a irmã ao lado JÁ estava consertada, com o comentário do conserto
+   * visível na mesma tela. É a forma mais comum de defeito deste repositório:
+   * a régua aplicada num lugar e deixada de pé no vizinho.
+   */
   async function toggleMilestone(key: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    if (isDone(key)) {
-      await removeMilestone({ data: { accessToken: s.session.access_token, milestoneKey: key } });
-      setMilestones((m) => m.filter((x) => x.milestone_key !== key));
-    } else {
-      await setMilestone({
-        data: {
-          accessToken: s.session.access_token,
-          milestoneKey: key,
-          achievedAt: dateInput,
-          notes: null,
-          customLabel: null,
-        },
-      });
-      setMilestones((m) => [
-        ...m,
-        { id: "", milestone_key: key, custom_label: null, achieved_at: dateInput, notes: null },
-      ]);
+    const marcado = isDone(key);
+    try {
+      const r = marcado
+        ? await removeMilestone({
+            data: { accessToken: s.session.access_token, milestoneKey: key },
+          })
+        : await setMilestone({
+            data: {
+              accessToken: s.session.access_token,
+              milestoneKey: key,
+              achievedAt: dateInput,
+              notes: null,
+              customLabel: null,
+            },
+          });
+      if (!r.ok) {
+        toast.error("Não consegui salvar — tente de novo.");
+        return;
+      }
+      /* Só depois do desfecho: a tela passa a refletir o banco, não a intenção. */
+      setMilestones((m) =>
+        marcado
+          ? m.filter((x) => x.milestone_key !== key)
+          : [
+              ...m,
+              {
+                id: "",
+                milestone_key: key,
+                custom_label: null,
+                achieved_at: dateInput,
+                notes: null,
+              },
+            ],
+      );
+    } catch {
+      toast.error("Não consegui salvar — tente de novo.");
+    } finally {
+      setMarking(null);
     }
-    setMarking(null);
   }
 
   const doneMilestones = MILESTONES_DEF.filter((m) => isDone(m.key));
@@ -16485,9 +16522,19 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
     const { data: s } = await supabase.auth.getSession();
     if (s.session) {
       const weightG = Math.round(parseFloat(babyWeight) * 1000);
-      await addBabyWeight({
+      /* ⚠️ **O CAMPO SÓ LIMPA DEPOIS DO "GRAVOU".** A lista aqui é relida do
+         servidor, então ela nunca mente — mas o campo era limpo de qualquer
+         jeito: numa falha, o número que ela digitou sumia E nada aparecia na
+         lista. Perder o valor e não receber recado nenhum é a pior combinação
+         possível, porque não sobra nem o que tentar de novo. */
+      const r = await addBabyWeight({
         data: { accessToken: s.session.access_token, measuredAt: weightDate, weightG },
       });
+      if (!r.ok) {
+        toast.error("Não consegui salvar o peso — tente de novo.");
+        setSaving(false);
+        return;
+      }
       const res = await getBabyWeights({ data: { accessToken: s.session.access_token } });
       if (res.ok) setWeights(res.weights);
       setBabyWeight("");
