@@ -11710,3 +11710,68 @@ irmã.
 
 **Medido ao fim da noite:** 5.434 testes · 112 bancadas · 11 roteiros de
 interação · zero problemas.
+
+## A vistoria de convergência da Comunidade (ago/2026)
+
+Pedido do dono: aplicar o que ainda falta na aba, verificar se todos os fluxos
+têm caminhos de verdade e convergem, e se o admin está com todas as
+informações. O método foi mecânico — e a lista de tarefas estava VELHA: as seis
+"pendentes" (véu sensível, legenda do vídeo, vídeo no story, responder com
+foto, memórias, álbum) existem todas no código há semanas. **Lista de tarefas
+não é fonte; o código é.**
+
+### O que a vistoria MEDIU e estava certo
+
+- **25 destinos da aba, 25 desenhados E alcançáveis** — `onde.t ===` contra
+  `setOnde({ t:` cruzados, zero órfãos nos dois sentidos.
+- 245 asserções das quatro catracas da rede verdes; `getAuditLog` tem leitor;
+  admin com 21 abas.
+
+### ⚠️ A REINCIDÊNCIA CLÍNICA ERA GRAVADA EM SETE PONTOS E LIDA EM NENHUM
+
+`anotarBarrada` registra desde que o rastro nasceu, `agruparPorPessoa` existia
+pura e testada com o limiar de três — e **nenhuma função de servidor lia
+`rede_triagem_barrada`**. O sinal mais forte de moderação da aba era gravado
+para ninguém. É o `denunciado_em` outra vez, e as catracas não pegavam por
+desenho: `servidor-tem-porta` acusa função de LEITURA órfã (ela nem existia), e
+a lista de réguas de `rede-tem-porta` não alcançava o módulo. As duas mudaram.
+
+`filaDeBarradas` + seção na fila de moderação:
+
+- ⚠️ **Só os grupos ACIMA do limiar viajam** — mandar trechos de quem não é
+  caso despejaria texto quase-clínico de pacientes inocentes na tela do admin.
+- ⚠️ **O vazio verdadeiro diz o agregado** ("a régua barrou N vezes, ninguém
+  passou do limiar") — sem o número, "nenhum grupo" é indistinguível de "o
+  rastro está morto", que é o estado em que a tabela viveu até aqui.
+- ⚠️ **Aqui o NOME aparece — o oposto da seção da caixinha, de propósito.** Lá
+  o anonimato é contrato do recurso; aqui a linha é tentativa de publicação
+  PÚBLICA, e a identidade é o que o admin precisa para agir pela ficha.
+- ⚠️ Tabela ausente nomeia o SQL; falha diz "não quer dizer que ninguém
+  reincide"; emergência não entra nem no agregado.
+
+### ⚠️ OS NÚMEROS DA COMUNIDADE MORAVAM NUMA TELA DE ONDE O DONO É EXPULSO
+
+`NumerosDaComunidade` montava só no `/painel` — que redireciona o super-admin
+para `/admin` antes de desenhar qualquer coisa. **A mesma forma do defeito da
+fila de denúncias, pago uma segunda vez.** E a bancada da moderação sempre
+montou números + fila juntos: ela aprovava uma composição que a produção nunca
+teve — bancada certa, produção errada, a direção inversa da mentira usual.
+
+### As três telas do GRUPO nunca tinham sido fotografadas
+
+`?tela=grupo` (mensagem apagada marcada) · `?tela=grupo-novo` ·
+`?tela=grupo-chamar` (a folha esconde quem já está no grupo — provado na foto).
+Entraram na varredura de CI (115 páginas agora).
+
+⚠️ **Registrado SEM conserto:** Explorar e Favoritas são as duas únicas
+sub-telas sem bancada — são INLINE no componente de vinte mil linhas, e
+extraí-las é cirurgia. Ficam nomeadas para ser decisão, não esquecimento.
+
+### E a simetria da auditoria
+
+O resolver da REDE deixava linha de auditoria; o da CAIXINHA — mesma tela,
+mesma classe de ação — não. Numa disputa, a ausência de linha da caixinha
+seria lida como "ninguém nunca olhou". As duas agora gravam, depois do update.
+
+**Medido ao fim:** 5.451 testes · 115 bancadas · 11 roteiros · zero problemas.
+Sete mutantes em vermelho nesta vistoria.

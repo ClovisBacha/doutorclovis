@@ -103,6 +103,23 @@ describe("resolver uma denúncia deixa linha", () => {
   });
 });
 
+describe("a fila da caixinha deixa a MESMA linha", () => {
+  /* ⚠️ As duas filas vivem na mesma tela do admin. Deixar o resolver da rede
+     com rastro e o da caixinha sem faria a ausência de linha da caixinha ser
+     lida como "ninguém nunca olhou" — a mentira exata que o log desmente. */
+  const CX = semComentarios(readFileSync("src/lib/caixinha.functions.ts", "utf8"));
+  const RESOLVER_CX = corpoDe(CX, "export const resolverDenuncia ", [".handler(", "=>"]);
+
+  test("⚠️ `writeAudit` é chamada, DEPOIS do update", () => {
+    expect(RESOLVER_CX.length).toBeGreaterThan(0);
+    expect(RESOLVER_CX).toContain('"moderacao.resolver_caixinha"');
+    const iUpdate = RESOLVER_CX.indexOf("resolvido_em: new Date().toISOString()");
+    const iLog = RESOLVER_CX.indexOf("await writeAudit(");
+    expect(iUpdate).toBeGreaterThan(-1);
+    expect(iLog).toBeGreaterThan(iUpdate);
+  });
+});
+
 describe("o log continua sendo best-effort", () => {
   test("⚠️ `writeAudit` NUNCA lança — uma falha de log não derruba a ação", () => {
     /* Se ela passasse a lançar, uma tabela de auditoria ausente impediria

@@ -681,5 +681,12 @@ export const resolverDenuncia = createServerFn({ method: "POST" })
       .update({ resolvido_em: new Date().toISOString() })
       .eq("id", data.perguntaId);
     if (error) return { ok: false as const, motivo: "banco" as const };
+    /* A MESMA linha de auditoria do resolver da REDE. As duas filas vivem na
+       mesma tela e sao a mesma classe de acao do admin - deixar uma com rastro
+       e a outra sem faria, numa disputa, a ausencia de linha da caixinha ser
+       lida como "ninguem nunca olhou". Best-effort, DEPOIS do update: antes,
+       registraria uma acao que pode nao ter acontecido. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: u.user?.id, email }, "moderacao.resolver_caixinha", data.perguntaId);
     return { ok: true as const };
   });
