@@ -94,6 +94,7 @@ import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unifica
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
+import { PesquisaNps } from "@/components/pesquisa-nps";
 import { EmissoesDaPaciente } from "@/components/emissoes-da-paciente";
 import { ConvitesDoMedico } from "@/components/convites-do-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
@@ -1666,6 +1667,13 @@ function PainelPage() {
                 porta. */}
             <SairDaClinicaCard tokenFn={token} />
             <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+            {/* ⚠️ O NPS separa MÉDICO de PACIENTE no relatório do dono
+                (`byRole`), e o lado do médico não tinha como responder — o
+                agregado dele ficava em zero para sempre. `careMode={false}`
+                porque Modo Cuidado é da PACIENTE: um médico não tem esse
+                estado, e passar `undefined` calaria a pesquisa para sempre
+                deste lado. */}
+            <PesquisaNps tokenFn={token} careMode={false} />
           </>
         )}
         {tab === "Engajamento" && (

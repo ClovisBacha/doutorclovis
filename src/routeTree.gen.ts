@@ -29,6 +29,7 @@ import { Route as PreviewProntuarioRouteImport } from './routes/preview-prontuar
 import { Route as PreviewPresentesRouteImport } from './routes/preview-presentes'
 import { Route as PreviewOnboardingRouteImport } from './routes/preview-onboarding'
 import { Route as PreviewOfertaRouteImport } from './routes/preview-oferta'
+import { Route as PreviewNpsRouteImport } from './routes/preview-nps'
 import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notificacoes'
 import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
 import { Route as PreviewModeracaoRouteImport } from './routes/preview-moderacao'
@@ -206,6 +207,11 @@ const PreviewOnboardingRoute = PreviewOnboardingRouteImport.update({
 const PreviewOfertaRoute = PreviewOfertaRouteImport.update({
   id: '/preview-oferta',
   path: '/preview-oferta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewNpsRoute = PreviewNpsRouteImport.update({
+  id: '/preview-nps',
+  path: '/preview-nps',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewNotificacoesRoute = PreviewNotificacoesRouteImport.update({
@@ -643,6 +649,7 @@ export interface FileRoutesByFullPath {
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -741,6 +748,7 @@ export interface FileRoutesByTo {
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -841,6 +849,7 @@ export interface FileRoutesById {
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
   '/preview-notificacoes': typeof PreviewNotificacoesRoute
+  '/preview-nps': typeof PreviewNpsRoute
   '/preview-oferta': typeof PreviewOfertaRoute
   '/preview-onboarding': typeof PreviewOnboardingRoute
   '/preview-presentes': typeof PreviewPresentesRoute
@@ -941,6 +950,7 @@ export interface FileRouteTypes {
     | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -1039,6 +1049,7 @@ export interface FileRouteTypes {
     | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -1138,6 +1149,7 @@ export interface FileRouteTypes {
     | '/preview-moderacao'
     | '/preview-momento'
     | '/preview-notificacoes'
+    | '/preview-nps'
     | '/preview-oferta'
     | '/preview-onboarding'
     | '/preview-presentes'
@@ -1238,6 +1250,7 @@ export interface RootRouteChildren {
   PreviewModeracaoRoute: typeof PreviewModeracaoRoute
   PreviewMomentoRoute: typeof PreviewMomentoRoute
   PreviewNotificacoesRoute: typeof PreviewNotificacoesRoute
+  PreviewNpsRoute: typeof PreviewNpsRoute
   PreviewOfertaRoute: typeof PreviewOfertaRoute
   PreviewOnboardingRoute: typeof PreviewOnboardingRoute
   PreviewPresentesRoute: typeof PreviewPresentesRoute
@@ -1424,6 +1437,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-oferta'
       fullPath: '/preview-oferta'
       preLoaderRoute: typeof PreviewOfertaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-nps': {
+      id: '/preview-nps'
+      path: '/preview-nps'
+      fullPath: '/preview-nps'
+      preLoaderRoute: typeof PreviewNpsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-notificacoes': {
@@ -2034,6 +2054,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewModeracaoRoute: PreviewModeracaoRoute,
   PreviewMomentoRoute: PreviewMomentoRoute,
   PreviewNotificacoesRoute: PreviewNotificacoesRoute,
+  PreviewNpsRoute: PreviewNpsRoute,
   PreviewOfertaRoute: PreviewOfertaRoute,
   PreviewOnboardingRoute: PreviewOnboardingRoute,
   PreviewPresentesRoute: PreviewPresentesRoute,

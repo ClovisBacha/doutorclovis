@@ -52,6 +52,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { PesquisaNps } from "@/components/pesquisa-nps";
 import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { hapticKick, hapticTap } from "@/lib/haptics";
@@ -5397,6 +5398,26 @@ function ProfileTab({
 
       {/* Minha agenda (próximas consultas) — junto do perfil */}
       <ProfileAgendaCard onNavigate={onNavigate} />
+
+      {/* ─── A PESQUISA QUE O DONO NÃO TINHA COMO RECEBER ──────────────────
+          `shouldAskNps` e `submitNps` estavam escritas, testadas e sem chamador
+          nenhum: o relatório do admin ficava em ZERO para sempre.
+
+          ⚠️ Ela mora AQUI, e nunca depois de uma conquista. A tentação óbvia é
+          perguntar logo após um momento bonito porque a nota sobe — e é por
+          isso que não se faz: NPS é instrumento de MEDIDA, e uma medida
+          enviesada para cima é pior que medida nenhuma. O Perfil é uma tela
+          calma que ela escolheu abrir.
+
+          ⚠️ `careMode` indefinido CALA (ver `podeMostrarNps`). */}
+      <PesquisaNps
+        tokenFn={async () => (await supabase.auth.getSession()).data.session?.access_token ?? ""}
+        /* ⚠️ `profile === null` É o "não sei", e é ele que precisa chegar como
+           `undefined`: a prop `careMode` desta aba é `boolean` puro, então
+           antes de o perfil carregar ela vale `false` — "não está de luto" —, e
+           o portão de `podeMostrarNps` não protegeria nada. */
+        careMode={profile ? careMode : undefined}
+      />
 
       {/* Completion card */}
       <div className="glass-card glass-indigo rounded-3xl p-6">

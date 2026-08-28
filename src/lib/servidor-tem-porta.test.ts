@@ -55,8 +55,6 @@ const TODAS_LIBS = arquivos("src/lib", (n) => /\.ts$/.test(n) && !/\.test\./.tes
  * nunca o contrário.
  */
 const DIVIDA_CONHECIDA: Record<string, string> = {
-  shouldAskNps: "o NPS inteiro não tem tela: o dono não tem como receber uma resposta",
-  submitNps: "idem — sem porta, ninguém responde",
   getMyAchievements: "a aba de conquistas usa outro caminho; esta ficou para trás",
   getCareMode: "o Modo Cuidado é lido do perfil em toda tela; esta é redundante",
 };
