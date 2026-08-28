@@ -282,3 +282,40 @@ describe("as contagens que barram", () => {
     expect(TELA).toMatch(/Não consegui conferir seus convites de hoje/);
   });
 });
+
+/**
+ * ─── O BOLSO DA CRIADORA ──────────────────────────────────────────────────
+ *
+ * ⚠️ O `error` da releitura do ledger era descartado e `pagasCru ?? []` virava
+ * lista vazia: `gasto` ia a ZERO, `0 + 30 > 300` era falso, e o presente saía.
+ * Numa oscilação do banco a mesada inteira deixava de existir — e não uma vez:
+ * cada chamada recalcularia zero, e a criadora distribuiria sem teto enquanto a
+ * leitura não voltasse.
+ *
+ * ⚠️ E o comentário logo acima da consulta diz "o bolso é RELIDO ANTES de
+ * gravar" — a releitura acontecia e o resultado dela não valia nada.
+ */
+describe("criadora: a mesada relida", () => {
+  const semCom = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+  const INF = semCom(readFileSync("src/lib/influenciadora.functions.ts", "utf8"));
+  const TELA = semCom(readFileSync("src/routes/influenciadora.tsx", "utf8"));
+
+  test("⚠️ o erro da releitura é NOMEADO e recusa", () => {
+    expect(INF).toContain("error: erroDoBolso");
+    expect(INF).toContain(
+      'if (erroDoBolso || !pagasCru) return { ok: false as const, motivo: "instavel" as const }',
+    );
+  });
+
+  test("⚠️ `pagasCru ?? []` sumiu — era ele que zerava o gasto", () => {
+    expect(INF).not.toContain("((pagasCru ?? []) as unknown[]).length");
+    expect(INF).toContain("(pagasCru as unknown[]).length");
+  });
+
+  test("⚠️ a falha NÃO é dita como 'o bolso acabou'", () => {
+    /* Faria a criadora concluir, no dia 3 do mês, que a mesada dela terminou —
+       e parar de presentear até o mês virar. */
+    expect(TELA).toContain('r.motivo === "instavel"');
+    expect(TELA).toMatch(/Não consegui conferir o seu bolso agora/);
+  });
+});
