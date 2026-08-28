@@ -23,8 +23,18 @@ export type CompanionView = {
    * **ouvia o batimento de um bebê que não existe mais** — e o pior é que ela
    * não está do lado para explicar.
    *
-   * O painel continua de pé no luto (ele é a rede de apoio dela, e o contato de
-   * emergência entra por aqui). O que some é o batimento.
+   * ⚠️ **E O ALCANCE CRESCEU: no luto NENHUMA aba de gestação abre.** O
+   * portão original cobria só o batimento, e as outras três continuavam —
+   * tamanho e descrição da semana, o que fazer no dia do parto, e dicas todas
+   * de gestação ("acompanhe às consultas do pré-natal", "lanches leves para o
+   * enjoo matinal"). Nada disso serve para quem abre o link nesse momento.
+   *
+   * O que fica é a EMERGÊNCIA, que já vivia fora das abas: o alerta de SOS com
+   * localização e o botão do SAMU. Era a razão que este comentário dava para
+   * manter o resto, e ela vale inteira sem uma única aba.
+   *
+   * ⚠️ E a tela NÃO conta o que aconteceu — o Modo Cuidado pode ser ligado
+   * pelo médico, e quem tem o link pode não saber de nada.
    */
   care_mode?: boolean | null;
 };
