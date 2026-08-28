@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
 import { SaudeClinicaTab } from "@/components/saude-clinica-tab";
 import { CustoTab } from "@/components/custo-da-plataforma-tab";
 import { Fragment, useEffect, useState } from "react";
@@ -380,7 +381,22 @@ function AdminConsole() {
            * fila inalcançável, com o app prometendo "a gente vai olhar".
            *
            * Aqui é onde ele de fato chega. */}
-          {tab === "moderacao" && <FilaDeDenuncias />}
+          {tab === "moderacao" && (
+            <>
+              {/* ⚠️ **OS NÚMEROS MORAVAM NUMA TELA DE ONDE O DONO É EXPULSO.**
+                  `NumerosDaComunidade` montava só no /painel — e o painel
+                  redireciona o super-admin para cá, algumas centenas de linhas
+                  antes de desenhar qualquer coisa. É a MESMA forma do defeito da
+                  fila de denúncias ("a única pessoa autorizada era expulsa da
+                  única tela que a mostrava"), consertado para a fila e deixado
+                  de pé para os números. A bancada da moderação sempre montou os
+                  dois juntos — a produção é que nunca teve a composição que a
+                  bancada aprovava. O /painel continua montando, para os
+                  ADMIN_EMAILS que são médicos e vivem lá. */}
+              <NumerosDaComunidade />
+              <FilaDeDenuncias />
+            </>
+          )}
           {tab === "saude-clinica" && <SaudeClinicaTab />}
           {tab === "crescimento" && <CrescimentoTab />}
           {tab === "alertas" && <AlertasTab />}

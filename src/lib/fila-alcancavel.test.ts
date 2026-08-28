@@ -52,3 +52,37 @@ describe("a fila mora onde o super-admin chega", () => {
     expect(PAINEL).toMatch(/isSuperAdmin[\s\S]{0,200}replace\("\/admin"\)/);
   });
 });
+
+/**
+ * ─── OS NÚMEROS DA COMUNIDADE, pela MESMA porta ─────────────────────────────
+ *
+ * ⚠️ A mesma forma do defeito da fila, pago uma segunda vez:
+ * `NumerosDaComunidade` montava SÓ no /painel — e o painel redireciona o
+ * super-admin para /admin antes de desenhar qualquer coisa. O dono era a única
+ * pessoa sem os números da aba mais movimentada do app, numa tela cujo
+ * comentário dizia existir "para o dono responder 'ela está viva?'".
+ *
+ * E a bancada da moderação SEMPRE montou números + fila juntos: ela aprovava
+ * uma composição que a produção nunca teve — bancada certa, produção errada, a
+ * direção inversa da mentira usual.
+ */
+describe("os números chegam ao super-admin", () => {
+  const ADMIN = readFileSync("src/routes/_authenticated/admin.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ a aba Moderação monta números E fila", () => {
+    const i = ADMIN.indexOf('tab === "moderacao"');
+    expect(i).toBeGreaterThan(-1);
+    /* Contenção: os dois entre esta condição e a próxima aba. */
+    const fim = ADMIN.indexOf('tab === "', i + 10);
+    const bloco = ADMIN.slice(i, fim > 0 ? fim : i + 1200);
+    expect(bloco).toContain("<NumerosDaComunidade />");
+    expect(bloco).toContain("<FilaDeDenuncias />");
+  });
+
+  test("o /painel continua montando — os ADMIN_EMAILS médicos vivem lá", () => {
+    const PAINEL = readFileSync("src/routes/_authenticated/painel.tsx", "utf8");
+    expect(PAINEL).toContain("<NumerosDaComunidade />");
+  });
+});

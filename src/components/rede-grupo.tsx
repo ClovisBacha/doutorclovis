@@ -22,7 +22,9 @@ async function token() {
   return s.data.session?.access_token ?? null;
 }
 
-type MensagemDoGrupo = {
+/* Exportado pela BANCADA: a conversa do grupo só nasce de um grupo real com
+   mensagens reais, e sem fabricar o dado a tela nunca seria fotografada. */
+export type MensagemDoGrupo = {
   id: string;
   souEu: boolean;
   texto: string | null;

@@ -89,6 +89,9 @@ import {
   GradeSimples,
   MeusDesfechos,
 } from "@/components/rede-instagram";
+import { ConversaDoGrupo, CriarGrupo, ChamarParaGrupo } from "@/components/rede-grupo";
+import type { MensagemDoGrupo } from "@/components/rede-grupo";
+import type { GrupoNaTela } from "@/lib/grupo.functions";
 import type {
   AtividadeNaTela,
   BolhaDeStory,
@@ -956,6 +959,125 @@ function Bancada() {
         aoVoltar={() => history.back()}
         aoDestacar={(id, v) => alert(v ? `destacaria ${id}` : `soltaria ${id}`)}
         aoTentarDeNovo={() => alert("tentaria de novo")}
+      />
+    );
+  }
+
+  /**
+   * ⚠️ AS TRÊS TELAS DO GRUPO NUNCA TIVERAM BANCADA. Nasceram na onda do
+   * direct completo e nunca foram fotografadas: conferir a conversa exigiria
+   * DUAS contas reais, um grupo criado, convites aceitos e mensagens trocadas —
+   * que é exatamente como uma tela passa meses sem ninguém nunca ter olhado.
+   */
+  if (tela === "grupo" || tela === "grupo-chamar") {
+    const membros = [
+      {
+        id: "eu",
+        nome: "Você",
+        avatarUrl: foto(CORES[0][0], CORES[0][1], CORES[0][2]),
+        souEu: true,
+        ehCriadora: true,
+      },
+      {
+        id: "m1",
+        nome: "Marina Costa",
+        avatarUrl: foto(CORES[1][0], CORES[1][1], CORES[1][2]),
+        souEu: false,
+        ehCriadora: false,
+      },
+      { id: "m2", nome: "Carol Andrade", avatarUrl: null, souEu: false, ehCriadora: false },
+      {
+        id: "m3",
+        nome: "Ana Paula",
+        avatarUrl: foto(CORES[3][0], CORES[3][1], CORES[3][2]),
+        souEu: false,
+        ehCriadora: false,
+      },
+    ];
+    const grupo: GrupoNaTela = {
+      id: "g1",
+      nome: "Turma da 28ª semana",
+      membros,
+      souACriadora: true,
+      ultimaEm: atras(12),
+      naoLida: false,
+      silenciado: false,
+    };
+    if (tela === "grupo-chamar") {
+      return (
+        <ChamarParaGrupo
+          grupo={grupo}
+          candidatas={[
+            { id: "c1", nome: "Beatriz Lima", avatar: null },
+            {
+              id: "c2",
+              nome: "Fernanda Souza",
+              avatar: foto(CORES[4][0], CORES[4][1], CORES[4][2]),
+            },
+            /* Já está no grupo — prova que a folha a esconde. */
+            { id: "m1", nome: "Marina Costa", avatar: null },
+          ]}
+          aoFechar={() => history.back()}
+          aoChamou={() => alert("chamou")}
+        />
+      );
+    }
+    const msgs: MensagemDoGrupo[] = [
+      {
+        id: "g-1",
+        souEu: false,
+        autorNome: "Marina Costa",
+        texto: "meninas, alguém mais com azia hoje? 😅",
+        apagada: false,
+        criadaEm: atras(60),
+      },
+      {
+        id: "g-2",
+        souEu: true,
+        autorNome: "Você",
+        texto: "eu! travesseiro mais alto me salvou",
+        apagada: false,
+        criadaEm: atras(52),
+      },
+      /* A apagada prova o desenho do buraco — a conversa não pode fechar
+         sobre ele. */
+      {
+        id: "g-3",
+        souEu: false,
+        autorNome: "Carol Andrade",
+        texto: null,
+        apagada: true,
+        criadaEm: atras(40),
+      },
+      {
+        id: "g-4",
+        souEu: false,
+        autorNome: "Ana Paula",
+        texto: "marquei minha consulta pra sexta, alguém vai no mesmo dia?",
+        apagada: false,
+        criadaEm: atras(12),
+      },
+    ];
+    return (
+      <ConversaDoGrupo
+        grupo={grupo}
+        bancada={msgs}
+        aoVoltar={() => history.back()}
+        aoConvidar={() => alert("abriria a folha de chamar")}
+      />
+    );
+  }
+
+  if (tela === "grupo-novo") {
+    return (
+      <CriarGrupo
+        candidatas={[
+          { id: "c1", nome: "Marina Costa", avatar: foto(CORES[1][0], CORES[1][1], CORES[1][2]) },
+          { id: "c2", nome: "Carol Andrade", avatar: null },
+          { id: "c3", nome: "Beatriz Lima", avatar: foto(CORES[2][0], CORES[2][1], CORES[2][2]) },
+        ]}
+        aoFechar={() => history.back()}
+        aoCriado={(id) => alert(`criou ${id}`)}
       />
     );
   }
