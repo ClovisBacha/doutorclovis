@@ -52,6 +52,7 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
@@ -20680,6 +20681,16 @@ function MédicoTab() {
             Você está vinculada a este obstetra. No <strong>Chat IA</strong>, o assistente responde
             com o estilo e as condutas que o seu médico validou.
           </p>
+          {/* ─── ONDE ELE ATENDE ──────────────────────────────────────────
+              ⚠️ O médico cadastra vários consultórios no painel e a paciente
+              via um campo de texto solto do perfil dele — e, uma vez vinculada,
+              endereço NENHUM. `listDoctorAddresses` é pública, existe desde a
+              primeira migração do painel e tinha zero chamadores.
+
+              O custo é ela ir ao lugar errado: um obstetra que atende na segunda
+              e na quinta em endereços diferentes é o caso comum, e falta em
+              consultório de alto risco é vaga perdida duas vezes. */}
+          <ConsultoriosDoMedico doctorId={doctor.id} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               to="/agendamento"

@@ -44,6 +44,7 @@ import { Route as PreviewCustoRouteImport } from './routes/preview-custo'
 import { Route as PreviewConvitesRouteImport } from './routes/preview-convites'
 import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
+import { Route as PreviewConsultoriosRouteImport } from './routes/preview-consultorios'
 import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
 import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
@@ -279,6 +280,11 @@ const PreviewConviteRoute = PreviewConviteRouteImport.update({
 const PreviewContaRoute = PreviewContaRouteImport.update({
   id: '/preview-conta',
   path: '/preview-conta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConsultoriosRoute = PreviewConsultoriosRouteImport.update({
+  id: '/preview-consultorios',
+  path: '/preview-consultorios',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewConquistasRoute = PreviewConquistasRouteImport.update({
@@ -614,6 +620,7 @@ export interface FileRoutesByFullPath {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
@@ -710,6 +717,7 @@ export interface FileRoutesByTo {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
@@ -808,6 +816,7 @@ export interface FileRoutesById {
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
   '/preview-conquistas': typeof PreviewConquistasRoute
+  '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
@@ -906,6 +915,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
     | '/preview-convite'
     | '/preview-convites'
@@ -1002,6 +1012,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
     | '/preview-convite'
     | '/preview-convites'
@@ -1099,6 +1110,7 @@ export interface FileRouteTypes {
     | '/preview-chat'
     | '/preview-comunidade'
     | '/preview-conquistas'
+    | '/preview-consultorios'
     | '/preview-conta'
     | '/preview-convite'
     | '/preview-convites'
@@ -1197,6 +1209,7 @@ export interface RootRouteChildren {
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewComunidadeRoute: typeof PreviewComunidadeRoute
   PreviewConquistasRoute: typeof PreviewConquistasRoute
+  PreviewConsultoriosRoute: typeof PreviewConsultoriosRoute
   PreviewContaRoute: typeof PreviewContaRoute
   PreviewConviteRoute: typeof PreviewConviteRoute
   PreviewConvitesRoute: typeof PreviewConvitesRoute
@@ -1503,6 +1516,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-conta'
       fullPath: '/preview-conta'
       preLoaderRoute: typeof PreviewContaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-consultorios': {
+      id: '/preview-consultorios'
+      path: '/preview-consultorios'
+      fullPath: '/preview-consultorios'
+      preLoaderRoute: typeof PreviewConsultoriosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-conquistas': {
@@ -1977,6 +1997,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewChatRoute: PreviewChatRoute,
   PreviewComunidadeRoute: PreviewComunidadeRoute,
   PreviewConquistasRoute: PreviewConquistasRoute,
+  PreviewConsultoriosRoute: PreviewConsultoriosRoute,
   PreviewContaRoute: PreviewContaRoute,
   PreviewConviteRoute: PreviewConviteRoute,
   PreviewConvitesRoute: PreviewConvitesRoute,
