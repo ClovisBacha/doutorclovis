@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { subtabPermitida, subtabsDoBebe } from "@/lib/subtabs-do-bebe";
 import { nivelDaEpds, respostaDaQuestao10 } from "@/lib/epds";
 import { codificarFoto } from "@/lib/codificar-imagem";
 import {
@@ -3655,20 +3656,32 @@ function BebeHub({
   initialSub?: string | null;
 }) {
   type SubBebe = (typeof BEBE_SUBTABS)[number]["key"];
+  /**
+   * ⚠️ **A GRADE NÃO CONHECIA O MODO CUIDADO.** `BEBE_SUBTABS` era usada crua:
+   * no luto a paciente continuava vendo "Contagem" (a contagem regressiva para
+   * o parto), "Nomes" (a votação do nome) e "Enxoval". O componente já RECEBIA
+   * `careMode` e o repassava para dentro de duas sub-telas; o que faltava era a
+   * própria grade olhar para ele — a mesma forma do portão do batimento no
+   * painel do acompanhante.
+   *
+   * O Álbum FICA: as fotos são a memória do que houve, e escondê-las seria o
+   * app apagar o bebê dela.
+   */
+  const visiveis = subtabsDoBebe(BEBE_SUBTABS, careMode);
   const [sub, setSub] = useState<SubBebe | null>(
-    BEBE_SUBTABS.some((x) => x.key === initialSub) ? (initialSub as SubBebe) : null,
+    subtabPermitida(BEBE_SUBTABS, careMode, initialSub) as SubBebe | null,
   );
   useEffect(() => {
-    if (BEBE_SUBTABS.some((x) => x.key === initialSub)) setSub(initialSub as SubBebe);
-  }, [initialSub]);
-  const atual = BEBE_SUBTABS.find((s) => s.key === sub);
+    /* ⚠️ Passa pela MESMA régua: `initialSub` vem de fora (o toque no bebê da
+       home, o hub da Saúde), e sem o filtro um pedido de tela barrada abriria
+       exatamente o que o luto acabou de tirar da grade — o portão pareceria
+       funcionar e não funcionaria. */
+    const ok = subtabPermitida(BEBE_SUBTABS, careMode, initialSub) as SubBebe | null;
+    if (ok) setSub(ok);
+  }, [initialSub, careMode]);
+  const atual = visiveis.find((s) => s.key === sub);
   if (!sub || !atual) {
-    return (
-      <GradeHub
-        itens={BEBE_SUBTABS}
-        onAbrir={(k) => setSub(k as (typeof BEBE_SUBTABS)[number]["key"])}
-      />
-    );
+    return <GradeHub itens={visiveis} onAbrir={(k) => setSub(k as SubBebe)} />;
   }
   return (
     <div className="space-y-5">
