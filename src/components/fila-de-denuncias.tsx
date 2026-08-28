@@ -38,6 +38,10 @@ export type BancadaDaFila = {
   falhou?: boolean;
   /** ⚠️ A ficha vem do servidor: sem isto ela nunca desenha na bancada. */
   ficha?: FichaDeModeracao;
+  /** A reincidência clínica — grupos que já passaram do limiar. */
+  barradas?: GrupoDeBarradas[];
+  /** O agregado da janela, para o vazio poder dizer "a régua barrou N vezes". */
+  totalBarradas?: number;
 };
 import {
   rotuloDoMotivo,
@@ -46,6 +50,7 @@ import {
   PODE_REMOVER,
   type MotivoDaDenuncia,
 } from "@/lib/denuncias";
+import type { GrupoDeBarradas } from "@/lib/moderacao.functions";
 
 /**
  * A FILA DE DENÚNCIAS DA CAIXINHA.
@@ -417,9 +422,162 @@ export function FilaDeDenuncias({ bancada }: { bancada?: BancadaDaFila } = {}) {
     <>
       <FilaDaRede bancada={bancada} />
       <FilaDaCaixinha bancada={bancada} />
+      <ReincidenciaClinica bancada={bancada} />
     </>
   );
 }
+
+/**
+ * A REINCIDÊNCIA CLÍNICA — quem a régua barra REPETIDAMENTE.
+ *
+ * ⚠️ **A tabela era escrita em sete pontos e lida em nenhum.** `anotarBarrada`
+ * grava desde que o rastro nasceu, `agruparPorPessoa` existia pura e testada
+ * com o limiar de três — e nenhuma tela mostrava. O sinal mais forte de
+ * moderação da aba (alguém tentando publicar conduta clínica de novo e de novo)
+ * era gravado para ninguém.
+ *
+ * ⚠️ **AQUI O NOME APARECE, e isso é o OPOSTO da seção da caixinha — de
+ * propósito.** Lá o anonimato é o contrato do recurso (a caixa é anônima para a
+ * dona, e o admin vê só texto e contagem). Aqui a linha é uma tentativa de
+ * publicação PÚBLICA — post, story, comentário, bio — sem contrato de anonimato
+ * nenhum; e a identidade é exatamente o que o administrador precisa para agir
+ * pela ficha. Esconder o nome tornaria a fila ilegível sem proteger ninguém.
+ *
+ * ⚠️ **"NÃO CONSEGUI LER" NUNCA VIRA "NINGUÉM REINCIDE".** E o vazio VERDADEIRO
+ * diz o agregado ("a régua barrou N tentativas, ninguém repetiu") — que é outra
+ * frase que "a régua não barrou nada", e as duas são outra coisa que a falha.
+ */
+function ReincidenciaClinica({ bancada }: { bancada?: BancadaDaFila }) {
+  const ehBancada = !!bancada;
+  const [grupos, setGrupos] = useState<GrupoDeBarradas[]>(bancada?.barradas ?? []);
+  const [total, setTotal] = useState<number>(bancada?.totalBarradas ?? 0);
+  const [estado, setEstado] = useState<"carregando" | "pronto" | "falhou" | "sem_tabela">(
+    bancada ? (bancada.falhou ? "falhou" : "pronto") : "carregando",
+  );
+
+  async function carregar() {
+    setEstado("carregando");
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const t = s.data.session?.access_token;
+      if (!t) {
+        setEstado("falhou");
+        return;
+      }
+      const { filaDeBarradas } = await import("@/lib/moderacao.functions");
+      const r = await filaDeBarradas({ data: { accessToken: t } });
+      if (!r.ok) {
+        setEstado(r.motivo === "sem_tabela" ? "sem_tabela" : "falhou");
+        return;
+      }
+      setGrupos(r.grupos);
+      setTotal(r.totalNaJanela);
+      setEstado("pronto");
+    } catch {
+      setEstado("falhou");
+    }
+  }
+
+  useEffect(() => {
+    if (ehBancada) return;
+    void carregar();
+  }, [ehBancada]);
+
+  if (estado === "carregando") return <div className="skeleton mt-6 h-14 rounded-2xl" />;
+
+  if (estado === "sem_tabela") {
+    return (
+      <div className="mt-6 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:bg-amber-500/10">
+        <p className="text-[13px] text-amber-900 dark:text-amber-100">
+          O rastro da triagem clínica ainda não existe neste banco — rode{" "}
+          <code className="font-mono text-[12px]">APLICAR_NOVE_DA_REDE.sql</code>. Até lá, as
+          tentativas barradas não ficam registradas.
+        </p>
+      </div>
+    );
+  }
+
+  if (estado === "falhou") {
+    return (
+      <div className="mt-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-4">
+        <p className="text-[13px] text-destructive">
+          Não consegui carregar a reincidência clínica. Isso não quer dizer que ninguém reincide.
+        </p>
+        <button
+          type="button"
+          onClick={() => void carregar()}
+          className="mt-2 min-h-[44px] rounded-full border border-destructive/40 px-4 text-[13px] font-medium text-destructive"
+        >
+          Tentar de novo
+        </button>
+      </div>
+    );
+  }
+
+  if (grupos.length === 0) {
+    /* O agregado é o que separa "régua viva, ninguém repete" de "régua morta":
+       um painel que some no vazio deixaria o admin sem saber se o rastro
+       funciona. Uma linha discreta basta. */
+    return (
+      <p className="mt-6 text-[12px] text-muted-foreground">
+        Triagem clínica: {total} tentativa(s) barrada(s) nos últimos 30 dias — nenhuma conta passou
+        do limiar de reincidência.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-2xl border border-border bg-card p-4">
+      <h3 className="text-[15px] font-semibold">
+        Reincidência clínica{" "}
+        <span className="ml-1 rounded-full bg-destructive px-2 py-0.5 text-[12px] font-semibold text-destructive-foreground">
+          {grupos.length}
+        </span>
+      </h3>
+      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+        Contas cujo texto a triagem clínica barrou {REPETICOES_QUE_CHAMAM_ROTULO} ou mais vezes em
+        30 dias. A paciente não é avisada e não perdeu nada — isto é observação, não punição. A
+        emergência nunca entra na conta.
+      </p>
+      <ul className="mt-3 flex flex-col gap-2">
+        {grupos.map((g) => (
+          <li key={g.quemId} className="rounded-xl border border-border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[14px] font-semibold">{g.quemNome ?? "Sem nome"}</p>
+              <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[12px] font-semibold text-muted-foreground">
+                {g.tentativas} tentativas
+              </span>
+            </div>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {g.exemplos.map((e, i) => (
+                <li key={i} className="rounded-lg bg-secondary/50 px-2.5 py-1.5">
+                  <p className="text-[13px] leading-snug">“{e.trecho}”</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {ROTULO_ONDE[e.onde] ?? e.onde} ·{" "}
+                    {new Date(e.criadoEm).toLocaleDateString("pt-BR")}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/* O limiar vem da régua; escrito à mão aqui, divergiria no primeiro ajuste. */
+import { REPETICOES_QUE_CHAMAM as REPETICOES_QUE_CHAMAM_ROTULO } from "@/lib/triagem-barrada";
+
+const ROTULO_ONDE: Record<string, string> = {
+  post: "publicação",
+  story: "story",
+  comentario: "comentário",
+  bio: "bio",
+  mensagem: "mensagem",
+  pergunta: "resposta da caixinha",
+};
 
 /**
  * A FICHA DE UMA CONTA — o histórico que a fila não mostra.

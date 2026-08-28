@@ -32,6 +32,9 @@ export const Route = createFileRoute("/preview-moderacao")({
     ficha: q.ficha == null ? 0 : Number(q.ficha),
     suspensa: q.suspensa == null ? 0 : Number(q.suspensa),
     vazio: q.vazio == null ? 0 : Number(q.vazio),
+    /* A reincidência clínica: 1 = grupos acima do limiar; 2 = o vazio com o
+       agregado ("a régua barrou N vezes, ninguém repetiu"). */
+    barradas: q.barradas == null ? 0 : Number(q.barradas),
   }),
 });
 
@@ -97,7 +100,7 @@ const CAIXINHA = [
 ];
 
 function Pagina() {
-  const { falhou, vazio, instavel, ficha, suspensa } = Route.useSearch();
+  const { falhou, vazio, instavel, ficha, suspensa, barradas } = Route.useSearch();
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">
       <h1 className="text-[15px] font-semibold">Bancada · fila de moderação</h1>
@@ -132,6 +135,65 @@ function Pagina() {
       <FilaDeDenuncias
         bancada={{
           falhou: falhou === 1,
+          /* ⚠️ A seção só nasce de contas reais barradas três vezes em 30 dias
+             — sem a bancada, olhá-la exigiria uma conta de verdade tentando
+             publicar conduta repetidamente. */
+          barradas:
+            barradas === 1
+              ? [
+                  {
+                    quemId: "b1",
+                    quemNome: "Carla Menezes",
+                    tentativas: 5,
+                    ultima: "2026-08-27T21:10:00Z",
+                    chamaAtencao: true,
+                    exemplos: [
+                      {
+                        quemId: "b1",
+                        quemNome: "Carla Menezes",
+                        onde: "comentario",
+                        desfecho: "clinica",
+                        trecho: "comigo foi assim, não precisa ir no PS — espera passar em casa",
+                        criadoEm: "2026-08-27T21:10:00Z",
+                      },
+                      {
+                        quemId: "b1",
+                        quemNome: "Carla Menezes",
+                        onde: "post",
+                        desfecho: "clinica",
+                        trecho: "toma buscopan que resolve, eu tomei a gravidez inteira",
+                        criadoEm: "2026-08-25T14:02:00Z",
+                      },
+                      {
+                        quemId: "b1",
+                        quemNome: "Carla Menezes",
+                        onde: "bio",
+                        desfecho: "clinica",
+                        trecho: "me chama no direct que eu digo o que tomar pra cada sintoma",
+                        criadoEm: "2026-08-22T09:44:00Z",
+                      },
+                    ],
+                  },
+                  {
+                    quemId: "b2",
+                    quemNome: null,
+                    tentativas: 3,
+                    ultima: "2026-08-26T11:00:00Z",
+                    chamaAtencao: true,
+                    exemplos: [
+                      {
+                        quemId: "b2",
+                        quemNome: null,
+                        onde: "pergunta",
+                        desfecho: "clinica",
+                        trecho: "no meu caso eu não fui e deu tudo certo",
+                        criadoEm: "2026-08-26T11:00:00Z",
+                      },
+                    ],
+                  },
+                ]
+              : [],
+          totalBarradas: barradas === 2 ? 12 : barradas === 1 ? 23 : 0,
           /* ⚠️ A ficha vem do servidor — sem injetá-la aqui ela nunca desenha,
              e a bancada aprovaria uma fila sem o histórico que decide entre
              "avisar" e "remover". */

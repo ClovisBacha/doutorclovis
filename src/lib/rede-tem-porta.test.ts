@@ -234,6 +234,11 @@ const REGUAS = [
   "src/lib/conversa.ts",
   "src/lib/comentarios.ts",
   "src/lib/onboarding-da-comunidade.ts",
+  /* ⚠️ Entrou DEPOIS de o buraco custar: `agruparPorPessoa` viveu aqui pura,
+     testada e com ZERO chamadores — a tabela era escrita em sete pontos e lida
+     em nenhum, e a catraca não alcançava este módulo porque a lista é à mão.
+     Módulo de régua novo entra no MESMO commit que o cria. */
+  "src/lib/triagem-barrada.ts",
 ];
 
 /**

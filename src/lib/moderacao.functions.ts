@@ -372,3 +372,109 @@ export const suspenderDaComunidade = createServerFn({ method: "POST" })
     );
     return { ok: true as const };
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A REINCIDÊNCIA CLÍNICA — o leitor que a tabela nunca teve
+   ══════════════════════════════════════════════════════════════════════════ */
+
+export type GrupoDeBarradas = ReturnType<
+  typeof import("./triagem-barrada").agruparPorPessoa
+>[number];
+
+/**
+ * ⚠️ **`rede_triagem_barrada` ERA ESCRITA EM SETE PONTOS E LIDA EM NENHUM.**
+ *
+ * `anotarBarrada` grava desde que o rastro nasceu — post, story, comentário,
+ * bio, resposta da caixinha, nota — e a régua `agruparPorPessoa` existia pura,
+ * testada, com o limiar de três repetições documentado… e com zero chamadores.
+ * O sinal MAIS FORTE de moderação que esta aba produz (alguém tentando publicar
+ * conduta clínica repetidamente) era gravado e ninguém nunca via. É o
+ * `denunciado_em` outra vez: a promessa escrita no módulo ("a plataforma passa
+ * a ver o padrão") sem a metade que vê.
+ *
+ * ⚠️ **SÓ OS GRUPOS QUE CHAMAM ATENÇÃO viajam para o navegador.** O próprio
+ * módulo da régua diz: "uma tentativa isolada não é caso — toda paciente um dia
+ * escreve uma frase que a régua barra". Mandar os trechos de quem NÃO é caso
+ * seria despejar texto quase-clínico de pacientes inocentes na tela do admin.
+ * O que viaja além dos grupos é um NÚMERO agregado (`totalNaJanela`), para a
+ * fila vazia poder dizer "a régua barrou N vezes e ninguém reincidiu" — que é
+ * outra frase que "a régua não barrou nada", e as duas são outra coisa que
+ * "não consegui ler".
+ *
+ * ⚠️ **JANELA DE 30 DIAS.** Reincidência é padrão de AGORA: sem janela, três
+ * tentativas de um ano atrás gritariam para sempre numa fila cuja moeda é
+ * atenção. E o teto de linhas existe porque `MAX_ROWS` é a lição de todo
+ * relatório desta base — sem ele, uma conta ruidosa faria a leitura crescer sem
+ * limite.
+ */
+export const filaDeBarradas = createServerFn({ method: "POST" })
+  .inputValidator((i: unknown) => z.object({ accessToken: z.string().min(10) }).parse(i))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: u } = await supabaseAdmin.auth.getUser(data.accessToken);
+    const email = u.user?.email?.trim().toLowerCase();
+    const permitidos = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+    if (!email || !permitidos.includes(email)) {
+      return { ok: false as const, motivo: "sem_acesso" as const };
+    }
+
+    const sb = supabaseAdmin as any;
+    const desde = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    const { data: linhas, error } = await sb
+      .from("rede_triagem_barrada")
+      .select("quem_id, onde, desfecho, trecho, criado_em")
+      .gte("criado_em", desde)
+      .order("criado_em", { ascending: false })
+      .limit(400);
+    /* ⚠️ Tabela ausente ≠ leitura falhou, e nenhum dos dois é "ninguém
+       reincide". O primeiro é "falta rodar o SQL" (a tela diz qual); o segundo
+       é "tente de novo". Fundi-los foi o defeito do export LGPD. */
+    if (error?.code === "42P01") return { ok: false as const, motivo: "sem_tabela" as const };
+    if (error || !linhas) return { ok: false as const, motivo: "banco" as const };
+
+    const cru = linhas as {
+      quem_id: string;
+      onde: string;
+      desfecho: string;
+      trecho: string;
+      criado_em: string;
+    }[];
+
+    /* Nomes em LOTE — uma consulta, nunca uma por pessoa. `patient_profiles`
+       filtra por `id` (a chave é `id`, não `user_id` — a catraca
+       patient-profiles-por-id existe porque esse engano já custou aqui). */
+    const ids = [...new Set(cru.map((l) => l.quem_id))];
+    const nomes = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: perfis } = await sb
+        .from("patient_profiles")
+        .select("id, display_name")
+        .in("id", ids);
+      for (const p of (perfis ?? []) as { id: string; display_name: string | null }[]) {
+        if (p.display_name?.trim()) nomes.set(p.id, p.display_name.trim());
+      }
+    }
+
+    const { agruparPorPessoa } = await import("./triagem-barrada");
+    const grupos = agruparPorPessoa(
+      cru.map((l) => ({
+        quemId: l.quem_id,
+        quemNome: nomes.get(l.quem_id) ?? null,
+        onde: l.onde as import("./triagem-barrada").OndeBarrou,
+        desfecho: l.desfecho,
+        trecho: l.trecho,
+        criadoEm: l.criado_em,
+      })),
+    );
+
+    return {
+      ok: true as const,
+      grupos: grupos.filter((g) => g.chamaAtencao),
+      /* A emergência não entra nem no agregado: é pedido de socorro, e somá-la
+         faria o número da régua parecer maior do que o que ela BARRA. */
+      totalNaJanela: cru.filter((l) => l.desfecho !== "emergencia").length,
+    };
+  });
