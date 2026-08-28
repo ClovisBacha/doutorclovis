@@ -435,14 +435,33 @@ type Gest = ReturnType<typeof computeGestation>;
 // lista 3x ao abrir. Cache de 30s no módulo; ações que mudam a agenda passam
 // force=true para revalidar na hora.
 let apptsCache: { at: number; appointments: MyAppointment[] } | null = null;
-async function fetchAppointmentsCached(force = false): Promise<MyAppointment[]> {
-  if (!force && apptsCache && Date.now() - apptsCache.at < 30_000) return apptsCache.appointments;
+/**
+ * ⚠️ **`instavel` EXISTE PORQUE `[]` ERA UMA AFIRMAÇÃO, E ELA PODIA SER FALSA.**
+ *
+ * Numa falha de primeira carga esta função devolvia lista vazia, e as telas
+ * escreviam **"Nenhuma consulta marcada ainda"** e **"Você ainda não tem
+ * consultas por aqui — agende a primeira"**. Quem tem consulta confirmada para
+ * amanhã abria o app para conferir a hora e lia que não tinha consulta nenhuma.
+ *
+ * Falta em consultório de alto risco é vaga perdida duas vezes — é a frase que
+ * abre o desenho dos lembretes de 24 h e 4 h. Este defeito produzia exatamente
+ * a perda que aquele sistema inteiro existe para impedir, e do lado de dentro.
+ *
+ * ⚠️ **A bandeira sobe SÓ quando o vazio vem de falha.** Servindo cache — dado
+ * de verdade, no máximo alguns segundos velho — a lista não mente, e um aviso
+ * sobre ela seria ruído que ensina a ignorar o aviso.
+ */
+type ListaDeConsultas = { appointments: MyAppointment[]; instavel: boolean };
+
+async function fetchAppointmentsCached(force = false): Promise<ListaDeConsultas> {
+  if (!force && apptsCache && Date.now() - apptsCache.at < 30_000)
+    return { appointments: apptsCache.appointments, instavel: false };
   const { data: s } = await supabase.auth.getSession();
-  if (!s.session) return apptsCache?.appointments ?? [];
+  if (!s.session) return { appointments: apptsCache?.appointments ?? [], instavel: !apptsCache };
   const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-  if (!res.ok) return apptsCache?.appointments ?? [];
+  if (!res.ok) return { appointments: apptsCache?.appointments ?? [], instavel: !apptsCache };
   apptsCache = { at: Date.now(), appointments: res.appointments };
-  return res.appointments;
+  return { appointments: res.appointments, instavel: false };
 }
 
 const TABS = [
@@ -1345,7 +1364,7 @@ function MinhaContaPage() {
   }, [profile?.id]);
   async function loadNextAppt(force = false) {
     try {
-      const appointments = await fetchAppointmentsCached(force);
+      const { appointments } = await fetchAppointmentsCached(force);
       const today = ymdLocal();
       const next = appointments
         .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
@@ -5081,10 +5100,15 @@ function CareModeToggle({
 /** Resumo da agenda dentro do Perfil: próxima consulta + avisos + atalhos. */
 function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
+  /* ⚠️ "não consegui ler" NÃO é "você não tem consulta" — ver
+     `fetchAppointmentsCached`. */
+  const [instavel, setInstavel] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     (async () => {
-      setAppts(await fetchAppointmentsCached());
+      const r = await fetchAppointmentsCached();
+      setAppts(r.appointments);
+      setInstavel(r.instavel);
       setLoaded(true);
     })();
   }, []);
@@ -5133,7 +5157,9 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
           <p className="mt-3 text-sm text-muted-foreground">
             {pendingCount > 0
               ? `Você tem ${pendingCount} pedido(s) aguardando confirmação do médico.`
-              : "Nenhuma consulta marcada ainda."}
+              : instavel
+                ? "Não consegui carregar sua agenda agora — se você tem consulta marcada, ela continua marcada."
+                : "Nenhuma consulta marcada ainda."}
           </p>
         )
       )}
@@ -9197,7 +9223,7 @@ function PrenatalCalendarTab({
   const [selectedYmd, setSelectedYmd] = useState<string>(() => ymdLocal());
   useEffect(() => {
     (async () => {
-      setAppts(await fetchAppointmentsCached());
+      setAppts((await fetchAppointmentsCached()).appointments);
     })();
   }, []);
 
@@ -11217,6 +11243,9 @@ function MeusPedidos() {
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
+  /* ⚠️ "não consegui ler" NÃO é "você não tem consulta" — ver
+     `fetchAppointmentsCached`. */
+  const [apptsInstavel, setApptsInstavel] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -11234,15 +11263,24 @@ function ConsultasTab() {
   const chunksRef = useRef<BlobPart[]>([]);
   const mimeRef = useRef<string>("audio/webm");
 
+  /* Nomeada para o botão "Tentar de novo" poder chamá-la: um estado de falha
+     sem saída é o vazio silencioso outra vez, só que honesto — e ela continua
+     sem saber se tem consulta. E `force`, senão o cache de 30 s devolveria a
+     mesma lista vazia sem tocar na rede. */
+  async function loadAppts() {
+    setLoadingAppts(true);
+    try {
+      const r = await fetchAppointmentsCached(true);
+      setAppts(r.appointments);
+      setApptsInstavel(r.instavel);
+    } finally {
+      setLoadingAppts(false);
+    }
+  }
+
   useEffect(() => {
     loadNotes();
-    (async () => {
-      try {
-        setAppts(await fetchAppointmentsCached());
-      } finally {
-        setLoadingAppts(false);
-      }
-    })();
+    void loadAppts();
   }, []);
 
   async function loadNotes() {
@@ -11409,7 +11447,9 @@ function ConsultasTab() {
     });
     if (res.ok) {
       toast(approve ? "Horário confirmado! ✅" : "Horário recusado.");
-      setAppts(await fetchAppointmentsCached(true));
+      const rec = await fetchAppointmentsCached(true);
+      setAppts(rec.appointments);
+      setApptsInstavel(rec.instavel);
     } else {
       toast(res.error ?? "Não foi possível responder");
     }
@@ -11468,6 +11508,24 @@ function ConsultasTab() {
           <div className="mt-4 space-y-2">
             <div className="skeleton h-16 rounded-2xl" />
             <div className="skeleton h-16 rounded-2xl" />
+          </div>
+        ) : apptsInstavel ? (
+          /* ⚠️ O convite a "agendar a primeira" é a pior frase possível para
+             quem já tem consulta marcada e veio conferir a hora. */
+          <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-center dark:bg-amber-500/10">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              Não consegui carregar sua agenda agora
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+              Isso é a nossa conexão. Se você tem consulta marcada, ela continua marcada.
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadAppts()}
+              className="mt-3 min-h-[44px] rounded-full border border-amber-400 px-4 text-sm font-medium text-amber-900 dark:text-amber-100"
+            >
+              Tentar de novo
+            </button>
           </div>
         ) : appts.length === 0 ? (
           <div className="mt-4 rounded-2xl bg-secondary/50 p-5 text-center">
