@@ -181,11 +181,18 @@ export const redeemInviteCode = createServerFn({ method: "POST" })
           if (ins.error && ins.error.code !== "23505")
             return { ok: false as const, error: "codigo_usado" };
           if (pc.max_redemptions != null) {
-            const { count } = await sb
+            /* ⚠️ **NÃO CONSEGUIR CONTAR REVERTE.** O `error` era descartado e
+               `count ?? 0` virava 0: `0 > max_redemptions` é falso, e o resgate
+               ficava de pé. Como a linha JÁ foi inserida acima, uma falha de
+               leitura aqui não é "não sei" — é o teto do cupom deixando de
+               existir, e cada resgate a mais é um plano pago que ninguém
+               comprou. A reversão é o lado seguro: o cupom continua lá, e ela
+               tenta de novo em dez segundos. */
+            const { count, error: erroDaContagem } = await sb
               .from("platform_coupon_redemptions")
               .select("user_id", { count: "exact", head: true })
               .eq("coupon_id", pc.id);
-            if ((count ?? 0) > pc.max_redemptions) {
+            if (erroDaContagem || count === null || count > pc.max_redemptions) {
               await sb
                 .from("platform_coupon_redemptions")
                 .delete()

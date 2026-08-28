@@ -239,3 +239,46 @@ describe("kill switch: a falha de leitura não desarma", () => {
     expect(iGrava).toBeLessThan(iCatch);
   });
 });
+
+/**
+ * ─── AS DUAS ÚLTIMAS CONTAGENS QUE BARRAVAM E FALHAVAM ABERTAS ────────────
+ *
+ * ⚠️ Achadas por varredura mecânica da forma exata (`const { count } = await`)
+ * depois de a classe produzir seis defeitos numa noite. Treze sítios no `src/`
+ * inteiro; onze são NÚMERO INFORMATIVO — quatro deles já dizem isso no próprio
+ * comentário —, e estes dois BARRAM alguma coisa.
+ *
+ * ⚠️ **A régua de triagem não é "o erro foi olhado?", é "se esta leitura voltar
+ * vazia, alguma coisa fica mais PERMITIDA?"** Mexer nos onze informativos seria
+ * churn; deixar estes dois seria o teto de um cupom pago e o teto anti-spam
+ * deixando de existir em silêncio.
+ */
+describe("as contagens que barram", () => {
+  const semCom = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+  const CUPOM = semCom(readFileSync("src/lib/invites.functions.ts", "utf8"));
+  const AMIGAS = semCom(readFileSync("src/lib/amigas.functions.ts", "utf8"));
+  const TELA = semCom(readFileSync("src/components/amigas.tsx", "utf8"));
+
+  test("⚠️ o cupom da plataforma REVERTE quando não consegue contar", () => {
+    /* A linha JÁ foi inserida acima, então uma falha aqui não é "não sei" — é o
+       teto deixando de existir, e cada resgate a mais é um plano pago que
+       ninguém comprou. */
+    expect(CUPOM).toContain("if (erroDaContagem || count === null || count > pc.max_redemptions)");
+    expect(CUPOM).not.toContain("(count ?? 0) > pc.max_redemptions");
+  });
+
+  test("⚠️ o teto diário de convites RECUSA quando não consegue contar", () => {
+    /* É justamente sob carga — um roteiro disparando — que a leitura falha, e
+       o canal que isso gasta é o mesmo por onde chega o aviso de emergência. */
+    expect(AMIGAS).toContain('return { ok: false as const, error: "instavel" as const }');
+    expect(AMIGAS).toContain("if (count >= CONVITES_POR_DIA)");
+    expect(AMIGAS).not.toContain("(count ?? 0) >= CONVITES_POR_DIA");
+  });
+
+  test("⚠️ a falha NÃO é dita como 'tente de novo amanhã'", () => {
+    /* Faria ela desistir por um dia inteiro de um convite que o servidor
+       aceitaria em dez segundos. */
+    expect(TELA).toContain('r.error === "instavel"');
+    expect(TELA).toMatch(/Não consegui conferir seus convites de hoje/);
+  });
+});

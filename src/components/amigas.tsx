@@ -216,11 +216,16 @@ export function AmigasTab({
             ? "Não achei esse código. Confira com ela — são 7 letras e números."
             : r.error === "muitos_convites"
               ? "Você já mandou muitos convites hoje. Tente de novo amanhã."
-              : r.error === "termo_curto"
-                ? "Digite o código completo ou o e-mail dela."
-                : r.error === "indisponivel"
-                  ? "Não é possível agora."
-                  : "Não foi possível. O convite precisa do SQL aplicado no banco.",
+              : /* ⚠️ Texto PRÓPRIO: dizer "tente amanhã" sobre uma contagem que
+                   falhou faria ela desistir por um dia inteiro de um convite
+                   que o servidor aceitaria em dez segundos. */
+                r.error === "instavel"
+                ? "Não consegui conferir seus convites de hoje — tente de novo."
+                : r.error === "termo_curto"
+                  ? "Digite o código completo ou o e-mail dela."
+                  : r.error === "indisponivel"
+                    ? "Não é possível agora."
+                    : "Não foi possível. O convite precisa do SQL aplicado no banco.",
           { duration: 6000 },
         );
         return;
