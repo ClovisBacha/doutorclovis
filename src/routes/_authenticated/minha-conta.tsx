@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { nivelDaEpds, respostaDaQuestao10 } from "@/lib/epds";
 import { codificarFoto } from "@/lib/codificar-imagem";
 import {
   Suspense,
@@ -15707,6 +15708,13 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [history, setHistory] = useState<PpdScreening[]>([]);
+  /**
+   * ⚠️ `null` = ainda não tentou. `false` = tentou e NÃO deu.
+   *
+   * Os dois não podem virar o mesmo estado: a tela precisa poder dizer "não
+   * consegui avisar seu médico" sem dizer isso antes de ter tentado.
+   */
+  const [avisouOMedico, setAvisouOMedico] = useState<boolean | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
@@ -15729,19 +15737,67 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
     }, 0);
   }
 
+  /**
+   * ⚠️ **A RESPOSTA DELA PRECISA CHEGAR AO MÉDICO — e não chegava.**
+   *
+   * Esta função gravava só em `ppd_screenings`, uma tabela que **não tem
+   * coluna `doctor_id`** e que NENHUM caminho do médico lê: nem o prontuário,
+   * nem `clinical_events`, nem a fila de trabalho. Varredura do repositório:
+   * os únicos toques são o `insert` daqui e o histórico que a própria paciente
+   * abre.
+   *
+   * Então uma puérpera abria Pós-parto → Bem-estar, respondia **"sim, tive
+   * pensamentos de me machucar"** (questão 10), via a caixa vermelha com o
+   * 188 — e o obstetra dela não recebia NADA.
+   *
+   * A MESMA resposta, dada na página pública `/epds`, dispara o e-mail
+   * "🚨 EPDS URGENTE — {nome} relatou pensamentos de autolesão" e entra em
+   * `eventosQuePedemOlhar` como gravidade GRAVE. Duas telas, o mesmo
+   * questionário validado, e só uma avisava alguém.
+   *
+   * E a tela ainda prometia o contrário: "o resultado deve ser compartilhado
+   * com o seu médico".
+   *
+   * ⚠️ **Grava nas DUAS**, e a ordem importa: `saveEpdsLog` primeiro, porque é
+   * ele que carimba `doctor_id` e dispara o alerta. `ppd_screenings` continua
+   * porque é dele que sai o HISTÓRICO que ela relê nesta tela — apagar seria
+   * tirar dela um dado que já é seu.
+   */
   async function handleSubmit() {
     if (answers.some((a) => a === null)) return;
     const s = getScore(answers as number[]);
     setScore(s);
     setSubmitted(true);
     const { data: sess } = await supabase.auth.getSession();
-    if (sess.session) {
-      await savePpdScreening({
-        data: { accessToken: sess.session.access_token, score: s, answers: answers as number[] },
+    if (!sess.session) return;
+    const token = sess.session.access_token;
+
+    /* ⚠️ O ALERTA VEM PRIMEIRO, e o retorno é LIDO. `saveEpdsLog` devolve
+       `{ ok: false }` numa resposta 200 normal — um `try/catch` em volta não
+       pegaria, e o "não registrei" precisa aparecer na tela: ela achar que o
+       médico foi avisado quando não foi é pior que o silêncio. */
+    let alertou = false;
+    try {
+      const { saveEpdsLog } = await import("@/lib/epds.functions");
+      const r = await saveEpdsLog({
+        data: {
+          accessToken: token,
+          score: s,
+          q10Score: respostaDaQuestao10(answers),
+          level: nivelDaEpds(s, respostaDaQuestao10(answers)),
+        },
       });
-      const res = await getMyPpdScreenings({ data: { accessToken: sess.session.access_token } });
-      if (res.ok) setHistory(res.screenings);
+      alertou = Boolean((r as { ok?: boolean })?.ok);
+    } catch {
+      alertou = false;
     }
+    setAvisouOMedico(alertou);
+
+    await savePpdScreening({
+      data: { accessToken: token, score: s, answers: answers as number[] },
+    });
+    const res = await getMyPpdScreenings({ data: { accessToken: token } });
+    if (res.ok) setHistory(res.screenings);
   }
 
   function scoreColor(s: number) {
@@ -15823,9 +15879,27 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
                     </div>
                   </a>
                 </div>
-                <p className="mt-2 text-xs text-red-700">
-                  Informe o seu médico sobre seu resultado na próxima consulta.
-                </p>
+                {/* ⚠️ **A FRASE MUDOU PORQUE O COMPORTAMENTO MUDOU.** Ela dizia
+                    "informe o seu médico na próxima consulta" — e era a única
+                    coisa verdadeira enquanto nada avisava ninguém. Agora o
+                    aviso sai na hora, e a tela diz isso.
+
+                    ⚠️ E quando ele NÃO sai, ela diz isso também: "avisamos seu
+                    médico" sobre um envio que falhou é a mentira mais cara que
+                    esta tela pode contar, porque ela para de procurar ajuda
+                    achando que já pediu. */}
+                {avisouOMedico === true && (
+                  <p className="mt-2 text-xs font-medium text-red-700">
+                    Avisamos o seu médico agora. Se você não estiver bem, ligue 188 ou procure
+                    atendimento — não espere a resposta dele.
+                  </p>
+                )}
+                {avisouOMedico === false && (
+                  <p className="mt-2 text-xs font-medium text-red-700">
+                    Não conseguimos avisar o seu médico agora. Ligue 188 ou procure atendimento, e
+                    fale com ele por outro caminho.
+                  </p>
+                )}
               </div>
             )}
 
@@ -15877,7 +15951,8 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
         A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar
-        depressão pós-parto. O resultado deve ser compartilhado com o seu médico.
+        depressão pós-parto. Quando o resultado indica atenção, o seu médico é avisado
+        automaticamente.
         {babyAgeDays < 42 && (
           <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>
         )}
