@@ -161,6 +161,59 @@ export const excluirMinhaConta = createServerFn({ method: "POST" })
       }
     }
 
+    /**
+     * ─── A AGENDA: ANONIMIZAR, e não apagar ──────────────────────────────
+     *
+     * ⚠️ **`appointment_requests` sobrevivia INTEIRA à exclusão, com nome,
+     * e-mail, telefone e observações dela.** A coluna que a liga à conta
+     * (`patient_user_id`) é `ON DELETE SET NULL` — deliberado, porque a agenda
+     * do médico não pode perder a consulta —, mas os campos PESSOAIS são
+     * digitados no pedido e não dependem daquela chave. Ela pedia a exclusão, o
+     * app respondia "apagamos", e o nome e o telefone continuavam lá.
+     *
+     * ⚠️ **APAGAR A LINHA seria a correção errada.** Ela é o registro de que
+     * houve uma consulta naquele horário — o histórico da agenda do médico, que
+     * é dado DELE e legítimo. Apagar destruiria isso para resolver um problema
+     * que é só dos campos de identificação.
+     *
+     * Anonimizar é exatamente o que a LGPD pede aqui: o fato fica, a pessoa
+     * sai. O `patient_user_id` já saiu pelo `SET NULL`, então nada volta a
+     * ligar a linha a ela.
+     *
+     * ⚠️ Roda ANTES do `deleteUser`: depois, `patient_user_id` já é `NULL` e
+     * não há mais como achar quais linhas eram dela.
+     */
+    {
+      const { error: anonErr } = await sb
+        .from("appointment_requests")
+        /* ⚠️ **MARCADOR, e não `null`.** `patient_email` e `patient_phone` são
+           `NOT NULL` no schema: mandar `null` faz o `update` inteiro falhar, a
+           exclusão devolver "falhou", e a paciente ficar sem conseguir apagar
+           a conta — trocando um vazamento por um bloqueio. `notes` é
+           anulável, e ali o `null` é o certo. */
+        .update({
+          patient_name: "Paciente removida",
+          patient_email: "removido@removido.invalid",
+          patient_phone: "removido",
+          notes: null,
+        })
+        .eq("patient_user_id", uid);
+      /* Tabela ou coluna ausente num banco atrás das migrations não é falha —
+         não há o que anonimizar. Qualquer outro erro é dado dela que FICOU.
+
+         ⚠️ **`PGRST204`, e NUNCA `42703`.** Este é um UPDATE: coluna fora do
+         schema cache volta como `PGRST204`, do PostgREST — o `42703` do
+         Postgres só aparece em SELECT. Eu escrevi os dois, e a catraca
+         `recuo-de-coluna.test.ts` reprovou na hora. É a mesma confusão que já
+         custou três recursos aqui (o "Salvar perfil" do médico, a devolutiva
+         de exame, e o registro do SOS que nunca gravava). */
+      const code = (anonErr as { code?: string } | null)?.code;
+      if (anonErr && code !== "42P01" && code !== "PGRST204") {
+        console.error("[exclusão] agenda não anonimizada", anonErr);
+        return { ok: false, motivo: "falhou" };
+      }
+    }
+
     /* ─── OS ARQUIVOS, ANTES DAS LINHAS ──────────────────────────────────────
      *
      * O CASCADE derruba as linhas de `exam_files` e `family_album_posts` — e,

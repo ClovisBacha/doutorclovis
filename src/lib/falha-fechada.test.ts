@@ -82,3 +82,49 @@ describe("o chá de bebê e o Modo Cuidado", () => {
     expect(P).not.toMatch(/if \(p\?\.care_mode\) return null;/);
   });
 });
+
+describe("o export de LGPD não some com dado dela", () => {
+  const E = ler("src/lib/exportar-dados.functions.ts");
+
+  test("⚠️ COLUNA ausente (42703) vira FALHA, e não bloco vazio", () => {
+    /* Tabela ausente (42P01) é normal num banco atrás das migrations: não há o
+       que levar. Coluna ausente é o OPOSTO — a tabela está lá, com o que ela
+       escreveu, e o `select` é que pediu errado. Juntar os dois fazia o bloco
+       inteiro sumir com `falhas: []`: ela baixava um arquivo que PARECE
+       completo, sem o perfil, e apagava a conta confiando nele. */
+    expect(E).toMatch(/if \(code !== "42P01"\) falhas\.push/);
+    expect(E).not.toMatch(/code !== "42P01" && code !== "42703"/);
+  });
+});
+
+describe("apagar a conta não deixa nome e telefone na agenda", () => {
+  const C = ler("src/lib/conta.functions.ts");
+
+  test("⚠️ a agenda é ANONIMIZADA, e não apagada", () => {
+    /* `patient_user_id` é `ON DELETE SET NULL` — deliberado, a agenda do médico
+       não pode perder a consulta. Mas nome, e-mail, telefone e observações são
+       digitados no pedido e sobreviviam inteiros. Apagar a linha destruiria o
+       histórico DELE; anonimizar tira a pessoa e deixa o fato. */
+    expect(C).toContain('.from("appointment_requests")');
+    expect(C).toContain('patient_name: "Paciente removida"');
+    expect(C).toMatch(/notes: null/);
+  });
+
+  test("⚠️ NOT NULL não vira `null` — isso travaria a exclusão inteira", () => {
+    /* `patient_email` e `patient_phone` são `NOT NULL`: mandar `null` faz o
+       update falhar, a exclusão devolver "falhou", e ela ficar sem conseguir
+       apagar a conta — um vazamento trocado por um bloqueio. */
+    expect(C).not.toMatch(/patient_email: null/);
+    expect(C).not.toMatch(/patient_phone: null/);
+  });
+
+  test("⚠️ roda ANTES do `deleteUser`", () => {
+    /* Depois, `patient_user_id` já é NULL e não há mais como achar as linhas
+       dela. */
+    const anon = C.indexOf('patient_name: "Paciente removida"');
+    const apaga = C.indexOf("admin.deleteUser");
+    expect(anon).toBeGreaterThan(-1);
+    expect(apaga).toBeGreaterThan(-1);
+    expect(anon).toBeLessThan(apaga);
+  });
+});
