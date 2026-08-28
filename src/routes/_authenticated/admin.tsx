@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CustoTab } from "@/components/custo-da-plataforma-tab";
 import { Fragment, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -156,6 +157,7 @@ const PLANS = [
 type AdminTab =
   | "visao"
   | "consultor"
+  | "custo"
   | "crescimento"
   | "alertas"
   | "nps"
@@ -179,6 +181,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
     group: "Crescimento",
     items: [
       { key: "consultor", label: "Consultor IA", icon: "🤖" },
+      { key: "custo", label: "Custo", icon: "🧾" },
       { key: "crescimento", label: "Crescimento", icon: "📈" },
       { key: "alertas", label: "Alertas", icon: "🚨" },
       { key: "nps", label: "NPS", icon: "⭐" },
@@ -356,6 +359,7 @@ function AdminConsole() {
           </div>
           {tab === "visao" && data && <OverviewTab data={data} />}
           {tab === "consultor" && <ConsultorTab />}
+          {tab === "custo" && <CustoTab />}
           {tab === "crescimento" && <CrescimentoTab />}
           {tab === "alertas" && <AlertasTab />}
           {tab === "nps" && <NpsTab />}

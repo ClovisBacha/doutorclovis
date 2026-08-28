@@ -14518,18 +14518,42 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
       // Get companion invite token for sharing
       const { data: invites } = await (supabase as any)
         .from("companion_invites")
-        .select("token")
+        /* ⚠️ **`album_token` TEM DE SER PEDIDO.** Este `select` trazia só
+           `token`, então `invites[0].album_token` era SEMPRE `undefined` e o
+           `??` abaixo caía sempre no recuo — que não era recuo nenhum: era o
+           caminho de todo mundo. E o comentário ao lado afirmava o contrário,
+           dizendo que depois do SQL `album_token` estaria preenchido. Está —
+           NO BANCO. A consulta é que não o trazia. */
+        .select("token, album_token")
         .eq("user_id", s.session.user.id)
         .order("created_at", { ascending: false })
         .limit(1);
       if (invites?.[0]?.token) {
         setInviteToken(invites[0].token);
-        /* ⚠️ `album_token`, e o recuo para `token` existe só para a linha que
-           ainda não passou pela rotação do SQL. Depois de rodá-lo, `album_token`
-           está sempre preenchido — e é ele que NÃO abre o SOS. */
-        setShareUrl(
-          `${window.location.origin}/album/${invites[0].album_token ?? invites[0].token}`,
-        );
+        /**
+         * ⚠️ **SEM `album_token`, O LINK NÃO SAI — e nunca cai no `token`.**
+         *
+         * Os dois vivem na mesma linha e têm privilégios OPOSTOS: `token` abre
+         * o painel do acompanhante E os SOS dos últimos 30 minutos com
+         * latitude e longitude (`getRecentPanicByToken`, que filtra por
+         * `token`). `album_token` abre só o álbum.
+         *
+         * O link do álbum é o que ela cola no grupo da família — numa
+         * influenciadora, para muito mais gente. Um recuo para `token` aqui
+         * publica a localização dela em tempo real de emergência para todo
+         * mundo que receber a mensagem.
+         *
+         * E o recuo nem funcionava: `getFamilyAlbum` busca por `album_token`,
+         * então um link com o `token` do acompanhante **não abre o álbum**.
+         * Ou seja, o recuo trocava um álbum que não abre por um vazamento de
+         * GPS — as duas pontas erradas de uma vez.
+         *
+         * Sem a coluna, o certo é NÃO oferecer o link: o álbum ficar
+         * indisponível até o SQL rodar é recuperável; o GPS espalhado no
+         * WhatsApp não é.
+         */
+        const doAlbum = invites[0].album_token;
+        setShareUrl(doAlbum ? `${window.location.origin}/album/${doAlbum}` : "");
       }
       setLoading(false);
     })();
@@ -14673,7 +14697,12 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             </button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            A família acessa o álbum com o mesmo link do acompanhante.
+            {/* ⚠️ A frase antiga dizia "a família acessa o álbum com o MESMO
+                link do acompanhante" — e ensinava exatamente o que não pode
+                ser verdade: o link do acompanhante abre o alerta de emergência
+                com localização. Os dois links são diferentes de propósito. */}
+            Este link abre só o álbum. Ele é diferente do link do acompanhante, que mostra mais
+            coisas suas.
           </p>
         </div>
       )}
@@ -14682,6 +14711,19 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm text-muted-foreground">
           Crie um convite de acompanhante na aba <strong>Acompanhante</strong> para compartilhar o
           álbum com a família.
+        </div>
+      )}
+
+      {/* ⚠️ **O SILÊNCIO AQUI LERIA COMO APP QUEBRADO.** Existe convite, e mesmo
+          assim não há link: é o caso em que a linha ainda não tem `album_token`
+          (o SQL da rotação não rodou). O link NÃO cai no token do acompanhante
+          — ele abre o SOS com GPS —, então em vez de um link perigoso ela
+          recebe a explicação. */}
+      {inviteToken && !shareUrl && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          O link do álbum ainda não está disponível nesta conta. Ele é diferente do link do
+          acompanhante de propósito — o do acompanhante abre o seu alerta de emergência, e não pode
+          ir para o grupo da família. Avise o consultório para liberar.
         </div>
       )}
 
