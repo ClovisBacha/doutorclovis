@@ -2005,8 +2005,32 @@ function MinhaContaPage() {
         />
       )}
 
-      {/* ── Central de emergência (aberta pelo SOS da barra) ────── */}
-      {emergencyOpen && !careMode && (
+      {/**
+       * ── Central de emergência (aberta pelo SOS da barra) ──────
+       *
+       * ⚠️ **NÃO HÁ PORTÃO DE MODO CUIDADO AQUI, E ISSO É A REGRA.**
+       *
+       * Esta condição era `emergencyOpen && !careMode`: a paciente em luto
+       * tocava no SOS da barra — que continua ACESO —, `emergencyOpen` virava
+       * `true`, e a folha simplesmente não montava. O botão de emergência do
+       * app não fazia nada, exatamente para quem mais precisa dele.
+       *
+       * Quem acabou de perder uma gestação está em risco clínico ALTO
+       * (hemorragia, infecção, pré-eclâmpsia de pós-parto) e em risco
+       * psiquiátrico. O Modo Cuidado existe para o app parar de falar do bebê
+       * — nunca para parar de socorrer.
+       *
+       * E a decisão já estava escrita DENTRO da própria folha, no comentário do
+       * som do alarme: "`podeSoar` deixa passar mesmo com o som desligado e
+       * mesmo em Modo Cuidado — quem perdeu a gestação continua podendo passar
+       * mal". O componente sabia; a tela que o monta fazia o contrário.
+       *
+       * O que o luto muda é o CONTEÚDO, não a porta: `weekLabel` chega `null`
+       * quando não há gestação em curso, e a folha já não desenha a linha da
+       * semana nesse caso. Gatear a folha inteira para não mostrar uma linha é
+       * apagar o socorro para esconder um rótulo.
+       */}
+      {emergencyOpen && (
         <EmergencySheet
           /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
              sem caminho nenhum no celular — as fileiras de categorias que a
