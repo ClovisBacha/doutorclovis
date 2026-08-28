@@ -7997,6 +7997,14 @@ export const resolverDenunciaDaRede = createServerFn({ method: "POST" })
         .eq("id", data.denunciaId));
     }
     if (error) return { ok: false as const, motivo: "banco" as const };
+    /* ⚠️ **Rastro da decisão.** Remover conteúdo de uma paciente é a segunda
+       ação mais grave do admin, e ela não deixava linha nenhuma — enquanto
+       criar um cupom deixa. Numa disputa, a ausência de linha é lida como "a
+       ação não aconteceu". Best-effort, depois do `update`. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit({ id: u.user?.id, email }, "moderacao.resolver", data.denunciaId, {
+      desfecho,
+    });
     return { ok: true as const };
   });
 

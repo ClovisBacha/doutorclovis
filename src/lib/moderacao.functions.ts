@@ -348,5 +348,27 @@ export const suspenderDaComunidade = createServerFn({ method: "POST" })
       }
     }
 
+    /* ─── A LINHA DE AUDITORIA ────────────────────────────────────────────
+     *
+     * ⚠️ **A DUAS AÇÕES MAIS GRAVES DO ADMIN NÃO DEIXAVAM RASTRO.** Trocar o
+     * plano de um médico, criar um cupom, publicar um comunicado — tudo isso
+     * grava em `audit_log`. Tirar uma paciente da Comunidade, não.
+     *
+     * Isso importa em três momentos concretos: quando ela pergunta por que
+     * sumiu (e ninguém sabe quem decidiu, quando, nem por quê), quando é
+     * preciso reverter (e não há o que reverter para), e numa disputa — onde
+     * **a ausência de linha é lida como "a ação não aconteceu"**, que é
+     * exatamente o que o log existe para desmentir.
+     *
+     * `writeAudit` é best-effort e NUNCA lança: uma falha de log não pode
+     * derrubar a suspensão em si. Ela vai DEPOIS do `update`, senão gravaria
+     * uma ação que não aconteceu. */
+    const { writeAudit } = await import("./audit.server");
+    await writeAudit(
+      { id: u.user?.id, email },
+      data.suspender ? "comunidade.suspender" : "comunidade.reativar",
+      data.contaId,
+      { motivo: data.suspender ? (data.motivo ?? "outro") : null },
+    );
     return { ok: true as const };
   });
