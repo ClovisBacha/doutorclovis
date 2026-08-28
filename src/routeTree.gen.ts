@@ -41,6 +41,7 @@ import { Route as PreviewGratidaoRouteImport } from './routes/preview-gratidao'
 import { Route as PreviewGradesRouteImport } from './routes/preview-grades'
 import { Route as PreviewExercicioRouteImport } from './routes/preview-exercicio'
 import { Route as PreviewCustoRouteImport } from './routes/preview-custo'
+import { Route as PreviewConvitesRouteImport } from './routes/preview-convites'
 import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
@@ -263,6 +264,11 @@ const PreviewExercicioRoute = PreviewExercicioRouteImport.update({
 const PreviewCustoRoute = PreviewCustoRouteImport.update({
   id: '/preview-custo',
   path: '/preview-custo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewConvitesRoute = PreviewConvitesRouteImport.update({
+  id: '/preview-convites',
+  path: '/preview-convites',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewConviteRoute = PreviewConviteRouteImport.update({
@@ -610,6 +616,7 @@ export interface FileRoutesByFullPath {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -705,6 +712,7 @@ export interface FileRoutesByTo {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -802,6 +810,7 @@ export interface FileRoutesById {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-conta': typeof PreviewContaRoute
   '/preview-convite': typeof PreviewConviteRoute
+  '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
   '/preview-exercicio': typeof PreviewExercicioRoute
   '/preview-grades': typeof PreviewGradesRoute
@@ -899,6 +908,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-convite'
+    | '/preview-convites'
     | '/preview-custo'
     | '/preview-exercicio'
     | '/preview-grades'
@@ -994,6 +1004,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-convite'
+    | '/preview-convites'
     | '/preview-custo'
     | '/preview-exercicio'
     | '/preview-grades'
@@ -1090,6 +1101,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-conta'
     | '/preview-convite'
+    | '/preview-convites'
     | '/preview-custo'
     | '/preview-exercicio'
     | '/preview-grades'
@@ -1187,6 +1199,7 @@ export interface RootRouteChildren {
   PreviewConquistasRoute: typeof PreviewConquistasRoute
   PreviewContaRoute: typeof PreviewContaRoute
   PreviewConviteRoute: typeof PreviewConviteRoute
+  PreviewConvitesRoute: typeof PreviewConvitesRoute
   PreviewCustoRoute: typeof PreviewCustoRoute
   PreviewExercicioRoute: typeof PreviewExercicioRoute
   PreviewGradesRoute: typeof PreviewGradesRoute
@@ -1469,6 +1482,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-custo'
       fullPath: '/preview-custo'
       preLoaderRoute: typeof PreviewCustoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-convites': {
+      id: '/preview-convites'
+      path: '/preview-convites'
+      fullPath: '/preview-convites'
+      preLoaderRoute: typeof PreviewConvitesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-convite': {
@@ -1959,6 +1979,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewConquistasRoute: PreviewConquistasRoute,
   PreviewContaRoute: PreviewContaRoute,
   PreviewConviteRoute: PreviewConviteRoute,
+  PreviewConvitesRoute: PreviewConvitesRoute,
   PreviewCustoRoute: PreviewCustoRoute,
   PreviewExercicioRoute: PreviewExercicioRoute,
   PreviewGradesRoute: PreviewGradesRoute,

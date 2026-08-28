@@ -94,6 +94,7 @@ import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unifica
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
+import { ConvitesDoMedico } from "@/components/convites-do-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
   listMyAddresses,
@@ -1620,6 +1621,16 @@ function PainelPage() {
                 para a lista delas. Pedido do dono: "vai ser lá que o médico
                 dará os presentinhos". */}
             <MesadaDoMedico tokenFn={token} pacientes={engagement?.patients ?? []} />
+            {/* ─── O CÓDIGO QUE A PACIENTE PEDE, E QUE NINGUÉM GERAVA ────────
+                Três telas do app dela dizem "Digite o código do seu médico" e
+                prometem um ano de Premium. `generateInviteCode` estava escrita,
+                testada e com a cota mensal resolvida no servidor — e sem UM
+                chamador no app: ela pedia o código, ele procurava no painel e
+                não achava, e a conclusão razoável dela era que ele não quis dar.
+
+                Fica ao lado da mesada pela mesma razão que trouxe a mesada para
+                cá: dar um ano de Premium é uma ação sobre uma paciente. */}
+            <ConvitesDoMedico tokenFn={token} />
             {/* ─── A LISTA DE PRÉ-CONSULTAS SAIU DAQUI (ago/2026) ────────────
                 Era uma seção própria, com o título "Pré-consultas" escrito na
                 aba — pedido do dono: "não tem que estar escrito ali". O selo

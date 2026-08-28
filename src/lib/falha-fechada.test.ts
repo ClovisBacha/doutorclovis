@@ -128,3 +128,39 @@ describe("apagar a conta não deixa nome e telefone na agenda", () => {
     expect(anon).toBeLessThan(apaga);
   });
 });
+
+/**
+ * ─── A VAGA CORPORATIVA ───────────────────────────────────────────────────
+ *
+ * ⚠️ `const { count } = …` descartava o `error`, e `count ?? 0` fazia
+ * `0 >= max_seats` ser FALSO: qualquer falha de leitura concedia a vaga. O teto
+ * contratado deixava de existir em silêncio, e cada vaga é um acesso pago que a
+ * empresa não comprou.
+ *
+ * ⚠️ E o recado distingue os dois casos. "Limite atingido" sobre uma contagem
+ * que falhou faria a paciente — e o RH que ela procurasse — concluírem que o
+ * contrato acabou, num mês em que ainda há vagas.
+ */
+describe("vaga corporativa: o teto do contrato", () => {
+  const CORP = readFileSync("src/lib/corporativo.functions.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ o erro da contagem é NOMEADO e conferido", () => {
+    expect(CORP).toContain("error: erroDaContagem");
+    expect(CORP).toContain("if (erroDaContagem || count === null)");
+  });
+
+  test("⚠️ `count ?? 0` sumiu — era ele que abria o portão", () => {
+    expect(CORP).not.toContain("(count ?? 0) >= account.max_seats");
+    expect(CORP).toContain("if (count >= account.max_seats)");
+  });
+
+  test("⚠️ a falha NÃO é dita como 'limite atingido'", () => {
+    const i = CORP.indexOf("if (erroDaContagem || count === null)");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = CORP.slice(i, CORP.indexOf("if (count >= account.max_seats)", i));
+    expect(bloco).toMatch(/tente de novo/i);
+    expect(bloco).not.toMatch(/Limite de vagas atingido/);
+  });
+});
