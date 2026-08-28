@@ -10816,13 +10816,13 @@ Régua em **`src/lib/codificar-imagem.ts`**, que virou o único caminho por onde
 uma foto do app vira bytes. Medido com imagem parecida com foto (degradê de
 pele e céu, detalhe fino de cabelo e tecido):
 
-| onde | JPEG | WebP | |
-| --- | --- | --- | --- |
+| onde                             | JPEG   | WebP      |      |
+| -------------------------------- | ------ | --------- | ---- |
 | foto da publicação (1080 · 0,72) | 122 kB | **85 kB** | −30% |
-| capa do vídeo (1080 · 0,72) | 122 kB | **85 kB** | −30% |
-| foto do álbum (800 · 0,75) | 78 kB | **62 kB** | −20% |
-| miniatura da grade (480 · 0,75) | 30 kB | 28 kB | −7% |
-| avatar (512 · 0,82) | 55 kB | 54 kB | −2% |
+| capa do vídeo (1080 · 0,72)      | 122 kB | **85 kB** | −30% |
+| foto do álbum (800 · 0,75)       | 78 kB  | **62 kB** | −20% |
+| miniatura da grade (480 · 0,75)  | 30 kB  | 28 kB     | −7%  |
+| avatar (512 · 0,82)              | 55 kB  | 54 kB     | −2%  |
 
 ⚠️ **O ganho mora nas GRANDES.** Miniatura e avatar quase não mudam — não
 custam nada e também não rendem nada. Quem paga a banda é a foto de 1080.
@@ -10885,11 +10885,11 @@ novo.
 
 Uma publicação de carrossel de cinco fotos, na abertura do feed:
 
-| | antes | agora |
-| --- | --- | --- |
-| fotos baixadas | 3 | **2** |
-| bytes por foto | 122 kB | **85 kB** |
-| **total** | **366 kB** | **170 kB** — −54% |
+|                | antes      | agora             |
+| -------------- | ---------- | ----------------- |
+| fotos baixadas | 3          | **2**             |
+| bytes por foto | 122 kB     | **85 kB**         |
+| **total**      | **366 kB** | **170 kB** — −54% |
 
 Nenhum pixel a menos, nenhum lado reduzido, nenhuma qualidade rebaixada.
 
@@ -11470,3 +11470,169 @@ vermelha na hora, e o componente virou `escolher-motivo.tsx`.
 **Medido:** 106 bancadas · 64 telas da Comunidade · 11 roteiros de interação ·
 5.210 testes · zero problemas.
 
+## A noite pré-apresentação, parte 2: sete recursos que não existiam (ago/2026)
+
+Continuação da varredura da noite. O que segue não são melhorias — são recursos
+que o app **prometia e não entregava**, e defeitos que faziam a tela afirmar
+coisas falsas. Todos falhavam em silêncio, com a suíte verde e o `tsc` limpo.
+
+### ⚠️ A classe que dominou a noite: "não consegui ler" com cara de "não há nada"
+
+Ela apareceu **quatro vezes**, em telas diferentes, e a régua de triagem é
+sempre a mesma: **"se esta leitura voltar vazia, o app AFIRMA alguma coisa que
+ela não tem como saber que é falsa, e que muda o que ela faz a seguir?"**
+
+| onde               | o que a tela dizia                  | o custo                               |
+| ------------------ | ----------------------------------- | ------------------------------------- |
+| busca de obstetra  | "Nenhum médico com esse nome"       | ela para de procurar o próprio médico |
+| cartão da agenda   | "Nenhuma consulta marcada ainda"    | ela falta à consulta                  |
+| aba Consultas      | "Agende a primeira — leva 1 minuto" | ela marca uma SEGUNDA                 |
+| emissões do médico | lista vazia                         | receita repetida, exame repetido      |
+
+⚠️ **A da busca é a pior**, porque a afirmação é sobre o MUNDO REAL: o obstetra
+dela existe, está cadastrado, e o app diz que não. E o servidor já distinguia
+(`{ ok: false, error }`) — a tela é que jogava fora. É a correção que a
+Comunidade ganhou meses antes (`motivo: "instavel"`), deixada de pé em todo o
+resto do app.
+
+⚠️ **A da agenda contradizia o próprio app:** o push do servidor continuaria
+dizendo "consulta amanhã" enquanto a tela dizia que não havia nenhuma.
+
+**Os textos novos dizem de quem é a culpa** ("isso é a nossa conexão") e o que
+continua valendo ("se você tem consulta marcada, ela continua marcada"). Há
+teste com lista de termos proibidos: o app pode dizer que ELE falhou, nunca
+induzir a conclusão cujo custo é uma falta.
+
+### ⚠️ E a outra classe: função de servidor sem porta — pela SEXTA vez
+
+`generateInviteCode`, `getMyInviteInfo`, `listDoctorAddresses`,
+`emissoesDaPaciente`, `shouldAskNps`, `submitNps` — seis funções escritas,
+testadas, e **inalcançáveis no app**. Cada uma era um recurso inteiro que não
+existia:
+
+- ⚠️ **O app pedia um código que ninguém conseguia gerar.** Três telas da
+  paciente dizem "Digite o código do seu médico" e prometem um ano de Premium.
+  Ela pedia, ele procurava no painel e não achava, e a conclusão razoável dela
+  era que ele não quis dar.
+- ⚠️ **A paciente nunca via onde o médico atende.** Ele cadastra vários
+  consultórios; ela via um campo de texto solto — e, depois de vinculada,
+  endereço NENHUM. O custo é ela ir ao lugar errado.
+- ⚠️ **O médico não via o que ele mesmo receitou.** Na consulta seguinte ele
+  decide o que pedir sem enxergar o que pediu no mês passado.
+- ⚠️ **O NPS não tinha como receber uma resposta.** O relatório do admin ficava
+  em ZERO para sempre — o painel parecia funcionar e media o vazio.
+
+**`src/lib/servidor-tem-porta.test.ts` fecha a classe inteira.** Ela varre todos
+os `*.functions.ts` (`rede-tem-porta` só cobria a rede), **nomeia** a dívida que
+já existia em vez de exigir um mutirão, e a lista **só pode encolher** — há
+teste recusando uma entrada que já ganhou porta. Ela mordeu duas vezes no mesmo
+turno, cobrando a remoção das que acabaram de ser ligadas.
+
+### As decisões de produto que essas telas exigiram
+
+- ⚠️ **O botão de gerar convite DESLIGA na cota esgotada e NÃO na ilegível** — e
+  isso é o oposto da decisão do presente entre amigas, de propósito: lá o
+  servidor não tem limite, e desabilitar pela contagem seria "o limite de volta,
+  agora só na tela". Aqui o servidor recusa, então o botão aceso mente. Na
+  contagem ilegível ninguém sabe se acabou.
+- ⚠️ **`cota_ilegivel` não é dito como "acabou"** — faria o médico parar de
+  tentar num mês em que ele ainda tem convites.
+- ⚠️ **Sem endereço cadastrado a seção não existe** — nunca "nenhum consultório
+  cadastrado": ela não pode fazer nada com essa frase, e ela insinua um problema
+  com o médico dela que provavelmente não existe.
+- ⚠️ **O mapa abre por `https://`**, nunca `geo:`/`maps:` — o esquema nativo não
+  existe no navegador e num PWA instalado o link não faria nada. Mesma lição do
+  `itms-apps://`.
+- ⚠️ **O NPS NÃO aparece depois de uma conquista.** A tentação é perguntar no
+  momento bonito porque a nota sobe — e é por isso que não se faz: **NPS é
+  instrumento de MEDIDA**, e uma medida enviesada para cima é pior que medida
+  nenhuma, porque o dono decide com ela achando que é real.
+- ⚠️ **Agradecimento ÚNICO.** "Avalie na loja" para quem deu 10 é o _review
+  gating_ que a diretriz 1.1.7 da App Store proíbe; e texto diferente por nota
+  ensina que a nota mudou o tratamento que ela recebe.
+- ⚠️ **Conta nova não é perguntada** (14 dias). O único corte era "90 dias desde
+  a última resposta": quem criava a conta era perguntada na primeira abertura, e
+  a resposta mediria a expectativa dela, não o produto.
+
+### ⚠️ E o Modo Cuidado ainda tinha buracos
+
+- **A grade da aba Bebê era usada crua**: no luto a paciente continuava vendo
+  **Contagem** (regressiva para o parto), **Nomes** (a votação do nome) e
+  **Enxoval**. O componente já RECEBIA `careMode` e o repassava para dentro de
+  duas sub-telas; o que faltava era a própria grade olhar para ele.
+  ⚠️ **O álbum FICA** — as fotos são a memória do que houve. ⚠️ **E o
+  `initialSub` passa pela mesma régua**: sem isso o ladrilho sumia e a tela abria
+  assim mesmo, por link.
+- ⚠️ **"Não sei" tinha de virar `undefined`, e não `false`.** A prop `careMode`
+  do Perfil é `boolean` puro: antes de o perfil carregar ela vale "não está de
+  luto". Quem sabe a diferença é `profile === null`.
+
+### ⚠️ Os marcos do bebê diziam "pronto" sem olhar a resposta
+
+`setMilestone`/`removeMilestone`/`addBabyWeight` devolvem `{ ok: false }` numa
+resposta **200 NORMAL** — um `try/catch` não pega. A tela pintava o ✓ e nunca
+corrigia: a mãe registrava o primeiro sorriso, fechava o app, e na abertura
+seguinte não havia nada. **É o livro de memórias do bebê** — quando ela
+descobre, a data já passou.
+
+⚠️ **E a irmã ao lado — a caderneta de VACINAS — já estava consertada**, com o
+comentário do conserto visível na mesma tela. É a forma mais comum de defeito
+deste repositório: a régua aplicada num lugar e deixada de pé no vizinho.
+
+### ⚠️ Duas travas de contrato falhavam abertas
+
+- **A vaga corporativa**: `count ?? 0` fazia `0 >= max_seats` ser falso, e
+  qualquer falha de leitura CONCEDIA a vaga. Cada vaga é um acesso pago que a
+  empresa não comprou.
+- **A cota de convites Premium** (consertada na primeira metade da noite): cada
+  convite é um ano de acesso gratuito.
+
+### ⚠️ E as armadilhas de teste, de novo — com uma nova
+
+Todas as antigas reapareceram (outra ocorrência do mesmo nome ×3, janela de
+distância ×2, prosa quebrando busca de texto, `indexOf` devolvendo −1). E duas
+novas, do **extrator de corpo por contagem de chaves**:
+
+1. ⚠️ **`createServerFn({ method: "POST" })`** — o primeiro `{` é o objeto de
+   opções, e o extrator devolvia `{ method: "POST" }`: a mutação passou VERDE.
+2. ⚠️ **`.handler(async ({ data }) => {`** — devolvia `{ data }`: a asserção
+   ficou VERMELHA sobre código certo.
+3. ⚠️ **E o marcador COM a chave junto** (`"=> {"`) começa a contagem na chave
+   SEGUINTE. Três voltas pelo mesmo extrator, nas duas direções do mesmo engano.
+4. ⚠️ **Num `return (` de JSX o primeiro `{` é uma EXPRESSÃO** — ali o que
+   garante o lugar é a CONTENÇÃO entre esta função e a próxima, não a extração.
+
+⚠️ **E a mutação achou uma guarda MINHA que não fazia nada:** o `if (quando >
+agora) return false` do adiamento do NPS era código morto — a subtração já dá
+negativo e reprova. **Código morto com um comentário afirmando uma proteção é
+armadilha para quem ler depois.** A guarda saiu, a prosa passou a dizer a
+verdade, e o teste ganhou o caso de 120 dias, que é o único que morde se alguém
+puser um `Math.abs` ali.
+
+### ⚠️ E duas medições minhas mentiram
+
+- A checagem de "a página carregou" era **sensível a caixa** (o título vem em
+  maiúsculas por CSS) e contava como defeito o `ERR_FAILED` do **abort de fontes
+  do próprio instrumento**. Seis telas certas foram reprovadas.
+- Antes disso, uma varredura imprimiu **✅ sobre um `ERR_CONNECTION_REFUSED`**:
+  o servidor de dev tinha caído e o script só olhava exceções de página.
+  **Marcar sucesso sem conferir que a página carregou é a mesma falha aberta que
+  a noite inteira passou consertando.**
+
+### O que a FOTO pegou, e nenhum teste pegaria
+
+- **O botão de gerar convite ficava ACESO com a cota esgotada** — a tela dizia
+  "0 de 25 disponíveis" e ele tocava para o servidor recusar.
+- **Onze notas do NPS numa linha davam 26px de largura** (11 × 44 = 484px numa
+  tela de 393). Duas fileiras: 50×44.
+
+**Aplicar no Supabase:** nada novo — tudo sai de tabelas e colunas que já
+existem. Continua pendente `supabase/APLICAR_CONVERSA_SILENCIAR.sql`.
+
+**Bancadas novas:** `/preview-convites?estado=normal · esgotada · ilegivel ·
+semplano · falhou · carregando` · `/preview-consultorios?estado=dois · um ·
+magro · vazio · falhou · carregando` · `/preview-emissoes?estado=algumas ·
+muitas · vazio · degradado · falhou · carregando` · `/preview-nps?fase=…&nota=9`.
+
+**Medido ao fim:** 5.406 testes · 112 bancadas · 11 roteiros de interação · zero
+problemas.
