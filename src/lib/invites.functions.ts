@@ -53,12 +53,22 @@ async function loadDoctor(accessToken: string) {
   return { supabaseAdmin, user: u.user, doc, convitesPorMes };
 }
 
-async function monthlyUsed(supabaseAdmin: any, doctorId: string): Promise<number> {
-  const { count } = await supabaseAdmin
+/**
+ * Quantos convites o médico já gerou no mês — ou `null` se não deu para contar.
+ *
+ * ⚠️ **`null`, e NUNCA zero.** A versão anterior fazia `return count ?? 0` com
+ * o `error` descartado: qualquer falha devolvia "zero usados", `used >= limit`
+ * virava `0 >= 25`, e o convite era gerado. A cota deixava de existir em
+ * silêncio — e cada convite Premium é **um ano de acesso gratuito** para uma
+ * paciente.
+ */
+async function monthlyUsed(supabaseAdmin: any, doctorId: string): Promise<number | null> {
+  const { count, error } = await supabaseAdmin
     .from("invite_codes")
     .select("id", { count: "exact", head: true })
     .eq("doctor_id", doctorId)
     .gte("created_at", monthStartISO());
+  if (error) return null;
   return count ?? 0;
 }
 
@@ -67,6 +77,11 @@ export type InviteInfo = {
   limit: number;
   used: number;
   remaining: number;
+  /**
+   * ⚠️ `true` quando a CONTAGEM falhou — `used`/`remaining` viram zero por
+   * segurança, não por medição.
+   */
+  usedIlegivel?: boolean;
 };
 
 export const getMyInviteInfo = createServerFn({ method: "POST" })
@@ -77,6 +92,19 @@ export const getMyInviteInfo = createServerFn({ method: "POST" })
     const limit = convitesPorMes;
     if (limit <= 0) return { ok: true as const, eligible: false, limit: 0, used: 0, remaining: 0 };
     const used = await monthlyUsed(supabaseAdmin, doc.id);
+    /* ⚠️ Aqui a leitura só INFORMA, e mesmo assim não vira zero: um painel
+       dizendo "0 usados · 25 restantes" sobre uma contagem que falhou faz o
+       médico contar com convites que talvez não tenha. */
+    if (used === null) {
+      return {
+        ok: true as const,
+        eligible: true,
+        limit,
+        used: 0,
+        remaining: 0,
+        usedIlegivel: true as const,
+      };
+    }
     return {
       ok: true as const,
       eligible: true,
@@ -95,6 +123,9 @@ export const generateInviteCode = createServerFn({ method: "POST" })
     if (limit <= 0) return { ok: false as const, error: "sem_convites" };
 
     const used = await monthlyUsed(supabaseAdmin, doc.id);
+    /* ⚠️ Não conseguir contar RECUSA. Um convite a menos é um pedido refeito em
+       dez segundos; a cota desligada é um ano de Premium grátis por clique. */
+    if (used === null) return { ok: false as const, error: "cota_ilegivel" };
     if (used >= limit) return { ok: false as const, error: "cota_esgotada" };
 
     // Gera um código único (retenta em colisão de UNIQUE).

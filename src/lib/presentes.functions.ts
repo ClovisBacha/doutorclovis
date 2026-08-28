@@ -102,7 +102,21 @@ async function listaViva(
     .select("display_name, baby_name, care_mode, referral_code")
     .eq("id", data.user_id)
     .maybeSingle();
-  if (p?.care_mode) return null;
+  /**
+   * ⚠️ **O PORTÃO DE MODO CUIDADO FALHAVA ABERTO — e aqui dói mais, porque o
+   * objeto vive FORA do aparelho dela.**
+   *
+   * Era `if (p?.care_mode)`. Com a leitura falhando, `p` é `null`,
+   * `p?.care_mode` é `undefined`, o `if` não dispara e **a lista de presentes
+   * continua no ar** — para as trinta pessoas que já têm o link, depois de uma
+   * perda.
+   *
+   * `!p` entra na frente. A página pública já responde o MESMO silêncio para
+   * token inválido, lista fechada e Modo Cuidado, então recusar por falha de
+   * leitura não conta nada a ninguém — e o pior caso é a lista ficar
+   * indisponível por um minuto.
+   */
+  if (!p || p.care_mode) return null;
 
   return { id: data.id, userId: data.user_id, row: data, perfil: p ?? {} };
 }
