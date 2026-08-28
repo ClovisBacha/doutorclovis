@@ -10904,6 +10904,290 @@ ninguém volte a codificar por fora.
 **Catraca:** `src/lib/codificar-imagem.test.ts` — sete mutantes em vermelho,
 inclusive o do PNG silencioso e o do carrossel voltando a baixar tudo.
 
+## A NOITE PRÉ-LANÇAMENTO: dez pontos, e sete eram defeitos que ninguém via (ago/2026)
+
+Pedido do dono antes de dormir: revisar o código inteiro, achar o que ainda pode
+estar falhando ou pela metade, citar dez pontos e aplicá-los — com foco na aba
+da paciente e em dar controle de verdade ao admin, "inclusive na visualização de
+custos".
+
+O método foi uma auditoria de dez lentes em paralelo (abas da paciente · porta e
+chamador · coluna sem degrau · falha aberta · testes que mentem · painel do
+médico · LGPD · iOS e hidratação · segurança clínica · custo), com céticos
+independentes tentando REFUTAR cada achado. Ela produziu **49 achados brutos**.
+
+⚠️ **E a fase de refutação estourou o limite de sessão** — 150 dos 178 agentes
+morreram. Os achados que sobreviveram com três céticos são ouro; os outros eu
+conferi um a um à mão, e **um deles era falso** (ver o fim desta seção).
+
+### 1 · ⚠️ O LINK DO ÁLBUM CARREGAVA O TOKEN QUE ABRE O SOS COM GPS
+
+O link que a paciente cola no grupo da família ia com o `token` do
+acompanhante — que abre `getRecentPanicByToken`, ou seja, os SOS dos últimos 30
+minutos **com latitude e longitude**. Em produção, para todas.
+
+A causa era uma palavra: o select pedia `.select("token")`, então
+`invites[0].album_token` era **sempre `undefined`** e o `??` caía sempre no
+recuo — que não era recuo nenhum, era o caminho de todo mundo. O comentário ao
+lado afirmava o contrário ("depois do SQL, `album_token` está preenchido"): está,
+no BANCO; a consulta é que não o trazia.
+
+E o mesmo defeito quebrava o álbum: `getFamilyAlbum` busca por `album_token`,
+então o link com o token do acompanhante **não abria nada**. O recuo trocava um
+álbum que não abre por um vazamento de GPS.
+
+⚠️ **E A CATRACA QUE JÁ EXISTIA APROVAVA ISTO.** `sos-nao-vaza.test.ts` fazia
+`slice(i, i+90).toContain("album_token")` — e a expressão defeituosa
+`album_token ?? invites[0].token` **contém** essa string. Um teste com o nome
+certo dando cobertura ao defeito que ele existia para impedir: as duas armadilhas
+já catalogadas ("outra ocorrência do mesmo nome" e "cobre a garantia, nunca a
+grafia") somadas.
+
+Sem `album_token` o link **não sai**, e a tela explica: o álbum indisponível é
+recuperável; o GPS espalhado no WhatsApp não é. E a frase da tela — "a família
+acessa o álbum com o MESMO link do acompanhante" — **ensinava o defeito**.
+
+### 2 · ⚠️ CINCO COLUNAS DO DIRECT EXISTIAM SÓ NO CÓDIGO
+
+`silenciada_a/b`, `saiu_a/b` (em `rede_conversas`) e `imagem_path`, `ref_tipo`,
+`ref_id` (em `rede_mensagens`) eram lidas e gravadas pelo app e criadas por
+**nenhum arquivo SQL**. O código chegava a NOMEAR o responsável
+(`APLICAR_CONVERSA_SILENCIAR`) em dois comentários; o arquivo nunca foi escrito.
+
+⚠️ **Nada quebrava, e é isso que fez durar**: toda leitura do direct tem degrau
+de recuo, então o app degradava em silêncio e três recursos ficavam
+permanentemente mortos — **silenciar** uma conversa (o interruptor gravava no
+nada e o push continuava chegando pelo mesmo canal do aviso de emergência),
+**sair** de uma conversa, e a **foto e o anexo** da mensagem.
+
+Escrito `supabase/APLICAR_CONVERSA_SILENCIAR.sql`.
+
+**Catraca:** `coluna-tem-sql.test.ts`. Ela pergunta "esta coluna existe em ALGUMA
+tabela do schema?" em vez de "existe NESTA tabela?" — a precisa é cega
+justamente aqui, porque o `select` da conversa recebe uma VARIÁVEL montada numa
+escada de degraus. ⚠️ **E ela passou em vazio DUAS vezes antes de morder**:
+primeiro por só ler `.select("…")` com aspas (a conversa usa template literal),
+depois porque a interpolação vira uma vírgula e deixa um pedaço vazio que
+reprovava o literal inteiro.
+
+### 3 · ⚠️ O PAINEL MOSTRAVA UM CUSTO DE IA INVENTADO
+
+O cartão "Custo e margem de IA" fazia `brain_hits × 1 centavo` — contava só o
+Segundo Cérebro (deixando de fora chat, triagem, transcrição, nota clínica e
+advisor) e multiplicava por uma constante chutada, com um rodapé admitindo "é
+uma estimativa". E `ai_usage` guarda `input_tokens`, `output_tokens`, `modelo`,
+`canal` e `especie` desde que existe: **o dado do custo sempre esteve lá;
+faltava alguém multiplicar.**
+
+`custo-da-plataforma.ts` (régua pura) + `custo.functions.ts` + a aba **Custo** no
+admin. Três avisos são obrigatórios na tela, e cada um existe porque um painel
+financeiro erra numa direção só que importa — **para menos**:
+
+- **`degradado`** — alguma leitura falhou. "Custo zero" parece lucro.
+- **`truncado`** — o teto de linhas cortou o período.
+- **`semPreco`** — modelo fora da tabela. O custo dele **não está no total**, e
+  sem o aviso o painel some com uma fatia inteira justamente no dia em que
+  alguém trocou o modelo.
+
+⚠️ **`null` NUNCA vira zero**, a tabela de preço tem **data de conferência** (sem
+ela, alguém lê "custo de agosto" seis meses depois e conclui que a margem
+melhorou), e a **projeção não roda no dia 1** (regra de três sobre algumas horas
+× trinta abriria o mês anunciando um custo dez vezes maior).
+
+⚠️ E eu escrevi `.from("doctor_profiles")` — tabela que **não existe**, é
+`doctors`. O PostgREST devolveria 42P01 e TODO médico apareceria como "(sem
+nome)", sem erro nenhum.
+
+### 4 · ⚠️ "A FILA CLÍNICA ESTÁ COMPLETA?" — o controle que cobre o pior desfecho
+
+A view `clinical_events` é montada com doze guardas `to_regclass`: cada fonte só
+entra se a tabela existir **no instante em que o SQL roda**. Desenho certo (um
+`CREATE VIEW` sobre tabela ausente falharia inteiro), com um preço que nada
+verificava — uma dependência de ORDEM entre arquivos que o dono roda à mão.
+
+`saudeClinica` compara, fonte a fonte: a tabela tem linhas E a view devolve
+linhas daquela fonte? Tem e não devolve = view velha, com a instrução do que
+rodar.
+
+⚠️ **"Sem dados" NUNCA vira "ok"** — tabela vazia não prova nada sobre a view. E
+a caixa verde precisou de uma segunda volta: ela dizia "nenhuma fonte com dado
+ficou de fora" numa base com tudo vazio — verdade literal, lida como aprovação
+sobre uma checagem que não checou nada.
+
+### 5 · ⚠️⚠️ O BOTÃO DE EMERGÊNCIA NÃO ABRIA PARA QUEM ESTÁ EM LUTO
+
+`{emergencyOpen && !careMode && <EmergencySheet …/>}`. A paciente em Modo
+Cuidado tocava no SOS da barra — que continua **aceso** —, o estado virava
+`true`, e a folha simplesmente não montava. **O botão de emergência do app não
+fazia nada, exatamente para quem mais precisa dele.**
+
+Quem acabou de perder uma gestação está em risco clínico ALTO (hemorragia,
+infecção, pré-eclâmpsia de pós-parto) e em risco psiquiátrico.
+
+⚠️ **E A DECISÃO JÁ ESTAVA ESCRITA DENTRO DA PRÓPRIA FOLHA**, no comentário do
+som do alarme: _"`podeSoar` deixa passar mesmo com o som desligado e mesmo em
+Modo Cuidado — quem perdeu a gestação continua podendo passar mal"_. O
+componente sabia; a tela que o monta fazia o oposto.
+
+**A regra que fica: o Modo Cuidado existe para o app parar de FALAR DO BEBÊ,
+nunca para parar de SOCORRER.** Ele governa conteúdo, nunca o acesso a um
+caminho de emergência.
+
+### 6 · ⚠️⚠️ A EPDS RESPONDIDA DENTRO DO APP NUNCA CHEGAVA AO MÉDICO
+
+O pior defeito clínico que este repositório teve, e o único achado que os três
+céticos independentes confirmaram sem ressalva.
+
+A Escala de Edinburgh tem dez perguntas, e **a décima é ideação de autolesão**.
+Havia DUAS telas rodando o mesmo questionário validado:
+
+- **`/epds`**, a página PÚBLICA — chama `saveEpdsLog`, que carimba `doctor_id`,
+  dispara o e-mail "🚨 EPDS URGENTE — {nome} relatou pensamentos de autolesão" e
+  entra em `clinical_events` como gravidade GRAVE.
+- **A aba Pós-parto** do app — chamava só `savePpdScreening`, que grava em
+  `ppd_screenings`: uma tabela **sem coluna `doctor_id`**, fora da view, que
+  nenhum caminho do médico lê.
+
+Ou seja: a puérpera abria Pós-parto → Bem-estar (a sub-tela de ABERTURA),
+respondia **"sim, tive pensamentos de me machucar"**, via a caixa vermelha com o
+188 — e o obstetra dela não recebia nada. A mesma resposta, na página pública,
+alertava.
+
+E a tela prometia o contrário: _"o resultado deve ser compartilhado com o seu
+médico"_.
+
+⚠️ **A causa estrutural era de ARQUITETURA**: a régua do nível era a função
+`interpret` DENTRO de `src/routes/epds.tsx`. A aba não podia importá-la — a
+catraca `rotas-sem-export-solto` proíbe export não-rota num arquivo de rota, e
+com razão. Foi assim que as duas telas divergiram.
+
+`src/lib/epds.ts` é a régua pura (o nível, o índice da questão 10, os cortes 10
+e 13), usada pelas duas. ⚠️ **A questão 10 GANHA do escore total, sempre**: uma
+paciente pode somar 8 e ainda assim ter respondido que pensou em se machucar.
+
+⚠️ E o retorno é **LIDO**: `saveEpdsLog` devolve `{ ok: false }` num 200 normal,
+que um `try/catch` não pega. A tela diz "avisamos o seu médico agora" **ou** "não
+conseguimos avisar" — e nos dois casos manda ligar 188 sem esperar a resposta
+dele. "Avisamos" sobre um envio que falhou é a mentira mais cara desta tela: ela
+para de procurar ajuda achando que já pediu.
+
+### 7 · ⚠️ O PAINEL DO ACOMPANHANTE MOSTRAVA A GESTAÇÃO INTEIRA NO LUTO
+
+O portão cobria SÓ o batimento — com o comentário certo e alcance curto.
+Continuavam de pé: o título "Helena de Marina Costa", "Semana 28 e 3 dias · 81
+dias para a DPP", a aba Bebê, a aba "Para o parto", e as dicas de "Apoiar
+mamãe"/"Tarefas", que são **todas de gestação** ("acompanhe às consultas do
+pré-natal", "lanches leves para o enjoo matinal").
+
+No Modo Cuidado a fita fica vazia e entra um cartão sóbrio.
+
+⚠️ **O texto NÃO conta o que aconteceu.** O Modo Cuidado pode ser ligado pelo
+MÉDICO, e quem tem o link pode não saber de nada — um painel que anunciasse a
+perda seria o app dando, por ela, a notícia mais íntima que existe.
+
+⚠️ **A EMERGÊNCIA FICA**, e já vivia fora das abas: o alerta de SOS com
+localização e o botão do SAMU.
+
+⚠️ **E o TÍTULO só foi pego pela BANCADA.** Esta tela nasce de um token e nunca
+teve uma: conferir o luto exigia conta de gestante, convite gerado e o luto
+ligado numa conta real. Foi por isso que o portão ficou meses cobrindo só o
+batimento. Agora: `/acompanhar/x?bancada=luto`.
+
+### 8 · ⚠️ TRÊS LEITURAS QUE FALHAVAM ABERTAS
+
+A pergunta de triagem: **"se esta consulta voltar vazia ou com erro, alguma coisa
+fica mais PERMITIDA?"** Se sim, o erro tem de RECUSAR.
+
+- **Marcar consulta** — a leitura do dia descartava o `error` e ia para
+  `(doDia ?? [])`: falha de rede, ou `duration_minutes` faltando, devolvia lista
+  vazia e **a consulta era marcada por cima de outra**. ⚠️ E o backstop do banco
+  não cobre: o índice único parcial pega o INSTANTE exato, e a sobreposição
+  (10:00–10:30 marcado, 10:15 pedido) passa por ele. A única coisa entre duas
+  pacientes na mesma sala era essa leitura.
+- **Cota de convites Premium** — `return count ?? 0` com o erro descartado
+  virava "zero usados": `0 >= 25` é falso e o convite saía. Cada convite é **um
+  ano de Premium grátis**.
+- **Chá de bebê** — `if (p?.care_mode)` com `p` nulo é `undefined`: a lista
+  continuava no ar depois de uma perda, para as trinta pessoas que já têm o
+  link. É o recurso em que isso dói mais, porque o objeto vive FORA do aparelho
+  dela.
+
+### 9 · ⚠️ LGPD: o export sumia com dado dela, e apagar a conta deixava a agenda
+
+- **O export engolia COLUNA ausente.** `if (code !== "42P01" && code !== "42703")`
+  juntava duas coisas opostas: tabela ausente é normal num banco atrás das
+  migrations (não há o que levar); **coluna ausente é o contrário** — a tabela
+  está lá, com o que ela escreveu, e o select é que pediu errado. O bloco inteiro
+  sumia com `falhas: []`: ela baixava um arquivo que PARECE completo, sem o
+  perfil, e apagava a conta confiando nele.
+- **Apagar a conta deixava nome, e-mail, telefone e observações** em
+  `appointment_requests`. ⚠️ Apagar a linha seria a correção ERRADA (é o registro
+  de que houve consulta naquele horário — dado do médico, legítimo);
+  **anonimizar** é o que a LGPD pede. ⚠️ E `patient_email`/`patient_phone` são
+  `NOT NULL`: mandar `null` faria a exclusão inteira falhar — um vazamento
+  trocado por um bloqueio.
+
+### 10 · ⚠️ A FILA DE DENÚNCIAS ERA INALCANÇÁVEL
+
+As duas pontas estavam certas sozinhas: `denunciasAbertas` só admite
+`ADMIN_EMAILS` (correto — a fila mistura texto denunciado de pacientes de vários
+médicos), e `/painel` redireciona o super-admin para `/admin` (correto — a conta
+da plataforma não é médico). **Somadas, a única pessoa autorizada a ver a fila
+era expulsa da única tela que a mostrava.** Ela mudou para `/admin` → Moderação.
+
+A catraca cobra as QUATRO pontas, porque afrouxar qualquer uma "conserta" o
+sintoma e reabre o problema pelo outro lado.
+
+### ⚠️ E UM DOS DEZ ERA FALSO — o que me fez conferir todos à mão
+
+A auditoria afirmou que "não existe jeito de desligar os avisos dentro do app — a
+função que faz isso tem zero chamadores". **É falso**: `ConfiguracoesDoPerfil`,
+onde vivem os interruptores, é renderizada em `tab === "Comunidade"`, e o
+servidor É chamado. A fase de refutação nunca rodou nesse achado (limite de
+sessão), e ele teria me feito "consertar" algo que funciona.
+
+**A régua que fica: achado sem cético é hipótese.** Nesta base, conferir custa
+minutos e acreditar custa mexer em código correto num app que roda em produção.
+
+### As armadilhas de teste que apareceram nesta noite
+
+Todas já catalogadas, todas cometidas de novo — por mim:
+
+1. **`slice(i, i+90).toContain("album_token")`** aprovava
+   `album_token ?? invites[0].token`, porque a expressão CONTÉM a string.
+2. **Janela de 1.200 caracteres** para achar um bloco — medir distância mente no
+   dia em que alguém acrescenta uma linha.
+3. **`.select("token")` só com aspas** deixava a catraca cega para template
+   literal.
+4. **A interpolação vira vírgula** e deixa um pedaço VAZIO que reprova o literal
+   inteiro — a catraca ficava vazia justamente para a tabela que a criou.
+5. **`handleSubmit` sem âncora de seção** pegou a função do ÁLBUM num arquivo de
+   vinte mil linhas.
+6. **`toContain("saveEpdsLog")`** passava com o import trocado por uma função de
+   mentira — hoje se cobra o MÓDULO.
+7. **`profile.care_mode && (`** casa dentro de `!profile.care_mode && (`.
+8. **`"sos-falhou"` aparece três vezes**, uma na prosa — a mutação da CHAMADA
+   passava verde.
+9. **Proibir "espere a resposta dele"** reprovava "**não** espere a resposta
+   dele", que é a instrução certa.
+10. **Duas catracas antigas travavam a GRAFIA** (`.select("…")` literal e
+    `if (p?.care_mode)` exato) e **reprovaram consertos estritamente mais
+    fortes** — a décima segunda vez nesta base.
+
+⚠️ **E a catraca de recuo me pegou**: escrevi `42703` no tratamento de um
+UPDATE, e em caminho de ESCRITA o código é `PGRST204`.
+
+### ⚠️ E o portão local pode reprovar por motivo alheio ao código
+
+`bun run verificar` falhou uma vez com o `tsc` "vermelho" e a linha dele
+AUSENTE da saída: era um `npm notice` atropelando a captura. Um portão que
+reprova por motivo alheio ao código é um portão que as pessoas aprendem a
+ignorar — e no dia em que o vermelho for de verdade, ele é ignorado junto.
+
+**Aplicar no Supabase:** `supabase/APLICAR_CONVERSA_SILENCIAR.sql` (as cinco
+colunas do direct — sem ele, silenciar, sair, a foto e o anexo continuam
+mortos).
+
 ## A auditoria das promessas da Comunidade (ago/2026)
 
 Pedido do dono: rever se tudo que a aba PROMETE está de fato certo. O método foi
