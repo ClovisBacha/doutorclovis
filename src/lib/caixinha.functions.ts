@@ -286,19 +286,39 @@ export const perguntar = createServerFn({ method: "POST" })
     ]);
 
     const desde = inicioDoDia();
-    const [{ count: hoje }, { count: paraEla }] = await Promise.all([
-      sb
-        .from("rede_perguntas")
-        .select("id", { count: "exact", head: true })
-        .eq("quem_id", eu)
-        .gte("criado_em", desde),
-      sb
-        .from("rede_perguntas")
-        .select("id", { count: "exact", head: true })
-        .eq("quem_id", eu)
-        .eq("dona_id", data.donaId)
-        .gte("criado_em", desde),
-    ]);
+    /* ⚠️ **OS DOIS TETOS FALHAVAM ABERTOS, e sao os anti-assedio.** Os erros
+       eram destruturados para fora (so `count` era lido): numa falha de leitura
+       os dois viravam `undefined`, o `?? 0` os zerava, e `decidirPergunta`
+       recebia "ela nao mandou nada hoje" — liberando tanto o teto GLOBAL quanto
+       o POR PESSOA. O CLAUDE.md diz por que o segundo existe: "o teto global nao
+       protege contra assedio dirigido, e o precedente e o ask.fm". Numa caixa
+       ANONIMA, isso e o recurso inteiro perdendo a unica trava que ele tem. */
+    const [{ count: hoje, error: erroHoje }, { count: paraEla, error: erroParaEla }] =
+      await Promise.all([
+        sb
+          .from("rede_perguntas")
+          .select("id", { count: "exact", head: true })
+          .eq("quem_id", eu)
+          .gte("criado_em", desde),
+        sb
+          .from("rede_perguntas")
+          .select("id", { count: "exact", head: true })
+          .eq("quem_id", eu)
+          .eq("dona_id", data.donaId)
+          .gte("criado_em", desde),
+      ]);
+
+    /* ⚠️ Nao conseguir contar RECUSA, e com motivo PROPRIO: dizer "voce ja
+       mandou muitas perguntas hoje" sobre uma contagem que falhou faria ela
+       desistir por um dia inteiro de uma pergunta que o servidor aceitaria em
+       dez segundos. */
+    if (erroHoje || erroParaEla || hoje === null || paraEla === null) {
+      return {
+        ok: false as const,
+        motivo: "instavel" as const,
+        recado: "Nao consegui conferir suas perguntas de hoje — tente de novo.",
+      };
+    }
 
     const veredicto = decidirPergunta(
       {

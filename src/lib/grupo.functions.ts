@@ -162,11 +162,18 @@ export const convidarParaGrupo = createServerFn({ method: "POST" })
 
     /* ⚠️ Conta os ATIVOS: quem saiu não ocupa vaga, senão um grupo que perdeu
        metade nunca mais aceitaria ninguém. */
-    const { data: jaLa } = await sb
+    /* ⚠️ **O TETO DE OITO FALHAVA ABERTO.** O `error` era descartado e
+       `(jaLa ?? [])` virava lista vazia numa falha de leitura: `ativos.length`
+       ia a ZERO, e o teto passava a ser calculado a partir do nada — ela podia
+       chamar mais oito para um grupo que ja tinha oito. O teto existe por uma
+       razao escrita: acima disso ninguem le tudo, e o que sobra e quem fala
+       mais alto. */
+    const { data: jaLa, error: erroMembros } = await sb
       .from("rede_grupo_membros")
       .select("quem_id, saiu_em")
       .eq("grupo_id", data.grupoId);
-    const ativos = ((jaLa ?? []) as any[]).filter((m) => !m.saiu_em);
+    if (erroMembros || !jaLa) return { ok: false as const, motivo: "instavel" as const };
+    const ativos = (jaLa as any[]).filter((m) => !m.saiu_em);
     const jaEstao = new Set(ativos.map((m) => m.quem_id as string));
 
     let entraram = 0;

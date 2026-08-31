@@ -380,9 +380,32 @@ export function CriarGrupo({
       /* ⚠️ Convidar é um passo À PARTE, e a falha dele NÃO derruba o grupo: ele
          já existe, e ela pode chamar de dentro. */
       if (escolhidas.length > 0) {
-        await convidarParaGrupo({
+        /* ⚠️ **O RESULTADO ERA DESCARTADO — e a funcao IRMA deste arquivo
+         * documenta por escrito que isso nao pode acontecer.**
+         *
+         * `ChamarParaGrupo` diz: "O NUMERO QUE ENTROU E DITO, e nao 'pronto'. O
+         * servidor recusa em silencio quem foi bloqueada, quem entrou em luto e
+         * quem ja saiu — e um 'pronto' sobre zero pessoas faria ela achar que o
+         * grupo cresceu." A regra estava escrita, aplicada numa funcao e
+         * violada na outra.
+         *
+         * Aqui doi MAIS que la: ela escolhe tres amigas, cria o grupo, e cai
+         * numa conversa VAZIA sem uma palavra — e a leitura razoavel e que o
+         * app quebrou. */
+        const c = await convidarParaGrupo({
           data: { accessToken: t, grupoId: r.grupoId, alvos: escolhidas },
         });
+        if (!c.ok) {
+          toast.warning("Criei o grupo, mas nao consegui chamar ninguem agora — tente de dentro.");
+        } else if (c.entraram === 0) {
+          toast.warning(
+            "Criei o grupo, mas ninguem entrou. Elas podem ter saido ou nao estar disponiveis.",
+          );
+        } else if (c.entraram < escolhidas.length) {
+          toast.warning(
+            `Criei o grupo com ${c.entraram} de ${escolhidas.length}. As outras nao puderam entrar.`,
+          );
+        }
       }
       aoCriado(r.grupoId);
     } catch {

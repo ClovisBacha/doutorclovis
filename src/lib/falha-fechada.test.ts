@@ -319,3 +319,93 @@ describe("criadora: a mesada relida", () => {
     expect(TELA).toMatch(/Não consegui conferir o seu bolso agora/);
   });
 });
+
+/**
+ * ─── OS TETOS ANTI-ASSÉDIO DA CAIXINHA ANÔNIMA ────────────────────────────
+ *
+ * ⚠️ Os dois erros eram destruturados para FORA (só `count` era lido): numa
+ * falha de leitura os dois viravam `undefined`, o `?? 0` os zerava, e
+ * `decidirPergunta` recebia "ela não mandou nada hoje" — liberando o teto
+ * GLOBAL e o POR PESSOA de uma vez.
+ *
+ * O CLAUDE.md diz por que o segundo existe: "o teto global não protege contra
+ * assédio dirigido, e o precedente é o ask.fm". Numa caixa ANÔNIMA, uma falha
+ * de leitura tirava a única trava que o recurso tem.
+ */
+describe("caixinha: os tetos anti-assédio", () => {
+  const semCom = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+  const CX = semCom(readFileSync("src/lib/caixinha.functions.ts", "utf8"));
+
+  test("⚠️ os DOIS erros são lidos", () => {
+    expect(CX).toContain("count: hoje, error: erroHoje");
+    expect(CX).toContain("count: paraEla, error: erroParaEla");
+  });
+
+  test("⚠️ e a falha RECUSA, antes do veredicto", () => {
+    const iGuarda = CX.indexOf("if (erroHoje || erroParaEla");
+    const iVeredicto = CX.indexOf("const veredicto = decidirPergunta(");
+    expect(iGuarda).toBeGreaterThan(-1);
+    expect(iVeredicto).toBeGreaterThan(iGuarda);
+  });
+
+  test("⚠️ a falha NÃO é dita como 'você já mandou muitas hoje'", () => {
+    /* Faria ela desistir por um dia inteiro de uma pergunta que o servidor
+       aceitaria em dez segundos. */
+    expect(CX).toContain('motivo: "instavel" as const');
+    expect(CX).toMatch(/Nao consegui conferir suas perguntas de hoje/);
+  });
+});
+
+/**
+ * ─── O TETO DE OITO DO GRUPO ──────────────────────────────────────────────
+ *
+ * ⚠️ O `error` era descartado e `(jaLa ?? [])` virava lista vazia: `ativos.length`
+ * ia a ZERO e o teto passava a ser calculado a partir do nada — ela podia chamar
+ * mais oito para um grupo que já tinha oito. O teto existe por uma razão
+ * escrita: acima disso ninguém lê tudo, e o que sobra é quem fala mais alto.
+ */
+describe("grupo: o teto de oito", () => {
+  const GR = readFileSync("src/lib/grupo.functions.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ o erro da leitura de membros é NOMEADO e recusa", () => {
+    expect(GR).toContain("data: jaLa, error: erroMembros");
+    expect(GR).toContain("if (erroMembros || !jaLa) return");
+  });
+
+  test("⚠️ `(jaLa ?? [])` sumiu — era ele que zerava a contagem", () => {
+    expect(GR).not.toContain("((jaLa ?? []) as any[])");
+    expect(GR).toContain("(jaLa as any[]).filter");
+  });
+});
+
+/**
+ * ─── CRIAR GRUPO DIZIA "PRONTO" SOBRE ZERO CONVITES ───────────────────────
+ *
+ * ⚠️ O resultado de `convidarParaGrupo` era descartado, e `aoCriado` disparava
+ * sem condição. Ela escolhe três amigas, cria o grupo, e cai numa conversa
+ * VAZIA sem uma palavra — a leitura razoável é que o app quebrou.
+ *
+ * ⚠️ E a função IRMÃ do mesmo arquivo documenta por escrito que isso não pode
+ * acontecer: "o NÚMERO QUE ENTROU é dito, e não 'pronto'… um 'pronto' sobre zero
+ * pessoas faria ela achar que o grupo cresceu". A regra estava escrita,
+ * aplicada numa função e violada na outra.
+ */
+describe("criar grupo conta o que aconteceu com os convites", () => {
+  const TELA = readFileSync("src/components/rede-grupo.tsx", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  test("⚠️ o retorno do convite é LIDO", () => {
+    expect(TELA).toContain("const c = await convidarParaGrupo(");
+    expect(TELA).toContain("if (!c.ok)");
+  });
+
+  test("⚠️ zero e PARCIAL têm recado próprio — não só a falha", () => {
+    /* "Ninguém entrou" e "duas de três entraram" são notícias diferentes, e as
+       duas são diferentes de "não consegui chamar". */
+    expect(TELA).toContain("c.entraram === 0");
+    expect(TELA).toContain("c.entraram < escolhidas.length");
+  });
+});
