@@ -1427,6 +1427,10 @@ function PainelPage() {
                   ok: r.ok,
                   erro: r.ok ? undefined : (r.error ?? undefined),
                   avisou: r.ok ? r.avisou : undefined,
+                  /* Sem repassar, o aviso da duracao morre aqui — foi assim que
+                     `parcial: true` ficou meses com zero leitores nesta base. */
+                  duracaoNaoFicou: r.ok ? r.duracaoNaoFicou : undefined,
+                  duracaoQueValeu: r.ok ? r.duracaoQueValeu : undefined,
                 };
               }}
               aoEnviarLink={async (ev) => {

@@ -652,10 +652,13 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
        É `PGRST204` e não `42703`: aquele é erro do Postgres em SELECT, e
        escrito aqui seria um recuo que nunca roda. */
     const { colunaAusente } = await import("./postgrest");
+    /* O recuo passa a LEMBRAR o que descartou — ver o comentario do retorno. */
+    const descartadas: string[] = [];
     for (const coluna of ["patient_user_id", "duration_minutes"] as const) {
       if (!error || !colunaAusente(error)) break;
       if (!(coluna in linha)) continue;
       delete linha[coluna];
+      descartadas.push(coluna);
       ({ data: nova, error } = await gravar());
     }
 
@@ -715,7 +718,36 @@ export const marcarConsultaNoDia = createServerFn({ method: "POST" })
     /* `avisou` sobe para a tela porque "marcada ✓" e "marcada, mas ela não foi
        avisada" são dois desfechos diferentes — e o segundo é o que faz ele
        pegar o telefone. Sem `RESEND_API_KEY` o envio é no-op silencioso. */
-    return { ok: true as const, id: nova.id as string, avisou, error: null };
+    /* ─── A DURACAO NAO FICOU, E ELE PRECISA SABER ──────────────────────────
+     *
+     * ⚠️ **Medido contra o banco de PRODUCAO (ago/2026): `duration_minutes` NAO
+     * EXISTE la.** Das 63 levas de SQL, e a unica coluna faltando — e o recuo
+     * acima a descartava EM SILENCIO.
+     *
+     * A conta do estrago: ele marca 60 minutos para uma primeira consulta ou um
+     * caso dificil, a tela responde "consulta marcada", a coluna e jogada fora,
+     * e a leitura devolve `DURACAO_PADRAO_MINUTOS`. Trinta minutos depois o
+     * horario volta a parecer livre — e `validarNovaConsulta`, que compara
+     * FAIXA, autoriza a segunda paciente em cima da segunda metade da primeira.
+     * **Duas pacientes na mesma sala, com o app tendo dito "pronto" as duas.**
+     *
+     * ⚠️ **So avisa quando MUDA alguma coisa.** Se ele escolheu exatamente a
+     * duracao padrao, descartar a coluna nao altera nada, e o aviso seria ruido
+     * numa tela que ele usa dezenas de vezes por dia — a mesma disciplina do
+     * "botao que nao muda nada ensina que os botoes desta tela nao valem".
+     *
+     * A consulta NAO e desfeita: ela esta na agenda dele, que e o que ele pediu.
+     * O que muda e ele saber que a duracao vale 30 min ate o SQL rodar. */
+    const duracaoNaoFicou =
+      descartadas.includes("duration_minutes") && data.duracaoMinutos !== DURACAO_PADRAO_MINUTOS;
+    return {
+      ok: true as const,
+      id: nova.id as string,
+      avisou,
+      duracaoNaoFicou,
+      duracaoQueValeu: duracaoNaoFicou ? DURACAO_PADRAO_MINUTOS : data.duracaoMinutos,
+      error: null,
+    };
   });
 
 /**
