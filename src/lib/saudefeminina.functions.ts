@@ -105,13 +105,18 @@ export const getRecentCycles = createServerFn({ method: "POST" })
     const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, cycles: [] as MenstrualCycle[] };
-    const { data: rows } = await db
+    const { data: rows, error } = await db
       .from("menstrual_cycles")
       .select("*")
       .eq("user_id", u.user.id)
       .order("start_date", { ascending: false })
       .limit(12);
-    return { ok: true as const, cycles: (rows ?? []) as MenstrualCycle[] };
+    /* ⚠️ `ok: true` com lista vazia sobre um erro é um VAZIO AUTENTICADO COMO
+       VERDADE: a tela não tem como distinguir, e responde "Nenhum ciclo
+       registrado" — a data da última menstruação é a base da DUM e da DPP.
+       Aqui nem um `else` no cliente salvaria; o defeito era de duas camadas. */
+    if (error || !rows) return { ok: false as const, cycles: [] as MenstrualCycle[] };
+    return { ok: true as const, cycles: rows as MenstrualCycle[] };
   });
 
 export const setPreventiveReminder = createServerFn({ method: "POST" })

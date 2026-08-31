@@ -50,6 +50,8 @@ import {
   DoctorThinkTab,
 } from "./admin-sections";
 import { downloadCsv, CsvButton } from "@/components/admin-ui";
+import { SaudeDoBancoTab } from "@/components/saude-do-banco-tab";
+import { saudeDoBanco, type ArquivoConferido } from "@/lib/saude-do-banco.functions";
 import { adminListTestimonials, reviewTestimonial } from "@/lib/testimonials.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -163,6 +165,7 @@ type AdminTab =
   | "custo"
   | "saude-clinica"
   | "moderacao"
+  | "banco"
   | "crescimento"
   | "alertas"
   | "nps"
@@ -189,6 +192,7 @@ const NAV_GROUPS: { group: string; items: { key: AdminTab; label: string; icon: 
       { key: "custo", label: "Custo", icon: "🧾" },
       { key: "saude-clinica", label: "Fila clínica", icon: "🩺" },
       { key: "moderacao", label: "Moderação", icon: "🛡️" },
+      { key: "banco", label: "Banco", icon: "🗄️" },
       { key: "crescimento", label: "Crescimento", icon: "📈" },
       { key: "alertas", label: "Alertas", icon: "🚨" },
       { key: "nps", label: "NPS", icon: "⭐" },
@@ -232,6 +236,36 @@ function AdminConsole() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [data, setData] = useState<PlatformOverview | null>(null);
   const [tab, setTab] = useState<AdminTab>("visao");
+
+  /* ⚠️ A conferência do banco é sob demanda, e nunca na abertura da tela: são
+     ~190 sondas, e ninguém abre o /admin para saber do schema. */
+  const [banco, setBanco] = useState<
+    | { t: "nunca" }
+    | { t: "ok"; arquivos: ArquivoConferido[] }
+    | { t: "sem_chave" }
+    | { t: "falhou" }
+  >({ t: "nunca" });
+  const [bancoEm, setBancoEm] = useState<string | undefined>();
+  const [conferindo, setConferindo] = useState(false);
+
+  async function conferirBanco() {
+    setConferindo(true);
+    try {
+      const r = await saudeDoBanco({ data: { accessToken: await token() } });
+      if (r.ok) {
+        setBanco({ t: "ok", arquivos: r.arquivos });
+        setBancoEm(r.conferidoEm);
+      } else {
+        /* ⚠️ "sem chave" e "falhou" dizem coisas diferentes, e nenhuma delas
+           é "está tudo certo". */
+        setBanco({ t: r.motivo === "sem_chave_de_servico" ? "sem_chave" : "falhou" });
+      }
+    } catch {
+      setBanco({ t: "falhou" });
+    } finally {
+      setConferindo(false);
+    }
+  }
 
   async function load() {
     const tk = await token();
@@ -381,6 +415,15 @@ function AdminConsole() {
            * fila inalcançável, com o app prometendo "a gente vai olhar".
            *
            * Aqui é onde ele de fato chega. */}
+          {tab === "banco" && (
+            <SaudeDoBancoTab
+              estado={banco}
+              conferidoEm={bancoEm}
+              aoConferir={() => void conferirBanco()}
+              carregando={conferindo}
+            />
+          )}
+
           {tab === "moderacao" && (
             <>
               {/* ⚠️ **OS NÚMEROS MORAVAM NUMA TELA DE ONDE O DONO É EXPULSO.**

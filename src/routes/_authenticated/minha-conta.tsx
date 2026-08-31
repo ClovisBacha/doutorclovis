@@ -5,6 +5,7 @@ import { codificarFoto } from "@/lib/codificar-imagem";
 import {
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useLayoutEffect as useLayoutEffectReact,
   useMemo,
@@ -55,6 +56,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PesquisaNps } from "@/components/pesquisa-nps";
 import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
 import { EmergencySheet } from "@/components/emergency-sheet";
+import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
@@ -2676,7 +2678,9 @@ function MinhaContaPage() {
                 {tab === "Carteirinha" && (
                   <CardTab profile={profile} gest={gest} onNavigate={goToTab} medico={meuMedico} />
                 )}
-                {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
+                {tab === "Pós-parto" && (
+                  <PosPartoTab profile={profile} onNavigate={goToTab} careMode={careMode} />
+                )}
                 {tab === "Recompensas" && (
                   <RecompensasHub
                     careMode={careMode}
@@ -4416,12 +4420,26 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
   const prompts = JOURNAL_PROMPTS[trimester];
   const firstName = profile?.display_name?.split(" ")[0];
 
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
+
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("journal_entries")
       .select("*")
       .order("entry_date", { ascending: false });
-    setEntries(data ?? []);
+    /* ⚠️ "Seu diário começará aqui" AFIRMA que ela nunca escreveu nada. Numa
+       paciente em rastreio de depressão perinatal, ler que meses de registro
+       sumiram não é frustração de interface. E repare na assimetria que estava
+       aqui: `add()` e `remove()` já avisavam quando falhavam; só a LEITURA
+       calava — e `add()` chama `load()` no fim, então ela salvava, o texto
+       sumia do campo e nada aparecia na lista. */
+    if (error || !data) {
+      setInstavel(true);
+      return;
+    }
+    setInstavel(false);
+    setEntries(data);
   }
   useEffect(() => {
     load();
@@ -4516,8 +4534,16 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
       </div>
 
       <div className="space-y-3">
-        {entries.length === 0 && (
-          <p className="text-sm text-muted-foreground">Seu diário começará aqui ✨</p>
+        {instavel ? (
+          <NaoConsegueLer
+            oQue="seu diário"
+            sossego="O que você escreveu continua salvo."
+            aoTentar={() => void load()}
+          />
+        ) : (
+          entries.length === 0 && (
+            <p className="text-sm text-muted-foreground">Seu diário começará aqui ✨</p>
+          )
         )}
         {entries.map((e) => (
           <div key={e.id} className="rounded-2xl border border-border bg-card p-5">
@@ -9816,16 +9842,30 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   const [elapsed, setElapsed] = useState(0);
   const [intensity, setIntensity] = useState(2);
   const startRef = useRef<number>(0);
+  /* ⚠️ A LEITURA FALHANDO SUPRIMIA O BOTÃO DO 192.
+     `data ?? []` transformava erro de rede em "ela não cronometrou nada", e o
+     banner de análise — que é o que mostra "Ligar 192 (SAMU)" no caso urgente
+     — vive atrás de `analysisWindow.length >= 2`. Com a lista vazia ele
+     simplesmente não renderiza: o alerta de emergência era silenciado por uma
+     falha de rede, em trabalho de parto.
+     E a contração ABERTA não era retomada: o cronômetro voltava para "Iniciar"
+     com uma contração em curso no banco. */
+  const [instavel, setInstavel] = useState(false);
 
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("contraction_logs")
       .select("*")
       .order("started_at", { ascending: false })
       .limit(30);
-    setContractions(data ?? []);
+    if (error || !data) {
+      setInstavel(true);
+      return;
+    }
+    setInstavel(false);
+    setContractions(data);
     // Resume active contraction if exists (no ended_at)
-    const open = (data ?? []).find((c: Contraction) => !c.ended_at);
+    const open = (data as Contraction[]).find((c) => !c.ended_at);
     if (open) {
       setActive(open);
       startRef.current = new Date(open.started_at).getTime();
@@ -9942,8 +9982,41 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
         <strong>192 (SAMU)</strong>.
       </div>
 
+      {/* ⚠️ O AVISO QUE SUBSTITUI O SILÊNCIO.
+          Sem ele, a falha de leitura apagava o banner de análise — inclusive o
+          caso `urgente`, que é o único lugar desta tela com o botão do SAMU. O
+          app não pode INVENTAR uma análise que não tem; o que ele pode, e
+          deve, é dizer que não conseguiu ler E dar o caminho que a análise
+          daria. Errar para o lado de mandar ligar é o único lado seguro aqui. */}
+      {instavel && (
+        <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-900">
+          <p className="font-semibold">Não consegui carregar suas contrações agora</p>
+          <p className="mt-0.5 text-sm">
+            Isso é a nossa conexão — o que você já cronometrou continua salvo.{" "}
+            <strong>
+              Se as contrações estão regulares e fortes, não espere o app: ligue para o seu médico
+              ou para o 192.
+            </strong>
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              onClick={() => void load()}
+              className="min-h-11 rounded-full border border-rose-300 px-5 py-2 text-sm font-medium"
+            >
+              Tentar de novo
+            </button>
+            <a
+              href="tel:192"
+              className="inline-flex min-h-11 items-center rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white"
+            >
+              Ligar 192 (SAMU)
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Analysis banner */}
-      {analysisWindow.length >= 2 && (
+      {!instavel && analysisWindow.length >= 2 && (
         <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
           <p className="font-semibold">{analysis.label}</p>
           <p className="mt-0.5 text-sm">{analysis.detail}</p>
@@ -11333,17 +11406,28 @@ function ConsultasTab() {
     void loadAppts();
   }, []);
 
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [notesInstavel, setNotesInstavel] = useState(false);
+
   async function loadNotes() {
     setLoadingNotes(true);
     try {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("consultation_notes")
         .select("*")
         .eq("user_id", u.user.id)
         .order("recorded_at", { ascending: false });
-      setNotes(data ?? []);
+      /* ⚠️ Ela abre isto para reler a posologia que o médico ditou. "Nenhuma
+         consulta salva ainda" sobre uma falha de leitura faz ela tomar o
+         remédio errado, ou nenhum. */
+      if (error || !data) {
+        setNotesInstavel(true);
+        return;
+      }
+      setNotesInstavel(false);
+      setNotes(data);
     } finally {
       setLoadingNotes(false);
     }
@@ -11865,6 +11949,12 @@ function ConsultasTab() {
             <div className="skeleton h-12 rounded-xl" />
             <div className="skeleton h-12 rounded-xl" />
           </div>
+        ) : notesInstavel ? (
+          <NaoConsegueLer
+            oQue="suas consultas salvas"
+            sossego="O que foi gravado continua salvo."
+            aoTentar={() => void loadNotes()}
+          />
         ) : notes.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">Nenhuma consulta salva ainda.</p>
         ) : (
@@ -12944,6 +13034,8 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
   const [activeSession, setActiveSession] = useState<TeleconsultaSession | null>(null);
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
 
   useEffect(() => {
     load();
@@ -12954,7 +13046,16 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
     const { data } = await supabase.auth.getSession();
     const tk = data.session?.access_token ?? "";
     const res = await getMyTeleconsultas({ data: { accessToken: tk } });
-    if (res.ok) setSessions(res.sessions);
+    /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL — o `try/catch` não
+       pega. Sem este `else`, o médico abre a sala, ela abre o app, lê "Nenhuma
+       consulta agendada no momento" e PERDE a teleconsulta com a sala aberta
+       do outro lado. */
+    if (res.ok) {
+      setSessions(res.sessions);
+      setInstavel(false);
+    } else {
+      setInstavel(true);
+    }
     setLoading(false);
   }
 
@@ -13008,6 +13109,12 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
           <div className="skeleton h-20 rounded-2xl" />
           <div className="skeleton h-20 rounded-2xl" />
         </div>
+      ) : instavel ? (
+        <NaoConsegueLer
+          oQue="suas teleconsultas"
+          sossego="Se você tem uma teleconsulta marcada, ela continua marcada."
+          aoTentar={() => void load()}
+        />
       ) : sessions.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📱</p>
@@ -14654,56 +14761,72 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) return;
-      const res = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
-      if (res.ok) setPosts(res.posts);
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
 
-      // Get companion invite token for sharing
-      const { data: invites } = await (supabase as any)
-        .from("companion_invites")
-        /* ⚠️ **`album_token` TEM DE SER PEDIDO.** Este `select` trazia só
+  /* ⚠️ Nomeada para o "Tentar de novo" poder chamá-la: um estado de falha sem
+     saída é o vazio silencioso outra vez, só que honesto. */
+  const load = useCallback(async () => {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const res = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
+    /* ⚠️ "Nenhuma memória ainda" — com o contador do título dizendo
+         "Álbum (0 memórias)" — faz ela achar que as fotos da gestação foram
+         apagadas. É o menor risco clínico desta leva e o maior risco
+         emocional. */
+    if (res.ok) {
+      setPosts(res.posts);
+      setInstavel(false);
+    } else {
+      setInstavel(true);
+    }
+
+    // Get companion invite token for sharing
+    const { data: invites } = await (supabase as any)
+      .from("companion_invites")
+      /* ⚠️ **`album_token` TEM DE SER PEDIDO.** Este `select` trazia só
            `token`, então `invites[0].album_token` era SEMPRE `undefined` e o
            `??` abaixo caía sempre no recuo — que não era recuo nenhum: era o
            caminho de todo mundo. E o comentário ao lado afirmava o contrário,
            dizendo que depois do SQL `album_token` estaria preenchido. Está —
            NO BANCO. A consulta é que não o trazia. */
-        .select("token, album_token")
-        .eq("user_id", s.session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (invites?.[0]?.token) {
-        setInviteToken(invites[0].token);
-        /**
-         * ⚠️ **SEM `album_token`, O LINK NÃO SAI — e nunca cai no `token`.**
-         *
-         * Os dois vivem na mesma linha e têm privilégios OPOSTOS: `token` abre
-         * o painel do acompanhante E os SOS dos últimos 30 minutos com
-         * latitude e longitude (`getRecentPanicByToken`, que filtra por
-         * `token`). `album_token` abre só o álbum.
-         *
-         * O link do álbum é o que ela cola no grupo da família — numa
-         * influenciadora, para muito mais gente. Um recuo para `token` aqui
-         * publica a localização dela em tempo real de emergência para todo
-         * mundo que receber a mensagem.
-         *
-         * E o recuo nem funcionava: `getFamilyAlbum` busca por `album_token`,
-         * então um link com o `token` do acompanhante **não abre o álbum**.
-         * Ou seja, o recuo trocava um álbum que não abre por um vazamento de
-         * GPS — as duas pontas erradas de uma vez.
-         *
-         * Sem a coluna, o certo é NÃO oferecer o link: o álbum ficar
-         * indisponível até o SQL rodar é recuperável; o GPS espalhado no
-         * WhatsApp não é.
-         */
-        const doAlbum = invites[0].album_token;
-        setShareUrl(doAlbum ? `${window.location.origin}/album/${doAlbum}` : "");
-      }
-      setLoading(false);
-    })();
+      .select("token, album_token")
+      .eq("user_id", s.session.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (invites?.[0]?.token) {
+      setInviteToken(invites[0].token);
+      /**
+       * ⚠️ **SEM `album_token`, O LINK NÃO SAI — e nunca cai no `token`.**
+       *
+       * Os dois vivem na mesma linha e têm privilégios OPOSTOS: `token` abre
+       * o painel do acompanhante E os SOS dos últimos 30 minutos com
+       * latitude e longitude (`getRecentPanicByToken`, que filtra por
+       * `token`). `album_token` abre só o álbum.
+       *
+       * O link do álbum é o que ela cola no grupo da família — numa
+       * influenciadora, para muito mais gente. Um recuo para `token` aqui
+       * publica a localização dela em tempo real de emergência para todo
+       * mundo que receber a mensagem.
+       *
+       * E o recuo nem funcionava: `getFamilyAlbum` busca por `album_token`,
+       * então um link com o `token` do acompanhante **não abre o álbum**.
+       * Ou seja, o recuo trocava um álbum que não abre por um vazamento de
+       * GPS — as duas pontas erradas de uma vez.
+       *
+       * Sem a coluna, o certo é NÃO oferecer o link: o álbum ficar
+       * indisponível até o SQL rodar é recuperável; o GPS espalhado no
+       * WhatsApp não é.
+       */
+      const doAlbum = invites[0].album_token;
+      setShareUrl(doAlbum ? `${window.location.origin}/album/${doAlbum}` : "");
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -14875,9 +14998,19 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
 
       <div>
         <h3 className="font-semibold mb-4">
-          Álbum ({posts.length} {posts.length === 1 ? "memória" : "memórias"})
+          {/* ⚠️ O contador é a afirmação em NÚMERO, e ele mente antes da prosa:
+              "Álbum (0 memórias)" já diz que não há nada, mesmo com o aviso de
+              falha logo abaixo. */}
+          Álbum
+          {instavel ? "" : ` (${posts.length} ${posts.length === 1 ? "memória" : "memórias"})`}
         </h3>
-        {posts.length === 0 ? (
+        {instavel ? (
+          <NaoConsegueLer
+            oQue="seu álbum"
+            sossego="Suas fotos continuam guardadas."
+            aoTentar={() => void load()}
+          />
+        ) : posts.length === 0 ? (
           <div className="py-14 text-center">
             <p className="text-4xl mb-3">📷</p>
             <p className="font-serif text-xl text-foreground/70">Nenhuma memória ainda</p>
@@ -15727,12 +15860,38 @@ const MILESTONES_DEF = [
   { key: "primeira_palavra", label: "Primeira palavra", emoji: "💬", weekApprox: 52 },
 ];
 
+/**
+ * ⚠️ O PORTAL PÓS-PARTO NÃO CONHECIA O MODO CUIDADO — e este era o pior lugar
+ * do app para isso faltar.
+ *
+ * `care_mode` não limpa `birth_date`. Numa perda DEPOIS do nascimento
+ * (natimorto, óbito neonatal), a data está preenchida e o Portal abria
+ * inteiro: "Helena nasceu! 3 semanas de vida", com o convite a marcar o
+ * primeiro sorriso e o calendário de 24 vacinas de um bebê que morreu.
+ *
+ * ⚠️ **E O CONSERTO NÃO É ESCONDER A ABA.** Duas coisas aqui importam MAIS
+ * depois de uma perda, não menos:
+ *
+ *   · **Bem-estar (EPDS)** — a escala de Edinburgh, cuja décima pergunta é
+ *     ideação de autolesão. Quem perdeu um bebê está no risco máximo de
+ *     depressão perinatal. Tirar isso seria o Modo Cuidado desligando socorro,
+ *     que é exatamente o que a régua deste repositório proíbe.
+ *   · **Retorno** — a consulta de puerpério. O corpo dela passou pelo parto do
+ *     mesmo jeito, e o retorno é onde hemorragia, infecção e pré-eclâmpsia de
+ *     pós-parto são pegas.
+ *
+ * O que sai são as três abas que falam DO BEBÊ: amamentação, marcos e vacinas.
+ * E o cabeçalho deixa de anunciar um nascimento — sem narrar a perda, que não
+ * é o app quem conta.
+ */
 function PosPartoTab({
   profile,
   onNavigate,
+  careMode = false,
 }: {
   profile: Profile | null;
   onNavigate: (tab: string) => void;
+  careMode?: boolean;
 }) {
   const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">(
     "saúde",
@@ -15771,31 +15930,50 @@ function PosPartoTab({
   const babyAgeWeeks = Math.floor(babyAgeDays / 7);
   const babyName = profile.baby_name ?? "bebê";
 
-  const subTabs: { key: typeof subTab; label: string }[] = [
-    { key: "saúde", label: "Bem-estar" },
-    { key: "amamentação", label: "Amamentação" },
-    { key: "marcos", label: "Marcos" },
-    { key: "vacinas", label: "Vacinas" },
-    { key: "retorno", label: "Retorno" },
-  ];
+  const subTabs: { key: typeof subTab; label: string }[] = careMode
+    ? /* Só o que é sobre o corpo e a cabeça DELA. */
+      [
+        { key: "saúde", label: "Bem-estar" },
+        { key: "retorno", label: "Retorno" },
+      ]
+    : [
+        { key: "saúde", label: "Bem-estar" },
+        { key: "amamentação", label: "Amamentação" },
+        { key: "marcos", label: "Marcos" },
+        { key: "vacinas", label: "Vacinas" },
+        { key: "retorno", label: "Retorno" },
+      ];
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 flex items-center gap-4">
-        <span className="text-4xl">🍼</span>
-        <div>
-          <p className="font-semibold">
-            {babyName} nasceu!{" "}
-            {babyAgeWeeks > 0
-              ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}`
-              : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`}{" "}
-            de vida
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Nascimento: {birthDate.toLocaleDateString("pt-BR")}
+      {careMode ? (
+        /* ⚠️ Sóbrio, e sem contar o que aconteceu: o Modo Cuidado pode ter
+           sido ligado pelo médico, e narrar a perda de volta para ela na
+           abertura da tela é o app dando a notícia mais íntima que existe. */
+        <div className="rounded-3xl border border-border bg-card p-5">
+          <p className="font-semibold">Cuidando de você</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Seu corpo passou por um parto, e o acompanhamento continua. O que estiver pesando também
+            é cuidado — e o seu médico está aqui.
           </p>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 flex items-center gap-4">
+          <span className="text-4xl">🍼</span>
+          <div>
+            <p className="font-semibold">
+              {babyName} nasceu!{" "}
+              {babyAgeWeeks > 0
+                ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}`
+                : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`}{" "}
+              de vida
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Nascimento: {birthDate.toLocaleDateString("pt-BR")}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-1">
         {subTabs.map((st) => (
@@ -15814,9 +15992,15 @@ function PosPartoTab({
       </div>
 
       {subTab === "saúde" && <PpdSection babyAgeDays={babyAgeDays} />}
-      {subTab === "amamentação" && <BreastfeedingSection />}
-      {subTab === "marcos" && <MilestonesSection babyAgeWeeks={babyAgeWeeks} babyName={babyName} />}
-      {subTab === "vacinas" && <VaccinesSection birthDate={birthDate} />}
+      {/* ⚠️ O cinto, além do suspensório: as três abas do bebê já não têm
+          botão no Modo Cuidado, mas o portão fica também no corpo. Uma prop de
+          sub-tela inicial acrescentada amanhã (como `initialSub`, que outras
+          abas já têm) abriria "Marcos" por link sem passar pela fita. */}
+      {!careMode && subTab === "amamentação" && <BreastfeedingSection />}
+      {!careMode && subTab === "marcos" && (
+        <MilestonesSection babyAgeWeeks={babyAgeWeeks} babyName={babyName} />
+      )}
+      {!careMode && subTab === "vacinas" && <VaccinesSection birthDate={birthDate} />}
       {subTab === "retorno" && <RetornoSection birthDate={birthDate} profile={profile} />}
     </div>
   );
@@ -19983,6 +20167,8 @@ function CicloMenstrualTab() {
   const [submitting, setSubmitting] = useState(false);
   const [endingId, setEndingId] = useState<string | null>(null);
   const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -19991,7 +20177,15 @@ function CicloMenstrualTab() {
       return;
     }
     const res = await getRecentCycles({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setCycles(res.cycles);
+    /* ⚠️ A data da última menstruação é a base da DUM e da DPP. "Nenhum ciclo
+       registrado" sobre uma falha faz ela registrar um ciclo duplicado, ou
+       informar uma data errada ao médico. */
+    if (res.ok) {
+      setCycles(res.cycles);
+      setInstavel(false);
+    } else {
+      setInstavel(true);
+    }
     setLoading(false);
   }
 
@@ -20162,7 +20356,13 @@ function CicloMenstrualTab() {
       )}
 
       {/* Cycle history */}
-      {cycles.length === 0 ? (
+      {instavel ? (
+        <NaoConsegueLer
+          oQue="seus ciclos"
+          sossego="O que você registrou continua salvo."
+          aoTentar={() => void load()}
+        />
+      ) : cycles.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📅</p>
           <p className="font-serif text-xl text-foreground/70">Nenhum ciclo registrado</p>
