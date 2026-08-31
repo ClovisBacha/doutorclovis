@@ -30,6 +30,14 @@ const rotas = readdirSync("src/routes")
 /* Estados que só existem com parâmetro — os mesmos que a prosa do CLAUDE.md
    documenta como "impossíveis de fotografar" sem eles. */
 const EXTRAS = [
+  /* A saúde do banco: os três estados que mais importam — faltando, incerto e
+     sem chave de serviço — não se fabricam num banco em dia, que é justamente
+     o banco de quem desenvolve. */
+  "/preview-banco?estado=incerto",
+  "/preview-banco?estado=verde",
+  "/preview-banco?estado=semchave",
+  "/preview-banco?estado=falhou",
+  "/preview-banco?estado=nunca",
   /* ⚠️ **A COMUNIDADE INTEIRA, e não cinco telas dela.**
    *
    * `preview-instagram` é UMA rota com VINTE sub-telas atrás de `?tela=` — a

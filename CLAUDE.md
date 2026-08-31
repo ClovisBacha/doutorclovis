@@ -11775,3 +11775,184 @@ seria lida como "ninguém nunca olhou". As duas agora gravam, depois do update.
 
 **Medido ao fim:** 5.451 testes · 115 bancadas · 11 roteiros · zero problemas.
 Sete mutantes em vermelho nesta vistoria.
+
+## A noite dos vazios mentirosos, e a tela que diz qual SQL falta (ago/2026)
+
+Pedido do dono: verificar o que ainda pode faltar no app inteiro e aplicar
+durante a noite. O método foi o de sempre — **três verificadores céticos em
+paralelo, cada um obrigado a citar arquivo, linha e trecho** —, e ele importa:
+das quatro afirmações que eu tinha levantado sobre Modo Cuidado, **uma era
+falsa** (o painel do acompanhante já estava inteiro, com portão em quatro
+pontos). Achado sem cético é hipótese.
+
+### ⚠️ A CLASSE QUE DOMINOU A NOITE: "não consegui ler" com cara de "não há nada"
+
+Seis telas do app da paciente descartavam o erro da leitura — `data ?? []`, ou
+um `{ ok: false }` que chega numa **resposta 200 NORMAL** e que nenhum
+`try/catch` pega — e desenhavam um vazio que AFIRMA um fato falso.
+
+⚠️ **A régua de triagem não é "o erro foi olhado?".** É: **se esta leitura
+voltar vazia, o app afirma alguma coisa que ela não tem como saber que é falsa,
+e que muda o que ela faz a seguir?**
+
+| tela             | o que dizia                    | o que ela faz com isso             |
+| ---------------- | ------------------------------ | ---------------------------------- |
+| **contrações**   | (o cartão some)                | **o botão do 192 desaparece**      |
+| teleconsulta     | "Nenhuma consulta agendada"    | perde a consulta com a sala aberta |
+| consultas salvas | "Nenhuma consulta salva ainda" | toma o remédio sem a posologia     |
+| ciclo            | "Nenhum ciclo registrado"      | informa uma DUM errada ao médico   |
+| diário           | "Seu diário começará aqui"     | acredita que perdeu meses          |
+| álbum            | "Álbum (0 memórias)"           | acha que as fotos foram apagadas   |
+
+⚠️ **A DAS CONTRAÇÕES É A PIOR, e ela silenciava um caminho de emergência.** O
+banner de análise vive atrás de `analysisWindow.length >= 2`, e é o ÚNICO lugar
+da tela com "Ligar 192 (SAMU)": com a lista vazia ele não renderiza. Uma
+oscilação de rede apagava o alerta **em trabalho de parto** — e a contração
+aberta não era retomada, então o cronômetro voltava para "Iniciar" com uma
+contração em curso no banco.
+
+⚠️ **O conserto NÃO pode inventar a análise que não existe.** O que o app pode,
+e deve, é dizer que não conseguiu ler E dar o telefone. Errar para o lado de
+mandar ligar é o único lado seguro aqui.
+
+⚠️ **DUAS ERAM DE DUAS CAMADAS.** `getRecentCycles` e `getMyAlbumPosts`
+devolviam `ok: true` com lista vazia sobre um erro — um vazio AUTENTICADO COMO
+VERDADE, que nenhuma correção só de tela alcançaria.
+
+⚠️ **E a correção já existia, aplicada em UM fluxo.** Os agendamentos
+distinguem instável de vazio desde ago/2026, com o comentário explicando o
+custo. É a forma mais comum de defeito deste repositório: a régua num lugar e
+deixada de pé em cinco vizinhos.
+
+- **`NaoConsegueLer` é UM componente**, e não cinco cópias — cinco divergiriam
+  no primeiro ajuste, e a que divergisse seria a menos olhada.
+- ⚠️ **A frase de sossego é PROP, nunca fixa.** "O que você registrou continua
+  salvo" é verdade no diário e MENTIRA na teleconsulta, onde quem marcou foi o
+  consultório. Uma frase genérica seria a segunda mentira no lugar da primeira.
+- ⚠️ **E o contador conta como afirmação:** "Álbum (0 memórias)" mente antes da
+  prosa, então ele some junto.
+
+### ⚠️ O PORTAL PÓS-PARTO FALAVA DE UM BEBÊ QUE MORREU
+
+`care_mode` **não limpa `birth_date`**. Numa perda depois do nascimento
+(natimorto, óbito neonatal), a data está preenchida e a aba abria inteira:
+_"Helena nasceu! 3 semanas de vida"_, com o convite a marcar o primeiro sorriso
+e o calendário de 24 vacinas. Era a única aba da lista sem a prop — as quatro
+vizinhas já recebiam.
+
+⚠️ **E O CONSERTO NÃO É ESCONDER A ABA**, porque duas coisas ali importam MAIS
+depois de uma perda: **Bem-estar (a EPDS**, cuja décima pergunta é ideação de
+autolesão, no momento de risco máximo de depressão perinatal**)** e **Retorno**
+(a consulta de puerpério, onde hemorragia, infecção e pré-eclâmpsia de
+pós-parto são pegas). O corpo dela passou pelo parto do mesmo jeito.
+
+Saem as três que falam do bebê. O cabeçalho fica sóbrio e **não narra a perda**
+— o Modo Cuidado pode ter sido ligado pelo médico. E a catraca cobra as DUAS
+metades, senão ela aprovaria alguém "consertando" o luto ao custo do socorro.
+
+### ⚠️ A ficha do SOS dizia GESTANTE, com o nome do bebê e a DPP
+
+A ficha que o SOCORRISTA lê. Ela abre a Central — a tela que se abre quando
+alguma coisa está errada — e lê o nome do bebê que perdeu e uma data de parto
+que não vai acontecer.
+
+⚠️ **Também não se apaga a ficha.** Quem perdeu uma gestação continua sendo
+paciente obstétrica. Tipo sanguíneo, alergias, medicações, contato e médico
+ficam INTEIROS; sai o que é FALSO — e falso não só emocionalmente: um bebê que
+não vai nascer e uma DPP que não existe são informação errada para quem vai
+atendê-la. "GESTANTE" vira "PACIENTE OBSTÉTRICA".
+
+⚠️ **O portão vive no ponto de MONTAGEM, e o título chega como STRING.** Um
+booleano de luto dentro da folha seria, um dia, um `if (emLuto) return null` — o
+defeito que `socorro-nao-e-gateado` acabou de consertar. Uma string não tem como
+desligar nada.
+
+⚠️ **A idade gestacional sai junto, e é a única linha em que se troca
+informação por exatidão.** "28s 3d" afirma uma gestação de hoje. Se o dono
+quiser a semana de volta, ela precisa de outro rótulo — é decisão clínica dele.
+
+### O grupo não avisava ninguém, e o voto se perdia
+
+- ⚠️ **Uma mensagem de grupo para até sete pessoas fazia duas escritas e
+  parava**: sem push, e sem acender o emblema da aba Mensagens, que conta só as
+  conversas de DUAS. A bolinha do grupo vive DENTRO da lista de grupos — ou
+  seja, o aviso só chegava a quem já tinha ido olhar. O direct de duas mandava
+  push desde o primeiro dia; o de oito, não.
+  ⚠️ **E o push respeita `silenciado_em`, por membro** — este é o mesmo canal do
+  aviso de emergência, e um push impossível de calar é como ela desliga a
+  notificação do app inteiro e leva o SOS junto. O TEXTO não vai: ele chega na
+  tela de bloqueio, e quem estiver ao lado lê.
+- ⚠️ **O voto no nome do bebê gravava "já votou" sem ler a resposta.** A
+  votação podia estar encerrada; o voto da avó nunca entrava na contagem **E** o
+  `localStorage` a impedia de tentar de novo. A régua certa mora quinze linhas
+  abaixo, no mesmo arquivo.
+- ⚠️ **O 👎 da nutrição prometia "seu médico vai ver" sem confirmar.** Ele só
+  enfileira quando há `entryId` — a cota pode ter estourado, o cérebro pode
+  estar desligado. O chat principal já tinha exatamente esta correção, com o
+  comentário do conserto à vista.
+- ⚠️ **A suspensão vazava em `postQueEuVejo`**: o select do autor nunca pedia
+  `rede_suspensa_em`, então mesmo num banco COM a coluna o post de uma autora
+  suspensa continuava comentável. Virou escada de três degraus, um por SQL.
+- ⚠️ **A conferência no CFM era gravada e lida por ninguém.** Três colunas, zero
+  selects — e o selo "verificado", que ORDENA a busca de médicos que a paciente
+  usa, é um booleano apertado à mão. A plataforma pagava a consulta e mostrava
+  como verificado quem ninguém verificou. **`verified` continua manual de
+  propósito** (situação regular no conselho ≠ aprovado nesta plataforma), e há
+  teste que fica vermelho se alguém casar os dois.
+
+### A tela de saúde do banco — o remédio para o defeito mais repetido daqui
+
+`/admin → Banco 🗄️` pergunta ao banco quais `APLICAR_*.sql` ainda não foram
+rodados. Até agora a única forma de descobrir era alguém reparar que um recurso
+não fazia nada — porque **nada quebra**: toda leitura tem degrau de recuo, e o
+recurso simplesmente deixa de existir.
+
+- ⚠️ **O mapa é GERADO** (`scripts/gerar-mapa-do-banco.mjs`, 54 arquivos · 127
+  tabelas · 192 conferências). Uma lista à mão envelhece no primeiro `APLICAR_`
+  novo — e envelhecer aqui significa a tela dizer "tudo aplicado" sobre um
+  arquivo que ela não conhece, que é pior que não ter a tela.
+- ⚠️ **O gerador FORMATA o que escreve**, senão o teste que regenera e compara
+  fica eternamente vermelho contra o arquivo que o prettier reformatou — e um
+  teste que reprova o estado correto é um teste que a próxima pessoa ignora.
+- ⚠️ **Coluna de tabela que o próprio arquivo CRIA não vira conferência**: se a
+  tabela existe, ela nasceu com as colunas.
+- ⚠️ **"Não consegui conferir" NUNCA vira "ok"**, e sem `SUPABASE_SERVICE_ROLE_KEY`
+  a tela RECUSA em vez de medir a RLS e chamar de schema.
+- ⚠️ **Nenhuma linha de paciente viaja** (`head: true`): um painel de
+  diagnóstico não é motivo para trafegar prontuário.
+
+### ⚠️ E as armadilhas de teste, de novo — com duas cometidas por mim
+
+Onze mutantes ficaram verdes na primeira rodada desta noite, e nenhum por
+motivo novo:
+
+1. **A asserção descrevia a TELA e não a LEITURA** — apagar a checagem do erro
+   não tira `instavel` do render. Três mutantes de uma vez.
+2. **Janela de distância**: `ContracoesTab` tem um SEGUNDO `tel:192` a menos de
+   1400 caracteres, e a mutação que apagava o botão do aviso passava verde.
+3. **"Outra ocorrência do mesmo nome"**, duas vezes: `crm_conferido_em` aparece
+   no tipo e no `.map()`, e `{false ? (` mantém `d.crm` nos dois ramos.
+4. **`f.indexOf("});", i)`** parava no `.order(..., { ascending: false });` e
+   cortava a função ANTES da linha que o teste existia para cobrar.
+5. **O primeiro `{` depois de `deixarDeSeguir(` é o ARGUMENTO**, não um corpo.
+
+⚠️ **E DUAS CATRACAS DO REPOSITÓRIO ME PEGARAM, as duas certas:**
+`travas-do-servidor` recusou um `void (async () => …)()` que eu tinha acabado de
+escrever (**no servidor a invocação congela quando a resposta sai**, e esta base
+já perdeu três recursos assim), e `servidor-tem-porta` recusou `saudeDoBanco`
+antes de a tela existir.
+
+⚠️ **E uma asserção antiga travava a GRAFIA do recuo** (`lerAutor("id,
+care_mode, perfil_publico")`, numa janela de 500 caracteres) e ficou VERMELHA
+sobre o degrau novo — ou seja, reprovou uma mudança que só APERTOU a garantia.
+Décima segunda vez nesta base. **Cobre a garantia, nunca a escrita.**
+
+⚠️ **E EU APAGUEI O MEU PRÓPRIO TRABALHO com `git checkout`** num arquivo não
+commitado, restaurando o HEAD por cima de um degrau recém-escrito. A lição já
+estava neste arquivo: **restaurar mutação com `cp`, NUNCA com `git checkout`.**
+
+**Medido ao fim:** 5.507 testes · 121 bancadas · 11 roteiros de interação ·
+zero problemas. **Aplicar no Supabase (pendentes, medidos):**
+`supabase/APLICAR_CONVERSA_SILENCIAR.sql` e
+`supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
+sozinha.
