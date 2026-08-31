@@ -1138,6 +1138,23 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
             </span>
           )}
         </p>
+        {/* ⚠️ **O SELO E O CONSELHO SÃO COISAS DIFERENTES, e é essa a
+            informação.** "✓ verificado" é um booleano que alguém aperta aqui;
+            esta linha é o que o CFM respondeu. A plataforma pagava a consulta
+            ao conselho e não a mostrava em lugar nenhum, então o selo podia
+            estar aceso sobre uma conferência que nunca aconteceu — ou apagado
+            sobre um médico com situação regular. */}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {d.crm ? (
+            <>
+              CFM: {d.crm.situacao ?? "—"}
+              {d.crm.nome ? ` · ${d.crm.nome}` : ""} · conferido em{" "}
+              {new Date(d.crm.em).toLocaleDateString("pt-BR")}
+            </>
+          ) : (
+            "CFM: nunca conferido por aqui"
+          )}
+        </p>
         <p className="truncate text-xs text-muted-foreground">
           {d.email ?? "—"} · {d.patients} pacientes · {d.brainEntries} no cérebro
         </p>
