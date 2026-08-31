@@ -200,3 +200,54 @@ describe("⚠️ postsCrus desce UM degrau por vez", () => {
     }
   });
 });
+
+/**
+ * ⚠️ O AUTOR DO POST, EM `postQueEuVejo` — a escada que faltava, e o vazamento
+ * que ela escondia.
+ *
+ * `foraDaRede` cruza TRÊS razões (luto, pausa e suspensão pela moderação), e o
+ * `select` do autor nunca pedia a terceira: mesmo num banco COM a coluna,
+ * `rede_suspensa_em` chegava `undefined` e **o post de uma autora suspensa
+ * continuava comentável**. É um dos vinte e seis pontos de decisão que o
+ * comentário da `foraDaRede` avisa que não podem ficar de fora — e ele ficou.
+ */
+describe("o autor do comentário desce um degrau por vez", () => {
+  const COM = readFileSync("src/lib/comentarios.functions.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/^\s*\/\/.*$/gm, " ");
+
+  const DEGRAUS = (() => {
+    const i = COM.indexOf("const DEGRAUS_DO_AUTOR");
+    expect(i).toBeGreaterThan(-1);
+    const j = COM.indexOf("];", i);
+    return COM.slice(i, j)
+      .split("\n")
+      .map((l) => l.match(/"([^"]+)"/)?.[1])
+      .filter((x): x is string => !!x);
+  })();
+
+  test("⚠️ pede a suspensão no topo", () => {
+    expect(DEGRAUS[0]).toContain("rede_suspensa_em");
+  });
+
+  test("⚠️ e são TRÊS — um por SQL, do mais novo para o mais antigo", () => {
+    /* Um recuo que só soubesse tirar a primeira coluna quebraria de novo assim
+       que a segunda faltasse num banco que rodou meio SQL. */
+    expect(DEGRAUS.length).toBe(3);
+    expect(DEGRAUS[1]).toContain("rede_pausada_em");
+    expect(DEGRAUS[1]).not.toContain("rede_suspensa_em");
+    expect(DEGRAUS[2]).not.toContain("rede_pausada_em");
+  });
+
+  test("⚠️ cada degrau é PREFIXO do de cima — descer só TIRA coluna", () => {
+    for (let i = 1; i < DEGRAUS.length; i++) {
+      expect(DEGRAUS[i - 1].startsWith(DEGRAUS[i])).toBe(true);
+    }
+  });
+
+  test("⚠️ e o laço para no primeiro que responde", () => {
+    const i = COM.indexOf("for (const colunas of DEGRAUS_DO_AUTOR)");
+    expect(i).toBeGreaterThan(-1);
+    expect(COM.slice(i, i + 220)).toMatch(/if \(!erroAutor\) break;/);
+  });
+});

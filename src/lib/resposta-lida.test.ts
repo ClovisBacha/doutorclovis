@@ -83,3 +83,34 @@ describe("a tela lê o que o servidor respondeu", () => {
     expect(depois).toMatch(/continua conectada/i);
   });
 });
+
+describe("as duas telas que prometiam sem confirmar", () => {
+  test("⚠️ o voto no nome do bebê não tranca sobre um voto que não entrou", () => {
+    const VOTAR = semComentarios(readFileSync("src/routes/votar-nome.$token.tsx", "utf8"));
+    const depois = instrucaoApos(VOTAR, "const r = await voteForName(");
+    /* A votação pode estar encerrada, ou o INSERT recusado — e a tela gravava
+       "já votou" no `localStorage` mesmo assim: o voto da avó nunca entrava na
+       contagem E ela ficava impedida de tentar de novo. O nome saía de uma
+       apuração silenciosamente incompleta.
+       ⚠️ E a régua certa mora QUINZE LINHAS ABAIXO, em `handleAddName`. */
+    expect(depois).toMatch(/!r\.ok/);
+    /* A trava só é gravada DEPOIS da conferência. */
+    expect(VOTAR.indexOf("!r.ok")).toBeLessThan(VOTAR.indexOf("localStorage.setItem(`voted_"));
+  });
+
+  test("⚠️ o 👎 da nutrição só promete o médico quando o servidor enfileirou", () => {
+    const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+    const i = CONTA.indexOf("async function votar(indice: number");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = CONTA.slice(i, CONTA.indexOf("\n  }", i));
+    /* `submitBrainFeedback` devolve `{ ok: false }` em 200, e só enfileira
+       quando há `entryId` — a cota pode ter estourado, o cérebro pode estar
+       desligado. Ela reclamava de uma orientação alimentar errada, lia "seu
+       médico vai ver", e o item podia não estar em fila nenhuma.
+       ⚠️ O chat principal já tinha esta correção, com o comentário à vista. */
+    expect(corpo).toMatch(/chegouAoMedico/);
+    expect(corpo).toMatch(/"fila"/);
+    /* E o rótulo distingue os três estados, senão a promessa volta pela tela. */
+    expect(CONTA).toMatch(/votos\[i\] === "fila"/);
+  });
+});

@@ -413,6 +413,62 @@ export const mandarNoGrupo = createServerFn({ method: "POST" })
        meio: silêncio para a paciente (a mensagem já foi), registro para quem
        investigar por que um grupo vivo aparece no fim da lista. */
     if (erroOrdem) console.warn("[grupo] ordem não atualizou", erroOrdem.code);
+
+    /* ⚠️ **O GRUPO NÃO AVISAVA NINGUÉM.** A mensagem para até sete pessoas não
+       gerava push nenhum, e o emblema da aba Mensagens conta só as conversas de
+       DUAS — então as outras membras só descobriam se, por conta própria,
+       abrissem a caixa de entrada e reparassem numa bolinha dentro da lista de
+       grupos. Um canal onde ninguém responde é um canal que morre.
+       O direct de duas já mandava; o de oito, não.
+
+       ⚠️ **E ELE RESPEITA `silenciado_em`, POR MEMBRO.** Este é o mesmo canal
+       por onde chega o aviso de emergência: um push de grupo que não se pode
+       calar é como uma paciente desliga a notificação do app inteiro, e leva o
+       SOS junto. Sem a coluna de silêncio este bloco não deveria existir.
+
+       ⚠️ **Best-effort, e depois da gravação.** Avisar sobre uma mensagem que
+       não gravou manda sete pessoas abrirem uma conversa vazia. */
+    /* ⚠️ `await`, e NUNCA `void (async () => …)()`: no servidor a invocação
+       congela quando a resposta sai, e a promessa que ninguém guarda morre
+       antes de rodar — sem erro, sem log. Esta base já perdeu três recursos
+       exatamente assim, e a catraca `travas-do-servidor` me pegou escrevendo o
+       quarto. Os pushes saem numa rodada só, então o custo é uma latência. */
+    await (async () => {
+      try {
+        const [{ sendPushToUser }, membros] = await Promise.all([
+          import("./push.server"),
+          sb
+            .from("rede_grupo_membros")
+            .select("quem_id, silenciado_em")
+            .eq("grupo_id", data.grupoId)
+            .is("saiu_em", null),
+        ]);
+        if (membros.error || !membros.data) return;
+        const { data: g } = await sb
+          .from("rede_grupos")
+          .select("nome")
+          .eq("id", data.grupoId)
+          .maybeSingle();
+        /* ⚠️ O texto NÃO vai no push. Ele chega na tela de bloqueio, e quem
+           estiver ao lado lê — a mesma decisão do resumo semanal da rede. */
+        const titulo = (g as { nome?: string } | null)?.nome?.trim() || "Grupo";
+        const alvos = (membros.data as { quem_id: string; silenciado_em: string | null }[])
+          .filter((m) => m.quem_id !== eu && !m.silenciado_em)
+          .map((m) => m.quem_id);
+        await Promise.all(
+          alvos.map((quem) =>
+            sendPushToUser(quem, {
+              title: titulo,
+              body: "Nova mensagem no grupo",
+              url: "/minha-conta?tab=Comunidade",
+            }).catch(() => {}),
+          ),
+        );
+      } catch {
+        /* Um aviso que não saiu não pode derrubar a mensagem que já existe. */
+      }
+    })();
+
     return { ok: true as const, avisoClinico };
   });
 

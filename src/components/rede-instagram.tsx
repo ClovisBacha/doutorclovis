@@ -5823,9 +5823,24 @@ export function RedeNoApp({
     try {
       const t = await token();
       if (!t) return;
-      const { minhasConversas } = await import("@/lib/conversa.functions");
-      const r = await minhasConversas({ data: { accessToken: t } });
-      if (r.ok) setMsgsNaoLidas(r.naoLidas);
+      /* ⚠️ **O EMBLEMA CONTAVA SÓ AS CONVERSAS DE DUAS.** Uma mensagem de
+         grupo não acendia número nenhum: a bolinha do grupo existe, e vive
+         DENTRO da lista de grupos, que só se vê depois de já ter aberto a aba
+         Mensagens. Ou seja, o aviso só chegava a quem já tinha ido olhar. */
+      const [{ minhasConversas }, { meusGrupos }] = await Promise.all([
+        import("@/lib/conversa.functions"),
+        import("@/lib/grupo.functions"),
+      ]);
+      const [r, g] = await Promise.all([
+        minhasConversas({ data: { accessToken: t } }),
+        meusGrupos({ data: { accessToken: t } }),
+      ]);
+      /* ⚠️ Cada metade conta a sua. Uma falha na leitura dos grupos não pode
+         zerar o número das conversas — o emblema some e ela deixa de abrir a
+         mensagem que existe. */
+      const deConversas = r.ok ? r.naoLidas : 0;
+      const deGrupos = g.ok ? g.grupos.filter((x) => x.naoLida).length : 0;
+      if (r.ok || g.ok) setMsgsNaoLidas(deConversas + deGrupos);
     } catch {
       /* Sem o número o atalho fica sem emblema, que é o estado de quem não tem
          mensagem — nunca um erro na tela. */

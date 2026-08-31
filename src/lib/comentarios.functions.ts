@@ -136,11 +136,31 @@ async function postQueEuVejo(sb: any, postId: string, eu: string) {
      um banco sem a coluna significa. */
   const lerAutor = (colunas: string) =>
     sb.from("patient_profiles").select(colunas).eq("id", data.autor_id).maybeSingle();
-  let { data: autor, error: erroAutor } = await lerAutor(
+  /* ⚠️ **`rede_suspensa_em` FALTAVA, e a suspensão vazava por aqui.**
+     `foraDaRede` cruza TRÊS razões — luto, pausa e suspensão pela moderação —,
+     e este `select` nunca pedia a terceira: mesmo num banco COM a coluna, o
+     campo chegava `undefined` e o post de uma autora suspensa continuava
+     comentável. É um dos vinte e seis pontos de decisão que o comentário da
+     `foraDaRede` avisa que não podem ficar de fora — e ele ficou.
+     ⚠️ **UM DEGRAU POR SQL, do mais novo para o mais antigo.** Um recuo que só
+     soubesse tirar a primeira coluna quebraria de novo assim que a segunda
+     faltasse num banco que rodou meio SQL — a mesma lição de
+     `marcarConsultaNoDia` e de `postsCrus`. */
+  const DEGRAUS_DO_AUTOR = [
+    "id, care_mode, perfil_publico, rede_pausada_em, rede_suspensa_em",
     "id, care_mode, perfil_publico, rede_pausada_em",
-  );
-  if (erroAutor) {
-    ({ data: autor, error: erroAutor } = await lerAutor("id, care_mode, perfil_publico"));
+    "id, care_mode, perfil_publico",
+  ];
+  let autor: {
+    care_mode?: boolean | null;
+    perfil_publico?: boolean | null;
+    rede_pausada_em?: string | null;
+    rede_suspensa_em?: string | null;
+  } | null = null;
+  let erroAutor: unknown = null;
+  for (const colunas of DEGRAUS_DO_AUTOR) {
+    ({ data: autor, error: erroAutor } = await lerAutor(colunas));
+    if (!erroAutor) break;
   }
   /* ⚠️ Falha de leitura do AUTOR recusa. Sem saber se ele está em Modo Cuidado
      ou se o perfil é público, publicar o comentário seria decidir visibilidade

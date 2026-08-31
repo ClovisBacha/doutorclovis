@@ -161,10 +161,25 @@ describe("⚠️ a coluna tem degrau próprio, no TOPO da escada", () => {
     /* Sem `rede_pausada_em` o `42703` cai em `erroAutor` e `postQueEuVejo`
        RECUSA — comentar pararia de funcionar para todo mundo por causa de uma
        coluna que ainda não existe naquele banco. */
+    /* ⚠️ COBRA A GARANTIA, e não a grafia. A primeira versão travava a chamada
+       literal `lerAutor("id, care_mode, perfil_publico")` numa janela de 500
+       caracteres, e ficou VERMELHA no dia em que a escada ganhou um terceiro
+       degrau (`rede_suspensa_em`) e virou um laço — ou seja, reprovou uma
+       mudança que só APERTOU a garantia. Décima segunda vez nesta base. */
     const c = semProsa(readFileSync("src/lib/comentarios.functions.ts", "utf8"));
-    const i = c.indexOf("const lerAutor =");
+    const i = c.indexOf("const DEGRAUS_DO_AUTOR");
     expect(i).toBeGreaterThan(-1);
-    expect(c.slice(i, i + 500)).toContain('lerAutor("id, care_mode, perfil_publico")');
+    const escada = c.slice(i, c.indexOf("];", i));
+    /* Existe um degrau SEM a pausa — é ele que salva o banco atrasado. */
+    const degraus = escada
+      .split("\n")
+      .map((l) => l.match(/"([^"]+)"/)?.[1])
+      .filter((x): x is string => !!x);
+    expect(degraus.some((d) => !d.includes("rede_pausada_em"))).toBe(true);
+    /* E o laço para no primeiro que responde, senão o recuo não recua. */
+    const j = c.indexOf("for (const colunas of DEGRAUS_DO_AUTOR)");
+    expect(j).toBeGreaterThan(-1);
+    expect(c.slice(j, j + 220)).toMatch(/if \(!erroAutor\) break;/);
   });
 });
 

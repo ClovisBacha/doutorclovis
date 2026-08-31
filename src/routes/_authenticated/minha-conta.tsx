@@ -10584,7 +10584,17 @@ function NutricaoTab({
      `submitBrainFeedback` em três lugares; este tinha zero.
      Mesma função, mesma fila de revisão do médico — o 👎 daqui chega no mesmo
      lugar que o de lá, e é isso que fecha o ciclo. */
-  const [votos, setVotos] = useState<Record<number, boolean>>({});
+  /* ⚠️ TRÊS ESTADOS, e não um booleano. `true` = 👍; `false` = 👎 que o
+     servidor NÃO confirmou ter enfileirado; `"fila"` = 👎 que chegou ao
+     médico. A tela prometia "seu médico vai ver" incondicionalmente — e
+     `submitBrainFeedback` devolve `{ ok: false }` numa resposta 200 NORMAL, e
+     só enfileira quando há `entryId` (a cota pode ter estourado, o cérebro
+     pode estar desligado, a pergunta pode ser suporte puro). Ela reclamava de
+     uma orientação alimentar errada, lia que o médico ia ver, e o item podia
+     não ter entrado em fila nenhuma.
+     ⚠️ O chat principal já tinha exatamente esta correção, com o comentário do
+     conserto à vista — a régua aplicada num lugar e deixada de pé no vizinho. */
+  const [votos, setVotos] = useState<Record<number, boolean | "fila">>({});
 
   async function votar(indice: number, gostou: boolean) {
     if (votos[indice] !== undefined) return;
@@ -10592,7 +10602,7 @@ function NutricaoTab({
     try {
       const { data: sess } = await supabase.auth.getSession();
       if (!sess.session) return;
-      await submitBrainFeedback({
+      const r = await submitBrainFeedback({
         data: {
           accessToken: sess.session.access_token,
           /* A PERGUNTA DELA, não a resposta: é ela que o médico precisa ler
@@ -10602,7 +10612,13 @@ function NutricaoTab({
           helpful: gostou,
         },
       });
-      if (!gostou) toast("Anotado — seu médico vai ver 💛");
+      /* Só promete quando o servidor confirma que enfileirou. */
+      if (!gostou && r?.ok && "chegouAoMedico" in r && r.chegouAoMedico) {
+        setVotos((v) => ({ ...v, [indice]: "fila" }));
+        toast("Anotado — seu médico vai ver 💛");
+      } else if (!gostou) {
+        toast("Anotado 💛");
+      }
     } catch {
       /* O voto já está na tela; insistir com um erro sobre um 👍 seria pior
          que perder o 👍. */
@@ -10779,7 +10795,11 @@ function NutricaoTab({
                   <div className="mt-1.5 flex items-center gap-2">
                     {votos[i] !== undefined ? (
                       <span className="text-[10px] text-muted-foreground">
-                        {votos[i] ? "Obrigada 💛" : "Anotado — seu médico vai ver"}
+                        {votos[i] === true
+                          ? "Obrigada 💛"
+                          : votos[i] === "fila"
+                            ? "Anotado — seu médico vai ver"
+                            : "Anotado 💛"}
                       </span>
                     ) : (
                       <>

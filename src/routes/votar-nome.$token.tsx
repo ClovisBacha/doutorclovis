@@ -85,9 +85,21 @@ function VotarNomePage() {
     try {
       localStorage.setItem("voter_name", voterName);
       const voterToken = getVoterToken();
-      await voteForName({
+      const r = await voteForName({
         data: { shareToken, entryId, voterName: voterName.trim(), voterToken },
       });
+      /* ⚠️ `{ ok: false }` CHEGA NUMA RESPOSTA 200 NORMAL — o `catch` abaixo
+         não pega. A votação pode ter sido encerrada, ou o INSERT recusado, e a
+         tela gravava "já votou" no `localStorage` mesmo assim: o voto da avó
+         nunca entrava na contagem E ela ficava impedida de tentar de novo. O
+         nome do bebê saía de uma apuração silenciosamente incompleta.
+         ⚠️ E a régua certa mora QUINZE LINHAS ABAIXO, em `handleAddName`:
+         `const res = await addPublicNameEntry(...); if (res.ok) { … }`. Mesmo
+         arquivo, mesma forma de retorno, uma função lia e a outra não. */
+      if (!r.ok) {
+        toast.error(r.error ?? "Não foi possível registrar o voto — tente novamente.");
+        return;
+      }
       localStorage.setItem(`voted_${shareToken}`, entryId);
       setVotedEntryId(entryId);
       await load();
