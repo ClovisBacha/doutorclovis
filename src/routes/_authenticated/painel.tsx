@@ -9091,7 +9091,16 @@ function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setBusy(true);
     try {
       const tk = await tokenFn();
-      await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      /* ⚠️ **`{ ok: false }` CHEGA NUM 200 NORMAL** — o `finally` nao pega, e o
+       * `try` tampouco. A tela dizia "Agenda desconectada.", apagava o e-mail e
+       * marcava desconectado; na abertura seguinte a agenda voltava conectada,
+       * e ele nao tem como saber se a integracao esta viva. Numa tela cujo
+       * assunto e quem enxerga a agenda dele, isso e o pior desfecho. */
+      const r = await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      if (!r.ok) {
+        toast.error("Nao consegui desconectar a agenda — ela continua conectada. Tente de novo.");
+        return;
+      }
       setConnected(false);
       setEmail(null);
       toast.success("Agenda desconectada.");

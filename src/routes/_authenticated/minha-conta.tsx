@@ -2064,19 +2064,47 @@ function MinhaContaPage() {
             setEmergencyOpen(false);
             goToTab("Alertas");
           }}
+          /* ⚠️ A FICHA QUE O SOCORRISTA LÊ, E O ÚNICO PORTÃO DE MODO CUIDADO
+             DELA — que vive AQUI, e não dentro da folha.
+
+             Em Modo Cuidado a ficha dizia "FICHA DE EMERGÊNCIA - GESTANTE",
+             com o NOME DO BEBÊ e a DPP. Ela abre o SOS — a tela que ela abre
+             quando alguma coisa está errada — e lê o nome do bebê que ela
+             perdeu e uma data de parto que não vai acontecer.
+
+             ⚠️ **O que NÃO se faz aqui é apagar a ficha.** Quem perdeu uma
+             gestação continua sendo paciente obstétrica: hemorragia,
+             infecção, pré-eclâmpsia de pós-parto e trombose são justamente os
+             riscos dela, e o socorrista precisa saber disso. Tipo sanguíneo,
+             alergias, medicações, contato e médico ficam INTEIROS.
+
+             O que sai é o que é falso: um bebê que não vai nascer e uma DPP
+             que não existe — que não são só dolorosos, são informação ERRADA
+             para quem vai atendê-la. E "GESTANTE" vira "PACIENTE OBSTÉTRICA",
+             que continua sinalizando obstetrícia na triagem sem afirmar uma
+             gestação em curso.
+
+             ⚠️ A idade gestacional sai junto, e esta é a única linha em que se
+             troca informação por exatidão: "28s 3d" afirma uma gestação de
+             hoje. Se o dono quiser a semana de volta, ela precisa vir com
+             outro rótulo — é decisão clínica dele, não minha. */
+          tituloDaFicha={careMode ? "FICHA DE EMERGÊNCIA - PACIENTE OBSTÉTRICA" : undefined}
           info={{
             name: profile?.display_name?.split(" ")[0] ?? null,
-            weekLabel: gest ? `${gest.weeks}s ${gest.days}d` : null,
+            weekLabel: careMode || !gest ? null : `${gest.weeks}s ${gest.days}d`,
             bloodType: profile?.blood_type ?? null,
             allergies: profile?.allergies ?? null,
             emergencyContact: profile?.emergency_contact ?? null,
             emergencyPhone: profile?.emergency_phone ?? null,
-            babyName: profile?.baby_name ?? null,
-            dpp: (() => {
-              const due =
-                profile?.due_date ?? (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-              return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
-            })(),
+            babyName: careMode ? null : (profile?.baby_name ?? null),
+            dpp: careMode
+              ? null
+              : (() => {
+                  const due =
+                    profile?.due_date ??
+                    (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
+                  return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
+                })(),
             medications: profile?.medications ?? null,
           }}
           medico={meuMedico}

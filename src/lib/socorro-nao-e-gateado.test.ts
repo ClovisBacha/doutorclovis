@@ -84,3 +84,85 @@ describe("o alarme sonoro do SOS também atravessa", () => {
     expect(chamadas.join(" ")).toContain('"sos-falhou"');
   });
 });
+
+/**
+ * ⚠️ A FICHA QUE O SOCORRISTA LÊ — o outro lado da mesma régua.
+ *
+ * O bloco acima garante que a folha ABRE no luto. Este garante o que ela DIZ
+ * quando abre: a ficha começava em "FICHA DE EMERGÊNCIA - GESTANTE", com o
+ * NOME DO BEBÊ e a DPP, para quem acabou de perder a gestação — na tela que
+ * ela abre justamente quando alguma coisa está errada.
+ *
+ * ⚠️ **E o conserto não é apagar a ficha.** Quem perdeu uma gestação continua
+ * sendo paciente obstétrica, e é por isso que este arquivo cobra as DUAS
+ * metades ao mesmo tempo: o que sai (bebê e DPP, que além de dolorosos são
+ * informação FALSA para quem vai atendê-la) e o que **não pode sair** (tipo
+ * sanguíneo, alergias, medicações, contato de emergência).
+ *
+ * Uma catraca que cobrasse só a primeira metade aprovaria alguém "consertando"
+ * o luto ao custo do socorro, que é o defeito no sentido contrário.
+ */
+describe("a ficha que o socorrista lê", () => {
+  /** O objeto `info={{ … }}` do ponto de montagem, por contagem de chaves. */
+  const infoDaFicha = (() => {
+    const i = CONTA.indexOf("info={{");
+    expect(i).toBeGreaterThan(-1);
+    let n = 0;
+    for (let j = i + "info=".length; j < CONTA.length; j++) {
+      if (CONTA[j] === "{") n++;
+      else if (CONTA[j] === "}" && --n === 0) return CONTA.slice(i, j + 1);
+    }
+    throw new Error("o objeto `info` não fecha");
+  })();
+
+  test("⚠️ o nome do bebê e a DPP saem em Modo Cuidado", () => {
+    /* Cobra o TERMO na decisão de cada campo, e não a grafia de um ternário:
+       `careMode ? null : x` e `!careMode && x` valem os dois. */
+    const campo = (nome: string) => {
+      const i = infoDaFicha.indexOf(`${nome}:`);
+      expect(i).toBeGreaterThan(-1);
+      /* até o próximo campo de primeiro nível, ou o fim do objeto */
+      const resto = infoDaFicha.slice(i);
+      const fim = resto.search(/\n {12}\w+:/);
+      return fim === -1 ? resto : resto.slice(0, fim);
+    };
+    expect(campo("babyName")).toMatch(/\bcareMode\b/);
+    expect(campo("dpp")).toMatch(/\bcareMode\b/);
+    expect(campo("weekLabel")).toMatch(/\bcareMode\b/);
+  });
+
+  test("⚠️ o que o socorrista precisa NÃO é gateado por luto", () => {
+    /* A metade que impede o conserto de virar o defeito oposto. */
+    for (const nome of [
+      "bloodType",
+      "allergies",
+      "medications",
+      "emergencyContact",
+      "emergencyPhone",
+    ]) {
+      const i = infoDaFicha.indexOf(`${nome}:`);
+      expect(i).toBeGreaterThan(-1);
+      const resto = infoDaFicha.slice(i);
+      const fim = resto.search(/\n {12}\w+:/);
+      const linha = fim === -1 ? resto : resto.slice(0, fim);
+      expect(linha).not.toMatch(/\bcareMode\b/);
+    }
+  });
+
+  test("⚠️ o cabeçalho deixa de afirmar uma gestação em curso", () => {
+    expect(CONTA).toMatch(/tituloDaFicha=\{careMode \?/);
+    /* E o padrão continua sendo o texto de hoje: a paciente grávida não perde
+       a palavra que o socorrista brasileiro lê primeiro. */
+    expect(FOLHA).toMatch(/tituloDaFicha \?\? "FICHA DE EMERGÊNCIA - GESTANTE"/);
+  });
+
+  test("⚠️ o portão chega como STRING, nunca como booleano de luto", () => {
+    /* Esta é a razão de o título ser um texto e não um `emLuto`: um booleano
+       de luto dentro da folha seria, um dia, um `if (emLuto) return null` — o
+       defeito que o primeiro bloco deste arquivo existe para impedir. Uma
+       string não tem como desligar nada. */
+    expect(FOLHA).toMatch(/tituloDaFicha\?: string;/);
+    expect(FOLHA).not.toMatch(/\bemLuto\b/);
+    expect(FOLHA).not.toMatch(/\bluto\b/);
+  });
+});

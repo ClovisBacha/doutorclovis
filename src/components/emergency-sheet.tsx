@@ -31,6 +31,7 @@ type Info = {
 export function EmergencySheet({
   onTriagem,
   info,
+  tituloDaFicha,
   medico,
   medicoResolvido,
   onClose,
@@ -52,6 +53,17 @@ export function EmergencySheet({
    */
   onTriagem?: () => void;
   info: Info;
+  /**
+   * O cabecalho da ficha que o socorrista le.
+   *
+   * ⚠️ **E uma STRING, e nao um booleano de luto — de proposito.** Passar
+   * `emLuto` para dentro deste componente seria pedir para alguem, um dia,
+   * escrever `if (emLuto) return null` — que e exatamente o defeito consertado
+   * nesta mesma folha: a paciente em Modo Cuidado tocava no SOS e a folha nao
+   * montava. **O Modo Cuidado governa CONTEUDO; nunca o acesso ao socorro.**
+   * Uma string nao tem como desligar nada.
+   */
+  tituloDaFicha?: string;
   /**
    * O médico DA PACIENTE, lido do cadastro dele (`getMyDoctorContact`).
    * `null` = ela ainda não tem médico vinculado, ou ele não preencheu o
@@ -503,7 +515,7 @@ export function EmergencySheet({
   }
 
   const card = [
-    "FICHA DE EMERGÊNCIA - GESTANTE",
+    tituloDaFicha ?? "FICHA DE EMERGÊNCIA - GESTANTE",
     `Nome: ${info.name || "-"}`,
     info.babyName ? `Bebe: ${info.babyName}` : "",
     `Idade gestacional: ${info.weekLabel || "-"}`,

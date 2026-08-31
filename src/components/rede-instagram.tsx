@@ -6252,8 +6252,16 @@ export function RedeNoApp({
       if (!t) return;
       const mod = await import("@/lib/rede-social.functions");
       if (perfil.meuVinculo === "ativo") {
-        await mod.deixarDeSeguir({ data: { accessToken: t, alvoId: perfil.id } });
-        setPerfil({ ...perfil, meuVinculo: null });
+        /* ⚠️ **O RETORNO ERA DESCARTADO — e o ramo LOGO ABAIXO, na MESMA
+         * funcao, le o dele.** `{ ok: false }` chega num 200 NORMAL, entao o
+         * `catch` nao pega: o botao virava "Seguir", ela saia da tela achando
+         * que tinha deixado de seguir, e na proxima abertura estava seguindo de
+         * novo. Nao ha erro, nao ha log — so o app desfazendo uma decisao dela.
+         *
+         * A regra ja estava aplicada dois ramos abaixo (`if (r.ok) setPerfil`);
+         * o que faltava era valer para os dois. */
+        const r = await mod.deixarDeSeguir({ data: { accessToken: t, alvoId: perfil.id } });
+        if (r.ok) setPerfil({ ...perfil, meuVinculo: null });
       } else if (!perfil.meuVinculo) {
         const r = await mod.seguir({ data: { accessToken: t, alvoId: perfil.id } });
         if (r.ok) setPerfil({ ...perfil, meuVinculo: r.estado });
