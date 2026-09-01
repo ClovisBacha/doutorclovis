@@ -79,7 +79,9 @@ describe("⚠️ o parâmetro é o MESMO que o app captura", () => {
 
 describe("⚠️ as DUAS telas usam o mesmo construtor", () => {
   const amigas = semComentarios("src/components/amigas.tsx");
-  const conta = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+  /* ⚠️ O cartão de indicação vive no Cantinho, que saiu de `minha-conta.tsx`
+     em set/2026 (move verbatim, conferido por hash). */
+  const conta = semComentarios("src/components/cantinho-tab.tsx");
 
   test("a aba das Amigas convida COM o código", () => {
     expect(amigas).toContain("linkDeIndicacao(codigo");

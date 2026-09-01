@@ -29,7 +29,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { CANTINHO_ITEMS } from "./cantinho";
 import { CURVA_GRATIS } from "./economia-sementinhas";
 
-const fonte = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/* ⚠️ O CANTINHO MUDOU DE CASA em set/2026 (`minha-conta.tsx` → componente
+   próprio), e a garantia não mudou uma linha: o move foi verbatim, conferido
+   por hash. Este teste seguia o ARQUIVO; segue a aba agora. */
+const fonte = readFileSync("src/components/cantinho-tab.tsx", "utf8");
 const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\{\/\*[\s\S]*?\*\/\}/g, "");
 
 /** A MESMA expressão da tela, reproduzida para poder ser varrida. */
