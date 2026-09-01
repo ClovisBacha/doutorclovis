@@ -53,12 +53,22 @@ const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta
  * verde com a checagem apagada, que é a armadilha que este repositório já
  * pagou onze vezes.
  */
-function componente(nome: string) {
-  const i = CONTA.indexOf(`function ${nome}(`);
+function componente(nome: string, arquivo = CONTA) {
+  const i = arquivo.indexOf(`function ${nome}(`);
   expect(i).toBeGreaterThan(-1);
-  const j = CONTA.indexOf("\nfunction ", i + 1);
-  return CONTA.slice(i, j === -1 ? undefined : j);
+  const j = arquivo.indexOf("\nfunction ", i + 1);
+  return arquivo.slice(i, j === -1 ? undefined : j);
 }
+
+/**
+ * ⚠️ **A TELA CARREGA O PRÓPRIO ARQUIVO, e isso é o conserto de uma lição.**
+ * `minha-conta.tsx` está sendo partido em componentes (set/2026), e a primeira
+ * aba a sair — o ciclo menstrual — deixou esta catraca vermelha só porque o
+ * caminho mudou. A garantia não mudou uma linha; o que faltava era o teste
+ * saber onde procurar. Com o arquivo ao lado do nome, o próximo corte não
+ * repete isto.
+ */
+const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
 /** As cinco de mesma forma: lê o erro, e o vazio vem DEPOIS do instável. */
 const TELAS = [
@@ -69,14 +79,19 @@ const TELAS = [
     vazio: "Nenhuma consulta agendada no momento",
     marca: "setInstavel(true)",
   },
-  { nome: "CicloMenstrualTab", vazio: "Nenhum ciclo registrado", marca: "setInstavel(true)" },
+  {
+    nome: "CicloMenstrualTab",
+    vazio: "Nenhum ciclo registrado",
+    marca: "setInstavel(true)",
+    arquivo: CICLO,
+  },
   { nome: "AlbumTab", vazio: "Nenhuma memória ainda", marca: "setInstavel(true)" },
-] as const;
+] as { nome: string; vazio: string; marca: string; arquivo?: string }[];
 
 describe("o vazio não pode ser a falha", () => {
-  for (const { nome, vazio, marca } of TELAS) {
+  for (const { nome, vazio, marca, arquivo } of TELAS) {
     test(`⚠️ ${nome} distingue "não consegui" de "não há nada"`, () => {
-      const c = componente(nome);
+      const c = componente(nome, arquivo);
       /* ⚠️ A METADE DA LEITURA, e ela é a que importa. A primeira versão deste
          teste cobrava só o RENDER — e três mutações passaram verdes, porque
          apagar a checagem do erro não tira `instavel` da tela. O estado
