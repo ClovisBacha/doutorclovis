@@ -12025,7 +12025,15 @@ caiu, abaixe o número aqui.
 
 ### ⚠️ E EU QUASE REPORTEI UMA MEDIÇÃO DE UM BUILD QUE NÃO ERA O MEU
 
-O `bun run build` foi morto pelo `pkill -f vite` do MESMO comando (saída 144), e
+⚠️ **E A CAUSA QUE EU REGISTREI AQUI ESTAVA ERRADA.** Escrevi que o `pkill -f
+vite` do mesmo comando tinha matado o build; testado depois, uma consulta que
+saiu 144 com o `pkill` **também saiu 144 com ele na forma `[v]ite`, e rodou
+limpa quando eu tirei tudo o mais** — ou seja, o `pkill` não era o culpado. O
+FATO continua de pé e é o que importa (os artefatos medidos eram de duas horas
+antes, conferido pelo relógio), mas a explicação não. **Atribuir causa sem
+testá-la é a mesma pressa que a nota abaixo existe para condenar.**
+
+O `bun run build` saiu com 144 num comando que também tinha um `pkill`, e
 os artefatos que sobraram eram de duas horas antes — de um estado anterior à
 mudança. Eu já tinha lido números deles. **Conferir o RELÓGIO do artefato antes
 de acreditar num build** é a versão desta armadilha para medição de pacote.
