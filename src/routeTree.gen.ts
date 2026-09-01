@@ -53,6 +53,7 @@ import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
 import { Route as PreviewCantinhoRouteImport } from './routes/preview-cantinho'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
+import { Route as PreviewBebeTabRouteImport } from './routes/preview-bebe-tab'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
 import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
 import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
@@ -329,6 +330,11 @@ const PreviewCantinhoRoute = PreviewCantinhoRouteImport.update({
 const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
   id: '/preview-bolha',
   path: '/preview-bolha',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewBebeTabRoute = PreviewBebeTabRouteImport.update({
+  id: '/preview-bebe-tab',
+  path: '/preview-bebe-tab',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewBebeRoute = PreviewBebeRouteImport.update({
@@ -640,6 +646,7 @@ export interface FileRoutesByFullPath {
   '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -741,6 +748,7 @@ export interface FileRoutesByTo {
   '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -844,6 +852,7 @@ export interface FileRoutesById {
   '/preview-assinatura': typeof PreviewAssinaturaRoute
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
+  '/preview-bebe-tab': typeof PreviewBebeTabRoute
   '/preview-bolha': typeof PreviewBolhaRoute
   '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
@@ -947,6 +956,7 @@ export interface FileRouteTypes {
     | '/preview-assinatura'
     | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
     | '/preview-cantinho'
     | '/preview-casal'
@@ -1048,6 +1058,7 @@ export interface FileRouteTypes {
     | '/preview-assinatura'
     | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
     | '/preview-cantinho'
     | '/preview-casal'
@@ -1150,6 +1161,7 @@ export interface FileRouteTypes {
     | '/preview-assinatura'
     | '/preview-banco'
     | '/preview-bebe'
+    | '/preview-bebe-tab'
     | '/preview-bolha'
     | '/preview-cantinho'
     | '/preview-casal'
@@ -1253,6 +1265,7 @@ export interface RootRouteChildren {
   PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
   PreviewBancoRoute: typeof PreviewBancoRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
+  PreviewBebeTabRoute: typeof PreviewBebeTabRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
   PreviewCantinhoRoute: typeof PreviewCantinhoRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
@@ -1631,6 +1644,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-bolha'
       fullPath: '/preview-bolha'
       preLoaderRoute: typeof PreviewBolhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-bebe-tab': {
+      id: '/preview-bebe-tab'
+      path: '/preview-bebe-tab'
+      fullPath: '/preview-bebe-tab'
+      preLoaderRoute: typeof PreviewBebeTabRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-bebe': {
@@ -2073,6 +2093,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewAssinaturaRoute: PreviewAssinaturaRoute,
   PreviewBancoRoute: PreviewBancoRoute,
   PreviewBebeRoute: PreviewBebeRoute,
+  PreviewBebeTabRoute: PreviewBebeTabRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
   PreviewCantinhoRoute: PreviewCantinhoRoute,
   PreviewCasalRoute: PreviewCasalRoute,

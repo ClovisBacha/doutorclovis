@@ -11983,6 +11983,69 @@ zero problemas. **Aplicar no Supabase (pendentes, medidos):**
 `supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
 sozinha.
 
+## A aba Bebê ganhou bancada — e a fruta parou de ser sempre morango (set/2026)
+
+O dono disse que "as informações do bebê, quando você clica nele, não estão cem
+por cento". **Eu não conseguia olhar essa tela**: `BabyTab` exige conta, perfil
+com DUM e médico vinculado, e enquanto ela morava dentro de `minha-conta.tsx`
+nem dava para importá-la — exportar de um arquivo de ROTA põe o código no
+pedaço da árvore de rotas que TODA página do site carrega
+(`rotas-sem-export-solto`).
+
+**Por isso o corte veio antes do desenho**, e não por arrumação:
+`src/components/baby-tab.tsx` (`BabyTab` + `WeeklyRecapCard` + `HomeMoodCheckin`
+
+- `DoctorPresenceCard` + `MOOD_CHOICES`), **631 linhas**, byte a byte —
+  os cinco blocos conferidos por SHA-256 contra o que estava em produção.
+  `minha-conta.tsx`: **18.637 → 18.006**.
+
+⚠️ **`dayGreeting` e `MOOD_LABEL` foram para `src/lib/humor-e-saudacao.ts`**,
+porque cada uma era usada dos DOIS lados do corte: a primeira é definida no meio
+do bloco que saiu e chamada fora dele; a segunda é definida fora e lida dentro.
+
+⚠️ **`Gest` virou `export type`, e a distinção é o ponto:** a catraca casa
+`export function|const|let|class` e **nunca `export type`** — tipo é apagado na
+compilação e não custa um byte ao pacote.
+
+### ⚠️ E OLHAR ACHOU O DEFEITO NA PRIMEIRA FOTO: 🍓 Abóbora
+
+A pílula da fruta tinha o emoji **CRAVADO** em `"🍓"`. Ele nunca mudava: a
+paciente de 28 semanas lia "🍓 Abóbora" e a de 40, "🍓 Abóbora moranga" — o
+desenho contradizendo a palavra ao lado, na pílula principal da tela.
+
+E o mais caro: **`fruitEmojiForWeek` já estava importada e já era usada dez
+linhas abaixo**, no cartão de compartilhar. A função certa existia; só esta
+pílula não a chamava. Medido depois: 🍓 Morango · 🍌 Banana · 🎃 Abóbora ·
+🍈 Mamão · 🎃 Abóbora moranga.
+
+⚠️ **E EU QUASE ACUSEI DEZ DEFEITOS QUE NÃO EXISTEM.** Cruzando emoji com
+palavra em todas as semanas, dez "discordavam" (🫘 lentilha, 🍐 figo, 🥬 aipo).
+São DELIBERADAS, e o comentário de `gestacao.ts` diz por quê: _"algumas semanas
+usam o parente mais próximo porque o emoji exato não existe"_. Não há emoji de
+lentilha nem de aipo. Ler o comentário antes de acusar.
+
+### ⚠️ QUATRO ARMADILHAS DE MEDIÇÃO, todas pagas nesta tela
+
+1. **A FOTO ESTAVA VELHA.** Escrevi duas vezes no MESMO caminho e li a primeira
+   versão — passei quatro rodadas concluindo que a aba renderizava em branco,
+   enquanto `elementFromPoint` mostrava o conteúdo em todos os pontos. **Foto de
+   verificação vai para um caminho NOVO**, com carimbo de tempo no nome.
+2. **`textContent` é CRU; `innerText` reflete `text-transform`.** Procurar
+   "2º TRIMESTRE" por `textContent` não acha nada, porque o texto real é
+   minúsculo e quem maiúsculiza é o CSS.
+3. **`Stagger`/`StaggerItem` usam `whileInView` com `once: true`**, e no headless
+   o observador pode não disparar antes da foto — os blocos ficam em
+   `opacity: 0`. Um contexto com `reducedMotion: "reduce"` os renderiza
+   estáticos, e isso NÃO é gambiarra: é o estado real de quem pede menos
+   movimento.
+4. **Opacidade zero no PAI apaga os filhos, e os filhos reportam `opacity: 1`.**
+   Contar elementos invisíveis subestima o estrago.
+
+**Bancada:** `/preview-bebe-tab?w=20&d=3` · `?w=40` (a reta final) ·
+`?luto=1` (Modo Cuidado) · `?semmedico=1` (sem o cartão de presença, que é quem
+nunca usou o código do consultório) · `?magro=1` (recém-cadastrada, sem nome do
+bebê nem histórico — onde os vazios aparecem).
+
 ## Os botões passaram a ser legíveis (set/2026)
 
 Pedido do dono na varredura de detalhes: melhorar "especialmente os botões e as
