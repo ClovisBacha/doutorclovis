@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { BabyTab } from "@/components/baby-tab";
+import { DOCTOR } from "@/lib/doctor.config";
 import type { Profile } from "@/routes/_authenticated/minha-conta";
 
 /**
@@ -35,6 +36,9 @@ export const Route = createFileRoute("/preview-bebe-tab")({
     /* Perfil magro: sem nome do bebê, sem batimento, sem histórico. É o que a
        paciente recém-cadastrada vê, e é onde os vazios aparecem. */
     magro: q.magro == null ? 0 : Number(q.magro),
+    /* Médica que NÃO é o dono da instalação: o cartão mostra a inicial, e não
+       o retrato. É o caso da maioria das pacientes num app multi-consultório. */
+    outromedico: q.outromedico == null ? 0 : Number(q.outromedico),
   }),
   head: () => ({
     meta: [{ title: "Bancada da aba Bebê" }, { name: "robots", content: "noindex" }],
@@ -43,7 +47,7 @@ export const Route = createFileRoute("/preview-bebe-tab")({
 });
 
 function PreviewBebeTab() {
-  const { w, d, luto, semmedico, magro } = Route.useSearch();
+  const { w, d, luto, semmedico, magro, outromedico } = Route.useSearch();
   const semanas = Number.isFinite(w) ? w : 20;
   const dias = Number.isFinite(d) ? Math.min(6, Math.max(0, d)) : 3;
 
@@ -74,7 +78,21 @@ function PreviewBebeTab() {
     <div className="fixed inset-0 z-[50] overflow-y-auto bg-background px-4 py-5">
       <BabyTab
         profile={perfil}
-        medico={semmedico ? null : { nome: "Clóvis Bacha", specialty: "Ginecologia e Obstetrícia" }}
+        /* ⚠️ O NOME PRECISA SER EXATAMENTE `DOCTOR.name`. O cartão de presença
+           só mostra o RETRATO quando o médico É o dono da instalação
+           (`nomeMedico === DOCTOR.name`) — para os demais, a inicial, que é a
+           decisão certa: a foto é dele, não de um profissional qualquer.
+           A bancada passava "Clóvis Bacha" sem o "Dr.", a comparação falhava, e
+           eu quase reportei a inicial como defeito de produto. Bancada que não
+           usa a MESMA forma da produção mede um app que não existe.
+           `?outromedico=1` mostra o outro caso, que também é real. */
+        medico={
+          semmedico
+            ? null
+            : outromedico
+              ? { nome: "Dra. Marina Alves", specialty: "Ginecologia e Obstetrícia" }
+              : { nome: DOCTOR.name, specialty: "Ginecologia e Obstetrícia" }
+        }
         gest={{ weeks: semanas, days: dias, totalDays: semanas * 7 + dias }}
         onNavigate={() => {}}
         onBabyTap={() => {}}
@@ -82,7 +100,7 @@ function PreviewBebeTab() {
       />
       <p className="pointer-events-none fixed bottom-2 left-0 right-0 z-[60] text-center text-[10px] text-muted-foreground">
         bancada · {dum.getUTCFullYear()} · ?w=semana &middot; ?d=dia &middot; ?luto=1 &middot;
-        ?semmedico=1 &middot; ?magro=1
+        ?semmedico=1 &middot; ?magro=1 &middot; ?outromedico=1
       </p>
     </div>
   );

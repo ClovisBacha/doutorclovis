@@ -522,22 +522,27 @@ export function BabyTab({
                 })
               : "—"}
           </p>
+          {/* ⚠️ A CONTAGEM NÃO SE REPETE AQUI. "Faltam 139 dias" aparecia neste
+              cartão E na barra da jornada, a duzentos pixels de distância — a
+              mesma variável, o mesmo número, duas vezes. Quem fica com ela é a
+              BARRA, porque lá a frase tem o nome do bebê e é o desfecho do que a
+              barra mede; aqui seria a data de cima repetida noutra unidade.
+              A janela do parto FICA: o texto dela diz outra coisa, e é o único
+              momento em que este cartão precisa falar além da data. */}
           {careMode ? null : reta ? (
             <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
-          ) : (
-            daysToDue != null && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {daysToDue === 0
-                  ? "É hoje! 🎉"
-                  : daysToDue === 1
-                    ? "Amanhã!"
-                    : `Faltam ${daysToDue} dias`}
-              </p>
-            )
-          )}
+          ) : null}
         </div>
         <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
+          {/* ⚠️ O TÍTULO DIZIA "PRÓXIMA CONSULTA" E O TEXTO É UMA REGRA GERAL.
+              O cartão prometia o compromisso DELA — que o app tem
+              (`getMyAppointments`, o Calendário, os lembretes de 24h e 4h) — e
+              entregava o ritmo da fase. Prometer específico e entregar genérico
+              é como uma tela perde a credibilidade das outras informações.
+              O título passou a dizer o que o texto de fato diz. Ligar a consulta
+              real é função nova (uma prop vinda de `minha-conta`), e não um
+              conserto de rótulo: fica como decisão, não como remendo. */}
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">Ritmo das consultas</p>
           <p className="mt-2 text-sm text-muted-foreground">
             {gest.weeks < 28
               ? "Consultas mensais — agende sua próxima visita."
