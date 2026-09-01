@@ -87,7 +87,7 @@ export function AbasDoPainel({
             >
               {g.rotulo}
               {total > 0 && (
-                <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-white">
+                <span className="ml-1.5 rounded-full bg-amber-700 px-1.5 py-0.5 text-xs font-bold text-white">
                   {total}
                 </span>
               )}
@@ -165,7 +165,7 @@ function SegundaFita({
           >
             {f}
             {n > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              <span className="ml-1.5 rounded-full bg-amber-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
                 {n}
               </span>
             )}

@@ -340,7 +340,7 @@ export function AppJogoMockupScreen() {
       </div>
 
       {/* Banner da fase */}
-      <div className="flex items-center justify-between rounded-2xl bg-amber-500 px-3 py-2 text-white">
+      <div className="flex items-center justify-between rounded-2xl bg-amber-700 px-3 py-2 text-white">
         <div>
           <p className="text-[7px] font-bold uppercase tracking-wider text-white/80">
             Fase 4 · Semanas 22–28

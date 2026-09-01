@@ -1187,7 +1187,7 @@ function DoctorRow({ d, onChanged }: { d: PlatformDoctor; onChanged: () => void 
         onClick={() => change({ active: !d.active })}
         disabled={busy}
         className={`rounded-full px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${
-          d.active ? "bg-rose-500" : "bg-emerald-500"
+          d.active ? "bg-rose-700" : "bg-emerald-700"
         }`}
       >
         {d.active ? "Desativar" : "Ativar"}
@@ -1591,7 +1591,7 @@ function DepoimentosAdminTab() {
           <button
             onClick={() => review(r.id, true)}
             disabled={busy === r.id}
-            className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
+            className="rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white disabled:opacity-40"
           >
             Aprovar (+100 🌱)
           </button>

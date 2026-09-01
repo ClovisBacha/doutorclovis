@@ -148,7 +148,7 @@ export function MascoteDaHome({
         {emblema && (
           <span
             aria-hidden
-            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/85"
+            className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-700 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-white/85"
           >
             {emblema}
           </span>

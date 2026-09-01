@@ -2410,7 +2410,7 @@ function RecentQuestionsCard({
       <div className="flex items-center justify-between gap-2">
         <p className="font-serif text-lg">Perguntas aguardando você</p>
         {pending > 0 && (
-          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+          <span className="rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
             {pending}
           </span>
         )}
@@ -6722,7 +6722,7 @@ function BrainReviewCard({
     <div className="rounded-3xl border border-amber-400/50 bg-amber-50/60 p-6 shadow-[var(--shadow-card)]">
       <p className="font-serif text-xl">
         ✋ Respostas que uma paciente não achou úteis{" "}
-        <span className="ml-1 rounded-full bg-amber-500 px-2 py-0.5 align-middle text-xs font-semibold text-white">
+        <span className="ml-1 rounded-full bg-amber-700 px-2 py-0.5 align-middle text-xs font-semibold text-white">
           {itens.length}
         </span>
       </p>
@@ -7097,7 +7097,7 @@ function BrainGapsCard({
           <p className="font-serif text-xl">
             🕳️ O que a IA não soube responder
             {gaps.length > 0 && (
-              <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+              <span className="ml-2 rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
                 {gaps.length}
               </span>
             )}
@@ -11212,7 +11212,7 @@ function PacientesSection({
         <div className="flex items-center gap-2">
           <h2 className="font-serif text-xl">Solicitações pendentes</h2>
           {requests.length > 0 && (
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+            <span className="rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
               {requests.length}
             </span>
           )}
@@ -11444,7 +11444,7 @@ function InvitePatientModal({
             href={`https://wa.me/?text=${encodeURIComponent(message)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white"
+            className="rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white"
           >
             Enviar no WhatsApp
           </a>

@@ -529,9 +529,21 @@ export function ChaDeBebe({
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                       {e ? legendaDaCota(e) : i.reservado > 0 ? "reservado 💛" : "—"}
                     </span>
-                    {/* ⚠️ Alvo de 44px e ✕ desenhado em texto: é o único
-                        controle destrutivo desta tela, e mirar num × de 16px
-                        ao lado do nome do item é pedir para errar. */}
+                    {/* ✕ desenhado em texto: é o único controle destrutivo
+                        desta tela.
+                        ⚠️ E ESTE COMENTÁRIO PROMETIA "44px" QUE O CÓDIGO NUNCA
+                        ENTREGOU. Medido a 393px: o desenho é 29×32 e o alvo
+                        efetivo é 28×18 — metade do mínimo em altura.
+                        ⚠️ PIOR: o toque 10px ABAIXO do centro já acerta o ✕ da
+                        LINHA DE BAIXO. Num controle que tira item da lista,
+                        isso tira o item errado. A causa é o `-my-2`: as caixas
+                        dos botões se encavalam.
+                        ⚠️ E NÃO SE CONSERTA COM `after:-inset`. Foi tentado e
+                        medido: estender a área do dedo põe o pseudo-elemento do
+                        vizinho por cima, e a altura efetiva CAI de 18 para 6.
+                        O conserto de verdade é a ALTURA DA LINHA (botão h-11
+                        com a linha acompanhando), que muda o desenho da lista —
+                        decisão do dono, não remendo. */}
                     <button
                       type="button"
                       onClick={() => setConfirmando(confirmando === i.id ? null : i.id)}

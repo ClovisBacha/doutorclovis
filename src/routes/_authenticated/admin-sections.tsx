@@ -679,7 +679,7 @@ export function FlagsTab() {
                 onClick={() => save(f, { enabled: !f.enabled })}
                 disabled={busy === f.key}
                 className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold ${
-                  f.enabled ? "bg-emerald-500 text-white" : "bg-muted text-muted-foreground"
+                  f.enabled ? "bg-emerald-700 text-white" : "bg-muted text-muted-foreground"
                 }`}
               >
                 {f.enabled ? "Ligado" : "Desligado"}

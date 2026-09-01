@@ -11983,6 +11983,91 @@ zero problemas. **Aplicar no Supabase (pendentes, medidos):**
 `supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
 sozinha.
 
+## Os botões passaram a ser legíveis (set/2026)
+
+Pedido do dono na varredura de detalhes: melhorar "especialmente os botões e as
+interfaces pequenas". Medido em 17 bancadas, com a cor saindo do CANVAS e o
+fundo COMPOSTO até o primeiro opaco (as duas armadilhas que este arquivo já
+registra): **67 botões abaixo do mínimo de 4,5:1**.
+
+O pior não era um botão grande — era a **pílula de preço da Loja**, `11px`
+branco sobre `emerald-500`, **2,47:1**, repetida nos 111 itens. É o número que
+a paciente lê para decidir a compra, na aba que o dono chamou de feia.
+
+**A decisão foi dele**, entre três caminhos medidos, e ele escolheu **escurecer
+para -700** — mantém a cor que ele desenhou, só mais funda. Resultado nos
+elementos reais:
+
+|                        | antes | agora |
+| ---------------------- | ----- | ----- |
+| pílula de preço (11px) | 2,47  | 5,36  |
+| "Guardar" (âmbar)      | 2,13  | 5,03  |
+| "Começar a mexer"      | 2,47  | 5,36  |
+| "Começar a meditar"    | 4,40  | 7,30  |
+
+Oito famílias, 93 botões: emerald 5,36 · amber 5,03 · sky 5,86 · green 4,95 ·
+rose 6,03 · violet 7,30 · pink 5,91 · fuchsia 6,27. **Indigo ficou de fora** —
+mede 4,58 e já passava.
+
+⚠️ **A TROCA É DENTRO DO `className`, e só onde há `text-white` NELE.** Um
+`bg-emerald-500` que pinta uma barrinha, um ponto ou um marcador não pode
+escurecer — ali não há texto para ficar legível, e mudar seria mexer no desenho
+sem motivo.
+
+⚠️ **E A CONFERÊNCIA POR `grep` DE UMA LINHA MENTE NOS DOIS SENTIDOS.** Ela
+acusou três conversões como "sem texto branco" e as três eram legítimas: o
+`text-white` estava em OUTRA LINHA do mesmo `className` (uma delas é a caixinha
+de "feito" da trilha, com o ✓ branco dentro). Quem decide é o literal inteiro.
+
+### ⚠️ O chip NÃO-ESCOLHIDO da Loja estava a 2,9:1 — e ele NÃO é desabilitado
+
+Os 11 chips de categoria (Plantas, Bichinhos, Luzes…) usavam
+`text-foreground/45`. Botão ativo a 2,9:1 é falha; controle **desabilitado**
+seria isento, e este não é.
+
+Medido sobre o creme da página: `/45` → 2,9 · `/55` → 3,88 · **`/60` → 4,56** ·
+`/65` → 5,41.
+
+⚠️ **É `/60` E NUNCA `/65`**: o chip ESCOLHIDO mede **4,72**, então `/65` daria
+mais contraste ao que ela não escolheu do que ao que ela escolheu — a
+hierarquia ao contrário. Quem separa os dois estados é o FUNDO verde do ativo;
+a opacidade só precisa ser legível, não discreta.
+
+### O que NÃO foi mexido, com a razão
+
+- **As 12 pílulas de preço DESABILITADAS** (cinza sobre cinza, 2,4:1). Controle
+  desabilitado é isento pela norma, e escurecer faria um item que ela **não
+  pode comprar** parecer disponível. A informação acionável ("faltam N 🌱") já
+  vive embaixo.
+- **Indigo**, que já passava.
+
+### ⚠️ DUAS ARMADILHAS DE MEDIÇÃO NOVAS, e as duas produzem número falso
+
+1. **O Tailwind só gera a classe que o CÓDIGO usa.** Montar `bg-rose-700` no
+   navegador para medir devolve `rgba(0,0,0,0)` — a classe não existe no CSS —
+   e o medidor computa contra PRETO, imprimindo um confortável **21:1**. Foi
+   assim que emerald-800, sky-600 e green-700 "mediram" 21:1 numa tabela minha.
+   Só se pode medir o tom que já está em uso; para os outros, **aplica-se e
+   mede-se depois**.
+2. **`elementFromPoint` responde `null` fora do viewport**, e o alvo de toque
+   sai **0×0** sem nada avisando. Rolar o elemento até a vista ANTES de sondar.
+
+### ⚠️ E EU PIOREI UM ALVO DE TOQUE TENTANDO CONSERTÁ-LO
+
+O ✕ que tira um item do chá de bebê tinha um comentário prometendo "Alvo de
+44px" e o código entregava **29×32** desenhado, **28×18** efetivo. Apliquei o
+`after:-inset` que este arquivo recomenda — e a medição mostrou o resultado:
+**44×6**, porque o pseudo-elemento do vizinho passa a pintar por cima.
+
+⚠️ E medindo o ORIGINAL apareceu o defeito de verdade, que é anterior a mim: o
+toque **10px abaixo do centro já acerta o ✕ da LINHA DE BAIXO**. Num controle
+que tira item da lista, isso tira o item errado. A causa é o `-my-2`, que
+encavala as caixas dos botões.
+
+**Foi revertido**, e o achado ficou escrito no componente com os números. O
+conserto de verdade é a ALTURA DA LINHA, que muda o desenho da lista — decisão
+do dono, não remendo. **Truque de pseudo-elemento não conserta encavalamento.**
+
 ## O primeiro corte do `minha-conta.tsx` (set/2026)
 
 O arquivo tem **21.478 linhas** — e o número deste parágrafo já envelheceu uma

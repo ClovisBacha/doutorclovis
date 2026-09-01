@@ -1849,7 +1849,7 @@ function PerfilDaAmigaTela({
             <button
               onClick={() => setEscolhendo(true)}
               disabled={presenteando || presenteado || perfil.jaPresenteada}
-              className="press mt-5 w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white disabled:opacity-50"
+              className="press mt-5 w-full rounded-full bg-emerald-700 py-3 text-sm font-bold text-white disabled:opacity-50"
             >
               {presenteado || perfil.jaPresenteada
                 ? "Enviado ✓"

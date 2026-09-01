@@ -618,7 +618,7 @@ function NuvemDeAtalhos({
             >
               {a.rotulo}
               {typeof a.emblema === "number" && a.emblema > 0 && (
-                <span className="ml-1 rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+                <span className="ml-1 rounded-full bg-rose-700 px-1.5 text-[10px] font-bold text-white">
                   {a.emblema > 9 ? "9+" : a.emblema}
                 </span>
               )}
@@ -634,7 +634,7 @@ function NuvemDeAtalhos({
                 a.aoTocar();
               }}
               aria-label={a.rotulo}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500 text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.9)]"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-700 text-white shadow-[0_8px_20px_-8px_rgba(14,165,233,0.9)]"
             >
               <IconeDoAtalho nome={a.icone} />
             </button>
@@ -836,7 +836,7 @@ export function AppBottomNav({
               <span aria-hidden className={compact ? ALTURA_ICONE.compacto : ALTURA_ICONE.normal} />
               <span
                 data-nav-center
-                className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-500 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
+                className={`absolute left-1/2 top-0 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-pink-700 text-white transition-all duration-300 [transition-timing-function:var(--ease-spring)] ${
                   compact ? "h-11 w-11" : "h-14 w-14"
                 } ${activeSection === id ? "scale-105" : "scale-100"}`}
                 style={{

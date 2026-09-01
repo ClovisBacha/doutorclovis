@@ -10567,7 +10567,7 @@ function WaitlistCard() {
             <button
               onClick={() => respond(e.id, true)}
               disabled={busy}
-              className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+              className="press flex-1 rounded-full bg-emerald-700 py-2 text-xs font-extrabold text-white disabled:opacity-40"
             >
               Aceitar vaga
             </button>
@@ -11134,7 +11134,7 @@ function ConsultasTab() {
                   <button
                     onClick={() => respondProposal(a.id, true)}
                     disabled={respondingId === a.id}
-                    className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                    className="press flex-1 rounded-full bg-emerald-700 py-2 text-xs font-extrabold text-white disabled:opacity-40"
                   >
                     Aprovar este horário
                   </button>
@@ -11238,7 +11238,7 @@ function ConsultasTab() {
           {!recording && (
             <button
               onClick={startRecording}
-              className="flex items-center gap-2 rounded-full bg-rose-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600"
+              className="flex items-center gap-2 rounded-full bg-rose-700 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600"
             >
               <span className="h-2.5 w-2.5 rounded-full bg-white" />
               Iniciar gravação
@@ -16202,7 +16202,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
               }`}
             >
               <span
-                className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground"}`}
+                className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-700 text-white" : "border-muted-foreground"}`}
               >
                 {done ? "✓" : ""}
               </span>
@@ -17078,7 +17078,7 @@ function LojaTab({
               className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all ${
                 category === c.key
                   ? "bg-primary/10 text-primary font-semibold"
-                  : "text-foreground/45 hover:text-foreground/70"
+                  : "text-foreground/60 hover:text-foreground/80"
               }`}
             >
               {c.label}

@@ -230,7 +230,7 @@ export function MenuDaConta({
             </span>
             <span className="flex-1">Notificações</span>
             {naoLidas > 0 && (
-              <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[11px] font-bold text-white">
+              <span className="rounded-full bg-rose-700 px-2 py-0.5 text-[11px] font-bold text-white">
                 {naoLidas}
               </span>
             )}

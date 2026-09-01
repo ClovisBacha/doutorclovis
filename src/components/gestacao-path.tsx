@@ -337,7 +337,7 @@ function AvisoDePresente({
           {onIrAoCantinho && (
             <button
               onClick={onIrAoCantinho}
-              className="press w-full rounded-full bg-emerald-500 py-3 text-sm font-bold text-white"
+              className="press w-full rounded-full bg-emerald-700 py-3 text-sm font-bold text-white"
             >
               Ver o Cantinho
             </button>
@@ -465,7 +465,7 @@ function FolhaDosTrofeus({
           {onIrAoCantinho && (
             <button
               onClick={onIrAoCantinho}
-              className="press w-full rounded-full bg-violet-500 py-3 text-sm font-bold text-white"
+              className="press w-full rounded-full bg-violet-700 py-3 text-sm font-bold text-white"
             >
               Ver no Cantinho
             </button>
@@ -583,7 +583,7 @@ function FolhaDaChama({
 
         <button
           onClick={onFechar}
-          className="press mt-5 w-full rounded-full bg-amber-500 py-3 text-sm font-bold text-white"
+          className="press mt-5 w-full rounded-full bg-amber-700 py-3 text-sm font-bold text-white"
         >
           Entendi
         </button>
@@ -2823,7 +2823,7 @@ export function GestacaoPath({
             setCelebrated(true);
             lsSet(LS.celebrated, true);
           }}
-          className="press rounded-full bg-sky-500 px-6 py-3 text-sm font-extrabold text-white shadow-md"
+          className="press rounded-full bg-sky-700 px-6 py-3 text-sm font-extrabold text-white shadow-md"
         >
           Começar o 4º trimestre 🍼
         </button>
@@ -2911,7 +2911,7 @@ export function GestacaoPath({
               <div className="mt-2 flex gap-2">
                 <button
                   onClick={declareBirth}
-                  className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                  className="press rounded-full bg-pink-700 px-4 py-2 text-sm font-bold text-white"
                 >
                   Sim, nasceu! 🎉
                 </button>
@@ -2934,7 +2934,7 @@ export function GestacaoPath({
               />
               <button
                 onClick={declareBirth}
-                className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                className="press rounded-full bg-pink-700 px-4 py-2 text-sm font-bold text-white"
               >
                 Nasceu! 🎉
               </button>
@@ -2971,7 +2971,7 @@ export function GestacaoPath({
           </p>
           <button
             onClick={() => setShowWelcome(false)}
-            className="press mt-3 rounded-full bg-pink-500 px-4 py-1.5 text-sm font-bold text-white"
+            className="press mt-3 rounded-full bg-pink-700 px-4 py-1.5 text-sm font-bold text-white"
           >
             Começar a jornada 🚀
           </button>
@@ -2993,7 +2993,7 @@ export function GestacaoPath({
           <div className="mt-3 flex flex-wrap gap-2">
             <a
               href="/agendamento"
-              className="press rounded-full bg-amber-500 px-4 py-2 text-sm font-bold text-white"
+              className="press rounded-full bg-amber-700 px-4 py-2 text-sm font-bold text-white"
             >
               Agendar consulta
             </a>
@@ -3026,7 +3026,7 @@ export function GestacaoPath({
                   <div className="mt-2 flex gap-2">
                     <button
                       onClick={declareBirth}
-                      className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                      className="press rounded-full bg-pink-700 px-4 py-2 text-sm font-bold text-white"
                     >
                       Sim, nasceu! 🎉
                     </button>
@@ -3049,7 +3049,7 @@ export function GestacaoPath({
                   />
                   <button
                     onClick={declareBirth}
-                    className="press rounded-full bg-pink-500 px-4 py-2 text-sm font-bold text-white"
+                    className="press rounded-full bg-pink-700 px-4 py-2 text-sm font-bold text-white"
                   >
                     Confirmar 🎉
                   </button>
@@ -3355,7 +3355,7 @@ export function GestacaoPath({
                 setArranging(false);
                 setSelDecor(null);
               }}
-              className="press shrink-0 rounded-full bg-emerald-500 px-4 py-2 text-sm font-extrabold text-white"
+              className="press shrink-0 rounded-full bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white"
             >
               Pronto ✓
             </button>
@@ -3484,7 +3484,7 @@ export function GestacaoPath({
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => removeDecor(p.k)}
                     aria-label={`Tirar ${item.name} da trilha`}
-                    className="absolute -left-6 -top-6 flex h-8 w-8 items-center justify-center rounded-full bg-rose-500 text-sm font-bold text-white shadow-md"
+                    className="absolute -left-6 -top-6 flex h-8 w-8 items-center justify-center rounded-full bg-rose-700 text-sm font-bold text-white shadow-md"
                   >
                     ✕
                   </button>
@@ -3511,7 +3511,7 @@ export function GestacaoPath({
                         ),
                       );
                     }}
-                    className="absolute -bottom-6 -right-6 flex h-8 w-8 cursor-nwse-resize touch-none items-center justify-center rounded-full bg-emerald-500 text-sm font-bold text-white shadow-md"
+                    className="absolute -bottom-6 -right-6 flex h-8 w-8 cursor-nwse-resize touch-none items-center justify-center rounded-full bg-emerald-700 text-sm font-bold text-white shadow-md"
                   >
                     ⤢
                   </span>
@@ -4283,7 +4283,7 @@ function LessonSheet({
         {phase === "intro" && (
           <button
             onClick={startQuiz}
-            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white"
+            className="press w-full rounded-full bg-emerald-700 py-3.5 text-sm font-extrabold text-white"
           >
             {alreadyDone ? "Revisar as respostas" : "Começar o quiz"}
           </button>
@@ -4292,7 +4292,7 @@ function LessonSheet({
           <button
             onClick={check}
             disabled={selected == null}
-            className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
+            className="press w-full rounded-full bg-emerald-700 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
           >
             Verificar
           </button>
@@ -4300,7 +4300,7 @@ function LessonSheet({
         {phase === "quiz" && checked && (
           <button
             onClick={next}
-            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+            className="press w-full rounded-full bg-pink-700 py-3.5 text-sm font-extrabold text-white"
           >
             {qIndex + 1 >= total ? "Ver resultado" : "Continuar"}
           </button>
@@ -4308,7 +4308,7 @@ function LessonSheet({
         {phase === "done" && (
           <button
             onClick={onClose}
-            className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+            className="press w-full rounded-full bg-pink-700 py-3.5 text-sm font-extrabold text-white"
           >
             Voltar ao caminho
           </button>
@@ -4525,7 +4525,7 @@ function QuizPaywall({
         }`}
       >
         {badge && (
-          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-black text-white">
+          <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-amber-700 px-2 py-0.5 text-[9px] font-black text-white">
             {badge}
           </span>
         )}
@@ -4678,7 +4678,7 @@ function QuizPaywall({
         <button
           onClick={subscribe}
           disabled={loading}
-          className="press mt-3 w-full rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-60"
+          className="press mt-3 w-full rounded-full bg-amber-700 py-3 text-sm font-extrabold text-white disabled:opacity-60"
           style={{ boxShadow: "0 4px 0 #b45309" }}
         >
           {loading ? "Abrindo pagamento seguro…" : "✨ Assinar e liberar as aulas"}
@@ -4716,7 +4716,7 @@ function QuizPaywall({
               <button
                 onClick={redeem}
                 disabled={redeeming}
-                className="press shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
+                className="press shrink-0 rounded-xl bg-emerald-700 px-4 py-2 text-sm font-extrabold text-white disabled:opacity-60"
               >
                 {redeeming ? "…" : "Resgatar"}
               </button>
@@ -5086,7 +5086,7 @@ export function MovementBlock({
             setOpen(true);
             setPhase("escolha");
           }}
-          className="press mt-3 w-full rounded-full bg-emerald-500 py-2.5 text-sm font-extrabold text-white"
+          className="press mt-3 w-full rounded-full bg-emerald-700 py-2.5 text-sm font-extrabold text-white"
         >
           {alreadyDone ? "Mover de novo" : "Começar a mexer"}
         </button>
@@ -5195,7 +5195,7 @@ export function MovementBlock({
                     aria-pressed={sintoma === x.chave}
                     className={`press flex items-center gap-2 rounded-2xl px-3 py-2.5 text-left transition-colors ${
                       sintoma === x.chave
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-emerald-700 text-white"
                         : "border border-emerald-200 bg-white/70 text-emerald-900"
                     }`}
                   >
@@ -5217,7 +5217,7 @@ export function MovementBlock({
                     onClick={() => setMinutos(m)}
                     className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
                       minutos === m
-                        ? "bg-emerald-500 text-white"
+                        ? "bg-emerald-700 text-white"
                         : "border border-emerald-200 bg-white/70 text-emerald-700"
                     }`}
                   >
@@ -5236,7 +5236,7 @@ export function MovementBlock({
                   aria-pressed={semChao}
                   className={`press mt-3 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
                     semChao
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-emerald-700 text-white"
                       : "border border-emerald-200 bg-white/70 text-emerald-900"
                   }`}
                 >
@@ -5290,7 +5290,7 @@ export function MovementBlock({
             >
               <button
                 onClick={begin}
-                className="press w-full rounded-full bg-emerald-500 py-3.5 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-emerald-700 py-3.5 text-sm font-extrabold text-white"
               >
                 Começar · {minutos} min
               </button>
@@ -5324,7 +5324,7 @@ export function MovementBlock({
                 {/* O relógio fica no TOPO do anel. Embaixo ele cobria os pés —
                     e o pé é justamente a parte que se mexe em metade dos
                     exercícios. */}
-                <span className="absolute -top-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-sm font-extrabold tabular-nums text-white">
+                <span className="absolute -top-1 rounded-full bg-emerald-700 px-2.5 py-0.5 text-sm font-extrabold tabular-nums text-white">
                   {secs}s
                 </span>
               </div>
@@ -5436,7 +5436,7 @@ export function MovementBlock({
               ) : (
                 <button
                   onClick={() => setPhase("done")}
-                  className="press mt-8 w-full max-w-xs rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white"
+                  className="press mt-8 w-full max-w-xs rounded-full bg-emerald-700 py-3 text-sm font-extrabold text-white"
                 >
                   Continuar
                 </button>
@@ -5463,7 +5463,7 @@ export function MovementBlock({
               )}
               <button
                 onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-emerald-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-8 w-full max-w-xs rounded-full bg-emerald-700 py-3 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho
               </button>
@@ -6760,7 +6760,7 @@ export function MeditationBlock({
             setOpen(true);
             setEtapa("escolha");
           }}
-          className="press mt-3 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white"
+          className="press mt-3 w-full rounded-full bg-violet-700 py-2.5 text-sm font-extrabold text-white"
         >
           {alreadyDone ? "Meditar de novo" : "Começar a meditar"}
         </button>
@@ -6949,7 +6949,7 @@ export function MeditationBlock({
                   ) : (
                     <button
                       onClick={() => void definirLembrete("21:00")}
-                      className="press rounded-full bg-violet-500 px-4 py-1.5 text-xs font-extrabold text-white"
+                      className="press rounded-full bg-violet-700 px-4 py-1.5 text-xs font-extrabold text-white"
                     >
                       Ativar
                     </button>
@@ -6967,7 +6967,7 @@ export function MeditationBlock({
                   mesma" abre exatamente a tela de sempre, inteira. */}
               {diaAtualDoPrograma && !menuAberto && (
                 <>
-                  <div className="mt-6 rounded-3xl bg-violet-500 p-5 text-white">
+                  <div className="mt-6 rounded-3xl bg-violet-700 p-5 text-white">
                     <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-white/80">
                       Dia {diaAtualDoPrograma.dia} de {PROGRAMA.length}
                     </p>
@@ -7014,7 +7014,7 @@ export function MeditationBlock({
                         onClick={() => setMinutos(m)}
                         className={`press flex-1 rounded-2xl py-3 text-sm font-extrabold transition-colors ${
                           minutos === m
-                            ? "bg-violet-500 text-white"
+                            ? "bg-violet-700 text-white"
                             : "border border-violet-200 bg-white/70 text-violet-700"
                         }`}
                       >
@@ -7033,7 +7033,7 @@ export function MeditationBlock({
                         onClick={() => setTemaIdx(i)}
                         className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
                           temaIdx === i
-                            ? "bg-violet-500 text-white"
+                            ? "bg-violet-700 text-white"
                             : "border border-violet-200 bg-white/70 text-violet-900"
                         }`}
                       >
@@ -7080,7 +7080,7 @@ export function MeditationBlock({
                             onClick={() => trocarSom(k)}
                             className={`press flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
                               som === k
-                                ? "bg-violet-500 text-white"
+                                ? "bg-violet-700 text-white"
                                 : "border border-violet-200 bg-white/70 text-violet-700"
                             }`}
                           >
@@ -7129,7 +7129,7 @@ export function MeditationBlock({
                         }}
                         className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
                           densidade === d.chave
-                            ? "bg-violet-500 text-white"
+                            ? "bg-violet-700 text-white"
                             : "border border-violet-200 bg-white/70 text-violet-900"
                         }`}
                       >
@@ -7209,7 +7209,7 @@ export function MeditationBlock({
             >
               <button
                 onClick={() => begin()}
-                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-violet-700 py-3.5 text-sm font-extrabold text-white"
               >
                 Começar · {minutos} min
               </button>
@@ -7344,7 +7344,7 @@ export function MeditationBlock({
                 </p>
                 <button
                   onClick={() => void retomarSessao()}
-                  className="press mt-7 w-full max-w-xs rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
+                  className="press mt-7 w-full max-w-xs rounded-full bg-violet-700 py-3.5 text-sm font-extrabold text-white"
                 >
                   Continuar
                 </button>
@@ -7396,7 +7396,7 @@ export function MeditationBlock({
                         }}
                         className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
                           som === s.key
-                            ? "bg-violet-500 text-white"
+                            ? "bg-violet-700 text-white"
                             : "border border-violet-200 bg-white/70 text-violet-900"
                         }`}
                       >
@@ -7481,7 +7481,7 @@ export function MeditationBlock({
                           }}
                           className={`press flex-1 rounded-full py-2.5 text-sm font-bold transition-colors ${
                             nivelDeSom === v
-                              ? "bg-violet-500 text-white"
+                              ? "bg-violet-700 text-white"
                               : "border border-violet-200 bg-white/70 text-violet-700"
                           }`}
                         >
@@ -7567,7 +7567,7 @@ export function MeditationBlock({
               )}
               <button
                 onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-violet-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-8 w-full max-w-xs rounded-full bg-violet-700 py-3 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho
               </button>
@@ -7926,7 +7926,7 @@ export function BondingBlock({
             setOpen(true);
             setPhase("intro");
           }}
-          className="press mt-3 w-full rounded-full bg-rose-500 py-2.5 text-sm font-extrabold text-white"
+          className="press mt-3 w-full rounded-full bg-rose-700 py-2.5 text-sm font-extrabold text-white"
         >
           {alreadyDone ? "Ler outra vez 💌" : "Abrir a carta 💌"}
         </button>
@@ -8017,7 +8017,7 @@ export function BondingBlock({
                         }}
                         className={`press flex items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors ${
                           som === s.key
-                            ? "bg-rose-500 text-white"
+                            ? "bg-rose-700 text-white"
                             : "border border-rose-200 bg-white/70 text-rose-900"
                         }`}
                       >
@@ -8100,7 +8100,7 @@ export function BondingBlock({
               </p>
               <button
                 onClick={begin}
-                className="press mt-8 rounded-full bg-rose-500 px-10 py-3 text-sm font-extrabold text-white shadow-[0_10px_24px_-8px_rgba(244,63,94,0.6)]"
+                className="press mt-8 rounded-full bg-rose-700 px-10 py-3 text-sm font-extrabold text-white shadow-[0_10px_24px_-8px_rgba(244,63,94,0.6)]"
               >
                 Começar a ler 💗
               </button>
@@ -8241,7 +8241,7 @@ export function BondingBlock({
               )}
               <button
                 onClick={close}
-                className="press mt-8 w-full max-w-xs rounded-full bg-rose-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-8 w-full max-w-xs rounded-full bg-rose-700 py-3 text-sm font-extrabold text-white"
               >
                 Voltar aos jogos
               </button>
@@ -8774,7 +8774,7 @@ export function GratitudeBlock({
             setOpen(true);
             setPhase("write");
           }}
-          className="press mt-3 w-full rounded-full bg-amber-500 py-2.5 text-sm font-extrabold text-white"
+          className="press mt-3 w-full rounded-full bg-amber-700 py-2.5 text-sm font-extrabold text-white"
         >
           {alreadyDone ? "Escrever de novo" : "Escrever"}
         </button>
@@ -8841,7 +8841,7 @@ export function GratitudeBlock({
               )}
               <button
                 onClick={() => setPhase("write")}
-                className="press mt-6 w-full max-w-sm rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-6 w-full max-w-sm rounded-full bg-amber-700 py-3 text-sm font-extrabold text-white"
               >
                 {alreadyDone ? "Fechar" : "Escrever a de hoje"}
               </button>
@@ -8936,7 +8936,7 @@ export function GratitudeBlock({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={pararEEnviar}
-                        className="press flex flex-1 items-center justify-center gap-2 rounded-full bg-rose-500 py-2.5 text-sm font-extrabold text-white"
+                        className="press flex flex-1 items-center justify-center gap-2 rounded-full bg-rose-700 py-2.5 text-sm font-extrabold text-white"
                       >
                         <span
                           className="dc-rec-dot h-2.5 w-2.5 rounded-full bg-white"
@@ -8962,7 +8962,7 @@ export function GratitudeBlock({
               <button
                 onClick={save}
                 disabled={saving || transcrevendo || gravando || text.trim().length < 2}
-                className="press mt-4 w-full max-w-sm rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white disabled:opacity-40"
+                className="press mt-4 w-full max-w-sm rounded-full bg-amber-700 py-3 text-sm font-extrabold text-white disabled:opacity-40"
               >
                 Guardar
               </button>
@@ -9014,7 +9014,7 @@ export function GratitudeBlock({
               </ul>
               <button
                 onClick={() => setPhase("write")}
-                className="press mt-6 w-full max-w-xs self-center rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-6 w-full max-w-xs self-center rounded-full bg-amber-700 py-3 text-sm font-extrabold text-white"
               >
                 Escrever uma nova
               </button>
@@ -9121,7 +9121,7 @@ export function GratitudeBlock({
                   {aoIrParaBebe && (
                     <button
                       onClick={aoIrParaBebe}
-                      className="press mt-2.5 w-full rounded-full bg-rose-500 py-2 text-[13px] font-extrabold text-white"
+                      className="press mt-2.5 w-full rounded-full bg-rose-700 py-2 text-[13px] font-extrabold text-white"
                     >
                       Ver carta 💌
                     </button>
@@ -9131,7 +9131,7 @@ export function GratitudeBlock({
 
               <button
                 onClick={close}
-                className="press mt-7 w-full max-w-xs rounded-full bg-amber-500 py-3 text-sm font-extrabold text-white"
+                className="press mt-7 w-full max-w-xs rounded-full bg-amber-700 py-3 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho
               </button>
@@ -10622,7 +10622,7 @@ function DailyQuizBlock({
                           <span
                             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 text-xs ${
                               picked
-                                ? "border-violet-500 bg-violet-500 text-white"
+                                ? "border-violet-500 bg-violet-700 text-white"
                                 : "border-slate-300"
                             }`}
                           >
@@ -10736,7 +10736,7 @@ function DailyQuizBlock({
             {phase === "intro" && (
               <button
                 onClick={startQuiz}
-                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-violet-700 py-3.5 text-sm font-extrabold text-white"
               >
                 {alreadyDone ? "Revisar as respostas" : "Começar o quiz"}
               </button>
@@ -10778,7 +10778,7 @@ function DailyQuizBlock({
                   }
                 }}
                 disabled={!canVerify}
-                className="press w-full rounded-full bg-violet-500 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
+                className="press w-full rounded-full bg-violet-700 py-3.5 text-sm font-extrabold text-white disabled:opacity-40"
               >
                 Verificar
               </button>
@@ -10786,7 +10786,7 @@ function DailyQuizBlock({
             {phase === "quiz" && checked && (
               <button
                 onClick={next}
-                className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-pink-700 py-3.5 text-sm font-extrabold text-white"
               >
                 {qIndex + 1 >= total ? "Ver resultado" : "Continuar"}
               </button>
@@ -10794,7 +10794,7 @@ function DailyQuizBlock({
             {phase === "done" && (
               <button
                 onClick={close}
-                className="press w-full rounded-full bg-pink-500 py-3.5 text-sm font-extrabold text-white"
+                className="press w-full rounded-full bg-pink-700 py-3.5 text-sm font-extrabold text-white"
               >
                 Voltar ao caminho
               </button>
@@ -11254,7 +11254,7 @@ function PosPartoJourney({
                             disabled={!canToggle && t.id === "desafio"}
                             className={`press flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 text-xs font-black text-white transition-colors ${
                               checked
-                                ? "border-emerald-500 bg-emerald-500"
+                                ? "border-emerald-500 bg-emerald-700"
                                 : "border-emerald-300 bg-white"
                             }`}
                             aria-label={checked ? "Feito" : "Marcar"}

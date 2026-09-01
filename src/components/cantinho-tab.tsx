@@ -141,7 +141,7 @@ function InstagramShareCard() {
         <button
           onClick={save}
           disabled={saving || input.trim() === (state.handle ?? "")}
-          className="press shrink-0 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+          className="press shrink-0 rounded-full bg-fuchsia-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
         >
           Salvar
         </button>
@@ -363,7 +363,7 @@ function TestimonialCard() {
           <button
             onClick={send}
             disabled={saving || body.trim().length < 10}
-            className="press mt-2 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
+            className="press mt-2 w-full rounded-full bg-violet-700 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
           >
             {status ? "Reenviar para análise" : "Enviar depoimento"}
           </button>
@@ -736,9 +736,16 @@ export function CantinhoTab({
     }
   }
 
+  /* ⚠️ O CHIP NÃO-ESCOLHIDO ESTAVA A 2,9:1, e ele é um botão ATIVO — não um
+     desabilitado, que a norma isenta. Medido a 393px sobre o creme da página:
+     /45 → 2,9 · /55 → 3,88 · /60 → 4,56 · /65 → 5,41 (o mínimo é 4,5).
+     ⚠️ E É /60, NUNCA /65: o chip ESCOLHIDO mede 4,72, então /65 daria MAIS
+     contraste ao que ela não escolheu do que ao que ela escolheu — a hierarquia
+     ao contrário. Quem separa os dois estados é o FUNDO verde do ativo; a
+     opacidade só precisa ser legível, não discreta. */
   const pill = (active: boolean) =>
     `shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
-      active ? "bg-emerald-100 text-emerald-700" : "text-foreground/45 hover:text-foreground/70"
+      active ? "bg-emerald-100 text-emerald-700" : "text-foreground/60 hover:text-foreground/80"
     }`;
 
   /* Modo Cuidado: a prateleira inteira se cala, não só o saldo.
@@ -790,7 +797,7 @@ export function CantinhoTab({
               aqui por prop e nunca era usado. */}
           <button
             onClick={() => onNavigate?.("Caminho")}
-            className="press rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white"
+            className="press rounded-full bg-emerald-700 px-4 py-1.5 text-xs font-bold text-white"
           >
             Ver o meu Caminho →
           </button>
@@ -967,7 +974,7 @@ export function CantinhoTab({
                       onClick={() => equipSkin(skinAtiva === i.id ? null : i.id)}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         skinAtiva === i.id
-                          ? "bg-emerald-500 text-white"
+                          ? "bg-emerald-700 text-white"
                           : "border border-emerald-300 text-emerald-700"
                       }`}
                     >
@@ -979,7 +986,7 @@ export function CantinhoTab({
                       onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         sky === "v1"
-                          ? "bg-emerald-500 text-white"
+                          ? "bg-emerald-700 text-white"
                           : "border border-emerald-300 text-emerald-700"
                       }`}
                     >
@@ -990,7 +997,7 @@ export function CantinhoTab({
                       onClick={() => equipFundo(equipped === i.id ? null : i.id)}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         equipped === i.id
-                          ? "bg-emerald-500 text-white"
+                          ? "bg-emerald-700 text-white"
                           : "border border-emerald-300 text-emerald-700"
                       }`}
                     >
@@ -1034,7 +1041,7 @@ export function CantinhoTab({
                      metade da loja era parede muda. Agora abre a oferta. */
                   <button
                     onClick={() => setOferta(i.name)}
-                    className="press mt-2 flex items-center gap-1 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white"
+                    className="press mt-2 flex items-center gap-1 rounded-full bg-violet-700 px-3 py-1 text-[11px] font-bold text-white"
                   >
                     💎 Ver o Premium
                   </button>
@@ -1043,7 +1050,7 @@ export function CantinhoTab({
                     onClick={() => buy(i.id, i.price)}
                     disabled={cant || buying === i.id}
                     className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
-                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white"
+                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-700 text-white"
                     }`}
                   >
                     🌱 {i.price}
