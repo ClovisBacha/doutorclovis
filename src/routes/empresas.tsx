@@ -318,7 +318,7 @@ function EmpresasPage() {
                   value={form.message}
                   onChange={(e) => setForm({ ...form, message: e.target.value })}
                   rows={3}
-                  placeholder="Conte um pouco sobre sua necessidade..."
+                  placeholder="Conte um pouco sobre sua necessidade…"
                   className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm resize-none"
                 />
               </div>
@@ -332,7 +332,7 @@ function EmpresasPage() {
                 }
                 className="w-full rounded-full bg-primary py-3 text-sm font-semibold text-white disabled:opacity-40"
               >
-                {submitting ? "Enviando..." : "Solicitar demonstração gratuita"}
+                {submitting ? "Enviando…" : "Solicitar demonstração gratuita"}
               </button>
 
               <p className="text-xs text-center text-muted-foreground">

@@ -2230,6 +2230,21 @@ const HERO_TONE: Record<string, { wrap: string; icon: string; value: string }> =
   muted: { wrap: "border-border bg-card", icon: "bg-secondary", value: "text-foreground" },
 };
 
+/** Ponto de estado de um canal do Cérebro. Verde = ligado; cinza = desligado —
+ *  nunca vermelho, que é a cor de "quebrou" e não a de "não liguei". */
+function PontoDeCanal({ ligado, nome }: { ligado: boolean; nome: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className={`h-2 w-2 rounded-full ${ligado ? "bg-emerald-400" : "bg-white/40"}`}
+      />
+      <span className={ligado ? "" : "opacity-70"}>{nome}</span>
+      <span className="sr-only">{ligado ? "ligado" : "desligado"}</span>
+    </span>
+  );
+}
+
 function HeroCard({
   icon,
   value,
@@ -2308,8 +2323,14 @@ function BrainValueCard({
               {active ? "Treinar mais respostas →" : "Treinar meu cérebro →"}
             </button>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-2 text-xs font-medium">
-              {brain.enabledApp ? "✅ App" : "⭕ App"} ·{" "}
-              {brain.enabledWhatsapp ? "✅ WhatsApp" : "⭕ WhatsApp"}
+              {/* ⚠️ BOLINHA DESENHADA, e não ✅/⭕. O ⭕ é VERMELHO em todo
+                  sistema, então "desligado" — que é uma escolha dele — aparecia
+                  com a cor de ERRO ao lado de um ✅ verde. E emoji ignora a cor
+                  do texto, então os dois eram os únicos elementos desta pílula
+                  que não seguiam o material dela. Desligado é NEUTRO. */}
+              <PontoDeCanal ligado={brain.enabledApp} nome="App" />
+              <span aria-hidden>·</span>
+              <PontoDeCanal ligado={brain.enabledWhatsapp} nome="WhatsApp" />
             </span>
           </div>
         </div>
@@ -3686,12 +3707,12 @@ function EngagementSection({
     }
     setLoadingReport(userId);
     setErroReport((e) => ({ ...e, [userId]: false }));
-    /* ─── SEM `try`, O BOTÃO FICAVA EM "..." PARA SEMPRE ────────────────────
+    /* ─── SEM `try`, O BOTÃO FICAVA EM "Abrindo…" PARA SEMPRE ────────────────────
      *
      * `tokenFn()` devolve string vazia quando a sessão expira e o validador do
      * servidor exige `min(10)` — a chamada é REJEITADA, e a promessa estoura.
      * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
-     * "Ver relatório" virava "..." e ficava assim, desabilitado, até o médico
+     * "Ver relatório" virava "Abrindo…" e ficava assim, desabilitado, até o médico
      * recarregar a página. Ele fica clicando num botão morto.
      *
      * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
@@ -3878,7 +3899,7 @@ function EngagementSection({
                       disabled={loadingReport === p.id}
                       className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
                     >
-                      {loadingReport === p.id ? "..." : "Ver relatório"}
+                      {loadingReport === p.id ? "Abrindo…" : "Ver relatório"}
                     </button>
                   </div>
                   {expandedId === p.id && erroReport[p.id] && (
@@ -3939,7 +3960,7 @@ function EngagementSection({
                       disabled={loadingReport === p.id}
                       className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
                     >
-                      {loadingReport === p.id ? "..." : "Ver relatório"}
+                      {loadingReport === p.id ? "Abrindo…" : "Ver relatório"}
                     </button>
                   </div>
                   {expandedId === p.id && erroReport[p.id] && (
@@ -4201,7 +4222,7 @@ function TeleconsultasSection({
      *
      * O servidor passou a barrar a nota SOAP por plano e devolve
      * `{ ok:false, error: fraseDoGancho("cerebro") }`. Aqui só `res.ok` era
-     * olhado: o botão voltava do "..." e não acontecia nada.
+     * olhado: o botão voltava do "Abrindo…" e não acontecia nada.
      *
      * A aba Teleconsultas não é filtrada por plano — o `podeIA` do painel cobre
      * só a aba Cérebro —, então o médico no Free vê o botão, digita a consulta
@@ -4211,7 +4232,7 @@ function TeleconsultasSection({
      *
      * E o `try/catch` porque `tokenFn()` devolve string vazia com a sessão
      * expirada: sem ele, `setGeneratingNote(null)` nunca roda e o botão fica em
-     * "..." até o F5. */
+     * "Abrindo…" até o F5. */
     try {
       const tk = await tokenFn();
       const res = await generateClinicalNote({
@@ -4315,7 +4336,7 @@ function TeleconsultasSection({
             disabled={creating || !form.patientUserId}
             className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
-            {creating ? "Criando..." : "Criar teleconsulta"}
+            {creating ? "Criando…" : "Criar teleconsulta"}
           </button>
         </div>
       )}
@@ -4512,7 +4533,7 @@ function TeleconsultasSection({
                             disabled={generatingNote === s.id || !(noteBullets[s.id] ?? "").trim()}
                             className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
                           >
-                            {generatingNote === s.id ? "Gerando..." : "✨ Gerar nota SOAP"}
+                            {generatingNote === s.id ? "Gerando…" : "✨ Gerar nota SOAP"}
                           </button>
                         </div>
 
@@ -4527,7 +4548,7 @@ function TeleconsultasSection({
                                 disabled={savingNote === s.id}
                                 className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
                               >
-                                {savingNote === s.id ? "Salvando..." : "💾 Salvar nota"}
+                                {savingNote === s.id ? "Salvando…" : "💾 Salvar nota"}
                               </button>
                               <button
                                 onClick={() =>
@@ -7488,7 +7509,7 @@ function BrainSettingsCard({
             disabled={saving}
             className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
           >
-            {saving ? "Salvando..." : "Salvar estilo"}
+            {saving ? "Salvando…" : "Salvar estilo"}
           </button>
         </div>
       )}
@@ -7679,7 +7700,7 @@ function BrainTrainCard({
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                 rows={3}
-                placeholder="Escreva como você responderia a essa paciente..."
+                placeholder="Escreva como você responderia a essa paciente…"
                 className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
               />
               <button
@@ -7687,7 +7708,7 @@ function BrainTrainCard({
                 disabled={sendingId === q.id || !(answers[q.id] ?? "").trim()}
                 className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
               >
-                {sendingId === q.id ? "Treinando..." : "Responder e treinar"}
+                {sendingId === q.id ? "Treinando…" : "Responder e treinar"}
               </button>
             </div>
           ))}
@@ -7952,7 +7973,7 @@ function BrainKnowledgeCard({
               disabled={adding || !newQuestion.trim() || !newAnswer.trim()}
               className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
-              {adding ? "Adicionando..." : "+ Adicionar ao cérebro"}
+              {adding ? "Adicionando…" : "+ Adicionar ao cérebro"}
             </button>
           </div>
 
@@ -7993,7 +8014,7 @@ function BrainKnowledgeCard({
                   disabled={adding}
                   className="rounded-full border border-amber-400 px-4 py-2 text-xs font-medium disabled:opacity-40"
                 >
-                  {adding ? "Adicionando..." : "Criar mesmo assim"}
+                  {adding ? "Adicionando…" : "Criar mesmo assim"}
                 </button>
                 <button
                   onClick={() => setParecida(null)}
@@ -8011,7 +8032,7 @@ function BrainKnowledgeCard({
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar na base (pergunta ou resposta)..."
+        placeholder="Buscar na base (pergunta ou resposta)…"
         className="mt-4 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
       />
 
@@ -8109,7 +8130,7 @@ function BrainKnowledgeCard({
                       disabled={savingEdit || !editQ.trim() || !editA.trim()}
                       className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
                     >
-                      {savingEdit ? "Salvando..." : "Salvar"}
+                      {savingEdit ? "Salvando…" : "Salvar"}
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
@@ -8190,7 +8211,7 @@ function BrainPlaygroundCard({
           disabled={asking || !question.trim()}
           className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
         >
-          {asking ? "Pensando..." : "Perguntar"}
+          {asking ? "Pensando…" : "Perguntar"}
         </button>
       </div>
 
@@ -10481,7 +10502,7 @@ function MeuPerfilSection({
           disabled={saving}
           className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {saving ? "Salvando..." : "Salvar perfil"}
+          {saving ? "Salvando…" : "Salvar perfil"}
         </button>
       </div>
     </div>

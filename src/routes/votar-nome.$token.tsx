@@ -216,7 +216,7 @@ function VotarNomePage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddName()}
-                placeholder="Nome do bebê..."
+                placeholder="Nome do bebê…"
                 className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
               />
               <button
@@ -224,7 +224,7 @@ function VotarNomePage() {
                 disabled={submittingName || !newName.trim() || !voterName.trim()}
                 className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
               >
-                {submittingName ? "..." : "Sugerir"}
+                {submittingName ? "Enviando…" : "Sugerir"}
               </button>
             </div>
             {addedName && (
@@ -304,7 +304,11 @@ function VotarNomePage() {
                                 : "bg-primary/10 text-primary hover:bg-primary hover:text-white disabled:opacity-40"
                           }`}
                         >
-                          {submittingVote === entry.id ? "..." : isMyVote ? "✓ Votei" : "Votar"}
+                          {submittingVote === entry.id
+                            ? "Votando…"
+                            : isMyVote
+                              ? "✓ Votei"
+                              : "Votar"}
                         </button>
                       )}
                     </div>

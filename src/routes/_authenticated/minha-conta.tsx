@@ -3932,7 +3932,7 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={4}
-          placeholder="Escreva uma memória, um pensamento, um sonho..."
+          placeholder="Escreva uma memória, um pensamento, um sonho…"
           className="mt-4 w-full rounded-md border border-input bg-background p-3 text-sm"
         />
         <button
@@ -4696,7 +4696,12 @@ function ProfileTab({
   const faltaEmergencia = !form.emergency_email.trim() || !form.emergency_contact.trim();
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [corporateCode, setCorporateCode] = useState("");
-  const [corporateMsg, setCorporateMsg] = useState<string | null>(null);
+  /* ⚠️ O DESFECHO É UM BOOLEANO, NUNCA O PRIMEIRO CARACTERE DO TEXTO.
+     Isto era `corporateMsg.startsWith("✅")` decidindo a COR: o estado de
+     sucesso morava dentro da frase que a paciente lê. Quem editasse o texto
+     — tirar o emoji, começar por "Pronto!" — pintava de VERMELHO um vínculo
+     que deu certo, sem erro nenhum e sem nada quebrado para apontar. */
+  const [corporateMsg, setCorporateMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [joiningCorporate, setJoiningCorporate] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -5021,7 +5026,7 @@ function ProfileTab({
             label="Medicamentos em uso"
             value={form.medications}
             onChange={(v) => setForm({ ...form, medications: v })}
-            placeholder="Ex: sulfato ferroso, ácido fólico..."
+            placeholder="Ex: sulfato ferroso, ácido fólico…"
           />
           <CampoCidade
             cidade={form.home_city}
@@ -5238,7 +5243,7 @@ function ProfileTab({
                 value={form.prior_notes}
                 onChange={(e) => setForm({ ...form, prior_notes: e.target.value })}
                 rows={2}
-                placeholder="Ex: bebê GIG, internação por DPP..."
+                placeholder="Ex: bebê GIG, internação por DPP…"
                 className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
               />
             </div>
@@ -5382,29 +5387,28 @@ function ProfileTab({
                     data: { accessToken: s.session.access_token, accessCode: corporateCode.trim() },
                   });
                   if (res.ok) {
-                    setCorporateMsg(
-                      `✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`,
-                    );
+                    setCorporateMsg({
+                      ok: true,
+                      texto: `Vinculado a ${res.companyName}. Salve o perfil para confirmar.`,
+                    });
                     onSaved({
                       ...profile!,
                       corporate_account_id: "pending",
                     } as NonNullable<typeof profile>);
                   } else {
-                    setCorporateMsg(res.error ?? "Código inválido.");
+                    setCorporateMsg({ ok: false, texto: res.error ?? "Código inválido." });
                   }
                   setJoiningCorporate(false);
                 }}
                 disabled={joiningCorporate || !corporateCode.trim()}
                 className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               >
-                {joiningCorporate ? "..." : "Aplicar"}
+                {joiningCorporate ? "Aplicando…" : "Aplicar"}
               </button>
             </div>
             {corporateMsg && (
-              <p
-                className={`text-sm ${corporateMsg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}
-              >
-                {corporateMsg}
+              <p className={`text-sm ${corporateMsg.ok ? "text-green-600" : "text-red-500"}`}>
+                {corporateMsg.texto}
               </p>
             )}
           </div>
@@ -5417,7 +5421,7 @@ function ProfileTab({
         disabled={saving}
         className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
       >
-        {saving ? "Salvando..." : "Salvar"}
+        {saving ? "Salvando…" : "Salvar"}
       </button>
 
       {/* Último elemento do Perfil, depois de Salvar: o Modo Cuidado é para um
@@ -5529,7 +5533,7 @@ function CampoCidade({
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Digite sua cidade..."
+            placeholder="Digite sua cidade…"
             className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
           {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando…</p>}
@@ -9794,7 +9798,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
             value={form.medications}
             onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
             rows={2}
-            placeholder="Ex.: Sulfato ferroso, ácido fólico, vitamina D..."
+            placeholder="Ex.: Sulfato ferroso, ácido fólico, vitamina D…"
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -9816,7 +9820,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
             value={form.other_notes}
             onChange={(e) => setForm((f) => ({ ...f, other_notes: e.target.value }))}
             rows={2}
-            placeholder="Algo incomum que notou, mudança no bebê, preocupação específica..."
+            placeholder="Algo incomum que notou, mudança no bebê, preocupação específica…"
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -9826,7 +9830,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           disabled={loading}
           className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
-          {loading ? "Enviando..." : "Enviar para o médico"}
+          {loading ? "Enviando…" : "Enviar para o médico"}
         </button>
       </form>
 
@@ -10069,7 +10073,7 @@ function NutricaoTab({
       /* `res.ok` ANTES do corpo — e isto era um "..." eterno.
          O código checava só `!res.body`, e 429 (limitador), 401 (sessão) e o
          500 de chave ausente TÊM corpo: o laço lia texto sem prefixo `data: `,
-         `acc` ficava vazio, e a bolha renderizava `{m.content || "..."}` para
+         `acc` ficava vazio, e a bolha renderizava `{m.content || "…"}` para
          sempre — sem erro, sem retry, sem nada dizendo o que houve. É o mesmo
          defeito que o chat principal e o widget do site já corrigiram; este
          ficou. */
@@ -10203,7 +10207,7 @@ function NutricaoTab({
                   m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"
                 }`}
               >
-                {m.content || "..."}
+                {m.content || "…"}
                 {/* Só nas respostas da IA, e não na saudação (i > 0). */}
                 {m.role === "assistant" && i > 0 && m.content && (
                   <div className="mt-1.5 flex items-center gap-2">
@@ -10263,9 +10267,7 @@ function NutricaoTab({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder={
-              careMode
-                ? "Pergunte sobre alimentação..."
-                : "Pergunte sobre alimentação na gestação..."
+              careMode ? "Pergunte sobre alimentação…" : "Pergunte sobre alimentação na gestação…"
             }
             className="flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
           />
@@ -10274,7 +10276,7 @@ function NutricaoTab({
             disabled={loading}
             className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
           >
-            {loading ? "..." : "Enviar"}
+            {loading ? "Enviando…" : "Enviar"}
           </button>
         </div>
       </div>
@@ -11267,7 +11269,7 @@ function ConsultasTab() {
               disabled={transcribing}
               className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
-              {transcribing ? "Transcrevendo..." : "Transcrever com IA"}
+              {transcribing ? "Transcrevendo…" : "Transcrever com IA"}
             </button>
           </div>
         )}
@@ -11366,7 +11368,7 @@ function ConsultasTab() {
                   disabled={saving}
                   className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
                 >
-                  {saving ? "Salvando..." : "Salvar nota"}
+                  {saving ? "Salvando…" : "Salvar nota"}
                 </button>
                 {savedMsg && <p className="text-sm text-primary">{savedMsg}</p>}
               </div>
@@ -11551,7 +11553,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         date: r.entry_date,
         type: "diario",
         title: `Diário ${r.mood ?? ""}`.trim(),
-        detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "..." : ""),
+        detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "…" : ""),
       });
     }
     for (const r of consultRes.data ?? []) {
@@ -12611,7 +12613,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                     setNotes(s.patient_notes ?? "");
                   }}
                   rows={2}
-                  placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta..."
+                  placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta…"
                   className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
                 />
                 {activeSession?.id === s.id && (
@@ -12620,7 +12622,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                     disabled={savingNotes}
                     className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
                   >
-                    {savingNotes ? "Salvando..." : "Salvar anotações"}
+                    {savingNotes ? "Salvando…" : "Salvar anotações"}
                   </button>
                 )}
               </div>
@@ -12794,7 +12796,7 @@ function CartaBebêTab({
           className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
           {loading
-            ? "Gerando carta..."
+            ? "Gerando carta…"
             : letter
               ? "Gerar nova carta"
               : "✉️ Receber carta desta semana"}
@@ -14359,7 +14361,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
           <input
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Legenda (opcional)..."
+            placeholder="Legenda (opcional)…"
             className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <div className="flex gap-2">
@@ -14378,7 +14380,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             disabled={submitting || (!caption && !imageData && !emoji)}
             className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            {submitting ? "Salvando..." : "Publicar no álbum"}
+            {submitting ? "Salvando…" : "Publicar no álbum"}
           </button>
         </div>
       </div>
@@ -14631,7 +14633,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddName()}
-            placeholder="Nome do bebê..."
+            placeholder="Nome do bebê…"
             className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <button
@@ -14639,7 +14641,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
             disabled={saving || !newName.trim()}
             className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            {saving ? "..." : "Adicionar"}
+            {saving ? "Adicionando…" : "Adicionar"}
           </button>
         </div>
       </div>
@@ -15050,7 +15052,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar pergunta..."
+            placeholder="Buscar pergunta…"
             className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <button
@@ -15845,7 +15847,7 @@ function BreastfeedingSection() {
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observação opcional..."
+              placeholder="Observação opcional…"
               className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
             />
             <button
@@ -17376,7 +17378,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
-                placeholder="Descreva brevemente o motivo da consulta..."
+                placeholder="Descreva brevemente o motivo da consulta…"
                 className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
               />
             </div>
@@ -17426,7 +17428,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           disabled={submitting}
           className="w-full rounded-full bg-primary px-6 py-3 text-sm font-medium text-white disabled:opacity-40"
         >
-          {submitting ? "Solicitando..." : "Solicitar consulta"}
+          {submitting ? "Solicitando…" : "Solicitar consulta"}
         </button>
       </div>
     );
@@ -17571,7 +17573,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                           disabled={markingId === c.id}
                           className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
                         >
-                          {markingId === c.id ? "..." : "✓ Marquei o pagamento"}
+                          {markingId === c.id ? "Marcando…" : "✓ Marquei o pagamento"}
                         </button>
                       </>
                     )}
@@ -17933,7 +17935,7 @@ function PreventivosTab() {
                       <input
                         value={editNotes}
                         onChange={(e) => setEditNotes(e.target.value)}
-                        placeholder="Resultado, local, médico..."
+                        placeholder="Resultado, local, médico…"
                         className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
                       />
                     </div>
@@ -17943,7 +17945,7 @@ function PreventivosTab() {
                     disabled={saving}
                     className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
                   >
-                    {saving ? "Salvando..." : "Salvar"}
+                    {saving ? "Salvando…" : "Salvar"}
                   </button>
                 </div>
               )}
@@ -18468,7 +18470,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
           <textarea
             className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             rows={4}
-            placeholder="Alergias, medo específico, pedidos especiais..."
+            placeholder="Alergias, medo específico, pedidos especiais…"
             value={plan.notes}
             onChange={(e) => setPlan({ ...plan, notes: e.target.value })}
           />

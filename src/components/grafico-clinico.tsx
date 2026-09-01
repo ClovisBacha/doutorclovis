@@ -284,7 +284,7 @@ export function GraficoClinico({
                   style={{ background: COR_DA_GRAVIDADE.atencao }}
                   aria-hidden
                 />
-                atenção
+                Atenção
               </span>
               <span className="flex items-center gap-1.5">
                 <span
@@ -292,7 +292,7 @@ export function GraficoClinico({
                   style={{ background: COR_DA_GRAVIDADE.grave }}
                   aria-hidden
                 />
-                fora da faixa
+                Fora da faixa
               </span>
             </>
           )}

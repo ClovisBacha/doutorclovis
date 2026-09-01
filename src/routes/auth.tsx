@@ -282,7 +282,7 @@ function AuthPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      setMsg({ text: "Senha atualizada com sucesso! Redirecionando...", type: "success" });
+      setMsg({ text: "Senha atualizada com sucesso! Redirecionando…", type: "success" });
       setTimeout(() => navigate({ to: "/minha-conta" }), 1800);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "";
@@ -577,7 +577,7 @@ function AuthPage() {
             disabled={loading}
             className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
           >
-            {loading ? "Enviando..." : "Enviar link de redefinição"}
+            {loading ? "Enviando…" : "Enviar link de redefinição"}
           </button>
           <button
             type="button"
@@ -637,7 +637,7 @@ function AuthPage() {
             disabled={loading}
             className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
           >
-            {loading ? "Salvando..." : "Salvar nova senha"}
+            {loading ? "Salvando…" : "Salvar nova senha"}
           </button>
         </form>
       )}
@@ -758,7 +758,7 @@ function AuthPage() {
                 disabled={resendLoading}
                 className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
               >
-                {resendLoading ? "Enviando..." : "Reenviar e-mail de confirmação"}
+                {resendLoading ? "Enviando…" : "Reenviar e-mail de confirmação"}
               </button>
             )}
 
@@ -767,7 +767,7 @@ function AuthPage() {
               disabled={loading}
               className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
             >
-              {loading ? "Aguarde..." : mode === "login" ? "Entrar" : "Criar conta"}
+              {loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
             </button>
             <button
               type="button"

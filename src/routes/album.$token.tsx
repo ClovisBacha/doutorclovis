@@ -102,7 +102,7 @@ function AlbumPage() {
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
-      // Antes, um throw deixava o botão preso em "Salvando..." para sempre.
+      // Antes, um throw deixava o botão preso em "Salvando…" para sempre.
       setSubmitting(false);
     }
   }
@@ -176,7 +176,7 @@ function AlbumPage() {
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Legenda (opcional)..."
+              placeholder="Legenda (opcional)…"
               className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
             />
             <div className="flex flex-wrap gap-2">
@@ -200,7 +200,7 @@ function AlbumPage() {
               disabled={submitting || !authorName.trim() || (!caption && !imageData && !emoji)}
               className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
             >
-              {submitting ? "Salvando..." : "Publicar memória"}
+              {submitting ? "Salvando…" : "Publicar memória"}
             </button>
           </div>
         </div>

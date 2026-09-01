@@ -6219,7 +6219,7 @@ export function MeditationBlock({
    * `planejarSessao` garante "cada janela recebe pelo menos um ciclo", e para
    * sessões curtas (1, 2 e 5 min) a janela `volta` só tem espaço para UM
    * ciclo — que é literalmente o último da sessão inteira. A frase de
-   * fechamento ("Vamos voltar devagar...") toca no início desse ciclo, e o
+   * fechamento ("Vamos voltar devagar…") toca no início desse ciclo, e o
    * relógio da respiração termina a sessão no segundo exato em que o ciclo
    * acaba. Numa rede mais lenta, ou só pela variação normal de quando o áudio
    * termina de carregar, a frase podia estar tocando ainda — e cortar no

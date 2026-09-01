@@ -351,7 +351,7 @@ function TestimonialCard() {
             value={body}
             onChange={(e) => setBody(e.target.value.slice(0, 600))}
             rows={4}
-            placeholder="Escreva aqui seu depoimento..."
+            placeholder="Escreva aqui seu depoimento…"
             className="mt-3 w-full resize-none rounded-2xl border border-border bg-white p-3 text-sm outline-none focus:border-violet-400"
           />
           <input

@@ -1036,7 +1036,7 @@ function MedicosPage() {
                     onChange={(e) => setLeadForm({ ...leadForm, message: e.target.value })}
                     rows={3}
                     className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:border-primary resize-none"
-                    placeholder="Ex: quero automatizar o WhatsApp e reduzir faltas..."
+                    placeholder="Ex: quero automatizar o WhatsApp e reduzir faltas…"
                   />
                 </div>
                 <button
@@ -1044,7 +1044,7 @@ function MedicosPage() {
                   disabled={submitting}
                   className="w-full rounded-full bg-primary py-3.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                 >
-                  {submitting ? "Enviando..." : "Solicitar demonstração gratuita →"}
+                  {submitting ? "Enviando…" : "Solicitar demonstração gratuita →"}
                 </button>
                 <p className="text-center text-xs text-muted-foreground">
                   Sem spam. Sem compromisso. Retorno em até 24h.
