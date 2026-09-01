@@ -57,6 +57,24 @@ import { PesquisaNps } from "@/components/pesquisa-nps";
 import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
+import {
+  PHASE_META,
+  WEEKDAYS_PT,
+  addDays,
+  avgCycleLength,
+  avgPeriodLength,
+  buildCycleModel,
+  classifyDay,
+  cycleDayFor,
+  cycleLengthDays,
+  diffDays,
+  fromYmd,
+  phaseForCycleDay,
+  startOfDay,
+  upcomingMarks,
+  ymd,
+} from "@/lib/ciclo-menstrual";
+import type { CycleModel, CyclePhase } from "@/lib/ciclo-menstrual";
 import { OnboardingRitual, CodigoDaEmbaixadora } from "@/components/onboarding-ritual";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
@@ -19126,163 +19144,17 @@ const TPM_SYMPTOMS = [
   "Ansiedade",
 ];
 
-function cycleLengthDays(cycle: MenstrualCycle): number | null {
-  if (!cycle.end_date) return null;
-  const start = new Date(cycle.start_date + "T00:00:00");
-  const end = new Date(cycle.end_date + "T00:00:00");
-  return Math.round((end.getTime() - start.getTime()) / 86400000);
-}
-
-function avgCycleLength(cycles: MenstrualCycle[]): number {
-  if (cycles.length < 2) return 28;
-  const gaps: number[] = [];
-  for (let i = 0; i < cycles.length - 1; i++) {
-    const a = new Date(cycles[i + 1].start_date + "T00:00:00").getTime();
-    const b = new Date(cycles[i].start_date + "T00:00:00").getTime();
-    gaps.push(Math.round((b - a) / 86400000));
-  }
-  return Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length);
-}
-
 /* ─────────────────────────────────────────────────────────
    Ciclo visual — estilo Apple Health (anel de fases + calendário)
 ───────────────────────────────────────────────────────── */
 
-type CyclePhase = "menstruacao" | "folicular" | "fertil" | "ovulacao" | "lutea";
-
-const PHASE_META: Record<
-  CyclePhase,
-  { label: string; emoji: string; dot: string; chip: string; desc: string }
-> = {
-  menstruacao: {
-    label: "Menstruação",
-    emoji: "🩸",
-    dot: "text-rose-500",
-    chip: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-    desc: "Fase de descanso. Escute seu corpo.",
-  },
-  folicular: {
-    label: "Fase folicular",
-    emoji: "🌱",
-    dot: "text-amber-400",
-    chip: "bg-amber-400/15 text-amber-600 dark:text-amber-300",
-    desc: "A energia vai voltando aos poucos.",
-  },
-  fertil: {
-    label: "Janela fértil",
-    emoji: "🌿",
-    dot: "text-emerald-400",
-    chip: "bg-emerald-400/15 text-emerald-600 dark:text-emerald-300",
-    desc: "Maior chance de concepção estimada.",
-  },
-  ovulacao: {
-    label: "Ovulação",
-    emoji: "✨",
-    dot: "text-emerald-600",
-    chip: "bg-emerald-600/15 text-emerald-700 dark:text-emerald-300",
-    desc: "Pico de fertilidade estimado.",
-  },
-  lutea: {
-    label: "Fase lútea",
-    emoji: "🌙",
-    dot: "text-violet-400",
-    chip: "bg-violet-400/15 text-violet-600 dark:text-violet-300",
-    desc: "A TPM pode aparecer nos últimos dias.",
-  },
-};
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
-function fromYmd(s: string): Date {
-  return new Date(s + "T00:00:00");
-}
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-function startOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-function diffDays(a: Date, b: Date): number {
-  return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000);
-}
-
-function avgPeriodLength(cycles: MenstrualCycle[]): number {
-  const durs = cycles
-    .map(cycleLengthDays)
-    .filter((n): n is number => n !== null && n >= 2 && n <= 12);
-  if (!durs.length) return 5;
-  return Math.round(durs.reduce((s, v) => s + v, 0) / durs.length);
-}
-
 // Ovulação ~14 dias antes do próximo período. Em base 1 (dia 1 = início do
 // período), isso cai no dia `cycleLen - 13`.
-function phaseForCycleDay(day: number, cycleLen: number, periodLen: number): CyclePhase {
-  const ov = cycleLen - 13;
-  if (day <= periodLen) return "menstruacao";
-  if (day === ov) return "ovulacao";
-  if (day >= ov - 5 && day <= ov + 1) return "fertil";
-  if (day < ov) return "folicular";
-  return "lutea";
-}
-
-type CycleModel = {
-  cycleLen: number;
-  periodLen: number;
-  lastStart: Date;
-  actualPeriod: Set<string>;
-};
-
-function buildCycleModel(cycles: MenstrualCycle[]): CycleModel | null {
-  if (!cycles.length) return null;
-  const cycleLen = Math.max(18, Math.min(45, avgCycleLength(cycles)));
-  const periodLen = avgPeriodLength(cycles);
-  const lastStart = fromYmd(cycles[0].start_date);
-  const actualPeriod = new Set<string>();
-  for (const c of cycles) {
-    const s = fromYmd(c.start_date);
-    const e = c.end_date ? fromYmd(c.end_date) : addDays(s, periodLen - 1);
-    for (let d = new Date(s); d <= e; d = addDays(d, 1)) actualPeriod.add(ymd(d));
-  }
-  return { cycleLen, periodLen, lastStart, actualPeriod };
-}
 
 // Dia do ciclo (base 1) para uma data qualquer, projetando o ciclo médio pra
 // frente e pra trás a partir do último período registrado.
-function cycleDayFor(date: Date, model: CycleModel): number {
-  const off = diffDays(model.lastStart, date);
-  return (((off % model.cycleLen) + model.cycleLen) % model.cycleLen) + 1;
-}
-
-function classifyDay(date: Date, model: CycleModel): { phase: CyclePhase; actual: boolean } {
-  if (model.actualPeriod.has(ymd(date))) return { phase: "menstruacao", actual: true };
-  const phase = phaseForCycleDay(cycleDayFor(date, model), model.cycleLen, model.periodLen);
-  return { phase, actual: false };
-}
 
 // Próximos marcos (a partir de hoje): período, ovulação, janela fértil.
-function upcomingMarks(model: CycleModel, today: Date) {
-  let nextPeriod: Date | null = null;
-  let ovulation: Date | null = null;
-  const horizon = model.cycleLen * 2 + 2;
-  for (let i = 1; i <= horizon; i++) {
-    const d = addDays(today, i);
-    const c = classifyDay(d, model);
-    const prev = classifyDay(addDays(d, -1), model);
-    if (!nextPeriod && c.phase === "menstruacao" && prev.phase !== "menstruacao") nextPeriod = d;
-    if (!ovulation && c.phase === "ovulacao") ovulation = d;
-    if (nextPeriod && ovulation) break;
-  }
-  const fertileStart = ovulation ? addDays(ovulation, -5) : null;
-  const fertileEnd = ovulation ? addDays(ovulation, 1) : null;
-  return { nextPeriod, ovulation, fertileStart, fertileEnd };
-}
 
 function CicloHero({ model }: { model: CycleModel }) {
   const today = startOfDay(new Date());
@@ -19393,8 +19265,6 @@ function CicloHero({ model }: { model: CycleModel }) {
     </div>
   );
 }
-
-const WEEKDAYS_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 function CicloCalendario({ model }: { model: CycleModel }) {
   const [monthOffset, setMonthOffset] = useState(0);
