@@ -10,20 +10,26 @@
  */
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
-import { MAPA_DO_BANCO } from "./mapa-do-banco";
+import { MAPA_DO_BANCO, type ArquivoDoBanco } from "./mapa-do-banco";
+import { construirMapaDoBanco } from "./mapa-do-banco.gerar";
 
 const semComentarios = (t: string) =>
   t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
 
 describe("o mapa do banco", () => {
   test("⚠️ está em dia com a pasta supabase/", () => {
-    const antes = readFileSync("src/lib/mapa-do-banco.ts", "utf8");
-    execFileSync("node", ["scripts/gerar-mapa-do-banco.mjs"], { stdio: "pipe" });
-    const depois = readFileSync("src/lib/mapa-do-banco.ts", "utf8");
-    /* Se este teste falhar, o conserto é rodar
-       `node scripts/gerar-mapa-do-banco.mjs` e commitar o resultado. */
-    expect(depois).toBe(antes);
+    /* ⚠️ **COMPARA O DADO, e não os bytes do arquivo gerado.**
+       A primeira versão RODAVA o gerador (`node`) e comparava o texto — e o
+       gerador roda `npx prettier` por dentro. Dois processos externos por
+       execução da suíte: 905 ms aqui, **mais de 5 s no runner limpo da CI**,
+       onde o teste estourou o limite com tudo verde na minha máquina. Das duas
+       execuções daquele commit, uma passou e a outra não: instabilidade por
+       construção, que é o que este repositório proíbe desde o medidor de ondas.
+       Agora a leitura da pasta é um módulo (`mapa-do-banco.gerar.ts`) e a
+       comparação acontece em memória.
+       Se este teste falhar, o conserto é rodar
+       `bun scripts/gerar-mapa-do-banco.ts` e commitar o resultado. */
+    expect(construirMapaDoBanco()).toEqual(MAPA_DO_BANCO as unknown as ArquivoDoBanco[]);
   });
 
   test("conhece os arquivos que o repositório de fato tem", () => {

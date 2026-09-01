@@ -11913,7 +11913,7 @@ rodados. Até agora a única forma de descobrir era alguém reparar que um recur
 não fazia nada — porque **nada quebra**: toda leitura tem degrau de recuo, e o
 recurso simplesmente deixa de existir.
 
-- ⚠️ **O mapa é GERADO** (`scripts/gerar-mapa-do-banco.mjs`, 54 arquivos · 127
+- ⚠️ **O mapa é GERADO** (`scripts/gerar-mapa-do-banco.ts`, 54 arquivos · 127
   tabelas · 192 conferências). Uma lista à mão envelhece no primeiro `APLICAR_`
   novo — e envelhecer aqui significa a tela dizer "tudo aplicado" sobre um
   arquivo que ela não conhece, que é pior que não ter a tela.
@@ -12033,3 +12033,20 @@ solto hoje, então pagam as duas dívidas juntas.
 ⚠️ **`MinhaContaPage` (1.864 linhas) fica por último**, e não por primeiro: é
 ela que segura os 29 estados que todo o resto lê por prop. Cortá-la é o único
 pedaço que NÃO é um move.
+
+### ⚠️ E A CATRACA DO MAPA ERA INSTÁVEL POR CONSTRUÇÃO
+
+Ela conferia a sincronia **rodando o gerador** e comparando os bytes do arquivo
+— e o gerador roda `npx prettier` por dentro. Dois processos externos por
+execução da suíte: 905 ms na máquina de desenvolvimento, **mais de 5 s no
+runner limpo da CI**, onde o teste ESTOUROU O TEMPO LIMITE com tudo verde aqui.
+Das duas execuções daquele commit, uma passou e a outra não.
+
+⚠️ **O conserto não é aumentar o limite** — seria manter um teste que sai do
+processo em toda execução. A leitura da pasta virou módulo
+(`src/lib/mapa-do-banco.gerar.ts`) e a catraca compara o DADO em memória:
+5.007 ms → **73 ms**, e nenhum teste do `src/` chama `execFileSync` agora.
+
+⚠️ **E o mutante não contou na primeira tentativa**: a âncora não casou (o
+prettier reformata o JSON gerado em uma coluna por linha), e o `assert` acusou
+em vez de deixar passar um "✅ vermelho" sobre uma edição que nunca aconteceu.

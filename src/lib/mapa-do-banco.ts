@@ -1,9 +1,9 @@
 /**
  * O QUE CADA `APLICAR_*.sql` PROMETE AO BANCO — GERADO, NÃO EDITE.
  *
- * ⚠️ Regenerar: `node scripts/gerar-mapa-do-banco.mjs`. O gerador tem a
- * explicação inteira; `mapa-do-banco.test.ts` cobra que este arquivo esteja
- * em dia com a pasta `supabase/`.
+ * ⚠️ Regenerar: `bun scripts/gerar-mapa-do-banco.ts`. A leitura da pasta mora
+ * em `mapa-do-banco.gerar.ts`, com a explicação inteira;
+ * `mapa-do-banco.test.ts` cobra que este arquivo esteja em dia.
  */
 export type AlvoDoBanco = {
   tabela: string;
