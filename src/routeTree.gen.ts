@@ -51,6 +51,7 @@ import { Route as PreviewConquistasRouteImport } from './routes/preview-conquist
 import { Route as PreviewComunidadeRouteImport } from './routes/preview-comunidade'
 import { Route as PreviewChatRouteImport } from './routes/preview-chat'
 import { Route as PreviewCasalRouteImport } from './routes/preview-casal'
+import { Route as PreviewCantinhoRouteImport } from './routes/preview-cantinho'
 import { Route as PreviewBolhaRouteImport } from './routes/preview-bolha'
 import { Route as PreviewBebeRouteImport } from './routes/preview-bebe'
 import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
@@ -318,6 +319,11 @@ const PreviewChatRoute = PreviewChatRouteImport.update({
 const PreviewCasalRoute = PreviewCasalRouteImport.update({
   id: '/preview-casal',
   path: '/preview-casal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewCantinhoRoute = PreviewCantinhoRouteImport.update({
+  id: '/preview-cantinho',
+  path: '/preview-cantinho',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewBolhaRoute = PreviewBolhaRouteImport.update({
@@ -635,6 +641,7 @@ export interface FileRoutesByFullPath {
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
@@ -735,6 +742,7 @@ export interface FileRoutesByTo {
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
@@ -837,6 +845,7 @@ export interface FileRoutesById {
   '/preview-banco': typeof PreviewBancoRoute
   '/preview-bebe': typeof PreviewBebeRoute
   '/preview-bolha': typeof PreviewBolhaRoute
+  '/preview-cantinho': typeof PreviewCantinhoRoute
   '/preview-casal': typeof PreviewCasalRoute
   '/preview-chat': typeof PreviewChatRoute
   '/preview-comunidade': typeof PreviewComunidadeRoute
@@ -939,6 +948,7 @@ export interface FileRouteTypes {
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-comunidade'
@@ -1039,6 +1049,7 @@ export interface FileRouteTypes {
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-comunidade'
@@ -1140,6 +1151,7 @@ export interface FileRouteTypes {
     | '/preview-banco'
     | '/preview-bebe'
     | '/preview-bolha'
+    | '/preview-cantinho'
     | '/preview-casal'
     | '/preview-chat'
     | '/preview-comunidade'
@@ -1242,6 +1254,7 @@ export interface RootRouteChildren {
   PreviewBancoRoute: typeof PreviewBancoRoute
   PreviewBebeRoute: typeof PreviewBebeRoute
   PreviewBolhaRoute: typeof PreviewBolhaRoute
+  PreviewCantinhoRoute: typeof PreviewCantinhoRoute
   PreviewCasalRoute: typeof PreviewCasalRoute
   PreviewChatRoute: typeof PreviewChatRoute
   PreviewComunidadeRoute: typeof PreviewComunidadeRoute
@@ -1604,6 +1617,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-casal'
       fullPath: '/preview-casal'
       preLoaderRoute: typeof PreviewCasalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-cantinho': {
+      id: '/preview-cantinho'
+      path: '/preview-cantinho'
+      fullPath: '/preview-cantinho'
+      preLoaderRoute: typeof PreviewCantinhoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-bolha': {
@@ -2054,6 +2074,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewBancoRoute: PreviewBancoRoute,
   PreviewBebeRoute: PreviewBebeRoute,
   PreviewBolhaRoute: PreviewBolhaRoute,
+  PreviewCantinhoRoute: PreviewCantinhoRoute,
   PreviewCasalRoute: PreviewCasalRoute,
   PreviewChatRoute: PreviewChatRoute,
   PreviewComunidadeRoute: PreviewComunidadeRoute,

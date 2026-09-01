@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -470,6 +470,7 @@ export function CantinhoTab({
   onNavigate,
   skyTheme = "v2",
   onSkyChange,
+  bancada,
 }: {
   careMode?: boolean;
   onNavigate?: (t: string) => void;
@@ -477,6 +478,18 @@ export function CantinhoTab({
   skyTheme?: "v2" | "v1";
   /** Avisa a página para a home repintar sem esperar um reload. */
   onSkyChange?: (t: "v2" | "v1") => void;
+  /**
+   * ⚠️ SÓ PARA A BANCADA (`/preview-cantinho`).
+   *
+   * A vitrine só desenha com uma sessão e um saldo do servidor, então esta aba
+   * — que é a "aba dos itens do jogo" — **nunca tinha sido fotografada**. Era
+   * a única forma de olhar para ela sem uma conta com Sementinhas gastas.
+   *
+   * ⚠️ Ela injeta o DADO nos MESMOS `useState` da produção, nunca o desenho: é
+   * a lição do `?streak=41` da folha da chama, que cravava o número e deixava
+   * o saldo vir de uma jornada vazia.
+   */
+  bancada?: { saldo: number; owned: string[]; premium: boolean; trofeus: number };
 }) {
   const [loading, setLoading] = useState(true);
   const [saldo, setSaldo] = useState(0);
@@ -503,8 +516,21 @@ export function CantinhoTab({
   // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
   // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
   const [showEarn, setShowEarn] = useState(false);
+  const ehBancada = !!bancada;
+  const bancadaRef = useRef(bancada);
+  bancadaRef.current = bancada;
 
   useEffect(() => {
+    /* ⚠️ Guarda BOOLEANO, e não o objeto: um literal remontado a cada render
+       faz o efeito re-rodar em toda pintura. É a lição da bancada das Amigas. */
+    if (ehBancada) {
+      setSaldo(bancadaRef.current!.saldo);
+      setOwned(bancadaRef.current!.owned);
+      setPremium(bancadaRef.current!.premium);
+      setTrofeus(bancadaRef.current!.trofeus);
+      setLoading(false);
+      return;
+    }
     (async () => {
       const { data: s } = await supabase.auth.getSession();
       if (!s.session?.access_token) {
@@ -526,7 +552,7 @@ export function CantinhoTab({
       }
       setLoading(false);
     })();
-  }, []);
+  }, [ehBancada]);
 
   async function equipSkyTheme(theme: "v2" | "v1") {
     const { data: s } = await supabase.auth.getSession();
