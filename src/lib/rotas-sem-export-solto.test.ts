@@ -69,10 +69,8 @@ const CONHECIDOS: Record<string, string[]> = {
   "src/routes/_authenticated/minha-conta.tsx": [
     "mostrarSaudeDaMulher",
     "HubSaude",
-    "OnboardingRitual",
     "ChatTab",
     "ConquistasTab",
-    "CodigoDaEmbaixadora",
     "BEMESTAR_SUBTABS",
     "REGISTROS_SUBTABS",
     "BEBE_SUBTABS",
@@ -80,6 +78,32 @@ const CONHECIDOS: Record<string, string[]> = {
   ],
   "src/routes/_authenticated/painel.tsx": ["DashboardView"],
 };
+
+/**
+ * ⚠️ **A LISTA SÓ PODE ENCOLHER — e é este teste que faz dela uma catraca.**
+ *
+ * `CONHECIDOS` é uma TOLERÂNCIA, e uma tolerância que sobra depois de a dívida
+ * ser paga aceita o defeito de volta em silêncio: `OnboardingRitual` e
+ * `CodigoDaEmbaixadora` saíram de `minha-conta.tsx` em set/2026, e enquanto os
+ * nomes ficassem aqui, reexportá-los amanhã passaria verde.
+ *
+ * Se este teste falhar, o conserto é APAGAR o nome da lista — nunca o
+ * contrário.
+ */
+function nomesQueSobraram(): string[] {
+  const sobrando: string[] = [];
+  for (const [arquivo, nomes] of Object.entries(CONHECIDOS)) {
+    const codigo = readFileSync(arquivo, "utf8");
+    for (const n of nomes) {
+      const temExport = new RegExp(
+        `^export\\s+(?:async\\s+)?(?:function|const|let|class)\\s+${n}\\b`,
+        "m",
+      ).test(codigo);
+      if (!temExport) sobrando.push(`${arquivo} → ${n}`);
+    }
+  }
+  return sobrando;
+}
 
 function arquivosDeRota(dir: string, saida: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {
@@ -127,8 +151,23 @@ describe("os arquivos de rota", () => {
      ver". Se um destes arquivos for arrumado, o número desce e este teste
      cobra a atualização. */
   test("⚠️ a dívida conhecida não cresce", () => {
+    /* ⚠️ **A IGUALDADE É PROPOSITAL, e ela morde nos DOIS sentidos.** Se este
+       número SUBIU, entrou export solto novo: o conserto é tirar o export.
+       Se CAIU, alguém pagou dívida — ótimo: abaixe o número aqui, no mesmo
+       commit. Um teto frouxo (`<=`) deixaria a lista encolher sem ninguém
+       reparar, e a tolerância voltaria a caber num export reintroduzido.
+       Caiu de 32 para 30 em set/2026, quando `OnboardingRitual` e
+       `CodigoDaEmbaixadora` saíram de `minha-conta.tsx`. */
     const total = Object.values(CONHECIDOS).reduce((n, l) => n + l.length, 0);
-    expect(total).toBe(32);
+    expect(total).toBe(30);
     expect(Object.keys(CONHECIDOS)).toHaveLength(5);
+  });
+});
+
+describe("a tolerância encolhe", () => {
+  test("⚠️ nenhum nome sobra em `CONHECIDOS` depois de a dívida ser paga", () => {
+    /* Um nome que ficou na lista depois de o export sair é a porta aberta para
+       ele voltar sem ninguém ver — a catraca continuaria verde. */
+    expect(nomesQueSobraram()).toEqual([]);
   });
 });

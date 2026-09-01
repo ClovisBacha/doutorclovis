@@ -121,7 +121,10 @@ describe("o portão", () => {
  * seria repetir, na porta mais nova, o defeito que a auditoria acabou de achar.
  */
 describe("o que o ritual grava", () => {
-  const ritual = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+  /* ⚠️ O ritual MUDOU DE CASA em set/2026 (`minha-conta.tsx` → o componente
+     próprio), e a garantia não mudou uma linha: o move foi verbatim, conferido
+     por hash. Este teste seguia o ARQUIVO; segue o componente agora. */
+  const ritual = semComentarios(readFileSync("src/components/onboarding-ritual.tsx", "utf8"));
 
   test("⚠️ grava `perfil_publico`", () => {
     expect(ritual).toContain("payload.perfil_publico = true");

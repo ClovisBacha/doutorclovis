@@ -4664,7 +4664,13 @@ passa meses sem ninguém perceber que não funciona.
 
 ### O que sobrou, e não foi feito
 
-`minha-conta.tsx` tem **20.367 linhas, 29 estados e zero memoização**: qualquer
+⚠️ **O NÚMERO AQUI JÁ ENVELHECEU UMA VEZ, e a favor do argumento.** Este
+parágrafo dizia 20.367 linhas; medido em set/2026, são **21.478** — ele cresceu
+1.111 linhas enquanto a nota dizia que ele estava parado. Toda leva nova entra
+nele, e a cirurgia fica mais cara a cada semana. Quem mexer aqui, remeça:
+`wc -l < src/routes/_authenticated/minha-conta.tsx`.
+
+`minha-conta.tsx` tem **21.478 linhas, 29 estados e zero memoização**: qualquer
 toque repinta a árvore inteira. É a maior peça estrutural que resta, e ficou
 parada de propósito — é cirurgia grande, e o dono precisa dizer se a lentidão
 sobreviveu às quatro correções acima antes de valer o risco.
@@ -7846,7 +7852,7 @@ literal, e `chama-sequencia.tsx` monta a classe por interpolação. Um script qu
 apagasse toda classe sem ocorrência literal quebraria as duas animações sem
 erro nenhum.
 
-**A maior peça que resta continua sendo `minha-conta.tsx`** — 20.367 linhas,
+**A maior peça que resta continua sendo `minha-conta.tsx`** — 21.478 linhas,
 125 kB comprimidos, zero memoização —, e ela segue parada de propósito: é
 cirurgia grande, e o dono precisa dizer se a lentidão sobreviveu às correções
 desta leva antes de valer o risco.
@@ -11956,3 +11962,74 @@ zero problemas. **Aplicar no Supabase (pendentes, medidos):**
 `supabase/APLICAR_CONVERSA_SILENCIAR.sql` e
 `supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
 sozinha.
+
+## O primeiro corte do `minha-conta.tsx` (set/2026)
+
+O arquivo tem **21.478 linhas** — e o número deste parágrafo já envelheceu uma
+vez, dizendo 20.367 enquanto ele crescia 1.111 linhas. É a única dívida do
+repositório que fica mais cara a cada semana, porque toda leva nova entra nela.
+
+O primeiro corte foi `OnboardingRitual` + `CodigoDaEmbaixadora` →
+`src/components/onboarding-ritual.tsx` (**−665 linhas**, 20.813).
+
+⚠️ **A ESCOLHA DO PRIMEIRO CORTE NÃO FOI PELO TAMANHO.** Os dois eram
+`export function` num arquivo de ROTA, e isso tem custo medido: um export
+não-rota sai do pedaço daquela rota e entra no da ÁRVORE DE ROTAS, que toda
+página do site carrega antes de qualquer coisa aparecer — foi assim que
+`PainelDaEmbaixadora` custou 11 kB. Ou seja, o corte paga a dívida estrutural
+E fecha uma entrada de `rotas-sem-export-solto.test.ts` de uma vez. E os dois
+têm bancada (`/preview-onboarding`), então dá para PROVAR que a tela não mudou.
+
+⚠️ **É UM MOVE, e nada mais** — nenhuma linha do corpo foi tocada, e isso é
+conferido por HASH: os dois blocos são byte a byte idênticos ao que estava em
+`minha-conta`. Um move que também "melhora" é uma reescrita, e aí a mudança de
+comportamento se esconde num diff de 650 linhas. As melhorias vêm depois, num
+commit que só faça isso.
+
+⚠️ **`Profile` viaja por `import type`**, e por isso não há ciclo em tempo de
+execução: o tipo é apagado na compilação. O lugar certo dele é `src/lib/`, junto
+das outras formas de linha de banco — mas mover `Profile` toca dezenas de
+referências, e um primeiro corte que também faz isso deixa de ser um move.
+
+### ⚠️ E A CATRACA DE EXPORT SOLTO NÃO ERA UMA CATRACA
+
+`CONHECIDOS` é uma TOLERÂNCIA — e uma tolerância que sobra depois de a dívida
+ser paga **aceita o defeito de volta em silêncio**: com os dois nomes ainda na
+lista, reexportá-los amanhã passaria verde. Agora há teste cobrando que nenhum
+nome sobre (`nomesQueSobraram`), e a contagem caiu de 32 para 30.
+
+⚠️ E o teste da contagem usava `toBe(32)`, então ele **reprovava também quando a
+dívida ENCOLHIA** — a armadilha de sempre. A igualdade é a régua certa; o que
+faltava era o comentário dizer para que lado ela morde: subiu, tire o export;
+caiu, abaixe o número aqui.
+
+### ⚠️ E EU QUASE REPORTEI UMA MEDIÇÃO DE UM BUILD QUE NÃO ERA O MEU
+
+O `bun run build` foi morto pelo `pkill -f vite` do MESMO comando (saída 144), e
+os artefatos que sobraram eram de duas horas antes — de um estado anterior à
+mudança. Eu já tinha lido números deles. **Conferir o RELÓGIO do artefato antes
+de acreditar num build** é a versão desta armadilha para medição de pacote.
+
+**Medido de verdade, com o "antes" construído numa `git worktree` do commit em
+produção:** o build inteiro caiu de **1.254.433 para 1.250.735 gzip (−3.698)**, e
+`minha-conta` de 124.583 para 121.118. O ritual virou pedaço próprio de 4.666.
+
+⚠️ **O `index` mostra −50.705 e isso NÃO é atribuído a esta mudança**: um pedaço
+`proxy` de 39.984 apareceu ao lado dele (7 arquivos a mais no total), ou seja o
+divisor reorganizou. Contar uma reorganização como ganho seria o mesmo tipo de
+número inventado que o painel de custo de IA tinha.
+
+**Verificado:** hash idêntico nos dois blocos · 5.508 testes · 121 bancadas ·
+11 roteiros · as três telas de `/preview-onboarding` fotografadas com zero erro
+de console.
+
+### O que vem depois, em ordem
+
+Os candidatos seguintes, medidos (linhas · dependências de módulo):
+`ConquistasTab` 676 · `CantinhoTab` 610 · `CicloMenstrualTab` 418 ·
+`ExerciciosTab` 387 · `ContracoesTab` 364. Os três primeiros também são export
+solto hoje, então pagam as duas dívidas juntas.
+
+⚠️ **`MinhaContaPage` (1.864 linhas) fica por último**, e não por primeiro: é
+ela que segura os 29 estados que todo o resto lê por prop. Cortá-la é o único
+pedaço que NÃO é um move.
