@@ -98,6 +98,26 @@ principal e as outras branches ganham uma URL de **preview** automática.
 > 3. **A régua de "posso empurrar isto?" fica mais dura**: o que estiver pela
 >    metade fica pela metade NA MÃO DA PACIENTE, não numa URL de teste.
 >
+> ⚠️ **E A CI NÃO BARRA O DEPLOY — MEDIDO EM SET/2026.** São dois sistemas
+> independentes: o GitHub Actions roda os testes, a Vercel constrói e publica, e
+> nenhum dos dois consulta o outro. A linha do tempo do commit `b467f1a`:
+>
+> | 11:41:01 | o job `Testes` REPROVOU |
+> | 11:41:54 | a Vercel publicou `www.obstetrica.com.br` — **o mesmo commit** |
+>
+> Cinquenta e três segundos. Ou seja: **`bun run verificar` verde é a ÚNICA
+> coisa entre um defeito e a paciente** — a CI é um segundo par de olhos que
+> chega TARDE, e a varredura de bancadas, que é a checagem mais valiosa que
+> existe aqui, termina depois de o código já estar no ar.
+>
+> Isso muda a régua de "posso empurrar isto?" mais uma vez: não basta o portão
+> local passar; o que estiver em dúvida não deve ser empurrado esperando que a
+> CI pegue, porque quando ela pegar já é tarde.
+>
+> Quem quiser fechar isto: exigir os checks no GitHub e ligar a proteção de
+> branch, ou apontar a Vercel para publicar só depois deles. É configuração do
+> dono, nos dois painéis — não se resolve pelo repositório.
+
 > Se a intenção era que a produção seguisse a `main`, quem conserta é o dono, no
 > painel da Vercel (a branch de produção do projeto, ou o domínio apontado para
 > esta branch). Não mexa nisso pelo repositório.
