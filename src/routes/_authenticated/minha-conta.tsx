@@ -666,7 +666,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   {
     key: "contracoes",
     label: "Contrações",
-    sub: "Cronometrar e ver",
+    sub: "Cronometrar e ver o padrão",
     Icon: Timer,
     caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
     tinta: "text-orange-600",
@@ -2973,7 +2973,7 @@ export const REGISTROS_SUBTABS = [
   {
     key: "contracoes",
     label: "Contrações",
-    sub: "Cronometrar e ver",
+    sub: "Cronometrar e ver o padrão",
     Icon: Timer,
     caixa: "border-violet-200/70 from-violet-50 to-purple-50/60",
     tinta: "text-violet-600",

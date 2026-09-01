@@ -70,8 +70,24 @@ export function GradeHub({
             preencherTela ? "min-h-0 p-4" : "aspect-square"
           } ${caixa}`}
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-            <Icon className={`h-5 w-5 ${tinta}`} strokeWidth={1.7} />
+          {/* ⚠️ O ÍCONE CRESCE COM O LADRILHO, e isto não desfaz o pedido do
+              dono — ele pediu os blocos GRANDES ("vão preencher a tela
+              inteira"), e o que estava errado era o que havia DENTRO deles.
+              Medido a 393px: o ladrilho de `preencherTela` mede 175×300 e o
+              ícone media 40×40 — 2,6% da área, com ~180px de gradiente vazio
+              entre ele e o texto do rodapé. Um bloco grande com um ícone de
+              bloco pequeno lê como o lugar onde a ilustração ainda não chegou.
+              ⚠️ E o quadrado NÃO muda: ali o ícone de 40px está na proporção
+              certa, e crescer os dois juntos quebraria a grade de seis. */}
+          <span
+            className={`flex shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${
+              preencherTela ? "h-16 w-16 rounded-[22px]" : "h-10 w-10"
+            }`}
+          >
+            <Icon
+              className={`${preencherTela ? "h-8 w-8" : "h-5 w-5"} ${tinta}`}
+              strokeWidth={1.7}
+            />
           </span>
           {/* `overflow-hidden` + `line-clamp` mantêm o QUADRADO quadrado: em
               telas de 320px um rótulo de duas linhas esticaria só aquele bloco
