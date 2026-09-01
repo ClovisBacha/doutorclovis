@@ -70,7 +70,6 @@ const CONHECIDOS: Record<string, string[]> = {
     "mostrarSaudeDaMulher",
     "HubSaude",
     "ChatTab",
-    "ConquistasTab",
     "BEMESTAR_SUBTABS",
     "REGISTROS_SUBTABS",
     "BEBE_SUBTABS",
@@ -156,10 +155,10 @@ describe("os arquivos de rota", () => {
        Se CAIU, alguém pagou dívida — ótimo: abaixe o número aqui, no mesmo
        commit. Um teto frouxo (`<=`) deixaria a lista encolher sem ninguém
        reparar, e a tolerância voltaria a caber num export reintroduzido.
-       Caiu de 32 para 30 em set/2026, quando `OnboardingRitual` e
-       `CodigoDaEmbaixadora` saíram de `minha-conta.tsx`. */
+       Caiu de 32 → 30 → 29 em set/2026, à medida que `OnboardingRitual`,
+       `CodigoDaEmbaixadora` e `ConquistasTab` saíram de `minha-conta.tsx`. */
     const total = Object.values(CONHECIDOS).reduce((n, l) => n + l.length, 0);
-    expect(total).toBe(30);
+    expect(total).toBe(29);
     expect(Object.keys(CONHECIDOS)).toHaveLength(5);
   });
 });
