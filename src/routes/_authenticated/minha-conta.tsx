@@ -7574,6 +7574,12 @@ export function ChatTab({
   const skyDark = sky.isDark;
   const headInk = skyDark ? "rgba(255,255,255,0.96)" : "rgba(20,24,48,0.92)";
   const headInkSoft = skyDark ? "rgba(255,255,255,0.62)" : "rgba(20,24,48,0.58)";
+  /* ⚠️ O AVISO DE QUEM LÊ A CONVERSA NÃO USA A TINTA DA ASSINATURA. Ele vivia
+     na MESMA linha e na MESMA tinta do crédito da plataforma — e o crédito tem
+     gradiente e peso 600, então a marca era o elemento mais chamativo da linha
+     e o consentimento era o texto cinza depois do "·". Numa tela onde ela conta
+     o que não conta a ninguém, a hierarquia estava invertida. */
+  const headInkAviso = skyDark ? "rgba(255,255,255,0.86)" : "rgba(20,24,48,0.82)";
 
   return (
     <div
@@ -7676,13 +7682,21 @@ export function ChatTab({
                 escrevesse, e descobre depois.
                 Fica na linha de assinatura, no cabeçalho, presente em toda
                 conversa — não num termo que ela aceitou uma vez e nunca leu. */}
-            {doctorName ? (
-              <>
-                {" · "}
-                <span>{doctorName} pode ler esta conversa</span>
-              </>
-            ) : null}
           </p>
+          {/* ⚠️ LINHA PRÓPRIA, e não o rabicho do crédito. Colado depois do "·"
+              ele QUEBRAVA NO MEIO DA FRASE ("…pode / ler esta conversa") num
+              aparelho de 393px — medido —, o que faz uma informação de
+              consentimento parecer sobra de outra frase. Aqui ele tem a linha
+              inteira, tinta mais forte e peso médio: continua discreto, e
+              deixa de perder para a assinatura de quem construiu. */}
+          {doctorName ? (
+            <p
+              className="mt-0.5 text-[11px] font-medium leading-tight"
+              style={{ color: headInkAviso }}
+            >
+              {doctorName} pode ler esta conversa
+            </p>
+          ) : null}
         </div>
       </div>
 
