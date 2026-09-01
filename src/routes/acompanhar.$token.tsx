@@ -169,7 +169,7 @@ function CompanionView() {
         setProfile(res.profile);
         setCodigoDeConvite(res.codigoDeConvite ?? null);
       } catch {
-        // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+        // Falha de rede: sem isso a tela ficava em "Carregando…" p/ sempre.
         setErr("Não foi possível carregar. Verifique a conexão e recarregue.");
         return;
       } finally {
@@ -188,7 +188,7 @@ function CompanionView() {
   if (loading)
     return (
       <div className="mx-auto max-w-2xl px-5 py-20 text-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
   if (err || !profile)

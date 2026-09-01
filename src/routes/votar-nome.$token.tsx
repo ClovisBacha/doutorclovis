@@ -72,7 +72,7 @@ function VotarNomePage() {
       setEntries(res.entries);
       setMotherName(res.motherName ?? null);
     } catch {
-      // Falha de rede: sem isso a tela ficava em "Carregando..." p/ sempre.
+      // Falha de rede: sem isso a tela ficava em "Carregando…" p/ sempre.
       setError("Não foi possível carregar a votação. Verifique a conexão e recarregue.");
     } finally {
       setLoading(false);
@@ -136,7 +136,7 @@ function VotarNomePage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
   }

@@ -105,7 +105,7 @@ export function CampoFocos({
             }}
             className="shrink-0 rounded-xl border border-primary/40 px-4 text-sm font-medium text-primary"
           >
-            Add
+            Adicionar
           </button>
         </div>
       )}

@@ -303,7 +303,7 @@ function EmpresasPage() {
                   onChange={(e) => setForm({ ...form, employeeCount: e.target.value })}
                   className="w-full rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 >
-                  <option value="">Selecione...</option>
+                  <option value="">Selecione…</option>
                   {EMPLOYEE_OPTIONS.map((o) => (
                     <option key={o} value={o}>
                       {o}

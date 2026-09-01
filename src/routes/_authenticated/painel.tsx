@@ -895,7 +895,7 @@ function PainelPage() {
   if (loading)
     return (
       <div className="mx-auto max-w-5xl px-5 py-20 text-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
 
@@ -3493,7 +3493,7 @@ function PreConsultaCard({
           {ficha ? (
             <PatientReportView data={ficha} formData={form} onPrint={() => window.print()} />
           ) : (
-            <p className="text-sm text-muted-foreground">Carregando relatório...</p>
+            <p className="text-sm text-muted-foreground">Carregando relatório…</p>
           )}
         </div>
       )}

@@ -5532,7 +5532,7 @@ function CampoCidade({
             placeholder="Digite sua cidade..."
             className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
-          {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando...</p>}
+          {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando…</p>}
           {itens && itens.length === 0 && !carregando && (
             <p className="mt-1.5 text-xs text-muted-foreground">
               Nenhuma cidade encontrada com esse nome.
@@ -9489,7 +9489,7 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
                 </div>
               </button>
               <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">
-                Contração ativa...
+                Contração ativa…
               </p>
             </div>
           ) : (
@@ -11254,7 +11254,7 @@ function ConsultasTab() {
           {recording && (
             <span className="flex items-center gap-1.5 text-sm text-rose-600">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-rose-500" />
-              Gravando...
+              Gravando…
             </span>
           )}
         </div>
@@ -14772,7 +14772,7 @@ function EscolaBebêTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: st
             <h3 className="font-serif text-lg">Seu progresso</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {loading
-                ? "Carregando..."
+                ? "Carregando…"
                 : `${completedCount} de ${COURSE_MODULES.length} lições · ${unlockedCount} já liberadas`}
             </p>
           </div>

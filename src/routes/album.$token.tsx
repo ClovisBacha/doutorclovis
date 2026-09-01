@@ -46,7 +46,7 @@ function AlbumPage() {
       setPosts(res.posts);
       setCodigoDeConvite(res.codigoDeConvite ?? null);
     } catch {
-      // Falha de rede: sem isso a tela ficava em "Carregando álbum..." p/ sempre.
+      // Falha de rede: sem isso a tela ficava em "Carregando álbum…" p/ sempre.
       setError("Não foi possível carregar o álbum. Verifique a conexão e recarregue.");
     } finally {
       setLoading(false);
@@ -110,7 +110,7 @@ function AlbumPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        Carregando álbum...
+        Carregando álbum…
       </div>
     );
   }

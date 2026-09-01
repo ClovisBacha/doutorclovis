@@ -232,7 +232,7 @@ export function AppChatMockupScreen() {
         </div>
       </div>
       <div className="mb-3 flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-2">
-        <p className="flex-1 text-[9px] text-muted-foreground">Escreva sua dúvida...</p>
+        <p className="flex-1 text-[9px] text-muted-foreground">Escreva sua dúvida…</p>
         <Mic className="h-3 w-3 text-muted-foreground" />
         <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary">
           <Send className="h-2.5 w-2.5 text-primary-foreground" />
