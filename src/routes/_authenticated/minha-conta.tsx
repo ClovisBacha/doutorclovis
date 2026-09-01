@@ -58,6 +58,8 @@ import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { CicloMenstrualTab } from "@/components/ciclo-menstrual-tab";
+import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
+import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
 import {
   PHASE_META,
   WEEKDAYS_PT,
@@ -537,7 +539,9 @@ const TABS = [
      ela paga, quando renova, nem como parar. */
   "Assinatura",
 ] as const;
-type Tab = (typeof TABS)[number];
+/* ⚠️ Exportado para `silencio-do-cuidado.tsx` — `export type` é apagado na
+   compilação, então não pesa no pacote nem fecha ciclo. */
+export type Tab = (typeof TABS)[number];
 
 const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   {
@@ -799,7 +803,6 @@ function categoryOfTab(t: Tab): string {
  * creditar aqui mostraria o saldo subindo por um pagamento que o servidor
  * ainda não fez.
  */
-const TOASTS_DE_CONQUISTA = 3;
 
 /**
  * ⚠️ O QUE IMPEDE O LAÇO — e ele é REAL, não teórico.
@@ -828,64 +831,6 @@ const TOASTS_DE_CONQUISTA = 3;
  * ⚠️ Vive FORA do componente de propósito — o ouvinte remonta a cada troca de
  * aba, e um `useRef` reiniciaria a trava junto.
  */
-const jaCelebradas = new Set<string>();
-
-function triggerAchievementsCheck() {
-  supabase.auth
-    .getSession()
-    .then(({ data: s }) =>
-      s.session?.access_token
-        ? checkAndAwardAchievements({ data: { accessToken: s.session.access_token } })
-        : null,
-    )
-    .then((res) => {
-      if (!res || !res.ok) return;
-      if (res.careMode) return; // Modo Cuidado: sem comemorações.
-
-      /* O emblema da fita. `resgatadas === null` é "não consegui ler" e vira
-         `null` aqui também — nunca 0, que afirmaria que não há nada, nem o
-         total, que prometeria moeda. Ver `evento-conquistas.ts`. */
-      publicarConquistasAResgatar(
-        res.resgatadas == null
-          ? null
-          : res.unlocked.filter((u) => !res.resgatadas!.includes(u.achievement_key)).length,
-      );
-
-      const novas = (res.newlyAwarded ?? []).filter((k) => !jaCelebradas.has(k));
-      if (novas.length === 0) return;
-      for (const k of novas) jaCelebradas.add(k);
-
-      /* ⚠️ O AVISO PRECISA DIZER QUE HÁ PRÊMIO, E ONDE PEGAR.
-         Ele dizia só "Nova conquista desbloqueada: X!" — texto de quando o
-         prêmio caía sozinho. Com o resgate no toque, quem não abrir
-         Recompensas → Conquistas fica com as Sementinhas paradas e SEM SABER
-         que estão lá. No Duolingo, que é a referência do dono, o que produz a
-         visita é justamente o aviso de que tem algo a pegar. */
-      for (const key of novas.slice(0, TOASTS_DE_CONQUISTA)) {
-        const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
-        if (def) {
-          toast(`${def.emoji} ${def.title}! Toque nela em Conquistas para pegar suas Sementinhas.`);
-        }
-      }
-      const resto = novas.length - TOASTS_DE_CONQUISTA;
-      if (resto > 0) {
-        toast(
-          `🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — as Sementinhas esperam o seu toque em Conquistas.`,
-        );
-      }
-
-      /* ⚠️ NÃO CREDITA MAIS AQUI. O prêmio da conquista deixou de ser
-         automático e passou a depender do toque dela na aba Conquistas
-         (`resgatarConquista`). Creditar neste ponto mostraria o saldo subir por
-         um prêmio que o servidor ainda não pagou — e ela chegaria à aba com o
-         botão de resgate ainda pedindo o mesmo número, sem entender qual dos
-         dois está certo.
-
-         O toast fica: "desbloqueou" continua sendo notícia, e agora ele é
-         também o convite para ir buscar. */
-    })
-    .catch(() => {});
-}
 
 function MinhaContaPage() {
   const navigate = useNavigate();
@@ -16561,23 +16506,6 @@ function RecompensasHub({
  * A resposta certa não é uma versão suavizada: é silêncio, e uma porta de
  * saída. Nada de emoji, nada de cor, nada de "continue firme".
  */
-function SilencioDoCuidado({ onNavigate }: { onNavigate?: (t: Tab) => void }) {
-  return (
-    <div className="rounded-3xl border border-border bg-card p-8 text-center">
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Esta parte do aplicativo está em pausa enquanto o Modo Cuidado estiver ligado.
-      </p>
-      {onNavigate && (
-        <button
-          onClick={() => onNavigate("Perfil")}
-          className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
-        >
-          Ajustes do Modo Cuidado
-        </button>
-      )}
-    </div>
-  );
-}
 
 export function ConquistasTab({
   careMode = false,
