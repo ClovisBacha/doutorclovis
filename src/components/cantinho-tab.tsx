@@ -927,7 +927,18 @@ export function CantinhoTab({
             return (
               <div
                 key={i.id}
-                className={`relative flex flex-col items-center rounded-2xl border p-4 text-center ${
+                /* ⚠️ O LADRILHO NÃO TINHA SUPERFÍCIE. Medido a 393px: o fundo
+                   dele é `bg-card` (oklch 0.997) sobre uma página oklch 0.989 —
+                   0,8% de diferença de luminosidade, ou seja, imperceptível. O
+                   que definia o cartão era só a borda, e numa LOJA cada peça
+                   deveria parecer um objeto na prateleira.
+                   O comentário do fundo roxo abaixo já nomeava o sintoma —
+                   "uma grade de 74 tiles brancos iguais" — e resolveu para o
+                   Premium com cor. Faltava resolver para todos com MATERIAL.
+                   ⚠️ `--shadow-card` é o token que o app já usa 117 vezes: dar
+                   corpo ao ladrilho sem inventar paleta nova, e sem competir
+                   com o roxo, que continua sendo quem diz a prateleira. */
+                className={`relative flex flex-col items-center rounded-2xl border p-4 text-center shadow-[var(--shadow-card)] ${
                   isTrophy
                     ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white"
                     : i.premium
