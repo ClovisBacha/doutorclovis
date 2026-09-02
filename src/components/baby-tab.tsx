@@ -314,6 +314,7 @@ export function BabyTab({
   onNavigate,
   onBabyTap,
   careMode = false,
+  proximaConsulta = null,
 }: {
   profile: Profile | null;
   /** Médico da paciente — o cartão de presença fala em nome dele. */
@@ -323,6 +324,12 @@ export function BabyTab({
   /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
   onBabyTap?: () => void;
   careMode?: boolean;
+  /**
+   * A próxima consulta CONFIRMADA, resolvida por `minha-conta` (que já a tinha
+   * para o menu ☰ e nunca a passava para cá). Com ela, o cartão volta a poder
+   * se chamar "Próxima consulta" — sem ela, ele diz o ritmo da fase.
+   */
+  proximaConsulta?: { dateLabel: string; typeLabel: string } | null;
 }) {
   if (!profile || !gest) {
     return (
@@ -542,14 +549,28 @@ export function BabyTab({
               O título passou a dizer o que o texto de fato diz. Ligar a consulta
               real é função nova (uma prop vinda de `minha-conta`), e não um
               conserto de rótulo: fica como decisão, não como remendo. */}
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Ritmo das consultas</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {gest.weeks < 28
-              ? "Consultas mensais — agende sua próxima visita."
-              : gest.weeks < 36
-                ? "Consultas quinzenais a partir de agora."
-                : "Consultas semanais — acompanhamento próximo."}
-          </p>
+          {proximaConsulta ? (
+            <>
+              <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
+              <p className="mt-2 font-serif text-lg leading-tight text-foreground">
+                {proximaConsulta.dateLabel}
+              </p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{proximaConsulta.typeLabel}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xs uppercase tracking-[0.22em] text-primary">
+                Ritmo das consultas
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {gest.weeks < 28
+                  ? "Consultas mensais — agende sua próxima visita."
+                  : gest.weeks < 36
+                    ? "Consultas quinzenais a partir de agora."
+                    : "Consultas semanais — acompanhamento próximo."}
+              </p>
+            </>
+          )}
         </div>
         <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">

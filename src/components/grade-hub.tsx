@@ -25,10 +25,25 @@ export type Ladrilho = {
   /** Uma linha dizendo o que tem lá dentro. É metade do valor da grade. */
   sub: string;
   Icon: LucideIcon;
+  /**
+   * Ícone 3D (arte importada) no lugar do Lucide. Quando presente, o desenho É
+   * o objeto — não vai dentro do círculo branco, que existe para dar corpo a
+   * um traço de 1,7px e só atrapalharia uma peça com volume próprio.
+   */
+  imagem?: string;
   /** Borda + gradiente do quadro, em classes do Tailwind. */
   caixa: string;
   /** Cor do ícone. */
   tinta: string;
+  /**
+   * O NÚMERO DELA, no meio do bloco grande — o último peso, os chutes de hoje.
+   * É o que faz o tamanho de `preencherTela` ter sentido: o dono pediu blocos
+   * que "preencham a tela inteira", e um bloco de 300px com ícone e rótulo é
+   * 180px de gradiente vazio. ⚠️ `null`/ausente NÃO DESENHA NADA — falha de
+   * leitura e "ela nunca registrou" caem os dois aqui, porque um "0" afirmaria
+   * um fato que a tela não tem como saber (a régua de `estado-das-portas`).
+   */
+  dado?: { valor: string; legenda?: string } | null;
 };
 
 export function GradeHub({
@@ -62,7 +77,7 @@ export function GradeHub({
           : "grid grid-cols-2 gap-3"
       }
     >
-      {itens.map(({ key, label, sub, Icon, caixa, tinta }) => (
+      {itens.map(({ key, label, sub, Icon, imagem, caixa, tinta, dado }) => (
         <button
           key={key}
           onClick={() => onAbrir(key)}
@@ -79,16 +94,46 @@ export function GradeHub({
               bloco pequeno lê como o lugar onde a ilustração ainda não chegou.
               ⚠️ E o quadrado NÃO muda: ali o ícone de 40px está na proporção
               certa, e crescer os dois juntos quebraria a grade de seis. */}
-          <span
-            className={`flex shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${
-              preencherTela ? "h-16 w-16 rounded-[22px]" : "h-10 w-10"
-            }`}
-          >
-            <Icon
-              className={`${preencherTela ? "h-8 w-8" : "h-5 w-5"} ${tinta}`}
-              strokeWidth={1.7}
+          {imagem ? (
+            <img
+              src={imagem}
+              alt=""
+              draggable={false}
+              className={`shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)] ${
+                preencherTela ? "h-24 w-24" : "h-11 w-11"
+              }`}
             />
-          </span>
+          ) : (
+            <span
+              className={`flex shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${
+                preencherTela ? "h-16 w-16 rounded-[22px]" : "h-10 w-10"
+              }`}
+            >
+              <Icon
+                className={`${preencherTela ? "h-8 w-8" : "h-5 w-5"} ${tinta}`}
+                strokeWidth={1.7}
+              />
+            </span>
+          )}
+          {/* O dado dela ocupa o meio do bloco grande. `justify-between` com três
+              filhos distribui: ícone em cima, número no meio, rótulo embaixo. */}
+          {/* ⚠️ VALOR grande e LEGENDA pequena, em vez de uma frase só. Medido:
+              "3 hoje · última 14:20" em serif 22px quebrava em TRÊS linhas numa
+              coluna de 175px, e o número — que é o que ela veio ver — ficava
+              do mesmo tamanho que "última". Separando, o número tem a linha
+              inteira e a legenda explica embaixo. */}
+          {preencherTela && dado ? (
+            <span className="block">
+              <span className="block font-serif text-[26px] leading-none text-foreground">
+                {dado.valor}
+              </span>
+              {dado.legenda ? (
+                <span className="mt-1 block text-[12px] leading-tight text-muted-foreground">
+                  {dado.legenda}
+                </span>
+              ) : null}
+            </span>
+          ) : null}
           {/* `overflow-hidden` + `line-clamp` mantêm o QUADRADO quadrado: em
               telas de 320px um rótulo de duas linhas esticaria só aquele bloco
               e desalinharia a grade inteira. */}

@@ -11983,6 +11983,112 @@ zero problemas. **Aplicar no Supabase (pendentes, medidos):**
 `supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
 sozinha.
 
+## A bolha responde, os blocos têm número, e a Saúde ganhou ícones 3D (set/2026)
+
+Direção do dono, depois de dois dias de detalhe: _"a bolha vira o avatar do
+chat"_, _"faça essas aplicações"_ (o dado dentro dos blocos e a consulta real),
+e _"se for necessário gere imagens novas… faça alterações de alguns ícones, na
+aba de saúde"_. Quatro frentes, todas fotografadas antes de subir.
+
+### A bolha É o avatar do chat
+
+`AiAvatar` era um orbe roxo genérico com duas faíscas. A paciente toca na
+BOLHA na home para chegar ao chat, e chegava numa tela onde ela não estava.
+Agora `AiAvatar` desenha `<Bolha humor="feliz" flutua={false}>` — 36px no
+cabeçalho, 28px em cada mensagem.
+
+- ⚠️ **`flutua={false}` não é gosto.** A bolha da home flutua porque é UMA,
+  sozinha no céu. Numa conversa ela aparece a cada mensagem: trinta bolhas
+  flutuando são ruído, e a repintura contínua num histórico longo custa
+  bateria. Parada, é avatar; flutuando, são trinta personagens.
+- **`humor="feliz"` fixo**, pelo padrão de `estudiosa`/`exercicio` — identidade
+  da tela, não estado da jornada. `careMode` passa adiante porque `Bolha` já
+  rebaixa humor festivo no luto sozinha; `WABubble` precisou ganhar a prop.
+
+### O dado dela dentro dos blocos da Saúde
+
+O dono tinha pedido blocos que "preencham a tela inteira" (`preencherTela`), e
+eles preenchiam com gradiente vazio — 175×300 com ícone de 40px e rótulo no
+pé. **O que dá sentido ao tamanho é o número.** `HubSaude` faz três leituras
+em paralelo (`health_logs`, `kick_sessions`, `contraction_logs`) e cada bloco
+recebe `dado: { valor, legenda }`: "68,4 kg / pressão 118/76", "12 / chutes
+hoje", "3 hoje / última às 14:20".
+
+- ⚠️ **QUALQUER FALHA VIRA `null`, E `null` NÃO DESENHA NADA.** "Não consegui
+  ler" e "ela nunca registrou" caem no mesmo lugar, porque um "0" afirmaria um
+  fato que a tela não sabe — a régua de `estado-das-portas`. O bloco volta ao
+  rótulo, que sempre foi verdade.
+- ⚠️ **VALOR grande e LEGENDA pequena, e não uma frase.** A primeira versão
+  mandava "3 hoje · última 14:20" numa string só: em serif 22px, numa coluna
+  de 175px, quebrava em TRÊS linhas e o número — que é o que ela veio ver —
+  tinha o mesmo tamanho que "última". Medido na foto, não deduzido.
+- **Nutrição fica sem número**, e isso também é informação: é conteúdo, não
+  medição.
+- **Bancada:** `/preview-saude?w=20&dados=1` injeta os três pelo MESMO
+  `useState` da produção. Sem isso ela só mostraria o bloco vazio — o único
+  estado que não precisava provar.
+
+### A consulta real chegou à aba Bebê
+
+`minha-conta` JÁ resolvia `nextAppt` (`{dateLabel, typeLabel}`) para o menu ☰ e
+nunca o passava para baixo. Agora desce por `BebeHub` → `BabyTab`, e o cartão
+volta a poder se chamar **"Próxima consulta"** quando há uma confirmada; sem
+ela, continua "Ritmo das consultas". Bancada: `/preview-bebe-tab?consulta=1`.
+
+### Os cinco ícones 3D da Saúde
+
+`recraft_v4_1`, `standard`, 1k, fundo `#FFFFFF`: **6,25 créditos** pelos cinco
+(coração com pulso · pezinhos · cronômetro · tigela de salada · tulipa). Todos
+da mesma família — vidro, cor NATURAL do objeto, luz ambiente uniforme.
+
+⚠️ **O que mudou em relação à rodada que o dono recusou ("muito brilho, pouca
+qualidade")**, e que agora está escrito para não voltar:
+
+1. **Nenhuma cor cravada.** A rodada anterior forçava "coral e creme" num
+   cacto e destruía a identidade do objeto. Aqui a cor vem do SUJEITO ("coração
+   verde-água", "pezinhos azul-céu") — descrever é diferente de pinçar hex.
+2. **Sem `soft key light from upper left`.** Luz dura de um lado é o que
+   produzia o brilho estourado. Virou "gentle even ambient studio lighting".
+3. **Sem `muted, calm, low-contrast`** — isso drenava a cor. Virou "vibrant
+   natural color".
+4. **SEM COMPRIMIR PARA OLHAR.** A "pouca qualidade" da rodada anterior era a
+   MINHA compressão a 420px para caber no artefato. Desta vez as artes foram
+   lidas em 1024 nativos.
+
+O recorte de fundo é o `scripts/bebes/do-drive.mjs` de sempre (croma + brilho
+
+- conexão com a borda, depois des-premultiplica): PSNR **46–50 dB**, 264 KB os
+  cinco. ⚠️ A tigela é de VIDRO e a tulipa tem pétala translúcida — os dois
+  casos que o CLAUDE.md nomeia como onde a inundação "come o miolo". Não comeu: o
+  brilho branco dentro da pétala é cercado por contorno e não alcança a borda,
+  que é exatamente a propriedade que o algoritmo explora.
+
+`Ladrilho` ganhou `imagem?: string`; com ela, `GradeHub` desenha a arte em
+96px no bloco grande **sem o círculo branco** — o círculo existe para dar corpo
+a um traço de 1,7px, e só atrapalharia uma peça com volume próprio. As grades
+de quadrados (seis destinos) continuam com o Lucide de 40px, inalteradas.
+
+### ⚠️ E um defeito de hidratação que era de TODA aba com `Stagger`
+
+`useReducedMotion()` devolve `false` no servidor e `true` na primeira pintura de
+quem ligou "Reduzir movimento" no iOS. Com a decisão no render, o servidor
+mandava `<motion.div style="opacity:0">` e o cliente montava `<div>` — atributos
+divergentes, em toda aba com `Stagger`/`Reveal`, para toda paciente com essa
+opção. Medido: `reducedMotion: "reduce"` → 1 aviso; sem → 0.
+
+`useReduzDepoisDeMontar` decide DEPOIS de montar — a régua de `podeGravar`
+(`capacidade-fora-do-render`). Eram **quatro** usos, não dois: o meu primeiro
+`assert ==2` estava errado, e foi o regex que pegou todos.
+
+⚠️ **Isto só apareceu porque a bancada rodou com `reducedMotion: "reduce"`** —
+que eu tinha ligado para fotografar o `Stagger` sem esperar o observador. A
+flag não era gambiarra: era o estado real de uma paciente, e ele estava
+quebrado.
+
+**Bancadas:** `/preview-chat` (a bolha no cabeçalho e nas mensagens) ·
+`/preview-saude?w=20&dados=1` · `/preview-bebe-tab?consulta=1` ·
+`/preview-saude?w=38` (a tulipa, em "Saúde da mulher").
+
 ## A aba Bebê ganhou bancada — e a fruta parou de ser sempre morango (set/2026)
 
 O dono disse que "as informações do bebê, quando você clica nele, não estão cem

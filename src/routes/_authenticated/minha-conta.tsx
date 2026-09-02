@@ -33,6 +33,15 @@ import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
+/* Os ícones 3D da aba Saúde (set/2026). Gerados numa família só — vidro, cor
+   natural do objeto, luz ambiente — e recortados por `scripts/bebes/do-drive.mjs`
+   (PSNR 46–50 dB). Substituem os traços do Lucide nos blocos grandes: um bloco
+   de 300px pedia um objeto com volume, não um contorno de 1,7px. */
+import icSaude from "@/assets/saude/saude.webp";
+import icChutes from "@/assets/saude/chutes.webp";
+import icContracoes from "@/assets/saude/contracoes.webp";
+import icNutricao from "@/assets/saude/nutricao.webp";
+import icMulher from "@/assets/saude/mulher.webp";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
@@ -621,6 +630,8 @@ type LadrilhoDaSaude = {
   label: string;
   sub: string;
   Icon: LucideIcon;
+  /** Ícone 3D; quando presente, `GradeHub` desenha a imagem no lugar do Lucide. */
+  imagem?: string;
   caixa: string;
   tinta: string;
   /** Aba de destino. Nem todo ladrilho é uma aba de mesmo nome. */
@@ -646,6 +657,7 @@ type LadrilhoDaSaude = {
 const HUB_SAUDE: LadrilhoDaSaude[] = [
   {
     key: "Saúde",
+    imagem: icSaude,
     label: "Saúde",
     sub: "Peso, pressão e glicemia",
     Icon: HeartPulse,
@@ -655,6 +667,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "chutes",
+    imagem: icChutes,
     label: "Chutes",
     sub: "Contar os movimentos",
     Icon: Footprints,
@@ -665,6 +678,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "contracoes",
+    imagem: icContracoes,
     label: "Contrações",
     sub: "Cronometrar e ver o padrão",
     Icon: Timer,
@@ -675,6 +689,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "Nutrição",
+    imagem: icNutricao,
     label: "Nutrição",
     sub: "O que comer hoje",
     Icon: Salad,
@@ -684,6 +699,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "Saúde da mulher",
+    imagem: icMulher,
     label: "Saúde da mulher",
     sub: "Ciclo, mamas e colo",
     Icon: Ribbon,
@@ -715,18 +731,109 @@ export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean 
   return weeks == null || weeks >= 36;
 }
 
+/** O número dela num bloco da Saúde: o valor grande e a legenda pequena. */
+type Dado = { valor: string; legenda?: string };
+
 export function HubSaude({
   onAbrir,
   weeks,
+  bancada,
 }: {
   onAbrir: (t: Tab, sub?: string) => void;
   /** Semana gestacional — `null` quando não há gestação configurada. */
   weeks: number | null;
+  /**
+   * Só a `/preview-saude`: os números prontos, sem sessão. Sem isto a bancada
+   * mostraria sempre o bloco VAZIO — o único estado que ela não precisava provar.
+   * Injeta o DADO no mesmo estado da produção, nunca um desenho à parte.
+   */
+  bancada?: Record<string, Dado | null>;
 }) {
   /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
      cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
      elas divergirem no próximo ajuste. */
-  const itens = HUB_SAUDE.filter((i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks));
+  /* ⚠️ OS NÚMEROS DELA DENTRO DOS BLOCOS. O dono pediu blocos que "preencham a
+     tela inteira" e eles preenchiam com gradiente vazio; o que dá sentido ao
+     tamanho é o dado. Três leituras em paralelo (uma onda, não três), e
+     ⚠️ QUALQUER FALHA VIRA `null` — que não desenha nada. "Não consegui ler" e
+     "ela nunca registrou" precisam cair no mesmo lugar, porque um "0" afirmaria
+     um fato que a tela não sabe. Nutrição não tem número: fica sem, e isso
+     também é informação (é conteúdo, não medição). */
+  const [dados, setDados] = useState<Record<string, Dado | null>>(bancada ?? {});
+  const ehBancada = !!bancada;
+  useEffect(() => {
+    if (ehBancada) return;
+    let vivo = true;
+    (async () => {
+      const hoje = ymdLocal();
+      const [saude, chutes, contr] = await Promise.all([
+        supabase
+          .from("health_logs")
+          .select("weight_kg, systolic, diastolic, log_date")
+          .order("log_date", { ascending: false })
+          .limit(1)
+          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
+        supabase
+          .from("kick_sessions")
+          .select("kick_count, started_at")
+          .not("ended_at", "is", null)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
+        supabase
+          .from("contraction_logs")
+          .select("started_at")
+          .gte("started_at", `${hoje}T00:00:00`)
+          .order("started_at", { ascending: false })
+          .limit(50)
+          .then((r) => (r.error ? null : (r.data ?? null))),
+      ]);
+      if (!vivo) return;
+      const d: Record<string, Dado | null> = {};
+      if (saude) {
+        const peso =
+          saude.weight_kg != null ? `${String(saude.weight_kg).replace(".", ",")} kg` : null;
+        const pa =
+          saude.systolic != null && saude.diastolic != null
+            ? `${saude.systolic}/${saude.diastolic}`
+            : null;
+        /* O peso é o valor grande; a pressão vai na legenda. Sem peso, a
+           pressão sobe para o valor — o bloco nunca fica com legenda solta. */
+        d["Saúde"] = peso
+          ? { valor: peso, legenda: pa ? `pressão ${pa}` : undefined }
+          : pa
+            ? { valor: pa, legenda: "pressão" }
+            : null;
+      }
+      if (chutes && chutes.kick_count != null) {
+        const dia = String(chutes.started_at).slice(0, 10);
+        const quando =
+          dia === hoje
+            ? "hoje"
+            : dia === ymdLocal(new Date(Date.now() - 86400000))
+              ? "ontem"
+              : null;
+        d["chutes"] = quando
+          ? { valor: String(chutes.kick_count), legenda: `chutes ${quando}` }
+          : null;
+      }
+      if (contr && contr.length > 0) {
+        const ult = new Date(contr[0].started_at);
+        const hh = String(ult.getHours()).padStart(2, "0");
+        const mm = String(ult.getMinutes()).padStart(2, "0");
+        d["contracoes"] = { valor: `${contr.length} hoje`, legenda: `última às ${hh}:${mm}` };
+      }
+      setDados(d);
+    })().catch(() => {
+      /* silêncio: sem dado, o bloco volta ao rótulo, que sempre foi verdade */
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [ehBancada]);
+  const itens = HUB_SAUDE.filter(
+    (i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks),
+  ).map((i) => ({ ...i, dado: dados[i.key] ?? null }));
   return (
     <GradeHub
       itens={itens}
@@ -2499,6 +2606,7 @@ function MinhaContaPage() {
                   <BebeHub
                     profile={profile}
                     gest={gest}
+                    proximaConsulta={nextAppt}
                     onNavigate={goToTab}
                     onBabyTap={() => setJourneyOpen(true)}
                     careMode={careMode}
@@ -3114,6 +3222,7 @@ function BebeHub({
   onNavigate,
   onBabyTap,
   careMode,
+  proximaConsulta = null,
   initialSub = null,
 }: {
   profile: Profile | null;
@@ -3123,6 +3232,8 @@ function BebeHub({
   onNavigate: (tab: string) => void;
   onBabyTap: () => void;
   careMode: boolean;
+  /** A próxima consulta CONFIRMADA dela, já resolvida pela página. */
+  proximaConsulta?: { dateLabel: string; typeLabel: string } | null;
   /* O toque no bebê da home promete "a semana detalhada" — então ele pede
      `semana` e cai direto lá, sem passar pela grade. Quem chega pela barra de
      baixo continua vendo a grade. */
@@ -3168,6 +3279,7 @@ function BebeHub({
             onNavigate={onNavigate}
             onBabyTap={onBabyTap}
             careMode={careMode}
+            proximaConsulta={proximaConsulta}
           />
         )}
         {sub === "contagem" && (
@@ -6822,34 +6934,50 @@ type WAMsg = {
  * "máquina" sem fingir ser gente — que é a linha que este assistente não
  * pode cruzar, já que ele fala em nome de um consultório.
  */
-function AiAvatar({ className = "h-9 w-9" }: { className?: string }) {
+/**
+ * O avatar de quem responde no chat É A BOLHA — decisão do dono.
+ *
+ * Era um orbe roxo genérico com duas faíscas. A paciente toca na BOLHA na home
+ * para chegar aqui, e chegava numa tela onde ela não estava: o personagem que a
+ * trouxe sumia na porta, e quem respondia era um ícone de IA de catálogo.
+ * Agora quem fala é quem ela tocou.
+ *
+ * ⚠️ `flutua={false}`: a bolha da home respira e flutua porque é UMA, sozinha
+ * no céu. Aqui ela aparece em cada mensagem da conversa — trinta bolhas
+ * flutuando viram ruído, e a repintura contínua num histórico longo custa
+ * bateria. Parada, ela é avatar; flutuando, é trinta personagens.
+ *
+ * ⚠️ `humor="feliz"` fixo, pelo mesmo padrão de `estudiosa`/`exercicio`: é
+ * identidade da TELA, não estado da jornada — e `Bolha` já rebaixa qualquer
+ * humor festivo sozinha no Modo Cuidado, então `careMode` passa adiante.
+ */
+function AiAvatar({
+  tamanho = 36,
+  careMode = false,
+  className = "",
+}: {
+  tamanho?: number;
+  careMode?: boolean;
+  /** Só posicionamento no pai (`self-end`, margens) — o desenho é da Bolha. */
+  className?: string;
+}) {
   return (
-    <span
-      aria-hidden
-      className={`relative flex shrink-0 items-center justify-center rounded-full ${className}`}
-      style={{
-        background:
-          "radial-gradient(circle at 32% 26%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.2) 42%)," +
-          " linear-gradient(140deg, #8b5cf6 0%, #6366f1 48%, #ec4899 100%)",
-        border: "1px solid rgba(255,255,255,0.45)",
-        boxShadow: "inset 0 1px 1px rgba(255,255,255,0.6), 0 6px 16px -6px rgba(120,60,200,0.65)",
-      }}
-    >
-      <svg viewBox="0 0 24 24" className="h-[55%] w-[55%]" fill="#fff" opacity={0.95}>
-        <path d="M12 2.6l1.7 4.9 4.9 1.7-4.9 1.7-1.7 4.9-1.7-4.9L5.4 9.2l4.9-1.7L12 2.6z" />
-        <path d="M18.4 14.3l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85.85-2.45z" />
-      </svg>
+    <span aria-hidden className={`relative flex shrink-0 items-center justify-center ${className}`}>
+      <Bolha humor="feliz" tamanho={tamanho} flutua={false} careMode={careMode} />
     </span>
   );
 }
 
 function WABubble({
   msg,
+  careMode = false,
   feedback,
   onFeedback,
   terminada = true,
 }: {
   msg: WAMsg;
+  /** A bolha-avatar rebaixa humor festivo no luto — precisa saber. */
+  careMode?: boolean;
   /** Voto já dado nesta resposta (persistido no estado do chat). */
   /* `down-fila` distingue "chegou ao médico" de "só registrado" — a frase de
      confirmação muda, porque prometer o que não aconteceu deixa a paciente
@@ -6876,7 +7004,7 @@ function WABubble({
 
   return (
     <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      {!isUser && <AiAvatar className="h-7 w-7 self-end mb-0.5" />}
+      {!isUser && <AiAvatar tamanho={28} careMode={careMode} className="mb-0.5 self-end" />}
 
       <div
         className={`max-w-[75%] overflow-hidden ${isUser ? "rounded-2xl rounded-tr-none" : "rounded-2xl rounded-tl-none"}`}
@@ -7641,7 +7769,7 @@ export function ChatTab({
           boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.9)"}`,
         }}
       >
-        <AiAvatar />
+        <AiAvatar careMode={careMode} />
         <div className="min-w-0 flex-1">
           <p
             className="truncate text-[16px] font-semibold leading-tight"
@@ -7742,6 +7870,7 @@ export function ChatTab({
             !(loading && i === messages.length - 1);
           return (
             <WABubble
+              careMode={careMode}
               key={i}
               msg={m}
               feedback={votes[i]}
@@ -7798,7 +7927,7 @@ export function ChatTab({
             para uma máquina que responde em nome de um consultório. */}
         {loading && (
           <div className="flex items-end gap-1.5">
-            <AiAvatar className="h-7 w-7" />
+            <AiAvatar tamanho={28} careMode={careMode} />
             <div
               className="relative overflow-hidden rounded-2xl rounded-tl-none px-6 py-3.5"
               style={{

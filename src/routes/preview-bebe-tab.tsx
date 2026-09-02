@@ -39,6 +39,7 @@ export const Route = createFileRoute("/preview-bebe-tab")({
     /* Médica que NÃO é o dono da instalação: o cartão mostra a inicial, e não
        o retrato. É o caso da maioria das pacientes num app multi-consultório. */
     outromedico: q.outromedico == null ? 0 : Number(q.outromedico),
+    consulta: q.consulta == null ? 0 : Number(q.consulta),
   }),
   head: () => ({
     meta: [{ title: "Bancada da aba Bebê" }, { name: "robots", content: "noindex" }],
@@ -47,7 +48,7 @@ export const Route = createFileRoute("/preview-bebe-tab")({
 });
 
 function PreviewBebeTab() {
-  const { w, d, luto, semmedico, magro, outromedico } = Route.useSearch();
+  const { w, d, luto, semmedico, magro, outromedico, consulta } = Route.useSearch();
   const semanas = Number.isFinite(w) ? w : 20;
   const dias = Number.isFinite(d) ? Math.min(6, Math.max(0, d)) : 3;
 
@@ -85,7 +86,7 @@ function PreviewBebeTab() {
            A bancada passava "Clóvis Bacha" sem o "Dr.", a comparação falhava, e
            eu quase reportei a inicial como defeito de produto. Bancada que não
            usa a MESMA forma da produção mede um app que não existe.
-           `?outromedico=1` mostra o outro caso, que também é real. */
+           `?outromedico=1 &middot; ?consulta=1` mostra o outro caso, que também é real. */
         medico={
           semmedico
             ? null
@@ -97,6 +98,9 @@ function PreviewBebeTab() {
         onNavigate={() => {}}
         onBabyTap={() => {}}
         careMode={!!luto}
+        proximaConsulta={
+          consulta ? { dateLabel: "ter, 08 de set · 09:30", typeLabel: "Pré-natal" } : null
+        }
       />
       <p className="pointer-events-none fixed bottom-2 left-0 right-0 z-[60] text-center text-[10px] text-muted-foreground">
         bancada · {dum.getUTCFullYear()} · ?w=semana &middot; ?d=dia &middot; ?luto=1 &middot;
