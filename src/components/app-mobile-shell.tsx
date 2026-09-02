@@ -6,11 +6,8 @@
  *
  * Clima via Open-Meteo (gratuito, sem API key) com recomendações para gestantes.
  */
-import navSaude from "@/assets/nav/saude.webp";
-import navJogo from "@/assets/nav/jogo.webp";
-import navComunidade from "@/assets/nav/comunidade.webp";
 import { useState, useEffect, useSyncExternalStore, type ComponentType } from "react";
-import { Baby, ChevronRight, LifeBuoy, Menu } from "lucide-react";
+import { Baby, ChevronRight, Gamepad2, Heart, LifeBuoy, Menu } from "lucide-react";
 import { IconeAmigas } from "@/components/icones-jogo";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
 import { DOCTOR } from "@/lib/doctor.config";
@@ -389,40 +386,6 @@ function useWeather(
  */
 type IconeDaBarra = ComponentType<{ className?: string; strokeWidth?: number }>;
 
-/**
- * Ícone da barra a partir de uma ARTE (a peça 3D), com a mesma assinatura do
- * Lucide para `NavItem` não saber a diferença. `strokeWidth` é aceito e
- * ignorado — não há traço numa imagem — e `className` chega inteiro: é por ele
- * que a barra manda o tamanho (`ALTURA_ICONE`) e a escala do item ativo.
- *
- * ⚠️ O BEBÊ DO CENTRO NÃO PASSA POR AQUI, de propósito: ele é a Bolha, a
- * personagem do ilustrador, e o círculo rosa dele é o que diz qual é o destino
- * principal. E o SOS também não: o dono pediu que ele ficasse como está.
- */
-function iconeDeArte(src: string, nome: string): IconeDaBarra {
-  const Icone: IconeDaBarra = ({ className }) => (
-    <img
-      src={src}
-      alt=""
-      draggable={false}
-      className={`object-contain ${className ?? ""}`}
-      /* ⚠️ A ARTE É MAIOR QUE A CAIXA, de propósito. A caixa é a do traço do
-         Lucide (`ALTURA_ICONE`, 28px), e um traço preenche a caixa inteira;
-         uma peça 3D tem volume, sombra no chão e perspectiva, e a 28px ela
-         saía com metade do tamanho visual do aro do SOS ao lado — medido na
-         foto da barra. `transform` não entra no layout, então a caixa (e o
-         alvo de 44px) ficam iguais; o `scale-110` do item ativo é a
-         propriedade `scale`, que compõe com este `transform` sem brigar. */
-      style={{ transform: "scale(1.5)" }}
-    />
-  );
-  Icone.displayName = `IconeDeArte(${nome})`;
-  return Icone;
-}
-const IconeSaude3D = iconeDeArte(navSaude, "saude");
-const IconeJogo3D = iconeDeArte(navJogo, "jogo");
-const IconeComunidade3D = iconeDeArte(navComunidade, "comunidade");
-
 const NAV_ITEMS: {
   id: BottomSection;
   Icon: IconeDaBarra;
@@ -435,7 +398,7 @@ const NAV_ITEMS: {
   // Comunidade.
   {
     id: "saude",
-    Icon: IconeSaude3D,
+    Icon: Heart,
     label: "Saúde",
     color: "text-emerald-500",
     pill: "bg-emerald-500/15",
@@ -443,14 +406,14 @@ const NAV_ITEMS: {
   { id: "home", Icon: Baby, label: "Bebê", color: "text-pink-500", pill: "bg-pink-500/15" },
   {
     id: "jogo",
-    Icon: IconeJogo3D,
+    Icon: Gamepad2,
     label: "Jogo",
     color: "text-fuchsia-500",
     pill: "bg-fuchsia-500/15",
   },
   {
     id: "comunidade",
-    Icon: IconeComunidade3D,
+    Icon: IconeAmigas,
     label: "Comunidade",
     color: "text-sky-500",
     pill: "bg-sky-500/15",

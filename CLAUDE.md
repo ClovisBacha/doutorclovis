@@ -12428,6 +12428,12 @@ objeto, luz ambiente uniforme, sem paleta cravada, lidas em 1024 nativos.
 - ⚠️ **O BEBÊ DO CENTRO E O SOS NÃO MUDARAM, de propósito.** O centro é a
   Bolha — personagem do ilustrador, e uma gerada não casaria com ela. O SOS
   ficou porque o dono pediu que ele não mudasse; o ícone da barra é parte dele.
+- ⚠️ **E A BARRA VOLTOU AO TRAÇO NO MESMO DIA, por decisão do dono** ("a barra
+  antiga era bem melhor, a nav bar volte para ela"). Os três ícones 3D da
+  barra saíram do repositório; `NAV_ITEMS` usa Heart, Gamepad2 e `IconeAmigas`
+  de novo. A família 3D vale para HUB e VITRINE — dentro de uma barra de vidro
+  com traços ao lado, ela não convenceu quem olhou no aparelho. Não reintroduza
+  sem uma foto que ele aprove.
 - ⚠️ **SÓ A VITRINE do Cantinho recebe arte.** A TRILHA continua com emoji
   (`DecorSprite`, a bandeja do Arrumar, os layouts gravados): trocar o sprite
   mexeria no tamanho, na animação e nos cantinhos que as pacientes já montaram.
@@ -12574,6 +12580,10 @@ que tudo emoji. Os 90 restantes entraram: **107 itens vivos, 107 artes**, e
   Hoje anota `⚠️` e segue; a decisão de refazer é humana, na folha.
 - **A trilha continua com emoji**, e a decisão está no cabeçalho de
   `arte-do-cantinho.tsx`: só a VITRINE mudou.
+- ⚠️ **OS 17 GRÁTIS VOLTARAM AO EMOJI, por decisão do dono** ("os itens grátis
+  da loja quero que fique os antigos, os novos podem ser assim"). A arte fica
+  só nos 90 premium — o que, de quebra, separa visualmente a prateleira grátis
+  da paga sem uma palavra. Item grátis novo entra em emoji.
 
 **Pipeline reproduzível:** `scratchpad/arte4/{mapa.txt,pipeline.mjs}` —
 `node pipeline.mjs lote.txt` (linhas "índice url") baixa, recorta, redimensiona
