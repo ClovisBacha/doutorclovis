@@ -263,6 +263,20 @@ import {
   lerPassoDoTutorial,
 } from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
+import arteGrade_agenda from "@/assets/grades/agenda.webp";
+import arteGrade_preparo from "@/assets/grades/preparo.webp";
+import arteGrade_perguntas from "@/assets/grades/perguntas.webp";
+import arteGrade_checklist from "@/assets/grades/checklist.webp";
+import arteGrade_parto from "@/assets/grades/parto.webp";
+import arteGrade_tele from "@/assets/grades/tele.webp";
+import arteGrade_particular from "@/assets/grades/particular.webp";
+import arteGrade_meditacoes from "@/assets/grades/meditacoes.webp";
+import arteGrade_sons from "@/assets/grades/sons.webp";
+import arteGrade_exercicios from "@/assets/grades/exercicios.webp";
+import arteGrade_humor from "@/assets/grades/humor.webp";
+import arteGrade_apoio from "@/assets/grades/apoio.webp";
+import arteGrade_diario from "@/assets/grades/diario.webp";
+import arteGrade_timeline from "@/assets/grades/timeline.webp";
 import arteBebe_semana from "@/assets/bebe/semana.webp";
 import arteBebe_contagem from "@/assets/bebe/contagem.webp";
 import arteBebe_album from "@/assets/bebe/album.webp";
@@ -2964,6 +2978,35 @@ function WeekMilestoneModal({
 
 /* ---------- Bebê ---------- */
 /**
+ * A peça 3D de cada quadrado das três grades — `GradeHub` a desenha no lugar
+ * do traço no círculo. Chutes e Contrações REUSAM a arte da Saúde: são o mesmo
+ * destino (o hub da Saúde abre `Registros` já na sub-tela certa), e duas artes
+ * para a mesma coisa ensinariam que são coisas diferentes.
+ *
+ * ⚠️ MORA ANTES DA PRIMEIRA GRADE que o lê. `const` de módulo não é içado:
+ * declarado depois de `BEMESTAR_SUBTABS`, o módulo inteiro estourava no SSR
+ * ("antes de inicializar") e TODA página do app respondia 500 — medido.
+ */
+const ARTE_GRADE = {
+  agenda: arteGrade_agenda,
+  preparo: arteGrade_preparo,
+  perguntas: arteGrade_perguntas,
+  checklist: arteGrade_checklist,
+  parto: arteGrade_parto,
+  tele: arteGrade_tele,
+  particular: arteGrade_particular,
+  meditacoes: arteGrade_meditacoes,
+  sons: arteGrade_sons,
+  exercicios: arteGrade_exercicios,
+  humor: arteGrade_humor,
+  apoio: arteGrade_apoio,
+  diario: arteGrade_diario,
+  timeline: arteGrade_timeline,
+  chutes: icChutes,
+  contracoes: icContracoes,
+} as const;
+
+/**
  * Hub "Bem-estar": autocuidado numa tela só (sub-abas) — Meditações, Sons,
  * Exercícios, Humor e Apoio Emocional. Antes eram 5 abas.
  */
@@ -2973,6 +3016,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Meditações",
     sub: "Meditar com voz e som",
     Icon: Flower2,
+    imagem: ARTE_GRADE.meditacoes,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
@@ -2981,6 +3025,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Sons",
     sub: "Relaxar e dormir",
     Icon: AudioLines,
+    imagem: ARTE_GRADE.sons,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
@@ -2989,6 +3034,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Exercícios",
     sub: "Movimentos leves",
     Icon: PersonStanding,
+    imagem: ARTE_GRADE.exercicios,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
@@ -2997,6 +3043,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Humor",
     sub: "Como você está hoje",
     Icon: Smile,
+    imagem: ARTE_GRADE.humor,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -3005,6 +3052,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Apoio emocional",
     sub: "Quando o peso é grande",
     Icon: HeartHandshake,
+    imagem: ARTE_GRADE.apoio,
     caixa: "border-rose-200/70 from-rose-50 to-pink-50/60",
     tinta: "text-rose-600",
   },
@@ -3071,6 +3119,7 @@ export const REGISTROS_SUBTABS = [
     label: "Diário",
     sub: "Escrever sobre o dia",
     Icon: NotebookPen,
+    imagem: ARTE_GRADE.diario,
     caixa: "border-amber-200/70 from-amber-50 to-orange-50/60",
     tinta: "text-amber-600",
   },
@@ -3079,6 +3128,7 @@ export const REGISTROS_SUBTABS = [
     label: "Chutes",
     sub: "Contar os movimentos",
     Icon: Footprints,
+    imagem: ARTE_GRADE.chutes,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
   },
@@ -3087,6 +3137,7 @@ export const REGISTROS_SUBTABS = [
     label: "Contrações",
     sub: "Cronometrar e ver o padrão",
     Icon: Timer,
+    imagem: ARTE_GRADE.contracoes,
     caixa: "border-violet-200/70 from-violet-50 to-purple-50/60",
     tinta: "text-violet-600",
   },
@@ -3095,6 +3146,7 @@ export const REGISTROS_SUBTABS = [
     label: "Linha do tempo",
     sub: "Tudo que já aconteceu",
     Icon: History,
+    imagem: ARTE_GRADE.timeline,
     caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
     tinta: "text-sky-600",
   },
@@ -9887,12 +9939,14 @@ function formatApptDate(ymd: string): string {
  * sub-abas. Antes: Consultas, Pré-consulta, Perguntas, Checklist, Plano de
  * Parto, Teleconsulta (6 abas). Agora: 1.
  */
+
 export const CONSULTAS_SUBTABS = [
   {
     key: "agenda",
     label: "Agenda",
     sub: "Marcar e remarcar",
     Icon: CalendarCheck,
+    imagem: ARTE_GRADE.agenda,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
@@ -9901,6 +9955,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Preparar",
     sub: "O que levar e contar",
     Icon: ClipboardList,
+    imagem: ARTE_GRADE.preparo,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
@@ -9909,6 +9964,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Perguntas",
     sub: "Anote para a consulta",
     Icon: MessageCircleQuestion,
+    imagem: ARTE_GRADE.perguntas,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -9917,6 +9973,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Checklist",
     sub: "A mala da maternidade",
     Icon: ListChecks,
+    imagem: ARTE_GRADE.checklist,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
@@ -9925,6 +9982,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Plano de parto",
     sub: "Suas preferências",
     Icon: Scroll,
+    imagem: ARTE_GRADE.parto,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
   },
@@ -9933,6 +9991,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Teleconsulta",
     sub: "Consulta por vídeo",
     Icon: Video,
+    imagem: ARTE_GRADE.tele,
     caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
     tinta: "text-indigo-600",
   },
@@ -9941,6 +10000,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Particular",
     sub: "Particular e pagamento",
     Icon: Wallet,
+    imagem: ARTE_GRADE.particular,
     caixa: "border-teal-200/70 from-teal-50 to-emerald-50/60",
     tinta: "text-teal-600",
   },

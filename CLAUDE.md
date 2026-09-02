@@ -12511,3 +12511,31 @@ tocados** — o pedido é sobre o APP.
 
 **Bancadas:** `/preview-bebe-tab` · `/preview-conquistas?tudo=1` ·
 `/preview-amigas?dupla=ativa&dias=12` · `/preview-assinatura?estado=loja`.
+
+### As três grades que faltavam: Consultas, Bem-estar e Registros (set/2026)
+
+Depois da Saúde e do Bebê, eram as últimas grades com o traço de 40px num
+círculo branco dentro de ladrilhos de 300px — "o lugar onde a ilustração ainda
+não chegou", nas palavras deste arquivo. **16 ladrilhos**, 14 peças novas a 1k
+(17,5 cr; 132,75 acumulados dos 300) e duas REUSADAS da Saúde.
+
+- ⚠️ **Chutes e Contrações reusam a arte da Saúde de propósito.** O hub da
+  Saúde abre `Registros` já na sub-tela certa — é o MESMO destino por duas
+  portas, e duas artes ensinariam que são coisas diferentes.
+- ⚠️ **`const` DE MÓDULO NÃO É IÇADO, e isso derrubou o app inteiro por dois
+  minutos no servidor de dev.** `ARTE_GRADE` foi declarado ao lado de
+  `CONSULTAS_SUBTABS` (linha 9919) e `BEMESTAR_SUBTABS` o lê na 2984: o
+  módulo estourava com "antes de inicializar" na AVALIAÇÃO, e **toda página do
+  app respondia 500** — `/preview-grades` voltou "This page didn't load".
+  `tsc` não acusa (o símbolo existe), lint não acusa, e o portão estava
+  rodando verde em cima disso. Quem pegou foi a FOTO da bancada. A regra:
+  **um mapa de arte mora antes da PRIMEIRA constante que o lê**, e num arquivo
+  de vinte mil linhas isso se confere com `grep -n`, nunca de memória.
+- **Quatro peças falharam no backend e voltaram com outras palavras** —
+  "calendar page with check" → "desk calendar block with a tick"; "scroll" →
+  "rolled parchment tied with a ribbon"; "wallet with card" → "coin purse
+  with clasp"; "heart wrapped in blanket" → "heart resting in a cushion
+  nest". Mesma lição da leva anterior: falha repetida é o texto.
+
+**Bancada:** `/preview-grades` (fotografe o ELEMENTO de cada grade; a página
+rola por dentro de um `fixed inset-0`).
