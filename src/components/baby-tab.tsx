@@ -191,7 +191,7 @@ function HomeMoodCheckin({ name }: { name: string }) {
             key={m.label}
             disabled={saving}
             onClick={() => pick(m)}
-            className="press flex min-w-[64px] flex-col items-center gap-1 rounded-2xl border border-border px-3 py-2 transition-colors hover:border-primary disabled:opacity-50"
+            className="press pill-3d flex min-w-[64px] flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-colors disabled:opacity-50"
           >
             <span className="text-2xl">{m.emoji}</span>
             <span className="text-[11px] text-muted-foreground">{m.label}</span>

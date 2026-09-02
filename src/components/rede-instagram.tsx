@@ -2155,7 +2155,7 @@ export function TelaPrincipal({
               <button
                 type="button"
                 onClick={aoTentarDeNovo}
-                className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[14px] font-semibold"
+                className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[14px] font-semibold"
               >
                 Tentar de novo
               </button>
@@ -2396,7 +2396,7 @@ function ConvidarPeloWhatsApp({ codigo }: { codigo: string | null }) {
               toast.error("Não deu para copiar. Tente pelo WhatsApp.");
             }
           }}
-          className="press min-h-[44px] rounded-full border border-border px-4 text-[14px] font-medium"
+          className="press min-h-[44px] rounded-full pill-3d px-4 text-[14px] font-medium"
         >
           Copiar o convite
         </button>
@@ -2473,7 +2473,7 @@ function FileiraDePessoas({
           role="switch"
           aria-checked={mesmaFase}
           onClick={() => aoTrocarFase(!mesmaFase)}
-          className="press mb-3 flex w-full items-center gap-2.5 rounded-full border border-border px-3 py-2 text-left"
+          className="press mb-3 flex w-full items-center gap-2.5 rounded-full pill-3d px-3 py-2 text-left"
         >
           <span
             aria-hidden
@@ -2535,7 +2535,7 @@ function FileiraDePessoas({
                    nome de duas linhas empurrava o botão para baixo do da
                    vizinha — uma fileira de botões em degrau. */
                 className={`press mt-auto w-full rounded-lg py-1.5 text-[13px] font-semibold ${
-                  jaSegue ? "border border-border" : "bg-primary text-primary-foreground"
+                  jaSegue ? "pill-3d" : "btn-3d bg-primary text-primary-foreground"
                 }`}
               >
                 {jaSegue ? "Seguindo" : "Seguir"}
@@ -2597,7 +2597,7 @@ export function CaixinhaNoPerfil({
       <button
         type="button"
         onClick={() => !inerte && setAberta(true)}
-        className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+        className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[14px] font-medium"
       >
         💬 Mandar uma pergunta
       </button>
@@ -3448,7 +3448,7 @@ export function TelaDePerfil({
                   <button
                     type="button"
                     onClick={() => setConfirmandoCodigo(true)}
-                    className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[13px] font-semibold"
+                    className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[13px] font-semibold"
                   >
                     Usar este código
                   </button>
@@ -3507,8 +3507,8 @@ export function TelaDePerfil({
             disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
             className={`press flex-1 rounded-lg py-1.5 text-[14px] font-semibold ${
               perfil.meuVinculo || perfil.souEu
-                ? "border border-border"
-                : "bg-primary text-primary-foreground"
+                ? "pill-3d"
+                : "btn-3d bg-primary text-primary-foreground"
             }`}
           >
             {rotuloDoBotao}
@@ -3527,7 +3527,7 @@ export function TelaDePerfil({
             <button
               type="button"
               onClick={() => aoMandarMensagem(perfil.id)}
-              className="press flex-1 rounded-lg border border-border py-1.5 text-[14px] font-semibold"
+              className="press flex-1 rounded-lg pill-3d py-1.5 text-[14px] font-semibold"
             >
               Mensagem
             </button>
@@ -3556,7 +3556,7 @@ export function TelaDePerfil({
           <button
             type="button"
             onClick={aoAbrirEspelho}
-            className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+            className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[14px] font-medium"
           >
             👁 Ver como os outros veem
           </button>
@@ -7151,7 +7151,7 @@ export function RedeNoApp({
             <button
               type="button"
               onClick={onAbrirSecoes}
-              className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
+              className="press mt-4 rounded-full pill-3d px-5 py-2 text-xs font-semibold text-foreground"
             >
               Ver Amigas, Álbum e Acompanhante
             </button>
@@ -7430,7 +7430,7 @@ export function RedeNoApp({
             <button
               type="button"
               onClick={() => void abrirExplorar()}
-              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
             >
               Tentar de novo
             </button>
@@ -7454,7 +7454,7 @@ export function RedeNoApp({
                     key={t.tag}
                     type="button"
                     onClick={() => acoes.abrirTag(t.tag)}
-                    className="press min-h-[44px] shrink-0 rounded-full border border-border px-3 text-[13px]"
+                    className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-[13px]"
                   >
                     #{t.tag}{" "}
                     {/* ⚠️ O número é o de PUBLICAÇÕES, e ele bate com o que a
@@ -7529,7 +7529,7 @@ export function RedeNoApp({
             <button
               type="button"
               onClick={() => void abrirFavoritas()}
-              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
             >
               Tentar de novo
             </button>
@@ -8270,7 +8270,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
                 disabled={ocupado}
                 onClick={() => void mudar(f.id, { sexo: s })}
                 className={`press rounded-full px-3 py-1 text-[12px] ${
-                  f.sexo === s ? "bg-primary text-primary-foreground" : "bg-muted"
+                  f.sexo === s ? "btn-3d bg-primary text-primary-foreground" : "bg-muted"
                 }`}
               >
                 {s === "f" ? "Menina" : s === "m" ? "Menino" : "Não sei"}
@@ -8317,7 +8317,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
             type="button"
             disabled={ocupado}
             onClick={() => void acrescentar(true)}
-            className="press rounded-full border border-border px-3 py-1.5 text-[13px]"
+            className="press rounded-full pill-3d px-3 py-1.5 text-[13px]"
           >
             + Estou esperando
           </button>
@@ -8325,7 +8325,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
             type="button"
             disabled={ocupado}
             onClick={() => void acrescentar(false)}
-            className="press rounded-full border border-border px-3 py-1.5 text-[13px]"
+            className="press rounded-full pill-3d px-3 py-1.5 text-[13px]"
           >
             + Já nasceu
           </button>
@@ -8944,7 +8944,7 @@ export function ArquivoDeStories({
             <button
               type="button"
               onClick={aoTentarDeNovo}
-              className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
             >
               Tentar de novo
             </button>
@@ -9942,7 +9942,7 @@ export function VisorDeStory({
                   setDenunciando(false);
                   setPausado(false);
                 }}
-                className="press min-h-[44px] rounded-full border border-border px-3 text-[12px]"
+                className="press min-h-[44px] rounded-full pill-3d px-3 text-[12px]"
               >
                 {m.rotulo}
               </button>
@@ -10104,7 +10104,7 @@ export function TelaDeAtividade({
                     <button
                       type="button"
                       onClick={() => aoResponder(a.quemId, false)}
-                      className="press rounded-lg border border-border px-2.5 py-1.5 text-[12px]"
+                      className="press rounded-lg pill-3d px-2.5 py-1.5 text-[12px]"
                     >
                       Agora não
                     </button>
@@ -11848,7 +11848,7 @@ export function TelaDosArquivados({
               <button
                 type="button"
                 onClick={() => aoDesarquivar(p)}
-                className="press min-h-[44px] shrink-0 rounded-full border border-border px-3 text-[12px] font-medium"
+                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-[12px] font-medium"
               >
                 Trazer de volta
               </button>
@@ -12036,7 +12036,7 @@ export function TelaDeBusca({
                     key={r}
                     type="button"
                     onClick={() => setTermo(r)}
-                    className="press min-h-[44px] rounded-full border border-border px-3 text-[13px]"
+                    className="press min-h-[44px] rounded-full pill-3d px-3 text-[13px]"
                   >
                     {r}
                   </button>
@@ -12896,8 +12896,8 @@ export function TelaDaCaixinha({
                           onClick={() => setVisibilidade(v.chave)}
                           className={`press rounded-full px-2.5 py-1 text-[12px] ${
                             visibilidade === v.chave
-                              ? "bg-primary text-primary-foreground"
-                              : "border border-border"
+                              ? "btn-3d bg-primary text-primary-foreground"
+                              : "pill-3d"
                           }`}
                         >
                           {v.rotulo}
@@ -13237,7 +13237,7 @@ export function GradeSimples({
           <button
             type="button"
             onClick={aoTentarDeNovo}
-            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
           >
             Tentar de novo
           </button>
@@ -13312,7 +13312,7 @@ export function MeusDesfechos({
           <button
             type="button"
             onClick={aoTentarDeNovo}
-            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
           >
             Tentar de novo
           </button>
@@ -13392,7 +13392,7 @@ export function ListaDeBloqueados({
           <button
             type="button"
             onClick={aoTentarDeNovo}
-            className="press mt-3 min-h-[44px] rounded-full border border-border px-5 text-[13px] font-semibold"
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
           >
             Tentar de novo
           </button>
@@ -13414,7 +13414,7 @@ export function ListaDeBloqueados({
               <button
                 type="button"
                 onClick={() => aoDesbloquear(p.id)}
-                className="press min-h-[44px] shrink-0 rounded-full border border-border px-4 text-[13px] font-semibold"
+                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-4 text-[13px] font-semibold"
               >
                 {rotuloDaAcao}
               </button>

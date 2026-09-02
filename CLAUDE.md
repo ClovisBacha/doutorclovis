@@ -12131,6 +12131,32 @@ família, então a categoria segue legível.
   é apagado). O antes está descrito pelo diff — `border border-emerald-300`
   sobre fundo nenhum — e não foi fabricado.
 
+**Segunda leva do material (mesma noite):** a Comunidade e a Bebê.
+
+- **Comunidade: 25 botões.** Duas famílias do mesmo tell: a pílula neutra
+  `press … rounded-full border border-border` (17 — "Tentar de novo",
+  "Seguir de volta", os pedidos) e a retangular `press … rounded-lg border
+border-border` (5 — "Editar perfil", "Usar este código", "Mandar uma
+  pergunta"), que é a convenção do próprio Instagram para ação secundária. As
+  duas viraram `pill-3d`, mantendo cada uma o seu raio.
+  ⚠️ **TRÊS ESTAVAM DENTRO DE TERNÁRIO** e o regex não pegou: `jaSegue ?
+"border border-border" : "bg-primary text-primary-foreground"`. O literal
+  fica numa string ANINHADA, e `[^"]*` para na aspa de dentro. Esses ramos
+  foram patchados à parte — e o ramo primário ("Seguir") ganhou `btn-3d`, senão
+  o toggle teria volume só desligado.
+- **`CompartilharMomento`**, o botão de compartilhar de oito telas: a variante
+  compacta (contorno) → `pill-3d`; a cheia (`bg-primary`) → `btn-3d`.
+- **Os cinco chips de humor da Bebê** (`rounded-2xl border border-border`) —
+  a mesma família, vista na foto da aba.
+- ⚠️ **O `btn-3d` CHEIO passa POR POUCO onde o brilho clareia:** medido no
+  pixel, o preço `🌱 22` (`bg-emerald-700`, 11px) dá **4,61:1** na faixa de
+  cima, contra 5,36 sem o brilho. Passa, e é o limite prático do brilho de
+  topo (0,16). Se um dia um botão cheio reprovar, o ajuste é ESSE número, não
+  a cor.
+- ⚠️ **O cabeçalho "Obstétrica" que aparece nas fotos das bancadas é a moldura
+  do SITE**, que `/minha-conta` esconde — já custou um falso diagnóstico uma
+  vez; fica repetido aqui porque toda foto de bancada o mostra.
+
 **Próximas telas, nesta ordem:** Saúde (as sub-telas de registrar) · Bebê ·
 Comunidade · chat. Cada uma com foto antes de subir. E os **129 cartões
 idênticos** são a mesma pergunta em outra forma: o material do cartão é um

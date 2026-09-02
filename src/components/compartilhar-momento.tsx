@@ -131,8 +131,8 @@ export function CompartilharMomento({
         onClick={() => setAberta(true)}
         className={
           compacto
-            ? "press inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-border px-4 text-[13px] font-semibold"
-            : "press inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-[14px] font-semibold text-primary-foreground"
+            ? "press pill-3d inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+            : "press btn-3d inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-full bg-primary px-5 text-[14px] font-semibold text-primary-foreground"
         }
       >
         <IconeCompartilhar />
