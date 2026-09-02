@@ -94,13 +94,20 @@ export function GradeHub({
               bloco pequeno lê como o lugar onde a ilustração ainda não chegou.
               ⚠️ E o quadrado NÃO muda: ali o ícone de 40px está na proporção
               certa, e crescer os dois juntos quebraria a grade de seis. */}
+          {/* ⚠️ A ARTE NO QUADRADO É 64px, e não os 44 do traço. O círculo
+              branco do Lucide mede 40px porque um traço de 1,7px preenche a
+              caixa; a peça 3D tem volume, sombra e perspectiva, e a 44px num
+              quadrado de 175px ela saía como um selo perdido no canto —
+              medido na foto da grade do Bebê. 64px é a proporção que o
+              ícone-no-círculo já tinha (40 de 175) aplicada a uma peça que
+              não preenche a própria caixa. */}
           {imagem ? (
             <img
               src={imagem}
               alt=""
               draggable={false}
               className={`shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)] ${
-                preencherTela ? "h-24 w-24" : "h-11 w-11"
+                preencherTela ? "h-24 w-24" : "h-16 w-16"
               }`}
             />
           ) : (

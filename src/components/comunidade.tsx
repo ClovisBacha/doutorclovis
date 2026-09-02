@@ -18,6 +18,12 @@
  * Contrações: duas implementações da mesma coisa divergem no primeiro conserto.
  */
 import { useEffect, useState } from "react";
+import arte_cha from "@/assets/comunidade/cha.webp";
+import arte_feed from "@/assets/comunidade/feed.webp";
+import arte_amigas from "@/assets/comunidade/amigas.webp";
+import arte_acompanhante from "@/assets/comunidade/acompanhante.webp";
+import arte_album from "@/assets/comunidade/album.webp";
+import arte_nome from "@/assets/comunidade/nome.webp";
 import { portasDaComunidade } from "@/lib/comunidade";
 import {
   emblemaDaPorta,
@@ -26,6 +32,19 @@ import {
   type ChaveDaPorta,
   type EstadoDasPortas,
 } from "@/lib/estado-das-portas";
+
+/**
+ * A peça 3D de cada porta, no lugar do emoji. Por CHAVE da porta, com o emoji
+ * como recuo — uma porta nova sem arte continua desenhando o dela.
+ */
+const ARTE_DA_PORTA: Record<string, string> = {
+  cha: arte_cha,
+  feed: arte_feed,
+  amigas: arte_amigas,
+  acompanhante: arte_acompanhante,
+  album: arte_album,
+  nome: arte_nome,
+};
 
 export function ComunidadeTab({
   careMode = false,
@@ -99,7 +118,16 @@ export function ComunidadeTab({
               onClick={() => onAbrir(p.destino, p.subDestino)}
               className="press relative flex flex-col items-start gap-1 rounded-2xl border border-border bg-card p-4 text-left shadow-[var(--shadow-card)]"
             >
-              <span className="text-2xl leading-none">{p.emoji}</span>
+              {ARTE_DA_PORTA[p.key] ? (
+                <img
+                  src={ARTE_DA_PORTA[p.key]}
+                  alt=""
+                  draggable={false}
+                  className="h-12 w-12 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)]"
+                />
+              ) : (
+                <span className="text-2xl leading-none">{p.emoji}</span>
+              )}
               {/* ⚠️ O emblema fica no CANTO, fora do fluxo: no fluxo ele
                   empurraria o título para a segunda linha em "Acompanhante",
                   que é o rótulo mais longo. */}

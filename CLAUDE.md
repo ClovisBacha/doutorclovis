@@ -12406,3 +12406,73 @@ processo em toda execução. A leitura da pasta virou módulo
 ⚠️ **E o mutante não contou na primeira tentativa**: a âncora não casou (o
 prettier reformata o JSON gerado em uma coluna por linha), e o `assert` acusou
 em vez de deixar passar um "✅ vermelho" sobre uma edição que nunca aconteceu.
+
+## A leva de artes 3D: barra, hubs e a vitrine do Cantinho (set/2026)
+
+Autorização do dono: _"pode fazer tudo que quiser que você acredita que irá
+deixar esse app ainda melhor, te dou um limite agora de 300 créditos"_. Esta
+leva gastou **77,75** (115,25 acumulados dos 300): 3 ícones da barra a 2k e
+41 peças a 1k, todas na fórmula aprovada dos cinco da Saúde — cor NATURAL do
+objeto, luz ambiente uniforme, sem paleta cravada, lidas em 1024 nativos.
+
+### Onde cada família mora
+
+| família                    | peças | onde entra                                       |
+| -------------------------- | ----- | ------------------------------------------------ |
+| barra de baixo             | 3     | `NAV_ITEMS` (Saúde · Jogo · Comunidade)          |
+| portas da Comunidade       | 6     | `ARTE_DA_PORTA` em `comunidade.tsx`              |
+| quadrados do Bebê          | 6     | `imagem:` em `BEBE_SUBTABS` (álbum reusa a peça) |
+| itens grátis do Cantinho   | 17    | `ARTE_DO_ITEM` (`arte-do-cantinho.tsx`)          |
+| conjuntos (domos de vidro) | 13    | `ARTE_DO_CONJUNTO`                               |
+
+- ⚠️ **O BEBÊ DO CENTRO E O SOS NÃO MUDARAM, de propósito.** O centro é a
+  Bolha — personagem do ilustrador, e uma gerada não casaria com ela. O SOS
+  ficou porque o dono pediu que ele não mudasse; o ícone da barra é parte dele.
+- ⚠️ **SÓ A VITRINE do Cantinho recebe arte.** A TRILHA continua com emoji
+  (`DecorSprite`, a bandeja do Arrumar, os layouts gravados): trocar o sprite
+  mexeria no tamanho, na animação e nos cantinhos que as pacientes já montaram.
+  Aqui é onde ela DECIDE comprar, e é onde o objeto precisa ter volume.
+- **Mapa por ID, emoji como recuo.** São 94 itens e 17 têm arte; os outros
+  seguem com o emoji, e item novo entra no mapa só quando a arte dele existir.
+  Os mapas moram em `components/` porque importam `.webp` — em `lib/` um teste
+  do `bun` morreria no primeiro `import`.
+- **Os conjuntos são DOMOS de vidro**, e os itens são o objeto solto: é o que
+  separa "uma cena que se completa" de "uma peça" sem uma palavra.
+
+### ⚠️ Três coisas que só a FOTO pegou
+
+1. **A nuvem foi COMIDA pelo recorte** — branco sobre branco, e a inundação
+   por semelhança de cor atravessou. Conferir os recortes sobre ROSA, nunca
+   sobre branco: sobre branco uma peça comida e uma inteira são idênticas. Ela
+   foi refeita "em vidro azul-claro, nunca branca" (1,25 cr).
+2. **A câmera lia como pílula** com um olho. Refeita "vista de frente, com
+   lente, visor e flash, claramente uma câmera". Descrever o que torna o
+   objeto reconhecível vale mais que descrever o material.
+3. **A ARTE É MAIOR QUE A CAIXA DO TRAÇO, nos dois lugares em que ela entrou
+   numa caixa desenhada para o Lucide.** Um traço de 1,7px preenche a caixa;
+   uma peça 3D tem volume, sombra no chão e perspectiva. Na barra, a 28px ela
+   saía com metade do tamanho visual do aro do SOS ao lado — virou
+   `transform: scale(1.5)` (não entra no layout, o alvo de 44px fica igual, e o
+   `scale-110` do ativo é a propriedade `scale`, que compõe sem brigar). No
+   quadrado da grade, a 44px num ladrilho de 175px ela era um selo perdido no
+   canto — virou 64px, a mesma proporção que o ícone-no-círculo já tinha.
+
+### ⚠️ O que o gerador recusou, e como se contorna
+
+Sete pedidos falharam no backend (não no limite de taxa) e três deles falharam
+DUAS vezes com o mesmo texto: "gift box", "two hands clasped" e "birdhouse with
+bird". Reescritos com outras palavras ("wrapped present", "two hearts leaning",
+"bluebird on a fence") passaram de primeira. **Falha repetida do mesmo prompt
+não é azar — é o texto.** E o limite de taxa aparece a partir da terceira dúzia
+em sequência: espere o lote anterior terminar antes de reenviar.
+
+⚠️ **Não há `sharp` nem `PIL` neste contêiner.** Folha de contato e
+redimensionamento passam pelo Chromium do Playwright (canvas → `toDataURL`),
+que é o mesmo caminho de `do-drive.mjs`. Um `require("sharp")` falha em
+qualquer diretório.
+
+**Bancadas:** `/preview-home?w=20` (a barra, de dia e de noite — a noite pelo
+`page.clock`) · `/preview-comunidade?vivo=1` · `/preview-cantinho` ·
+`/preview-grades` (⚠️ é um `fixed inset-0` que rola POR DENTRO: `scrollTo` na
+janela não move nada e a captura de página inteira mostra o site por baixo —
+fotografe o ELEMENTO da grade).

@@ -263,6 +263,12 @@ import {
   lerPassoDoTutorial,
 } from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
+import arteBebe_semana from "@/assets/bebe/semana.webp";
+import arteBebe_contagem from "@/assets/bebe/contagem.webp";
+import arteBebe_album from "@/assets/bebe/album.webp";
+import arteBebe_nome from "@/assets/bebe/nome.webp";
+import arteBebe_carta from "@/assets/bebe/carta.webp";
+import arteBebe_quartinho from "@/assets/bebe/quartinho.webp";
 import {
   contarNaoLidas,
   lerLidas,
@@ -3164,12 +3170,23 @@ function RegistrosHub({
  * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
  * Antes eram 6 abas separadas; agora é 1 (menos poluição visual).
  */
+/** A peça 3D de cada quadrado da aba Bebê — `GradeHub` a desenha no lugar do Lucide. */
+const ARTE_BEBE = {
+  semana: arteBebe_semana,
+  contagem: arteBebe_contagem,
+  album: arteBebe_album,
+  nome: arteBebe_nome,
+  carta: arteBebe_carta,
+  quartinho: arteBebe_quartinho,
+} as const;
+
 export const BEBE_SUBTABS = [
   {
     key: "semana",
     label: "Semana",
     sub: "O que mudou agora",
     Icon: Baby,
+    imagem: ARTE_BEBE.semana,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
   },
@@ -3178,6 +3195,7 @@ export const BEBE_SUBTABS = [
     label: "Contagem",
     sub: "Quanto falta",
     Icon: Timer,
+    imagem: ARTE_BEBE.contagem,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
@@ -3186,6 +3204,7 @@ export const BEBE_SUBTABS = [
     label: "Álbum",
     sub: "As fotos da barriga",
     Icon: Images,
+    imagem: ARTE_BEBE.album,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
@@ -3194,6 +3213,7 @@ export const BEBE_SUBTABS = [
     label: "Nomes",
     sub: "Escolher e votar",
     Icon: Sparkles,
+    imagem: ARTE_BEBE.nome,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -3202,6 +3222,7 @@ export const BEBE_SUBTABS = [
     label: "Carta",
     sub: "Escrever para o bebê",
     Icon: Mail,
+    imagem: ARTE_BEBE.carta,
     caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
     tinta: "text-rose-600",
   },
@@ -3210,6 +3231,7 @@ export const BEBE_SUBTABS = [
     label: "Enxoval",
     sub: "A lista do quartinho",
     Icon: ShoppingBag,
+    imagem: ARTE_BEBE.quartinho,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },

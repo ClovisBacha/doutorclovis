@@ -1,3 +1,4 @@
+import { ARTE_DO_CONJUNTO, ARTE_DO_ITEM } from "@/components/arte-do-cantinho";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
@@ -871,9 +872,18 @@ export function CantinhoTab({
               }`}
             >
               <div className="flex items-center gap-1.5">
-                <span className="text-lg leading-none" aria-hidden>
-                  {p.conjunto.emoji}
-                </span>
+                {ARTE_DO_CONJUNTO[p.conjunto.id] ? (
+                  <img
+                    src={ARTE_DO_CONJUNTO[p.conjunto.id]}
+                    alt=""
+                    draggable={false}
+                    className="h-9 w-9 shrink-0 object-contain"
+                  />
+                ) : (
+                  <span className="text-lg leading-none" aria-hidden>
+                    {p.conjunto.emoji}
+                  </span>
+                )}
                 <span className="text-[12.5px] font-extrabold leading-tight">
                   {p.conjunto.nome}
                 </span>
@@ -971,13 +981,24 @@ export function CantinhoTab({
                     {faltamTrof > 0 ? "🔒" : "✓"} {trofeusExigidos(i.id)} 🏆
                   </span>
                 )}
-                <span
-                  className={`text-4xl ${
-                    locked || trophyLocked || faltamTrof > 0 ? "opacity-40 grayscale" : ""
-                  }`}
-                >
-                  {i.emoji}
-                </span>
+                {ARTE_DO_ITEM[i.id] ? (
+                  <img
+                    src={ARTE_DO_ITEM[i.id]}
+                    alt=""
+                    draggable={false}
+                    className={`h-14 w-14 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)] ${
+                      locked || trophyLocked || faltamTrof > 0 ? "opacity-40 grayscale" : ""
+                    }`}
+                  />
+                ) : (
+                  <span
+                    className={`text-4xl ${
+                      locked || trophyLocked || faltamTrof > 0 ? "opacity-40 grayscale" : ""
+                    }`}
+                  >
+                    {i.emoji}
+                  </span>
+                )}
                 <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
                 {has ? (
                   i.type === "trilha" ? (
