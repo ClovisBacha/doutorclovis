@@ -141,7 +141,7 @@ function InstagramShareCard() {
         <button
           onClick={save}
           disabled={saving || input.trim() === (state.handle ?? "")}
-          className="press shrink-0 rounded-full bg-fuchsia-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
+          className="press btn-3d shrink-0 rounded-full bg-fuchsia-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
         >
           Salvar
         </button>
@@ -152,7 +152,7 @@ function InstagramShareCard() {
           href="https://instagram.com"
           target="_blank"
           rel="noopener noreferrer"
-          className="press mt-3 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
+          className="press btn-3d mt-3 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
         >
           Abrir o Instagram e postar
         </a>
@@ -236,7 +236,7 @@ function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
                 href={state.appleUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
+                className="press pill-3d flex-1 rounded-full py-2 text-center text-xs font-bold text-amber-700"
               >
                 App Store
               </a>
@@ -246,7 +246,7 @@ function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
                 href={state.playUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
+                className="press pill-3d flex-1 rounded-full py-2 text-center text-xs font-bold text-amber-700"
               >
                 ▶ Play Store
               </a>
@@ -255,7 +255,7 @@ function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
           <button
             onClick={claim}
             disabled={claiming}
-            className="press mt-2 w-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
+            className="press btn-3d mt-2 w-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
           >
             Já avaliei — resgatar {state.reward} 🌱
           </button>
@@ -363,7 +363,7 @@ function TestimonialCard() {
           <button
             onClick={send}
             disabled={saving || body.trim().length < 10}
-            className="press mt-2 w-full rounded-full bg-violet-700 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
+            className="press btn-3d mt-2 w-full rounded-full bg-violet-700 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
           >
             {status ? "Reenviar para análise" : "Enviar depoimento"}
           </button>
@@ -457,7 +457,7 @@ function ReferralCard() {
         href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="press mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
+        className="press btn-3d mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
       >
         Convidar pelo WhatsApp
       </a>
@@ -985,8 +985,8 @@ export function CantinhoTab({
                       onClick={() => equipSkin(skinAtiva === i.id ? null : i.id)}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         skinAtiva === i.id
-                          ? "bg-emerald-700 text-white"
-                          : "border border-emerald-300 text-emerald-700"
+                          ? "btn-3d bg-emerald-700 text-white"
+                          : "pill-3d text-emerald-700"
                       }`}
                     >
                       {skinAtiva === i.id ? "Em uso ✓" : "Usar"}
@@ -997,8 +997,8 @@ export function CantinhoTab({
                       onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         sky === "v1"
-                          ? "bg-emerald-700 text-white"
-                          : "border border-emerald-300 text-emerald-700"
+                          ? "btn-3d bg-emerald-700 text-white"
+                          : "pill-3d text-emerald-700"
                       }`}
                     >
                       {sky === "v1" ? "Em uso ✓" : "Usar"}
@@ -1008,14 +1008,14 @@ export function CantinhoTab({
                       onClick={() => equipFundo(equipped === i.id ? null : i.id)}
                       className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
                         equipped === i.id
-                          ? "bg-emerald-700 text-white"
-                          : "border border-emerald-300 text-emerald-700"
+                          ? "btn-3d bg-emerald-700 text-white"
+                          : "pill-3d text-emerald-700"
                       }`}
                     >
                       {equipped === i.id ? "Em uso ✓" : "Usar"}
                     </button>
                   ) : (
-                    <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                    <span className="pill-3d mt-2 rounded-full px-3 py-1 text-[11px] font-bold text-emerald-700">
                       {isTrophy ? "Conquistado! 👑" : "No cantinho ✓"}
                     </span>
                   )
@@ -1052,7 +1052,7 @@ export function CantinhoTab({
                      metade da loja era parede muda. Agora abre a oferta. */
                   <button
                     onClick={() => setOferta(i.name)}
-                    className="press mt-2 flex items-center gap-1 rounded-full bg-violet-700 px-3 py-1 text-[11px] font-bold text-white"
+                    className="press btn-3d mt-2 flex items-center gap-1 rounded-full bg-violet-700 px-3 py-1 text-[11px] font-bold text-white"
                   >
                     💎 Ver o Premium
                   </button>
@@ -1061,7 +1061,7 @@ export function CantinhoTab({
                     onClick={() => buy(i.id, i.price)}
                     disabled={cant || buying === i.id}
                     className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
-                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-700 text-white"
+                      cant ? "bg-slate-100 text-slate-400" : "btn-3d bg-emerald-700 text-white"
                     }`}
                   >
                     🌱 {i.price}

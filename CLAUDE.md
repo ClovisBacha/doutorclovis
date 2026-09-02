@@ -12089,6 +12089,54 @@ quebrado.
 `/preview-saude?w=20&dados=1` · `/preview-bebe-tab?consulta=1` ·
 `/preview-saude?w=38` (a tulipa, em "Saúde da mulher").
 
+### A quinta frente: o material 3D dos botões — começou pelo Cantinho
+
+Direção do dono: _"sem cara de que foi usado o Claude Code… cara mais 3D de
+aplicativo tecnológico… alguns botões, alguns elementos"_. Antes de opinar,
+medi o app da paciente:
+
+| tell de desenho gerado                                     | quantos |
+| ---------------------------------------------------------- | ------- |
+| **pílula com CONTORNO** (`rounded-full border`, sem fundo) | **176** |
+| **cartão idêntico** (`rounded-3xl` + borda + `bg-card`)    | **129** |
+| rótulo em CAIXA ALTA espaçado ("eyebrow")                  | 61      |
+| botão primário `rounded-full` chapado                      | 133     |
+
+A pílula de contorno é o tell número um — e são 176 escritas à mão em
+Tailwind. Não há alavanca central: `<Button>` do shadcn tem 4 usos, e `.press`
+(542 botões) é só a animação de toque e **diz por escrito que não carrega
+sombra** — "sombras pertencem a cada superfície".
+
+**`.btn-3d` e `.pill-3d`** (`styles.css`, ao lado do `.press`): brilho suave no
+topo, sombra macia (`--shadow-card`), gradiente vertical quase imperceptível —
+o mesmo vocabulário dos ícones 3D aprovados. ⚠️ **Compõem com qualquer
+`bg-*`/`text-*`**: o material não escolhe cor, dá corpo à cor que o botão já
+tem. `.pill-3d` é a pílula com SUPERFÍCIE que substitui a de contorno: fundo
+quase branco e quente, borda que é luz e não linha; o texto continua na cor da
+família, então a categoria segue legível.
+
+- ⚠️ **Opt-in, botão a botão, tela a tela — NUNCA no `.press`.** O `.press` está
+  no painel do médico também, e o comentário dele é uma decisão. Pôr material
+  ali seria desfazê-la por atacado.
+- **Primeira tela: o Cantinho**, 13 botões — os três toggles "Usar / Em uso ✓"
+  (skin, céu e fundo), "No cantinho ✓", o preço, "Ver o Premium", e os sete dos
+  cartões de ganhar Sementinhas. Medido no pixel: **5,32:1** em `pill-3d`
+  (texto emerald-700) — passa.
+- ⚠️ **Sete dos treze NÃO foram fotografados**: os cartões de indicação,
+  avaliação e depoimento exigem sessão real e a bancada não os fabrica (dois
+  cliques em "Ganhe mais Sementinhas", inclusive depois da hidratação, não os
+  abrem). Levam a MESMA classe já fotografada nos outros 88 elementos da tela, e
+  o `tsc` cobre a forma. Fica escrito como dívida de bancada, não como feito.
+- ⚠️ **A foto do "antes" se perdeu com o reinício do contêiner** (`/tmp/fotos`
+  é apagado). O antes está descrito pelo diff — `border border-emerald-300`
+  sobre fundo nenhum — e não foi fabricado.
+
+**Próximas telas, nesta ordem:** Saúde (as sub-telas de registrar) · Bebê ·
+Comunidade · chat. Cada uma com foto antes de subir. E os **129 cartões
+idênticos** são a mesma pergunta em outra forma: o material do cartão é um
+token só (`--shadow-card`), então a resposta é provavelmente uma classe, não
+129 edições.
+
 ## A aba Bebê ganhou bancada — e a fruta parou de ser sempre morango (set/2026)
 
 O dono disse que "as informações do bebê, quando você clica nele, não estão cem
