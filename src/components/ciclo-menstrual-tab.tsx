@@ -78,7 +78,7 @@ function CicloHero({ model }: { model: CycleModel }) {
     d ? d.toLocaleDateString("pt-BR", opts ?? { day: "2-digit", month: "short" }) : "—";
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="rounded-3xl card-material p-6">
       <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8">
         {/* Anel */}
         <div className="relative shrink-0" style={{ width: 220, height: 220 }}>
@@ -194,7 +194,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
   ];
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <div className="mb-3 flex items-center justify-between">
         <button
           onClick={() => setMonthOffset((m) => m - 1)}
@@ -367,7 +367,7 @@ export function CicloMenstrualTab() {
           + Registrar período
         </button>
       ) : (
-        <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+        <div className="rounded-3xl card-material p-6 space-y-4">
           <h3 className="font-semibold">Novo registro de período</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div>

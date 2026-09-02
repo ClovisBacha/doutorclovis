@@ -2060,7 +2060,7 @@ export function AppHomeScreen({
           DOIS emojis de sol (um de cada lado do nome) e a dica ainda abria com
           "Céu aberto —". */}
       {gest && baby && weather && (
-        <div className="flex items-start gap-3 rounded-3xl border border-border bg-card px-4 py-3 shadow-[var(--shadow-card)]">
+        <div className="flex items-start gap-3 rounded-3xl card-material px-4 py-3">
           <span className="mt-0.5 text-xl leading-none">{weather.emoji}</span>
           <div className="min-w-0">
             <p className="text-[14px] font-extrabold text-foreground">
@@ -2110,7 +2110,7 @@ export function AppHomeScreen({
           cinza. Este cartão passa a usar o mesmo material do cartão do
           médico, que é o vizinho dele. */}
       {gest && baby && (
-        <div className="mb-3 rounded-3xl border border-border bg-card px-4 py-3.5 shadow-[var(--shadow-card)]">
+        <div className="mb-3 rounded-3xl card-material px-4 py-3.5">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
             <div className="text-left">
               <p className="text-[10px] font-medium text-muted-foreground">Início</p>
@@ -2156,7 +2156,7 @@ export function AppHomeScreen({
       {/* ── Card do médico ──────────────────────────────────────────── */}
       <button
         onClick={() => onNavigate("Médico")}
-        className="shine group w-full rounded-3xl border border-border bg-card overflow-hidden text-left shadow-[var(--shadow-card)] transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
+        className="shine group w-full rounded-3xl card-material overflow-hidden text-left transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] active:scale-[0.98]"
       >
         <div className="flex items-center gap-4 p-4">
           {/* A FOTO é do dono da instalação e não temos foto dos outros médicos:

@@ -2288,7 +2288,7 @@ function CartaoDoEntaoEAgora({
     semanas >= 1 ? `${semanas} ${semanas === 1 ? "semana" : "semanas"}` : `${dias} dias`;
 
   return (
-    <div className="my-3 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+    <div className="my-3 flex items-center gap-3 rounded-2xl card-material p-3">
       <img
         src={foto}
         alt=""
@@ -2361,7 +2361,7 @@ function ConvidarPeloWhatsApp({ codigo }: { codigo: string | null }) {
   const texto = mensagemDeConvite(link);
 
   return (
-    <div className="my-6 rounded-3xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
+    <div className="my-6 rounded-3xl card-material p-5 text-center">
       <p className="text-[15px] font-semibold">Chame quem já está com você</p>
       <p className="mx-auto mt-1 max-w-[30ch] text-[13px] leading-snug text-muted-foreground">
         Sua irmã, a amiga do trabalho, a prima que está grávida junto. Quem entra pelo seu link já
@@ -7143,7 +7143,7 @@ export function RedeNoApp({
   if (careMode) {
     return (
       <div className="px-4 py-10">
-        <div className="rounded-3xl border border-border bg-card p-8 text-center">
+        <div className="rounded-3xl card-material p-8 text-center">
           <p className="text-sm leading-relaxed text-muted-foreground">
             O feed está em pausa enquanto o Modo Cuidado estiver ligado.
           </p>

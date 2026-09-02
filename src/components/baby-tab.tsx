@@ -72,10 +72,8 @@ function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullabl
   const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Sua semana em resumo
-      </p>
+    <div className="rounded-3xl card-material p-6">
+      <p className="font-serif text-[15px] font-semibold text-primary">Sua semana em resumo</p>
 
       {/* Humor da semana */}
       <div className="mt-4">
@@ -181,7 +179,7 @@ function HomeMoodCheckin({ name }: { name: string }) {
   }
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <p className="text-sm font-semibold text-foreground">
         Como você está se sentindo agora{name ? `, ${name}` : ""}?
       </p>
@@ -404,7 +402,7 @@ export function BabyTab({
           </button>
 
           <div className="text-center md:text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               {trimestre} · {babyLabel} esta semana
             </p>
             <h2 className="mt-2 font-serif leading-none">
@@ -516,8 +514,8 @@ export function BabyTab({
 
       {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
       <StaggerItem className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">
+        <div className="rounded-3xl card-material p-6">
+          <p className="font-serif text-[15px] font-semibold text-primary">
             DPP — Data provável do parto
           </p>
           <p className="mt-2 font-serif text-2xl">
@@ -540,7 +538,7 @@ export function BabyTab({
             <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
           ) : null}
         </div>
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="rounded-3xl card-material p-6">
           {/* ⚠️ O TÍTULO DIZIA "PRÓXIMA CONSULTA" E O TEXTO É UMA REGRA GERAL.
               O cartão prometia o compromisso DELA — que o app tem
               (`getMyAppointments`, o Calendário, os lembretes de 24h e 4h) — e
@@ -551,7 +549,7 @@ export function BabyTab({
               conserto de rótulo: fica como decisão, não como remendo. */}
           {proximaConsulta ? (
             <>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
+              <p className="font-serif text-[15px] font-semibold text-primary">Próxima consulta</p>
               <p className="mt-2 font-serif text-lg leading-tight text-foreground">
                 {proximaConsulta.dateLabel}
               </p>
@@ -559,7 +557,7 @@ export function BabyTab({
             </>
           ) : (
             <>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              <p className="font-serif text-[15px] font-semibold text-primary">
                 Ritmo das consultas
               </p>
               <p className="mt-2 text-sm text-muted-foreground">
@@ -573,9 +571,7 @@ export function BabyTab({
           )}
         </div>
         <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Exame desta semana
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Exame desta semana</p>
           <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
         </div>
       </StaggerItem>

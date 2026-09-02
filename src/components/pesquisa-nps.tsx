@@ -122,7 +122,7 @@ export function PesquisaNps({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-4">
+    <div className="rounded-2xl card-material p-4">
       <p className="text-sm font-medium text-foreground">{PERGUNTA}</p>
       {/* ⚠️ **DUAS FILEIRAS, e não uma.** Onze alvos de 44px somam 484px e a
           tela de um iPhone tem 393: numa linha só cada botão media 26px de

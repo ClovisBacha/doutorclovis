@@ -2255,9 +2255,7 @@ function MinhaContaPage() {
           {/* ── Desktop header ───────────────────────────────────── */}
           <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-                Minha conta
-              </p>
+              <p className="font-serif text-[15px] font-semibold text-primary">Minha conta</p>
               <h1 className="mt-2 font-serif text-3xl md:text-4xl">
                 {dayGreeting()}, {firstName} 💛
               </h1>
@@ -2909,7 +2907,7 @@ function WeekMilestoneModal({
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="relative flex max-w-sm flex-col items-center"
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+        <p className="font-serif text-[15px] font-semibold text-primary">
           {motherName ? `${motherName}, chegou um novo marco` : "Chegou um novo marco"}
         </p>
 
@@ -3410,7 +3408,7 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">
           {firstName
             ? `${firstName}, como você está se sentindo hoje?`
@@ -3481,7 +3479,7 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
           )
         )}
         {entries.map((e) => (
-          <div key={e.id} className="rounded-2xl border border-border bg-card p-5">
+          <div key={e.id} className="rounded-2xl card-material p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {e.mood} · {new Date(e.entry_date + "T00:00:00").toLocaleDateString("pt-BR")}
@@ -3678,16 +3676,16 @@ function KicksTab({
       {/* Stats */}
       {history.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões registradas</p>
+          <div className="rounded-2xl card-material p-5 text-center">
+            <p className="font-serif text-[15px] font-semibold text-primary">Sessões registradas</p>
             <p className="mt-2 font-serif text-3xl">{history.length}</p>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões completas</p>
+          <div className="rounded-2xl card-material p-5 text-center">
+            <p className="font-serif text-[15px] font-semibold text-primary">Sessões completas</p>
             <p className="mt-2 font-serif text-3xl">{completeSessions.length}</p>
           </div>
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+          <div className="rounded-2xl card-material p-5 text-center">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               Tempo médio (10 chutes)
             </p>
             <p className="mt-2 font-serif text-3xl">{avgMins != null ? `${avgMins} min` : "—"}</p>
@@ -3696,9 +3694,7 @@ function KicksTab({
       )}
 
       <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          Histórico
-        </p>
+        <p className="mb-3 font-serif text-[15px] font-semibold text-muted-foreground">Histórico</p>
         <div className="space-y-2">
           {history.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
@@ -3927,8 +3923,8 @@ function ChecklistTab({ gest }: { gest: Gest }) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Mala da maternidade</p>
+      <div className="rounded-3xl card-material p-6">
+        <p className="font-serif text-[15px] font-semibold text-primary">Mala da maternidade</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {done} de {total} itens prontos
         </p>
@@ -3944,7 +3940,7 @@ function ChecklistTab({ gest }: { gest: Gest }) {
       </div>
 
       {Object.entries(groups).map(([cat, list]) => (
-        <div key={cat} className="rounded-3xl border border-border bg-card p-6">
+        <div key={cat} className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">{groupLabels[cat] ?? cat}</p>
           <ul className="mt-3 space-y-1">
             {list.map((it) => (
@@ -4015,7 +4011,7 @@ function CareModeBanner({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="font-serif text-[15px] font-semibold text-slate-500">Modo Cuidado 🤍</p>
       <p className="mt-2 font-serif text-lg text-foreground">Estamos aqui com você.</p>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
         Pausamos as comemorações, contagens e a pontuação. Tudo o que você construiu está guardado —
@@ -4054,7 +4050,7 @@ function CareModeToggle({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-card p-6">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="font-serif text-[15px] font-semibold text-slate-500">Modo Cuidado 🤍</p>
       {careMode ? (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -4117,7 +4113,7 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
   const pendingCount = appts.filter((a) => a.status === "pending").length;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <div className="flex items-center justify-between gap-2">
         <p className="font-serif text-lg">Minha agenda</p>
         <a href="/agendamento" className="press text-xs font-bold text-primary">
@@ -4365,7 +4361,7 @@ function ProfileTab({
       </button>
 
       {/* Foto + nome da paciente */}
-      <div className="flex items-center gap-4 rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-center gap-4 rounded-3xl card-material p-5">
         <label className="press relative shrink-0 cursor-pointer">
           <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-secondary ring-2 ring-primary/20">
             {form.avatar_url ? (
@@ -4417,7 +4413,7 @@ function ProfileTab({
       <div className="glass-card glass-indigo rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-indigo-600">
+            <p className="font-serif text-[15px] font-semibold text-indigo-600">
               💫 Perfil completo
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -4438,7 +4434,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Suas informações</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
@@ -4490,7 +4486,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Idade gestacional</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Use a DUM (data da última menstruação) <strong>ou</strong> os dados informados pelo médico
@@ -4530,7 +4526,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dados clínicos & emergência</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
@@ -4642,7 +4638,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Pós-parto</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Preencha após o nascimento do bebê para ativar o Portal Pós-parto.
@@ -4660,7 +4656,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dados corporais</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Usados para calcular seu IMC pré-gestacional e a curva de ganho de peso recomendada (IOM
@@ -4683,7 +4679,7 @@ function ProfileTab({
       </div>
 
       {/* Feature 19: Second pregnancy */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Histórico gestacional</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Se esta é sua segunda gestação (ou mais), registre as complicações anteriores para
@@ -4773,7 +4769,7 @@ function ProfileTab({
       </div>
 
       {/* Feature 17: Push notifications */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dicas semanais</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Receba uma dica personalizada baseada na sua semana gestacional toda segunda-feira.
@@ -4869,7 +4865,7 @@ function ProfileTab({
       <ExportarDados ehMedico={ehMedico} />
       <ExcluirConta ehMedico={ehMedico} />
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Benefício Corporativo</p>
         {profile?.corporate_account_id ? (
           <div className="mt-3 flex items-center gap-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
@@ -5387,13 +5383,13 @@ function HealthTab({
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
         <div className="press glass-card glass-emerald rounded-3xl p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-emerald-600">⚖️ Último peso</p>
+          <p className="font-serif text-[15px] font-semibold text-emerald-600">⚖️ Último peso</p>
           <p className="mt-2 font-serif text-3xl">
             {last?.weight_kg ? `${last.weight_kg} kg` : "—"}
           </p>
         </div>
         <div className="press glass-card glass-teal rounded-3xl p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-teal-600">📈 Ganho total</p>
+          <p className="font-serif text-[15px] font-semibold text-teal-600">📈 Ganho total</p>
           <p className="mt-2 font-serif text-3xl">
             {totalGain != null ? `${Number(totalGain) > 0 ? "+" : ""}${totalGain} kg` : "—"}
           </p>
@@ -5402,7 +5398,7 @@ function HealthTab({
           className={`press rounded-3xl p-5 ${bpStatus?.color === "rose" ? "glass-card glass-rose" : bpStatus?.color === "amber" ? "glass-card glass-amber" : "glass-card glass-blue"}`}
         >
           <p
-            className={`text-xs uppercase tracking-[0.22em] ${bpStatus?.color === "rose" ? "text-rose-600" : bpStatus?.color === "amber" ? "text-amber-600" : "text-blue-600"}`}
+            className={`font-serif text-[15px] font-semibold ${bpStatus?.color === "rose" ? "text-rose-600" : bpStatus?.color === "amber" ? "text-amber-600" : "text-blue-600"}`}
           >
             🩺 Última PA
           </p>
@@ -5451,7 +5447,7 @@ function HealthTab({
               className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
             >
               <p
-                className={`text-xs uppercase tracking-[0.22em] ${gColor === "rose" ? "text-rose-600" : gColor === "amber" ? "text-amber-600" : "text-sky-600"}`}
+                className={`font-serif text-[15px] font-semibold ${gColor === "rose" ? "text-rose-600" : gColor === "amber" ? "text-amber-600" : "text-sky-600"}`}
               >
                 🍬 Glicemia
               </p>
@@ -5487,10 +5483,10 @@ function HealthTab({
 
       {/* IOM weight corridor chart — Feature #9 */}
       {showIomChart ? (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">
+              <p className="font-serif text-[15px] font-semibold text-primary">
                 Curva de ganho de peso (IOM 2009)
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -5599,8 +5595,8 @@ function HealthTab({
         const systPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.systolic!)}`).join(" ");
         const diasPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.diastolic!)}`).join(" ");
         return (
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+          <div className="rounded-3xl card-material p-6">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               Histórico de pressão arterial
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -5676,8 +5672,8 @@ function HealthTab({
         const sx = (i: number) => 10 + (i / (glHistory.length - 1)) * (W - 20);
         const pts = glHistory.map((l, i) => `${sx(i)},${sy(l.glucose_mg_dl!)}`).join(" ");
         return (
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+          <div className="rounded-3xl card-material p-6">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               Histórico de glicemia
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -5770,7 +5766,7 @@ function HealthTab({
           que ela já mandou seria outra. */}
 
       {/* New log form */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Novo registro</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3 md:grid-cols-4">
           <Field
@@ -5830,7 +5826,7 @@ function HealthTab({
           Então ela recolhe. Fechada não ocupa tela; aberta é o que a paciente
           procura quando quer arrumar alguma coisa — e o rótulo passa a dizer
           isso, em vez de fingir ser um resumo. */}
-      <details className="rounded-2xl border border-border bg-card">
+      <details className="rounded-2xl card-material">
         <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
           ✏️ Ver e corrigir meus registros
           {logs.length > 0 && (
@@ -6027,7 +6023,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
           </ul>
         </div>
       )}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Anote para a próxima consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Aquela dúvida que sempre esquece na hora — registre aqui.
@@ -6077,7 +6073,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <p className="mb-2 font-serif text-[15px] font-semibold text-muted-foreground">
           Pendentes ({pending.length})
         </p>
         <div className="space-y-2">
@@ -6085,10 +6081,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
             <p className="text-sm text-muted-foreground">Nenhuma pergunta pendente.</p>
           )}
           {pending.map((q) => (
-            <div
-              key={q.id}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4"
-            >
+            <div key={q.id} className="flex items-start gap-3 rounded-2xl card-material p-4">
               <input
                 type="checkbox"
                 checked={q.answered}
@@ -6109,12 +6102,12 @@ function QuestionsTab({ gest }: { gest: Gest }) {
 
       {answered.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          <p className="mb-2 font-serif text-[15px] font-semibold text-muted-foreground">
             Respondidas ({answered.length})
           </p>
           <div className="space-y-2">
             {answered.map((q) => (
-              <div key={q.id} className="rounded-2xl border border-border bg-card p-4">
+              <div key={q.id} className="rounded-2xl card-material p-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
@@ -6231,7 +6224,7 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Convidar acompanhante</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Traga o papai, a vovó ou alguém especial pra viver essa fase com você. Com o link, a
@@ -6271,7 +6264,7 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
         {invites.map((i) => {
           const url = `${window.location.origin}/acompanhar/${i.token}`;
           return (
-            <div key={i.id} className="rounded-2xl border border-border bg-card p-4">
+            <div key={i.id} className="rounded-2xl card-material p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{i.companion_name ?? "Acompanhante"}</p>
                 <button
@@ -6621,7 +6614,7 @@ function CardTab({
       <div className="rounded-3xl bg-[image:var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               Carteirinha de emergência
             </p>
             <h2 className="mt-1.5 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
@@ -6793,7 +6786,7 @@ function ApagarConversas() {
   }
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="rounded-3xl card-material p-6">
       <p className="font-serif text-lg">Suas conversas com a IA</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Elas ficam guardadas para a IA dar continuidade — e o seu médico pode lê-las no painel dele.
@@ -8275,7 +8268,7 @@ function PrenatalCalendarTab({
 
   if (!profile || (!profile.lmp_date && !profile.reference_date)) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+      <div className="rounded-3xl card-material p-8 text-center">
         <p className="text-muted-foreground">
           Configure a DUM ou os dados do ultrassom em{" "}
           <button
@@ -8385,7 +8378,7 @@ function PrenatalCalendarTab({
     <div className="space-y-5">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Meu Calendário</p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu Calendário</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Marcos do pré-natal e suas consultas, no dia certo.
           </p>
@@ -8437,7 +8430,7 @@ function PrenatalCalendarTab({
           </div>
 
           {/* Grade do mês */}
-          <div className="rounded-3xl border border-border bg-card p-3">
+          <div className="rounded-3xl card-material p-3">
             <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
               {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
                 <div key={d} className="py-1">
@@ -8506,7 +8499,7 @@ function PrenatalCalendarTab({
               })}
             </p>
             {selectedEvents.length === 0 ? (
-              <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+              <p className="rounded-2xl card-material px-4 py-3 text-sm text-muted-foreground">
                 Nada marcado neste dia.
               </p>
             ) : (
@@ -8544,10 +8537,7 @@ function PrenatalCalendarTab({
                   }
                   const m = it.m;
                   return (
-                    <div
-                      key={`d-ms-${idx}`}
-                      className="rounded-2xl border border-border bg-card p-3"
-                    >
+                    <div key={`d-ms-${idx}`} className="rounded-2xl card-material p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
                           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
@@ -8689,7 +8679,7 @@ function PrenatalCalendarTab({
 
       {/* ── Consultas integradas: tudo (agendar, preparar, teleconsulta…) aqui ── */}
       <div className="mt-2 border-t border-border pt-5">
-        <p className="mb-4 text-xs uppercase tracking-[0.22em] text-primary">Minhas consultas</p>
+        <p className="mb-4 font-serif text-[15px] font-semibold text-primary">Minhas consultas</p>
         <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
       </div>
     </div>
@@ -9002,8 +8992,10 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
       )}
 
       {/* Main button */}
-      <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Cronômetro de contrações</p>
+      <div className="rounded-3xl card-material p-8 text-center">
+        <p className="font-serif text-[15px] font-semibold text-primary">
+          Cronômetro de contrações
+        </p>
 
         {/* Intensity selector */}
         {!active && (
@@ -9068,9 +9060,9 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
 
       {/* History table */}
       {recentContractions.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            <p className="font-serif text-[15px] font-semibold text-muted-foreground">
               Últimas contrações
             </p>
             <button
@@ -9275,7 +9267,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
       <form onSubmit={submit} className="space-y-6">
         {/* Emotional state */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Como você está se sentindo?</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {EMOTIONAL_OPTIONS.map((o) => (
@@ -9296,7 +9288,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Vitals */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Medidas desta semana</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <Field
@@ -9321,7 +9313,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Symptoms */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Sintomas desde a última consulta</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {PRE_CONSULT_SYMPTOMS.map((s) => (
@@ -9344,7 +9336,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Open questions */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Medicamentos em uso</p>
           <textarea
             value={form.medications}
@@ -9355,7 +9347,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           />
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Perguntas para o médico</p>
           <textarea
             value={form.questions}
@@ -9366,7 +9358,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           />
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Algo mais a relatar?</p>
           <textarea
             value={form.other_notes}
@@ -9398,7 +9390,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           {showHistory && (
             <div className="mt-3 space-y-3">
               {history.map((h) => (
-                <div key={h.id} className="rounded-2xl border border-border bg-card p-4 text-sm">
+                <div key={h.id} className="rounded-2xl card-material p-4 text-sm">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">
                       Semana {h.weeks_at_submission ?? "—"} —{" "}
@@ -9720,7 +9712,7 @@ function NutricaoTab({
           conteúdo dele. Eu tinha calado só a saudação e deixado a tela inteira
           falando do bebê logo abaixo. */}
       {!careMode && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Nutrientes em destaque — {trimester}º trimestre</p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {tips.map((t) => (
@@ -9738,10 +9730,7 @@ function NutricaoTab({
       )}
 
       {/* Chat */}
-      <div
-        className="flex flex-col rounded-3xl border border-border bg-card"
-        style={{ height: "55vh" }}
-      >
+      <div className="flex flex-col rounded-3xl card-material" style={{ height: "55vh" }}>
         <div className="border-b border-border p-4">
           <p className="font-serif text-lg">Nutricionista Virtual</p>
           <p className="text-xs text-muted-foreground">
@@ -10090,7 +10079,7 @@ function WaitlistCard() {
   const waiting = entries.filter((e) => e.status === "waiting");
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="rounded-3xl card-material p-6">
       <p className="font-serif text-lg">Fila de espera</p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         Sem horário na semana que você quer? Entre na fila — se abrir vaga, a gente te avisa aqui e
@@ -10209,7 +10198,7 @@ function ResumosDasConsultas() {
   if (carregando || itens.length === 0) return null;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <p className="font-serif text-lg">📋 Depois das suas consultas</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         O que o seu médico deixou escrito para você.
@@ -10303,7 +10292,7 @@ function MeusPedidos() {
   if (carregando || itens.length === 0) return null;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <p className="font-serif text-lg">Do seu médico</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         Receitas, pedidos de exame e orientações. Marque o que já fez.
@@ -10610,7 +10599,7 @@ function ConsultasTab() {
       <ResumosDasConsultas />
 
       {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-serif text-lg">Minhas consultas</p>
@@ -10779,7 +10768,7 @@ function ConsultasTab() {
       <WaitlistCard />
 
       {/* Recording card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Gravar consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Grave o áudio da consulta e a IA extrai orientações, medicamentos e exames
@@ -10829,7 +10818,7 @@ function ConsultasTab() {
 
       {/* Result card */}
       {result && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           {result.error ? (
             <p className="text-sm text-destructive">{result.error}</p>
           ) : (
@@ -10930,7 +10919,7 @@ function ConsultasTab() {
       )}
 
       {/* History */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Histórico de consultas</p>
         {loadingNotes ? (
           <div className="mt-4 space-y-2">
@@ -11166,7 +11155,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Sua jornada pré-natal</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Todos os seus registros numa linha do tempo cronológica.
@@ -11217,7 +11206,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
                     className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 border-background ${s.dot} flex items-center justify-center`}
                   />
 
-                  <div className="flex-1 rounded-2xl border border-border bg-card p-4">
+                  <div className="flex-1 rounded-2xl card-material p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{ev.title}</p>
@@ -11404,7 +11393,7 @@ function HumorTab() {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Resumo dos últimos 14 dias</p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-2xl bg-secondary/50 p-3 text-center">
@@ -11434,7 +11423,7 @@ function HumorTab() {
       </div>
 
       {/* Weekly mood chart */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Humor por semana</p>
         <p className="text-xs text-muted-foreground mt-1">
           Média semanal das últimas 8 semanas (1=muito ruim · 5=ótimo)
@@ -11491,7 +11480,7 @@ function HumorTab() {
       </div>
 
       {/* Day of week heatmap */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Padrão por dia da semana</p>
         <div className="mt-4 flex gap-2">
           {DAY_NAMES.map((name, i) => {
@@ -11526,7 +11515,7 @@ function HumorTab() {
       </div>
 
       {/* Top moods */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Seus humores mais frequentes</p>
         <div className="mt-4 space-y-2">
           {topMoods.map(([emoji, count]) => (
@@ -11840,7 +11829,7 @@ function MeditacoesConteudo({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Meditações Guiadas</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Sessões de meditação para ler ou ouvir, específicas para cada fase da gestação.
@@ -12065,7 +12054,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
   return (
     <div className="space-y-6">
       {/* Info card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Quando o seu médico abrir a sala, você receberá um e-mail com o link do Google Meet e
@@ -12099,7 +12088,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       ) : (
         <div className="space-y-4">
           {sessions.map((s) => (
-            <div key={s.id} className="rounded-3xl border border-border bg-card p-6">
+            <div key={s.id} className="rounded-3xl card-material p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">
@@ -12252,7 +12241,7 @@ function CartaBebêTab({
 
   if (!gest || !week) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+      <div className="rounded-3xl card-material p-8 text-center">
         <p className="text-muted-foreground">
           Configure sua gestação em{" "}
           <button
@@ -12273,10 +12262,10 @@ function CartaBebêTab({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Semana {week}</p>
+            <p className="font-serif text-[15px] font-semibold text-primary">Semana {week}</p>
             <p className="mt-1 font-serif text-2xl">Carta do seu bebê</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Uma mensagem especial na perspectiva do {profile?.baby_name ?? "seu bebê"}, gerada por
@@ -12643,7 +12632,7 @@ function SonsBebêTab({
   return (
     <div className="space-y-6">
       {/* Info */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Sons para o bebê</p>
         <p className="mt-1 text-sm text-muted-foreground">
           O bebê começa a ouvir sons por volta da semana 16–18. Sons reproduzidos regularmente
@@ -12658,7 +12647,7 @@ function SonsBebêTab({
       </div>
 
       {/* Volume */}
-      <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-3">
+      <div className="flex items-center gap-4 rounded-2xl card-material px-5 py-3">
         <span className="text-sm text-muted-foreground">🔉 Volume</span>
         <input
           type="range"
@@ -12733,7 +12722,7 @@ function SonsBebêTab({
 
       {/* Most played */}
       {Object.values(playCount).some((v) => v > 0) && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Sons favoritos do seu bebê</p>
           <div className="mt-4 space-y-2">
             {sortedByPlays
@@ -12995,7 +12984,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Exercícios para gestantes</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {currentTrimester
@@ -13032,7 +13021,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
       ) : (
         <div className="space-y-3">
           {available.map((ex) => (
-            <div key={ex.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div key={ex.id} className="rounded-2xl card-material overflow-hidden">
               <button
                 onClick={() => setExpanded(expanded === ex.id ? null : ex.id)}
                 className="flex w-full items-start justify-between gap-3 p-5 text-left"
@@ -13402,7 +13391,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Progress */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="font-serif text-lg">Preparação do quartinho</p>
@@ -13470,7 +13459,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
         if (items.length === 0) return null;
         const doneCat = items.filter((i) => checked.has(i.id)).length;
         return (
-          <div key={cat} className="rounded-3xl border border-border bg-card overflow-hidden">
+          <div key={cat} className="rounded-3xl card-material overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <p className="font-medium">{cat}</p>
               <span className="text-xs text-muted-foreground">
@@ -13565,7 +13554,7 @@ function CountdownTab({
 
   if (!profile || !gest) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+      <div className="rounded-3xl card-material p-8 text-center text-muted-foreground">
         Configure seu perfil (DPP ou DUM) para ver a contagem regressiva.
       </div>
     );
@@ -13574,7 +13563,7 @@ function CountdownTab({
   const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
   if (!due) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+      <div className="rounded-3xl card-material p-8 text-center text-muted-foreground">
         Adicione a data provável do parto em{" "}
         <button
           type="button"
@@ -13630,9 +13619,7 @@ function CountdownTab({
     <div className="space-y-8">
       {!isDueToday && reta ? (
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            {reta.eyebrow}
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">{reta.eyebrow}</p>
           <p className="mt-3 font-serif text-2xl text-foreground">{reta.titulo}</p>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-foreground/80">
             {reta.corpo}
@@ -13644,9 +13631,7 @@ function CountdownTab({
         </div>
       ) : (
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Faltam para a DPP
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Faltam para a DPP</p>
           <div className="mt-6 flex justify-center gap-4 sm:gap-8">
             {[
               { value: days, label: "dias" },
@@ -13867,7 +13852,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-4">Adicionar ao álbum</h3>
         <div className="space-y-3">
           <input
@@ -13994,7 +13979,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             {posts.map((post) => (
               <div
                 key={post.id}
-                className="group relative rounded-2xl border border-border bg-card overflow-hidden"
+                className="group relative rounded-2xl card-material overflow-hidden"
               >
                 {post.image_url && (
                   <img
@@ -14115,7 +14100,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3 items-center justify-between rounded-3xl border border-border bg-card p-6">
+      <div className="flex flex-wrap gap-3 items-center justify-between rounded-3xl card-material p-6">
         <div>
           <h3 className="font-semibold">Votação de nomes</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -14163,7 +14148,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-3">Sugerir nome</h3>
         <div className="flex gap-2">
           <input
@@ -14305,7 +14290,7 @@ function EscolaBebêTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: st
       </div>
 
       {/* Progresso resumido */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-serif text-lg">Seu progresso</h3>
@@ -14558,7 +14543,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
           </button>
           <a
             href={`mailto:${DOCTOR.supportEmail}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
-            className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
+            className="press flex w-full items-center gap-3 rounded-2xl card-material p-4 text-left"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-lg">
               2️⃣
@@ -14578,7 +14563,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
         </p>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <h2 className="font-serif text-xl mb-1">Perguntas frequentes</h2>
         {currentWeek > 0 && (
           <p className="text-sm text-muted-foreground">
@@ -14611,7 +14596,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
       ) : (
         <div className="space-y-2">
           {filtered.map((item, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div key={i} className="rounded-2xl card-material overflow-hidden">
               <button
                 className="w-full flex items-center justify-between p-4 text-left"
                 onClick={() => setOpen(open === i ? null : i)}
@@ -14872,7 +14857,7 @@ function PosPartoTab({
 
   if (!profile?.birth_date) {
     return (
-      <div className="max-w-md mx-auto rounded-3xl border border-border bg-card p-8 text-center space-y-4">
+      <div className="max-w-md mx-auto rounded-3xl card-material p-8 text-center space-y-4">
         <p className="text-4xl">🍼</p>
         <h2 className="font-serif text-xl">Portal Pós-parto</h2>
         <p className="text-sm text-muted-foreground">
@@ -14923,7 +14908,7 @@ function PosPartoTab({
         /* ⚠️ Sóbrio, e sem contar o que aconteceu: o Modo Cuidado pode ter
            sido ligado pelo médico, e narrar a perda de volta para ela na
            abertura da tela é o app dando a notícia mais íntima que existe. */
-        <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="rounded-3xl card-material p-5">
           <p className="font-semibold">Cuidando de você</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Seu corpo passou por um parto, e o acompanhamento continua. O que estiver pesando também
@@ -15094,7 +15079,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-1">Rastreio de depressão pós-parto (EPDS)</h3>
         <p className="text-xs text-muted-foreground mb-4">
           Escala de Edimburgo — 10 perguntas sobre como você se sentiu nos últimos 7 dias
@@ -15206,7 +15191,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
       </div>
 
       {!loadingHistory && history.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <h3 className="font-semibold mb-3">Histórico</h3>
           <div className="space-y-2">
             {history.map((h) => (
@@ -15329,18 +15314,18 @@ function BreastfeedingSection() {
     <div className="max-w-xl space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+        <div className="rounded-2xl card-material p-4 text-center">
           <p className="text-3xl font-bold text-primary">{todayCount}</p>
           <p className="text-xs text-muted-foreground">mamadas hoje</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+        <div className="rounded-2xl card-material p-4 text-center">
           <p className="text-3xl font-bold text-primary">{todayMinutes}</p>
           <p className="text-xs text-muted-foreground">minutos hoje</p>
         </div>
       </div>
 
       {/* Timer */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-4">Registrar mamada</h3>
         {!activeLog ? (
           <div className="space-y-3">
@@ -15555,7 +15540,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
       )}
 
       {upcoming.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="rounded-3xl card-material p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             Em breve para {babyName}
           </p>
@@ -15697,7 +15682,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
 
   return (
     <div className="max-w-xl space-y-5">
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-semibold">Calendário de vacinas</h3>
@@ -15854,7 +15839,7 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-3">Peso do bebê</h3>
         <div className="flex gap-2 mb-4">
           <input
@@ -16855,7 +16840,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           ← Voltar
         </button>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <h2 className="font-serif text-xl mb-4">Nova consulta particular</h2>
           <div className="space-y-4">
             <div>
@@ -16973,8 +16958,8 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
+      <div className="rounded-3xl card-material p-6">
+        <p className="font-serif text-[15px] font-semibold text-primary mb-1">
           Consultas particulares
         </p>
         {/* Sem nome do fundador: esta aba é de TODA paciente de TODO médico. */}
@@ -17629,10 +17614,8 @@ function MédicoTab() {
   return (
     <div className="space-y-6 pb-8">
       {doctor ? (
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            Meu obstetra
-          </p>
+        <div className="rounded-2xl card-material p-6">
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu obstetra</p>
           <h2 className="mt-1 font-serif text-2xl text-foreground">
             {doctor.display_name || "Obstetra"}
           </h2>
@@ -17672,9 +17655,7 @@ function MédicoTab() {
         </div>
       ) : pending ? (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-            Solicitação enviada
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-amber-700">Solicitação enviada</p>
           <h2 className="mt-1 font-serif text-xl text-foreground">
             Aguardando {pending.doctor.display_name || "o médico"} aceitar
           </h2>
@@ -17691,10 +17672,8 @@ function MédicoTab() {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            Meu obstetra
-          </p>
+        <div className="rounded-2xl card-material p-6">
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu obstetra</p>
           <h2 className="mt-1 font-serif text-xl text-foreground">Encontre o seu obstetra</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Busque pelo nome do seu médico e envie uma solicitação. Quando ele aceitar, seu
@@ -17704,7 +17683,7 @@ function MédicoTab() {
       )}
 
       {(!doctor || showSearch) && !pending && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-2xl card-material p-6">
           <form onSubmit={doSearch} className="flex gap-2">
             <input
               value={query}
@@ -17905,7 +17884,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-2xl">Plano de parto</p>
         <p className="mt-2 text-sm text-muted-foreground">
           Registre suas preferências para compartilhar com o seu médico e a equipe da maternidade. O
@@ -17914,7 +17893,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Tipo de parto */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+      <div className="rounded-3xl card-material p-6 space-y-3">
         <p className="font-serif text-lg">Tipo de parto desejado</p>
         {[
           { value: "normal", label: "Parto normal / vaginal" },
@@ -17936,7 +17915,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Alívio da dor */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+      <div className="rounded-3xl card-material p-6 space-y-3">
         <p className="font-serif text-lg">Alívio da dor (marque os que aceitar)</p>
         {PAIN_RELIEF_OPTIONS.map((opt) => (
           <label key={opt} className="flex cursor-pointer items-center gap-3">
@@ -17952,7 +17931,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Presença e procedimentos */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-3xl card-material p-6 space-y-4">
         <p className="font-serif text-lg">Presença e procedimentos</p>
         <PlanoField
           label="Quem você quer presente no parto"
@@ -17986,7 +17965,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Ambiente */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-3xl card-material p-6 space-y-4">
         <p className="font-serif text-lg">Ambiente</p>
         <PlanoField
           label="Iluminação"
@@ -18080,7 +18059,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* O que é normal sentir */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-xl">O que é normal sentir</p>
         <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
           {[
@@ -18121,7 +18100,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* Redes de apoio */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-xl">Redes de apoio</p>
         <div className="mt-4 space-y-3">
           {[

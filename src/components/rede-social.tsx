@@ -229,7 +229,7 @@ function ArrobaDoPerfil({
   }
 
   return (
-    <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <section className="rounded-3xl card-material p-4">
       <h3 className="font-semibold">Seu @</h3>
 
       {!editando ? (
@@ -532,7 +532,7 @@ export function ConfiguracoesDoPerfil({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-center gap-3">
           <Avatar url={perfil.avatarUrl} nome={perfil.nome} tamanho={52} />
           <div className="min-w-0">
@@ -559,7 +559,7 @@ export function ConfiguracoesDoPerfil({
         />
       </section>
 
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="font-semibold">Perfil público</h3>
@@ -620,7 +620,7 @@ export function ConfiguracoesDoPerfil({
           ⚠️ E o rótulo "Sugerido para você" continua em toda publicação de
           fora, ligada ou desligada esta chave: misturar sem avisar é a única
           versão disto que não se faz num app de gestação de alto risco. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="font-semibold">Só quem eu sigo</h3>
@@ -662,7 +662,7 @@ export function ConfiguracoesDoPerfil({
           o app não contava a ninguém: a página existia e nenhuma tela dizia
           onde. Uma vitrine que a dona não sabe achar não é vitrine. */}
       {perfil.publico && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="font-semibold">Uma página na internet</h3>
@@ -720,7 +720,7 @@ export function ConfiguracoesDoPerfil({
           acompanhar" não aparecem porque nunca empurram nada — pôr um
           interruptor desligado ao lado deles prometeria controle sobre um aviso
           que não existe. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <h3 className="font-semibold">Avisos da Comunidade</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Só isto. Os avisos do seu médico, das consultas e da emergência não passam por aqui — e
@@ -763,7 +763,7 @@ export function ConfiguracoesDoPerfil({
           ⚠️ **O texto diz o que NÃO acontece**, e é a parte que faz alguém usar
           o botão: quem não tem certeza de que as fotos ficam não pausa — vai
           embora de vez, ou fica sem descansar. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="font-semibold">Pausar a minha conta</h3>
@@ -807,7 +807,7 @@ export function ConfiguracoesDoPerfil({
           ⚠️ E o texto de cada uma diz o que aparece e para quem. A explicação é
           a defesa: "não podemos expor a paciente sem ela saber" só é verdade se
           ela puder ler, ali, o que ligar aquilo significa. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <h3 className="font-semibold">O que o seu perfil conta</h3>
         <p className="mt-1 text-xs leading-snug text-muted-foreground">
           Hoje quem abre o seu perfil vê o seu nome, a sua foto, a sua descrição e o que você
@@ -849,7 +849,7 @@ export function ConfiguracoesDoPerfil({
       </section>
 
       {totalPedidos > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h3 className="font-semibold">
             {totalPedidos === 1 ? "1 pedido" : `${totalPedidos} pedidos`}
           </h3>
@@ -972,7 +972,7 @@ export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
   }
 
   return (
-    <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <section className="rounded-3xl card-material p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="font-semibold">Palavras que você não quer ler</h3>

@@ -36,7 +36,7 @@ export function NaoConsegueLer({
   aoTentar: () => void;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 text-center">
+    <div className="rounded-2xl card-material p-5 text-center">
       <p className="text-3xl">🌧️</p>
       <p className="mt-2 font-serif text-lg text-foreground/80">
         Não consegui carregar {oQue} agora

@@ -529,7 +529,7 @@ export function OnboardingRitual({
         aria-hidden
         className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
       />
-      <div className="relative w-full max-w-md rounded-3xl border border-border bg-card/90 p-7 shadow-[var(--shadow-card)] backdrop-blur md:p-9">
+      <div className="relative w-full max-w-md rounded-3xl card-material/90 p-7 backdrop-blur md:p-9">
         {/* Progresso */}
         <div className="mb-6 flex items-center justify-center gap-1.5">
           {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
@@ -675,7 +675,7 @@ export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) 
   if (jaTem !== false) return null;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-4">
+    <div className="rounded-3xl card-material p-4">
       <p className="text-sm font-bold">Veio pela indicação de alguém?</p>
       <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
         Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}

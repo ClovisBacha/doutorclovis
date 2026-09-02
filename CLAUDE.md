@@ -12476,3 +12476,38 @@ qualquer diretório.
 `/preview-grades` (⚠️ é um `fixed inset-0` que rola POR DENTRO: `scrollTo` na
 janela não move nada e a captura de página inteira mostra o site por baixo —
 fotografe o ELEMENTO da grade).
+
+### O material dos cartões, e os rótulos que saíram da caixa alta (set/2026)
+
+A etapa sem crédito da mesma leva. Medido antes: **153 cartões** escritos à
+mão como `rounded-*xl border border-border bg-card` (contorno de 1px + fundo
+chapado — o tell número um de tela gerada) e **40 rótulos** em
+`text-xs uppercase tracking-[0.22em]` (o "eyebrow" espaçado, o tell número
+dois).
+
+- **`.card-material`** (`styles.css`) é a superfície: brilho de topo, borda que
+  é luz e não linha, a sombra macia do token. Substitui `border border-border
+bg-card` no literal — nada mais disputa fundo e borda com ela.
+  ⚠️ **NÃO é o `.card-3d` que já existia**: aquele é o cartão TÁTIL do painel
+  do admin, com lábio de 4px e `translateY` no hover. Reusá-lo em 153 cartões
+  de leitura poria salto de botão em superfície de texto. A colisão de nome
+  foi pega por um `assert` antes de qualquer edição — **conferir se a classe
+  existe antes de criá-la**, sempre.
+  ⚠️ Quem carrega `shadow-[var(--shadow-float)]` (os dois modais) ficou de
+  fora: a classe vive FORA de `@layer` e a sombra dela venceria a flutuante.
+- **Os rótulos viraram serif 15px semibold**, na mesma cor. "2º TRIMESTRE ·
+  HELENA ESTA SEMANA" espaçado em caixa alta lia como etiqueta de template;
+  em serif lê como título pequeno, que é o que ele é. ⚠️ O `font-serif` já
+  existia (`--font-serif`), o que foi conferido ANTES da troca: sem ele a
+  substituição cairia em Times.
+- **O anel de raridade** das conquistas ganhou o mesmo brilho de topo; a COR
+  continua sendo a identidade (o teste cobra `slate`/`sky`/`amber`, e só isso).
+- **As nove pílulas de contorno das Amigas** ("Desfazer", os pedidos) viraram
+  `pill-3d` — tinham ficado de fora da varredura da Comunidade.
+
+Sobraram **4** literais de contorno no app, todos com variante própria
+(`border-slate-200`), e o **site institucional e o painel do médico não foram
+tocados** — o pedido é sobre o APP.
+
+**Bancadas:** `/preview-bebe-tab` · `/preview-conquistas?tudo=1` ·
+`/preview-amigas?dupla=ativa&dias=12` · `/preview-assinatura?estado=loja`.

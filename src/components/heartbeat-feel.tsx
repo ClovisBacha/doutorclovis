@@ -103,7 +103,7 @@ export function HeartbeatFeel({
   const beatSeconds = 60 / bpm;
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+    <div className="relative overflow-hidden rounded-3xl card-material p-6">
       <style>{`
         @keyframes hb-lubdub {
           0% { transform: scale(1); }

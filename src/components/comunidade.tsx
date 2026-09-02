@@ -116,7 +116,7 @@ export function ComunidadeTab({
               key={p.key}
               type="button"
               onClick={() => onAbrir(p.destino, p.subDestino)}
-              className="press relative flex flex-col items-start gap-1 rounded-2xl border border-border bg-card p-4 text-left shadow-[var(--shadow-card)]"
+              className="press relative flex flex-col items-start gap-1 rounded-2xl card-material p-4 text-left"
             >
               {ARTE_DA_PORTA[p.key] ? (
                 <img

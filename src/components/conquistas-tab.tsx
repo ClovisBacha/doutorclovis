@@ -270,7 +270,7 @@ export function ConquistasTab({
         <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">
+              <p className="font-serif text-[15px] font-semibold text-emerald-700">
                 Suas Sementinhas
               </p>
               <p className="mt-1 flex items-baseline gap-1.5 font-serif text-3xl text-emerald-900">
@@ -293,10 +293,10 @@ export function ConquistasTab({
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Suas conquistas</p>
+            <p className="font-serif text-[15px] font-semibold text-primary">Suas conquistas</p>
             <p className="mt-1 font-serif text-2xl">
               {unlockedCount} de {totalCount}
             </p>

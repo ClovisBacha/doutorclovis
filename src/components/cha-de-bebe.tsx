@@ -418,7 +418,7 @@ export function ChaDeBebe({
           ⚠️ **`type="date"`, e não texto.** Data em campo livre já custou três
           horas nesta base (`confirmed_time` aceitando "manhã"), e aqui ela vai
           para uma coluna `date`. */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           O convite
         </p>
@@ -461,7 +461,7 @@ export function ChaDeBebe({
       </section>
 
       {/* ─── O LINK ────────────────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Seu link
         </p>
@@ -486,7 +486,7 @@ export function ChaDeBebe({
       </section>
 
       {/* ─── O QUE JÁ CHEGOU ───────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <h3 className="font-semibold">Fraldas</h3>
         <ul className="mt-2 space-y-1.5">
           {ordemDeUrgencia(saldos).map((t) => {
@@ -510,7 +510,7 @@ export function ChaDeBebe({
       </section>
 
       {/* ─── OS OUTROS ITENS ───────────────────────────────────────────── */}
-      <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+      <section className="rounded-3xl card-material p-4">
         <div className="flex items-baseline justify-between">
           <h3 className="font-semibold">Na lista</h3>
           <span className="text-xs tabular-nums text-muted-foreground">
@@ -694,7 +694,7 @@ export function ChaDeBebe({
 
       {/* ─── A QUEM AGRADECER ──────────────────────────────────────────── */}
       {pessoas.length > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h3 className="font-semibold">Agradecer</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             O texto já vem pronto — dá pra mudar antes de mandar.

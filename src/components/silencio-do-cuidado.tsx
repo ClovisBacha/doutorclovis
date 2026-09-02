@@ -17,7 +17,7 @@ import type { Tab } from "@/routes/_authenticated/minha-conta";
  */
 export function SilencioDoCuidado({ onNavigate }: { onNavigate?: (t: Tab) => void }) {
   return (
-    <div className="rounded-3xl border border-border bg-card p-8 text-center">
+    <div className="rounded-3xl card-material p-8 text-center">
       <p className="text-sm leading-relaxed text-muted-foreground">
         Esta parte do aplicativo está em pausa enquanto o Modo Cuidado estiver ligado.
       </p>

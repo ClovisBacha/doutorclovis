@@ -370,6 +370,31 @@
    médico, e o comentário dele diz por escrito que sombra pertence a cada
    superfície. O material é opt-in, botão a botão, tela a tela — e a primeira
    tela é o Cantinho, com foto antes e depois. */
+/* ═══════════════════════════════════════════════════════════════════════
+   .card-material — o MATERIAL do cartão comum do app da paciente.
+   Eram 118 cartões escritos à mão como `rounded-*xl border border-border
+   bg-card`: contorno de 1px + fundo chapado, que é o tell número um de tela
+   gerada. O material é o mesmo vocabulário do `.btn-3d`: brilho de topo,
+   borda que é LUZ e não linha, e a sombra macia do token — corpo em vez de
+   contorno. Sem hover e sem salto: é superfície de leitura, não botão.
+   ⚠️ NÃO é o `.card-3d` (mais abaixo): aquele é o cartão TÁTIL do painel do
+   admin, com lábio de 4px e translateY no hover — outro objeto.
+   ⚠️ Fica FORA de @layer de propósito: a classe substitui `border` e
+   `bg-card` no literal, então nada mais disputa fundo e borda com ela. Quem
+   precisa de sombra flutuante (`shadow-[var(--shadow-float)]`) NÃO usa esta
+   classe — a sombra daqui venceria a utilitária pela camada.
+   ═══════════════════════════════════════════════════════════════════════ */
+.card-material {
+  position: relative;
+  background-color: var(--card);
+  border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45),
+    var(--shadow-card);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 38%);
+}
+
 .btn-3d {
   position: relative;
   isolation: isolate;

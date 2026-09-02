@@ -52,7 +52,7 @@ export function BabyEvolution() {
         </div>
 
         {/* Seletor de semana */}
-        <div className="mt-6 rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)] md:p-6">
+        <div className="mt-6 rounded-3xl card-material p-5 md:p-6">
           <div className="flex items-center gap-4">
             <button
               type="button"
@@ -100,7 +100,7 @@ export function BabyEvolution() {
         </div>
 
         {/* Card principal */}
-        <div className="mt-6 grid gap-6 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)] md:grid-cols-[1fr_1.4fr] md:p-10">
+        <div className="mt-6 grid gap-6 rounded-3xl card-material p-6 md:grid-cols-[1fr_1.4fr] md:p-10">
           <div className="flex flex-col items-center justify-center rounded-2xl bg-[var(--gradient-warm)] p-6 text-center">
             <BabyIllustration week={week} />
             <div className="mt-4 grid w-full grid-cols-2 gap-3">

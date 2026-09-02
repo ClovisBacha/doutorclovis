@@ -301,7 +301,7 @@ export function ListaDePresentesPublica({
 
       {/* ─── AS FRALDAS ────────────────────────────────────────────────── */}
       {fraldas.length > 0 && (
-        <section className="rounded-3xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+        <section className="rounded-3xl card-material p-4">
           <h2 className="font-semibold">Fraldas</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Os tamanhos maiores duram muito mais — e são os que costumam faltar.

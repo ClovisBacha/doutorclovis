@@ -78,7 +78,7 @@ export function ExportarDados({ ehMedico = false }: { ehMedico?: boolean }) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-4">
+    <section className="rounded-2xl card-material p-4">
       <h3 className="text-[15px] font-semibold">Baixar meus dados</h3>
       <p className="mt-1.5 text-[13px] leading-snug text-muted-foreground">
         Um arquivo com o que você registrou aqui: diário, medidas, cartas, plano de parto, conversas

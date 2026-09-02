@@ -255,7 +255,7 @@ export function AppSaudeMockupScreen() {
     <div className="space-y-2.5 px-3 pt-2">
       <p className="font-serif text-base text-foreground">Minha saúde</p>
 
-      <div className="rounded-3xl border border-border bg-card p-3">
+      <div className="rounded-3xl card-material p-3">
         <div className="flex items-center justify-between">
           <p className="text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Peso (kg)
@@ -287,14 +287,14 @@ export function AppSaudeMockupScreen() {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-border bg-card p-2.5">
+        <div className="rounded-2xl card-material p-2.5">
           <p className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">Pressão</p>
           <p className="mt-0.5 font-serif text-lg text-foreground">
             110<span className="text-xs text-muted-foreground">/</span>72
           </p>
           <p className="text-[8px] text-emerald-600">✓ dentro do esperado</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-2.5">
+        <div className="rounded-2xl card-material p-2.5">
           <p className="text-[8px] uppercase tracking-[0.14em] text-muted-foreground">
             Chutes hoje
           </p>
@@ -327,7 +327,7 @@ export function AppJogoMockupScreen() {
       <p className="font-serif text-base text-foreground">Minha jornada</p>
 
       {/* Stats: chama · dia · figurinhas */}
-      <div className="flex items-center justify-around rounded-2xl border border-border bg-card px-2 py-1.5">
+      <div className="flex items-center justify-around rounded-2xl card-material px-2 py-1.5">
         <span className="flex items-center gap-1 text-[9px] font-bold text-amber-500">
           🔥 12 <span className="font-medium text-muted-foreground">dias</span>
         </span>
@@ -351,7 +351,7 @@ export function AppJogoMockupScreen() {
       </div>
 
       {/* Caminho: figurinhas conquistadas → baú de hoje → dias travados */}
-      <div className="relative rounded-3xl border border-border bg-card px-3 pb-2 pt-1.5">
+      <div className="relative rounded-3xl card-material px-3 pb-2 pt-1.5">
         <p className="text-center text-[7px] font-bold uppercase tracking-wider text-muted-foreground">
           Semana 24 🌽
         </p>

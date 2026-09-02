@@ -189,7 +189,7 @@ export function AssinaturaTab({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <div className="flex items-start gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12">
             <CreditCard className="h-[21px] w-[21px] text-primary" strokeWidth={1.9} />
@@ -373,7 +373,7 @@ export function AssinaturaTab({
       {/* ⚠️ ESTA CAIXA NÃO É ENFEITE. É a frase que a paciente procura quando
           está insegura sobre um débito recorrente, e ela precisa estar na
           mesma tela do botão — não num link de termos. */}
-      <div className="flex items-start gap-3 rounded-3xl border border-border bg-card p-4">
+      <div className="flex items-start gap-3 rounded-3xl card-material p-4">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" strokeWidth={1.9} />
         {/* ⚠️ A PRIMEIRA FRASE SÓ APARECE PARA QUEM PAGA. "Cancelar é imediato"
             não diz nada a quem nunca assinou — e uma tela que responde a uma

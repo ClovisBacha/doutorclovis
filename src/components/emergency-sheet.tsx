@@ -1048,7 +1048,7 @@ export function EmergencySheet({
             <button
               type="button"
               onClick={onTriagem}
-              className="press mt-3 w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm font-semibold text-foreground"
+              className="press mt-3 w-full rounded-2xl card-material px-4 py-3 text-sm font-semibold text-foreground"
             >
               Não tenho certeza — avaliar meus sintomas
             </button>

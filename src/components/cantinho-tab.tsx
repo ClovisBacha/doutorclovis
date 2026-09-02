@@ -760,7 +760,7 @@ export function CantinhoTab({
       {/* Cabeçalho + saldo */}
       <div className="flex items-center justify-between rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">Meu Cantinho</p>
+          <p className="font-serif text-[15px] font-semibold text-emerald-700">Meu Cantinho</p>
           <p className="mt-0.5 text-sm text-emerald-800/80">Um cantinho que cresce com você.</p>
         </div>
         {/* O saldo era um <div> mudo. Virou botão: é o lugar óbvio onde a
