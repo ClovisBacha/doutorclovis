@@ -12539,3 +12539,47 @@ não chegou", nas palavras deste arquivo. **16 ladrilhos**, 14 peças novas a 1k
 
 **Bancada:** `/preview-grades` (fotografe o ELEMENTO de cada grade; a página
 rola por dentro de um `fixed inset-0`).
+
+### A vitrine inteira: os 90 itens que faltavam (set/2026)
+
+Depois dos 17 grátis, a vitrine do Cantinho misturava peças de vidro com
+emojis chapados NA MESMA GRADE — inconsistência dentro de uma tela só, pior
+que tudo emoji. Os 90 restantes entraram: **107 itens vivos, 107 artes**, e
+`ARTE_DO_ITEM` é gerado a partir da pasta `src/assets/cantinho/`. Custo:
+112,5 cr nas peças mais as refeitas (255 acumulados dos 300, medido pelo saldo).
+
+- ⚠️ **BRANCO SOBRE BRANCO É COMIDO PELO RECORTE**, e desta vez foram quatro
+  de uma vez: o berço branco, a ovelha branca, a nuvem e o ladrilho de neve.
+  Sobre a folha branca do gerador eles parecem inteiros; sobre ROSA sobra um
+  fantasma. A regra que fica no prompt: **"clearly colored, never white"** —
+  berço em menta, lã creme sombreada, neve em azul-gelo. Conferir SEMPRE
+  sobre rosa, e o PSNR abaixo de 42 é o primeiro aviso (o script de recorte
+  REPROVA ali, e ele tem razão).
+- ⚠️ **O gerador emoldura PLANTA em cartão de vidro** sem ninguém pedir:
+  girassol, tulipa, cerejeira, roseira e palmeira vieram dentro de um
+  ladrilho — que é a forma reservada aos FUNDOS. Refeitas com "the plant
+  alone with nothing around it, no card, no border". Descrever o que NÃO
+  pode existir em volta vale tanto quanto descrever o objeto.
+- ⚠️ **Falha repetida do mesmo texto é o texto** — pela terceira leva:
+  "cactus" falhou duas vezes e passou como "round green desert plant";
+  "snowman" passou como "two stacked pale-blue snowballs"; "hot air balloon"
+  como "striped air balloon shape". A lista de palavras que o backend recusa
+  não é publicada, e o contorno é sempre descrever a FORMA.
+- ⚠️ **O limite de taxa aceita ~3 lotes de 12 e depois recusa tudo** por um
+  minuto. O ritmo que funcionou: um lote, `jobs_wait`, pipeline do lote
+  anterior, próximo lote — a espera do pipeline É o intervalo.
+- ⚠️ **O pipeline tem de tolerar o REPROVA do recorte**: `do-drive.mjs` sai
+  com código 1 quando o PSNR fica abaixo de 42 — e o `.webp` está escrito. A
+  primeira versão derrubava o lote inteiro por causa de UM ladrilho de neve.
+  Hoje anota `⚠️` e segue; a decisão de refazer é humana, na folha.
+- **A trilha continua com emoji**, e a decisão está no cabeçalho de
+  `arte-do-cantinho.tsx`: só a VITRINE mudou.
+
+**Pipeline reproduzível:** `scratchpad/arte4/{mapa.txt,pipeline.mjs}` —
+`node pipeline.mjs lote.txt` (linhas "índice url") baixa, recorta, redimensiona
+a 144px com o nome do item e monta a folha sobre rosa. Vive no scratchpad
+porque depende de URLs efêmeras do gerador; a versão que vale é a descrição
+acima mais `scripts/bebes/do-drive.mjs`.
+
+**Bancada:** `/preview-cantinho` (rolar a vitrine: nenhum `span.text-4xl`
+deve sobrar — medido: 0).
