@@ -81,10 +81,17 @@ export function GradeHub({
         <button
           key={key}
           onClick={() => onAbrir(key)}
-          className={`press flex flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3 text-left ${
+          className={`press relative flex flex-col justify-between overflow-hidden rounded-[26px] border bg-gradient-to-br p-3 text-left ${
             preencherTela ? "min-h-0 p-4" : "aspect-square"
           } ${caixa}`}
         >
+          {/* Luz de cima: um brilho branco radial no topo do bloco, por cima do
+              degradê da família. É o que separa "cartão colorido" de "bloco
+              com profundidade" — e é decoração, fora do fluxo e do toque. */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_0%,rgba(255,255,255,0.75),transparent_70%)]"
+          />
           {/* ⚠️ O ÍCONE CRESCE COM O LADRILHO, e isto não desfaz o pedido do
               dono — ele pediu os blocos GRANDES ("vão preencher a tela
               inteira"), e o que estava errado era o que havia DENTRO deles.
@@ -102,14 +109,43 @@ export function GradeHub({
               ícone-no-círculo já tinha (40 de 175) aplicada a uma peça que
               não preenche a própria caixa. */}
           {imagem ? (
-            <img
-              src={imagem}
-              alt=""
-              draggable={false}
-              className={`shrink-0 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)] ${
-                preencherTela ? "h-24 w-24" : "h-16 w-16"
+            /* ⚠️ A ARTE FICA CENTRADA, COM UM HALO ATRÁS — pedido do dono
+               ("cada ícone centralizado e com um efeito atrás gradiente mais
+               bonito, está muito básico"). O halo são dois discos desfocados:
+               um na COR DA FAMÍLIA do bloco (`tinta`, via `currentColor` —
+               verde no Saúde, azul nos Chutes) e um branco menor, que dá a
+               sensação de luz vindo de trás da peça. Nada é imagem: é a
+               mesma cor que o traço usava, então a família do bloco continua
+               sendo uma decisão só. */
+            <span
+              className={`relative flex w-full shrink-0 items-center justify-center ${tinta} ${
+                preencherTela ? "min-h-36 flex-1" : "h-[4.75rem]"
               }`}
-            />
+            >
+              {/* brilho grande na cor da família (desfocado) */}
+              <span
+                aria-hidden
+                className={`absolute rounded-full bg-current opacity-[0.28] blur-2xl ${
+                  preencherTela ? "h-36 w-36" : "h-20 w-20"
+                }`}
+              />
+              {/* o "pratinho": um disco branco nítido sob a peça, com um anel de
+                  luz — é ele que dá ao ícone um lugar para pousar */}
+              <span
+                aria-hidden
+                className={`absolute rounded-full bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_18px_-6px_rgba(0,0,0,0.12)] ring-1 ring-white/80 ${
+                  preencherTela ? "h-28 w-28" : "h-[4.25rem] w-[4.25rem]"
+                }`}
+              />
+              <img
+                src={imagem}
+                alt=""
+                draggable={false}
+                className={`relative object-contain drop-shadow-[0_10px_14px_rgba(0,0,0,0.16)] ${
+                  preencherTela ? "h-24 w-24" : "h-14 w-14"
+                }`}
+              />
+            </span>
           ) : (
             <span
               className={`flex shrink-0 items-center justify-center rounded-2xl bg-white/75 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ${
@@ -130,7 +166,7 @@ export function GradeHub({
               do mesmo tamanho que "última". Separando, o número tem a linha
               inteira e a legenda explica embaixo. */}
           {preencherTela && dado ? (
-            <span className="block">
+            <span className="mb-3 block">
               <span className="block font-serif text-[26px] leading-none text-foreground">
                 {dado.valor}
               </span>

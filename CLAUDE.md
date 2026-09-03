@@ -12620,3 +12620,27 @@ dele chegou de primeira.
   `media_import_url` do Higgsfield aceita a mesma URL.
 
 **Bancada:** `/preview-saude?w=38` (as cinco) · `?w=20&dados=1`.
+
+### O ícone pousou num pratinho, no centro do bloco (set/2026)
+
+Pedido do dono, depois do hub da Saúde com o coração dele: "cada ícone
+centralizado e com um efeito atrás gradiente mais bonito, está muito básico".
+Feito em CSS, em `GradeHub`, para TODAS as grades com imagem — zero crédito.
+
+- **Três camadas atrás da peça**: um brilho grande desfocado na COR DA
+  FAMÍLIA do bloco (`tinta` via `currentColor` — verde no Saúde, azul nos
+  Chutes: a família continua sendo uma decisão só), um **disco branco nítido**
+  com anel de luz (o "pratinho" onde a peça pousa) e, no bloco inteiro, uma luz
+  radial branca vinda de cima. A peça fica centrada, e no bloco alto ocupa o
+  espaço livre (`flex-1`) em vez de colar no topo.
+- ⚠️ **A primeira versão era só o brilho desfocado, e sobre pastel ele não se
+  via** — a foto mostrou o mesmo bloco de antes com o ícone deslocado para o
+  meio. O que dá corpo é o disco NÍTIDO; o desfoque sozinho é sugestão.
+- ⚠️ **A peça no quadrado é 56px num pratinho de 68px**: a 48 ela parecia um
+  selo perdido no prato. E o número do bloco alto ganhou `mb-3`, senão o
+  `flex-1` da peça empurrava "68,4 kg" para cima do rótulo.
+- As peças antigas em vidro (Bebê, Consultas…) ficam pequenas no prato porque
+  a arte delas tem margem própria; a hora de acertar é quando forem refeitas
+  na referência do dono, não com um tamanho por grade.
+
+**Bancadas:** `/preview-saude?w=20&dados=1` · `/preview-grades` (a do Bebê).
