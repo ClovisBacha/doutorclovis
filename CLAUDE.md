@@ -12593,3 +12593,30 @@ acima mais `scripts/bebes/do-drive.mjs`.
 
 **Bancada:** `/preview-cantinho` (rolar a vitrine: nenhum `span.text-4xl`
 deve sobrar — medido: 0).
+
+### A estética virou a do dono: o coração de referência do Drive (set/2026)
+
+Depois de ver os ícones 3D no aparelho, o dono disse que estavam "muito
+tecnológicos, com vários efeitos" — e mandou pelo Drive a imagem que ELE
+queria ("Imagem referência coração saúde"): um coração rosa-doce, brilho
+suave, formas simples, sem rosto, sem textura. Onze variações minhas
+(argila, guache, pelúcia, kawaii, Pixar, toon…) não chegaram lá; a referência
+dele chegou de primeira.
+
+- **O coração da Saúde É a imagem dele**, recortada por `do-drive.mjs` (alfa
+  real, PSNR 49). Os outros quatro (chutes, contrações, nutrição, mulher)
+  foram gerados com **`nano_banana_pro` + `image_references`** (2 cr cada),
+  com o prompt pedindo "EXACTLY the same illustration style as the reference
+  image" e descrevendo o estilo em palavras junto (glossy candy-like, soft
+  white highlights, simple rounded shapes, no outline, no face).
+- ⚠️ **Referência de imagem vale mais que dez prompts de estilo.** O `recraft`
+  com prompt sozinho oscilou entre vidro, argila e feltro; com a imagem dele
+  como referência, os quatro saíram na mesma família de primeira. Para as
+  próximas famílias (grades, Cantinho), o caminho é este: pedir a referência
+  ao dono e gerar a partir dela — não descrever de memória o que ele gosta.
+- ⚠️ **O arquivo do Drive baixa por link direto**
+  (`drive.google.com/uc?export=download&id=…`), sem passar o base64 pelo
+  contexto: 900 KB de PNG virariam ~300 mil tokens numa leitura.
+  `media_import_url` do Higgsfield aceita a mesma URL.
+
+**Bancada:** `/preview-saude?w=38` (as cinco) · `?w=20&dados=1`.
