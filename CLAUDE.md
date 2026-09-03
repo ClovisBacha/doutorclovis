@@ -12704,3 +12704,14 @@ quadrados do Bebê** que abrem — mesmo destino por duas portas, mesma cor.
 pintado do Drive) e Feed (modelo do Instagram) ficam como estão, de propósito.
 
 **Bancadas:** `/preview-comunidade?cabecalhos=1` · `/preview-presentes?dona=1`.
+
+#### ⚠️ Dois portões no MESMO log, e um "NÃO COMMITE" que era de outro
+
+Um `bun run verificar` em segundo plano (disparado antes de um conserto de
+tipo) e outro em primeiro plano escreveram no MESMO arquivo de log. O primeiro
+terminou "tudo verde", o segundo trouxe um "Parsing error" de um arquivo que o
+prettier ainda estava reformatando naquele instante — e o `grep "tudo verde"`
+que guardava o commit casou o bloco do OUTRO processo. O commit saiu; o
+portão rodado de novo, sozinho, deu verde, e a árvore estava certa. Mas foi
+sorte: **um portão por vez, com log próprio, e `pkill` do anterior antes de
+começar o seguinte.** Log compartilhado é portão que mente nas duas direções.
