@@ -12644,3 +12644,24 @@ Feito em CSS, em `GradeHub`, para TODAS as grades com imagem — zero crédito.
   na referência do dono, não com um tamanho por grade.
 
 **Bancadas:** `/preview-saude?w=20&dados=1` · `/preview-grades` (a do Bebê).
+
+### As grades e a Comunidade seguiram o coração (set/2026)
+
+Pedido do dono: "esses outros — semana, álbum etc. — estão muito ruins, devem
+ficar no design desse de saúde". As 26 peças que ainda eram do vidro
+tecnológico foram refeitas com a MESMA referência e o MESMO prompt da Saúde
+(`nano_banana_pro` + `image_references`, 2 cr cada, 52 no total): Bebê (6),
+Consultas (7), Bem-estar (5), Registros (2 — chutes e contrações já eram os da
+Saúde) e as seis portas da Comunidade. Nenhuma precisou ser refeita: com a
+referência, 26 de 26 saíram na família de primeira.
+
+- O `pipeline.mjs` desta leva vive em `scratchpad/ref-grades/` e grava direto
+  com o caminho do asset (`bebe/semana`, `grades/agenda`…), então instalar é
+  um `cp` por pasta. Os nomes NÃO mudaram: nenhum `import` foi tocado.
+- ⚠️ **`generate_image_batch` aceita 12 por chamada, e eu contei 13 duas
+  vezes.** A validação recusa a chamada inteira, sem submeter nada — barato,
+  mas custa uma volta. Contar antes de mandar.
+- O que continua em vidro: o Cantinho (90 premium) e os domos dos conjuntos
+  (13). Refazer os dois na referência custa ~206 cr, fora do teto atual.
+
+**Bancadas:** `/preview-grades` (as quatro grades) · `/preview-comunidade?vivo=1`.
