@@ -306,9 +306,7 @@ export function SonsParaDormir({
             Vêm ANTES dos sons porque é o que se procura acordada às três da
             manhã: som ambiente acalma quem já está quase dormindo, história
             ocupa a cabeça de quem está com a cabeça a mil. */}
-        <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
-          Histórias
-        </p>
+        <p className="mt-7 text-xs font-bold uppercase tracking-wider text-white/40">Histórias</p>
         <div className="mt-2 grid gap-2">
           {HISTORIAS.map((h) => (
             <button
@@ -321,7 +319,7 @@ export function SonsParaDormir({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-extrabold">{h.titulo}</span>
-                <span className="block text-[11px] leading-snug text-white/50">
+                <span className="block text-xs leading-snug text-white/50">
                   {h.sub} · {duracaoAproximada(h)} min
                 </span>
               </span>
@@ -331,7 +329,7 @@ export function SonsParaDormir({
             </button>
           ))}
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-white/35">
+        <p className="mt-2 text-xs leading-relaxed text-white/35">
           Quando a história acaba, a chuva continua sozinha — o quarto não fica mudo de repente.
         </p>
 
@@ -341,7 +339,7 @@ export function SonsParaDormir({
             ("hoje eu quero água") em vez de ler vinte rótulos seguidos. */}
         {POR_FAMILIA.map(({ familia, sons }) => (
           <div key={familia}>
-            <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
+            <p className="mt-7 text-xs font-bold uppercase tracking-wider text-white/40">
               {familia}
             </p>
             <div className="mt-2 grid grid-cols-2 gap-3">
@@ -373,7 +371,7 @@ export function SonsParaDormir({
                       )}
                     </span>
                     <span className="mt-2 block text-sm font-extrabold">{ROTULO[k].label}</span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-white/50">
+                    <span className="mt-0.5 block text-xs leading-snug text-white/50">
                       {carregando === k ? "preparando…" : ROTULO[k].sub}
                     </span>
                   </button>
@@ -383,7 +381,7 @@ export function SonsParaDormir({
           </div>
         ))}
 
-        <p className="mt-7 text-[11px] font-bold uppercase tracking-wider text-white/40">
+        <p className="mt-7 text-xs font-bold uppercase tracking-wider text-white/40">
           Desligar sozinho em
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
@@ -426,7 +424,7 @@ export function SonsParaDormir({
         {/* O volume é o do aparelho, e isto precisa estar dito: no iPhone a
             página não controla volume nenhum, e uma paciente procurando um
             controle que não existe acha que o app está quebrado. */}
-        <p className="mt-8 text-[11px] leading-relaxed text-white/35">
+        <p className="mt-8 text-xs leading-relaxed text-white/35">
           O volume é o do próprio celular — use os botões da lateral. Com fone, o som fica mais
           fechado e costuma incomodar menos quem dorme do lado.
         </p>

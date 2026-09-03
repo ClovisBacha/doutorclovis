@@ -50,7 +50,7 @@ export function CampoFocos({
   return (
     <div>
       <label className={classeLabel}>Também atendo</label>
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Marque tudo o que você atende de fato — cada um é uma busca em que você aparece. Até {TETO}.
       </p>
       <div className="mt-2 flex flex-wrap gap-1.5">
@@ -110,7 +110,7 @@ export function CampoFocos({
         </div>
       )}
       {cheio && (
-        <p className="mt-2 text-[11px] text-amber-700">
+        <p className="mt-2 text-xs text-amber-700">
           Oito é o limite. Um card com etiqueta demais não ajuda ela a decidir — tire um para pôr
           outro.
         </p>

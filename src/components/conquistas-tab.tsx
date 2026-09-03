@@ -286,7 +286,7 @@ export function ConquistasTab({
           {/* Dizia "Em breve você vai poder usar suas Sementinhas para montar o
               seu Cantinho" — sobre uma tela que já existe, pronta, na pílula ao
               lado desta. O app anunciava como futuro o que estava a um toque. */}
-          <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-[11px] text-emerald-800/80">
+          <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-xs text-emerald-800/80">
             Gaste no <strong>Meu Cantinho</strong>, aqui do lado — plantinhas, bichinhos e cenários
             pro seu Caminho. 💛
           </p>
@@ -313,7 +313,7 @@ export function ConquistasTab({
           />
         </div>
         {aindaNaoNasceu && posPartoTotal > 0 && (
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {posPartoTotal} destas só acontecem depois que o bebê nascer — na gestação, o caminho
             completo são {totalCount - posPartoTotal}.
           </p>
@@ -398,7 +398,7 @@ export function ConquistasTab({
                       {def.description}
                     </p>
                     <p
-                      className={`mt-1.5 text-[10px] font-bold uppercase tracking-wide ${
+                      className={`mt-1.5 text-xs font-bold uppercase tracking-wide ${
                         isUnlocked ? rar.texto : "text-muted-foreground/60"
                       }`}
                     >
@@ -415,7 +415,7 @@ export function ConquistasTab({
                          e o mesmo defeito que a Loja de Sementinhas teve com o
                          preço a 2,64:1: consertado numa tela e não na irmã. O
                          700 dá 5,48:1 e continua verde. */
-                      <p className="mt-1.5 rounded-full bg-emerald-700 px-2 py-1 text-[11px] font-bold text-white">
+                      <p className="mt-1.5 rounded-full bg-emerald-700 px-2 py-1 text-xs font-bold text-white">
                         {emVoo ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
                       </p>
                     ) : isUnlocked && unlockedAt ? (

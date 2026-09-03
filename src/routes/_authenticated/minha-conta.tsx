@@ -4234,7 +4234,7 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
       )}
       {next ? (
         <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
             Próxima consulta
           </p>
           <p className="mt-0.5 text-sm font-semibold">
@@ -4685,7 +4685,7 @@ function ProfileTab({
                   ? "Quem o SOS vai avisar por você"
                   : "Seu contato de emergência está pronto"}
               </p>
-              <p className="mt-1 text-[12.5px] leading-snug text-foreground/75">
+              <p className="mt-1 text-xs leading-snug text-foreground/75">
                 No segundo em que você apertar o SOS, esta pessoa recebe a sua localização e a sua
                 ficha — tipo sanguíneo, alergias, medicamentos — sem você precisar escrever nada.
                 {faltaEmergencia ? " Sem o e-mail, esse aviso não sai." : ""}
@@ -4704,7 +4704,7 @@ function ProfileTab({
               {/* Vai no aviso do SOS. É o primeiro número que quem recebe o
                   socorro tenta — antes de sair de casa, antes de ligar para o
                   hospital, a pessoa liga para ela para saber se atende. */}
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 Quem receber o pedido de socorro liga para cá primeiro.
               </p>
             </div>
@@ -4732,7 +4732,7 @@ function ProfileTab({
                   O WhatsApp abre com a mensagem escrita, mas ainda depende de
                   ela conseguir apertar enviar — e quem aperta o SOS nem sempre
                   consegue. */}
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 É o único aviso que sai sozinho, mesmo que você não consiga mexer no celular depois.
               </p>
             </div>
@@ -5519,9 +5519,7 @@ function HealthTab({
           {/* A etiqueta sozinha é meia informação. "PA muito elevada" sem o que
               fazer produz susto às 23h; com a próxima ação, produz conduta. */}
           {bpStatus?.orientacao && (
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              {bpStatus.orientacao}
-            </p>
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">{bpStatus.orientacao}</p>
           )}
         </div>
         {(() => {
@@ -5562,9 +5560,7 @@ function HealthTab({
                 </p>
               )}
               {gVoz?.orientacao && (
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  {gVoz.orientacao}
-                </p>
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">{gVoz.orientacao}</p>
               )}
             </div>
           );
@@ -6117,7 +6113,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
                 <span className="min-w-0 flex-1 text-sm">
                   {d.pergunta || "Uma dúvida que você mandou pelo chat"}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-xs text-muted-foreground">
                   registrada em {new Date(d.quando).toLocaleDateString("pt-BR")}
                 </span>
               </li>
@@ -6228,7 +6224,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
                 {/* Resposta do médico — volta para a paciente aqui */}
                 {q.answer && (
                   <div className="ml-7 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                       💬 Resposta do seu médico
                       {q.answered_at
                         ? ` · ${new Date(q.answered_at).toLocaleDateString("pt-BR")}`
@@ -6834,7 +6830,7 @@ function CardTab({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-card/60 p-3 backdrop-blur">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-medium">{value}</p>
     </div>
   );
@@ -7181,7 +7177,7 @@ function WABubble({
                 />
               ))}
             </div>
-            <span className="text-[11px] shrink-0" style={{ color: inkSoft }}>
+            <span className="text-xs shrink-0" style={{ color: inkSoft }}>
               {msg.audioDuration ?? "0:00"}
             </span>
             <audio
@@ -7203,11 +7199,11 @@ function WABubble({
               📄
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-semibold line-clamp-1" style={{ color: ink }}>
+              <p className="text-xs font-semibold line-clamp-1" style={{ color: ink }}>
                 {msg.fileName}
               </p>
               {msg.fileSize && (
-                <p className="text-[10px] mt-0.5" style={{ color: inkSoft }}>
+                <p className="text-xs mt-0.5" style={{ color: inkSoft }}>
                   {msg.fileSize}
                 </p>
               )}
@@ -7247,7 +7243,7 @@ function WABubble({
           {!isUser && onFeedback && (
             <span className="mr-auto flex items-center gap-1.5 pl-0.5">
               {feedback ? (
-                <span className="text-[10px]" style={{ color: inkSoft }}>
+                <span className="text-xs" style={{ color: inkSoft }}>
                   {/* A FRASE SEGUE O QUE O SERVIDOR REALMENTE FEZ.
                       "Anotado — seu médico vai ver" era dito para todo 👎, e o
                       retorno de `submitBrainFeedback` era ignorado. Um 👎 numa
@@ -7281,11 +7277,11 @@ function WABubble({
               )}
             </span>
           )}
-          <span className="text-[10px] leading-none" style={{ color: inkSoft }}>
+          <span className="text-xs leading-none" style={{ color: inkSoft }}>
             {timeStr}
           </span>
           {isUser && (
-            <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.85)" }}>
+            <span className="text-xs leading-none" style={{ color: "rgba(255,255,255,0.85)" }}>
               ✓✓
             </span>
           )}
@@ -7896,7 +7892,7 @@ export function ChatTab({
           </p>
           {/* A assinatura de quem construiu — pequena, mas presente em toda
               conversa. É a única marca da plataforma dentro do app. */}
-          <p className="text-[11px] leading-tight" style={{ color: headInkSoft }}>
+          <p className="text-xs leading-tight" style={{ color: headInkSoft }}>
             Desenvolvido por{" "}
             <span
               className="font-semibold"
@@ -7935,10 +7931,7 @@ export function ChatTab({
               inteira, tinta mais forte e peso médio: continua discreto, e
               deixa de perder para a assinatura de quem construiu. */}
           {doctorName ? (
-            <p
-              className="mt-0.5 text-[11px] font-medium leading-tight"
-              style={{ color: headInkAviso }}
-            >
+            <p className="mt-0.5 text-xs font-medium leading-tight" style={{ color: headInkAviso }}>
               {doctorName} pode ler esta conversa
             </p>
           ) : null}
@@ -8020,7 +8013,7 @@ export function ChatTab({
                 <button
                   key={q}
                   onClick={() => sendText(q)}
-                  className="rounded-full px-3.5 py-2 text-[12px] font-medium transition-transform active:scale-95"
+                  className="rounded-full px-3.5 py-2 text-xs font-medium transition-transform active:scale-95"
                   style={{
                     color: headInk,
                     background: skyDark ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.55)",
@@ -8533,7 +8526,7 @@ function PrenatalCalendarTab({
 
           {/* Grade do mês */}
           <div className="rounded-3xl card-material p-3">
-            <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="mb-1 grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
                 <div key={d} className="py-1">
                   {d}
@@ -8581,7 +8574,7 @@ function PrenatalCalendarTab({
               })}
             </div>
             {/* Legenda */}
-            <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
+            <div className="mt-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Consulta
               </span>
@@ -8617,11 +8610,11 @@ function PrenatalCalendarTab({
                         className="block w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 text-left"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                             Sua consulta
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}
                           >
                             {st.label}
                           </span>
@@ -8642,7 +8635,7 @@ function PrenatalCalendarTab({
                     <div key={`d-ms-${idx}`} className="rounded-2xl card-material p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                          className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
                         >
                           {TYPE_LABEL[m.type]}
                         </span>
@@ -8677,12 +8670,10 @@ function PrenatalCalendarTab({
                 >
                   <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                       Sua consulta
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
-                    >
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>
                       {st.label}
                     </span>
                   </div>
@@ -8736,7 +8727,7 @@ function PrenatalCalendarTab({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                        className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
                       >
                         {TYPE_LABEL[m.type]}
                       </span>
@@ -9855,7 +9846,7 @@ function NutricaoTab({
                 {m.role === "assistant" && i > 0 && m.content && (
                   <div className="mt-1.5 flex items-center gap-2">
                     {votos[i] !== undefined ? (
-                      <span className="text-[10px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {votos[i] === true
                           ? "Obrigada 💛"
                           : votos[i] === "fila"
@@ -10201,7 +10192,7 @@ function WaitlistCard() {
           key={e.id}
           className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 p-4"
         >
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
             🎉 Abriu uma vaga!
           </span>
           <p className="mt-2 text-base font-extrabold text-emerald-800">
@@ -10316,7 +10307,7 @@ function ResumosDasConsultas() {
       <ul className="mt-3 space-y-2">
         {itens.map((c) => (
           <li key={c.id} className="rounded-2xl bg-secondary/50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {new Date(c.occurred_at).toLocaleDateString("pt-BR", {
                 day: "2-digit",
                 month: "long",
@@ -10415,20 +10406,20 @@ function MeusPedidos() {
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {ROT[p.kind] ?? p.kind} · {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </p>
                 <p className="mt-0.5 text-sm font-semibold text-foreground">{p.titulo}</p>
               </div>
               {p.cumprido_em ? (
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                   ✓ feito
                 </span>
               ) : (
                 <button
                   onClick={() => marcarFeito(p.id)}
                   disabled={marcando === p.id}
-                  className="press shrink-0 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold disabled:opacity-50"
+                  className="press shrink-0 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold disabled:opacity-50"
                 >
                   {marcando === p.id ? "…" : "Já fiz"}
                 </button>
@@ -10438,7 +10429,7 @@ function MeusPedidos() {
               {p.conteudo}
             </pre>
             {p.nota && (
-              <p className="mt-1.5 rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug">
+              <p className="mt-1.5 rounded-xl bg-card px-3 py-2 text-xs leading-snug">
                 <span className="font-semibold">Recado dele: </span>
                 {p.nota}
               </p>
@@ -10766,7 +10757,7 @@ function ConsultasTab() {
                 className="rounded-2xl border-2 border-violet-300 bg-violet-50/70 p-4"
               >
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.counter_proposed.cls}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.counter_proposed.cls}`}
                 >
                   {APPT_STATUS_UI.counter_proposed.emoji} {APPT_STATUS_UI.counter_proposed.label}
                 </span>
@@ -10808,7 +10799,7 @@ function ConsultasTab() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.confirmed.cls}`}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.confirmed.cls}`}
                   >
                     {APPT_STATUS_UI.confirmed.emoji} {i === 0 ? "Próxima consulta" : "Confirmada"}
                   </span>
@@ -10828,7 +10819,7 @@ function ConsultasTab() {
             {pending.map((a) => (
               <div key={a.id} className="rounded-2xl border border-border bg-background p-4">
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.pending.cls}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.pending.cls}`}
                 >
                   {APPT_STATUS_UI.pending.emoji} {APPT_STATUS_UI.pending.label}
                 </span>
@@ -10853,9 +10844,7 @@ function ConsultasTab() {
                         key={a.id}
                         className="rounded-2xl border border-border/60 bg-background/60 p-3 opacity-80"
                       >
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ui.cls}`}
-                        >
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ui.cls}`}>
                           {ui.emoji} {ui.label}
                         </span>
                         <p className="mt-1.5 text-xs text-muted-foreground">
@@ -14668,7 +14657,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
             </span>
           </a>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           🚨 Emergência médica não é suporte: ligue 192 (SAMU) ou vá à maternidade.
         </p>
       </div>
@@ -16104,7 +16093,7 @@ function RecompensasHub({
                 emblema do bebê bolha. */}
             {s.key === "conquistas" && !careMode && aResgatar != null && aResgatar > 0 && (
               <span
-                className="ml-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-emerald-700 px-1 py-0.5 text-[10px] font-black leading-none text-white tabular-nums"
+                className="ml-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-emerald-700 px-1 py-0.5 text-xs font-black leading-none text-white tabular-nums"
                 aria-label={`${aResgatar} ${aResgatar === 1 ? "conquista" : "conquistas"} com Sementinhas para pegar`}
               >
                 {aResgatar > 9 ? "9+" : aResgatar}
@@ -16412,7 +16401,7 @@ function ProductSheet({
             >
               <span className="text-8xl select-none drop-shadow-md">{vis.emoji}</span>
               {product.badge && (
-                <span className="absolute top-3 left-3 bg-[#ff7733] text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wide leading-none">
+                <span className="absolute top-3 left-3 bg-[#ff7733] text-white text-xs font-bold px-2 py-1 rounded-sm uppercase tracking-wide leading-none">
                   {product.badge}
                 </span>
               )}
@@ -16431,7 +16420,7 @@ function ProductSheet({
 
               {/* Recomendação médica */}
               <div className="rounded-xl bg-primary/[0.06] border border-primary/15 p-3">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1.5">
                   👨‍⚕️ Por que seu médico recomenda
                 </p>
                 <p className="text-[13px] text-gray-700 leading-relaxed">{product.description}</p>
@@ -16439,7 +16428,7 @@ function ProductSheet({
 
               {/* Semana recomendada */}
               {(product.weeks_min != null || product.weeks_max != null) && (
-                <div className="flex items-center gap-2 text-[12px]">
+                <div className="flex items-center gap-2 text-xs">
                   <span className="text-gray-500">📅 Semana recomendada:</span>
                   <span className="font-semibold text-gray-800">
                     {product.weeks_min != null && product.weeks_max != null
@@ -16452,7 +16441,7 @@ function ProductSheet({
               )}
 
               {/* Selo de confiança */}
-              <p className="text-[10px] text-gray-400">
+              <p className="text-xs text-gray-400">
                 ✓ Curado e recomendado pelo seu médico — Ginecologia e Obstetrícia, especialista em
                 gestação de alto risco
               </p>
@@ -16472,7 +16461,7 @@ function ProductSheet({
                 <div className="pt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex-1 h-px bg-gray-100" />
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 shrink-0">
                       Também recomendados
                     </p>
                     <div className="flex-1 h-px bg-gray-100" />
@@ -16499,7 +16488,7 @@ function ProductSheet({
                             </span>
                           </div>
                           <div className="px-2 pt-2 pb-2.5">
-                            <p className="text-[10px] font-medium line-clamp-2 text-gray-800 leading-snug">
+                            <p className="text-xs font-medium line-clamp-2 text-gray-800 leading-snug">
                               {r.name}
                             </p>
                           </div>
@@ -16644,7 +16633,7 @@ function LojaTab({
       {/* ── Header ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-primary/70">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary/70">
             Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
@@ -16654,11 +16643,11 @@ function LojaTab({
         {currentWeek !== null && (
           <button
             onClick={() => setWeekFilter((v) => !v)}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
               weekFilter ? "bg-primary text-white" : "border border-primary/30 text-primary"
             }`}
           >
-            <span className="text-[10px]">⬤</span> Sem. {currentWeek}
+            <span className="text-xs">⬤</span> Sem. {currentWeek}
           </button>
         )}
       </div>
@@ -16682,10 +16671,10 @@ function LojaTab({
                   <span className="text-[36px]">{vis.emoji}</span>
                 </div>
                 <div className="flex flex-col justify-center bg-white px-3 py-3 flex-1 min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+                  <span className="text-xs font-bold uppercase tracking-widest text-primary/70 mb-0.5">
                     {vis.label}
                   </span>
-                  <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
+                  <p className="text-xs font-medium leading-tight line-clamp-2 text-gray-800">
                     {p.name}
                   </p>
                 </div>
@@ -16707,7 +16696,7 @@ function LojaTab({
             <button
               key={c.key}
               onClick={() => setCategory(c.key)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all ${
+              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
                 category === c.key
                   ? "bg-primary/10 text-primary font-semibold"
                   : "text-foreground/60 hover:text-foreground/80"
@@ -16754,13 +16743,13 @@ function LojaTab({
                   </span>
 
                   {/* Label categoria — canto superior direito */}
-                  <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                  <span className="absolute top-2 right-2 text-xs font-semibold uppercase tracking-widest text-white/50">
                     {vis.label}
                   </span>
 
                   {/* Badge destaque — canto superior esquerdo */}
                   {product.badge && (
-                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-xs font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
@@ -16768,11 +16757,11 @@ function LojaTab({
 
                 {/* Info */}
                 <div className="flex flex-col px-2.5 pt-2.5 pb-3">
-                  <p className="text-[12px] font-medium leading-snug line-clamp-2 text-gray-800">
+                  <p className="text-xs font-medium leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
                   <div className="mt-2 flex items-center justify-end">
-                    <span className="text-[10px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
                       ✓ Recomendado
                     </span>
                   </div>
@@ -16787,7 +16776,7 @@ function LojaTab({
           links carrega tag de afiliado, então ninguém era remunerado por
           nenhuma compra. Enquanto não houver programa de afiliados de fato, a
           linha diz só o que é verdade. */}
-      <p className="text-center text-[10px] text-gray-400 pb-4">
+      <p className="text-center text-xs text-gray-400 pb-4">
         Seleção do consultório · os preços você confere na Amazon
       </p>
 
@@ -17815,7 +17804,7 @@ function MédicoTab() {
                 <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
                   Não consegui carregar a lista agora
                 </p>
-                <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                <p className="mt-0.5 text-xs leading-snug text-amber-900/80 dark:text-amber-100/80">
                   Isso é a nossa conexão, não o cadastro do seu médico — ele pode muito bem estar
                   aqui.
                 </p>
@@ -17836,7 +17825,7 @@ function MédicoTab() {
               </p>
             )}
             {filtrosFora && results.length > 0 && (
-              <p className="rounded-xl bg-secondary/60 p-3 text-[12px] leading-snug text-muted-foreground">
+              <p className="rounded-xl bg-secondary/60 p-3 text-xs leading-snug text-muted-foreground">
                 Esta lista está sem filtros — mostrando todos os obstetras do app.
               </p>
             )}
@@ -17845,7 +17834,7 @@ function MédicoTab() {
                 <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
                   Não encontramos “{query.trim()}” no app
                 </p>
-                <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                <p className="mt-0.5 text-xs leading-snug text-amber-900/80 dark:text-amber-100/80">
                   Seu médico talvez ainda não esteja aqui. Abaixo estão os obstetras que já atendem
                   pelo app — confira o nome antes de solicitar.
                 </p>
@@ -17872,7 +17861,7 @@ function MédicoTab() {
                       não tem cidade preenchida — é o mesmo dado, e ela só
                       quer saber se é perto. */}
                   {(d.city || d.endereco_cidade || d.years_experience) && (
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {[
                         d.city
                           ? `${d.city}${d.state ? `/${d.state}` : ""}`
@@ -17887,7 +17876,7 @@ function MédicoTab() {
                       faz antes de solicitar. Sem elas, "Solicitar" era um pedido
                       no escuro — e ela descobria o preço depois de aceita. */}
                   {(d.accepts_insurance || d.accepts_private || d.consultation_price_brl) && (
-                    <p className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                    <p className="mt-1 flex flex-wrap gap-1 text-xs">
                       {d.accepts_insurance && (
                         <span className="rounded-full bg-secondary px-1.5 py-0.5">💳 Convênio</span>
                       )}
@@ -17905,9 +17894,7 @@ function MédicoTab() {
                     </p>
                   )}
                   {d.endereco ? (
-                    <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                      📍 {d.endereco}
-                    </p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">📍 {d.endereco}</p>
                   ) : null}
                 </div>
                 <button

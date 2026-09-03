@@ -271,7 +271,7 @@ function ArrobaDoPerfil({
             />
           </div>
           {recusa && (
-            <p className="mt-1.5 text-[12px] leading-snug text-destructive">
+            <p className="mt-1.5 text-xs leading-snug text-destructive">
               {recusa === "curto"
                 ? "Muito curto."
                 : recusa === "longo"
@@ -283,7 +283,7 @@ function ArrobaDoPerfil({
                       : "Use letras, números, ponto e _ ."}
             </p>
           )}
-          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             Dá para trocar {TROCAS_POR_JANELA} vezes a cada {JANELA_DE_TROCA_DIAS} dias. O @ antigo
             fica guardado por {RESERVA_DO_ANTIGO_DIAS} dias — ninguém assume o seu lugar.
           </p>
@@ -793,7 +793,7 @@ export function ConfiguracoesDoPerfil({
         </div>
         {/* ⚠️ **NINGUÉM É AVISADO, e a tela diz isso.** Sem a frase, ela pausa
             imaginando que a amiga vai receber "Fulana pausou" — e não pausa. */}
-        <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           Ninguém é avisado. É só voltar aqui para reativar.
         </p>
       </section>
@@ -1020,7 +1020,7 @@ export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
           </div>
 
           {palavras.length === 0 ? (
-            <p className="mt-3 text-[12px] text-muted-foreground">
+            <p className="mt-3 text-xs text-muted-foreground">
               Sua lista está vazia. Nada está sendo escondido.
             </p>
           ) : (
@@ -1048,7 +1048,7 @@ export function FiltroDePalavras({ bancada }: { bancada?: string[] }) {
               "mal" e estranha que "mala" continue aparecendo — ou o contrário,
               espera que "parto" esconda "departamento". A régua é
               `temPalavraOculta`, e a tela a explica em uma frase. */}
-          <p className="mt-3 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-3 text-xs leading-snug text-muted-foreground">
             Casa a palavra inteira: “parto” não esconde “departamento”. Você pode escrever uma
             frase, e ela é escondida como frase.
           </p>

@@ -33,7 +33,7 @@ export function EscolherMotivo({
       <p className="text-[13px] font-semibold leading-snug">{titulo}</p>
       {/* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra vai
           saber — a mesma razão pela qual o bloqueio é mudo. */}
-      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{aviso}</p>
+      <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{aviso}</p>
 
       <div className="mt-2.5 space-y-1">
         {MOTIVOS.map((m) => (
@@ -47,9 +47,7 @@ export function EscolherMotivo({
             }`}
           >
             <span className="block text-[13px] font-medium">{m.rotulo}</span>
-            <span className="block text-[11px] leading-tight text-muted-foreground">
-              {m.explica}
-            </span>
+            <span className="block text-xs leading-tight text-muted-foreground">{m.explica}</span>
           </button>
         ))}
       </div>

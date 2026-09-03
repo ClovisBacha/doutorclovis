@@ -153,9 +153,7 @@ export function CompartilharMomento({
             style={{ paddingBottom: "max(1.25rem, var(--safe-bottom))" }}
           >
             <p className="text-[15px] font-semibold">Compartilhe essa vitória</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
-              {momento.legenda}
-            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{momento.legenda}</p>
 
             <div className="mt-4 flex flex-col gap-2">
               <button
@@ -208,7 +206,7 @@ export function CompartilharMomento({
             {/* ⚠️ Diz o que vai acontecer ANTES de ela tocar. "Publicar na
                 Comunidade" abre o compositor — e uma paciente que ache que o
                 toque já publica simplesmente não toca. */}
-            <p className="mt-3 text-center text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-3 text-center text-xs leading-snug text-muted-foreground">
               Nada é publicado sozinho — você confere antes.
             </p>
           </div>

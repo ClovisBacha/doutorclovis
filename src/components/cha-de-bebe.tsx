@@ -621,7 +621,7 @@ export function ChaDeBebe({
 
         {ehCota && (
           <div className="mt-2 rounded-2xl border border-border p-3">
-            <label className="block text-[12px] text-muted-foreground" htmlFor="valor-da-cota">
+            <label className="block text-xs text-muted-foreground" htmlFor="valor-da-cota">
               Quanto custa, mais ou menos?
             </label>
             <div className="mt-1 flex items-center gap-2">
@@ -648,7 +648,7 @@ export function ChaDeBebe({
                 um número livre reintroduziria exatamente isso. */}
             {sugestoesDeCota.length > 0 ? (
               <>
-                <p className="mt-2.5 text-[12px] text-muted-foreground">Dividir em:</p>
+                <p className="mt-2.5 text-xs text-muted-foreground">Dividir em:</p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {sugestoesDeCota.map((n) => (
                     <button
@@ -671,7 +671,7 @@ export function ChaDeBebe({
               /* ⚠️ Diz o PISO, não "valor inválido": sem o número ela não sabe
                  o que corrigir, e o piso é a regra inteira. */
               valorDaCota.trim() !== "" && (
-                <p className="mt-2.5 text-[12px] text-muted-foreground">
+                <p className="mt-2.5 text-xs text-muted-foreground">
                   Para dividir, o presente precisa custar pelo menos R$ 50 — cada cota não pode
                   ficar abaixo de R$ 25.
                 </p>

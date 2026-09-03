@@ -97,7 +97,7 @@ export function MeusGrupos({
       {/* ⚠️ O vazio EXPLICA a régua, senão criar um grupo e não conseguir
           convidar ninguém lê como app quebrado. */}
       {(grupos ?? []).length === 0 ? (
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
           Você ainda não está em nenhum grupo. Dá para chamar até {MEMBROS_DO_GRUPO_MAX} pessoas que
           você já acompanha.
         </p>
@@ -113,7 +113,7 @@ export function MeusGrupos({
                 <Foto url={g.membros.find((m) => !m.souEu)?.avatarUrl ?? null} nome={g.nome} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{g.nome}</span>
-                  <span className="block truncate text-[12px] text-muted-foreground">
+                  <span className="block truncate text-xs text-muted-foreground">
                     {g.membros.length} {g.membros.length === 1 ? "pessoa" : "pessoas"}
                   </span>
                 </span>
@@ -236,7 +236,7 @@ export function ConversaDoGrupo({
         </button>
         <span className="min-w-0 flex-1">
           <span className="block truncate text-[15px] font-semibold">{grupo.nome}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">
+          <span className="block truncate text-xs text-muted-foreground">
             {grupo.membros.map((m) => (m.souEu ? "Você" : m.nome)).join(", ")}
           </span>
         </span>
@@ -266,7 +266,7 @@ export function ConversaDoGrupo({
             conversa antiga vê uma tela vazia e conclui que o app quebrou — e
             quem já estava precisa saber que o que ela escreveu antes NÃO foi
             entregue a quem chegou depois. */}
-        <p className="mb-3 text-center text-[11px] leading-snug text-muted-foreground">
+        <p className="mb-3 text-center text-xs leading-snug text-muted-foreground">
           Você vê as mensagens a partir de quando entrou.
         </p>
         {(msgs ?? []).map((m) => (
@@ -274,9 +274,7 @@ export function ConversaDoGrupo({
             key={m.id}
             className={`mb-1.5 flex flex-col ${m.souEu ? "items-end" : "items-start"}`}
           >
-            {!m.souEu && (
-              <span className="px-1 text-[11px] text-muted-foreground">{m.autorNome}</span>
-            )}
+            {!m.souEu && <span className="px-1 text-xs text-muted-foreground">{m.autorNome}</span>}
             <span
               className={`max-w-[78%] rounded-2xl px-3 py-2 text-[14px] leading-snug ${
                 m.apagada
@@ -294,7 +292,7 @@ export function ConversaDoGrupo({
 
       <div className="border-t border-border px-4 py-2 pb-[calc(0.5rem+var(--safe-area-inset-bottom,0px))]">
         {recado && (
-          <p className="mb-2 rounded-xl bg-muted/60 px-3 py-2 text-[12px] leading-snug">{recado}</p>
+          <p className="mb-2 rounded-xl bg-muted/60 px-3 py-2 text-xs leading-snug">{recado}</p>
         )}
         <div className="flex items-end gap-2">
           <textarea
@@ -322,7 +320,7 @@ export function ConversaDoGrupo({
           </p>
           {/* ⚠️ A criadora precisa saber que sair ENCERRA para todo mundo — sem
               a frase, ela sai achando que só ela sai. */}
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
             {grupo.souACriadora
               ? "Você criou este grupo: saindo, ele acaba para todas. As mensagens não são apagadas."
               : "Ninguém é avisado. Você para de ver as mensagens novas."}
@@ -439,7 +437,7 @@ export function CriarGrupo({
 
       {/* ⚠️ A régua é DITA: sem a frase, quem não acha a amiga na lista conclui
           que o app quebrou — quando na verdade ela só ainda não se acompanham. */}
-      <p className="mt-3 text-[12px] leading-snug text-muted-foreground">
+      <p className="mt-3 text-xs leading-snug text-muted-foreground">
         Você chama quem já acompanha. Até {MEMBROS_DO_GRUPO_MAX} pessoas, contando você.
       </p>
 
@@ -543,7 +541,7 @@ export function ChamarParaGrupo({
         </button>
         <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Chamar para o grupo</h1>
       </header>
-      <p className="text-[12px] leading-snug text-muted-foreground">
+      <p className="text-xs leading-snug text-muted-foreground">
         {vagas > 0 ? `Cabem mais ${vagas}.` : "O grupo está cheio."}
       </p>
       <ul className="mt-2">

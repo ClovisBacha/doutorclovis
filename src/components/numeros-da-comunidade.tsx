@@ -54,7 +54,7 @@ export function NumerosDaComunidade({ bancada }: { bancada?: NumerosDaComunidade
 
   if (falhou) {
     return (
-      <p className="mt-6 text-[12px] text-muted-foreground">
+      <p className="mt-6 text-xs text-muted-foreground">
         Não consegui ler os números da Comunidade agora.
       </p>
     );
@@ -66,7 +66,7 @@ export function NumerosDaComunidade({ bancada }: { bancada?: NumerosDaComunidade
   return (
     <div className="mt-6">
       <h3 className="text-[14px] font-semibold">Comunidade</h3>
-      <p className="mt-0.5 text-[12px] text-muted-foreground">
+      <p className="mt-0.5 text-xs text-muted-foreground">
         Últimos 7 dias, exceto onde diz o contrário.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -95,7 +95,7 @@ function Caixa({ rotulo, valor, alerta }: { rotulo: string; valor: string; alert
       }`}
     >
       <p className="text-[20px] font-semibold tabular-nums leading-none">{valor}</p>
-      <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{rotulo}</p>
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">{rotulo}</p>
     </div>
   );
 }

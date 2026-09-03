@@ -200,7 +200,7 @@ export function AssinaturaTab({
             </p>
             {st && (
               <span
-                className="mt-1.5 inline-block rounded-full px-2.5 py-1 text-[12px] font-bold"
+                className="mt-1.5 inline-block rounded-full px-2.5 py-1 text-xs font-bold"
                 style={{ background: st.fundo, color: st.cor }}
               >
                 {st.rotulo}
@@ -294,7 +294,7 @@ export function AssinaturaTab({
                 {abrindo ? "Abrindo…" : ativa ? "Gerenciar ou cancelar" : "Reativar assinatura"}
                 {!abrindo && <ExternalLink className="h-4 w-4" strokeWidth={2.2} />}
               </button>
-              <p className="mt-2 text-center text-[11.5px] leading-snug text-muted-foreground">
+              <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
                 {ativa
                   ? "Abre a área segura de pagamento, onde você troca o cartão, vê as faturas ou cancela quando quiser."
                   : "Abre a área segura de pagamento. Sua assinatura volta a renovar e você não perde nada do que já tem."}
@@ -320,7 +320,7 @@ export function AssinaturaTab({
                 {(viva?.source ?? "").toLowerCase().includes("google") ? "Play Store" : "App Store"}
                 <ExternalLink className="h-4 w-4" strokeWidth={2.2} />
               </a>
-              <p className="mt-2 text-center text-[11.5px] leading-snug text-muted-foreground">
+              <p className="mt-2 text-center text-xs leading-snug text-muted-foreground">
                 Esta assinatura foi feita pela loja do seu celular — por regra dela, é lá que se
                 troca o pagamento ou se cancela.
               </p>
@@ -380,7 +380,7 @@ export function AssinaturaTab({
             pergunta que a pessoa não fez ensina que o texto daqui é enfeite. A
             SEGUNDA frase fica sempre: é o limite ético do produto, e ela vale
             ainda mais para quem está decidindo se assina. */}
-        <p className="text-[12.5px] leading-relaxed text-muted-foreground">
+        <p className="text-xs leading-relaxed text-muted-foreground">
           {ativa &&
             origem !== "presente" &&
             "Cancelar é imediato e você mantém o acesso até o fim do período já pago. "}

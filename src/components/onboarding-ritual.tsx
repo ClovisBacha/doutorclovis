@@ -431,7 +431,7 @@ export function OnboardingRitual({
               <div className="mx-auto mt-6 max-w-xs text-left">
                 <label
                   htmlFor="codigo-ref"
-                  className="block text-[12px] font-semibold text-muted-foreground"
+                  className="block text-xs font-semibold text-muted-foreground"
                 >
                   Código da sua médica ou embaixadora (opcional)
                 </label>
@@ -448,14 +448,14 @@ export function OnboardingRitual({
                   spellCheck={false}
                   className="mt-1.5 min-h-11 w-full rounded-full border border-border bg-background px-4 text-[14px]"
                 />
-                <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
+                <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                   Ganhe {BONUS_INFLUENCIADORA} Sementinhas 🌱 para começar. Dá para colocar depois,
                   no Perfil.
                 </p>
                 {/* Ver o mesmo aviso em `CodigoDaEmbaixadora`: o consentimento
                     tem de dizer o que acontece, e é a MESMA frase nas duas
                     portas. */}
-                <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">
                   Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para
                   poder te presentear.
                 </p>
@@ -508,7 +508,7 @@ export function OnboardingRitual({
                   <span className="block text-[13px] font-semibold">
                     {CONVITE_DA_COMUNIDADE.titulo}
                   </span>
-                  <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
+                  <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                     {entrarNaComunidade ? TEXTO_PERFIL_PUBLICO.ligado : CONVITE_DA_COMUNIDADE.sub}
                   </span>
                 </span>
@@ -677,7 +677,7 @@ export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) 
   return (
     <div className="rounded-3xl card-material p-4">
       <p className="text-sm font-bold">Veio pela indicação de alguém?</p>
-      <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
         <strong className="font-semibold">{BONUS_INFLUENCIADORA} Sementinhas 🌱</strong>.
       </p>
@@ -687,7 +687,7 @@ export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) 
           ela saber" — e o que fica exposto não é um nome qualquer: é "esta
           pessoa é paciente de um app de gestação de alto risco", que é dado de
           saúde por inferência. */}
-      <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para poder te
         presentear. Nada mais do seu acompanhamento aparece para ela.
       </p>

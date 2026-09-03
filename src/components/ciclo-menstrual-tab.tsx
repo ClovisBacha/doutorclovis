@@ -124,12 +124,12 @@ function CicloHero({ model }: { model: CycleModel }) {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
                 Próximo período
               </p>
               <p className="font-serif text-lg">{fmt(marks.nextPeriod)}</p>
               {daysToNext !== null && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   {daysToNext === 0
                     ? "pode ser hoje"
                     : daysToNext === 1
@@ -139,23 +139,21 @@ function CicloHero({ model }: { model: CycleModel }) {
               )}
             </div>
             <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ovulação</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Ovulação</p>
               <p className="font-serif text-lg">{fmt(marks.ovulation)}</p>
-              <p className="text-[11px] text-muted-foreground">estimada</p>
+              <p className="text-xs text-muted-foreground">estimada</p>
             </div>
             <div className="col-span-2 rounded-2xl bg-secondary/60 px-3 py-2.5 sm:col-span-1">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Janela fértil
-              </p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Janela fértil</p>
               <p className="font-serif text-base">
                 {fmt(marks.fertileStart)} – {fmt(marks.fertileEnd)}
               </p>
-              <p className="text-[11px] text-muted-foreground">ciclo de {model.cycleLen} dias</p>
+              <p className="text-xs text-muted-foreground">ciclo de {model.cycleLen} dias</p>
             </div>
           </div>
         </div>
       </div>
-      <p className="mt-4 text-center text-[11px] text-muted-foreground md:text-left">
+      <p className="mt-4 text-center text-xs text-muted-foreground md:text-left">
         Estimativas com base no seu histórico. Não substituem métodos contraceptivos nem
         acompanhamento médico.
       </p>
@@ -216,7 +214,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
         {WEEKDAYS_PT.map((w, i) => (
           <div
             key={i}
-            className="pb-1 text-center text-[11px] font-medium uppercase text-muted-foreground"
+            className="pb-1 text-center text-xs font-medium uppercase text-muted-foreground"
           >
             {w}
           </div>
@@ -229,10 +227,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
       </div>
       <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
         {legend.map((l) => (
-          <span
-            key={l.label}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
-          >
+          <span key={l.label} className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <span className={`h-3 w-3 shrink-0 rounded-full ${l.swatch}`} />
             {l.label}
           </span>

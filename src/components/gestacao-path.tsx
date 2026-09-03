@@ -1557,7 +1557,7 @@ function WeekBar({
               </span>
             )}
           </p>
-          <p className="truncate text-[11px] font-semibold leading-tight text-slate-500">
+          <p className="truncate text-xs font-semibold leading-tight text-slate-500">
             {sub ?? `${feitos} de 7 dias`}
           </p>
         </div>
@@ -3230,7 +3230,7 @@ export function GestacaoPath({
             >
               <IconeLoja className="h-6 w-6 text-emerald-600" />
               {saldo != null && (
-                <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-[10px] font-black leading-none text-emerald-700 shadow-sm ring-1 ring-emerald-200">
+                <span className="absolute -right-1.5 -top-1.5 rounded-full bg-white px-1.5 py-0.5 text-xs font-black leading-none text-emerald-700 shadow-sm ring-1 ring-emerald-200">
                   {saldo}
                 </span>
               )}
@@ -3332,7 +3332,7 @@ export function GestacaoPath({
       {arranging && !careMode && (
         <div className="fixed inset-x-0 bottom-0 z-50 border-t border-emerald-200 bg-white/95 px-3 pt-2 shadow-[0_-6px_24px_rgba(0,0,0,0.12)] backdrop-blur">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] leading-snug text-muted-foreground">
+            <p className="text-xs leading-snug text-muted-foreground">
               Arraste pra mover · <span className="font-bold text-emerald-600">⤢</span> pra mudar o
               tamanho · <span className="font-bold text-rose-500">✕</span> pra tirar
               <span className="ml-1 tabular-nums opacity-70">
@@ -3395,7 +3395,7 @@ export function GestacaoPath({
                 className="press flex flex-1 flex-col items-center gap-0.5 rounded-xl bg-slate-50 py-2 hover:bg-pink-50"
               >
                 <span className="text-2xl">{m.emoji}</span>
-                <span className="text-[10px] font-medium text-muted-foreground">{m.label}</span>
+                <span className="text-xs font-medium text-muted-foreground">{m.label}</span>
               </button>
             ))}
           </div>
@@ -3538,7 +3538,7 @@ export function GestacaoPath({
                   }}
                 >
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-white/80">
+                    <p className="text-xs font-bold uppercase tracking-wider text-white/80">
                       Fase {p.n} · Semanas {p.from}–{p.to}
                     </p>
                     <p className="mt-0.5 text-xl font-extrabold">{p.name}</p>
@@ -3649,7 +3649,7 @@ export function GestacaoPath({
                   </div>
                 </div>
                 <span
-                  className={`mt-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-sm ${
+                  className={`mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wide shadow-sm ${
                     !unlocked
                       ? "bg-white/80 text-slate-400"
                       : done
@@ -3722,7 +3722,7 @@ export function GestacaoPath({
               >
                 {isToday && (
                   <div className="duo-bubble absolute -top-11 z-20 whitespace-nowrap">
-                    <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
+                    <div className="relative rounded-xl bg-white px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-pink-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
                       {done ? "Desafio completo ✓" : "Desafio de hoje 🎁"}
                       <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-white" />
                     </div>
@@ -4529,9 +4529,9 @@ function QuizPaywall({
             {badge}
           </span>
         )}
-        <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600">{label}</p>
+        <p className="text-xs font-bold uppercase tracking-wide text-amber-600">{label}</p>
         <p className="text-lg font-extrabold text-amber-900">{price}</p>
-        <p className="text-[10px] text-amber-700">{sub}</p>
+        <p className="text-xs text-amber-700">{sub}</p>
       </button>
     );
   };
@@ -4587,7 +4587,7 @@ function QuizPaywall({
           as alternativas e o gabarito continuam do lado de dentro). */}
       {peek && peek.questions.length > 0 && (
         <div className="mt-3 rounded-xl border border-amber-200 bg-white/70 p-3">
-          <p className="text-[11px] font-black uppercase tracking-wider text-amber-600">
+          <p className="text-xs font-black uppercase tracking-wider text-amber-600">
             Nesta aula · {peek.questions.length} exercícios
           </p>
           <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-amber-900/80">
@@ -4595,10 +4595,7 @@ function QuizPaywall({
           </p>
           <ul className="mt-2 space-y-1.5">
             {peek.questions.map((q, i) => (
-              <li
-                key={i}
-                className="flex items-start gap-2 text-[11px] leading-snug text-amber-800"
-              >
+              <li key={i} className="flex items-start gap-2 text-xs leading-snug text-amber-800">
                 <span
                   className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-100 text-[9px] font-black text-amber-600"
                   aria-hidden
@@ -4616,7 +4613,7 @@ function QuizPaywall({
       {oferta && (
         <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2.5 text-white">
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-white/85">
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-white/85">
               Plano anual
             </p>
             <p className="font-serif text-xl leading-tight">
@@ -4625,7 +4622,7 @@ function QuizPaywall({
             {/* O riscado com legenda: R$ 238,80 é o plano mensal por doze
                 meses, não um preço anual inflado. Sem a legenda, comparação
                 vira propaganda enganosa. */}
-            <p className="mt-0.5 text-[11px] leading-tight text-white/80">
+            <p className="mt-0.5 text-xs leading-tight text-white/80">
               <span className="whitespace-nowrap line-through">
                 {brlPromo(oferta.referenciaCentavos)}
               </span>{" "}
@@ -4669,8 +4666,8 @@ function QuizPaywall({
           {/* Frase vinda de `canal-de-venda.ts` — a mesma que a folha do
               Cantinho usa. Duas telas de preço com textos diferentes sobre a
               mesma regra é como a divergência começa. */}
-          <p className="mt-1 text-[12px] leading-relaxed text-amber-800/90">{veredito.texto}</p>
-          <p className="mt-1 text-[12px] text-amber-800/90">
+          <p className="mt-1 text-xs leading-relaxed text-amber-800/90">{veredito.texto}</p>
+          <p className="mt-1 text-xs text-amber-800/90">
             Se o seu médico te deu um código, ele funciona aqui mesmo.
           </p>
         </div>
@@ -4685,7 +4682,7 @@ function QuizPaywall({
         </button>
       )}
 
-      <p className="mt-2 text-center text-[10px] leading-relaxed text-amber-700/80">
+      <p className="mt-2 text-center text-xs leading-relaxed text-amber-700/80">
         Pagamento seguro por cartão · acesso na hora · cancele quando quiser.
         <br />A aula de hoje continua grátis, todos os dias 💛
       </p>
@@ -4815,9 +4812,7 @@ function QuizIntro({
       <p className="dc-intro-sub mt-2 max-w-[240px] text-center font-serif text-2xl font-extrabold leading-snug text-white drop-shadow-sm">
         {isToday ? `2 minutinhos por ${babyLabel} 💛` : `Relembre pelo ${babyLabel} 💛`}
       </p>
-      <p className="dc-intro-sub mt-3 text-[11px] font-semibold text-white/75">
-        toque para começar
-      </p>
+      <p className="dc-intro-sub mt-3 text-xs font-semibold text-white/75">toque para começar</p>
     </div>
   );
 }
@@ -5150,7 +5145,7 @@ export function MovementBlock({
           {/* O aviso médico morava na telinha intermediária que saiu. Ele não
               podia sair junto: fica fixo, discreto, na tela do exercício. */}
           {phase === "active" && (
-            <p className="px-6 pb-1 text-center text-[10.5px] leading-snug text-emerald-700/70">
+            <p className="px-6 pb-1 text-center text-xs leading-snug text-emerald-700/70">
               Vá no seu ritmo. Confirme com seu médico se algum movimento não é indicado pra você.
             </p>
           )}
@@ -5184,7 +5179,7 @@ export function MovementBlock({
                   A pergunta que faltava. Antes a sessão era `day % 9`: a
                   mulher com ciática recebia "rolar os ombros" porque era
                   terça. */}
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+              <p className="mt-6 text-xs font-bold uppercase tracking-wider text-emerald-600">
                 O que está incomodando?
               </p>
               <div className="mt-2 grid grid-cols-2 gap-2">
@@ -5202,12 +5197,12 @@ export function MovementBlock({
                     <span className="text-lg leading-none" aria-hidden>
                       {x.emoji}
                     </span>
-                    <span className="text-[12.5px] font-bold leading-tight">{x.rotulo}</span>
+                    <span className="text-xs font-bold leading-tight">{x.rotulo}</span>
                   </button>
                 ))}
               </div>
 
-              <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+              <p className="mt-6 text-xs font-bold uppercase tracking-wider text-emerald-600">
                 De quanto tempo você tem?
               </p>
               <div className="mt-2 flex gap-2">
@@ -5244,11 +5239,11 @@ export function MovementBlock({
                     🛏️
                   </span>
                   <span className="flex-1">
-                    <span className="block text-[12.5px] font-bold leading-tight">
+                    <span className="block text-xs font-bold leading-tight">
                       Hoje eu não desço ao chão
                     </span>
                     <span
-                      className={`block text-[11px] leading-snug ${semChao ? "text-white/80" : "text-emerald-700/60"}`}
+                      className={`block text-xs leading-snug ${semChao ? "text-white/80" : "text-emerald-700/60"}`}
                     >
                       Cama, sofá ou de pé — sem tapete
                     </span>
@@ -5261,22 +5256,22 @@ export function MovementBlock({
                   se exercitar hoje, e todos pedem contato com o obstetra em
                   vez de alongamento. Fica ANTES, porque depois não serve. */}
               <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-3">
-                <p className="text-[12px] font-extrabold text-amber-900">
+                <p className="text-xs font-extrabold text-amber-900">
                   Hoje não é dia de exercício se você tiver:
                 </p>
                 <ul className="mt-1.5 grid gap-1">
                   {SINAIS_DE_PARADA.map((sinal) => (
-                    <li key={sinal} className="text-[12px] leading-snug text-amber-900/85">
+                    <li key={sinal} className="text-xs leading-snug text-amber-900/85">
                       · {sinal}
                     </li>
                   ))}
                 </ul>
-                <p className="mt-2 text-[11.5px] leading-snug text-amber-900/70">
+                <p className="mt-2 text-xs leading-snug text-amber-900/70">
                   Qualquer um deles: fale com seu médico agora, pelo SOS ou pela conversa.
                 </p>
               </div>
 
-              <p className="mt-4 text-[11px] leading-relaxed text-emerald-700/60">
+              <p className="mt-4 text-xs leading-relaxed text-emerald-700/60">
                 Nada aqui substitui a orientação do seu obstetra. Se ele já disse que algum
                 movimento não serve pra você, pule esse.
               </p>
@@ -5340,7 +5335,7 @@ export function MovementBlock({
               <ol className="mx-auto mt-4 w-full max-w-sm space-y-2">
                 {cur.passos.map((p, i) => (
                   <li key={i} className="flex gap-2.5 text-left">
-                    <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[11px] font-extrabold text-emerald-700">
+                    <span className="mt-[1px] flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-extrabold text-emerald-700">
                       {i + 1}
                     </span>
                     <span className="text-[13px] leading-snug text-emerald-900/90">{p}</span>
@@ -5349,10 +5344,10 @@ export function MovementBlock({
               </ol>
 
               <div className="mx-auto mt-4 grid w-full max-w-sm gap-2">
-                <p className="rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-left text-[12px] leading-snug text-emerald-800">
+                <p className="rounded-2xl bg-emerald-50 px-3.5 py-2.5 text-left text-xs leading-snug text-emerald-800">
                   <span className="font-extrabold">Você deve sentir:</span> {cur.sentir}
                 </p>
-                <p className="rounded-2xl bg-amber-50 px-3.5 py-2.5 text-left text-[12px] leading-snug text-amber-900">
+                <p className="rounded-2xl bg-amber-50 px-3.5 py-2.5 text-left text-xs leading-snug text-amber-900">
                   <span className="font-extrabold">Pare se:</span> {cur.parar}
                 </p>
               </div>
@@ -6769,7 +6764,7 @@ export function MeditationBlock({
             ao som. */}
         <button
           onClick={() => setSonsAbertos(true)}
-          className="press mt-2 w-full text-center text-[12px] font-bold text-violet-600/80"
+          className="press mt-2 w-full text-center text-xs font-bold text-violet-600/80"
         >
           🌙 Só sons, para dormir
         </button>
@@ -6818,7 +6813,7 @@ export function MeditationBlock({
                 trava a largura: sem isso "9s" para "10s" empurra o ícone de
                 pausa um pixel para o lado a cada troca de dígito. */}
             {etapa === "sessao" && (
-              <span className="mr-2 text-[12px] font-bold tabular-nums text-violet-500/80">
+              <span className="mr-2 text-xs font-bold tabular-nums text-violet-500/80">
                 {formatarRestante(restanteSeg)}
               </span>
             )}
@@ -6923,7 +6918,7 @@ export function MeditationBlock({
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-extrabold text-violet-900">Lembrar todo dia</p>
-                    <p className="text-[11px] leading-snug text-violet-700/70">
+                    <p className="text-xs leading-snug text-violet-700/70">
                       {lembrete.hora
                         ? "E fico quieto se você já tiver meditado"
                         : "Um empurrãozinho na hora que você escolher"}
@@ -6968,13 +6963,13 @@ export function MeditationBlock({
               {diaAtualDoPrograma && !menuAberto && (
                 <>
                   <div className="mt-6 rounded-3xl bg-violet-700 p-5 text-white">
-                    <p className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-white/80">
+                    <p className="text-xs font-extrabold uppercase tracking-[0.12em] text-white/80">
                       Dia {diaAtualDoPrograma.dia} de {PROGRAMA.length}
                     </p>
                     <p className="mt-1.5 font-serif text-[21px] leading-tight">
                       {diaAtualDoPrograma.titulo}
                     </p>
-                    <p className="mt-1 text-[12.5px] text-white/85">{diaAtualDoPrograma.sub}</p>
+                    <p className="mt-1 text-xs text-white/85">{diaAtualDoPrograma.sub}</p>
                     <div className="mt-3.5 flex gap-1.5" aria-hidden>
                       {PROGRAMA.map((d) => (
                         <span
@@ -7004,7 +6999,7 @@ export function MeditationBlock({
 
               {(!diaAtualDoPrograma || menuAberto) && (
                 <>
-                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                  <p className="mt-6 text-xs font-bold uppercase tracking-wider text-violet-500">
                     De quanto tempo você tem?
                   </p>
                   <div className="mt-2 flex gap-2">
@@ -7023,7 +7018,7 @@ export function MeditationBlock({
                     ))}
                   </div>
 
-                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                  <p className="mt-6 text-xs font-bold uppercase tracking-wider text-violet-500">
                     O que você precisa agora?
                   </p>
                   <div className="mt-2 grid gap-2">
@@ -7041,14 +7036,14 @@ export function MeditationBlock({
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-extrabold">{m.need}</span>
                           <span
-                            className={`block text-[11px] ${temaIdx === i ? "text-white/75" : "text-violet-700/70"}`}
+                            className={`block text-xs ${temaIdx === i ? "text-white/75" : "text-violet-700/70"}`}
                           >
                             {m.theme}
                           </span>
                         </span>
                         {i === sugerida && (
                           <span
-                            className={`shrink-0 rounded-full px-2 py-[3px] text-[9.5px] font-bold ${
+                            className={`shrink-0 rounded-full px-2 py-[3px] text-xs font-bold ${
                               temaIdx === i
                                 ? "bg-white/25 text-white"
                                 : "bg-violet-100 text-violet-700"
@@ -7061,7 +7056,7 @@ export function MeditationBlock({
                     ))}
                   </div>
 
-                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                  <p className="mt-6 text-xs font-bold uppercase tracking-wider text-violet-500">
                     Som de fundo
                   </p>
                   {/* ⚠️ Agrupado por família: vinte e duas pílulas numa fita lisa é
@@ -7069,7 +7064,7 @@ export function MeditationBlock({
                   {gruposDeSom(careMode).map((g) => (
                     <div key={g.familia || "especiais"} className="mt-2">
                       {g.familia && (
-                        <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-violet-400">
+                        <p className="mb-1.5 text-xs font-bold uppercase tracking-wider text-violet-400">
                           {g.familia}
                         </p>
                       )}
@@ -7102,7 +7097,7 @@ export function MeditationBlock({
                       </div>
                     </div>
                   ))}
-                  <p className="mt-1.5 text-[11px] text-violet-700/60">
+                  <p className="mt-1.5 text-xs text-violet-700/60">
                     Toque para ouvir 5 segundos antes de escolher.
                   </p>
 
@@ -7113,7 +7108,7 @@ export function MeditationBlock({
                   mais importam para quem está começando. Três degraus é o que
                   o Headspace oferece (guiada, semi-guiada, não guiada), e é uma
                   das razões de ele ser o melhor app para iniciante. */}
-                  <p className="mt-6 text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                  <p className="mt-6 text-xs font-bold uppercase tracking-wider text-violet-500">
                     Quanta voz você quer?
                   </p>
                   <div className="mt-2 grid gap-2">
@@ -7136,7 +7131,7 @@ export function MeditationBlock({
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-extrabold">{d.rotulo}</span>
                           <span
-                            className={`block text-[11px] ${
+                            className={`block text-xs ${
                               densidade === d.chave ? "text-white/75" : "text-violet-700/70"
                             }`}
                           >
@@ -7165,7 +7160,7 @@ export function MeditationBlock({
                     <span className="block text-sm font-extrabold text-violet-900">
                       Para vocês dois
                     </span>
-                    <span className="block text-[11px] text-violet-700/70">
+                    <span className="block text-xs text-violet-700/70">
                       10 min com quem vai estar com você no parto
                     </span>
                   </span>
@@ -7188,7 +7183,7 @@ export function MeditationBlock({
                   <span className="block text-sm font-extrabold text-violet-900">
                     Só sons, para dormir
                   </span>
-                  <span className="block text-[11px] text-violet-700/70">
+                  <span className="block text-xs text-violet-700/70">
                     Chuva, mar ou o coração — com a tela apagada
                   </span>
                 </span>
@@ -7381,7 +7376,7 @@ export function MeditationBlock({
                 className="relative rounded-t-3xl bg-white px-6 pb-8 pt-5"
                 style={{ paddingBottom: "calc(2rem + var(--safe-bottom, 0px))" }}
               >
-                <p className="text-center text-[11px] font-bold uppercase tracking-wider text-violet-500">
+                <p className="text-center text-xs font-bold uppercase tracking-wider text-violet-500">
                   Som de fundo
                 </p>
                 <div className="mt-4 grid gap-2">
@@ -7411,7 +7406,7 @@ export function MeditationBlock({
                             não vai tocar em cada um para descobrir. */}
                           {s.sub && (
                             <span
-                              className={`block text-[11px] leading-snug ${
+                              className={`block text-xs leading-snug ${
                                 som === s.key ? "text-white/70" : "text-violet-700/55"
                               }`}
                             >
@@ -7450,7 +7445,7 @@ export function MeditationBlock({
                     <p className="text-sm font-extrabold text-violet-900">
                       Um toque na virada da respiração
                     </p>
-                    <p className="mt-1 text-[12px] leading-relaxed text-violet-800/70">
+                    <p className="mt-1 text-xs leading-relaxed text-violet-800/70">
                       De olhos fechados, um tom curto avisa quando o ciclo vira — e outro quando a
                       sessão acaba. Das 22h às 7h ele fica quieto sozinho. Isso não muda os avisos
                       do seu médico nem a emergência.
@@ -7917,7 +7912,7 @@ export function BondingBlock({
             </p>
           </div>
         </div>
-        <p className="mt-2 text-[11px] leading-relaxed text-rose-700/70">
+        <p className="mt-2 text-xs leading-relaxed text-rose-700/70">
           Leia em voz alta, devagar: o bebê já reconhece a sua voz — e o coraçãozinho dele acalma
           quando você fala. 💛
         </p>
@@ -8002,7 +7997,7 @@ export function BondingBlock({
                 className="relative rounded-t-3xl bg-white px-6 pb-8 pt-5"
                 style={{ paddingBottom: "calc(2rem + var(--safe-bottom, 0px))" }}
               >
-                <p className="text-center text-[11px] font-bold uppercase tracking-wider text-rose-500">
+                <p className="text-center text-xs font-bold uppercase tracking-wider text-rose-500">
                   Som de fundo
                 </p>
                 <div className="mt-4 grid gap-2">
@@ -8032,7 +8027,7 @@ export function BondingBlock({
                             não vai tocar em cada um para descobrir. */}
                           {s.sub && (
                             <span
-                              className={`block text-[11px] leading-snug ${
+                              className={`block text-xs leading-snug ${
                                 som === s.key ? "text-white/70" : "text-violet-700/55"
                               }`}
                             >
@@ -8149,7 +8144,7 @@ export function BondingBlock({
                 <h3 className="mt-1 font-serif text-2xl font-extrabold text-rose-900">
                   {pool.length} {pool.length === 1 ? "carta" : "cartas"} nesta fase
                 </h3>
-                <p className="mt-1 max-w-xs text-[12px] leading-snug text-rose-700/70">
+                <p className="mt-1 max-w-xs text-xs leading-snug text-rose-700/70">
                   Toque numa carta pra ler de novo, no seu ritmo. 💛
                 </p>
               </div>
@@ -8177,7 +8172,7 @@ export function BondingBlock({
                           <span className="block text-[13.5px] font-bold text-rose-900">
                             {p.title}
                           </span>
-                          <span className="block text-[11px] text-rose-600/70">{rotulo}</span>
+                          <span className="block text-xs text-rose-600/70">{rotulo}</span>
                         </span>
                       </button>
                     </li>
@@ -8195,7 +8190,7 @@ export function BondingBlock({
               >
                 {carta.lines[idx]}
               </p>
-              <p className="mt-8 text-[11px] font-semibold uppercase tracking-wider text-rose-300">
+              <p className="mt-8 text-xs font-semibold uppercase tracking-wider text-rose-300">
                 leia em voz alta, no seu ritmo
               </p>
               <button
@@ -8953,7 +8948,7 @@ export function GratitudeBlock({
                       </button>
                     </div>
                   )}
-                  <p className="mt-1.5 text-[11px] leading-snug text-amber-700/60">
+                  <p className="mt-1.5 text-xs leading-snug text-amber-700/60">
                     O áudio não fica guardado — vira texto aqui pra você conferir e mudar.
                   </p>
                 </div>
@@ -9006,7 +9001,7 @@ export function GratitudeBlock({
                     className="rounded-2xl border border-amber-200/70 bg-white/80 px-4 py-3 text-left"
                   >
                     <p className="text-[13.5px] leading-snug text-amber-900">{g.texto}</p>
-                    <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-600/80">
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-amber-600/80">
                       {haQuantoTempo(g.quando, new Date())}
                     </p>
                   </li>
@@ -9092,7 +9087,7 @@ export function GratitudeBlock({
               {paraReler && (
                 <div className="mt-4 w-full max-w-xs rounded-2xl border border-amber-200 bg-white/80 px-4 py-3">
                   <p className="text-[15px] leading-snug text-amber-900">“{paraReler.texto}”</p>
-                  <p className="mt-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-600">
+                  <p className="mt-1.5 text-xs font-bold uppercase tracking-wider text-amber-600">
                     {haQuantoTempo(paraReler.quando, new Date())}
                   </p>
                 </div>
@@ -10107,7 +10102,7 @@ function WellnessScreen({
                         {meta.title}
                       </span>
                       <span
-                        className="mt-0.5 block text-[12.5px] leading-[1.35]"
+                        className="mt-0.5 block text-xs leading-[1.35]"
                         style={{ color: tintaSec }}
                       >
                         {a.desc}
@@ -10124,7 +10119,7 @@ function WellnessScreen({
                           <SpriteDoJogo tipo="check" tamanho={30} className="-m-0.5" />
                         ) : (
                           <span
-                            className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-[12px] ${
+                            className={`flex h-[26px] w-[26px] items-center justify-center rounded-full text-xs ${
                               isDone ? "bg-emerald-400 text-white" : ""
                             }`}
                             style={
@@ -10260,7 +10255,7 @@ function WellnessScreen({
                   </span>{" "}
                   estrelas conquistadas
                 </p>
-                <p className="mt-1 text-center text-[12px]" style={{ color: tintaSec }}>
+                <p className="mt-1 text-center text-xs" style={{ color: tintaSec }}>
                   {halves >= TOTAL_DO_DIA ? (
                     "Dia completo! Você acendeu as cinco 🌟"
                   ) : halves > 0 ? (
@@ -10513,7 +10508,7 @@ function DailyQuizBlock({
           {alreadyDone ? "Revisar a aula ⭐" : "Fazer a aula de hoje 📚"}
         </button>
         {missingHint && !alreadyDone && (
-          <p className="mt-2 text-center text-[11px] text-violet-500">{missingHint}</p>
+          <p className="mt-2 text-center text-xs text-violet-500">{missingHint}</p>
         )}
       </div>
 
@@ -11039,7 +11034,7 @@ function PosPartoJourney({
                 className="press flex flex-1 flex-col items-center gap-0.5 rounded-xl bg-slate-50 py-2 hover:bg-sky-50"
               >
                 <span className="text-2xl">{m.emoji}</span>
-                <span className="text-[10px] font-medium text-muted-foreground">{m.label}</span>
+                <span className="text-xs font-medium text-muted-foreground">{m.label}</span>
               </button>
             ))}
           </div>
@@ -11074,7 +11069,7 @@ function PosPartoJourney({
         className={`flex items-center justify-between rounded-2xl ${posMeta(phase.from).banner} px-5 py-4 text-white shadow-md`}
       >
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wider text-white/80">
+          <p className="text-xs font-bold uppercase tracking-wider text-white/80">
             Fase {phase.n} · Semanas {phase.from}–{phase.to} de vida
           </p>
           <p className="mt-0.5 text-xl font-extrabold">{phase.name}</p>
@@ -11148,7 +11143,7 @@ function PosPartoJourney({
               >
                 {isToday && (
                   <div className="duo-bubble absolute -top-10 z-20 whitespace-nowrap">
-                    <div className="relative rounded-xl bg-white px-3 py-1 text-[11px] font-extrabold uppercase tracking-wide text-sky-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
+                    <div className="relative rounded-xl bg-white px-3 py-1 text-xs font-extrabold uppercase tracking-wide text-sky-500 shadow-[0_3px_10px_rgba(0,0,0,0.12)]">
                       {graduated
                         ? "Jornada completa 🎓"
                         : done

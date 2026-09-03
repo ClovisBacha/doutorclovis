@@ -721,7 +721,7 @@ export function EmergencySheet({
           <div
             /* Âmbar quando ninguém foi avisado: o painel ficava verde de sucesso
                enquanto o texto dentro dele dizia "ninguém foi avisado". */
-            className={`mt-2 rounded-2xl px-3.5 py-3 text-[12px] leading-snug ${
+            className={`mt-2 rounded-2xl px-3.5 py-3 text-xs leading-snug ${
               panic === "ninguem"
                 ? "bg-amber-50 text-amber-900 dark:bg-amber-500/10 dark:text-amber-200"
                 : "bg-emerald-50 text-emerald-900 dark:bg-emerald-500/10 dark:text-emerald-200"
@@ -768,7 +768,7 @@ export function EmergencySheet({
           </a>
         )}
         {(panic === "sent" || panic === "ninguem") && zapAbriu && (
-          <p className="mt-1.5 text-center text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-center text-xs leading-snug text-muted-foreground">
             A mensagem já está escrita no WhatsApp — é só apertar enviar.
           </p>
         )}
@@ -783,10 +783,10 @@ export function EmergencySheet({
             coordenada de um instante vira um trajeto de oito horas. */}
         {(panic === "sent" || panic === "ninguem") && zapAbriu && (
           <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-3.5 py-3 dark:border-emerald-500/30 dark:bg-emerald-500/10">
-            <p className="text-[12.5px] font-bold text-emerald-800 dark:text-emerald-300">
+            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-300">
               Se você estiver a caminho do hospital, compartilhe onde você está
             </p>
-            <p className="mt-1 text-[12px] leading-snug text-foreground/75">
+            <p className="mt-1 text-xs leading-snug text-foreground/75">
               Dentro da conversa do WhatsApp: toque em <b>📎</b> → <b>Localização</b> →{" "}
               <b>Localização em tempo real</b> → <b>8 horas</b>. Quem estiver te procurando passa a
               ver você se movendo.
@@ -894,7 +894,7 @@ export function EmergencySheet({
         </div>
 
         {!medZap && !medTel && (
-          <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-[12px] leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
+          <p className="mt-2.5 rounded-2xl bg-amber-50 px-3.5 py-2.5 text-center text-xs leading-snug text-amber-900 dark:bg-amber-500/12 dark:text-amber-200">
             {medNome
               ? `${medNome} ainda não cadastrou um telefone no app. Use o 192 ou o 193 acima.`
               : medicoIndefinido
@@ -1009,7 +1009,7 @@ export function EmergencySheet({
           )}
 
           {(!info.bloodType || !info.emergencyContact) && (
-            <p className="mt-3 text-[11px] text-amber-600 dark:text-amber-400">
+            <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
               Complete tipo sanguíneo e contato de emergência no seu Perfil para a ficha ficar
               completa.
             </p>
@@ -1055,7 +1055,7 @@ export function EmergencySheet({
           )}
         </div>
 
-        <p className="mt-4 text-center text-[11px] text-muted-foreground">
+        <p className="mt-4 text-center text-xs text-muted-foreground">
           Orientação geral — não substitui a avaliação do seu médico.
         </p>
       </div>

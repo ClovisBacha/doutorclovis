@@ -54,7 +54,7 @@ export class TabErrorBoundary extends Component<Props, State> {
             <summary className="cursor-pointer text-center text-xs text-muted-foreground">
               Ver detalhes do erro
             </summary>
-            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 text-[11px] leading-snug text-muted-foreground">
+            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-xl bg-muted/60 p-3 text-xs leading-snug text-muted-foreground">
               {detalhe}
             </pre>
           </details>

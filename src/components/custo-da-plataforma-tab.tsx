@@ -169,7 +169,7 @@ export function CustoTab({ bancada }: { bancada?: CustoDaPlataforma | "falhou" }
               </div>
             )}
 
-            <p className="mt-3 text-[11px] text-muted-foreground">
+            <p className="mt-3 text-xs text-muted-foreground">
               {d.resumo.tokensEntrada.toLocaleString("pt-BR")} tokens de entrada ·{" "}
               {d.resumo.tokensSaida.toLocaleString("pt-BR")} de saída. A saída custa muito mais que
               a entrada — respostas longas são as caras.

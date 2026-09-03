@@ -146,7 +146,7 @@ export function PesquisaNps({
           </button>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[11px] text-muted-foreground">
+      <div className="mt-1 flex justify-between text-xs text-muted-foreground">
         <span>não recomendaria</span>
         <span>recomendaria muito</span>
       </div>

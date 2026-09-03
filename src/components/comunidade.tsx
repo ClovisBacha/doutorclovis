@@ -176,7 +176,7 @@ export function ComunidadeTab({
               {emblema && (
                 <span
                   aria-hidden="true"
-                  className="absolute right-3 top-3 z-10 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-primary-foreground tabular-nums"
+                  className="absolute right-3 top-3 z-10 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center text-xs font-bold leading-tight text-primary-foreground tabular-nums"
                 >
                   {emblema}
                 </span>

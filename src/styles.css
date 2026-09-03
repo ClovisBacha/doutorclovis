@@ -80,6 +80,14 @@
  */
 
 @theme inline {
+  /* O PISO DA LETRA É 13 px (set/2026). `text-xs` era 12 px e havia 1.112
+     textos do app em 10, 11 e 12 px — quase 400 abaixo do que o iOS chama de
+     legenda (11 pt). Redefinir o token sobe os 491 `text-xs` de uma vez; os
+     literais de 10/11/12 px do app viraram `text-xs`. Onde 13 px não couber,
+     muda-se o DESENHO (quebra em duas linhas, tira uma palavra), nunca a
+     letra para baixo. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.35;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

@@ -395,12 +395,12 @@ export function CaixaDeEntrada({
         </button>
       )}
       {vendoArquivadas && (
-        <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
           Elas voltam para a lista sozinhas se a outra pessoa escrever.
         </p>
       )}
       {vendoPedidos && (
-        <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
           Elas não podem escrever de novo até você responder.
         </p>
       )}
@@ -445,7 +445,7 @@ export function CaixaDeEntrada({
                 <span className="flex h-14 w-14 items-center justify-center rounded-full border border-dashed border-border text-[18px] text-muted-foreground">
                   ＋
                 </span>
-                <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+                <span className="w-full truncate text-center text-xs text-muted-foreground">
                   Sua nota
                 </span>
               </button>
@@ -462,7 +462,7 @@ export function CaixaDeEntrada({
               >
                 {/* ⚠️ `-top-9` casa com o `pt-9` do container: o balão vive na
                     faixa reservada, e nunca sobre o avatar. */}
-                <span className="absolute -top-9 left-0 right-0 rounded-xl bg-muted px-1.5 py-1 text-[10px] leading-tight">
+                <span className="absolute -top-9 left-0 right-0 rounded-xl bg-muted px-1.5 py-1 text-xs leading-tight">
                   <span className="line-clamp-2 block break-words">{n.texto}</span>
                 </span>
                 <span className="relative">
@@ -478,7 +478,7 @@ export function CaixaDeEntrada({
                     </span>
                   )}
                 </span>
-                <span className="w-full truncate text-center text-[11px] text-muted-foreground">
+                <span className="w-full truncate text-center text-xs text-muted-foreground">
                   {n.souEu ? "Você" : n.autor.nome}
                 </span>
               </button>
@@ -503,7 +503,7 @@ export function CaixaDeEntrada({
           {/* ⚠️ A régua de privacidade é DITA. Sem a frase, quem fechou o perfil
               e não se vê aqui conclui que a fileira quebrou — e quem deixou
               aberto não sabe que está aparecendo para desconhecidas. */}
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             {EXPLICACAO_DA_SUGESTAO}
           </p>
           <div className="mt-2 flex gap-2 overflow-x-auto">
@@ -515,10 +515,8 @@ export function CaixaDeEntrada({
                 className="press flex w-[104px] shrink-0 flex-col items-center gap-1 rounded-2xl border border-border p-2"
               >
                 <Avatar url={p.avatarUrl} nome={p.nome} />
-                <span className="w-full truncate text-center text-[12px] font-medium">
-                  {p.nome}
-                </span>
-                <span className="text-[11px] text-primary">Falar</span>
+                <span className="w-full truncate text-center text-xs font-medium">{p.nome}</span>
+                <span className="text-xs text-primary">Falar</span>
               </button>
             ))}
           </div>
@@ -552,7 +550,7 @@ export function CaixaDeEntrada({
               <span className="flex items-center gap-1.5">
                 <span className="truncate text-[15px] font-semibold">{c.comNome}</span>
                 {c.pedido && c.euIniciei && (
-                  <span className="shrink-0 text-[11px] text-muted-foreground">aguardando</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">aguardando</span>
                 )}
               </span>
               <span className="block truncate text-[13px] text-muted-foreground">{c.previa}</span>
@@ -626,7 +624,7 @@ export function CaixaDeEntrada({
               <div className="mt-1 flex items-center justify-between">
                 {/* ⚠️ O contador diz o LIMITE, e não só quantos faltam: sem ele
                     ela digita e o campo para de aceitar sem explicar. */}
-                <span className="text-[11px] text-muted-foreground">
+                <span className="text-xs text-muted-foreground">
                   {rascunhoDaNota.length}/{TAMANHO_DA_NOTA} · some em 24 horas
                 </span>
                 <div className="flex gap-2">
@@ -650,7 +648,7 @@ export function CaixaDeEntrada({
                 </div>
               </div>
               {recadoDaNota && (
-                <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-[12px] leading-snug">
+                <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-xs leading-snug">
                   {recadoDaNota}
                 </p>
               )}
@@ -1349,7 +1347,7 @@ export function Conversa({
               não acha conclui que a conversa se perdeu. E ela não alcança o que
               foi apagado nem o que o filtro de palavras recolheu: o texto dessas
               não viaja para cá de propósito. */}
-          <p className="mt-1.5 px-1 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 px-1 text-xs leading-snug text-muted-foreground">
             {termo.trim().length < 2
               ? "Procura no que já está carregado — suba para trazer o mais antigo."
               : achadas.length === 0
@@ -1361,7 +1359,7 @@ export function Conversa({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
         {pedido && !euIniciei && (
-          <p className="mx-auto mb-3 max-w-[280px] rounded-xl bg-muted/60 px-3 py-2 text-center text-[12px] leading-snug text-muted-foreground">
+          <p className="mx-auto mb-3 max-w-[280px] rounded-xl bg-muted/60 px-3 py-2 text-center text-xs leading-snug text-muted-foreground">
             Pedido de mensagem. Se você responder, a conversa fica aberta.
           </p>
         )}
@@ -1453,7 +1451,7 @@ export function Conversa({
                           largura e a conversa inteira pula quando o áudio
                           carrega. */}
                       {!!m.duracaoSeg && (
-                        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
                           {duracaoEmTexto(m.duracaoSeg)}
                         </span>
                       )}
@@ -1467,7 +1465,7 @@ export function Conversa({
                       cabe numa citação. */}
                   {m.citacao && (
                     <span
-                      className={`mb-1 block border-l-2 pl-2 text-[12px] leading-snug ${
+                      className={`mb-1 block border-l-2 pl-2 text-xs leading-snug ${
                         m.souEu ? "border-white/40 opacity-80" : "border-foreground/25 opacity-70"
                       }`}
                     >
@@ -1486,7 +1484,7 @@ export function Conversa({
                     <button
                       type="button"
                       onClick={() => m.refId && aoAbrirRef?.(m.refTipo!, m.refId)}
-                      className={`press mb-1 block min-h-[44px] w-full rounded-xl px-2.5 py-1.5 text-left text-[12px] ${
+                      className={`press mb-1 block min-h-[44px] w-full rounded-xl px-2.5 py-1.5 text-left text-xs ${
                         m.souEu ? "bg-white/15" : "bg-background/70"
                       }`}
                     >
@@ -1538,12 +1536,12 @@ export function Conversa({
                       reescrevendo a conversa por baixo dela — e é justamente
                       isso que faz um recurso de correção virar suspeita. */}
                   {!!m.editadaEm && (
-                    <span className="ml-1.5 align-baseline text-[11px] opacity-60">editada</span>
+                    <span className="ml-1.5 align-baseline text-xs opacity-60">editada</span>
                   )}
                   {m.souEu && (
                     <span
                       aria-label={m.lidaPelaOutra ? "Lida" : "Enviada"}
-                      className="ml-1.5 align-baseline text-[11px] opacity-70"
+                      className="ml-1.5 align-baseline text-xs opacity-70"
                     >
                       {m.lidaPelaOutra ? "✓✓" : "✓"}
                     </span>
@@ -1557,7 +1555,7 @@ export function Conversa({
                 fundo dele — sobre o roxo da minha mensagem, um emoji some. */}
             {(m.reacoes ?? []).length > 0 && (
               <span
-                className={`-mt-1.5 flex gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-[12px] shadow-sm ${
+                className={`-mt-1.5 flex gap-0.5 rounded-full border border-border bg-background px-1.5 py-0.5 text-xs shadow-sm ${
                   m.souEu ? "mr-1 self-end" : "ml-1 self-start"
                 }`}
               >
@@ -1565,9 +1563,7 @@ export function Conversa({
                   <span key={r.tipo}>
                     {r.tipo}
                     {r.quantas > 1 && (
-                      <span className="ml-0.5 align-middle text-[10px] tabular-nums">
-                        {r.quantas}
-                      </span>
+                      <span className="ml-0.5 align-middle text-xs tabular-nums">{r.quantas}</span>
                     )}
                   </span>
                 ))}
@@ -1696,7 +1692,7 @@ export function Conversa({
       {denunciando && (
         <div className="shrink-0 border-t border-border px-4 py-3">
           <p className="text-[13px] font-semibold">Por que você está denunciando?</p>
-          <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
             Fica registrada para a gente olhar, e quem escreveu não é avisada.
           </p>
           <div className="mt-2 flex flex-col gap-1">
@@ -1708,7 +1704,7 @@ export function Conversa({
                 className="press min-h-[44px] rounded-xl border border-border px-3 text-left"
               >
                 <span className="block text-[13px] font-medium">{mo.rotulo}</span>
-                <span className="block text-[11px] leading-snug text-muted-foreground">
+                <span className="block text-xs leading-snug text-muted-foreground">
                   {mo.explica}
                 </span>
               </button>
@@ -1730,10 +1726,10 @@ export function Conversa({
       {citando && (
         <div className="flex shrink-0 items-center gap-2 border-t border-border bg-muted/40 px-4 py-2">
           <span className="min-w-0 flex-1 border-l-2 border-foreground/25 pl-2">
-            <span className="block text-[11px] font-semibold">
+            <span className="block text-xs font-semibold">
               Respondendo {citando.souEu ? "a você" : `a ${conversa.comNome}`}
             </span>
-            <span className="line-clamp-1 block text-[12px] text-muted-foreground">
+            <span className="line-clamp-1 block text-xs text-muted-foreground">
               {textoDaCitacao({
                 texto: citando.texto,
                 apagada: citando.apagada,
@@ -1779,7 +1775,7 @@ export function Conversa({
         </div>
       )}
 
-      {recado && <p className="px-4 pb-1 text-[12px] text-muted-foreground">{recado}</p>}
+      {recado && <p className="px-4 pb-1 text-xs text-muted-foreground">{recado}</p>}
 
       {denunciandoConversa && aoDenunciarConversa && (
         <div
@@ -1797,7 +1793,7 @@ export function Conversa({
             {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
                 da plataforma, e prometer remoção seria prometer o que ninguém
                 garante. Mesma decisão das outras seis denúncias. */}
-            <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
               A gente vai olhar as últimas mensagens dela. Só as dela — o que você escreveu não vai
               junto.
             </p>
@@ -1810,7 +1806,7 @@ export function Conversa({
                     aoDenunciarConversa(mo.motivo);
                     setDenunciandoConversa(false);
                   }}
-                  className="press min-h-[44px] rounded-full border border-border px-3 text-[12px]"
+                  className="press min-h-[44px] rounded-full border border-border px-3 text-xs"
                 >
                   {mo.rotulo}
                 </button>
@@ -1850,7 +1846,7 @@ export function Conversa({
             {/* ⚠️ **DIZ O QUE SILENCIAR FAZ, e o que NÃO faz.** Sem a frase, a
                 paciente lê "silenciar" como "bloquear" — e a outra continua
                 escrevendo, o que a faz concluir que o app não funciona. */}
-            <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+            <p className="mb-2 text-xs leading-snug text-muted-foreground">
               Para de avisar no celular. Ela continua podendo escrever, e você continua vendo aqui.
               Ninguém é avisado.
             </p>
@@ -1871,7 +1867,7 @@ export function Conversa({
                   <span>{conversa.fixadaEm ? "Tirar do topo" : "Fixar no topo"}</span>
                   <span aria-hidden>📌</span>
                 </button>
-                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                <p className="mb-2 text-xs leading-snug text-muted-foreground">
                   Só na sua lista. A outra pessoa não vê nem é avisada.
                 </p>
               </>
@@ -1894,7 +1890,7 @@ export function Conversa({
                   <span>{conversa.arquivada ? "Tirar do arquivo" : "Arquivar conversa"}</span>
                   <span aria-hidden>🗄️</span>
                 </button>
-                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                <p className="mb-2 text-xs leading-snug text-muted-foreground">
                   Sai da sua lista e volta sozinha se {conversa.comNome.split(" ")[0]} escrever. Ela
                   não é avisada.
                 </p>
@@ -1918,7 +1914,7 @@ export function Conversa({
                   <span>Denunciar esta conversa</span>
                   <span aria-hidden>⚑</span>
                 </button>
-                <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+                <p className="mb-2 text-xs leading-snug text-muted-foreground">
                   A gente vai olhar as últimas mensagens dela. Você também pode bloquear.
                 </p>
               </>
@@ -1937,7 +1933,7 @@ export function Conversa({
                 dela, sumindo porque eu limpei a minha lista. E a conversa volta
                 se ela escrever: quem quer que ela não escreva mais tem o
                 bloqueio, no perfil, com o nome certo. */}
-            <p className="mb-2 text-[12px] leading-snug text-muted-foreground">
+            <p className="mb-2 text-xs leading-snug text-muted-foreground">
               Some da sua lista. Nada é apagado, e ela volta se {conversa.comNome} escrever de novo.
               Para não receber mais, bloqueie pelo perfil.
             </p>
@@ -1971,7 +1967,7 @@ export function Conversa({
                   alt="Foto escolhida"
                   className="h-14 w-14 rounded-lg object-cover"
                 />
-                <span className="flex-1 text-[12px] text-muted-foreground">
+                <span className="flex-1 text-xs text-muted-foreground">
                   {texto.trim() ? "Vai junto com o texto." : "Vai sem legenda."}
                 </span>
                 <button
@@ -2048,7 +2044,7 @@ export function Conversa({
                 "Salvar" — ela não tem como voltar a escrever uma mensagem
                 nova sem apagar tudo à mão. */
                 <div className="mb-2 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-2">
-                  <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                     Corrigindo: {editando.texto}
                   </span>
                   <button
@@ -2073,7 +2069,7 @@ export function Conversa({
                   <span className="tabular-nums text-[14px] font-semibold">
                     {relogio(segundos)}
                   </span>
-                  <span className="text-[12px] text-muted-foreground">
+                  <span className="text-xs text-muted-foreground">
                     / {relogio(AUDIO_SEGUNDOS_MAX)}
                   </span>
                   <button

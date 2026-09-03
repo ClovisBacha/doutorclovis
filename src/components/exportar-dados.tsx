@@ -96,7 +96,7 @@ export function ExportarDados({ ehMedico = false }: { ehMedico?: boolean }) {
       {/* ⚠️ O aviso de que o arquivo tem dado de saúde e não tem senha. Quem
           exporta manda por WhatsApp sem pensar, e este é o único momento em que
           dá para dizer isso. */}
-      <p className="mt-2 text-[11.5px] leading-snug text-muted-foreground">
+      <p className="mt-2 text-xs leading-snug text-muted-foreground">
         O arquivo tem informações de saúde e não tem senha. Guarde com o mesmo cuidado que teria com
         um exame.
       </p>

@@ -283,7 +283,7 @@ export function HistoriaDaNoite({
               style={{ width: `${((i + 1) / total) * 100}%` }}
             />
           </div>
-          <p className="mt-4 text-[11px] text-white/30">
+          <p className="mt-4 text-xs text-white/30">
             {pausado ? "Pausado" : "A tela vai escurecer sozinha"}
           </p>
         </div>

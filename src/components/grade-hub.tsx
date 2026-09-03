@@ -171,7 +171,7 @@ export function GradeHub({
                 {dado.valor}
               </span>
               {dado.legenda ? (
-                <span className="mt-1 block text-[12px] leading-tight text-muted-foreground">
+                <span className="mt-1 block text-xs leading-tight text-muted-foreground">
                   {dado.legenda}
                 </span>
               ) : null}
@@ -184,7 +184,7 @@ export function GradeHub({
             <span className="line-clamp-2 block font-serif text-[15.5px] leading-tight text-foreground">
               {label}
             </span>
-            <span className="mt-0.5 line-clamp-2 block text-[11px] leading-[1.28] text-muted-foreground">
+            <span className="mt-0.5 line-clamp-2 block text-xs leading-[1.28] text-muted-foreground">
               {sub}
             </span>
           </span>

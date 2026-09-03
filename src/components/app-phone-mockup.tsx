@@ -50,7 +50,7 @@ export function PhoneFrame({
         {/* tela — shine varre o vidro no hover */}
         <div className="shine relative h-[560px] overflow-hidden rounded-[2.1rem] bg-background">
           {/* status bar */}
-          <div className="relative z-10 flex items-center justify-between px-6 pt-3 text-[10px] font-semibold text-foreground">
+          <div className="relative z-10 flex items-center justify-between px-6 pt-3 text-xs font-semibold text-foreground">
             <span>9:41</span>
             <span className="flex items-center gap-1">
               <span className="inline-block h-2 w-3 rounded-[2px] bg-foreground/70" />
@@ -203,7 +203,7 @@ export function AppChatMockupScreen() {
           <MessageCircle className="h-4 w-4 text-primary" />
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-foreground">Assistente Obstétrica</p>
+          <p className="text-xs font-semibold text-foreground">Assistente Obstétrica</p>
           <p className="flex items-center gap-1 text-[8px] text-emerald-600">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> disponível 24h
           </p>
@@ -345,7 +345,7 @@ export function AppJogoMockupScreen() {
           <p className="text-[7px] font-bold uppercase tracking-wider text-white/80">
             Fase 4 · Semanas 22–28
           </p>
-          <p className="text-[11px] font-extrabold">Crescendo forte</p>
+          <p className="text-xs font-extrabold">Crescendo forte</p>
         </div>
         <span className="text-lg">🌈</span>
       </div>
@@ -358,7 +358,7 @@ export function AppJogoMockupScreen() {
         <div className="mt-1 flex flex-col items-center gap-1">
           <div className="ml-[-40%]">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px]"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs"
               style={node3d("#f59e0b", "#b45309")}
             >
               🍓
@@ -371,7 +371,7 @@ export function AppJogoMockupScreen() {
           </div>
           <div className="ml-[20%]">
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-[11px] font-black text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-black text-white"
               style={node3d("#f59e0b", "#b45309")}
             >
               ✓

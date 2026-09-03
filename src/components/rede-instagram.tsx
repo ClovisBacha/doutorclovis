@@ -234,7 +234,7 @@ export function BolinhaDeStory({
           <Foto url={url} nome={nome} lado={FOTO_DO_STORY} />
         </span>
       </span>
-      <span className="w-full truncate text-center text-[11px] leading-tight text-foreground/80">
+      <span className="w-full truncate text-center text-xs leading-tight text-foreground/80">
         {rotulo}
       </span>
     </button>
@@ -585,7 +585,7 @@ function Carrossel({
         <>
           {/* O contador no canto, como eles fazem — é o que diz de cara que
               há mais de uma foto, antes de a pessoa tentar deslizar. */}
-          <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">
+          <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium tabular-nums text-white">
             {i + 1}/{urls.length}
           </span>
           <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
@@ -719,7 +719,7 @@ function Sensivel({
         <span className="text-[13px] font-semibold">
           {razao === "palavra" ? "Escondido pelo seu filtro de palavras" : rotuloDoMotivo(motivo)}
         </span>
-        <span className="text-[12px] text-muted-foreground">Toque para ver</span>
+        <span className="text-xs text-muted-foreground">Toque para ver</span>
       </button>
     </div>
   );
@@ -916,7 +916,7 @@ export const PostInstagram = memo(function PostInstagram({
                 sem avisar — e num app de gestação de alto risco a pessoa
                 precisa saber se está lendo uma amiga ou uma desconhecida. */}
             {sugerido && (
-              <span className="block text-[11px] leading-tight text-muted-foreground">
+              <span className="block text-xs leading-tight text-muted-foreground">
                 Sugerido para você
               </span>
             )}
@@ -925,7 +925,7 @@ export const PostInstagram = memo(function PostInstagram({
                 e empurram a hora do post para a linha de baixo. Régua em
                 `marcacoes.ts`, testada. */}
             {textoDeMarcadas(post.marcadas.map((m) => m.nome)) && (
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="block truncate text-xs leading-tight text-muted-foreground">
                 {textoDeMarcadas(post.marcadas.map((m) => m.nome))}
               </span>
             )}
@@ -934,7 +934,7 @@ export const PostInstagram = memo(function PostInstagram({
                 resolver a localização — e é exatamente isso que este campo
                 existe para não fazer. */}
             {post.lugar && (
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="block truncate text-xs leading-tight text-muted-foreground">
                 📍 {post.lugar}
               </span>
             )}
@@ -1012,7 +1012,7 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoTirarMarcacao(post)}
-            className="press inline-flex min-h-[44px] items-center text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+            className="press inline-flex min-h-[44px] items-center text-xs font-medium text-muted-foreground underline underline-offset-2"
           >
             Tirar minha marcação
           </button>
@@ -1442,7 +1442,7 @@ export const PostInstagram = memo(function PostInstagram({
                     </svg>
                   )}
                   {jaVotou && (
-                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
                       {fatia}%
                       {/* ⚠️ A PORCENTAGEM e o NÚMERO, os dois. "67%" são dois
                           votos de três, e numa base pequena a porcentagem
@@ -1461,7 +1461,7 @@ export const PostInstagram = memo(function PostInstagram({
             /* ⚠️ Ela precisa saber ANTES que o voto não se troca — a PK do
                banco garante um por pessoa, e descobrir isso tocando é o tipo de
                surpresa que faz alguém desconfiar do app inteiro. */
-            <p className="pt-0.5 text-[11px] text-muted-foreground">
+            <p className="pt-0.5 text-xs text-muted-foreground">
               Toque para votar — o voto não muda depois.
             </p>
           )}
@@ -1475,7 +1475,7 @@ export const PostInstagram = memo(function PostInstagram({
           continua anônima depois de respondida. */}
       {post.pergunta && (
         <div className="mx-4 mt-2 rounded-xl border-l-2 border-primary/40 bg-muted/40 px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Perguntaram
           </p>
           <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-snug">{post.pergunta}</p>
@@ -1511,7 +1511,7 @@ export const PostInstagram = memo(function PostInstagram({
               <button
                 type="button"
                 onClick={() => aoAbrirPerfil?.(post.repost!.autorId)}
-                className="press text-[12px] font-semibold"
+                className="press text-xs font-semibold"
               >
                 {post.repost.autorNome}
               </button>
@@ -1529,7 +1529,7 @@ export const PostInstagram = memo(function PostInstagram({
               )}
             </>
           ) : (
-            <p className="text-[12px] text-muted-foreground">Publicação não disponível.</p>
+            <p className="text-xs text-muted-foreground">Publicação não disponível.</p>
           )}
         </div>
       )}
@@ -1627,7 +1627,7 @@ export const PostInstagram = memo(function PostInstagram({
       {/* ⚠️ Sem caixa alta: "3 h" virava "3 H" e "18 de agosto de 2026" virava
           um berro de duas linhas. O modelo mudou para minúscula anos atrás, e
           em português a versão em caixa alta lê pior que em inglês. */}
-      <p className="px-4 pt-1 text-[11px] text-muted-foreground">
+      <p className="px-4 pt-1 text-xs text-muted-foreground">
         {/* ⚠️ **QUANTAS VIRAM — só no post DELA, e só o número.** O servidor
             devolve `null` para quem não é a autora, então esta linha não pode
             virar um contador público de audiência nem por engano.
@@ -1747,9 +1747,7 @@ export function CartaoDaSemana({
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-            Sua semana
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sua semana</p>
           <p className="mt-0.5 text-[14px] leading-snug">{fraseDaRetrospectiva(retro)}</p>
         </div>
         <button
@@ -2066,12 +2064,12 @@ export function TelaPrincipal({
       {suspensa && (
         <div className="mb-3 rounded-2xl border border-destructive/40 bg-destructive/5 p-3">
           <p className="text-[13px] font-semibold">Sua conta da Comunidade está indisponível</p>
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
             Você não aparece na Comunidade por enquanto, e o que você publicou não foi apagado. Isso
             vale só para esta aba: as suas consultas, os seus registros e a conversa com o seu
             médico continuam normais.
           </p>
-          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             Se você acha que houve um engano, fale com o consultório — a gente revê.
           </p>
         </div>
@@ -2080,7 +2078,7 @@ export function TelaPrincipal({
       {!suspensa && pausada && (
         <div className="mb-3 rounded-2xl border border-border bg-muted/60 p-3">
           <p className="text-[13px] font-semibold">Sua conta está pausada</p>
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
             Ninguém te encontra e as suas publicações não aparecem para mais ninguém. Nada foi
             apagado.
           </p>
@@ -2298,7 +2296,7 @@ function CartaoDoEntaoEAgora({
       />
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold leading-snug">Faz {quando} desde esta foto</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
           Dá para pôr as duas lado a lado.
         </p>
         <button
@@ -2487,7 +2485,7 @@ function FileiraDePessoas({
               }`}
             />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px]">{ROTULO_DO_FILTRO}</span>
+          <span className="min-w-0 flex-1 truncate text-xs">{ROTULO_DO_FILTRO}</span>
         </button>
       )}
 
@@ -2496,7 +2494,7 @@ function FileiraDePessoas({
           interruptor parecer quebrado e entregaria justamente quem ela pediu
           para não ver. */}
       {mesmaFase && pessoas.length === 0 && (
-        <p className="pb-2 text-[12.5px] leading-snug text-muted-foreground">{VAZIO_DO_FILTRO}</p>
+        <p className="pb-2 text-xs leading-snug text-muted-foreground">{VAZIO_DO_FILTRO}</p>
       )}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pessoas.map((p) => {
@@ -2519,7 +2517,7 @@ function FileiraDePessoas({
                 {p.premium && <SeloPremium />}
               </p>
               {p.bio && (
-                <p className="line-clamp-1 w-full text-center text-[11px] leading-tight text-muted-foreground">
+                <p className="line-clamp-1 w-full text-center text-xs leading-tight text-muted-foreground">
                   {p.bio}
                 </p>
               )}
@@ -2556,7 +2554,7 @@ function Numero({ valor, rotulo }: { valor: number; rotulo: string }) {
   return (
     <span className="flex flex-col items-center">
       <span className="text-[15px] font-semibold tabular-nums leading-tight">{valor}</span>
-      <span className="text-[12px] leading-tight text-muted-foreground">{rotulo}</span>
+      <span className="text-xs leading-tight text-muted-foreground">{rotulo}</span>
     </span>
   );
 }
@@ -2641,7 +2639,7 @@ export function CaixinhaNoPerfil({
           existem por razões opostas: sem a primeira ninguém pergunta, e sem a
           segunda a caixinha vira o lugar onde se pede conduta médica a uma
           leiga — que é o que fechou os comentários deste app. */}
-      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Ela não vê quem perguntou. Para dúvidas do seu corpo, quem responde é o seu médico — mande
         por aqui mesmo que eu levo até ele.
       </p>
@@ -2653,7 +2651,7 @@ export function CaixinhaNoPerfil({
         placeholder="Sua pergunta…"
         className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
       />
-      <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+      <div className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
         {texto.length}/{LIMITE_DA_PERGUNTA}
       </div>
       <div className="mt-1.5 flex gap-2">
@@ -3176,7 +3174,7 @@ export function TelaDePerfil({
                       setConfirmandoBloqueio(false);
                       aoSilenciar(true, { calaPosts: true, calaStories: false });
                     }}
-                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-[12px]"
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-xs"
                   >
                     Só as publicações
                   </button>
@@ -3186,7 +3184,7 @@ export function TelaDePerfil({
                       setConfirmandoBloqueio(false);
                       aoSilenciar(true, { calaPosts: false, calaStories: true });
                     }}
-                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-[12px]"
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-xs"
                   >
                     Só os stories
                   </button>
@@ -3194,7 +3192,7 @@ export function TelaDePerfil({
               </div>
             ))}
           {aoSilenciar && (
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
               {perfil.silenciado
                 ? "As publicações dela voltam a aparecer no seu feed."
                 : "Você continua seguindo, e o perfil dela continua aqui — só o feed para de trazer as publicações. Ela não é avisada."}
@@ -3231,7 +3229,7 @@ export function TelaDePerfil({
                Sem a segunda metade, a paciente lê "restringir" como "bloquear
                parcial" e não usa — ou usa achando que a pessoa para de ver as
                fotos dela, o que seria uma promessa falsa. */
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
               {perfil.restrito
                 ? "Os comentários dela voltam a aparecer para todo mundo."
                 : "Os comentários dela nas suas publicações passam a aparecer só para ela — e para você, marcados. Ela continua seguindo, continua vendo tudo, e não é avisada."}
@@ -3251,7 +3249,7 @@ export function TelaDePerfil({
                 setConfirmandoBloqueio(false);
                 setDenunciandoPerfil(true);
               }}
-              className="press mt-2 w-full text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+              className="press mt-2 w-full text-xs font-medium text-muted-foreground underline underline-offset-2"
             >
               Denunciar este perfil para a plataforma
             </button>
@@ -3346,12 +3344,12 @@ export function TelaDePerfil({
                 custa um `TS1005` que aponta para a linha do `<span>`. Já está
                 escrito no CLAUDE.md, e eu caí nele de novo. */}
             {perfil.seloSemana && (
-              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[12px] font-semibold text-foreground">
+              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-foreground">
                 🤰 {perfil.seloSemana}
               </span>
             )}
             {perfil.seloBebe && (
-              <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[12px] font-medium">
+              <span className="rounded-full bg-muted/70 px-2.5 py-1 text-xs font-medium">
                 💛 {perfil.seloBebe}
               </span>
             )}
@@ -3382,7 +3380,7 @@ export function TelaDePerfil({
             {/* ⚠️ A régua é DITA: sem a frase, ela lê a fileira como "parecidas
                 com esta pessoa" — e este app não deriva nada do grafo de
                 terceiro. */}
-            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
               Contas abertas com gente em comum com você.
             </p>
             <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
@@ -3397,7 +3395,7 @@ export function TelaDePerfil({
                     className="press flex flex-col items-center gap-1"
                   >
                     <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
-                    <span className="w-full truncate text-center text-[12px] font-medium">
+                    <span className="w-full truncate text-center text-xs font-medium">
                       {p.nome}
                     </span>
                   </button>
@@ -3405,7 +3403,7 @@ export function TelaDePerfil({
                     <button
                       type="button"
                       onClick={() => aoSeguirParecida(p.id)}
-                      className="press min-h-[44px] w-full rounded-full bg-primary px-2 text-[12px] font-semibold text-primary-foreground"
+                      className="press min-h-[44px] w-full rounded-full bg-primary px-2 text-xs font-semibold text-primary-foreground"
                     >
                       Seguir
                     </button>
@@ -3438,7 +3436,7 @@ export function TelaDePerfil({
             publicação. */}
         {perfil.codigoDeEmbaixadora && (
           <div className="mt-3 rounded-2xl border border-border p-3">
-            <p className="text-[12px] text-muted-foreground">Código de embaixadora</p>
+            <p className="text-xs text-muted-foreground">Código de embaixadora</p>
             <p className="mt-0.5 font-mono text-[15px] font-semibold tracking-wide">
               {perfil.codigoDeEmbaixadora}
             </p>
@@ -3459,7 +3457,7 @@ export function TelaDePerfil({
                       <span className="font-semibold">{perfil.codigoDeEmbaixadora}</span> como quem
                       te trouxe ao app? Você ganha 150 🌱 de boas-vindas.
                     </p>
-                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                       Isso vale uma vez só e não dá para trocar depois — é o mesmo campo onde entra
                       o código da sua médica, se ela te passou um.
                     </p>
@@ -3470,7 +3468,7 @@ export function TelaDePerfil({
                         que fica exposto não é um nome qualquer: é "esta pessoa é
                         paciente de um app de gestação de alto risco", que é dado
                         de saúde por inferência. */}
-                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                       Quem te trouxe passa a ver o seu primeiro nome numa lista, para poder te
                       presentear. Nada mais do seu acompanhamento aparece para ela.
                     </p>
@@ -3664,7 +3662,7 @@ export function TelaDePerfil({
             </div>
           </div>
           <p className="mt-4 text-[14px] leading-snug">{perfil.bebe.sobre}</p>
-          <p className="mt-4 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-4 text-xs leading-snug text-muted-foreground">
             O tamanho é uma média da semana — cada bebê cresce no ritmo dele.
           </p>
         </div>
@@ -7488,7 +7486,7 @@ export function RedeNoApp({
                     ) : (
                       /* ⚠️ Post só de texto existe (`postEhValido`), e sem este
                          ramo ele viraria um quadrado cinza vazio na grade. */
-                      <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug">
+                      <span className="line-clamp-4 block p-2 text-left text-xs leading-snug">
                         {p.texto}
                       </span>
                     )}
@@ -8218,7 +8216,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
   return (
     <section className="mt-6 border-t border-border pt-5">
       <h2 className="text-[15px] font-semibold">Meus filhos</h2>
-      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         É daqui que sai a frase do seu perfil. Nome e sexo são opcionais.
       </p>
 
@@ -8269,7 +8267,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
                 type="button"
                 disabled={ocupado}
                 onClick={() => void mudar(f.id, { sexo: s })}
-                className={`press rounded-full px-3 py-1 text-[12px] ${
+                className={`press rounded-full px-3 py-1 text-xs ${
                   f.sexo === s ? "btn-3d bg-primary text-primary-foreground" : "bg-muted"
                 }`}
               >
@@ -8279,7 +8277,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
           </div>
 
           <div className="mt-2 flex items-center gap-2">
-            <label className="text-[12px] text-muted-foreground">
+            <label className="text-xs text-muted-foreground">
               {f.nascidoEm ? "Nasceu em" : "Previsto para"}
             </label>
             <input
@@ -8303,7 +8301,7 @@ function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
               type="button"
               disabled={ocupado}
               onClick={() => void mudar(f.id, { nascidoEm: hoje, previstoPara: null })}
-              className="press mt-2 rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+              className="press mt-2 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
             >
               Já nasceu 💛
             </button>
@@ -8420,7 +8418,7 @@ export function EditarPerfil({
 
       <div className="space-y-4 px-4">
         <label className="block">
-          <span className="text-[12px] text-muted-foreground">Nome</span>
+          <span className="text-xs text-muted-foreground">Nome</span>
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value.slice(0, 60))}
@@ -8428,14 +8426,14 @@ export function EditarPerfil({
           />
         </label>
         <label className="block">
-          <span className="text-[12px] text-muted-foreground">Bio</span>
+          <span className="text-xs text-muted-foreground">Bio</span>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value.slice(0, LIMITE_DA_BIO))}
             rows={2}
             className="mt-1 w-full resize-none border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
           />
-          <span className="mt-0.5 block text-right text-[11px] tabular-nums text-muted-foreground">
+          <span className="mt-0.5 block text-right text-xs tabular-nums text-muted-foreground">
             {bio.length}/{LIMITE_DA_BIO}
           </span>
         </label>
@@ -8449,7 +8447,7 @@ export function EditarPerfil({
             contrário), e o `href` é o único lugar do app onde texto de uma
             paciente vira comportamento na tela de outra. */}
         <label className="mt-4 block">
-          <span className="text-[12px] font-medium text-muted-foreground">Link</span>
+          <span className="text-xs font-medium text-muted-foreground">Link</span>
           <input
             value={bioLink}
             onChange={(e) => setBioLink(e.target.value.slice(0, LINK_DA_BIO_MAX))}
@@ -8457,7 +8455,7 @@ export function EditarPerfil({
             placeholder="instagram.com/seu-perfil"
             className="mt-1 w-full border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
           />
-          <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground">
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
             Aparece no seu perfil, embaixo da descrição. Pode deixar em branco.
           </span>
         </label>
@@ -8554,7 +8552,7 @@ export function ListaDeGente({
                       {p.nome}
                     </span>
                     {p.bio && (
-                      <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                      <span className="block truncate text-xs leading-tight text-muted-foreground">
                         {p.bio}
                       </span>
                     )}
@@ -8687,7 +8685,7 @@ export function FolhaDeQuemReagiu({
                 <Foto url={g.avatarUrl} nome={g.nome} lado={40} />
                 <span
                   aria-hidden
-                  className="absolute -bottom-0.5 -right-1 grid h-[20px] w-[20px] place-items-center rounded-full bg-card text-[12px] leading-none ring-1 ring-border/70"
+                  className="absolute -bottom-0.5 -right-1 grid h-[20px] w-[20px] place-items-center rounded-full bg-card text-xs leading-none ring-1 ring-border/70"
                 >
                   {g.emoji}
                 </span>
@@ -8698,7 +8696,7 @@ export function FolhaDeQuemReagiu({
                     precisa dizer o que é sem depender de o desenho ser
                     reconhecido, e é a informação mais valiosa da lista. */}
                 {g.ehMeuMedico && (
-                  <span className="block text-[11px] font-semibold leading-tight text-primary">
+                  <span className="block text-xs font-semibold leading-tight text-primary">
                     Seu obstetra
                   </span>
                 )}
@@ -8974,7 +8972,7 @@ export function ArquivoDeStories({
                     decoding="async"
                   />
                 ) : (
-                  <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+                  <span className="line-clamp-4 block p-2 text-left text-xs leading-snug text-foreground/70">
                     {st.texto}
                   </span>
                 )}
@@ -8983,7 +8981,7 @@ export function ArquivoDeStories({
                     ainda dentro das 24 h pode ser apagado do visor; um que já
                     saiu, não. Sem a pílula, as duas células são idênticas. */}
                 {st.noAr && (
-                  <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-xs font-semibold text-white">
                     no ar
                   </span>
                 )}
@@ -8992,7 +8990,7 @@ export function ArquivoDeStories({
                     perfil mostra uma grade de imagens: "Ultrassons" e "Chá de
                     bebê" são o que faz alguém tocar. */}
                 {st.destacado && st.destaqueTitulo && (
-                  <span className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-full bg-black/55 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+                  <span className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-full bg-black/55 px-1.5 py-0.5 text-center text-xs font-semibold text-white">
                     {st.destaqueTitulo}
                   </span>
                 )}
@@ -9040,7 +9038,7 @@ export function ArquivoDeStories({
       {nomeando && aoDestacar && (
         <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-border bg-card p-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
           <p className="text-[14px] font-semibold">Nome do destaque</p>
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
             É o que aparece no seu perfil — "Ultrassons", "Chá de bebê". Pode deixar em branco.
           </p>
           <input
@@ -9385,12 +9383,12 @@ export function VisorDeStory({
             className="absolute inset-0 z-20 flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-900 px-8 text-center"
           >
             {atual.motivoSensivel && (
-              <span className="rounded-full bg-white/15 px-3 py-1 text-[12px] text-white">
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs text-white">
                 {atual.motivoSensivel}
               </span>
             )}
             <span className="text-[15px] font-semibold text-white">Toque para ver</span>
-            <span className="text-[12px] text-white/70">
+            <span className="text-xs text-white/70">
               Quem publicou marcou este story como sensível.
             </span>
           </button>
@@ -9514,12 +9512,12 @@ export function VisorDeStory({
                 {atual.postCompartilhado.autorNome}
               </span>
               {atual.postCompartilhado.texto && (
-                <span className="line-clamp-2 block text-[12px] leading-snug text-white/80">
+                <span className="line-clamp-2 block text-xs leading-snug text-white/80">
                   {atual.postCompartilhado.texto}
                 </span>
               )}
             </span>
-            <span className="shrink-0 text-[12px] font-semibold text-white/90">Ver</span>
+            <span className="shrink-0 text-xs font-semibold text-white/90">Ver</span>
           </button>
         )}
 
@@ -9584,7 +9582,7 @@ export function VisorDeStory({
               });
             })()}
             {(voteiAgora[atual.id] ?? atual.enquete.meuVoto) === null && (
-              <p className="text-center text-[11px] text-white/75">
+              <p className="text-center text-xs text-white/75">
                 Toque para votar — o voto não muda depois.
               </p>
             )}
@@ -9638,7 +9636,7 @@ export function VisorDeStory({
             </div>
             {/* ⚠️ Diz PARA ONDE VAI. Sem esta frase ela acha que mandou um
                 recado que ninguém vai ler. */}
-            <p className="mt-1 text-center text-[11px] text-white/75">
+            <p className="mt-1 text-center text-xs text-white/75">
               {(reagiAgora[atual.id] ?? atual.minhaReacao)
                 ? "Ela vai ver na caixa dela 💛"
                 : "Toque para reagir — ela vê o seu nome"}
@@ -9656,7 +9654,7 @@ export function VisorDeStory({
             {!borrado && aoResponderStory && (
               <div className="mt-2">
                 {respondido[atual.id] ? (
-                  <p className="rounded-full bg-black/45 px-4 py-2 text-center text-[12px] text-white backdrop-blur-sm">
+                  <p className="rounded-full bg-black/45 px-4 py-2 text-center text-xs text-white backdrop-blur-sm">
                     Enviado 💛
                   </p>
                 ) : (
@@ -9683,7 +9681,7 @@ export function VisorDeStory({
                           alt="A foto que vai junto com a sua resposta"
                           className="h-14 w-14 rounded-xl object-cover"
                         />
-                        <span className="flex-1 text-[12px] text-white/85">
+                        <span className="flex-1 text-xs text-white/85">
                           Vai junto com a sua resposta
                         </span>
                         <button
@@ -9766,7 +9764,7 @@ export function VisorDeStory({
               </p>
             ) : (
               <div className="rounded-2xl bg-black/40 p-2.5 backdrop-blur-sm">
-                <p className="px-1 pb-1.5 text-[12px] text-white/85">
+                <p className="px-1 pb-1.5 text-xs text-white/85">
                   Pergunte o que quiser — ela não vê quem perguntou.
                 </p>
                 <div className="flex items-end gap-2">
@@ -9798,9 +9796,7 @@ export function VisorDeStory({
                     {mandando ? "…" : "Enviar"}
                   </button>
                 </div>
-                {recado && (
-                  <p className="px-1 pt-1.5 text-[12px] leading-snug text-white">{recado}</p>
-                )}
+                {recado && <p className="px-1 pt-1.5 text-xs leading-snug text-white">{recado}</p>}
               </div>
             )}
           </div>
@@ -9903,7 +9899,7 @@ export function VisorDeStory({
           Modo Cuidado, quem pausou e quem ela bloqueou já saíram da lista no
           servidor. Aqui é só o desenho. */}
       {atual && (atual.marcadas ?? []).length > 0 && (
-        <span className="pointer-events-none absolute inset-x-4 bottom-16 z-10 truncate rounded-full bg-black/45 px-3 py-1 text-center text-[12px] text-white">
+        <span className="pointer-events-none absolute inset-x-4 bottom-16 z-10 truncate rounded-full bg-black/45 px-3 py-1 text-center text-xs text-white">
           com {(atual.marcadas ?? []).map((m) => m.nome).join(", ")}
         </span>
       )}
@@ -9929,7 +9925,7 @@ export function VisorDeStory({
           {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
               da plataforma, e prometer remoção seria prometer o que ninguém
               garante. Mesma decisão das outras cinco denúncias. */}
-          <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
             A gente vai olhar. O story some em 24 horas; a denúncia fica.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
@@ -9942,7 +9938,7 @@ export function VisorDeStory({
                   setDenunciando(false);
                   setPausado(false);
                 }}
-                className="press min-h-[44px] rounded-full pill-3d px-3 text-[12px]"
+                className="press min-h-[44px] rounded-full pill-3d px-3 text-xs"
               >
                 {m.rotulo}
               </button>
@@ -10104,14 +10100,14 @@ export function TelaDeAtividade({
                     <button
                       type="button"
                       onClick={() => aoResponder(a.quemId, false)}
-                      className="press rounded-lg pill-3d px-2.5 py-1.5 text-[12px]"
+                      className="press rounded-lg pill-3d px-2.5 py-1.5 text-xs"
                     >
                       Agora não
                     </button>
                     <button
                       type="button"
                       onClick={() => aoResponder(a.quemId, true)}
-                      className="press rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                      className="press rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground"
                     >
                       Aceitar
                     </button>
@@ -10716,7 +10712,7 @@ export function NovoPost({
             texto errado. */}
         {rascunho && !ofereceu && (
           <div className="mb-2 flex items-center gap-2 rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2">
-            <p className="min-w-0 flex-1 text-[12px] leading-snug">
+            <p className="min-w-0 flex-1 text-xs leading-snug">
               Você tinha começado a escrever aqui.
             </p>
             <button
@@ -10729,7 +10725,7 @@ export function NovoPost({
                 setMarcadas(rascunho.marcadas);
                 setOfereceu(true);
               }}
-              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
             >
               Recuperar
             </button>
@@ -10758,7 +10754,7 @@ export function NovoPost({
         {/* O contador só aparece perto do fim: um número piscando a cada letra
             desde a primeira transforma escrever num exercício de caber. */}
         {texto.length > LIMITE_DO_TEXTO - 80 && (
-          <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+          <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
             {LIMITE_DO_TEXTO - texto.length}
           </p>
         )}
@@ -10800,7 +10796,7 @@ export function NovoPost({
             type="button"
             onClick={() => setSensivel((v) => !v)}
             aria-pressed={sensivel}
-            className="press min-h-[36px] text-[12px] font-medium text-muted-foreground"
+            className="press min-h-[36px] text-xs font-medium text-muted-foreground"
           >
             {sensivel ? "✓ Marcado como sensível" : "Marcar como conteúdo sensível"}
           </button>
@@ -10813,7 +10809,7 @@ export function NovoPost({
                     type="button"
                     onClick={() => setMotivoSensivel(m.id)}
                     aria-pressed={motivoSensivel === m.id}
-                    className={`press min-h-[36px] rounded-full border px-3 text-[12px] ${
+                    className={`press min-h-[36px] rounded-full border px-3 text-xs ${
                       motivoSensivel === m.id
                         ? "border-primary bg-primary/10 font-semibold"
                         : "border-border text-muted-foreground"
@@ -10823,7 +10819,7 @@ export function NovoPost({
                   </button>
                 ))}
               </div>
-              <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">
                 A publicação continua no feed. Ela aparece borrada, com este aviso, e quem quiser
                 toca para ver.
               </p>
@@ -10844,7 +10840,7 @@ export function NovoPost({
               aria-label="Legenda do vídeo"
               className="min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
             />
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
               Para quem assiste sem som e para quem usa leitor de tela.
             </p>
           </div>
@@ -10856,7 +10852,7 @@ export function NovoPost({
               <button
                 type="button"
                 onClick={() => setAltAberto(true)}
-                className="press min-h-[36px] text-[12px] font-medium text-muted-foreground"
+                className="press min-h-[36px] text-xs font-medium text-muted-foreground"
               >
                 {altTexto.trim() ? "✓ Descrição escrita" : "Descrever a foto (acessibilidade)"}
               </button>
@@ -10872,7 +10868,7 @@ export function NovoPost({
                 {/* ⚠️ Diz PARA QUEM serve. Sem a frase, ela escreve uma segunda
                     legenda — e o leitor de tela lê as duas, uma atrás da
                     outra. */}
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">
                   Lida em voz alta por quem usa leitor de tela. Descreva o que aparece, sem repetir
                   a legenda.
                 </p>
@@ -10901,13 +10897,13 @@ export function NovoPost({
                 "mandaram minha ultrassom para alguém" de uma escolha
                 informada. */}
             {sugestoes === null && !pensando && (
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 A foto é enviada só para escrever a sugestão, e não fica guardada.
               </p>
             )}
 
             {sugestoes !== null && sugestoes.length === 0 && !pensando && (
-              <p className="mt-1.5 text-[12px] text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Não consegui pensar em nada para esta foto. Escreva do seu jeito 💛
               </p>
             )}
@@ -10931,7 +10927,7 @@ export function NovoPost({
                     {sug}
                   </button>
                 ))}
-                <p className="pt-0.5 text-[11px] text-muted-foreground">
+                <p className="pt-0.5 text-xs text-muted-foreground">
                   Toque para usar — dá para editar depois.
                 </p>
               </div>
@@ -10953,7 +10949,7 @@ export function NovoPost({
                 {/* A PRIMEIRA leva o selo — sem ele ninguém sabe qual vai
                     aparecer na grade do perfil. */}
                 {n === 0 && (
-                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-[10px] text-white">
+                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-xs text-white">
                     capa
                   </span>
                 )}
@@ -10991,7 +10987,7 @@ export function NovoPost({
               <div className="mt-2 rounded-2xl border border-border p-2">
                 {/* ⚠️ Diz o TETO na tela. Descobrir o limite só ao tocar na
                     sexta amiga é o tipo de recusa que parece defeito. */}
-                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                <p className="px-1 pb-1.5 text-xs text-muted-foreground">
                   Até {MARCADAS_MAX} pessoas, entre as suas amigas do app.
                 </p>
                 <div className="max-h-56 space-y-0.5 overflow-y-auto">
@@ -11088,7 +11084,7 @@ export function NovoPost({
 
             {entao && (
               <div className="mt-2 rounded-2xl border border-border p-2">
-                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                <p className="px-1 pb-1.5 text-xs text-muted-foreground">
                   Escolha a foto de antes. As semanas entram sozinhas.
                 </p>
                 <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -11133,7 +11129,7 @@ export function NovoPost({
               <button
                 type="button"
                 onClick={() => setOpcoes(null)}
-                className="press text-[12px] text-muted-foreground"
+                className="press text-xs text-muted-foreground"
               >
                 tirar
               </button>
@@ -11167,12 +11163,12 @@ export function NovoPost({
             {/* ⚠️ O aviso do voto único aparece ANTES de publicar, e não só
                 para quem vota: quem cria a enquete precisa saber que não dá
                 para corrigir depois — post não se edita. */}
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-2 text-xs leading-snug text-muted-foreground">
               Cada pessoa vota uma vez, e o voto não muda. Você vê só os números — nunca quem votou
               em quê.
             </p>
             {!enqueteOk && opcoesLimpas.length > 0 && (
-              <p className="mt-1 text-[12px] text-destructive">
+              <p className="mt-1 text-xs text-destructive">
                 {opcoesLimpas.length < OPCOES_MIN
                   ? `Escreva pelo menos ${OPCOES_MIN} opções.`
                   : "As opções precisam ser diferentes entre si."}
@@ -11232,7 +11228,7 @@ export function NovoPost({
             entre "as amigas" e "qualquer pessoa" é a diferença entre contar
             uma notícia e publicá-la. */}
         <div className="mt-3">
-          <p className="text-[12px] font-medium text-muted-foreground">Quem vai ver</p>
+          <p className="text-xs font-medium text-muted-foreground">Quem vai ver</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {VISIBILIDADES.map((v) => (
               <button
@@ -11247,7 +11243,7 @@ export function NovoPost({
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             {VISIBILIDADES.find((v) => v.chave === vis)?.sub}
           </p>
         </div>
@@ -11266,7 +11262,7 @@ export function NovoPost({
             abriu nada. A régua é `apertarQuemComenta`, e não um `filter` escrito
             aqui. */}
         <div className="mt-3">
-          <p className="text-[12px] font-medium text-muted-foreground">Quem pode comentar</p>
+          <p className="text-xs font-medium text-muted-foreground">Quem pode comentar</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {QUEM_COMENTA.filter(
               (q) => apertarQuemComenta({ visibilidade: vis, quemComenta: q.chave }) === q.chave,
@@ -11292,10 +11288,8 @@ export function NovoPost({
             depois de publicado, quando não dá mais para mudar de ideia. */}
         {repostando && (
           <div className="mt-3 rounded-xl border border-border p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Republicando
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold">{repostando.autorNome}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Republicando</p>
+            <p className="mt-0.5 text-xs font-semibold">{repostando.autorNome}</p>
             {repostando.texto && (
               <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
             )}
@@ -11392,10 +11386,8 @@ export function NovoPost({
             depois de publicado, quando não dá mais para mudar de ideia. */}
         {repostando && (
           <div className="mt-3 rounded-xl border border-border p-3">
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              Republicando
-            </p>
-            <p className="mt-0.5 text-[12px] font-semibold">{repostando.autorNome}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Republicando</p>
+            <p className="mt-0.5 text-xs font-semibold">{repostando.autorNome}</p>
             {repostando.texto && (
               <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
             )}
@@ -11587,7 +11579,7 @@ export function GradeDePosts({
               />
             ) : (
               /* Post só de texto na grade: mostra o texto, não um buraco. */
-              <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+              <span className="line-clamp-4 block p-2 text-left text-xs leading-snug text-foreground/70">
                 {p.texto}
               </span>
             )}
@@ -11677,7 +11669,7 @@ export function TelaDosSalvos({
       {/* ⚠️ O texto diz que ninguém vê esta lista, e isso não é enfeite: no
           modelo, "salvo" é a única coleção privada de verdade, e quem não sabe
           disso usa o marcador com o mesmo cuidado de uma curtida pública. */}
-      <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+      <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
         Só você vê o que guardou aqui — nem quem publicou fica sabendo.
       </p>
       {/* Sem padding lateral, como a grade do perfil: a célula da grade encosta
@@ -11760,7 +11752,7 @@ export function TelaDaTag({
       {/* ⚠️ A régua é DITA. Sem esta linha, quem publicou para as amigas e não
           se vê aqui conclui que a tag está quebrada — e quem publicou em
           público não sabe que a foto dela virou vitrine aberta. */}
-      <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+      <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
         Aqui aparecem só as publicações abertas a qualquer pessoa no app.
       </p>
       {posts === null ? (
@@ -11813,7 +11805,7 @@ export function TelaDosArquivados({
       {/* ⚠️ Diz que NINGUÉM MAIS VÊ, e diz que as reações continuam lá. As duas
           coisas são a razão de arquivar ser diferente de apagar, e nenhuma das
           duas é adivinhável. */}
-      <p className="px-4 pb-3 text-[12px] leading-snug text-muted-foreground">
+      <p className="px-4 pb-3 text-xs leading-snug text-muted-foreground">
         Ninguém mais vê o que está aqui. As reações e a data continuam guardadas — se você trouxer
         de volta, volta como estava.
       </p>
@@ -11835,20 +11827,20 @@ export function TelaDosArquivados({
               ) : (
                 /* Post só de texto: um quadrado com a primeira linha, para a
                    lista não ter buraco cinza. */
-                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted/50 px-1 text-center text-[10px] leading-tight text-muted-foreground">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted/50 px-1 text-center text-xs leading-tight text-muted-foreground">
                   {(p.texto ?? "").slice(0, 28) || "sem texto"}
                 </span>
               )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px]">{p.texto ?? "Sem legenda"}</span>
-                <span className="block text-[11px] text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   {haQuantoPublicou(p.criadoEm, Date.now())}
                 </span>
               </span>
               <button
                 type="button"
                 onClick={() => aoDesarquivar(p)}
-                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-[12px] font-medium"
+                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-xs font-medium"
               >
                 Trazer de volta
               </button>
@@ -11985,7 +11977,7 @@ export function TelaDeBusca({
             <span className="block truncate text-[14px] font-semibold leading-tight">
               #{tagDaBusca(termo)}
             </span>
-            <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+            <span className="block truncate text-xs leading-tight text-muted-foreground">
               Ver publicações com esta tag
             </span>
           </span>
@@ -12014,7 +12006,7 @@ export function TelaDeBusca({
           {!termo.trim() && recentes.length > 0 && (
             <div className="px-4 pt-2">
               <div className="flex items-center justify-between">
-                <span className="text-[12px] font-semibold text-muted-foreground">Recentes</span>
+                <span className="text-xs font-semibold text-muted-foreground">Recentes</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -12025,7 +12017,7 @@ export function TelaDeBusca({
                       /* Sem storage, some só desta sessão. */
                     }
                   }}
-                  className="press min-h-[44px] text-[12px] text-muted-foreground"
+                  className="press min-h-[44px] text-xs text-muted-foreground"
                 >
                   Limpar
                 </button>
@@ -12065,7 +12057,7 @@ export function TelaDeBusca({
                     {p.nome}
                   </span>
                   {p.bio && (
-                    <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                    <span className="block truncate text-xs leading-tight text-muted-foreground">
                       {p.bio}
                     </span>
                   )}
@@ -12139,7 +12131,7 @@ export function EspelhoDoPerfil({
               key={p.chave}
               type="button"
               onClick={() => aoTrocarPersona(p.chave)}
-              className={`press flex-1 rounded-xl px-2 py-2 text-[12px] font-semibold ${
+              className={`press flex-1 rounded-xl px-2 py-2 text-xs font-semibold ${
                 p.chave === persona ? "bg-primary text-primary-foreground" : "bg-muted/60"
               }`}
             >
@@ -12147,7 +12139,7 @@ export function EspelhoDoPerfil({
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">{escolhida?.sub}</p>
+        <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{escolhida?.sub}</p>
       </div>
 
       {carregando ? (
@@ -12176,7 +12168,7 @@ export function EspelhoDoPerfil({
         </p>
       )}
 
-      <p className="px-6 pb-8 pt-2 text-center text-[12px] leading-snug text-muted-foreground">
+      <p className="px-6 pb-8 pt-2 text-center text-xs leading-snug text-muted-foreground">
         Nada do seu acompanhamento aparece aqui para ninguém — peso, pressão, exames e consultas são
         só seus e do seu médico.
       </p>
@@ -12417,7 +12409,7 @@ export function ConferirStory({
             className="w-full resize-none rounded-2xl bg-white/95 px-3 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground"
           />
           {texto.length >= 140 && (
-            <span className="pointer-events-none absolute bottom-2 right-3 text-[11px] tabular-nums text-muted-foreground">
+            <span className="pointer-events-none absolute bottom-2 right-3 text-xs tabular-nums text-muted-foreground">
               {TEXTO_DO_STORY_MAX - texto.length}
             </span>
           )}
@@ -12441,7 +12433,7 @@ export function ConferirStory({
               }`}
             >
               <span className="block text-[13px] font-semibold">{v.rotulo}</span>
-              <span className="block text-[11px] opacity-70">{v.sub}</span>
+              <span className="block text-xs opacity-70">{v.sub}</span>
             </button>
           ))}
         </div>
@@ -12465,7 +12457,7 @@ export function ConferirStory({
           /* Sem semana não há carimbo, e a tela não finge que há: sem DUM,
              depois do parto ou em Modo Cuidado, o controle simplesmente não
              existe. */
-          <p className="text-center text-[12px] text-white/60">
+          <p className="text-center text-xs text-white/60">
             Sem a data da última menstruação no perfil, não dá para carimbar a semana.
           </p>
         )}
@@ -12521,7 +12513,7 @@ export function ConferirStory({
               <button
                 type="button"
                 onClick={() => setOpcoes((v) => [...(v ?? []), ""])}
-                className="press text-[12px] text-white/80 underline underline-offset-2"
+                className="press text-xs text-white/80 underline underline-offset-2"
               >
                 Mais uma opção
               </button>
@@ -12534,7 +12526,7 @@ export function ConferirStory({
               pergunta: publicar a caixinha sem saber que as respostas vêm sem
               nome muda o que ela decide perguntar — e o que ela decide
               publicar. */
-          <p className="text-center text-[12px] leading-snug text-white/75">
+          <p className="text-center text-xs leading-snug text-white/75">
             Quem responder não aparece para você — a caixinha é anônima.
           </p>
         )}
@@ -12680,7 +12672,7 @@ export function CartaoDoDesafio({
 
   return (
     <section className="-mx-4 mb-2 border-b border-border bg-primary/[0.04] px-4 py-3">
-      <p className="text-[12px] font-semibold uppercase tracking-wide text-primary">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">
         Desafio da semana
       </p>
       <p className="mt-1 text-[15px] font-semibold leading-snug">
@@ -12702,7 +12694,7 @@ export function CartaoDoDesafio({
               </>
             )}
           </p>
-          {doGrupo && <p className="mt-0.5 text-[12px] text-muted-foreground">{doGrupo}</p>}
+          {doGrupo && <p className="mt-0.5 text-xs text-muted-foreground">{doGrupo}</p>}
           <div className="mt-2 flex gap-2">
             {!fechei && aoIrParaOJogo && (
               <button
@@ -12823,7 +12815,7 @@ export function TelaDaCaixinha({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[14px] font-semibold">Aceitar perguntas</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
               Quem abre o seu perfil pode te mandar uma pergunta sem se identificar. Você responde
               quando quiser — e a resposta vira uma publicação sua.
             </p>
@@ -12847,7 +12839,7 @@ export function TelaDaCaixinha({
         </div>
         {/* ⚠️ Fechar a caixa NÃO apaga o que já chegou, e a tela diz isso: sem
             a frase, quem fecha acha que perdeu as perguntas e não fecha. */}
-        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           Fechando, ninguém manda perguntas novas — as que já chegaram continuam aqui.
         </p>
       </div>
@@ -12862,14 +12854,14 @@ export function TelaDaCaixinha({
 
       {semResposta.length > 0 && (
         <>
-          <h2 className="mx-4 mt-5 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mx-4 mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Sem resposta
           </h2>
           <ul className="mt-1.5 flex flex-col gap-2 px-4">
             {semResposta.map((p) => (
               <li key={p.id} className="rounded-2xl border border-border p-3">
                 <p className="whitespace-pre-wrap text-[14px] leading-snug">{p.texto}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {haQuantoPublicou(p.criadoEm, Date.now())}
                 </p>
 
@@ -12883,7 +12875,7 @@ export function TelaDaCaixinha({
                       aria-label="Sua resposta"
                       className="w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
                     />
-                    <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+                    <div className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
                       {texto.length}/{LIMITE_DO_TEXTO}
                     </div>
 
@@ -12894,7 +12886,7 @@ export function TelaDaCaixinha({
                           key={v.chave}
                           type="button"
                           onClick={() => setVisibilidade(v.chave)}
-                          className={`press rounded-full px-2.5 py-1 text-[12px] ${
+                          className={`press rounded-full px-2.5 py-1 text-xs ${
                             visibilidade === v.chave
                               ? "btn-3d bg-primary text-primary-foreground"
                               : "pill-3d"
@@ -12909,7 +12901,7 @@ export function TelaDaCaixinha({
                         o único lugar que sabe por que a resposta foi recusada, e
                         um texto local divergiria da régua no primeiro ajuste. */}
                     {recado && (
-                      <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12px] leading-snug">
+                      <p className="mt-2 rounded-lg bg-muted/60 p-2 text-xs leading-snug">
                         {recado}
                       </p>
                     )}
@@ -13040,7 +13032,7 @@ export function TelaDaCaixinha({
 
       {respondidas.length > 0 && (
         <>
-          <h2 className="mx-4 mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mx-4 mt-6 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Respondidas
           </h2>
           <ul className="mt-1.5 flex flex-col gap-2 px-4">
@@ -13090,12 +13082,12 @@ function CartaoDaLive({ live }: { live: LiveNoTopo }) {
         }`}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+        <p className="text-xs font-bold uppercase tracking-wider text-primary">
           {live.aoVivo ? "Ao vivo agora" : "Próxima live"}
         </p>
         <p className="truncate text-[14px] font-semibold leading-tight">{live.titulo}</p>
         {!live.aoVivo && (
-          <p className="text-[12px] leading-tight text-muted-foreground">
+          <p className="text-xs leading-tight text-muted-foreground">
             {quandoAcontece(live.quando, Date.now())}
           </p>
         )}
@@ -13332,7 +13324,7 @@ export function MeusDesfechos({
           {desfechos.map((d) => (
             <li key={d.id} className="rounded-xl border border-border p-3">
               <p className="text-[13px] font-semibold">{oQueFoi(d.desfecho)}</p>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="mt-0.5 text-xs text-muted-foreground">
                 {d.alvo === "perfil" ? "Perfil" : d.alvo === "story" ? "Story" : "Publicação"} ·{" "}
                 {haQuantoPublicou(d.em, Date.now())}
               </p>

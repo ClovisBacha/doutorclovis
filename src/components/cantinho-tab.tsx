@@ -315,15 +315,15 @@ function TestimonialCard() {
 
   const statusBadge =
     status === "approved" ? (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
+      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
         Publicado ✓ +100 🌱
       </span>
     ) : status === "pending" ? (
-      <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
         Em análise pelo médico ⏳
       </span>
     ) : status === "rejected" ? (
-      <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
+      <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold text-rose-600">
         Não publicado — pode reescrever
       </span>
     ) : null;
@@ -438,7 +438,7 @@ function ReferralCard() {
           <p className="text-sm font-extrabold text-pink-700">Indique uma amiga → 100 🌱</p>
         </div>
         {count > 0 && (
-          <span className="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-bold text-pink-700">
+          <span className="rounded-full bg-pink-100 px-3 py-1 text-xs font-bold text-pink-700">
             {count} {count === 1 ? "amiga" : "amigas"} 💞
           </span>
         )}
@@ -745,7 +745,7 @@ export function CantinhoTab({
      ao contrário. Quem separa os dois estados é o FUNDO verde do ativo; a
      opacidade só precisa ser legível, não discreta. */
   const pill = (active: boolean) =>
-    `shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
+    `shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors ${
       active ? "bg-emerald-100 text-emerald-700" : "text-foreground/60 hover:text-foreground/80"
     }`;
 
@@ -773,7 +773,7 @@ export function CantinhoTab({
         >
           <span className="text-lg">🌱</span>
           <span className="tabular-nums font-extrabold text-emerald-600">{saldo}</span>
-          <span aria-hidden className="text-[10px] font-bold text-emerald-500">
+          <span aria-hidden className="text-xs font-bold text-emerald-500">
             +
           </span>
         </button>
@@ -860,7 +860,7 @@ export function CantinhoTab({
           ⚠️ E a contagem é "3 de 4", que é ESTADO. Nunca "falta 1!", que é
           dívida. */}
       <div className="mb-5">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+        <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Conjuntos
         </p>
         <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
@@ -884,15 +884,13 @@ export function CantinhoTab({
                     {p.conjunto.emoji}
                   </span>
                 )}
-                <span className="text-[12.5px] font-extrabold leading-tight">
-                  {p.conjunto.nome}
-                </span>
+                <span className="text-xs font-extrabold leading-tight">{p.conjunto.nome}</span>
               </div>
-              <span className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
+              <span className="mt-0.5 text-xs leading-snug text-muted-foreground">
                 {p.conjunto.descricao}
               </span>
               <span
-                className={`mt-1.5 text-[11px] font-bold ${
+                className={`mt-1.5 text-xs font-bold ${
                   p.completo ? "text-emerald-600" : "text-muted-foreground"
                 }`}
               >
@@ -965,19 +963,19 @@ export function CantinhoTab({
                 }`}
               >
                 {i.premium && (
-                  <span className="absolute right-2 top-2 rounded-full bg-violet-200/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800">
+                  <span className="absolute right-2 top-2 rounded-full bg-violet-200/80 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-violet-800">
                     {locked ? "🔒 Premium" : "Premium"}
                   </span>
                 )}
                 {isTrophy && (
-                  <span className="absolute right-2 top-2 rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
+                  <span className="absolute right-2 top-2 rounded-full bg-amber-200 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-800">
                     Coleção
                   </span>
                 )}
                 {/* O selo do troféu fica à ESQUERDA: o canto direito já é do
                     selo Premium, e dois desses itens são premium também. */}
                 {trofeusExigidos(i.id) > 0 && !has && (
-                  <span className="absolute left-2 top-2 rounded-full bg-amber-200/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
+                  <span className="absolute left-2 top-2 rounded-full bg-amber-200/85 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-amber-800">
                     {faltamTrof > 0 ? "🔒" : "✓"} {trofeusExigidos(i.id)} 🏆
                   </span>
                 )}
@@ -1004,7 +1002,7 @@ export function CantinhoTab({
                   i.type === "trilha" ? (
                     <button
                       onClick={() => equipSkin(skinAtiva === i.id ? null : i.id)}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                      className={`press mt-2 rounded-full px-3 py-1 text-xs font-bold ${
                         skinAtiva === i.id
                           ? "btn-3d bg-emerald-700 text-white"
                           : "pill-3d text-emerald-700"
@@ -1016,7 +1014,7 @@ export function CantinhoTab({
                     // Tema veste a HOME, não o cantinho: alterna V1 ⇄ V2.
                     <button
                       onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                      className={`press mt-2 rounded-full px-3 py-1 text-xs font-bold ${
                         sky === "v1"
                           ? "btn-3d bg-emerald-700 text-white"
                           : "pill-3d text-emerald-700"
@@ -1027,7 +1025,7 @@ export function CantinhoTab({
                   ) : i.type === "fundo" ? (
                     <button
                       onClick={() => equipFundo(equipped === i.id ? null : i.id)}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
+                      className={`press mt-2 rounded-full px-3 py-1 text-xs font-bold ${
                         equipped === i.id
                           ? "btn-3d bg-emerald-700 text-white"
                           : "pill-3d text-emerald-700"
@@ -1036,13 +1034,13 @@ export function CantinhoTab({
                       {equipped === i.id ? "Em uso ✓" : "Usar"}
                     </button>
                   ) : (
-                    <span className="pill-3d mt-2 rounded-full px-3 py-1 text-[11px] font-bold text-emerald-700">
+                    <span className="pill-3d mt-2 rounded-full px-3 py-1 text-xs font-bold text-emerald-700">
                       {isTrophy ? "Conquistado! 👑" : "No cantinho ✓"}
                     </span>
                   )
                 ) : trophyLocked ? (
                   <>
-                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
                       🔒 {collection.owned}/{collection.total} categorias
                     </span>
                     {/* Antes dizia "inclui os itens Premium", porque a Coroa
@@ -1050,7 +1048,7 @@ export function CantinhoTab({
                         assinatura. Agora ela pede um item pago de 8 categorias
                         e todas as 8 mais baratas são alcançáveis sem Premium —
                         então o aviso saiu, e no lugar entrou o que fazer. */}
-                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
+                    <span className="mt-1 text-xs font-medium text-amber-700/70">
                       Um enfeite de cada tipo
                     </span>
                   </>
@@ -1059,10 +1057,10 @@ export function CantinhoTab({
                      o que fazer a seguir, e é ela que faz a paciente achar que
                      o item é pago em dinheiro. */
                   <>
-                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
+                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
                       🔒 faltam {faltamTrof} 🏆
                     </span>
-                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
+                    <span className="mt-1 text-xs font-medium text-amber-700/70">
                       1 troféu por dia de 5 estrelas
                     </span>
                   </>
@@ -1073,7 +1071,7 @@ export function CantinhoTab({
                      metade da loja era parede muda. Agora abre a oferta. */
                   <button
                     onClick={() => setOferta(i.name)}
-                    className="press btn-3d mt-2 flex items-center gap-1 rounded-full bg-violet-700 px-3 py-1 text-[11px] font-bold text-white"
+                    className="press btn-3d mt-2 flex items-center gap-1 rounded-full bg-violet-700 px-3 py-1 text-xs font-bold text-white"
                   >
                     💎 Ver o Premium
                   </button>
@@ -1081,7 +1079,7 @@ export function CantinhoTab({
                   <button
                     onClick={() => buy(i.id, i.price)}
                     disabled={cant || buying === i.id}
-                    className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
+                    className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold ${
                       cant ? "bg-slate-100 text-slate-400" : "btn-3d bg-emerald-700 text-white"
                     }`}
                   >
@@ -1093,7 +1091,7 @@ export function CantinhoTab({
                     perto ou longe — a diferença entre "amanhã eu compro" e
                     "isso não é pra mim". */}
                 {!has && !locked && cant && saldo !== null && (
-                  <span className="mt-1 text-[9px] font-medium text-slate-400">
+                  <span className="mt-1 text-xs font-medium text-slate-400">
                     faltam {i.price - saldo} 🌱
                   </span>
                 )}

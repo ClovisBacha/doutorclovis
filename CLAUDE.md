@@ -12715,3 +12715,62 @@ que guardava o commit casou o bloco do OUTRO processo. O commit saiu; o
 portão rodado de novo, sozinho, deu verde, e a árvore estava certa. Mas foi
 sorte: **um portão por vez, com log próprio, e `pkill` do anterior antes de
 começar o seguinte.** Log compartilhado é portão que mente nas duas direções.
+
+## A letra do app: Nunito, e o piso de 13 px (set/2026)
+
+Pedido do dono: _"faça um estudo profundo… veja qual fonte deveríamos usar…
+cor tamanho etc"_. O estudo mediu antes de opinar, e a resposta à sensação de
+"as fontes estão um pouco ruins" era esta: **o app não tinha fonte, tinha o
+padrão de cada aparelho** — SF Pro no iPhone, DM Sans no Android —, e a página
+ainda pedia DM Sans + Nunito + Inter ao Google (482 KB referenciados, nenhum
+usado no iPhone; Inter sem um uso no código).
+
+Quatro telas renderizadas em quatro sistemas (atual · Nunito · Plus Jakarta ·
+Figtree+Fraunces), lado a lado; o dono escolheu a **Nunito**.
+
+- **Uma família, quatro pesos**: 500 texto · 600 rótulos e botões (e o corpo
+  no escuro) · 700 subtítulos · 800 títulos e números. Self-hosted em
+  `public/fontes/` (variável, latim, ~40 KB por estilo), preload do normal,
+  `font-display: swap` + "Nunito Reserva" com `size-adjust` para a tela não
+  pular. ⚠️ **O arquivo "latin" do Google cobre U+0000-00FF** — ã, ç, é, ê,
+  ô, ú, º estão lá; não é preciso o latin-ext.
+  ⚠️ **Baixe o subconjunto CERTO**: a primeira tentativa pegou o
+  `cyrillic-ext` por um `awk` frouxo. Confira o `unicode-range` do bloco antes
+  de gravar, sempre.
+- `--font-sans` e `--font-serif` apontam para a mesma família. **`font-serif`
+  (341 usos) ficou como nome**: hoje quer dizer "peso de título", não serifa.
+  Renomear é churn puro.
+- Títulos em 800 com **−0,01 em** — a Nunito pede menos aperto que a SF; os
+  −0,022 em de antes a deixavam grudada. Corpo em 1,55 de entrelinha e
+  `tabular-nums` global.
+
+### ⚠️ O PISO É 13 px, e ele foi aplicado pelo TOKEN
+
+Medido antes: **1.112 textos do app em 10, 11 ou 12 px** e 39 no tamanho de
+leitura — quase 400 abaixo do que o iOS chama de legenda (11 pt).
+
+- **`--text-xs` virou 0,8125 rem (13 px)** no `@theme inline`. Redefinir o
+  token subiu os 491 `text-xs` de uma vez, sem tocar em linha nenhuma.
+- **Os literais de 10/11/12 px do app da paciente viraram `text-xs`** (473
+  em 51 arquivos), e os fracionários (12,5 · 11,5 · 10,5 · 9,5 px · 0,65 rem)
+  também. ⚠️ **Escopo: o app da paciente** — `minha-conta`, os componentes
+  dela, `acompanhar`, `votar-nome`, `epds`. O painel do médico e o site
+  institucional ficaram (327 literais): é desktop, e o pedido era sobre o
+  APP. Os `text-xs` deles subiram junto pelo token, o que não faz mal.
+- ⚠️ **Ficam em 9 px só GLIFOS de emblema** — o ✓ numa bolinha de 16 px, o
+  "9+" do contador, o selo do médico em `size="xs"`. Não são texto de
+  leitura; a 13 px estourariam a bolinha. As etiquetas em caixa alta
+  ("PREMIUM", "NOVO") e as legendas âmbar da loja subiram.
+- **Medido depois, em 393 e em 320 px**, doze telas: `scrollWidth` igual ao
+  viewport em todas, nenhum texto de leitura abaixo de 13 px, zero erros de
+  console. Os "transbordos" que a sonda acusou são os `-mx-5` deliberados da
+  fita do Caminho e halos decorativos absolutos — já existiam.
+- ⚠️ **Trocar classe encurta linha, e o prettier cobra**: 55 arquivos
+  reformatados depois da troca. Rode `bun run format` ANTES do portão, senão
+  ele reprova por espaçamento sobre código certo.
+- ⚠️ **`pgrep -f "verificar.sh"` mata o PRÓPRIO shell** que o invocou (a
+  string está na linha de comando dele) — é de onde vinha o exit 144 do
+  portão. Use um colchete no padrão: `pgrep -f "scripts/verifica[r].sh"`.
+
+**Onde 13 px não couber, muda-se o DESENHO** (duas linhas, uma palavra a
+menos, o número sozinho), nunca a letra para baixo.

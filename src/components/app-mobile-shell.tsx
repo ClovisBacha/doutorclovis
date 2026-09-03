@@ -612,13 +612,13 @@ function NuvemDeAtalhos({
             style={{ animationDelay: `${(atalhos.length - 1 - n) * 32}ms` }}
           >
             <span
-              className={`rounded-full px-2.5 py-1 text-[12px] font-medium shadow-sm ${
+              className={`rounded-full px-2.5 py-1 text-xs font-medium shadow-sm ${
                 escura ? "bg-white/90 text-neutral-900" : "bg-card text-foreground"
               }`}
             >
               {a.rotulo}
               {typeof a.emblema === "number" && a.emblema > 0 && (
-                <span className="ml-1 rounded-full bg-rose-700 px-1.5 text-[10px] font-bold text-white">
+                <span className="ml-1 rounded-full bg-rose-700 px-1.5 text-xs font-bold text-white">
                   {a.emblema > 9 ? "9+" : a.emblema}
                 </span>
               )}
@@ -1759,7 +1759,7 @@ export function AppHomeScreen({
             </div>
 
             {isMadrugada && (
-              <p className="mt-3 text-center text-[11px] text-white/65">
+              <p className="mt-3 text-center text-xs text-white/65">
                 🌙 Madrugada — tente descansar um pouco
               </p>
             )}
@@ -2032,7 +2032,7 @@ export function AppHomeScreen({
                 `muted` a 12px e peso normal lia bem mais claro que o `muted` a
                 11px em negrito do "% concluído" — mesma cor no código, dois
                 cinzas diferentes no olho. */}
-            <p className="mt-0.5 text-[12px] leading-snug text-foreground">{weather.tip}</p>
+            <p className="mt-0.5 text-xs leading-snug text-foreground">{weather.tip}</p>
           </div>
         </div>
       )}
@@ -2074,14 +2074,14 @@ export function AppHomeScreen({
         <div className="mb-3 rounded-3xl card-material px-4 py-3.5">
           <div className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3">
             <div className="text-left">
-              <p className="text-[10px] font-medium text-muted-foreground">Início</p>
-              <p className="text-[11px] font-bold text-foreground">
+              <p className="text-xs font-medium text-muted-foreground">Início</p>
+              <p className="text-xs font-bold text-foreground">
                 {dateOffsetLabel(-(gest.totalDays ?? 0))}
               </p>
             </div>
 
             <div>
-              <p className="text-center text-[11px] font-bold text-muted-foreground">
+              <p className="text-center text-xs font-bold text-muted-foreground">
                 {Math.round(progress ?? 0)}% concluído
               </p>
               {/* Trilho com o coração na posição de hoje */}
@@ -2096,7 +2096,7 @@ export function AppHomeScreen({
                 />
                 <span
                   aria-hidden
-                  className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-[10px] shadow-md transition-all duration-700"
+                  className="absolute top-1/2 flex h-5 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-xs shadow-md transition-all duration-700"
                   style={{ left: `${progress ?? 0}%` }}
                 >
                   💜
@@ -2105,10 +2105,8 @@ export function AppHomeScreen({
             </div>
 
             <div className="text-right">
-              <p className="text-[10px] font-medium text-muted-foreground">Parto previsto</p>
-              <p className="text-[11px] font-bold text-foreground">
-                {dateOffsetLabel(daysLeft ?? 0)}
-              </p>
+              <p className="text-xs font-medium text-muted-foreground">Parto previsto</p>
+              <p className="text-xs font-bold text-foreground">{dateOffsetLabel(daysLeft ?? 0)}</p>
             </div>
           </div>
         </div>
@@ -2136,12 +2134,12 @@ export function AppHomeScreen({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
               {semMedico ? "Encontre o seu médico" : "Seu médico"}
             </p>
             <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>
             <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{medEspec}</p>
-            {medCrm && <p className="mt-1 text-[10px] text-muted-foreground">{medCrm}</p>}
+            {medCrm && <p className="mt-1 text-xs text-muted-foreground">{medCrm}</p>}
           </div>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-300 group-hover:translate-x-1" />
         </div>

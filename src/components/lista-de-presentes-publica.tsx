@@ -419,7 +419,7 @@ export function ListaDePresentesPublica({
         </p>
       )}
 
-      <p className="pb-4 text-center text-[11px] text-muted-foreground">
+      <p className="pb-4 text-center text-xs text-muted-foreground">
         Nada é cobrado por aqui — você combina direto com {lista.donaNome}.
       </p>
     </div>

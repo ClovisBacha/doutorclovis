@@ -105,15 +105,11 @@ export function BabyEvolution() {
             <BabyIllustration week={week} />
             <div className="mt-4 grid w-full grid-cols-2 gap-3">
               <div className="rounded-xl bg-card/70 px-3 py-2">
-                <p className="text-[0.65rem] uppercase tracking-[0.16em] text-muted-foreground">
-                  Tamanho
-                </p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Tamanho</p>
                 <p className="font-serif text-lg text-primary">{baby.size}</p>
               </div>
               <div className="rounded-xl bg-card/70 px-3 py-2">
-                <p className="text-[0.65rem] uppercase tracking-[0.16em] text-muted-foreground">
-                  Peso
-                </p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Peso</p>
                 <p className="font-serif text-lg text-primary">{baby.weight}</p>
               </div>
             </div>

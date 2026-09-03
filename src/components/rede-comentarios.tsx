@@ -546,7 +546,7 @@ export function Comentarios({
                `min-h-[44px]` aqui empurraria o "8 comentários" ao lado, então o
                `after` estende só a área do dedo — a mesma solução do × da
                linha, e pelo mesmo motivo. */
-            className="press relative text-[12px] text-muted-foreground after:absolute after:inset-x-0 after:-inset-y-3.5 after:content-['']"
+            className="press relative text-xs text-muted-foreground after:absolute after:inset-x-0 after:-inset-y-3.5 after:content-['']"
           >
             {abertos ? "Fechar comentários" : "Reabrir comentários"}
           </button>
@@ -559,7 +559,7 @@ export function Comentarios({
           régua do "Hoje eu não desço ao chão" da aba de exercícios, que só
           aparece quando há chão a tirar. */}
       {lista.length >= 3 && (
-        <div className="mb-2 flex items-center gap-1.5 text-[12px]">
+        <div className="mb-2 flex items-center gap-1.5 text-xs">
           <span className="text-muted-foreground">Ordenar por</span>
           {(
             [
@@ -652,7 +652,7 @@ export function Comentarios({
             <button
               type="button"
               onClick={() => setAbertas((a) => ({ ...a, [raiz.id]: true }))}
-              className="press ml-9 mt-1 min-h-[44px] text-[12px] font-medium text-muted-foreground"
+              className="press ml-9 mt-1 min-h-[44px] text-xs font-medium text-muted-foreground"
             >
               Ver mais {respostas.length - RESPOSTAS_VISIVEIS}{" "}
               {respostas.length - RESPOSTAS_VISIVEIS === 1 ? "resposta" : "respostas"}
@@ -680,13 +680,13 @@ export function Comentarios({
             </button>
           </div>
           {curtidasDe.pessoas === null ? (
-            <p className="mt-1 text-[12px] text-muted-foreground">Carregando…</p>
+            <p className="mt-1 text-xs text-muted-foreground">Carregando…</p>
           ) : curtidasDe.pessoas === "erro" ? (
-            <p className="mt-1 text-[12px] text-muted-foreground">
+            <p className="mt-1 text-xs text-muted-foreground">
               Não deu para carregar agora. Tente de novo.
             </p>
           ) : curtidasDe.pessoas.length === 0 ? (
-            <p className="mt-1 text-[12px] text-muted-foreground">Ninguém ainda.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Ninguém ainda.</p>
           ) : (
             <ul className="mt-2 flex flex-col gap-2">
               {curtidasDe.pessoas.map((p) => (
@@ -699,7 +699,7 @@ export function Comentarios({
                     {p.avatarUrl ? (
                       <img src={p.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
                     ) : (
-                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[12px] font-semibold">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
                         {(p.nome.trim()[0] ?? "?").toUpperCase()}
                       </span>
                     )}
@@ -719,14 +719,14 @@ export function Comentarios({
             <button
               type="button"
               onClick={() => void apagar(apagando)}
-              className="press rounded-full bg-destructive px-3 py-1 text-[12px] font-semibold text-destructive-foreground"
+              className="press rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground"
             >
               Apagar
             </button>
             <button
               type="button"
               onClick={() => setApagando(null)}
-              className="press rounded-full border border-border px-3 py-1 text-[12px]"
+              className="press rounded-full border border-border px-3 py-1 text-xs"
             >
               Manter
             </button>
@@ -750,11 +750,11 @@ export function Comentarios({
       )}
 
       {indisponivel ? (
-        <p className="mt-3 text-[12px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           Não consegui carregar os comentários agora.
         </p>
       ) : !abertos ? (
-        <p className="mt-3 text-[12px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           Os comentários deste post estão fechados.
         </p>
       ) : !possoComentar ? (
@@ -763,7 +763,7 @@ export function Comentarios({
             conclusão bem pior e sobre outra coisa. E a lista continua VISÍVEL:
             quem pode ver a publicação continua podendo ler a conversa; o que
             muda é quem escreve. */
-        <p className="mt-3 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-3 text-xs leading-snug text-muted-foreground">
           {quemComenta === "amigas"
             ? "Só as amigas dela podem comentar nesta publicação."
             : "Só quem ela acompanha pode comentar nesta publicação."}
@@ -779,7 +779,7 @@ export function Comentarios({
               coisas. Entrar no modo edição limpa a resposta pendente. */}
           {editando && (
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-1.5">
-              <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 Editando o seu comentário
               </span>
               <button
@@ -797,7 +797,7 @@ export function Comentarios({
           )}
           {respondendo && !editando && (
             <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-3 py-1.5">
-              <span className="min-w-0 flex-1 truncate text-[12px] text-muted-foreground">
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                 Respondendo a {respondendo.nome}
               </span>
               <button
@@ -829,9 +829,7 @@ export function Comentarios({
             </button>
           </div>
           {recado && (
-            <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-[12px] leading-snug">
-              {recado}
-            </p>
+            <p className="mt-2 rounded-xl bg-muted/60 px-3 py-2 text-xs leading-snug">{recado}</p>
           )}
         </>
       )}
@@ -898,7 +896,7 @@ function Linha({
         {c.autorAvatar ? (
           <img src={c.autorAvatar} alt="" className="h-7 w-7 rounded-full object-cover" />
         ) : (
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[12px] font-semibold">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-xs font-semibold">
             {(c.autorNome.trim()[0] ?? "?").toUpperCase()}
           </span>
         )}
@@ -911,7 +909,7 @@ function Linha({
             própria em cada sistema, a mesma lição do 📞 e da estrela do
             destaque. */}
         {!!c.fixadoEm && !oculto && (
-          <span className="mb-0.5 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+          <span className="mb-0.5 flex items-center gap-1 text-xs font-medium text-muted-foreground">
             <svg viewBox="0 0 24 24" className="h-3 w-3" fill="currentColor" aria-hidden>
               <path d="M14 2l8 8-3 1-3.5 3.5L14 22l-4-6-6-4 7.5-1.5L15 7l-1-5z" />
             </svg>
@@ -953,9 +951,7 @@ function Linha({
                 ao texto que estava lá; sem ele, uma edição posterior faz as
                 respostas parecerem sem sentido — ou faz a autora parecer ter
                 dito uma coisa que ninguém leu. */}
-            {c.editadoEm && (
-              <span className="ml-1 text-[11px] text-muted-foreground">· editado</span>
-            )}
+            {c.editadoEm && <span className="ml-1 text-xs text-muted-foreground">· editado</span>}
           </p>
         )}
 
@@ -970,7 +966,7 @@ function Linha({
             escondido, e aí precisa estar. Foi o olhar na bancada que pegou;
             nenhuma asserção estava perto disso. */}
         {c.oculto && !oculto && (
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {c.oculto === "restrito"
               ? "Só você e quem escreveu veem este comentário."
               : "Escondido pelo seu filtro de palavras."}
@@ -986,7 +982,7 @@ function Linha({
             <button
               type="button"
               onClick={aoResponder}
-              className="press min-h-[44px] pr-2 text-[12px] font-medium text-muted-foreground"
+              className="press min-h-[44px] pr-2 text-xs font-medium text-muted-foreground"
             >
               Responder
             </button>
@@ -1001,12 +997,12 @@ function Linha({
               <button
                 type="button"
                 onClick={aoVerCurtidas}
-                className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+                className="press min-h-[44px] text-xs font-medium text-muted-foreground"
               >
                 {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
               </button>
             ) : (
-              <span className="text-[12px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {c.curtidas} {c.curtidas === 1 ? "curtida" : "curtidas"}
               </span>
             ))}
@@ -1017,7 +1013,7 @@ function Linha({
             <button
               type="button"
               onClick={aoFixar}
-              className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+              className="press min-h-[44px] text-xs font-medium text-muted-foreground"
             >
               {c.fixadoEm ? "Desafixar" : "Fixar"}
             </button>
@@ -1029,7 +1025,7 @@ function Linha({
             <button
               type="button"
               onClick={aoEditar}
-              className="press min-h-[44px] text-[12px] font-medium text-muted-foreground"
+              className="press min-h-[44px] text-xs font-medium text-muted-foreground"
             >
               Editar
             </button>
@@ -1079,7 +1075,7 @@ function Linha({
              393px — a mesma medição que fixou o `gap-1.5` na linha da amiga.
              O `after` estende a área do dedo 6px para cada lado sem mover um
              pixel do desenho. */
-          className="press relative h-11 w-8 shrink-0 text-[12px] text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
+          className="press relative h-11 w-8 shrink-0 text-xs text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
           aria-label="Apagar comentário"
         >
           ×
@@ -1088,7 +1084,7 @@ function Linha({
         <button
           type="button"
           onClick={() => aoDenunciar(c.id)}
-          className="press relative h-11 w-8 shrink-0 text-[12px] text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
+          className="press relative h-11 w-8 shrink-0 text-xs text-muted-foreground after:absolute after:-inset-x-1.5 after:inset-y-0 after:content-['']"
           aria-label="Denunciar comentário"
         >
           ⋯

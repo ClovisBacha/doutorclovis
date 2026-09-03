@@ -265,8 +265,8 @@ export function BabyIllustration({
               </>
             )}
           </div>
-          <p className="mt-0.5 text-[11px] text-primary/70">{info.fruit}</p>
-          <p className="mx-auto mt-1 max-w-[220px] text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 text-xs text-primary/70">{info.fruit}</p>
+          <p className="mx-auto mt-1 max-w-[220px] text-xs leading-snug text-muted-foreground">
             {info.desc}
           </p>
         </div>

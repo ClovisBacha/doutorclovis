@@ -230,7 +230,7 @@ export function MenuDaConta({
             </span>
             <span className="flex-1">Notificações</span>
             {naoLidas > 0 && (
-              <span className="rounded-full bg-rose-700 px-2 py-0.5 text-[11px] font-bold text-white">
+              <span className="rounded-full bg-rose-700 px-2 py-0.5 text-xs font-bold text-white">
                 {naoLidas}
               </span>
             )}
@@ -257,12 +257,12 @@ export function MenuDaConta({
                 <span className="block text-sm font-semibold text-foreground">
                   {label}
                   {perfilPendente && tab === "Perfil" && (
-                    <span className="ml-1.5 align-middle text-[10.5px] font-bold text-rose-600">
+                    <span className="ml-1.5 align-middle text-xs font-bold text-rose-600">
                       • contato de emergência
                     </span>
                   )}
                 </span>
-                <span className="block text-[11.5px] leading-snug text-muted-foreground">
+                <span className="block text-xs leading-snug text-muted-foreground">
                   {tab === "Consultas" && proximaConsulta ? proximaConsulta : sub}
                 </span>
               </span>
@@ -282,7 +282,7 @@ export function MenuDaConta({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-semibold text-foreground">Pós-parto</span>
-                <span className="block text-[11.5px] leading-snug text-muted-foreground">
+                <span className="block text-xs leading-snug text-muted-foreground">
                   Cuidados com você e o bebê depois do parto
                 </span>
               </span>

@@ -192,11 +192,11 @@ function HomeMoodCheckin({ name }: { name: string }) {
             className="press pill-3d flex min-w-[64px] flex-col items-center gap-1 rounded-2xl px-3 py-2 transition-colors disabled:opacity-50"
           >
             <span className="text-2xl">{m.emoji}</span>
-            <span className="text-[11px] text-muted-foreground">{m.label}</span>
+            <span className="text-xs text-muted-foreground">{m.label}</span>
           </button>
         ))}
       </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         Fica só no seu diário e ajuda seu médico a te entender melhor.
       </p>
     </div>
@@ -269,7 +269,7 @@ function DoctorPresenceCard({
             {nomeMedico.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
           </span>
         )}
-        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground ring-2 ring-card">
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground ring-2 ring-card">
           ✓
         </span>
       </span>
@@ -472,7 +472,7 @@ export function BabyTab({
             {/* Progresso da jornada (silenciado no Modo Cuidado) */}
             {!careMode && (
               <div className="mt-5">
-                <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
+                <div className="flex justify-between text-xs font-medium text-muted-foreground">
                   <span>Início</span>
                   <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
                   <span>Parto</span>
