@@ -754,10 +754,24 @@ export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean 
 /** O número dela num bloco da Saúde: o valor grande e a legenda pequena. */
 type Dado = { valor: string; legenda?: string };
 
+/**
+ * O cabeçalho das três telas que o hub da Saúde abre como ABA (Saúde,
+ * Nutrição, Saúde da mulher) — Chutes e Contrações já passam pelo cabeçalho de
+ * `Registros`. Sem seta: a barra de cima é quem volta ao hub (`voltarDaBarra`).
+ * Lê o MESMO `HUB_SAUDE` que desenha o bloco, então o coração verde de lá é o
+ * coração verde daqui por construção.
+ */
+function CabecalhoDaSaude({ chave }: { chave: string }) {
+  const item = HUB_SAUDE.find((i) => i.key === chave);
+  if (!item) return null;
+  return <VoltarDaGrade rotulo={item.label} ladrilho={item} />;
+}
+
 export function HubSaude({
   onAbrir,
   weeks,
   bancada,
+  cabecalhos,
 }: {
   onAbrir: (t: Tab, sub?: string) => void;
   /** Semana gestacional — `null` quando não há gestação configurada. */
@@ -768,6 +782,8 @@ export function HubSaude({
    * Injeta o DADO no mesmo estado da produção, nunca um desenho à parte.
    */
   bancada?: Record<string, Dado | null>;
+  /** Só a `/preview-saude`: em vez da grade, os cinco cabeçalhos de sub-tela, para fotografar. */
+  cabecalhos?: boolean;
 }) {
   /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
      cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
@@ -854,6 +870,15 @@ export function HubSaude({
   const itens = HUB_SAUDE.filter(
     (i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks),
   ).map((i) => ({ ...i, dado: dados[i.key] ?? null }));
+  if (cabecalhos) {
+    return (
+      <div className="space-y-3">
+        {itens.map((i) => (
+          <VoltarDaGrade key={i.key} rotulo={i.label} ladrilho={i} onVoltar={() => {}} />
+        ))}
+      </div>
+    );
+  }
   return (
     <GradeHub
       itens={itens}
@@ -2765,10 +2790,16 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Saúde" && (
-                  <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Saúde" />
+                    <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
+                  </div>
                 )}
                 {tab === "Nutrição" && (
-                  <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Nutrição" />
+                    <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                  </div>
                 )}
                 {tab === "Bem-estar" && (
                   <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
@@ -2796,7 +2827,12 @@ function MinhaContaPage() {
                     (Sementinhas) — ver o cabeçalho de `RECOMPENSAS_SUBTABS`. */}
                 {tab === "Loja" && <LojaTab gest={gest} careMode={careMode} onNavigate={goToTab} />}
                 {tab === "Assinatura" && <AssinaturaTab onNavigate={goToTab} />}
-                {tab === "Saúde da mulher" && <SaudeMulherHub />}
+                {tab === "Saúde da mulher" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Saúde da mulher" />
+                    <SaudeMulherHub />
+                  </div>
+                )}
                 {tab === "Médico" && <MédicoTab />}
                 {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
                 {tab === "Perfil" && (
@@ -3097,7 +3133,7 @@ function BemEstarHub({
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} careMode={careMode} />}
         {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />}
@@ -3124,13 +3160,16 @@ export const REGISTROS_SUBTABS = [
     tinta: "text-amber-600",
   },
   {
+    /* ⚠️ Chutes e Contrações têm a MESMA família (cor e arte) que no hub da
+       Saúde: são o mesmo destino por duas portas, e quem toca no bloco azul
+       de Chutes na Saúde tem de chegar numa tela azul — não numa rosa. */
     key: "chutes",
     label: "Chutes",
     sub: "Contar os movimentos",
     Icon: Footprints,
     imagem: ARTE_GRADE.chutes,
-    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
-    tinta: "text-pink-600",
+    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
+    tinta: "text-sky-600",
   },
   {
     key: "contracoes",
@@ -3138,8 +3177,8 @@ export const REGISTROS_SUBTABS = [
     sub: "Cronometrar e ver o padrão",
     Icon: Timer,
     imagem: ARTE_GRADE.contracoes,
-    caixa: "border-violet-200/70 from-violet-50 to-purple-50/60",
-    tinta: "text-violet-600",
+    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
+    tinta: "text-orange-600",
   },
   {
     key: "timeline",
@@ -3197,7 +3236,7 @@ function RegistrosHub({
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
         {sub === "chutes" && (
@@ -3341,7 +3380,7 @@ function BebeHub({
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "semana" && (
           <BabyTab
@@ -10050,7 +10089,7 @@ function ConsultasHub({
   }
   return (
     <div ref={rootRef} className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "agenda" && <ConsultasTab />}
         {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}

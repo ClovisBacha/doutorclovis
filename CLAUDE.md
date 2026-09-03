@@ -12665,3 +12665,29 @@ referência, 26 de 26 saíram na família de primeira.
   (13). Refazer os dois na referência custa ~206 cr, fora do teto atual.
 
 **Bancadas:** `/preview-grades` (as quatro grades) · `/preview-comunidade?vivo=1`.
+
+### Dentro de cada sub-tela, o bloco que a abriu (set/2026)
+
+Pedido do dono: "dentro de cada aba, ver como mudar para ficar no design
+daquela aba — a da Saúde é um coração com fundo verde; lá dentro tem de estar
+similar. Faça isso com todos."
+
+- **`VoltarDaGrade` virou o cabeçalho da sub-tela**, alimentado pelo MESMO
+  `ladrilho` que desenha o bloco: o degradê da família, a peça no pratinho, o
+  rótulo e a linha de baixo, com a seta de voltar dentro. Quem toca no coração
+  verde chega numa tela que começa com o coração verde — por construção, não
+  por alguém lembrar de pintar cada tela. Vale para as quatro grades (Bebê,
+  Consultas, Bem-estar, Registros) e para as três abas que o hub da Saúde abre
+  (Saúde, Nutrição, Saúde da mulher — `CabecalhoDaSaude`, sem seta, porque
+  ali a barra de cima é quem volta).
+- ⚠️ **Chutes e Contrações eram AZUL e LARANJA na Saúde e ROSA e ROXO em
+  Registros** — o mesmo destino por duas portas, com duas cores. Quem tocava no
+  bloco azul chegava numa tela rosa. Registros passou a emprestar a família da
+  Saúde para os dois.
+- **Bancadas:** `/preview-grades?cabecalhos=1` (os 22 cabeçalhos) ·
+  `/preview-saude?w=38&cabecalhos=1` (os cinco). O cabeçalho só existe depois
+  de um toque que a bancada não dá, então ele ganhou uma porta própria.
+- **Fica para a segunda passada:** as portas da Comunidade abrem telas com
+  cabeçalho próprio (Amigas tem o herói pintado do Drive; Chá de bebê,
+  Acompanhante e o Feed têm os seus) — decidir se ganham o mesmo cabeçalho é
+  olhar cada uma.

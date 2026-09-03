@@ -195,23 +195,86 @@ export function GradeHub({
 }
 
 /**
- * A volta para a grade, dentro de uma sub-aba aberta.
+ * A volta para a grade, dentro de uma sub-aba aberta — e o CABEÇALHO da
+ * sub-tela, no desenho do bloco que a abriu.
  *
- * Fica no topo do conteúdo e diz o NOME de onde se está — a barra de cima do
- * app mostra o nome da aba (Consultas), não o da sub-aba, e sem esta linha a
- * paciente perde a referência de qual das sete telas está vendo.
+ * Pedido do dono: "dentro de cada aba, ver como mudar para ficar no design
+ * daquela aba — a da Saúde é um coração com fundo verde; lá dentro tem de
+ * estar similar". A forma de garantir isso em TODAS as sub-telas é uma peça
+ * só, alimentada pelos MESMOS dados do bloco (`ladrilho`: a arte, o degradê
+ * da família, a cor, o rótulo e a linha de baixo). Quem abriu um bloco verde
+ * com o coração chega numa tela que começa com o mesmo coração sobre o mesmo
+ * verde — a continuidade não depende de ninguém lembrar de pintar a tela.
+ *
+ * Sem `ladrilho` ela é só a seta com o nome (o formato antigo). Sem
+ * `onVoltar` não há seta: é o caso das abas que a barra de cima já sabe
+ * voltar (Saúde, Nutrição, Saúde da mulher), onde o cabeçalho é só a
+ * identidade do bloco.
  */
-export function VoltarDaGrade({ rotulo, onVoltar }: { rotulo: string; onVoltar: () => void }) {
+export function VoltarDaGrade({
+  rotulo,
+  onVoltar,
+  ladrilho,
+}: {
+  rotulo: string;
+  onVoltar?: () => void;
+  ladrilho?: Pick<Ladrilho, "label" | "sub" | "imagem" | "caixa" | "tinta" | "Icon">;
+}) {
+  const seta = onVoltar ? (
+    <button
+      onClick={onVoltar}
+      aria-label="Voltar"
+      className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-white/70 text-primary transition-colors hover:bg-white"
+    >
+      <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
+    </button>
+  ) : null;
+  if (!ladrilho) {
+    return (
+      <div className="flex items-center gap-2.5">
+        {seta}
+        <p className="min-w-0 truncate font-serif text-lg leading-tight text-foreground">
+          {rotulo}
+        </p>
+      </div>
+    );
+  }
+  const { imagem, caixa, tinta, sub, Icon } = ladrilho;
   return (
-    <div className="flex items-center gap-2.5">
-      <button
-        onClick={onVoltar}
-        aria-label="Voltar"
-        className="press flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-primary/8 text-primary transition-colors hover:bg-primary/15"
-      >
-        <ChevronLeft className="h-[18px] w-[18px]" strokeWidth={2} />
-      </button>
-      <p className="min-w-0 truncate font-serif text-lg leading-tight text-foreground">{rotulo}</p>
+    <div
+      className={`relative flex items-center gap-3 overflow-hidden rounded-[26px] border bg-gradient-to-br p-3 pr-4 ${caixa}`}
+    >
+      {/* a mesma luz de cima do bloco */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_0%,rgba(255,255,255,0.75),transparent_70%)]"
+      />
+      <span className="relative">{seta}</span>
+      {/* a mesma peça, no mesmo pratinho, menor */}
+      <span className={`relative flex h-16 w-16 shrink-0 items-center justify-center ${tinta}`}>
+        <span
+          aria-hidden
+          className="absolute h-16 w-16 rounded-full bg-current opacity-[0.28] blur-xl"
+        />
+        <span
+          aria-hidden
+          className="absolute h-14 w-14 rounded-full bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_18px_-6px_rgba(0,0,0,0.12)] ring-1 ring-white/80"
+        />
+        {imagem ? (
+          <img
+            src={imagem}
+            alt=""
+            draggable={false}
+            className="relative h-11 w-11 object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.16)]"
+          />
+        ) : (
+          <Icon className="relative h-6 w-6" strokeWidth={1.7} />
+        )}
+      </span>
+      <div className="relative min-w-0">
+        <p className="truncate font-serif text-lg leading-tight text-foreground">{rotulo}</p>
+        <p className="mt-0.5 truncate text-[13px] leading-snug text-muted-foreground">{sub}</p>
+      </div>
     </div>
   );
 }

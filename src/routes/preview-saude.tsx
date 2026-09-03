@@ -24,6 +24,8 @@ export const Route = createFileRoute("/preview-saude")({
   validateSearch: (q: Record<string, unknown>) => ({
     w: q.w == null || q.w === "" ? null : Number(q.w),
     dados: q.dados == null ? 0 : Number(q.dados),
+    /* `?cabecalhos=1`: os cinco cabeçalhos de sub-tela no lugar da grade. */
+    cabecalhos: q.cabecalhos === "1" || q.cabecalhos === 1 || q.cabecalhos === true,
   }),
   head: () => ({
     meta: [{ title: "Bancada da Saúde" }, { name: "robots", content: "noindex" }],
@@ -32,12 +34,13 @@ export const Route = createFileRoute("/preview-saude")({
 });
 
 function PreviewSaude() {
-  const { w, dados } = Route.useSearch();
+  const { w, dados, cabecalhos } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[50] overflow-y-auto bg-background px-4 py-5">
       <p className="mb-4 font-serif text-xl">Sua saúde</p>
       <HubSaude
         onAbrir={() => {}}
+        cabecalhos={cabecalhos}
         weeks={Number.isFinite(w) ? (w as number) : null}
         bancada={
           dados
