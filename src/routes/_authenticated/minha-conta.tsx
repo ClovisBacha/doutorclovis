@@ -200,6 +200,7 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
 import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
+import { CabecalhoDaPorta } from "@/components/comunidade";
 import { ConfiguracoesDoPerfil } from "@/components/rede-social";
 import { aulaDeHojeParaCompartilhar } from "@/lib/aula-compartilhavel";
 import type { AulaNoPost } from "@/lib/rede-social";
@@ -2716,7 +2717,12 @@ function MinhaContaPage() {
                     />
                   </div>
                 )}
-                {tab === "Chá de bebê" && <ChaDeBebe careMode={careMode} />}
+                {tab === "Chá de bebê" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaPorta chave="cha" />
+                    <ChaDeBebe careMode={careMode} />
+                  </div>
+                )}
                 {/* ⚠️ A tela do FEED é a do modelo Instagram (`RedeNoApp`), e
                     as CONFIGURAÇÕES ficam acima dela — perfil público, bio e a
                     fila de pedidos. Elas não são parte do modelo copiado: o
@@ -2805,7 +2811,12 @@ function MinhaContaPage() {
                   <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
                 )}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-                {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
+                {tab === "Acompanhante" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaPorta chave="acompanhante" />
+                    <CompanionTab babyName={profile?.baby_name ?? null} />
+                  </div>
+                )}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
                   <CardTab profile={profile} gest={gest} onNavigate={goToTab} medico={meuMedico} />

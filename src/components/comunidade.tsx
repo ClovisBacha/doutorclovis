@@ -24,7 +24,8 @@ import arte_amigas from "@/assets/comunidade/amigas.webp";
 import arte_acompanhante from "@/assets/comunidade/acompanhante.webp";
 import arte_album from "@/assets/comunidade/album.webp";
 import arte_nome from "@/assets/comunidade/nome.webp";
-import { portasDaComunidade } from "@/lib/comunidade";
+import { PORTAS, portasDaComunidade } from "@/lib/comunidade";
+import { VoltarDaGrade } from "@/components/grade-hub";
 import {
   emblemaDaPorta,
   fraseDaPorta,
@@ -45,6 +46,31 @@ const ARTE_DA_PORTA: Record<string, string> = {
   album: arte_album,
   nome: arte_nome,
 };
+
+/**
+ * O cabeçalho das telas que uma porta da Comunidade abre como ABA (Chá de
+ * bebê, Acompanhante): a mesma peça, sobre a mesma família, com o mesmo texto
+ * — quem tocou no cartão rosa do chá chega numa tela que começa rosa. Sem seta:
+ * a barra de cima é quem volta. Álbum e Nome caem nos quadrados do Bebê, que já
+ * têm o cabeçalho deles; Amigas tem o herói pintado do Drive, e o Feed é o
+ * modelo do Instagram — os dois ficam como estão, de propósito.
+ */
+export function CabecalhoDaPorta({ chave }: { chave: string }) {
+  const p = PORTAS.find((x) => x.key === chave);
+  if (!p) return null;
+  return (
+    <VoltarDaGrade
+      rotulo={p.label}
+      ladrilho={{
+        label: p.label,
+        sub: p.sub,
+        imagem: ARTE_DA_PORTA[p.key],
+        caixa: p.caixa,
+        tinta: p.tinta,
+      }}
+    />
+  );
+}
 
 export function ComunidadeTab({
   careMode = false,
@@ -116,30 +142,46 @@ export function ComunidadeTab({
               key={p.key}
               type="button"
               onClick={() => onAbrir(p.destino, p.subDestino)}
-              className="press relative flex flex-col items-start gap-1 rounded-2xl card-material p-4 text-left"
+              className={`press relative flex flex-col items-start gap-1 overflow-hidden rounded-[26px] border bg-gradient-to-br p-4 text-left ${p.caixa}`}
             >
-              {ARTE_DA_PORTA[p.key] ? (
-                <img
-                  src={ARTE_DA_PORTA[p.key]}
-                  alt=""
-                  draggable={false}
-                  className="h-12 w-12 object-contain drop-shadow-[0_6px_10px_rgba(0,0,0,0.12)]"
+              {/* a mesma luz de cima dos ladrilhos das grades */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_45%_at_50%_0%,rgba(255,255,255,0.75),transparent_70%)]"
+              />
+              {/* a peça no pratinho, como em toda grade do app */}
+              <span className={`relative flex h-16 w-16 items-center justify-center ${p.tinta}`}>
+                <span
+                  aria-hidden
+                  className="absolute h-16 w-16 rounded-full bg-current opacity-[0.28] blur-xl"
                 />
-              ) : (
-                <span className="text-2xl leading-none">{p.emoji}</span>
-              )}
+                <span
+                  aria-hidden
+                  className="absolute h-14 w-14 rounded-full bg-white/70 shadow-[inset_0_1px_0_rgba(255,255,255,1),0_6px_18px_-6px_rgba(0,0,0,0.12)] ring-1 ring-white/80"
+                />
+                {ARTE_DA_PORTA[p.key] ? (
+                  <img
+                    src={ARTE_DA_PORTA[p.key]}
+                    alt=""
+                    draggable={false}
+                    className="relative h-11 w-11 object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.16)]"
+                  />
+                ) : (
+                  <span className="relative text-2xl leading-none">{p.emoji}</span>
+                )}
+              </span>
               {/* ⚠️ O emblema fica no CANTO, fora do fluxo: no fluxo ele
                   empurraria o título para a segunda linha em "Acompanhante",
                   que é o rótulo mais longo. */}
               {emblema && (
                 <span
                   aria-hidden="true"
-                  className="absolute right-3 top-3 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-primary-foreground tabular-nums"
+                  className="absolute right-3 top-3 z-10 min-w-[20px] rounded-full bg-primary px-1.5 py-0.5 text-center text-[11px] font-bold leading-tight text-primary-foreground tabular-nums"
                 >
                   {emblema}
                 </span>
               )}
-              <span className="mt-1 font-semibold leading-tight">{p.label}</span>
+              <span className="relative mt-1 font-semibold leading-tight">{p.label}</span>
               {/* ⚠️ A frase SUBSTITUI o subtítulo quando existe — não se soma a
                   ele. Duas linhas de texto miúdo num cartão de 170px viram um
                   bloco cinza que ninguém lê, e o FATO ("3 presentes

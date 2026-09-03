@@ -21,6 +21,11 @@ export type PortaDaComunidade = {
   label: string;
   sub: string;
   emoji: string;
+  /** Borda + degradê do cartão e cor da peça — a FAMÍLIA da porta, como nos
+      ladrilhos das grades. Álbum e Nome repetem a família dos quadrados do Bebê
+      que eles abrem: é o mesmo destino por duas portas. */
+  caixa: string;
+  tinta: string;
   /** Aba de destino. */
   destino: string;
   /** Sub-tela dentro do destino, quando ele é um hub. */
@@ -43,6 +48,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Chá de bebê",
     sub: "Fraldas, cotas e a lista",
     emoji: "🎁",
+    caixa: "border-rose-200/70 from-rose-50 to-pink-50/60",
+    tinta: "text-rose-600",
     destino: "Chá de bebê",
   },
   {
@@ -50,6 +57,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Feed",
     sub: "O que as suas pessoas postaram",
     emoji: "📷",
+    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
+    tinta: "text-orange-600",
     destino: "Feed",
   },
   {
@@ -57,6 +66,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Amigas",
     sub: "Quem está com você",
     emoji: "👯",
+    caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
+    tinta: "text-violet-600",
     destino: "Amigas",
   },
   {
@@ -64,6 +75,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Acompanhante",
     sub: "Marido, mãe, quem você escolher",
     emoji: "🤝",
+    caixa: "border-teal-200/70 from-teal-50 to-emerald-50/60",
+    tinta: "text-teal-600",
     destino: "Acompanhante",
   },
   {
@@ -71,6 +84,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Álbum",
     sub: "As fotos que a família vê",
     emoji: "📸",
+    caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
+    tinta: "text-sky-600",
     destino: "Bebê",
     subDestino: "album",
   },
@@ -79,6 +94,8 @@ export const PORTAS: PortaDaComunidade[] = [
     label: "Nome do bebê",
     sub: "A família sugere e vota",
     emoji: "💭",
+    caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
+    tinta: "text-amber-600",
     destino: "Bebê",
     subDestino: "nome",
   },

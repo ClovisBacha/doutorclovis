@@ -218,7 +218,7 @@ export function VoltarDaGrade({
 }: {
   rotulo: string;
   onVoltar?: () => void;
-  ladrilho?: Pick<Ladrilho, "label" | "sub" | "imagem" | "caixa" | "tinta" | "Icon">;
+  ladrilho?: Pick<Ladrilho, "label" | "sub" | "imagem" | "caixa" | "tinta"> & { Icon?: LucideIcon };
 }) {
   const seta = onVoltar ? (
     <button
@@ -267,9 +267,9 @@ export function VoltarDaGrade({
             draggable={false}
             className="relative h-11 w-11 object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.16)]"
           />
-        ) : (
+        ) : Icon ? (
           <Icon className="relative h-6 w-6" strokeWidth={1.7} />
-        )}
+        ) : null}
       </span>
       <div className="relative min-w-0">
         <p className="truncate font-serif text-lg leading-tight text-foreground">{rotulo}</p>

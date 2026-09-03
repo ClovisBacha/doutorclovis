@@ -12691,3 +12691,16 @@ similar. Faça isso com todos."
   cabeçalho próprio (Amigas tem o herói pintado do Drive; Chá de bebê,
   Acompanhante e o Feed têm os seus) — decidir se ganham o mesmo cabeçalho é
   olhar cada uma.
+
+#### E as portas da Comunidade ganharam família (set/2026)
+
+Segunda passada do mesmo pedido. As seis portas eram cartões brancos com a
+peça no canto; agora cada uma tem `caixa`/`tinta` em `PORTAS` (rosa no chá,
+laranja no feed, lilás nas amigas, verde-água no acompanhante) e desenha a
+peça no pratinho, como as grades. **Álbum e Nome repetem a família dos
+quadrados do Bebê** que abrem — mesmo destino por duas portas, mesma cor.
+`CabecalhoDaPorta` abre Chá de bebê e Acompanhante com o bloco da porta; o
+`<h2>🎁 Chá de bebê</h2>` do componente saiu (seria eco). Amigas (herói
+pintado do Drive) e Feed (modelo do Instagram) ficam como estão, de propósito.
+
+**Bancadas:** `/preview-comunidade?cabecalhos=1` · `/preview-presentes?dona=1`.

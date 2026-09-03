@@ -400,9 +400,11 @@ export function ChaDeBebe({
 
   return (
     <div className="space-y-5">
+      {/* O título mora no cabeçalho da porta (`CabecalhoDaPorta`, em
+          `minha-conta`), que já diz "Chá de bebê" sobre a família rosa. Aqui fica
+          só a frase de abertura — um segundo título seria eco. */}
       <header>
-        <h2 className="text-xl font-semibold">🎁 Chá de bebê</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Monte a lista, mande o link. Quem quiser dar escolhe o que ainda cabe.
         </p>
       </header>
