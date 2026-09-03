@@ -1906,12 +1906,10 @@ export function AppHomeScreen({
                   className={`leading-[0.92] ${heroText}`}
                   style={{
                     color: corDoCorpo,
-                    /* HERDA a face do corpo, que é a geométrica do sistema (SF
-                       Pro Text no Apple, DM Sans de reserva). A `--font-serif`
-                       deste projeto é na verdade a ARREDONDADA — bonita nos
-                       títulos, mas a referência traz o número numa geométrica
-                       reta. Preso a uma fonte fixa, o maior número da tela era
-                       o único texto que NÃO seguia a fonte do sistema. */
+                    /* HERDA a face do corpo. Desde set/2026 o corpo e os títulos
+                       são a MESMA família (Nunito), então a herança aqui só
+                       garante que o maior número da tela nunca fique preso a
+                       uma face fixa se a letra do app mudar de novo. */
                     fontFamily: "inherit",
                     /* O termo em `svh` é irmão do que dimensiona a bolha: só
                        pela LARGURA, o número ficava com 104px numa tela de

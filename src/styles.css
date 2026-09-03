@@ -2,6 +2,39 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* ── A LETRA DO APP: Nunito, self-hosted (set/2026) ─────────────────────
+   Decisão do dono depois do estudo de tipografia: UMA família, igual no
+   iPhone e no Android. Antes o corpo era a fonte do sistema (SF Pro no Apple,
+   DM Sans no Android) e a página ainda pedia DM Sans + Nunito + Inter ao
+   Google — 482 KB referenciados, nenhum usado no iPhone. Agora são dois
+   arquivos variáveis (latim, ~40 KB cada) em public/fontes/, e o link do
+   Google saiu.
+   "Nunito Reserva" é a fonte de espera com size-adjust: enquanto o woff2 não
+   chega, o texto sai em Arial/Helvetica com a MESMA largura de linha, para a
+   tela não pular quando a Nunito entrar. */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("/fontes/nunito.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Nunito";
+  font-style: italic;
+  font-weight: 200 1000;
+  font-display: swap;
+  src: url("/fontes/nunito-italica.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Nunito Reserva";
+  src: local("Helvetica Neue"), local("Arial");
+  size-adjust: 101%;
+  ascent-override: 101%;
+  descent-override: 35%;
+  line-gap-override: 0%;
+}
+
 @custom-variant dark (&:is(.dark *));
 
 /* Tela CURTA: iPhone no Safari perde ~150px para a barra de endereço (svh
@@ -139,22 +172,12 @@
   --shadow-float:
     0 20px 60px -20px oklch(0.3 0.02 35 / 0.14), 0 8px 24px -8px oklch(0.3 0.02 35 / 0.08);
 
-  /* ── Tipografia: a fonte do SISTEMA primeiro ──────────────────────
-     `ui-rounded` é a palavra-chave do CSS que resolve para a face
-     arredondada nativa da plataforma — no iPhone e no Mac, a SF Pro Rounded,
-     que é exatamente a tipografia do Liquid Glass da Apple.
-     Isso ganha de qualquer webfont por três motivos, nesta ordem:
-       1. É a MESMA fonte do relógio e dos widgets do sistema, então o app
-          deixa de parecer um site dentro do celular.
-       2. Não baixa nada. Nunito e DM Sans vinham do Google Fonts, e com elas
-          o primeiro parágrafo aparecia numa fonte e trocava depois.
-       3. Vem com o ajuste óptico do sistema — o mesmo texto fica mais legível
-          em corpo pequeno sem precisar de tabela de tamanhos.
-     Nunito e DM Sans continuam como plano B para quem não está no ecossistema
-     Apple: lá o desenho arredondado se mantém, só não é o nativo. */
-  --font-serif:
-    ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, "Nunito", "DM Sans", system-ui,
-    sans-serif;
+  /* ── Tipografia: Nunito para TUDO (set/2026). Os títulos e o corpo são a
+     mesma família em pesos diferentes — leve é conversa, pesada é cartaz.
+     O nome `--font-serif`/`.font-serif` ficou por herança (341 usos): hoje
+     quer dizer "peso de título", não serifa. */
+  --font-serif: "Nunito", "Nunito Reserva", ui-rounded, -apple-system, system-ui, sans-serif;
+  --font-sans: "Nunito", "Nunito Reserva", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -238,15 +261,19 @@
         );
     background-attachment: fixed;
     color: var(--color-foreground);
-    /* Corpo na face de texto do sistema (SF Pro no Apple), com DM Sans de
-       reserva. Casa com os títulos arredondados do mesmo jeito que a Apple
-       casa SF Pro Rounded no relógio com SF Pro na data logo acima. */
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "DM Sans", system-ui, sans-serif;
-    font-feature-settings: "ss01", "cv11";
+    font-family: var(--font-sans);
+    /* 500 e não 400: em corpo pequeno a Nunito 400 fica fina sobre pastel. */
+    font-weight: 500;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
-    line-height: 1.6;
+    line-height: 1.55;
     font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+  }
+  /* No escuro (OLED, brilho no mínimo, madrugada) a 500 afina; 600 é a
+     diferença entre confortável e cansativo. */
+  .dark body {
+    font-weight: 600;
   }
 
   h1,
@@ -254,8 +281,9 @@
   h3,
   .font-serif {
     font-family: var(--font-serif);
-    font-weight: 700;
-    letter-spacing: -0.022em;
+    font-weight: 800;
+    /* A Nunito pede menos aperto que a SF: -0.022em a deixava grudada. */
+    letter-spacing: -0.01em;
     line-height: 1.15;
   }
 

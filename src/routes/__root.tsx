@@ -258,16 +258,15 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.ico", sizes: "any" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // A letra do app é self-hosted (ver styles.css). O link do Google saiu:
+      // pedia DM Sans + Nunito + Inter (482 KB referenciados) e no iPhone
+      // nenhuma era usada. O preload é só do peso normal; o itálico é raro.
       {
         rel: "preload",
-        as: "style",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
+        as: "font",
+        type: "font/woff2",
+        href: "/fontes/nunito.woff2",
+        crossOrigin: "anonymous",
       },
       {
         rel: "stylesheet",
