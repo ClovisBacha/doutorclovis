@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
-/* Os dois veículos são peças da MESMA família do coração da Saúde (a
-   referência do dono, via nano_banana_pro + image_references), no lugar dos
-   emojis de ambulância e caminhão: emoji tem desenho e cor próprios em cada
-   sistema, e eram os dois únicos da tela. A ambulância é azul-clara de
-   propósito — a primeira saiu branca e o recorte de fundo a comeu (branco
-   sobre branco), a lição que o CLAUDE.md já registra para a nuvem e o berço. */
+/* Os dois veículos (192 e 193) são EMOJI, por decisão do dono: as peças
+   geradas em src/assets/sos/ foram para o ar e ele preferiu a ambulância
+   antiga ("preferia a antiga"); o caminhão voltou junto para o par não
+   desalinhar. As peças ficaram no repositório sem uso — não as reintroduza
+   sem uma foto que ele aprove. O coração do CVV continua sendo a peça da
+   Saúde. */
 import icCoracao from "@/assets/saude/saude.webp";
-import icBombeiros from "@/assets/sos/bombeiros.webp";
 import { toast } from "sonner";
 import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 import { RED_SYMPTOMS } from "@/lib/triage";
@@ -882,12 +881,12 @@ export function EmergencySheet({
               href="tel:193"
               className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
             >
-              <img
-                src={icBombeiros}
-                alt=""
-                aria-hidden
-                className="h-16 w-16 object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.14)]"
-              />
+              {/* Emoji, como a ambulância ao lado: os dois cartões são um par, e
+                  uma peça de 64px ao lado de um emoji de 42px desalinhava os
+                  dois títulos (medido na foto). */}
+              <span className="text-[2.6rem] leading-none" aria-hidden>
+                🚒
+              </span>
               <span>
                 <span className="block text-[1.05rem] font-extrabold leading-tight text-foreground">
                   Ligar 193
@@ -959,7 +958,7 @@ export function EmergencySheet({
             href="tel:193"
             className="press mt-2 flex items-center justify-center gap-2 rounded-2xl bg-card px-3 py-2.5 text-[13px] text-foreground ring-1 ring-black/5"
           >
-            <img src={icBombeiros} alt="" aria-hidden className="h-6 w-6 object-contain" />
+            <span aria-hidden>🚒</span>
             <span className="font-bold">193</span>
             <span className="text-muted-foreground">Bombeiros</span>
           </a>
