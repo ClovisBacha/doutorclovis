@@ -26,8 +26,8 @@ function PreviewChat() {
   const profile = { display_name: "Ana Clara", baby_name: "Clovis" } as never;
   return (
     <div className="fixed inset-0 z-[75] overflow-y-auto bg-background">
-      <div className="mx-auto max-w-md px-4 pt-3">
-        <ChatTab profile={profile} gest={gest} />
+      <div className="mx-auto max-w-md md:px-4 md:pt-3">
+        <ChatTab profile={profile} gest={gest} onVoltar={() => {}} />
       </div>
     </div>
   );

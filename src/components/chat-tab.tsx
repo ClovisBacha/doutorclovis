@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Mic, Send } from "lucide-react";
+import { ChevronLeft, Mic, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Bolha } from "@/components/bolha";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
-import { useWeatherSky } from "@/components/weather-sky";
 import { supabase } from "@/integrations/supabase/client";
 import { DOCTOR } from "@/lib/doctor.config";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
@@ -199,45 +198,15 @@ function WABubble({
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  /* A tinta segue o LADO, não o céu. A bolha da paciente é cor sólida, então
-     escreve em branco; a da IA é vidro claro — e vidro claro pede tinta
-     escura em qualquer hora do dia. Foi por isso que a bolha da IA não ficou
-     translúcida de verdade: sobre o céu de madrugada, um vidro fino com
-     texto escuro seria ilegível, e com texto branco ficaria ilegível ao
-     meio-dia. Vidro claro e denso é o único que atravessa as 24 horas. */
-  const ink = isUser ? "rgba(255,255,255,0.97)" : "rgba(22,26,50,0.92)";
-  const inkSoft = isUser ? "rgba(255,255,255,0.74)" : "rgba(22,26,50,0.55)";
-
   return (
-    <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
+    <div className={`mb-1 flex items-end gap-1.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
       {!isUser && <AiAvatar tamanho={28} careMode={careMode} className="mb-0.5 self-end" />}
-
       <div
-        className={`max-w-[75%] overflow-hidden ${isUser ? "rounded-2xl rounded-tr-none" : "rounded-2xl rounded-tl-none"}`}
-        style={
+        className={`max-w-[78%] overflow-hidden ${
           isUser
-            ? {
-                /* A fala da paciente é a única cor SÓLIDA da tela — é ela que
-                   diz "isto sou eu". O degradê violeta→rosa é o mesmo par que
-                   o site usa para o Chat e para o botão do bebê. */
-                background: "linear-gradient(140deg, #8b5cf6 0%, #d946a8 62%, #ec4899 100%)",
-                border: "1px solid rgba(255,255,255,0.28)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.45), 0 8px 22px -8px rgba(150,50,150,0.6)",
-              }
-            : {
-                /* A fala da IA é vidro claro — o mesmo material dos cartões
-                   da home, com o céu passando por trás. */
-                background:
-                  "linear-gradient(152deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.26) 52%)," +
-                  " rgba(255,253,252,0.5)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.7)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 10px 26px -12px rgba(20,25,60,0.4)",
-              }
-        }
+            ? "rounded-3xl rounded-br-md bg-primary text-primary-foreground shadow-[0_10px_22px_-12px_rgba(224,85,122,0.7)]"
+            : "card-material rounded-3xl rounded-bl-md text-foreground"
+        }`}
       >
         {/* Áudio */}
         {msg.audioUrl && (
@@ -252,12 +221,9 @@ function WABubble({
                   audioRef.current.play().then(() => setPlaying(true));
                 }
               }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-[13px]"
-              style={{
-                background: isUser ? "rgba(255,255,255,0.26)" : "rgba(22,26,50,0.1)",
-                color: ink,
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)",
-              }}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] ${
+                isUser ? "bg-white/25 text-primary-foreground" : "bg-foreground/8 text-foreground"
+              }`}
             >
               {playing ? "⏸" : "▶"}
             </button>
@@ -265,12 +231,14 @@ function WABubble({
               {[3, 6, 4, 9, 5, 7, 4, 8, 6, 5, 9, 4, 7, 5, 8].map((h, i) => (
                 <div
                   key={i}
-                  className="w-[2px] rounded-full shrink-0"
-                  style={{ height: h, background: inkSoft }}
+                  className={`w-[2px] shrink-0 rounded-full ${isUser ? "bg-white/70" : "bg-foreground/40"}`}
+                  style={{ height: h }}
                 />
               ))}
             </div>
-            <span className="text-xs shrink-0" style={{ color: inkSoft }}>
+            <span
+              className={`shrink-0 text-xs ${isUser ? "text-white/80" : "text-muted-foreground"}`}
+            >
               {msg.audioDuration ?? "0:00"}
             </span>
             <audio
@@ -281,69 +249,50 @@ function WABubble({
             />
           </div>
         )}
-
         {/* Arquivo */}
         {msg.fileName && (
           <div className="flex items-center gap-3 px-3 py-2.5" style={{ minWidth: 180 }}>
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl"
-              style={{ background: isUser ? "rgba(255,255,255,0.22)" : "rgba(22,26,50,0.08)" }}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl ${
+                isUser ? "bg-white/20" : "bg-foreground/8"
+              }`}
             >
               📄
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold line-clamp-1" style={{ color: ink }}>
-                {msg.fileName}
-              </p>
+              <p className="line-clamp-1 text-xs font-semibold">{msg.fileName}</p>
               {msg.fileSize && (
-                <p className="text-xs mt-0.5" style={{ color: inkSoft }}>
+                <p
+                  className={`mt-0.5 text-xs ${isUser ? "text-white/80" : "text-muted-foreground"}`}
+                >
                   {msg.fileSize}
                 </p>
               )}
             </div>
           </div>
         )}
-
-        {/* Texto */}
+        {/* Texto — 16px: é o piso de leitura, e é o tamanho em que uma
+            conversa longa se lê deitada. */}
         {msg.content && (
-          <p
-            className="px-3 pt-2 text-[14px] leading-snug whitespace-pre-wrap"
-            style={{ color: ink }}
-          >
-            {msg.content}
-          </p>
+          <p className="whitespace-pre-wrap px-4 pt-3 text-[16px] leading-[1.5]">{msg.content}</p>
         )}
-
-        {/* RESPOSTA VAZIA.
-
-            O modelo às vezes termina sem texto nenhum — no Gemini 2.5 isso
-            acontece quando o raciocínio consome todo o orçamento de saída. Sem
-            esta guarda a paciente via uma bolha em branco com dois botões de
-            joinha: nada para ler, nada para entender, e nenhum erro na tela.
-            Uma bolha muda é pior que um erro — erro pelo menos se pode
-            reagir a.
-
-            Só depois que a mensagem terminou de chegar: durante o streaming o
-            texto nasce vazio e isso é normal. */}
+        {/* RESPOSTA VAZIA — ver o histórico deste bloco: o modelo às vezes
+            termina sem texto, e uma bolha muda é pior que um erro. Só depois
+            que a mensagem terminou de chegar. */}
         {!isUser && terminada && !msg.content && !msg.fileName && !msg.audioUrl && (
-          <p className="px-3 pt-2 text-[14px] leading-snug italic" style={{ color: inkSoft }}>
+          <p className="px-4 pt-3 text-[16px] italic leading-[1.5] text-muted-foreground">
             Não consegui formular a resposta agora. Pode perguntar de novo?
           </p>
         )}
-
-        {/* Timestamp + feedback 👍👎 (só em respostas da IA) */}
-        <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
+        {/* Hora + 👍👎 (só em respostas da IA) */}
+        <div className="flex items-center justify-end gap-1 px-3 pb-2 pt-1">
           {!isUser && onFeedback && (
-            <span className="mr-auto flex items-center gap-1.5 pl-0.5">
+            <span className="mr-auto flex items-center gap-1.5">
               {feedback ? (
-                <span className="text-xs" style={{ color: inkSoft }}>
-                  {/* A FRASE SEGUE O QUE O SERVIDOR REALMENTE FEZ.
-                      "Anotado — seu médico vai ver" era dito para todo 👎, e o
-                      retorno de `submitBrainFeedback` era ignorado. Um 👎 numa
-                      pergunta de plataforma ("quanto custa?") não entra em fila
-                      nenhuma: a paciente lia que o médico veria, e ele nunca
-                      veria. É o mesmo portão que o `chat.ts` já usa para a IA
-                      não prometer registro que não houve — faltava no botão. */}
+                <span className="text-xs text-muted-foreground">
+                  {/* A frase segue o que o servidor de fato fez — ver
+                      `submitBrainFeedback`: só promete "seu médico vai ver"
+                      quando o 👎 entrou na fila dele. */}
                   {feedback === "up"
                     ? "Obrigado! 💛"
                     : feedback === "down-fila"
@@ -355,14 +304,14 @@ function WABubble({
                   <button
                     onClick={() => onFeedback(true)}
                     aria-label="Resposta útil"
-                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                    className="press flex h-9 w-9 items-center justify-center rounded-full text-[15px] leading-none opacity-70 hover:opacity-100"
                   >
                     👍
                   </button>
                   <button
                     onClick={() => onFeedback(false)}
                     aria-label="Resposta não ajudou"
-                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
+                    className="press flex h-9 w-9 items-center justify-center rounded-full text-[15px] leading-none opacity-70 hover:opacity-100"
                   >
                     👎
                   </button>
@@ -370,26 +319,30 @@ function WABubble({
               )}
             </span>
           )}
-          <span className="text-xs leading-none" style={{ color: inkSoft }}>
+          <span
+            className={`text-xs leading-none ${isUser ? "text-white/80" : "text-muted-foreground"}`}
+          >
             {timeStr}
           </span>
-          {isUser && (
-            <span className="text-xs leading-none" style={{ color: "rgba(255,255,255,0.85)" }}>
-              ✓✓
-            </span>
-          )}
+          {isUser && <span className="text-xs leading-none text-white/85">✓✓</span>}
         </div>
       </div>
     </div>
   );
 }
 
-/** Exportado só para a bancada de design `/preview-chat` (ver o arquivo). */
 export function ChatTab({
   profile,
   gest,
   careMode = false,
+  onVoltar,
 }: {
+  /**
+   * A seta do cabeçalho, só no celular. O chat cobre a tela inteira ali (ver
+   * o container), então a barra de voltar da página fica por baixo — sem esta
+   * prop a paciente não teria como sair da conversa.
+   */
+  onVoltar?: () => void;
   profile: Profile | null;
   gest: Gest;
   /* ─── O CHAT ERA A ÚNICA ABA QUE NÃO RECEBIA ISTO ────────────────────────
@@ -403,12 +356,6 @@ export function ChatTab({
 }) {
   const ctx = buildPatientContext(profile, gest);
   const firstName = profile?.display_name?.split(" ")[0];
-
-  /* O céu do site — o MESMO gradiente do hero da página pública e do item
-     "Céu Clássico" da loja. Usar aqui não é economia de código: é o que faz
-     esta aba pertencer ao app em vez de parecer um chat colado de fora. E ele
-     muda com a hora, então o chat de madrugada é escuro sem ninguém pedir. */
-  const sky = useWeatherSky();
 
   /* O nome do consultório de VERDADE. Cada paciente é de um médico, então
      "Dr. Clóvis" no código seria errado para todo mundo menos os dele. */
@@ -903,148 +850,114 @@ export function ChatTab({
     toast("Mensagens de áudio em breve — por enquanto, envie texto.");
   }
 
-  /* O céu vem do gradiente do site; as auroras são a camada de "tecnologia"
-     por cima dele. A tinta do cabeçalho segue o céu, não o material. */
-  const skyDark = sky.isDark;
-  const headInk = skyDark ? "rgba(255,255,255,0.96)" : "rgba(20,24,48,0.92)";
-  const headInkSoft = skyDark ? "rgba(255,255,255,0.62)" : "rgba(20,24,48,0.58)";
-  /* ⚠️ O AVISO DE QUEM LÊ A CONVERSA NÃO USA A TINTA DA ASSINATURA. Ele vivia
-     na MESMA linha e na MESMA tinta do crédito da plataforma — e o crédito tem
-     gradiente e peso 600, então a marca era o elemento mais chamativo da linha
-     e o consentimento era o texto cinza depois do "·". Numa tela onde ela conta
-     o que não conta a ninguém, a hierarquia estava invertida. */
-  const headInkAviso = skyDark ? "rgba(255,255,255,0.86)" : "rgba(20,24,48,0.82)";
+  /* ─── A TELA INTEIRA NO CELULAR, e o teclado sem empurrar nada ──────────
+     Pedido do dono: "quando eu clico para digitar, por algum motivo desce o
+     texto, a tela se desloca". Eram duas causas somadas:
+
+     1. O chat era uma caixa de 72vh DENTRO da página rolável — com a barra de
+        voltar acima e o rodapé abaixo. Ao focar o campo, o iOS rola a página
+        para trazer o input à vista, e a caixa inteira saltava.
+     2. O campo tinha 15px. Abaixo de 16px o Safari do iPhone dá ZOOM na
+        página ao focar um input — é essa a "tela que se desloca por algum
+        motivo". Hoje é 16px, que também é o piso de leitura.
+
+     Agora, no celular, o painel é `fixed` e mede exatamente o
+     `visualViewport`: quando o teclado sobe, a altura visual encolhe e o
+     painel encolhe junto — a lista rola por dentro, o compositor pousa em cima
+     do teclado, e a página por baixo fica travada (`overflow: hidden` no
+     body enquanto o chat está montado). No computador ele continua uma caixa
+     estática de 72vh, dentro da página. */
+  const [janela, setJanela] = useState<{ h: number; top: number } | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const vv = window.visualViewport;
+    const celular = () => window.matchMedia("(max-width: 767px)").matches;
+    const medir = () => {
+      if (!celular() || !vv) {
+        setJanela(null);
+        return;
+      }
+      setJanela({ h: Math.round(vv.height), top: Math.round(vv.offsetTop) });
+    };
+    medir();
+    vv?.addEventListener("resize", medir);
+    vv?.addEventListener("scroll", medir);
+    window.addEventListener("resize", medir);
+    return () => {
+      vv?.removeEventListener("resize", medir);
+      vv?.removeEventListener("scroll", medir);
+      window.removeEventListener("resize", medir);
+    };
+  }, []);
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    const antes = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.style.overflow = antes;
+    };
+  }, []);
+  /* Com o teclado aberto o painel encolhe; a lista precisa continuar no fim,
+     senão a última mensagem some atrás do compositor. */
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [janela?.h]);
 
   return (
     <div
-      className="relative -mx-4 flex flex-col overflow-hidden rounded-t-none"
-      style={{ height: "72vh", background: sky.gradient }}
+      className="fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-background md:static md:z-auto md:h-[72vh] md:overflow-hidden md:rounded-3xl md:border md:border-border md:shadow-[var(--shadow-card)]"
+      style={janela ? { height: janela.h, top: janela.top } : undefined}
     >
-      {/* ── Atmosfera: três manchas de luz derivando atrás de tudo ──────
-          Elas ficam FORA do fluxo e sem eventos de ponteiro; o que se move é
-          só `transform`. Blur alto e mistura `screen` para somarem luz em vez
-          de pintar por cima — sobre o céu de madrugada isso vira brilho de
-          neon, sobre o de meio-dia quase não aparece, que é o desejado. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        {[
-          {
-            cls: "dc-aurora-a",
-            pos: "-left-1/4 -top-1/4 h-[70%] w-[85%]",
-            cor: "139,92,246",
-            b: 46,
-          },
-          {
-            cls: "dc-aurora-b",
-            pos: "-right-1/4 top-1/4 h-[65%] w-[80%]",
-            cor: "236,72,153",
-            b: 52,
-          },
-          {
-            cls: "dc-aurora-c",
-            pos: "-bottom-1/4 left-1/5 h-[60%] w-[75%]",
-            cor: "56,189,248",
-            b: 50,
-          },
-        ].map((a) => (
-          <span
-            key={a.cls}
-            className={`${a.cls} absolute rounded-full ${a.pos}`}
-            style={{
-              background: `radial-gradient(circle, rgba(${a.cor},${skyDark ? 0.55 : 0.6}) 0%, transparent 68%)`,
-              filter: `blur(${a.b}px)`,
-              /* `screen` SOMA luz: perfeito no céu de madrugada, invisível ao
-                 meio-dia, porque somar luz a um azul já claro não muda quase
-                 nada. Sobre céu claro a mancha precisa TINGIR, e `soft-light`
-                 faz isso sem chapar — medido nas duas horas. */
-              mixBlendMode: skyDark ? "screen" : "soft-light",
-            }}
-          />
-        ))}
-      </div>
+      {/* Um sopro de rosa no alto, e mais nada: o chat é a MESMA casa do resto
+          do app (o creme, o Nunito, os cartões), não uma tela de outro produto
+          colada aqui. Era um céu de madrugada com três auroras — bonito, e
+          dizia "isto é outra coisa". */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,rgba(224,85,122,0.12),transparent_70%)]"
+      />
 
       {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
-      <div
-        className="relative flex items-center gap-3 px-4 py-3"
-        style={{
-          background: skyDark
-            ? "linear-gradient(160deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 60%)"
-            : "linear-gradient(160deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 60%)",
-          backdropFilter: "blur(22px) saturate(180%)",
-          WebkitBackdropFilter: "blur(22px) saturate(180%)",
-          borderBottom: `1px solid ${skyDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.6)"}`,
-          boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.9)"}`,
-        }}
-      >
-        <AiAvatar careMode={careMode} />
-        <div className="min-w-0 flex-1">
-          <p
-            className="truncate text-[16px] font-semibold leading-tight"
-            style={{ color: headInk }}
+      <header className="relative flex items-center gap-3 border-b border-border/70 bg-card/92 px-3 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.5rem)] backdrop-blur md:rounded-t-3xl md:px-4 md:pt-3">
+        {onVoltar && (
+          <button
+            type="button"
+            onClick={onVoltar}
+            aria-label="Voltar"
+            className="press -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground md:hidden"
           >
+            <ChevronLeft className="h-6 w-6" strokeWidth={2} />
+          </button>
+        )}
+        <AiAvatar tamanho={40} careMode={careMode} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-serif text-[17px] font-bold leading-tight text-foreground">
             {aiName}
           </p>
-          {/* A assinatura de quem construiu — pequena, mas presente em toda
-              conversa. É a única marca da plataforma dentro do app. */}
-          <p className="text-xs leading-tight" style={{ color: headInkSoft }}>
-            Desenvolvido por{" "}
-            <span
-              className="font-semibold"
-              style={{
-                /* O degradê da marca troca de faixa conforme o céu. Os mesmos
-                   três tons servem de dia e de noite, mas o ciano claro some
-                   sobre o lilás do entardecer e o violeta escuro some no céu
-                   de madrugada — então cada lado usa a ponta do espectro que
-                   sobrevive ali. */
-                backgroundImage: skyDark
-                  ? "linear-gradient(96deg, #c4b5fd, #f9a8d4 58%, #7dd3fc)"
-                  : "linear-gradient(96deg, #6d28d9, #be185d 70%, #a21caf)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              DoctorThink
-            </span>
-            {/* ─── ELA PRECISA SABER QUEM LÊ ISTO ────────────────────────────
-                O painel do médico tem a aba Conversas, e ele lê a transcrição
-                inteira. O comentário de `listBrainConversations` é honesto
-                sobre o que isso significa: "é o dado mais íntimo do produto: é
-                para a IA que ela conta o que não conta a ninguém."
-                E não havia UMA palavra na tela dela dizendo isso. Consentimento
-                que ninguém informou não é consentimento — e aqui o efeito
-                prático é pior que o jurídico: ela escreve coisas que talvez não
-                escrevesse, e descobre depois.
-                Fica na linha de assinatura, no cabeçalho, presente em toda
-                conversa — não num termo que ela aceitou uma vez e nunca leu. */}
+          <p className="text-xs leading-tight text-muted-foreground">
+            Desenvolvido por <span className="font-bold text-primary">DoctorThink</span>
           </p>
-          {/* ⚠️ LINHA PRÓPRIA, e não o rabicho do crédito. Colado depois do "·"
-              ele QUEBRAVA NO MEIO DA FRASE ("…pode / ler esta conversa") num
-              aparelho de 393px — medido —, o que faz uma informação de
-              consentimento parecer sobra de outra frase. Aqui ele tem a linha
-              inteira, tinta mais forte e peso médio: continua discreto, e
-              deixa de perder para a assinatura de quem construiu. */}
+          {/* ELA PRECISA SABER QUEM LÊ ISTO — o médico lê a transcrição inteira
+              no painel. Linha própria, presente em toda conversa, e não um
+              termo aceito uma vez. */}
           {doctorName ? (
-            <p className="mt-0.5 text-xs font-medium leading-tight" style={{ color: headInkAviso }}>
+            <p className="mt-0.5 text-xs font-semibold leading-tight text-foreground/75">
               {doctorName} pode ler esta conversa
             </p>
           ) : null}
         </div>
-      </div>
+      </header>
 
-      {/* A RESPOSTA É ANUNCIADA UMA VEZ, NO FIM — não 60 vezes por segundo.
-          `aria-live` num container cujo texto muda a cada quadro é
-          anti-padrão: o leitor de tela enfileira ou repete a cada mutação, e
-          quem usa VoiceOver sem `prefers-reduced-motion` pega o pior caso.
-          A bolha visual fica `aria-hidden` durante o streaming, e o texto
-          completo vai para a região abaixo quando termina de chegar. */}
+      {/* A RESPOSTA É ANUNCIADA UMA VEZ, NO FIM — a bolha visual fica
+          `aria-hidden` durante o streaming, e o texto completo vai para a
+          região `aria-live` abaixo quando termina de chegar. */}
       <div
         ref={scrollRef}
         aria-hidden={loading}
-        className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
+        className="relative flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3"
       >
-        {/* Enquanto o histórico não respondeu, a lista está vazia de propósito.
-            Três pontinhos discretos são melhores que uma tela em branco — e
-            muito melhores que uma saudação que aparece e é trocada. */}
         {carregandoHistorico && messages.length === 0 && (
           <div className="flex justify-center py-6" aria-label="Carregando a conversa">
             <span className="flex gap-1">
@@ -1059,15 +972,11 @@ export function ChatTab({
           </div>
         )}
         {messages.map((m, i) => {
-          // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
           const canVote =
             m.role === "assistant" &&
             !m.error &&
-            /* Bolha VAZIA não é votável. Quando o provedor falha, a resposta
-               chega em branco e a paciente vê o aviso de "não consegui
-               formular" — um 👎 ali viraria lacuna (ou revisão) sobre uma falha
-               de infraestrutura, e o médico receberia trabalho criado por um
-               erro 429 do Gemini. */
+            /* Sem texto não há o que avaliar: um 👎 numa bolha que chegou em
+               branco viraria lacuna sobre uma falha de infraestrutura. */
             !!m.content?.trim() &&
             messages.slice(0, i).some((x) => x.role === "user") &&
             !(loading && i === messages.length - 1);
@@ -1082,9 +991,6 @@ export function ChatTab({
             />
           );
         })}
-
-        {/* O que o leitor de tela lê: a resposta inteira, uma vez só, quando
-            ela termina de chegar. Enquanto `loading`, fica vazio. */}
         <div role="status" aria-live="polite" className="sr-only">
           {loading
             ? ""
@@ -1092,13 +998,7 @@ export function ChatTab({
               ? messages[messages.length - 1]?.content
               : ""}
         </div>
-
-        {/* ── Primeiras perguntas ───────────────────────────────────────
-            Uma tela de chat vazia é uma folha em branco, e folha em branco
-            trava — ainda mais quando a dúvida é sobre o próprio corpo. Estas
-            três existem enquanto a conversa não começou e somem no primeiro
-            envio. São as mesmas famílias de pergunta que o campo digita
-            sozinho, mas aqui em um toque. */}
+        {/* ── Primeiras perguntas: existem enquanto a conversa não começou. */}
         {messages.length === 1 && !loading && (
           <div className="flex flex-wrap gap-2 pl-9 pt-2">
             {["Posso tomar dipirona?", "Quantos chutes por dia é normal?", "Estou com azia"].map(
@@ -1106,15 +1006,7 @@ export function ChatTab({
                 <button
                   key={q}
                   onClick={() => sendText(q)}
-                  className="rounded-full px-3.5 py-2 text-xs font-medium transition-transform active:scale-95"
-                  style={{
-                    color: headInk,
-                    background: skyDark ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.55)",
-                    backdropFilter: "blur(16px) saturate(170%)",
-                    WebkitBackdropFilter: "blur(16px) saturate(170%)",
-                    border: `1px solid ${skyDark ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.8)"}`,
-                    boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.95)"}`,
-                  }}
+                  className="pill-3d press rounded-full px-3.5 py-2 text-[13px] font-semibold text-primary"
                 >
                   {q}
                 </button>
@@ -1122,90 +1014,36 @@ export function ChatTab({
             )}
           </div>
         )}
-
-        {/* ── "Pensando" ────────────────────────────────────────────────
-            Os três pontinhos saltitantes viraram uma varredura de luz
-            atravessando a bolha vazia. Diz a mesma coisa — está processando —
-            mas sem imitar o "digitando" de um humano, que é a leitura errada
-            para uma máquina que responde em nome de um consultório. */}
+        {/* ── "Pensando": uma varredura de luz atravessando a bolha vazia. */}
         {loading && (
           <div className="flex items-end gap-1.5">
             <AiAvatar tamanho={28} careMode={careMode} />
-            <div
-              className="relative overflow-hidden rounded-2xl rounded-tl-none px-6 py-3.5"
-              style={{
-                background:
-                  "linear-gradient(152deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.26) 52%)," +
-                  " rgba(255,253,252,0.5)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.7)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 10px 26px -12px rgba(20,25,60,0.4)",
-              }}
-            >
+            <div className="card-material relative overflow-hidden rounded-3xl rounded-bl-md px-6 py-3.5">
               <span
                 aria-hidden
-                className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3"
-                style={{
-                  background:
-                    "linear-gradient(90deg, transparent, rgba(139,92,246,0.55), transparent)",
-                }}
+                className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(224,85,122,0.35),transparent)]"
               />
-              {/* `role="status"`: o `sr-only` era inserido e removido do DOM sem
-                  live region nenhuma, então NUNCA era anunciado. Quem usa
-                  leitor de tela mandava a pergunta e ficava sem saber se algo
-                  estava acontecendo. */}
               <span role="status" className="sr-only">
                 Pensando
               </span>
-              <span
-                aria-hidden
-                className="relative block h-2 w-12 rounded-full"
-                style={{ background: "rgba(22,26,50,0.14)" }}
-              />
+              <span aria-hidden className="relative block h-2 w-12 rounded-full bg-foreground/12" />
             </div>
           </div>
         )}
       </div>
 
       {/* ── Barra de mensagem ─────────────────────────────────────────── */}
-      <div
-        className="relative flex items-end gap-2 px-2 py-2"
-        style={{
-          background: skyDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.3)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderTop: `1px solid ${skyDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.55)"}`,
-        }}
-      >
-        {/* Campo de texto */}
-        <div
-          className="relative flex min-h-[42px] flex-1 items-end rounded-3xl px-4 py-2"
-          style={{
-            background: skyDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.62)",
-            backdropFilter: "blur(16px) saturate(170%)",
-            WebkitBackdropFilter: "blur(16px) saturate(170%)",
-            border: `1px solid ${skyDark ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.85)"}`,
-            boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.95)"}`,
-          }}
-        >
-          {/* O convite que se digita sozinho.
-              Ele NÃO é o `placeholder` do textarea: placeholder nativo não
-              aceita um cursor piscando ao lado. É uma camada por baixo, sem
-              eventos de ponteiro, que some no instante em que a paciente
-              digita a primeira letra ou toca no campo. O `placeholder` real
-              fica vazio para as duas coisas não se sobreporem. */}
+      <div className="relative flex items-end gap-2 border-t border-border/70 bg-card/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 backdrop-blur md:rounded-b-3xl md:pb-2">
+        <div className="card-material relative flex min-h-[44px] flex-1 items-end rounded-[22px] px-4 py-2">
+          {/* O convite que se digita sozinho — uma camada por baixo do campo,
+              que some no primeiro caractere ou no toque. */}
           {!input && !focado && (
             <span
               aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-4 right-11 flex items-center text-[15px]"
-              style={{ color: headInkSoft }}
+              className="pointer-events-none absolute inset-y-0 left-4 right-4 flex items-center text-[16px] text-muted-foreground"
             >
               <span className="truncate">{typed}</span>
-              <span className="dc-caret ml-px shrink-0" style={{ opacity: 0.8 }}>
-                |
-              </span>
+              <span className="dc-caret ml-px shrink-0 opacity-80">|</span>
             </span>
           )}
           <textarea
@@ -1227,19 +1065,19 @@ export function ChatTab({
             aria-label="Mensagem"
             placeholder={focado ? "Escreva sua dúvida…" : ""}
             rows={1}
-            className="relative flex-1 resize-none bg-transparent text-[15px] leading-[1.45] outline-none"
-            style={{ maxHeight: 100, color: headInk }}
+            /* ⚠️ 16px, NUNCA menos: abaixo disso o Safari do iPhone dá zoom na
+               página ao focar — era metade do "a tela se desloca". */
+            className="relative flex-1 resize-none bg-transparent text-[16px] leading-[1.45] text-foreground outline-none placeholder:text-muted-foreground"
+            style={{ maxHeight: 100 }}
           />
         </div>
 
-        {/* PARAR — a saída de emergência. Enquanto a resposta corre, o botão de
-            enviar não serve para nada (o envio já está barrado por `loading`),
-            e o que ela precisa é interromper. */}
+        {/* PARAR — enquanto a resposta corre, o que ela precisa é interromper. */}
         {loading ? (
           <button
             onClick={() => pararRef.current?.abort()}
             aria-label="Parar a resposta"
-            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground/85 text-background transition-transform active:scale-95"
+            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-background"
           >
             <span className="block h-3 w-3 rounded-[3px] bg-current" />
           </button>
@@ -1248,13 +1086,7 @@ export function ChatTab({
             onClick={() => sendText()}
             disabled={loading}
             aria-label="Enviar"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-60"
-            style={{
-              background: "linear-gradient(140deg, #8b5cf6 0%, #d946a8 60%, #ec4899 100%)",
-              border: "1px solid rgba(255,255,255,0.4)",
-              boxShadow:
-                "0 8px 22px -6px rgba(180,60,190,0.65), inset 0 1px 1px rgba(255,255,255,0.5)",
-            }}
+            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
           >
             <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
           </button>
@@ -1262,13 +1094,7 @@ export function ChatTab({
           <button
             onClick={handleAudioSoon}
             aria-label="Mensagem de voz"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95"
-            style={{
-              background: "linear-gradient(140deg, #6366f1 0%, #8b5cf6 60%, #a855f7 100%)",
-              border: "1px solid rgba(255,255,255,0.4)",
-              boxShadow:
-                "0 8px 22px -6px rgba(110,80,220,0.6), inset 0 1px 1px rgba(255,255,255,0.5)",
-            }}
+            className="pill-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-primary"
           >
             <Mic className="h-[21px] w-[21px]" strokeWidth={1.9} />
           </button>

@@ -2948,7 +2948,14 @@ function MinhaContaPage() {
                   </div>
                 )}
                 {tab === "Médico" && <MédicoTab />}
-                {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
+                {tab === "Chat IA" && (
+                  <ChatTab
+                    profile={profile}
+                    gest={gest}
+                    careMode={careMode}
+                    onVoltar={voltarDaBarra}
+                  />
+                )}
                 {tab === "Perfil" && (
                   <ProfileTab
                     profile={profile}
