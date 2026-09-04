@@ -13026,3 +13026,41 @@ faz todo dia, o que é dela, e segurança.
 - **A ambulância e o caminhão do SOS voltaram a ser emoji**, por decisão do
   dono ("preferia a antiga"). As duas peças ficaram em `src/assets/sos/` sem
   uso; o comentário do arquivo diz para não reintroduzi-las sem foto aprovada.
+
+## A abertura do app e a fita do Jogo pararam de esperar o servidor (set/2026)
+
+O dono, no aparelho: _"a primeira tela está demorando muito para carregar"_ e
+_"na aba do Jogo o número de sementinhas e o da ofensiva demoram"_. Medido no
+código, não deduzido:
+
+- **A home esperava DUAS funções serverless para pintar.** O portão `loading`
+  só abria depois de `checkIsAdmin` e `getMyDoctor` — duas idas ao servidor de
+  funções da Vercel, que acorda frio — para uma gestante que já tem DUM no
+  perfil e cuja resposta só pode confirmar que ela é paciente. Agora **quem
+  tem âncora gestacional e não carrega a marca de médico é liberada assim que
+  o perfil chega** (`liberarCedo`); o papel continua sendo aplicado quando
+  responde. Quem NÃO tem âncora espera como antes — é ali que mora o médico
+  sem marca, e a espera existia para o painel dele não piscar como app de
+  gestante.
+- **O perfil esperava o `getUser`** (uma ida ao servidor de auth) só para ter
+  o `user.id`, que a SESSÃO local já tem. Agora sai junto. ⚠️ **O construtor
+  do PostgREST é preguiçoso**: guardado cru numa variável ele só dispara no
+  `await`; é o `Promise.resolve(...)` que o faz sair na hora. Sem isso a
+  "rodada junta" seria em série de novo, com o comentário dizendo o contrário.
+- **O 🌱 da fita nem era desenhado** até `claimDailyAndGetWallet` voltar (sete
+  idas ao banco em série, dentro de uma função fria), e o `getCantinho` só saía
+  DEPOIS dela. Agora a fita **pinta do cache** (`fita-cache.ts`: último saldo,
+  troféus e amigas por uid, chave `dc-cache-fita:<uid>`) e as duas funções
+  saem juntas. ⚠️ A chave NÃO é `dc-path-` (isso viajaria no blob da jornada e
+  dispararia um push por escrita), e `saldo: null` é gravado como valor — é o
+  Modo Cuidado, e a abertura seguinte já esconde o 🌱 em vez de piscá-lo.
+- **A jornada usava `getUser` no pull e no push** — mais uma ida ao servidor
+  de auth na frente da chama num aparelho novo. Virou `getSession`; a RLS de
+  `journey_state` continua decidindo o que volta.
+
+**O que NÃO foi feito, e depende do dono:** a função de servidor roda em
+`iad1` (Washington). Se o projeto Supabase estiver em São Paulo
+(`sa-east-1`), cada ida ao banco atravessa o continente e o conserto certo é
+`vercel.functions.regions: ["gru1"]` no `nitro` do `vite.config.ts`. Se
+estiver nos EUA, mudar pioraria. A região está em Supabase → Project Settings
+→ General.

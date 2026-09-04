@@ -1719,12 +1719,34 @@ function MinhaContaPage() {
          vê o quê não mudou, só a hora do pedido. Trocar uma ida à rede em
          série por uma leitura extra que o admin descarta é o negócio certo:
          admin é raro e gestante é todo mundo. */
-      const [{ data: u }, { data: s }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getSession(),
-      ]);
-      if (!u.user) return;
+      /* ── ⚠️ O PERFIL SAI NA PRIMEIRA RODADA, E NÃO NA SEGUNDA (set/2026) ──
+         O dono, no aparelho: "a primeira tela está demorando muito para
+         carregar". Medido no código: o perfil esperava o `getUser` — que é
+         uma ida ao servidor de auth — só para ter o `user.id`. Mas o id já
+         está na SESSÃO, que é local e responde em milissegundos. O `getUser`
+         continua saindo (é ele que VALIDA o token no servidor, e sem usuário
+         válido a tela não abre), só deixou de estar na frente do perfil.
+         A RLS de `patient_profiles` continua sendo quem decide o que a
+         consulta devolve — o id da sessão só aponta a linha. */
+      const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
+      const idDaSessao = s.session?.user?.id ?? null;
+      /* ⚠️ `Promise.resolve(...)` de propósito: o construtor de consulta do
+         PostgREST é PREGUIÇOSO — só dispara a requisição quando alguém chama
+         o `then`. Guardado cru na variável, ele só sairia no `await` lá
+         embaixo, DEPOIS do `getUser`, e a rodada "junta" seria em série de
+         novo, com o comentário dizendo o contrário. */
+      const perfilEmVoo = idDaSessao
+        ? Promise.resolve(
+            (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", idDaSessao)
+              .maybeSingle(),
+          )
+        : null;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
 
       /* ─── ⚠️ "ELA APARECEU" — sem isto, a aba das Amigas mente por omissão ──
          `last_seen_at` é o que vira "há 2h" na lista de amigas. Se ninguém
@@ -1743,30 +1765,56 @@ function MinhaContaPage() {
           .catch(() => {});
       }
 
-      const [perfilRes, papel] = await Promise.all([
-        (supabase as any).from("patient_profiles").select("*").eq("id", u.user.id).maybeSingle(),
-        (async () => {
-          if (!token) return null;
-          try {
-            const [admin, medico] = await Promise.all([
-              checkIsAdmin({ data: { accessToken: token } }),
-              /* `catch` PRÓPRIO: conta sem perfil de médico é o caso comum
+      /* O papel (admin? médico?) são DUAS idas ao servidor de funções, e a
+         gestante com DUM não precisa esperar por elas para ver a home — ver
+         `liberarCedo` abaixo. Quem ainda precisa esperar é quem NÃO tem
+         âncora gestacional: é ali que mora o médico sem marca, e a espera é o
+         que impede o painel dele de piscar como app de gestante. */
+      const papelEmVoo = (async () => {
+        if (!token) return null;
+        try {
+          const [admin, medico] = await Promise.all([
+            checkIsAdmin({ data: { accessToken: token } }),
+            /* `catch` PRÓPRIO: conta sem perfil de médico é o caso comum
                  (é uma gestante), e sem isto o `Promise.all` derrubaria a
                  resolução de papel inteira por causa do caminho normal. */
-              getMyDoctor({ data: { accessToken: token } }).catch(() => null),
-            ]);
-            return { admin, medico };
-          } catch {
-            return null;
-          }
-        })(),
-      ]);
+            getMyDoctor({ data: { accessToken: token } }).catch(() => null),
+          ]);
+          return { admin, medico };
+        } catch {
+          return null;
+        }
+      })();
+      const perfilRes =
+        perfilEmVoo && idDaSessao === u.user.id
+          ? await perfilEmVoo
+          : await (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", u.user.id)
+              .maybeSingle();
       const { data } = perfilRes as { data: any };
       setProfile(data);
       setUserId(u.user.id);
 
-      // Papel ANTES de liberar o render: sem isso o médico via o app da
-      // gestante piscar por 2-3 round-trips até o bloqueio assumir.
+      /* ── ⚠️ A GESTANTE COM DUM NÃO ESPERA O PAPEL ──────────────────────
+         Quem tem âncora gestacional (DUM, DPP ou ultrassom) e não carrega a
+         marca de médico É paciente — as duas idas ao servidor de funções
+         (`checkIsAdmin`, `getMyDoctor`) só podem CONFIRMAR isso. Esperá-las
+         era pôr a home de toda gestante atrás de duas funções serverless que
+         acordam frias. A resposta continua sendo aplicada quando chega: admin
+         vira admin, e a obstetra grávida continua com o app dela como antes.
+         Quem NÃO tem âncora espera como sempre — é o caso do médico sem marca,
+         e é para ele que a espera existia. */
+      const marcaDeMedico = (u.user.user_metadata as { role?: string } | null)?.role === "doctor";
+      const ancora = !!(data?.lmp_date || data?.due_date || data?.reference_date);
+      const liberarCedo = ancora && !marcaDeMedico;
+      if (liberarCedo) setLoading(false);
+      const papel = await papelEmVoo;
+
+      // Para quem NÃO foi liberada acima, o papel vem ANTES de liberar o
+      // render: sem isso o médico via o app da gestante piscar por 2-3
+      // round-trips até o bloqueio assumir.
       let roleIsPatient = true;
 
       /* A MARCA DO AUTH VEM PRIMEIRO, antes de qualquer chamada de rede.

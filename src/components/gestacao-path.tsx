@@ -1201,6 +1201,7 @@ import {
 } from "@/lib/journey-sync";
 /* Re-exportado para não quebrar quem já importava daqui. */
 export { lsGet, lsSet, ensureInitialJourneyPull, mergeJourneyValue } from "@/lib/journey-sync";
+import { gravarFitaCache, lerFitaCache } from "@/lib/fita-cache";
 
 function localDateStr(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1718,9 +1719,16 @@ export function GestacaoPath({
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         if (!s.session?.access_token) return;
+        /* O número que o servidor devolveu da última vez, na hora — ver
+           `fita-cache.ts`. A contagem de verdade o sobrescreve logo abaixo. */
+        const lembrado = lerFitaCache(s.session.user.id);
+        if (typeof lembrado?.amigas === "number") setAmigas(lembrado.amigas);
         const { contarAmigas, cobrarBonusDaDupla } = await import("@/lib/amigas.functions");
         const r = await contarAmigas({ data: { accessToken: s.session.access_token } });
-        if (r.ok) setAmigas(r.amigas);
+        if (r.ok) {
+          setAmigas(r.amigas);
+          gravarFitaCache(s.session.user.id, { amigas: r.amigas });
+        }
 
         /* ─── ⚠️ A OFENSIVA É COBRADA AQUI TAMBÉM ────────────────────────
            O bônus da dupla nascia com UM chamador só: o efeito da aba das
@@ -1860,15 +1868,37 @@ export function GestacaoPath({
   // Sementinhas 🌱: concede o check-in do dia (idempotente) e lê o saldo p/ a
   // barra do topo. Falha é silenciosa (moeda é secundária ao Caminho).
   useEffect(() => {
-    (async () => {
+    /* ── ⚠️ A CARTEIRA E O CANTINHO SAEM JUNTOS, e a fita pinta do CACHE ──
+       O dono, no aparelho: "o número de sementinhas demora para carregar". Dois
+       motivos, medidos no código: o 🌱 só era desenhado depois de
+       `claimDailyAndGetWallet` (função serverless que acorda fria e faz sete
+       idas ao banco em série), e o `getCantinho` só SAÍA depois de ela voltar
+       — dois servidores em fila para dois dados que não dependem um do outro.
+       Agora a fita nasce com o último valor que o servidor devolveu
+       (`lerFitaCache`, por uid) e as duas funções saem ao mesmo tempo. */
+    const carteira = (async () => {
       try {
         const { supabase } = await import("@/integrations/supabase/client");
         const { data: s } = await supabase.auth.getSession();
         const token = s.session?.access_token;
         if (!token || !s.session) return;
+        const uid = s.session.user.id;
+        if (bancada == null) {
+          const lembrado = lerFitaCache(uid);
+          if (lembrado) {
+            if ("saldo" in lembrado) setSaldo(lembrado.saldo ?? null);
+            if (typeof lembrado.trofeus === "number") setTrofeus(lembrado.trofeus);
+          }
+        }
         const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
         // Modo Cuidado: esconde a barra de moeda e as decorações (não celebra).
         if (w.ok) setSaldo(w.careMode ? null : w.balance);
+        if (w.ok) {
+          gravarFitaCache(uid, {
+            saldo: w.careMode ? null : w.balance,
+            trofeus: w.careMode ? 0 : (w.trofeus ?? 0),
+          });
+        }
         if (w.ok && w.careMode) return;
         if (w.ok) setTrofeus(w.trofeus ?? 0);
         /* O anúncio do presente. A chave do "já vi" é o INSTANTE da linha do
@@ -1914,7 +1944,9 @@ export function GestacaoPath({
       } catch {
         /* saldo é secundário */
       }
+    })();
 
+    const cantinho = (async () => {
       /* ─── ⚠️ O CANTINHO GANHOU `try` PRÓPRIO ──────────────────────────
          Ele vivia dentro do bloco acima, sob um `catch` que dizia "saldo é
          secundário". Secundário descreve o SALDO — não os enfeites que ela
@@ -1941,6 +1973,9 @@ export function GestacaoPath({
            falha só, e não um efeito colateral da falha do saldo */
       }
     })();
+
+    void Promise.all([carteira, cantinho]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* O saldo sobe na hora, com o que o servidor concedeu. A régua e o porquê
