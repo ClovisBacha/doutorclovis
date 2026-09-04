@@ -8,12 +8,14 @@ import { useEffect, useState } from "react";
 import icCoracao from "@/assets/saude/saude.webp";
 import { toast } from "sonner";
 import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
+import { hapticoDeAviso, tocarPadrao } from "@/lib/nativo";
 import { RED_SYMPTOMS } from "@/lib/triage";
 import { esquemaWhatsApp, linkTel, linkWhatsApp } from "@/lib/telefone";
 import type { DoctorContato } from "@/lib/patientlink.functions";
 import { dispararEmergencia, type CanaisAviso } from "@/lib/emergencia.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 import { localizacaoAgora, localizacaoNegada } from "@/lib/localizacao";
 
 type Info = {
@@ -92,6 +94,9 @@ export function EmergencySheet({
      inteiro usa para "cancelar isto aqui" fechava o APP — com a tela de
      emergência aberta. */
   useVoltar(true, onClose);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
 
   /* Quem é "o médico" desta tela — tudo ou nada, nunca uma mistura.
      
@@ -212,6 +217,16 @@ export function EmergencySheet({
      * justamente o que não toca.
      */
     destravarSomDeUI();
+
+    /* ⚠️ E O DEDO RECEBE RESPOSTA AQUI, no mesmo instante e pelo mesmo motivo.
+       O som era o único retorno deste botão — e no iPhone no SILENCIOSO ele
+       não toca: o WebKit silencia Web Audio pelo botão físico (bug 237322).
+       Uma paciente em pânico apertava o círculo vermelho e não recebia sinal
+       NENHUM de que o app tinha entendido.
+       Vai antes de qualquer `await`, como o destravar: depois dele o gesto já
+       passou. E é um pulso só — o desfecho tem padrão próprio lá embaixo, e
+       dois padrões iguais não diriam nada um do outro. */
+    tocarPadrao([40]);
 
     /* ── A janela do WhatsApp é aberta AGORA, dentro do toque ──────────────
        Isto parece estranho e é o único jeito de funcionar. iOS e Android só
@@ -449,6 +464,10 @@ export function EmergencySheet({
        */
       const chegouEmTodos = r.canais.destinos.length > 0 && !r.canais.faltou;
       tocarSomDeUI(chegouEmTodos ? "sos" : "sos-falhou");
+      /* ⚠️ O MESMO desfecho no dedo, e pela MESMA régua do som — nunca uma
+         segunda: com duas, o iPhone no silencioso diria uma coisa pelo tato e
+         a tela diria outra. */
+      hapticoDeAviso(chegouEmTodos ? "sucesso" : "erro");
       /* A mensagem do WhatsApp é a MESMA que saiu por e-mail e SMS — vem
          pronta do servidor em vez de ser remontada aqui, senão o parente que
          receber pelos dois canais leria duas versões diferentes do mesmo
@@ -517,6 +536,7 @@ export function EmergencySheet({
        * distinguir os dois sem olhar.
        */
       tocarSomDeUI("sos-falhou");
+      hapticoDeAviso("erro");
       toast.error("Não consegui avisar por aqui — ligue 192 imediatamente.");
     }
   }

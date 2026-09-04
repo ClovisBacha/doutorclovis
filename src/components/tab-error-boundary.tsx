@@ -1,9 +1,32 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
+
+/**
+ * ⚠️ A MESMA CHAVE DA RAIZ (`__root.tsx`), de propósito.
+ *
+ * As duas fronteiras se recuperam do MESMO defeito — um deploy no meio do uso
+ * faz o `import()` do pedaço antigo rejeitar. Com chaves diferentes, a
+ * paciente poderia recarregar duas vezes na mesma sessão: a raiz uma, a aba
+ * outra. Uma chave só é o que faz "uma recarga por sessão" ser verdade.
+ */
+const CHAVE_RECARGA = "dc-recarreguei-por-pedaco-antigo";
 
 interface Props {
   children: ReactNode;
   tabName?: string;
+  /**
+   * ⚠️ ADIA A RECARGA — e o único caso hoje é o SOS ABERTO.
+   *
+   * A recuperação é uma recarga de página, e uma recarga no meio de um envio
+   * de socorro o ABORTA: o GPS, o endereço e a chamada ao servidor morrem, e a
+   * paciente fica olhando um botão que ela já apertou. A aba que quebrou é
+   * irrelevante perto disso — ela pode esperar o desfecho.
+   *
+   * Quando isto volta a ser falso, a recarga acontece (`componentDidUpdate`):
+   * adiar não é desistir.
+   */
+  adiarRecarga?: boolean;
 }
 
 interface State {
@@ -23,6 +46,38 @@ export class TabErrorBoundary extends Component<Props, State> {
       error,
       info.componentStack,
     );
+    this.talvezRecarregar();
+  }
+
+  componentDidUpdate() {
+    /* O SOS terminou: a recarga adiada acontece agora. */
+    this.talvezRecarregar();
+  }
+
+  /**
+   * ⚠️ "TENTAR NOVAMENTE" NÃO FUNCIONA PARA UM PEDAÇO QUE SUMIU, e este era o
+   * defeito: depois de um deploy, o `import()` da aba rejeita, o navegador
+   * MARCA a promessa do módulo como falha (`_status = 2`) e a guarda — então
+   * `setState({ error: null })` remonta e o mesmo `import()` rejeita de novo,
+   * na hora. A paciente tocava num botão que comprovadamente não fazia nada.
+   *
+   * A raiz já se recupera assim há tempos, e o comentário dela vale igual
+   * aqui: quem abriu o app não tem por que saber o que é "um pedaço do
+   * aplicativo" — para ela isso é o app não abrir. Uma vez por sessão, senão
+   * um erro de rede de verdade viraria laço de recarga e a tela de erro, que é
+   * o último recurso, deixaria de aparecer.
+   */
+  private talvezRecarregar(): void {
+    if (typeof window === "undefined") return;
+    if (this.props.adiarRecarga) return;
+    if (!ehPedacoQueSumiu(this.state.error)) return;
+    try {
+      if (sessionStorage.getItem(CHAVE_RECARGA)) return;
+      sessionStorage.setItem(CHAVE_RECARGA, "1");
+    } catch {
+      /* modo privado: recarrega assim mesmo, uma vez. */
+    }
+    window.location.reload();
   }
 
   render() {
@@ -45,10 +100,14 @@ export class TabErrorBoundary extends Component<Props, State> {
           <p className="text-sm text-muted-foreground">Algo deu errado ao carregar esta seção.</p>
           <button
             type="button"
-            onClick={() => this.setState({ error: null })}
-            className="rounded-full border border-border px-4 py-2 text-sm hover:bg-accent"
+            onClick={() =>
+              /* Para um pedaço que sumiu, remontar não adianta — ver
+                 `talvezRecarregar`. O botão faz o que de fato resolve. */
+              ehPedacoQueSumiu(error) ? window.location.reload() : this.setState({ error: null })
+            }
+            className="min-h-11 rounded-full border border-border px-4 py-2 text-sm hover:bg-accent"
           >
-            Tentar novamente
+            {ehPedacoQueSumiu(error) ? "Recarregar o app" : "Tentar novamente"}
           </button>
           <details className="w-full max-w-sm text-left">
             <summary className="cursor-pointer text-center text-xs text-muted-foreground">

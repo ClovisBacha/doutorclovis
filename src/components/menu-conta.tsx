@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { AppTab } from "@/components/app-mobile-shell";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 /**
  * O menu da conta — o que se abre na silhueta do topo da home.
@@ -209,6 +210,9 @@ export function MenuDaConta({
 }) {
   /* Voltar (Android) e Escape fecham o menu, não o app. */
   useVoltar(true, onFechar);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
   return (
     <div
       className="fixed inset-0 z-[70] flex items-start justify-center bg-black/30 backdrop-blur-sm"

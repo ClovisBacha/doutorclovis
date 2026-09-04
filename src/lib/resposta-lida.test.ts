@@ -67,11 +67,18 @@ describe("a tela lê o que o servidor respondeu", () => {
   test("⚠️ deixar de seguir só some da tela se o servidor aceitou", () => {
     const REDE = semComentarios(readFileSync("src/components/rede-instagram.tsx", "utf8"));
     const depois = instrucaoApos(REDE, "const r = await mod.deixarDeSeguir(");
-    /* Cobra a GARANTIA — a limpeza do vínculo depende do `ok` —, e não a
-       grafia de um `if`. */
-    expect(depois).toMatch(/meuVinculo: null/);
+    /* Cobra a GARANTIA — o `null` só chega ao vínculo se o servidor aceitou —
+       e não a grafia. As duas formas passam:
+         `if (r.ok) setPerfil({ ...perfil, meuVinculo: null })`
+         `setPerfil({ ...perfil, meuVinculo: r.ok ? null : antes })`
+       ⚠️ A segunda é ESTRITAMENTE mais forte (ela também DESFAZ a pintura
+       otimista quando o servidor recusa), e a versão anterior deste teste a
+       reprovava: ele exigia `meuVinculo: null` literal e media a posição de
+       `r.ok` contra ele. Um teste que reprova código melhor é um teste que
+       ensina a relaxá-lo. */
+    expect(depois).toContain("meuVinculo");
     expect(depois).toMatch(/r\.ok/);
-    expect(depois.search(/r\.ok/)).toBeLessThan(depois.indexOf("meuVinculo: null"));
+    expect(depois.search(/r\.ok/)).toBeLessThan(depois.search(/\bnull\b/));
   });
 
   test("⚠️ desconectar a agenda do Google não afirma o que não aconteceu", () => {

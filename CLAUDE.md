@@ -13277,8 +13277,7 @@ enquanto o dedo está nele.
 - ⚠️ **`opacity`, NUNCA `transform`.** Um `transform` num ancestral vira bloco
   de contenção para descendente `fixed` — e este app tem folha `fixed inset-0`
   dentro de botão, mais as animações de sprite do Jogo. O `.press` paga esse
-  risco em 245 elementos por ser opt-in; a regra global não pode pagá-lo em
-  801.
+  risco em 245 elementos por ser opt-in; a regra global não pode pagá-lo em 801.
 - ⚠️ **O DESABILITADO fica de fora.** Ele vive em `opacity-50`, e a regra (fora
   de `@layer`) venceria a utilitária: ao toque ele iria a 0,62 e ficaria MAIS
   CLARO, dizendo que está disponível. Medido em `?estado=esgotada`: fica em
@@ -13427,3 +13426,141 @@ carteirinha inteira mora no servidor e hoje não existe no aparelho).
 **Medir:** `node scratchpad/nativo/medir-toque.mjs` (o toque, oito telas) ·
 `contencao.mjs` (a rolagem) · `encadeia.mjs` (a prova de que a contenção não
 prende quem não rola) · `cobertura-press.mjs` (quantos alvos têm retorno).
+
+### A segunda leva: o dedo, o aviso e o deploy (set/2026)
+
+A auditoria devolveu **42 achados, 35 vivos**. O que segue é o que entrou
+depois dela, cada um com a régua e a mutação.
+
+#### ⚠️ O SOS ERA O ÚNICO GESTO DE CONSEQUÊNCIA MUDO AO DEDO
+
+O único retorno do botão vermelho era SOM — e o som não é confiável no
+aparelho em que ele mais importa: **no iPhone no silencioso o Web Audio não
+toca** (o WebKit trata isso como o bug 237322, e `sessao-de-audio.ts` existe
+por causa disso). Uma paciente em pânico apertava o círculo e não recebia
+sinal nenhum de que o app tinha entendido.
+
+- **A vibração do envio sai ao lado do `destravarSomDeUI()`**, antes de
+  qualquer `await` — depois dele o gesto já passou, que é a mesma armadilha
+  que aquela linha documenta.
+- ⚠️ **O desfecho é sentido pela MESMA régua do som** (`chegouEmTodos`), nunca
+  por uma segunda: com duas, o iPhone no silencioso diria uma coisa pelo tato
+  e a tela diria outra.
+- ⚠️ **Nada disso passa por `podeSoar` nem por Modo Cuidado.** O SOS é ALARME:
+  quem perdeu a gestação continua podendo passar mal, e quem desligou os sons
+  do app não desligou o socorro.
+- **`hapticoDeAviso` NÃO é `tocarPadrao` com outro nome**: no iOS ele usa
+  `Haptics.notification`, o padrão do SISTEMA — a assinatura tátil que o
+  iPhone usa para "concluído" e "falhou", que a paciente já conhece de todo
+  outro app.
+
+#### ⚠️ TODA CONTRAÇÃO ERA GRAVADA MAIS CURTA DO QUE FOI
+
+Defeito de MEDIDA CLÍNICA, não de sensação. `ended_at` sempre foi carimbado no
+cliente (`new Date()` dentro do `update`); `started_at` caía no `DEFAULT now()`
+do banco — ou seja, no relógio do SERVIDOR, depois de `getUser()` e do insert.
+**As duas pontas mediam em relógios diferentes**, e o INTERVALO entre
+contrações — o dado que decide ir para a maternidade — saía deslocado pela
+latência. Num 4G de hospital isso é segundos.
+
+Agora o instante é capturado antes de qualquer `await` e vai nas duas pontas
+(banco e cronômetro da tela). `getUser()` (rede) virou `getSession()` (disco):
+uma espera a menos no minuto em que ela menos pode esperar. E o começo ganhou
+o tique que o FIM já tinha — o comentário dele chama isto de "o caso de mão
+ocupada".
+
+#### ⚠️ O SERVIDOR MANDAVA O DESTINO DO AVISO E O APP JOGAVA FORA
+
+Todo push carrega `url`, e o `notificationclick` abria `"/minha-conta"` cru
+enquanto o app nativo não tinha ouvinte nenhum. Tocar em "sua consulta é
+amanhã" abria a tela em que o app estava.
+
+- ⚠️ **O caminho é LIMPO antes de virar navegação.** Ele é montado pelo
+  servidor mas chega ao aparelho pelo serviço da Apple/Google como dado
+  arbitrário: navegar para isso sem conferir abre a porta para `javascript:`
+  (execução na origem do app, com a sessão dela dentro) e para
+  `https://outro.site` (uma tela que PARECE o app pedindo a senha). A régua é
+  fechada — só caminho relativo da própria origem.
+- ⚠️ **`//outro.site` é o caso que uma checagem ingênua de "começa com /"
+  deixa passar** — é endereço absoluto sem esquema.
+- ⚠️ **EXISTEM DUAS IMPLEMENTAÇÕES**, porque `public/sw.js` é servido cru e não
+  pode importar um módulo. O que impede a divergência é
+  `destino-do-push.test.ts`: a tabela de casos é UMA, ele EXTRAI a função do
+  worker e a EXECUTA. Um teste que só procurasse o texto ficaria verde sobre
+  uma cópia que mudou de comportamento.
+- ⚠️ **`openWindow` cru era o defeito, não a correção**: no app instalado ele
+  não abre nada. Procurar a janela existente, focá-la e NAVEGAR nela é o que
+  faz o aviso levar a algum lugar.
+- ⚠️ **A faixa de caracteres de controle do regex vai por sequência de escape
+  (de `\u0000` a `\u001f`, mais `\u007f`), NUNCA com os caracteres
+  literais.** O `Write` chegou
+  a gravar bytes crus ali, e eles são invisíveis no editor — o `grep` passou a
+  chamar o arquivo de binário. Mesma lição das marcas combinantes do filtro de
+  palavras.
+
+#### ⚠️ UM DEPLOY NO MEIO DO USO VIRAVA UMA TELA DE ERRO MORTA
+
+A raiz já se recuperava; a aba não. Depois de um deploy, tocar em Jogo ou
+Comunidade rejeita o `import()`, e "Tentar novamente" fazia
+`setState({error:null})` — que remonta e cai no MESMO `import()` já marcado
+como falho pelo navegador. **Um botão que comprovadamente não fazia nada.**
+
+- A fronteira da aba usa a MESMA `ehPedacoQueSumiu` e a MESMA chave de sessão
+  da raiz — com chaves diferentes, a paciente recarregaria duas vezes na mesma
+  sessão.
+- ⚠️ **NADA disso acontece com a Central de Emergência aberta.** Uma recarga no
+  meio de um envio de socorro o ABORTA: o GPS, o endereço e a chamada ao
+  servidor morrem, e ela fica olhando um botão que já apertou. A aba quebrada
+  pode esperar o desfecho — e adiar não é desistir (`componentDidUpdate`).
+
+#### As outras quatro
+
+- ⚠️ **A Comunidade abria no RODAPÉ de telas que ela nunca viu.** O reset de
+  rolagem depende de `[tab, …]`, e ali `tab` continua sendo "Feed" nos 25
+  destinos. Medido: lendo o feed em 3.000 px e abrindo um perfil, o navegador
+  clampa em 1.361. O FEED é a exceção obrigatória (senão atropela
+  `lugar-no-feed`), e é `instant` — o `<html>` tem `scroll-behavior: smooth`.
+- ⚠️ **O carrossel disputava o dedo com o zoom.** Ele tem toque duplo PRÓPRIO
+  (❤️), e sem `touch-action` o navegador continua com o direito de ler os
+  mesmos dois toques como zoom. Nunca `none` (mataria a rolagem lateral dele) e
+  **nunca `user-scalable=no`** no viewport: a pinça é acessibilidade, e é o que
+  a paciente com pouca visão usa para ler o telefone do 192.
+- ⚠️ **Seis folhas deixavam a página correr por baixo.**
+  `useTravarRolagemDeFundo` **guarda e restaura o valor anterior**, nunca
+  `= ""`: as folhas deste app se empilham, e com `""` a de cima ao fechar
+  destravaria a página com a de baixo ainda aberta.
+- ⚠️ **O convite "Instalar o app" aparecia DENTRO do app instalado** —
+  `navigator.standalone` é indefinido na casca, então o ramo do iPhone dava
+  `true` lá dentro: um cartão mandando "toque em compartilhar" numa tela sem
+  barra de navegador. E ele **continua no Safari comum do iPhone**, de
+  propósito: é lá que instalar destrava o push, que é o canal do aviso de
+  consulta e do retorno do SOS.
+- ⚠️ **"Seguir" esperava a rede** enquanto o mesmo botão na fileira de
+  sugeridas já respondia. O otimismo fica no RÓTULO e sai da MESMA régua dele
+  (`perfil.publico`); o CONTEÚDO nunca é pintado antes do aceite. Desfaz também
+  quando `r.ok` é falso — não só no `catch`, porque `{ ok: false }` chega numa
+  resposta 200 NORMAL.
+
+#### O que NÃO foi feito, e por quê
+
+- **A barra de baixo e o SOS desde o primeiro quadro** (o maior item que
+  sobra). Ele reestrutura o render da tela que HOSPEDA a emergência, e o ganho
+  encolheu: a abertura já foi otimizada (duas funções serverless fora do
+  caminho crítico, a casca na borda, a função em São Paulo), então a janela sem
+  barra é curta. É a próxima coisa a fazer, com foto antes e depois — não às
+  cegas no fim de uma leva.
+- **`server.errorPath` no Capacitor** (a tela do SAMU alcançável). O plano
+  exige testar em modo avião nos dois sistemas antes de considerar feito, e
+  isso não se faz daqui. O conserto do TELEFONE já foi, então ligar o
+  `errorPath` amanhã não liga junto um vazamento.
+- **Guardar a casca no service worker**: o dono já recusou ("acho que tem que
+  ser em tempo real"). Sobrevive só como RECUO de offline — network-first
+  mantido, cache usado apenas quando o fetch falha. Precisa de "sim" explícito.
+- **Teclado nativo, fila offline das contrações, emblema no ícone, Universal
+  Links**: pedem medição em aparelho ou credencial que não mora no
+  repositório.
+
+⚠️ **E a lição de método da noite:** a auditoria mediu o estado da árvore
+ENQUANTO eu trabalhava nela, então um dos achados voltou como "CORREÇÃO DA
+PREMISSA: já está resolvido". Auditoria em repositório vivo precisa disso
+escrito — o achado não estava errado, ele estava atrasado.

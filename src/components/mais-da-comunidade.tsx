@@ -12,6 +12,7 @@ import {
   X,
 } from "lucide-react";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 /**
  * "MAIS" DA COMUNIDADE — a folha que guarda o que não é uso diário.
@@ -95,6 +96,9 @@ export function MaisDaComunidade({
   onFechar: () => void;
 }) {
   useVoltar(true, onFechar);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
   return (
     <div
       role="dialog"

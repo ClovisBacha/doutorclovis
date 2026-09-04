@@ -8,6 +8,7 @@ import {
   type FuncaoDoApp,
 } from "@/lib/mapa-do-app";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 /**
  * "TUDO O QUE O APP FAZ" — o mapa do app, dentro do app.
@@ -40,6 +41,9 @@ export function MapaDoApp({
 }) {
   const [termo, setTermo] = useState("");
   useVoltar(true, onFechar);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
   const visiveis = useMemo(() => funcoesVisiveis({ careMode, weeks }), [careMode, weeks]);
   const lista = useMemo(() => buscarFuncoes(termo, visiveis), [termo, visiveis]);
   const buscando = termo.trim().length > 0;

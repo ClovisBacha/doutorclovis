@@ -91,6 +91,7 @@ import {
 import type { CycleModel, CyclePhase } from "@/lib/ciclo-menstrual";
 import { OnboardingRitual } from "@/components/onboarding-ritual";
 import { hapticKick, hapticTap } from "@/lib/haptics";
+import { hapticoDeAviso } from "@/lib/nativo";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
 import {
@@ -2633,7 +2634,7 @@ function MinhaContaPage() {
                   Com o portão, o pior caso passa a ser um cartão quebrado
                   dentro de um app que abre — e o erro fica LEGÍVEL, que é o que
                   faltava para achar este defeito. */}
-              <TabErrorBoundary tabName="tela inicial">
+              <TabErrorBoundary tabName="tela inicial" adiarRecarga={emergencyOpen}>
                 <AppHomeScreen
                   firstName={firstName}
                   babyName={profile?.baby_name ?? null}
@@ -2848,7 +2849,7 @@ function MinhaContaPage() {
               key={`${tab}-${refreshKey}`}
               className={`mt-6 tab-enter ${hubAberto ? "hidden md:block" : ""}`}
             >
-              <TabErrorBoundary tabName={tab}>
+              <TabErrorBoundary tabName={tab} adiarRecarga={emergencyOpen}>
                 {tab === "Bebê" && (
                   <BebeHub
                     profile={profile}
@@ -7920,20 +7921,41 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
   }, [active]);
 
   async function startContraction() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
+    /* ⚠️ O INSTANTE É O DO DEDO, e isto era um defeito de MEDIDA CLÍNICA.
+       `ended_at` sempre foi carimbado aqui (`new Date()` dentro do `update`),
+       e `started_at` caía no `DEFAULT now()` do banco — ou seja, no relógio do
+       SERVIDOR, depois de `getUser()` e do insert. As duas pontas mediam em
+       lugares diferentes: toda contração era gravada mais CURTA do que foi, e
+       o INTERVALO entre elas — que é o dado que decide ir para a maternidade —
+       saía deslocado pela latência. Num 4G ruim de hospital isso é segundos.
+       Carimbar aqui põe as duas pontas no mesmo relógio: o dela. */
+    const agora = Date.now();
+
+    /* ⚠️ E O DEDO RECEBE RESPOSTA ANTES DE QUALQUER `await`. Ela está
+       cronometrando DOR, de olhos fechados — é o caso de mão ocupada que o
+       tique do FIM já documenta três linhas abaixo. O começo não tinha
+       nenhum. */
+    hapticTap();
+
+    /* `getSession` lê o disco; `getUser` ia à rede. Uma ida a menos entre o
+       toque e o cronômetro, no minuto em que ela menos pode esperar. */
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user?.id;
+    if (!uid) return;
     const { data, error } = await (supabase as any)
       .from("contraction_logs")
-      .insert({ user_id: u.user.id, intensity })
+      .insert({ user_id: uid, intensity, started_at: new Date(agora).toISOString() })
       .select()
       .single();
     if (error) {
+      /* ⚠️ O erro também é sentido: ela pode não estar olhando a tela. */
+      hapticoDeAviso("erro");
       toast.error("Não foi possível registrar a contração. Tente novamente.");
       return;
     }
     setActive(data);
-    startRef.current = Date.now();
-    setElapsed(0);
+    startRef.current = agora;
+    setElapsed(Math.max(0, Math.round((Date.now() - agora) / 1000)));
     load();
   }
 
@@ -7944,6 +7966,7 @@ function ContracoesTab({ weeks }: { weeks: number | null }) {
       .update({ ended_at: new Date().toISOString() })
       .eq("id", active.id);
     if (error) {
+      hapticoDeAviso("erro");
       toast.error("Não foi possível salvar a contração. Tente novamente.");
       return;
     }

@@ -185,6 +185,32 @@ describe("⚠️ `standalone` não pode ser o único portão — ele é FALSO na
     expect(chamada).toContain("ehNativo()");
   });
 
+  test('⚠️ o convite "Instalar o app" NÃO aparece dentro do app instalado', () => {
+    /* `navigator.standalone` é indefinido na casca, então o ramo do iPhone
+       dava `true` lá dentro: a paciente que baixou o app da loja recebia, na
+       primeira tela, um cartão mandando "toque em compartilhar ↑" — numa tela
+       sem barra de navegador. */
+    const ROOT = readFileSync("src/routes/__root.tsx", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const i = ROOT.indexOf("function PWAInstallBanner()");
+    expect(i).toBeGreaterThan(-1);
+    const corpo = ROOT.slice(i, ROOT.indexOf("\n}", i));
+    expect(corpo).toMatch(/ehAppInstalado\(\)[\s\S]{0,20}return/);
+  });
+
+  test("⚠️ ...e CONTINUA no Safari comum do iPhone", () => {
+    /* É lá que instalar destrava o push, que é o canal do aviso de consulta e
+       do retorno do SOS. Esconder ali tiraria dela o caminho da emergência —
+       por isso a régua é "já está instalado", nunca "é iPhone". */
+    const NATIVO = readFileSync("src/lib/nativo.ts", "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+    const i = NATIVO.indexOf("export function ehAppInstalado()");
+    const corpo = NATIVO.slice(i, NATIVO.indexOf("\n}", i));
+    expect(corpo).toContain("ehNativo()");
+    expect(corpo).toContain("display-mode: standalone");
+    expect(corpo).toContain("standalone");
+    /* E ela não olha o user agent: iPhone no Safari não é "instalado". */
+    expect(corpo).not.toContain("userAgent");
+  });
+
   test("⚠️ e a decisão continua num EFEITO, nunca no render", () => {
     /* `ehNativo()` lê um global que não existe no servidor: no render, ele
        trocaria um gesto faltando por uma quebra de hidratação. */
@@ -192,5 +218,41 @@ describe("⚠️ `standalone` não pode ser o único portão — ele é FALSO na
     const efeito = PTR.lastIndexOf("useEffect(", i);
     expect(efeito).toBeGreaterThan(-1);
     expect(efeito).toBeLessThan(i);
+  });
+});
+
+describe("⚠️ o carrossel do feed declara o gesto que ele consome", () => {
+  /* Esta `div` tem toque duplo PRÓPRIO (janela de 320 ms, que dá ❤️). Sem
+     `touch-action`, o navegador continua com o direito de ler os mesmos dois
+     toques como ZOOM: a paciente toca duas vezes na ultrassom para curtir e a
+     página amplia. A regra do bloco `pointer: coarse` alcança botão e afins;
+     uma `div` fica de fora. */
+  const REDE = readFileSync("src/components/rede-instagram.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  test("o carrossel do post declara `manipulation`", () => {
+    const i = REDE.indexOf("snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]");
+    expect(i).toBeGreaterThan(-1);
+    /* A âncora é a MESMA `div`: o `style` dela vem logo abaixo do className. */
+    const bloco = REDE.slice(i, REDE.indexOf(">", i));
+    expect(bloco).toContain('touchAction: "manipulation"');
+  });
+
+  test("⚠️ e nunca `none` — mataria a rolagem lateral do próprio carrossel", () => {
+    const i = REDE.indexOf("snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]");
+    const bloco = REDE.slice(i, REDE.indexOf(">", i));
+    expect(bloco).not.toContain('touchAction: "none"');
+  });
+
+  test("⚠️ o viewport NÃO trava a escala — a pinça é acessibilidade", () => {
+    /* `user-scalable=no`/`maximum-scale` matariam o zoom por pinça, que é
+       falha de WCAG e é o que a paciente com pouca visão usa para ler o
+       telefone do 192. `manipulation` tira só o toque duplo. */
+    const ROOT = readFileSync("src/routes/__root.tsx", "utf8");
+    expect(ROOT).toContain("width=device-width");
+    expect(ROOT).not.toContain("user-scalable=no");
+    expect(ROOT).not.toContain("maximum-scale");
   });
 });

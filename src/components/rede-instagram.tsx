@@ -27,7 +27,7 @@
  */
 import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
 import { codificarFoto } from "@/lib/codificar-imagem";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import { intercalarDescobertas } from "@/lib/sugestoes";
 import {
   MOTIVOS_SENSIVEIS,
@@ -581,8 +581,18 @@ function Carrossel({
              dispara no primeiro pixel, muito antes de o encaixe terminar. */
           setAte((v) => Math.max(v, n + 1));
         }}
+        /* ⚠️ `touch-action: manipulation` NÃO É SUPÉRFLUO AQUI, e é por isso que
+             ele tem comentário: esta `div` tem gesto de TOQUE DUPLO próprio
+             (`aoSoltar`, janela de 320 ms, que dá ❤️). Sem a declaração, o
+             navegador continua com o direito de ler os mesmos dois toques como
+             ZOOM — ela toca duas vezes na ultrassom para curtir e a página
+             amplia. A regra de `styles.css` alcança botão e afins; isto é uma
+             `div`, e fica de fora.
+             ⚠️ Nunca `none` (mataria a rolagem lateral do próprio carrossel) e
+             nunca `user-scalable=no` no viewport: o zoom por PINÇA é
+             acessibilidade, e é o que a paciente com pouca visão usa. */
         className="flex w-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ aspectRatio: String(RAZAO_DO_POST) }}
+        style={{ aspectRatio: String(RAZAO_DO_POST), touchAction: "manipulation" }}
       >
         {urls.map((u, n) => (
           <div key={n} className="relative w-full shrink-0 snap-center overflow-hidden bg-muted/40">
@@ -3868,6 +3878,32 @@ export function RedeNoApp({
     setOnde(pilhaDeTelas.current.voltar() ?? { t: "feed" });
   });
 
+  /* ⚠️ ABRIR UMA TELA COMEÇA NO COMEÇO DELA (set/2026).
+     O reset de rolagem de `minha-conta` depende de `[tab, mobileHome,
+     hubAberto]`, e dentro da Comunidade `tab` continua sendo "Feed" nos 25
+     destinos — então ele nunca disparava aqui. Medido a 393×852: lendo o feed
+     em 3.000 px e abrindo um perfil, o navegador clampa em 1.361 — o RODAPÉ do
+     perfil, a última fileira da grade, sem avatar nem nome à vista. É o
+     defeito que o comentário de `minha-conta` descreve com todas as letras
+     ("caía no rodapé de uma tela que nunca tinha visto"), sobrevivendo dentro
+     da aba com mais destinos do app.
+
+     ⚠️ O FEED É A EXCEÇÃO, e ela é obrigatória: quem restaura o lugar dela é
+     `lugar-no-feed.ts`, e rolar ao topo aqui atropelaria isso — o app
+     esqueceria onde ela parou de ler toda vez que ela voltasse.
+
+     ⚠️ `instant`, nunca `auto`: o `<html>` tem `scroll-behavior: smooth`, e a
+     volta sairia como uma rolagem animada de milhares de pixels. Mesma lição
+     de `lugar-no-feed`.
+
+     ⚠️ E é `useLayoutEffect`: com `useEffect` o navegador chega a PINTAR o
+     rodapé da tela nova antes de saltar, que é o pisca que ele veio tirar. */
+  useLayoutEffect(() => {
+    if (onde.t === "feed") return;
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [onde]);
+
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   /**
    * O CABEÇALHO PROVISÓRIO, com o que o feed já sabia.
@@ -6341,13 +6377,37 @@ export function RedeNoApp({
     }
   }
 
+  const seguindoEmVoo = useRef(false);
+
   async function seguir() {
     if (!perfil || perfil.souEu) return;
+    /* ⚠️ UM TOQUE POR VEZ. A ida à rede leva centenas de milissegundos, e sem
+       trava o segundo toque dispara a ação OPOSTA sobre um estado que ainda
+       não voltou — ela toca duas vezes e acaba não seguindo. `useRef` porque
+       um estado só valeria no render seguinte. */
+    if (seguindoEmVoo.current) return;
+    seguindoEmVoo.current = true;
+
+    /* ⚠️ O RÓTULO MUDA NO TOQUE, e o conteúdo NÃO.
+       O mesmo botão na fileira de sugeridas já responde na hora; no perfil ele
+       esperava a rede, e a paciente tocava de novo achando que não tinha
+       pegado. O otimismo fica no RÓTULO: nunca pintar publicação de perfil
+       privado antes do aceite — isso seria mostrar o que a régua recusa.
+       O estado provisório sai da MESMA régua do rótulo (`perfil.publico`
+       decide entre `ativo` e `pendente`), nunca de um palpite. */
+    const antes = perfil.meuVinculo;
+    const otimista =
+      antes === "ativo" ? null : perfil.publico ? ("ativo" as const) : ("pendente" as const);
+    setPerfil({ ...perfil, meuVinculo: otimista });
+
     try {
       const t = await token();
-      if (!t) return;
+      if (!t) {
+        setPerfil({ ...perfil, meuVinculo: antes });
+        return;
+      }
       const mod = await import("@/lib/rede-social.functions");
-      if (perfil.meuVinculo === "ativo") {
+      if (antes === "ativo") {
         /* ⚠️ **O RETORNO ERA DESCARTADO — e o ramo LOGO ABAIXO, na MESMA
          * funcao, le o dele.** `{ ok: false }` chega num 200 NORMAL, entao o
          * `catch` nao pega: o botao virava "Seguir", ela saia da tela achando
@@ -6357,13 +6417,22 @@ export function RedeNoApp({
          * A regra ja estava aplicada dois ramos abaixo (`if (r.ok) setPerfil`);
          * o que faltava era valer para os dois. */
         const r = await mod.deixarDeSeguir({ data: { accessToken: t, alvoId: perfil.id } });
-        if (r.ok) setPerfil({ ...perfil, meuVinculo: null });
-      } else if (!perfil.meuVinculo) {
+        /* ⚠️ DESFAZ TAMBÉM QUANDO `r.ok` É FALSO — e não só no `catch`.
+           `{ ok: false }` chega numa resposta 200 NORMAL, que nenhum
+           `try/catch` pega: sem esta linha, o botão ficaria dizendo o
+           contrário do que o servidor gravou. É o defeito que este mesmo
+           ramo já pagou uma vez. */
+        setPerfil({ ...perfil, meuVinculo: r.ok ? null : antes });
+      } else if (!antes) {
         const r = await mod.seguir({ data: { accessToken: t, alvoId: perfil.id } });
-        if (r.ok) setPerfil({ ...perfil, meuVinculo: r.estado });
+        setPerfil({ ...perfil, meuVinculo: r.ok ? r.estado : antes });
       }
     } catch {
-      /* O botão volta ao estado real na próxima abertura do perfil. */
+      /* Desfaz na hora: o botão dizendo "Seguindo" sobre uma rede que caiu é
+         pior que o botão não ter respondido. */
+      setPerfil({ ...perfil, meuVinculo: antes });
+    } finally {
+      seguindoEmVoo.current = false;
     }
   }
 

@@ -123,3 +123,88 @@ describe("⚠️ o voltar do Android sobe um nível em vez de fechar o app", () 
     expect(corpo).toContain(".voltar()");
   });
 });
+
+describe("⚠️ abrir uma tela da Comunidade começa no começo dela", () => {
+  /* O reset de rolagem de `minha-conta` depende de `[tab, mobileHome,
+     hubAberto]`, e dentro da Comunidade `tab` continua sendo "Feed" nos 25
+     destinos — ele nunca disparava aqui. Medido a 393×852: lendo o feed em
+     3.000 px e abrindo um perfil, o navegador clampa em 1.361 — o RODAPÉ do
+     perfil, sem avatar nem nome à vista.
+     ⚠️ Não dá para exercitar isto de ponta a ponta: `RedeNoApp` não tem
+     bancada (`/preview-instagram` monta as telas internas direto). O que se
+     cobra aqui são as três decisões que, erradas, desfazem o conserto. */
+  const REDE = semComentarios("src/components/rede-instagram.tsx");
+  const i = REDE.indexOf("useLayoutEffect(");
+  const efeito = REDE.slice(i, REDE.indexOf("}, [onde]);", i));
+
+  test("existe, e é de LAYOUT — não um efeito comum", () => {
+    /* Com `useEffect` o navegador chega a PINTAR o rodapé da tela nova antes
+       de saltar: o pisca que ele veio tirar. */
+    expect(i).toBeGreaterThan(-1);
+    expect(efeito).toContain("scrollTo");
+  });
+
+  test("⚠️ o FEED é a exceção — senão atropela o lugar guardado", () => {
+    /* Quem restaura onde ela parou de ler é `lugar-no-feed.ts`. Sem esta
+       linha, o app esqueceria isso toda vez que ela voltasse ao feed. */
+    expect(efeito).toMatch(/onde\.t === "feed"[\s\S]{0,30}return/);
+    expect(REDE).toContain("lugar-no-feed");
+  });
+
+  test("⚠️ `instant`, nunca `auto` — o `<html>` tem `scroll-behavior: smooth`", () => {
+    expect(efeito).toContain('"instant"');
+    expect(efeito).not.toContain('"smooth"');
+  });
+});
+
+describe('⚠️ "Seguir" no perfil responde no toque', () => {
+  /* O mesmo botão na fileira de sugeridas já respondia na hora; no perfil ele
+     esperava a ida à rede, e a paciente tocava de novo achando que não tinha
+     pegado. */
+  const REDE = semComentarios("src/components/rede-instagram.tsx");
+  const i = REDE.indexOf("async function seguir()");
+  const corpo = REDE.slice(i, REDE.indexOf("\n  async function", i + 10));
+
+  test("o rótulo muda ANTES da rede", () => {
+    const pinta = corpo.indexOf("setPerfil(");
+    const rede = corpo.indexOf("await ");
+    expect(pinta).toBeGreaterThan(-1);
+    expect(pinta).toBeLessThan(rede);
+  });
+
+  test("⚠️ o estado provisório sai da MESMA régua do rótulo", () => {
+    /* `perfil.publico` decide entre seguir e pedir para seguir — um palpite
+       aqui faria o botão dizer "Seguindo" num perfil privado, ou seja,
+       prometer o que a régua recusa. */
+    expect(corpo).toMatch(/perfil\.publico[\s\S]{0,60}"ativo"[\s\S]{0,40}"pendente"/);
+  });
+
+  test("⚠️ desfaz quando `r.ok` é falso — e não só no `catch`", () => {
+    /* `{ ok: false }` chega numa resposta 200 NORMAL, que nenhum `try/catch`
+       pega. É o defeito que este mesmo ramo já pagou uma vez. */
+    expect([...corpo.matchAll(/r\.ok \? [^:]+: antes/g)].length).toBeGreaterThanOrEqual(2);
+    expect(corpo).toMatch(/catch \{[\s\S]{0,120}meuVinculo: antes/);
+  });
+
+  test("⚠️ um toque por vez — o segundo dispararia a ação oposta", () => {
+    /* ⚠️ A âncora é a GUARDA, não o nome: `seguindoEmVoo.current` aparece
+       também no `finally`, então procurar o nome ficava verde com a guarda
+       apagada. */
+    expect(corpo).toMatch(/if \(seguindoEmVoo\.current\)\s*return/);
+    expect(corpo).toMatch(/seguindoEmVoo\.current = true/);
+    expect(corpo).toContain("finally");
+    /* E a guarda vem ANTES de qualquer ida à rede. */
+    expect(corpo.indexOf("seguindoEmVoo.current = true")).toBeLessThan(corpo.indexOf("await "));
+    /* `useRef`, nunca estado: um estado só valeria no render seguinte. */
+    expect(REDE).toContain("const seguindoEmVoo = useRef(false)");
+  });
+
+  test("⚠️ e o CONTEÚDO nunca é pintado por otimismo", () => {
+    /* Só `meuVinculo` muda. Pintar publicação de perfil privado antes do
+       aceite seria mostrar o que a régua existe para recusar. */
+    const pintadas = [...corpo.matchAll(/setPerfil\(\{ \.\.\.perfil, ([a-zA-Z]+):/g)].map(
+      (m) => m[1],
+    );
+    expect(new Set(pintadas)).toEqual(new Set(["meuVinculo"]));
+  });
+});

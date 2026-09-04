@@ -15,6 +15,7 @@ const ARTE_DO_AVISO: Readonly<Record<string, string>> = {
 };
 import type { Lidas, Notificacao } from "@/lib/notificacoes";
 import { useVoltar } from "@/lib/use-voltar";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
 
 /**
  * A caixa de entrada do app.
@@ -52,6 +53,9 @@ export function NotificacoesSheet({
 }) {
   /* Voltar (Android) e Escape fecham a folha, não o app. */
   useVoltar(true, onFechar);
+  /* A página de trás não anda enquanto esta folha está aberta — ver
+     `useTravarRolagemDeFundo`, que guarda e restaura o valor anterior. */
+  useTravarRolagemDeFundo(true);
   return (
     <div
       className="fixed inset-0 z-[80] flex items-end justify-center bg-black/35 backdrop-blur-sm sm:items-center"
