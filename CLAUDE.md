@@ -12881,3 +12881,57 @@ a leem — por isso ela é uma:
 o 7º a bolha) · `/preview-instagram` (a bolinha ⊞ em x=16) ·
 `/preview-conta` (o ☰ com as cinco linhas novas) · `/preview-mapa`
 (`?luto=1` · `?w=38` · `?abertas=saude,chutes`) · `/preview-home?w=20&dica=1`.
+
+## A noite de 3 para 4 de setembro: o chat, o SOS e os Sons na mesma família (set/2026)
+
+Pedido do dono antes de dormir: "quando eu acordar, que esse app esteja com
+uma cara sensacional" — varrer a identidade visual do app inteiro, refazer o
+chat ("o design dele não está interessante" e "quando eu clico para digitar,
+desce o texto, a tela se desloca"), e não mexer nos itens do Jogo além de
+conferir que entram certo.
+
+### O chat saiu de `minha-conta.tsx` e ganhou a cara do app
+
+- **O move veio ANTES do redesenho**, como sempre: `src/components/chat-tab.tsx`
+  nasceu com o corpo byte a byte igual (SHA-256 conferido) e um commit só de
+  move. Seis testes liam o chat pelo fonte de `minha-conta`; quatro conferem
+  os DOIS arquivos e passaram a ler os dois juntos. ⚠️ Um deles passava por
+  acidente — procurava `content: acc }` do primeiro
+  `streamAbertoRef.current = false;` até o fim do arquivo e achava no chat da
+  NUTRIÇÃO, que vinha depois. Décima terceira vez da armadilha de substring.
+- ⚠️ **O deslocamento ao digitar tinha DUAS causas somadas**: o chat era uma
+  caixa de 72vh DENTRO da página rolável (o iOS rola a página para trazer o
+  campo à vista), e o campo tinha **15px — abaixo de 16px o Safari do iPhone
+  dá ZOOM ao focar**. No celular o painel agora é `fixed` e mede o
+  `visualViewport` (com o teclado aberto ele encolhe junto; a lista rola por
+  dentro; o compositor pousa em cima do teclado; o `body` fica travado
+  enquanto o chat está montado). O campo tem 16px. No computador continua uma
+  caixa estática de 72vh.
+- **O desenho**: creme, Nunito, bolha da IA em `card-material`, bolha da
+  paciente no rosa primário, chips `pill-3d`, botões `btn-3d`, cabeçalho com a
+  Bolha e a seta de voltar (`onVoltar`, porque o painel cobre a barra da
+  página). O céu de madrugada com três auroras saiu: era bonito e dizia "isto
+  é outra coisa".
+
+### As duas famílias de emoji que sobravam viraram peças
+
+- **A Central de Emergência**: 🚑 e 🚒 eram os únicos emojis de uma tela em que
+  tudo o mais é desenhado. Viraram `src/assets/sos/{ambulancia,bombeiros}.webp`
+  na referência do dono. ⚠️ **A ambulância é azul-clara de propósito**: a
+  primeira saiu branca e o recorte a comeu — a lição da nuvem e do berço,
+  paga de novo.
+- **Os Sons para dormir**: 32 sons + 2 histórias, todos emoji numa tela escura.
+  `src/components/arte-dos-sons.tsx` é o mapa (`ARTE_DO_SOM`, chave do som ou
+  da história → arte) e `IconeDoSom` é o ícone: **a peça quando existe, o
+  emoji quando não** — som novo entra com emoji e ganha peça quando a arte for
+  feita, nunca com um buraco. Usado na folha de Sons, nos chips de som da
+  meditação e na tela da história. O pipeline vive em
+  `scratchpad/nav/sons/{chaves.txt,urls.txt,pipeline.sh}`: 68 cr, 34 peças,
+  PSNR 47–50, zero refeitas.
+
+### O que a varredura visual MEDIU e estava certo
+
+33 bancadas da paciente a 393px, lidas por script: **100% Nunito** (o único
+`ui-monospace` é código de indicação e link, de propósito), **zero texto de
+leitura abaixo de 13px** fora das legendas das bancadas e de dois glifos de
+emblema, nenhuma página rolando na horizontal, zero erros de console.

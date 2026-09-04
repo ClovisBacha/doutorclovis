@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { IconeDoSom } from "@/components/arte-dos-sons";
 import { emConteudo, emRepouso } from "@/lib/sessao-de-audio";
 import {
   criarTocador,
@@ -314,9 +315,7 @@ export function SonsParaDormir({
               onClick={() => abrirHistoria(h)}
               className="press flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.06] px-4 py-3 text-left"
             >
-              <span className="text-2xl leading-none" aria-hidden>
-                {h.emoji}
-              </span>
+              <IconeDoSom chave={h.chave} emoji={h.emoji} tamanho={40} />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-extrabold">{h.titulo}</span>
                 <span className="block text-xs leading-snug text-white/50">
@@ -357,7 +356,7 @@ export function SonsParaDormir({
                     }`}
                   >
                     <span className="flex items-center gap-2 text-2xl leading-none">
-                      <span aria-hidden>{ROTULO[k].emoji}</span>
+                      <IconeDoSom chave={k} emoji={ROTULO[k].emoji} tamanho={44} />
                       {ativo && (
                         <span className="flex items-end gap-[3px]" aria-hidden>
                           {[0, 1, 2].map((i) => (

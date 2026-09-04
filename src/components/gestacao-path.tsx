@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { IconeDoSom } from "@/components/arte-dos-sons";
 import { paraLike } from "@/lib/like-seguro";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
@@ -7079,7 +7080,7 @@ export function MeditationBlock({
                                 : "border border-violet-200 bg-white/70 text-violet-700"
                             }`}
                           >
-                            <span aria-hidden>{ROTULO[k]?.emoji}</span>
+                            <IconeDoSom chave={k} emoji={ROTULO[k]?.emoji ?? ""} tamanho={22} />
                             {ROTULO[k]?.label}
                             {amostrando === k && (
                               <span className="flex items-end gap-[2px]" aria-hidden>
