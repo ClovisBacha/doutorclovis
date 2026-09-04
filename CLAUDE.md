@@ -13072,14 +13072,14 @@ foi na PRODUÇÃO, e não no código: buscar o HTML de `/minha-conta` (que é o
 `start_url` do manifesto, ou seja, a tela em que o app instalado abre) e somar
 tudo que ele manda o navegador buscar.
 
-| o que o HTML pede                | quanto |
-| -------------------------------- | ------ |
-| arquivos (90 com prioridade alta) | **91** |
+| o que o HTML pede                 | quanto     |
+| --------------------------------- | ---------- |
+| arquivos (90 com prioridade alta) | **91**     |
 | total comprimido                  | **661 kB** |
-| pedaço de entrada                 | 215 kB |
-| `minha-conta`                     | 105 kB |
-| **`cantinho-tab`**                | **97 kB** |
-| folha de estilo                   | 44 kB |
+| pedaço de entrada                 | 215 kB     |
+| `minha-conta`                     | 105 kB     |
+| **`cantinho-tab`**                | **97 kB**  |
+| folha de estilo                   | 44 kB      |
 
 ⚠️ **O terceiro maior era a LOJA DE ENFEITES**, e ela estava ali por um
 `import` estático no topo de `minha-conta.tsx`. Ela pesa isso porque carrega a
@@ -13107,10 +13107,10 @@ descobre o que cai na entrada, e não olhando o componente suspeito.
 
 **Medido de novo na produção, depois do deploy:**
 
-|                    | antes  | depois |
-| ------------------ | ------ | ------ |
-| arquivos           | 91     | **87** |
-| total comprimido   | 661 kB | **559 kB** |
+|                  | antes  | depois     |
+| ---------------- | ------ | ---------- |
+| arquivos         | 91     | **87**     |
+| total comprimido | 661 kB | **559 kB** |
 
 **O que sobra, em ordem de tamanho:** o pedaço de entrada (215 kB, quase tudo
 biblioteca), o `minha-conta` (105 kB, o arquivo de vinte e um mil linhas) e o
@@ -13145,10 +13145,10 @@ muito maior que a média.
 sobre a outra ideia: _"acho que tem que ser em tempo real, aí não iria ficar
 bacana"_. Ele estava certo, e eu tinha oferecido a versão pior:
 
-| | guardar no telefone (RECUSADA) | guardar na borda (feita) |
-| --- | --- | --- |
-| abertura | instantânea | instantânea |
-| ao publicar correção | chega na abertura SEGUINTE | **chega na hora** |
+|                      | guardar no telefone (RECUSADA) | guardar na borda (feita) |
+| -------------------- | ------------------------------ | ------------------------ |
+| abertura             | instantânea                    | instantânea              |
+| ao publicar correção | chega na abertura SEGUINTE     | **chega na hora**        |
 
 O cache da borda é **por publicação**: cada deploy começa com ele vazio, então
 o que a paciente recebe é sempre o último commit.
@@ -13165,11 +13165,11 @@ preset do Lovable declara só `preset`/`output`/`cloudflare`, e sem o cast o
 **Medido na produção depois do deploy**, comparando a página com um arquivo
 estático para anular o ruído do proxy do contêiner:
 
-|                          | antes | depois |
-| ------------------------ | ----- | ------ |
-| página, mediana          | 0,24 s | **0,19 s** |
-| arquivo estático, mediana | 0,20 s | 0,19 s |
-| `x-vercel-cache`         | (função) | **HIT em 8 de 8** |
+|                           | antes    | depois            |
+| ------------------------- | -------- | ----------------- |
+| página, mediana           | 0,24 s   | **0,19 s**        |
+| arquivo estático, mediana | 0,20 s   | 0,19 s            |
+| `x-vercel-cache`          | (função) | **HIT em 8 de 8** |
 
 ⚠️ **O número daqui subestima o ganho, e vale dizer por quê.** Este contêiner
 fica perto de Washington, então a função nunca esteve longe dele e estava
@@ -13215,6 +13215,40 @@ segundo campo é onde a função EXECUTOU:
 quem abre de fora do país é um pouco pior; o público é brasileiro, então é o
 negócio certo — e está escrito aqui para ser uma decisão, e não uma
 consequência que ninguém notou.
+
+#### Como CONFERIR que nada mais executa fora do Brasil
+
+Pedido do dono depois da mudança ("verifique isso com cuidado para não ter esse
+erro"). O método que vale é o cabeçalho **`x-vercel-id`**, e ele se lê assim:
+
+    iad1::gru1::hash   → entrou por iad1, EXECUTOU em gru1
+    iad1::hash         → arquivo estático, não executou nada
+
+O segundo campo é a região de COMPUTAÇÃO. O primeiro é só a borda por onde o
+pedido entrou, e varia com quem pede — daqui é sempre `iad1` porque o contêiner
+fica perto de Washington; de um telefone no Brasil seria `gru1`. **Não confunda
+os dois: o primeiro campo dizer `iad1` não quer dizer que algo roda lá.**
+
+Conferido em produção, um caminho de cada tipo:
+
+| caminho                 | x-vercel-id    | o que é               |
+| ----------------------- | -------------- | --------------------- |
+| `/`                     | iad1::**gru1** | site renderizado      |
+| `/minha-conta`          | iad1::**gru1** | casca do app          |
+| `/gestacao`             | iad1::**gru1** | página do site        |
+| `/api/push-weekly-tick` | iad1::**gru1** | cron                  |
+| `/_serverFn/…`          | iad1::**gru1** | **os dados do app**   |
+| `/assets/*.js`          | iad1::         | estático, não executa |
+
+⚠️ **E UMA ARMADILHA DE MÉTODO QUE QUASE ME FEZ CONCLUIR O CONTRÁRIO.** O build
+gera DOIS nomes de função (`__server.func` e `minha-conta-isr.func`), e um
+`find .vercel/output/functions -name ".vc-config.json"` lista **só um** — o que
+parece um segundo função sem região declarada, caindo no padrão de Washington.
+
+É falso: `minha-conta-isr.func` é um **link simbólico** para `./__server.func`
+(mesmo inode, conferido com `stat -L`), e `find` não segue links sem `-L`. Há
+uma função só, e ela declara `gru1`. **Use `find -L`, ou confira o inode — a
+ausência num `find` não é prova de ausência.**
 
 ⚠️ **A ordem em que isto foi descoberto é a lição.** Eu passei duas levas
 cortando bytes (round trips, pacote, casca na borda) antes de perguntar onde o
