@@ -10,6 +10,7 @@ import { useState, useEffect, useSyncExternalStore, type ComponentType } from "r
 import { Baby, ChevronRight, Gamepad2, Heart, LifeBuoy, Menu } from "lucide-react";
 import { IconeAmigas } from "@/components/icones-jogo";
 import portrait from "@/assets/dr-clovis-portrait.jpg";
+import icMedico from "@/assets/avisos/medico.webp";
 import { DOCTOR } from "@/lib/doctor.config";
 import { BabyIllustration } from "@/components/baby-illustration";
 import { SkyRain, forcaDaChuva } from "@/components/sky-rain";
@@ -2154,7 +2155,12 @@ export function AppHomeScreen({
             />
           ) : (
             <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary/12 font-serif text-2xl text-primary ring-1 ring-primary/20">
-              {semMedico ? "🔍" : medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
+              {semMedico ? (
+                /* A peça do médico (a mesma do aviso de convite), no lugar da 🔍. */
+                <img src={icMedico} alt="" aria-hidden className="h-11 w-11 object-contain" />
+              ) : (
+                medNome.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"
+              )}
             </span>
           )}
           <div className="min-w-0 flex-1">

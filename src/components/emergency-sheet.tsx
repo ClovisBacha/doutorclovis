@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
    propósito — a primeira saiu branca e o recorte de fundo a comeu (branco
    sobre branco), a lição que o CLAUDE.md já registra para a nuvem e o berço. */
 import icAmbulancia from "@/assets/sos/ambulancia.webp";
+import icCoracao from "@/assets/saude/saude.webp";
 import icBombeiros from "@/assets/sos/bombeiros.webp";
 import { toast } from "sonner";
 import { destravarSomDeUI, tocarSomDeUI } from "@/lib/tocar-som-de-ui";
@@ -934,9 +935,9 @@ export function EmergencySheet({
           href="tel:188"
           className="press mt-3 flex items-center gap-3 rounded-2xl bg-card px-3.5 py-3 ring-1 ring-black/5"
         >
-          <span className="text-2xl leading-none" aria-hidden>
-            ❤️
-          </span>
+          {/* O coração da família do app (o mesmo da Saúde), no lugar do ❤️ —
+              era o único emoji que sobrava numa tela em que tudo é desenhado. */}
+          <img src={icCoracao} alt="" aria-hidden className="h-9 w-9 shrink-0 object-contain" />
           <span className="min-w-0 flex-1">
             <span className="block text-[13px] leading-snug text-foreground">
               <strong className="font-bold">CVV:</strong> apoio emocional gratuito, 24h, sigiloso.
