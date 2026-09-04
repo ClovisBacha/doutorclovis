@@ -3,6 +3,7 @@ import { subtabPermitida, subtabsDoBebe } from "@/lib/subtabs-do-bebe";
 import { nivelDaEpds, respostaDaQuestao10 } from "@/lib/epds";
 import { codificarFoto } from "@/lib/codificar-imagem";
 import {
+  Fragment,
   Suspense,
   lazy,
   useCallback,
@@ -65,6 +66,7 @@ import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { PesquisaNps } from "@/components/pesquisa-nps";
 import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
+import { PrimeiroQuadro } from "@/components/primeiro-quadro";
 import { EmergencySheet } from "@/components/emergency-sheet";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { CicloMenstrualTab } from "@/components/ciclo-menstrual-tab";
@@ -1052,6 +1054,27 @@ function MinhaContaPage() {
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDoctor, setIsDoctor] = useState(false);
+  /**
+   * ⚠️ "PODE SER MÉDICO" — e ele NÃO é uma segunda régua de papel.
+   *
+   * Quem decide quem é médico continua inteiro onde sempre esteve (a marca do
+   * Auth + `checkIsAdmin` + `getMyDoctor`, no efeito de carga). Este sinal é o
+   * MESMO campo, lido um `await` antes, e governa UMA coisa: se o cromo do app
+   * (a barra da paciente) é DESENHADO durante a espera. Ele nunca decide quem
+   * recebe qual app.
+   *
+   * Existe porque o caminho do médico é o MAIS LONGO do boot, por desenho:
+   * `liberarCedo = ancora && !marcaDeMedico` é falso para ele, então
+   * `setLoading(false)` só acontece no `finally`, depois de duas funções
+   * serverless. Sem este sinal, ele veria a barra de cinco itens da gestante em
+   * TODA abertura do app instalado — e `start_url` do manifesto é
+   * `/minha-conta`, então é toda vez.
+   *
+   * ⚠️ Nasce `false` de propósito: a paciente é a maioria, e errar aqui para o
+   * lado dela é o certo — o pior caso dele é uma barra que não aparece; o pior
+   * caso dela é o socorro que não aparece.
+   */
+  const [podeSerMedico, setPodeSerMedico] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [milestoneWeek, setMilestoneWeek] = useState<number | null>(null);
@@ -1837,6 +1860,10 @@ function MinhaContaPage() {
          Quem NÃO tem âncora espera como sempre — é o caso do médico sem marca,
          e é para ele que a espera existia. */
       const marcaDeMedico = (u.user.user_metadata as { role?: string } | null)?.role === "doctor";
+      /* O cromo da paciente não é desenhado na espera dele — ver
+         `podeSerMedico`. Aqui é só o carimbo; a decisão de papel continua
+         abaixo, inteira. */
+      if (marcaDeMedico) setPodeSerMedico(true);
       const ancora = !!(data?.lmp_date || data?.due_date || data?.reference_date);
       const liberarCedo = ancora && !marcaDeMedico;
       if (liberarCedo) setLoading(false);
@@ -2021,44 +2048,12 @@ function MinhaContaPage() {
      paciente dentro do app sem saída pelo gesto do sistema. */
   useVoltarDeFundo(!mobileHome, voltarDaBarra);
 
-  /* ⚠️ Ele fica AQUI, longe da `voltarDaBarra` que chama, e não é gosto: há um
-     `if (loading) return` logo abaixo, e um hook depois de um retorno
-     antecipado quebra a regra dos hooks (o lint pegou). A referência funciona
-     porque `voltarDaBarra` é uma DECLARAÇÃO de função, içada — e porque
-     `useVoltarDeFundo` a guarda numa ref, chamando-a só quando o voltar
-     acontece. */
-  if (loading)
-    return (
-      <>
-        {/* ESQUELETO NO FORMATO DA HOME DO CELULAR.
-            O anterior era uma grade de oito quadradinhos com 5 colunas — o
-            desenho da versão de computador. No celular a tela trocava de
-            SILHUETA ao carregar: primeiro uma grade cinza, depois um céu de
-            borda a borda com o bebê no meio. Era metade do "pisca" que ela
-            relatava; a outra metade era a rolagem.
-            Agora o vulto é o mesmo: bloco alto sangrando nas laterais (o céu),
-            cartão da semana em degrau e a fileira de medidas. O conteúdo
-            aparece DENTRO do lugar onde já estava, em vez de empurrar tudo. */}
-        <div className="md:hidden">
-          <div className="skeleton -mx-5 -mt-2 h-[62vh] rounded-none" />
-          <div className="mx-auto -mt-10 w-[86%] space-y-2">
-            <div className="skeleton mx-auto h-16 w-32 rounded-t-3xl" />
-            <div className="skeleton h-28 rounded-[26px]" />
-          </div>
-        </div>
-        <div className="mx-auto hidden max-w-5xl px-5 py-8 space-y-4 md:block">
-          <div className="skeleton h-52 rounded-3xl" />
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton h-[72px] rounded-2xl" />
-            ))}
-          </div>
-          <div className="skeleton h-16 rounded-3xl" />
-          <div className="skeleton h-24 rounded-3xl" />
-        </div>
-      </>
-    );
-
+  /* ⚠️ `gest` e `activeSection` SOBEM PARA CÁ porque o cromo do app (a barra de
+     baixo e a Central de Emergência) passou a existir desde o primeiro quadro,
+     e ele precisa das duas — ver `cromoDoApp` logo abaixo. As duas são
+     à prova de nulo (`profile` ainda não chegou) e não dependem de nada que
+     nasça depois; mover custa a leitura de estar longe de quem as usa, e o que
+     se ganha é o botão de socorro existir enquanto o app carrega. */
   /* ─── EM MODO CUIDADO, A IDADE GESTACIONAL DEIXA DE EXISTIR NA TELA ──────
    *
    * Eu tinha consertado isto tapando buraco: escondi a semana na saudação do
@@ -2094,12 +2089,198 @@ function MinhaContaPage() {
         })
       : null;
 
+  const activeSection: BottomSection | null = mobileHome ? "home" : tabToSection(tab as AppTab);
+
+  /* ═══ O CROMO DO APP — E ELE EXISTE DESDE O PRIMEIRO QUADRO ═══════════
+     Pedido do dono: "faça a barra de baixo aparecer desde o primeiro quadro".
+
+     ⚠️ O QUE ISSO CONSERTA É O SOCORRO, não a estética. A barra e a Central de
+     Emergência ficavam DEPOIS do `if (loading) return` — então, enquanto o app
+     carregava, **o botão de socorro não existia na tela**. A paciente que abre
+     o app justamente porque está passando mal encontrava um esqueleto cinza e
+     nenhuma saída.
+
+     ⚠️ E ele FUNCIONA com o perfil ainda nulo, o que é o que torna isto útil e
+     não decorativo: `dispararEmergencia` recebe só o token da SESSÃO e as
+     coordenadas — o servidor resolve médico, contato e ficha. O botão não fica
+     bonito esperando dado; ele socorre.
+
+     ⚠️ **UMA FONTE SÓ**, e é por isso que ele é uma `const` em vez de JSX
+     repetido nos dois caminhos. Duas cópias divergiriam no primeiro conserto, e
+     a que divergisse seria a do CARREGAMENTO — a menos olhada, e a que existe
+     exatamente para o pior momento.
+
+     ⚠️ `{emergencyOpen && (` continua literal aqui porque
+     `socorro-nao-e-gateado.test.ts` cobra essa forma: a folha já foi gateada
+     por `careMode` uma vez, e o botão passou a não fazer nada para quem está
+     de luto. */
+  /* ⚠️ A CHAVE NÃO É ENFEITE — ela é o que impede o SOS de se reiniciar no
+     meio de um envio.
+
+     O ramo de carregamento e o corpo normal são dois `return` diferentes, e o
+     cromo aparece em POSIÇÕES diferentes nos dois. O React casa filhos de um
+     fragmento por posição — e, sem chave, a virada de `loading` DESMONTARIA a
+     Central de Emergência e montaria outra. Ela guarda `panic`, a posição e os
+     canais em estado INTERNO: um SOS já em "Localizando e avisando…" voltaria
+     a "Pedir socorro agora", e o `setPanic("sent")` da promessa em voo cairia
+     num componente que já saiu. A paciente apertaria de novo achando que não
+     tinha ido.
+
+     Com a chave, o React o encontra pelo nome em vez da posição e ATUALIZA a
+     mesma instância. Por isso ela precisa ser a mesma string nos dois lugares —
+     e por isso `cromoDoApp` é um `<Fragment key=…>`, e não o `<>` curto, que
+     não aceita chave. */
+  const cromoDoApp = (
+    <Fragment key="cromo-do-app">
+      {/**
+       * ── Central de emergência (aberta pelo SOS da barra) ──────
+       *
+       * ⚠️ **NÃO HÁ PORTÃO DE MODO CUIDADO AQUI, E ISSO É A REGRA.**
+       *
+       * Esta condição era `emergencyOpen && !careMode`: a paciente em luto
+       * tocava no SOS da barra — que continua ACESO —, `emergencyOpen` virava
+       * `true`, e a folha simplesmente não montava. O botão de emergência do
+       * app não fazia nada, exatamente para quem mais precisa dele.
+       *
+       * Quem acabou de perder uma gestação está em risco clínico ALTO
+       * (hemorragia, infecção, pré-eclâmpsia de pós-parto) e em risco
+       * psiquiátrico. O Modo Cuidado existe para o app parar de falar do bebê
+       * — nunca para parar de socorrer.
+       *
+       * E a decisão já estava escrita DENTRO da própria folha, no comentário do
+       * som do alarme: "`podeSoar` deixa passar mesmo com o som desligado e
+       * mesmo em Modo Cuidado — quem perdeu a gestação continua podendo passar
+       * mal". O componente sabia; a tela que o monta fazia o contrário.
+       *
+       * O que o luto muda é o CONTEÚDO, não a porta: `weekLabel` chega `null`
+       * quando não há gestação em curso, e a folha já não desenha a linha da
+       * semana nesse caso. Gatear a folha inteira para não mostrar uma linha é
+       * apagar o socorro para esconder um rótulo.
+       */}
+      {emergencyOpen && (
+        <EmergencySheet
+          /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
+           sem caminho nenhum no celular — as fileiras de categorias que a
+           listam são `hidden md:flex`. Esta é a porta dela agora, e é a
+           porta certa: quem lê a lista vermelha e fica em dúvida está a um
+           toque de responder. */
+          onTriagem={() => {
+            setEmergencyOpen(false);
+            goToTab("Alertas");
+          }}
+          /* ⚠️ A FICHA QUE O SOCORRISTA LÊ, E O ÚNICO PORTÃO DE MODO CUIDADO
+           DELA — que vive AQUI, e não dentro da folha.
+  
+           Em Modo Cuidado a ficha dizia "FICHA DE EMERGÊNCIA - GESTANTE",
+           com o NOME DO BEBÊ e a DPP. Ela abre o SOS — a tela que ela abre
+           quando alguma coisa está errada — e lê o nome do bebê que ela
+           perdeu e uma data de parto que não vai acontecer.
+  
+           ⚠️ **O que NÃO se faz aqui é apagar a ficha.** Quem perdeu uma
+           gestação continua sendo paciente obstétrica: hemorragia,
+           infecção, pré-eclâmpsia de pós-parto e trombose são justamente os
+           riscos dela, e o socorrista precisa saber disso. Tipo sanguíneo,
+           alergias, medicações, contato e médico ficam INTEIROS.
+  
+           O que sai é o que é falso: um bebê que não vai nascer e uma DPP
+           que não existe — que não são só dolorosos, são informação ERRADA
+           para quem vai atendê-la. E "GESTANTE" vira "PACIENTE OBSTÉTRICA",
+           que continua sinalizando obstetrícia na triagem sem afirmar uma
+           gestação em curso.
+  
+           ⚠️ A idade gestacional sai junto, e esta é a única linha em que se
+           troca informação por exatidão: "28s 3d" afirma uma gestação de
+           hoje. Se o dono quiser a semana de volta, ela precisa vir com
+           outro rótulo — é decisão clínica dele, não minha. */
+          /* ⚠️ FALHA FECHADO: sem perfil, "não sei se ela está em luto" tem de
+             valer o rótulo NEUTRO. `careMode` é derivado do perfil, então
+             durante o carregamento ele é `false` e o `??` da folha caía em
+             "FICHA DE EMERGÊNCIA - GESTANTE" — exatamente a frase que o Modo
+             Cuidado existe para apagar, em CAIXA ALTA, no topo da ficha, para
+             quem acabou de perder a gestação. Os outros campos do luto (bebê,
+             DPP, semana) chegam nulos por acidente — porque o perfil não
+             carregou —, não pela régua; o rótulo era o único que ficava errado.
+             "PACIENTE OBSTÉTRICA" é verdadeiro nos DOIS casos: continua
+             sinalizando obstetrícia para a triagem sem afirmar uma gestação em
+             curso. O custo para a gestante comum é um rótulo menos específico
+             por uma fração de segundo. */
+          tituloDaFicha={
+            !profile || careMode ? "FICHA DE EMERGÊNCIA - PACIENTE OBSTÉTRICA" : undefined
+          }
+          info={{
+            name: profile?.display_name?.split(" ")[0] ?? null,
+            weekLabel: careMode || !gest ? null : `${gest.weeks}s ${gest.days}d`,
+            bloodType: profile?.blood_type ?? null,
+            allergies: profile?.allergies ?? null,
+            emergencyContact: profile?.emergency_contact ?? null,
+            emergencyPhone: profile?.emergency_phone ?? null,
+            babyName: careMode ? null : (profile?.baby_name ?? null),
+            dpp: careMode
+              ? null
+              : (() => {
+                  const due =
+                    profile?.due_date ??
+                    (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
+                  return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
+                })(),
+            medications: profile?.medications ?? null,
+          }}
+          medico={meuMedico}
+          medicoResolvido={medicoResolvido}
+          /* ⚠️ `!!profile` e não `!loading`: o que a ficha precisa é o PERFIL,
+             e ele é a única coisa que a torna verdadeira. Amarrá-la a `loading`
+             faria a ficha se dizer resolvida no instante em que o app libera a
+             tela — que pode ser antes de o perfil chegar. */
+          fichaResolvida={!!profile}
+          onClose={() => setEmergencyOpen(false)}
+          onOpenCard={() => {
+            setEmergencyOpen(false);
+            goToTab("Carteirinha");
+          }}
+        />
+      )}
+
+      {/* ── App bottom nav (mobile only) ─────────────────────── */}
+      <AppBottomNav
+        activeSection={activeSection}
+        onSelect={handleBottomNav}
+        /* O SOS NÃO é gated por Modo Cuidado — e isto é uma correção, não um
+         esquecimento. O Modo Cuidado existe para calar gamificação,
+         comemoração e cobrança; esconder o botão de emergência era o
+         contrário de cuidado, ainda mais porque quem está em Modo Cuidado
+         costuma estar num momento em que precisa MAIS dele. Era, também, a
+         única porta de entrada do SOS no app inteiro. */
+        onEmergency={() => setEmergencyOpen(true)}
+        escura={barraEscura}
+        destaque={destaqueDaBarra}
+      />
+    </Fragment>
+  );
+
+  /* ⚠️ Ele fica AQUI, longe da `voltarDaBarra` que chama, e não é gosto: há um
+     `if (loading) return` logo abaixo, e um hook depois de um retorno
+     antecipado quebra a regra dos hooks (o lint pegou). A referência funciona
+     porque `voltarDaBarra` é uma DECLARAÇÃO de função, içada — e porque
+     `useVoltarDeFundo` a guarda numa ref, chamando-a só quando o voltar
+     acontece. */
+  if (loading)
+    return (
+      <>
+        {/* ⚠️ O CROMO É IRMÃO, e não filho do quadro: ele precisa ser um filho
+            DIRETO do fragmento nos dois retornos para a chave o encontrar. */}
+        <PrimeiroQuadro ceu={mobileHome ? ceuAgora.nome : null} />
+        {/* ⚠️ E não para quem tem marca de médico: o app dele é o painel, e o
+            caminho dele é o mais longo do boot — sem esta guarda ele veria a
+            barra da gestante em toda abertura. Ver `podeSerMedico`. */}
+        {!podeSerMedico && cromoDoApp}
+      </>
+    );
+
   const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
 
   // Mobile navigation helpers
   // `null` = tela filha do hub (Calendário, Registros, Médico…): nenhuma pílula
   // acesa, em vez de acender "Bebê" fora do Bebê.
-  const activeSection: BottomSection | null = mobileHome ? "home" : tabToSection(tab as AppTab);
 
   function mobileNavigate(t: AppTab, sub?: string) {
     setTab(t as Tab);
@@ -2337,109 +2518,7 @@ function MinhaContaPage() {
         />
       )}
 
-      {/**
-       * ── Central de emergência (aberta pelo SOS da barra) ──────
-       *
-       * ⚠️ **NÃO HÁ PORTÃO DE MODO CUIDADO AQUI, E ISSO É A REGRA.**
-       *
-       * Esta condição era `emergencyOpen && !careMode`: a paciente em luto
-       * tocava no SOS da barra — que continua ACESO —, `emergencyOpen` virava
-       * `true`, e a folha simplesmente não montava. O botão de emergência do
-       * app não fazia nada, exatamente para quem mais precisa dele.
-       *
-       * Quem acabou de perder uma gestação está em risco clínico ALTO
-       * (hemorragia, infecção, pré-eclâmpsia de pós-parto) e em risco
-       * psiquiátrico. O Modo Cuidado existe para o app parar de falar do bebê
-       * — nunca para parar de socorrer.
-       *
-       * E a decisão já estava escrita DENTRO da própria folha, no comentário do
-       * som do alarme: "`podeSoar` deixa passar mesmo com o som desligado e
-       * mesmo em Modo Cuidado — quem perdeu a gestação continua podendo passar
-       * mal". O componente sabia; a tela que o monta fazia o contrário.
-       *
-       * O que o luto muda é o CONTEÚDO, não a porta: `weekLabel` chega `null`
-       * quando não há gestação em curso, e a folha já não desenha a linha da
-       * semana nesse caso. Gatear a folha inteira para não mostrar uma linha é
-       * apagar o socorro para esconder um rótulo.
-       */}
-      {emergencyOpen && (
-        <EmergencySheet
-          /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
-             sem caminho nenhum no celular — as fileiras de categorias que a
-             listam são `hidden md:flex`. Esta é a porta dela agora, e é a
-             porta certa: quem lê a lista vermelha e fica em dúvida está a um
-             toque de responder. */
-          onTriagem={() => {
-            setEmergencyOpen(false);
-            goToTab("Alertas");
-          }}
-          /* ⚠️ A FICHA QUE O SOCORRISTA LÊ, E O ÚNICO PORTÃO DE MODO CUIDADO
-             DELA — que vive AQUI, e não dentro da folha.
-
-             Em Modo Cuidado a ficha dizia "FICHA DE EMERGÊNCIA - GESTANTE",
-             com o NOME DO BEBÊ e a DPP. Ela abre o SOS — a tela que ela abre
-             quando alguma coisa está errada — e lê o nome do bebê que ela
-             perdeu e uma data de parto que não vai acontecer.
-
-             ⚠️ **O que NÃO se faz aqui é apagar a ficha.** Quem perdeu uma
-             gestação continua sendo paciente obstétrica: hemorragia,
-             infecção, pré-eclâmpsia de pós-parto e trombose são justamente os
-             riscos dela, e o socorrista precisa saber disso. Tipo sanguíneo,
-             alergias, medicações, contato e médico ficam INTEIROS.
-
-             O que sai é o que é falso: um bebê que não vai nascer e uma DPP
-             que não existe — que não são só dolorosos, são informação ERRADA
-             para quem vai atendê-la. E "GESTANTE" vira "PACIENTE OBSTÉTRICA",
-             que continua sinalizando obstetrícia na triagem sem afirmar uma
-             gestação em curso.
-
-             ⚠️ A idade gestacional sai junto, e esta é a única linha em que se
-             troca informação por exatidão: "28s 3d" afirma uma gestação de
-             hoje. Se o dono quiser a semana de volta, ela precisa vir com
-             outro rótulo — é decisão clínica dele, não minha. */
-          tituloDaFicha={careMode ? "FICHA DE EMERGÊNCIA - PACIENTE OBSTÉTRICA" : undefined}
-          info={{
-            name: profile?.display_name?.split(" ")[0] ?? null,
-            weekLabel: careMode || !gest ? null : `${gest.weeks}s ${gest.days}d`,
-            bloodType: profile?.blood_type ?? null,
-            allergies: profile?.allergies ?? null,
-            emergencyContact: profile?.emergency_contact ?? null,
-            emergencyPhone: profile?.emergency_phone ?? null,
-            babyName: careMode ? null : (profile?.baby_name ?? null),
-            dpp: careMode
-              ? null
-              : (() => {
-                  const due =
-                    profile?.due_date ??
-                    (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-                  return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
-                })(),
-            medications: profile?.medications ?? null,
-          }}
-          medico={meuMedico}
-          medicoResolvido={medicoResolvido}
-          onClose={() => setEmergencyOpen(false)}
-          onOpenCard={() => {
-            setEmergencyOpen(false);
-            goToTab("Carteirinha");
-          }}
-        />
-      )}
-
-      {/* ── App bottom nav (mobile only) ─────────────────────── */}
-      <AppBottomNav
-        activeSection={activeSection}
-        onSelect={handleBottomNav}
-        /* O SOS NÃO é gated por Modo Cuidado — e isto é uma correção, não um
-           esquecimento. O Modo Cuidado existe para calar gamificação,
-           comemoração e cobrança; esconder o botão de emergência era o
-           contrário de cuidado, ainda mais porque quem está em Modo Cuidado
-           costuma estar num momento em que precisa MAIS dele. Era, também, a
-           única porta de entrada do SOS no app inteiro. */
-        onEmergency={() => setEmergencyOpen(true)}
-        escura={barraEscura}
-        destaque={destaqueDaBarra}
-      />
+      {cromoDoApp}
 
       {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
       {journeyOpen && gest && (

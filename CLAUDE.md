@@ -13564,3 +13564,131 @@ como falho pelo navegador. **Um botão que comprovadamente não fazia nada.**
 ENQUANTO eu trabalhava nela, então um dos achados voltou como "CORREÇÃO DA
 PREMISSA: já está resolvido". Auditoria em repositório vivo precisa disso
 escrito — o achado não estava errado, ele estava atrasado.
+
+## ⚠️ O BOTÃO DE SOCORRO NÃO EXISTIA ENQUANTO O APP CARREGAVA (set/2026)
+
+Pedido do dono: _"faça a barra de baixo aparecer desde o primeiro quadro"_.
+
+A barra e a Central de Emergência ficavam DEPOIS do `if (loading) return` de
+`minha-conta.tsx`. Enquanto o app carregava, **o botão de socorro não existia
+na tela**: a paciente que abre o app justamente porque está passando mal
+encontrava um esqueleto cinza e nenhuma saída — e quem abre com pressa e não
+acha o SOS conclui que o app é assim.
+
+⚠️ **E a intenção original estava DOCUMENTADA na mesma tela.** O comentário de
+`medicoResolvido` afirma, por escrito, que _"o SOS está clicável desde o
+primeiro pixel"_. O retorno antecipado tinha quebrado esse desenho em silêncio.
+Comentário desatualizado é a forma mais barata de um defeito sobreviver a uma
+revisão — aqui ele foi a prova de que havia um.
+
+**O que torna isto útil e não decorativo:** `dispararEmergencia` recebe só o
+token da SESSÃO e as coordenadas, e o servidor resolve médico, contato e ficha.
+**O socorro funciona inteiro com o perfil ainda nulo.**
+
+### ⚠️ E A FORMA INGÊNUA REINICIARIA O SOS NO MEIO DE UM ENVIO
+
+O defeito mais caro desta rodada, e ele nasceu da minha primeira
+implementação: devolver `<PrimeiroQuadro/>` como raiz do ramo de carregamento,
+contra `<>` no corpo normal. **Raízes de tipos diferentes fazem o React
+desmontar a subárvore inteira** na virada de `loading`.
+
+A folha de emergência guarda `panic`, a posição e os canais em estado INTERNO.
+Um SOS já em "Localizando e avisando…" voltaria a "Pedir socorro agora", e o
+`setPanic("sent")` da promessa em voo cairia num componente que já saiu — **a
+paciente apertaria de novo achando que não tinha ido**, no minuto em que ela
+menos pode. E o caso não é raro: é exatamente a janela que este trabalho
+existe para servir.
+
+**O conserto é uma CHAVE, e não reestruturar setecentas linhas.** O React casa
+filhos por chave dentro do mesmo pai, mesmo mudando de posição — então
+`cromoDoApp` é um `<Fragment key="cromo-do-app">` (o `<>` curto não aceita
+chave) e é filho DIRETO do fragmento nos dois retornos.
+
+⚠️ **Por isso o cromo é IRMÃO do `PrimeiroQuadro`, e não filho.** Passá-lo por
+prop o poria um nível abaixo em um dos caminhos, fora do alcance da chave, e o
+defeito voltaria em silêncio. Há teste que EXERCITA a regra do React (com
+contraprova de que sem a chave a posição muda), e não só lê o fonte.
+
+### O que a mudança destapou, e que precisou ir junto
+
+- ⚠️ **A ficha afirmava "Alergias: nenhuma informada" e "Medicamentos:
+  nenhum" — para um SOCORRISTA.** Com o perfil nulo, "nada relatado" e
+  "desconhecido" viravam a mesma coisa, e a diferença entre os dois é uma
+  prescrição. É a régua que o modo consulta já aplica com `ficha.degradada`.
+  `fichaResolvida` (padrão `true`, no molde de `medicoResolvido`) faz os campos
+  dizerem "carregando…" e **suprime o QR**: um código gerado ali levaria uma
+  ficha vazia para o telefone de quem for atendê-la.
+- ⚠️ **E acusava a paciente**: "Complete tipo sanguíneo e contato de emergência
+  no seu Perfil", sobre um perfil preenchido há meses, numa emergência.
+- ⚠️ **O rótulo da ficha voltava a dizer "GESTANTE" no luto.** `careMode` é
+  derivado do perfil, então durante o carregamento ele é `false` e o `??` da
+  folha caía no padrão — exatamente a frase que o Modo Cuidado existe para
+  apagar, em CAIXA ALTA, no topo da ficha. Falha FECHADO:
+  `!profile || careMode` → "PACIENTE OBSTÉTRICA", que é verdadeiro nos dois
+  casos. **Não se generaliza para os outros campos**: `weekLabel`, `babyName`
+  e `dpp` já resolvem para `null` por ausência de perfil; o título era o único
+  do bloco com valor PADRÃO.
+- ⚠️ **O médico veria a barra da gestante em TODA abertura.** O caminho dele é
+  o mais longo do boot, por desenho (`liberarCedo` é falso para ele, então
+  `setLoading(false)` só acontece no `finally`, depois de duas funções
+  serverless) — e `start_url` do manifesto é `/minha-conta`. `podeSerMedico`
+  carimba a MESMA marca do Auth um `await` antes e governa UMA coisa: se o
+  cromo é DESENHADO na espera. **Não é uma segunda régua de papel**, e nasce
+  `false` de propósito: o pior caso dele é uma barra que não aparece; o dela é
+  o socorro que não aparece.
+- ⚠️ **O céu só quando o destino É a home.** Quem abre por deep link
+  (`?tab=Caminho`, `?tab=Feed` — os pushes usam isso) não vai para a home:
+  pintar a home durante a espera mostraria uma tela que não é a dela, e o app
+  trocaria de ASSUNTO ao carregar. O vulto cinza é neutro nos dois casos; a
+  arte não é.
+- **E o Céu Clássico (item PAGO) não virou decisão nova**: `useSkyNow` já
+  resolve esta exata espera, e o comentário dele diz por quê — antes de montar
+  vale o céu do DIA, "o mais neutro para essa espera de um quadro".
+
+### ⚠️ E A SUBIDA DE `gest` CONSERTOU UMA TDZ QUE JÁ EXISTIA
+
+Achado por uma das lentes e conferido à mão. O efeito da dica da bolha lê
+`gest?.weeks` dentro de um `.then()`, e `gest` era declarada DEPOIS do
+`if (loading) return`. Numa paciente com perfil e **sem âncora gestacional**,
+`setProfile` comita com `loading` ainda `true`: aquele render sai cedo, `gest`
+nunca é inicializada naquele escopo, e o fecho do efeito estoura em TDZ. **A
+dica nunca aparecia, em silêncio** — o `void` engole a rejeição.
+
+⚠️ Nem o `tsc` nem o lint pegam: o símbolo EXISTE. A regra geral que fica é
+esta — **nenhum símbolo declarado depois de um retorno antecipado pode ser
+lido dentro do corpo de um efeito declarado antes dele.**
+
+### A bancada que faltava
+
+`PrimeiroQuadro` mora em `src/components/` **porque o primeiro quadro precisava
+ser FOTOGRAFÁVEL**. Enterrado na rota, ele só aparece com sessão de verdade,
+por uma fração de segundo, no meio de duas idas à rede — ou seja, ninguém nunca
+tinha olhado para ele. Foi assim que a barra sumiu dali sem relato nenhum.
+
+**Bancada:** `/preview-abertura` (o caso normal) · `?ceu=anoitecer` (a barra
+escura) · `?ceu=nenhum` (o deep link) · `?medico=1` (sem a barra da gestante) ·
+`?sos=1` (a folha aberta ANTES de o perfil chegar). Os quatro estados entraram
+na varredura da CI — a varredura de disco abre só o padrão.
+
+**Medido:** SOS presente com alvo de 69×44, barra em y=784 num viewport de 852,
+zero erros de console nos cinco estados; e na folha aberta durante o
+carregamento, nenhuma acusação, nenhum "nenhuma informada", nenhum "GESTANTE",
+com o 192 e o 193 na tela.
+
+### ⚠️ Uma lição de método: auditar a árvore VIVA
+
+As cinco lentes leram o arquivo ENQUANTO eu o editava, e a síntese voltou
+dizendo "a premissa do enunciado está vencida: a mudança já está aplicada".
+Três achados dela eram sobre um estado que já não existia. **Isso não invalida
+o método — foi uma lente que achou a remontagem, que era o defeito mais caro
+da rodada** —, mas confirma o que o CLAUDE.md já registra: revisão adversarial
+em repositório vivo pede `isolation: "worktree"`, ou paciência para não editar
+enquanto se lê.
+
+⚠️ **E um conserto meu SUMIU no meio do caminho, sem que eu conseguisse
+reconstruir como.** O `tituloDaFicha` falha-fechado foi aplicado (o `assert` do
+script passou), e minutos depois o arquivo tinha a forma original de volta — o
+`git diff` mostrava a linha apenas MUDANDO DE LUGAR. Reapliquei, e a catraca
+nova é o que impede que ele suma de novo em silêncio. **Quando um conserto
+desaparece sem explicação, a resposta não é reaplicar e seguir: é reaplicar e
+travar.**

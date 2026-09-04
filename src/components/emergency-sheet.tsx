@@ -43,6 +43,7 @@ export function EmergencySheet({
   tituloDaFicha,
   medico,
   medicoResolvido,
+  fichaResolvida = true,
   onClose,
   onOpenCard,
 }: {
@@ -86,6 +87,24 @@ export function EmergencySheet({
   medico?: DoctorContato | null;
   /** `false` = ainda não sabemos se ela tem médico. Ver `medicoResolvido`. */
   medicoResolvido?: boolean;
+  /**
+   * `false` = o PERFIL ainda não chegou. Não é o mesmo que "ela não preencheu".
+   *
+   * ⚠️ Isto passou a importar quando a folha ganhou o direito de abrir DURANTE
+   * o carregamento do app (o botão de socorro existe desde o primeiro quadro).
+   * Nesse instante `profile` é nulo, e a folha afirmava DUAS coisas falsas:
+   *
+   *   · "Complete tipo sanguíneo e contato de emergência no seu Perfil" — uma
+   *     acusação, numa emergência, sobre um perfil preenchido há meses;
+   *   · "Alergias: nenhuma informada" e "Medicamentos: nenhum" — **para um
+   *     SOCORRISTA**. "Nada relatado" e "desconhecido" não são a mesma coisa, e
+   *     a diferença entre os dois é uma prescrição. É a régua que o modo
+   *     consulta já aplica com `ficha.degradada`.
+   *
+   * Segue a forma de `medicoResolvido`, e o padrão é `true` para que nenhum
+   * chamador de hoje mude de comportamento.
+   */
+  fichaResolvida?: boolean;
   onClose: () => void;
   /** Abre a carteirinha completa (QR grande, copiar, imprimir) fora do SOS. */
   onOpenCard?: () => void;
@@ -569,6 +588,13 @@ export function EmergencySheet({
        atrasa nada que ela esteja olhando. Medido: o chunk da folha de
        emergência caiu de 49,2 kB para 24,7 kB. */
     let vivo = true;
+    /* ⚠️ Sem ficha, sem QR: o desenho pulsante que já existe no `else` diz
+       "estou buscando", e um QR gerado agora levaria uma ficha vazia para o
+       telefone do socorrista. */
+    if (!fichaResolvida) {
+      setQr(null);
+      return;
+    }
     void import("qrcode")
       .then((m) =>
         (m.default ?? m).toDataURL(card, { margin: 1, width: 260, errorCorrectionLevel: "M" }),
@@ -578,7 +604,7 @@ export function EmergencySheet({
     return () => {
       vivo = false;
     };
-  }, [card]);
+  }, [card, fichaResolvida]);
 
   return (
     <div
@@ -1013,7 +1039,12 @@ export function EmergencySheet({
             </div>
             <dl className="min-w-0 flex-1 space-y-1 text-xs">
               <Row label="Sangue" value={info.bloodType} />
-              <Row label="Alergias" value={info.allergies || "nenhuma informada"} />
+              {/* ⚠️ "NENHUMA" É UMA AFIRMAÇÃO, e quem a lê é o socorrista.
+                  Enquanto o perfil não chegou, o valor é DESCONHECIDO. */}
+              <Row
+                label="Alergias"
+                value={fichaResolvida ? info.allergies || "nenhuma informada" : "carregando…"}
+              />
               <Row label="Semana" value={info.weekLabel} />
               <Row label="Contato" value={info.emergencyContact} />
             </dl>
@@ -1024,7 +1055,10 @@ export function EmergencySheet({
               <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
                 {info.babyName && <Row label="Bebê" value={info.babyName} />}
                 <Row label="DPP" value={info.dpp} />
-                <Row label="Medicamentos" value={info.medications || "nenhum"} />
+                <Row
+                  label="Medicamentos"
+                  value={fichaResolvida ? info.medications || "nenhum" : "carregando…"}
+                />
                 <Row label="Tel. emergência" value={info.emergencyPhone} />
                 {medNome && (
                   <Row label="Médico" value={medCrm ? `${medNome} · ${medCrm}` : medNome} />
@@ -1042,7 +1076,10 @@ export function EmergencySheet({
             </button>
           )}
 
-          {(!info.bloodType || !info.emergencyContact) && (
+          {/* ⚠️ Só quando o perfil JÁ CHEGOU: durante o carregamento isto
+              acusava a paciente de não ter preenchido o que está preenchido há
+              meses — e no pior momento para receber uma cobrança. */}
+          {fichaResolvida && (!info.bloodType || !info.emergencyContact) && (
             <p className="mt-3 text-xs text-amber-600 dark:text-amber-400">
               Complete tipo sanguíneo e contato de emergência no seu Perfil para a ficha ficar
               completa.

@@ -150,7 +150,19 @@ describe("a ficha que o socorrista lê", () => {
   });
 
   test("⚠️ o cabeçalho deixa de afirmar uma gestação em curso", () => {
-    expect(CONTA).toMatch(/tituloDaFicha=\{careMode \?/);
+    /* ⚠️ Cobra a GARANTIA, nunca a grafia. A forma anterior era
+       `toMatch(/tituloDaFicha=\{careMode \?/)` e ficou VERMELHA sobre o
+       conserto que APERTA o portão (`!profile || careMode`) — a décima terceira
+       vez desta armadilha nesta base. O que importa é: o rótulo depende de
+       `careMode`, e "não sei se ela está em luto" resolve para o NEUTRO.
+       ⚠️ E o recorte existe porque um `toMatch` que falha sobre vinte mil
+       linhas despeja o fonte inteiro no relatório. */
+    const iTitulo = CONTA.indexOf("tituloDaFicha=");
+    expect(iTitulo).toBeGreaterThan(-1);
+    const expr = CONTA.slice(iTitulo, CONTA.indexOf("info={", iTitulo));
+    expect(expr).toMatch(/\bcareMode\b/);
+    expect(expr).toMatch(/!profile\b/);
+    expect(expr).toContain("PACIENTE OBSTÉTRICA");
     /* E o padrão continua sendo o texto de hoje: a paciente grávida não perde
        a palavra que o socorrista brasileiro lê primeiro. */
     expect(FOLHA).toMatch(/tituloDaFicha \?\? "FICHA DE EMERGÊNCIA - GESTANTE"/);

@@ -30,6 +30,15 @@ const rotas = readdirSync("src/routes")
 /* Estados que só existem com parâmetro — os mesmos que a prosa do CLAUDE.md
    documenta como "impossíveis de fotografar" sem eles. */
 const EXTRAS = [
+  /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
+     Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
+     duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum
+     relato. A varredura de disco abre só o padrão; estes quatro são os casos
+     que decidem. */
+  "/preview-abertura?ceu=anoitecer",
+  "/preview-abertura?ceu=nenhum",
+  "/preview-abertura?medico=1",
+  "/preview-abertura?sos=1",
   /* A saúde do banco: os três estados que mais importam — faltando, incerto e
      sem chave de serviço — não se fabricam num banco em dia, que é justamente
      o banco de quem desenvolve. */

@@ -60,6 +60,7 @@ import { Route as PreviewBancoRouteImport } from './routes/preview-banco'
 import { Route as PreviewAssinaturaRouteImport } from './routes/preview-assinatura'
 import { Route as PreviewAmigasRouteImport } from './routes/preview-amigas'
 import { Route as PreviewAgendaRouteImport } from './routes/preview-agenda'
+import { Route as PreviewAberturaRouteImport } from './routes/preview-abertura'
 import { Route as MuralRouteImport } from './routes/mural'
 import { Route as ModoAcompanhanteRouteImport } from './routes/modo-acompanhante'
 import { Route as MitosRouteImport } from './routes/mitos'
@@ -368,6 +369,11 @@ const PreviewAgendaRoute = PreviewAgendaRouteImport.update({
   path: '/preview-agenda',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreviewAberturaRoute = PreviewAberturaRouteImport.update({
+  id: '/preview-abertura',
+  path: '/preview-abertura',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MuralRoute = MuralRouteImport.update({
   id: '/mural',
   path: '/mural',
@@ -647,6 +653,7 @@ export interface FileRoutesByFullPath {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
@@ -750,6 +757,7 @@ export interface FileRoutesByTo {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
@@ -855,6 +863,7 @@ export interface FileRoutesById {
   '/mitos': typeof MitosRoute
   '/modo-acompanhante': typeof ModoAcompanhanteRoute
   '/mural': typeof MuralRoute
+  '/preview-abertura': typeof PreviewAberturaRoute
   '/preview-agenda': typeof PreviewAgendaRoute
   '/preview-amigas': typeof PreviewAmigasRoute
   '/preview-assinatura': typeof PreviewAssinaturaRoute
@@ -960,6 +969,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
@@ -1063,6 +1073,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
@@ -1167,6 +1178,7 @@ export interface FileRouteTypes {
     | '/mitos'
     | '/modo-acompanhante'
     | '/mural'
+    | '/preview-abertura'
     | '/preview-agenda'
     | '/preview-amigas'
     | '/preview-assinatura'
@@ -1272,6 +1284,7 @@ export interface RootRouteChildren {
   MitosRoute: typeof MitosRoute
   ModoAcompanhanteRoute: typeof ModoAcompanhanteRoute
   MuralRoute: typeof MuralRoute
+  PreviewAberturaRoute: typeof PreviewAberturaRoute
   PreviewAgendaRoute: typeof PreviewAgendaRoute
   PreviewAmigasRoute: typeof PreviewAmigasRoute
   PreviewAssinaturaRoute: typeof PreviewAssinaturaRoute
@@ -1708,6 +1721,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PreviewAgendaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/preview-abertura': {
+      id: '/preview-abertura'
+      path: '/preview-abertura'
+      fullPath: '/preview-abertura'
+      preLoaderRoute: typeof PreviewAberturaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/mural': {
       id: '/mural'
       path: '/mural'
@@ -2108,6 +2128,7 @@ const rootRouteChildren: RootRouteChildren = {
   MitosRoute: MitosRoute,
   ModoAcompanhanteRoute: ModoAcompanhanteRoute,
   MuralRoute: MuralRoute,
+  PreviewAberturaRoute: PreviewAberturaRoute,
   PreviewAgendaRoute: PreviewAgendaRoute,
   PreviewAmigasRoute: PreviewAmigasRoute,
   PreviewAssinaturaRoute: PreviewAssinaturaRoute,
