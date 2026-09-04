@@ -13162,6 +13162,21 @@ tempo com ele; o caminho é `routeRules`.
 preset do Lovable declara só `preset`/`output`/`cloudflare`, e sem o cast o
 `tsc` reprova uma configuração que funciona.
 
+**Medido na produção depois do deploy**, comparando a página com um arquivo
+estático para anular o ruído do proxy do contêiner:
+
+|                          | antes | depois |
+| ------------------------ | ----- | ------ |
+| página, mediana          | 0,24 s | **0,19 s** |
+| arquivo estático, mediana | 0,20 s | 0,19 s |
+| `x-vercel-cache`         | (função) | **HIT em 8 de 8** |
+
+⚠️ **O número daqui subestima o ganho, e vale dizer por quê.** Este contêiner
+fica perto de Washington, então a função nunca esteve longe dele e estava
+quente de tanto eu medir. O que a borda entrega e não dá para medir daqui:
+**o ponto de São Paulo** para quem abre no Brasil, e sobretudo **nunca ficar
+fria** — que é o caso de "às vezes demora MUITO", não o da mediana.
+
 **`src/lib/casca-do-app.test.ts` é a catraca, e ela existe por um risco de
 PRIVACIDADE, não de desempenho:** a resposta guardada é servida para todas. Um
 `loader` acrescentado ali amanhã entregaria o HTML de uma paciente às outras,
