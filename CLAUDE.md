@@ -13105,7 +13105,18 @@ cabeçalho dele para ninguém repetir a aposta.
 `router.tsx`** — `routeTree.gen.ts` alcança 696 módulos. É por aí que se
 descobre o que cai na entrada, e não olhando o componente suspeito.
 
+**Medido de novo na produção, depois do deploy:**
+
+|                    | antes  | depois |
+| ------------------ | ------ | ------ |
+| arquivos           | 91     | **87** |
+| total comprimido   | 661 kB | **559 kB** |
+
 **O que sobra, em ordem de tamanho:** o pedaço de entrada (215 kB, quase tudo
-biblioteca: React, o router, o Supabase, o `sonner`) e o `minha-conta` (105 kB,
-que é o arquivo de vinte e um mil linhas). O segundo é a cirurgia parada
-esperando o dono dizer se a lentidão sobreviveu.
+biblioteca), o `minha-conta` (105 kB, o arquivo de vinte e um mil linhas) e o
+`proxy` (40 kB), que é o **framer-motion** — ele entra pelo `motion-primitives`
+(`Reveal` em onze telas, `Stagger` em duas) e por mais seis arquivos. Trocar as
+primitivas por animação em CSS, ou passar para `LazyMotion`, tiraria a maior
+parte desses 40 kB; é a próxima da fila, e é a primeira que mexe no que se VÊ,
+então pede foto antes. O `minha-conta` é a cirurgia parada esperando o dono
+dizer se a lentidão sobreviveu.
