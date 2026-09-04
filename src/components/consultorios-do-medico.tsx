@@ -131,7 +131,7 @@ export function ConsultoriosDoMedico({
                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(linha)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-[44px] items-center rounded-full border border-border px-3 text-[13px] font-medium text-foreground"
+                    className="pill-3d press inline-flex min-h-[44px] items-center rounded-full px-3 text-xs font-semibold text-foreground"
                   >
                     Ver no mapa
                   </a>
@@ -139,7 +139,7 @@ export function ConsultoriosDoMedico({
                 {a.phone && (
                   <a
                     href={`tel:${a.phone.replace(/[^\d+]/g, "")}`}
-                    className="inline-flex min-h-[44px] items-center rounded-full border border-border px-3 text-[13px] font-medium text-foreground"
+                    className="pill-3d press inline-flex min-h-[44px] items-center rounded-full px-3 text-xs font-semibold text-foreground"
                   >
                     Ligar {a.phone}
                   </a>
