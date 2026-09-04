@@ -13120,3 +13120,51 @@ primitivas por animação em CSS, ou passar para `LazyMotion`, tiraria a maior
 parte desses 40 kB; é a próxima da fila, e é a primeira que mexe no que se VÊ,
 então pede foto antes. O `minha-conta` é a cirurgia parada esperando o dono
 dizer se a lentidão sobreviveu.
+
+### ⚠️ A CASCA DO APP É GUARDADA NA BORDA, e continua em tempo real (set/2026)
+
+Terceira leva do mesmo relato. Medido: **toda abertura do app acordava uma
+função em Washington** para montar um HTML que é idêntico para todo mundo.
+
+O que eu conferi antes de mexer, e é o que torna isto seguro:
+
+- a rota `/minha-conta` **não tem `loader` nem `beforeLoad`**;
+- o `head()` é fixo;
+- o portão de login roda **no telefone** (`getSession` lê o disco — ver
+  `_authenticated/route.tsx`), e não no servidor;
+- a resposta **não traz `Set-Cookie` nem `Vary`**;
+- `/minha-conta` e `/minha-conta?tab=Caminho` devolvem o **mesmo HTML** —
+  medido, diferem só num carimbo de tempo do router.
+
+`routeRules: { "/minha-conta": { isr: { expiration: false } } }`. A borda passa
+a servir a casca do ponto mais próximo (São Paulo) e **nunca fica fria** —
+função fria é o pior caso da abertura, e é o que faz a demora ser às vezes
+muito maior que a média.
+
+⚠️ **E CONTINUA EM TEMPO REAL, que foi a condição do dono.** Palavras dele
+sobre a outra ideia: _"acho que tem que ser em tempo real, aí não iria ficar
+bacana"_. Ele estava certo, e eu tinha oferecido a versão pior:
+
+| | guardar no telefone (RECUSADA) | guardar na borda (feita) |
+| --- | --- | --- |
+| abertura | instantânea | instantânea |
+| ao publicar correção | chega na abertura SEGUINTE | **chega na hora** |
+
+O cache da borda é **por publicação**: cada deploy começa com ele vazio, então
+o que a paciente recebe é sempre o último commit.
+
+⚠️ **`nitro.prerender` NÃO FUNCIONA NESTE ARRANJO, foi tentado.** Com Vite 7 +
+TanStack Start, o prerenderer roda ANTES de o ambiente de servidor ser
+construído: a rota volta **404** e o log diz "Prerendered 0 routes". Não perca
+tempo com ele; o caminho é `routeRules`.
+
+⚠️ **E `routeRules` precisa do MESMO cast do `vercel.functions`** — o tipo do
+preset do Lovable declara só `preset`/`output`/`cloudflare`, e sem o cast o
+`tsc` reprova uma configuração que funciona.
+
+**`src/lib/casca-do-app.test.ts` é a catraca, e ela existe por um risco de
+PRIVACIDADE, não de desempenho:** a resposta guardada é servida para todas. Um
+`loader` acrescentado ali amanhã entregaria o HTML de uma paciente às outras,
+sem erro nenhum — a tela só mostraria o nome errado. Três mutações conferidas
+em vermelho: pôr um `loader` na rota, ligar o `isr` na raiz do site, e trocar o
+portão do telefone por um do servidor.

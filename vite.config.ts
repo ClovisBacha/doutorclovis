@@ -41,6 +41,48 @@ export default defineConfig({
        o preset, e o `vercel.functions.maxDuration` é honrado (conferido no
        `.vc-config.json` gerado). Sem o cast, `tsc --noEmit` reprova uma
        configuração que funciona. */
-    ...({ vercel: { functions: { maxDuration: 30 } } } as Record<string, unknown>),
+    /* ⚠️ **A CASCA DO APP É GUARDADA NA BORDA, e não montada a cada
+       abertura (set/2026).**
+
+       O dono: "a primeira tela está demorando muito para carregar quando abro
+       o app". O app instalado abre em `/minha-conta` (o `start_url` do
+       manifesto), e toda abertura acordava uma função em Washington para
+       montar um HTML que é IDÊNTICO para todo mundo — conferido: a rota não
+       tem `loader` nem `beforeLoad`, o `head()` é fixo, e o portão que
+       decide se ela está logada roda no TELEFONE (`getSession` lê o
+       armazenamento local, ver `_authenticated/route.tsx`). Não há nada por
+       usuária naquele HTML.
+
+       Com `isr`, a Vercel guarda a resposta na rede de distribuição — que tem
+       ponto em São Paulo — e passa a servi-la de lá. O ganho maior não é a
+       distância: é que **a borda nunca fica fria**. Função fria é o pior caso
+       da abertura, e é o que faz a demora ser às vezes muito maior que a
+       média: a paciente espera um Node subir do outro lado do continente
+       antes de o navegador saber sequer o que baixar.
+
+       ⚠️ **E continua em TEMPO REAL, que foi a condição do dono** ("acho que
+       tem que ser em tempo real"). O cache da borda é POR PUBLICAÇÃO: cada
+       deploy começa com ele vazio, então o que ela recebe é sempre o último
+       commit. Isto NÃO é o cache no telefone, que deixaria a paciente uma
+       abertura atrás — essa ideia foi levantada e recusada, e a diferença
+       entre as duas está registrada no CLAUDE.md.
+
+       ⚠️ **`allowQuery` fica sem valor de propósito** (o padrão guarda cada
+       query separadamente). O app recebe link profundo com `?tab=` do push,
+       e o router serializa a localização no HTML: uma casca guardada sem a
+       query servida para uma URL com query é a receita do erro de hidratação
+       que já deixou este app SEM ABRIR uma vez.
+
+       ⚠️ **Só a casca do app.** O site institucional é renderizado no servidor
+       de propósito (é o que os buscadores leem) e o painel do médico não é o
+       caminho que a paciente abre todo dia.
+
+       ⚠️ E `nitro.prerender` NÃO serve aqui, foi tentado: neste arranjo
+       (Vite 7 + TanStack Start) o prerenderer roda ANTES de o ambiente de
+       servidor ser construído, e a rota volta 404 — "Prerendered 0 routes". */
+    ...({
+      routeRules: { "/minha-conta": { isr: { expiration: false } } },
+      vercel: { functions: { maxDuration: 30 } },
+    } as Record<string, unknown>),
   },
 });
