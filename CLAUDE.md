@@ -12987,3 +12987,10 @@ pública do chá e o batimento — ainda tinham cartão de contorno e botão
 chapado. São a cara do app para quem nunca o instalou (chegam pelo link do
 WhatsApp). Entraram no material; medido nas quatro bancadas: zero pílulas e
 zero cartões de contorno.
+
+**Fechamento da noite (medido):** 5.527 testes verdes · 124 bancadas e 11
+roteiros de interação sem problema · a varredura de acessibilidade caiu de
+124 para 113 achados de contraste e de 49 para 40 de alvo (os que ficam são
+texto auxiliar do Jogo e o ✕ do chá, ambos já registrados como decisão do
+dono) · nas bancadas da paciente fora do Jogo, zero pílulas de contorno e
+zero cartões de contorno restantes.
