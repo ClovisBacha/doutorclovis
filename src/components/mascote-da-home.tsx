@@ -110,8 +110,11 @@ export function MascoteDaHome({
 
   const oQueEleDiz = oQueOMascoteDiz(fala, recados);
   const emblema = emblemaDeRecados(recados);
+  /* A fala que promete um lugar (o "Você sabia?") manda no toque do balão;
+     depois vêm os recados; por fim o personagem. */
   const aoTocarNoBalao =
-    oBalaoAbreOsRecados(fala, recados) && onAbrirRecados ? onAbrirRecados : onAbrir;
+    fala?.aoTocar ??
+    (oBalaoAbreOsRecados(fala, recados) && onAbrirRecados ? onAbrirRecados : onAbrir);
 
   /* O balão espera, e o personagem CUTUCA no mesmo instante em que fala.
      Sem o cutucão o balão aparece sozinho e lê como aviso de sistema; com ele,

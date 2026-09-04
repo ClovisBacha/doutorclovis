@@ -12774,3 +12774,110 @@ leitura — quase 400 abaixo do que o iOS chama de legenda (11 pt).
 
 **Onde 13 px não couber, muda-se o DESENHO** (duas linhas, uma palavra a
 menos, o número sozinho), nunca a letra para baixo.
+
+## Os caminhos: o estudo de navegação e as três camadas (set/2026)
+
+Pedido do dono: _"sinto que hoje o app tem muitas funções porém é muito
+complexo para chegar em todas — a pessoa pode viver o tempo inteiro usando o
+app e nem sequer sabendo da existência de algumas funções"_. Um agente mapeou
+toda porta da paciente (arquivo e linha para cada afirmação), e eu conferi no
+código os achados que decidiam as propostas antes de escrever — **um deles
+seria falso** se não tivesse sido conferido (a lista de interruptores de
+aviso tinha chamador, sim).
+
+**O que o mapa mediu:** 24 abas e 60+ destinos atrás de 5 portas; 14 funções
+da Comunidade só atrás de um gesto que nada anunciava (tocar de novo no ícone
+da barra); a aba **Bem-estar** inteira sem porta no celular fora do Modo
+Cuidado; **Saúde da mulher** sumindo por nove meses com um comentário
+garantindo acesso por um menu que é `hidden md:flex`; a grade do **Bebê** só
+alcançável apertando "voltar"; o **tutorial** destacando um item `chat` que a
+barra não tem desde ago/2026. Estudo publicado como artefato; as decisões que
+importam estão abaixo.
+
+### Camada A — as portas, sem mudar o desenho
+
+- **O tutorial ensina a barra REAL** (`tutorial-do-mascote.ts`): o cartão do
+  chat virou o da Comunidade, e entraram os cartões do ☰ e da bolha.
+  `DestaqueDoTutorial` ganhou `"menu" | "bolha"`, e os dois pulsam **acima do
+  véu** (`z-[39]` contra o véu em `z-38`) — sem isso o cartão apontava para um
+  borrão. A bancada `/preview-tutorial` ganhou o topo da home (☰ + bolha),
+  senão ela mostraria um cartão falando de um botão que não está na tela.
+- **O ☰ ganhou quatro linhas**: "Estou com um sintoma" (`Alertas`),
+  "Carteirinha de emergência", "Bem-estar" e "Meu Cantinho" (`Recompensas`,
+  some no luto — `MenuDaConta` ganhou `careMode`). ⚠️ **A grade da Saúde NÃO
+  recebeu Bem-estar nem Alertas**: o dono pediu por escrito que ela não os
+  tivesse. O ☰ é a lista completa; a grade é a curta. E a Carteirinha VOLTOU
+  ao ☰, desfazendo uma decisão anterior — a paciente só descobria que ela
+  existe depois de apertar o SOS.
+- **Saúde da mulher fica sempre na grade**; `mostrarSaudeDaMulher` decide só a
+  LEGENDA ("O que fica para depois do parto"). Uma garantia escrita que o
+  aparelho não cumpre é pior que nenhuma.
+- **A bolinha ⊞ "Mais" abre o hub da Comunidade**, e ela é a **PRIMEIRA** da
+  fileira de stories (`FileiraDeStories.aoAbrirMais`). O cabeçalho do feed
+  saiu a pedido do dono, então a porta entra onde o dedo já olha. ⚠️ Medido: em
+  último lugar ela caía em x=544 num viewport de 393 — uma porta que só
+  aparece rolando é o defeito que ela veio consertar. O onboarding da
+  Comunidade ganhou o quinto cartão, "Onde ficam as coisas".
+- **O bebê da home abre a GRADE do Bebê** (`onNavigate("Bebê")`), e
+  `?tab=Bebê` abre a aba: `mobileHome` nasce
+  `initialTab === "Bebê" && !tabPedidaNaUrl`, porque "Bebê" é a aba padrão E
+  a aba do bebê, e `initialTab === "Bebê"` não distinguia as duas.
+- **A grade das sete sub-telas de Consultas subiu para o topo**, acima do
+  calendário.
+- **Limpeza**: `"Exames"` saiu de `AppTab`/`SECTION_TABS` (não tinha tela), o
+  import morto de `CodigoDaEmbaixadora` em `minha-conta` saiu, e o comentário
+  descrevendo um "bolão do nascimento" que não existe no repositório saiu.
+
+### Camada B — a bolha vira guia, e o app ganha um mapa
+
+`src/lib/mapa-do-app.ts` é a **lista única** (34 funções: id, título,
+descrição, `dica`, `tab`, `sub`, grupo, `noLuto`, `semanaMin`), e duas coisas
+a leem — por isso ela é uma:
+
+1. **"Tudo o que o app faz"** (`mapa-do-app.tsx`, primeira linha do ☰):
+   agrupada por PERGUNTA ("Estou bem?", "E o bebê?", "Quem está comigo",
+   "Meu dia", "Minha conta"), com busca sem acento. O que ela nunca abriu
+   ganha "novo para você"; o que já abriu não ganha selo nenhum — marcar o
+   visto viraria placar.
+2. **O "Você sabia?"** (`dicaDaSemana`): uma vez por semana, no dia em que não
+   há recado, a bolha apresenta UMA função que ela nunca abriu, e o toque no
+   balão leva lá (`FalaDoMascote.aoTocar`, que vence os recados no toque do
+   balão). Precedência da FALA: recado > dica > frase do dia.
+
+- ⚠️ **Nunca no Modo Cuidado** — nem as funções permitidas viram dica: quem
+  está de luto não abre o app para um passeio guiado.
+- ⚠️ **"Já abriu" é alimentado por `goToTab`**, o único ponto por onde toda
+  navegação passa (`idDaFuncao`, o id mais específico do destino). Chaves
+  `dc-path-` (`CHAVE_VISITADAS`, `CHAVE_DICA`), para viajarem no
+  `journey_state` — senão a bolha repetiria a mesma dica no outro aparelho.
+- ⚠️ **O efeito espera `ensureInitialJourneyPull()` antes de ler e gravar**:
+  `lsSet` numa chave `dc-path-` agenda um PUSH, e empurrar antes do pull
+  sobrescreve a jornada real por um blob incompleto. Mesma regra do
+  onboarding da Comunidade.
+- ⚠️ **A dica é marcada como mostrada quando é DECIDIDA, não no toque** —
+  quem leu e não tocou não a reencontra amanhã; senão a bolha vira letreiro
+  da mesma frase por sete dias. E é decidida num EFEITO, nunca no render:
+  ela lê `localStorage` e `Date.now()`, os dois divergem entre servidor e
+  cliente.
+- **`mapa-do-app.test.ts` confere o catálogo contra o fonte**: toda `tab`
+  está em `TABS`, toda `sub` existe no hub daquela aba, toda dica termina em
+  "?" e nenhuma cobra (regex). Função apontando para tela que não existe é o
+  defeito que o teste existe para pegar.
+
+### Camada C — as decisões do dono, aplicadas
+
+- **Triagem e carteirinha fora do SOS**: pelo ☰ (acima). O SOS continua sendo
+  o caminho da mão tremendo.
+- **As três lojas com nomes que não se confundem**: "Loja de produtos" (☰,
+  dinheiro) · "Meu Cantinho" (☰ e fita do Jogo, enfeites) · "Loja de
+  Sementinhas" (a folha do saldo — o nome está PINTADO no herói do Drive, e
+  fica). O Cantinho ganhou porta no ☰ para não depender do botão flutuante do
+  Jogo, que some em dois estados.
+- **Bem-estar e Jogo continuam duplicando meditação e exercício**, com papéis
+  distintos: no Jogo é a atividade do dia, que pontua; no Bem-estar é a
+  biblioteca inteira, sem pontuação.
+
+**Bancadas:** `/preview-tutorial?nome=Ana` (os nove cartões; o 6º acende o ☰,
+o 7º a bolha) · `/preview-instagram` (a bolinha ⊞ em x=16) ·
+`/preview-conta` (o ☰ com as cinco linhas novas) · `/preview-mapa`
+(`?luto=1` · `?w=38` · `?abertas=saude,chutes`) · `/preview-home?w=20&dica=1`.

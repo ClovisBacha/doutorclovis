@@ -252,6 +252,16 @@ const RedeNoApp = lazy(() =>
   import("@/components/rede-instagram").then((m) => ({ default: m.RedeNoApp })),
 );
 import { ensureInitialJourneyPull, lsGet, lsSet } from "@/lib/journey-sync";
+import {
+  CHAVE_DICA,
+  CHAVE_VISITADAS,
+  dicaDaSemana,
+  falaDaDica,
+  idDaFuncao,
+  type DicaMostrada,
+  type FuncaoDoApp,
+} from "@/lib/mapa-do-app";
+import { MapaDoApp } from "@/components/mapa-do-app";
 import { Bolha } from "@/components/bolha";
 import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
@@ -1118,6 +1128,16 @@ function MinhaContaPage() {
 
   /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
   const [homeMenu, setHomeMenu] = useState(false);
+  /* ─── O MAPA DO APP e o "VOCÊ SABIA?" (set/2026) ───────────────────────────
+     `visitadas` é o conjunto de funções que ela JÁ abriu (ids de
+     `FUNCOES_DO_APP`), gravado em chave `dc-path-` para viajar no
+     `journey_state`. Quem alimenta é `goToTab`, o único ponto por onde toda
+     navegação passa. A dica é calculada DEPOIS de montar (num efeito), nunca no
+     render: ela lê `localStorage` e `Date.now()`, e os dois divergem entre
+     servidor e cliente — a classe de defeito que já derrubou o app inteiro. */
+  const [mapaAberto, setMapaAberto] = useState(false);
+  const [visitadas, setVisitadas] = useState<Set<string>>(() => new Set());
+  const [dicaDaBolha, setDicaDaBolha] = useState<FuncaoDoApp | null>(null);
 
   /* ── O TUTORIAL DO PRIMEIRO ACESSO ──────────────────────────────────────
      Quem apresenta o app é o bebê bolha, pela barra de baixo. O estado do
@@ -1423,10 +1443,53 @@ function MinhaContaPage() {
        ainda verdadeiro, e ela reabria sozinha ao voltar para o Bebê. */
     setNotifOpen(false);
     setConsultasSub(sub ?? null);
+    /* "Já abriu": o id mais específico do destino, gravado uma vez. */
+    const idAberto = idDaFuncao(t, sub);
+    if (idAberto && !visitadas.has(idAberto)) {
+      const prox = new Set(visitadas);
+      prox.add(idAberto);
+      setVisitadas(prox);
+      lsSet(CHAVE_VISITADAS, [...prox]);
+    }
   };
 
   // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
   const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  useEffect(() => {
+    if (!profile) return;
+    let vivo = true;
+    /* ⚠️ O PULL DA NUVEM VEM ANTES de ler e de gravar: `lsSet` numa chave
+       `dc-path-` agenda um PUSH do blob da jornada, e empurrar antes do pull
+       sobrescreve a jornada real por um blob incompleto — a mesma regra que o
+       onboarding da Comunidade já paga. */
+    void ensureInitialJourneyPull()
+      .catch(() => false)
+      .then(() => {
+        if (!vivo) return;
+        const abertas = new Set(lsGet<string[]>(CHAVE_VISITADAS, []));
+        setVisitadas(abertas);
+        const ultima = lsGet<DicaMostrada | null>(CHAVE_DICA, null);
+        const agora = Date.now();
+        const d = dicaDaSemana({
+          visitadas: abertas,
+          careMode,
+          weeks: gest?.weeks ?? null,
+          agora,
+          ultima,
+        });
+        setDicaDaBolha(d);
+        /* Marcada como MOSTRADA no instante em que é decidida — não no toque:
+           quem leu e não tocou não pode reencontrá-la amanhã, senão a bolha
+           vira letreiro da mesma dica por sete dias. */
+        if (d) lsSet(CHAVE_DICA, { id: d.id, em: agora } satisfies DicaMostrada);
+      });
+    return () => {
+      vivo = false;
+    };
+    /* Só na primeira leitura do perfil: reler a cada mudança de aba
+       recalcularia a dica no MESMO dia e a marcaria de novo. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
   /**
    * ⚠️ CARIMBA O MODO CUIDADO PARA O SOM — e isto fecha um portão que nenhuma
    * prop alcançava.
@@ -2504,6 +2567,14 @@ function MinhaContaPage() {
                    com só `tutorialAberto`, uma janela larga calava o mascote
                    por causa de um tutorial que não está na tela. */
                   mascoteCalado={tutorialAberto && ehCelular}
+                  dica={
+                    dicaDaBolha && !careMode
+                      ? {
+                          ...falaDaDica(dicaDaBolha),
+                          aoTocar: () => goToTab(dicaDaBolha.tab, dicaDaBolha.sub),
+                        }
+                      : null
+                  }
                   onOrigemLocal={setOrigemLocal}
                   babyTone={profile?.baby_skin_tone ?? 0}
                   careMode={careMode}
@@ -2540,6 +2611,10 @@ function MinhaContaPage() {
                   mostrarPainel={isAdmin || isDoctor}
                   ehDono={isAdmin}
                   onNotificacoes={abrirNotificacoes}
+                  onMapa={() => {
+                    setHomeMenu(false);
+                    setMapaAberto(true);
+                  }}
                   onNavegar={(t, subAba) => {
                     setHomeMenu(false);
                     goToTab(t, subAba);
@@ -2552,6 +2627,18 @@ function MinhaContaPage() {
                 />
               )}
 
+              {mapaAberto && (
+                <MapaDoApp
+                  careMode={careMode}
+                  weeks={gest?.weeks ?? null}
+                  visitadas={visitadas}
+                  onNavegar={(t, sub) => {
+                    setMapaAberto(false);
+                    goToTab(t, sub);
+                  }}
+                  onFechar={() => setMapaAberto(false)}
+                />
+              )}
               {notifOpen && (
                 <NotificacoesSheet
                   lista={caixaDeEntrada}

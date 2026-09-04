@@ -1075,6 +1075,7 @@ export function AppHomeScreen({
   naoLidas = 0,
   mascoteCalado = false,
   destaqueDoTopo = null,
+  dica = null,
   onOpenRecados,
   onOpenChat,
   onOrigemLocal,
@@ -1131,6 +1132,12 @@ export function AppHomeScreen({
   /** Tutorial: acende o ☰ ("menu") ou a bolha ("bolha") — a mesma pulsação
    *  da barra de baixo, para a paciente achar do que o cartão fala. */
   destaqueDoTopo?: "menu" | "bolha" | null;
+  /**
+   * O "Você sabia?" da semana (`dicaDaSemana`, em `mapa-do-app.ts`): a bolha
+   * apresenta UMA função que ela nunca abriu, e o toque no balão leva lá.
+   * Vence a frase do dia e perde para o recado — recado é o médico falando.
+   */
+  dica?: { texto: string; aria: string; aoTocar: () => void } | null;
   /**
    * Abre a central de recados DIRETO, sem passar pelo menu.
    *
@@ -1744,7 +1751,11 @@ export function AppHomeScreen({
                    rótulo do botão virava "Abrir recados" justamente nos dias
                    em que não há recado nenhum — a fala de conforto só existe
                    quando a caixa está vazia. */
-                fala={conforto ? { texto: conforto, aria: "Falar com a bolha" } : null}
+                fala={
+                  temNaoLidas
+                    ? null
+                    : (dica ?? (conforto ? { texto: conforto, aria: "Falar com a bolha" } : null))
+                }
                 /* DOBRO do tamanho, a pedido do dono. 44 → 88px: ele deixou de
                    ser um ícone no canto e virou personagem. O alvo do menu
                    continua com 40px do outro lado, e os dois seguem sem se

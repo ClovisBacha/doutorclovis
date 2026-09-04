@@ -5,6 +5,7 @@ import {
   CreditCard,
   Heart,
   IdCard,
+  Map,
   ShieldAlert,
   Sparkles,
   Sprout,
@@ -162,6 +163,7 @@ export function MenuDaConta({
   naoLidas,
   perfilPendente = false,
   careMode = false,
+  onMapa,
   mostrarPainel,
   ehDono = false,
   onNotificacoes,
@@ -189,6 +191,8 @@ export function MenuDaConta({
   perfilPendente?: boolean;
   /** Modo Cuidado: esconde as linhas que falam do jogo e da chegada do bebê. */
   careMode?: boolean;
+  /** Abre "Tudo o que o app faz" — o mapa do app. */
+  onMapa?: () => void;
   mostrarPainel: boolean;
   /**
    * O dono da plataforma, não o médico.
@@ -279,6 +283,27 @@ export function MenuDaConta({
 
           <div className="mx-4 my-1 h-px bg-border/60" />
 
+          {/* O MAPA vem primeiro: é a única linha que responde "onde fica…?"
+              para qualquer coisa, e quem abriu o ☰ procurando algo que não
+              está nas dez linhas abaixo precisa dela antes de desistir. */}
+          {onMapa && (
+            <button
+              onClick={onMapa}
+              className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
+            >
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <Map className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">
+                  Tudo o que o app faz
+                </span>
+                <span className="block text-xs leading-snug text-muted-foreground">
+                  Procure uma função pelo nome
+                </span>
+              </span>
+            </button>
+          )}
           {MENU_CONTA.filter(({ tab }) => !(careMode && tab === "Recompensas")).map(
             ({ tab, subAba, label, sub, Icon }) => (
               <button
