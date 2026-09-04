@@ -105,7 +105,7 @@ function CicloHero({ model }: { model: CycleModel }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
             <span className="text-3xl leading-none">{meta.emoji}</span>
-            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
+            <p className="mt-1 font-serif text-[15px] font-semibold text-muted-foreground">
               Dia do ciclo
             </p>
             <p className="font-serif text-4xl leading-none">{dayInCycle}</p>

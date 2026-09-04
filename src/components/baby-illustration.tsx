@@ -253,7 +253,7 @@ export function BabyIllustration({
       {/* ── Informações da semana ─────────── */}
       {showInfo && (
         <div className="mt-2 w-full text-center">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary/80">
+          <p className="font-serif text-[15px] font-semibold text-primary/80">
             {STAGE_LABEL[stage]}
           </p>
           <div className="mt-1.5 flex items-center justify-center gap-2 text-xs font-semibold text-foreground">

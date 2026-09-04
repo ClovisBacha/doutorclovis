@@ -273,9 +273,7 @@ export function OfertaPremium({
           <div className="mb-4 overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-fuchsia-600 to-rose-500 p-4 text-white shadow-lg">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-white/85">
-                  Plano anual
-                </p>
+                <p className="font-serif text-[15px] font-semibold text-white/85">Plano anual</p>
                 <p className="mt-0.5 font-serif text-3xl leading-none">
                   {oferta.descontoAnualPct}% OFF
                 </p>
@@ -357,7 +355,7 @@ export function OfertaPremium({
                 : "border-border bg-background"
             }`}
           >
-            <span className="block text-xs font-bold uppercase tracking-wide text-muted-foreground">
+            <span className="block font-serif text-[15px] font-semibold text-muted-foreground">
               Mensal
             </span>
             <span className="mt-0.5 block font-serif text-lg tabular-nums">
@@ -375,7 +373,7 @@ export function OfertaPremium({
                 : "border-border bg-background"
             }`}
           >
-            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-primary">
+            <span className="flex items-center gap-1.5 font-serif text-[15px] font-semibold text-primary">
               Anual
               {oferta && (
                 <span className="rounded-full bg-violet-600 px-1.5 py-px text-[9px] text-white">

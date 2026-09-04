@@ -2158,7 +2158,7 @@ export function AppHomeScreen({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               {semMedico ? "Encontre o seu médico" : "Seu médico"}
             </p>
             <p className="mt-0.5 font-serif text-lg leading-tight text-foreground">{medNome}</p>

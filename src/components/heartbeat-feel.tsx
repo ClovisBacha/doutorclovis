@@ -119,9 +119,7 @@ export function HeartbeatFeel({
 
       <div className="flex flex-col items-center text-center">
         {!compact && (
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Sinta na palma da mão
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Sinta na palma da mão</p>
         )}
         <p className="mt-2 font-serif text-2xl">
           {babyName ? `O coração de ${babyName}` : "O coração do bebê"}

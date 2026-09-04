@@ -99,9 +99,7 @@ export function ConsultoriosDoMedico({
 
   return (
     <div className="mt-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-        Onde ele atende
-      </p>
+      <p className="font-serif text-[15px] font-semibold text-muted-foreground">Onde ele atende</p>
       <div className="mt-2 space-y-2">
         {ordenados.map((a) => {
           const linha = umaLinha(a);

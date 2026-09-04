@@ -301,9 +301,7 @@ function CompanionView() {
         </div>
       )}
       {/* Header */}
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Painel do Papai
-      </p>
+      <p className="font-serif text-[15px] font-semibold text-primary">Painel do Papai</p>
       {/* ⚠️ **O CABEÇALHO TAMBÉM É CONTEÚDO DE GESTAÇÃO.** No luto ele dizia
           "Helena de Marina Costa" e, na linha de baixo, "Semana 28 e 3 dias ·
           81 dias para a DPP" — o nome do bebê e a contagem regressiva para um
@@ -390,7 +388,7 @@ function CompanionView() {
             <div className="rounded-3xl bg-gradient-to-br from-primary/10 to-secondary/30 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-wide text-primary">Esta semana</p>
+                  <p className="font-serif text-[15px] font-semibold text-primary">Esta semana</p>
                   <p className="mt-1 font-serif text-4xl">
                     {gest.weeks}
                     <span className="ml-1 text-xl text-muted-foreground">sem</span>

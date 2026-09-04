@@ -612,7 +612,7 @@ export function BabyTab({
       {/* Segunda gestação: historical alerts */}
       {(profile.pregnancy_number ?? 1) >= 2 && (
         <StaggerItem className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">
+          <p className="mb-3 font-serif text-[15px] font-semibold text-primary">
             🔁 2ª Gestação — Histórico da anterior
           </p>
           <div className="space-y-2 text-sm">

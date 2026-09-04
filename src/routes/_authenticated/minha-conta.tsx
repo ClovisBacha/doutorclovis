@@ -15493,7 +15493,7 @@ function LojaTab({
       {/* ── Header ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary/70">
+          <p className="font-serif text-[15px] font-semibold text-primary/70">
             Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
