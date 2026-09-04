@@ -34,6 +34,7 @@ import { Route as PreviewNotificacoesRouteImport } from './routes/preview-notifi
 import { Route as PreviewMomentoRouteImport } from './routes/preview-momento'
 import { Route as PreviewModeracaoRouteImport } from './routes/preview-moderacao'
 import { Route as PreviewMeditacaoRouteImport } from './routes/preview-meditacao'
+import { Route as PreviewMapaRouteImport } from './routes/preview-mapa'
 import { Route as PreviewLojaSementinhasRouteImport } from './routes/preview-loja-sementinhas'
 import { Route as PreviewJogoRouteImport } from './routes/preview-jogo'
 import { Route as PreviewInstagramRouteImport } from './routes/preview-instagram'
@@ -235,6 +236,11 @@ const PreviewModeracaoRoute = PreviewModeracaoRouteImport.update({
 const PreviewMeditacaoRoute = PreviewMeditacaoRouteImport.update({
   id: '/preview-meditacao',
   path: '/preview-meditacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewMapaRoute = PreviewMapaRouteImport.update({
+  id: '/preview-mapa',
+  path: '/preview-mapa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewLojaSementinhasRoute = PreviewLojaSementinhasRouteImport.update({
@@ -666,6 +672,7 @@ export interface FileRoutesByFullPath {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
@@ -768,6 +775,7 @@ export interface FileRoutesByTo {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
@@ -872,6 +880,7 @@ export interface FileRoutesById {
   '/preview-instagram': typeof PreviewInstagramRoute
   '/preview-jogo': typeof PreviewJogoRoute
   '/preview-loja-sementinhas': typeof PreviewLojaSementinhasRoute
+  '/preview-mapa': typeof PreviewMapaRoute
   '/preview-meditacao': typeof PreviewMeditacaoRoute
   '/preview-moderacao': typeof PreviewModeracaoRoute
   '/preview-momento': typeof PreviewMomentoRoute
@@ -976,6 +985,7 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
     | '/preview-moderacao'
     | '/preview-momento'
@@ -1078,6 +1088,7 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
     | '/preview-moderacao'
     | '/preview-momento'
@@ -1181,6 +1192,7 @@ export interface FileRouteTypes {
     | '/preview-instagram'
     | '/preview-jogo'
     | '/preview-loja-sementinhas'
+    | '/preview-mapa'
     | '/preview-meditacao'
     | '/preview-moderacao'
     | '/preview-momento'
@@ -1285,6 +1297,7 @@ export interface RootRouteChildren {
   PreviewInstagramRoute: typeof PreviewInstagramRoute
   PreviewJogoRoute: typeof PreviewJogoRoute
   PreviewLojaSementinhasRoute: typeof PreviewLojaSementinhasRoute
+  PreviewMapaRoute: typeof PreviewMapaRoute
   PreviewMeditacaoRoute: typeof PreviewMeditacaoRoute
   PreviewModeracaoRoute: typeof PreviewModeracaoRoute
   PreviewMomentoRoute: typeof PreviewMomentoRoute
@@ -1511,6 +1524,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-meditacao'
       fullPath: '/preview-meditacao'
       preLoaderRoute: typeof PreviewMeditacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-mapa': {
+      id: '/preview-mapa'
+      path: '/preview-mapa'
+      fullPath: '/preview-mapa'
+      preLoaderRoute: typeof PreviewMapaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-loja-sementinhas': {
@@ -2113,6 +2133,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewInstagramRoute: PreviewInstagramRoute,
   PreviewJogoRoute: PreviewJogoRoute,
   PreviewLojaSementinhasRoute: PreviewLojaSementinhasRoute,
+  PreviewMapaRoute: PreviewMapaRoute,
   PreviewMeditacaoRoute: PreviewMeditacaoRoute,
   PreviewModeracaoRoute: PreviewModeracaoRoute,
   PreviewMomentoRoute: PreviewMomentoRoute,

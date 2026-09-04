@@ -17,8 +17,12 @@ function codigoDe(caminho: string): string {
 
 const chat = codigoDe("src/routes/api/chat.ts");
 const chatBruto = readFileSync("src/routes/api/chat.ts", "utf8");
-const app = codigoDe("src/routes/_authenticated/minha-conta.tsx");
-const appBruto = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+const app = codigoDe("src/components/chat-tab.tsx");
+const appBruto = readFileSync("src/components/chat-tab.tsx", "utf8");
+/* O chat da NUTRIÇÃO continua em minha-conta.tsx; o principal saiu para
+   chat-tab.tsx (set/2026). São dois arquivos, de propósito: o teste compara os
+   dois leitores de stream, e eles moram em lugares diferentes agora. */
+const contaBruta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
 
 describe("erro do provedor vira mensagem, não bolha vazia", () => {
   /**
@@ -160,9 +164,10 @@ describe("os três chats leem erro do mesmo jeito", () => {
      outro lugar. Teste que encontra a string no vizinho é teste que não
      protege ninguém. */
   const nutricao = (() => {
-    const ini = appBruto.indexOf("function NutricaoTab");
-    const fim = appBruto.indexOf("\nfunction ", ini + 10);
-    return appBruto.slice(ini, fim > 0 ? fim : undefined);
+    const ini = contaBruta.indexOf("function NutricaoTab");
+    if (ini < 0) throw new Error("NutricaoTab não está em minha-conta.tsx");
+    const fim = contaBruta.indexOf("\nfunction ", ini + 10);
+    return contaBruta.slice(ini, fim > 0 ? fim : undefined);
   })();
   const endpointNutricao = readFileSync("src/routes/api/nutrition.ts", "utf8");
 

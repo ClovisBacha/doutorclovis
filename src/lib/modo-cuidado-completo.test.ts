@@ -27,7 +27,14 @@ import { memoryBlock } from "./chat-memory.server";
 import { buildClinicalBlock } from "@/routes/api/chat";
 
 const chat = readFileSync("src/routes/api/chat.ts", "utf8");
-const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/* ⚠️ O chat (ChatTab, WABubble, buildPatientContext…) saiu de minha-conta.tsx
+   para src/components/chat-tab.tsx em set/2026. Este teste confere coisas dos
+   DOIS arquivos, então lê os dois juntos — uma asserção que procura texto do
+   chat aqui continua encontrando. */
+const tela =
+  readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8") +
+  "\n" +
+  readFileSync("src/components/chat-tab.tsx", "utf8");
 const memoria = readFileSync("src/lib/chat-memory.server.ts", "utf8");
 
 describe("1. a idade gestacional some da TELA INTEIRA, não de duas abas", () => {

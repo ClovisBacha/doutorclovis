@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ChatTab } from "@/routes/_authenticated/minha-conta";
+import { ChatTab } from "@/components/chat-tab";
 
 /**
  * Bancada de design do CHAT — renderiza o `ChatTab` REAL, sem login.
