@@ -12960,3 +12960,24 @@ emblema, nenhuma página rolando na horizontal, zero erros de console.
   legenda de bancada.
 - **Medido ao fim desta leva:** 124 bancadas varridas e 11 roteiros de
   interação, zero problemas; 5.523 testes verdes.
+
+### ⚠️ NENHUM CAMPO DO APP DÁ ZOOM NO IPHONE — uma regra, não 155 edições
+
+Abaixo de 16px o Safari do iPhone AMPLIA a página ao focar um campo, e não
+volta sozinho. Foi metade da causa do "a tela se desloca" do chat — e o chat
+era UM de **161 campos do app: 155 estavam em 13, 14 ou 15px** (medido).
+
+A regra vive no fim de `styles.css`, **fora de @layer** (regra sem camada
+vence qualquer utilitário sem `!important`) e recortada por
+`(max-width: 767px) and (pointer: coarse)` — no computador nada muda.
+`max(16px, 1em)` só SOBE. Medido em oito telas no modo toque: zero campos
+abaixo de 16, nenhuma rolando na horizontal.
+
+⚠️ **Campo novo com `text-sm` continua CERTO no código** — a regra o sobe no
+aparelho. Não "conserte" um campo pondo `text-[16px]` à mão fora do chat: a
+regra já faz isso, e o 16 à mão só estraga o computador.
+
+**E o `/auth`** — a porta de entrada — era a última tela com a cara antiga:
+rótulo espaçado, cinco cartões de contorno, papéis a 12,5px, botões chapados.
+Ganhou o material do app e o piso de 13px; "Acompanhante" continua cabendo a
+320px pela hifenização que já estava lá.
