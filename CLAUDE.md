@@ -11978,10 +11978,11 @@ commitado, restaurando o HEAD por cima de um degrau recém-escrito. A lição j�
 estava neste arquivo: **restaurar mutação com `cp`, NUNCA com `git checkout`.**
 
 **Medido ao fim:** 5.507 testes · 121 bancadas · 11 roteiros de interação ·
-zero problemas. **Aplicar no Supabase (pendentes, medidos):**
-`supabase/APLICAR_CONVERSA_SILENCIAR.sql` e
-`supabase/APLICAR_DURACAO_DA_CONSULTA.sql` — e a aba Banco passa a dizer isso
-sozinha.
+zero problemas. **Aplicar no Supabase:** os dois que estavam pendentes
+(`APLICAR_CONVERSA_SILENCIAR.sql` e `APLICAR_DURACAO_DA_CONSULTA.sql`) **já
+foram rodados** — conferido por sondagem ao PostgREST em 04/set: `silenciada_a`,
+`imagem_path` e `duration_minutes` respondem 200. A aba Banco continua sendo
+quem diz isso sozinha para os próximos.
 
 ## A bolha responde, os blocos têm número, e a Saúde ganhou ícones 3D (set/2026)
 
