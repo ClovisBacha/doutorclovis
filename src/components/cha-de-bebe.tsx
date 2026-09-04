@@ -421,9 +421,7 @@ export function ChaDeBebe({
           horas nesta base (`confirmed_time` aceitando "manhã"), e aqui ela vai
           para uma coluna `date`. */}
       <section className="rounded-3xl card-material p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          O convite
-        </p>
+        <p className="font-serif text-[15px] font-semibold text-muted-foreground">O convite</p>
         <input
           value={titulo}
           onChange={(e) => setTitulo(e.target.value.slice(0, 120))}
@@ -464,15 +462,13 @@ export function ChaDeBebe({
 
       {/* ─── O LINK ────────────────────────────────────────────────────── */}
       <section className="rounded-3xl card-material p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Seu link
-        </p>
+        <p className="font-serif text-[15px] font-semibold text-muted-foreground">Seu link</p>
         <p className="mt-1 break-all text-sm text-foreground">{url}</p>
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={copiar}
-            className="press flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+            className="btn-3d press min-h-11 flex-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
           >
             Copiar convite
           </button>
@@ -480,7 +476,7 @@ export function ChaDeBebe({
             href={linkDeWhatsApp(textoDoConvite({ bebeNome: lista.bebeNome, url }))}
             target="_blank"
             rel="noreferrer"
-            className="press flex-1 rounded-xl border border-border px-3 py-2 text-center text-sm font-medium"
+            className="pill-3d press min-h-11 flex-1 rounded-xl px-3 py-2 text-center text-sm font-semibold"
           >
             Mandar no WhatsApp
           </a>
