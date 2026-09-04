@@ -13203,6 +13203,14 @@ o pacote é uma vez; a latência é uma vez por consulta.
 (no mesmo cast do `maxDuration`, pelo mesmo motivo de tipo). Conferido no
 `.vc-config.json` gerado.
 
+**Conferido na produção depois do deploy**, pelo cabeçalho `x-vercel-id`, cujo
+segundo campo é onde a função EXECUTOU:
+
+    antes   iad1::iad1::...
+    depois  iad1::gru1::...
+
+(o primeiro campo é a borda que recebeu o pedido, e varia com quem pede.)
+
 ⚠️ **O site institucional passa a ser renderizado no Brasil também.** Para
 quem abre de fora do país é um pouco pior; o público é brasileiro, então é o
 negócio certo — e está escrito aqui para ser uma decisão, e não uma
