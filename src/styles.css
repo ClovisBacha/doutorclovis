@@ -3579,3 +3579,125 @@ button:active > .duo3d {
     font-size: max(16px, 1em);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   O TOQUE RESPONDE COMO NO APARELHO (set/2026).
+
+   Pedido do dono: deixar o app mais perto de nativo. Medido antes de mexer,
+   em oito bancadas: 114 de 114 botões podiam ser SELECIONADOS no toque
+   longo, 114 de 114 sem `touch-action`, e nenhuma tela continha o
+   encadeamento da rolagem. São os tells que fazem um app instalado continuar
+   parecendo uma página.
+
+   ⚠️ O REALCE CINZA NÃO SAI SOZINHO. Medido: só 245 dos 801 alvos (31%)
+   têm `.press`, o retorno ao toque do app — 310 deles no Jogo. Tirar o
+   realce sem repor nada deixaria a maioria dos botões MUDA ao dedo, que é
+   pior que o realce feio. Por isso as duas linhas andam juntas: sai o
+   retângulo do navegador, entra o escurecer instantâneo do iOS.
+
+   ⚠️ `opacity`, NUNCA `transform`. Um `transform` num ancestral vira bloco
+   de contenção para descendente `fixed` — este app tem folha `fixed
+   inset-0` dentro de botão (a Loja, a folha do menu) e as animações de
+   sprite do Jogo. O `.press` já paga esse risco em 245 elementos com razão
+   (ele é opt-in); espalhá-lo por mais 556 seria devolver a conta.
+
+   ⚠️ `:disabled` e `aria-disabled` ficam de fora: eles já vivem em
+   `opacity-50`, e esta regra (fora de @layer) venceria a utilitária —
+   o botão desabilitado CLAREARIA ao toque, dizendo que está disponível.
+
+   ⚠️ O QUE ELA PRECISA COPIAR CONTINUA SELECIONÁVEL. A régua é a NATUREZA
+   do elemento, não a tela: rótulo de controle (`button`, `label`,
+   `summary`, `[role=...]`) não é texto para copiar; parágrafo, código de
+   indicação, endereço e telefone são TEXTO e nem entram no seletor. `a` só
+   entra no retorno ao toque, nunca na trava de seleção — `tel:` e `wa.me`
+   da Central de Emergência continuam com o menu do sistema no toque longo.
+
+   ⚠️ A CONTENÇÃO DA ROLAGEM É SÓ NO APP INSTALADO, e o recorte é o MESMO
+   do `PullToRefresh` (`display-mode: standalone`). No navegador o puxar-
+   para-atualizar é do navegador e ele fica; instalado, quem atualiza é o
+   nosso, e sem `contain` os dois disputam o mesmo gesto no Android.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (pointer: coarse) {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button:not(:disabled):not([aria-disabled="true"]):active,
+  [role="button"]:not([aria-disabled="true"]):active,
+  [role="tab"]:not([aria-disabled="true"]):active,
+  [role="switch"]:not([aria-disabled="true"]):active,
+  a[href]:active,
+  label:active,
+  summary:active {
+    opacity: 0.62;
+  }
+
+  button,
+  [role="button"],
+  [role="tab"],
+  [role="switch"],
+  label,
+  summary {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: manipulation;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+
+  /* ⚠️ A ROLAGEM PARA ONDE A LISTA ACABA.
+     Medido no app da paciente: 50 contêineres roláveis e TRÊS com contenção.
+     Sem ela, chegar ao fim de uma folha e continuar arrastando anda com a
+     PÁGINA ATRÁS — a paciente fecha a folha noutro ponto da tela, sem ter
+     pedido. Nenhum app nativo faz isso.
+     Uma regra só, e não 50 edições: é a lição do piso de 16px dos campos —
+     a 51ª lista nasceria sem a contenção.
+     ⚠️ E ela NÃO prende a rolagem num contêiner que não precisa rolar.
+     Medido no Chromium: com o conteúdo cabendo, a página ainda andou 748px;
+     com o conteúdo maior que a caixa, ficou em 0. `overscroll-behavior` só
+     vale onde há o que rolar.
+     ⚠️ Só o eixo Y. No X ela bloquearia o "voltar" por deslize do Android
+     quando o dedo começa dentro de um carrossel — trocar um encadeamento
+     por uma navegação perdida é pior negócio. */
+  [class*="overflow-y-auto"],
+  [class*="overflow-auto"],
+  [class*="overflow-y-scroll"] {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* ⚠️ `display-mode: standalone` É FALSO DENTRO DA CASCA DO CAPACITOR — e por
+   isso ele não pode ser o único portão. Num WKWebView o display-mode é
+   `browser` e `navigator.standalone` é indefinido; a prova está no próprio
+   repositório, em `src/lib/avisos.ts`: antes daquela camada, o botão de avisos
+   DENTRO do app devolvia `ios-not-installed`, e `push.ts` só devolve esse
+   motivo quando `isIos && !standalone`. Com o portão sozinho, o app instalado
+   como PWA teria mais gesto de app que o app NATIVO.
+   `html.nativo` é a marca que `prepararNativo()` põe de forma SÍNCRONA, antes
+   de o React hidratar — a mesma que esconde o cabeçalho do site lá dentro.
+
+   ⚠️ É `contain`, e NÃO `none`, e a diferença importa: `contain` impede o
+   encadeamento (e com ele o puxar-para-recarregar do Chrome no Android, que
+   hoje disputa o gesto com o nosso `PullToRefresh`); `none` mataria também a
+   ELÁSTICA. App nativo de iOS tem elástica — tirá-la afastaria do nativo em
+   vez de aproximar. O rosa que ela revela é a cor de espera da MARCA, escolhida
+   de propósito em `capacitor.config.ts`, não um defeito. Se um dia o dono não
+   quiser vê-la no arrasto, o botão é trocar este valor por `none`. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+html.nativo,
+html.nativo body {
+  overscroll-behavior-y: contain;
+}

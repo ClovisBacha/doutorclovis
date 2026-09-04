@@ -13255,3 +13255,175 @@ cortando bytes (round trips, pacote, casca na borda) antes de perguntar onde o
 banco estava. Os cortes valeram, e nenhum deles é da ordem de grandeza deste.
 **Numa queixa de lentidão, a primeira pergunta é a GEOGRAFIA: onde roda o
 código, onde mora o dado, e onde está a pessoa.**
+
+## Mais perto de nativo: o toque, a rolagem e o voltar (set/2026)
+
+Pedido do dono: _"monte um planejamento de como melhorar ainda mais o app,
+deixar ela mais perto de ser native, e execute agora"_. Oito auditores em
+paralelo, cada um numa dimensão, com céticos independentes tentando REFUTAR
+cada achado — e o que segue é o que sobreviveu à medição.
+
+### ⚠️ O REALCE E O RETORNO AO TOQUE ANDAM JUNTOS
+
+O retângulo cinza que o navegador pinta ao tocar é o tell número um de "isto é
+uma página". Tirá-lo é UMA linha — e sozinha ela seria uma piora: medido em
+oito bancadas, **só 245 dos 801 alvos têm `.press`**, o retorno ao toque do
+app (310 dos que não têm estão no Jogo). Sem repor nada, a maioria dos botões
+ficaria MUDA ao dedo.
+
+Então saem juntos: o realce vira transparente e todo controle escurece
+enquanto o dedo está nele.
+
+- ⚠️ **`opacity`, NUNCA `transform`.** Um `transform` num ancestral vira bloco
+  de contenção para descendente `fixed` — e este app tem folha `fixed inset-0`
+  dentro de botão, mais as animações de sprite do Jogo. O `.press` paga esse
+  risco em 245 elementos por ser opt-in; a regra global não pode pagá-lo em
+  801.
+- ⚠️ **O DESABILITADO fica de fora.** Ele vive em `opacity-50`, e a regra (fora
+  de `@layer`) venceria a utilitária: ao toque ele iria a 0,62 e ficaria MAIS
+  CLARO, dizendo que está disponível. Medido em `?estado=esgotada`: fica em
+  0,4 e nenhum clareia.
+- ⚠️ **O que ela precisa copiar continua selecionável**, e a régua é a NATUREZA
+  do elemento: rótulo de controle (`button`, `label`, `summary`, `[role=…]`)
+  não é texto para copiar; parágrafo, código de indicação e endereço são TEXTO
+  e nem entram no seletor. **`a[href]` fica FORA da trava** — medido, 11 de 11
+  links `tel:`/`wa.me` da Central de Emergência seguem com o menu do sistema no
+  toque longo.
+
+**Medido depois, em oito telas:** 550/550 alvos travados e com
+`touch-action: manipulation`, 2/2 campos ainda selecionáveis, realce
+transparente.
+
+### A rolagem para onde a lista acaba
+
+Medido: **50 contêineres roláveis no app da paciente e TRÊS com contenção.**
+Sem ela, chegar ao fim de uma folha e continuar arrastando anda com a PÁGINA
+ATRÁS — a paciente fecha a folha noutro ponto da tela, sem ter pedido.
+
+- **Uma regra só, e não 50 edições** (`[class*="overflow-y-auto"]`): a 51ª
+  lista nasceria sem. É a lição do piso de 16px dos campos.
+- ⚠️ **E ela NÃO prende a rolagem num contêiner que não precisa rolar.**
+  Medido no Chromium: com o conteúdo cabendo, a página ainda andou **748px**;
+  com o conteúdo maior que a caixa, **0**. `overscroll-behavior` só vale onde
+  há o que rolar.
+- ⚠️ **Só o eixo Y.** No X ela bloquearia o "voltar" por deslize do Android
+  quando o dedo começa dentro de um carrossel.
+
+### ⚠️ `display-mode: standalone` É FALSO DENTRO DA CASCA
+
+O achado que mais mudou o que eu ia fazer. Num WKWebView do Capacitor o
+display-mode é `browser` e `navigator.standalone` é indefinido — então o
+`PullToRefresh` e a contenção da PÁGINA, os dois gateados nisso, **não valiam
+justamente no app nativo**: o app instalado como PWA tinha mais gesto de app
+que o app nativo de verdade.
+
+⚠️ **A prova está no próprio repositório**, e não numa suposição: `avisos.ts`
+conta que, antes daquela camada, o botão de avisos DENTRO do app devolvia
+`ios-not-installed` — e `push.ts` só devolve esse motivo quando
+`isIos && !standalone`.
+
+O portão passou a ser `standalone` **OU** nativo, nos dois lugares:
+`html.nativo` (a marca que `prepararNativo()` põe de forma síncrona, antes de
+hidratar) no CSS, e `ehNativo()` no componente — em EFEITO, nunca no render.
+
+⚠️ **É `contain`, e não `none`.** `contain` impede o encadeamento e com ele o
+puxar-para-recarregar do Chrome, que hoje disputa o gesto com o nosso;
+**`none` mataria também a ELÁSTICA, e app nativo de iOS tem elástica** —
+tirá-la afastaria do nativo em vez de aproximar. O rosa que ela revela é a cor
+de espera da MARCA (`capacitor.config.ts`), escolhida de propósito.
+
+### ⚠️ O VOLTAR DO ANDROID FECHAVA O APP, DE QUALQUER PROFUNDIDADE
+
+A pilha de `voltar.ts` existe, está testada e está certa — e **apenas OITO
+folhas se registravam nela.** Nenhuma tela de NAVEGAÇÃO: nem a troca de aba,
+nem o hub da Saúde, nem os 25 destinos da Comunidade. Medido: Saúde → grade →
+Chutes, botão de voltar, ninguém assume, `minimizeApp()`. O gesto que o
+Android inteiro usa para "suba um nível" tirava o app da frente.
+
+⚠️ **E a subida certa já existia**: `voltarDaBarra`, com três regras escritas e
+justificadas, ligada só à seta desenhada na barra de cima. Aqui não nasceu
+régua nova — nasceu o SEGUNDO chamador da mesma. Uma segunda régua faria a
+seta e o botão do aparelho discordarem.
+
+⚠️ **`registrarVoltarDeFundo` existe por causa da ORDEM DOS EFEITOS DO REACT.**
+O efeito do FILHO roda antes do do PAI: registrada pelo caminho normal, a
+subida de aba (o pai) entraria na pilha ACIMA da Comunidade (o filho) e
+engoliria todo voltar antes de a aba ter a vez. Quem chama o registro de fundo
+está dizendo "só me chame se ninguém mais quiser", e entra na BASE
+independentemente de quando montou.
+
+⚠️ **Em `mobileHome` NÃO se registra**, de propósito: na raiz o voltar do
+Android sai do app, e é isso que todo app faz.
+
+⚠️ **A Comunidade tem pilha PRÓPRIA**, e ela é OBSERVADA — não escrita em cada
+`setOnde`. Empilhar no ponto de uso exigiria tocar nas 67 chamadas, e a 68ª
+nasceria sem. A régua mora em `src/lib/pilha-de-telas.ts` porque **`RedeNoApp`
+NÃO TEM BANCADA**: `/preview-instagram` monta as telas internas direto, nunca
+ele — enterrada no componente, esta lógica não teria como ser exercitada em
+lugar nenhum, nem no navegador, nem em teste.
+
+⚠️ **E o `useVoltar` passou a poder RECUSAR** (`return false`). É o que faz as
+duas conviverem: dentro de uma sub-tela da Comunidade quem assume é ela; no
+feed ela recusa, e o voltar cai na subida de aba. `void` continua querendo
+dizer "assumi", então nenhuma das oito folhas precisou mudar.
+
+### ⚠️ A CARTEIRINHA DE EMERGÊNCIA ACUSAVA A PACIENTE
+
+`CardTab` fazia `if (!profile) return "Preencha seu perfil primeiro"`, e
+`profile` vinha de uma leitura cujo erro era DESCARTADO — no supabase-js a
+falha devolve `data: null`. Uma oscilação de rede transformava o documento que
+ela mostra no pronto-socorro (tipo sanguíneo, alergias, medicações, contato de
+emergência, o QR) numa frase que é **falsa**, que **culpa ela**, e que a manda
+ao Perfil refazer o que já está preenchido há meses.
+
+É a **sétima** da classe que `NaoConsegueLer` fechou em seis telas — a régua
+aplicada num lugar e deixada de pé na mais grave. A ironia estava no próprio
+arquivo: o comentário do QR promete "funciona offline" sobre uma tela que não
+chegava a montar sem rede.
+
+⚠️ **A ORDEM é o conserto**: a falha vem ANTES do vazio. E o sossego dela dá o
+caminho de emergência (`192`), não só consolo — é a única das sete em que a
+paciente pode estar num pronto-socorro agora.
+
+### ⚠️ A CASCA OFFLINE DAVA O TELEFONE DO CONSULTÓRIO FUNDADOR
+
+`native/shell/index.html` é a única coisa dentro do aparelho quando o Capacitor
+não alcança o site. Ela oferecia `tel:+5531986342903` rotulado só
+"Consultório" — o número do consultório fundador, para paciente de **qualquer
+médico** da plataforma. É exatamente o que `emergency-sheet.tsx` gastou uma
+decisão inteira para não fazer: _"um SOS que liga para o médico errado é pior
+que um SOS que não liga para ninguém, porque ela vai esperar do outro lado uma
+resposta que não vem"_.
+
+A casca é um arquivo ESTÁTICO: sem sessão, sem banco, sem como saber de quem é
+a paciente. O 192 fica (certo para todo mundo, em qualquer cidade, sem rede); o
+consultório virou INSTRUÇÃO, não número.
+
+⚠️ **Hoje a tela é INALCANÇÁVEL** — não há `server.errorPath` no
+`capacitor.config.ts` —, e é isso que torna este conserto barato: **quem ligar
+o `errorPath` amanhã não liga junto um vazamento.** Ligá-lo é decisão do dono,
+e ela vem com uma segunda pergunta: o que mais essa tela deveria ter (a
+carteirinha inteira mora no servidor e hoje não existe no aparelho).
+
+### O que ficou escrito para NÃO ser refeito
+
+- ⚠️ **`*-tmp.mjs` na raiz é medição descartável**, e agora está no
+  `.gitignore` e no `ignores` do eslint. Agente de auditoria e bancada
+  escrevem na árvore viva, e o portão reprovava por formatação de arquivo que
+  ninguém vai commitar — **portão que reprova por motivo alheio ao código é
+  portão que se aprende a ignorar.**
+- ⚠️ **`pkill` no MESMO comando do portão devolve 144**, com ou sem colchete no
+  padrão. Um comando por vez.
+- ⚠️ **A prosa quebrou a busca DE NOVO**, nas duas direções: um guarda
+  `'pilha-de-telas' not in s` casou o comentário que eu tinha acabado de
+  escrever citando o arquivo, e o import não foi inserido. E `setProfile(data)`
+  aparece CINCO vezes em `minha-conta.tsx` — a âncora certa é o estado que
+  decide a tela, nunca o nome que o arquivo pode ter cinco vezes.
+- ⚠️ **`if (loading) return` fica ANTES de onde `voltarDaBarra` é declarada**,
+  então o hook do voltar mora longe da função que chama. Funciona porque
+  `voltarDaBarra` é uma DECLARAÇÃO (içada) e porque o hook a guarda numa ref.
+  O lint pegou a primeira versão.
+
+**Medir:** `node scratchpad/nativo/medir-toque.mjs` (o toque, oito telas) ·
+`contencao.mjs` (a rolagem) · `encadeia.mjs` (a prova de que a contenção não
+prende quem não rola) · `cobertura-press.mjs` (quantos alvos têm retorno).

@@ -61,3 +61,6 @@ src/assets/social/*.png
 # commitado, ou tem de ser conferido à mão e commitado no arquivo certo. Ele
 # nunca entra no repositório.
 restos-*.patch
+
+# Medição descartável na raiz (bancada, agente de auditoria). Nunca é produto.
+*-tmp.mjs

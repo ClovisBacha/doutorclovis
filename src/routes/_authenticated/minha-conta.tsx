@@ -394,6 +394,7 @@ import { joinCorporate } from "@/lib/corporativo.functions";
 import { OfertaPremium } from "@/components/oferta-premium";
 import { LojaSementinhas } from "@/components/loja-sementinhas";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
+import { useVoltarDeFundo } from "@/lib/use-voltar";
 import {
   savePpdScreening,
   getMyPpdScreenings,
@@ -1110,6 +1111,7 @@ function MinhaContaPage() {
     setRefreshKey((k) => k + 1);
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
+  const [perfilInstavel, setPerfilInstavel] = useState(false);
   const [mobileHome, setMobileHome] = useState(initialTab === "Bebê" && !tabPedidaNaUrl);
   /* Hub da seção Saúde (só no celular). A seção tem SEIS abas e elas viviam
      numa fileira de pílulas que rolava na horizontal: cabiam quatro, então
@@ -1812,8 +1814,16 @@ function MinhaContaPage() {
               .select("*")
               .eq("id", u.user.id)
               .maybeSingle();
-      const { data } = perfilRes as { data: any };
+      const { data, error: erroPerfil } = perfilRes as { data: any; error: unknown };
       setProfile(data);
+      /* ⚠️ "NÃO CONSEGUI LER" NÃO É "NÃO PREENCHEU". O erro era descartado, e
+         no supabase-js a falha devolve `data: null` — então uma oscilação de
+         rede transformava a CARTEIRINHA DE EMERGÊNCIA (tipo sanguíneo,
+         alergias, medicações, contato) na frase "Preencha seu perfil
+         primeiro": falsa, culpando ela, e mandando para o lado errado no
+         pronto-socorro. É a mesma classe que `NaoConsegueLer` fechou em seis
+         telas e que ficou de pé na mais grave. */
+      setPerfilInstavel(!data && !!erroPerfil);
       setUserId(u.user.id);
 
       /* ── ⚠️ A GESTANTE COM DUM NÃO ESPERA O PAPEL ──────────────────────
@@ -1993,6 +2003,29 @@ function MinhaContaPage() {
     navigate({ to: "/" });
   }
 
+  /* ⚠️ O VOLTAR DO ANDROID SOBE UM NÍVEL — antes ele FECHAVA O APP (set/2026).
+     A pilha de `voltar.ts` existe, está testada e está certa; só que apenas
+     OITO folhas se registravam nela, e nenhuma tela de NAVEGAÇÃO. Medido: a
+     paciente entrava em Saúde → grade → Chutes, apertava o voltar do Android,
+     ninguém assumia e o app era minimizado. O gesto que o Android inteiro usa
+     para "suba um nível" tirava o app da frente.
+     ⚠️ E a subida certa já existia: é esta `voltarDaBarra` logo acima, com as
+     três regras escritas e justificadas. Ela estava ligada só à seta desenhada
+     na barra de cima. Aqui não nasce régua nova nenhuma — nasce o SEGUNDO
+     chamador da mesma. Uma segunda régua faria a seta e o botão do aparelho
+     discordarem, e o defeito apareceria como "às vezes ele volta para outro
+     lugar".
+     ⚠️ Em `mobileHome` NÃO se registra, de propósito: na raiz o voltar do
+     Android sai do app, e é isso que todo app faz. Registrar aqui prenderia a
+     paciente dentro do app sem saída pelo gesto do sistema. */
+  useVoltarDeFundo(!mobileHome, voltarDaBarra);
+
+  /* ⚠️ Ele fica AQUI, longe da `voltarDaBarra` que chama, e não é gosto: há um
+     `if (loading) return` logo abaixo, e um hook depois de um retorno
+     antecipado quebra a regra dos hooks (o lint pegou). A referência funciona
+     porque `voltarDaBarra` é uma DECLARAÇÃO de função, içada — e porque
+     `useVoltarDeFundo` a guarda numa ref, chamando-a só quando o voltar
+     acontece. */
   if (loading)
     return (
       <>
@@ -2989,7 +3022,14 @@ function MinhaContaPage() {
                 )}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
-                  <CardTab profile={profile} gest={gest} onNavigate={goToTab} medico={meuMedico} />
+                  <CardTab
+                    profile={profile}
+                    gest={gest}
+                    onNavigate={goToTab}
+                    medico={meuMedico}
+                    instavel={perfilInstavel}
+                    aoTentar={refreshAll}
+                  />
                 )}
                 {tab === "Pós-parto" && (
                   <PosPartoTab profile={profile} onNavigate={goToTab} careMode={careMode} />
@@ -6808,10 +6848,15 @@ function CardTab({
   gest,
   onNavigate,
   medico,
+  instavel = false,
+  aoTentar,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  /** A leitura do perfil FALHOU — não é o mesmo que ela não ter preenchido. */
+  instavel?: boolean;
+  aoTentar?: () => void;
   /** Médico da paciente; `null` = usa o dono da instalação. */
   medico?: DoctorContato | null;
 }) {
@@ -6874,6 +6919,18 @@ function CardTab({
     };
   }, [cardText]);
 
+  /* ⚠️ A ORDEM É O CONSERTO: falha de leitura vem ANTES do vazio. Trocadas, a
+     paciente no pronto-socorro lê "Preencha seu perfil primeiro" sobre um
+     perfil que está preenchido há meses — e vai ao Perfil refazer o que já
+     existe, em vez de tentar de novo. */
+  if (!profile && instavel)
+    return (
+      <NaoConsegueLer
+        oQue="a sua carteirinha"
+        sossego="Os seus dados continuam salvos. No pronto-socorro, mostre este aparelho ou ligue 192."
+        aoTentar={() => aoTentar?.()}
+      />
+    );
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
 

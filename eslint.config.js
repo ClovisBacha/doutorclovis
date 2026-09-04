@@ -6,7 +6,13 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi", ".vercel"] },
+  /* ⚠️ `*-tmp.mjs` na RAIZ é medição descartável, nunca produto. Eles nascem de
+     agente de auditoria e de bancada de medição rodando na árvore viva, e o
+     portão reprovava por formatação de arquivo que ninguém vai commitar —
+     portão que reprova por motivo alheio ao código é portão que se aprende a
+     ignorar. O `.gitignore` impede o commit; esta linha impede o falso
+     vermelho. */
+  { ignores: ["dist", ".output", ".vinxi", ".vercel", "*-tmp.mjs"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],

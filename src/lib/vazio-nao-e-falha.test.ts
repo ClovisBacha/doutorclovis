@@ -185,3 +185,88 @@ describe("⚠️ as duas de DUAS camadas", () => {
     expect(trecho).toMatch(/if \(error \|\| !posts\) return \{ ok: false/);
   });
 });
+
+describe("⚠️ a SÉTIMA — a carteirinha de emergência (set/2026)", () => {
+  /* Ela ficou de pé quando as seis foram consertadas, e é a de maior
+     consequência: `CardTab` fazia `if (!profile) return "Preencha seu perfil
+     primeiro"`, e `profile` vinha de uma leitura cujo erro era DESCARTADO
+     (`const { data } = perfilRes`). Uma oscilação de rede transformava o
+     documento que ela mostra no pronto-socorro — tipo sanguíneo, alergias,
+     medicações, contato de emergência, o QR — numa frase que é falsa, que
+     culpa ela, e que a manda ao Perfil refazer o que já existe.
+     A ironia estava no próprio arquivo: o comentário do QR promete "funciona
+     offline" sobre uma tela que não chegava a montar sem rede. */
+  const CONTA = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  test("o erro da leitura do perfil NÃO é descartado", () => {
+    /* ⚠️ A âncora NÃO é `setProfile(data)`: ele aparece CINCO vezes neste
+       arquivo, e a primeira é outra leitura — a armadilha de substring que
+       este repositório já pagou uma dúzia de vezes. Quem identifica o lugar é
+       o estado que decide a tela. */
+    const i = CONTA.indexOf("setPerfilInstavel(");
+    expect(i).toBeGreaterThan(-1);
+    const decisao = CONTA.slice(i, CONTA.indexOf(";", i));
+    /* E ela sai do ERRO da leitura, nunca de um booleano solto: com
+       `setPerfilInstavel(false)` cravado, a tela volta a acusar a paciente. */
+    const nomeDoErro = decisao.match(/!!\s*(\w+)/)?.[1];
+    expect(nomeDoErro).toBeTruthy();
+    const desestrutura = CONTA.slice(CONTA.lastIndexOf("const {", i), i);
+    expect(desestrutura).toContain(`error: ${nomeDoErro}`);
+  });
+
+  test("⚠️ a falha vem ANTES do vazio — trocadas, ela lê a acusação", () => {
+    const vazio = CONTA.indexOf("Preencha seu perfil primeiro");
+    expect(vazio).toBeGreaterThan(-1);
+    const falha = CONTA.indexOf("a sua carteirinha");
+    expect(falha).toBeGreaterThan(-1);
+    expect(falha).toBeLessThan(vazio);
+    /* E o que ela vê é o componente único desta classe, não um texto novo. */
+    const trecho = CONTA.slice(falha - 400, vazio);
+    expect(trecho).toContain("NaoConsegueLer");
+  });
+
+  test("⚠️ o sossego dela dá o caminho de emergência, e não só consolo", () => {
+    /* É a única das sete em que a paciente pode estar num pronto-socorro
+       agora. A frase tem de dizer o que fazer sem o app. */
+    const i = CONTA.indexOf("a sua carteirinha");
+    const bloco = CONTA.slice(i, i + 320);
+    expect(bloco).toContain("192");
+  });
+});
+
+describe("⚠️ a casca offline não pode nomear o médico errado", () => {
+  /* `native/shell/index.html` é a única coisa dentro do aparelho quando o
+     Capacitor não alcança o site. Ela é um arquivo ESTÁTICO: sem sessão, sem
+     banco, sem como saber de quem é a paciente. Havia ali o telefone do
+     consultório FUNDADOR rotulado só "Consultório", oferecido a paciente de
+     qualquer médico da plataforma — exatamente o que `emergency-sheet.tsx`
+     gastou uma decisão inteira para não fazer.
+     ⚠️ Hoje a tela é INALCANÇÁVEL (não há `server.errorPath` no
+     `capacitor.config.ts`), e é isso que torna este conserto barato: quem
+     ligar o `errorPath` amanhã não liga junto um vazamento. */
+  const CASCA = readFileSync("native/shell/index.html", "utf8").replace(/<!--[\s\S]*?-->/g, "");
+  const MEDICO = readFileSync("src/lib/doctor.config.ts", "utf8");
+
+  test("o 192 fica — ele é certo para todo mundo e funciona sem rede", () => {
+    expect(CASCA).toContain('href="tel:192"');
+  });
+
+  test("⚠️ e nenhum outro telefone, porque ela não sabe de quem é a paciente", () => {
+    const tels = CASCA.match(/href="tel:[^"]+"/g) ?? [];
+    expect(tels).toEqual(['href="tel:192"']);
+  });
+
+  test("⚠️ o número do consultório fundador não aparece — nem em outro formato", () => {
+    /* A âncora sai do PRÓPRIO `doctor.config.ts`: cravar o número aqui faria o
+       teste envelhecer no dia em que ele mudar, e envelhecer para o lado de
+       aprovar. */
+    const numero = MEDICO.match(/wa\.me\/(\d+)/)?.[1];
+    expect(numero).toBeTruthy();
+    const soDigitos = CASCA.replace(/\D/g, "");
+    expect(soDigitos).not.toContain(numero!);
+    expect(soDigitos).not.toContain(numero!.replace(/^55/, ""));
+  });
+});

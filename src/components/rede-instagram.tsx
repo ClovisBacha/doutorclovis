@@ -130,6 +130,8 @@ import { BUSCAS_RECENTES_MAX, chaveDasBuscasRecentes, comBuscaNova } from "@/lib
 import { ChamarParaGrupo, ConversaDoGrupo, CriarGrupo, MeusGrupos } from "@/components/rede-grupo";
 import type { GrupoNaTela } from "@/lib/grupo.functions";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
+import { criarPilhaDeTelas } from "@/lib/pilha-de-telas";
+import { useVoltar } from "@/lib/use-voltar";
 import {
   esquecerDoCache,
   guardarNoCache,
@@ -3835,6 +3837,36 @@ export function RedeNoApp({
 }) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
+
+  /* ═══ O VOLTAR DO ANDROID DENTRO DA COMUNIDADE (set/2026) ═══
+     Esta aba tem 25 destinos e 67 chamadas de `setOnde` — e nenhuma delas era
+     um passo que o botão de voltar do aparelho soubesse desfazer. Medido: de
+     um perfil aberto, o voltar do Android minimizava o app.
+
+     ⚠️ A PILHA É OBSERVADA, e não escrita em cada `setOnde`. Empilhar no ponto
+     de uso exigiria tocar nas 67 chamadas, e a 68ª — escrita amanhã — nasceria
+     sem. Um efeito que olha `onde` mudar pega TODAS, inclusive as que ainda
+     não existem. É a mesma lição do piso de 16px dos campos.
+
+     ⚠️ A RÉGUA MORA EM `src/lib/pilha-de-telas.ts` — o teto, o zerar na raiz e
+     o "o passo do próprio voltar não é empilhado". Aqui ficam só os fios,
+     porque `RedeNoApp` NÃO TEM BANCADA: `/preview-instagram` monta as telas
+     internas direto, nunca ele. Enterrada neste arquivo, esta lógica não teria
+     como ser exercitada em lugar nenhum. */
+  const pilhaDeTelas = useRef(criarPilhaDeTelas<Onde>((o) => o.t === "feed"));
+  const ondeAnterior = useRef<Onde>(onde);
+  useEffect(() => {
+    const anterior = ondeAnterior.current;
+    ondeAnterior.current = onde;
+    pilhaDeTelas.current.andou(anterior, onde);
+  }, [onde]);
+
+  /* ⚠️ No FEED ela NÃO se registra — e é isso que faz a subida de aba de
+     `minha-conta` assumir a vez. Registrada sempre, esta aba engoliria o
+     voltar para sempre e a paciente ficaria presa na Comunidade. */
+  useVoltar(onde.t !== "feed", () => {
+    setOnde(pilhaDeTelas.current.voltar() ?? { t: "feed" });
+  });
 
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   /**
