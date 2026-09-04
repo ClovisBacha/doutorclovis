@@ -24,8 +24,8 @@ const ABA = semProsa(readFileSync("src/components/rede-instagram.tsx", "utf8"));
 
 describe("os cartões", () => {
   test("são quatro, e nenhum id se repete", () => {
-    expect(CARTOES_DA_COMUNIDADE.length).toBe(4);
-    expect(new Set(CARTOES_DA_COMUNIDADE.map((c) => c.id)).size).toBe(4);
+    expect(CARTOES_DA_COMUNIDADE.length).toBe(5);
+    expect(new Set(CARTOES_DA_COMUNIDADE.map((c) => c.id)).size).toBe(5);
   });
 
   test("⚠️ um deles diz o LIMITE CLÍNICO — é a razão da tela existir", () => {

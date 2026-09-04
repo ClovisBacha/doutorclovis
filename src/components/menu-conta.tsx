@@ -4,6 +4,10 @@ import {
   CircleHelp,
   CreditCard,
   Heart,
+  IdCard,
+  ShieldAlert,
+  Sparkles,
+  Sprout,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -44,11 +48,19 @@ import { useVoltar } from "@/lib/use-voltar";
    fim o que dá para aprender aqui. Sair fica sozinho embaixo de uma linha,
    para ninguém acertar de raspão.
 
-   A CARTEIRINHA saiu: ela vive inteira dentro do SOS — QR, sangue, alergias,
-   semana, DPP, medicamentos, contato, médico — com um "abrir carteirinha
-   completa" que leva à aba. Repetir aqui era um segundo caminho para a mesma
-   tela, e o do SOS é o que importa: é lá que ela vai procurar com a mão
-   tremendo.
+   A CARTEIRINHA VOLTOU (set/2026), e "Estou com um sintoma" (a triagem)
+   entrou junto. As duas viviam SÓ dentro do SOS — a paciente só descobria que
+   existem uma ficha clínica e uma triagem de sintomas depois de apertar o
+   botão de emergência: aprender custava um susto. O caminho do SOS continua
+   sendo o principal na hora da mão tremendo; este é o de quem quer conferir
+   com calma, ou mostrar a um médico de plantão.
+
+   BEM-ESTAR e MEU CANTINHO também entraram por decisão do estudo de navegação:
+   a aba Bem-estar (meditações, sons para dormir, exercícios, humor, apoio) não
+   tinha NENHUMA porta no celular fora do Modo Cuidado, e o Cantinho só existia
+   num botão flutuante do Jogo que some em dois estados. ⚠️ A grade da Saúde
+   NÃO recebeu esses dois: o dono pediu, por escrito, que ela não tivesse
+   "alertas nem bem-estar" — o ☰ é a lista completa, a grade é a curta.
 
    CONSULTAS e REGISTROS vieram da home, onde eram dois cartões grandes acima
    do médico. A home ficou com o bebê e o médico; o que é agenda e caderno
@@ -89,6 +101,32 @@ const MENU_CONTA: {
     sub: "Diário, chutes e contrações",
     Icon: NotebookPen,
   },
+  {
+    tab: "Alertas",
+    label: "Estou com um sintoma",
+    sub: "Uma triagem rápida, e o que fazer agora",
+    Icon: ShieldAlert,
+  },
+  {
+    tab: "Carteirinha",
+    label: "Carteirinha de emergência",
+    sub: "Sangue, alergias, medicamentos e contato",
+    Icon: IdCard,
+  },
+  {
+    tab: "Bem-estar",
+    label: "Bem-estar",
+    sub: "Meditações, sons para dormir e exercícios",
+    Icon: Sparkles,
+  },
+  {
+    /* Some no Modo Cuidado: o Cantinho é a loja de enfeites do jogo, e o
+       botão dele no Caminho já se esconde no luto. */
+    tab: "Recompensas",
+    label: "Meu Cantinho",
+    sub: "Enfeites, conquistas e as suas Sementinhas",
+    Icon: Sprout,
+  },
   { tab: "Médico", label: "Meu médico", sub: "Quem acompanha a sua gestação", Icon: Stethoscope },
   { tab: "Acompanhante", label: "Acompanhante", sub: "Convide quem acompanha você", Icon: Users },
   {
@@ -103,7 +141,7 @@ const MENU_CONTA: {
        sub-aba, o `goToTab` gravá-la, o hub aceitá-la) — e nenhum dos três
        tinha teste. Um destino próprio não tem elo nenhum para quebrar. */
     tab: "Loja",
-    label: "Loja",
+    label: "Loja de produtos",
     sub: "Suplementos, conforto e enxoval",
     Icon: ShoppingBag,
   },
@@ -123,6 +161,7 @@ export function MenuDaConta({
   proximaConsulta,
   naoLidas,
   perfilPendente = false,
+  careMode = false,
   mostrarPainel,
   ehDono = false,
   onNotificacoes,
@@ -148,6 +187,8 @@ export function MenuDaConta({
       notificações — é o mesmo sinal, e ele quer dizer a mesma coisa: isto
       aqui precisa de você. */
   perfilPendente?: boolean;
+  /** Modo Cuidado: esconde as linhas que falam do jogo e da chegada do bebê. */
+  careMode?: boolean;
   mostrarPainel: boolean;
   /**
    * O dono da plataforma, não o médico.
@@ -238,36 +279,38 @@ export function MenuDaConta({
 
           <div className="mx-4 my-1 h-px bg-border/60" />
 
-          {MENU_CONTA.map(({ tab, subAba, label, sub, Icon }) => (
-            <button
-              key={tab}
-              onClick={() => onNavegar(tab, subAba)}
-              className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
-            >
-              <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
-                <Icon className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
-                {perfilPendente && tab === "Perfil" && (
-                  <span
-                    aria-hidden
-                    className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
-                  />
-                )}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-foreground">
-                  {label}
+          {MENU_CONTA.filter(({ tab }) => !(careMode && tab === "Recompensas")).map(
+            ({ tab, subAba, label, sub, Icon }) => (
+              <button
+                key={tab}
+                onClick={() => onNavegar(tab, subAba)}
+                className="flex w-full items-center gap-3 rounded-2xl px-4 py-2.5 text-left transition-colors hover:bg-primary/8"
+              >
+                <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                  <Icon className="h-[19px] w-[19px] text-primary" strokeWidth={1.9} />
                   {perfilPendente && tab === "Perfil" && (
-                    <span className="ml-1.5 align-middle text-xs font-bold text-rose-600">
-                      • contato de emergência
-                    </span>
+                    <span
+                      aria-hidden
+                      className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-card"
+                    />
                   )}
                 </span>
-                <span className="block text-xs leading-snug text-muted-foreground">
-                  {tab === "Consultas" && proximaConsulta ? proximaConsulta : sub}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-foreground">
+                    {label}
+                    {perfilPendente && tab === "Perfil" && (
+                      <span className="ml-1.5 align-middle text-xs font-bold text-rose-600">
+                        • contato de emergência
+                      </span>
+                    )}
+                  </span>
+                  <span className="block text-xs leading-snug text-muted-foreground">
+                    {tab === "Consultas" && proximaConsulta ? proximaConsulta : sub}
+                  </span>
                 </span>
-              </span>
-            </button>
-          ))}
+              </button>
+            ),
+          )}
 
           {/* Pós-parto só existe na reta final. Era um cartão da home que
               aparecia a partir da semana 36; a home ficou com o médico, e sem

@@ -64,8 +64,12 @@ export function MascoteDaHome({
   onAbrirRecados,
   careMode = false,
   calado = false,
+  destacado = false,
   tamanho = 44,
 }: {
+  /** Tutorial: o cartão "Dúvida às três da manhã?" acende o personagem com a
+   *  mesma pulsação da barra (`dc-nav-destaque`). */
+  destacado?: boolean;
   humor?: Humor;
   /** Recados não lidos. Zero = ele fica quieto. */
   recados?: number;
@@ -127,7 +131,7 @@ export function MascoteDaHome({
   }, [oQueEleDiz?.texto]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="relative z-20 shrink-0">
+    <div className={`relative shrink-0 ${destacado ? "z-[39]" : "z-20"}`}>
       <button
         type="button"
         onClick={onAbrir}
@@ -137,7 +141,7 @@ export function MascoteDaHome({
            recados" num botão que abre outra coisa. Quem descreve o recado é o
            balão, que é o botão que leva até ele. */
         aria-label="Falar com a bolha"
-        className="press relative flex items-center justify-center"
+        className={`press relative flex items-center justify-center rounded-full ${destacado ? "dc-nav-destaque" : ""}`}
         style={{ width: tamanho, height: tamanho }}
       >
         <Bolha ref={bolha} humor={humor} tamanho={tamanho} careMode={careMode} />

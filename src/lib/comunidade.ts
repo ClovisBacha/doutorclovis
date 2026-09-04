@@ -116,9 +116,7 @@ export const PORTAS: PortaDaComunidade[] = [
  * o bebê dela. A mesma decisão que manteve `exam_files` de pé quando o envio de
  * exames saiu do produto: parar de pedir é uma coisa, apagar o que já existe é
  * outra, e muito mais irreversível.
- *
- * O bolão do nascimento também some, mas o portão dele é `bolaoDisponivel`, em
- * `bolao.ts`, e é conferido no SERVIDOR — ele carrega dado de outras pessoas.
+
  */
 export function portasDaComunidade({ careMode }: { careMode: boolean }): PortaDaComunidade[] {
   if (!careMode) return PORTAS;

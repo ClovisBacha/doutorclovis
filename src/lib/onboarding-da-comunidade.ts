@@ -60,6 +60,18 @@ export const CARTOES_DA_COMUNIDADE: readonly CartaoDaComunidade[] = [
       "Conduta é com o seu obstetra. Se algo no seu corpo te preocupa, fale com ele — e se for urgente, use o SOS na barra de baixo. Ele avisa o seu médico e o seu contato de uma vez.",
   },
   {
+    /* ⚠️ Este cartão existe porque catorze funções da aba (publicar,
+       mensagens, busca, caixinha, salvos, o hub de Chá de bebê, Amigas e
+       Acompanhante…) viviam atrás de um gesto que nada anunciava — tocar de
+       novo no ícone da barra. Os quatro cartões falavam só de privacidade.
+       Estudo de navegação, set/2026. */
+    id: "onde",
+    emoji: "🧭",
+    titulo: "Onde ficam as coisas",
+    texto:
+      "A primeira bolinha da fileira, com o ⊞, abre o chá de bebê, as amigas, o álbum e o acompanhante. E tocar de novo no ícone da Comunidade, na barra de baixo, mostra os atalhos: publicar, mensagens, buscar.",
+  },
+  {
     id: "comecar",
     emoji: "✨",
     titulo: "Pode começar devagar",

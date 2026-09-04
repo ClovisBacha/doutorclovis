@@ -23,6 +23,7 @@ import {
   tabToSection,
   type AppTab,
   type BottomSection,
+  type DestaqueDoTutorial,
   type NextAppointment,
 } from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
@@ -89,7 +90,7 @@ import {
   ymd,
 } from "@/lib/ciclo-menstrual";
 import type { CycleModel, CyclePhase } from "@/lib/ciclo-menstrual";
-import { OnboardingRitual, CodigoDaEmbaixadora } from "@/components/onboarding-ritual";
+import { OnboardingRitual } from "@/components/onboarding-ritual";
 import { hapticKick, hapticTap } from "@/lib/haptics";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
@@ -743,10 +744,11 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
  * gestação em andamento, é a aba certa; a partir da 36ª semana o pós-parto
  * entra no horizonte e ela volta.
  *
- * ⚠️ **Isto NÃO tira o acesso.** A aba continua listada no grupo "Saúde" do
- * menu (`SECOES`), que é a navegação completa. O que sai é o atalho da grade —
- * a diferença entre "não está aqui agora" e "não existe mais" é o que separa
- * arrumar de apagar, e eu já confundi as duas neste app.
+ * ⚠️ **Hoje ela decide só a LEGENDA do ladrilho, nunca a presença dele.** A
+ * primeira versão tirava o ladrilho e afirmava que "a aba continua listada no
+ * menu (`SECOES`)" — esse menu era o de computador (`hidden md:flex`), e no
+ * celular a função sumia por nove meses. Uma garantia escrita que o aparelho
+ * não cumpre é pior que nenhuma: quem lê acredita que preservou o acesso.
  */
 export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean {
   return weeks == null || weeks >= 36;
@@ -868,9 +870,19 @@ export function HubSaude({
       vivo = false;
     };
   }, [ehBancada]);
-  const itens = HUB_SAUDE.filter(
-    (i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks),
-  ).map((i) => ({ ...i, dado: dados[i.key] ?? null }));
+  /* ⚠️ Os cinco ladrilhos aparecem SEMPRE. Antes "Saúde da mulher" saía da
+     grade durante a gestação, com um comentário garantindo que "a aba
+     continua listada no menu" — e esse menu é o de computador, escondido no
+     celular. No aparelho a função sumia por nove meses (estudo de navegação,
+     set/2026). O que muda com a fase é a LEGENDA, não a porta. */
+  const itens = HUB_SAUDE.map((i) => ({
+    ...i,
+    sub:
+      i.key === "Saúde da mulher" && !mostrarSaudeDaMulher(weeks)
+        ? "O que fica para depois do parto"
+        : i.sub,
+    dado: dados[i.key] ?? null,
+  }));
   if (cabecalhos) {
     return (
       <div className="space-y-3">
@@ -1003,6 +1015,12 @@ function MinhaContaPage() {
     const t = new URLSearchParams(window.location.search).get("tab");
     return t && (TABS as readonly string[]).includes(t) ? (t as Tab) : "Bebê";
   })();
+  /* ⚠️ "Bebê" é a aba PADRÃO e também o nome da aba do bebê — então
+     `initialTab === "Bebê"` não distingue "abriu o app" de "pediu ?tab=Bebê".
+     Sem esta bandeira o deep link para a aba do Bebê caía na home, e a grade
+     dela (contagem, álbum, nomes, carta, enxoval) ficava sem porta por link. */
+  const tabPedidaNaUrl =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tab");
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDoctor, setIsDoctor] = useState(false);
@@ -1066,7 +1084,7 @@ function MinhaContaPage() {
     setRefreshKey((k) => k + 1);
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
-  const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  const [mobileHome, setMobileHome] = useState(initialTab === "Bebê" && !tabPedidaNaUrl);
   /* Hub da seção Saúde (só no celular). A seção tem SEIS abas e elas viviam
      numa fileira de pílulas que rolava na horizontal: cabiam quatro, então
      "Alertas" e "Saúde da mulher" ficavam fora da tela — existiam sem que
@@ -1106,7 +1124,7 @@ function MinhaContaPage() {
      DESTAQUE mora aqui porque a barra mora aqui: o tutorial diz de qual item
      está falando, e quem acende é o `AppBottomNav`. */
   const [tutorialAberto, setTutorialAberto] = useState(false);
-  const [destaqueDaBarra, setDestaqueDaBarra] = useState<BottomSection | "sos" | null>(null);
+  const [destaqueDaBarra, setDestaqueDaBarra] = useState<DestaqueDoTutorial>(null);
   /* ⚠️ O PASSO MORA AQUI, e não dentro do tutorial. A barra continua clicável
      durante a aula: tocar em "Jogo" troca a aba, tira a home do ar e desmonta
      o componente — e com o índice lá dentro, voltar recomeçava do primeiro
@@ -2120,7 +2138,7 @@ function MinhaContaPage() {
           nome={profile?.display_name ?? null}
           passo={passoDoTutorial}
           onAvancar={avancarTutorial}
-          onPasso={(d) => setDestaqueDaBarra(d as BottomSection | "sos" | null)}
+          onPasso={(d) => setDestaqueDaBarra(d as DestaqueDoTutorial)}
           onFechar={fecharTutorial}
         />
       )}
@@ -2509,6 +2527,7 @@ function MinhaContaPage() {
                   (saudação, Painel, Perfil e Sair) continuam todas aqui. */}
               {homeMenu && (
                 <MenuDaConta
+                  careMode={careMode}
                   nome={firstName}
                   saudacao={dayGreeting()}
                   foto={profile?.avatar_url ?? null}
@@ -8471,7 +8490,16 @@ function PrenatalCalendarTab({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-2">
+      {/* ── A grade das sete sub-telas vem PRIMEIRO (set/2026). Ela ficava no
+          fim, depois de ~440 linhas de calendário: plano de parto, mala da
+          maternidade, perguntas ao médico e teleconsulta só apareciam para
+          quem rolava tudo — o padrão que o próprio arquivo já tinha registrado
+          como defeito ("existiam sem que nada na tela dissesse que existiam"). */}
+      <div>
+        <p className="mb-4 font-serif text-[15px] font-semibold text-primary">Minhas consultas</p>
+        <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-5">
         <div>
           <p className="font-serif text-[15px] font-semibold text-primary">Meu Calendário</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -8769,12 +8797,6 @@ function PrenatalCalendarTab({
           })}
         </div>
       )}
-
-      {/* ── Consultas integradas: tudo (agendar, preparar, teleconsulta…) aqui ── */}
-      <div className="mt-2 border-t border-border pt-5">
-        <p className="mb-4 font-serif text-[15px] font-semibold text-primary">Minhas consultas</p>
-        <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
-      </div>
     </div>
   );
 }

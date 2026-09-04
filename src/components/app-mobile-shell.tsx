@@ -71,8 +71,7 @@ export type AppTab =
   /* A assinatura da PACIENTE. Vive fora das seções da barra de baixo, como a
      Loja: o caminho dela é o menu ☰ no celular e a categoria "Conta" no
      computador. */
-  | "Assinatura"
-  | "Exames";
+  | "Assinatura";
 
 /**
  * Barra de baixo enxuta (5 = Bebê + Jogo + Comunidade + Saúde + SOS). O "Bebê" é
@@ -92,12 +91,15 @@ export type AppTab =
  * as Amigas.
  */
 export type BottomSection = "home" | "jogo" | "comunidade" | "saude";
+/** O que o tutorial pode acender: um item da barra, o SOS, ou uma das duas
+ *  portas do TOPO da home (o ☰ e a bolha). */
+export type DestaqueDoTutorial = BottomSection | "sos" | "menu" | "bolha" | null;
 
 const SECTION_TABS: Record<BottomSection, readonly AppTab[]> = {
   home: [],
   jogo: ["Caminho"],
   comunidade: ["Comunidade", "Amigas", "Chá de bebê", "Feed"],
-  saude: ["Saúde", "Exames", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
+  saude: ["Saúde", "Nutrição", "Bem-estar", "Alertas", "Saúde da mulher"],
 };
 
 /**
@@ -663,7 +665,7 @@ export function AppBottomNav({
    * sozinho — o primeiro item que a paciente precisa conhecer seria justamente
    * o único que o tutorial não conseguiria apontar.
    */
-  destaque?: BottomSection | "sos" | null;
+  destaque?: DestaqueDoTutorial;
   /**
    * Vidro ESCURO. Verdadeiro só na home com céu de noite/madrugada.
    *
@@ -1072,6 +1074,7 @@ export function AppHomeScreen({
   temNaoLidas = false,
   naoLidas = 0,
   mascoteCalado = false,
+  destaqueDoTopo = null,
   onOpenRecados,
   onOpenChat,
   onOrigemLocal,
@@ -1125,6 +1128,9 @@ export function AppHomeScreen({
    * diferentes na mesma tela.
    */
   mascoteCalado?: boolean;
+  /** Tutorial: acende o ☰ ("menu") ou a bolha ("bolha") — a mesma pulsação
+   *  da barra de baixo, para a paciente achar do que o cartão fala. */
+  destaqueDoTopo?: "menu" | "bolha" | null;
   /**
    * Abre a central de recados DIRETO, sem passar pelo menu.
    *
@@ -1623,7 +1629,10 @@ export function AppHomeScreen({
                    desenho do botão, não a área que o dedo acerta — encolher o
                    toque para o tamanho do ícone seria "maneirar" cobrando o
                    preço no lugar errado. */
-                className="press relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+                /* z-[39]: acima do véu do tutorial (z-38) enquanto o cartão
+                   "O resto mora no ☰" o acende — senão ele pulsa embaçado
+                   atrás do véu, e o cartão aponta para um borrão. */
+                className={`press relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${destaqueDoTopo === "menu" ? "z-[39] dc-nav-destaque" : "z-10"}`}
               >
                 {/* ⚠️ O PONTO VERMELHO SAIU DAQUI (ago/2026) e foi para o
                     mascote, do outro lado da barra. Ele só quis dizer uma
@@ -1747,6 +1756,7 @@ export function AppHomeScreen({
                    ficaria mudo justamente quando o app disse que há recado. */
                 recados={temNaoLidas ? Math.max(1, naoLidas) : 0}
                 calado={mascoteCalado}
+                destacado={destaqueDoTopo === "bolha"}
                 careMode={careMode}
                 /* O PERSONAGEM abre o chat; o BALÃO, quando está anunciando
                    recado, abre a central. Quem decide é `oBalaoAbreOsRecados`,
@@ -1798,11 +1808,14 @@ export function AppHomeScreen({
              no 15 Pro, 12px no SE). Ver `deitada` em `styles.css`. */
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center deitada:bottom-[calc(var(--safe-bottom)+6rem)]">
               {/* Bebê protagonista dentro da bolha (o "ventre").
-                Toque abre a aba do Bebê com a semana detalhada — e pede a
-                sub-aba "semana" de propósito: a aba do Bebê agora abre numa
-                grade de seis, e este toque promete a semana, não um menu. */}
+                Toque abre a ABA do Bebê — a grade de seis, com "Semana" em
+                primeiro. Antes pulava direto para a sub-tela "semana", e a
+                grade (contagem, álbum, nomes, carta, enxoval) só aparecia
+                apertando "voltar" numa tela em que a paciente não sentia que
+                tinha entrado: cinco funções alcançáveis só andando para trás
+                (estudo de navegação, set/2026). */}
               <button
-                onClick={() => onNavigate("Bebê", "semana")}
+                onClick={() => onNavigate("Bebê")}
                 aria-label="Ver a semana do bebê"
                 className="press pointer-events-auto relative flex shrink-0 items-center justify-center transition-transform active:scale-[0.97]"
               >

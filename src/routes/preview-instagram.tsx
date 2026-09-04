@@ -2049,6 +2049,10 @@ function Bancada() {
               uma bancada apagaria o tutorial da conta de verdade. */}
           {!!onboarding && <OnboardingDaComunidade careMode={false} bancada />}
           <TelaPrincipal
+            /* A bolinha ⊞ "Mais" da fileira de stories — a porta do hub. Sem a
+               prop a bancada aprovaria uma fileira sem ela, que é exatamente o
+               estado que o estudo de navegação achou em produção. */
+            aoAbrirSecoes={() => {}}
             /* ⚠️ **A SUSPENSÃO É DECISÃO DA PLATAFORMA, e a paciente é
                avisada** — é a única das três (luto, pausa, suspensão) em que o
                app fala. Sem esta prop o aviso não desenha, e a bancada

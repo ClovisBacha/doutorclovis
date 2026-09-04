@@ -259,16 +259,63 @@ export type Story = { id: string; nome: string; avatarUrl: string | null; novo: 
 export const FileiraDeStories = memo(function FileiraDeStories({
   stories,
   aoTocar,
+  aoAbrirMais,
 }: {
   stories: Story[];
   aoTocar?: (id: string) => void;
+  /**
+   * A PRIMEIRA bolinha da fileira: ⊞ "Mais", que abre o hub de portas (Chá de
+   * bebê, Amigas, Álbum, Nome, Acompanhante).
+   *
+   * ⚠️ Ela mora AQUI, e não num cabeçalho, porque o cabeçalho do feed saiu a
+   * pedido do dono ("o primeiro elemento da aba será os stories"). Sem ela, o
+   * hub só se alcançava tocando de novo no ícone da barra — um gesto que nada
+   * anuncia — e as cinco portas ficavam a quatro toques atrás de um segredo
+   * (estudo de navegação, set/2026).
+   *
+   * ⚠️ PRIMEIRA, não última: com cinco stories ela caía fora da tela (medido:
+   * x=544 num viewport de 393) — uma porta que só aparece rolando é o defeito
+   * que ela veio consertar.
+   */
+  aoAbrirMais?: () => void;
 }) {
-  if (stories.length === 0) return null;
+  if (stories.length === 0 && !aoAbrirMais) return null;
   return (
     <div className="-mx-4 border-b border-border">
       {/* Rola na horizontal e sangra nas laterais — a última bolinha tem de
           encostar na borda da tela, senão a fileira parece ter acabado. */}
       <div className="flex gap-1 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {aoAbrirMais && (
+          <button
+            type="button"
+            onClick={aoAbrirMais}
+            aria-label="Mais da Comunidade: chá de bebê, amigas, álbum e acompanhante"
+            className="press flex shrink-0 flex-col items-center gap-1"
+            style={{ width: CAIXA_DO_STORY + 12 }}
+          >
+            <span
+              className="flex items-center justify-center rounded-full border-2 border-dashed border-primary/50 bg-primary/5 text-primary"
+              style={{ width: CAIXA_DO_STORY, height: CAIXA_DO_STORY }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden
+                className="h-7 w-7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+              </svg>
+            </span>
+            <span className="w-full truncate text-center text-xs text-muted-foreground">Mais</span>
+          </button>
+        )}
         {stories.map((s) => (
           <BolinhaDeStory
             key={s.id}
@@ -1789,6 +1836,7 @@ export function CartaoDaSemana({
 
 export function TelaPrincipal({
   posts,
+  aoAbrirSecoes,
   pausada = false,
   suspensa = false,
   aoReativar,
@@ -1834,6 +1882,8 @@ export function TelaPrincipal({
   aoCompararAgora,
   aoDispensarEntao,
 }: {
+  /** Abre o hub de portas da Comunidade — a bolinha ⊞ "Mais" da fileira. */
+  aoAbrirSecoes?: () => void;
   /**
    * A leitura do feed FALHOU — diferente de "não há nada".
    *
@@ -2102,7 +2152,7 @@ export function TelaPrincipal({
         />
       )}
 
-      <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
+      <FileiraDeStories stories={stories} aoTocar={aoTocarStory} aoAbrirMais={aoAbrirSecoes} />
 
       {/* ⚠️ **A PRÓXIMA LIVE, e ela vem DEPOIS dos stories.** Acima deles
           empurraria a fileira para fora da primeira dobra — o arranjo exato que
@@ -7940,6 +7990,7 @@ export function RedeNoApp({
       />
       <TelaPrincipal
         posts={posts}
+        aoAbrirSecoes={onAbrirSecoes}
         soSeguindo={soSeguindo}
         aoRepublicar={acoes.republicar}
         aoCompartilhar={acoes.compartilhar}
