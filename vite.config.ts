@@ -82,7 +82,28 @@ export default defineConfig({
        servidor ser construído, e a rota volta 404 — "Prerendered 0 routes". */
     ...({
       routeRules: { "/minha-conta": { isr: { expiration: false } } },
-      vercel: { functions: { maxDuration: 30 } },
+      /* ⚠️ **A FUNÇÃO RODA EM SÃO PAULO, e não em Washington (set/2026).**
+
+         O banco está em `sa-east-1` (São Paulo) — conferido no painel do
+         Supabase, em Project Settings. A função de servidor rodava em `iad1`
+         (Washington), o padrão da Vercel. Então toda chamada de dado fazia o
+         caminho: telefone no Brasil → função nos EUA → banco no Brasil → volta
+         → volta. Duas travessias do continente para buscar um dado que estava
+         na mesma cidade da paciente.
+
+         E o custo se multiplica pelo número de idas ao banco DENTRO da função:
+         `claimDailyAndGetWallet`, que é quem devolve o saldo da fita do Jogo,
+         faz sete consultas em série. Cada uma pagava a ida e a volta
+         EUA↔Brasil.
+
+         ⚠️ **Não é ajuste fino, é a maior alavanca que sobrou** — bem maior
+         que qualquer corte de pacote, porque o número de idas ao banco é alto
+         e elas são em série.
+
+         ⚠️ E o SITE institucional passa a ser renderizado no Brasil também.
+         Para quem abre de fora do país isso é um pouco pior; o público é
+         brasileiro, então é o negócio certo. */
+      vercel: { functions: { maxDuration: 30, regions: ["gru1"] } },
     } as Record<string, unknown>),
   },
 });

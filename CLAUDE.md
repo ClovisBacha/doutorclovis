@@ -13183,3 +13183,33 @@ PRIVACIDADE, não de desempenho:** a resposta guardada é servida para todas. Um
 sem erro nenhum — a tela só mostraria o nome errado. Três mutações conferidas
 em vermelho: pôr um `loader` na rota, ligar o `isr` na raiz do site, e trocar o
 portão do telefone por um do servidor.
+
+### ⚠️ A FUNÇÃO DE SERVIDOR RODA EM SÃO PAULO (set/2026)
+
+O dono mandou o print de Project Settings: **`sa-east-1`, South America (São
+Paulo)**. A função da Vercel rodava em `iad1` (Washington), o padrão.
+
+Então toda chamada de dado fazia: **telefone no Brasil → função nos EUA →
+banco no Brasil → volta → volta.** Duas travessias do continente para buscar um
+dado que estava na mesma cidade da paciente.
+
+⚠️ **E o custo se MULTIPLICA pelas idas ao banco dentro da função.**
+`claimDailyAndGetWallet`, que devolve o saldo da fita do Jogo, faz **sete
+consultas em série** — cada uma pagava a ida e a volta EUA↔Brasil. É por isso
+que este é um efeito de outra ordem de grandeza que qualquer corte de pacote:
+o pacote é uma vez; a latência é uma vez por consulta.
+
+`vercel: { functions: { regions: ["gru1"] } }` no `nitro` do `vite.config.ts`
+(no mesmo cast do `maxDuration`, pelo mesmo motivo de tipo). Conferido no
+`.vc-config.json` gerado.
+
+⚠️ **O site institucional passa a ser renderizado no Brasil também.** Para
+quem abre de fora do país é um pouco pior; o público é brasileiro, então é o
+negócio certo — e está escrito aqui para ser uma decisão, e não uma
+consequência que ninguém notou.
+
+⚠️ **A ordem em que isto foi descoberto é a lição.** Eu passei duas levas
+cortando bytes (round trips, pacote, casca na borda) antes de perguntar onde o
+banco estava. Os cortes valeram, e nenhum deles é da ordem de grandeza deste.
+**Numa queixa de lentidão, a primeira pergunta é a GEOGRAFIA: onde roda o
+código, onde mora o dado, e onde está a pessoa.**

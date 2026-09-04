@@ -82,6 +82,15 @@ describe("a casca guardada continua sendo a mesma para todas", () => {
     expect(PORTAO).not.toContain("createServerFn");
   });
 
+  test("⚠️ a função roda em São Paulo, onde o banco está", () => {
+    /* O banco é `sa-east-1`. Com a função em `iad1` (o padrão da Vercel), toda
+       chamada de dado atravessava o continente duas vezes — e a função da
+       carteira faz sete consultas EM SÉRIE, pagando a travessia em cada uma.
+       Se um dia alguém tirar isto, tem de saber que está devolvendo essa
+       conta. */
+    expect(CONFIG).toMatch(/regions:\s*\["gru1"\]/);
+  });
+
   test("a regra da borda está no build, e é por publicação", () => {
     expect(CONFIG).toContain('routeRules: { "/minha-conta"');
     expect(CONFIG).toMatch(/isr:\s*\{\s*expiration:\s*false\s*\}/);
