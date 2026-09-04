@@ -13064,3 +13064,48 @@ código, não deduzido:
 `vercel.functions.regions: ["gru1"]` no `nitro` do `vite.config.ts`. Se
 estiver nos EUA, mudar pioraria. A região está em Supabase → Project Settings
 → General.
+
+### ⚠️ O QUE O APP INSTALADO BAIXA AO ABRIR: 661 kB em 91 arquivos (set/2026)
+
+Segunda leva do mesmo relato ("a primeira tela demora"). Desta vez a medição
+foi na PRODUÇÃO, e não no código: buscar o HTML de `/minha-conta` (que é o
+`start_url` do manifesto, ou seja, a tela em que o app instalado abre) e somar
+tudo que ele manda o navegador buscar.
+
+| o que o HTML pede                | quanto |
+| -------------------------------- | ------ |
+| arquivos (90 com prioridade alta) | **91** |
+| total comprimido                  | **661 kB** |
+| pedaço de entrada                 | 215 kB |
+| `minha-conta`                     | 105 kB |
+| **`cantinho-tab`**                | **97 kB** |
+| folha de estilo                   | 44 kB |
+
+⚠️ **O terceiro maior era a LOJA DE ENFEITES**, e ela estava ali por um
+`import` estático no topo de `minha-conta.tsx`. Ela pesa isso porque carrega a
+arte dos 107 itens do catálogo. A paciente que abre o app para ver a semana do
+bebê pagava a loja inteira para chegar lá. Virou `lazy()`, como
+`GestacaoPath` e `RedeNoApp` já eram.
+
+⚠️ **E UMA HIPÓTESE MINHA FOI DERRUBADA PELA MEDIÇÃO, o que vale mais que o
+conserto.** Eu tinha achado que o cliente do Supabase entrava na entrada por
+causa de dois componentes do cabeçalho do site (`site-header`,
+`public-bottom-nav`), que o importavam de forma estática só para saber se ela
+está logada. Troquei os dois por `useSessaoDoSite`, com import dinâmico,
+construí de novo — e o pedaço de entrada foi de **210.692 para 210.718 bytes**.
+Não se moveu.
+
+A causa real: **trinta e seis arquivos importam o client de forma estática**, e
+o Rollup iça o que é compartilhado por muitos pedaços para o pedaço COMUM, que
+é justamente a entrada. Tirar de dois não tira de lugar nenhum. O hook fica
+(uma cópia do efeito no lugar de duas), com o número medido escrito no
+cabeçalho dele para ninguém repetir a aposta.
+
+⚠️ **A ferramenta que respondeu foi o grafo de imports ESTÁTICOS a partir de
+`router.tsx`** — `routeTree.gen.ts` alcança 696 módulos. É por aí que se
+descobre o que cai na entrada, e não olhando o componente suspeito.
+
+**O que sobra, em ordem de tamanho:** o pedaço de entrada (215 kB, quase tudo
+biblioteca: React, o router, o Supabase, o `sonner`) e o `minha-conta` (105 kB,
+que é o arquivo de vinte e um mil linhas). O segundo é a cirurgia parada
+esperando o dono dizer se a lentidão sobreviveu.

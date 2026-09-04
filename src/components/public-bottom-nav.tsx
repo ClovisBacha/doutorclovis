@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+
+import { useSessaoDoSite } from "@/lib/use-sessao-do-site";
 
 /**
  * Barra inferior das páginas públicas: um único botão grande e chamativo para
@@ -10,12 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function PublicBottomNav() {
   const { location } = useRouterState();
   // Logada → abre o app direto; visitante → tela de login.
-  const [signedIn, setSignedIn] = useState(false);
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
+  const signedIn = useSessaoDoSite();
 
   /* As BANCADAS (`/preview-*`) existem para fotografar pedaços do app fora do
      login, e esta barra pousava por cima do que elas fotografam — foi ela que

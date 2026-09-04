@@ -70,7 +70,6 @@ import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { CicloMenstrualTab } from "@/components/ciclo-menstrual-tab";
 import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
 import { ConquistasTab } from "@/components/conquistas-tab";
-import { CantinhoTab } from "@/components/cantinho-tab";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
 import {
   PHASE_META,
@@ -247,6 +246,26 @@ const GestacaoPath = lazy(() =>
  * uma única função ou um único tipo deste módulo por `import` estático traria os
  * 120 kB de volta junto.
  */
+/**
+ * ⚠️ **O CANTINHO TAMBÉM É `lazy()`, e a medição foi na PRODUÇÃO (set/2026).**
+ *
+ * O dono: "a primeira tela está demorando muito para carregar quando abro o
+ * app". O app instalado abre em `/minha-conta` (é o `start_url` do
+ * manifesto), e o HTML dessa rota mandava o navegador buscar, com prioridade
+ * alta, NOVENTA E UM arquivos somando 661 kB comprimidos — antes de a home
+ * pintar. O terceiro maior deles, com 97 kB, era este: a LOJA DE ENFEITES.
+ *
+ * Ela pesa isso porque carrega a arte dos 107 itens do catálogo, e estava no
+ * caminho crítico por um motivo só: um `import` estático no topo deste
+ * arquivo. A paciente que abre o app para ver a semana do bebê pagava a loja
+ * inteira para chegar lá.
+ *
+ * É a mesma conta que já tinha tirado `GestacaoPath` e `RedeNoApp` daqui.
+ */
+const CantinhoTab = lazy(() =>
+  import("@/components/cantinho-tab").then((m) => ({ default: m.CantinhoTab })),
+);
+
 const RedeNoApp = lazy(() =>
   import("@/components/rede-instagram").then((m) => ({ default: m.RedeNoApp })),
 );
@@ -15012,12 +15031,23 @@ function RecompensasHub({
       </div>
       <Fade key={sub}>
         {sub === "cantinho" && (
-          <CantinhoTab
-            careMode={careMode}
-            onNavigate={onNavigate}
-            skyTheme={skyTheme}
-            onSkyChange={onSkyChange}
-          />
+          /* A espera do Cantinho — ver o `lazy()` lá em cima. O broto é o que
+             a prateleira inteira usa como moeda, então ele é quem recebe. */
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center py-20">
+                <span className="text-4xl">🌱</span>
+                <p className="mt-3 text-sm font-bold text-foreground/50">Abrindo o seu cantinho…</p>
+              </div>
+            }
+          >
+            <CantinhoTab
+              careMode={careMode}
+              onNavigate={onNavigate}
+              skyTheme={skyTheme}
+              onSkyChange={onSkyChange}
+            />
+          </Suspense>
         )}
         {sub === "conquistas" && <ConquistasTab careMode={careMode} onNavigate={onNavigate} />}
       </Fade>
