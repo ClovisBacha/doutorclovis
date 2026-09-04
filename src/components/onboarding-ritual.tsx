@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
+import icFesta from "@/assets/avisos/festa.webp";
 import { supabase } from "@/integrations/supabase/client";
 import { dueDateFromLmp } from "@/lib/gestacao";
 import { codificarFoto } from "@/lib/codificar-imagem";
@@ -400,7 +401,15 @@ export function OnboardingRitual({
       default:
         return (
           <div className="text-center">
-            <p className="text-6xl">🎉</p>
+            {/* A festa é uma peça da família do coração, não o emoji 🎉 — é a
+                primeira tela cheia que a paciente vê, e o emoji tem desenho
+                próprio em cada sistema. */}
+            <img
+              src={icFesta}
+              alt=""
+              aria-hidden
+              className="mx-auto h-24 w-24 object-contain drop-shadow-[0_10px_16px_rgba(0,0,0,0.14)]"
+            />
             <h2 className="mt-5 font-serif text-3xl leading-tight">
               Tudo pronto{name.trim() ? `, ${name.trim()}` : ""}! 💛
             </h2>
