@@ -12981,3 +12981,9 @@ regra já faz isso, e o 16 à mão só estraga o computador.
 rótulo espaçado, cinco cartões de contorno, papéis a 12,5px, botões chapados.
 Ganhou o material do app e o piso de 13px; "Acompanhante" continua cabendo a
 320px pela hifenização que já estava lá.
+
+**E as páginas que a FAMÍLIA abre** — o painel do acompanhante, a lista
+pública do chá e o batimento — ainda tinham cartão de contorno e botão
+chapado. São a cara do app para quem nunca o instalou (chegam pelo link do
+WhatsApp). Entraram no material; medido nas quatro bancadas: zero pílulas e
+zero cartões de contorno.
