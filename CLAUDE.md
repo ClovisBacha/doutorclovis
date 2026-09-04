@@ -12995,3 +12995,34 @@ roteiros de interação sem problema · a varredura de acessibilidade caiu de
 texto auxiliar do Jogo e o ✕ do chá, ambos já registrados como decisão do
 dono) · nas bancadas da paciente fora do Jogo, zero pílulas de contorno e
 zero cartões de contorno restantes.
+
+## O leque da Comunidade voltou a caber na tela (set/2026)
+
+O dono, com a foto do aparelho: _"muitas opções e muito confuso"_. O leque
+que sobe do ícone da Comunidade tinha **catorze bolinhas numa coluna só** —
+nasceu com seis e cada função nova entrou ali. Com catorze ele passava por
+cima do relógio e do sinal do celular, três ícones se repetiam (a grade três
+vezes, a pessoa três vezes) e ele misturava três naturezas de coisa: o que ela
+faz todo dia, o que é dela, e segurança.
+
+- **O leque ficou com QUATRO de uso diário** (Atividade · Mensagens ·
+  Publicar · Meu perfil) **e a quinta bolinha é "Mais"** (⋯), que abre
+  `MaisDaComunidade` — uma folha em três grupos com ícone PRÓPRIO por item:
+  Minhas coisas (Salvos, Arquivados, Meus stories, Favoritas) · Descobrir
+  (Explorar, Buscar) · Segurança (Bloqueados, Suas denúncias, Caixinha).
+- ⚠️ **Função nova entra na FOLHA, num grupo — nunca no leque.** O leque
+  chegou a catorze exatamente porque era o lugar mais fácil de acrescentar.
+- ⚠️ **Chá de bebê, álbum, amigas e acompanhante saíram do leque.** A porta
+  deles é a bolinha ⊞ da fileira de stories, que já existia: dois "Mais" na
+  mesma tela com destinos parecidos era metade da confusão.
+- **O emblema da Caixinha sobe para a bolinha "Mais"**: sem isso, uma pergunta
+  sem resposta ficaria invisível até ela abrir a folha.
+- **A folha fecha sozinha ao sair do feed** e fecha ANTES de agir, como a
+  nuvem de atalhos.
+- ⚠️ **A folha recebe tudo por prop**, e é isso que a torna fotografável:
+  `/preview-instagram?tela=mais`. O leque nunca teve bancada, e foi assim que
+  ele chegou a catorze sem ninguém olhar. Medido: nove alvos de 357×54, zero
+  erros de console.
+- **A ambulância e o caminhão do SOS voltaram a ser emoji**, por decisão do
+  dono ("preferia a antiga"). As duas peças ficaram em `src/assets/sos/` sem
+  uso; o comentário do arquivo diz para não reintroduzi-las sem foto aprovada.

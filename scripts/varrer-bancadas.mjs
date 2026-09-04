@@ -55,6 +55,7 @@ const EXTRAS = [
   "/preview-instagram?tela=perfil&meu=1",
   "/preview-instagram?tela=perfil&restrito=1",
   "/preview-instagram?tela=perfil&silenciado=1",
+  "/preview-instagram?tela=mais",
   "/preview-instagram?tela=caixinha",
   "/preview-instagram?tela=caixinha&perguntas=0",
   "/preview-instagram?tela=caixinha&caixinha=0",

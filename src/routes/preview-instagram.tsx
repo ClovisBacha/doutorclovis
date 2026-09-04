@@ -56,6 +56,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
+import { MaisDaComunidade } from "@/components/mais-da-comunidade";
 import { Comentarios } from "@/components/rede-comentarios";
 import { chaveDoRascunhoDeComentario, serializarRascunho } from "@/lib/comentarios";
 import { FiltroDePalavras } from "@/components/rede-social";
@@ -1705,6 +1706,108 @@ function Bancada() {
           posts={vazio ? [] : POSTS.slice(0, 3)}
           aoVoltar={() => history.back()}
           aoDesarquivar={(p) => alert(`traria de volta o post ${p.id}`)}
+        />
+      </div>
+    );
+  }
+
+  if (tela === "mais") {
+    /**
+     * ⚠️ **O LEQUE DA COMUNIDADE NUNCA TEVE BANCADA — e foi assim que ele
+     * chegou a catorze bolinhas** sem ninguém olhar (o dono viu no aparelho:
+     * passava por cima do relógio). A folha "Mais" recebe tudo por prop, então
+     * aqui ela abre sobre um fundo neutro, com os três grupos e um emblema na
+     * Caixinha — o único estado que muda o desenho.
+     */
+    const diga = (o: string) => () => alert(`abriria ${o}`);
+    return (
+      <div className="min-h-[100svh] bg-background">
+        <MaisDaComunidade
+          onFechar={() => history.back()}
+          grupos={[
+            {
+              id: "minhas",
+              titulo: "Minhas coisas",
+              itens: [
+                {
+                  id: "salvos",
+                  rotulo: "Salvos",
+                  descricao: "As publicações que você guardou",
+                  icone: "salvos",
+                  aoTocar: diga("Salvos"),
+                },
+                {
+                  id: "arquivados",
+                  rotulo: "Arquivados",
+                  descricao: "Publicações que você tirou do ar",
+                  icone: "arquivados",
+                  aoTocar: diga("Arquivados"),
+                },
+                {
+                  id: "arquivo-stories",
+                  rotulo: "Meus stories",
+                  descricao: "Tudo o que você já publicou por 24 horas",
+                  icone: "stories",
+                  aoTocar: diga("Meus stories"),
+                },
+                {
+                  id: "favoritas",
+                  rotulo: "Favoritas",
+                  descricao: "O que as pessoas que você marcou publicaram",
+                  icone: "favoritas",
+                  aoTocar: diga("Favoritas"),
+                },
+              ],
+            },
+            {
+              id: "descobrir",
+              titulo: "Descobrir",
+              itens: [
+                {
+                  id: "explorar",
+                  rotulo: "Explorar",
+                  descricao: "Publicações públicas e assuntos em alta",
+                  icone: "explorar",
+                  aoTocar: diga("Explorar"),
+                },
+                {
+                  id: "buscar",
+                  rotulo: "Buscar",
+                  descricao: "Pessoas com perfil público e #assuntos",
+                  icone: "buscar",
+                  aoTocar: diga("Buscar"),
+                },
+              ],
+            },
+            {
+              id: "seguranca",
+              titulo: "Segurança",
+              itens: [
+                {
+                  id: "bloqueados",
+                  rotulo: "Bloqueados",
+                  descricao: "Quem você bloqueou, e desbloquear",
+                  icone: "bloqueados",
+                  aoTocar: diga("Bloqueados"),
+                },
+                {
+                  id: "desfechos",
+                  rotulo: "Suas denúncias",
+                  descricao: "O que aconteceu com cada uma",
+                  icone: "denuncias",
+                  aoTocar: diga("Suas denúncias"),
+                },
+                {
+                  id: "caixinha",
+                  rotulo: "Caixinha",
+                  descricao: "Perguntas anônimas que você recebeu",
+                  icone: "caixinha",
+                  emblema: vazio ? 0 : 2,
+                  aoTocar: diga("Caixinha"),
+                },
+              ],
+            },
+          ]}
         />
       </div>
     );

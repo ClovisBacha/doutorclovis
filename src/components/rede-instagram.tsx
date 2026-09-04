@@ -100,6 +100,7 @@ import {
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
+import { MaisDaComunidade, type GrupoDoMais } from "./mais-da-comunidade";
 import { CaixaDeEntrada, Conversa, MandarPublicacao, subirFoto } from "@/components/rede-conversa";
 import { Comentarios } from "@/components/rede-comentarios";
 import type { ConversaNaTela } from "@/lib/conversa.functions";
@@ -7011,6 +7012,14 @@ export function RedeNoApp({
    * atividades novas congelaria no valor da montagem, e a bolinha diria "3"
    * depois de ela ter lido as três.
    */
+  /* A folha "Mais" da Comunidade — ver `MaisDaComunidade`. Fecha sozinha ao
+     sair do feed: os itens dela agem sobre o feed, e uma folha aberta por cima
+     de outra tela ofereceria "Salvos" em cima do perfil de alguém. */
+  const [maisAberto, setMaisAberto] = useState(false);
+  useEffect(() => {
+    if (onde.t !== "feed") setMaisAberto(false);
+  }, [onde.t]);
+
   useEffect(() => {
     if (onde.t !== "feed") return;
     /* ⚠️ **Em Modo Cuidado as bolinhas NÃO somem — elas encolhem.** Sumindo,
@@ -7033,8 +7042,13 @@ export function RedeNoApp({
           : [],
       );
     }
+    /* ⚠️ **QUATRO de uso diário e a bolinha "Mais" — nunca a lista inteira.**
+       O leque chegou a CATORZE bolinhas numa coluna: passava por cima do
+       relógio do celular, repetia ícones e misturava uso diário com segurança
+       (pedido do dono, com a foto: "muitas opções e muito confuso"). O resto
+       mora em `MaisDaComunidade`, em três grupos com ícone próprio. Função
+       nova entra LÁ, num grupo — não aqui. */
     const atalhos: AtalhoDaAba[] = [
-      { id: "buscar", rotulo: "Buscar", icone: "buscar", aoTocar: () => setOnde({ t: "busca" }) },
       {
         id: "atividade",
         rotulo: "Atividade",
@@ -7062,80 +7076,15 @@ export function RedeNoApp({
           if (euId) void abrirPerfil(euId);
         },
       },
-      { id: "salvos", rotulo: "Salvos", icone: "marcador", aoTocar: () => void abrirSalvos() },
       {
-        id: "arquivados",
-        rotulo: "Arquivados",
-        icone: "grade",
-        aoTocar: () => void abrirArquivados(),
-      },
-      {
-        /* ⚠️ **Ao lado de "Arquivados", e com nome que os separa.** Os dois
-           guardam o que saiu do ar, e um rótulo genérico faria a paciente abrir
-           um procurando o outro. "Meus stories" diz o formato, que é a única
-           coisa que distingue os dois. */
-        id: "arquivo-stories",
-        rotulo: "Meus stories",
-        icone: "grade",
-        aoTocar: () => void abrirArquivoDeStories(),
-      },
-      {
-        /* ⚠️ **"VER PRIMEIRO" É UMA LISTA À PARTE, e não uma reordenação do
-           feed.** O feed continua cronológico — a razão está em `favoritar`:
-           ranquear exigiria engajamento como sinal, e numa base de alto risco o
-           post que mais engaja é o da EMERGÊNCIA. */
-        id: "explorar",
-        rotulo: "Explorar",
-        icone: "buscar",
-        aoTocar: () => void abrirExplorar(),
-      },
-      {
-        id: "favoritas",
-        rotulo: "Favoritas",
-        icone: "coracao",
-        aoTocar: () => void abrirFavoritas(),
-      },
-      {
-        /* ⚠️ **SEM ESTA PORTA, BLOQUEAR ERA UM BECO SEM SAÍDA.** Ela conseguia
-           bloquear e não conseguia DESBLOQUEAR: a única entrada era o `⋯` do
-           perfil da pessoa, e o bloqueio esconde o perfil. */
-        id: "bloqueados",
-        rotulo: "Bloqueados",
-        icone: "pessoa",
-        aoTocar: () => void abrirBloqueados(),
-      },
-      {
-        /* ⚠️ **A DENÚNCIA PROMETIA "fica registrada para a gente olhar" e o
-           desfecho nunca voltava.** Denúncia sem retorno é a que ninguém faz
-           duas vezes — e aqui a alternativa é o bloqueio cego, que não deixa
-           rastro nenhum para a plataforma: a reincidente segue reincidindo, e a
-           próxima paciente recebe a mesma coisa. */
-        id: "desfechos",
-        rotulo: "Suas denúncias",
-        icone: "pessoa",
-        aoTocar: () => void abrirDesfechos(),
-      },
-      {
-        id: "caixinha",
-        rotulo: "Caixinha",
-        icone: "balao",
-        /* ⚠️ O emblema conta as SEM RESPOSTA, e não o total: uma caixa com
-           quarenta perguntas já respondidas diria "40" para sempre, e o número
-           deixaria de significar trabalho. Mesma régua do contador da fita do
-           painel. */
+        id: "mais",
+        rotulo: "Mais",
+        icone: "pontos",
+        /* O emblema da caixinha sobe para a bolinha "Mais": sem isso, uma
+           pergunta sem resposta ficaria invisível até ela abrir a folha. */
         emblema: naCaixa,
-        aoTocar: () => setOnde({ t: "caixinha" }),
+        aoTocar: () => setMaisAberto(true),
       },
-      ...(onAbrirSecoes
-        ? [
-            {
-              id: "secoes",
-              rotulo: "Chá de bebê, álbum…",
-              icone: "grade" as const,
-              aoTocar: onAbrirSecoes,
-            },
-          ]
-        : []),
     ];
     return publicarAtalhos("comunidade", atalhos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -7988,6 +7937,108 @@ export function RedeNoApp({
           if (d) setConferindoStory(d);
         }}
       />
+      {maisAberto && (
+        <MaisDaComunidade
+          onFechar={() => setMaisAberto(false)}
+          grupos={
+            [
+              {
+                id: "minhas",
+                titulo: "Minhas coisas",
+                itens: [
+                  {
+                    id: "salvos",
+                    rotulo: "Salvos",
+                    descricao: "As publicações que você guardou",
+                    icone: "salvos",
+                    aoTocar: () => void abrirSalvos(),
+                  },
+                  {
+                    id: "arquivados",
+                    rotulo: "Arquivados",
+                    descricao: "Publicações que você tirou do ar",
+                    icone: "arquivados",
+                    aoTocar: () => void abrirArquivados(),
+                  },
+                  {
+                    /* ⚠️ **Com nome que o separa de "Arquivados"**: os dois
+                       guardam o que saiu do ar; "Meus stories" diz o formato,
+                       que é a única coisa que os distingue. */
+                    id: "arquivo-stories",
+                    rotulo: "Meus stories",
+                    descricao: "Tudo o que você já publicou por 24 horas",
+                    icone: "stories",
+                    aoTocar: () => void abrirArquivoDeStories(),
+                  },
+                  {
+                    /* ⚠️ **"VER PRIMEIRO" É UMA LISTA À PARTE, e não uma
+                       reordenação do feed** — a razão está em `favoritar`. */
+                    id: "favoritas",
+                    rotulo: "Favoritas",
+                    descricao: "O que as pessoas que você marcou publicaram",
+                    icone: "favoritas",
+                    aoTocar: () => void abrirFavoritas(),
+                  },
+                ],
+              },
+              {
+                id: "descobrir",
+                titulo: "Descobrir",
+                itens: [
+                  {
+                    id: "explorar",
+                    rotulo: "Explorar",
+                    descricao: "Publicações públicas e assuntos em alta",
+                    icone: "explorar",
+                    aoTocar: () => void abrirExplorar(),
+                  },
+                  {
+                    id: "buscar",
+                    rotulo: "Buscar",
+                    descricao: "Pessoas com perfil público e #assuntos",
+                    icone: "buscar",
+                    aoTocar: () => setOnde({ t: "busca" }),
+                  },
+                ],
+              },
+              {
+                id: "seguranca",
+                titulo: "Segurança",
+                itens: [
+                  {
+                    /* ⚠️ **SEM ESTA PORTA, BLOQUEAR ERA UM BECO SEM SAÍDA**: a
+                       única entrada era o ⋯ do perfil, e o bloqueio esconde o
+                       perfil. */
+                    id: "bloqueados",
+                    rotulo: "Bloqueados",
+                    descricao: "Quem você bloqueou, e desbloquear",
+                    icone: "bloqueados",
+                    aoTocar: () => void abrirBloqueados(),
+                  },
+                  {
+                    /* ⚠️ Denúncia sem retorno é a que ninguém faz duas vezes. */
+                    id: "desfechos",
+                    rotulo: "Suas denúncias",
+                    descricao: "O que aconteceu com cada uma",
+                    icone: "denuncias",
+                    aoTocar: () => void abrirDesfechos(),
+                  },
+                  {
+                    id: "caixinha",
+                    rotulo: "Caixinha",
+                    descricao: "Perguntas anônimas que você recebeu",
+                    icone: "caixinha",
+                    /* ⚠️ Conta as SEM RESPOSTA, e não o total — mesma régua do
+                       contador da fita do painel. */
+                    emblema: naCaixa,
+                    aoTocar: () => setOnde({ t: "caixinha" }),
+                  },
+                ],
+              },
+            ] satisfies GrupoDoMais[]
+          }
+        />
+      )}
       <TelaPrincipal
         posts={posts}
         aoAbrirSecoes={onAbrirSecoes}

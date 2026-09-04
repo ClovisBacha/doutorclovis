@@ -559,6 +559,14 @@ function IconeDoAtalho({ nome }: { nome: IconeDeAtalho }) {
           <path d="M20 12.6c0 3.6-3.6 6.5-8 6.5-.9 0-1.8-.1-2.6-.3L4.6 20.4l1.3-3.4C4.7 15.8 4 14.3 4 12.6 4 9 7.6 6.1 12 6.1s8 2.9 8 6.5z" />
         </svg>
       );
+    case "pontos":
+      return (
+        <svg {...comum}>
+          <circle cx="6" cy="12" r="1.4" fill="currentColor" />
+          <circle cx="12" cy="12" r="1.4" fill="currentColor" />
+          <circle cx="18" cy="12" r="1.4" fill="currentColor" />
+        </svg>
+      );
     case "engrenagem":
       return (
         <svg {...comum}>
