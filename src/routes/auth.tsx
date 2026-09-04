@@ -355,7 +355,7 @@ function AuthPage() {
           <FaixaDeConvite />
         </div>
       )}
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">Minha conta</p>
+      <p className="font-serif text-[15px] font-semibold text-primary">Minha conta</p>
       <h1 className="mt-3 font-serif text-3xl">{title}</h1>
       <p className="mt-3 text-sm text-muted-foreground">
         {mode === "forgot"
@@ -415,10 +415,10 @@ function AuthPage() {
                  botão — os outros dois quebram sozinhos ("Sou / paciente") e o
                  terceiro não tinha onde quebrar. Empilhado, os três ficam da
                  mesma altura e nenhum transborda, inclusive em 320px. */
-              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 text-center text-[12.5px] font-semibold leading-tight transition-all ${
+              className={`flex flex-col items-center gap-1 rounded-2xl border px-1.5 py-2.5 text-center text-xs font-semibold leading-tight transition-all ${
                 role === r.key
                   ? "border-primary bg-primary/10 text-primary shadow-[var(--shadow-soft)]"
-                  : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                  : "card-material text-muted-foreground hover:border-primary/40"
               }`}
             >
               <span aria-hidden className="text-lg leading-none">
@@ -461,7 +461,7 @@ function AuthPage() {
           checagem no cliente só poderia divergir dela — e diria "código
           inválido" para um convite que o servidor aceitaria. */}
       {(mode === "login" || mode === "signup") && role === "acompanhante" && (
-        <div className="mt-8 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+        <div className="mt-8 card-material rounded-3xl p-6">
           <p className="text-4xl">🫶</p>
           <h2 className="mt-3 font-serif text-xl">Você foi convidado a acompanhar</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
@@ -502,7 +502,7 @@ function AuthPage() {
 
       {/* ── Cadastro de médico tem fluxo próprio (CRM, perfil profissional) ── */}
       {mode === "signup" && role === "medico" && (
-        <div className="mt-8 rounded-3xl border border-border bg-card p-6 text-center shadow-[var(--shadow-card)]">
+        <div className="mt-8 card-material rounded-3xl p-6 text-center">
           <p className="text-4xl">🩺</p>
           <h2 className="mt-3 font-serif text-xl">Criar conta de médico</h2>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -538,7 +538,7 @@ function AuthPage() {
       {mode === "forgot" && (
         <form
           onSubmit={submitForgot}
-          className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          className="mt-8 space-y-4 card-material rounded-3xl p-6"
           noValidate
         >
           <div>
@@ -596,7 +596,7 @@ function AuthPage() {
       {mode === "reset" && (
         <form
           onSubmit={submitReset}
-          className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+          className="mt-8 space-y-4 card-material rounded-3xl p-6"
           noValidate
         >
           <div>
@@ -658,7 +658,7 @@ function AuthPage() {
         (mode === "login" || (mode === "signup" && role !== "medico")) && (
           <form
             onSubmit={submit}
-            className="mt-8 space-y-4 rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
+            className="mt-8 space-y-4 card-material rounded-3xl p-6"
             noValidate
           >
             <GoogleButton role={role} />
