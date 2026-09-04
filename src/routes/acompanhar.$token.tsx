@@ -352,7 +352,7 @@ function CompanionView() {
        * proíbe em todo texto sensível.
        */}
       {profile.care_mode && (
-        <div className="mt-6 rounded-3xl border border-border bg-card p-5 text-sm leading-relaxed text-muted-foreground">
+        <div className="mt-6 card-material rounded-3xl p-5 text-sm leading-relaxed text-muted-foreground">
           As informações da gestação estão pausadas neste link.
           <br />
           Os avisos de emergência continuam chegando aqui normalmente.
@@ -438,7 +438,7 @@ function CompanionView() {
             )}
 
             {due && (
-              <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+              <div className="card-material rounded-2xl p-4 text-sm">
                 <p className="text-muted-foreground">Data Provável do Parto</p>
                 <p className="mt-1 font-serif text-xl">
                   {new Date(due + "T00:00:00").toLocaleDateString("pt-BR", {
@@ -465,7 +465,7 @@ function CompanionView() {
         {/* Tab: Apoiar mamãe */}
         {activeTab === "apoiar" && !profile.care_mode && (
           <div className="space-y-4">
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">Apoio emocional</p>
               <ul className="mt-3 space-y-2">
                 {tips.emotional.map((tip, i) => (
@@ -476,7 +476,7 @@ function CompanionView() {
                 ))}
               </ul>
             </div>
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">Suporte físico</p>
               <ul className="mt-3 space-y-2">
                 {tips.physical.map((tip, i) => (
@@ -507,7 +507,7 @@ function CompanionView() {
         {/* Tab: Para o parto */}
         {activeTab === "parto" && !profile.care_mode && (
           <div className="space-y-4">
-            <div className="rounded-3xl border border-border bg-card p-5">
+            <div className="card-material rounded-3xl p-5">
               <p className="font-serif text-lg">No dia do parto</p>
               <ul className="mt-3 space-y-3">
                 {PARTO_TIPS.map((tip, i) => (
