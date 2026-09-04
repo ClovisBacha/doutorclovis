@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
    sistema, e eram os dois únicos da tela. A ambulância é azul-clara de
    propósito — a primeira saiu branca e o recorte de fundo a comeu (branco
    sobre branco), a lição que o CLAUDE.md já registra para a nuvem e o berço. */
-import icAmbulancia from "@/assets/sos/ambulancia.webp";
 import icCoracao from "@/assets/saude/saude.webp";
 import icBombeiros from "@/assets/sos/bombeiros.webp";
 import { toast } from "sonner";
@@ -821,12 +820,13 @@ export function EmergencySheet({
             href="tel:192"
             className="press flex flex-col items-center justify-between gap-3 rounded-3xl bg-card px-3 py-4 text-center ring-1 ring-black/5"
           >
-            <img
-              src={icAmbulancia}
-              alt=""
-              aria-hidden
-              className="h-16 w-16 object-contain drop-shadow-[0_8px_12px_rgba(0,0,0,0.14)]"
-            />
+            {/* ⚠️ A ambulância VOLTOU a ser o emoji, por decisão do dono
+                ("a ambulância do SOS, preferia a antiga"). A peça gerada
+                (src/assets/sos/ambulancia.webp) ficou no repositório sem uso;
+                não a reintroduza aqui sem uma foto que ele aprove. */}
+            <span className="text-[2.6rem] leading-none" aria-hidden>
+              🚑
+            </span>
             <span>
               <span className="block text-[1.05rem] font-extrabold leading-tight text-foreground">
                 Ligar 192
