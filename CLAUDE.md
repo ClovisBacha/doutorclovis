@@ -12935,3 +12935,28 @@ conferir que entram certo.
 `ui-monospace` é código de indicação e link, de propósito), **zero texto de
 leitura abaixo de 13px** fora das legendas das bancadas e de dois glifos de
 emblema, nenhuma página rolando na horizontal, zero erros de console.
+
+### A madrugada continuou: avisos, o cartão que sai do app e os últimos rótulos
+
+- **As notificações e o ritual** — os quatro avisos derivados da central
+  (médico, convite, localização, contato) e a festa do último passo do ritual
+  eram emoji. Viraram peças em `src/assets/avisos/`. ⚠️ O mapa da central é por
+  EMOJI (`ARTE_DO_AVISO`), porque `Notificacao.icone` é o campo que viaja: uma
+  notificação nova nasce com emoji e aparece com ele até ganhar peça.
+- **O cartão de compartilhar era a única peça do produto em Georgia** — e é a
+  que sai para o WhatsApp e o Instagram com o nome do consultório. Agora
+  desenha em Nunito (`LETRA` em `share-card.ts`), nos pesos da régua da letra.
+  ⚠️ **O canvas NÃO espera fonte**: `fillText` com família ainda não carregada
+  desenha na reserva e não avisa. Os dois caminhos assíncronos chamam
+  `garantirLetra()` (`document.fonts.load`, teto de 1,5 s) antes de desenhar;
+  o síncrono roda depois de a tela já estar pintada em Nunito. O chapéu deixou
+  de ser caixa alta espaçada letra a letra.
+- **Doze rótulos em caixa alta espaçada** que a passada do material dos
+  cartões não alcançou viraram o serif de 15 px semibold. ⚠️ O Jogo
+  (`gestacao-path.tsx`, quatro deles) e o site institucional ficaram como
+  estavam, de propósito — o dono pediu para não mexer no Jogo. A sonda
+  `[class*='uppercase'][class*='tracking-']` nas cinco bancadas afetadas volta
+  vazia; o que sobra com esse padrão está no site, no painel do médico e numa
+  legenda de bancada.
+- **Medido ao fim desta leva:** 124 bancadas varridas e 11 roteiros de
+  interação, zero problemas; 5.523 testes verdes.
