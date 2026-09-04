@@ -524,7 +524,7 @@ function AuthPage() {
           </div>
           <Link
             to="/medicos/cadastro"
-            className="press inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)]"
+            className="btn-3d press inline-block rounded-full bg-primary px-7 py-3 text-sm font-semibold text-primary-foreground"
           >
             Continuar com e-mail e senha →
           </Link>
@@ -575,7 +575,7 @@ function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+            className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             {loading ? "Enviando…" : "Enviar link de redefinição"}
           </button>
@@ -635,7 +635,7 @@ function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+            className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             {loading ? "Salvando…" : "Salvar nova senha"}
           </button>
@@ -756,7 +756,7 @@ function AuthPage() {
                 type="button"
                 onClick={handleResend}
                 disabled={resendLoading}
-                className="w-full rounded-full border border-primary px-5 py-2 text-sm font-medium text-primary transition-opacity disabled:opacity-60 hover:bg-primary/5"
+                className="pill-3d press min-h-11 w-full rounded-full px-5 py-2 text-sm font-semibold text-primary disabled:opacity-60"
               >
                 {resendLoading ? "Enviando…" : "Reenviar e-mail de confirmação"}
               </button>
@@ -765,7 +765,7 @@ function AuthPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-60 hover:opacity-90"
+              className="btn-3d press min-h-11 w-full rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             >
               {loading ? "Aguarde…" : mode === "login" ? "Entrar" : "Criar conta"}
             </button>

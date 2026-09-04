@@ -3555,3 +3555,27 @@ button:active > .duo3d {
     background: color-mix(in oklch, var(--muted) 60%, transparent);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   O CAMPO NÃO DÁ ZOOM NO IPHONE (set/2026).
+   Abaixo de 16px o Safari do iPhone AMPLIA a página ao focar um campo — e
+   depois não volta sozinho. Foi metade da causa do "quando eu clico para
+   digitar, a tela se desloca" do chat, e o chat era UM dos 161 campos do app:
+   155 estavam em 13, 14 ou 15px (medido). Consertar campo a campo seria 155
+   edições e a 156ª nasceria errada.
+   ⚠️ `(pointer: coarse)` recorta para dedo: no computador (painel do médico,
+   site) nada muda. `max(16px, 1em)` só SOBE — um campo que já é maior fica
+   como está. Fora de @layer de propósito: regra sem camada vence qualquer
+   utilitário (`text-sm`) por definição, sem precisar de !important.
+   Caixa de marcar, rádio, faixa, arquivo e cor ficam de fora — não recebem
+   texto e não dão zoom.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not(
+      [type="color"]
+    ),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
