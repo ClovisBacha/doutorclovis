@@ -3923,19 +3923,31 @@ function KicksTab({
   const [active, setActive] = useState<KickSession | null>(null);
   const [count, setCount] = useState(0);
   const [history, setHistory] = useState<KickSession[]>([]);
+  /** A leitura FALHOU — não é o mesmo que ela nunca ter contado chutes. */
+  const [instavel, setInstavel] = useState(false);
   const startRef = useRef<number>(0);
   const [elapsed, setElapsed] = useState(0);
 
   const label = babyName ?? "o bebê";
   const isMonitoringPhase = weeks != null && weeks >= 28;
 
+  /* ⚠️ Mesma classe da HealthTab, na tela que MEDE um sintoma vermelho:
+     `data ?? []` fazia uma falha de rede afirmar "Nenhuma sessão registrada
+     ainda" para quem conta chutes há semanas — e é a comparação com as
+     sessões anteriores que diz se o bebê está se mexendo menos que o normal
+     dele. Sem histórico, a tela não responde a pergunta que ela veio fazer. */
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("kick_sessions")
       .select("*")
       .not("ended_at", "is", null)
       .order("started_at", { ascending: false })
       .limit(10);
+    if (error) {
+      setInstavel(true);
+      return;
+    }
+    setInstavel(false);
     setHistory(data ?? []);
   }
   useEffect(() => {
@@ -4086,7 +4098,12 @@ function KicksTab({
       {history.length > 0 && (
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-2xl card-material p-5 text-center">
-            <p className="font-serif text-[15px] font-semibold text-primary">Sessões registradas</p>
+            {/* ⚠️ "Sessões registradas" afirmava o TOTAL sobre uma consulta com
+                `.limit(10)`: quem contou trinta vezes lia "10" e concluía que
+                o app perdeu vinte. Os três cartões descrevem a mesma janela. */}
+            <p className="font-serif text-[15px] font-semibold text-primary">
+              Sessões (últimas 10)
+            </p>
             <p className="mt-2 font-serif text-3xl">{history.length}</p>
           </div>
           <div className="rounded-2xl card-material p-5 text-center">
@@ -4105,7 +4122,22 @@ function KicksTab({
       <div>
         <p className="mb-3 font-serif text-[15px] font-semibold text-muted-foreground">Histórico</p>
         <div className="space-y-2">
-          {history.length === 0 && (
+          {/* ⚠️ A falha vem ANTES do vazio. "Nenhuma sessão registrada ainda"
+              sobre uma leitura que falhou apaga a única referência que esta
+              tela tem: é a comparação com as sessões anteriores que responde
+              "ele está se mexendo menos que o normal DELE?". */}
+          {/* ⚠️ O COMPONENTE ÚNICO, e a frase de sossego é CLÍNICA — é para isso
+              que ela é prop. A carteirinha já carrega "ligue 192" na dela;
+              aqui o que não pode faltar é dizer que a decisão de procurar
+              atendimento NÃO depende desta tela voltar. */}
+          {instavel && history.length === 0 && (
+            <NaoConsegueLer
+              oQue="o seu histórico de chutes"
+              sossego="As suas contagens continuam salvas. E se você está sentindo o bebê se mexer menos que o normal dele, não espere por esta tela: fale com o seu médico ou procure atendimento."
+              aoTentar={() => void load()}
+            />
+          )}
+          {!instavel && history.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
           )}
           {history.map((s) => {
@@ -5560,6 +5592,8 @@ function HealthTab({
   onNavigate: (tab: string) => void;
 }) {
   const [logs, setLogs] = useState<HealthLog[]>([]);
+  /** A leitura FALHOU — não é o mesmo que ela nunca ter registrado. */
+  const [instavel, setInstavel] = useState(false);
   const [form, setForm] = useState({
     weight_kg: "",
     systolic: "",
@@ -5576,12 +5610,40 @@ function HealthTab({
      o INSERT segue aceitando as colunas, e um registro antigo aberto para
      correção não perde os valores por passar por aqui. */
 
+  /**
+   * ⚠️ "NÃO CONSEGUI LER" TINHA A CARA DE "VOCÊ NUNCA REGISTROU NADA" — e esta
+   * é a OITAVA tela da mesma classe, na mais clínica do app.
+   *
+   * O PostgREST resolve com `{ data: null, error }` numa falha e NÃO lança, e
+   * `data ?? []` transformava isso na tela de quem acabou de instalar o app:
+   * "Último peso —", "Ganho total —", "Última PA —", "Glicemia —", os TRÊS
+   * gráficos somem (`length < 2 → return null`) e a lista afirma "Você ainda
+   * não registrou nada." sobre meses de medição.
+   *
+   * ⚠️ E o pior caso não é a abertura: é o RE-READ. `add()` e `remove()`
+   * terminam chamando `load()`. Ela mede 158/98 às onze da noite, registra, o
+   * formulário limpa — e a tela que ela estava lendo vira quatro traços com os
+   * gráficos sumindo. A leitura razoável é "não gravou" ou "o app apagou tudo",
+   * e as duas levam a registrar de novo: `health_logs` não tem chave única por
+   * dia, então a duplicata entra em `clinical_events` e o médico vê duas.
+   *
+   * ⚠️ Some-se a isso que o cartão da PA é o único lugar desta tela com
+   * conduta (`vozDaPaciente` do último valor grave: "Repita em 5 minutos,
+   * sentada… ligue para o seu médico agora"). Com a lista vazia, some.
+   */
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("health_logs")
       .select("*")
       .order("log_date", { ascending: false })
       .limit(60);
+    if (error) {
+      /* ⚠️ NÃO zera a lista. Se havia registros na tela, eles continuam ali —
+         o defeito era justamente apagá-los sobre uma falha de rede. */
+      setInstavel(true);
+      return;
+    }
+    setInstavel(false);
     setLogs(data ?? []);
   }
   useEffect(() => {
@@ -5796,8 +5858,44 @@ function HealthTab({
             ? "sobrepeso"
             : "obesidade";
 
+  /* ⚠️ A ORDEM É O CONSERTO: a falha vem ANTES do vazio. Trocadas, quem
+     registra há meses lê quatro traços e "Você ainda não registrou nada." */
+  if (instavel && logs.length === 0)
+    return (
+      <NaoConsegueLer
+        oQue="os seus registros"
+        sossego="Tudo o que você anotou continua salvo, e o seu médico continua vendo."
+        aoTentar={() => void load()}
+      />
+    );
+
   return (
     <div className="space-y-6">
+      {/*
+        ⚠️ A FAIXA DO CASO QUE MAIS ENGANA: a leitura falhou E havia dados na
+        tela. `load()` não zera mais a lista, então o que ela vê são os últimos
+        números que deram certo — e isso é honesto até o instante em que ela
+        SALVA um registro novo, porque o re-read falha e o número novo não
+        aparece. Sem esta linha, a conclusão razoável é "não gravou", e ela
+        registra de novo: `health_logs` não tem chave única por dia, e a
+        duplicata vai para o prontuário que o médico lê.
+      */}
+      {instavel && logs.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm">
+          <p className="font-semibold text-amber-900">Não consegui atualizar agora</p>
+          <p className="mt-1 text-amber-900/80">
+            Estes são os últimos números que consegui ler. Se você acabou de anotar algo, ele foi
+            salvo — só ainda não apareceu aqui. Não registre de novo.
+          </p>
+          <button
+            type="button"
+            onClick={() => void load()}
+            className="press mt-3 h-11 rounded-full border border-amber-300 bg-white px-4 font-semibold text-amber-900"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      )}
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
         <div className="press glass-card glass-emerald rounded-3xl p-5">
@@ -10096,20 +10194,44 @@ const MOOD_SUGGESTIONS: Record<number, string[]> = {
 function HumorTab() {
   const [entries, setEntries] = useState<{ entry_date: string; mood: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  /* ⚠️ O Diário lê a MESMA tabela e já distingue instável de vazio desde
+     ago/2026 (`JournalTab`, em `vazio-nao-e-falha.test.ts`). A tela do Humor
+     ficou de pé — e ela é a curva de oito semanas do estado emocional dela:
+     "Nenhum registro ainda" sobre uma leitura que falhou faz quem escreve há
+     meses concluir que perdeu tudo. */
+  const [instavel, setInstavel] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("journal_entries")
-        .select("entry_date, mood")
-        .order("entry_date", { ascending: false })
-        .limit(180);
+  const carregar = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from("journal_entries")
+      .select("entry_date, mood")
+      .order("entry_date", { ascending: false })
+      .limit(180);
+    if (error) setInstavel(true);
+    else {
+      setInstavel(false);
       setEntries(data ?? []);
-      setLoading(false);
-    })();
+    }
+    setLoading(false);
   }, []);
 
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
   if (loading) return <TabSkeleton />;
+
+  /* ⚠️ A ORDEM É O CONSERTO: a falha vem ANTES do vazio. Trocadas, quem
+     escreve há meses lê "Nenhum registro ainda" e vai procurar o diário
+     perdido em vez de tentar de novo. */
+  if (instavel && entries.length === 0)
+    return (
+      <NaoConsegueLer
+        oQue="o seu humor"
+        sossego="O que você escreveu no diário continua salvo."
+        aoTentar={() => void carregar()}
+      />
+    );
 
   if (entries.length === 0)
     return (
@@ -16096,6 +16218,8 @@ function PreventivosTab() {
   const [editDate, setEditDate] = useState("");
   const [editNotes, setEditNotes] = useState("");
   const [saving, setSaving] = useState(false);
+  /** A leitura FALHOU — não é o mesmo que ela nunca ter registrado exame. */
+  const [instavel, setInstavel] = useState(false);
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -16104,7 +16228,15 @@ function PreventivosTab() {
       return;
     }
     const res = await getPreventiveReminders({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setReminders(res.reminders);
+    /* ⚠️ O `res.ok` já era conferido — o que faltava era o servidor DIZER a
+       verdade: ele devolvia `ok: true` sobre uma leitura que falhou. Agora que
+       ele distingue, a tela precisa distinguir também: com a lista vazia por
+       falha, todo exame cai em "nunca registrado" e o contador de atraso
+       zera. */
+    if (res.ok) {
+      setInstavel(false);
+      setReminders(res.reminders);
+    } else setInstavel(true);
     setLoading(false);
   }
 
@@ -16120,7 +16252,12 @@ function PreventivosTab() {
       setSaving(false);
       return;
     }
-    await setPreventiveReminder({
+    /* ⚠️ O RETORNO ERA DESCARTADO, e ele chega numa resposta 200 NORMAL —
+       nenhum `try/catch` pegaria. O painel fechava, a lista recarregava sem a
+       data que ela acabou de digitar, e a leitura razoável é que ela errou o
+       campo. Numa tela de preventivos, isso vira um exame que ela acha que
+       registrou e o app não conhece. */
+    const r = await setPreventiveReminder({
       data: {
         accessToken: s.session.access_token,
         examKey: editingKey,
@@ -16128,12 +16265,29 @@ function PreventivosTab() {
         notes: editNotes || null,
       },
     });
+    setSaving(false);
+    if (!r.ok) {
+      /* Fica ABERTO com o que ela digitou: fechar perderia o texto. */
+      toast.error("Não consegui salvar agora. Confira a conexão e toque em salvar de novo.");
+      return;
+    }
     setEditingKey(null);
     await load();
-    setSaving(false);
   }
 
   if (loading) return <TabSkeleton />;
+
+  /* ⚠️ A falha vem ANTES de qualquer contagem. Com a lista vazia por erro, os
+     três números do topo mentem juntos: "Em atraso: 0" é o mais perigoso,
+     porque é exatamente o que ela veio conferir. */
+  if (instavel)
+    return (
+      <NaoConsegueLer
+        oQue="os seus preventivos"
+        sossego="As datas que você registrou continuam salvas."
+        aoTentar={() => void load()}
+      />
+    );
 
   const reminderMap = Object.fromEntries(reminders.map((r) => [r.exam_key, r]));
   const today = new Date();

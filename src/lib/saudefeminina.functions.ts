@@ -154,9 +154,19 @@ export const getPreventiveReminders = createServerFn({ method: "POST" })
     const db = typedDb(supabaseAdmin);
     const { data: u, error: authErr } = await supabaseAdmin.auth.getUser(data.accessToken);
     if (authErr || !u.user) return { ok: false as const, reminders: [] as PreventiveReminder[] };
-    const { data: rows } = await db
+    const { data: rows, error } = await db
       .from("preventive_reminders")
       .select("*")
       .eq("user_id", u.user.id);
+    /* ⚠️ MESMO DEFEITO DE `getRecentCycles`, QUARENTA LINHAS ACIMA NESTE
+       ARQUIVO — e lá ele já está consertado, com o comentário explicando por
+       quê. Aqui o `error` era descartado e a função devolvia `ok: true` com
+       lista vazia: um VAZIO AUTENTICADO COMO VERDADE, que nenhuma correção só
+       de tela alcança.
+       O custo é específico: sem lembretes, TODO exame cai em `status:
+       "never"`. A tela responde "Em atraso: 0" e conta como "Nunca registrado"
+       o Papanicolau que ela anotou no ano passado — e ela ou refaz um exame
+       que já fez, ou conclui que o app perdeu o registro. */
+    if (error) return { ok: false as const, reminders: [] as PreventiveReminder[] };
     return { ok: true as const, reminders: (rows ?? []) as PreventiveReminder[] };
   });
