@@ -131,6 +131,7 @@ import {
   validaRegistro,
   vozDaPaciente,
 } from "@/lib/sinais-clinicos";
+import { lerPressaoDigitada } from "@/lib/pressao-digitada";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -6987,6 +6988,21 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
     });
   }
 
+  /**
+   * ⚠️ **A PRESSÃO MAL ESCRITA DESTRUÍA A TRIAGEM INTEIRA.**
+   *
+   * Os campos são opcionais e a régua do servidor exige os pisos clínicos
+   * (`systolic >= 50`, `diastolic >= 30`). Quem escrevia "12" e "8" — que é
+   * como se fala pressão no Brasil — fazia o `zod` LANÇAR, e o `catch` de fora
+   * respondia "Não foi possível avaliar os sintomas". Ela podia ter marcado
+   * sangramento e dor de cabeça que não passa, dois dos nove sintomas
+   * VERMELHOS, e receber uma tela de erro genérica no lugar da orientação.
+   *
+   * Agora um campo opcional ilegível vale `null`: a triagem segue pelos
+   * SINTOMAS, que é o que ela veio perguntar.
+   */
+  const pressao = lerPressaoDigitada(sys, dia);
+
   async function avaliar() {
     setLoading(true);
     setResult(null);
@@ -6999,8 +7015,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         data: {
           accessToken: sess.session?.access_token,
           symptoms: [...selected],
-          systolic: sys ? Number(sys) : null,
-          diastolic: dia ? Number(dia) : null,
+          systolic: pressao?.systolic ?? null,
+          diastolic: pressao?.diastolic ?? null,
           note: note || undefined,
           weeks,
         },
@@ -7019,8 +7035,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
               accessToken: s.session.access_token,
               level: res.level,
               symptoms: [...selected],
-              systolic: sys ? Number(sys) : null,
-              diastolic: dia ? Number(dia) : null,
+              systolic: pressao?.systolic ?? null,
+              diastolic: pressao?.diastolic ?? null,
               note: note || null,
             },
           }).catch(() => ({ ok: false as const }));
@@ -7112,6 +7128,29 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
             className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
           />
         </div>
+        {/* ⚠️ A CONVERSÃO NUNCA É SILENCIOSA. Multiplicar o número dela por dez
+            sem dizer seria o app reescrevendo um dado clínico por conta
+            própria — ela vê o que entendemos e corrige se não era isso. */}
+        {pressao?.interpretada && (
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Entendi{" "}
+            <strong className="text-foreground">
+              {pressao.systolic}/{pressao.diastolic}
+            </strong>{" "}
+            — é isso?
+          </p>
+        )}
+        {/* E quando não dá para entender, a tela DIZ que vai seguir sem ela, em
+            vez de recusar a triagem inteira lá na frente. */}
+        {(sys.trim() || dia.trim()) && !pressao && (
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Não consegui ler essa pressão — vou avaliar pelos sintomas. Você pode escrever{" "}
+            <strong className="text-foreground">120</strong> e{" "}
+            <strong className="text-foreground">80</strong>, ou{" "}
+            <strong className="text-foreground">12</strong> e{" "}
+            <strong className="text-foreground">8</strong>.
+          </p>
+        )}
       </div>
       <textarea
         value={note}
