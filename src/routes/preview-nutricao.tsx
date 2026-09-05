@@ -22,7 +22,9 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *   `?estado=erro`       — o aviso do servidor virando bolha
  *
  * E `?w=` muda o trimestre (chips e nutrientes), `?luto=1` liga o Modo Cuidado
- * — onde o cartão de nutrientes, os chips e a semana somem.
+ * — onde o cartão de nutrientes, os chips e a semana somem —, `?agua=5` põe
+ * cinco copos no contador e `?ferramenta=comer|prato|alivio` abre o painel
+ * daquela ferramenta (os dois dependem de `localStorage` e de um toque).
  */
 export const Route = createFileRoute("/preview-nutricao")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -31,6 +33,8 @@ export const Route = createFileRoute("/preview-nutricao")({
     w: q.w == null || q.w === "" ? 24 : Number(q.w),
     estado: q.estado == null ? "saudacao" : String(q.estado),
     luto: q.luto == null ? false : Boolean(q.luto),
+    agua: q.agua == null || q.agua === "" ? 0 : Number(q.agua),
+    ferramenta: q.ferramenta == null ? "" : String(q.ferramenta),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -69,7 +73,7 @@ const TRES: ChatMsg[] = [
 ];
 
 function Pagina() {
-  const { w, estado, luto } = Route.useSearch();
+  const { w, estado, luto, agua, ferramenta } = Route.useSearch();
 
   const bancada =
     estado === "conversa"
@@ -92,6 +96,14 @@ function Pagina() {
                 ],
               }
             : undefined;
+  const extras = {
+    agua,
+    ferramenta: (["comer", "prato", "alivio"].includes(ferramenta) ? ferramenta : undefined) as
+      | "comer"
+      | "prato"
+      | "alivio"
+      | undefined,
+  };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
@@ -114,7 +126,7 @@ function Pagina() {
           } as never
         }
         careMode={luto}
-        bancada={bancada}
+        bancada={{ ...(bancada ?? {}), ...extras }}
       />
     </div>
   );

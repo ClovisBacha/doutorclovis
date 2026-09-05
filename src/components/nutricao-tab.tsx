@@ -16,13 +16,28 @@
  * `ChatMsg`, `Gest` e `Profile` viajam por `import type` — apagados na
  * compilação, então não há dependência de execução do arquivo de rota.
  */
+import { Droplets, Leaf, Minus, Plus, Search, Send, UtensilsCrossed } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import type { ChatMsg, Gest, Profile } from "@/routes/_authenticated/minha-conta";
 import { supabase } from "@/integrations/supabase/client";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
+import icNutricao from "@/assets/saude/nutricao.webp";
 import { trimesterForWeek } from "@/lib/gestacao";
+import {
+  ALIVIOS,
+  META_COPOS,
+  REFEICOES,
+  chaveDaAgua,
+  chavesDeAguaVencidas,
+  limparAlimento,
+  perguntaDeAlivio,
+  perguntaDoPrato,
+  perguntaPossoComer,
+  type Refeicao,
+} from "@/lib/nutricao-ferramentas";
+import { ymdLocal } from "@/lib/utils";
 import { alturaNoFluxo, useJanelaDoTeclado } from "@/lib/janela-do-teclado";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 
@@ -119,6 +134,74 @@ function semAnimacaoNutricao(): boolean {
   );
 }
 
+/* ─── AS PEÇAS ─────────────────────────────────────────────────────────────
+   A identidade é a do ladrilho Nutrição da grade da Saúde (`lime-50 →
+   amber-50`, tinta `lime`): quem toca no verde-limão chega numa tela
+   verde-limão. As três "ferramentas" abrem um painel e mandam a pergunta
+   pronta para a MESMA conversa — nada responde fora do chat. */
+
+type Ferramenta = "comer" | "prato" | "alivio";
+
+function Avatar({ tamanho }: { tamanho: number }) {
+  return (
+    <span
+      className="flex shrink-0 items-center justify-center rounded-full bg-white shadow-[0_6px_16px_-8px_rgba(77,124,15,0.55)] ring-1 ring-lime-200/80"
+      style={{ width: tamanho, height: tamanho }}
+    >
+      <img src={icNutricao} alt="" width={tamanho * 0.72} height={tamanho * 0.72} />
+    </span>
+  );
+}
+
+function CartaoFerramenta({
+  aberta,
+  icone,
+  titulo,
+  legenda,
+  onClick,
+}: {
+  aberta: boolean;
+  icone: React.ReactNode;
+  titulo: string;
+  legenda: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={aberta}
+      className={`press flex min-h-[92px] flex-col items-start gap-2 rounded-2xl border p-3 text-left transition-colors ${
+        aberta
+          ? "border-lime-500 bg-gradient-to-b from-lime-100 to-lime-50 shadow-[0_10px_22px_-14px_rgba(77,124,15,0.6)]"
+          : "card-material border-lime-200/70 bg-gradient-to-b from-lime-100/80 to-lime-50/40"
+      }`}
+    >
+      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-lime-700 ring-1 ring-lime-200/80">
+        {icone}
+      </span>
+      <span className="min-w-0">
+        <span className="block font-serif text-[15px] font-semibold leading-tight text-foreground">
+          {titulo}
+        </span>
+        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">{legenda}</span>
+      </span>
+    </button>
+  );
+}
+
+function Chip({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pill-3d press min-h-[44px] rounded-full px-4 py-2 text-[13px] font-semibold text-lime-800"
+    >
+      {children}
+    </button>
+  );
+}
+
 export function NutricaoTab({
   profile,
   gest,
@@ -143,8 +226,13 @@ export function NutricaoTab({
     mensagens?: ChatMsg[];
     votos?: Record<number, boolean | "fila">;
     carregando?: boolean;
+    /** A água do dia e a ferramenta aberta — os dois estados que dependem de
+        `localStorage` e de um toque, e por isso eram impossíveis de fotografar. */
+    agua?: number;
+    ferramenta?: Ferramenta;
   };
 }) {
+  const ehBancada = bancada != null;
   const trimester = gest ? trimesterForWeek(gest.weeks) : 2;
   const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
   const chips = NUTRITION_CHIPS[trimester as 1 | 2 | 3];
@@ -182,6 +270,48 @@ export function NutricaoTab({
      os dois na mesma tela trocando de aba, e duas medições divergiriam. */
   const janela = useJanelaDoTeclado();
   const alturaDaCaixa = alturaNoFluxo(janela);
+
+  /* ─── AS FERRAMENTAS ─────────────────────────────────────────────────────── */
+  const [ferramenta, setFerramenta] = useState<Ferramenta | null>(bancada?.ferramenta ?? null);
+  const [alimento, setAlimento] = useState("");
+  const conversaRef = useRef<HTMLDivElement>(null);
+  /** Manda a pergunta pronta e leva a paciente até a conversa. */
+  function perguntar(texto: string) {
+    setFerramenta(null);
+    setAlimento("");
+    void send(texto);
+    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ─── A ÁGUA DO DIA ───────────────────────────────────────────────────────
+     ⚠️ Lida num EFEITO, nunca no render: `localStorage` não existe no servidor
+     e o dia local muda entre as duas execuções — é a divergência de hidratação
+     que já deixou este app sem abrir. `null` = ainda não li. */
+  const [agua, setAgua] = useState<number | null>(bancada?.agua ?? null);
+  useEffect(() => {
+    if (ehBancada) return;
+    try {
+      const v = Number(localStorage.getItem(chaveDaAgua(ymdLocal())) ?? "0");
+      setAgua(Number.isFinite(v) ? v : 0);
+    } catch {
+      setAgua(0);
+    }
+  }, [ehBancada]);
+  function beber(delta: number) {
+    const proximo = Math.max(0, Math.min(99, (agua ?? 0) + delta));
+    setAgua(proximo);
+    if (ehBancada) return;
+    try {
+      const hoje = ymdLocal();
+      /* As chaves de outros dias saem a cada escrita — cota do localStorage. */
+      chavesDeAguaVencidas(Object.keys(localStorage), hoje).forEach((k) =>
+        localStorage.removeItem(k),
+      );
+      localStorage.setItem(chaveDaAgua(hoje), String(proximo));
+    } catch {
+      /* sem armazenamento, o contador vive só nesta abertura */
+    }
+  }
   /* ─── O 👎 QUE NÃO EXISTIA AQUI ────────────────────────────────────────────
      Este chat clínico não tinha nenhum caminho de correção: o que saísse errado
      ficava entre a IA e a paciente, para sempre. O chat principal tem
@@ -348,111 +478,240 @@ export function NutricaoTab({
   }
 
   return (
-    <div className="space-y-6">
-      {/* ─── O CARTÃO DE NUTRIENTES SOME EM MODO CUIDADO ──────────────────
-          "Formação óssea do bebê" e "Desenvolvimento do cérebro fetal" são o
-          conteúdo dele. Eu tinha calado só a saudação e deixado a tela inteira
-          falando do bebê logo abaixo. */}
-      {!careMode && (
-        <div className="rounded-3xl card-material p-6">
-          <p className="font-serif text-lg">Nutrientes em destaque — {trimester}º trimestre</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {tips.map((t) => (
-              <div
-                key={t.nutrient}
-                className="rounded-2xl border border-border bg-secondary/40 p-3"
+    <div className="space-y-5">
+      {/* ─── AS FERRAMENTAS ─────────────────────────────────────────────
+          As três perguntas que só uma nutricionista recebe, prontas para
+          tocar. Cada uma abre um painel e manda a pergunta MONTADA para a
+          mesma conversa — nada responde fora do chat. Em Modo Cuidado elas
+          ficam (comer bem é dela), e o texto não diz "gestação". */}
+      <section aria-label="Ferramentas da nutrição">
+        <div className="grid grid-cols-3 gap-2">
+          <CartaoFerramenta
+            aberta={ferramenta === "comer"}
+            icone={<Search className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Posso comer?"
+            legenda="Sushi, queijo, café…"
+            onClick={() => setFerramenta(ferramenta === "comer" ? null : "comer")}
+          />
+          <CartaoFerramenta
+            aberta={ferramenta === "prato"}
+            icone={<UtensilsCrossed className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Meu prato"
+            legenda="A próxima refeição"
+            onClick={() => setFerramenta(ferramenta === "prato" ? null : "prato")}
+          />
+          <CartaoFerramenta
+            aberta={ferramenta === "alivio"}
+            icone={<Leaf className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="Alívio"
+            legenda="Enjoo, azia…"
+            onClick={() => setFerramenta(ferramenta === "alivio" ? null : "alivio")}
+          />
+        </div>
+
+        {ferramenta === "comer" && (
+          <form
+            className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const a = limparAlimento(alimento);
+              if (a) perguntar(perguntaPossoComer(a, careMode));
+            }}
+          >
+            <label htmlFor="alimento" className="block text-sm font-semibold text-foreground">
+              Qual alimento?
+            </label>
+            <div className="mt-2 flex gap-2">
+              <input
+                id="alimento"
+                value={alimento}
+                onChange={(e) => setAlimento(e.target.value)}
+                placeholder="Ex.: sushi, queijo brie, café…"
+                autoComplete="off"
+                maxLength={60}
+                /* ⚠️ 16px, nunca menos: abaixo disso o Safari do iPhone dá zoom
+                   ao focar. */
+                className="min-h-[44px] flex-1 rounded-full border border-lime-200 bg-white px-4 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus:border-lime-500"
+              />
+              <button
+                type="submit"
+                disabled={!limparAlimento(alimento) || loading}
+                className="btn-3d press min-h-[44px] rounded-full bg-lime-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
               >
-                <p className="text-sm font-semibold text-primary">{t.nutrient}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t.why}</p>
-                <p className="mt-1 text-xs">{t.foods}</p>
-              </div>
+                Perguntar
+              </button>
+            </div>
+          </form>
+        )}
+
+        {ferramenta === "prato" && (
+          <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+            <p className="text-sm font-semibold text-foreground">Qual refeição?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {REFEICOES.map((r: Refeicao) => (
+                <Chip key={r} onClick={() => perguntar(perguntaDoPrato(r))}>
+                  {r}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {ferramenta === "alivio" && (
+          <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+            <p className="text-sm font-semibold text-foreground">O que está incomodando?</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {ALIVIOS.map((a) => (
+                <Chip key={a.rotulo} onClick={() => perguntar(perguntaDeAlivio(a.frase))}>
+                  {a.rotulo}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ─── A ÁGUA DO DIA ──────────────────────────────────────────────
+          Contador, não meta clínica: 8 copos é REFERÊNCIA e a tela diz. */}
+      <section
+        aria-label="Água de hoje"
+        className="card-material flex items-center gap-3 rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3"
+      >
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-sky-600 ring-1 ring-lime-200/80">
+          <Droplets className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-baseline gap-1.5">
+            <span className="font-serif text-2xl font-semibold leading-none tabular-nums text-foreground">
+              {agua ?? "–"}
+            </span>
+            <span className="text-sm text-muted-foreground">de {META_COPOS} copos hoje</span>
+          </div>
+          <div className="mt-1.5 flex gap-1" aria-hidden>
+            {Array.from({ length: META_COPOS }, (_, i) => (
+              <span
+                key={i}
+                className={`h-1.5 flex-1 rounded-full ${
+                  agua != null && i < agua ? "bg-sky-500" : "bg-lime-200/70"
+                }`}
+              />
             ))}
           </div>
-        </div>
-      )}
-
-      {/* Chat */}
-      <div
-        className="flex flex-col rounded-3xl card-material"
-        style={{ height: alturaDaCaixa ?? "55vh" }}
-      >
-        <div className="border-b border-border p-4">
-          <p className="font-serif text-lg">Nutricionista Virtual</p>
-          <p className="text-xs text-muted-foreground">
-            {careMode
-              ? "Orientações de alimentação para você — não substitui avaliação nutricional individual."
-              : "Orientações personalizadas para sua gestação — não substitui avaliação nutricional individual."}
+          <p className="mt-1 text-xs text-muted-foreground">
+            Referência de cerca de 2 litros — quem ajusta é o seu médico.
           </p>
         </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => beber(-1)}
+            disabled={!agua}
+            aria-label="Tirar um copo"
+            className="pill-3d press flex h-11 w-11 items-center justify-center rounded-full text-lime-800 disabled:opacity-40"
+          >
+            <Minus className="h-4 w-4" strokeWidth={2.2} />
+          </button>
+          <button
+            type="button"
+            onClick={() => beber(1)}
+            aria-label="Bebi um copo"
+            className="btn-3d press flex h-11 w-11 items-center justify-center rounded-full bg-lime-700 text-white"
+          >
+            <Plus className="h-5 w-5" strokeWidth={2.2} />
+          </button>
+        </div>
+      </section>
 
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+      {/* ─── A CONVERSA ─────────────────────────────────────────────────── */}
+      <div
+        ref={conversaRef}
+        className="card-material flex scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-lime-200/70"
+        style={{ height: alturaDaCaixa ?? "55vh" }}
+      >
+        <div className="flex items-center gap-3 border-b border-lime-100 bg-gradient-to-r from-lime-50 to-amber-50/60 px-4 py-3">
+          <Avatar tamanho={40} />
+          <div className="min-w-0">
+            <p className="font-serif text-[17px] font-semibold leading-tight text-foreground">
+              Nutricionista virtual
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {careMode
+                ? "Orientações de alimentação — não substitui avaliação nutricional individual."
+                : "Orientações para a sua gestação — não substitui avaliação nutricional individual."}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+          {messages.map((m, i) => {
+            const dela = m.role === "user";
+            return (
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                  m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"
-                }`}
+                key={i}
+                className={`flex items-end gap-1.5 ${dela ? "flex-row-reverse" : "flex-row"}`}
               >
-                {m.content || "…"}
-                {/* Só nas respostas da IA, e não na saudação (i > 0). */}
-                {m.role === "assistant" && i > 0 && m.content && (
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {votos[i] !== undefined ? (
-                      <span className="text-xs text-muted-foreground">
-                        {votos[i] === true
-                          ? "Obrigada 💛"
-                          : votos[i] === "fila"
-                            ? "Anotado — seu médico vai ver"
-                            : "Anotado 💛"}
-                      </span>
-                    ) : (
-                      <>
-                        {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
-                            `after:-inset`. Medido antes: 16×18px — o menor
-                            controle do app da paciente, e o ÚNICO caminho que
-                            ela tem para corrigir uma orientação alimentar
-                            errada (o 👎 chega na fila do médico).
-                            ⚠️ O truque do pseudo-elemento serviria se o botão
-                            fosse sozinho; aqui são dois VIZINHOS e opostos, e
-                            estendê-los faria os alvos se encavalarem — tocar
-                            entre eles acertaria o contrário do que ela quis.
-                            É a lição do ✕ do chá de bebê: truque de
-                            pseudo-elemento não conserta encavalamento.
-                            Os `-m` devolvem o espaço que o quadrado tomou, para
-                            o desenho da bolha não mudar. */}
-                        <button
-                          onClick={() => votar(i, true)}
-                          aria-label="Esta resposta ajudou"
-                          className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
-                        >
-                          👍
-                        </button>
-                        <button
-                          onClick={() => votar(i, false)}
-                          aria-label="Esta resposta não ajudou"
-                          className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
-                        >
-                          👎
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
+                {!dela && <Avatar tamanho={28} />}
+                <div
+                  className={`max-w-[80%] px-4 py-2.5 text-[15px] leading-relaxed ${
+                    dela
+                      ? "rounded-3xl rounded-br-md bg-lime-700 text-white shadow-[0_10px_22px_-12px_rgba(77,124,15,0.7)]"
+                      : "card-material rounded-3xl rounded-bl-md text-foreground"
+                  }`}
+                >
+                  {m.content || "…"}
+                  {/* Só nas respostas da IA, e não na saudação (i > 0). */}
+                  {m.role === "assistant" && i > 0 && m.content && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      {votos[i] !== undefined ? (
+                        <span className="text-xs text-muted-foreground">
+                          {votos[i] === true
+                            ? "Obrigada 💛"
+                            : votos[i] === "fila"
+                              ? "Anotado — seu médico vai ver"
+                              : "Anotado 💛"}
+                        </span>
+                      ) : (
+                        <>
+                          {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
+                              `after:-inset`: são dois VIZINHOS e opostos, e
+                              estendê-los faria os alvos se encavalarem —
+                              tocar entre eles acertaria o contrário do que
+                              ela quis. É a lição do ✕ do chá de bebê. Os
+                              `-m` devolvem o espaço que o quadrado tomou. */}
+                          <button
+                            onClick={() => votar(i, true)}
+                            aria-label="Esta resposta ajudou"
+                            className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
+                          >
+                            👍
+                          </button>
+                          <button
+                            onClick={() => votar(i, false)}
+                            aria-label="Esta resposta não ajudou"
+                            className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
+                          >
+                            👎
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={messagesEndRef} />
         </div>
 
         {/* Sugestões: em Modo Cuidado somem. NUTRITION_CHIPS traz "Posso comer
             tâmara para preparar o parto?" e coisas do tipo. */}
         {!careMode && messages.length <= 1 && (
-          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-2">
+          <div className="scrollbar-hide flex gap-2 overflow-x-auto border-t border-lime-100 px-3 py-2">
             {chips.map((c) => (
               <button
                 key={c}
                 onClick={() => send(c)}
-                className="rounded-full border border-border bg-secondary px-3 py-1 text-xs hover:bg-secondary/70"
+                className="pill-3d press min-h-[44px] shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold text-lime-800"
               >
                 {c}
               </button>
@@ -460,25 +719,54 @@ export function NutricaoTab({
           </div>
         )}
 
-        <div className="flex gap-2 border-t border-border p-3">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder={
-              careMode ? "Pergunte sobre alimentação…" : "Pergunte sobre alimentação na gestação…"
-            }
-            className="min-h-[44px] flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
-          />
+        <div className="flex items-end gap-2 border-t border-lime-100 bg-card/92 px-3 py-2">
+          <div className="card-material flex min-h-[44px] flex-1 items-center rounded-[22px] px-4">
+            <input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && send()}
+              aria-label="Mensagem"
+              placeholder={careMode ? "Pergunte sobre alimentação…" : "Pergunte sobre alimentação…"}
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. */
+              className="min-h-[44px] w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
           <button
             onClick={() => send()}
-            disabled={loading}
-            className="min-h-[44px] rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
+            disabled={loading || !input.trim()}
+            aria-label="Enviar"
+            className="btn-3d press flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-lime-700 text-white disabled:opacity-50"
           >
-            {loading ? "Enviando…" : "Enviar"}
+            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
           </button>
         </div>
       </div>
+
+      {/* ─── O FOCO DO TRIMESTRE ───────────────────────────────────────
+          Some em Modo Cuidado: "Formação óssea do bebê" e "Desenvolvimento do
+          cérebro fetal" são o conteúdo dele. */}
+      {!careMode && (
+        <section aria-label="Nutrientes em foco">
+          <div className="mb-2 flex items-baseline justify-between px-1">
+            <p className="font-serif text-[17px] font-semibold text-foreground">
+              Foco do {trimester}º trimestre
+            </p>
+            <p className="text-xs text-muted-foreground">deslize →</p>
+          </div>
+          <div className="scrollbar-hide -mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-1">
+            {tips.map((t) => (
+              <article
+                key={t.nutrient}
+                className="card-material w-[210px] shrink-0 snap-start rounded-2xl border border-lime-200/70 bg-gradient-to-b from-lime-50 to-amber-50/60 p-3.5"
+              >
+                <p className="font-serif text-[15px] font-semibold text-lime-800">{t.nutrient}</p>
+                <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{t.why}</p>
+                <p className="mt-2 text-[13px] leading-snug text-foreground">{t.foods}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

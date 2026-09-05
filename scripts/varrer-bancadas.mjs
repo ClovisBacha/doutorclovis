@@ -64,6 +64,11 @@ const EXTRAS = [
   "/preview-nutricao?estado=carregando",
   "/preview-nutricao?estado=erro",
   "/preview-nutricao?estado=conversa&luto=1",
+  /* As ferramentas da nutricionista e a água: dependem de um toque e do
+     `localStorage`, então só a bancada as desenha. */
+  "/preview-nutricao?estado=saudacao&ferramenta=comer&agua=3",
+  "/preview-nutricao?estado=saudacao&ferramenta=alivio",
+  "/preview-nutricao?estado=conversa&luto=1&ferramenta=prato",
   /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
      existe —, então era a mais difícil de olhar. E é onde o anel de fases
      derrubava a hidratação por 17 dígitos num `cx` de SVG. */
