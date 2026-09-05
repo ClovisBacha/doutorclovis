@@ -18,6 +18,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ScrollProgress } from "@/components/motion-fx";
 import { PublicBottomNav } from "@/components/public-bottom-nav";
 import { ehPedacoQueSumiu } from "@/lib/pedaco-que-sumiu";
+import { ehAppInstalado } from "@/lib/nativo";
 
 /**
  * ⚠️ O CHATBOT DO SITE SAIU DO PACOTE DE ENTRADA — e isso é a maior conta do app.
@@ -258,16 +259,15 @@ export const Route = createRootRoute({
       { rel: "icon", href: "/favicon.ico", sizes: "any" },
       { rel: "icon", href: "/icon-192.png", type: "image/png", sizes: "192x192" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      // A letra do app é self-hosted (ver styles.css). O link do Google saiu:
+      // pedia DM Sans + Nunito + Inter (482 KB referenciados) e no iPhone
+      // nenhuma era usada. O preload é só do peso normal; o itálico é raro.
       {
         rel: "preload",
-        as: "style",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
-      },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800;1,9..40,400&family=Nunito:wght@700;800&family=Inter:wght@300;400;500;600&display=swap",
+        as: "font",
+        type: "font/woff2",
+        href: "/fontes/nunito.woff2",
+        crossOrigin: "anonymous",
       },
       {
         rel: "stylesheet",
@@ -525,6 +525,16 @@ function PWAInstallBanner() {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
+    /* ⚠️ NUNCA DENTRO DO APP JÁ INSTALADO. `navigator.standalone` é indefinido
+       na casca do Capacitor, então o ramo do iPhone dava `true` lá dentro: a
+       paciente que baixou o app da loja recebia, na primeira tela, um cartão
+       mandando "toque em compartilhar ↑" — numa tela sem barra de navegador.
+       ⚠️ E o convite CONTINUA no Safari comum do iPhone, de propósito: é lá
+       que instalar destrava o push, que é o canal do aviso de consulta e do
+       retorno do SOS. Esconder ali tiraria dela o caminho da emergência.
+       ⚠️ A decisão é aqui, num efeito — no render ela quebraria a hidratação
+       (`capacidade-fora-do-render.test.ts`). */
+    if (ehAppInstalado()) return;
     // Só mostra uma vez
     if (localStorage.getItem("pwa-banner-dismissed")) return;
 

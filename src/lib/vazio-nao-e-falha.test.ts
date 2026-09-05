@@ -1,331 +1,474 @@
 /**
- * "NÃO TEM NADA" E "NÃO CONSEGUI OLHAR" SÃO COISAS DIFERENTES.
+ * "NÃO CONSEGUI LER" NÃO PODE TER CARA DE "NÃO HÁ NADA".
  *
- * ─── A CLASSE DE DEFEITO ────────────────────────────────────────────────────
+ * ⚠️ Seis telas do app da paciente descartavam o erro da leitura — `data ?? []`
+ * ou um `{ ok: false }` que chega numa resposta **200 NORMAL** e que nenhum
+ * `try/catch` pega — e desenhavam um vazio que AFIRMA um fato falso. O custo
+ * nunca é a tela feia; é a conclusão que ela induz, e o que a paciente faz com
+ * ela:
  *
- * `supabase-js` NUNCA lança: devolve `{ data, error }`. Uma auditoria contou 54
- * leituras neste produto que descartam o `error` — e todas produzem o mesmo
- * resultado: lista vazia, com cara de boa notícia.
+ *   · contrações — a pior. `analysisWindow.length >= 2` esconde o banner de
+ *     análise, e o banner é o ÚNICO lugar desta tela com o botão "Ligar 192".
+ *     **Uma falha de rede silenciava o caminho de emergência, em trabalho de
+ *     parto** — e a contração aberta não era retomada, então o cronômetro
+ *     voltava para "Iniciar" com uma contração em curso no banco.
+ *   · teleconsulta — o médico abre a sala, ela lê "Nenhuma consulta agendada".
+ *   · consultas salvas — ela abre para reler a posologia que o médico ditou.
+ *   · ciclo — a data da última menstruação é a base da DUM e da DPP.
+ *   · diário — "Seu diário começará aqui" para quem escreve há meses.
+ *   · álbum — "Álbum (0 memórias)" sobre as fotos da gestação.
  *
- * Num painel clínico isso não é um detalhe de UX. As duas frases levam o médico
- * a AÇÕES OPOSTAS:
+ * ⚠️ **DUAS DELAS ERAM DE DUAS CAMADAS.** `getRecentCycles` e `getMyAlbumPosts`
+ * devolviam `ok: true` com lista vazia sobre um erro — um vazio AUTENTICADO
+ * COMO VERDADE, que nenhuma correção só de tela alcançaria.
  *
- *  · "Nada esperando por você" → ele fecha o painel. Se foi um timeout, pode
- *    haver uma pressão alterada esperando do outro lado.
- *  · "Ninguém na fila de espera" → ele para de oferecer vaga. Do outro lado há
- *    gestantes esperando um horário que ele acha que ninguém quer.
- *
- * Este arquivo cobra os dois casos que foram fechados, e a razão de cada um.
+ * ⚠️ **E A CORREÇÃO JÁ EXISTIA, aplicada em UM fluxo.** Os agendamentos
+ * distinguem instável de vazio desde ago/2026, com o comentário explicando o
+ * custo. É a forma mais comum de defeito deste repositório: a régua aplicada
+ * num lugar e deixada de pé em cinco vizinhos.
  */
-
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const semComentarios = (p: string) =>
-  readFileSync(p, "utf8")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+/** ⚠️ A prosa deste repositório CITA o que ela proíbe — sai antes da busca. */
+/** ⚠️ Corta na próxima função exportada, nunca num `});` — o primeiro deles
+ *  é o `.order(..., { ascending: false });`, e cortar ali deixava de fora
+ *  justamente a linha que este teste existe para cobrar. */
+const proximoExport = (f: string, i: number) => {
+  const j = f.indexOf("\nexport ", i + 1);
+  return j === -1 ? undefined : j;
+};
 
-const clinical = semComentarios("src/lib/clinical.functions.ts");
-const admin = semComentarios("src/lib/admin.functions.ts");
-const painel = semComentarios("src/routes/_authenticated/painel.tsx");
+const semComentarios = (t: string) =>
+  t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\{\/\*[\s\S]*?\*\/\}/g, " ");
 
-describe("1. o recorte de pacientes diz quando não conseguiu ler", () => {
-  test("a leitura passou a olhar o `error`", () => {
-    const i = clinical.indexOf("async function pacientesAtuaisComEstado");
-    const corpo = clinical.slice(i, clinical.indexOf("async function pacientesAtuais(", i));
-    expect(corpo).toContain("const { data, error }");
-    expect(corpo).toContain("falhou: !!error");
-  });
+const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
 
-  test("mas o Map vazio continua sendo o comportamento SEGURO", () => {
-    /**
-     * A falha não pode virar "mostra tudo". Quem não sabe de quem é a paciente
-     * não mostra nada de ninguém — falha fechando. O que muda é só a MENSAGEM.
-     */
-    const i = clinical.indexOf("async function pacientesAtuais(");
-    const corpo = clinical.slice(i, i + 240);
-    /* O COMPORTAMENTO, não a sintaxe: ele devolve o mapa e não faz nada de
-       diferente quando `falhou` — quem precisa distinguir usa a outra função.
-       Cobrar a linha exata matava até um mutante equivalente (a mesma coisa
-       escrita em duas linhas), o que é sinal de teste preso à forma. */
-    expect(corpo).toContain("pacientesAtuaisComEstado(doctorId)");
-    expect(corpo).toContain(".mapa");
-    expect(corpo).not.toContain("falhou");
-  });
+/**
+ * O corpo de um componente de topo, do `function X(` até o próximo `function`
+ * na coluna zero.
+ *
+ * ⚠️ **Não é uma janela de N caracteres.** `minha-conta.tsx` tem 21 mil linhas
+ * e as mesmas palavras aparecem dezenas de vezes; uma janela larga ficaria
+ * verde com a checagem apagada, que é a armadilha que este repositório já
+ * pagou onze vezes.
+ */
+function componente(nome: string, arquivo = CONTA) {
+  const i = arquivo.indexOf(`function ${nome}(`);
+  expect(i).toBeGreaterThan(-1);
+  const j = arquivo.indexOf("\nfunction ", i + 1);
+  return arquivo.slice(i, j === -1 ? undefined : j);
+}
 
-  test("e a fila clínica distingue vazio de falha", () => {
-    /* Era `if (ids.length === 0) return vazio;` — os dois casos no mesmo
-       `return`, e a tela afirmando que não há nada. */
-    expect(clinical).toContain(
-      "if (ids.length === 0) return falhou ? { ...vazio, incompleto: true } : vazio;",
-    );
-  });
+/**
+ * ⚠️ **A TELA CARREGA O PRÓPRIO ARQUIVO, e isso é o conserto de uma lição.**
+ * `minha-conta.tsx` está sendo partido em componentes (set/2026), e a primeira
+ * aba a sair — o ciclo menstrual — deixou esta catraca vermelha só porque o
+ * caminho mudou. A garantia não mudou uma linha; o que faltava era o teste
+ * saber onde procurar. Com o arquivo ao lado do nome, o próximo corte não
+ * repete isto.
+ */
+const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
-  test("o painel de fato acende o aviso com esse campo", () => {
-    /* Sem isto o servidor diria a verdade e a tela continuaria calada. */
-    expect(painel).toContain("setFonteFalhou((f) => ({ ...f, eventos: r.incompleto }))");
-  });
-});
+/** ⚠️ O SEGUNDO corte (set/2026): as contrações. Mesma lição do bloco acima,
+ *  e a razão de o helper aceitar o arquivo — sem ele, mover a tela deixaria
+ *  vermelha a catraca que guarda o único botão do 192 desta aba. */
+const CONTRACOES = semComentarios(readFileSync("src/components/contracoes-tab.tsx", "utf8"));
 
-describe("2. a fila de espera não afirma vazio quando não leu", () => {
-  test("o servidor devolve `ok: false` quando a leitura falha", () => {
-    /* Ancorado na FUNÇÃO, não na tabela: o `const { data, error }` vem antes do
-       `.from(...)` na mesma expressão, então cortar a partir do nome da tabela
-       deixava a asserção olhando para depois do que ela queria ver. */
-    const i = admin.indexOf("export const getDoctorWaitlist");
-    const corpo = admin.slice(i, i + 1600);
-    expect(corpo).toContain("const { data: rows, error }");
-    expect(corpo).toContain("if (error) return { ok: false as const");
-  });
+/** ⚠️ O QUINTO corte (set/2026): a saúde da mulher — o ciclo e os preventivos.
+ *  Ela SOME por nove meses (`mostrarSaudeDaMulher`), e era a metade da grade da
+ *  Saúde sem bancada nenhuma. Mesma lição dos blocos acima: a garantia não
+ *  mudou, mudou o endereço. */
+const MULHER = semComentarios(readFileSync("src/components/saude-mulher.tsx", "utf8"));
 
-  test("a tela mostra a faixa, e NÃO um zero", () => {
-    /**
-     * Mostrar "0" seria a mesma mentira com outro tipo: um número é uma
-     * afirmação. O traço não afirma nada.
-     */
-    const i = painel.indexOf("function WaitlistSection");
-    const bloco = painel.slice(i, i + 2600);
-    expect(bloco).toContain("setFalhou(!res.ok)");
-    expect(bloco).toContain('{falhou ? "—" : entries.length}');
-    expect(bloco).toContain("Não consegui ler a fila de espera agora");
-  });
+/** ⚠️ O TERCEIRO corte (set/2026): os chutes. Mesma lição, quarta vez — e é
+ *  por isso que o helper aceita o arquivo ao lado do nome. */
+const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
 
-  test("e a faixa diz o que NÃO concluir", () => {
-    /* "Erro ao carregar" faria o médico atualizar e seguir. A frase precisa
-       impedir a conclusão errada, que é o dano real. */
-    expect(painel).toContain("não</strong> quer dizer que ela");
-  });
-});
+/** ⚠️ O QUARTO corte (set/2026): peso, pressão e glicemia. Quinta vez que uma
+ *  catraca fica vermelha por mudança de caminho — e a razão de o helper aceitar
+ *  o arquivo ao lado do nome. */
+const SAUDE = semComentarios(readFileSync("src/components/health-tab.tsx", "utf8"));
 
-describe("3. a lista de pacientes não afirma consultório vazio", () => {
-  const link = semComentarios("src/lib/patientlink.functions.ts");
+/** As cinco de mesma forma: lê o erro, e o vazio vem DEPOIS do instável. */
+const TELAS = [
+  { nome: "JournalTab", vazio: "Seu diário começará aqui", marca: "setInstavel(true)" },
+  { nome: "ConsultasTab", vazio: "Nenhuma consulta salva ainda", marca: "setNotesInstavel(true)" },
+  {
+    nome: "TeleconsultaTab",
+    vazio: "Nenhuma consulta agendada no momento",
+    marca: "setInstavel(true)",
+  },
+  {
+    nome: "CicloMenstrualTab",
+    vazio: "Nenhum ciclo registrado",
+    marca: "setInstavel(true)",
+    arquivo: CICLO,
+  },
+  { nome: "AlbumTab", vazio: "Nenhuma memória ainda", marca: "setInstavel(true)" },
+  /*
+    ⚠️ **AS TRÊS DA ABA SAÚDE (set/2026), e elas eram as que faltavam.**
+    A auditoria da aba encontrou a mesma classe nas três telas mais clínicas
+    que o coração abre, e nenhuma delas estava aqui:
 
-  test("a cascata de selects diz se chegou a LER", () => {
-    /**
-     * O laço sai por três portas: achou, erro real (break), ou esgotou os
-     * selects. Nas duas últimas `rows` ficava `null` e o `(rows ?? [])`
-     * transformava isso em lista vazia com `ok: true`.
-     *
-     * Em produção não é hipotético: a última tentativa da cascata ainda cita
-     * `doctor_id` no filtro, e se ESSA coluna faltar as seis falham em
-     * sequência com 42703 — a tela então afirma que o consultório está vazio.
-     */
-    const i = link.indexOf("export const listMyPatients");
-    const corpo = link.slice(i, i + 2600);
-    expect(corpo).toContain("let leu = false;");
-    expect(corpo).toContain("leu = true;");
-    expect(corpo).toContain("if (!leu) return { ok: false as const");
-  });
+      · `HealthTab` — a tela de peso, pressão e glicemia, e a OITAVA da classe.
+        Com `data ?? []` a tela inteira virava a de quem acabou de instalar o
+        app: quatro cartões em "—", os três gráficos sumindo, e a lista
+        afirmando "Você ainda não registrou nada." sobre meses de medição.
+        ⚠️ E o pior caso é o RE-READ: `add()` e `remove()` terminam chamando
+        `load()`, então uma falha DEPOIS de um insert bem-sucedido apagava da
+        tela o que ela acabou de gravar — e `health_logs` não tem chave única
+        por dia, então registrar de novo duplica no prontuário do médico.
+      · `KicksTab` — a tela que MEDE um sintoma vermelho. É a comparação com as
+        sessões anteriores que responde "ele está se mexendo menos que o normal
+        DELE?"; sem histórico, a tela não responde o que ela veio perguntar.
+      · `HumorTab` — a curva de oito semanas do estado emocional dela. O
+        Diário, que lê a MESMA tabela, já estava consertado desde ago/2026.
+  */
+  {
+    nome: "HealthTab",
+    vazio: "Você ainda não registrou nada",
+    marca: "setInstavel(true)",
+    arquivo: SAUDE,
+  },
+  {
+    nome: "KicksTab",
+    vazio: "Nenhuma sessão registrada ainda",
+    marca: "setInstavel(true)",
+    arquivo: CHUTES,
+  },
+  {
+    nome: "HumorTab",
+    vazio: "Nenhum registro ainda",
+    marca: "setInstavel(true)",
+  },
+] as { nome: string; vazio: string; marca: string; arquivo?: string }[];
 
-  test("a tela avisa em vez de convidar a adicionar a primeira paciente", () => {
-    /* O vazio antigo trazia um botão "+ Adicionar paciente". Para um médico com
-       duzentas, isso não parece erro: parece que o produto perdeu tudo. */
-    expect(painel).toContain("{patients.length === 0 && !falhouLista ? (");
-    expect(painel).toContain("Não consegui carregar a sua lista de pacientes agora");
-  });
+/**
+ * A condição do `if` mais próximo ANTES de um ponto do texto.
+ *
+ * ⚠️ **ESTE HELPER É O CONSERTO DA PRÓPRIA CATRACA, e ele nasceu de seis
+ * mutações que passaram VERDES.** A versão anterior cobrava
+ * `expect(c).toContain("setInstavel(true)")` — ou seja, que a STRING existisse
+ * no arquivo. Trocando `const { data, error } = await` por `const { data } =
+ * await`, o `error` vira `undefined`, o `if (error)` nunca dispara, o estado de
+ * falha nunca é ligado — **e a string continua lá.** O teste ficava verde sobre
+ * o defeito exato que ele existe para pegar.
+ *
+ * O comentário antigo já contava metade da história ("a primeira versão cobrava
+ * só o RENDER"); o conserto daquela vez trocou uma asserção de presença por
+ * outra asserção de presença. O que faltava era cobrar a CORRENTE: quem liga o
+ * estado de falha tem de estar dentro de um ramo que fala de ERRO.
+ *
+ * ⚠️ E é por CONTAGEM DE PARÊNTESES, nunca por janela de N caracteres: medir
+ * distância mente no dia em que alguém acrescenta uma linha, e esta base já
+ * pagou isso mais de dez vezes.
+ */
+function guardaDoIf(texto: string, ate: number): string {
+  const i = texto.lastIndexOf("if (", ate);
+  return i === -1 ? "" : texto.slice(i, ate);
+}
 
-  test("e a falha NÃO apaga a lista que já estava na tela", () => {
-    /**
-     * `setPatients([])` no ramo de erro seria a mesma mentira, só que
-     * destruindo dado bom que já tinha sido lido com sucesso.
-     */
-    const i = painel.indexOf("async function loadPatients");
-    const bloco = painel.slice(i, i + 500);
-    expect(bloco).toContain("setFalhouLista(true)");
-    expect(bloco).not.toContain("setPatients([])");
-  });
-});
+/**
+ * O guarda de um trecho de JSX: `{cond && (` — ou um `if (`, o que estiver
+ * MAIS PERTO.
+ *
+ * ⚠️ São duas formas porque são duas naturezas. LIGAR o estado é uma
+ * instrução, e ela mora sempre dentro de um `if`; DESENHAR é JSX, e ali o
+ * guarda é `{instavel && …}`. Um helper só, procurando `if (`, dava a
+ * condição de um `careMode` trinta linhas acima na `KicksTab` — e teria
+ * reprovado código correto, que é como uma catraca ensina alguém a
+ * desligá-la.
+ */
+function guardaDoJsx(texto: string, ate: number): string {
+  const iIf = texto.lastIndexOf("if (", ate);
+  const iChave = texto.lastIndexOf("{", ate);
+  const i = Math.max(iIf, iChave);
+  return i === -1 ? "" : texto.slice(i, ate);
+}
 
-describe("4. uma solicitação de vínculo que some é uma paciente perdida", () => {
-  const link = semComentarios("src/lib/patientlink.functions.ts");
+/** Fala de falha de leitura? `error`, `res.ok`, `!r.ok`, `err`… */
+const FALA_DE_ERRO = /\berror\b|\.ok\b|\berr\b/;
 
-  test("a leitura das solicitações olha o `error`", () => {
-    /**
-     * É o único item desta fila em que o custo do silêncio é uma PESSOA, não um
-     * número errado: do outro lado há uma gestante que pediu para ser
-     * acompanhada e está esperando o aceite. Ela não tem como saber que o
-     * pedido nunca apareceu para ninguém — e depois de alguns dias procura
-     * outro obstetra.
-     */
-    const i = link.indexOf("export const listPatientRequests");
-    const corpo = link.slice(i, i + 1600);
-    expect(corpo).toContain("const { data: rows, error }");
-    expect(corpo).toContain("if (error) return { ok: false as const, requests:");
-  });
+/**
+ * O bloco da função que contém um ponto do texto — do `function …` ou do
+ * `=> {` mais próximo até ele.
+ *
+ * ⚠️ **O RECORTE TEM DE SER A FUNÇÃO, e não o componente inteiro.** Uma tela
+ * tem várias leituras: a `HealthTab` destrutura `error` no `load()`, no
+ * `add()` e no `remove()`. Perguntar "existe algum `const { …, error } =
+ * await` neste componente?" fica verde com o `error` do `load()` apagado,
+ * porque o do `add()` continua lá — e é justamente o `load()` que decide se a
+ * tela afirma o vazio.
+ */
+function blocoDaFuncao(texto: string, ate: number): string {
+  const i = Math.max(texto.lastIndexOf("function ", ate), texto.lastIndexOf("=> {", ate));
+  return i === -1 ? "" : texto.slice(i, ate);
+}
 
-  test("o carregamento da tela tem `catch`, não só `finally`", () => {
-    /**
-     * Era `try/finally` SEM `catch`. `token()` devolve string vazia com a sessão
-     * expirada, o validador exige `min(10)`, a chamada é rejeitada — e a
-     * rejeição subia sem ninguém tratar. A tela saía do "carregando" por causa
-     * do `finally` e ficava vazia, calada, para sempre.
-     */
-    /* Ancorado no `Promise.all` das duas listas: `listPatientRequests(...)`
-       aparece antes, noutro carregador (`loadPedidosVinculo`, que já tratava
-       certo), e cortar da primeira ocorrência media o bloco errado. */
-    const i = painel.indexOf("const [reqRes, patRes] = await Promise.all(");
+describe("o vazio não pode ser a falha", () => {
+  for (const { nome, vazio, marca, arquivo } of TELAS) {
+    test(`⚠️ ${nome} distingue "não consegui" de "não há nada"`, () => {
+      const c = componente(nome, arquivo);
+
+      /* 1 · A METADE DA LEITURA — e agora ela é cobrada pela CORRENTE. Toda
+         ocorrência que liga o estado de falha tem de estar dentro de um `if`
+         que fala de erro. Sem isto, apagar o `error` do destructuring deixa
+         a marca no arquivo e o teste verde. */
+      const ligacoes: number[] = [];
+      for (let k = c.indexOf(marca); k !== -1; k = c.indexOf(marca, k + 1)) ligacoes.push(k);
+      expect(ligacoes.length).toBeGreaterThan(0);
+      for (const k of ligacoes) {
+        expect(guardaDoIf(c, k)).toMatch(FALA_DE_ERRO);
+      }
+
+      /* 2 · ⚠️ E O `error` PRECISA SER VINCULADO, NA MESMA FUNÇÃO — esta é a
+         asserção que faltava, e sem ela TRÊS mutações passavam verdes. Tirar
+         `error` do destructuring (`const { data, error } = await` →
+         `const { data } = await`) deixa todo o resto no lugar: o `if (error)`
+         continua escrito, o `setInstavel(true)` continua escrito, o guarda
+         continua dizendo "error" — e a variável é `undefined`, então o ramo
+         NUNCA dispara e a tela volta a afirmar o vazio.
+         ⚠️ E a primeira tentativa de fechar isto também passou verde, por
+         alternação frouxa (`… | \.ok\b`): `.ok` aparece em qualquer lugar de
+         um componente grande. O que vale é a ORIGEM do valor que o guarda usa,
+         dentro do bloco que o usa. */
+      for (const k of ligacoes) {
+        const guarda = guardaDoIf(c, k);
+        if (/\berror\b/.test(guarda)) {
+          expect(blocoDaFuncao(c, k)).toMatch(/const \{[^}]*\berror\b[^}]*\} = await/);
+        }
+      }
+
+      /* 3 · O RENDER: o componente único é desenhado, e a condição que o
+         governa fala do estado de falha. Trocar por `if (false)` reprova. */
+      const falha = c.search(/<NaoConsegueLer/);
+      expect(falha).toBeGreaterThan(-1);
+      expect(guardaDoJsx(c, falha)).toMatch(/instavel/i);
+
+      /* 4 · E o texto que AFIRMA o vazio só é alcançado DEPOIS dele. */
+      expect(c.indexOf(vazio)).toBeGreaterThan(falha);
+    });
+  }
+
+  test('⚠️ os preventivos: a mentira é um NÚMERO — "Em atraso: 0"', () => {
+    /*
+      Esta não entra na lista acima porque a forma é outra: `PreventivosTab`
+      não tem uma FRASE que afirme o vazio, tem três CONTADORES. Com a lista
+      de lembretes vazia, todo exame cai em `status: "never"` e o topo diz
+      "Em atraso: 0" — que é exatamente o que ela abriu a tela para conferir —
+      e conta como "Nunca registrado" o Papanicolau que ela anotou no ano
+      passado. Ou ela refaz um exame que já fez, ou conclui que o app perdeu
+      o registro.
+
+      ⚠️ E ERA DE DUAS CAMADAS: `getPreventiveReminders` devolvia `ok: true`
+      com lista vazia sobre um erro — um vazio AUTENTICADO COMO VERDADE, que
+      nenhuma correção só de tela alcançaria. O conserto certo já existia
+      QUARENTA LINHAS ACIMA no mesmo arquivo, em `getRecentCycles`.
+    */
+    const servidor = semComentarios(readFileSync("src/lib/saudefeminina.functions.ts", "utf8"));
+    const i = servidor.indexOf("export const getPreventiveReminders");
     expect(i).toBeGreaterThan(-1);
-    const bloco = painel.slice(i, i + 900);
-    expect(bloco).toContain("} catch {");
-    expect(bloco).toContain("setFalhouLista(true)");
+    const j = servidor.indexOf("\nexport ", i + 1);
+    const fn = servidor.slice(i, j === -1 ? undefined : j);
+    expect(fn).toMatch(/const \{ data: rows, error \} = await/);
+    expect(fn).toMatch(/if \(error\) return \{ ok: false as const/);
+
+    const c = componente("PreventivosTab", MULHER);
+    /* A CORRENTE, e não a presença da string — a mesma régua do bloco acima:
+       quem liga o estado de falha está dentro de um ramo que fala de erro. */
+    const k = c.indexOf("setInstavel(true)");
+    expect(k).toBeGreaterThan(-1);
+    expect(guardaDoIf(c, k)).toMatch(FALA_DE_ERRO);
+    /* A falha vem ANTES de qualquer contagem — os três números do topo mentem
+       juntos, e o de atraso é o que ela veio ler. */
+    const falha = c.search(/<NaoConsegueLer/);
+    expect(falha).toBeGreaterThan(-1);
+    /* ⚠️ E o guarda dele fala do estado de falha: sem esta linha, trocar
+       `if (instavel)` por `if (false)` mantinha a ordem e passava verde. */
+    expect(guardaDoJsx(c, falha)).toMatch(/instavel/i);
+    expect(c.indexOf("const overdueCount")).toBeGreaterThan(falha);
   });
 
-  test("e a faixa acende se QUALQUER uma das duas listas falhar", () => {
-    expect(painel).toContain("setFalhouLista(!reqRes.ok || !patRes.ok)");
-  });
-});
-
-describe("5. aceitar uma paciente que não vinculou não pode passar por aceite", () => {
-  const link = semComentarios("src/lib/patientlink.functions.ts");
-  const bloco = link.slice(link.indexOf("export const respondPatientRequest"));
-
-  test("o vínculo confere QUANTAS linhas mudaram, não só o erro", () => {
-    /**
-     * Um UPDATE que não encontra a linha NÃO é erro no Postgres: afeta zero
-     * linhas e volta limpo. Como a solicitação já foi RECLAMADA como "accepted"
-     * uma linha acima, o resultado era o pior estado possível.
-     *
-     * A paciente fica em limbo: o cartão dela sai de "aguardando o médico" e
-     * ela acredita que foi aceita, enquanto `doctor_id` continua nulo. Não
-     * aparece na lista dele, o cérebro dele não a atende, e o SOS dela não
-     * chega a ninguém — sem uma linha de erro em lugar nenhum.
-     */
-    expect(bloco).toContain('.eq("id", req.patient_id)\n        .select("id")');
-    expect(bloco).toContain("if (linkErr || !vinculada?.length)");
+  test("⚠️ e salvar um preventivo LÊ a resposta antes de fechar o painel", () => {
+    /* `setPreventiveReminder` devolve `{ ok }` numa resposta 200 NORMAL —
+       nenhum `try/catch` pega. O painel fechava, a lista recarregava sem a
+       data que ela acabou de digitar, e a leitura razoável é que ela errou o
+       campo. Numa tela de preventivos isso vira um exame que ela acha que
+       registrou e o app não conhece. */
+    const c = componente("PreventivosTab", MULHER);
+    const i = c.indexOf("async function handleSave(");
+    expect(i).toBeGreaterThan(-1);
+    const fn = c.slice(i, c.indexOf("\n  }", i));
+    expect(fn).toMatch(/const r = await setPreventiveReminder\(/);
+    expect(fn).toMatch(/if \(!r\.ok\)/);
+    /* ⚠️ Fica ABERTO com o que ela digitou: fechar perderia o texto, e é o
+       que a fazia digitar de novo. O `setEditingKey(null)` vem DEPOIS do
+       `return` da falha. */
+    expect(fn.indexOf("if (!r.ok)")).toBeLessThan(fn.indexOf("setEditingKey(null)"));
+    expect(fn).toContain("toast.error(");
   });
 
-  test("e zero linhas DESFAZ a decisão, em vez de seguir", () => {
-    /* O rollback já existia para o caso de erro; faltava chegar até aqui. */
-    const i = bloco.indexOf("if (linkErr || !vinculada?.length)");
-    const trecho = bloco.slice(i, i + 420);
-    expect(trecho).toContain("await desfazer();");
-    expect(trecho).toContain("return { ok: false as const };");
+  test("⚠️ o componente da falha é UM só, e não cinco cópias", () => {
+    /* Cinco cópias do mesmo JSX divergiriam no primeiro ajuste de texto, e a
+       que divergisse seria justamente a menos olhada. */
+    expect(CONTA).not.toMatch(/Não consegui carregar (seu diário|seus ciclos|seu álbum)/);
   });
 
-  test("o caso silencioso fica REGISTRADO — ele não tem erro para logar", () => {
-    /* Sem erro do banco não há nada em log nenhum: se não registrarmos, esse
-       estado é literalmente invisível depois do fato. */
-    const i = bloco.indexOf("if (linkErr || !vinculada?.length)");
-    expect(bloco.slice(i, i + 420)).toContain("aceite não encontrou o perfil da paciente");
-  });
-});
-
-describe("6. o botão «Ver relatório» não pode virar «...» para sempre", () => {
-  /**
-   * `tokenFn()` devolve string vazia quando a sessão expira, e o validador do
-   * servidor exige `min(10)` — a chamada é REJEITADA e a promessa estoura.
-   *
-   * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
-   * virava "..." e ficava assim, desabilitado, até o médico recarregar a
-   * página. Ele fica clicando num botão morto, sem uma palavra do que houve.
-   *
-   * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
-   * de "não consegui".
-   */
-  const i = painel.indexOf("async function loadPatientReport");
-  const bloco = painel.slice(i, i + 1100);
-
-  test("o carregamento sempre termina", () => {
-    expect(bloco).toContain("} finally {");
-    expect(bloco).toContain("setLoadingReport(null);");
-    /* O `finally` é o que garante isso mesmo quando a promessa estoura. */
-    const iFinally = bloco.indexOf("} finally {");
-    expect(bloco.indexOf("setLoadingReport(null);")).toBeGreaterThan(iFinally);
-  });
-
-  test("e a falha aparece na linha DAQUELA paciente", () => {
-    /* Um erro global mostraria o aviso na linha errada quando duas falham. */
-    /* Os DOIS ramos: `ok:false` (o servidor respondeu que não deu) e a exceção
-       (a promessa estourou). Cobrar a expressão solta era satisfeito pelo
-       `catch` enquanto o `else` sumia — e `ok:false` é o caso mais comum dos
-       dois, porque não depende de a sessão ter expirado. */
-    expect(bloco).toContain("else setErroReport((e) => ({ ...e, [userId]: true }));");
-    expect(bloco).toContain("} catch {\n      setErroReport((e) => ({ ...e, [userId]: true }));");
-    expect(painel).toContain("{expandedId === p.id && erroReport[p.id] && (");
-    expect(painel).toContain("Não consegui carregar o relatório dela agora");
-  });
-
-  test("os DOIS botões «Ver relatório» têm a faixa", () => {
-    /* A tela repete o cartão em duas listas; corrigir um só deixaria o defeito
-       vivo na outra — é o padrão desta base. */
-    expect((painel.match(/erroReport\[p\.id\]/g) ?? []).length).toBe(2);
+  test("⚠️ a frase de sossego é PROP, e não fixa", () => {
+    /* "O que você registrou continua salvo" é verdade no diário e MENTIRA na
+       teleconsulta, onde quem marcou foi o consultório. Uma frase genérica
+       seria a segunda mentira no lugar da primeira. */
+    const comp = readFileSync("src/components/nao-consegui-ler.tsx", "utf8");
+    expect(comp).toMatch(/sossego:\s*string/);
+    expect(comp).toMatch(/\{sossego\}/);
+    const tele = componente("TeleconsultaTab");
+    expect(tele).toMatch(/ela continua marcada/);
   });
 });
 
-describe("7. a aba Engajamento não morre calada", () => {
-  /**
-   * `token()` devolve string vazia quando a sessão expira e o validador exige
-   * `min(10)` — a chamada é REJEITADA e a promessa estoura. Sem `try`, sem
-   * estado de erro e sem `else`, `engagement` ficava `null` e a aba continuava
-   * mostrando "Clique para carregar o dashboard". O médico clica, nada
-   * acontece, clica de novo.
-   *
-   * O irmão ao lado (`loadEventosClinicos`) já fazia isto certo — mais um caso
-   * de correção aplicada de um lado só.
-   */
-  const i = painel.indexOf("async function loadEngagement");
-  const bloco = painel.slice(i, i + 800);
+describe("⚠️ as contrações: a falha não pode calar o 192", () => {
+  const c = componente("ContracoesTab", CONTRACOES);
 
-  test("o carregador trata os dois modos de falha", () => {
-    expect(bloco).toContain("else setFonteFalhou((f) => ({ ...f, engajamento: true }));");
-    expect(bloco).toContain(
-      "} catch {\n      setFonteFalhou((f) => ({ ...f, engajamento: true }));",
-    );
+  test("a leitura confere o erro e não vira lista vazia", () => {
+    expect(c).toMatch(/const \{ data, error \} = await[\s\S]{0,200}contraction_logs/);
+    expect(c).not.toMatch(/setContractions\(data \?\? \[\]\)/);
   });
 
-  test("e limpa o aviso quando dá certo", () => {
-    /* Sem isto a faixa fica acesa para sempre depois da primeira falha. */
-    expect(bloco).toContain("setFonteFalhou((f) => ({ ...f, engajamento: false }));");
+  test("⚠️ o banner de análise não é desenhado sobre uma lista que falhou", () => {
+    /* Sem isto, `analysisWindow` fica vazio e o banner some — junto com o
+       único botão do SAMU desta tela. */
+    expect(c).toMatch(/!instavel && analysisWindow\.length >= 2/);
   });
 
-  test("a tela para de convidar a repetir o que acabou de falhar", () => {
-    expect(painel).toContain("falhou={fonteFalhou.engajamento}");
-    expect(painel).toContain("Não consegui carregar o dashboard agora");
-    expect(painel).toContain('{falhou ? "Tentar de novo:" : "Clique para carregar o dashboard."}');
+  test("⚠️ e o aviso de falha OFERECE o caminho que o banner daria", () => {
+    /* O app não pode INVENTAR uma análise que não tem; o que ele pode, e deve,
+       é dizer que não conseguiu ler E dar o telefone. Errar para o lado de
+       mandar ligar é o único lado seguro aqui. */
+    /* ⚠️ O bloco INTEIRO por contagem de chaves, nunca uma janela de N
+       caracteres: `ContracoesTab` tem um segundo `tel:192` (o do banner de
+       análise) a menos de 1400 caracteres daqui, e com a janela a mutação que
+       APAGAVA o botão do aviso passava verde. Décima segunda vez que medir
+       distância mente nesta base. */
+    const i = c.search(/\{instavel && \(/);
+    expect(i).toBeGreaterThan(-1);
+    let n = 0;
+    let fim = i;
+    for (let j = i; j < c.length; j++) {
+      if (c[j] === "{") n++;
+      else if (c[j] === "}" && --n === 0) {
+        fim = j + 1;
+        break;
+      }
+    }
+    expect(fim).toBeGreaterThan(i);
+    const bloco = c.slice(i, fim);
+    expect(bloco).toContain('href="tel:192"');
+    expect(bloco).toMatch(/não espere o app/i);
   });
 });
 
-describe("8. a fila de perguntas não esvazia por causa da leitura dos PERFIS", () => {
-  /**
-   * ─── O ELO QUE NÃO É ÓBVIO ────────────────────────────────────────────────
-   *
-   * `getAdminData` faz três leituras em paralelo e descartava os três `error`.
-   *
-   * A de `patient_profiles` é a pior, e não parece: o mapa de nomes que ela
-   * produz alimenta o FILTRO das perguntas (`nameById.has(q.user_id)`). Se essa
-   * leitura falha, o mapa fica vazio e o filtro derruba TODAS as perguntas — a
-   * fila do médico esvazia inteira por causa de uma consulta que nem é a das
-   * perguntas, e a tela diz que não há nada a responder.
-   *
-   * É o mesmo formato do defeito de `vinculadasAgora`: uma segunda leitura,
-   * acrescentada por um bom motivo, sem a proteção que a primeira já tinha.
-   */
-  const adminFn = semComentarios("src/lib/admin.functions.ts");
-
-  test("as três leituras são conferidas", () => {
-    expect(adminFn).toContain(
-      "const leituraFalhou = !!(appts.error || questions.error || profiles.error);",
-    );
+describe("⚠️ as duas de DUAS camadas", () => {
+  test("getRecentCycles não devolve `ok: true` sobre um erro", () => {
+    const f = semComentarios(readFileSync("src/lib/saudefeminina.functions.ts", "utf8"));
+    const i = f.indexOf("export const getRecentCycles");
+    expect(i).toBeGreaterThan(-1);
+    const trecho = f.slice(i, proximoExport(f, i));
+    expect(trecho).toMatch(/data: rows, error/);
+    expect(trecho).toMatch(/if \(error \|\| !rows\) return \{ ok: false/);
   });
 
-  test("mas o dado bom NÃO é jogado fora", () => {
-    /**
-     * `ok:false` aqui apagaria os agendamentos que podem ter vindo bem. Trocar
-     * uma mentira por um apagão não é conserto — a tela precisa mostrar o que
-     * tem E avisar que pode faltar.
-     */
-    const i = adminFn.indexOf("const leituraFalhou");
-    const bloco = adminFn.slice(i, i + 2600);
-    expect(bloco).toContain("incompleto: leituraFalhou,");
-    expect(bloco).not.toContain("if (leituraFalhou) return { ok: false");
+  test("getMyAlbumPosts não devolve `ok: true` sobre um erro", () => {
+    const f = semComentarios(readFileSync("src/lib/family.functions.ts", "utf8"));
+    const i = f.indexOf("export const getMyAlbumPosts");
+    expect(i).toBeGreaterThan(-1);
+    const trecho = f.slice(i, proximoExport(f, i));
+    expect(trecho).toMatch(/data: posts, error/);
+    expect(trecho).toMatch(/if \(error \|\| !posts\) return \{ ok: false/);
+  });
+});
+
+describe("⚠️ a SÉTIMA — a carteirinha de emergência (set/2026)", () => {
+  /* Ela ficou de pé quando as seis foram consertadas, e é a de maior
+     consequência: `CardTab` fazia `if (!profile) return "Preencha seu perfil
+     primeiro"`, e `profile` vinha de uma leitura cujo erro era DESCARTADO
+     (`const { data } = perfilRes`). Uma oscilação de rede transformava o
+     documento que ela mostra no pronto-socorro — tipo sanguíneo, alergias,
+     medicações, contato de emergência, o QR — numa frase que é falsa, que
+     culpa ela, e que a manda ao Perfil refazer o que já existe.
+     A ironia estava no próprio arquivo: o comentário do QR promete "funciona
+     offline" sobre uma tela que não chegava a montar sem rede. */
+  const CONTA = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  test("o erro da leitura do perfil NÃO é descartado", () => {
+    /* ⚠️ A âncora NÃO é `setProfile(data)`: ele aparece CINCO vezes neste
+       arquivo, e a primeira é outra leitura — a armadilha de substring que
+       este repositório já pagou uma dúzia de vezes. Quem identifica o lugar é
+       o estado que decide a tela. */
+    const i = CONTA.indexOf("setPerfilInstavel(");
+    expect(i).toBeGreaterThan(-1);
+    const decisao = CONTA.slice(i, CONTA.indexOf(";", i));
+    /* E ela sai do ERRO da leitura, nunca de um booleano solto: com
+       `setPerfilInstavel(false)` cravado, a tela volta a acusar a paciente. */
+    const nomeDoErro = decisao.match(/!!\s*(\w+)/)?.[1];
+    expect(nomeDoErro).toBeTruthy();
+    const desestrutura = CONTA.slice(CONTA.lastIndexOf("const {", i), i);
+    expect(desestrutura).toContain(`error: ${nomeDoErro}`);
   });
 
-  test("e o painel acende a faixa com isso", () => {
-    /* Sem o chamador, o servidor diria a verdade e a tela continuaria calada. */
-    expect(painel).toContain(
-      "setFonteFalhou((f) => ({ ...f, consultasEPerguntas: !!res.incompleto }));",
-    );
+  test("⚠️ a falha vem ANTES do vazio — trocadas, ela lê a acusação", () => {
+    const vazio = CONTA.indexOf("Preencha seu perfil primeiro");
+    expect(vazio).toBeGreaterThan(-1);
+    const falha = CONTA.indexOf("a sua carteirinha");
+    expect(falha).toBeGreaterThan(-1);
+    expect(falha).toBeLessThan(vazio);
+    /* E o que ela vê é o componente único desta classe, não um texto novo. */
+    const trecho = CONTA.slice(falha - 400, vazio);
+    expect(trecho).toContain("NaoConsegueLer");
+  });
+
+  test("⚠️ o sossego dela dá o caminho de emergência, e não só consolo", () => {
+    /* É a única das sete em que a paciente pode estar num pronto-socorro
+       agora. A frase tem de dizer o que fazer sem o app. */
+    const i = CONTA.indexOf("a sua carteirinha");
+    const bloco = CONTA.slice(i, i + 320);
+    expect(bloco).toContain("192");
+  });
+});
+
+describe("⚠️ a casca offline não pode nomear o médico errado", () => {
+  /* `native/shell/index.html` é a única coisa dentro do aparelho quando o
+     Capacitor não alcança o site. Ela é um arquivo ESTÁTICO: sem sessão, sem
+     banco, sem como saber de quem é a paciente. Havia ali o telefone do
+     consultório FUNDADOR rotulado só "Consultório", oferecido a paciente de
+     qualquer médico da plataforma — exatamente o que `emergency-sheet.tsx`
+     gastou uma decisão inteira para não fazer.
+     ⚠️ Hoje a tela é INALCANÇÁVEL (não há `server.errorPath` no
+     `capacitor.config.ts`), e é isso que torna este conserto barato: quem
+     ligar o `errorPath` amanhã não liga junto um vazamento. */
+  const CASCA = readFileSync("native/shell/index.html", "utf8").replace(/<!--[\s\S]*?-->/g, "");
+  const MEDICO = readFileSync("src/lib/doctor.config.ts", "utf8");
+
+  test("o 192 fica — ele é certo para todo mundo e funciona sem rede", () => {
+    expect(CASCA).toContain('href="tel:192"');
+  });
+
+  test("⚠️ e nenhum outro telefone, porque ela não sabe de quem é a paciente", () => {
+    const tels = CASCA.match(/href="tel:[^"]+"/g) ?? [];
+    expect(tels).toEqual(['href="tel:192"']);
+  });
+
+  test("⚠️ o número do consultório fundador não aparece — nem em outro formato", () => {
+    /* A âncora sai do PRÓPRIO `doctor.config.ts`: cravar o número aqui faria o
+       teste envelhecer no dia em que ele mudar, e envelhecer para o lado de
+       aprovar. */
+    const numero = MEDICO.match(/wa\.me\/(\d+)/)?.[1];
+    expect(numero).toBeTruthy();
+    const soDigitos = CASCA.replace(/\D/g, "");
+    expect(soDigitos).not.toContain(numero!);
+    expect(soDigitos).not.toContain(numero!.replace(/^55/, ""));
   });
 });

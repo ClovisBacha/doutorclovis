@@ -1,7 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { subtabPermitida, subtabsDoBebe } from "@/lib/subtabs-do-bebe";
+import { nivelDaEpds, respostaDaQuestao10 } from "@/lib/epds";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import {
+  Fragment,
   Suspense,
   lazy,
+  useCallback,
   useEffect,
   useLayoutEffect as useLayoutEffectReact,
   useMemo,
@@ -19,6 +24,7 @@ import {
   tabToSection,
   type AppTab,
   type BottomSection,
+  type DestaqueDoTutorial,
   type NextAppointment,
 } from "@/components/app-mobile-shell";
 import { TabErrorBoundary } from "@/components/tab-error-boundary";
@@ -29,6 +35,15 @@ import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/
 import { formatarDinheiro } from "@/lib/dinheiro";
 import { DOCTOR } from "@/lib/doctor.config";
 import drPortrait from "@/assets/dr-clovis-portrait.jpg";
+/* Os ícones 3D da aba Saúde (set/2026). Gerados numa família só — vidro, cor
+   natural do objeto, luz ambiente — e recortados por `scripts/bebes/do-drive.mjs`
+   (PSNR 46–50 dB). Substituem os traços do Lucide nos blocos grandes: um bloco
+   de 300px pedia um objeto com volume, não um contorno de 1,7px. */
+import icSaude from "@/assets/saude/saude.webp";
+import icChutes from "@/assets/saude/chutes.webp";
+import icContracoes from "@/assets/saude/contracoes.webp";
+import icNutricao from "@/assets/saude/nutricao.webp";
+import icMulher from "@/assets/saude/mulher.webp";
 import { ymdLocal } from "@/lib/utils";
 import { getMyDoctor } from "@/lib/doctors.functions";
 import { minhasConsultas, type ConsultaDaPaciente } from "@/lib/clinical.functions";
@@ -49,8 +64,37 @@ import {
 import { HeartbeatFeel } from "@/components/heartbeat-feel";
 import { Stagger, StaggerItem, Fade } from "@/components/motion-primitives";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { PesquisaNps } from "@/components/pesquisa-nps";
+import { ConsultoriosDoMedico } from "@/components/consultorios-do-medico";
+import { PrimeiroQuadro } from "@/components/primeiro-quadro";
 import { EmergencySheet } from "@/components/emergency-sheet";
+import { NaoConsegueLer } from "@/components/nao-consegui-ler";
+import { CicloMenstrualTab } from "@/components/ciclo-menstrual-tab";
+import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
+import { ConquistasTab } from "@/components/conquistas-tab";
+import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
+import {
+  PHASE_META,
+  WEEKDAYS_PT,
+  addDays,
+  avgCycleLength,
+  avgPeriodLength,
+  buildCycleModel,
+  classifyDay,
+  cycleDayFor,
+  cycleLengthDays,
+  diffDays,
+  fromYmd,
+  phaseForCycleDay,
+  startOfDay,
+  upcomingMarks,
+  ymd,
+} from "@/lib/ciclo-menstrual";
+import type { CycleModel, CyclePhase } from "@/lib/ciclo-menstrual";
+import { OnboardingRitual } from "@/components/onboarding-ritual";
 import { hapticKick, hapticTap } from "@/lib/haptics";
+import { hapticoDeAviso } from "@/lib/nativo";
+import { ContracoesTab } from "@/components/contracoes-tab";
 import { createBreathAudio } from "@/lib/breath-audio";
 import { CompartilharMomento } from "@/components/compartilhar-momento";
 import {
@@ -77,13 +121,23 @@ import {
   type DuvidaRegistrada,
 } from "@/lib/secondbrain.functions";
 import { toast } from "sonner";
+import { MOOD_LABEL, dayGreeting } from "@/lib/humor-e-saudacao";
+import { BabyTab } from "@/components/baby-tab";
+import { KicksTab } from "@/components/kicks-tab";
+import { HealthTab } from "@/components/health-tab";
+import { NutricaoTab } from "@/components/nutricao-tab";
+import { diasEntre, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
+import { SaudeMulherHub } from "@/components/saude-mulher";
+import { Field } from "@/components/campo";
 import {
+  sinalMovimentosReduzidos,
   sinalContracoesPrematuras,
   sinalGlicemia,
   sinalPressao,
   validaRegistro,
   vozDaPaciente,
 } from "@/lib/sinais-clinicos";
+import { lerPressaoDigitada } from "@/lib/pressao-digitada";
 import { checkIsAdmin } from "@/lib/admin.functions";
 import {
   babyForWeek,
@@ -94,11 +148,16 @@ import {
   retaFinalMensagemFor,
   trimesterForWeek,
 } from "@/lib/gestacao";
-import { nomeDoMedico } from "@/lib/nome-do-medico";
 import { faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
-import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
+import {
+  RED_SYMPTOMS,
+  YELLOW_SYMPTOMS,
+  assessLevel,
+  LEVEL_FALLBACK,
+  type RiskLevel,
+} from "@/lib/triage";
 import {
   submitPreConsulta,
   getMyPreConsultas,
@@ -158,6 +217,7 @@ import { linkDeIndicacao, mensagemDeConvite } from "@/lib/indicacao";
 import { AmigasTab } from "@/components/amigas";
 import { ComunidadeTab } from "@/components/comunidade";
 import { ChaDeBebe } from "@/components/cha-de-bebe";
+import { CabecalhoDaPorta } from "@/components/comunidade";
 import { ConfiguracoesDoPerfil } from "@/components/rede-social";
 import { aulaDeHojeParaCompartilhar } from "@/lib/aula-compartilhavel";
 import type { AulaNoPost } from "@/lib/rede-social";
@@ -204,12 +264,52 @@ const GestacaoPath = lazy(() =>
  * uma única função ou um único tipo deste módulo por `import` estático traria os
  * 120 kB de volta junto.
  */
+/**
+ * ⚠️ **O CANTINHO TAMBÉM É `lazy()`, e a medição foi na PRODUÇÃO (set/2026).**
+ *
+ * O dono: "a primeira tela está demorando muito para carregar quando abro o
+ * app". O app instalado abre em `/minha-conta` (é o `start_url` do
+ * manifesto), e o HTML dessa rota mandava o navegador buscar, com prioridade
+ * alta, NOVENTA E UM arquivos somando 661 kB comprimidos — antes de a home
+ * pintar. O terceiro maior deles, com 97 kB, era este: a LOJA DE ENFEITES.
+ *
+ * Ela pesa isso porque carrega a arte dos 107 itens do catálogo, e estava no
+ * caminho crítico por um motivo só: um `import` estático no topo deste
+ * arquivo. A paciente que abre o app para ver a semana do bebê pagava a loja
+ * inteira para chegar lá.
+ *
+ * É a mesma conta que já tinha tirado `GestacaoPath` e `RedeNoApp` daqui.
+ */
+const CantinhoTab = lazy(() =>
+  import("@/components/cantinho-tab").then((m) => ({ default: m.CantinhoTab })),
+);
+
 const RedeNoApp = lazy(() =>
   import("@/components/rede-instagram").then((m) => ({ default: m.RedeNoApp })),
 );
+
+/**
+ * ⚠️ O TOCADOR DE DORMIR, e ele é `lazy()` pela mesma conta dos três acima:
+ * ele carrega `som-continuo` + `som-receitas` + `som-primitivas` (as trinta e
+ * duas receitas), e quem abre o app para ver a semana do bebê não pode pagar
+ * isso na abertura.
+ */
+const SonsParaDormir = lazy(() =>
+  import("@/components/sons-para-dormir").then((m) => ({ default: m.SonsParaDormir })),
+);
 import { ensureInitialJourneyPull, lsGet, lsSet } from "@/lib/journey-sync";
+import {
+  CHAVE_DICA,
+  CHAVE_VISITADAS,
+  dicaDaSemana,
+  falaDaDica,
+  idDaFuncao,
+  type DicaMostrada,
+  type FuncaoDoApp,
+} from "@/lib/mapa-do-app";
+import { MapaDoApp } from "@/components/mapa-do-app";
+import { ChatTab } from "@/components/chat-tab";
 import { Bolha } from "@/components/bolha";
-import { useWeatherSky } from "@/components/weather-sky";
 import { SKIN_KEY } from "@/lib/trilha-skins";
 import { useSkyNow } from "@/components/app-mobile-shell";
 import { NotificacoesSheet } from "@/components/notificacoes-sheet";
@@ -221,6 +321,26 @@ import {
   lerPassoDoTutorial,
 } from "@/lib/tutorial-do-mascote";
 import { GradeHub, VoltarDaGrade } from "@/components/grade-hub";
+import arteGrade_agenda from "@/assets/grades/agenda.webp";
+import arteGrade_preparo from "@/assets/grades/preparo.webp";
+import arteGrade_perguntas from "@/assets/grades/perguntas.webp";
+import arteGrade_checklist from "@/assets/grades/checklist.webp";
+import arteGrade_parto from "@/assets/grades/parto.webp";
+import arteGrade_tele from "@/assets/grades/tele.webp";
+import arteGrade_particular from "@/assets/grades/particular.webp";
+import arteGrade_meditacoes from "@/assets/grades/meditacoes.webp";
+import arteGrade_sons from "@/assets/grades/sons.webp";
+import arteGrade_exercicios from "@/assets/grades/exercicios.webp";
+import arteGrade_humor from "@/assets/grades/humor.webp";
+import arteGrade_apoio from "@/assets/grades/apoio.webp";
+import arteGrade_diario from "@/assets/grades/diario.webp";
+import arteGrade_timeline from "@/assets/grades/timeline.webp";
+import arteBebe_semana from "@/assets/bebe/semana.webp";
+import arteBebe_contagem from "@/assets/bebe/contagem.webp";
+import arteBebe_album from "@/assets/bebe/album.webp";
+import arteBebe_nome from "@/assets/bebe/nome.webp";
+import arteBebe_carta from "@/assets/bebe/carta.webp";
+import arteBebe_quartinho from "@/assets/bebe/quartinho.webp";
 import {
   contarNaoLidas,
   lerLidas,
@@ -252,13 +372,11 @@ import {
   LogOut,
   Mail,
   MessageCircleQuestion,
-  Mic,
   NotebookPen,
   PersonStanding,
   Ribbon,
   Salad,
   Scroll,
-  Send,
   Settings,
   ShoppingBag,
   Smile,
@@ -304,6 +422,7 @@ import { joinCorporate } from "@/lib/corporativo.functions";
 import { OfertaPremium } from "@/components/oferta-premium";
 import { LojaSementinhas } from "@/components/loja-sementinhas";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
+import { useVoltarDeFundo } from "@/lib/use-voltar";
 import {
   savePpdScreening,
   getMyPpdScreenings,
@@ -335,7 +454,9 @@ export const Route = createFileRoute("/_authenticated/minha-conta")({
   component: MinhaContaPage,
 });
 
-type Profile = {
+/* ⚠️ Exportado para `onboarding-ritual.tsx` — `export type` é apagado na
+   compilação, então não pesa no pacote nem fecha ciclo. */
+export type Profile = {
   id: string;
   /** Céu da home: null/"v2" = arte por período; "v1" = gradiente original. */
   sky_theme?: string | null;
@@ -425,21 +546,44 @@ type DoctorQ = {
 };
 type Invite = { id: string; token: string; companion_name: string | null; created_at: string };
 
-type Gest = ReturnType<typeof computeGestation>;
+/* ⚠️ EXPORTADO COMO TIPO, e a distinção importa: `rotas-sem-export-solto`
+   proíbe `export function|const|class` num arquivo de rota, porque isso põe o
+   código no pedaço da árvore de rotas que toda página carrega. `export type` é
+   APAGADO na compilação — não custa um byte ao pacote. */
+export type Gest = ReturnType<typeof computeGestation>;
 
 // ── Cache curto da lista de consultas ────────────────────────────────────────
 // A tela unificada (Calendário + Consultas) e o card da home pediam a MESMA
 // lista 3x ao abrir. Cache de 30s no módulo; ações que mudam a agenda passam
 // force=true para revalidar na hora.
 let apptsCache: { at: number; appointments: MyAppointment[] } | null = null;
-async function fetchAppointmentsCached(force = false): Promise<MyAppointment[]> {
-  if (!force && apptsCache && Date.now() - apptsCache.at < 30_000) return apptsCache.appointments;
+/**
+ * ⚠️ **`instavel` EXISTE PORQUE `[]` ERA UMA AFIRMAÇÃO, E ELA PODIA SER FALSA.**
+ *
+ * Numa falha de primeira carga esta função devolvia lista vazia, e as telas
+ * escreviam **"Nenhuma consulta marcada ainda"** e **"Você ainda não tem
+ * consultas por aqui — agende a primeira"**. Quem tem consulta confirmada para
+ * amanhã abria o app para conferir a hora e lia que não tinha consulta nenhuma.
+ *
+ * Falta em consultório de alto risco é vaga perdida duas vezes — é a frase que
+ * abre o desenho dos lembretes de 24 h e 4 h. Este defeito produzia exatamente
+ * a perda que aquele sistema inteiro existe para impedir, e do lado de dentro.
+ *
+ * ⚠️ **A bandeira sobe SÓ quando o vazio vem de falha.** Servindo cache — dado
+ * de verdade, no máximo alguns segundos velho — a lista não mente, e um aviso
+ * sobre ela seria ruído que ensina a ignorar o aviso.
+ */
+type ListaDeConsultas = { appointments: MyAppointment[]; instavel: boolean };
+
+async function fetchAppointmentsCached(force = false): Promise<ListaDeConsultas> {
+  if (!force && apptsCache && Date.now() - apptsCache.at < 30_000)
+    return { appointments: apptsCache.appointments, instavel: false };
   const { data: s } = await supabase.auth.getSession();
-  if (!s.session) return apptsCache?.appointments ?? [];
+  if (!s.session) return { appointments: apptsCache?.appointments ?? [], instavel: !apptsCache };
   const res = await getMyAppointments({ data: { accessToken: s.session.access_token } });
-  if (!res.ok) return apptsCache?.appointments ?? [];
+  if (!res.ok) return { appointments: apptsCache?.appointments ?? [], instavel: !apptsCache };
   apptsCache = { at: Date.now(), appointments: res.appointments };
-  return res.appointments;
+  return { appointments: res.appointments, instavel: false };
 }
 
 const TABS = [
@@ -489,7 +633,9 @@ const TABS = [
      ela paga, quando renova, nem como parar. */
   "Assinatura",
 ] as const;
-type Tab = (typeof TABS)[number];
+/* ⚠️ Exportado para `silencio-do-cuidado.tsx` — `export type` é apagado na
+   compilação, então não pesa no pacote nem fecha ciclo. */
+export type Tab = (typeof TABS)[number];
 
 const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   {
@@ -561,6 +707,8 @@ type LadrilhoDaSaude = {
   label: string;
   sub: string;
   Icon: LucideIcon;
+  /** Ícone 3D; quando presente, `GradeHub` desenha a imagem no lugar do Lucide. */
+  imagem?: string;
   caixa: string;
   tinta: string;
   /** Aba de destino. Nem todo ladrilho é uma aba de mesmo nome. */
@@ -586,6 +734,7 @@ type LadrilhoDaSaude = {
 const HUB_SAUDE: LadrilhoDaSaude[] = [
   {
     key: "Saúde",
+    imagem: icSaude,
     label: "Saúde",
     sub: "Peso, pressão e glicemia",
     Icon: HeartPulse,
@@ -595,6 +744,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "chutes",
+    imagem: icChutes,
     label: "Chutes",
     sub: "Contar os movimentos",
     Icon: Footprints,
@@ -605,8 +755,9 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "contracoes",
+    imagem: icContracoes,
     label: "Contrações",
-    sub: "Cronometrar e ver",
+    sub: "Cronometrar e ver o padrão",
     Icon: Timer,
     caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
     tinta: "text-orange-600",
@@ -615,6 +766,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "Nutrição",
+    imagem: icNutricao,
     label: "Nutrição",
     sub: "O que comer hoje",
     Icon: Salad,
@@ -624,6 +776,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
   },
   {
     key: "Saúde da mulher",
+    imagem: icMulher,
     label: "Saúde da mulher",
     sub: "Ciclo, mamas e colo",
     Icon: Ribbon,
@@ -646,34 +799,184 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
  * gestação em andamento, é a aba certa; a partir da 36ª semana o pós-parto
  * entra no horizonte e ela volta.
  *
- * ⚠️ **Isto NÃO tira o acesso.** A aba continua listada no grupo "Saúde" do
- * menu (`SECOES`), que é a navegação completa. O que sai é o atalho da grade —
- * a diferença entre "não está aqui agora" e "não existe mais" é o que separa
- * arrumar de apagar, e eu já confundi as duas neste app.
+ * ⚠️ **Hoje ela decide só a LEGENDA do ladrilho, nunca a presença dele.** A
+ * primeira versão tirava o ladrilho e afirmava que "a aba continua listada no
+ * menu (`SECOES`)" — esse menu era o de computador (`hidden md:flex`), e no
+ * celular a função sumia por nove meses. Uma garantia escrita que o aparelho
+ * não cumpre é pior que nenhuma: quem lê acredita que preservou o acesso.
  */
 export function mostrarSaudeDaMulher(weeks: number | null | undefined): boolean {
   return weeks == null || weeks >= 36;
 }
 
+/** O número dela num bloco da Saúde: o valor grande e a legenda pequena. */
+type Dado = { valor: string; legenda?: string };
+
+/**
+ * O cabeçalho das três telas que o hub da Saúde abre como ABA (Saúde,
+ * Nutrição, Saúde da mulher) — Chutes e Contrações já passam pelo cabeçalho de
+ * `Registros`. Sem seta: a barra de cima é quem volta ao hub (`voltarDaBarra`).
+ * Lê o MESMO `HUB_SAUDE` que desenha o bloco, então o coração verde de lá é o
+ * coração verde daqui por construção.
+ */
+function CabecalhoDaSaude({ chave }: { chave: string }) {
+  const item = HUB_SAUDE.find((i) => i.key === chave);
+  if (!item) return null;
+  return <VoltarDaGrade rotulo={item.label} ladrilho={item} />;
+}
+
 export function HubSaude({
   onAbrir,
   weeks,
+  bancada,
+  cabecalhos,
 }: {
   onAbrir: (t: Tab, sub?: string) => void;
   /** Semana gestacional — `null` quando não há gestação configurada. */
   weeks: number | null;
+  /**
+   * Só a `/preview-saude`: os números prontos, sem sessão. Sem isto a bancada
+   * mostraria sempre o bloco VAZIO — o único estado que ela não precisava provar.
+   * Injeta o DADO no mesmo estado da produção, nunca um desenho à parte.
+   */
+  bancada?: Record<string, Dado | null>;
+  /** Só a `/preview-saude`: em vez da grade, os cinco cabeçalhos de sub-tela, para fotografar. */
+  cabecalhos?: boolean;
 }) {
   /* Usa a MESMA grade das sub-abas (`GradeHub`). Antes esta tela tinha uma
      cópia do desenho; duas cópias do mesmo quadrado significam duas chances de
      elas divergirem no próximo ajuste. */
-  const itens = HUB_SAUDE.filter((i) => i.key !== "Saúde da mulher" || mostrarSaudeDaMulher(weeks));
+  /* ⚠️ OS NÚMEROS DELA DENTRO DOS BLOCOS. O dono pediu blocos que "preencham a
+     tela inteira" e eles preenchiam com gradiente vazio; o que dá sentido ao
+     tamanho é o dado. Três leituras em paralelo (uma onda, não três), e
+     ⚠️ QUALQUER FALHA VIRA `null` — que não desenha nada. "Não consegui ler" e
+     "ela nunca registrou" precisam cair no mesmo lugar, porque um "0" afirmaria
+     um fato que a tela não sabe. Nutrição não tem número: fica sem, e isso
+     também é informação (é conteúdo, não medição). */
+  const [dados, setDados] = useState<Record<string, Dado | null>>(bancada ?? {});
+  const ehBancada = !!bancada;
+  useEffect(() => {
+    if (ehBancada) return;
+    let vivo = true;
+    (async () => {
+      /* ⚠️ O INSTANTE da meia-noite DELA, e não uma data solta: mandar
+         `"2026-09-05T00:00:00"` sem fuso faz o Postgres ler em UTC, e em São
+         Paulo isso arrasta as contrações das 21h de ONTEM para dentro do
+         "hoje". Ver `src/lib/quando-foi.ts`. */
+      const agora = new Date();
+      const desdeMeiaNoite = inicioDeHojeISO(agora);
+      const [saude, chutes, contr] = await Promise.all([
+        supabase
+          .from("health_logs")
+          .select("weight_kg, systolic, diastolic, log_date")
+          .order("log_date", { ascending: false })
+          .limit(1)
+          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
+        supabase
+          .from("kick_sessions")
+          .select("kick_count, started_at")
+          .not("ended_at", "is", null)
+          .order("started_at", { ascending: false })
+          .limit(1)
+          .then((r) => (r.error ? null : (r.data?.[0] ?? null))),
+        supabase
+          .from("contraction_logs")
+          .select("started_at")
+          .gte("started_at", desdeMeiaNoite)
+          .order("started_at", { ascending: false })
+          .limit(50)
+          .then((r) => (r.error ? null : (r.data ?? null))),
+      ]);
+      if (!vivo) return;
+      const d: Record<string, Dado | null> = {};
+      if (saude) {
+        const peso =
+          saude.weight_kg != null ? `${String(saude.weight_kg).replace(".", ",")} kg` : null;
+        const pa =
+          saude.systolic != null && saude.diastolic != null
+            ? `${saude.systolic}/${saude.diastolic}`
+            : null;
+        /* ⚠️ NADA DE "QUANDO" ESCRITO NO BLOCO — decisão do dono, com o print
+           na mão ("quando que fez não preciso deixar escrito"). O que fica é o
+           NÚMERO e o que ele é.
+           ⚠️ Mas o dado VELHO continua não podendo se passar por atual: uma
+           pressão de cinco meses atrás lida como o estado de hoje é a pior
+           forma de dado velho. Sem poder escrever "há 3 meses", o que sobra é
+           a régua dos blocos vizinhos — passado o prazo, o número SOME e o
+           bloco volta ao rótulo, que sempre foi verdade. Sete dias, porque
+           peso e pressão não se medem todo dia. */
+        const velho = saude.log_date ? diasEntre(saude.log_date, agora) > 7 : false;
+        /* O peso é o valor grande; a pressão vai na legenda. Sem peso, a
+           pressão sobe para o valor — o bloco nunca fica com legenda solta. */
+        d["Saúde"] = velho
+          ? null
+          : peso
+            ? { valor: peso, legenda: pa ? `pressão ${pa}` : undefined }
+            : pa
+              ? { valor: pa, legenda: "pressão" }
+              : null;
+      }
+      if (chutes && chutes.kick_count != null) {
+        /* ⚠️ NUNCA `String(started_at).slice(0, 10)`: a coluna é `timestamptz`
+           e o PostgREST devolve em UTC. Medido em São Paulo — uma sessão às
+           21h30 do dia 5 chega como dia 6, não casava com "hoje" nem com
+           "ontem", e o contador SUMIA do bloco. Quem conta movimentos no
+           horário que a tela recomenda era quem nunca via o número. */
+        /* `quandoFoi` continua sendo o FILTRO (hoje ou ontem, senão o número
+           some) — só não vai mais para o texto. */
+        const quando = quandoFoi(chutes.started_at, agora);
+        d["chutes"] = quando ? { valor: String(chutes.kick_count), legenda: "chutes" } : null;
+      }
+      if (contr && contr.length > 0) {
+        /* A consulta já recorta o dia (`desdeMeiaNoite`); o "hoje" e a hora da
+           última saíram do TEXTO a pedido do dono. */
+        d["contracoes"] = { valor: String(contr.length), legenda: "contrações" };
+      }
+      setDados(d);
+    })().catch(() => {
+      /* silêncio: sem dado, o bloco volta ao rótulo, que sempre foi verdade */
+    });
+    return () => {
+      vivo = false;
+    };
+  }, [ehBancada]);
+  /* ⚠️ Os cinco ladrilhos aparecem SEMPRE. Antes "Saúde da mulher" saía da
+     grade durante a gestação, com um comentário garantindo que "a aba
+     continua listada no menu" — e esse menu é o de computador, escondido no
+     celular. No aparelho a função sumia por nove meses (estudo de navegação,
+     set/2026). O que muda com a fase é a LEGENDA, não a porta. */
+  const itens = HUB_SAUDE.map((i) => ({
+    ...i,
+    sub:
+      i.key === "Saúde da mulher" && !mostrarSaudeDaMulher(weeks)
+        ? "O que fica para depois do parto"
+        : i.sub,
+    dado: dados[i.key] ?? null,
+  }));
+  if (cabecalhos) {
+    return (
+      <div className="space-y-3">
+        {itens.map((i) => (
+          <VoltarDaGrade key={i.key} rotulo={i.label} ladrilho={i} onVoltar={() => {}} />
+        ))}
+      </div>
+    );
+  }
   return (
     <GradeHub
       itens={itens}
-      /* Quatro é o caso da gestação (Saúde da mulher sai de cena): dois por
-         linha, preenchendo a tela. Com cinco — fora da gestação — volta ao
-         quadrado, senão a quinta ficaria sozinha numa linha esticada. */
-      preencherTela={itens.length === 4}
+      /* ⚠️ SEMPRE o bloco grande — e isto foi um RECURSO MORTO por um tempo.
+         A condição aqui era `itens.length === 4`, escrita quando "Saúde da
+         mulher" saía da grade durante a gestação. Quando os cinco ladrilhos
+         passaram a aparecer SEMPRE (o estudo de navegação: no celular a função
+         sumia por nove meses), a condição virou constante FALSA — e com ela
+         morreram as duas coisas que o dono tinha pedido: os blocos que
+         "preenchem a tela" e O NÚMERO DELA dentro deles, que só é desenhado
+         atrás de `preencherTela`. As três consultas ao banco continuavam
+         saindo a cada visita e o resultado era jogado fora.
+
+         Nada mais no app usa `preencherTela` — ele existe para esta grade. */
+      preencherTela
       onAbrir={(k) => {
         const item = itens.find((i) => i.key === k);
         if (item) onAbrir(item.destino, item.subDestino);
@@ -751,7 +1054,6 @@ function categoryOfTab(t: Tab): string {
  * creditar aqui mostraria o saldo subindo por um pagamento que o servidor
  * ainda não fez.
  */
-const TOASTS_DE_CONQUISTA = 3;
 
 /**
  * ⚠️ O QUE IMPEDE O LAÇO — e ele é REAL, não teórico.
@@ -780,64 +1082,6 @@ const TOASTS_DE_CONQUISTA = 3;
  * ⚠️ Vive FORA do componente de propósito — o ouvinte remonta a cada troca de
  * aba, e um `useRef` reiniciaria a trava junto.
  */
-const jaCelebradas = new Set<string>();
-
-function triggerAchievementsCheck() {
-  supabase.auth
-    .getSession()
-    .then(({ data: s }) =>
-      s.session?.access_token
-        ? checkAndAwardAchievements({ data: { accessToken: s.session.access_token } })
-        : null,
-    )
-    .then((res) => {
-      if (!res || !res.ok) return;
-      if (res.careMode) return; // Modo Cuidado: sem comemorações.
-
-      /* O emblema da fita. `resgatadas === null` é "não consegui ler" e vira
-         `null` aqui também — nunca 0, que afirmaria que não há nada, nem o
-         total, que prometeria moeda. Ver `evento-conquistas.ts`. */
-      publicarConquistasAResgatar(
-        res.resgatadas == null
-          ? null
-          : res.unlocked.filter((u) => !res.resgatadas!.includes(u.achievement_key)).length,
-      );
-
-      const novas = (res.newlyAwarded ?? []).filter((k) => !jaCelebradas.has(k));
-      if (novas.length === 0) return;
-      for (const k of novas) jaCelebradas.add(k);
-
-      /* ⚠️ O AVISO PRECISA DIZER QUE HÁ PRÊMIO, E ONDE PEGAR.
-         Ele dizia só "Nova conquista desbloqueada: X!" — texto de quando o
-         prêmio caía sozinho. Com o resgate no toque, quem não abrir
-         Recompensas → Conquistas fica com as Sementinhas paradas e SEM SABER
-         que estão lá. No Duolingo, que é a referência do dono, o que produz a
-         visita é justamente o aviso de que tem algo a pegar. */
-      for (const key of novas.slice(0, TOASTS_DE_CONQUISTA)) {
-        const def = ACHIEVEMENT_DEFS.find((d) => d.key === key);
-        if (def) {
-          toast(`${def.emoji} ${def.title}! Toque nela em Conquistas para pegar suas Sementinhas.`);
-        }
-      }
-      const resto = novas.length - TOASTS_DE_CONQUISTA;
-      if (resto > 0) {
-        toast(
-          `🏅 E mais ${resto} ${resto === 1 ? "conquista" : "conquistas"} — as Sementinhas esperam o seu toque em Conquistas.`,
-        );
-      }
-
-      /* ⚠️ NÃO CREDITA MAIS AQUI. O prêmio da conquista deixou de ser
-         automático e passou a depender do toque dela na aba Conquistas
-         (`resgatarConquista`). Creditar neste ponto mostraria o saldo subir por
-         um prêmio que o servidor ainda não pagou — e ela chegaria à aba com o
-         botão de resgate ainda pedindo o mesmo número, sem entender qual dos
-         dois está certo.
-
-         O toast fica: "desbloqueou" continua sendo notícia, e agora ele é
-         também o convite para ir buscar. */
-    })
-    .catch(() => {});
-}
 
 function MinhaContaPage() {
   const navigate = useNavigate();
@@ -849,9 +1093,36 @@ function MinhaContaPage() {
     const t = new URLSearchParams(window.location.search).get("tab");
     return t && (TABS as readonly string[]).includes(t) ? (t as Tab) : "Bebê";
   })();
+  /* ⚠️ "Bebê" é a aba PADRÃO e também o nome da aba do bebê — então
+     `initialTab === "Bebê"` não distingue "abriu o app" de "pediu ?tab=Bebê".
+     Sem esta bandeira o deep link para a aba do Bebê caía na home, e a grade
+     dela (contagem, álbum, nomes, carta, enxoval) ficava sem porta por link. */
+  const tabPedidaNaUrl =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tab");
   const [tab, setTab] = useState<Tab>(initialTab);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDoctor, setIsDoctor] = useState(false);
+  /**
+   * ⚠️ "PODE SER MÉDICO" — e ele NÃO é uma segunda régua de papel.
+   *
+   * Quem decide quem é médico continua inteiro onde sempre esteve (a marca do
+   * Auth + `checkIsAdmin` + `getMyDoctor`, no efeito de carga). Este sinal é o
+   * MESMO campo, lido um `await` antes, e governa UMA coisa: se o cromo do app
+   * (a barra da paciente) é DESENHADO durante a espera. Ele nunca decide quem
+   * recebe qual app.
+   *
+   * Existe porque o caminho do médico é o MAIS LONGO do boot, por desenho:
+   * `liberarCedo = ancora && !marcaDeMedico` é falso para ele, então
+   * `setLoading(false)` só acontece no `finally`, depois de duas funções
+   * serverless. Sem este sinal, ele veria a barra de cinco itens da gestante em
+   * TODA abertura do app instalado — e `start_url` do manifesto é
+   * `/minha-conta`, então é toda vez.
+   *
+   * ⚠️ Nasce `false` de propósito: a paciente é a maioria, e errar aqui para o
+   * lado dela é o certo — o pior caso dele é uma barra que não aparece; o pior
+   * caso dela é o socorro que não aparece.
+   */
+  const [podeSerMedico, setPodeSerMedico] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [milestoneWeek, setMilestoneWeek] = useState<number | null>(null);
@@ -912,7 +1183,8 @@ function MinhaContaPage() {
     setRefreshKey((k) => k + 1);
   }
   // Mobile-only: true = dashboard home screen (se veio deep-link de aba, abre nela)
-  const [mobileHome, setMobileHome] = useState(initialTab === "Bebê");
+  const [perfilInstavel, setPerfilInstavel] = useState(false);
+  const [mobileHome, setMobileHome] = useState(initialTab === "Bebê" && !tabPedidaNaUrl);
   /* Hub da seção Saúde (só no celular). A seção tem SEIS abas e elas viviam
      numa fileira de pílulas que rolava na horizontal: cabiam quatro, então
      "Alertas" e "Saúde da mulher" ficavam fora da tela — existiam sem que
@@ -946,13 +1218,23 @@ function MinhaContaPage() {
 
   /** Menu do ☰ da home — guarda as ações que ficavam na barra de topo. */
   const [homeMenu, setHomeMenu] = useState(false);
+  /* ─── O MAPA DO APP e o "VOCÊ SABIA?" (set/2026) ───────────────────────────
+     `visitadas` é o conjunto de funções que ela JÁ abriu (ids de
+     `FUNCOES_DO_APP`), gravado em chave `dc-path-` para viajar no
+     `journey_state`. Quem alimenta é `goToTab`, o único ponto por onde toda
+     navegação passa. A dica é calculada DEPOIS de montar (num efeito), nunca no
+     render: ela lê `localStorage` e `Date.now()`, e os dois divergem entre
+     servidor e cliente — a classe de defeito que já derrubou o app inteiro. */
+  const [mapaAberto, setMapaAberto] = useState(false);
+  const [visitadas, setVisitadas] = useState<Set<string>>(() => new Set());
+  const [dicaDaBolha, setDicaDaBolha] = useState<FuncaoDoApp | null>(null);
 
   /* ── O TUTORIAL DO PRIMEIRO ACESSO ──────────────────────────────────────
      Quem apresenta o app é o bebê bolha, pela barra de baixo. O estado do
      DESTAQUE mora aqui porque a barra mora aqui: o tutorial diz de qual item
      está falando, e quem acende é o `AppBottomNav`. */
   const [tutorialAberto, setTutorialAberto] = useState(false);
-  const [destaqueDaBarra, setDestaqueDaBarra] = useState<BottomSection | "sos" | null>(null);
+  const [destaqueDaBarra, setDestaqueDaBarra] = useState<DestaqueDoTutorial>(null);
   /* ⚠️ O PASSO MORA AQUI, e não dentro do tutorial. A barra continua clicável
      durante a aula: tocar em "Jogo" troca a aba, tira a home do ar e desmonta
      o componente — e com o índice lá dentro, voltar recomeçava do primeiro
@@ -1251,10 +1533,53 @@ function MinhaContaPage() {
        ainda verdadeiro, e ela reabria sozinha ao voltar para o Bebê. */
     setNotifOpen(false);
     setConsultasSub(sub ?? null);
+    /* "Já abriu": o id mais específico do destino, gravado uma vez. */
+    const idAberto = idDaFuncao(t, sub);
+    if (idAberto && !visitadas.has(idAberto)) {
+      const prox = new Set(visitadas);
+      prox.add(idAberto);
+      setVisitadas(prox);
+      lsSet(CHAVE_VISITADAS, [...prox]);
+    }
   };
 
   // Modo Cuidado 🤍 — lido do perfil; pausa a gamificação globalmente.
   const careMode = Boolean((profile as { care_mode?: boolean } | null)?.care_mode);
+  useEffect(() => {
+    if (!profile) return;
+    let vivo = true;
+    /* ⚠️ O PULL DA NUVEM VEM ANTES de ler e de gravar: `lsSet` numa chave
+       `dc-path-` agenda um PUSH do blob da jornada, e empurrar antes do pull
+       sobrescreve a jornada real por um blob incompleto — a mesma regra que o
+       onboarding da Comunidade já paga. */
+    void ensureInitialJourneyPull()
+      .catch(() => false)
+      .then(() => {
+        if (!vivo) return;
+        const abertas = new Set(lsGet<string[]>(CHAVE_VISITADAS, []));
+        setVisitadas(abertas);
+        const ultima = lsGet<DicaMostrada | null>(CHAVE_DICA, null);
+        const agora = Date.now();
+        const d = dicaDaSemana({
+          visitadas: abertas,
+          careMode,
+          weeks: gest?.weeks ?? null,
+          agora,
+          ultima,
+        });
+        setDicaDaBolha(d);
+        /* Marcada como MOSTRADA no instante em que é decidida — não no toque:
+           quem leu e não tocou não pode reencontrá-la amanhã, senão a bolha
+           vira letreiro da mesma dica por sete dias. */
+        if (d) lsSet(CHAVE_DICA, { id: d.id, em: agora } satisfies DicaMostrada);
+      });
+    return () => {
+      vivo = false;
+    };
+    /* Só na primeira leitura do perfil: reler a cada mudança de aba
+       recalcularia a dica no MESMO dia e a marcaria de novo. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
   /**
    * ⚠️ CARIMBA O MODO CUIDADO PARA O SOM — e isto fecha um portão que nenhuma
    * prop alcançava.
@@ -1342,7 +1667,7 @@ function MinhaContaPage() {
   }, [profile?.id]);
   async function loadNextAppt(force = false) {
     try {
-      const appointments = await fetchAppointmentsCached(force);
+      const { appointments } = await fetchAppointmentsCached(force);
       const today = ymdLocal();
       const next = appointments
         .filter((a) => a.status === "confirmed" && (a.confirmed_date ?? "") >= today)
@@ -1487,12 +1812,34 @@ function MinhaContaPage() {
          vê o quê não mudou, só a hora do pedido. Trocar uma ida à rede em
          série por uma leitura extra que o admin descarta é o negócio certo:
          admin é raro e gestante é todo mundo. */
-      const [{ data: u }, { data: s }] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getSession(),
-      ]);
-      if (!u.user) return;
+      /* ── ⚠️ O PERFIL SAI NA PRIMEIRA RODADA, E NÃO NA SEGUNDA (set/2026) ──
+         O dono, no aparelho: "a primeira tela está demorando muito para
+         carregar". Medido no código: o perfil esperava o `getUser` — que é
+         uma ida ao servidor de auth — só para ter o `user.id`. Mas o id já
+         está na SESSÃO, que é local e responde em milissegundos. O `getUser`
+         continua saindo (é ele que VALIDA o token no servidor, e sem usuário
+         válido a tela não abre), só deixou de estar na frente do perfil.
+         A RLS de `patient_profiles` continua sendo quem decide o que a
+         consulta devolve — o id da sessão só aponta a linha. */
+      const { data: s } = await supabase.auth.getSession();
       const token = s.session?.access_token;
+      const idDaSessao = s.session?.user?.id ?? null;
+      /* ⚠️ `Promise.resolve(...)` de propósito: o construtor de consulta do
+         PostgREST é PREGUIÇOSO — só dispara a requisição quando alguém chama
+         o `then`. Guardado cru na variável, ele só sairia no `await` lá
+         embaixo, DEPOIS do `getUser`, e a rodada "junta" seria em série de
+         novo, com o comentário dizendo o contrário. */
+      const perfilEmVoo = idDaSessao
+        ? Promise.resolve(
+            (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", idDaSessao)
+              .maybeSingle(),
+          )
+        : null;
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
 
       /* ─── ⚠️ "ELA APARECEU" — sem isto, a aba das Amigas mente por omissão ──
          `last_seen_at` é o que vira "há 2h" na lista de amigas. Se ninguém
@@ -1511,30 +1858,68 @@ function MinhaContaPage() {
           .catch(() => {});
       }
 
-      const [perfilRes, papel] = await Promise.all([
-        (supabase as any).from("patient_profiles").select("*").eq("id", u.user.id).maybeSingle(),
-        (async () => {
-          if (!token) return null;
-          try {
-            const [admin, medico] = await Promise.all([
-              checkIsAdmin({ data: { accessToken: token } }),
-              /* `catch` PRÓPRIO: conta sem perfil de médico é o caso comum
+      /* O papel (admin? médico?) são DUAS idas ao servidor de funções, e a
+         gestante com DUM não precisa esperar por elas para ver a home — ver
+         `liberarCedo` abaixo. Quem ainda precisa esperar é quem NÃO tem
+         âncora gestacional: é ali que mora o médico sem marca, e a espera é o
+         que impede o painel dele de piscar como app de gestante. */
+      const papelEmVoo = (async () => {
+        if (!token) return null;
+        try {
+          const [admin, medico] = await Promise.all([
+            checkIsAdmin({ data: { accessToken: token } }),
+            /* `catch` PRÓPRIO: conta sem perfil de médico é o caso comum
                  (é uma gestante), e sem isto o `Promise.all` derrubaria a
                  resolução de papel inteira por causa do caminho normal. */
-              getMyDoctor({ data: { accessToken: token } }).catch(() => null),
-            ]);
-            return { admin, medico };
-          } catch {
-            return null;
-          }
-        })(),
-      ]);
-      const { data } = perfilRes as { data: any };
+            getMyDoctor({ data: { accessToken: token } }).catch(() => null),
+          ]);
+          return { admin, medico };
+        } catch {
+          return null;
+        }
+      })();
+      const perfilRes =
+        perfilEmVoo && idDaSessao === u.user.id
+          ? await perfilEmVoo
+          : await (supabase as any)
+              .from("patient_profiles")
+              .select("*")
+              .eq("id", u.user.id)
+              .maybeSingle();
+      const { data, error: erroPerfil } = perfilRes as { data: any; error: unknown };
       setProfile(data);
+      /* ⚠️ "NÃO CONSEGUI LER" NÃO É "NÃO PREENCHEU". O erro era descartado, e
+         no supabase-js a falha devolve `data: null` — então uma oscilação de
+         rede transformava a CARTEIRINHA DE EMERGÊNCIA (tipo sanguíneo,
+         alergias, medicações, contato) na frase "Preencha seu perfil
+         primeiro": falsa, culpando ela, e mandando para o lado errado no
+         pronto-socorro. É a mesma classe que `NaoConsegueLer` fechou em seis
+         telas e que ficou de pé na mais grave. */
+      setPerfilInstavel(!data && !!erroPerfil);
       setUserId(u.user.id);
 
-      // Papel ANTES de liberar o render: sem isso o médico via o app da
-      // gestante piscar por 2-3 round-trips até o bloqueio assumir.
+      /* ── ⚠️ A GESTANTE COM DUM NÃO ESPERA O PAPEL ──────────────────────
+         Quem tem âncora gestacional (DUM, DPP ou ultrassom) e não carrega a
+         marca de médico É paciente — as duas idas ao servidor de funções
+         (`checkIsAdmin`, `getMyDoctor`) só podem CONFIRMAR isso. Esperá-las
+         era pôr a home de toda gestante atrás de duas funções serverless que
+         acordam frias. A resposta continua sendo aplicada quando chega: admin
+         vira admin, e a obstetra grávida continua com o app dela como antes.
+         Quem NÃO tem âncora espera como sempre — é o caso do médico sem marca,
+         e é para ele que a espera existia. */
+      const marcaDeMedico = (u.user.user_metadata as { role?: string } | null)?.role === "doctor";
+      /* O cromo da paciente não é desenhado na espera dele — ver
+         `podeSerMedico`. Aqui é só o carimbo; a decisão de papel continua
+         abaixo, inteira. */
+      if (marcaDeMedico) setPodeSerMedico(true);
+      const ancora = !!(data?.lmp_date || data?.due_date || data?.reference_date);
+      const liberarCedo = ancora && !marcaDeMedico;
+      if (liberarCedo) setLoading(false);
+      const papel = await papelEmVoo;
+
+      // Para quem NÃO foi liberada acima, o papel vem ANTES de liberar o
+      // render: sem isso o médico via o app da gestante piscar por 2-3
+      // round-trips até o bloqueio assumir.
       let roleIsPatient = true;
 
       /* A MARCA DO AUTH VEM PRIMEIRO, antes de qualquer chamada de rede.
@@ -1694,38 +2079,29 @@ function MinhaContaPage() {
     navigate({ to: "/" });
   }
 
-  if (loading)
-    return (
-      <>
-        {/* ESQUELETO NO FORMATO DA HOME DO CELULAR.
-            O anterior era uma grade de oito quadradinhos com 5 colunas — o
-            desenho da versão de computador. No celular a tela trocava de
-            SILHUETA ao carregar: primeiro uma grade cinza, depois um céu de
-            borda a borda com o bebê no meio. Era metade do "pisca" que ela
-            relatava; a outra metade era a rolagem.
-            Agora o vulto é o mesmo: bloco alto sangrando nas laterais (o céu),
-            cartão da semana em degrau e a fileira de medidas. O conteúdo
-            aparece DENTRO do lugar onde já estava, em vez de empurrar tudo. */}
-        <div className="md:hidden">
-          <div className="skeleton -mx-5 -mt-2 h-[62vh] rounded-none" />
-          <div className="mx-auto -mt-10 w-[86%] space-y-2">
-            <div className="skeleton mx-auto h-16 w-32 rounded-t-3xl" />
-            <div className="skeleton h-28 rounded-[26px]" />
-          </div>
-        </div>
-        <div className="mx-auto hidden max-w-5xl px-5 py-8 space-y-4 md:block">
-          <div className="skeleton h-52 rounded-3xl" />
-          <div className="grid grid-cols-4 gap-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="skeleton h-[72px] rounded-2xl" />
-            ))}
-          </div>
-          <div className="skeleton h-16 rounded-3xl" />
-          <div className="skeleton h-24 rounded-3xl" />
-        </div>
-      </>
-    );
+  /* ⚠️ O VOLTAR DO ANDROID SOBE UM NÍVEL — antes ele FECHAVA O APP (set/2026).
+     A pilha de `voltar.ts` existe, está testada e está certa; só que apenas
+     OITO folhas se registravam nela, e nenhuma tela de NAVEGAÇÃO. Medido: a
+     paciente entrava em Saúde → grade → Chutes, apertava o voltar do Android,
+     ninguém assumia e o app era minimizado. O gesto que o Android inteiro usa
+     para "suba um nível" tirava o app da frente.
+     ⚠️ E a subida certa já existia: é esta `voltarDaBarra` logo acima, com as
+     três regras escritas e justificadas. Ela estava ligada só à seta desenhada
+     na barra de cima. Aqui não nasce régua nova nenhuma — nasce o SEGUNDO
+     chamador da mesma. Uma segunda régua faria a seta e o botão do aparelho
+     discordarem, e o defeito apareceria como "às vezes ele volta para outro
+     lugar".
+     ⚠️ Em `mobileHome` NÃO se registra, de propósito: na raiz o voltar do
+     Android sai do app, e é isso que todo app faz. Registrar aqui prenderia a
+     paciente dentro do app sem saída pelo gesto do sistema. */
+  useVoltarDeFundo(!mobileHome, voltarDaBarra);
 
+  /* ⚠️ `gest` e `activeSection` SOBEM PARA CÁ porque o cromo do app (a barra de
+     baixo e a Central de Emergência) passou a existir desde o primeiro quadro,
+     e ele precisa das duas — ver `cromoDoApp` logo abaixo. As duas são
+     à prova de nulo (`profile` ainda não chegou) e não dependem de nada que
+     nasça depois; mover custa a leitura de estar longe de quem as usa, e o que
+     se ganha é o botão de socorro existir enquanto o app carrega. */
   /* ─── EM MODO CUIDADO, A IDADE GESTACIONAL DEIXA DE EXISTIR NA TELA ──────
    *
    * Eu tinha consertado isto tapando buraco: escondi a semana na saudação do
@@ -1761,12 +2137,198 @@ function MinhaContaPage() {
         })
       : null;
 
+  const activeSection: BottomSection | null = mobileHome ? "home" : tabToSection(tab as AppTab);
+
+  /* ═══ O CROMO DO APP — E ELE EXISTE DESDE O PRIMEIRO QUADRO ═══════════
+     Pedido do dono: "faça a barra de baixo aparecer desde o primeiro quadro".
+
+     ⚠️ O QUE ISSO CONSERTA É O SOCORRO, não a estética. A barra e a Central de
+     Emergência ficavam DEPOIS do `if (loading) return` — então, enquanto o app
+     carregava, **o botão de socorro não existia na tela**. A paciente que abre
+     o app justamente porque está passando mal encontrava um esqueleto cinza e
+     nenhuma saída.
+
+     ⚠️ E ele FUNCIONA com o perfil ainda nulo, o que é o que torna isto útil e
+     não decorativo: `dispararEmergencia` recebe só o token da SESSÃO e as
+     coordenadas — o servidor resolve médico, contato e ficha. O botão não fica
+     bonito esperando dado; ele socorre.
+
+     ⚠️ **UMA FONTE SÓ**, e é por isso que ele é uma `const` em vez de JSX
+     repetido nos dois caminhos. Duas cópias divergiriam no primeiro conserto, e
+     a que divergisse seria a do CARREGAMENTO — a menos olhada, e a que existe
+     exatamente para o pior momento.
+
+     ⚠️ `{emergencyOpen && (` continua literal aqui porque
+     `socorro-nao-e-gateado.test.ts` cobra essa forma: a folha já foi gateada
+     por `careMode` uma vez, e o botão passou a não fazer nada para quem está
+     de luto. */
+  /* ⚠️ A CHAVE NÃO É ENFEITE — ela é o que impede o SOS de se reiniciar no
+     meio de um envio.
+
+     O ramo de carregamento e o corpo normal são dois `return` diferentes, e o
+     cromo aparece em POSIÇÕES diferentes nos dois. O React casa filhos de um
+     fragmento por posição — e, sem chave, a virada de `loading` DESMONTARIA a
+     Central de Emergência e montaria outra. Ela guarda `panic`, a posição e os
+     canais em estado INTERNO: um SOS já em "Localizando e avisando…" voltaria
+     a "Pedir socorro agora", e o `setPanic("sent")` da promessa em voo cairia
+     num componente que já saiu. A paciente apertaria de novo achando que não
+     tinha ido.
+
+     Com a chave, o React o encontra pelo nome em vez da posição e ATUALIZA a
+     mesma instância. Por isso ela precisa ser a mesma string nos dois lugares —
+     e por isso `cromoDoApp` é um `<Fragment key=…>`, e não o `<>` curto, que
+     não aceita chave. */
+  const cromoDoApp = (
+    <Fragment key="cromo-do-app">
+      {/**
+       * ── Central de emergência (aberta pelo SOS da barra) ──────
+       *
+       * ⚠️ **NÃO HÁ PORTÃO DE MODO CUIDADO AQUI, E ISSO É A REGRA.**
+       *
+       * Esta condição era `emergencyOpen && !careMode`: a paciente em luto
+       * tocava no SOS da barra — que continua ACESO —, `emergencyOpen` virava
+       * `true`, e a folha simplesmente não montava. O botão de emergência do
+       * app não fazia nada, exatamente para quem mais precisa dele.
+       *
+       * Quem acabou de perder uma gestação está em risco clínico ALTO
+       * (hemorragia, infecção, pré-eclâmpsia de pós-parto) e em risco
+       * psiquiátrico. O Modo Cuidado existe para o app parar de falar do bebê
+       * — nunca para parar de socorrer.
+       *
+       * E a decisão já estava escrita DENTRO da própria folha, no comentário do
+       * som do alarme: "`podeSoar` deixa passar mesmo com o som desligado e
+       * mesmo em Modo Cuidado — quem perdeu a gestação continua podendo passar
+       * mal". O componente sabia; a tela que o monta fazia o contrário.
+       *
+       * O que o luto muda é o CONTEÚDO, não a porta: `weekLabel` chega `null`
+       * quando não há gestação em curso, e a folha já não desenha a linha da
+       * semana nesse caso. Gatear a folha inteira para não mostrar uma linha é
+       * apagar o socorro para esconder um rótulo.
+       */}
+      {emergencyOpen && (
+        <EmergencySheet
+          /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
+           sem caminho nenhum no celular — as fileiras de categorias que a
+           listam são `hidden md:flex`. Esta é a porta dela agora, e é a
+           porta certa: quem lê a lista vermelha e fica em dúvida está a um
+           toque de responder. */
+          onTriagem={() => {
+            setEmergencyOpen(false);
+            goToTab("Alertas");
+          }}
+          /* ⚠️ A FICHA QUE O SOCORRISTA LÊ, E O ÚNICO PORTÃO DE MODO CUIDADO
+           DELA — que vive AQUI, e não dentro da folha.
+  
+           Em Modo Cuidado a ficha dizia "FICHA DE EMERGÊNCIA - GESTANTE",
+           com o NOME DO BEBÊ e a DPP. Ela abre o SOS — a tela que ela abre
+           quando alguma coisa está errada — e lê o nome do bebê que ela
+           perdeu e uma data de parto que não vai acontecer.
+  
+           ⚠️ **O que NÃO se faz aqui é apagar a ficha.** Quem perdeu uma
+           gestação continua sendo paciente obstétrica: hemorragia,
+           infecção, pré-eclâmpsia de pós-parto e trombose são justamente os
+           riscos dela, e o socorrista precisa saber disso. Tipo sanguíneo,
+           alergias, medicações, contato e médico ficam INTEIROS.
+  
+           O que sai é o que é falso: um bebê que não vai nascer e uma DPP
+           que não existe — que não são só dolorosos, são informação ERRADA
+           para quem vai atendê-la. E "GESTANTE" vira "PACIENTE OBSTÉTRICA",
+           que continua sinalizando obstetrícia na triagem sem afirmar uma
+           gestação em curso.
+  
+           ⚠️ A idade gestacional sai junto, e esta é a única linha em que se
+           troca informação por exatidão: "28s 3d" afirma uma gestação de
+           hoje. Se o dono quiser a semana de volta, ela precisa vir com
+           outro rótulo — é decisão clínica dele, não minha. */
+          /* ⚠️ FALHA FECHADO: sem perfil, "não sei se ela está em luto" tem de
+             valer o rótulo NEUTRO. `careMode` é derivado do perfil, então
+             durante o carregamento ele é `false` e o `??` da folha caía em
+             "FICHA DE EMERGÊNCIA - GESTANTE" — exatamente a frase que o Modo
+             Cuidado existe para apagar, em CAIXA ALTA, no topo da ficha, para
+             quem acabou de perder a gestação. Os outros campos do luto (bebê,
+             DPP, semana) chegam nulos por acidente — porque o perfil não
+             carregou —, não pela régua; o rótulo era o único que ficava errado.
+             "PACIENTE OBSTÉTRICA" é verdadeiro nos DOIS casos: continua
+             sinalizando obstetrícia para a triagem sem afirmar uma gestação em
+             curso. O custo para a gestante comum é um rótulo menos específico
+             por uma fração de segundo. */
+          tituloDaFicha={
+            !profile || careMode ? "FICHA DE EMERGÊNCIA - PACIENTE OBSTÉTRICA" : undefined
+          }
+          info={{
+            name: profile?.display_name?.split(" ")[0] ?? null,
+            weekLabel: careMode || !gest ? null : `${gest.weeks}s ${gest.days}d`,
+            bloodType: profile?.blood_type ?? null,
+            allergies: profile?.allergies ?? null,
+            emergencyContact: profile?.emergency_contact ?? null,
+            emergencyPhone: profile?.emergency_phone ?? null,
+            babyName: careMode ? null : (profile?.baby_name ?? null),
+            dpp: careMode
+              ? null
+              : (() => {
+                  const due =
+                    profile?.due_date ??
+                    (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
+                  return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
+                })(),
+            medications: profile?.medications ?? null,
+          }}
+          medico={meuMedico}
+          medicoResolvido={medicoResolvido}
+          /* ⚠️ `!!profile` e não `!loading`: o que a ficha precisa é o PERFIL,
+             e ele é a única coisa que a torna verdadeira. Amarrá-la a `loading`
+             faria a ficha se dizer resolvida no instante em que o app libera a
+             tela — que pode ser antes de o perfil chegar. */
+          fichaResolvida={!!profile}
+          onClose={() => setEmergencyOpen(false)}
+          onOpenCard={() => {
+            setEmergencyOpen(false);
+            goToTab("Carteirinha");
+          }}
+        />
+      )}
+
+      {/* ── App bottom nav (mobile only) ─────────────────────── */}
+      <AppBottomNav
+        activeSection={activeSection}
+        onSelect={handleBottomNav}
+        /* O SOS NÃO é gated por Modo Cuidado — e isto é uma correção, não um
+         esquecimento. O Modo Cuidado existe para calar gamificação,
+         comemoração e cobrança; esconder o botão de emergência era o
+         contrário de cuidado, ainda mais porque quem está em Modo Cuidado
+         costuma estar num momento em que precisa MAIS dele. Era, também, a
+         única porta de entrada do SOS no app inteiro. */
+        onEmergency={() => setEmergencyOpen(true)}
+        escura={barraEscura}
+        destaque={destaqueDaBarra}
+      />
+    </Fragment>
+  );
+
+  /* ⚠️ Ele fica AQUI, longe da `voltarDaBarra` que chama, e não é gosto: há um
+     `if (loading) return` logo abaixo, e um hook depois de um retorno
+     antecipado quebra a regra dos hooks (o lint pegou). A referência funciona
+     porque `voltarDaBarra` é uma DECLARAÇÃO de função, içada — e porque
+     `useVoltarDeFundo` a guarda numa ref, chamando-a só quando o voltar
+     acontece. */
+  if (loading)
+    return (
+      <>
+        {/* ⚠️ O CROMO É IRMÃO, e não filho do quadro: ele precisa ser um filho
+            DIRETO do fragmento nos dois retornos para a chave o encontrar. */}
+        <PrimeiroQuadro ceu={mobileHome ? ceuAgora.nome : null} />
+        {/* ⚠️ E não para quem tem marca de médico: o app dele é o painel, e o
+            caminho dele é o mais longo do boot — sem esta guarda ele veria a
+            barra da gestante em toda abertura. Ver `podeSerMedico`. */}
+        {!podeSerMedico && cromoDoApp}
+      </>
+    );
+
   const firstName = profile?.display_name?.split(" ")[0] ?? "mamãe";
 
   // Mobile navigation helpers
   // `null` = tela filha do hub (Calendário, Registros, Médico…): nenhuma pílula
   // acesa, em vez de acender "Bebê" fora do Bebê.
-  const activeSection: BottomSection | null = mobileHome ? "home" : tabToSection(tab as AppTab);
 
   function mobileNavigate(t: AppTab, sub?: string) {
     setTab(t as Tab);
@@ -1966,7 +2528,7 @@ function MinhaContaPage() {
           nome={profile?.display_name ?? null}
           passo={passoDoTutorial}
           onAvancar={avancarTutorial}
-          onPasso={(d) => setDestaqueDaBarra(d as BottomSection | "sos" | null)}
+          onPasso={(d) => setDestaqueDaBarra(d as DestaqueDoTutorial)}
           onFechar={fecharTutorial}
         />
       )}
@@ -2004,57 +2566,7 @@ function MinhaContaPage() {
         />
       )}
 
-      {/* ── Central de emergência (aberta pelo SOS da barra) ────── */}
-      {emergencyOpen && !careMode && (
-        <EmergencySheet
-          /* A triagem de sintomas perdeu o ladrilho da grade da Saúde e ficou
-             sem caminho nenhum no celular — as fileiras de categorias que a
-             listam são `hidden md:flex`. Esta é a porta dela agora, e é a
-             porta certa: quem lê a lista vermelha e fica em dúvida está a um
-             toque de responder. */
-          onTriagem={() => {
-            setEmergencyOpen(false);
-            goToTab("Alertas");
-          }}
-          info={{
-            name: profile?.display_name?.split(" ")[0] ?? null,
-            weekLabel: gest ? `${gest.weeks}s ${gest.days}d` : null,
-            bloodType: profile?.blood_type ?? null,
-            allergies: profile?.allergies ?? null,
-            emergencyContact: profile?.emergency_contact ?? null,
-            emergencyPhone: profile?.emergency_phone ?? null,
-            babyName: profile?.baby_name ?? null,
-            dpp: (() => {
-              const due =
-                profile?.due_date ?? (profile?.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-              return due ? new Date(`${due}T00:00:00`).toLocaleDateString("pt-BR") : null;
-            })(),
-            medications: profile?.medications ?? null,
-          }}
-          medico={meuMedico}
-          medicoResolvido={medicoResolvido}
-          onClose={() => setEmergencyOpen(false)}
-          onOpenCard={() => {
-            setEmergencyOpen(false);
-            goToTab("Carteirinha");
-          }}
-        />
-      )}
-
-      {/* ── App bottom nav (mobile only) ─────────────────────── */}
-      <AppBottomNav
-        activeSection={activeSection}
-        onSelect={handleBottomNav}
-        /* O SOS NÃO é gated por Modo Cuidado — e isto é uma correção, não um
-           esquecimento. O Modo Cuidado existe para calar gamificação,
-           comemoração e cobrança; esconder o botão de emergência era o
-           contrário de cuidado, ainda mais porque quem está em Modo Cuidado
-           costuma estar num momento em que precisa MAIS dele. Era, também, a
-           única porta de entrada do SOS no app inteiro. */
-        onEmergency={() => setEmergencyOpen(true)}
-        escura={barraEscura}
-        destaque={destaqueDaBarra}
-      />
+      {cromoDoApp}
 
       {/* ── Jornada do Bebê (toque na foto) + popup Premium ─────── */}
       {journeyOpen && gest && (
@@ -2089,9 +2601,7 @@ function MinhaContaPage() {
           {/* ── Desktop header ───────────────────────────────────── */}
           <div className="hidden md:flex flex-wrap items-end justify-between gap-3 mb-2">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-                Minha conta
-              </p>
+              <p className="font-serif text-[15px] font-semibold text-primary">Minha conta</p>
               <h1 className="mt-2 font-serif text-3xl md:text-4xl">
                 {dayGreeting()}, {firstName} 💛
               </h1>
@@ -2251,7 +2761,7 @@ function MinhaContaPage() {
                   Com o portão, o pior caso passa a ser um cartão quebrado
                   dentro de um app que abre — e o erro fica LEGÍVEL, que é o que
                   faltava para achar este defeito. */}
-              <TabErrorBoundary tabName="tela inicial">
+              <TabErrorBoundary tabName="tela inicial" adiarRecarga={emergencyOpen}>
                 <AppHomeScreen
                   firstName={firstName}
                   babyName={profile?.baby_name ?? null}
@@ -2282,6 +2792,14 @@ function MinhaContaPage() {
                    com só `tutorialAberto`, uma janela larga calava o mascote
                    por causa de um tutorial que não está na tela. */
                   mascoteCalado={tutorialAberto && ehCelular}
+                  dica={
+                    dicaDaBolha && !careMode
+                      ? {
+                          ...falaDaDica(dicaDaBolha),
+                          aoTocar: () => goToTab(dicaDaBolha.tab, dicaDaBolha.sub),
+                        }
+                      : null
+                  }
                   onOrigemLocal={setOrigemLocal}
                   babyTone={profile?.baby_skin_tone ?? 0}
                   careMode={careMode}
@@ -2305,6 +2823,7 @@ function MinhaContaPage() {
                   (saudação, Painel, Perfil e Sair) continuam todas aqui. */}
               {homeMenu && (
                 <MenuDaConta
+                  careMode={careMode}
                   nome={firstName}
                   saudacao={dayGreeting()}
                   foto={profile?.avatar_url ?? null}
@@ -2317,6 +2836,10 @@ function MinhaContaPage() {
                   mostrarPainel={isAdmin || isDoctor}
                   ehDono={isAdmin}
                   onNotificacoes={abrirNotificacoes}
+                  onMapa={() => {
+                    setHomeMenu(false);
+                    setMapaAberto(true);
+                  }}
                   onNavegar={(t, subAba) => {
                     setHomeMenu(false);
                     goToTab(t, subAba);
@@ -2329,6 +2852,18 @@ function MinhaContaPage() {
                 />
               )}
 
+              {mapaAberto && (
+                <MapaDoApp
+                  careMode={careMode}
+                  weeks={gest?.weeks ?? null}
+                  visitadas={visitadas}
+                  onNavegar={(t, sub) => {
+                    setMapaAberto(false);
+                    goToTab(t, sub);
+                  }}
+                  onFechar={() => setMapaAberto(false)}
+                />
+              )}
               {notifOpen && (
                 <NotificacoesSheet
                   lista={caixaDeEntrada}
@@ -2441,11 +2976,12 @@ function MinhaContaPage() {
               key={`${tab}-${refreshKey}`}
               className={`mt-6 tab-enter ${hubAberto ? "hidden md:block" : ""}`}
             >
-              <TabErrorBoundary tabName={tab}>
+              <TabErrorBoundary tabName={tab} adiarRecarga={emergencyOpen}>
                 {tab === "Bebê" && (
                   <BebeHub
                     profile={profile}
                     gest={gest}
+                    proximaConsulta={nextAppt}
                     onNavigate={goToTab}
                     onBabyTap={() => setJourneyOpen(true)}
                     careMode={careMode}
@@ -2512,7 +3048,12 @@ function MinhaContaPage() {
                     />
                   </div>
                 )}
-                {tab === "Chá de bebê" && <ChaDeBebe careMode={careMode} />}
+                {tab === "Chá de bebê" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaPorta chave="cha" />
+                    <ChaDeBebe careMode={careMode} />
+                  </div>
+                )}
                 {/* ⚠️ A tela do FEED é a do modelo Instagram (`RedeNoApp`), e
                     as CONFIGURAÇÕES ficam acima dela — perfil público, bio e a
                     fila de pedidos. Elas não são parte do modelo copiado: o
@@ -2537,6 +3078,14 @@ function MinhaContaPage() {
                   >
                     <RedeNoApp
                       careMode={careMode}
+                      /* ⚠️ **O TUTORIAL DA ABA ESPERA O RITUAL DE BOAS-VINDAS.**
+                       Duas telas cheias no primeiro minuto seriam dois
+                       tutoriais — é a mesma decisão que `TutorialDaBolha` já
+                       toma com `!showOnboarding`. E aqui era alcançável de
+                       verdade: o ritual não tem portão de aba nenhum, então uma
+                       paciente recém-criada que tocasse em Comunidade antes de
+                       terminá-lo receberia os quatro cartões por baixo dele. */
+                      adiarOnboarding={showOnboarding}
                       /* Ver `onSelect`: sobe a cada toque no ícone da barra. */
                       sinalDeVoltarAoFeed={voltarAoFeed}
                       onAbrirSecoes={() => goToTab("Comunidade")}
@@ -2578,21 +3127,50 @@ function MinhaContaPage() {
                   />
                 )}
                 {tab === "Saúde" && (
-                  <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Saúde" />
+                    <HealthTab gest={gest} profile={profile} onNavigate={goToTab} />
+                  </div>
                 )}
                 {tab === "Nutrição" && (
-                  <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Nutrição" />
+                    <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                  </div>
                 )}
                 {tab === "Bem-estar" && (
-                  <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
+                  <BemEstarHub
+                    gest={gest}
+                    onNavigate={goToTab}
+                    careMode={careMode}
+                    /* O MESMO `consultasSub` que Registros, Consultas e Bebê já
+                       usam — era o único hub que não o recebia, e por isso a
+                       porta "Sons para dormir" do ☰ caía na grade. */
+                    initialSub={consultasSub}
+                  />
                 )}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
-                {tab === "Acompanhante" && <CompanionTab babyName={profile?.baby_name ?? null} />}
+                {tab === "Acompanhante" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaPorta chave="acompanhante" />
+                    <CompanionTab babyName={profile?.baby_name ?? null} />
+                  </div>
+                )}
                 {tab === "FAQ" && <FAQTab gest={gest} onNavigate={goToTab} />}
                 {tab === "Carteirinha" && (
-                  <CardTab profile={profile} gest={gest} onNavigate={goToTab} medico={meuMedico} />
+                  <CardTab
+                    profile={profile}
+                    gest={gest}
+                    onNavigate={goToTab}
+                    medico={meuMedico}
+                    instavel={perfilInstavel}
+                    aoTentar={refreshAll}
+                    careMode={careMode}
+                  />
                 )}
-                {tab === "Pós-parto" && <PosPartoTab profile={profile} onNavigate={goToTab} />}
+                {tab === "Pós-parto" && (
+                  <PosPartoTab profile={profile} onNavigate={goToTab} careMode={careMode} />
+                )}
                 {tab === "Recompensas" && (
                   <RecompensasHub
                     careMode={careMode}
@@ -2607,9 +3185,24 @@ function MinhaContaPage() {
                     (Sementinhas) — ver o cabeçalho de `RECOMPENSAS_SUBTABS`. */}
                 {tab === "Loja" && <LojaTab gest={gest} careMode={careMode} onNavigate={goToTab} />}
                 {tab === "Assinatura" && <AssinaturaTab onNavigate={goToTab} />}
-                {tab === "Saúde da mulher" && <SaudeMulherHub />}
+                {tab === "Saúde da mulher" && (
+                  <div className="space-y-5">
+                    <CabecalhoDaSaude chave="Saúde da mulher" />
+                    {/* ⚠️ `gest` existe para sempre depois do parto (a conta não
+                        para). "Gestante" aqui é gestação SEM nascimento
+                        registrado — senão a previsão do ciclo nunca voltaria. */}
+                    <SaudeMulherHub gestante={gest != null && !profile?.birth_date} />
+                  </div>
+                )}
                 {tab === "Médico" && <MédicoTab />}
-                {tab === "Chat IA" && <ChatTab profile={profile} gest={gest} careMode={careMode} />}
+                {tab === "Chat IA" && (
+                  <ChatTab
+                    profile={profile}
+                    gest={gest}
+                    careMode={careMode}
+                    onVoltar={voltarDaBarra}
+                  />
+                )}
                 {tab === "Perfil" && (
                   <ProfileTab
                     profile={profile}
@@ -2626,561 +3219,6 @@ function MinhaContaPage() {
         </section>
       </PullToRefresh>
     </>
-  );
-}
-
-/* ---------- Ritual de boas-vindas (primeiro acesso) ---------- */
-
-const ONBOARD_STEPS = 5;
-const ONBOARD_EASE = [0.16, 1, 0.3, 1] as const;
-
-/**
- * Onboarding acolhedor de primeiro acesso. Coleta o essencial (como chamar a
- * paciente, a âncora da gestação, o nome do bebê e uma foto) escrevendo nos
- * MESMOS campos do Perfil (`patient_profiles`) — não cria coluna nova, então
- * funciona mesmo com as migrations pendentes em produção. Tudo é opcional e
- * pode ser pulado; ao terminar, o app já abre personalizado.
- */
-export function OnboardingRitual({
-  initialName,
-  onClose,
-  passoInicial = 0,
-}: {
-  initialName: string;
-  onClose: (saved: Profile | null) => void;
-  /**
-   * ⚠️ SÓ PARA A BANCADA (`/preview-onboarding`).
-   *
-   * O ritual só aparece para uma paciente RECÉM-CRIADA e sem perfil — não há
-   * como abri-lo de novo depois. Enquanto ele só tinha nome, DUM e foto isso
-   * era um incômodo; no dia em que ganhou o campo do código da embaixadora,
-   * virou um controle no primeiro minuto de toda paciente nova que ninguém
-   * consegue olhar sem criar uma conta do zero.
-   *
-   * A bancada fabrica o PASSO, e nada mais: o corpo de cada tela, o salvamento
-   * e as regras continuam sendo os da produção.
-   */
-  passoInicial?: number;
-}) {
-  const [step, setStep] = useState(passoInicial);
-  const [name, setName] = useState(initialName);
-  const [mode, setMode] = useState<"dum" | "us">("dum");
-  const [lmp, setLmp] = useState("");
-  const [usDate, setUsDate] = useState(new Date().toISOString().split("T")[0]);
-  const [usWeeks, setUsWeeks] = useState("");
-  const [usDays, setUsDays] = useState("");
-  const [babyName, setBabyName] = useState("");
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  /* ─── A COMUNIDADE, NO ÚLTIMO PASSO ────────────────────────────────────────
-     ⚠️ **Nasce DESLIGADA**, como a chave nasce no banco. O ritual OFERECE; um
-     perfil que nascesse aberto exporia milhares de gestantes de alto risco por
-     omissão, sem ninguém nunca ter pedido plateia.
-
-     ⚠️ E ela liga só `perfil_publico` — NUNCA `vitrine_publica`, que é a página
-     aberta na internet e merece um momento deliberado, não uma chavinha no meio
-     das boas-vindas. */
-  const [entrarNaComunidade, setEntrarNaComunidade] = useState(false);
-  /* ─── O CÓDIGO DA INFLUENCIADORA ────────────────────────────────────────────
-     Nasce PRÉ-PREENCHIDO quando ela veio por um link `?ref=` — é o "link
-     inteligente" do desenho. Quem baixou pela busca da loja digita.
-
-     ⚠️ `useState(() => …)` e não `useState(storedAffiliateCode())`: a segunda
-     forma LÊ o localStorage a cada render, e no SSR não há localStorage. A
-     função inicializadora roda uma vez, no cliente. */
-  const [codigoRef, setCodigoRef] = useState<string>(() => {
-    try {
-      return storedAffiliateCode() ?? "";
-    } catch {
-      return "";
-    }
-  });
-  /* Veio do link? Então o efeito da página já vai atribuir e creditar sozinho —
-     aqui o campo só CONFIRMA, e não pede ação nenhuma. */
-  const [veioDoLink] = useState<boolean>(() => {
-    try {
-      return !!storedAffiliateCode();
-    } catch {
-      return false;
-    }
-  });
-
-  const next = () => setStep((s) => Math.min(ONBOARD_STEPS - 1, s + 1));
-  const back = () => setStep((s) => Math.max(0, s - 1));
-  const hasAnchor = mode === "dum" ? !!lmp : !!usWeeks;
-
-  function handleAvatar(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const size = 256;
-        const canvas = document.createElement("canvas");
-        canvas.width = size;
-        canvas.height = size;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-        const min = Math.min(img.width, img.height);
-        ctx.drawImage(
-          img,
-          (img.width - min) / 2,
-          (img.height - min) / 2,
-          min,
-          min,
-          0,
-          0,
-          size,
-          size,
-        );
-        setAvatar(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.src = ev.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  }
-
-  async function finish() {
-    setSaving(true);
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        toast.error("Sua sessão expirou — entre novamente.");
-        onClose(null);
-        return;
-      }
-      const payload: any = { id: u.user.id, updated_at: new Date().toISOString() };
-      if (name.trim()) payload.display_name = name.trim();
-      if (babyName.trim()) payload.baby_name = babyName.trim();
-      if (avatar) payload.avatar_url = avatar;
-      /* ⚠️ Só quando ela LIGOU. Mandar `false` explícito também funcionaria
-         hoje, e seria uma pegadinha no dia em que o padrão do banco mudar: o
-         ritual passaria a DESLIGAR uma chave que ninguém tocou. */
-      if (entrarNaComunidade) payload.perfil_publico = true;
-      if (mode === "dum" && lmp) {
-        payload.lmp_date = lmp;
-        payload.due_date = dueDateFromLmp(lmp);
-      } else if (mode === "us" && usWeeks) {
-        payload.reference_date = usDate;
-        payload.reference_weeks = Number(usWeeks);
-        payload.reference_days = usDays ? Number(usDays) : 0;
-      }
-      let { data, error } = await (supabase as any)
-        .from("patient_profiles")
-        .upsert(payload)
-        .select()
-        .single();
-      /* ⚠️ Recuo por coluna ausente, como no resto do app: `perfil_publico`
-         nasce num `APLICAR_` que o dono roda à mão, e o deploy chega antes. Sem
-         isto, um `42703` derrubaria o ritual INTEIRO — nome, DUM e foto — por
-         causa de uma chavinha opcional. */
-      if (error && String(error.message || "").includes("perfil_publico")) {
-        delete payload.perfil_publico;
-        ({ data, error } = await (supabase as any)
-          .from("patient_profiles")
-          .upsert(payload)
-          .select()
-          .single());
-      }
-      if (error && String(error.message || "").includes("avatar_url")) {
-        delete payload.avatar_url;
-        ({ data, error } = await (supabase as any)
-          .from("patient_profiles")
-          .upsert(payload)
-          .select()
-          .single());
-      }
-      if (error) {
-        toast.error("Não consegui salvar agora. Você pode ajustar depois no Perfil.");
-        onClose(null);
-        return;
-      }
-
-      /* ─── O CÓDIGO DIGITADO À MÃO ─────────────────────────────────────────
-         Só quando ela NÃO veio do link: nesse caso o efeito da página já
-         atribuiu, e mandar de novo daqui seria uma segunda chamada para o
-         mesmo fato.
-
-         ⚠️ DEPOIS do perfil salvo, nunca antes: o servidor precisa da linha em
-         `patient_profiles` para escrever `ref_code`, e sem ela devolve
-         `repetir`. Invertido, o código válido dela seria descartado em
-         silêncio no primeiro acesso — que é justamente quando ele vale. */
-      const digitado = codigoRef.trim();
-      if (!veioDoLink && digitado.length >= 3) {
-        try {
-          const { data: s } = await supabase.auth.getSession();
-          if (s.session?.access_token) {
-            const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
-            const r = await atribuirInfluenciadora({
-              data: { accessToken: s.session.access_token, codigo: digitado },
-            });
-            if (r.ok && "invalido" in r && r.invalido) {
-              /* Dito em voz alta: ela digitou algo e nada aconteceu. Silêncio
-                 aqui faz a paciente achar que ganhou o bônus e procurá-lo
-                 depois. */
-              toast("Não encontrei esse código. Você pode tentar de novo no Perfil.", {
-                duration: 6000,
-              });
-            } else if (r.ok && "atribuido" in r && r.atribuido && r.bonus > 0) {
-              toast.success(`Você começou com ${r.bonus} Sementinhas 🌱`);
-              creditarSementinhas(r.bonus);
-            }
-          }
-        } catch {
-          /* o campo do Perfil continua aceitando depois */
-        }
-      }
-
-      onClose(data as Profile);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const stepBody = (() => {
-    switch (step) {
-      case 0:
-        return (
-          <div className="text-center">
-            <p className="text-6xl">🌸</p>
-            <h2 className="mt-5 font-serif text-3xl leading-tight">Bem-vinda 💛</h2>
-            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              Este é o seu espaço para viver a gestação com tranquilidade — acompanhando o bebê
-              semana a semana, com o seu médico por perto. Vamos deixar tudo com a sua cara em 1
-              minutinho.
-            </p>
-          </div>
-        );
-      case 1:
-        return (
-          <div>
-            <p className="text-4xl">👋</p>
-            <h2 className="mt-4 font-serif text-2xl">Como você gostaria de ser chamada?</h2>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Seu primeiro nome"
-              onKeyDown={(e) => e.key === "Enter" && next()}
-              className="mt-5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-            />
-          </div>
-        );
-      case 2:
-        return (
-          <div>
-            <p className="text-4xl">🤰</p>
-            <h2 className="mt-4 font-serif text-2xl">Vamos calcular a idade do bebê</h2>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => setMode("dum")}
-                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-                  mode === "dum"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted-foreground"
-                }`}
-              >
-                Última menstruação
-              </button>
-              <button
-                onClick={() => setMode("us")}
-                className={`flex-1 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
-                  mode === "us"
-                    ? "bg-primary text-primary-foreground"
-                    : "border border-border text-muted-foreground"
-                }`}
-              >
-                Pelo ultrassom
-              </button>
-            </div>
-            {mode === "dum" ? (
-              <div className="mt-4">
-                <label className="mb-1.5 block text-sm font-medium">
-                  1º dia da última menstruação
-                </label>
-                <input
-                  type="date"
-                  value={lmp}
-                  onChange={(e) => setLmp(e.target.value)}
-                  className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-                />
-              </div>
-            ) : (
-              <div className="mt-4 space-y-3">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium">Data do ultrassom</label>
-                  <input
-                    type="date"
-                    value={usDate}
-                    onChange={(e) => setUsDate(e.target.value)}
-                    className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <label className="mb-1.5 block text-sm font-medium">Semanas</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={42}
-                      value={usWeeks}
-                      onChange={(e) => setUsWeeks(e.target.value)}
-                      placeholder="12"
-                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="mb-1.5 block text-sm font-medium">Dias</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={6}
-                      value={usDays}
-                      onChange={(e) => setUsDays(e.target.value)}
-                      placeholder="3"
-                      className="w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-            <button
-              onClick={next}
-              className="mt-4 text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
-            >
-              Ainda não sei a data — pular por agora
-            </button>
-          </div>
-        );
-      case 3:
-        return (
-          <div>
-            <p className="text-4xl">👶</p>
-            <h2 className="mt-4 font-serif text-2xl">Um toque pessoal (opcional)</h2>
-            <label className="mt-5 block text-sm font-medium">Já escolheram um nome?</label>
-            <input
-              value={babyName}
-              onChange={(e) => setBabyName(e.target.value)}
-              placeholder="Nome do bebê"
-              className="mt-1.5 w-full rounded-2xl border border-border bg-background px-4 py-3 text-base"
-            />
-            <div className="mt-5 flex items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-secondary">
-                {avatar ? (
-                  <img src={avatar} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <span className="text-2xl">📷</span>
-                )}
-              </div>
-              <label className="cursor-pointer rounded-full border border-border px-4 py-2 text-sm font-medium hover:border-primary hover:text-primary">
-                {avatar ? "Trocar foto" : "Adicionar sua foto"}
-                <input type="file" accept="image/*" onChange={handleAvatar} className="hidden" />
-              </label>
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="text-center">
-            <p className="text-6xl">🎉</p>
-            <h2 className="mt-5 font-serif text-3xl leading-tight">
-              Tudo pronto{name.trim() ? `, ${name.trim()}` : ""}! 💛
-            </h2>
-            <p className="mx-auto mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-              {hasAnchor
-                ? "Seu acompanhamento já está calculado. A partir de agora o app se ajusta à sua semana de gestação."
-                : "Você pode informar a data da gestação quando quiser, lá no Perfil. Seu espaço está pronto."}
-            </p>
-
-            {/* ─── CÓDIGO DA MÉDICA OU EMBAIXADORA ───────────────────────────
-                No ÚLTIMO passo, e não num passo próprio: é opcional, e um passo
-                inteiro para um campo que a maioria vai pular alonga o ritual de
-                boas-vindas de todo mundo por causa de uma minoria.
-
-                ⚠️ Vindo do link, ele NÃO pede ação: o efeito da página já
-                atribui e credita. Pedir que ela "confirme" um código que já
-                valeu é inventar um passo que só pode dar errado. */}
-            {veioDoLink ? (
-              <p
-                className="mx-auto mt-5 max-w-xs rounded-2xl px-3 py-2.5 text-[13px] font-semibold leading-snug"
-                style={{ background: "#e7f6ec", color: "#166534" }}
-              >
-                <span aria-hidden>🌱</span> Código{" "}
-                <strong className="font-mono tracking-wider">{codigoRef}</strong> aplicado —{" "}
-                {BONUS_INFLUENCIADORA} Sementinhas de boas-vindas!
-              </p>
-            ) : (
-              <div className="mx-auto mt-6 max-w-xs text-left">
-                <label
-                  htmlFor="codigo-ref"
-                  className="block text-[12px] font-semibold text-muted-foreground"
-                >
-                  Código da sua médica ou embaixadora (opcional)
-                </label>
-                <input
-                  id="codigo-ref"
-                  value={codigoRef}
-                  onChange={(e) => setCodigoRef(e.target.value)}
-                  placeholder="Ex.: MARIA"
-                  /* Os três desligados pela mesma razão do campo de convite das
-                     Amigas: o código é maiúsculo e sem acento, e o teclado do
-                     celular capitaliza e corrige sozinho. */
-                  autoCapitalize="none"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  className="mt-1.5 min-h-11 w-full rounded-full border border-border bg-background px-4 text-[14px]"
-                />
-                <p className="mt-1.5 text-[11.5px] leading-snug text-muted-foreground">
-                  Ganhe {BONUS_INFLUENCIADORA} Sementinhas 🌱 para começar. Dá para colocar depois,
-                  no Perfil.
-                </p>
-                {/* Ver o mesmo aviso em `CodigoDaEmbaixadora`: o consentimento
-                    tem de dizer o que acontece, e é a MESMA frase nas duas
-                    portas. */}
-                <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
-                  Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para
-                  poder te presentear.
-                </p>
-              </div>
-            )}
-
-            {/* ─── ENTRAR NA COMUNIDADE ───────────────────────────────────────
-                O feed nasce vazio e o perfil nasce fechado — então a paciente
-                nova abre a Comunidade, não é encontrável por ninguém, não tem
-                ninguém para ver, e conclui que a aba não tem nada. Este é o
-                único minuto em que ela está disposta a mexer nisso.
-
-                ⚠️ **OFERECE, e nunca liga sozinho.** O padrão é desligado, como
-                no banco: um perfil que nascesse aberto exporia milhares de
-                gestantes de alto risco por omissão.
-
-                ⚠️ **E não segue ninguém por ela.** Seguir é um gesto, e um app
-                que segue coisas pela paciente ensina que a lista dela não é
-                dela — a mesma razão pela qual nem a conta oficial é seguida
-                automaticamente (ver `conta-oficial.ts`). O que ela ganha é ser
-                ENCONTRÁVEL; quem ela segue continua sendo escolha dela.
-
-                ⚠️ **O texto é o MESMO da tela de configurações**
-                (`chaves-do-perfil.ts`): duas cópias divergem no primeiro
-                ajuste, e aqui a divergência seria duas telas prometendo coisas
-                diferentes sobre o mesmo interruptor. */}
-            {ofereceAComunidade({ emCuidado: false }) && (
-              <button
-                type="button"
-                role="switch"
-                aria-checked={entrarNaComunidade}
-                onClick={() => setEntrarNaComunidade((v) => !v)}
-                className="press mx-auto mt-6 flex w-full max-w-xs items-start gap-3 rounded-2xl border border-border bg-background/70 p-3 text-left"
-              >
-                <span
-                  aria-hidden
-                  className={`mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
-                    entrarNaComunidade ? "bg-primary" : "bg-muted"
-                  }`}
-                >
-                  <span
-                    className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
-                      entrarNaComunidade
-                        ? "translate-x-[22px] translate-y-0.5"
-                        : "translate-x-0.5 translate-y-0.5"
-                    }`}
-                  />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[13px] font-semibold">
-                    {CONVITE_DA_COMUNIDADE.titulo}
-                  </span>
-                  <span className="mt-0.5 block text-[11.5px] leading-snug text-muted-foreground">
-                    {entrarNaComunidade ? TEXTO_PERFIL_PUBLICO.ligado : CONVITE_DA_COMUNIDADE.sub}
-                  </span>
-                </span>
-              </button>
-            )}
-          </div>
-        );
-    }
-  })();
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-[image:var(--gradient-warm)] p-5">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-24 -left-16 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
-      />
-      <div className="relative w-full max-w-md rounded-3xl border border-border bg-card/90 p-7 shadow-[var(--shadow-card)] backdrop-blur md:p-9">
-        {/* Progresso */}
-        <div className="mb-6 flex items-center justify-center gap-1.5">
-          {Array.from({ length: ONBOARD_STEPS }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === step ? "w-6 bg-primary" : i < step ? "w-1.5 bg-primary/50" : "w-1.5 bg-border"
-              }`}
-            />
-          ))}
-        </div>
-
-        <div className="min-h-[240px]">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={step}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.28, ease: ONBOARD_EASE }}
-            >
-              {stepBody}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* Ações */}
-        <div className="mt-7 flex items-center justify-between gap-3">
-          {step > 0 && step < ONBOARD_STEPS - 1 ? (
-            <button
-              onClick={back}
-              className="rounded-full px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-            >
-              Voltar
-            </button>
-          ) : (
-            <span />
-          )}
-
-          {step < ONBOARD_STEPS - 1 ? (
-            <button
-              onClick={next}
-              disabled={step === 2 && !hasAnchor}
-              className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              {step === 0 ? "Começar" : "Continuar"}
-            </button>
-          ) : (
-            <button
-              onClick={finish}
-              disabled={saving}
-              className="rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-soft)] transition-opacity hover:opacity-90 disabled:opacity-50"
-            >
-              {saving ? "Salvando…" : "Entrar no meu espaço"}
-            </button>
-          )}
-        </div>
-
-        {step < ONBOARD_STEPS - 1 && (
-          <button
-            onClick={() => onClose(null)}
-            className="mt-4 block w-full text-center text-xs text-muted-foreground/70 hover:text-foreground"
-          >
-            Pular por agora
-          </button>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -3287,7 +3325,7 @@ function WeekMilestoneModal({
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="relative flex max-w-sm flex-col items-center"
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+        <p className="font-serif text-[15px] font-semibold text-primary">
           {motherName ? `${motherName}, chegou um novo marco` : "Chegou um novo marco"}
         </p>
 
@@ -3344,6 +3382,35 @@ function WeekMilestoneModal({
 
 /* ---------- Bebê ---------- */
 /**
+ * A peça 3D de cada quadrado das três grades — `GradeHub` a desenha no lugar
+ * do traço no círculo. Chutes e Contrações REUSAM a arte da Saúde: são o mesmo
+ * destino (o hub da Saúde abre `Registros` já na sub-tela certa), e duas artes
+ * para a mesma coisa ensinariam que são coisas diferentes.
+ *
+ * ⚠️ MORA ANTES DA PRIMEIRA GRADE que o lê. `const` de módulo não é içado:
+ * declarado depois de `BEMESTAR_SUBTABS`, o módulo inteiro estourava no SSR
+ * ("antes de inicializar") e TODA página do app respondia 500 — medido.
+ */
+const ARTE_GRADE = {
+  agenda: arteGrade_agenda,
+  preparo: arteGrade_preparo,
+  perguntas: arteGrade_perguntas,
+  checklist: arteGrade_checklist,
+  parto: arteGrade_parto,
+  tele: arteGrade_tele,
+  particular: arteGrade_particular,
+  meditacoes: arteGrade_meditacoes,
+  sons: arteGrade_sons,
+  exercicios: arteGrade_exercicios,
+  humor: arteGrade_humor,
+  apoio: arteGrade_apoio,
+  diario: arteGrade_diario,
+  timeline: arteGrade_timeline,
+  chutes: icChutes,
+  contracoes: icContracoes,
+} as const;
+
+/**
  * Hub "Bem-estar": autocuidado numa tela só (sub-abas) — Meditações, Sons,
  * Exercícios, Humor e Apoio Emocional. Antes eram 5 abas.
  */
@@ -3353,22 +3420,52 @@ export const BEMESTAR_SUBTABS = [
     label: "Meditações",
     sub: "Meditar com voz e som",
     Icon: Flower2,
+    imagem: ARTE_GRADE.meditacoes,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
+  /*
+    ⚠️ **ESTE LADRILHO ENTREGAVA OUTRO RECURSO — e um que faz o CONTRÁRIO do
+    que ele promete.**
+
+    Ele dizia "Sons · Relaxar e dormir" e abria `SonsBebêTab`, que são cinco
+    sons feitos em **Web Audio** — e o iOS SUSPENDE o `AudioContext` quando o
+    aparelho bloqueia. Ou seja: o ladrilho de dormir abria um tocador que para
+    no segundo em que ela apoia o celular na mesa de cabeceira. É literalmente
+    o defeito que `sons-para-dormir.tsx` foi escrito para evitar, e o
+    comentário de lá diz isso com todas as letras.
+
+    E o `mapa-do-app` promete, para `tab: "Bem-estar", sub: "sons"`, "Chuva,
+    mar, ventre e mais trinta — **tocam com a tela apagada**". O tocador que
+    cumpre isso (WAV + `<audio loop>`, sobrevive à tela apagada, com card na
+    tela de bloqueio) existia e só era alcançável DENTRO da aba Jogo.
+
+    Agora são dois ladrilhos, cada um dizendo o que entrega.
+  */
   {
     key: "sons",
-    label: "Sons",
-    sub: "Relaxar e dormir",
+    label: "Sons para dormir",
+    sub: "Chuva, mar e mais 30 — com a tela apagada",
     Icon: AudioLines,
+    imagem: ARTE_GRADE.sons,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
+  },
+  {
+    key: "sons-bebe",
+    label: "Sons para o bebê",
+    sub: "O que ele escuta daí de dentro",
+    Icon: Baby,
+    imagem: ARTE_GRADE.sons,
+    caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
+    tinta: "text-indigo-600",
   },
   {
     key: "exercicios",
     label: "Exercícios",
     sub: "Movimentos leves",
     Icon: PersonStanding,
+    imagem: ARTE_GRADE.exercicios,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
@@ -3377,6 +3474,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Humor",
     sub: "Como você está hoje",
     Icon: Smile,
+    imagem: ARTE_GRADE.humor,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -3385,6 +3483,7 @@ export const BEMESTAR_SUBTABS = [
     label: "Apoio emocional",
     sub: "Quando o peso é grande",
     Icon: HeartHandshake,
+    imagem: ARTE_GRADE.apoio,
     caixa: "border-rose-200/70 from-rose-50 to-pink-50/60",
     tinta: "text-rose-600",
   },
@@ -3394,12 +3493,33 @@ function BemEstarHub({
   gest,
   onNavigate,
   careMode = false,
+  initialSub = null,
 }: {
   gest: Gest;
   onNavigate: (tab: string) => void;
   careMode?: boolean;
+  /**
+   * ⚠️ ESTE HUB ERA O ÚNICO DOS CINCO SEM `initialSub`, e por isso o
+   * `mapa-do-app` apontava para uma sub-tela que ele não sabia abrir:
+   * "Sons para dormir" (`tab: "Bem-estar", sub: "sons"`) caía na GRADE, e a
+   * paciente tinha de adivinhar em qual dos seis quadrados o app queria pôr
+   * ela. `mapa-do-app.test.ts` cobra que toda `sub` exista no hub daquela aba;
+   * o que faltava era o hub SABER receber.
+   */
+  initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(null);
+  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(() =>
+    initialSub && initialSub !== "sons"
+      ? (initialSub as (typeof BEMESTAR_SUBTABS)[number]["key"])
+      : null,
+  );
+  /**
+   * O tocador de dormir é uma FOLHA `fixed inset-0`, com tema escuro e botão de
+   * fechar próprios — ele não cabe dentro da moldura do `VoltarDaGrade`, que
+   * desenharia um cabeçalho claro por baixo de uma tela preta. Então ele abre
+   * POR CIMA da grade, e fechar devolve a grade onde ela estava.
+   */
+  const [dormirAberto, setDormirAberto] = useState(initialSub === "sons");
   /**
    * ⚠️ AS MEDITAÇÕES SAEM DA GRADE NO MODO CUIDADO.
    *
@@ -3415,28 +3535,51 @@ function BemEstarHub({
    * tirar "Nome do bebê" e manter Amigas — o que sai é o que fala no presente
    * sobre um bebê que vai nascer.
    */
+  /* ⚠️ E "Sons para o bebê" SAI JUNTO no Modo Cuidado — ele é literalmente o
+     que o bebê escuta daí de dentro, e o portão que já tirava as meditações
+     existe por essa exata razão. O tocador de DORMIR fica: `porFamilia(luto)`
+     dentro dele já esconde o coração e o ventre, e dormir mal é justamente o
+     que ela tem depois de uma perda. */
   const itens = careMode
-    ? BEMESTAR_SUBTABS.filter((x) => x.key !== "meditacoes")
+    ? BEMESTAR_SUBTABS.filter((x) => x.key !== "meditacoes" && x.key !== "sons-bebe")
     : BEMESTAR_SUBTABS;
   const atual = itens.find((s) => s.key === sub);
+
+  /* A folha do tocador vive fora do `if` da grade: ela cobre a tela inteira, e
+     o que estiver por baixo continua onde estava quando ela fechar. */
+  const folhaDeDormir = dormirAberto ? (
+    <Suspense fallback={null}>
+      <SonsParaDormir aoFechar={() => setDormirAberto(false)} careMode={careMode} />
+    </Suspense>
+  ) : null;
+
   if (!sub || !atual) {
     return (
-      <GradeHub
-        itens={itens}
-        onAbrir={(k) => setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"])}
-      />
+      <>
+        <GradeHub
+          itens={itens}
+          onAbrir={(k) => {
+            if (k === "sons") setDormirAberto(true);
+            else setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"]);
+          }}
+        />
+        {folhaDeDormir}
+      </>
     );
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} careMode={careMode} />}
-        {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />}
+        {sub === "sons-bebe" && (
+          <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />
+        )}
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
       </Fade>
+      {folhaDeDormir}
     </div>
   );
 }
@@ -3451,30 +3594,37 @@ export const REGISTROS_SUBTABS = [
     label: "Diário",
     sub: "Escrever sobre o dia",
     Icon: NotebookPen,
+    imagem: ARTE_GRADE.diario,
     caixa: "border-amber-200/70 from-amber-50 to-orange-50/60",
     tinta: "text-amber-600",
   },
   {
+    /* ⚠️ Chutes e Contrações têm a MESMA família (cor e arte) que no hub da
+       Saúde: são o mesmo destino por duas portas, e quem toca no bloco azul
+       de Chutes na Saúde tem de chegar numa tela azul — não numa rosa. */
     key: "chutes",
     label: "Chutes",
     sub: "Contar os movimentos",
     Icon: Footprints,
-    caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
-    tinta: "text-pink-600",
+    imagem: ARTE_GRADE.chutes,
+    caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
+    tinta: "text-sky-600",
   },
   {
     key: "contracoes",
     label: "Contrações",
-    sub: "Cronometrar e ver",
+    sub: "Cronometrar e ver o padrão",
     Icon: Timer,
-    caixa: "border-violet-200/70 from-violet-50 to-purple-50/60",
-    tinta: "text-violet-600",
+    imagem: ARTE_GRADE.contracoes,
+    caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
+    tinta: "text-orange-600",
   },
   {
     key: "timeline",
     label: "Linha do tempo",
     sub: "Tudo que já aconteceu",
     Icon: History,
+    imagem: ARTE_GRADE.timeline,
     caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
     tinta: "text-sky-600",
   },
@@ -3525,7 +3675,7 @@ function RegistrosHub({
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
         {sub === "chutes" && (
@@ -3548,12 +3698,23 @@ function RegistrosHub({
  * a semana, a contagem regressiva, o álbum, os nomes, a carta e o enxoval.
  * Antes eram 6 abas separadas; agora é 1 (menos poluição visual).
  */
+/** A peça 3D de cada quadrado da aba Bebê — `GradeHub` a desenha no lugar do Lucide. */
+const ARTE_BEBE = {
+  semana: arteBebe_semana,
+  contagem: arteBebe_contagem,
+  album: arteBebe_album,
+  nome: arteBebe_nome,
+  carta: arteBebe_carta,
+  quartinho: arteBebe_quartinho,
+} as const;
+
 export const BEBE_SUBTABS = [
   {
     key: "semana",
     label: "Semana",
     sub: "O que mudou agora",
     Icon: Baby,
+    imagem: ARTE_BEBE.semana,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
   },
@@ -3562,6 +3723,7 @@ export const BEBE_SUBTABS = [
     label: "Contagem",
     sub: "Quanto falta",
     Icon: Timer,
+    imagem: ARTE_BEBE.contagem,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
@@ -3570,6 +3732,7 @@ export const BEBE_SUBTABS = [
     label: "Álbum",
     sub: "As fotos da barriga",
     Icon: Images,
+    imagem: ARTE_BEBE.album,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
@@ -3578,6 +3741,7 @@ export const BEBE_SUBTABS = [
     label: "Nomes",
     sub: "Escolher e votar",
     Icon: Sparkles,
+    imagem: ARTE_BEBE.nome,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -3586,6 +3750,7 @@ export const BEBE_SUBTABS = [
     label: "Carta",
     sub: "Escrever para o bebê",
     Icon: Mail,
+    imagem: ARTE_BEBE.carta,
     caixa: "border-rose-200/70 from-rose-50 to-orange-50/60",
     tinta: "text-rose-600",
   },
@@ -3594,6 +3759,7 @@ export const BEBE_SUBTABS = [
     label: "Enxoval",
     sub: "A lista do quartinho",
     Icon: ShoppingBag,
+    imagem: ARTE_BEBE.quartinho,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
@@ -3606,6 +3772,7 @@ function BebeHub({
   onNavigate,
   onBabyTap,
   careMode,
+  proximaConsulta = null,
   initialSub = null,
 }: {
   profile: Profile | null;
@@ -3615,30 +3782,44 @@ function BebeHub({
   onNavigate: (tab: string) => void;
   onBabyTap: () => void;
   careMode: boolean;
+  /** A próxima consulta CONFIRMADA dela, já resolvida pela página. */
+  proximaConsulta?: { dateLabel: string; typeLabel: string } | null;
   /* O toque no bebê da home promete "a semana detalhada" — então ele pede
      `semana` e cai direto lá, sem passar pela grade. Quem chega pela barra de
      baixo continua vendo a grade. */
   initialSub?: string | null;
 }) {
   type SubBebe = (typeof BEBE_SUBTABS)[number]["key"];
+  /**
+   * ⚠️ **A GRADE NÃO CONHECIA O MODO CUIDADO.** `BEBE_SUBTABS` era usada crua:
+   * no luto a paciente continuava vendo "Contagem" (a contagem regressiva para
+   * o parto), "Nomes" (a votação do nome) e "Enxoval". O componente já RECEBIA
+   * `careMode` e o repassava para dentro de duas sub-telas; o que faltava era a
+   * própria grade olhar para ele — a mesma forma do portão do batimento no
+   * painel do acompanhante.
+   *
+   * O Álbum FICA: as fotos são a memória do que houve, e escondê-las seria o
+   * app apagar o bebê dela.
+   */
+  const visiveis = subtabsDoBebe(BEBE_SUBTABS, careMode);
   const [sub, setSub] = useState<SubBebe | null>(
-    BEBE_SUBTABS.some((x) => x.key === initialSub) ? (initialSub as SubBebe) : null,
+    subtabPermitida(BEBE_SUBTABS, careMode, initialSub) as SubBebe | null,
   );
   useEffect(() => {
-    if (BEBE_SUBTABS.some((x) => x.key === initialSub)) setSub(initialSub as SubBebe);
-  }, [initialSub]);
-  const atual = BEBE_SUBTABS.find((s) => s.key === sub);
+    /* ⚠️ Passa pela MESMA régua: `initialSub` vem de fora (o toque no bebê da
+       home, o hub da Saúde), e sem o filtro um pedido de tela barrada abriria
+       exatamente o que o luto acabou de tirar da grade — o portão pareceria
+       funcionar e não funcionaria. */
+    const ok = subtabPermitida(BEBE_SUBTABS, careMode, initialSub) as SubBebe | null;
+    if (ok) setSub(ok);
+  }, [initialSub, careMode]);
+  const atual = visiveis.find((s) => s.key === sub);
   if (!sub || !atual) {
-    return (
-      <GradeHub
-        itens={BEBE_SUBTABS}
-        onAbrir={(k) => setSub(k as (typeof BEBE_SUBTABS)[number]["key"])}
-      />
-    );
+    return <GradeHub itens={visiveis} onAbrir={(k) => setSub(k as SubBebe)} />;
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "semana" && (
           <BabyTab
@@ -3648,6 +3829,7 @@ function BebeHub({
             onNavigate={onNavigate}
             onBabyTap={onBabyTap}
             careMode={careMode}
+            proximaConsulta={proximaConsulta}
           />
         )}
         {sub === "contagem" && (
@@ -3668,625 +3850,6 @@ function BebeHub({
  * próxima semana. Retenção: dá um motivo pra voltar. Lê o humor do próprio
  * diário (LGPD). Suprimido no Modo Cuidado por quem chama.
  */
-function WeeklyRecapCard({ profile, gest }: { profile: Profile; gest: NonNullable<Gest> }) {
-  const [moods, setMoods] = useState<string[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const since = new Date(Date.now() - 7 * 86400000).toLocaleDateString("en-CA");
-      const { data } = await (supabase as any)
-        .from("journal_entries")
-        .select("mood, entry_date")
-        .gte("entry_date", since)
-        .order("entry_date", { ascending: true });
-      setMoods(
-        ((data ?? []) as { mood: string | null }[]).map((d) => d.mood ?? "").filter(Boolean),
-      );
-      setLoaded(true);
-    })();
-  }, []);
-
-  const week = gest.weeks;
-  const baby = babyForWeek(week);
-  const nextBaby = babyForWeek(week + 1);
-
-  // Humor predominante da semana
-  const counts: Record<string, number> = {};
-  moods.forEach((m) => (counts[m] = (counts[m] ?? 0) + 1));
-  const dominant = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0];
-
-  return (
-    <div className="rounded-3xl border border-border bg-card p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-        Sua semana em resumo
-      </p>
-
-      {/* Humor da semana */}
-      <div className="mt-4">
-        <p className="text-sm font-semibold text-foreground">Como foi seu humor</p>
-        {!loaded ? (
-          <div className="skeleton mt-2 h-6 w-40 rounded-full" />
-        ) : moods.length === 0 ? (
-          <p className="mt-1 text-sm text-muted-foreground">
-            Você ainda não registrou seu humor esta semana — o check-in no topo leva 1 toque. 💛
-          </p>
-        ) : (
-          <>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {moods.map((m, i) => (
-                <span key={i} className="text-xl">
-                  {m}
-                </span>
-              ))}
-            </div>
-            {dominant && (
-              <p className="mt-1.5 text-xs text-muted-foreground">
-                No geral, você se sentiu{" "}
-                <strong>{(MOOD_LABEL[dominant] ?? "bem").toLowerCase()}</strong> nesta semana.
-              </p>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Bebê agora */}
-      <div className="mt-5 rounded-2xl bg-secondary/50 p-4">
-        <p className="text-sm font-semibold text-foreground">
-          {profile.baby_name ? profile.baby_name : "Seu bebê"} nesta semana
-        </p>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{baby.desc}</p>
-      </div>
-
-      {/* Próxima semana */}
-      <div className="mt-3 flex items-center gap-2 text-sm">
-        <span className="text-lg">🔜</span>
-        <span className="text-muted-foreground">
-          Semana <strong className="text-foreground">{week + 1}</strong> chegando —{" "}
-          {profile.baby_name ? "ele" : "seu bebê"} vai ter o tamanho de{" "}
-          <strong className="text-foreground">{nextBaby.fruit.toLowerCase()}</strong>.
-        </span>
-      </div>
-    </div>
-  );
-}
-
-/** Saudação pela hora do dia — deixa a home viva e pessoal. */
-function dayGreeting(): string {
-  const h = new Date().getHours();
-  if (h < 5) return "Boa madrugada";
-  if (h < 12) return "Bom dia";
-  if (h < 18) return "Boa tarde";
-  return "Boa noite";
-}
-
-const MOOD_CHOICES = [
-  { emoji: "😊", label: "Bem", phrase: "Hoje me sinto bem." },
-  { emoji: "😌", label: "Tranquila", phrase: "Hoje me sinto tranquila." },
-  { emoji: "😴", label: "Cansada", phrase: "Hoje estou cansada." },
-  { emoji: "😟", label: "Ansiosa", phrase: "Hoje estou um pouco ansiosa." },
-  { emoji: "😢", label: "Pra baixo", phrase: "Hoje não está sendo um bom dia." },
-] as const;
-
-/**
- * Check-in de humor de 1 toque na home. Registra o humor do dia no diário
- * (alimenta o cérebro do paciente, que lê só o rótulo do humor). Uma vez por
- * dia (marcador no localStorage) — some depois de responder.
- */
-function HomeMoodCheckin({ name }: { name: string }) {
-  const today = new Date().toLocaleDateString("en-CA");
-  const key = `mood-checkin:${today}`;
-  const [done, setDone] = useState(() => {
-    try {
-      return !!localStorage.getItem(key);
-    } catch {
-      return false;
-    }
-  });
-  const [saving, setSaving] = useState(false);
-
-  if (done) return null;
-
-  async function pick(m: (typeof MOOD_CHOICES)[number]) {
-    hapticTap();
-    setSaving(true);
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      if (u.user) {
-        await (supabase as any).from("journal_entries").insert({
-          user_id: u.user.id,
-          mood: m.emoji,
-          content: m.phrase,
-          entry_date: today,
-        });
-      }
-      try {
-        localStorage.setItem(key, "1");
-      } catch {
-        /* modo privado */
-      }
-      setDone(true);
-      toast("Obrigado por compartilhar como você está 💛");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="rounded-3xl border border-border bg-card p-5">
-      <p className="text-sm font-semibold text-foreground">
-        Como você está se sentindo agora{name ? `, ${name}` : ""}?
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {MOOD_CHOICES.map((m) => (
-          <button
-            key={m.label}
-            disabled={saving}
-            onClick={() => pick(m)}
-            className="press flex min-w-[64px] flex-col items-center gap-1 rounded-2xl border border-border px-3 py-2 transition-colors hover:border-primary disabled:opacity-50"
-          >
-            <span className="text-2xl">{m.emoji}</span>
-            <span className="text-[11px] text-muted-foreground">{m.label}</span>
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Fica só no seu diário e ajuda seu médico a te entender melhor.
-      </p>
-    </div>
-  );
-}
-
-/**
- * Presença do médico — a "integração real" sentida. Um selo vivo de que o
- * médico acompanha a gestação e, quando ele registrou o batimento do bebê
- * recentemente, uma "novidade" acolhedora com o coração pulsando.
- *
- * A identidade vem do médico VINCULADO à paciente; o `doctor.config` só entra
- * quando não há vínculo (aí o médico é o dono da instalação, que é quem de
- * fato atende). O sinal do
- * batimento é real (profile.fetal_bpm_at, gravado pelo médico) — nada é
- * inventado: sem batimento recente, mostra só o selo de acompanhamento.
- */
-function DoctorPresenceCard({
-  profile,
-  onNavigate,
-  careMode = false,
-  medico,
-}: {
-  profile: Profile | null;
-  onNavigate: (tab: string) => void;
-  careMode?: boolean;
-  /** O médico DA PACIENTE. Sem ele o cartão afirmava, com a foto e o nome do
-      dono da instalação, que "Dr. Clóvis ouviu o coração do seu bebê" — para
-      quem é paciente de outro profissional e para quem não tem médico. */
-  medico?: { nome: string; title?: string; specialty?: string } | null;
-}) {
-  const bpm = profile?.fetal_bpm ?? null;
-  const at = profile?.fetal_bpm_at ?? null;
-  const baby = profile?.baby_name ? profile.baby_name : "seu bebê";
-
-  let whenLabel: string | null = null;
-  let recent = false;
-  if (at) {
-    const days = Math.floor((Date.now() - new Date(at + "T00:00:00").getTime()) / 86400000);
-    recent = days >= 0 && days <= 30;
-    whenLabel = days <= 0 ? "hoje" : days === 1 ? "ontem" : `há ${days} dias`;
-  }
-  // Em Modo Cuidado nunca mostra a novidade do batimento do bebê (pode ser
-  // doloroso); fica só o selo de acompanhamento, que é acolhedor.
-  const showBpm = bpm != null && at != null && recent && !careMode;
-  /* Quem este cartão nomeia. A foto é do dono da instalação, então só aparece
-     quando o médico É ele; para os demais, a inicial do nome.
-
-     Sem vínculo NÃO cai no fundador: o cartão dizia "Dr. Clóvis Bacha está
-     acompanhando sua gestação" com a foto dele para quem não escolheu médico
-     nenhum. Agora vira um convite para escolher. */
-  const nomeMedico = medico?.nome?.trim() ?? "";
-  const semMedico = !nomeMedico;
-  const ehODono = nomeMedico === DOCTOR.name;
-
-  return (
-    <button
-      onClick={() => onNavigate("Consultas")}
-      className="flex w-full items-center gap-4 rounded-3xl border border-primary/20 bg-primary/5 p-4 text-left transition-colors hover:border-primary/40"
-    >
-      <span className="relative shrink-0">
-        {ehODono ? (
-          <img
-            src={drPortrait}
-            alt={nomeMedico}
-            className="h-14 w-14 rounded-full object-cover ring-2 ring-primary/20"
-          />
-        ) : (
-          <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/12 font-serif text-xl text-primary ring-2 ring-primary/20">
-            {nomeMedico.replace(/^(Dr|Dra)\.?\s*/i, "").charAt(0) || "?"}
-          </span>
-        )}
-        <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground ring-2 ring-card">
-          ✓
-        </span>
-      </span>
-      <span className="min-w-0 flex-1">
-        {showBpm ? (
-          <>
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
-              <span className="heartbeat-icon text-rose-500">💓</span>
-              {semMedico
-                ? `O coração de ${baby} foi ouvido`
-                : `${nomeMedico.split(" ").slice(0, 2).join(" ")} ouviu o coração de ${baby}`}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {bpm} bpm · {whenLabel} · toque para sentir o batimento
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="block text-sm font-semibold text-foreground">
-              {/* Sem médico vinculado o cartão renderizava " está acompanhando
-                  sua gestação" — frase sem sujeito. Vira um convite. */}
-              {semMedico
-                ? "Escolha o seu obstetra"
-                : `${nomeMedico} está acompanhando sua gestação`}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              Você não está sozinha — seu médico acompanha cada semana por aqui. 💛
-            </span>
-          </>
-        )}
-      </span>
-    </button>
-  );
-}
-
-function BabyTab({
-  profile,
-  medico,
-  gest,
-  onNavigate,
-  onBabyTap,
-  careMode = false,
-}: {
-  profile: Profile | null;
-  /** Médico da paciente — o cartão de presença fala em nome dele. */
-  medico?: { nome: string; title?: string; specialty?: string } | null;
-  gest: Gest;
-  onNavigate: (tab: string) => void;
-  /** Toque na foto do bebê → Jornada do Bebê (gatilho Premium). */
-  onBabyTap?: () => void;
-  careMode?: boolean;
-}) {
-  if (!profile || !gest) {
-    return (
-      <div className="glass-card glass-pink rounded-3xl p-10 text-center">
-        <p className="text-5xl mb-4">🌸</p>
-        <p className="font-serif text-xl text-pink-700">Configure seu perfil</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Configure a data da sua última menstruação ou os dados do ultrassom em{" "}
-          <button
-            type="button"
-            onClick={() => onNavigate("Perfil")}
-            className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
-          >
-            Perfil
-          </button>{" "}
-          para começar o acompanhamento.
-        </p>
-      </div>
-    );
-  }
-  const baby = babyForWeek(gest.weeks);
-  const trimestre =
-    gest.weeks < 14 ? "1º trimestre" : gest.weeks < 28 ? "2º trimestre" : "3º trimestre";
-  const progress = Math.min(100, (gest.totalDays / 280) * 100);
-  const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
-  const daysToDue = due
-    ? Math.max(0, Math.ceil((new Date(due + "T00:00:00").getTime() - Date.now()) / 86400000))
-    : null;
-  const exam = consultaForWeek(gest.weeks);
-  const babyLabel = profile.baby_name ? profile.baby_name : "seu bebê";
-  // Reta final (semanas 40-42+): substitui a contagem regressiva por acolhimento.
-  // Usa âncora unificada (idade gestacional + DPP) para nunca sobrar estado sem mensagem.
-  const reta = retaFinalMensagemFor({ weeks: gest.weeks, dueDate: due });
-
-  const bpmDefault = profile.fetal_bpm ?? (gest.weeks < 14 ? 160 : gest.weeks < 28 ? 145 : 135);
-
-  return (
-    <Stagger className="space-y-6">
-      {/* ── Check-in de humor de 1 toque (home viva) ─────────────────── */}
-      <StaggerItem>
-        <HomeMoodCheckin name={profile.display_name?.split(" ")[0] ?? ""} />
-      </StaggerItem>
-
-      {/* ── Hero imersivo: o bebê é o protagonista ─────────────────────── */}
-      <StaggerItem className="relative overflow-hidden rounded-3xl border border-border bg-[image:var(--gradient-warm)] p-6 shadow-[var(--shadow-card)] md:p-10">
-        {/* brilhos suaves ao fundo */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-primary/10 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -bottom-24 -left-14 h-64 w-64 rounded-full bg-rose-200/40 blur-3xl"
-        />
-
-        <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr] md:gap-12">
-          {/* Bebê grande, flutuando devagar — toque abre a Jornada */}
-          <button
-            onClick={() => {
-              hapticTap();
-              onBabyTap?.();
-            }}
-            aria-label="Ver a jornada do bebê"
-            className="float-slow mx-auto transition-transform active:scale-[0.97]"
-          >
-            <BabyIllustration
-              week={gest.weeks}
-              tone={profile.baby_skin_tone ?? 0}
-              showInfo={false}
-              className="h-60 w-60 drop-shadow-[0_18px_44px_rgba(168,90,68,0.22)] md:h-80 md:w-80"
-            />
-          </button>
-
-          <div className="text-center md:text-left">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-              {trimestre} · {babyLabel} esta semana
-            </p>
-            <h2 className="mt-2 font-serif leading-none">
-              <span className="text-6xl md:text-7xl">{gest.weeks}</span>
-              <span className="ml-2 text-xl text-muted-foreground md:text-2xl">
-                semanas{gest.days > 0 ? ` e ${gest.days}d` : ""}
-              </span>
-            </h2>
-
-            {/* Chips: tamanho · peso · comparação (silenciados no Modo Cuidado) */}
-            {!careMode && (
-              <div className="mt-4 flex flex-wrap justify-center gap-2 md:justify-start">
-                {[
-                  { icon: "📏", label: baby.size },
-                  ...(baby.weight !== "—" ? [{ icon: "⚖️", label: baby.weight }] : []),
-                  { icon: "🍓", label: baby.fruit },
-                ].map((c) => (
-                  <span
-                    key={c.label}
-                    className="rounded-full border border-primary/15 bg-card/70 px-3.5 py-1.5 text-xs font-semibold text-foreground shadow-sm backdrop-blur"
-                  >
-                    {c.icon} {c.label}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {!careMode && (
-              <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-foreground md:mx-0 md:text-base">
-                {baby.desc}
-              </p>
-            )}
-
-            {/* ⚠️ O MESMO cartão do marco, pela mesma régua — e não uma
-                segunda chamada a `shareMilestoneCard`. `momentoDe` devolve
-                `null` no Modo Cuidado, então o portão deixou de ser um `if` na
-                tela e passou a ser a régua: é a lição de `humorDaJornada`
-                aplicada ao compartilhamento. */}
-            <div className="mt-4 max-w-xs">
-              <CompartilharMomento
-                momento={momentoDe({
-                  especie: "semana",
-                  numero: gest.weeks,
-                  rotulo: `${profile.baby_name || "Meu bebê"} do tamanho de ${baby.fruit.toLocaleLowerCase("pt-BR")}`,
-                  emoji: fruitEmojiForWeek(gest.weeks),
-                  emCuidado: !!careMode,
-                })}
-                nomeDaMae={profile.display_name?.split(" ")[0] ?? null}
-                aoPublicarNaComunidade={(m) => {
-                  guardarMomentoParaPublicar(m);
-                  onNavigate("Feed");
-                }}
-                compacto
-              />
-            </div>
-
-            {/* Progresso da jornada (silenciado no Modo Cuidado) */}
-            {!careMode && (
-              <div className="mt-5">
-                <div className="flex justify-between text-[11px] font-medium text-muted-foreground">
-                  <span>Início</span>
-                  <span className="text-primary">{progress.toFixed(0)}% da jornada</span>
-                  <span>Parto</span>
-                </div>
-                <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-card/70">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary/70 to-primary transition-all"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-                {reta ? (
-                  <p className="mt-1.5 text-xs font-medium text-primary">{reta.titulo}</p>
-                ) : (
-                  daysToDue != null && (
-                    <p className="mt-1.5 text-xs text-muted-foreground">
-                      {daysToDue === 0
-                        ? "É hoje! 🎉"
-                        : daysToDue === 1
-                          ? "Amanhã! 🎉"
-                          : `Faltam ${daysToDue} dias para conhecer ${babyLabel} 💛`}
-                    </p>
-                  )
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </StaggerItem>
-
-      {/* ── Presença do médico (integração real sentida) ─────────────── */}
-      <StaggerItem>
-        <DoctorPresenceCard
-          profile={profile}
-          onNavigate={onNavigate}
-          careMode={careMode}
-          medico={medico}
-        />
-      </StaggerItem>
-
-      {/* ── Linha de cards: DPP · próxima consulta · exame ─────────────── */}
-      <StaggerItem className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">
-            DPP — Data provável do parto
-          </p>
-          <p className="mt-2 font-serif text-2xl">
-            {due
-              ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR", {
-                  day: "2-digit",
-                  month: "long",
-                  year: "numeric",
-                })
-              : "—"}
-          </p>
-          {careMode ? null : reta ? (
-            <p className="mt-1 text-sm text-primary">Você está na janela do parto 💛</p>
-          ) : (
-            daysToDue != null && (
-              <p className="mt-1 text-sm text-muted-foreground">
-                {daysToDue === 0
-                  ? "É hoje! 🎉"
-                  : daysToDue === 1
-                    ? "Amanhã!"
-                    : `Faltam ${daysToDue} dias`}
-              </p>
-            )
-          )}
-        </div>
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Próxima consulta</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {gest.weeks < 28
-              ? "Consultas mensais — agende sua próxima visita."
-              : gest.weeks < 36
-                ? "Consultas quinzenais a partir de agora."
-                : "Consultas semanais — acompanhamento próximo."}
-          </p>
-        </div>
-        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Exame desta semana
-          </p>
-          <p className="mt-2 text-sm leading-relaxed text-foreground">{exam}</p>
-        </div>
-      </StaggerItem>
-
-      {/* ── Sentir o coração: vibra no ritmo do bebê (BPM real se o médico
-             registrou na consulta; senão, o típico do trimestre)
-
-             ⚠️ E ELE FICA DENTRO DO MODO CUIDADO. O portão `!careMode` existia
-             três linhas ABAIXO, e este bloco estava fora dele: quem acabou de
-             perder a gestação abria a aba do Bebê e encontrava "O coração de
-             {nome}", com som lub-dub a 140 bpm e vibração no ritmo. É a coisa
-             mais dolorosa que este app consegue fazer. ─────────────────── */}
-      {!careMode && (
-        <StaggerItem>
-          <HeartbeatFeel
-            defaultBpm={bpmDefault}
-            babyName={profile.baby_name}
-            sourceNote={
-              profile.fetal_bpm
-                ? `Ritmo real medido pelo seu médico${
-                    profile.fetal_bpm_at
-                      ? ` em ${new Date(profile.fetal_bpm_at + "T00:00:00").toLocaleDateString("pt-BR")}`
-                      : ""
-                  } 💗`
-                : undefined
-            }
-            compact
-          />
-        </StaggerItem>
-      )}
-
-      {!careMode && (
-        <StaggerItem>
-          <WeeklyRecapCard profile={profile} gest={gest} />
-        </StaggerItem>
-      )}
-
-      {/* Segunda gestação: historical alerts */}
-      {(profile.pregnancy_number ?? 1) >= 2 && (
-        <StaggerItem className="col-span-full rounded-3xl border border-primary/25 bg-primary/8 p-6">
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary mb-3">
-            🔁 2ª Gestação — Histórico da anterior
-          </p>
-          <div className="space-y-2 text-sm">
-            {profile.prior_bp_elevated && (
-              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
-                <span className="text-red-500 text-base">⚠️</span>
-                <p>
-                  Na gestação anterior, você teve <strong>pressão elevada</strong>
-                  {profile.prior_bp_week ? ` a partir da semana ${profile.prior_bp_week}` : ""}.
-                  {gest.weeks >= (profile.prior_bp_week ?? 28) - 2
-                    ? " Estamos nessa janela — monitore sua pressão com mais frequência."
-                    : " Vamos monitorar de perto conforme a semana se aproxima."}
-                </p>
-              </div>
-            )}
-            {profile.prior_gestational_diabetes && (
-              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
-                <span className="text-primary text-base">🍬</span>
-                <p>
-                  Você teve <strong>diabetes gestacional</strong> anteriormente. O risco de
-                  recorrência é maior — converse com seu médico sobre o teste de glicemia antecipado
-                  (semanas 20–24).
-                </p>
-              </div>
-            )}
-            {profile.prior_preterm && (
-              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
-                <span className="text-primary text-base">👶</span>
-                <p>
-                  Histórico de <strong>parto prematuro</strong>. Seu médico acompanhará o
-                  comprimento cervical com mais frequência nesta gestação.
-                </p>
-              </div>
-            )}
-            {profile.prior_cesarean && (
-              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
-                <span className="text-primary text-base">🏥</span>
-                <p>
-                  Cesariana anterior registrada. A via de parto desta gestação será planejada em
-                  conjunto com o seu médico.
-                </p>
-              </div>
-            )}
-            {!profile.prior_bp_elevated &&
-              !profile.prior_gestational_diabetes &&
-              !profile.prior_preterm &&
-              !profile.prior_cesarean && (
-                <p className="text-primary">
-                  Nenhuma complicação registrada na gestação anterior. Continue preenchendo seu
-                  histórico em{" "}
-                  <button
-                    type="button"
-                    onClick={() => onNavigate("Perfil")}
-                    className="font-semibold underline underline-offset-2 hover:opacity-80"
-                  >
-                    Perfil → 2ª Gestação
-                  </button>
-                  .
-                </p>
-              )}
-            {profile.prior_notes && (
-              <div className="flex items-start gap-2 rounded-xl bg-card/80 p-3">
-                <span className="text-base">📋</span>
-                <p>
-                  <strong>Observações:</strong> {profile.prior_notes}
-                </p>
-              </div>
-            )}
-          </div>
-        </StaggerItem>
-      )}
-    </Stagger>
-  );
-}
 
 /* ---------- Diário ---------- */
 
@@ -4320,12 +3883,26 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
   const prompts = JOURNAL_PROMPTS[trimester];
   const firstName = profile?.display_name?.split(" ")[0];
 
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
+
   async function load() {
-    const { data } = await (supabase as any)
+    const { data, error } = await (supabase as any)
       .from("journal_entries")
       .select("*")
       .order("entry_date", { ascending: false });
-    setEntries(data ?? []);
+    /* ⚠️ "Seu diário começará aqui" AFIRMA que ela nunca escreveu nada. Numa
+       paciente em rastreio de depressão perinatal, ler que meses de registro
+       sumiram não é frustração de interface. E repare na assimetria que estava
+       aqui: `add()` e `remove()` já avisavam quando falhavam; só a LEITURA
+       calava — e `add()` chama `load()` no fim, então ela salvava, o texto
+       sumia do campo e nada aparecia na lista. */
+    if (error || !data) {
+      setInstavel(true);
+      return;
+    }
+    setInstavel(false);
+    setEntries(data);
   }
   useEffect(() => {
     load();
@@ -4361,7 +3938,7 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">
           {firstName
             ? `${firstName}, como você está se sentindo hoje?`
@@ -4404,7 +3981,7 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={4}
-          placeholder="Escreva uma memória, um pensamento, um sonho..."
+          placeholder="Escreva uma memória, um pensamento, um sonho…"
           className="mt-4 w-full rounded-md border border-input bg-background p-3 text-sm"
         />
         <button
@@ -4420,11 +3997,19 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
       </div>
 
       <div className="space-y-3">
-        {entries.length === 0 && (
-          <p className="text-sm text-muted-foreground">Seu diário começará aqui ✨</p>
+        {instavel ? (
+          <NaoConsegueLer
+            oQue="seu diário"
+            sossego="O que você escreveu continua salvo."
+            aoTentar={() => void load()}
+          />
+        ) : (
+          entries.length === 0 && (
+            <p className="text-sm text-muted-foreground">Seu diário começará aqui ✨</p>
+          )
         )}
         {entries.map((e) => (
-          <div key={e.id} className="rounded-2xl border border-border bg-card p-5">
+          <div key={e.id} className="rounded-2xl card-material p-5">
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {e.mood} · {new Date(e.entry_date + "T00:00:00").toLocaleDateString("pt-BR")}
@@ -4445,242 +4030,10 @@ function JournalTab({ profile, gest }: { profile: Profile | null; gest: Gest }) 
 }
 
 /* ---------- Chutes ---------- */
-function KicksTab({
-  weeks,
-  babyName,
-  careMode = false,
-  onNavigate,
-}: {
-  weeks: number | null;
-  babyName: string | null;
-  careMode?: boolean;
-  onNavigate?: (t: Tab) => void;
-}) {
-  const [active, setActive] = useState<KickSession | null>(null);
-  const [count, setCount] = useState(0);
-  const [history, setHistory] = useState<KickSession[]>([]);
-  const startRef = useRef<number>(0);
-  const [elapsed, setElapsed] = useState(0);
+/* ---------- Chutes — a tela mudou para `src/components/kicks-tab.tsx`
+   (set/2026). Ela mede um sintoma VERMELHO e não era fotografável; ver o
+   cabeçalho de lá. ---------- */
 
-  const label = babyName ?? "o bebê";
-  const isMonitoringPhase = weeks != null && weeks >= 28;
-
-  async function load() {
-    const { data } = await (supabase as any)
-      .from("kick_sessions")
-      .select("*")
-      .not("ended_at", "is", null)
-      .order("started_at", { ascending: false })
-      .limit(10);
-    setHistory(data ?? []);
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
-    return () => clearInterval(t);
-  }, [active]);
-
-  async function start() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data, error } = await (supabase as any)
-      .from("kick_sessions")
-      .insert({ user_id: u.user.id, kick_count: 0 })
-      .select()
-      .single();
-    if (error) {
-      toast.error("Não foi possível iniciar a sessão. Tente novamente.");
-      return;
-    }
-    setActive(data);
-    setCount(0);
-    startRef.current = Date.now();
-    setElapsed(0);
-  }
-
-  async function tap() {
-    if (!active) return;
-    hapticKick(); // vínculo tátil: o bebê "chuta de volta"
-    const next = count + 1;
-    setCount(next);
-    if (next >= 10) {
-      await stop(next);
-    }
-  }
-
-  async function stop(finalCount = count) {
-    if (!active) return;
-    const { error } = await (supabase as any)
-      .from("kick_sessions")
-      .update({ ended_at: new Date().toISOString(), kick_count: finalCount })
-      .eq("id", active.id);
-    if (error) {
-      toast.error("Não foi possível salvar a sessão. Tente novamente.");
-      return;
-    }
-    setActive(null);
-    setCount(0);
-    load();
-    triggerAchievementsCheck();
-  }
-
-  const mins = Math.floor(elapsed / 60000);
-  const secs = Math.floor((elapsed % 60000) / 1000);
-
-  // Stats from history
-  const completeSessions = history.filter((s) => s.kick_count >= 10);
-  const avgMins =
-    completeSessions.length > 0
-      ? Math.round(
-          completeSessions.reduce((acc, s) => {
-            const dur = s.ended_at
-              ? (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
-              : 0;
-            return acc + dur;
-          }, 0) / completeSessions.length,
-        )
-      : null;
-
-  /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
-     movimentos de {nome do bebê}" — o convite mais doloroso possível para
-     quem acabou de perder a gestação. */
-  /* Tela acesa durante a contagem. É a atividade mais longa do app — a
-     paciente pode ficar até duas horas esperando o bebê se mexer, sem tocar no
-     aparelho, e é justamente por não tocar que a tela apaga. */
-  useEffect(() => {
-    if (!active) return;
-    return manterTelaAcesa();
-  }, [active]);
-
-  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
-  return (
-    <div className="space-y-6">
-      {/* Context banner */}
-      {weeks != null && !isMonitoringPhase && (
-        <div className="glass-card glass-violet rounded-2xl p-4 text-sm text-violet-800">
-          <span className="mr-1.5">{weeks < 20 ? "🌱" : "🤗"}</span>
-          {weeks < 20
-            ? `Semana ${weeks} — os movimentos começam a ser sentidos entre as semanas 18 e 25. Continue o pré-natal normalmente.`
-            : `Semana ${weeks} — você já pode perceber os movimentos de ${label}! A contagem formal de chutes começa na semana 28.`}
-        </div>
-      )}
-
-      <div className="glass-card glass-violet rounded-3xl p-8 text-center">
-        <p className="text-4xl mb-3">👶🦵</p>
-        <p className="font-serif text-xl text-violet-700">Contador de chutes</p>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {isMonitoringPhase
-            ? `A partir da semana 28, conte 10 movimentos de ${label}. O ideal é sentir 10 em até 2 horas.`
-            : "A contagem de movimentos é recomendada a partir da 28ª semana de gestação."}
-        </p>
-        {!active ? (
-          <button
-            onClick={start}
-            className="mt-6 rounded-full px-8 py-3 text-sm font-medium text-primary-foreground shadow-sm transition-all duration-300 active:scale-95 hover:opacity-90"
-            style={{
-              background:
-                "radial-gradient(circle at 30% 30%, color-mix(in oklch, var(--primary) 80%, white), var(--primary) 70%)",
-            }}
-          >
-            Iniciar sessão
-          </button>
-        ) : (
-          <div className="mt-6">
-            <button
-              onClick={tap}
-              className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-primary-foreground shadow-xl transition-transform duration-300 active:scale-95 hover:scale-[1.03]"
-              style={{
-                background:
-                  "radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--primary) 78%, white), var(--primary) 70%)",
-              }}
-            >
-              <div>
-                <div key={count} className="pop-in font-serif text-5xl">
-                  {count}
-                </div>
-                <div className="text-xs uppercase tracking-widest opacity-80">/ 10 chutes</div>
-              </div>
-            </button>
-            <p className="mt-4 text-sm text-muted-foreground">
-              ⏱ {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
-            </p>
-            <button
-              onClick={() => stop()}
-              className="mt-3 text-xs text-muted-foreground hover:text-destructive"
-            >
-              Encerrar sessão
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Stats */}
-      {history.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões registradas</p>
-            <p className="mt-2 font-serif text-3xl">{history.length}</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Sessões completas</p>
-            <p className="mt-2 font-serif text-3xl">{completeSessions.length}</p>
-          </div>
-          <div className="rounded-2xl border border-border bg-card p-5 text-center">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
-              Tempo médio (10 chutes)
-            </p>
-            <p className="mt-2 font-serif text-3xl">{avgMins != null ? `${avgMins} min` : "—"}</p>
-          </div>
-        </div>
-      )}
-
-      <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          Histórico
-        </p>
-        <div className="space-y-2">
-          {history.length === 0 && (
-            <p className="text-sm text-muted-foreground">Nenhuma sessão registrada ainda.</p>
-          )}
-          {history.map((s) => {
-            const dur = s.ended_at
-              ? Math.round(
-                  (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000,
-                )
-              : 0;
-            return (
-              <div
-                key={s.id}
-                className="flex items-center justify-between rounded-xl border border-border bg-card p-4 text-sm"
-              >
-                <span>
-                  {new Date(s.started_at).toLocaleString("pt-BR", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                </span>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  {s.kick_count >= 10 && (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
-                      ✓ completo
-                    </span>
-                  )}
-                  {s.kick_count} chutes · {dur} min
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Checklist ---------- */
 const DEFAULT_ITEMS: { category: string; label: string }[] = [
   // Mamãe — documentos e identificação
   { category: "mae", label: "RG e CPF (originais)" },
@@ -4870,8 +4223,8 @@ function ChecklistTab({ gest }: { gest: Gest }) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Mala da maternidade</p>
+      <div className="rounded-3xl card-material p-6">
+        <p className="font-serif text-[15px] font-semibold text-primary">Mala da maternidade</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {done} de {total} itens prontos
         </p>
@@ -4887,7 +4240,7 @@ function ChecklistTab({ gest }: { gest: Gest }) {
       </div>
 
       {Object.entries(groups).map(([cat, list]) => (
-        <div key={cat} className="rounded-3xl border border-border bg-card p-6">
+        <div key={cat} className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">{groupLabels[cat] ?? cat}</p>
           <ul className="mt-3 space-y-1">
             {list.map((it) => (
@@ -4958,7 +4311,7 @@ function CareModeBanner({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-5">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="font-serif text-[15px] font-semibold text-slate-500">Modo Cuidado 🤍</p>
       <p className="mt-2 font-serif text-lg text-foreground">Estamos aqui com você.</p>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
         Pausamos as comemorações, contagens e a pontuação. Tudo o que você construiu está guardado —
@@ -4997,7 +4350,7 @@ function CareModeToggle({
 }) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-card p-6">
-      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Modo Cuidado 🤍</p>
+      <p className="font-serif text-[15px] font-semibold text-slate-500">Modo Cuidado 🤍</p>
       {careMode ? (
         <>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -5034,10 +4387,15 @@ function CareModeToggle({
 /** Resumo da agenda dentro do Perfil: próxima consulta + avisos + atalhos. */
 function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }) {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
+  /* ⚠️ "não consegui ler" NÃO é "você não tem consulta" — ver
+     `fetchAppointmentsCached`. */
+  const [instavel, setInstavel] = useState(false);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     (async () => {
-      setAppts(await fetchAppointmentsCached());
+      const r = await fetchAppointmentsCached();
+      setAppts(r.appointments);
+      setInstavel(r.instavel);
       setLoaded(true);
     })();
   }, []);
@@ -5055,7 +4413,7 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
   const pendingCount = appts.filter((a) => a.status === "pending").length;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <div className="flex items-center justify-between gap-2">
         <p className="font-serif text-lg">Minha agenda</p>
         <a href="/agendamento" className="press text-xs font-bold text-primary">
@@ -5074,7 +4432,7 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
       )}
       {next ? (
         <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-3">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-700">
+          <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">
             Próxima consulta
           </p>
           <p className="mt-0.5 text-sm font-semibold">
@@ -5086,7 +4444,9 @@ function ProfileAgendaCard({ onNavigate }: { onNavigate: (tab: string) => void }
           <p className="mt-3 text-sm text-muted-foreground">
             {pendingCount > 0
               ? `Você tem ${pendingCount} pedido(s) aguardando confirmação do médico.`
-              : "Nenhuma consulta marcada ainda."}
+              : instavel
+                ? "Não consegui carregar sua agenda agora — se você tem consulta marcada, ela continua marcada."
+                : "Nenhuma consulta marcada ainda."}
           </p>
         )
       )}
@@ -5153,7 +4513,12 @@ function ProfileTab({
   const faltaEmergencia = !form.emergency_email.trim() || !form.emergency_contact.trim();
   const [notifPermission, setNotifPermission] = useState<string>("default");
   const [corporateCode, setCorporateCode] = useState("");
-  const [corporateMsg, setCorporateMsg] = useState<string | null>(null);
+  /* ⚠️ O DESFECHO É UM BOOLEANO, NUNCA O PRIMEIRO CARACTERE DO TEXTO.
+     Isto era `corporateMsg.startsWith("✅")` decidindo a COR: o estado de
+     sucesso morava dentro da frase que a paciente lê. Quem editasse o texto
+     — tirar o emoji, começar por "Pronto!" — pintava de VERMELHO um vínculo
+     que deu certo, sem erro nenhum e sem nada quebrado para apontar. */
+  const [corporateMsg, setCorporateMsg] = useState<{ ok: boolean; texto: string } | null>(null);
   const [joiningCorporate, setJoiningCorporate] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -5269,7 +4634,7 @@ function ProfileTab({
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setForm((f) => ({ ...f, avatar_url: canvas.toDataURL("image/jpeg", 0.8) }));
+        setForm((f) => ({ ...f, avatar_url: codificarFoto(canvas, 0.8) }));
       };
       img.src = ev.target?.result as string;
     };
@@ -5296,7 +4661,7 @@ function ProfileTab({
       </button>
 
       {/* Foto + nome da paciente */}
-      <div className="flex items-center gap-4 rounded-3xl border border-border bg-card p-5">
+      <div className="flex items-center gap-4 rounded-3xl card-material p-5">
         <label className="press relative shrink-0 cursor-pointer">
           <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-secondary ring-2 ring-primary/20">
             {form.avatar_url ? (
@@ -5324,11 +4689,31 @@ function ProfileTab({
       {/* Minha agenda (próximas consultas) — junto do perfil */}
       <ProfileAgendaCard onNavigate={onNavigate} />
 
+      {/* ─── A PESQUISA QUE O DONO NÃO TINHA COMO RECEBER ──────────────────
+          `shouldAskNps` e `submitNps` estavam escritas, testadas e sem chamador
+          nenhum: o relatório do admin ficava em ZERO para sempre.
+
+          ⚠️ Ela mora AQUI, e nunca depois de uma conquista. A tentação óbvia é
+          perguntar logo após um momento bonito porque a nota sobe — e é por
+          isso que não se faz: NPS é instrumento de MEDIDA, e uma medida
+          enviesada para cima é pior que medida nenhuma. O Perfil é uma tela
+          calma que ela escolheu abrir.
+
+          ⚠️ `careMode` indefinido CALA (ver `podeMostrarNps`). */}
+      <PesquisaNps
+        tokenFn={async () => (await supabase.auth.getSession()).data.session?.access_token ?? ""}
+        /* ⚠️ `profile === null` É o "não sei", e é ele que precisa chegar como
+           `undefined`: a prop `careMode` desta aba é `boolean` puro, então
+           antes de o perfil carregar ela vale `false` — "não está de luto" —, e
+           o portão de `podeMostrarNps` não protegeria nada. */
+        careMode={profile ? careMode : undefined}
+      />
+
       {/* Completion card */}
       <div className="glass-card glass-indigo rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-indigo-600">
+            <p className="font-serif text-[15px] font-semibold text-indigo-600">
               💫 Perfil completo
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -5349,7 +4734,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Suas informações</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
@@ -5401,7 +4786,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Idade gestacional</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Use a DUM (data da última menstruação) <strong>ou</strong> os dados informados pelo médico
@@ -5441,7 +4826,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dados clínicos & emergência</p>
         <div className="mt-4 grid gap-4 md:grid-cols-2">
           <Field
@@ -5458,7 +4843,7 @@ function ProfileTab({
             label="Medicamentos em uso"
             value={form.medications}
             onChange={(v) => setForm({ ...form, medications: v })}
-            placeholder="Ex: sulfato ferroso, ácido fólico..."
+            placeholder="Ex: sulfato ferroso, ácido fólico…"
           />
           <CampoCidade
             cidade={form.home_city}
@@ -5498,7 +4883,7 @@ function ProfileTab({
                   ? "Quem o SOS vai avisar por você"
                   : "Seu contato de emergência está pronto"}
               </p>
-              <p className="mt-1 text-[12.5px] leading-snug text-foreground/75">
+              <p className="mt-1 text-xs leading-snug text-foreground/75">
                 No segundo em que você apertar o SOS, esta pessoa recebe a sua localização e a sua
                 ficha — tipo sanguíneo, alergias, medicamentos — sem você precisar escrever nada.
                 {faltaEmergencia ? " Sem o e-mail, esse aviso não sai." : ""}
@@ -5517,7 +4902,7 @@ function ProfileTab({
               {/* Vai no aviso do SOS. É o primeiro número que quem recebe o
                   socorro tenta — antes de sair de casa, antes de ligar para o
                   hospital, a pessoa liga para ela para saber se atende. */}
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 Quem receber o pedido de socorro liga para cá primeiro.
               </p>
             </div>
@@ -5545,7 +4930,7 @@ function ProfileTab({
                   O WhatsApp abre com a mensagem escrita, mas ainda depende de
                   ela conseguir apertar enviar — e quem aperta o SOS nem sempre
                   consegue. */}
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 É o único aviso que sai sozinho, mesmo que você não consiga mexer no celular depois.
               </p>
             </div>
@@ -5553,7 +4938,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Pós-parto</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Preencha após o nascimento do bebê para ativar o Portal Pós-parto.
@@ -5571,7 +4956,7 @@ function ProfileTab({
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dados corporais</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Usados para calcular seu IMC pré-gestacional e a curva de ganho de peso recomendada (IOM
@@ -5594,7 +4979,7 @@ function ProfileTab({
       </div>
 
       {/* Feature 19: Second pregnancy */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Histórico gestacional</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Se esta é sua segunda gestação (ou mais), registre as complicações anteriores para
@@ -5675,7 +5060,7 @@ function ProfileTab({
                 value={form.prior_notes}
                 onChange={(e) => setForm({ ...form, prior_notes: e.target.value })}
                 rows={2}
-                placeholder="Ex: bebê GIG, internação por DPP..."
+                placeholder="Ex: bebê GIG, internação por DPP…"
                 className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
               />
             </div>
@@ -5684,7 +5069,7 @@ function ProfileTab({
       </div>
 
       {/* Feature 17: Push notifications */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Dicas semanais</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Receba uma dica personalizada baseada na sua semana gestacional toda segunda-feira.
@@ -5780,7 +5165,7 @@ function ProfileTab({
       <ExportarDados ehMedico={ehMedico} />
       <ExcluirConta ehMedico={ehMedico} />
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Benefício Corporativo</p>
         {profile?.corporate_account_id ? (
           <div className="mt-3 flex items-center gap-3 rounded-2xl bg-primary/5 border border-primary/20 p-4">
@@ -5819,29 +5204,28 @@ function ProfileTab({
                     data: { accessToken: s.session.access_token, accessCode: corporateCode.trim() },
                   });
                   if (res.ok) {
-                    setCorporateMsg(
-                      `✅ Vinculado a ${res.companyName}! Salve o perfil para confirmar.`,
-                    );
+                    setCorporateMsg({
+                      ok: true,
+                      texto: `Vinculado a ${res.companyName}. Salve o perfil para confirmar.`,
+                    });
                     onSaved({
                       ...profile!,
                       corporate_account_id: "pending",
                     } as NonNullable<typeof profile>);
                   } else {
-                    setCorporateMsg(res.error ?? "Código inválido.");
+                    setCorporateMsg({ ok: false, texto: res.error ?? "Código inválido." });
                   }
                   setJoiningCorporate(false);
                 }}
                 disabled={joiningCorporate || !corporateCode.trim()}
                 className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-40"
               >
-                {joiningCorporate ? "..." : "Aplicar"}
+                {joiningCorporate ? "Aplicando…" : "Aplicar"}
               </button>
             </div>
             {corporateMsg && (
-              <p
-                className={`text-sm ${corporateMsg.startsWith("✅") ? "text-green-600" : "text-red-500"}`}
-              >
-                {corporateMsg}
+              <p className={`text-sm ${corporateMsg.ok ? "text-green-600" : "text-red-500"}`}>
+                {corporateMsg.texto}
               </p>
             )}
           </div>
@@ -5854,7 +5238,7 @@ function ProfileTab({
         disabled={saving}
         className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
       >
-        {saving ? "Salvando..." : "Salvar"}
+        {saving ? "Salvando…" : "Salvar"}
       </button>
 
       {/* Último elemento do Perfil, depois de Salvar: o Modo Cuidado é para um
@@ -5966,10 +5350,10 @@ function CampoCidade({
           <input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Digite sua cidade..."
+            placeholder="Digite sua cidade…"
             className="w-full rounded-xl border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
           />
-          {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando...</p>}
+          {carregando && <p className="mt-1.5 text-xs text-muted-foreground">Procurando…</p>}
           {itens && itens.length === 0 && !carregando && (
             <p className="mt-1.5 text-xs text-muted-foreground">
               Nenhuma cidade encontrada com esse nome.
@@ -6003,801 +5387,8 @@ function CampoCidade({
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </label>
-      <input
-        type={type}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-      />
-    </div>
-  );
-}
-
-/* ---------- Saúde (peso + pressão) ---------- */
-// IOM 2009 expected weight gain corridor at gestational week w, given pre-pregnancy BMI
-function iomGain(week: number, bmi: number): { min: number; max: number } {
-  let rMin: number, rMax: number;
-  if (bmi < 18.5) {
-    rMin = 0.44;
-    rMax = 0.58;
-  } else if (bmi < 25) {
-    rMin = 0.35;
-    rMax = 0.5;
-  } else if (bmi < 30) {
-    rMin = 0.23;
-    rMax = 0.33;
-  } else {
-    rMin = 0.17;
-    rMax = 0.27;
-  }
-
-  if (week <= 12) {
-    const f = week / 12;
-    return { min: f * 0.5, max: f * 2.0 };
-  }
-  return { min: 0.5 + (week - 12) * rMin, max: 2.0 + (week - 12) * rMax };
-}
-
-function HealthTab({
-  gest,
-  profile,
-  onNavigate,
-}: {
-  gest: Gest;
-  profile: Profile | null;
-  onNavigate: (tab: string) => void;
-}) {
-  const [logs, setLogs] = useState<HealthLog[]>([]);
-  const [form, setForm] = useState({
-    weight_kg: "",
-    systolic: "",
-    diastolic: "",
-    glucose_mg_dl: "",
-    spo2: "",
-    heart_rate_bpm: "",
-    steps: "",
-    sleep_hours: "",
-    notes: "",
-  });
-  /* `showWearable` saiu junto com o bloco que ele abria. Os campos do
-     formulário (`form.spo2` e companhia) continuam no estado e no `payload`:
-     o INSERT segue aceitando as colunas, e um registro antigo aberto para
-     correção não perde os valores por passar por aqui. */
-
-  async function load() {
-    const { data } = await (supabase as any)
-      .from("health_logs")
-      .select("*")
-      .order("log_date", { ascending: false })
-      .limit(60);
-    setLogs(data ?? []);
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function add() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    if (
-      !form.weight_kg &&
-      !form.systolic &&
-      !form.diastolic &&
-      !form.glucose_mg_dl &&
-      !form.spo2 &&
-      !form.heart_rate_bpm &&
-      !form.steps &&
-      !form.sleep_hours &&
-      !form.notes
-    ) {
-      toast.error("Preencha ao menos um campo para registrar.");
-      return;
-    }
-    /* VALIDAÇÃO ANTES DE GRAVAR — e agora o banco também recusa.
-
-       Marcar o número impossível na LEITURA conserta a tela; não conserta o
-       prontuário. E com os CHECKs aplicados, sem esta checagem aqui o insert
-       volta erro e a paciente lê "Erro ao salvar. Tente novamente." — conselho
-       errado, porque repetir o mesmo número falha para sempre. */
-    const erroFaixa = validaRegistro({
-      weight_kg: form.weight_kg,
-      systolic: form.systolic,
-      diastolic: form.diastolic,
-      glucose_mg_dl: form.glucose_mg_dl,
-      spo2: form.spo2,
-      heart_rate_bpm: form.heart_rate_bpm,
-      steps: form.steps,
-      sleep_hours: form.sleep_hours,
-    });
-    if (erroFaixa) {
-      toast.error(erroFaixa);
-      return;
-    }
-
-    // Envia apenas os campos preenchidos (colunas extras podem não existir
-    // no banco ainda sem as migrations pendentes) e a data local do navegador.
-    const payload: Record<string, unknown> = {
-      user_id: u.user.id,
-      log_date: new Date().toLocaleDateString("en-CA"),
-    };
-    if (form.weight_kg !== "") payload.weight_kg = Number(String(form.weight_kg).replace(",", "."));
-    if (form.systolic !== "") payload.systolic = Number(String(form.systolic).replace(",", "."));
-    if (form.diastolic !== "") payload.diastolic = Number(String(form.diastolic).replace(",", "."));
-    if (form.glucose_mg_dl !== "")
-      payload.glucose_mg_dl = Number(String(form.glucose_mg_dl).replace(",", "."));
-    if (form.spo2 !== "") payload.spo2 = Number(String(form.spo2).replace(",", "."));
-    if (form.heart_rate_bpm !== "")
-      payload.heart_rate_bpm = Number(String(form.heart_rate_bpm).replace(",", "."));
-    if (form.steps !== "") payload.steps = Number(String(form.steps).replace(",", "."));
-    if (form.sleep_hours !== "")
-      payload.sleep_hours = Number(String(form.sleep_hours).replace(",", "."));
-    if (form.notes) payload.notes = form.notes;
-    const { error } = await (supabase as any).from("health_logs").insert(payload);
-    if (error) {
-      toast.error("Erro ao salvar o registro. Tente novamente.");
-      return;
-    }
-    triggerAchievementsCheck();
-    setForm({
-      weight_kg: "",
-      systolic: "",
-      diastolic: "",
-      glucose_mg_dl: "",
-      spo2: "",
-      heart_rate_bpm: "",
-      steps: "",
-      sleep_hours: "",
-      notes: "",
-    });
-    load();
-  }
-  async function remove(id: string) {
-    const { error } = await (supabase as any).from("health_logs").delete().eq("id", id);
-    if (error) {
-      toast.error("Não foi possível excluir o registro. Tente novamente.");
-      return;
-    }
-    load();
-  }
-
-  const last = logs[0];
-  const allWeightLogs = logs.filter((l) => l.weight_kg != null).reverse();
-  const weights = allWeightLogs.slice(-12);
-
-  // Stats
-  const firstWeight = allWeightLogs[0]?.weight_kg ? Number(allWeightLogs[0].weight_kg) : null;
-  const lastWeight = allWeightLogs[allWeightLogs.length - 1]?.weight_kg
-    ? Number(allWeightLogs[allWeightLogs.length - 1].weight_kg)
-    : null;
-  const totalGain =
-    firstWeight != null && lastWeight != null ? (lastWeight - firstWeight).toFixed(1) : null;
-
-  /* A MESMA RÉGUA DO PAINEL DO MÉDICO.
-
-     Aqui havia uma cópia inline dos cortes. Os números batiam por sorte, mas as
-     GUARDAS não existiam: "0/0" saía como "PA normal" em verde (e o número ao
-     lado saía como "—", porque aquele teste é truthy — o mesmo card afirmava
-     duas coisas incompatíveis), e pressão de pulso zero também passava. Uma
-     régua só, duas vozes: a gravidade vem de `sinalPressao`, o texto de ação
-     vem de `vozDaPaciente`. */
-  const lastBp = logs.find((l) => l.systolic != null && l.diastolic != null);
-  const bpSinal = sinalPressao(lastBp?.systolic, lastBp?.diastolic);
-  const bpVoz = vozDaPaciente(bpSinal);
-  const bpStatus = bpSinal
-    ? {
-        label: bpSinal.gravidade === "normal" ? "PA normal" : bpSinal.nota,
-        color:
-          bpSinal.gravidade === "grave"
-            ? "rose"
-            : bpSinal.gravidade === "atencao"
-              ? "amber"
-              : "emerald",
-        orientacao: bpVoz?.orientacao ?? null,
-      }
-    : null;
-
-  // IOM weight curve — Feature #9
-  const prePregW = profile?.pre_pregnancy_weight_kg
-    ? Number(profile.pre_pregnancy_weight_kg)
-    : null;
-  const heightM = profile?.height_cm ? profile.height_cm / 100 : null;
-  const bmi = prePregW && heightM ? prePregW / (heightM * heightM) : null;
-
-  // Map each weight log to gestational week at that date
-  type WeightPoint = { week: number; weight: number };
-  const weightByWeek: WeightPoint[] = [];
-  if (bmi != null && prePregW != null) {
-    allWeightLogs.forEach((l) => {
-      const g = computeGestation({
-        lmp: profile?.lmp_date,
-        referenceDate: profile?.reference_date,
-        referenceWeeks: profile?.reference_weeks,
-        referenceDays: profile?.reference_days,
-        today: new Date(l.log_date + "T00:00:00"),
-      });
-      if (g && g.weeks >= 0 && g.weeks <= 42 && l.weight_kg) {
-        weightByWeek.push({ week: g.weeks, weight: Number(l.weight_kg) });
-      }
-    });
-  }
-
-  // Build SVG IOM chart
-  const showIomChart = bmi != null && prePregW != null && weightByWeek.length > 0;
-  const iomChartW = 400,
-    iomChartH = 180;
-  let iomMinY: number, iomMaxY: number;
-  if (showIomChart) {
-    const corridor = [0, 10, 20, 30, 40].map((w) => {
-      const g = iomGain(w, bmi!);
-      return { min: prePregW! + g.min, max: prePregW! + g.max };
-    });
-    const allY = [...corridor.flatMap((c) => [c.min, c.max]), ...weightByWeek.map((p) => p.weight)];
-    iomMinY = Math.min(...allY) - 1;
-    iomMaxY = Math.max(...allY) + 1;
-  } else {
-    iomMinY = 50;
-    iomMaxY = 90;
-  }
-  const yRange = Math.max(iomMaxY - iomMinY, 1);
-
-  function toSvgX(week: number) {
-    return (week / 42) * iomChartW;
-  }
-  function toSvgY(w: number) {
-    return iomChartH - ((w - iomMinY) / yRange) * (iomChartH - 20) - 10;
-  }
-
-  const bandMinPts = Array.from(
-    { length: 43 },
-    (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).min)}`,
-  ).join(" ");
-  const bandMaxPts = Array.from(
-    { length: 43 },
-    (_, i) => `${toSvgX(i)},${toSvgY(prePregW! + iomGain(i, bmi!).max)}`,
-  ).join(" ");
-  const bandPolygon =
-    bandMinPts +
-    " " +
-    Array.from(
-      { length: 43 },
-      (_, i) => `${toSvgX(42 - i)},${toSvgY(prePregW! + iomGain(42 - i, bmi!).max)}`,
-    ).join(" ");
-  const actualPts = weightByWeek.map((p) => `${toSvgX(p.week)},${toSvgY(p.weight)}`).join(" ");
-
-  const bmiLabel =
-    bmi == null
-      ? null
-      : bmi < 18.5
-        ? "abaixo do peso"
-        : bmi < 25
-          ? "peso normal"
-          : bmi < 30
-            ? "sobrepeso"
-            : "obesidade";
-
-  return (
-    <div className="space-y-6">
-      {/* Stats row */}
-      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
-        <div className="press glass-card glass-emerald rounded-3xl p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-emerald-600">⚖️ Último peso</p>
-          <p className="mt-2 font-serif text-3xl">
-            {last?.weight_kg ? `${last.weight_kg} kg` : "—"}
-          </p>
-        </div>
-        <div className="press glass-card glass-teal rounded-3xl p-5">
-          <p className="text-xs uppercase tracking-[0.22em] text-teal-600">📈 Ganho total</p>
-          <p className="mt-2 font-serif text-3xl">
-            {totalGain != null ? `${Number(totalGain) > 0 ? "+" : ""}${totalGain} kg` : "—"}
-          </p>
-        </div>
-        <div
-          className={`press rounded-3xl p-5 ${bpStatus?.color === "rose" ? "glass-card glass-rose" : bpStatus?.color === "amber" ? "glass-card glass-amber" : "glass-card glass-blue"}`}
-        >
-          <p
-            className={`text-xs uppercase tracking-[0.22em] ${bpStatus?.color === "rose" ? "text-rose-600" : bpStatus?.color === "amber" ? "text-amber-600" : "text-blue-600"}`}
-          >
-            🩺 Última PA
-          </p>
-          <p className="mt-2 font-serif text-3xl">
-            {lastBp?.systolic != null && lastBp?.diastolic != null
-              ? `${lastBp.systolic}/${lastBp.diastolic}`
-              : "—"}
-          </p>
-          {bpStatus && (
-            <p
-              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}
-            >
-              {bpStatus.label}
-            </p>
-          )}
-          {/* A etiqueta sozinha é meia informação. "PA muito elevada" sem o que
-              fazer produz susto às 23h; com a próxima ação, produz conduta. */}
-          {bpStatus?.orientacao && (
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              {bpStatus.orientacao}
-            </p>
-          )}
-        </div>
-        {(() => {
-          const lastGlucose = logs.find((l) => l.glucose_mg_dl != null);
-          const gv = lastGlucose?.glucose_mg_dl;
-          /* A escala antiga só olhava para CIMA: 35 mg/dL — neuroglicopenia —
-             saía rotulado "Normal", em verde, enquanto o painel do médico dizia
-             "Glicemia muito baixa". Não era falta de alerta, era o alerta
-             invertido, e para uma gestante em insulina isso é a diferença entre
-             comer agora e desmaiar. Mesma função do painel. */
-          const gSinal = sinalGlicemia(gv);
-          const gVoz = vozDaPaciente(gSinal, "glicemia");
-          const gColor =
-            gSinal == null
-              ? null
-              : gSinal.gravidade === "grave"
-                ? "rose"
-                : gSinal.gravidade === "atencao"
-                  ? "amber"
-                  : "emerald";
-          const gLabel =
-            gSinal == null ? null : gSinal.gravidade === "normal" ? "Normal" : gSinal.nota;
-          return (
-            <div
-              className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
-            >
-              <p
-                className={`text-xs uppercase tracking-[0.22em] ${gColor === "rose" ? "text-rose-600" : gColor === "amber" ? "text-amber-600" : "text-sky-600"}`}
-              >
-                🍬 Glicemia
-              </p>
-              <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
-              {gLabel && (
-                <p
-                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
-                >
-                  {gLabel}
-                </p>
-              )}
-              {gVoz?.orientacao && (
-                <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
-                  {gVoz.orientacao}
-                </p>
-              )}
-            </div>
-          );
-        })()}
-        {/* ─── O CARTÃO DE SpO₂ / FC SAIU (ago/2026) ────────────────────────
-            Ele mostrava o que a paciente tinha DIGITADO À MÃO, copiando do
-            Apple Health. Saiu junto com o formulário que o alimentava, e a
-            razão é a mesma: SpO₂, frequência, passos e sono não mudam conduta
-            obstétrica. Era o pior formato possível de recurso — trabalho dela,
-            decisão de ninguém —, ocupando um dos cinco lugares mais visíveis
-            da tela mais clínica do app.
-
-            Os valores JÁ REGISTRADOS não sumiram: as colunas continuam em
-            `health_logs`, aparecem na lista de correção mais abaixo e seguem
-            para o `clinical_events` que o médico lê. Parar de pedir é uma
-            decisão; apagar o que ela já mandou seria outra. */}
-      </div>
-
-      {/* IOM weight corridor chart — Feature #9 */}
-      {showIomChart ? (
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-primary">
-                Curva de ganho de peso (IOM 2009)
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                IMC pré-gestacional: {bmi!.toFixed(1)} ({bmiLabel}) · Faixa recomendada em verde
-              </p>
-            </div>
-          </div>
-          <svg viewBox={`0 0 ${iomChartW} ${iomChartH}`} className="mt-3 h-44 w-full">
-            {/* Corridor band */}
-            <polygon points={bandPolygon} fill="var(--primary)" fillOpacity="0.12" />
-            {/* Min line */}
-            <polyline
-              points={bandMinPts}
-              fill="none"
-              stroke="var(--primary)"
-              strokeWidth="1"
-              strokeDasharray="4 3"
-              opacity="0.4"
-            />
-            {/* Max line */}
-            <polyline
-              points={bandMaxPts}
-              fill="none"
-              stroke="var(--primary)"
-              strokeWidth="1"
-              strokeDasharray="4 3"
-              opacity="0.4"
-            />
-            {/* Actual weight line */}
-            {weightByWeek.length > 1 && (
-              <polyline
-                points={actualPts}
-                fill="none"
-                stroke="var(--primary)"
-                strokeWidth="2.5"
-                strokeLinejoin="round"
-              />
-            )}
-            {/* Data points */}
-            {weightByWeek.map((p, i) => (
-              <circle
-                key={i}
-                cx={toSvgX(p.week)}
-                cy={toSvgY(p.weight)}
-                r="4"
-                fill="var(--primary)"
-              />
-            ))}
-            {/* X-axis labels */}
-            {[0, 10, 20, 28, 36, 40].map((w) => (
-              <text
-                key={w}
-                x={toSvgX(w)}
-                y={iomChartH - 1}
-                fontSize="8"
-                fill="var(--muted-foreground)"
-                textAnchor="middle"
-              >
-                {w}s
-              </text>
-            ))}
-          </svg>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Linha sólida = seu peso · Faixa = zona saudável para seu IMC. Configure altura e peso
-            pré-gestacional em{" "}
-            <button
-              type="button"
-              onClick={() => onNavigate("Perfil")}
-              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
-            >
-              Perfil
-            </button>
-            .
-          </p>
-        </div>
-      ) : (
-        prePregW == null && (
-          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm">
-            Configure sua <strong>altura</strong> e <strong>peso pré-gestacional</strong> em{" "}
-            <button
-              type="button"
-              onClick={() => onNavigate("Perfil")}
-              className="font-semibold text-primary underline underline-offset-2 hover:opacity-80"
-            >
-              Perfil
-            </button>{" "}
-            para ver a curva de ganho de peso recomendada pelo IOM.
-          </div>
-        )
-      )}
-
-      {/* Gráfico histórico de PA */}
-      {(() => {
-        const bpHistory = logs
-          .filter((l) => l.systolic != null && l.diastolic != null)
-          .reverse()
-          .slice(-15);
-        if (bpHistory.length < 2) return null;
-        const W = 400,
-          H = 140;
-        const allY = bpHistory.flatMap((l) => [l.systolic!, l.diastolic!]);
-        const minY = Math.min(...allY, 50) - 5;
-        const maxY = Math.max(...allY, 160) + 5;
-        const sy = (v: number) => H - 10 - ((v - minY) / (maxY - minY)) * (H - 20);
-        const sx = (i: number) => 10 + (i / (bpHistory.length - 1)) * (W - 20);
-        const systPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.systolic!)}`).join(" ");
-        const diasPts = bpHistory.map((l, i) => `${sx(i)},${sy(l.diastolic!)}`).join(" ");
-        return (
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
-              Histórico de pressão arterial
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Linha vermelha = sistólica · Linha azul = diastólica · Limite em tracejado
-            </p>
-            <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-36 w-full">
-              {/* threshold 140 sistólica */}
-              <line
-                x1="10"
-                y1={sy(140)}
-                x2={W - 10}
-                y2={sy(140)}
-                stroke="#f87171"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.6"
-              />
-              <text x="12" y={sy(140) - 3} fontSize="7" fill="#f87171" opacity="0.8">
-                140
-              </text>
-              {/* threshold 90 diastólica */}
-              <line
-                x1="10"
-                y1={sy(90)}
-                x2={W - 10}
-                y2={sy(90)}
-                stroke="#60a5fa"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.6"
-              />
-              <text x="12" y={sy(90) - 3} fontSize="7" fill="#60a5fa" opacity="0.8">
-                90
-              </text>
-              <polyline
-                points={systPts}
-                fill="none"
-                stroke="#f87171"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-              <polyline
-                points={diasPts}
-                fill="none"
-                stroke="#60a5fa"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-              {bpHistory.map((l, i) => (
-                <g key={i}>
-                  <circle cx={sx(i)} cy={sy(l.systolic!)} r="3.5" fill="#f87171" />
-                  <circle cx={sx(i)} cy={sy(l.diastolic!)} r="3.5" fill="#60a5fa" />
-                </g>
-              ))}
-            </svg>
-          </div>
-        );
-      })()}
-
-      {/* Gráfico histórico de glicemia */}
-      {(() => {
-        const glHistory = logs
-          .filter((l) => l.glucose_mg_dl != null)
-          .reverse()
-          .slice(-15);
-        if (glHistory.length < 2) return null;
-        const W = 400,
-          H = 130;
-        const allY = glHistory.map((l) => l.glucose_mg_dl!);
-        const minY = Math.min(...allY, 70) - 5;
-        const maxY = Math.max(...allY, 180) + 5;
-        const sy = (v: number) => H - 10 - ((v - minY) / (maxY - minY)) * (H - 20);
-        const sx = (i: number) => 10 + (i / (glHistory.length - 1)) * (W - 20);
-        const pts = glHistory.map((l, i) => `${sx(i)},${sy(l.glucose_mg_dl!)}`).join(" ");
-        return (
-          <div className="rounded-3xl border border-border bg-card p-6">
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
-              Histórico de glicemia
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Referência em jejum: &lt; 95 mg/dL · Pós-prandial: &lt; 140 mg/dL
-            </p>
-            <svg viewBox={`0 0 ${W} ${H}`} className="mt-3 h-32 w-full">
-              {/* zona verde < 95 */}
-              <rect
-                x="10"
-                y={sy(95)}
-                width={W - 20}
-                height={sy(minY) - sy(95)}
-                fill="#4ade80"
-                opacity="0.08"
-              />
-              <line
-                x1="10"
-                y1={sy(95)}
-                x2={W - 10}
-                y2={sy(95)}
-                stroke="#4ade80"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.7"
-              />
-              <text x="12" y={sy(95) - 3} fontSize="7" fill="#4ade80" opacity="0.9">
-                95
-              </text>
-              {/* threshold 140 */}
-              <line
-                x1="10"
-                y1={sy(140)}
-                x2={W - 10}
-                y2={sy(140)}
-                stroke="#fb923c"
-                strokeWidth="1"
-                strokeDasharray="4 3"
-                opacity="0.7"
-              />
-              <text x="12" y={sy(140) - 3} fontSize="7" fill="#fb923c" opacity="0.9">
-                140
-              </text>
-              <polyline
-                points={pts}
-                fill="none"
-                stroke="var(--primary)"
-                strokeWidth="2.2"
-                strokeLinejoin="round"
-              />
-              {glHistory.map((l, i) => (
-                <circle
-                  key={i}
-                  cx={sx(i)}
-                  cy={sy(l.glucose_mg_dl!)}
-                  r="3.5"
-                  fill={(() => {
-                    /* Terceira cópia da escala, agora removida: os pontos do
-                       gráfico pintavam de verde exatamente os mesmos valores
-                       baixos que o card. */
-                    const g = sinalGlicemia(l.glucose_mg_dl)?.gravidade;
-                    return g === "grave"
-                      ? "#f87171"
-                      : g === "atencao"
-                        ? "#fb923c"
-                        : "var(--primary)";
-                  })()}
-                />
-              ))}
-            </svg>
-          </div>
-        );
-      })()}
-
-      {/* ─── O WEARABLE SAIU INTEIRO (ago/2026) ────────────────────────────
-          Aqui moravam duas coisas: quatro cartões de SpO₂ / FC / Passos / Sono
-          e um guia ensinando a ABRIR o Apple Health, LER os números e DIGITAR
-          cada um deles aqui.
-
-          Nenhum dos quatro muda conduta obstétrica. O que este bloco pedia era
-          trabalho manual e diário da paciente para produzir um dado que nenhuma
-          decisão do médico consulta — e o guia deixava isso explícito ao
-          admitir que "a integração automática requer aplicativo nativo".
-
-          Não confundir com a pressão e a glicemia, que ficam: aquelas são
-          aferições que ELA faz com aparelho próprio e que entram na régua
-          clínica. A diferença não é o esforço, é quem lê o resultado.
-
-          As colunas continuam em `health_logs` e o que já foi registrado
-          aparece na lista de correção — parar de pedir é uma decisão; apagar o
-          que ela já mandou seria outra. */}
-
-      {/* New log form */}
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="font-serif text-lg">Novo registro</p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-3 md:grid-cols-4">
-          <Field
-            label="Peso (kg)"
-            type="number"
-            value={form.weight_kg}
-            onChange={(v) => setForm({ ...form, weight_kg: v })}
-          />
-          <Field
-            label="Sistólica"
-            type="number"
-            value={form.systolic}
-            onChange={(v) => setForm({ ...form, systolic: v })}
-          />
-          <Field
-            label="Diastólica"
-            type="number"
-            value={form.diastolic}
-            onChange={(v) => setForm({ ...form, diastolic: v })}
-          />
-          <Field
-            label="Glicemia (mg/dL)"
-            type="number"
-            value={form.glucose_mg_dl}
-            onChange={(v) => setForm({ ...form, glucose_mg_dl: v })}
-          />
-          <Field
-            label="Notas"
-            value={form.notes}
-            onChange={(v) => setForm({ ...form, notes: v })}
-          />
-        </div>
-        {/* Os quatro campos de wearable ficavam aqui, atrás de um botão que os
-            revelava. Ver a nota acima — e note que o rótulo dele não aparece
-            nem em comentário: `hub-da-saude.test.ts` procura a string no
-            arquivo inteiro, e citá-la aqui reprovaria o teste que existe para
-            impedir o bloco de voltar. */}
-        <button
-          onClick={add}
-          className="mt-4 rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground"
-        >
-          Adicionar
-        </button>
-      </div>
-
-      {/* ─── A LISTA VIROU "CORRIGIR", E ISSO É O QUE ELA SEMPRE FOI ───────
-          Ela era a TERCEIRA cópia dos mesmos números na mesma tela: cinco
-          cartões dizem "como estou", os gráficos dizem "para onde isso vai", e
-          a lista repetia tudo mais uma vez, crua.
-
-          Mas apagá-la seria tirar uma capacidade, não uma repetição: é o único
-          lugar com o × que apaga um registro. Quem digitou 1200 em vez de 120
-          precisa dele — e num app cujo painel do médico pinta a gravidade
-          desses números, um valor errado que não se pode apagar vira alarme
-          falso no consultório.
-
-          Então ela recolhe. Fechada não ocupa tela; aberta é o que a paciente
-          procura quando quer arrumar alguma coisa — e o rótulo passa a dizer
-          isso, em vez de fingir ser um resumo. */}
-      <details className="rounded-2xl border border-border bg-card">
-        <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
-          ✏️ Ver e corrigir meus registros
-          {logs.length > 0 && (
-            <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-              ({logs.length})
-            </span>
-          )}
-        </summary>
-        <div className="space-y-2 px-3 pb-3">
-          {logs.length === 0 && (
-            <p className="px-2 pb-1 text-sm text-muted-foreground">
-              Você ainda não registrou nada.
-            </p>
-          )}
-          {logs.map((l) => (
-            <div
-              key={l.id}
-              className="flex items-start justify-between rounded-xl border border-border bg-card p-4 text-sm"
-            >
-              <span className="shrink-0 text-muted-foreground">
-                {new Date(l.log_date + "T00:00:00").toLocaleDateString("pt-BR")}
-              </span>
-              <span className="flex flex-1 flex-wrap gap-x-3 gap-y-0.5 px-3 text-xs">
-                {l.weight_kg && <span>⚖️ {l.weight_kg} kg</span>}
-                {l.systolic && l.diastolic && (
-                  <span>
-                    💓 {l.systolic}/{l.diastolic}
-                  </span>
-                )}
-                {l.glucose_mg_dl && <span>🩸 {l.glucose_mg_dl} mg/dL</span>}
-                {/* Os quatro de wearable continuam aqui de propósito: o app
-                    parou de PEDIR, mas quem já registrou tem de conseguir ver
-                    (e apagar) o que mandou. */}
-                {l.spo2 && <span>🫁 {l.spo2}% SpO₂</span>}
-                {l.heart_rate_bpm && <span>❤️ {l.heart_rate_bpm}bpm</span>}
-                {l.steps && <span>🚶 {l.steps} passos</span>}
-                {l.sleep_hours && <span>🌙 {l.sleep_hours}h sono</span>}
-                {l.notes && <span className="text-muted-foreground">{l.notes}</span>}
-              </span>
-              <button
-                onClick={() => remove(l.id)}
-                aria-label="Apagar este registro"
-                className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
-              >
-                ×
-              </button>
-            </div>
-          ))}
-        </div>
-      </details>
-    </div>
-  );
-}
-
-/* ---------- Perguntas para o médico ---------- */
+/* ---------- Saúde (peso, pressão, glicemia) — a tela mudou para
+   `src/components/health-tab.tsx` (set/2026). Ver o cabeçalho de lá. ---------- */
 
 const SUGGESTED_QUESTIONS: Record<1 | 2 | 3, string[]> = {
   1: [
@@ -6931,7 +5522,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
                 <span className="min-w-0 flex-1 text-sm">
                   {d.pergunta || "Uma dúvida que você mandou pelo chat"}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-xs text-muted-foreground">
                   registrada em {new Date(d.quando).toLocaleDateString("pt-BR")}
                 </span>
               </li>
@@ -6939,7 +5530,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
           </ul>
         </div>
       )}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Anote para a próxima consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Aquela dúvida que sempre esquece na hora — registre aqui.
@@ -6989,7 +5580,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
       </div>
 
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+        <p className="mb-2 font-serif text-[15px] font-semibold text-muted-foreground">
           Pendentes ({pending.length})
         </p>
         <div className="space-y-2">
@@ -6997,10 +5588,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
             <p className="text-sm text-muted-foreground">Nenhuma pergunta pendente.</p>
           )}
           {pending.map((q) => (
-            <div
-              key={q.id}
-              className="flex items-start gap-3 rounded-2xl border border-border bg-card p-4"
-            >
+            <div key={q.id} className="flex items-start gap-3 rounded-2xl card-material p-4">
               <input
                 type="checkbox"
                 checked={q.answered}
@@ -7021,12 +5609,12 @@ function QuestionsTab({ gest }: { gest: Gest }) {
 
       {answered.length > 0 && (
         <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          <p className="mb-2 font-serif text-[15px] font-semibold text-muted-foreground">
             Respondidas ({answered.length})
           </p>
           <div className="space-y-2">
             {answered.map((q) => (
-              <div key={q.id} className="rounded-2xl border border-border bg-card p-4">
+              <div key={q.id} className="rounded-2xl card-material p-4">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
@@ -7045,7 +5633,7 @@ function QuestionsTab({ gest }: { gest: Gest }) {
                 {/* Resposta do médico — volta para a paciente aqui */}
                 {q.answer && (
                   <div className="ml-7 mt-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
                       💬 Resposta do seu médico
                       {q.answered_at
                         ? ` · ${new Date(q.answered_at).toLocaleDateString("pt-BR")}`
@@ -7143,7 +5731,7 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Convidar acompanhante</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Traga o papai, a vovó ou alguém especial pra viver essa fase com você. Com o link, a
@@ -7183,7 +5771,7 @@ function CompanionTab({ babyName }: { babyName: string | null }) {
         {invites.map((i) => {
           const url = `${window.location.origin}/acompanhar/${i.token}`;
           return (
-            <div key={i.id} className="rounded-2xl border border-border bg-card p-4">
+            <div key={i.id} className="rounded-2xl card-material p-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{i.companion_name ?? "Acompanhante"}</p>
                 <button
@@ -7247,6 +5835,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
    * que a gravação falhe. O que mudou é ela saber que o registro não foi.
    */
   const [registrou, setRegistrou] = useState<boolean | null>(null);
+  /** A avaliação saiu da régua DO CELULAR, porque o servidor não respondeu. */
+  const [semRede, setSemRede] = useState(false);
   const [result, setResult] = useState<{
     level: RiskLevel;
     reasons: string[];
@@ -7262,9 +5852,25 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
     });
   }
 
+  /**
+   * ⚠️ **A PRESSÃO MAL ESCRITA DESTRUÍA A TRIAGEM INTEIRA.**
+   *
+   * Os campos são opcionais e a régua do servidor exige os pisos clínicos
+   * (`systolic >= 50`, `diastolic >= 30`). Quem escrevia "12" e "8" — que é
+   * como se fala pressão no Brasil — fazia o `zod` LANÇAR, e o `catch` de fora
+   * respondia "Não foi possível avaliar os sintomas". Ela podia ter marcado
+   * sangramento e dor de cabeça que não passa, dois dos nove sintomas
+   * VERMELHOS, e receber uma tela de erro genérica no lugar da orientação.
+   *
+   * Agora um campo opcional ilegível vale `null`: a triagem segue pelos
+   * SINTOMAS, que é o que ela veio perguntar.
+   */
+  const pressao = lerPressaoDigitada(sys, dia);
+
   async function avaliar() {
     setLoading(true);
     setResult(null);
+    setSemRede(false);
     try {
       /* A sessão vai junto: sem ela a orientação continua saindo (a régua é de
          regra, não de IA), mas escrita à mão em vez de gerada. Ver o cabeçalho
@@ -7274,8 +5880,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         data: {
           accessToken: sess.session?.access_token,
           symptoms: [...selected],
-          systolic: sys ? Number(sys) : null,
-          diastolic: dia ? Number(dia) : null,
+          systolic: pressao?.systolic ?? null,
+          diastolic: pressao?.diastolic ?? null,
           note: note || undefined,
           weeks,
         },
@@ -7294,8 +5900,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
               accessToken: s.session.access_token,
               level: res.level,
               symptoms: [...selected],
-              systolic: sys ? Number(sys) : null,
-              diastolic: dia ? Number(dia) : null,
+              systolic: pressao?.systolic ?? null,
+              diastolic: pressao?.diastolic ?? null,
               note: note || null,
             },
           }).catch(() => ({ ok: false as const }));
@@ -7310,9 +5916,33 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         /* sessão indisponível — a triagem já foi mostrada, seguimos */
       }
     } catch {
-      toast.error(
-        "Não foi possível avaliar os sintomas. Tente novamente ou ligue para o consultório.",
-      );
+      /**
+       * ⚠️ **UMA FALHA DE REDE APAGAVA A ORIENTAÇÃO INTEIRA — e a régua que a
+       * produz já está no celular, sem uso.**
+       *
+       * `assessSymptoms` é servidor por dois motivos: escrever a explicação com
+       * IA e gravar a triagem para o médico. Mas o NÍVEL nunca veio da IA —
+       * vem de `assessLevel`, que é regra pura e já está no pacote do
+       * navegador (esta tela importa `RED_SYMPTOMS` do mesmo arquivo). E o
+       * texto do caso sem IA é `LEVEL_FALLBACK`, também puro.
+       *
+       * Ou seja: sem rede o app tinha, na mão, exatamente a mesma resposta que
+       * daria com o servidor de pé sem chave de IA — e respondia "Não foi
+       * possível avaliar os sintomas" a quem marcou sangramento. Numa aba cujo
+       * assunto são os nove sintomas VERMELHOS, essa é a hora em que ela mais
+       * precisa da frase "procure atendimento agora: ligue 192".
+       *
+       * ⚠️ E o que NÃO se pode fingir é o registro: `setRegistrou(false)` faz a
+       * tela dizer, na caixa, que o médico não vai ver isto — que é verdade, e
+       * é a informação que muda o que ela faz a seguir.
+       */
+      const local = assessLevel([...selected], {
+        systolic: pressao?.systolic ?? null,
+        diastolic: pressao?.diastolic ?? null,
+      });
+      setResult({ ...local, message: LEVEL_FALLBACK[local.level] });
+      setRegistrou(false);
+      setSemRede(true);
     } finally {
       setLoading(false);
     }
@@ -7387,6 +6017,29 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
             className="w-16 rounded-md border border-input bg-background px-2 py-1.5 text-sm"
           />
         </div>
+        {/* ⚠️ A CONVERSÃO NUNCA É SILENCIOSA. Multiplicar o número dela por dez
+            sem dizer seria o app reescrevendo um dado clínico por conta
+            própria — ela vê o que entendemos e corrige se não era isso. */}
+        {pressao?.interpretada && (
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Entendi{" "}
+            <strong className="text-foreground">
+              {pressao.systolic}/{pressao.diastolic}
+            </strong>{" "}
+            — é isso?
+          </p>
+        )}
+        {/* E quando não dá para entender, a tela DIZ que vai seguir sem ela, em
+            vez de recusar a triagem inteira lá na frente. */}
+        {(sys.trim() || dia.trim()) && !pressao && (
+          <p className="text-sm text-muted-foreground sm:col-span-2">
+            Não consegui ler essa pressão — vou avaliar pelos sintomas. Você pode escrever{" "}
+            <strong className="text-foreground">120</strong> e{" "}
+            <strong className="text-foreground">80</strong>, ou{" "}
+            <strong className="text-foreground">12</strong> e{" "}
+            <strong className="text-foreground">8</strong>.
+          </p>
+        )}
       </div>
       <textarea
         value={note}
@@ -7434,7 +6087,18 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
               E é texto NA CAIXA, nunca um `toast`: ela rola a tela lendo a
               orientação, e um aviso que some em cinco segundos é um aviso que
               não aconteceu. */}
-          {registrou === false && result.level !== "verde" && (
+          {/* ⚠️ Sem rede, a orientação acima saiu da régua DO CELULAR — a mesma
+              que o servidor usa, com o mesmo texto de quando não há IA. O que
+              muda é que ela não foi registrada, e a paciente precisa saber
+              disso: é o que decide se ela também liga para o consultório. */}
+          {semRede && (
+            <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900">
+              Você está sem conexão. Avaliei pelos sinais que você marcou, com a mesma régua de
+              sempre — a orientação acima vale. O que não deu foi registrar na sua conta, então o
+              seu médico não vai ver por aqui.
+            </p>
+          )}
+          {!semRede && registrou === false && result.level !== "verde" && (
             <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900">
               Não consegui registrar isto na sua conta — então seu médico não vai ver por aqui. A
               orientação acima vale do mesmo jeito. Se puder, fale com o consultório.
@@ -7452,12 +6116,34 @@ function CardTab({
   gest,
   onNavigate,
   medico,
+  instavel = false,
+  aoTentar,
+  careMode = false,
 }: {
   profile: Profile | null;
   gest: Gest;
   onNavigate: (tab: string) => void;
+  /** A leitura do perfil FALHOU — não é o mesmo que ela não ter preenchido. */
+  instavel?: boolean;
+  aoTentar?: () => void;
   /** Médico da paciente; `null` = usa o dono da instalação. */
   medico?: DoctorContato | null;
+  /**
+   * ⚠️ ESTA PROP FALTAVA, E ESTA É A FICHA QUE O SOCORRISTA LÊ.
+   *
+   * A folha do SOS já recebe o Modo Cuidado desde ago/2026 — `tituloDaFicha`
+   * vira "PACIENTE OBSTÉTRICA" e a idade gestacional sai. A carteirinha, que é
+   * a MESMA informação num documento permanente e com QR, ficou de fora: no
+   * luto ela continuava carimbando "GESTANTE", o nome do bebê e uma DPP que
+   * não vai acontecer.
+   *
+   * E não é só o custo emocional. Um bebê que não vai nascer e uma data de
+   * parto que não existe são informação ERRADA para quem vai atendê-la — é a
+   * mesma razão pela qual a ficha do SOS troca o rótulo em vez de apagá-la
+   * inteira. Sangue, alergias, medicações e contato FICAM: quem perdeu uma
+   * gestação continua sendo paciente obstétrica.
+   */
+  careMode?: boolean;
 }) {
   /* Tudo-ou-nada, e sem fundador.
   
@@ -7479,23 +6165,49 @@ function CardTab({
   const due = profile
     ? (profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null))
     : null;
-  const updatedAt = new Date().toLocaleString("pt-BR");
+  /**
+   * ⚠️ "ATUALIZADO EM" MENTIA, e a mentira era sobre a idade de um dado
+   * clínico. Ele carimbava `new Date()` — a hora em que a TELA ABRIU —, então
+   * o socorrista lia "Atualizado em: 05/09/2026 04:55" e concluía que a lista
+   * de alergias tinha sido conferida minutos atrás. Ela pode ter seis meses.
+   *
+   * `patient_profiles.updated_at` existe, mas hoje só é escrito quando o
+   * MÉDICO edita o perfil (`doctors.functions.ts`); os salvamentos da própria
+   * paciente não o movem e não há gatilho. Mostrá-lo seria trocar uma data
+   * falsa para mais por uma falsa para menos.
+   *
+   * Então o que fica é o que É verdade: o QR foi GERADO agora. E a tela
+   * convida a conferir, em vez de afirmar frescor que o app não conhece.
+   */
+  const geradoEm = new Date().toLocaleString("pt-BR");
+
+  /* ⚠️ NUNCA "Nenhuma"/"Nenhum" — a mesma régua da folha do SOS, que já diz
+     "nenhuma informada". Campo em branco quer dizer que ela NÃO PREENCHEU, e
+     "nada relatado" não é "não tem": a diferença entre os dois é uma
+     prescrição. Vale para o QR e para a tela. */
+  const alergias = profile?.allergies || "não informado";
+  const medicacoes = profile?.medications || "não informado";
+  const rotuloDaFicha = careMode ? "PACIENTE OBSTÉTRICA" : "GESTANTE";
 
   const cardText = profile
     ? [
-        `🚨 CARTEIRINHA DE EMERGÊNCIA — GESTANTE`,
+        `🚨 CARTEIRINHA DE EMERGÊNCIA — ${rotuloDaFicha}`,
         `Paciente: ${profile.display_name ?? "—"}`,
-        `Bebê: ${profile.baby_name ?? "—"}`,
-        `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
-        `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
+        /* No Modo Cuidado saem as três linhas que falam de uma gestação em
+           curso — as outras continuam inteiras. */
+        careMode ? null : `Bebê: ${profile.baby_name ?? "—"}`,
+        careMode ? null : `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
+        careMode
+          ? null
+          : `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
         `Tipo sanguíneo: ${profile.blood_type ?? "—"}`,
-        `Alergias: ${profile.allergies ?? "Nenhuma"}`,
-        `Medicamentos: ${profile.medications ?? "Nenhum"}`,
+        `Alergias: ${alergias}`,
+        `Medicamentos: ${medicacoes}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
         // Sem vínculo a linha sai fora do QR: melhor o hospital não ver
         // médico nenhum do que ver o nome errado.
         medLinha ? `Médico: ${medLinha}` : null,
-        `Atualizado: ${updatedAt}`,
+        `Gerado em: ${geradoEm}`,
       ]
         .filter(Boolean)
         .join("\n")
@@ -7518,13 +6230,36 @@ function CardTab({
     };
   }, [cardText]);
 
+  /* ⚠️ A ORDEM É O CONSERTO: falha de leitura vem ANTES do vazio. Trocadas, a
+     paciente no pronto-socorro lê "Preencha seu perfil primeiro" sobre um
+     perfil que está preenchido há meses — e vai ao Perfil refazer o que já
+     existe, em vez de tentar de novo. */
+  if (!profile && instavel)
+    return (
+      <NaoConsegueLer
+        oQue="a sua carteirinha"
+        sossego="Os seus dados continuam salvos. No pronto-socorro, mostre este aparelho ou ligue 192."
+        aoTentar={() => aoTentar?.()}
+      />
+    );
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
 
-  function copyCard() {
-    navigator.clipboard.writeText(cardText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  /**
+   * ⚠️ "✓ Copiado!" APARECIA SEM NINGUÉM TER OLHADO A RESPOSTA. `writeText`
+   * devolve uma promessa que REJEITA quando o navegador nega o acesso — num
+   * WKWebView sem permissão, fora de contexto seguro, ou com a aba em segundo
+   * plano. A tela dizia que copiou, ela colava no WhatsApp do marido e não
+   * vinha nada, num documento de emergência.
+   */
+  async function copyCard() {
+    try {
+      await navigator.clipboard.writeText(cardText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não consegui copiar. Tire um print desta tela ou mostre o QR.");
+    }
   }
 
   return (
@@ -7533,28 +6268,32 @@ function CardTab({
       <div className="rounded-3xl bg-[image:var(--gradient-warm)] p-8 shadow-[var(--shadow-card)]">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">
+            <p className="font-serif text-[15px] font-semibold text-primary">
               Carteirinha de emergência
             </p>
             <h2 className="mt-1.5 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
-            {profile.baby_name && (
+            {!careMode && profile.baby_name && (
               <p className="text-sm text-muted-foreground">Bebê: {profile.baby_name}</p>
             )}
           </div>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            GESTANTE
+            {rotuloDaFicha}
           </span>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <Info label="IG atual" value={gest ? `${gest.weeks}s ${gest.days}d` : "—"} />
-          <Info
-            label="DPP"
-            value={due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
-          />
+          {!careMode && (
+            <Info label="IG atual" value={gest ? `${gest.weeks}s ${gest.days}d` : "—"} />
+          )}
+          {!careMode && (
+            <Info
+              label="DPP"
+              value={due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+            />
+          )}
           <Info label="Tipo sanguíneo" value={profile.blood_type ?? "—"} />
-          <Info label="Alergias" value={profile.allergies || "Nenhuma"} />
-          <Info label="Medicamentos" value={profile.medications || "Nenhum"} />
+          <Info label="Alergias" value={alergias} />
+          <Info label="Medicamentos" value={medicacoes} />
           <Info label="Contato emergência" value={profile.emergency_contact ?? "—"} />
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
@@ -7562,8 +6301,21 @@ function CardTab({
           {medLinha ? <Info label="Médico" value={medLinha} /> : null}
         </div>
 
+        {/* ⚠️ Diz o que É verdade. O QR foi gerado agora; os DADOS são os que ela
+            deixou no Perfil, e o app não sabe quando ela os conferiu pela
+            última vez. Ver o comentário de `geradoEm`. */}
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
-          Atualizado em: {updatedAt}
+          <p>QR gerado em: {geradoEm}</p>
+          <p className="mt-1">
+            Os dados vêm do seu Perfil.{" "}
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="press font-semibold text-primary underline underline-offset-2"
+            >
+              Conferir agora
+            </button>
+          </p>
         </div>
 
         <div className="mt-6 flex flex-col items-center border-t border-primary/20 pt-5">
@@ -7651,7 +6403,7 @@ function CardTab({
 function Info({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-card/60 p-3 backdrop-blur">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-sm font-medium">{value}</p>
     </div>
   );
@@ -7705,7 +6457,7 @@ function ApagarConversas() {
   }
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="rounded-3xl card-material p-6">
       <p className="font-serif text-lg">Suas conversas com a IA</p>
       <p className="mt-1 text-sm text-muted-foreground">
         Elas ficam guardadas para a IA dar continuidade — e o seu médico pode lê-las no painel dele.
@@ -7751,1232 +6503,7 @@ function ApagarConversas() {
 }
 
 /* ---------- Chat IA ---------- */
-type ChatMsg = { role: "user" | "assistant"; content: string };
-
-function buildPatientContext(profile: Profile | null, gest: Gest): string {
-  if (!profile) return "";
-  /* ─── O CAMINHO EM QUE O SERVIDOR NÃO SABE DE NADA ───────────────────────
-   * Este prefixo vai na PRIMEIRA mensagem e é a única coisa que o modelo sabe
-   * sobre ela quando `resolvePatientDoctor` devolve null (token expirado,
-   * soluço no Auth): ali o `clinicalBlock` nem é calculado e o system vira o
-   * prompt público. Sem esta guarda, a mulher em luto mandava, com as próprias
-   * palavras aparentes, "estou na semana 24 e o nome do meu bebê é Lucas".
-   * `gest` já vem nulo em Modo Cuidado; o NOME não vinha. */
-  const emLuto = Boolean((profile as { care_mode?: boolean }).care_mode);
-  const parts: string[] = [];
-  if (profile.display_name) parts.push(`Meu nome é ${profile.display_name}.`);
-  if (gest) {
-    parts.push(`Estou na semana ${gest.weeks} e ${gest.days} dias de gestação.`);
-  }
-  if (profile.baby_name && !emLuto) parts.push(`O nome do meu bebê é ${profile.baby_name}.`);
-  return parts.join(" ");
-}
-
-/**
- * "Dr. Clóvis Bacha" → "Dr. Clóvis IA".
- *
- * Título + primeiro nome, não o nome inteiro: "Dr. Clóvis Bacha IA" não cabe
- * no cabeçalho de um celular e soa a crachá. Sem título reconhecido, fica só
- * o primeiro nome — vale para médica, para nome composto e para quem cadastrou
- * o nome sem "Dr.".
- */
-function aiNameFrom(displayName: string | null | undefined): string {
-  /* A régua de "título + primeiro nome" mora em `nome-do-medico.ts`, e não
-     mais aqui: o aviso de presente precisou da MESMA conta, e uma segunda
-     cópia é como a mesma pessoa vira "Dr. Clóvis" numa tela e "Dr." na
-     outra. O que continua sendo desta tela é só o fallback. */
-  const base = nomeDoMedico(displayName);
-  return base ? `${base} IA` : "Assistente IA";
-}
-
-/** As perguntas que o campo de mensagem digita sozinho quando está vazio. */
-const CHAT_SUGESTOES = [
-  "Posso tomar dipirona?",
-  "Esse exame está normal?",
-  "Quantos chutes por dia?",
-  "O que ajuda na azia?",
-  "Posso viajar de avião?",
-  "Quando ir para a maternidade?",
-];
-
-/**
- * Texto que se digita, apaga e troca de frase — só enquanto o campo está
- * vazio e a paciente não está escrevendo.
- *
- * `prefers-reduced-motion` não recebe uma versão sem graça: recebe a primeira
- * frase inteira, parada. Texto que aparece letra por letra é exatamente o tipo
- * de movimento que essa preferência existe para desligar.
- */
-function useTypedPlaceholder(frases: string[], ativo: boolean): string {
-  const [texto, setTexto] = useState("");
-  const [parado, setParado] = useState(false);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const ler = () => setParado(mq.matches);
-    ler();
-    mq.addEventListener("change", ler);
-    return () => mq.removeEventListener("change", ler);
-  }, []);
-
-  useEffect(() => {
-    if (!ativo || parado) return;
-    let i = 0;
-    let n = 0;
-    let apagando = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const passo = () => {
-      const frase = frases[i % frases.length];
-      n += apagando ? -1 : 1;
-      setTexto(frase.slice(0, n));
-      let espera = apagando ? 26 : 52;
-      if (!apagando && n === frase.length) {
-        apagando = true;
-        espera = 2100; // a frase fica parada tempo de ser lida
-      } else if (apagando && n === 0) {
-        apagando = false;
-        i += 1;
-        espera = 420;
-      }
-      timer = setTimeout(passo, espera);
-    };
-    timer = setTimeout(passo, 700);
-    return () => clearTimeout(timer);
-  }, [frases, ativo, parado]);
-
-  if (parado) return frases[0];
-  return texto;
-}
-
-// ─── WhatsApp-style chat ─────────────────────────────────────────────────────
-
-type WAMsg = {
-  role: "user" | "assistant";
-  content: string;
-  ts: Date;
-  audioUrl?: string;
-  audioDuration?: string;
-  fileName?: string;
-  fileSize?: string;
-  /** Mensagem de erro transitório — não votável. */
-  error?: boolean;
-};
-
-/**
- * O rosto da IA. Não é uma foto nem um robô: é uma pedra de vidro com luz
- * própria, do mesmo material do resto da tela, e uma faísca dentro. Diz
- * "máquina" sem fingir ser gente — que é a linha que este assistente não
- * pode cruzar, já que ele fala em nome de um consultório.
- */
-function AiAvatar({ className = "h-9 w-9" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden
-      className={`relative flex shrink-0 items-center justify-center rounded-full ${className}`}
-      style={{
-        background:
-          "radial-gradient(circle at 32% 26%, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.2) 42%)," +
-          " linear-gradient(140deg, #8b5cf6 0%, #6366f1 48%, #ec4899 100%)",
-        border: "1px solid rgba(255,255,255,0.45)",
-        boxShadow: "inset 0 1px 1px rgba(255,255,255,0.6), 0 6px 16px -6px rgba(120,60,200,0.65)",
-      }}
-    >
-      <svg viewBox="0 0 24 24" className="h-[55%] w-[55%]" fill="#fff" opacity={0.95}>
-        <path d="M12 2.6l1.7 4.9 4.9 1.7-4.9 1.7-1.7 4.9-1.7-4.9L5.4 9.2l4.9-1.7L12 2.6z" />
-        <path d="M18.4 14.3l.85 2.45 2.45.85-2.45.85-.85 2.45-.85-2.45-2.45-.85 2.45-.85.85-2.45z" />
-      </svg>
-    </span>
-  );
-}
-
-function WABubble({
-  msg,
-  feedback,
-  onFeedback,
-  terminada = true,
-}: {
-  msg: WAMsg;
-  /** Voto já dado nesta resposta (persistido no estado do chat). */
-  /* `down-fila` distingue "chegou ao médico" de "só registrado" — a frase de
-     confirmação muda, porque prometer o que não aconteceu deixa a paciente
-     esperando resposta que ninguém vai dar. */
-  feedback?: "up" | "down" | "down-fila";
-  /** Presente só em respostas da IA elegíveis a avaliação. */
-  onFeedback?: (helpful: boolean) => void;
-  /** `false` só na mensagem que ainda está chegando pelo streaming. */
-  terminada?: boolean;
-}) {
-  const isUser = msg.role === "user";
-  const timeStr = msg.ts.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
-  const [playing, setPlaying] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
-  /* A tinta segue o LADO, não o céu. A bolha da paciente é cor sólida, então
-     escreve em branco; a da IA é vidro claro — e vidro claro pede tinta
-     escura em qualquer hora do dia. Foi por isso que a bolha da IA não ficou
-     translúcida de verdade: sobre o céu de madrugada, um vidro fino com
-     texto escuro seria ilegível, e com texto branco ficaria ilegível ao
-     meio-dia. Vidro claro e denso é o único que atravessa as 24 horas. */
-  const ink = isUser ? "rgba(255,255,255,0.97)" : "rgba(22,26,50,0.92)";
-  const inkSoft = isUser ? "rgba(255,255,255,0.74)" : "rgba(22,26,50,0.55)";
-
-  return (
-    <div className={`flex items-end gap-1.5 mb-0.5 ${isUser ? "flex-row-reverse" : "flex-row"}`}>
-      {!isUser && <AiAvatar className="h-7 w-7 self-end mb-0.5" />}
-
-      <div
-        className={`max-w-[75%] overflow-hidden ${isUser ? "rounded-2xl rounded-tr-none" : "rounded-2xl rounded-tl-none"}`}
-        style={
-          isUser
-            ? {
-                /* A fala da paciente é a única cor SÓLIDA da tela — é ela que
-                   diz "isto sou eu". O degradê violeta→rosa é o mesmo par que
-                   o site usa para o Chat e para o botão do bebê. */
-                background: "linear-gradient(140deg, #8b5cf6 0%, #d946a8 62%, #ec4899 100%)",
-                border: "1px solid rgba(255,255,255,0.28)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.45), 0 8px 22px -8px rgba(150,50,150,0.6)",
-              }
-            : {
-                /* A fala da IA é vidro claro — o mesmo material dos cartões
-                   da home, com o céu passando por trás. */
-                background:
-                  "linear-gradient(152deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.26) 52%)," +
-                  " rgba(255,253,252,0.5)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.7)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 10px 26px -12px rgba(20,25,60,0.4)",
-              }
-        }
-      >
-        {/* Áudio */}
-        {msg.audioUrl && (
-          <div className="flex items-center gap-2 px-3 py-2.5" style={{ minWidth: 180 }}>
-            <button
-              onClick={() => {
-                if (!audioRef.current) return;
-                if (playing) {
-                  audioRef.current.pause();
-                  setPlaying(false);
-                } else {
-                  audioRef.current.play().then(() => setPlaying(true));
-                }
-              }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-[13px]"
-              style={{
-                background: isUser ? "rgba(255,255,255,0.26)" : "rgba(22,26,50,0.1)",
-                color: ink,
-                boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)",
-              }}
-            >
-              {playing ? "⏸" : "▶"}
-            </button>
-            <div className="flex flex-1 items-center gap-[2px]">
-              {[3, 6, 4, 9, 5, 7, 4, 8, 6, 5, 9, 4, 7, 5, 8].map((h, i) => (
-                <div
-                  key={i}
-                  className="w-[2px] rounded-full shrink-0"
-                  style={{ height: h, background: inkSoft }}
-                />
-              ))}
-            </div>
-            <span className="text-[11px] shrink-0" style={{ color: inkSoft }}>
-              {msg.audioDuration ?? "0:00"}
-            </span>
-            <audio
-              ref={audioRef}
-              src={msg.audioUrl}
-              onEnded={() => setPlaying(false)}
-              className="hidden"
-            />
-          </div>
-        )}
-
-        {/* Arquivo */}
-        {msg.fileName && (
-          <div className="flex items-center gap-3 px-3 py-2.5" style={{ minWidth: 180 }}>
-            <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xl"
-              style={{ background: isUser ? "rgba(255,255,255,0.22)" : "rgba(22,26,50,0.08)" }}
-            >
-              📄
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[12px] font-semibold line-clamp-1" style={{ color: ink }}>
-                {msg.fileName}
-              </p>
-              {msg.fileSize && (
-                <p className="text-[10px] mt-0.5" style={{ color: inkSoft }}>
-                  {msg.fileSize}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Texto */}
-        {msg.content && (
-          <p
-            className="px-3 pt-2 text-[14px] leading-snug whitespace-pre-wrap"
-            style={{ color: ink }}
-          >
-            {msg.content}
-          </p>
-        )}
-
-        {/* RESPOSTA VAZIA.
-
-            O modelo às vezes termina sem texto nenhum — no Gemini 2.5 isso
-            acontece quando o raciocínio consome todo o orçamento de saída. Sem
-            esta guarda a paciente via uma bolha em branco com dois botões de
-            joinha: nada para ler, nada para entender, e nenhum erro na tela.
-            Uma bolha muda é pior que um erro — erro pelo menos se pode
-            reagir a.
-
-            Só depois que a mensagem terminou de chegar: durante o streaming o
-            texto nasce vazio e isso é normal. */}
-        {!isUser && terminada && !msg.content && !msg.fileName && !msg.audioUrl && (
-          <p className="px-3 pt-2 text-[14px] leading-snug italic" style={{ color: inkSoft }}>
-            Não consegui formular a resposta agora. Pode perguntar de novo?
-          </p>
-        )}
-
-        {/* Timestamp + feedback 👍👎 (só em respostas da IA) */}
-        <div className="flex items-center justify-end gap-1 px-2.5 pb-1.5 pt-0.5">
-          {!isUser && onFeedback && (
-            <span className="mr-auto flex items-center gap-1.5 pl-0.5">
-              {feedback ? (
-                <span className="text-[10px]" style={{ color: inkSoft }}>
-                  {/* A FRASE SEGUE O QUE O SERVIDOR REALMENTE FEZ.
-                      "Anotado — seu médico vai ver" era dito para todo 👎, e o
-                      retorno de `submitBrainFeedback` era ignorado. Um 👎 numa
-                      pergunta de plataforma ("quanto custa?") não entra em fila
-                      nenhuma: a paciente lia que o médico veria, e ele nunca
-                      veria. É o mesmo portão que o `chat.ts` já usa para a IA
-                      não prometer registro que não houve — faltava no botão. */}
-                  {feedback === "up"
-                    ? "Obrigado! 💛"
-                    : feedback === "down-fila"
-                      ? "Anotado — seu médico vai ver 💛"
-                      : "Obrigada pelo aviso 💛"}
-                </span>
-              ) : (
-                <>
-                  <button
-                    onClick={() => onFeedback(true)}
-                    aria-label="Resposta útil"
-                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
-                  >
-                    👍
-                  </button>
-                  <button
-                    onClick={() => onFeedback(false)}
-                    aria-label="Resposta não ajudou"
-                    className="rounded-full px-1.5 py-0.5 text-[13px] leading-none opacity-60 transition-opacity hover:opacity-100"
-                  >
-                    👎
-                  </button>
-                </>
-              )}
-            </span>
-          )}
-          <span className="text-[10px] leading-none" style={{ color: inkSoft }}>
-            {timeStr}
-          </span>
-          {isUser && (
-            <span className="text-[10px] leading-none" style={{ color: "rgba(255,255,255,0.85)" }}>
-              ✓✓
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Exportado só para a bancada de design `/preview-chat` (ver o arquivo). */
-export function ChatTab({
-  profile,
-  gest,
-  careMode = false,
-}: {
-  profile: Profile | null;
-  gest: Gest;
-  /* ─── O CHAT ERA A ÚNICA ABA QUE NÃO RECEBIA ISTO ────────────────────────
-     Todas as outras recebem `careMode`. O Chat IA e a Nutrição não recebiam —
-     e são justamente as duas que FALAM com ela.
-     O servidor foi reescrito para que, em Modo Cuidado, a semana e o trimestre
-     nunca entrem no prompt. E a primeira bolha da tela, escrita como se fosse
-     a IA, abria com "Você está na semana 24". A proibição do servidor e o
-     texto da tela se contradiziam na mesma conversa. */
-  careMode?: boolean;
-}) {
-  const ctx = buildPatientContext(profile, gest);
-  const firstName = profile?.display_name?.split(" ")[0];
-
-  /* O céu do site — o MESMO gradiente do hero da página pública e do item
-     "Céu Clássico" da loja. Usar aqui não é economia de código: é o que faz
-     esta aba pertencer ao app em vez de parecer um chat colado de fora. E ele
-     muda com a hora, então o chat de madrugada é escuro sem ninguém pedir. */
-  const sky = useWeatherSky();
-
-  /* O nome do consultório de VERDADE. Cada paciente é de um médico, então
-     "Dr. Clóvis" no código seria errado para todo mundo menos os dele. */
-  const [doctorName, setDoctorName] = useState<string | null>(null);
-  useEffect(() => {
-    let vivo = true;
-    void (async () => {
-      try {
-        const { data: s } = await supabase.auth.getSession();
-        if (!s.session?.access_token) {
-          /* Sem sessão aqui é anomalia (a aba vive dentro de `_authenticated`),
-             e ficar com o rótulo genérico para sempre seria pior que usar o
-             médico desta instalação — o mesmo destino do `catch`. */
-          if (vivo) setDoctorName(DOCTOR.name);
-          return;
-        }
-        const res = await getMyDoctorLink({ data: { accessToken: s.session.access_token } });
-        if (!vivo) return;
-        if (res.ok && res.link.doctor?.display_name) setDoctorName(res.link.doctor.display_name);
-        else setDoctorName(DOCTOR.name);
-      } catch {
-        if (vivo) setDoctorName(DOCTOR.name);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
-  /* Antes de a resposta chegar fica "Assistente IA" e não um nome chutado:
-     mostrar o médico errado por meio segundo é pior do que não mostrar. */
-  const aiName = doctorName ? aiNameFrom(doctorName) : "Assistente IA";
-
-  const greeting = [
-    firstName ? `Olá, ${firstName}!` : "Olá!",
-    /* Em Modo Cuidado a semana some daqui também. Não é detalhe de texto: é a
-       PRIMEIRA coisa que ela lê ao abrir o chat, e dizia "você está na semana
-       24" para quem acabou de perder o bebê. */
-    !careMode && gest
-      ? `Você está na semana ${gest.weeks} — vou responder levando em conta sua gestação.`
-      : "",
-    "Sou o assistente virtual do consultório do seu obstetra. Como posso ajudar?",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  /* Começa VAZIO, não com a saudação.
-
-     Se nascesse com a saudação, ela apareceria e seria trocada pelo histórico
-     meio segundo depois — um salto visível, logo na abertura. Como não dá para
-     saber de antemão se existe conversa anterior, a lista fica vazia até a
-     resposta chegar, e aí é uma coisa ou outra. */
-  const [messages, setMessages] = useState<WAMsg[]>([]);
-
-  /* O HISTÓRICO na tela.
-
-     Tudo o que ela conversou já era guardado, e o servidor reconstruía as
-     últimas 12 a cada mensagem — é por isso que a IA lembra do que foi dito
-     ontem. A TELA não: abria com a saudação e mais nada, toda vez. A paciente
-     perguntava sobre uma dor na terça, voltava na quinta e não achava a
-     resposta que tinha recebido, enquanto a IA continuava lembrando.
-
-     A IA lembrava e ela não. */
-  const [carregandoHistorico, setCarregandoHistorico] = useState(true);
-  useEffect(() => {
-    let vivo = true;
-    /* Toda saída deste efeito passa por aqui: sem sessão, sem histórico, erro
-       de rede. Em todos os casos a paciente precisa ver ALGUMA coisa — um chat
-       em branco para sempre porque o banco não respondeu é pior que um chat sem
-       histórico. */
-    const abrirVazio = () => {
-      if (!vivo) return;
-      setMessages((ms) =>
-        ms.length === 0 ? [{ role: "assistant", content: greeting, ts: new Date() }] : ms,
-      );
-      setCarregandoHistorico(false);
-    };
-    void (async () => {
-      try {
-        const { data: sess } = await supabase.auth.getSession();
-        if (!sess.session?.access_token) return abrirVazio();
-        const { historicoDaConversa } = await import("@/lib/historico-chat.functions");
-        const r = await historicoDaConversa({
-          data: { accessToken: sess.session.access_token },
-        });
-        if (!vivo) return;
-        if (!r.ok || r.mensagens.length === 0) return abrirVazio();
-        setMessages((ms) => {
-          /* Se ela já escreveu enquanto o banco respondia, o que acabou de
-             digitar vale mais que o histórico — não se sobrescreve. */
-          if (ms.length > 0) return ms;
-          return r.mensagens.map((m) => ({
-            role: m.role,
-            content: m.content,
-            ts: new Date(m.created_at),
-          }));
-        });
-        setCarregandoHistorico(false);
-      } catch {
-        abrirVazio();
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
-
-  /* Quando o nome do consultório chega, a saudação passa a citá-lo — mas SÓ
-     se a conversa ainda não começou. Reescrever uma mensagem que a paciente
-     já leu e respondeu seria adulterar o histórico dela. */
-  useEffect(() => {
-    if (!doctorName) return;
-    setMessages((ms) => {
-      if (ms.length !== 1 || ms[0].role !== "assistant") return ms;
-      return [
-        {
-          ...ms[0],
-          content: ms[0].content.replace(
-            "do consultório do seu obstetra",
-            `do consultório do ${doctorName}`,
-          ),
-        },
-      ];
-    });
-    /* `messages.length` nas dependências, e não só `doctorName`.
-
-       A lista agora começa VAZIA e só ganha a saudação quando o histórico
-       responde. Se o nome do consultório chegasse ANTES disso — o caso comum,
-       porque é uma consulta mais rápida —, este efeito rodaria com a lista
-       vazia, não faria nada, e a saudação apareceria depois para sempre com o
-       texto genérico. */
-  }, [doctorName, messages.length]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  /* O texto que se digita sozinho para de digitar assim que a paciente entra
-     no campo: escrever POR CIMA de algo que está se movendo é desconcertante,
-     mesmo que o convite desapareça no primeiro caractere. */
-  const [focado, setFocado] = useState(false);
-  const typed = useTypedPlaceholder(CHAT_SUGESTOES, !input && !focado);
-  // Feedback 👍👎 por índice de mensagem — o 👎 vira lacuna na fila do médico.
-  /* `down-fila` = o 👎 chegou de fato ao médico (virou lacuna ou revisão);
-     `down` = registrado, mas não gerou trabalho para ele. A tela precisa saber
-     a diferença para não prometer o que não aconteceu. */
-  const [votes, setVotes] = useState<Record<number, "up" | "down" | "down-fila">>({});
-
-  /* ─── A RESPOSTA APARECE SENDO ESCRITA ─────────────────────────────────────
-     O streaming já entregava a resposta em pedaços, mas cada pedaço virava um
-     `setState` imediato — e o modelo manda blocos grandes, então o texto
-     surgia aos trancos: nada, nada, parágrafo inteiro.
-
-     Aqui a CHEGADA é separada da EXIBIÇÃO. O que chega vai para `alvoRef`; o
-     que aparece avança sozinho, quadro a quadro, até alcançar. A paciente vê a
-     resposta sendo escrita, que é o que uma conversa parece.
-
-     O passo é adaptativo de propósito: quanto mais texto acumulado, mais
-     rápido ele anda. Um ritmo fixo faria a paciente esperar depois de a
-     resposta inteira já ter chegado — trocaria um defeito por outro, e o
-     segundo é pior, porque é tempo que ela perde sem ganhar nada. */
-  const alvoRef = useRef("");
-  const mostradoRef = useRef(0);
-  const quadroRef = useRef<number | null>(null);
-  const streamAbertoRef = useRef(false);
-  /* O texto que o SERVIDOR mandou quando recusou a requisição (429 do
-     limitador, manutenção). O `catch` monta a bolha de erro e não tem acesso à
-     resposta HTTP — sem este ref, a mensagem acionável era descartada e a
-     paciente recebia o genérico. */
-  const avisoDoServidorRef = useRef<string | null>(null);
-  /** O que cancela a resposta em andamento (botão "Parar"). */
-  const pararRef = useRef<AbortController | null>(null);
-
-  /* Quem pede menos movimento recebe o texto inteiro de uma vez. A animação
-     aqui é conforto, nunca informação — nada se perde ao desligá-la. */
-  const semAnimacao =
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-  useEffect(() => {
-    /* Sair da tela no meio da digitação não pode deixar um laço de quadros
-       vivo chamando `setState` num componente que não existe mais. */
-    return () => {
-      if (quadroRef.current !== null) cancelAnimationFrame(quadroRef.current);
-      quadroRef.current = null;
-      streamAbertoRef.current = false;
-    };
-  }, []);
-
-  function voteMessage(i: number, helpful: boolean) {
-    setVotes((v) => ({ ...v, [i]: helpful ? "up" : "down" }));
-    void (async () => {
-      try {
-        const q = messages
-          .slice(0, i)
-          .reverse()
-          .find((x) => x.role === "user")?.content;
-        if (!q) return;
-        /* A RESPOSTA vai junto agora.
-           Antes só a pergunta viajava — e a pergunta é justamente a única coisa
-           que não estava errada. Sem o texto que ela leu, o médico revisaria no
-           escuro: veria a dúvida e teria que adivinhar o que a IA respondeu. */
-        const resposta = messages[i]?.content ?? "";
-        const { data: s } = await supabase.auth.getSession();
-        if (!s.session?.access_token) return;
-        const r = await submitBrainFeedback({
-          data: {
-            accessToken: s.session.access_token,
-            question: q,
-            ...(resposta ? { answer: resposta } : {}),
-            helpful,
-          },
-        });
-        /* Só promete quando o servidor confirma que enfileirou. */
-        if (!helpful && r?.ok && "chegouAoMedico" in r && r.chegouAoMedico) {
-          setVotes((v) => ({ ...v, [i]: "down-fila" }));
-        }
-      } catch {
-        /* telemetria é best-effort */
-      }
-    })();
-  }
-
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, loading]);
-
-  async function sendText(textOverride?: string) {
-    const text = (textOverride ?? input).trim();
-    if (!text || loading) return;
-
-    const enrichedText =
-      ctx && messages.filter((m) => m.role === "user").length === 0
-        ? `[Contexto: ${ctx}]\n\n${text}`.trim()
-        : text;
-
-    const displayMsg: WAMsg = { role: "user", content: text, ts: new Date() };
-    const displayNext = [...messages, displayMsg];
-
-    setMessages(displayNext);
-    setInput("");
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
-    setLoading(true);
-
-    /* A bolha da IA é criada ANTES do `try` porque o `catch` precisa achá-la:
-       é o `ts` dela que identifica onde escrever. */
-    const asstMsg: WAMsg = { role: "assistant", content: "", ts: new Date() };
-
-    try {
-      const uiMessages = [...messages.filter((m) => m.content?.trim()), displayMsg].map((m, i) => {
-        const msgText = m === displayMsg ? enrichedText : m.content;
-        return {
-          id: String(i),
-          role: m.role,
-          parts: msgText ? [{ type: "text", text: msgText }] : [],
-        };
-      });
-      // Envia o token da paciente para o /api/chat resolver o médico dela e
-      // usar a IA do consultório correto (cada conta é individual).
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess.session?.access_token;
-      /* A SAÍDA DE EMERGÊNCIA. Sem ela, uma resposta longa e errada obrigava a
-         paciente a esperar os ~19s até o fim — sem parar, sem perguntar de
-         novo. Todo chat de IA tem esse botão. */
-      const parar = new AbortController();
-      pararRef.current = parar;
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        signal: parar.signal,
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ messages: uiMessages }),
-      });
-      if (!res.ok) {
-        /* O TEXTO DO SERVIDOR CHEGA À TELA.
-           Era `throw new Error(await res.text())`, e o `catch` lá embaixo
-           descartava o erro e mostrava "Desculpe, ocorreu um erro. Tente
-           novamente." O 429 do limitador local devolve algo ACIONÁVEL —
-           "Muitas mensagens em pouco tempo. Aguarde um instante." — e ela
-           recebia o genérico, que ainda sugere que ela fez algo errado.
-           Guardado num ref porque o `catch` monta a bolha e não enxerga isto. */
-        /* SÓ O QUE FOI FEITO PARA ELA LER.
-           Aceitar qualquer corpo com menos de 300 caracteres fazia a gestante
-           ler "Missing GOOGLE_GENERATIVE_AI_API_KEY" numa bolha de chat. */
-        const corpo = await res.text().catch(() => "");
-        avisoDoServidorRef.current = avisoQuePodeAparecer(corpo);
-        throw new Error(corpo || "http");
-      }
-      if (!res.body) throw new Error("no stream");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      let buffer = "";
-      /* O provedor falhou DEPOIS de o fluxo abrir? Então o texto que a paciente
-         lê é um aviso, não uma resposta — e aviso não vai para a fila do
-         médico. */
-      let houveErro = false;
-      avisoDoServidorRef.current = null;
-      setMessages([...displayNext, asstMsg]);
-
-      alvoRef.current = "";
-      mostradoRef.current = 0;
-      streamAbertoRef.current = true;
-
-      /* O laço de exibição. Ele anda por conta própria, quadro a quadro, e não
-         depende do ritmo em que os pedaços chegam — é essa separação que
-         transforma "bloco de texto surgindo" em "resposta sendo escrita". */
-      /* A ESCRITA DA BOLHA DA IA, num lugar só.
-         O laço por quadro foi consertado para atualização funcional, mas as
-         QUATRO escritas de fim de stream continuaram usando `displayNext` — o
-         retrato capturado quando o envio começou. Uma mensagem enviada
-         durante a resposta sobrevivia ao laço e era apagada quando o stream
-         fechava: o mesmo defeito, ~1s depois. Uma função só, e as cinco usam
-         ela. */
-      const escreverNaBolha = (texto: string, extra?: Partial<WAMsg>) =>
-        setMessages((atuais) => {
-          const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
-          if (i < 0) return [...atuais, { ...asstMsg, content: texto, ...extra }];
-          const copia = [...atuais];
-          copia[i] = { ...copia[i], content: texto, ...extra };
-          return copia;
-        });
-
-      const digitar = () => {
-        const alvo = alvoRef.current;
-        const atraso = alvo.length - mostradoRef.current;
-        if (atraso > 0) {
-          /* Passo adaptativo: 2 caracteres por quadro num ritmo de leitura
-             confortável quando o texto está chegando, e MUITO mais rápido
-             quando já chegou tudo.
-
-             O teto era 12 caracteres por quadro — 720/s a 60fps. Medido: uma
-             resposta de 4.000 caracteres deixava 6,7s de cauda DEPOIS de o
-             texto inteiro já estar no navegador, e uma de 8.000 deixava 12,3s.
-             Resposta obstétrica longa passa de 2.000 com frequência, e o teste
-             só cobria até lá — passando por 0,03s de folga.
-
-             O piso de 2/quadro é o que faz parecer escrita; o teto solto é o
-             que impede que "parecer escrita" vire "fazer esperar". Quando o
-             stream fechou, a cauda inteira sai em no máximo ~1s. */
-          const passo = passoDaDigitacao(atraso, streamAbertoRef.current);
-          mostradoRef.current = Math.min(alvo.length, mostradoRef.current + passo);
-          /* Atualização FUNCIONAL, e isto é conserto de um apagão real.
-             Era `setMessages([...displayNext, …])` — um retrato capturado
-             quando o envio começou. Qualquer mensagem acrescentada durante o
-             streaming era APAGADA no quadro seguinte: anexar um exame enquanto
-             a resposta digitava fazia sumir da tela a bolha do arquivo e a
-             confirmação "já encaminhei para a sua médica". O arquivo estava
-             salvo no servidor, e a paciente via o contrário disso. */
-          /* Pelo `ts`, e não pela última posição: se a paciente anexar um
-             exame durante o streaming, a bolha do arquivo entra DEPOIS da
-             resposta, e escrever "na última" sobrescreveria a bolha errada. */
-          escreverNaBolha(alvo.slice(0, mostradoRef.current));
-        }
-        if (streamAbertoRef.current || mostradoRef.current < alvoRef.current.length) {
-          quadroRef.current = requestAnimationFrame(digitar);
-        } else {
-          quadroRef.current = null;
-        }
-      };
-      if (!semAnimacao) quadroRef.current = requestAnimationFrame(digitar);
-
-      const processLine = (line: string) => {
-        /* A leitura mora em `src/lib/chat-stream.ts` porque aqui dentro nenhum
-           teste alcançava: é a peça que decide se a paciente vê a resposta, o
-           texto do erro, ou uma bolha em branco — o defeito mais caro deste
-           chat — e não tinha um único teste. */
-        const p = lerLinhaDoStream(line);
-        if (p.tipo === "texto") acc += p.texto;
-        else if (p.tipo === "erro") {
-          acc = p.texto;
-          /* A BOLHA DE ERRO NÃO PODE SER VOTÁVEL. Ler a parte `error`
-             consertou a bolha vazia e abriu um buraco por baixo: a mensagem
-             passou a TER conteúdo e continuava sem a marca, então os polegares
-             apareciam. Um 👎 num 429 do Gemini virava lacuna na fila do médico. */
-          houveErro = true;
-        }
-      };
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        lines.forEach(processLine);
-        alvoRef.current = acc;
-        /* Sem animação, a chegada É a exibição — igual ao comportamento
-           anterior, que é exatamente o que quem pediu menos movimento quer. */
-        if (semAnimacao) {
-          /* `mostradoRef` TAMBÉM anda aqui. Sem isto, quem pediu menos
-             movimento ficava com ele em zero para sempre — e o `catch` abaixo,
-             que corta o texto parcial em `mostradoRef`, devolvia string vazia:
-             o texto que ela estava lendo sumia da tela e virava o erro
-             genérico. O conserto do texto parcial existia e não valia para a
-             trilha de acessibilidade. */
-          mostradoRef.current = acc.length;
-          escreverNaBolha(acc);
-        }
-      }
-      (buffer + decoder.decode()).split("\n").forEach(processLine);
-      alvoRef.current = acc;
-      streamAbertoRef.current = false;
-
-      if (semAnimacao) {
-        mostradoRef.current = acc.length;
-        escreverNaBolha(acc, houveErro ? { error: true } : undefined);
-      } else {
-        /* Espera o texto terminar de aparecer antes de liberar o "digitando".
-           Sem isto, o indicador sumiria com a bolha ainda pela metade — e a
-           paciente veria uma resposta truncada parecendo pronta. */
-        await new Promise<void>((resolve) => {
-          const conferir = () => {
-            if (mostradoRef.current >= alvoRef.current.length) resolve();
-            else setTimeout(conferir, 60);
-          };
-          conferir();
-        });
-        escreverNaBolha(acc, houveErro ? { error: true } : undefined);
-      }
-    } catch (e) {
-      /* O QUE ELA JÁ ESTAVA LENDO NÃO SE PERDE.
-         Antes a lista era reconstruída a partir de `displayNext` — o retrato
-         anterior à resposta. Se a rede caísse no meio, o texto que ela estava
-         lendo sumia da tela e virava um erro genérico. Pior: o servidor
-         terminava e GRAVAVA a resposta inteira, então ela reaparecia "do nada"
-         na próxima abertura do chat.
-         Agora o que chegou fica, e o aviso vem depois — que é o que qualquer
-         conversa interrompida deveria fazer. */
-      /* O que CHEGOU, não só o que já apareceu.
-         Cortar em `mostradoRef` jogava fora o texto que o servidor já tinha
-         mandado e o laço ainda não tinha desenhado — e o comentário acima diz
-         "o que chegou fica". Agora diz a verdade. */
-      /* Cancelamento pedido POR ELA não é falha: o que já apareceu fica, e não
-         há aviso de erro nenhum. */
-      if ((e as Error)?.name === "AbortError") {
-        const lido = alvoRef.current.trim();
-        if (lido) {
-          setMessages((atuais) => {
-            const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
-            if (i < 0) return atuais;
-            const copia = [...atuais];
-            copia[i] = { ...copia[i], content: lido };
-            return copia;
-          });
-        }
-        return;
-      }
-      const parcial = alvoRef.current.trim();
-      const aviso: WAMsg = {
-        role: "assistant",
-        content:
-          /* O aviso do servidor manda, quando existe: ele sabe o que houve
-             (limite de mensagens, manutenção) e a tela não. */
-          avisoDoServidorRef.current ??
-          (parcial
-            ? "A conexão caiu no meio da resposta. Pode perguntar de novo?"
-            : "Desculpe, ocorreu um erro. Tente novamente."),
-        ts: new Date(),
-        error: true, // falha transitória não é votável (senão 👎 vira lacuna falsa)
-      };
-      /* FUNCIONAL aqui também, e pelo mesmo motivo dos outros quatro: o
-         `displayNext` é o retrato de antes do envio, então reconstruir a lista
-         a partir dele apagaria qualquer mensagem enviada enquanto a resposta
-         chegava — justamente no caminho de erro, onde ela mais precisa ver a
-         tela consistente. A bolha parcial substitui a da IA no lugar dela, e
-         o aviso entra no fim. */
-      setMessages((atuais) => {
-        const i = atuais.findIndex((m) => m.ts === asstMsg.ts);
-        const semVazia = i < 0 ? atuais : atuais.filter((_, k) => k !== i);
-        return [
-          ...semVazia.slice(0, i < 0 ? semVazia.length : i),
-          ...(parcial ? [{ ...asstMsg, content: parcial }] : []),
-          ...semVazia.slice(i < 0 ? semVazia.length : i),
-          aviso,
-        ];
-      });
-    } finally {
-      /* O laço de digitação morre AQUI, sempre. Deixá-lo vivo depois de um erro
-         faria ele reescrever por cima da mensagem de falha — a paciente veria a
-         resposta antiga voltando por cima do aviso. */
-      streamAbertoRef.current = false;
-      if (quadroRef.current !== null) cancelAnimationFrame(quadroRef.current);
-      quadroRef.current = null;
-      pararRef.current = null;
-      setLoading(false);
-    }
-  }
-
-  function handleAudioSoon() {
-    toast("Mensagens de áudio em breve — por enquanto, envie texto.");
-  }
-
-  /* O céu vem do gradiente do site; as auroras são a camada de "tecnologia"
-     por cima dele. A tinta do cabeçalho segue o céu, não o material. */
-  const skyDark = sky.isDark;
-  const headInk = skyDark ? "rgba(255,255,255,0.96)" : "rgba(20,24,48,0.92)";
-  const headInkSoft = skyDark ? "rgba(255,255,255,0.62)" : "rgba(20,24,48,0.58)";
-
-  return (
-    <div
-      className="relative -mx-4 flex flex-col overflow-hidden rounded-t-none"
-      style={{ height: "72vh", background: sky.gradient }}
-    >
-      {/* ── Atmosfera: três manchas de luz derivando atrás de tudo ──────
-          Elas ficam FORA do fluxo e sem eventos de ponteiro; o que se move é
-          só `transform`. Blur alto e mistura `screen` para somarem luz em vez
-          de pintar por cima — sobre o céu de madrugada isso vira brilho de
-          neon, sobre o de meio-dia quase não aparece, que é o desejado. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        {[
-          {
-            cls: "dc-aurora-a",
-            pos: "-left-1/4 -top-1/4 h-[70%] w-[85%]",
-            cor: "139,92,246",
-            b: 46,
-          },
-          {
-            cls: "dc-aurora-b",
-            pos: "-right-1/4 top-1/4 h-[65%] w-[80%]",
-            cor: "236,72,153",
-            b: 52,
-          },
-          {
-            cls: "dc-aurora-c",
-            pos: "-bottom-1/4 left-1/5 h-[60%] w-[75%]",
-            cor: "56,189,248",
-            b: 50,
-          },
-        ].map((a) => (
-          <span
-            key={a.cls}
-            className={`${a.cls} absolute rounded-full ${a.pos}`}
-            style={{
-              background: `radial-gradient(circle, rgba(${a.cor},${skyDark ? 0.55 : 0.6}) 0%, transparent 68%)`,
-              filter: `blur(${a.b}px)`,
-              /* `screen` SOMA luz: perfeito no céu de madrugada, invisível ao
-                 meio-dia, porque somar luz a um azul já claro não muda quase
-                 nada. Sobre céu claro a mancha precisa TINGIR, e `soft-light`
-                 faz isso sem chapar — medido nas duas horas. */
-              mixBlendMode: skyDark ? "screen" : "soft-light",
-            }}
-          />
-        ))}
-      </div>
-
-      {/* ── Cabeçalho ─────────────────────────────────────────────────── */}
-      <div
-        className="relative flex items-center gap-3 px-4 py-3"
-        style={{
-          background: skyDark
-            ? "linear-gradient(160deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 60%)"
-            : "linear-gradient(160deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 60%)",
-          backdropFilter: "blur(22px) saturate(180%)",
-          WebkitBackdropFilter: "blur(22px) saturate(180%)",
-          borderBottom: `1px solid ${skyDark ? "rgba(255,255,255,0.16)" : "rgba(255,255,255,0.6)"}`,
-          boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.9)"}`,
-        }}
-      >
-        <AiAvatar />
-        <div className="min-w-0 flex-1">
-          <p
-            className="truncate text-[16px] font-semibold leading-tight"
-            style={{ color: headInk }}
-          >
-            {aiName}
-          </p>
-          {/* A assinatura de quem construiu — pequena, mas presente em toda
-              conversa. É a única marca da plataforma dentro do app. */}
-          <p className="text-[11px] leading-tight" style={{ color: headInkSoft }}>
-            Desenvolvido por{" "}
-            <span
-              className="font-semibold"
-              style={{
-                /* O degradê da marca troca de faixa conforme o céu. Os mesmos
-                   três tons servem de dia e de noite, mas o ciano claro some
-                   sobre o lilás do entardecer e o violeta escuro some no céu
-                   de madrugada — então cada lado usa a ponta do espectro que
-                   sobrevive ali. */
-                backgroundImage: skyDark
-                  ? "linear-gradient(96deg, #c4b5fd, #f9a8d4 58%, #7dd3fc)"
-                  : "linear-gradient(96deg, #6d28d9, #be185d 70%, #a21caf)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
-                color: "transparent",
-              }}
-            >
-              DoctorThink
-            </span>
-            {/* ─── ELA PRECISA SABER QUEM LÊ ISTO ────────────────────────────
-                O painel do médico tem a aba Conversas, e ele lê a transcrição
-                inteira. O comentário de `listBrainConversations` é honesto
-                sobre o que isso significa: "é o dado mais íntimo do produto: é
-                para a IA que ela conta o que não conta a ninguém."
-                E não havia UMA palavra na tela dela dizendo isso. Consentimento
-                que ninguém informou não é consentimento — e aqui o efeito
-                prático é pior que o jurídico: ela escreve coisas que talvez não
-                escrevesse, e descobre depois.
-                Fica na linha de assinatura, no cabeçalho, presente em toda
-                conversa — não num termo que ela aceitou uma vez e nunca leu. */}
-            {doctorName ? (
-              <>
-                {" · "}
-                <span>{doctorName} pode ler esta conversa</span>
-              </>
-            ) : null}
-          </p>
-        </div>
-      </div>
-
-      {/* A RESPOSTA É ANUNCIADA UMA VEZ, NO FIM — não 60 vezes por segundo.
-          `aria-live` num container cujo texto muda a cada quadro é
-          anti-padrão: o leitor de tela enfileira ou repete a cada mutação, e
-          quem usa VoiceOver sem `prefers-reduced-motion` pega o pior caso.
-          A bolha visual fica `aria-hidden` durante o streaming, e o texto
-          completo vai para a região abaixo quando termina de chegar. */}
-      <div
-        ref={scrollRef}
-        aria-hidden={loading}
-        className="relative flex-1 overflow-y-auto space-y-0.5 px-3 py-3"
-      >
-        {/* Enquanto o histórico não respondeu, a lista está vazia de propósito.
-            Três pontinhos discretos são melhores que uma tela em branco — e
-            muito melhores que uma saudação que aparece e é trocada. */}
-        {carregandoHistorico && messages.length === 0 && (
-          <div className="flex justify-center py-6" aria-label="Carregando a conversa">
-            <span className="flex gap-1">
-              {[0, 1, 2].map((n) => (
-                <span
-                  key={n}
-                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/25"
-                  style={{ animationDelay: `${n * 160}ms` }}
-                />
-              ))}
-            </span>
-          </div>
-        )}
-        {messages.map((m, i) => {
-          // Avaliável: resposta da IA com pergunta anterior, fora do streaming.
-          const canVote =
-            m.role === "assistant" &&
-            !m.error &&
-            /* Bolha VAZIA não é votável. Quando o provedor falha, a resposta
-               chega em branco e a paciente vê o aviso de "não consegui
-               formular" — um 👎 ali viraria lacuna (ou revisão) sobre uma falha
-               de infraestrutura, e o médico receberia trabalho criado por um
-               erro 429 do Gemini. */
-            !!m.content?.trim() &&
-            messages.slice(0, i).some((x) => x.role === "user") &&
-            !(loading && i === messages.length - 1);
-          return (
-            <WABubble
-              key={i}
-              msg={m}
-              feedback={votes[i]}
-              onFeedback={canVote ? (helpful) => voteMessage(i, helpful) : undefined}
-              terminada={!(loading && i === messages.length - 1)}
-            />
-          );
-        })}
-
-        {/* O que o leitor de tela lê: a resposta inteira, uma vez só, quando
-            ela termina de chegar. Enquanto `loading`, fica vazio. */}
-        <div role="status" aria-live="polite" className="sr-only">
-          {loading
-            ? ""
-            : messages[messages.length - 1]?.role === "assistant"
-              ? messages[messages.length - 1]?.content
-              : ""}
-        </div>
-
-        {/* ── Primeiras perguntas ───────────────────────────────────────
-            Uma tela de chat vazia é uma folha em branco, e folha em branco
-            trava — ainda mais quando a dúvida é sobre o próprio corpo. Estas
-            três existem enquanto a conversa não começou e somem no primeiro
-            envio. São as mesmas famílias de pergunta que o campo digita
-            sozinho, mas aqui em um toque. */}
-        {messages.length === 1 && !loading && (
-          <div className="flex flex-wrap gap-2 pl-9 pt-2">
-            {["Posso tomar dipirona?", "Quantos chutes por dia é normal?", "Estou com azia"].map(
-              (q) => (
-                <button
-                  key={q}
-                  onClick={() => sendText(q)}
-                  className="rounded-full px-3.5 py-2 text-[12px] font-medium transition-transform active:scale-95"
-                  style={{
-                    color: headInk,
-                    background: skyDark ? "rgba(255,255,255,0.13)" : "rgba(255,255,255,0.55)",
-                    backdropFilter: "blur(16px) saturate(170%)",
-                    WebkitBackdropFilter: "blur(16px) saturate(170%)",
-                    border: `1px solid ${skyDark ? "rgba(255,255,255,0.24)" : "rgba(255,255,255,0.8)"}`,
-                    boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.95)"}`,
-                  }}
-                >
-                  {q}
-                </button>
-              ),
-            )}
-          </div>
-        )}
-
-        {/* ── "Pensando" ────────────────────────────────────────────────
-            Os três pontinhos saltitantes viraram uma varredura de luz
-            atravessando a bolha vazia. Diz a mesma coisa — está processando —
-            mas sem imitar o "digitando" de um humano, que é a leitura errada
-            para uma máquina que responde em nome de um consultório. */}
-        {loading && (
-          <div className="flex items-end gap-1.5">
-            <AiAvatar className="h-7 w-7" />
-            <div
-              className="relative overflow-hidden rounded-2xl rounded-tl-none px-6 py-3.5"
-              style={{
-                background:
-                  "linear-gradient(152deg, rgba(255,255,255,0.62) 0%, rgba(255,255,255,0.26) 52%)," +
-                  " rgba(255,253,252,0.5)",
-                backdropFilter: "blur(20px) saturate(180%)",
-                WebkitBackdropFilter: "blur(20px) saturate(180%)",
-                border: "1px solid rgba(255,255,255,0.7)",
-                boxShadow:
-                  "inset 0 1px 0 rgba(255,255,255,0.95), 0 10px 26px -12px rgba(20,25,60,0.4)",
-              }}
-            >
-              <span
-                aria-hidden
-                className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3"
-                style={{
-                  background:
-                    "linear-gradient(90deg, transparent, rgba(139,92,246,0.55), transparent)",
-                }}
-              />
-              {/* `role="status"`: o `sr-only` era inserido e removido do DOM sem
-                  live region nenhuma, então NUNCA era anunciado. Quem usa
-                  leitor de tela mandava a pergunta e ficava sem saber se algo
-                  estava acontecendo. */}
-              <span role="status" className="sr-only">
-                Pensando
-              </span>
-              <span
-                aria-hidden
-                className="relative block h-2 w-12 rounded-full"
-                style={{ background: "rgba(22,26,50,0.14)" }}
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Barra de mensagem ─────────────────────────────────────────── */}
-      <div
-        className="relative flex items-end gap-2 px-2 py-2"
-        style={{
-          background: skyDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.3)",
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderTop: `1px solid ${skyDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.55)"}`,
-        }}
-      >
-        {/* Campo de texto */}
-        <div
-          className="relative flex min-h-[42px] flex-1 items-end rounded-3xl px-4 py-2"
-          style={{
-            background: skyDark ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.62)",
-            backdropFilter: "blur(16px) saturate(170%)",
-            WebkitBackdropFilter: "blur(16px) saturate(170%)",
-            border: `1px solid ${skyDark ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.85)"}`,
-            boxShadow: `inset 0 1px 0 ${skyDark ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.95)"}`,
-          }}
-        >
-          {/* O convite que se digita sozinho.
-              Ele NÃO é o `placeholder` do textarea: placeholder nativo não
-              aceita um cursor piscando ao lado. É uma camada por baixo, sem
-              eventos de ponteiro, que some no instante em que a paciente
-              digita a primeira letra ou toca no campo. O `placeholder` real
-              fica vazio para as duas coisas não se sobreporem. */}
-          {!input && !focado && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-4 right-11 flex items-center text-[15px]"
-              style={{ color: headInkSoft }}
-            >
-              <span className="truncate">{typed}</span>
-              <span className="dc-caret ml-px shrink-0" style={{ opacity: 0.8 }}>
-                |
-              </span>
-            </span>
-          )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onFocus={() => setFocado(true)}
-            onBlur={() => setFocado(false)}
-            onChange={(e) => {
-              setInput(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = Math.min(e.target.scrollHeight, 100) + "px";
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                sendText();
-              }
-            }}
-            aria-label="Mensagem"
-            placeholder={focado ? "Escreva sua dúvida…" : ""}
-            rows={1}
-            className="relative flex-1 resize-none bg-transparent text-[15px] leading-[1.45] outline-none"
-            style={{ maxHeight: 100, color: headInk }}
-          />
-        </div>
-
-        {/* PARAR — a saída de emergência. Enquanto a resposta corre, o botão de
-            enviar não serve para nada (o envio já está barrado por `loading`),
-            e o que ela precisa é interromper. */}
-        {loading ? (
-          <button
-            onClick={() => pararRef.current?.abort()}
-            aria-label="Parar a resposta"
-            className="ml-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-foreground/85 text-background transition-transform active:scale-95"
-          >
-            <span className="block h-3 w-3 rounded-[3px] bg-current" />
-          </button>
-        ) : input.trim() ? (
-          <button
-            onClick={() => sendText()}
-            disabled={loading}
-            aria-label="Enviar"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95 disabled:opacity-60"
-            style={{
-              background: "linear-gradient(140deg, #8b5cf6 0%, #d946a8 60%, #ec4899 100%)",
-              border: "1px solid rgba(255,255,255,0.4)",
-              boxShadow:
-                "0 8px 22px -6px rgba(180,60,190,0.65), inset 0 1px 1px rgba(255,255,255,0.5)",
-            }}
-          >
-            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
-          </button>
-        ) : (
-          <button
-            onClick={handleAudioSoon}
-            aria-label="Mensagem de voz"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white transition-transform active:scale-95"
-            style={{
-              background: "linear-gradient(140deg, #6366f1 0%, #8b5cf6 60%, #a855f7 100%)",
-              border: "1px solid rgba(255,255,255,0.4)",
-              boxShadow:
-                "0 8px 22px -6px rgba(110,80,220,0.6), inset 0 1px 1px rgba(255,255,255,0.5)",
-            }}
-          >
-            <Mic className="h-[21px] w-[21px]" strokeWidth={1.9} />
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+export type ChatMsg = { role: "user" | "assistant"; content: string };
 
 /* ---------- Calendário do Pré-natal ---------- */
 
@@ -9150,13 +6677,13 @@ function PrenatalCalendarTab({
   const [selectedYmd, setSelectedYmd] = useState<string>(() => ymdLocal());
   useEffect(() => {
     (async () => {
-      setAppts(await fetchAppointmentsCached());
+      setAppts((await fetchAppointmentsCached()).appointments);
     })();
   }, []);
 
   if (!profile || (!profile.lmp_date && !profile.reference_date)) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+      <div className="rounded-3xl card-material p-8 text-center">
         <p className="text-muted-foreground">
           Configure a DUM ou os dados do ultrassom em{" "}
           <button
@@ -9264,9 +6791,18 @@ function PrenatalCalendarTab({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between gap-2">
+      {/* ── A grade das sete sub-telas vem PRIMEIRO (set/2026). Ela ficava no
+          fim, depois de ~440 linhas de calendário: plano de parto, mala da
+          maternidade, perguntas ao médico e teleconsulta só apareciam para
+          quem rolava tudo — o padrão que o próprio arquivo já tinha registrado
+          como defeito ("existiam sem que nada na tela dissesse que existiam"). */}
+      <div>
+        <p className="mb-4 font-serif text-[15px] font-semibold text-primary">Minhas consultas</p>
+        <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-5">
         <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-primary">Meu Calendário</p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu Calendário</p>
           <p className="mt-1 text-sm text-muted-foreground">
             Marcos do pré-natal e suas consultas, no dia certo.
           </p>
@@ -9318,8 +6854,8 @@ function PrenatalCalendarTab({
           </div>
 
           {/* Grade do mês */}
-          <div className="rounded-3xl border border-border bg-card p-3">
-            <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <div className="rounded-3xl card-material p-3">
+            <div className="mb-1 grid grid-cols-7 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((d) => (
                 <div key={d} className="py-1">
                   {d}
@@ -9367,7 +6903,7 @@ function PrenatalCalendarTab({
               })}
             </div>
             {/* Legenda */}
-            <div className="mt-3 flex items-center justify-center gap-4 text-[10px] text-muted-foreground">
+            <div className="mt-3 flex items-center justify-center gap-4 text-xs text-muted-foreground">
               <span className="flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary" /> Consulta
               </span>
@@ -9387,7 +6923,7 @@ function PrenatalCalendarTab({
               })}
             </p>
             {selectedEvents.length === 0 ? (
-              <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+              <p className="rounded-2xl card-material px-4 py-3 text-sm text-muted-foreground">
                 Nada marcado neste dia.
               </p>
             ) : (
@@ -9403,11 +6939,11 @@ function PrenatalCalendarTab({
                         className="block w-full rounded-2xl border border-primary/40 bg-primary/5 p-3 text-left"
                       >
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                          <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                             Sua consulta
                           </span>
                           <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
+                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}
                           >
                             {st.label}
                           </span>
@@ -9425,13 +6961,10 @@ function PrenatalCalendarTab({
                   }
                   const m = it.m;
                   return (
-                    <div
-                      key={`d-ms-${idx}`}
-                      className="rounded-2xl border border-border bg-card p-3"
-                    >
+                    <div key={`d-ms-${idx}`} className="rounded-2xl card-material p-3">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
-                          className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                          className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
                         >
                           {TYPE_LABEL[m.type]}
                         </span>
@@ -9466,12 +6999,10 @@ function PrenatalCalendarTab({
                 >
                   <div className="absolute -left-4 top-5 h-3 w-3 rounded-full border-2 border-primary bg-primary" />
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground">
+                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-primary-foreground">
                       Sua consulta
                     </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.cls}`}
-                    >
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>
                       {st.label}
                     </span>
                   </div>
@@ -9525,7 +7056,7 @@ function PrenatalCalendarTab({
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
+                        className={`rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide ${TYPE_COLOR[m.type]}`}
                       >
                         {TYPE_LABEL[m.type]}
                       </span>
@@ -9567,418 +7098,12 @@ function PrenatalCalendarTab({
           })}
         </div>
       )}
-
-      {/* ── Consultas integradas: tudo (agendar, preparar, teleconsulta…) aqui ── */}
-      <div className="mt-2 border-t border-border pt-5">
-        <p className="mb-4 text-xs uppercase tracking-[0.22em] text-primary">Minhas consultas</p>
-        <ConsultasHub profile={profile} gest={gest} initialSub={consultasSub} />
-      </div>
     </div>
   );
 }
 
-/* ---------- Contrações ---------- */
-
-type Contraction = {
-  id: string;
-  started_at: string;
-  ended_at: string | null;
-  intensity: number;
-};
-
-const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
-const INTENSITY_COLOR = [
-  "",
-  "bg-secondary text-primary",
-  "bg-primary/10 text-primary",
-  "bg-rose-100 text-rose-700",
-];
-
-/**
- * ⚠️ `weeks` NÃO É DECORATIVO — ele era descartado, e isso custava caro.
- *
- * A função só olhava intervalo e duração médios. Uma paciente de 28 semanas com
- * contrações a cada 12 minutos lia "Padrão normal"; a cada 8, "Atenção — monitore
- * de perto". E `triage.ts` lista "Contrações regulares antes de 37 semanas" como
- * sintoma VERMELHO: a mesma paciente, respondendo a triagem, receberia "procure
- * atendimento agora". Duas telas do mesmo app dizendo coisas opostas sobre o
- * mesmo quadro — e a que ela abre com o cronômetro na mão era a que
- * tranquilizava.
- *
- * A régua nova mora em `sinais-clinicos.ts`, com as outras, porque CLAUDE.md é
- * explícito: nunca duplique um limite clínico fora daquele arquivo.
- */
-function analyzeContractions(
-  list: Contraction[],
-  weeks: number | null,
-): {
-  status: "normal" | "atencao" | "alerta" | "urgente";
-  label: string;
-  detail: string;
-} {
-  if (list.length < 2)
-    return {
-      status: "normal",
-      label: "Monitorando",
-      detail: "Registre mais contrações para análise do padrão.",
-    };
-
-  const completed = list.filter((c) => c.ended_at != null);
-  if (completed.length < 2)
-    return { status: "normal", label: "Monitorando", detail: "Continue registrando." };
-
-  // Average duration (seconds)
-  const avgDur =
-    completed.reduce((sum, c) => {
-      const dur = (new Date(c.ended_at!).getTime() - new Date(c.started_at).getTime()) / 1000;
-      return sum + dur;
-    }, 0) / completed.length;
-
-  // Average interval between contractions (minutes)
-  const sorted = [...list].sort(
-    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-  );
-  const intervals: number[] = [];
-  for (let i = 1; i < sorted.length; i++) {
-    const interval =
-      (new Date(sorted[i].started_at).getTime() - new Date(sorted[i - 1].started_at).getTime()) /
-      60000;
-    intervals.push(interval);
-  }
-  const avgInterval = intervals.reduce((s, x) => s + x, 0) / intervals.length;
-
-  /* ─── PREMATURIDADE VEM ANTES DE TUDO ────────────────────────────────────
-     Antes das 37 semanas, contração regular é sinal vermelho independentemente
-     de quão "leve" o padrão parece — e é justamente o padrão leve que a régua
-     de trabalho de parto classificaria como normal. Por isso este teste vem
-     PRIMEIRO: ele não pode ser alcançado só depois de a paciente passar pelos
-     cortes de parto ativo. */
-  const prematuro = sinalContracoesPrematuras({ semanas: weeks, intervaloMin: avgInterval });
-  if (prematuro)
-    return {
-      status: "urgente",
-      label: "⚠️ Ligue para o seu médico agora",
-      detail: `${prematuro.nota} Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
-    };
-
-  if (avgInterval <= 3 && avgDur >= 60)
-    return {
-      status: "urgente",
-      label: "⚠️ Vá para a maternidade agora",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — trabalho de parto avançado.`,
-    };
-  if (avgInterval <= 5 && avgDur >= 45)
-    return {
-      status: "alerta",
-      label: "Trabalho de parto ativo",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — ligue para o consultório.`,
-    };
-  if (avgInterval <= 10 && avgDur >= 30)
-    return {
-      status: "atencao",
-      label: "Atenção — padrão irregular",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — monitore de perto.`,
-    };
-  return {
-    status: "normal",
-    label: "Padrão normal",
-    detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
-  };
-}
-
-function ContracoesTab({ weeks }: { weeks: number | null }) {
-  /* `weeks` é lido de verdade agora — ver `analyzeContractions`. */
-  const [contractions, setContractions] = useState<Contraction[]>([]);
-  const [active, setActive] = useState<Contraction | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [intensity, setIntensity] = useState(2);
-  const startRef = useRef<number>(0);
-
-  async function load() {
-    const { data } = await (supabase as any)
-      .from("contraction_logs")
-      .select("*")
-      .order("started_at", { ascending: false })
-      .limit(30);
-    setContractions(data ?? []);
-    // Resume active contraction if exists (no ended_at)
-    const open = (data ?? []).find((c: Contraction) => !c.ended_at);
-    if (open) {
-      setActive(open);
-      startRef.current = new Date(open.started_at).getTime();
-    }
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  useEffect(() => {
-    if (!active) return;
-    const t = setInterval(() => setElapsed(Date.now() - startRef.current), 1000);
-    return () => clearInterval(t);
-  }, [active]);
-
-  async function startContraction() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data, error } = await (supabase as any)
-      .from("contraction_logs")
-      .insert({ user_id: u.user.id, intensity })
-      .select()
-      .single();
-    if (error) {
-      toast.error("Não foi possível registrar a contração. Tente novamente.");
-      return;
-    }
-    setActive(data);
-    startRef.current = Date.now();
-    setElapsed(0);
-    load();
-  }
-
-  async function stopContraction() {
-    if (!active) return;
-    const { error } = await (supabase as any)
-      .from("contraction_logs")
-      .update({ ended_at: new Date().toISOString() })
-      .eq("id", active.id);
-    if (error) {
-      toast.error("Não foi possível salvar a contração. Tente novamente.");
-      return;
-    }
-    setActive(null);
-    setElapsed(0);
-    /**
-     * ⚠️ O TIQUE DO FIM DA CONTRAÇÃO, e ele é o caso de mão ocupada.
-     *
-     * Ela está cronometrando DOR: olhar a tela para confirmar que o toque
-     * pegou é exatamente o que ela menos consegue fazer nesse minuto. Um tique
-     * de cinquenta milissegundos diz "marquei" sem pedir os olhos.
-     *
-     * ⚠️ A espécie existia declarada, justificada e SEM NENHUM CHAMADOR — a
-     * mesma família de `proximoDesbloqueio` e `escadaDeTrofeus`. Uma revisão
-     * adversarial a achou.
-     *
-     * `emSessao` porque o cronômetro É uma sessão que ela abriu: o toque que
-     * marca o fim é dela, mas o portão de gesto é generoso demais para
-     * depender de milissegundos aqui.
-     */
-    /* ⚠️ Sem `careMode` aqui: este componente não o recebe, e o cronômetro de
-       contrações é justamente uma tela que continua valendo no Modo Cuidado —
-       quem perdeu a gestação pode estar em trabalho de parto. `podeSoar` já
-       barra o resto; este som é sobre o corpo dela, não sobre o bebê. */
-    tocarSomDeUI("intervalo", { emSessao: true });
-    load();
-  }
-
-  /* ⚠️ A confirmação vive na TELA — ver `ApagarConversas`, que carrega a razão
-     inteira: no app instalado o `window.confirm` abre com o nome do domínio, e
-     a decisão do dono é confirmação em mensagem separada. */
-  const [confirmandoLimpar, setConfirmandoLimpar] = useState(false);
-
-  async function clearSession() {
-    setConfirmandoLimpar(false);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await (supabase as any)
-      .from("contraction_logs")
-      .delete()
-      .eq("user_id", u.user.id);
-    if (error) {
-      toast.error("Não foi possível limpar o histórico. Tente novamente.");
-      return;
-    }
-    setActive(null);
-    load();
-  }
-
-  const elapsedSecs = Math.floor(elapsed / 1000);
-  const elapsedMins = Math.floor(elapsedSecs / 60);
-  const recentContractions = contractions.slice(0, 10);
-  // Análise/banner consideram apenas contrações das últimas 2 horas,
-  // para não manter alertas urgentes presos com dados antigos.
-  const ANALYSIS_WINDOW_MS = 2 * 3600000;
-  const analysisWindow = contractions
-    .filter((c) => Date.now() - new Date(c.started_at).getTime() < ANALYSIS_WINDOW_MS)
-    .slice(0, 10);
-  const analysis = analyzeContractions(analysisWindow, weeks);
-
-  const statusStyle: Record<string, string> = {
-    normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    atencao: "border-primary/20 bg-primary/6 text-foreground",
-    alerta: "border-rose-200 bg-rose-50 text-rose-800",
-    urgente: "border-rose-400 bg-rose-100 text-rose-900",
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-2xl border border-primary/20 bg-primary/6 p-4 text-sm text-foreground">
-        Use este diário se sentir contrações regulares.{" "}
-        <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue{" "}
-        <strong>192 (SAMU)</strong>.
-      </div>
-
-      {/* Analysis banner */}
-      {analysisWindow.length >= 2 && (
-        <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
-          <p className="font-semibold">{analysis.label}</p>
-          <p className="mt-0.5 text-sm">{analysis.detail}</p>
-          {analysis.status === "urgente" && (
-            <a
-              href="tel:192"
-              className="mt-3 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white"
-            >
-              Ligar 192 (SAMU)
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* Main button */}
-      <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-[var(--shadow-card)]">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary">Cronômetro de contrações</p>
-
-        {/* Intensity selector */}
-        {!active && (
-          <div className="mt-4 flex justify-center gap-2">
-            {[1, 2, 3].map((i) => (
-              <button
-                key={i}
-                onClick={() => setIntensity(i)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                  intensity === i
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:border-primary"
-                }`}
-              >
-                {INTENSITY_LABEL[i]}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-6">
-          {active ? (
-            <div>
-              <button
-                onClick={stopContraction}
-                className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-white shadow-xl transition-transform duration-300 active:scale-95"
-                style={{
-                  background: "radial-gradient(circle at 30% 25%, #fb7185, #e11d48 70%)",
-                }}
-              >
-                <div>
-                  <div className="font-serif text-4xl">
-                    {String(elapsedMins).padStart(2, "0")}:
-                    {String(elapsedSecs % 60).padStart(2, "0")}
-                  </div>
-                  <div className="text-xs uppercase tracking-widest opacity-80 mt-1">
-                    Toque p/ parar
-                  </div>
-                </div>
-              </button>
-              <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">
-                Contração ativa...
-              </p>
-            </div>
-          ) : (
-            <button
-              onClick={startContraction}
-              className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-primary-foreground shadow-xl transition-transform duration-300 active:scale-95 hover:scale-[1.03]"
-              style={{
-                background:
-                  "radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--primary) 78%, white), var(--primary) 70%)",
-              }}
-            >
-              <div>
-                <div className="text-lg font-medium">Iniciar</div>
-                <div className="text-xs uppercase tracking-widest opacity-80 mt-1">contração</div>
-              </div>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* History table */}
-      {recentContractions.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-              Últimas contrações
-            </p>
-            <button
-              onClick={() => setConfirmandoLimpar(true)}
-              className="press min-h-11 px-1 text-xs text-muted-foreground hover:text-destructive"
-            >
-              Limpar sessão
-            </button>
-          </div>
-          {confirmandoLimpar && (
-            <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50/60 p-3">
-              <p className="text-[13px] leading-snug text-rose-900">
-                Apagar todo o histórico de contrações? Isto não tem volta.
-              </p>
-              <div className="mt-3 flex gap-2">
-                <button
-                  onClick={clearSession}
-                  className="press min-h-11 flex-1 rounded-full bg-rose-600 px-4 text-sm font-semibold text-white"
-                >
-                  Sim, apagar
-                </button>
-                <button
-                  onClick={() => setConfirmandoLimpar(false)}
-                  className="press min-h-11 flex-1 rounded-full border border-border px-4 text-sm font-medium"
-                >
-                  Não
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="mt-3 space-y-2">
-            {recentContractions.map((c, idx) => {
-              const dur = c.ended_at
-                ? Math.round(
-                    (new Date(c.ended_at).getTime() - new Date(c.started_at).getTime()) / 1000,
-                  )
-                : null;
-              const interval =
-                idx < recentContractions.length - 1
-                  ? Math.round(
-                      (new Date(c.started_at).getTime() -
-                        new Date(recentContractions[idx + 1].started_at).getTime()) /
-                        60000,
-                    )
-                  : null;
-              return (
-                <div
-                  key={c.id}
-                  className="flex items-center justify-between rounded-xl border border-border p-3 text-sm"
-                >
-                  <span className="text-muted-foreground">
-                    {new Date(c.started_at).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}
-                  >
-                    {INTENSITY_LABEL[c.intensity] ?? "—"}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {dur != null ? `${dur}s` : "ativa"}
-                    {interval != null && ` · intervalo ${interval}min`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+/* ---------- Contrações — a tela mudou para `src/components/contracoes-tab.tsx`
+   para poder ter bancada; ver o cabeçalho de lá. ---------- */
 
 /* ---------- Pré-consulta Inteligente ---------- */
 
@@ -10109,7 +7234,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
       <form onSubmit={submit} className="space-y-6">
         {/* Emotional state */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Como você está se sentindo?</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {EMOTIONAL_OPTIONS.map((o) => (
@@ -10130,7 +7255,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Vitals */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Medidas desta semana</p>
           <div className="mt-4 grid gap-4 sm:grid-cols-3">
             <Field
@@ -10155,7 +7280,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Symptoms */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Sintomas desde a última consulta</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {PRE_CONSULT_SYMPTOMS.map((s) => (
@@ -10178,18 +7303,18 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
         </div>
 
         {/* Open questions */}
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Medicamentos em uso</p>
           <textarea
             value={form.medications}
             onChange={(e) => setForm((f) => ({ ...f, medications: e.target.value }))}
             rows={2}
-            placeholder="Ex.: Sulfato ferroso, ácido fólico, vitamina D..."
+            placeholder="Ex.: Sulfato ferroso, ácido fólico, vitamina D…"
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Perguntas para o médico</p>
           <textarea
             value={form.questions}
@@ -10200,13 +7325,13 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           />
         </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Algo mais a relatar?</p>
           <textarea
             value={form.other_notes}
             onChange={(e) => setForm((f) => ({ ...f, other_notes: e.target.value }))}
             rows={2}
-            placeholder="Algo incomum que notou, mudança no bebê, preocupação específica..."
+            placeholder="Algo incomum que notou, mudança no bebê, preocupação específica…"
             className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -10216,7 +7341,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           disabled={loading}
           className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
-          {loading ? "Enviando..." : "Enviar para o médico"}
+          {loading ? "Enviando…" : "Enviar para o médico"}
         </button>
       </form>
 
@@ -10232,7 +7357,7 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
           {showHistory && (
             <div className="mt-3 space-y-3">
               {history.map((h) => (
-                <div key={h.id} className="rounded-2xl border border-border bg-card p-4 text-sm">
+                <div key={h.id} className="rounded-2xl card-material p-4 text-sm">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">
                       Semana {h.weeks_at_submission ?? "—"} —{" "}
@@ -10257,400 +7382,10 @@ function PreConsultaTab({ profile, gest }: { profile: Profile | null; gest: Gest
 
 /* ---------- Nutrição Tab ---------- */
 
-const NUTRIENT_TIPS: Record<1 | 2 | 3, { nutrient: string; why: string; foods: string }[]> = {
-  1: [
-    {
-      nutrient: "Ácido Fólico",
-      why: "Previne defeitos do tubo neural",
-      foods: "Feijão, lentilha, espinafre, brócolis",
-    },
-    {
-      nutrient: "Ferro",
-      why: "Suporte ao volume de sangue",
-      foods: "Carne vermelha magra, feijão + vitamina C",
-    },
-    { nutrient: "Vitamina B6", why: "Alivia enjoo matinal", foods: "Banana, batata, frango, atum" },
-    {
-      nutrient: "Água",
-      why: "Hidratação e redução do enjoo",
-      foods: "8–10 copos/dia; água de coco, chás claros",
-    },
-  ],
-  2: [
-    {
-      nutrient: "Cálcio",
-      why: "Formação óssea do bebê",
-      foods: "Leite, iogurte, sardinha, brócolis",
-    },
-    {
-      nutrient: "Ômega-3",
-      why: "Desenvolvimento do cérebro fetal",
-      foods: "Salmão, sardinha, sementes de chia, linhaça",
-    },
-    {
-      nutrient: "Proteína",
-      why: "Crescimento muscular e placentário",
-      foods: "Ovos, frango, leguminosas, queijos pasteurizados",
-    },
-    {
-      nutrient: "Vitamina D",
-      why: "Absorção de cálcio e imunidade",
-      foods: "Ovos, cogumelos, exposição solar moderada",
-    },
-  ],
-  3: [
-    {
-      nutrient: "Fibras",
-      why: "Combate a constipação",
-      foods: "Aveia, ameixa, mamão, folhas verdes",
-    },
-    {
-      nutrient: "Magnésio",
-      why: "Reduz câimbras nas pernas",
-      foods: "Castanha-do-pará, banana, sementes de abóbora",
-    },
-    {
-      nutrient: "Ferro",
-      why: "Preparo para o parto",
-      foods: "Fígado (cozido), feijão preto, espinafre",
-    },
-    {
-      nutrient: "Vitamina C",
-      why: "Aumenta absorção do ferro",
-      foods: "Acerola, laranja, morango, kiwi",
-    },
-  ],
-};
-
-const NUTRITION_CHIPS: Record<1 | 2 | 3, string[]> = {
-  1: [
-    "Como controlar o enjoo com alimentação?",
-    "Quais alimentos evitar no 1º trimestre?",
-    "Posso tomar suplemento de ácido fólico junto com a alimentação?",
-    "O que comer quando não tenho apetite?",
-  ],
-  2: [
-    "Quanta proteína preciso por dia?",
-    "Posso comer salmão? Qual a frequência ideal?",
-    "Como garantir cálcio suficiente sem laticínios?",
-    "O que comer antes e depois de uma caminhada?",
-  ],
-  3: [
-    "Como evitar a constipação no final da gestação?",
-    "Tenho muita azia — o que posso comer?",
-    "Qual o melhor lanche noturno para não acordar com fome?",
-    "Posso comer tâmara para preparar o parto?",
-  ],
-};
-
-/** Mesma preferência que o chat principal respeita. */
-function semAnimacaoNutricao(): boolean {
-  return (
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  );
-}
-
-function NutricaoTab({
-  profile,
-  gest,
-  careMode = false,
-}: {
-  profile: Profile | null;
-  gest: Gest;
-  /** Mesma razão do Chat IA: em Modo Cuidado, nada de semana nem trimestre. */
-  careMode?: boolean;
-}) {
-  const trimester = gest ? trimesterForWeek(gest.weeks) : 2;
-  const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
-  const chips = NUTRITION_CHIPS[trimester as 1 | 2 | 3];
-  const firstName = profile?.display_name?.split(" ")[0];
-
-  const greeting = [
-    firstName ? `Olá, ${firstName}!` : "Olá!",
-    // Mesma regra do Chat IA: em Modo Cuidado, nada de semana nem trimestre.
-    !careMode && gest
-      ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gest.weeks}.`
-      : "",
-    careMode
-      ? "Sou sua nutricionista virtual. Estou aqui para o que você precisar sobre alimentação."
-      : "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  const [messages, setMessages] = useState<ChatMsg[]>([{ role: "assistant", content: greeting }]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  /* ─── O 👎 QUE NÃO EXISTIA AQUI ────────────────────────────────────────────
-     Este chat clínico não tinha nenhum caminho de correção: o que saísse errado
-     ficava entre a IA e a paciente, para sempre. O chat principal tem
-     `submitBrainFeedback` em três lugares; este tinha zero.
-     Mesma função, mesma fila de revisão do médico — o 👎 daqui chega no mesmo
-     lugar que o de lá, e é isso que fecha o ciclo. */
-  const [votos, setVotos] = useState<Record<number, boolean>>({});
-
-  async function votar(indice: number, gostou: boolean) {
-    if (votos[indice] !== undefined) return;
-    setVotos((v) => ({ ...v, [indice]: gostou }));
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      if (!sess.session) return;
-      await submitBrainFeedback({
-        data: {
-          accessToken: sess.session.access_token,
-          /* A PERGUNTA DELA, não a resposta: é ela que o médico precisa ler
-             para entender o que foi perguntado e onde o cérebro falhou. */
-          question: messages[indice - 1]?.content ?? "",
-          answer: messages[indice]?.content ?? "",
-          helpful: gostou,
-        },
-      });
-      if (!gostou) toast("Anotado — seu médico vai ver 💛");
-    } catch {
-      /* O voto já está na tela; insistir com um erro sobre um 👍 seria pior
-         que perder o 👍. */
-    }
-  }
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  async function send(text?: string) {
-    const msg = (text ?? input).trim();
-    if (!msg || loading) return;
-    const next: ChatMsg[] = [...messages, { role: "user", content: msg }];
-    setMessages(next);
-    setInput("");
-    setLoading(true);
-    try {
-      const uiMessages = next.map((m, i) => ({
-        id: String(i),
-        role: m.role,
-        parts: [{ type: "text", text: m.content }],
-      }));
-      const { data: sess } = await supabase.auth.getSession();
-      const res = await fetch("/api/nutrition", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // O endpoint agora exige sessão: era proxy aberto para o Gemini.
-          Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
-        },
-        body: JSON.stringify({ messages: uiMessages }),
-      });
-      /* `res.ok` ANTES do corpo — e isto era um "..." eterno.
-         O código checava só `!res.body`, e 429 (limitador), 401 (sessão) e o
-         500 de chave ausente TÊM corpo: o laço lia texto sem prefixo `data: `,
-         `acc` ficava vazio, e a bolha renderizava `{m.content || "..."}` para
-         sempre — sem erro, sem retry, sem nada dizendo o que houve. É o mesmo
-         defeito que o chat principal e o widget do site já corrigiram; este
-         ficou. */
-      if (!res.ok) {
-        const corpo = await res.text().catch(() => "");
-        throw new Error(avisoQuePodeAparecer(corpo) ?? "");
-      }
-      if (!res.body) throw new Error("");
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let acc = "";
-      let erroNoFluxo = "";
-      let buffer = "";
-      setMessages([...next, { role: "assistant", content: "" }]);
-
-      /* A MESMA CADÊNCIA DO CHAT PRINCIPAL.
-         A paciente usa Chat IA e Nutrição na MESMA tela, trocando de aba —
-         dois ritmos diferentes leem como dois produtos. E aqui o texto vinha
-         em bloco por pedaço, que é exatamente o "nada, nada, parágrafo
-         inteiro" que a régua existe para consertar. */
-      let mostrado = 0;
-      let aberto = true;
-      let quadro: number | null = null;
-      const desenhar = () => {
-        const passo = passoDaDigitacao(acc.length - mostrado, aberto);
-        if (passo > 0) {
-          mostrado = Math.min(acc.length, mostrado + passo);
-          setMessages([...next, { role: "assistant", content: acc.slice(0, mostrado) }]);
-        }
-        quadro = aberto || mostrado < acc.length ? requestAnimationFrame(desenhar) : null;
-      };
-      if (!semAnimacaoNutricao()) quadro = requestAnimationFrame(desenhar);
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        /* BUFFER de linha, como no chat principal. Sem `{stream: true}` e sem
-           carry-over, um `data:` partido entre dois `read()` some do meio da
-           resposta — e acento partido vira "�". */
-        buffer += decoder.decode(value, { stream: true });
-        const linhas = buffer.split("\n");
-        buffer = linhas.pop() ?? "";
-        /* O MESMO leitor do chat principal. Duas cópias de um parser divergem,
-           e foi assim que a parte `error` ficou sem ser lida aqui: falha do
-           provedor depois do HTTP 200 continuava virando bolha vazia. */
-        linhas.forEach((line) => {
-          const parte = lerLinhaDoStream(line);
-          if (parte.tipo === "texto") acc += parte.texto;
-          else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
-        });
-        if (semAnimacaoNutricao()) {
-          mostrado = acc.length;
-          setMessages([...next, { role: "assistant", content: acc }]);
-        }
-      }
-      (buffer + decoder.decode()).split("\n").forEach((line) => {
-        const parte = lerLinhaDoStream(line);
-        if (parte.tipo === "texto") acc += parte.texto;
-        else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
-      });
-      aberto = false;
-      if (erroNoFluxo && !acc.trim()) {
-        if (quadro !== null) cancelAnimationFrame(quadro);
-        throw new Error(erroNoFluxo);
-      }
-      /* Espera o texto terminar de aparecer antes de liberar o "digitando" —
-         senão o indicador some com a bolha pela metade. */
-      await new Promise<void>((r) => {
-        const conferir = () => (mostrado >= acc.length ? r() : setTimeout(conferir, 60));
-        conferir();
-      });
-      setMessages([...next, { role: "assistant", content: acc }]);
-    } catch (e) {
-      setMessages([
-        ...next,
-        {
-          role: "assistant",
-          /* O aviso do servidor manda quando existe: ele sabe o que houve
-             (limite de mensagens, sessão vencida) e a tela não. */
-          content: (e as Error)?.message?.trim() || "Desculpe, ocorreu um erro. Tente novamente.",
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* ─── O CARTÃO DE NUTRIENTES SOME EM MODO CUIDADO ──────────────────
-          "Formação óssea do bebê" e "Desenvolvimento do cérebro fetal" são o
-          conteúdo dele. Eu tinha calado só a saudação e deixado a tela inteira
-          falando do bebê logo abaixo. */}
-      {!careMode && (
-        <div className="rounded-3xl border border-border bg-card p-6">
-          <p className="font-serif text-lg">Nutrientes em destaque — {trimester}º trimestre</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {tips.map((t) => (
-              <div
-                key={t.nutrient}
-                className="rounded-2xl border border-border bg-secondary/40 p-3"
-              >
-                <p className="text-sm font-semibold text-primary">{t.nutrient}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{t.why}</p>
-                <p className="mt-1 text-xs">{t.foods}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Chat */}
-      <div
-        className="flex flex-col rounded-3xl border border-border bg-card"
-        style={{ height: "55vh" }}
-      >
-        <div className="border-b border-border p-4">
-          <p className="font-serif text-lg">Nutricionista Virtual</p>
-          <p className="text-xs text-muted-foreground">
-            {careMode
-              ? "Orientações de alimentação para você — não substitui avaliação nutricional individual."
-              : "Orientações personalizadas para sua gestação — não substitui avaliação nutricional individual."}
-          </p>
-        </div>
-
-        <div className="flex-1 space-y-3 overflow-y-auto p-4">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              <div
-                className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm ${
-                  m.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"
-                }`}
-              >
-                {m.content || "..."}
-                {/* Só nas respostas da IA, e não na saudação (i > 0). */}
-                {m.role === "assistant" && i > 0 && m.content && (
-                  <div className="mt-1.5 flex items-center gap-2">
-                    {votos[i] !== undefined ? (
-                      <span className="text-[10px] text-muted-foreground">
-                        {votos[i] ? "Obrigada 💛" : "Anotado — seu médico vai ver"}
-                      </span>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => votar(i, true)}
-                          aria-label="Esta resposta ajudou"
-                          className="text-xs opacity-50 hover:opacity-100"
-                        >
-                          👍
-                        </button>
-                        <button
-                          onClick={() => votar(i, false)}
-                          aria-label="Esta resposta não ajudou"
-                          className="text-xs opacity-50 hover:opacity-100"
-                        >
-                          👎
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Sugestões: em Modo Cuidado somem. NUTRITION_CHIPS traz "Posso comer
-            tâmara para preparar o parto?" e coisas do tipo. */}
-        {!careMode && messages.length <= 1 && (
-          <div className="flex flex-wrap gap-2 border-t border-border px-4 py-2">
-            {chips.map((c) => (
-              <button
-                key={c}
-                onClick={() => send(c)}
-                className="rounded-full border border-border bg-secondary px-3 py-1 text-xs hover:bg-secondary/70"
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <div className="flex gap-2 border-t border-border p-3">
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && send()}
-            placeholder={
-              careMode
-                ? "Pergunte sobre alimentação..."
-                : "Pergunte sobre alimentação na gestação..."
-            }
-            className="flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
-          />
-          <button
-            onClick={() => send()}
-            disabled={loading}
-            className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
-          >
-            {loading ? "..." : "Enviar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* ⚠️ A tela mudou-se para `src/components/nutricao-tab.tsx` — ela é a única
+   da grade da Saúde que é CONVERSA, e enquanto morava aqui não havia como
+   fotografá-la sem uma conta real e cota de IA. `NUTRIENT_TIPS`,
+   `NUTRITION_CHIPS` e `semAnimacaoNutricao` foram junto: só ela os lê. */
 
 /* ---------- Consultas Tab (Feature #2 — Transcrição IA) ---------- */
 
@@ -10714,12 +7449,14 @@ function formatApptDate(ymd: string): string {
  * sub-abas. Antes: Consultas, Pré-consulta, Perguntas, Checklist, Plano de
  * Parto, Teleconsulta (6 abas). Agora: 1.
  */
+
 export const CONSULTAS_SUBTABS = [
   {
     key: "agenda",
     label: "Agenda",
     sub: "Marcar e remarcar",
     Icon: CalendarCheck,
+    imagem: ARTE_GRADE.agenda,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
   },
@@ -10728,6 +7465,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Preparar",
     sub: "O que levar e contar",
     Icon: ClipboardList,
+    imagem: ARTE_GRADE.preparo,
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
@@ -10736,6 +7474,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Perguntas",
     sub: "Anote para a consulta",
     Icon: MessageCircleQuestion,
+    imagem: ARTE_GRADE.perguntas,
     caixa: "border-amber-200/70 from-amber-50 to-yellow-50/60",
     tinta: "text-amber-600",
   },
@@ -10744,6 +7483,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Checklist",
     sub: "A mala da maternidade",
     Icon: ListChecks,
+    imagem: ARTE_GRADE.checklist,
     caixa: "border-emerald-200/70 from-emerald-50 to-teal-50/60",
     tinta: "text-emerald-600",
   },
@@ -10752,6 +7492,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Plano de parto",
     sub: "Suas preferências",
     Icon: Scroll,
+    imagem: ARTE_GRADE.parto,
     caixa: "border-pink-200/70 from-pink-50 to-rose-50/60",
     tinta: "text-pink-600",
   },
@@ -10760,6 +7501,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Teleconsulta",
     sub: "Consulta por vídeo",
     Icon: Video,
+    imagem: ARTE_GRADE.tele,
     caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
     tinta: "text-indigo-600",
   },
@@ -10768,6 +7510,7 @@ export const CONSULTAS_SUBTABS = [
     label: "Particular",
     sub: "Particular e pagamento",
     Icon: Wallet,
+    imagem: ARTE_GRADE.particular,
     caixa: "border-teal-200/70 from-teal-50 to-emerald-50/60",
     tinta: "text-teal-600",
   },
@@ -10817,7 +7560,7 @@ function ConsultasHub({
   }
   return (
     <div ref={rootRef} className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "agenda" && <ConsultasTab />}
         {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}
@@ -10906,7 +7649,7 @@ function WaitlistCard() {
   const waiting = entries.filter((e) => e.status === "waiting");
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6">
+    <div className="rounded-3xl card-material p-6">
       <p className="font-serif text-lg">Fila de espera</p>
       <p className="mt-0.5 text-sm text-muted-foreground">
         Sem horário na semana que você quer? Entre na fila — se abrir vaga, a gente te avisa aqui e
@@ -10918,7 +7661,7 @@ function WaitlistCard() {
           key={e.id}
           className="mt-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50/70 p-4"
         >
-          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">
+          <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-700">
             🎉 Abriu uma vaga!
           </span>
           <p className="mt-2 text-base font-extrabold text-emerald-800">
@@ -10935,7 +7678,7 @@ function WaitlistCard() {
             <button
               onClick={() => respond(e.id, true)}
               disabled={busy}
-              className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+              className="press flex-1 rounded-full bg-emerald-700 py-2 text-xs font-extrabold text-white disabled:opacity-40"
             >
               Aceitar vaga
             </button>
@@ -11025,7 +7768,7 @@ function ResumosDasConsultas() {
   if (carregando || itens.length === 0) return null;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <p className="font-serif text-lg">📋 Depois das suas consultas</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         O que o seu médico deixou escrito para você.
@@ -11033,7 +7776,7 @@ function ResumosDasConsultas() {
       <ul className="mt-3 space-y-2">
         {itens.map((c) => (
           <li key={c.id} className="rounded-2xl bg-secondary/50 p-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {new Date(c.occurred_at).toLocaleDateString("pt-BR", {
                 day: "2-digit",
                 month: "long",
@@ -11119,7 +7862,7 @@ function MeusPedidos() {
   if (carregando || itens.length === 0) return null;
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-5">
+    <div className="rounded-3xl card-material p-5">
       <p className="font-serif text-lg">Do seu médico</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         Receitas, pedidos de exame e orientações. Marque o que já fez.
@@ -11132,20 +7875,20 @@ function MeusPedidos() {
           >
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {ROT[p.kind] ?? p.kind} · {new Date(p.created_at).toLocaleDateString("pt-BR")}
                 </p>
                 <p className="mt-0.5 text-sm font-semibold text-foreground">{p.titulo}</p>
               </div>
               {p.cumprido_em ? (
-                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold text-emerald-800">
+                <span className="shrink-0 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                   ✓ feito
                 </span>
               ) : (
                 <button
                   onClick={() => marcarFeito(p.id)}
                   disabled={marcando === p.id}
-                  className="press shrink-0 rounded-full border border-border bg-card px-3 py-1 text-[11px] font-semibold disabled:opacity-50"
+                  className="press shrink-0 rounded-full border border-border bg-card px-3 py-1 text-xs font-semibold disabled:opacity-50"
                 >
                   {marcando === p.id ? "…" : "Já fiz"}
                 </button>
@@ -11155,7 +7898,7 @@ function MeusPedidos() {
               {p.conteudo}
             </pre>
             {p.nota && (
-              <p className="mt-1.5 rounded-xl bg-card px-3 py-2 text-[12.5px] leading-snug">
+              <p className="mt-1.5 rounded-xl bg-card px-3 py-2 text-xs leading-snug">
                 <span className="font-semibold">Recado dele: </span>
                 {p.nota}
               </p>
@@ -11170,6 +7913,9 @@ function MeusPedidos() {
 function ConsultasTab() {
   const [appts, setAppts] = useState<MyAppointment[]>([]);
   const [loadingAppts, setLoadingAppts] = useState(true);
+  /* ⚠️ "não consegui ler" NÃO é "você não tem consulta" — ver
+     `fetchAppointmentsCached`. */
+  const [apptsInstavel, setApptsInstavel] = useState(false);
   const [respondingId, setRespondingId] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -11187,28 +7933,48 @@ function ConsultasTab() {
   const chunksRef = useRef<BlobPart[]>([]);
   const mimeRef = useRef<string>("audio/webm");
 
+  /* Nomeada para o botão "Tentar de novo" poder chamá-la: um estado de falha
+     sem saída é o vazio silencioso outra vez, só que honesto — e ela continua
+     sem saber se tem consulta. E `force`, senão o cache de 30 s devolveria a
+     mesma lista vazia sem tocar na rede. */
+  async function loadAppts() {
+    setLoadingAppts(true);
+    try {
+      const r = await fetchAppointmentsCached(true);
+      setAppts(r.appointments);
+      setApptsInstavel(r.instavel);
+    } finally {
+      setLoadingAppts(false);
+    }
+  }
+
   useEffect(() => {
     loadNotes();
-    (async () => {
-      try {
-        setAppts(await fetchAppointmentsCached());
-      } finally {
-        setLoadingAppts(false);
-      }
-    })();
+    void loadAppts();
   }, []);
+
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [notesInstavel, setNotesInstavel] = useState(false);
 
   async function loadNotes() {
     setLoadingNotes(true);
     try {
       const { data: u } = await supabase.auth.getUser();
       if (!u.user) return;
-      const { data } = await (supabase as any)
+      const { data, error } = await (supabase as any)
         .from("consultation_notes")
         .select("*")
         .eq("user_id", u.user.id)
         .order("recorded_at", { ascending: false });
-      setNotes(data ?? []);
+      /* ⚠️ Ela abre isto para reler a posologia que o médico ditou. "Nenhuma
+         consulta salva ainda" sobre uma falha de leitura faz ela tomar o
+         remédio errado, ou nenhum. */
+      if (error || !data) {
+        setNotesInstavel(true);
+        return;
+      }
+      setNotesInstavel(false);
+      setNotes(data);
     } finally {
       setLoadingNotes(false);
     }
@@ -11362,7 +8128,9 @@ function ConsultasTab() {
     });
     if (res.ok) {
       toast(approve ? "Horário confirmado! ✅" : "Horário recusado.");
-      setAppts(await fetchAppointmentsCached(true));
+      const rec = await fetchAppointmentsCached(true);
+      setAppts(rec.appointments);
+      setApptsInstavel(rec.instavel);
     } else {
       toast(res.error ?? "Não foi possível responder");
     }
@@ -11401,7 +8169,7 @@ function ConsultasTab() {
       <ResumosDasConsultas />
 
       {/* ── Minhas consultas: o ciclo médico→paciente fecha AQUI ────── */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="font-serif text-lg">Minhas consultas</p>
@@ -11422,6 +8190,24 @@ function ConsultasTab() {
             <div className="skeleton h-16 rounded-2xl" />
             <div className="skeleton h-16 rounded-2xl" />
           </div>
+        ) : apptsInstavel ? (
+          /* ⚠️ O convite a "agendar a primeira" é a pior frase possível para
+             quem já tem consulta marcada e veio conferir a hora. */
+          <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-center dark:bg-amber-500/10">
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+              Não consegui carregar sua agenda agora
+            </p>
+            <p className="mt-1 text-[13px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+              Isso é a nossa conexão. Se você tem consulta marcada, ela continua marcada.
+            </p>
+            <button
+              type="button"
+              onClick={() => void loadAppts()}
+              className="mt-3 min-h-[44px] rounded-full border border-amber-400 px-4 text-sm font-medium text-amber-900 dark:text-amber-100"
+            >
+              Tentar de novo
+            </button>
+          </div>
         ) : appts.length === 0 ? (
           <div className="mt-4 rounded-2xl bg-secondary/50 p-5 text-center">
             <p className="text-2xl">🗓️</p>
@@ -11440,7 +8226,7 @@ function ConsultasTab() {
                 className="rounded-2xl border-2 border-violet-300 bg-violet-50/70 p-4"
               >
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.counter_proposed.cls}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.counter_proposed.cls}`}
                 >
                   {APPT_STATUS_UI.counter_proposed.emoji} {APPT_STATUS_UI.counter_proposed.label}
                 </span>
@@ -11459,7 +8245,7 @@ function ConsultasTab() {
                   <button
                     onClick={() => respondProposal(a.id, true)}
                     disabled={respondingId === a.id}
-                    className="press flex-1 rounded-full bg-emerald-500 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                    className="press flex-1 rounded-full bg-emerald-700 py-2 text-xs font-extrabold text-white disabled:opacity-40"
                   >
                     Aprovar este horário
                   </button>
@@ -11482,7 +8268,7 @@ function ConsultasTab() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.confirmed.cls}`}
+                    className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.confirmed.cls}`}
                   >
                     {APPT_STATUS_UI.confirmed.emoji} {i === 0 ? "Próxima consulta" : "Confirmada"}
                   </span>
@@ -11502,7 +8288,7 @@ function ConsultasTab() {
             {pending.map((a) => (
               <div key={a.id} className="rounded-2xl border border-border bg-background p-4">
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold ${APPT_STATUS_UI.pending.cls}`}
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${APPT_STATUS_UI.pending.cls}`}
                 >
                   {APPT_STATUS_UI.pending.emoji} {APPT_STATUS_UI.pending.label}
                 </span>
@@ -11527,9 +8313,7 @@ function ConsultasTab() {
                         key={a.id}
                         className="rounded-2xl border border-border/60 bg-background/60 p-3 opacity-80"
                       >
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${ui.cls}`}
-                        >
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${ui.cls}`}>
                           {ui.emoji} {ui.label}
                         </span>
                         <p className="mt-1.5 text-xs text-muted-foreground">
@@ -11552,7 +8336,7 @@ function ConsultasTab() {
       <WaitlistCard />
 
       {/* Recording card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Gravar consulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Grave o áudio da consulta e a IA extrai orientações, medicamentos e exames
@@ -11563,7 +8347,7 @@ function ConsultasTab() {
           {!recording && (
             <button
               onClick={startRecording}
-              className="flex items-center gap-2 rounded-full bg-rose-500 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600"
+              className="flex items-center gap-2 rounded-full bg-rose-700 px-6 py-2.5 text-sm font-medium text-white hover:bg-rose-600"
             >
               <span className="h-2.5 w-2.5 rounded-full bg-white" />
               Iniciar gravação
@@ -11581,7 +8365,7 @@ function ConsultasTab() {
           {recording && (
             <span className="flex items-center gap-1.5 text-sm text-rose-600">
               <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-rose-500" />
-              Gravando...
+              Gravando…
             </span>
           )}
         </div>
@@ -11594,7 +8378,7 @@ function ConsultasTab() {
               disabled={transcribing}
               className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
-              {transcribing ? "Transcrevendo..." : "Transcrever com IA"}
+              {transcribing ? "Transcrevendo…" : "Transcrever com IA"}
             </button>
           </div>
         )}
@@ -11602,7 +8386,7 @@ function ConsultasTab() {
 
       {/* Result card */}
       {result && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           {result.error ? (
             <p className="text-sm text-destructive">{result.error}</p>
           ) : (
@@ -11693,7 +8477,7 @@ function ConsultasTab() {
                   disabled={saving}
                   className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
                 >
-                  {saving ? "Salvando..." : "Salvar nota"}
+                  {saving ? "Salvando…" : "Salvar nota"}
                 </button>
                 {savedMsg && <p className="text-sm text-primary">{savedMsg}</p>}
               </div>
@@ -11703,13 +8487,19 @@ function ConsultasTab() {
       )}
 
       {/* History */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Histórico de consultas</p>
         {loadingNotes ? (
           <div className="mt-4 space-y-2">
             <div className="skeleton h-12 rounded-xl" />
             <div className="skeleton h-12 rounded-xl" />
           </div>
+        ) : notesInstavel ? (
+          <NaoConsegueLer
+            oQue="suas consultas salvas"
+            sossego="O que foi gravado continua salvo."
+            aoTentar={() => void loadNotes()}
+          />
         ) : notes.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">Nenhuma consulta salva ainda.</p>
         ) : (
@@ -11872,7 +8662,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
         date: r.entry_date,
         type: "diario",
         title: `Diário ${r.mood ?? ""}`.trim(),
-        detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "..." : ""),
+        detail: r.content?.slice(0, 100) + (r.content?.length > 100 ? "…" : ""),
       });
     }
     for (const r of consultRes.data ?? []) {
@@ -11933,7 +8723,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Sua jornada pré-natal</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Todos os seus registros numa linha do tempo cronológica.
@@ -11984,7 +8774,7 @@ function TimelineTab({ profile, gest }: { profile: Profile | null; gest: Gest })
                     className={`absolute left-0 top-4 h-6 w-6 rounded-full border-2 border-background ${s.dot} flex items-center justify-center`}
                   />
 
-                  <div className="flex-1 rounded-2xl border border-border bg-card p-4">
+                  <div className="flex-1 rounded-2xl card-material p-4">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-medium">{ev.title}</p>
@@ -12042,21 +8832,6 @@ const MOOD_VALUE: Record<string, number> = {
   "😰": 1,
 };
 
-const MOOD_LABEL: Record<string, string> = {
-  "🥰": "Muito bem",
-  "😊": "Bem",
-  "😌": "Tranquila",
-  "💛": "Conectada",
-  "🙏": "Gratidão",
-  "😴": "Cansada",
-  "🥱": "Com sono",
-  "😐": "Igual",
-  "🤢": "Mal-estar",
-  "😟": "Ansiosa",
-  "😢": "Triste",
-  "😰": "Ansiosa",
-};
-
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 const MOOD_SUGGESTIONS: Record<number, string[]> = {
@@ -12085,20 +8860,44 @@ const MOOD_SUGGESTIONS: Record<number, string[]> = {
 function HumorTab() {
   const [entries, setEntries] = useState<{ entry_date: string; mood: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  /* ⚠️ O Diário lê a MESMA tabela e já distingue instável de vazio desde
+     ago/2026 (`JournalTab`, em `vazio-nao-e-falha.test.ts`). A tela do Humor
+     ficou de pé — e ela é a curva de oito semanas do estado emocional dela:
+     "Nenhum registro ainda" sobre uma leitura que falhou faz quem escreve há
+     meses concluir que perdeu tudo. */
+  const [instavel, setInstavel] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { data } = await (supabase as any)
-        .from("journal_entries")
-        .select("entry_date, mood")
-        .order("entry_date", { ascending: false })
-        .limit(180);
+  const carregar = useCallback(async () => {
+    const { data, error } = await (supabase as any)
+      .from("journal_entries")
+      .select("entry_date, mood")
+      .order("entry_date", { ascending: false })
+      .limit(180);
+    if (error) setInstavel(true);
+    else {
+      setInstavel(false);
       setEntries(data ?? []);
-      setLoading(false);
-    })();
+    }
+    setLoading(false);
   }, []);
 
+  useEffect(() => {
+    void carregar();
+  }, [carregar]);
+
   if (loading) return <TabSkeleton />;
+
+  /* ⚠️ A ORDEM É O CONSERTO: a falha vem ANTES do vazio. Trocadas, quem
+     escreve há meses lê "Nenhum registro ainda" e vai procurar o diário
+     perdido em vez de tentar de novo. */
+  if (instavel && entries.length === 0)
+    return (
+      <NaoConsegueLer
+        oQue="o seu humor"
+        sossego="O que você escreveu no diário continua salvo."
+        aoTentar={() => void carregar()}
+      />
+    );
 
   if (entries.length === 0)
     return (
@@ -12186,7 +8985,7 @@ function HumorTab() {
   return (
     <div className="space-y-6">
       {/* Summary */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Resumo dos últimos 14 dias</p>
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-2xl bg-secondary/50 p-3 text-center">
@@ -12216,7 +9015,7 @@ function HumorTab() {
       </div>
 
       {/* Weekly mood chart */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Humor por semana</p>
         <p className="text-xs text-muted-foreground mt-1">
           Média semanal das últimas 8 semanas (1=muito ruim · 5=ótimo)
@@ -12273,7 +9072,7 @@ function HumorTab() {
       </div>
 
       {/* Day of week heatmap */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Padrão por dia da semana</p>
         <div className="mt-4 flex gap-2">
           {DAY_NAMES.map((name, i) => {
@@ -12308,7 +9107,7 @@ function HumorTab() {
       </div>
 
       {/* Top moods */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Seus humores mais frequentes</p>
         <div className="mt-4 space-y-2">
           {topMoods.map(([emoji, count]) => (
@@ -12622,7 +9421,7 @@ function MeditacoesConteudo({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Meditações Guiadas</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Sessões de meditação para ler ou ouvir, específicas para cada fase da gestação.
@@ -12789,6 +9588,8 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
   const [activeSession, setActiveSession] = useState<TeleconsultaSession | null>(null);
   const [notes, setNotes] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
 
   useEffect(() => {
     load();
@@ -12799,7 +9600,16 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
     const { data } = await supabase.auth.getSession();
     const tk = data.session?.access_token ?? "";
     const res = await getMyTeleconsultas({ data: { accessToken: tk } });
-    if (res.ok) setSessions(res.sessions);
+    /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL — o `try/catch` não
+       pega. Sem este `else`, o médico abre a sala, ela abre o app, lê "Nenhuma
+       consulta agendada no momento" e PERDE a teleconsulta com a sala aberta
+       do outro lado. */
+    if (res.ok) {
+      setSessions(res.sessions);
+      setInstavel(false);
+    } else {
+      setInstavel(true);
+    }
     setLoading(false);
   }
 
@@ -12836,7 +9646,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
   return (
     <div className="space-y-6">
       {/* Info card */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Teleconsulta</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Quando o seu médico abrir a sala, você receberá um e-mail com o link do Google Meet e
@@ -12853,6 +9663,12 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
           <div className="skeleton h-20 rounded-2xl" />
           <div className="skeleton h-20 rounded-2xl" />
         </div>
+      ) : instavel ? (
+        <NaoConsegueLer
+          oQue="suas teleconsultas"
+          sossego="Se você tem uma teleconsulta marcada, ela continua marcada."
+          aoTentar={() => void load()}
+        />
       ) : sessions.length === 0 ? (
         <div className="py-14 text-center">
           <p className="text-4xl mb-3">📱</p>
@@ -12864,7 +9680,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
       ) : (
         <div className="space-y-4">
           {sessions.map((s) => (
-            <div key={s.id} className="rounded-3xl border border-border bg-card p-6">
+            <div key={s.id} className="rounded-3xl card-material p-6">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-medium">
@@ -12915,7 +9731,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                     setNotes(s.patient_notes ?? "");
                   }}
                   rows={2}
-                  placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta..."
+                  placeholder="Anote dúvidas antes ou orientações recebidas durante a consulta…"
                   className="mt-2 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
                 />
                 {activeSession?.id === s.id && (
@@ -12924,7 +9740,7 @@ function TeleconsultaTab({ profile }: { profile: Profile | null }) {
                     disabled={savingNotes}
                     className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
                   >
-                    {savingNotes ? "Salvando..." : "Salvar anotações"}
+                    {savingNotes ? "Salvando…" : "Salvar anotações"}
                   </button>
                 )}
               </div>
@@ -13017,7 +9833,7 @@ function CartaBebêTab({
 
   if (!gest || !week) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center">
+      <div className="rounded-3xl card-material p-8 text-center">
         <p className="text-muted-foreground">
           Configure sua gestação em{" "}
           <button
@@ -13038,10 +9854,10 @@ function CartaBebêTab({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Semana {week}</p>
+            <p className="font-serif text-[15px] font-semibold text-primary">Semana {week}</p>
             <p className="mt-1 font-serif text-2xl">Carta do seu bebê</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Uma mensagem especial na perspectiva do {profile?.baby_name ?? "seu bebê"}, gerada por
@@ -13098,7 +9914,7 @@ function CartaBebêTab({
           className="rounded-full bg-primary px-8 py-3 text-sm font-medium text-primary-foreground disabled:opacity-60"
         >
           {loading
-            ? "Gerando carta..."
+            ? "Gerando carta…"
             : letter
               ? "Gerar nova carta"
               : "✉️ Receber carta desta semana"}
@@ -13146,8 +9962,24 @@ const SOUND_INFO: Record<
     icon: "🌊",
   },
   binaural: {
-    label: "Batidas binaurais",
-    description: "Dois tons levemente diferentes criam uma sensação de relaxamento profundo.",
+    label: "Dois tons",
+    /*
+      ⚠️ **ERA UMA ALEGAÇÃO SEM EVIDÊNCIA, E ELA FALHAVA DUAS VEZES.**
+
+      1. "Criam uma sensação de relaxamento profundo" é exatamente o tipo de
+         afirmação que `afinacao.ts` existe para barrar: num app de gestação de
+         alto risco, prometer efeito sem evidência ao lado de uma triagem de
+         pré-eclâmpsia ensina que este app afirma coisas que não sustenta — e a
+         próxima afirmação que ela vai desacreditar é a que importa.
+         ⚠️ A catraca de `afinacao.test.ts` não alcança esta linha: o gatilho
+         dela é "432 / Hz / afinação", e aqui não há nenhum. A proteção é o
+         texto.
+      2. E o nome "batidas binaurais" descreve um efeito que depende de cada
+         ouvido receber um tom DIFERENTE. No alto-falante do celular os dois
+         tons se somam no ar antes de chegar nela: sem fone, o que a
+         palavra promete não acontece de jeito nenhum. Agora o texto diz isso.
+    */
+    description: "Dois tons próximos, um em cada lado. Use fone para ouvir como foi feito.",
     minWeek: 24,
     icon: "🎵",
   },
@@ -13408,7 +10240,7 @@ function SonsBebêTab({
   return (
     <div className="space-y-6">
       {/* Info */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Sons para o bebê</p>
         <p className="mt-1 text-sm text-muted-foreground">
           O bebê começa a ouvir sons por volta da semana 16–18. Sons reproduzidos regularmente
@@ -13423,7 +10255,7 @@ function SonsBebêTab({
       </div>
 
       {/* Volume */}
-      <div className="flex items-center gap-4 rounded-2xl border border-border bg-card px-5 py-3">
+      <div className="flex items-center gap-4 rounded-2xl card-material px-5 py-3">
         <span className="text-sm text-muted-foreground">🔉 Volume</span>
         <input
           type="range"
@@ -13498,7 +10330,7 @@ function SonsBebêTab({
 
       {/* Most played */}
       {Object.values(playCount).some((v) => v > 0) && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <p className="font-serif text-lg">Sons favoritos do seu bebê</p>
           <div className="mt-4 space-y-2">
             {sortedByPlays
@@ -13760,7 +10592,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-lg">Exercícios para gestantes</p>
         <p className="mt-1 text-sm text-muted-foreground">
           {currentTrimester
@@ -13797,7 +10629,7 @@ function ExerciciosTab({ gest }: { gest: Gest }) {
       ) : (
         <div className="space-y-3">
           {available.map((ex) => (
-            <div key={ex.id} className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div key={ex.id} className="rounded-2xl card-material overflow-hidden">
               <button
                 onClick={() => setExpanded(expanded === ex.id ? null : ex.id)}
                 className="flex w-full items-start justify-between gap-3 p-5 text-left"
@@ -14167,7 +10999,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
   return (
     <div className="space-y-6">
       {/* Progress */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="font-serif text-lg">Preparação do quartinho</p>
@@ -14235,7 +11067,7 @@ function QuartinhoTab({ gest }: { gest: Gest }) {
         if (items.length === 0) return null;
         const doneCat = items.filter((i) => checked.has(i.id)).length;
         return (
-          <div key={cat} className="rounded-3xl border border-border bg-card overflow-hidden">
+          <div key={cat} className="rounded-3xl card-material overflow-hidden">
             <div className="flex items-center justify-between border-b border-border px-5 py-3">
               <p className="font-medium">{cat}</p>
               <span className="text-xs text-muted-foreground">
@@ -14330,7 +11162,7 @@ function CountdownTab({
 
   if (!profile || !gest) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+      <div className="rounded-3xl card-material p-8 text-center text-muted-foreground">
         Configure seu perfil (DPP ou DUM) para ver a contagem regressiva.
       </div>
     );
@@ -14339,7 +11171,7 @@ function CountdownTab({
   const due = profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null);
   if (!due) {
     return (
-      <div className="rounded-3xl border border-border bg-card p-8 text-center text-muted-foreground">
+      <div className="rounded-3xl card-material p-8 text-center text-muted-foreground">
         Adicione a data provável do parto em{" "}
         <button
           type="button"
@@ -14395,9 +11227,7 @@ function CountdownTab({
     <div className="space-y-8">
       {!isDueToday && reta ? (
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            {reta.eyebrow}
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">{reta.eyebrow}</p>
           <p className="mt-3 font-serif text-2xl text-foreground">{reta.titulo}</p>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-foreground/80">
             {reta.corpo}
@@ -14409,9 +11239,7 @@ function CountdownTab({
         </div>
       ) : (
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 to-rose-50 p-8 text-center shadow-[var(--shadow-card)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
-            Faltam para a DPP
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-primary">Faltam para a DPP</p>
           <div className="mt-6 flex justify-center gap-4 sm:gap-8">
             {[
               { value: days, label: "dias" },
@@ -14499,32 +11327,72 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session) return;
-      const res = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
-      if (res.ok) setPosts(res.posts);
+  /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
+  const [instavel, setInstavel] = useState(false);
 
-      // Get companion invite token for sharing
-      const { data: invites } = await (supabase as any)
-        .from("companion_invites")
-        .select("token")
-        .eq("user_id", s.session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1);
-      if (invites?.[0]?.token) {
-        setInviteToken(invites[0].token);
-        /* ⚠️ `album_token`, e o recuo para `token` existe só para a linha que
-           ainda não passou pela rotação do SQL. Depois de rodá-lo, `album_token`
-           está sempre preenchido — e é ele que NÃO abre o SOS. */
-        setShareUrl(
-          `${window.location.origin}/album/${invites[0].album_token ?? invites[0].token}`,
-        );
-      }
-      setLoading(false);
-    })();
+  /* ⚠️ Nomeada para o "Tentar de novo" poder chamá-la: um estado de falha sem
+     saída é o vazio silencioso outra vez, só que honesto. */
+  const load = useCallback(async () => {
+    const { data: s } = await supabase.auth.getSession();
+    if (!s.session) return;
+    const res = await getMyAlbumPosts({ data: { accessToken: s.session.access_token } });
+    /* ⚠️ "Nenhuma memória ainda" — com o contador do título dizendo
+         "Álbum (0 memórias)" — faz ela achar que as fotos da gestação foram
+         apagadas. É o menor risco clínico desta leva e o maior risco
+         emocional. */
+    if (res.ok) {
+      setPosts(res.posts);
+      setInstavel(false);
+    } else {
+      setInstavel(true);
+    }
+
+    // Get companion invite token for sharing
+    const { data: invites } = await (supabase as any)
+      .from("companion_invites")
+      /* ⚠️ **`album_token` TEM DE SER PEDIDO.** Este `select` trazia só
+           `token`, então `invites[0].album_token` era SEMPRE `undefined` e o
+           `??` abaixo caía sempre no recuo — que não era recuo nenhum: era o
+           caminho de todo mundo. E o comentário ao lado afirmava o contrário,
+           dizendo que depois do SQL `album_token` estaria preenchido. Está —
+           NO BANCO. A consulta é que não o trazia. */
+      .select("token, album_token")
+      .eq("user_id", s.session.user.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (invites?.[0]?.token) {
+      setInviteToken(invites[0].token);
+      /**
+       * ⚠️ **SEM `album_token`, O LINK NÃO SAI — e nunca cai no `token`.**
+       *
+       * Os dois vivem na mesma linha e têm privilégios OPOSTOS: `token` abre
+       * o painel do acompanhante E os SOS dos últimos 30 minutos com
+       * latitude e longitude (`getRecentPanicByToken`, que filtra por
+       * `token`). `album_token` abre só o álbum.
+       *
+       * O link do álbum é o que ela cola no grupo da família — numa
+       * influenciadora, para muito mais gente. Um recuo para `token` aqui
+       * publica a localização dela em tempo real de emergência para todo
+       * mundo que receber a mensagem.
+       *
+       * E o recuo nem funcionava: `getFamilyAlbum` busca por `album_token`,
+       * então um link com o `token` do acompanhante **não abre o álbum**.
+       * Ou seja, o recuo trocava um álbum que não abre por um vazamento de
+       * GPS — as duas pontas erradas de uma vez.
+       *
+       * Sem a coluna, o certo é NÃO oferecer o link: o álbum ficar
+       * indisponível até o SQL rodar é recuperável; o GPS espalhado no
+       * WhatsApp não é.
+       */
+      const doAlbum = invites[0].album_token;
+      setShareUrl(doAlbum ? `${window.location.origin}/album/${doAlbum}` : "");
+    }
+    setLoading(false);
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -14541,7 +11409,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setImageData(canvas.toDataURL("image/jpeg", 0.75));
+        setImageData(codificarFoto(canvas, 0.75));
       };
       img.src = ev.target?.result as string;
     };
@@ -14592,7 +11460,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-4">Adicionar ao álbum</h3>
         <div className="space-y-3">
           <input
@@ -14623,7 +11491,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
           <input
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Legenda (opcional)..."
+            placeholder="Legenda (opcional)…"
             className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <div className="flex gap-2">
@@ -14642,7 +11510,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             disabled={submitting || (!caption && !imageData && !emoji)}
             className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            {submitting ? "Salvando..." : "Publicar no álbum"}
+            {submitting ? "Salvando…" : "Publicar no álbum"}
           </button>
         </div>
       </div>
@@ -14664,7 +11532,12 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             </button>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            A família acessa o álbum com o mesmo link do acompanhante.
+            {/* ⚠️ A frase antiga dizia "a família acessa o álbum com o MESMO
+                link do acompanhante" — e ensinava exatamente o que não pode
+                ser verdade: o link do acompanhante abre o alerta de emergência
+                com localização. Os dois links são diferentes de propósito. */}
+            Este link abre só o álbum. Ele é diferente do link do acompanhante, que mostra mais
+            coisas suas.
           </p>
         </div>
       )}
@@ -14676,11 +11549,34 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
+      {/* ⚠️ **O SILÊNCIO AQUI LERIA COMO APP QUEBRADO.** Existe convite, e mesmo
+          assim não há link: é o caso em que a linha ainda não tem `album_token`
+          (o SQL da rotação não rodou). O link NÃO cai no token do acompanhante
+          — ele abre o SOS com GPS —, então em vez de um link perigoso ela
+          recebe a explicação. */}
+      {inviteToken && !shareUrl && (
+        <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          O link do álbum ainda não está disponível nesta conta. Ele é diferente do link do
+          acompanhante de propósito — o do acompanhante abre o seu alerta de emergência, e não pode
+          ir para o grupo da família. Avise o consultório para liberar.
+        </div>
+      )}
+
       <div>
         <h3 className="font-semibold mb-4">
-          Álbum ({posts.length} {posts.length === 1 ? "memória" : "memórias"})
+          {/* ⚠️ O contador é a afirmação em NÚMERO, e ele mente antes da prosa:
+              "Álbum (0 memórias)" já diz que não há nada, mesmo com o aviso de
+              falha logo abaixo. */}
+          Álbum
+          {instavel ? "" : ` (${posts.length} ${posts.length === 1 ? "memória" : "memórias"})`}
         </h3>
-        {posts.length === 0 ? (
+        {instavel ? (
+          <NaoConsegueLer
+            oQue="seu álbum"
+            sossego="Suas fotos continuam guardadas."
+            aoTentar={() => void load()}
+          />
+        ) : posts.length === 0 ? (
           <div className="py-14 text-center">
             <p className="text-4xl mb-3">📷</p>
             <p className="font-serif text-xl text-foreground/70">Nenhuma memória ainda</p>
@@ -14691,7 +11587,7 @@ function AlbumTab({ profile }: { profile: Profile | null }) {
             {posts.map((post) => (
               <div
                 key={post.id}
-                className="group relative rounded-2xl border border-border bg-card overflow-hidden"
+                className="group relative rounded-2xl card-material overflow-hidden"
               >
                 {post.image_url && (
                   <img
@@ -14812,7 +11708,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-3 items-center justify-between rounded-3xl border border-border bg-card p-6">
+      <div className="flex flex-wrap gap-3 items-center justify-between rounded-3xl card-material p-6">
         <div>
           <h3 className="font-semibold">Votação de nomes</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -14860,14 +11756,14 @@ function NomeTab({ profile }: { profile: Profile | null }) {
         </div>
       )}
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-3">Sugerir nome</h3>
         <div className="flex gap-2">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleAddName()}
-            placeholder="Nome do bebê..."
+            placeholder="Nome do bebê…"
             className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <button
@@ -14875,7 +11771,7 @@ function NomeTab({ profile }: { profile: Profile | null }) {
             disabled={saving || !newName.trim()}
             className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
           >
-            {saving ? "..." : "Adicionar"}
+            {saving ? "Adicionando…" : "Adicionar"}
           </button>
         </div>
       </div>
@@ -15002,13 +11898,13 @@ function EscolaBebêTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: st
       </div>
 
       {/* Progresso resumido */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <div className="mb-3 flex items-center justify-between">
           <div>
             <h3 className="font-serif text-lg">Seu progresso</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {loading
-                ? "Carregando..."
+                ? "Carregando…"
                 : `${completedCount} de ${COURSE_MODULES.length} lições · ${unlockedCount} já liberadas`}
             </p>
           </div>
@@ -15255,7 +12151,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
           </button>
           <a
             href={`mailto:${DOCTOR.supportEmail}?subject=${encodeURIComponent("Preciso de ajuda — app Obstétrica")}&body=${encodeURIComponent("Olá! Já tentei pelo chat e ainda preciso de ajuda com: ")}`}
-            className="press flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left"
+            className="press flex w-full items-center gap-3 rounded-2xl card-material p-4 text-left"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-secondary text-lg">
               2️⃣
@@ -15270,12 +12166,12 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
             </span>
           </a>
         </div>
-        <p className="mt-3 text-[11px] text-muted-foreground">
+        <p className="mt-3 text-xs text-muted-foreground">
           🚨 Emergência médica não é suporte: ligue 192 (SAMU) ou vá à maternidade.
         </p>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <h2 className="font-serif text-xl mb-1">Perguntas frequentes</h2>
         {currentWeek > 0 && (
           <p className="text-sm text-muted-foreground">
@@ -15286,7 +12182,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar pergunta..."
+            placeholder="Buscar pergunta…"
             className="flex-1 rounded-xl border border-border bg-background px-4 py-2 text-sm"
           />
           <button
@@ -15308,7 +12204,7 @@ function FAQTab({ gest, onNavigate }: { gest: Gest; onNavigate: (tab: string) =>
       ) : (
         <div className="space-y-2">
           {filtered.map((item, i) => (
-            <div key={i} className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div key={i} className="rounded-2xl card-material overflow-hidden">
               <button
                 className="w-full flex items-center justify-between p-4 text-left"
                 onClick={() => setOpen(open === i ? null : i)}
@@ -15530,12 +12426,38 @@ const MILESTONES_DEF = [
   { key: "primeira_palavra", label: "Primeira palavra", emoji: "💬", weekApprox: 52 },
 ];
 
+/**
+ * ⚠️ O PORTAL PÓS-PARTO NÃO CONHECIA O MODO CUIDADO — e este era o pior lugar
+ * do app para isso faltar.
+ *
+ * `care_mode` não limpa `birth_date`. Numa perda DEPOIS do nascimento
+ * (natimorto, óbito neonatal), a data está preenchida e o Portal abria
+ * inteiro: "Helena nasceu! 3 semanas de vida", com o convite a marcar o
+ * primeiro sorriso e o calendário de 24 vacinas de um bebê que morreu.
+ *
+ * ⚠️ **E O CONSERTO NÃO É ESCONDER A ABA.** Duas coisas aqui importam MAIS
+ * depois de uma perda, não menos:
+ *
+ *   · **Bem-estar (EPDS)** — a escala de Edinburgh, cuja décima pergunta é
+ *     ideação de autolesão. Quem perdeu um bebê está no risco máximo de
+ *     depressão perinatal. Tirar isso seria o Modo Cuidado desligando socorro,
+ *     que é exatamente o que a régua deste repositório proíbe.
+ *   · **Retorno** — a consulta de puerpério. O corpo dela passou pelo parto do
+ *     mesmo jeito, e o retorno é onde hemorragia, infecção e pré-eclâmpsia de
+ *     pós-parto são pegas.
+ *
+ * O que sai são as três abas que falam DO BEBÊ: amamentação, marcos e vacinas.
+ * E o cabeçalho deixa de anunciar um nascimento — sem narrar a perda, que não
+ * é o app quem conta.
+ */
 function PosPartoTab({
   profile,
   onNavigate,
+  careMode = false,
 }: {
   profile: Profile | null;
   onNavigate: (tab: string) => void;
+  careMode?: boolean;
 }) {
   const [subTab, setSubTab] = useState<"saúde" | "amamentação" | "marcos" | "vacinas" | "retorno">(
     "saúde",
@@ -15543,7 +12465,7 @@ function PosPartoTab({
 
   if (!profile?.birth_date) {
     return (
-      <div className="max-w-md mx-auto rounded-3xl border border-border bg-card p-8 text-center space-y-4">
+      <div className="max-w-md mx-auto rounded-3xl card-material p-8 text-center space-y-4">
         <p className="text-4xl">🍼</p>
         <h2 className="font-serif text-xl">Portal Pós-parto</h2>
         <p className="text-sm text-muted-foreground">
@@ -15574,31 +12496,50 @@ function PosPartoTab({
   const babyAgeWeeks = Math.floor(babyAgeDays / 7);
   const babyName = profile.baby_name ?? "bebê";
 
-  const subTabs: { key: typeof subTab; label: string }[] = [
-    { key: "saúde", label: "Bem-estar" },
-    { key: "amamentação", label: "Amamentação" },
-    { key: "marcos", label: "Marcos" },
-    { key: "vacinas", label: "Vacinas" },
-    { key: "retorno", label: "Retorno" },
-  ];
+  const subTabs: { key: typeof subTab; label: string }[] = careMode
+    ? /* Só o que é sobre o corpo e a cabeça DELA. */
+      [
+        { key: "saúde", label: "Bem-estar" },
+        { key: "retorno", label: "Retorno" },
+      ]
+    : [
+        { key: "saúde", label: "Bem-estar" },
+        { key: "amamentação", label: "Amamentação" },
+        { key: "marcos", label: "Marcos" },
+        { key: "vacinas", label: "Vacinas" },
+        { key: "retorno", label: "Retorno" },
+      ];
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 flex items-center gap-4">
-        <span className="text-4xl">🍼</span>
-        <div>
-          <p className="font-semibold">
-            {babyName} nasceu!{" "}
-            {babyAgeWeeks > 0
-              ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}`
-              : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`}{" "}
-            de vida
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Nascimento: {birthDate.toLocaleDateString("pt-BR")}
+      {careMode ? (
+        /* ⚠️ Sóbrio, e sem contar o que aconteceu: o Modo Cuidado pode ter
+           sido ligado pelo médico, e narrar a perda de volta para ela na
+           abertura da tela é o app dando a notícia mais íntima que existe. */
+        <div className="rounded-3xl card-material p-5">
+          <p className="font-semibold">Cuidando de você</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Seu corpo passou por um parto, e o acompanhamento continua. O que estiver pesando também
+            é cuidado — e o seu médico está aqui.
           </p>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-3xl border border-primary/20 bg-primary/5 p-5 flex items-center gap-4">
+          <span className="text-4xl">🍼</span>
+          <div>
+            <p className="font-semibold">
+              {babyName} nasceu!{" "}
+              {babyAgeWeeks > 0
+                ? `${babyAgeWeeks} semana${babyAgeWeeks > 1 ? "s" : ""}`
+                : `${babyAgeDays} dia${babyAgeDays !== 1 ? "s" : ""}`}{" "}
+              de vida
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Nascimento: {birthDate.toLocaleDateString("pt-BR")}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-1">
         {subTabs.map((st) => (
@@ -15617,9 +12558,15 @@ function PosPartoTab({
       </div>
 
       {subTab === "saúde" && <PpdSection babyAgeDays={babyAgeDays} />}
-      {subTab === "amamentação" && <BreastfeedingSection />}
-      {subTab === "marcos" && <MilestonesSection babyAgeWeeks={babyAgeWeeks} babyName={babyName} />}
-      {subTab === "vacinas" && <VaccinesSection birthDate={birthDate} />}
+      {/* ⚠️ O cinto, além do suspensório: as três abas do bebê já não têm
+          botão no Modo Cuidado, mas o portão fica também no corpo. Uma prop de
+          sub-tela inicial acrescentada amanhã (como `initialSub`, que outras
+          abas já têm) abriria "Marcos" por link sem passar pela fita. */}
+      {!careMode && subTab === "amamentação" && <BreastfeedingSection />}
+      {!careMode && subTab === "marcos" && (
+        <MilestonesSection babyAgeWeeks={babyAgeWeeks} babyName={babyName} />
+      )}
+      {!careMode && subTab === "vacinas" && <VaccinesSection birthDate={birthDate} />}
       {subTab === "retorno" && <RetornoSection birthDate={birthDate} profile={profile} />}
     </div>
   );
@@ -15632,6 +12579,13 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
   const [submitted, setSubmitted] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [history, setHistory] = useState<PpdScreening[]>([]);
+  /**
+   * ⚠️ `null` = ainda não tentou. `false` = tentou e NÃO deu.
+   *
+   * Os dois não podem virar o mesmo estado: a tela precisa poder dizer "não
+   * consegui avisar seu médico" sem dizer isso antes de ter tentado.
+   */
+  const [avisouOMedico, setAvisouOMedico] = useState<boolean | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(true);
 
   useEffect(() => {
@@ -15654,19 +12608,67 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
     }, 0);
   }
 
+  /**
+   * ⚠️ **A RESPOSTA DELA PRECISA CHEGAR AO MÉDICO — e não chegava.**
+   *
+   * Esta função gravava só em `ppd_screenings`, uma tabela que **não tem
+   * coluna `doctor_id`** e que NENHUM caminho do médico lê: nem o prontuário,
+   * nem `clinical_events`, nem a fila de trabalho. Varredura do repositório:
+   * os únicos toques são o `insert` daqui e o histórico que a própria paciente
+   * abre.
+   *
+   * Então uma puérpera abria Pós-parto → Bem-estar, respondia **"sim, tive
+   * pensamentos de me machucar"** (questão 10), via a caixa vermelha com o
+   * 188 — e o obstetra dela não recebia NADA.
+   *
+   * A MESMA resposta, dada na página pública `/epds`, dispara o e-mail
+   * "🚨 EPDS URGENTE — {nome} relatou pensamentos de autolesão" e entra em
+   * `eventosQuePedemOlhar` como gravidade GRAVE. Duas telas, o mesmo
+   * questionário validado, e só uma avisava alguém.
+   *
+   * E a tela ainda prometia o contrário: "o resultado deve ser compartilhado
+   * com o seu médico".
+   *
+   * ⚠️ **Grava nas DUAS**, e a ordem importa: `saveEpdsLog` primeiro, porque é
+   * ele que carimba `doctor_id` e dispara o alerta. `ppd_screenings` continua
+   * porque é dele que sai o HISTÓRICO que ela relê nesta tela — apagar seria
+   * tirar dela um dado que já é seu.
+   */
   async function handleSubmit() {
     if (answers.some((a) => a === null)) return;
     const s = getScore(answers as number[]);
     setScore(s);
     setSubmitted(true);
     const { data: sess } = await supabase.auth.getSession();
-    if (sess.session) {
-      await savePpdScreening({
-        data: { accessToken: sess.session.access_token, score: s, answers: answers as number[] },
+    if (!sess.session) return;
+    const token = sess.session.access_token;
+
+    /* ⚠️ O ALERTA VEM PRIMEIRO, e o retorno é LIDO. `saveEpdsLog` devolve
+       `{ ok: false }` numa resposta 200 normal — um `try/catch` em volta não
+       pegaria, e o "não registrei" precisa aparecer na tela: ela achar que o
+       médico foi avisado quando não foi é pior que o silêncio. */
+    let alertou = false;
+    try {
+      const { saveEpdsLog } = await import("@/lib/epds.functions");
+      const r = await saveEpdsLog({
+        data: {
+          accessToken: token,
+          score: s,
+          q10Score: respostaDaQuestao10(answers),
+          level: nivelDaEpds(s, respostaDaQuestao10(answers)),
+        },
       });
-      const res = await getMyPpdScreenings({ data: { accessToken: sess.session.access_token } });
-      if (res.ok) setHistory(res.screenings);
+      alertou = Boolean((r as { ok?: boolean })?.ok);
+    } catch {
+      alertou = false;
     }
+    setAvisouOMedico(alertou);
+
+    await savePpdScreening({
+      data: { accessToken: token, score: s, answers: answers as number[] },
+    });
+    const res = await getMyPpdScreenings({ data: { accessToken: token } });
+    if (res.ok) setHistory(res.screenings);
   }
 
   function scoreColor(s: number) {
@@ -15685,7 +12687,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-1">Rastreio de depressão pós-parto (EPDS)</h3>
         <p className="text-xs text-muted-foreground mb-4">
           Escala de Edimburgo — 10 perguntas sobre como você se sentiu nos últimos 7 dias
@@ -15748,9 +12750,27 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
                     </div>
                   </a>
                 </div>
-                <p className="mt-2 text-xs text-red-700">
-                  Informe o seu médico sobre seu resultado na próxima consulta.
-                </p>
+                {/* ⚠️ **A FRASE MUDOU PORQUE O COMPORTAMENTO MUDOU.** Ela dizia
+                    "informe o seu médico na próxima consulta" — e era a única
+                    coisa verdadeira enquanto nada avisava ninguém. Agora o
+                    aviso sai na hora, e a tela diz isso.
+
+                    ⚠️ E quando ele NÃO sai, ela diz isso também: "avisamos seu
+                    médico" sobre um envio que falhou é a mentira mais cara que
+                    esta tela pode contar, porque ela para de procurar ajuda
+                    achando que já pediu. */}
+                {avisouOMedico === true && (
+                  <p className="mt-2 text-xs font-medium text-red-700">
+                    Avisamos o seu médico agora. Se você não estiver bem, ligue 188 ou procure
+                    atendimento — não espere a resposta dele.
+                  </p>
+                )}
+                {avisouOMedico === false && (
+                  <p className="mt-2 text-xs font-medium text-red-700">
+                    Não conseguimos avisar o seu médico agora. Ligue 188 ou procure atendimento, e
+                    fale com ele por outro caminho.
+                  </p>
+                )}
               </div>
             )}
 
@@ -15779,7 +12799,7 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
       </div>
 
       {!loadingHistory && history.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <h3 className="font-semibold mb-3">Histórico</h3>
           <div className="space-y-2">
             {history.map((h) => (
@@ -15802,7 +12822,8 @@ function PpdSection({ babyAgeDays }: { babyAgeDays: number }) {
 
       <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-xs text-muted-foreground">
         A EPDS é um rastreio, não um diagnóstico. Apenas um profissional de saúde pode diagnosticar
-        depressão pós-parto. O resultado deve ser compartilhado com o seu médico.
+        depressão pós-parto. Quando o resultado indica atenção, o seu médico é avisado
+        automaticamente.
         {babyAgeDays < 42 && (
           <span> Recomenda-se repetir o rastreio com 6 semanas após o parto.</span>
         )}
@@ -15901,18 +12922,18 @@ function BreastfeedingSection() {
     <div className="max-w-xl space-y-6">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+        <div className="rounded-2xl card-material p-4 text-center">
           <p className="text-3xl font-bold text-primary">{todayCount}</p>
           <p className="text-xs text-muted-foreground">mamadas hoje</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-4 text-center">
+        <div className="rounded-2xl card-material p-4 text-center">
           <p className="text-3xl font-bold text-primary">{todayMinutes}</p>
           <p className="text-xs text-muted-foreground">minutos hoje</p>
         </div>
       </div>
 
       {/* Timer */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-4">Registrar mamada</h3>
         {!activeLog ? (
           <div className="space-y-3">
@@ -15956,7 +12977,7 @@ function BreastfeedingSection() {
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Observação opcional..."
+              placeholder="Observação opcional…"
               className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
             />
             <button
@@ -16038,28 +13059,65 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
     return milestones.some((m) => m.milestone_key === key);
   }
 
+  /**
+   * ⚠️ **A MESMA RÉGUA DA CADERNETA DE VACINAS, que vive logo abaixo nesta tela.**
+   *
+   * `setMilestone` e `removeMilestone` devolvem `{ ok: false }` numa resposta
+   * **200 NORMAL** — sessão expirada, RLS, coluna faltando —, e um `try/catch`
+   * em volta não pega nada disso. A tela pintava o marco na hora e nunca
+   * corrigia: a mãe registrava o primeiro sorriso, via o ✓, fechava o app, e na
+   * abertura seguinte não havia nada.
+   *
+   * ⚠️ **E aqui dói mais que em quase todo lugar: isto é o livro de memórias do
+   * bebê.** O primeiro sorriso não volta para ser registrado de novo — quando
+   * ela descobrir que não gravou, a data já passou.
+   *
+   * ⚠️ E a irmã ao lado JÁ estava consertada, com o comentário do conserto
+   * visível na mesma tela. É a forma mais comum de defeito deste repositório:
+   * a régua aplicada num lugar e deixada de pé no vizinho.
+   */
   async function toggleMilestone(key: string) {
     const { data: s } = await supabase.auth.getSession();
     if (!s.session) return;
-    if (isDone(key)) {
-      await removeMilestone({ data: { accessToken: s.session.access_token, milestoneKey: key } });
-      setMilestones((m) => m.filter((x) => x.milestone_key !== key));
-    } else {
-      await setMilestone({
-        data: {
-          accessToken: s.session.access_token,
-          milestoneKey: key,
-          achievedAt: dateInput,
-          notes: null,
-          customLabel: null,
-        },
-      });
-      setMilestones((m) => [
-        ...m,
-        { id: "", milestone_key: key, custom_label: null, achieved_at: dateInput, notes: null },
-      ]);
+    const marcado = isDone(key);
+    try {
+      const r = marcado
+        ? await removeMilestone({
+            data: { accessToken: s.session.access_token, milestoneKey: key },
+          })
+        : await setMilestone({
+            data: {
+              accessToken: s.session.access_token,
+              milestoneKey: key,
+              achievedAt: dateInput,
+              notes: null,
+              customLabel: null,
+            },
+          });
+      if (!r.ok) {
+        toast.error("Não consegui salvar — tente de novo.");
+        return;
+      }
+      /* Só depois do desfecho: a tela passa a refletir o banco, não a intenção. */
+      setMilestones((m) =>
+        marcado
+          ? m.filter((x) => x.milestone_key !== key)
+          : [
+              ...m,
+              {
+                id: "",
+                milestone_key: key,
+                custom_label: null,
+                achieved_at: dateInput,
+                notes: null,
+              },
+            ],
+      );
+    } catch {
+      toast.error("Não consegui salvar — tente de novo.");
+    } finally {
+      setMarking(null);
     }
-    setMarking(null);
   }
 
   const doneMilestones = MILESTONES_DEF.filter((m) => isDone(m.key));
@@ -16090,7 +13148,7 @@ function MilestonesSection({ babyAgeWeeks, babyName }: { babyAgeWeeks: number; b
       )}
 
       {upcoming.length > 0 && (
-        <div className="rounded-3xl border border-border bg-card p-5">
+        <div className="rounded-3xl card-material p-5">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">
             Em breve para {babyName}
           </p>
@@ -16232,7 +13290,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
 
   return (
     <div className="max-w-xl space-y-5">
-      <div className="rounded-3xl border border-border bg-card p-5">
+      <div className="rounded-3xl card-material p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="font-semibold">Calendário de vacinas</h3>
@@ -16274,7 +13332,7 @@ function VaccinesSection({ birthDate }: { birthDate: Date }) {
               }`}
             >
               <span
-                className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-500 text-white" : "border-muted-foreground"}`}
+                className={`h-6 w-6 shrink-0 rounded-full border-2 flex items-center justify-center text-xs ${done ? "border-green-500 bg-green-700 text-white" : "border-muted-foreground"}`}
               >
                 {done ? "✓" : ""}
               </span>
@@ -16322,9 +13380,19 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
     const { data: s } = await supabase.auth.getSession();
     if (s.session) {
       const weightG = Math.round(parseFloat(babyWeight) * 1000);
-      await addBabyWeight({
+      /* ⚠️ **O CAMPO SÓ LIMPA DEPOIS DO "GRAVOU".** A lista aqui é relida do
+         servidor, então ela nunca mente — mas o campo era limpo de qualquer
+         jeito: numa falha, o número que ela digitou sumia E nada aparecia na
+         lista. Perder o valor e não receber recado nenhum é a pior combinação
+         possível, porque não sobra nem o que tentar de novo. */
+      const r = await addBabyWeight({
         data: { accessToken: s.session.access_token, measuredAt: weightDate, weightG },
       });
+      if (!r.ok) {
+        toast.error("Não consegui salvar o peso — tente de novo.");
+        setSaving(false);
+        return;
+      }
       const res = await getBabyWeights({ data: { accessToken: s.session.access_token } });
       if (res.ok) setWeights(res.weights);
       setBabyWeight("");
@@ -16379,7 +13447,7 @@ function RetornoSection({ birthDate, profile }: { birthDate: Date; profile: Prof
         </div>
       </div>
 
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <h3 className="font-semibold mb-3">Peso do bebê</h3>
         <div className="flex gap-2 mb-4">
           <input
@@ -16534,7 +13602,7 @@ function RecompensasHub({
                 emblema do bebê bolha. */}
             {s.key === "conquistas" && !careMode && aResgatar != null && aResgatar > 0 && (
               <span
-                className="ml-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-emerald-700 px-1 py-0.5 text-[10px] font-black leading-none text-white tabular-nums"
+                className="ml-1.5 inline-flex min-w-[1.15rem] items-center justify-center rounded-full bg-emerald-700 px-1 py-0.5 text-xs font-black leading-none text-white tabular-nums"
                 aria-label={`${aResgatar} ${aResgatar === 1 ? "conquista" : "conquistas"} com Sementinhas para pegar`}
               >
                 {aResgatar > 9 ? "9+" : aResgatar}
@@ -16545,12 +13613,23 @@ function RecompensasHub({
       </div>
       <Fade key={sub}>
         {sub === "cantinho" && (
-          <CantinhoTab
-            careMode={careMode}
-            onNavigate={onNavigate}
-            skyTheme={skyTheme}
-            onSkyChange={onSkyChange}
-          />
+          /* A espera do Cantinho — ver o `lazy()` lá em cima. O broto é o que
+             a prateleira inteira usa como moeda, então ele é quem recebe. */
+          <Suspense
+            fallback={
+              <div className="flex flex-col items-center py-20">
+                <span className="text-4xl">🌱</span>
+                <p className="mt-3 text-sm font-bold text-foreground/50">Abrindo o seu cantinho…</p>
+              </div>
+            }
+          >
+            <CantinhoTab
+              careMode={careMode}
+              onNavigate={onNavigate}
+              skyTheme={skyTheme}
+              onSkyChange={onSkyChange}
+            />
+          </Suspense>
         )}
         {sub === "conquistas" && <ConquistasTab careMode={careMode} onNavigate={onNavigate} />}
       </Fade>
@@ -16572,491 +13651,6 @@ function RecompensasHub({
  * A resposta certa não é uma versão suavizada: é silêncio, e uma porta de
  * saída. Nada de emoji, nada de cor, nada de "continue firme".
  */
-function SilencioDoCuidado({ onNavigate }: { onNavigate?: (t: Tab) => void }) {
-  return (
-    <div className="rounded-3xl border border-border bg-card p-8 text-center">
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Esta parte do aplicativo está em pausa enquanto o Modo Cuidado estiver ligado.
-      </p>
-      {onNavigate && (
-        <button
-          onClick={() => onNavigate("Perfil")}
-          className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
-        >
-          Ajustes do Modo Cuidado
-        </button>
-      )}
-    </div>
-  );
-}
-
-export function ConquistasTab({
-  careMode = false,
-  onNavigate,
-  bancada,
-}: {
-  careMode?: boolean;
-  onNavigate?: (t: Tab) => void;
-  /**
-   * ⚠️ SÓ A BANCADA (`/preview-conquistas`).
-   *
-   * A tela busca do servidor e concede na hora — conferir a moldura de
-   * raridade numa conta de verdade exigiria desbloquear uma épica, que leva
-   * meses. Foi por telas assim serem impossíveis de olhar que a aba passou
-   * tanto tempo com dezoito conquistas de um app que já tinha o dobro.
-   */
-  bancada?: { desbloqueadas: string[]; resgatadas?: string[] };
-}) {
-  const [unlocked, setUnlocked] = useState<{ achievement_key: string; unlocked_at: string }[]>(
-    bancada
-      ? bancada.desbloqueadas.map((k) => ({
-          achievement_key: k,
-          unlocked_at: "2026-08-01T12:00:00.000Z",
-        }))
-      : [],
-  );
-  const [loading, setLoading] = useState(!bancada);
-  const [newBadges, setNewBadges] = useState<string[]>([]);
-  const [saldo, setSaldo] = useState<number | null>(bancada ? 125 : null);
-  /* Quais já foram PAGAS. Desbloqueada e fora deste conjunto = tem prêmio
-     esperando o toque dela. Ver `resgatarConquista` no servidor. */
-  const [resgatadas, setResgatadas] = useState<Set<string>>(new Set(bancada?.resgatadas ?? []));
-  /**
-   * ⚠️ NÃO CONSEGUI LER quais já foram pagas.
-   *
-   * `resgatadas` vazio quer dizer "nenhuma ainda"; isto aqui quer dizer "não
-   * sei". Com o vazio, uma falha de leitura faria as 39 conquistas voltarem a
-   * pulsar "Resgatar +120 🌱" de uma vez — ela toca, o servidor responde
-   * certíssimo que já pagou, e o cartão vira uma data sem nada acontecer. O app
-   * prometendo moeda e não entregando é a forma mais rápida de ensinar que os
-   * avisos daqui não valem leitura. Na dúvida, não prometer.
-   */
-  const [semSaberPagas, setSemSaberPagas] = useState(false);
-  /**
-   * ⚠️ Um CONJUNTO, não uma chave só.
-   *
-   * Era `resgatandoKey: string | null` com `if (resgatandoKey) return`, que é
-   * uma trava GLOBAL: enquanto um cartão estava indo ao servidor, tocar em
-   * outro era descartado em silêncio. Quem sai do Modo Cuidado, ou quem
-   * acumulou vários, encontra justamente uma grade com muitos pendentes — e
-   * toque que some sem sinal lê como app travado.
-   */
-  const [resgatando, setResgatando] = useState<Set<string>>(new Set());
-
-  /**
-   * O TOQUE QUE PAGA.
-   *
-   * ⚠️ O saldo sobe pelo MESMO caminho de todo ganho do app
-   * (`creditarSementinhas`), e não por um `setSaldo` local: a barra do topo do
-   * Caminho ouve esse evento, e um segundo caminho faria os dois números
-   * discordarem — que é exatamente o defeito que o evento veio consertar.
-   *
-   * ⚠️ E a chave entra em `resgatadas` mesmo quando o servidor responde
-   * `repetido` (a linha já existia): o objetivo do estado é "não há mais
-   * prêmio aqui", e isso é verdade nos dois casos.
-   *
-   * ⚠️ O CAMINHO REPETIDO PRECISA DIZER ALGO. Todo o retorno visível (confete,
-   * som, toast) vivia dentro de `if (r.granted > 0)`, então no repetido ela
-   * tocava um botão que prometia `+40 🌱` e a tela respondia com silêncio — e
-   * silêncio depois de um toque lê como app quebrado, não como "isso já era
-   * seu". Acontece de verdade com dois aparelhos abertos ao mesmo tempo.
-   * Sem festa: não é conquista nova, é um esclarecimento.
-   */
-  /**
-   * A conquista que ela ACABOU de resgatar, para a folha de comemoração.
-   *
-   * ⚠️ **Só o instante do resgate, nunca o estado da grade.** Com o estado, a
-   * folha abriria por cima da aba toda vez que ela viesse olhar as conquistas
-   * que já tem — é a mesma distinção que faz os sprites do Caminho nascerem da
-   * TRANSIÇÃO e não do contador.
-   */
-  const [conquistada, setConquistada] = useState<{ titulo: string; emoji: string } | null>(null);
-
-  async function resgatar(key: string) {
-    /* Por CHAVE, nunca global: a trava protege este cartão de um toque duplo,
-       e não a grade inteira de ser usada. */
-    if (resgatando.has(key)) return;
-    setResgatando((v) => new Set(v).add(key));
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      const token = s.session?.access_token;
-      if (!token) return;
-      const { resgatarConquista } = await import("@/lib/achievements.functions");
-      const r = await resgatarConquista({ data: { accessToken: token, key } });
-      if (!r.ok) {
-        toast.error(r.error);
-        return;
-      }
-      setResgatadas((antes) => {
-        const depois = new Set(antes).add(key);
-        /* O emblema desce no MESMO instante do toque. Esperar a próxima
-           checagem faria o número ficar prometendo o que ela acabou de pegar. */
-        publicarConquistasAResgatar(
-          Math.max(0, unlocked.filter((u) => !depois.has(u.achievement_key)).length),
-        );
-        return depois;
-      });
-      if (r.granted > 0) {
-        creditarSementinhas(r.granted);
-        setSaldo((v) => (v == null ? v : v + r.granted));
-        fireConfetti(1);
-        celebrateChime(1, careMode);
-        celebrateHaptic(1);
-        toast.success(`+${r.granted} 🌱`);
-        /* ⚠️ O título e o emoji saem do CATÁLOGO (`conquistas.ts`), nunca de um
-           texto digitado aqui: são os mesmos que o cartão da grade desenha, e
-           duas cópias divergiriam no primeiro ajuste de nome. */
-        const def = ACHIEVEMENT_DEFS.find((a) => a.key === key);
-        if (def) setConquistada({ titulo: def.title, emoji: def.emoji });
-        return;
-      }
-      if (r.repetido) toast("Essas Sementinhas já são suas 💛");
-    } catch {
-      toast.error("Não consegui resgatar agora.");
-    } finally {
-      setResgatando((v) => {
-        const n = new Set(v);
-        n.delete(key);
-        return n;
-      });
-    }
-  }
-
-  useEffect(() => {
-    if (bancada) return;
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) {
-        setLoading(false);
-        return;
-      }
-      const token = s.session.access_token;
-      const res = await checkAndAwardAchievements({ data: { accessToken: token } });
-      if (res.ok) {
-        setUnlocked(res.unlocked);
-        /* `null` = o servidor não conseguiu ler o ledger. Ver `semSaberPagas`:
-           tratar como lista vazia poria prêmio em toda conquista da grade. */
-        setSemSaberPagas(res.resgatadas == null);
-        setResgatadas(new Set(res.resgatadas ?? []));
-        /* A aba tem a leitura mais fresca — republica para o emblema da fita
-           não ficar contando o que ela já pegou noutro aparelho. */
-        publicarConquistasAResgatar(
-          res.resgatadas == null
-            ? null
-            : res.unlocked.filter((u) => !res.resgatadas!.includes(u.achievement_key)).length,
-        );
-        /* Quais conquistas ainda NÃO foram comemoradas para esta paciente.
-           Antes a régua era "desbloqueada nos últimos 30 segundos", calculada
-           ao montar esta aba, e ela errava dos dois lados:
-             · a conquista concedida em outro ponto do app (o
-               `triggerAchievementsCheck`, que só mostra um toast) já tinha
-               mais de 30s quando ela chegava aqui — a badge simplesmente
-               aparecia colorida, sem festa nenhuma;
-             · e sair e voltar dentro dos 30s disparava o confete de novo,
-               quantas vezes ela quisesse.
-           Agora a memória é de QUAIS, não de QUANDO: cada conquista comemora
-           uma vez, no dia em que ela vier ver — mesmo que tenha sido dada há
-           uma semana. */
-        const JA = "dc-conquistas-comemoradas";
-        let comemoradas: string[] = [];
-        try {
-          comemoradas = JSON.parse(localStorage.getItem(JA) ?? "[]");
-          if (!Array.isArray(comemoradas)) comemoradas = [];
-        } catch {
-          comemoradas = [];
-        }
-        const todas = res.unlocked.map((a) => a.achievement_key);
-        // Modo Cuidado: não acende o banner nem comemora — respeita o luto.
-        const novas = res.careMode ? [] : todas.filter((k) => !comemoradas.includes(k));
-        setNewBadges(novas);
-        if (novas.length > 0) {
-          /* A festa cresce com quantas vieram de uma vez. Antes eram sempre os
-             mesmos confetes: desbloquear uma e desbloquear seis davam
-             exatamente a mesma comemoração. */
-          const nivel = Math.min(5, novas.length) as 1 | 2 | 3 | 4 | 5;
-          fireConfetti(nivel);
-          celebrateChime(nivel, careMode);
-          celebrateHaptic(nivel);
-        }
-        /* Grava SEMPRE (inclusive em Modo Cuidado): quem sai do Modo Cuidado
-           não deve levar de uma vez o confete de tudo que acumulou durante o
-           luto. */
-        try {
-          localStorage.setItem(JA, JSON.stringify(todas));
-        } catch {
-          /* armazenamento bloqueado: no pior caso comemora de novo */
-        }
-      }
-      // Concede o check-in do dia (idempotente) e lê o saldo já com conquistas
-      // e marcos contabilizados acima.
-      try {
-        const w = await claimDailyAndGetWallet({ data: { accessToken: token } });
-        if (w.ok) setSaldo(w.careMode ? null : w.balance);
-      } catch {
-        /* saldo é secundário: falha não quebra a aba */
-      }
-      setLoading(false);
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
-  if (loading) return <TabSkeleton />;
-
-  const unlockedKeys = new Set(unlocked.map((u) => u.achievement_key));
-  const unlockedCount = ACHIEVEMENT_DEFS.filter((d) => unlockedKeys.has(d.key)).length;
-  const totalCount = ACHIEVEMENT_DEFS.length;
-  const pct = Math.round((unlockedCount / totalCount) * 100);
-
-  /* Cinco das dezoito só acontecem depois do parto. O contador dizia "3 de 18"
-     e o anel nunca chegava perto de 100% — a gestante tem teto real de 13, e
-     nada na tela dizia isso. Parecia falha dela em conquistas que ainda nem
-     eram possíveis. Agora a linha embaixo do anel explica o teto. */
-  const posPartoTotal = ACHIEVEMENT_DEFS.filter((d) => d.posParto).length;
-  const posPartoFeitas = ACHIEVEMENT_DEFS.filter(
-    (d) => d.posParto && unlockedKeys.has(d.key),
-  ).length;
-  const aindaNaoNasceu = posPartoFeitas === 0;
-
-  const categories = [
-    { key: "bebe", label: "Bebê", emoji: "👶" },
-    { key: "saude", label: "Saúde", emoji: "❤️" },
-    { key: "diario", label: "Diário", emoji: "📝" },
-    { key: "educacao", label: "Educação", emoji: "🎓" },
-    { key: "familia", label: "Família", emoji: "👨‍👩‍👧" },
-  ] as const;
-
-  return (
-    <div className="space-y-8">
-      {saldo != null && (
-        <div className="rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">
-                Suas Sementinhas
-              </p>
-              <p className="mt-1 flex items-baseline gap-1.5 font-serif text-3xl text-emerald-900">
-                <span className="tabular-nums">{saldo}</span>
-                <span className="text-2xl">🌱</span>
-              </p>
-              <p className="mt-0.5 text-xs text-emerald-700/80">
-                Você ganha cuidando de você, aprendendo e avançando na jornada.
-              </p>
-            </div>
-            <div className="text-4xl">🌱</div>
-          </div>
-          {/* Dizia "Em breve você vai poder usar suas Sementinhas para montar o
-              seu Cantinho" — sobre uma tela que já existe, pronta, na pílula ao
-              lado desta. O app anunciava como futuro o que estava a um toque. */}
-          <p className="mt-3 rounded-2xl bg-white/60 px-3 py-2 text-[11px] text-emerald-800/80">
-            Gaste no <strong>Meu Cantinho</strong>, aqui do lado — plantinhas, bichinhos e cenários
-            pro seu Caminho. 💛
-          </p>
-        </div>
-      )}
-
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.22em] text-primary">Suas conquistas</p>
-            <p className="mt-1 font-serif text-2xl">
-              {unlockedCount} de {totalCount}
-            </p>
-            <p className="text-sm text-muted-foreground">badges desbloqueadas</p>
-          </div>
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-primary/20 text-base font-bold text-primary">
-            {pct}%
-          </div>
-        </div>
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-secondary">
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        {aindaNaoNasceu && posPartoTotal > 0 && (
-          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-            {posPartoTotal} destas só acontecem depois que o bebê nascer — na gestação, o caminho
-            completo são {totalCount - posPartoTotal}.
-          </p>
-        )}
-      </div>
-
-      {newBadges.length > 0 && (
-        <div className="rounded-3xl border border-primary/25 bg-primary/8 p-5 text-center">
-          <p className="text-2xl mb-1">🎉</p>
-          <p className="font-semibold text-foreground">
-            {newBadges.length === 1
-              ? "Nova conquista desbloqueada!"
-              : `${newBadges.length} novas conquistas!`}
-          </p>
-        </div>
-      )}
-
-      {categories.map((cat) => {
-        const defs = ACHIEVEMENT_DEFS.filter((d) => d.category === cat.key);
-        return (
-          <div key={cat.key}>
-            <h3 className="mb-3 flex items-center gap-2 font-semibold">
-              <span>{cat.emoji}</span> {cat.label}
-            </h3>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {defs.map((def) => {
-                const isUnlocked = unlockedKeys.has(def.key);
-                const unlockedAt = unlocked.find((u) => u.achievement_key === def.key)?.unlocked_at;
-                const isNew = newBadges.includes(def.key);
-                const rar = RARIDADES[def.raridade];
-                /* ⚠️ Desbloqueada e AINDA NÃO RESGATADA: o cartão vira botão.
-                   Ver `resgatarConquista` — o prêmio deixou de cair sozinho e
-                   passou a depender do toque dela, como no Duolingo. */
-                /* ⚠️ `!semSaberPagas`: sem saber quais já foram pagas, NENHUMA
-                   vira botão. Ver o estado — a alternativa é a grade inteira
-                   prometendo moeda que o servidor (com razão) não vai dar. */
-                const aResgatar = isUnlocked && !semSaberPagas && !resgatadas.has(def.key);
-                const emVoo = resgatando.has(def.key);
-                return (
-                  <div
-                    key={def.key}
-                    role={aResgatar ? "button" : undefined}
-                    tabIndex={aResgatar ? 0 : undefined}
-                    aria-label={
-                      aResgatar
-                        ? `Resgatar ${rar.sementinhas} Sementinhas de ${def.title}`
-                        : undefined
-                    }
-                    onClick={aResgatar ? () => resgatar(def.key) : undefined}
-                    onKeyDown={
-                      aResgatar
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              resgatar(def.key);
-                            }
-                          }
-                        : undefined
-                    }
-                    className={`rounded-2xl border p-4 text-center transition-all ${
-                      aResgatar
-                        ? /* Pulsa e convida. É o único estado da grade que pede
-                             uma ação, e ele tem de se separar do resto à
-                             distância de um olhar. */
-                          "press cursor-pointer ring-2 ring-emerald-400 ring-offset-2 animate-pulse-slow "
-                        : ""
-                    }${
-                      /* ⚠️ O ANEL DE RARIDADE SÓ PINTA O QUE ELA JÁ TEM.
-                         Bloqueada continua cinza-neutra e apagada, de
-                         propósito: um anel dourado numa conquista que ela
-                         ainda não alcançou vira vitrine do que falta, e a
-                         aba inteira passaria a medir ausência. A raridade é
-                         informação sobre o que ela CONQUISTOU. O rótulo
-                         abaixo continua dizendo qual é, sempre — quem quiser
-                         saber o que vale a pena perseguir consegue ler. */
-                      isUnlocked ? rar.anel : "border-border bg-secondary/20 opacity-50"
-                    } ${isNew ? "shadow-md" : ""}`}
-                  >
-                    <div className={`text-3xl mb-2 ${!isUnlocked && "grayscale"}`}>{def.emoji}</div>
-                    <p className="text-xs font-semibold">{def.title}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground leading-tight">
-                      {def.description}
-                    </p>
-                    <p
-                      className={`mt-1.5 text-[10px] font-bold uppercase tracking-wide ${
-                        isUnlocked ? rar.texto : "text-muted-foreground/60"
-                      }`}
-                    >
-                      {rar.label} · {rar.sementinhas} 🌱
-                    </p>
-                    {aResgatar ? (
-                      /* A data sai daqui de propósito: enquanto há prêmio a
-                         pegar, a única coisa que o cartão precisa dizer é o
-                         que fazer. A data volta assim que ela resgata. */
-                      /* ⚠️ `emerald-700` e não `emerald-500`. Medido em pixel:
-                         branco sobre o 500 dá **2,54:1**, e 11px em negrito não
-                         é "texto grande" pela WCAG (o corte é 18,66px) — o
-                         mínimo é 4,5. Era o CTA central desta mudança inteira,
-                         e o mesmo defeito que a Loja de Sementinhas teve com o
-                         preço a 2,64:1: consertado numa tela e não na irmã. O
-                         700 dá 5,48:1 e continua verde. */
-                      <p className="mt-1.5 rounded-full bg-emerald-700 px-2 py-1 text-[11px] font-bold text-white">
-                        {emVoo ? "Resgatando…" : `Resgatar +${rar.sementinhas} 🌱`}
-                      </p>
-                    ) : isUnlocked && unlockedAt ? (
-                      <p className="mt-1 text-xs text-primary">
-                        {new Date(unlockedAt).toLocaleDateString("pt-BR")}
-                      </p>
-                    ) : null}
-                    {!isUnlocked && (
-                      <p className="mt-1 text-xs text-muted-foreground">🔒 bloqueada</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* ── ⚠️ A CONQUISTA VIRA CARTÃO — no instante do resgate ────────────
-          Pedido do dono: "se a pessoa fez ali cinco exercícios e ganhou lá
-          cinco estrelas, isso na página do jogo tem que depois refletir também
-          essa mensagem pra ela compartilhar ali na comunidade".
-
-          ⚠️ **Nasce do RESGATE, nunca do estado da grade.** Com o estado, a
-          folha abriria por cima da aba toda vez que ela viesse olhar as
-          conquistas que já tem — é a mesma distinção que faz os sprites do
-          Caminho nascerem da TRANSIÇÃO e não do contador.
-
-          ⚠️ **E o portão de Modo Cuidado é o de `momentoDe`**, que devolve
-          `null` e faz o componente não desenhar botão nenhum. Um `if` aqui
-          seria a segunda régua que `humorDaJornada` proíbe. */}
-      {conquistada && (
-        <div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-black/45 p-6"
-          onClick={() => setConquistada(null)}
-        >
-          <div
-            className="w-full max-w-xs rounded-3xl bg-card p-6 text-center shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-5xl">{conquistada.emoji}</p>
-            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-primary">
-              Conquista desbloqueada
-            </p>
-            <p className="mt-1 font-serif text-xl leading-tight">{conquistada.titulo}</p>
-            <div className="mt-4">
-              <CompartilharMomento
-                momento={momentoDe({
-                  especie: "conquista",
-                  rotulo: conquistada.titulo,
-                  emoji: conquistada.emoji,
-                  emCuidado: !!careMode,
-                })}
-                /* ⚠️ `undefined` quando não há para onde navegar — e é o que
-                   faz `CompartilharMomento` ESCONDER o botão em vez de oferecer
-                   um que não leva a lugar nenhum. */
-                aoPublicarNaComunidade={
-                  onNavigate
-                    ? (m) => {
-                        guardarMomentoParaPublicar(m);
-                        setConquistada(null);
-                        onNavigate("Feed");
-                      }
-                    : undefined
-                }
-              />
-            </div>
-            <button
-              onClick={() => setConquistada(null)}
-              className="press mt-3 w-full rounded-full bg-primary py-3 text-sm font-semibold text-primary-foreground"
-            >
-              Fechar
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────────────────────
    Feature 13 — Loja Curada
@@ -17327,7 +13921,7 @@ function ProductSheet({
             >
               <span className="text-8xl select-none drop-shadow-md">{vis.emoji}</span>
               {product.badge && (
-                <span className="absolute top-3 left-3 bg-[#ff7733] text-white text-[10px] font-bold px-2 py-1 rounded-sm uppercase tracking-wide leading-none">
+                <span className="absolute top-3 left-3 bg-[#ff7733] text-white text-xs font-bold px-2 py-1 rounded-sm uppercase tracking-wide leading-none">
                   {product.badge}
                 </span>
               )}
@@ -17346,7 +13940,7 @@ function ProductSheet({
 
               {/* Recomendação médica */}
               <div className="rounded-xl bg-primary/[0.06] border border-primary/15 p-3">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-primary mb-1.5">
+                <p className="text-xs font-bold uppercase tracking-wide text-primary mb-1.5">
                   👨‍⚕️ Por que seu médico recomenda
                 </p>
                 <p className="text-[13px] text-gray-700 leading-relaxed">{product.description}</p>
@@ -17354,7 +13948,7 @@ function ProductSheet({
 
               {/* Semana recomendada */}
               {(product.weeks_min != null || product.weeks_max != null) && (
-                <div className="flex items-center gap-2 text-[12px]">
+                <div className="flex items-center gap-2 text-xs">
                   <span className="text-gray-500">📅 Semana recomendada:</span>
                   <span className="font-semibold text-gray-800">
                     {product.weeks_min != null && product.weeks_max != null
@@ -17367,7 +13961,7 @@ function ProductSheet({
               )}
 
               {/* Selo de confiança */}
-              <p className="text-[10px] text-gray-400">
+              <p className="text-xs text-gray-400">
                 ✓ Curado e recomendado pelo seu médico — Ginecologia e Obstetrícia, especialista em
                 gestação de alto risco
               </p>
@@ -17387,7 +13981,7 @@ function ProductSheet({
                 <div className="pt-2">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex-1 h-px bg-gray-100" />
-                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 shrink-0">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 shrink-0">
                       Também recomendados
                     </p>
                     <div className="flex-1 h-px bg-gray-100" />
@@ -17414,7 +14008,7 @@ function ProductSheet({
                             </span>
                           </div>
                           <div className="px-2 pt-2 pb-2.5">
-                            <p className="text-[10px] font-medium line-clamp-2 text-gray-800 leading-snug">
+                            <p className="text-xs font-medium line-clamp-2 text-gray-800 leading-snug">
                               {r.name}
                             </p>
                           </div>
@@ -17439,349 +14033,18 @@ function ProductSheet({
  * credita. A paciente registra o @ dela; ao marcar @obstetrica.app num Story, o
  * webhook casa e credita automático (no máx. 1x/semana). Sem aprovação manual.
  */
-function InstagramShareCard() {
-  const [state, setState] = useState<{
-    enabled: boolean;
-    handle: string | null;
-    reward: number;
-    tag: string;
-    rewardedThisWeek: boolean;
-  } | null>(null);
-  const [input, setInput] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) return;
-      const res = await getInstagramShare({ data: { accessToken: s.session.access_token } });
-      if (res.ok) {
-        setState({
-          enabled: res.enabled,
-          handle: res.handle,
-          reward: res.reward,
-          tag: res.tag,
-          rewardedThisWeek: res.rewardedThisWeek,
-        });
-        setInput(res.handle ?? "");
-      }
-    })();
-  }, []);
-
-  async function save() {
-    if (saving) return;
-    setSaving(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setSaving(false);
-      return;
-    }
-    const res = await setInstagramHandle({
-      data: { accessToken: s.session.access_token, handle: input },
-    });
-    if (res.ok) {
-      setState((st) => (st ? { ...st, handle: res.handle } : st));
-      toast(res.handle ? "Instagram salvo! 📸" : "Instagram removido");
-    } else {
-      toast(res.error ?? "Não foi possível salvar");
-    }
-    setSaving(false);
-  }
-
-  // Integração desligada (Meta ainda não configurada) → não mostra nada.
-  if (!state || !state.enabled) return null;
-
-  return (
-    <div className="rounded-3xl border border-fuchsia-200 bg-gradient-to-br from-fuchsia-50 via-white to-rose-50 p-5">
-      <div className="flex items-center gap-2">
-        <span className="text-2xl">📸</span>
-        <p className="text-sm font-extrabold text-fuchsia-700">
-          Compartilhe e ganhe {state.reward} 🌱
-        </p>
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
-        Poste um Story marcando <span className="font-bold">@{state.tag}</span> mostrando seu
-        progresso e ganhe <span className="font-bold">{state.reward} Sementinhas</span> —
-        automático, até 1x por semana. 💜
-      </p>
-
-      {state.rewardedThisWeek && (
-        <p className="mt-2 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
-          Você já ganhou esta semana ✓ Obrigado por compartilhar!
-        </p>
-      )}
-
-      <label className="mt-3 block text-xs font-semibold text-muted-foreground">
-        Seu @ do Instagram (pra gente reconhecer você)
-      </label>
-      <div className="mt-1 flex gap-2">
-        <div className="flex flex-1 items-center rounded-full border border-border bg-white px-3">
-          <span className="text-sm text-muted-foreground">@</span>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value.replace(/^@+/, ""))}
-            placeholder="seu.usuario"
-            className="w-full bg-transparent px-1 py-2 text-sm outline-none"
-            autoCapitalize="none"
-            autoCorrect="off"
-          />
-        </div>
-        <button
-          onClick={save}
-          disabled={saving || input.trim() === (state.handle ?? "")}
-          className="press shrink-0 rounded-full bg-fuchsia-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-40"
-        >
-          Salvar
-        </button>
-      </div>
-
-      {state.handle && (
-        <a
-          href="https://instagram.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="press mt-3 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-fuchsia-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
-        >
-          Abrir o Instagram e postar
-        </a>
-      )}
-    </div>
-  );
-}
 
 /**
  * Card "Avalie o app e ganhe 100 🌱". Só aparece quando há loja publicada
  * (Play/App Store configurada). A paciente abre a loja, avalia e toca "já
  * avaliei" → ganha 100 uma vez (por confiança; a loja não diz quem avaliou).
  */
-function RatingRewardCard({ onEarned }: { onEarned: (n: number) => void }) {
-  const [state, setState] = useState<{
-    enabled: boolean;
-    reward: number;
-    playUrl: string | null;
-    appleUrl: string | null;
-    claimed: boolean;
-  } | null>(null);
-  const [claiming, setClaiming] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) return;
-      const res = await getRatingReward({ data: { accessToken: s.session.access_token } });
-      if (res.ok) {
-        setState({
-          enabled: res.enabled,
-          reward: res.reward,
-          playUrl: res.playUrl,
-          appleUrl: res.appleUrl,
-          claimed: res.claimed,
-        });
-      }
-    })();
-  }, []);
-
-  async function claim() {
-    if (claiming) return;
-    setClaiming(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setClaiming(false);
-      return;
-    }
-    const res = await claimRatingReward({ data: { accessToken: s.session.access_token } });
-    if (res.ok && res.granted > 0) {
-      onEarned(res.granted);
-      setState((st) => (st ? { ...st, claimed: true } : st));
-      toast(`+${res.granted} 🌱 Obrigado por avaliar! ⭐`);
-    } else if (res.ok) {
-      setState((st) => (st ? { ...st, claimed: true } : st));
-    } else {
-      toast(res.error ?? "Não foi possível resgatar");
-    }
-    setClaiming(false);
-  }
-
-  if (!state || !state.enabled) return null;
-
-  return (
-    <div className="rounded-3xl border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-yellow-50 p-5">
-      <div className="flex items-center gap-2">
-        <span className="text-2xl">⭐</span>
-        <p className="text-sm font-extrabold text-amber-700">
-          Avalie o app e ganhe {state.reward} 🌱
-        </p>
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
-        Sua avaliação ajuda outras gestantes a encontrarem o app 💛 Avalie na loja e ganhe{" "}
-        <span className="font-bold">{state.reward} Sementinhas</span>.
-      </p>
-
-      {state.claimed ? (
-        <p className="mt-3 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-700">
-          Recompensa resgatada ✓ Obrigado! ⭐
-        </p>
-      ) : (
-        <>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {state.appleUrl && (
-              <a
-                href={state.appleUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
-              >
-                App Store
-              </a>
-            )}
-            {state.playUrl && (
-              <a
-                href={state.playUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="press flex-1 rounded-full border border-amber-300 bg-white py-2 text-center text-xs font-bold text-amber-700"
-              >
-                ▶ Play Store
-              </a>
-            )}
-          </div>
-          <button
-            onClick={claim}
-            disabled={claiming}
-            className="press mt-2 w-full rounded-full bg-gradient-to-r from-amber-400 to-yellow-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
-          >
-            Já avaliei — resgatar {state.reward} 🌱
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 /**
  * Card "Deixe seu depoimento". A paciente escreve; o Dr. Clóvis aprova no
  * painel → ela ganha 100 🌱 (uma vez) e o texto pode ir pra página pública.
  * Mostra o status (em análise / publicado / recusado) e permite editar.
  */
-function TestimonialCard() {
-  const [status, setStatus] = useState<TestimonialStatus | null>(null);
-  const [body, setBody] = useState("");
-  const [name, setName] = useState("");
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) return;
-      const res = await getMyTestimonial({ data: { accessToken: s.session.access_token } });
-      if (res.ok) {
-        if (res.testimonial) {
-          setStatus(res.testimonial.status);
-          setBody(res.testimonial.body);
-          setName(res.testimonial.displayName ?? "");
-        }
-        setLoaded(true);
-      }
-    })();
-  }, []);
-
-  async function send() {
-    if (saving || body.trim().length < 10) return;
-    setSaving(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setSaving(false);
-      return;
-    }
-    const res = await submitTestimonial({
-      data: { accessToken: s.session.access_token, body: body.trim(), displayName: name.trim() },
-    });
-    if (res.ok) {
-      setStatus("pending");
-      setEditing(false);
-      toast("Depoimento enviado! O Dr. Clóvis vai revisar 💛");
-    } else {
-      toast(res.error ?? "Não foi possível enviar");
-    }
-    setSaving(false);
-  }
-
-  if (!loaded) return null;
-
-  const statusBadge =
-    status === "approved" ? (
-      <span className="rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
-        Publicado ✓ +100 🌱
-      </span>
-    ) : status === "pending" ? (
-      <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
-        Em análise pelo médico ⏳
-      </span>
-    ) : status === "rejected" ? (
-      <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-bold text-rose-600">
-        Não publicado — pode reescrever
-      </span>
-    ) : null;
-
-  // Já enviou e não está editando: mostra status + preview + botão editar.
-  const showForm = editing || !status;
-
-  return (
-    <div className="rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-fuchsia-50 p-5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">💬</span>
-          <p className="text-sm font-extrabold text-violet-700">Deixe seu depoimento</p>
-        </div>
-        {statusBadge}
-      </div>
-
-      {showForm ? (
-        <>
-          <p className="mt-2 text-sm leading-relaxed text-foreground/80">
-            Conte como está sendo sua experiência 💜 Se o Dr. Clóvis aprovar, você ganha{" "}
-            <span className="font-bold">100 Sementinhas</span> e seu depoimento pode aparecer no
-            site.
-          </p>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value.slice(0, 600))}
-            rows={4}
-            placeholder="Escreva aqui seu depoimento..."
-            className="mt-3 w-full resize-none rounded-2xl border border-border bg-white p-3 text-sm outline-none focus:border-violet-400"
-          />
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value.slice(0, 60))}
-            placeholder="Como quer aparecer (ex.: Mariana, mamãe da Alice)"
-            className="mt-2 w-full rounded-full border border-border bg-white px-4 py-2 text-sm outline-none focus:border-violet-400"
-          />
-          <button
-            onClick={send}
-            disabled={saving || body.trim().length < 10}
-            className="press mt-2 w-full rounded-full bg-violet-500 py-2.5 text-sm font-extrabold text-white disabled:opacity-40"
-          >
-            {status ? "Reenviar para análise" : "Enviar depoimento"}
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="mt-3 rounded-2xl bg-white/70 p-3 text-sm italic leading-relaxed text-foreground/80">
-            “{body}”
-          </p>
-          <button
-            onClick={() => setEditing(true)}
-            className="press mt-2 text-xs font-bold text-violet-600"
-          >
-            Editar depoimento
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
 
 /**
  * ─── A REDE DE SEGURANÇA DO CÓDIGO DE EMBAIXADORA ───────────────────────────
@@ -17804,796 +14067,11 @@ function TestimonialCard() {
  * responde "você já tem" a cada tentativa é um campo que ensina a paciente a
  * não confiar nos campos desta tela.
  */
-export function CodigoDaEmbaixadora({ bancada = false }: { bancada?: boolean }) {
-  const [codigo, setCodigo] = useState("");
-  const [enviando, setEnviando] = useState(false);
-  /* `null` = ainda não sei; `true`/`false` = já tem código ou não.
-     ⚠️ Três estados, e não um booleano: com `false` inicial o cartão PISCA na
-     tela de quem já tem código, no intervalo entre montar e a consulta voltar. */
-  const [jaTem, setJaTem] = useState<boolean | null>(null);
-
-  /* ⚠️ LÊ O PRÓPRIO `ref_code` em vez de receber o `profile` da página. Duas
-     razões: a aba onde ele mora não carrega o perfil (seria prop atravessando
-     três níveis), e o `profile` da página fica VELHO depois de o onboarding
-     atribuir — o cartão continuaria oferecendo um código que ela já usou. */
-  useEffect(() => {
-    /* ⚠️ A BANCADA PULA A CONSULTA. Sem sessão, `getUser` devolve nulo e o
-       cartão se esconde (`setJaTem(true)`) — que é o comportamento certo em
-       produção e o que tornava este componente impossível de fotografar. */
-    if (bancada) return setJaTem(false);
-    (async () => {
-      try {
-        const { data: u } = await supabase.auth.getUser();
-        if (!u.user) return setJaTem(true); // sem sessão: não oferece nada
-        const { data } = await (supabase as any)
-          .from("patient_profiles")
-          .select("ref_code")
-          .eq("id", u.user.id)
-          .maybeSingle();
-        setJaTem(Boolean(data?.ref_code));
-      } catch {
-        /* falha de leitura → NÃO oferece. Errar para o lado de não mostrar é
-           chato; para o outro, ela digita um código que o servidor vai recusar
-           e a tela promete um bônus que não vem. */
-        setJaTem(true);
-      }
-    })();
-  }, [bancada]);
-
-  async function enviar() {
-    const limpo = codigo.trim();
-    if (limpo.length < 3) return;
-    setEnviando(true);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) return;
-      const { atribuirInfluenciadora } = await import("@/lib/influenciadora.functions");
-      const r = await atribuirInfluenciadora({
-        data: { accessToken: s.session.access_token, codigo: limpo },
-      });
-      if (r.ok && "atribuido" in r && r.atribuido) {
-        setJaTem(true);
-        if (r.bonus > 0) {
-          toast.success(`${r.bonus} Sementinhas de boas-vindas 🌱`);
-          creditarSementinhas(r.bonus);
-        }
-        return;
-      }
-      if (r.ok && "invalido" in r && r.invalido) {
-        toast("Não encontrei esse código. Confira com quem te indicou.", { duration: 6000 });
-        return;
-      }
-      if (r.ok && "jaTinha" in r && r.jaTinha) {
-        setJaTem(true);
-        return;
-      }
-      toast("Não foi possível agora. Tente de novo mais tarde.");
-    } catch {
-      toast("Não foi possível agora. Tente de novo mais tarde.");
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  if (jaTem !== false) return null;
-
-  return (
-    <div className="rounded-3xl border border-border bg-card p-4">
-      <p className="text-sm font-bold">Veio pela indicação de alguém?</p>
-      <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
-        Coloque o código da sua médica ou da embaixadora que te trouxe e ganhe{" "}
-        <strong className="font-semibold">{BONUS_INFLUENCIADORA} Sementinhas 🌱</strong>.
-      </p>
-      {/* ⚠️ **O CONSENTIMENTO PRECISA DIZER O QUE ACONTECE.** O código faz o
-          primeiro nome dela aparecer numa lista da embaixadora, e as duas telas
-          que o pediam falavam só das Sementinhas. Isso é "expor a paciente sem
-          ela saber" — e o que fica exposto não é um nome qualquer: é "esta
-          pessoa é paciente de um app de gestação de alto risco", que é dado de
-          saúde por inferência. */}
-      <p className="mt-1 text-[11.5px] leading-snug text-muted-foreground">
-        Se for de uma embaixadora, ela passa a ver o seu primeiro nome numa lista, para poder te
-        presentear. Nada mais do seu acompanhamento aparece para ela.
-      </p>
-      <div className="mt-3 flex gap-2">
-        <input
-          value={codigo}
-          onChange={(e) => setCodigo(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void enviar();
-          }}
-          placeholder="Ex.: MARIA"
-          aria-label="Código da médica ou embaixadora"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          className="min-h-11 min-w-0 flex-1 rounded-full border border-border bg-background px-4 text-[14px]"
-        />
-        <button
-          onClick={() => void enviar()}
-          disabled={enviando || codigo.trim().length < 3}
-          className="press min-h-11 shrink-0 rounded-full px-4 text-[14px] font-bold text-white disabled:opacity-40"
-          style={{ background: "#c9316f" }}
-        >
-          {enviando ? "…" : "Aplicar"}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Card "Indique uma amiga". Mostra o link pessoal da paciente; quando a amiga
  * entra pelo link e cria a conta, a indicadora ganha 100 🌱 (uma vez por amiga).
  */
-function ReferralCard() {
-  const [code, setCode] = useState<string | null>(null);
-  const [count, setCount] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) return;
-      const res = await getReferral({ data: { accessToken: s.session.access_token } });
-      if (res.ok) {
-        setCode(res.code);
-        setCount(res.count);
-      }
-      setLoaded(true);
-    })();
-  }, []);
-
-  /* ⚠️ O MESMO construtor da aba das Amigas (`indicacao.ts`). As duas telas
-     montavam este link à mão, e a mais nova divergiu: o botão "Convidar" das
-     Amigas mandava `/auth` sem código nenhum, e a amiga que entrasse por ali
-     nunca virava amiga de ninguém. Duas construções do mesmo link é sempre
-     assim que acaba. */
-  const link = linkDeIndicacao(
-    code,
-    typeof window !== "undefined" ? window.location.origin : undefined,
-  );
-  /* Sem link não há cartão: ele existe para ser compartilhado, e um botão de
-     copiar que copia `null` é pior que a ausência do cartão. */
-  if (!loaded || !code || !link) return null;
-  const msg = mensagemDeConvite(link);
-
-  async function copy() {
-    try {
-      /* O TEXTO INTEIRO, e não só a URL — é o mesmo que a aba das Amigas faz.
-         Colado no WhatsApp, um "https://..." sozinho não diz de quem veio nem
-         o que é, e é justamente aí que a amiga decide se abre. */
-      await navigator.clipboard.writeText(msg);
-      toast.success("Link copiado! Manda pra sua amiga 💌");
-    } catch {
-      toast("Copie o link: " + msg);
-    }
-  }
-
-  return (
-    <div className="rounded-3xl border border-pink-200 bg-gradient-to-br from-pink-50 via-white to-rose-50 p-5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">👭</span>
-          <p className="text-sm font-extrabold text-pink-700">Indique uma amiga → 100 🌱</p>
-        </div>
-        {count > 0 && (
-          <span className="rounded-full bg-pink-100 px-3 py-1 text-[11px] font-bold text-pink-700">
-            {count} {count === 1 ? "amiga" : "amigas"} 💞
-          </span>
-        )}
-      </div>
-      <p className="mt-2 text-sm leading-relaxed text-foreground/80">
-        Cada amiga que criar a conta pelo seu link te dá{" "}
-        <span className="font-bold">100 Sementinhas</span>. Sem limite de amigas 💜
-      </p>
-
-      <div className="mt-3 flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2">
-        <span className="flex-1 truncate text-xs text-muted-foreground">{link}</span>
-        <button onClick={copy} className="press shrink-0 text-xs font-bold text-pink-600">
-          Copiar
-        </button>
-      </div>
-      <a
-        href={`https://wa.me/?text=${encodeURIComponent(msg)}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="press mt-2 flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 py-2.5 text-sm font-extrabold text-white"
-      >
-        Convidar pelo WhatsApp
-      </a>
-    </div>
-  );
-}
-
-function CantinhoTab({
-  careMode = false,
-  onNavigate,
-  skyTheme = "v2",
-  onSkyChange,
-}: {
-  careMode?: boolean;
-  onNavigate?: (t: string) => void;
-  /** Céu da home hoje — o item "Céu Clássico" marca "Em uso" a partir daqui. */
-  skyTheme?: "v2" | "v1";
-  /** Avisa a página para a home repintar sem esperar um reload. */
-  onSkyChange?: (t: "v2" | "v1") => void;
-}) {
-  const [loading, setLoading] = useState(true);
-  const [saldo, setSaldo] = useState(0);
-  const [owned, setOwned] = useState<string[]>([]);
-  const [premium, setPremium] = useState(false);
-  const [sky, setSky] = useState<"v2" | "v1">(skyTheme);
-  const [equipped, setEquipped] = useState<string | null>(null);
-  const [cat, setCat] = useState<CantinhoType | "all">("all");
-  const [buying, setBuying] = useState<string | null>(null);
-  /* Nome do item que ela tentou pegar; `null` = folha fechada. */
-  const [oferta, setOferta] = useState<string | null>(null);
-  const [lojaSementinhas, setLojaSementinhas] = useState(false);
-  const [collection, setCollection] = useState({ owned: 0, total: 0, complete: false });
-  /* Pele equipada das bolinhas do Caminho. Lida no cliente (localStorage
-     dentro do blob da jornada), então começa nula e se corrige ao montar. */
-  const [skinAtiva, setSkinAtiva] = useState<string | null>(null);
-  /* Troféus (dias de cinco estrelas). Três itens só abrem com eles — ver
-     `TROFEUS_PARA`. O número é só para a VITRINE desenhar o cadeado e dizer
-     quantos faltam; quem decide a compra é o servidor, que reconta. */
-  const [trofeus, setTrofeus] = useState(0);
-  useEffect(() => {
-    setSkinAtiva(lsGet<string | null>(SKIN_KEY, null));
-  }, []);
-  // As formas de ganhar Sementinhas ficam num bloco só, recolhido por padrão,
-  // pra não empilhar 4 cards e poluir a tela (fica "Ganhe mais 🌱 ›").
-  const [showEarn, setShowEarn] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) {
-        setLoading(false);
-        return;
-      }
-      const res = await getCantinho({ data: { accessToken: s.session.access_token } });
-      if (res.ok) {
-        setSaldo(res.balance);
-        setOwned(res.owned);
-        setPremium(res.premium);
-        setEquipped(res.equippedFundo);
-        setCollection({
-          owned: res.collectionOwned ?? 0,
-          total: res.collectionTotal ?? 0,
-          complete: res.collectionComplete ?? false,
-        });
-        setTrofeus(res.trofeus ?? 0);
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  async function equipSkyTheme(theme: "v2" | "v1") {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) return;
-    const prev = sky;
-    setSky(theme); // otimista
-    const res = await setSkyTheme({ data: { accessToken: s.session.access_token, theme } });
-    if (!res.ok) {
-      setSky(prev);
-      toast(res.error ?? "Não foi possível trocar o céu");
-    } else {
-      toast(theme === "v1" ? "Céu Clássico aplicado 🌅" : "De volta ao céu novo ✨");
-      onSkyChange?.(theme);
-    }
-  }
-
-  /* A pele das bolinhas NÃO vai para o servidor.
-     Ela mora no `journey_state` — o mesmo blob que já guarda o progresso da
-     jornada e as posições dos enfeites, e que já sincroniza entre aparelhos.
-     Uma coluna nova em `patient_profiles` daria o mesmo resultado ao custo de
-     uma migração que precisa ser rodada à mão no Supabase, e este projeto já
-     tem migrações pendentes esperando isso. */
-  function equipSkin(id: string | null) {
-    setSkinAtiva(id);
-    lsSet(SKIN_KEY, id);
-    /* Avisa o Caminho, que pode estar montado noutra aba ao mesmo tempo. */
-    window.dispatchEvent(new CustomEvent("dc-skin-trocada", { detail: id }));
-    toast(id ? "Bolinhas trocadas! 🌱" : "Bolinhas de volta ao normal");
-  }
-
-  async function equipFundo(id: string | null) {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) return;
-    const prev = equipped;
-    setEquipped(id); // otimista
-    const res = await setCantinhoFundo({
-      data: { accessToken: s.session.access_token, fundoId: id },
-    });
-    if (!res.ok) {
-      setEquipped(prev);
-      toast(res.error ?? "Não foi possível trocar o cenário");
-    } else {
-      toast(id ? "Cenário aplicado! 🌄" : "Cenário removido");
-    }
-  }
-
-  if (loading) return <TabSkeleton />;
-
-  const ownedSet = new Set(owned);
-  // A cena mostra só decorações que a paciente REALMENTE possui — cenários
-  // (fundo) são papel de parede, não entram como emoji na cena.
-  // Enfeites que ela posiciona no Cantinho. Fora: `fundo` (é o cenário) e
-  // `tema` (veste a home do app, não entra na cena).
-  const ownedItems = CANTINHO_ITEMS.filter(
-    (i) => ownedSet.has(i.id) && i.type !== "fundo" && i.type !== "tema",
-  );
-  /**
-   * A ordem da vitrine.
-   *
-   * Era a ordem do ARQUIVO: a paciente abria a loja e via, em sequência,
-   * 280 · grátis · 150 · 30. Nada dizia o que ela alcança hoje, e o primeiro
-   * tile — o mais caro da prateleira comum — era justamente o que ela não
-   * pode comprar.
-   *
-   * Agora é preço crescente: o que ela alcança primeiro vem primeiro, e a
-   * grade vira uma escada. Quem NÃO tem Premium leva os bloqueados para o
-   * fim, também em ordem — eles continuam visíveis (é assim que ela descobre
-   * que existem), mas param de atravessar a lista do que dá para comprar
-   * hoje. Quem TEM Premium vê tudo numa escada só: para ela não há prateleira
-   * separada, todos os itens são compráveis.
-   *
-   * A Coroa fica sempre por último: é troféu, não item.
-   *
-   * Sem `useMemo` de propósito — esta linha vem depois de um `return`
-   * antecipado, e hook atrás de return quebra a ordem dos hooks entre
-   * renders. São 111 itens; ordenar a cada render custa menos que o risco.
-   */
-  const shopItems = (() => {
-    /* ⚠️ `CANTINHO_LOJA`, e não `CANTINHO_ITEMS`: quatro itens foram
-       aposentados (emoji igual ao de outro item, ou nome que prometia
-       comportamento inexistente) e saíram da VITRINE. Continuam no catálogo,
-       desenhando no cantinho de quem já os comprou — ver `aposentado` em
-       `cantinho.ts`. Quem tem um deles o vê em "Meus itens", logo acima. */
-    const daCategoria = CANTINHO_ITEMS.filter(
-      (i) => (cat === "all" || i.type === cat) && (!i.aposentado || owned.includes(i.id)),
-    );
-    const peso = (i: (typeof CANTINHO_ITEMS)[number]) =>
-      i.id === CANTINHO_COMPLETIONIST_ID ? 2 : !premium && i.premium ? 1 : 0;
-    return [...daCategoria].sort(
-      (a, b) => peso(a) - peso(b) || a.price - b.price || a.name.localeCompare(b.name, "pt-BR"),
-    );
-  })();
-
-  async function buy(itemId: string, price: number) {
-    if (buying) return;
-    if (saldo < price) {
-      toast("Sementinhas insuficientes 🌱");
-      return;
-    }
-    setBuying(itemId);
-    try {
-      const { data: s } = await supabase.auth.getSession();
-      if (!s.session?.access_token) {
-        toast("Sua sessão expirou — entre novamente.");
-        return;
-      }
-      const res = await buyCantinhoItem({
-        data: { accessToken: s.session.access_token, itemId },
-      });
-      if (res.ok) {
-        setSaldo(res.balance);
-        /**
-         * ⚠️ COMPRAR ERA MUDO — exceto no caso RARO.
-         *
-         * O único som da compra era o do conjunto completo, algumas linhas
-         * abaixo. Ou seja: o caso comum (comprar um enfeite) acontecia em
-         * silêncio e o caso excepcional fazia festa — o que faz o comum parecer
-         * ter FALHADO.
-         *
-         * Comprar é a saída da moeda, e merece o mesmo selo de "pousou" que
-         * guardar tem, não o arpejo de conquista. O conjunto completo continua
-         * com a festa maior; a hierarquia é essa.
-         */
-        tocarSomDeUI("guardado", { careMode });
-        setOwned((o) => {
-          const next = o.includes(itemId) ? o : [...o, itemId];
-          // Trofeu da coleção: se esta compra fechou a coleção, desbloqueia na hora.
-          const nowComplete = isCantinhoCollectionComplete(next);
-          /* Conta CATEGORIAS, igual ao servidor (`getCantinho`).
-             Contava `CANTINHO_COMPLETION_REQUIRED.filter(...)` — a lista de
-             ids REPRESENTATIVOS, um por categoria — então o selo caía de
-             "5/8 categorias" para "1/8" na hora em que ela comprava algo, a
-             menos que o item comprado fosse exatamente o representante. O
-             servidor já tinha sido corrigido; o cliente, não. */
-          setCollection((c) => ({
-            owned: cantinhoCategoriasCompletas(next),
-            total: c.total || CANTINHO_COMPLETION_MIN,
-            complete: nowComplete,
-          }));
-          return nowComplete && !next.includes(CANTINHO_COMPLETIONIST_ID)
-            ? [...next, CANTINHO_COMPLETIONIST_ID]
-            : next;
-        });
-        /* ─── ⚠️ O CONJUNTO FECHADO PRECISA SER DITO ────────────────────
-           `conjuntosFechados` existia com o comentário "a tela usa para saber
-           que este item fechou um, e comemorar" — e NENHUM leitor no repo. A
-           paciente fechava um conjunto, o servidor creditava 36–48 🌱, a
-           prateleira virava "completo ✓" e o app não dizia uma palavra.
-
-           `conjuntosNovos` são só os que fecharam NESTA compra (a lista
-           antiga trazia todos os já fechados), e `bonusNovo` é o que de fato
-           foi creditado agora. */
-        if (res.conjuntosNovos?.length) {
-          const nomes = res.conjuntosNovos
-            .map((cid) => CONJUNTO_POR_ID[cid]?.nome)
-            .filter(Boolean)
-            .join(" · ");
-          toast.success(`Conjunto completo: ${nomes}! +${res.bonusNovo} 🌱`, { duration: 7000 });
-          /* A mesma festa da conquista, e pelo mesmo motivo: fechar um
-             conjunto é a coisa mais rara que acontece no Cantinho. */
-          fireConfetti(1);
-          celebrateChime(1, careMode);
-        } else {
-          toast("Adicionado ao seu cantinho! 💛");
-        }
-      } else {
-        toast(res.error ?? "Não foi possível comprar");
-        if (typeof res.balance === "number") setSaldo(res.balance);
-        // Já possuído (ex.: comprado em outro aparelho): reflete na hora.
-        // Compara o CÓDIGO, não a frase — a frase tem emoji e nunca casava.
-        if ("motivo" in res && res.motivo === "ja_possui")
-          setOwned((o) => (o.includes(itemId) ? o : [...o, itemId]));
-      }
-    } catch (e) {
-      // SEM try/catch, um erro aqui deixava `buying` travado pra sempre e todos
-      // os cliques seguintes viravam no-op silencioso. Agora sempre libera.
-      console.error("[cantinho buy] erro:", e);
-      toast("Não consegui comprar agora — tente de novo em instantes.");
-    } finally {
-      setBuying(null);
-    }
-  }
-
-  const pill = (active: boolean) =>
-    `shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-colors ${
-      active ? "bg-emerald-100 text-emerald-700" : "text-foreground/45 hover:text-foreground/70"
-    }`;
-
-  /* Modo Cuidado: a prateleira inteira se cala, não só o saldo.
-     `getCantinho` já devolvia saldo 0 e nada possuído, mas a paciente
-     continuava vendo o catálogo com "Berço (opcional) — 250 🌱" e o
-     cabeçalho "Um cantinho que cresce com você". O conserto anterior tinha
-     fechado metade da porta. */
-  if (careMode) return <SilencioDoCuidado onNavigate={onNavigate} />;
-  return (
-    <div className="space-y-6">
-      {/* Cabeçalho + saldo */}
-      <div className="flex items-center justify-between rounded-3xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-5">
-        <div>
-          <p className="text-xs uppercase tracking-[0.22em] text-emerald-700">Meu Cantinho</p>
-          <p className="mt-0.5 text-sm text-emerald-800/80">Um cantinho que cresce com você.</p>
-        </div>
-        {/* O saldo era um <div> mudo. Virou botão: é o lugar óbvio onde a
-            paciente vai tocar querendo saber como se ganha (e agora, como se
-            compra) Sementinhas. */}
-        <button
-          onClick={() => setLojaSementinhas(true)}
-          aria-label="Ver como ganhar e comprar Sementinhas"
-          className="press flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1.5"
-        >
-          <span className="text-lg">🌱</span>
-          <span className="tabular-nums font-extrabold text-emerald-600">{saldo}</span>
-          <span aria-hidden className="text-[10px] font-bold text-emerald-500">
-            +
-          </span>
-        </button>
-      </div>
-
-      {/* A VITRINE SAIU.
-          Ela era um quadro de 300px que mostrava os enfeites espalhados e um
-          botão "Arrumar na trilha". Mas arrumar já acontece no Caminho, na
-          tela grande, com posição e tamanho — e é lá que os enfeites vivem.
-          O quadro era, então, uma segunda cópia do Caminho: mais pobre (sem
-          escala, sem arrastar) e desencontrada dele, porque as posições daqui
-          nunca foram as de lá. Esta aba volta a ser o que ela é: saldo, como
-          ganhar mais e a loja. O cantinho em si mora no Caminho. */}
-      {ownedItems.length === 0 && (
-        <div className="space-y-2 px-1">
-          <p className="text-sm text-muted-foreground">
-            Ganhe Sementinhas cuidando de você e traga vida pro seu Caminho — uma plantinha de cada
-            vez. 💛
-          </p>
-          {/* A frase mandava ela "trazer vida pro Caminho" e não havia UM
-              botão levando ao Caminho em toda a aba. O `onNavigate` já chegava
-              aqui por prop e nunca era usado. */}
-          <button
-            onClick={() => onNavigate?.("Caminho")}
-            className="press rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-bold text-white"
-          >
-            Ver o meu Caminho →
-          </button>
-        </div>
-      )}
-
-      {/* Ganhe mais Sementinhas — um bloco só, recolhido, no lugar de 4 cards
-          soltos empilhados (Instagram, avaliar, depoimento, indicar). */}
-      {!careMode && (
-        <div className="rounded-3xl border border-emerald-100 bg-emerald-50/40">
-          <button
-            onClick={() => setShowEarn((v) => !v)}
-            className="flex w-full items-center justify-between px-4 py-3 text-left"
-          >
-            <span className="flex items-center gap-2 text-sm font-bold text-emerald-800">
-              🌱 Ganhe mais Sementinhas
-            </span>
-            <span
-              className={`text-emerald-600 transition-transform duration-300 ${showEarn ? "rotate-90" : ""}`}
-            >
-              ›
-            </span>
-          </button>
-          {showEarn && (
-            <div className="space-y-2 px-3 pb-3">
-              <InstagramShareCard />
-              <RatingRewardCard onEarned={(n) => setSaldo((s) => s + n)} />
-              <TestimonialCard />
-              <ReferralCard />
-              {/* A rede de segurança: quem pulou o campo do onboarding, ou
-                  baixou pela busca da loja sem clicar no link, coloca o código
-                  aqui. Ver `CodigoDaEmbaixadora`. */}
-              <CodigoDaEmbaixadora />
-              {/* ⚠️ O CARTÃO DE PRESENTEAR SAIU DAQUI (ago/2026).
-                  Pedido do dono: "eu sei que tem outro lugar que você também
-                  consegue dar sementinhas, mas a gente tem que tirar de onde
-                  está esse outro lugar. Vai ser agora somente nas amizades."
-                  Ele vivia aqui, dentro do Cantinho — a aba de COMPRAR enfeite
-                  para si. Duas portas para a mesma ação faziam a paciente
-                  descobrir a mecânica no lugar onde ela não pensa em amiga
-                  nenhuma. O bolso não mudou: `presentearAmiga` continua igual,
-                  e a porta é a linha da amiga na aba Amigas. */}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── OS CONJUNTOS ────────────────────────────────────────────────────
-          Pedido do dono: "veja se os itens se complementam — um emoji de
-          golfinho e outro de um lago, dá pra juntar". Eles já se completavam;
-          o que faltava era o app dizer isso.
-
-          ⚠️ A PRATELEIRA VEM ANTES DA LOJA, mas mostra os COMPLETOS primeiro
-          (`conjuntosOrdenados`). A ordem oposta — "quase lá" no topo — é o
-          padrão de todo jogo comercial e é exatamente o que transforma a tela
-          num lembrete do que falta. Numa gestante de alto risco isso vira
-          cobrança com cara de enfeite.
-
-          ⚠️ E a contagem é "3 de 4", que é ESTADO. Nunca "falta 1!", que é
-          dívida. */}
-      <div className="mb-5">
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Conjuntos
-        </p>
-        <div className="scrollbar-hide flex gap-2 overflow-x-auto pb-1">
-          {conjuntosOrdenados(ownedSet).map((p) => (
-            <div
-              key={p.conjunto.id}
-              className={`flex min-w-[9.5rem] shrink-0 flex-col rounded-2xl border px-3 py-2.5 ${
-                p.completo ? "border-emerald-300 bg-emerald-50" : "border-border bg-secondary/20"
-              }`}
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="text-lg leading-none" aria-hidden>
-                  {p.conjunto.emoji}
-                </span>
-                <span className="text-[12.5px] font-extrabold leading-tight">
-                  {p.conjunto.nome}
-                </span>
-              </div>
-              <span className="mt-0.5 text-[10.5px] leading-snug text-muted-foreground">
-                {p.conjunto.descricao}
-              </span>
-              <span
-                className={`mt-1.5 text-[11px] font-bold ${
-                  p.completo ? "text-emerald-600" : "text-muted-foreground"
-                }`}
-              >
-                {p.completo ? "completo ✓" : `${p.tem} de ${p.total}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Loja de itens */}
-      <div>
-        <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto">
-          <button onClick={() => setCat("all")} className={pill(cat === "all")}>
-            Tudo
-          </button>
-          {CANTINHO_CATEGORIES.map((c) => (
-            <button key={c.key} onClick={() => setCat(c.key)} className={pill(cat === c.key)}>
-              {c.label}
-            </button>
-          ))}
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {shopItems.map((i) => {
-            const has = ownedSet.has(i.id);
-            const isTrophy = i.id === CANTINHO_COMPLETIONIST_ID;
-            /* ─── `has` ENTRA AQUI, E A FALTA DELE DIZIA DUAS COISAS OPOSTAS
-                 O item já COMPRADO por ela aparecia cinza, com "🔒 Premium" no
-                 canto, e o botão embaixo dizia "No cantinho ✓" — no mesmo tile.
-
-                 Não é hipótese: vinte itens que eram grátis viraram Premium na
-                 recalibração da loja, e quem já os tinha comprado passou a ver
-                 exatamente isso. Comprar é DEFINITIVO; o cadeado é sobre o que
-                 ela ainda pode comprar, nunca sobre o que já é dela. */
-            const locked = i.premium && !premium && !has;
-            const trophyLocked = isTrophy && !has; // troféu ainda não conquistado
-            /* Cadeado de TROFÉU: três itens só abrem depois de N dias de cinco
-               estrelas. Não substitui o preço — ela ainda paga em Sementinhas;
-               o troféu diz QUANDO a prateleira aparece. */
-            const faltamTrof = has ? 0 : faltamTrofeus(i.id, trofeus);
-            const cant = !has && !locked && saldo < i.price;
-            return (
-              <div
-                key={i.id}
-                className={`relative flex flex-col items-center rounded-2xl border p-4 text-center ${
-                  isTrophy
-                    ? "border-amber-300 bg-gradient-to-b from-amber-50 to-white"
-                    : i.premium
-                      ? /* Fundo roxo no item premium. O único sinal era um selo
-                           de 9px no canto, do mesmo amarelo do troféu da
-                           Coleção — e numa grade de 74 tiles brancos iguais,
-                           selo não separa nada. Roxo é a cor do Premium no
-                           resto do app, então o tile diz a que prateleira
-                           pertence antes de ela ler qualquer palavra. Só o
-                           FUNDO muda: preço, botão e emoji seguem com o mesmo
-                           peso dos outros, senão a grade vira propaganda. */
-                        "border-violet-200 bg-gradient-to-b from-violet-100/70 via-violet-50/40 to-white"
-                      : "border-border bg-card"
-                }`}
-              >
-                {i.premium && (
-                  <span className="absolute right-2 top-2 rounded-full bg-violet-200/80 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800">
-                    {locked ? "🔒 Premium" : "Premium"}
-                  </span>
-                )}
-                {isTrophy && (
-                  <span className="absolute right-2 top-2 rounded-full bg-amber-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
-                    Coleção
-                  </span>
-                )}
-                {/* O selo do troféu fica à ESQUERDA: o canto direito já é do
-                    selo Premium, e dois desses itens são premium também. */}
-                {trofeusExigidos(i.id) > 0 && !has && (
-                  <span className="absolute left-2 top-2 rounded-full bg-amber-200/85 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-800">
-                    {faltamTrof > 0 ? "🔒" : "✓"} {trofeusExigidos(i.id)} 🏆
-                  </span>
-                )}
-                <span
-                  className={`text-4xl ${
-                    locked || trophyLocked || faltamTrof > 0 ? "opacity-40 grayscale" : ""
-                  }`}
-                >
-                  {i.emoji}
-                </span>
-                <p className="mt-2 line-clamp-2 text-xs font-medium text-foreground">{i.name}</p>
-                {has ? (
-                  i.type === "trilha" ? (
-                    <button
-                      onClick={() => equipSkin(skinAtiva === i.id ? null : i.id)}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
-                        skinAtiva === i.id
-                          ? "bg-emerald-500 text-white"
-                          : "border border-emerald-300 text-emerald-700"
-                      }`}
-                    >
-                      {skinAtiva === i.id ? "Em uso ✓" : "Usar"}
-                    </button>
-                  ) : i.type === "tema" ? (
-                    // Tema veste a HOME, não o cantinho: alterna V1 ⇄ V2.
-                    <button
-                      onClick={() => equipSkyTheme(sky === "v1" ? "v2" : "v1")}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
-                        sky === "v1"
-                          ? "bg-emerald-500 text-white"
-                          : "border border-emerald-300 text-emerald-700"
-                      }`}
-                    >
-                      {sky === "v1" ? "Em uso ✓" : "Usar"}
-                    </button>
-                  ) : i.type === "fundo" ? (
-                    <button
-                      onClick={() => equipFundo(equipped === i.id ? null : i.id)}
-                      className={`press mt-2 rounded-full px-3 py-1 text-[11px] font-bold ${
-                        equipped === i.id
-                          ? "bg-emerald-500 text-white"
-                          : "border border-emerald-300 text-emerald-700"
-                      }`}
-                    >
-                      {equipped === i.id ? "Em uso ✓" : "Usar"}
-                    </button>
-                  ) : (
-                    <span className="mt-2 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                      {isTrophy ? "Conquistado! 👑" : "No cantinho ✓"}
-                    </span>
-                  )
-                ) : trophyLocked ? (
-                  <>
-                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
-                      🔒 {collection.owned}/{collection.total} categorias
-                    </span>
-                    {/* Antes dizia "inclui os itens Premium", porque a Coroa
-                        exigia o catálogo inteiro e era inalcançável sem
-                        assinatura. Agora ela pede um item pago de 8 categorias
-                        e todas as 8 mais baratas são alcançáveis sem Premium —
-                        então o aviso saiu, e no lugar entrou o que fazer. */}
-                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
-                      Um enfeite de cada tipo
-                    </span>
-                  </>
-                ) : faltamTrof > 0 ? (
-                  /* Diz o que FALTA, e não "bloqueado": a segunda frase não dá
-                     o que fazer a seguir, e é ela que faz a paciente achar que
-                     o item é pago em dinheiro. */
-                  <>
-                    <span className="mt-2 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-bold text-amber-700">
-                      🔒 faltam {faltamTrof} 🏆
-                    </span>
-                    <span className="mt-1 text-[9px] font-medium text-amber-700/70">
-                      1 troféu por dia de 5 estrelas
-                    </span>
-                  </>
-                ) : locked ? (
-                  /* Era um <span> sem onClick: 38 dos 72 itens pagos eram
-                     premium, e tocar em qualquer um deles não fazia nada.
-                     Nem erro, nem explicação, nem caminho para assinar —
-                     metade da loja era parede muda. Agora abre a oferta. */
-                  <button
-                    onClick={() => setOferta(i.name)}
-                    className="press mt-2 flex items-center gap-1 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-bold text-white"
-                  >
-                    💎 Ver o Premium
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => buy(i.id, i.price)}
-                    disabled={cant || buying === i.id}
-                    className={`press mt-2 flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-bold ${
-                      cant ? "bg-slate-100 text-slate-400" : "bg-emerald-500 text-white"
-                    }`}
-                  >
-                    🌱 {i.price}
-                  </button>
-                )}
-                {/* Quantas faltam. O tile cinza dizia só o preço, e a paciente
-                    tinha de fazer a subtração de cabeça para saber se estava
-                    perto ou longe — a diferença entre "amanhã eu compro" e
-                    "isso não é pra mim". */}
-                {!has && !locked && cant && saldo !== null && (
-                  <span className="mt-1 text-[9px] font-medium text-slate-400">
-                    faltam {i.price - saldo} 🌱
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      <OfertaPremium
-        aberto={oferta !== null}
-        onFechar={() => setOferta(null)}
-        motivo="item"
-        itemNome={oferta ?? undefined}
-      />
-
-      <LojaSementinhas
-        aberto={lojaSementinhas}
-        onFechar={() => setLojaSementinhas(false)}
-        saldo={saldo}
-        careMode={careMode}
-      />
-    </div>
-  );
-}
 
 /**
  * A LOJA DE PRODUTOS DE VERDADE — suplemento, conforto e enxoval, por dinheiro.
@@ -18675,7 +14153,7 @@ function LojaTab({
       {/* ── Header ──────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-primary/70">
+          <p className="font-serif text-[15px] font-semibold text-primary/70">
             Curadoria do seu médico
           </p>
           <h2 className="font-serif text-[22px] font-medium leading-tight text-gray-900 mt-0.5">
@@ -18685,11 +14163,11 @@ function LojaTab({
         {currentWeek !== null && (
           <button
             onClick={() => setWeekFilter((v) => !v)}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
               weekFilter ? "bg-primary text-white" : "border border-primary/30 text-primary"
             }`}
           >
-            <span className="text-[10px]">⬤</span> Sem. {currentWeek}
+            <span className="text-xs">⬤</span> Sem. {currentWeek}
           </button>
         )}
       </div>
@@ -18713,10 +14191,10 @@ function LojaTab({
                   <span className="text-[36px]">{vis.emoji}</span>
                 </div>
                 <div className="flex flex-col justify-center bg-white px-3 py-3 flex-1 min-w-0">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-0.5">
+                  <span className="text-xs font-bold uppercase tracking-widest text-primary/70 mb-0.5">
                     {vis.label}
                   </span>
-                  <p className="text-[11px] font-medium leading-tight line-clamp-2 text-gray-800">
+                  <p className="text-xs font-medium leading-tight line-clamp-2 text-gray-800">
                     {p.name}
                   </p>
                 </div>
@@ -18738,10 +14216,10 @@ function LojaTab({
             <button
               key={c.key}
               onClick={() => setCategory(c.key)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[12px] font-semibold transition-all ${
+              className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-all ${
                 category === c.key
                   ? "bg-primary/10 text-primary font-semibold"
-                  : "text-foreground/45 hover:text-foreground/70"
+                  : "text-foreground/60 hover:text-foreground/80"
               }`}
             >
               {c.label}
@@ -18785,13 +14263,13 @@ function LojaTab({
                   </span>
 
                   {/* Label categoria — canto superior direito */}
-                  <span className="absolute top-2 right-2 text-[10px] font-semibold uppercase tracking-widest text-white/50">
+                  <span className="absolute top-2 right-2 text-xs font-semibold uppercase tracking-widest text-white/50">
                     {vis.label}
                   </span>
 
                   {/* Badge destaque — canto superior esquerdo */}
                   {product.badge && (
-                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
+                    <span className="absolute top-2 left-2 bg-[#ff7733] text-white text-xs font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide leading-none">
                       {product.badge}
                     </span>
                   )}
@@ -18799,11 +14277,11 @@ function LojaTab({
 
                 {/* Info */}
                 <div className="flex flex-col px-2.5 pt-2.5 pb-3">
-                  <p className="text-[12px] font-medium leading-snug line-clamp-2 text-gray-800">
+                  <p className="text-xs font-medium leading-snug line-clamp-2 text-gray-800">
                     {product.name}
                   </p>
                   <div className="mt-2 flex items-center justify-end">
-                    <span className="text-[10px] font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold text-primary bg-primary/8 px-1.5 py-0.5 rounded-full">
                       ✓ Recomendado
                     </span>
                   </div>
@@ -18818,7 +14296,7 @@ function LojaTab({
           links carrega tag de afiliado, então ninguém era remunerado por
           nenhuma compra. Enquanto não houver programa de afiliados de fato, a
           linha diz só o que é verdade. */}
-      <p className="text-center text-[10px] text-gray-400 pb-4">
+      <p className="text-center text-xs text-gray-400 pb-4">
         Seleção do consultório · os preços você confere na Amazon
       </p>
 
@@ -18981,7 +14459,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           ← Voltar
         </button>
 
-        <div className="rounded-3xl border border-border bg-card p-6">
+        <div className="rounded-3xl card-material p-6">
           <h2 className="font-serif text-xl mb-4">Nova consulta particular</h2>
           <div className="space-y-4">
             <div>
@@ -19041,7 +14519,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
-                placeholder="Descreva brevemente o motivo da consulta..."
+                placeholder="Descreva brevemente o motivo da consulta…"
                 className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
               />
             </div>
@@ -19091,7 +14569,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
           disabled={submitting}
           className="w-full rounded-full bg-primary px-6 py-3 text-sm font-medium text-white disabled:opacity-40"
         >
-          {submitting ? "Solicitando..." : "Solicitar consulta"}
+          {submitting ? "Solicitando…" : "Solicitar consulta"}
         </button>
       </div>
     );
@@ -19099,8 +14577,8 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
-        <p className="text-xs uppercase tracking-[0.22em] text-primary mb-1">
+      <div className="rounded-3xl card-material p-6">
+        <p className="font-serif text-[15px] font-semibold text-primary mb-1">
           Consultas particulares
         </p>
         {/* Sem nome do fundador: esta aba é de TODA paciente de TODO médico. */}
@@ -19236,7 +14714,7 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
                           disabled={markingId === c.id}
                           className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
                         >
-                          {markingId === c.id ? "..." : "✓ Marquei o pagamento"}
+                          {markingId === c.id ? "Marcando…" : "✓ Marquei o pagamento"}
                         </button>
                       </>
                     )}
@@ -19259,1012 +14737,22 @@ function ConsultaParticularTab({ profile }: { profile: Profile | null }) {
    Feature 40a — Ciclo Menstrual
 ───────────────────────────────────────────────────────── */
 
-const TPM_SYMPTOMS = [
-  "Cólicas",
-  "Dor de cabeça",
-  "Irritabilidade",
-  "Inchaço",
-  "Fadiga",
-  "Acne",
-  "Sensibilidade nos seios",
-  "Insônia",
-  "Desejos alimentares",
-  "Ansiedade",
-];
-
-function cycleLengthDays(cycle: MenstrualCycle): number | null {
-  if (!cycle.end_date) return null;
-  const start = new Date(cycle.start_date + "T00:00:00");
-  const end = new Date(cycle.end_date + "T00:00:00");
-  return Math.round((end.getTime() - start.getTime()) / 86400000);
-}
-
-function avgCycleLength(cycles: MenstrualCycle[]): number {
-  if (cycles.length < 2) return 28;
-  const gaps: number[] = [];
-  for (let i = 0; i < cycles.length - 1; i++) {
-    const a = new Date(cycles[i + 1].start_date + "T00:00:00").getTime();
-    const b = new Date(cycles[i].start_date + "T00:00:00").getTime();
-    gaps.push(Math.round((b - a) / 86400000));
-  }
-  return Math.round(gaps.reduce((s, v) => s + v, 0) / gaps.length);
-}
-
 /* ─────────────────────────────────────────────────────────
    Ciclo visual — estilo Apple Health (anel de fases + calendário)
 ───────────────────────────────────────────────────────── */
 
-type CyclePhase = "menstruacao" | "folicular" | "fertil" | "ovulacao" | "lutea";
-
-const PHASE_META: Record<
-  CyclePhase,
-  { label: string; emoji: string; dot: string; chip: string; desc: string }
-> = {
-  menstruacao: {
-    label: "Menstruação",
-    emoji: "🩸",
-    dot: "text-rose-500",
-    chip: "bg-rose-500/15 text-rose-600 dark:text-rose-300",
-    desc: "Fase de descanso. Escute seu corpo.",
-  },
-  folicular: {
-    label: "Fase folicular",
-    emoji: "🌱",
-    dot: "text-amber-400",
-    chip: "bg-amber-400/15 text-amber-600 dark:text-amber-300",
-    desc: "A energia vai voltando aos poucos.",
-  },
-  fertil: {
-    label: "Janela fértil",
-    emoji: "🌿",
-    dot: "text-emerald-400",
-    chip: "bg-emerald-400/15 text-emerald-600 dark:text-emerald-300",
-    desc: "Maior chance de concepção estimada.",
-  },
-  ovulacao: {
-    label: "Ovulação",
-    emoji: "✨",
-    dot: "text-emerald-600",
-    chip: "bg-emerald-600/15 text-emerald-700 dark:text-emerald-300",
-    desc: "Pico de fertilidade estimado.",
-  },
-  lutea: {
-    label: "Fase lútea",
-    emoji: "🌙",
-    dot: "text-violet-400",
-    chip: "bg-violet-400/15 text-violet-600 dark:text-violet-300",
-    desc: "A TPM pode aparecer nos últimos dias.",
-  },
-};
-
-function ymd(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
-function fromYmd(s: string): Date {
-  return new Date(s + "T00:00:00");
-}
-function addDays(d: Date, n: number): Date {
-  const r = new Date(d);
-  r.setDate(r.getDate() + n);
-  return r;
-}
-function startOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
-function diffDays(a: Date, b: Date): number {
-  return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / 86400000);
-}
-
-function avgPeriodLength(cycles: MenstrualCycle[]): number {
-  const durs = cycles
-    .map(cycleLengthDays)
-    .filter((n): n is number => n !== null && n >= 2 && n <= 12);
-  if (!durs.length) return 5;
-  return Math.round(durs.reduce((s, v) => s + v, 0) / durs.length);
-}
-
 // Ovulação ~14 dias antes do próximo período. Em base 1 (dia 1 = início do
 // período), isso cai no dia `cycleLen - 13`.
-function phaseForCycleDay(day: number, cycleLen: number, periodLen: number): CyclePhase {
-  const ov = cycleLen - 13;
-  if (day <= periodLen) return "menstruacao";
-  if (day === ov) return "ovulacao";
-  if (day >= ov - 5 && day <= ov + 1) return "fertil";
-  if (day < ov) return "folicular";
-  return "lutea";
-}
-
-type CycleModel = {
-  cycleLen: number;
-  periodLen: number;
-  lastStart: Date;
-  actualPeriod: Set<string>;
-};
-
-function buildCycleModel(cycles: MenstrualCycle[]): CycleModel | null {
-  if (!cycles.length) return null;
-  const cycleLen = Math.max(18, Math.min(45, avgCycleLength(cycles)));
-  const periodLen = avgPeriodLength(cycles);
-  const lastStart = fromYmd(cycles[0].start_date);
-  const actualPeriod = new Set<string>();
-  for (const c of cycles) {
-    const s = fromYmd(c.start_date);
-    const e = c.end_date ? fromYmd(c.end_date) : addDays(s, periodLen - 1);
-    for (let d = new Date(s); d <= e; d = addDays(d, 1)) actualPeriod.add(ymd(d));
-  }
-  return { cycleLen, periodLen, lastStart, actualPeriod };
-}
 
 // Dia do ciclo (base 1) para uma data qualquer, projetando o ciclo médio pra
 // frente e pra trás a partir do último período registrado.
-function cycleDayFor(date: Date, model: CycleModel): number {
-  const off = diffDays(model.lastStart, date);
-  return (((off % model.cycleLen) + model.cycleLen) % model.cycleLen) + 1;
-}
-
-function classifyDay(date: Date, model: CycleModel): { phase: CyclePhase; actual: boolean } {
-  if (model.actualPeriod.has(ymd(date))) return { phase: "menstruacao", actual: true };
-  const phase = phaseForCycleDay(cycleDayFor(date, model), model.cycleLen, model.periodLen);
-  return { phase, actual: false };
-}
 
 // Próximos marcos (a partir de hoje): período, ovulação, janela fértil.
-function upcomingMarks(model: CycleModel, today: Date) {
-  let nextPeriod: Date | null = null;
-  let ovulation: Date | null = null;
-  const horizon = model.cycleLen * 2 + 2;
-  for (let i = 1; i <= horizon; i++) {
-    const d = addDays(today, i);
-    const c = classifyDay(d, model);
-    const prev = classifyDay(addDays(d, -1), model);
-    if (!nextPeriod && c.phase === "menstruacao" && prev.phase !== "menstruacao") nextPeriod = d;
-    if (!ovulation && c.phase === "ovulacao") ovulation = d;
-    if (nextPeriod && ovulation) break;
-  }
-  const fertileStart = ovulation ? addDays(ovulation, -5) : null;
-  const fertileEnd = ovulation ? addDays(ovulation, 1) : null;
-  return { nextPeriod, ovulation, fertileStart, fertileEnd };
-}
 
-function CicloHero({ model }: { model: CycleModel }) {
-  const today = startOfDay(new Date());
-  const dayInCycle = cycleDayFor(today, model);
-  const { phase } = classifyDay(today, model);
-  const meta = PHASE_META[phase];
-  const marks = upcomingMarks(model, today);
-  const daysToNext = marks.nextPeriod ? diffDays(today, marks.nextPeriod) : null;
-
-  // Anel de fases: um ponto por dia do ciclo.
-  const cx = 110;
-  const cy = 110;
-  const radius = 90;
-  const dots = Array.from({ length: model.cycleLen }, (_, i) => {
-    const angle = (i / model.cycleLen) * 2 * Math.PI - Math.PI / 2;
-    const x = cx + radius * Math.cos(angle);
-    const y = cy + radius * Math.sin(angle);
-    const p = phaseForCycleDay(i + 1, model.cycleLen, model.periodLen);
-    const isToday = i + 1 === dayInCycle;
-    return { x, y, dot: PHASE_META[p].dot, isToday };
-  });
-
-  const fmt = (d: Date | null, opts?: Intl.DateTimeFormatOptions) =>
-    d ? d.toLocaleDateString("pt-BR", opts ?? { day: "2-digit", month: "short" }) : "—";
-
-  return (
-    <div className="rounded-3xl border border-border bg-card p-6">
-      <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:gap-8">
-        {/* Anel */}
-        <div className="relative shrink-0" style={{ width: 220, height: 220 }}>
-          <svg viewBox="0 0 220 220" className="h-full w-full" aria-hidden="true">
-            {dots.map((d, i) => (
-              <g key={i}>
-                {d.isToday && (
-                  <circle
-                    cx={d.x}
-                    cy={d.y}
-                    r={8.5}
-                    className="fill-background stroke-foreground"
-                    strokeWidth={1.5}
-                  />
-                )}
-                <circle
-                  cx={d.x}
-                  cy={d.y}
-                  r={d.isToday ? 5 : 4.2}
-                  className={`fill-current ${d.dot}`}
-                />
-              </g>
-            ))}
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <span className="text-3xl leading-none">{meta.emoji}</span>
-            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-muted-foreground">
-              Dia do ciclo
-            </p>
-            <p className="font-serif text-4xl leading-none">{dayInCycle}</p>
-          </div>
-        </div>
-
-        {/* Resumo */}
-        <div className="min-w-0 flex-1 space-y-4 text-center md:text-left">
-          <div>
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${meta.chip}`}
-            >
-              {meta.emoji} {meta.label}
-            </span>
-            <p className="mt-2 text-sm text-muted-foreground">{meta.desc}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Próximo período
-              </p>
-              <p className="font-serif text-lg">{fmt(marks.nextPeriod)}</p>
-              {daysToNext !== null && (
-                <p className="text-[11px] text-muted-foreground">
-                  {daysToNext === 0
-                    ? "pode ser hoje"
-                    : daysToNext === 1
-                      ? "em 1 dia"
-                      : `em ${daysToNext} dias`}
-                </p>
-              )}
-            </div>
-            <div className="rounded-2xl bg-secondary/60 px-3 py-2.5">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Ovulação</p>
-              <p className="font-serif text-lg">{fmt(marks.ovulation)}</p>
-              <p className="text-[11px] text-muted-foreground">estimada</p>
-            </div>
-            <div className="col-span-2 rounded-2xl bg-secondary/60 px-3 py-2.5 sm:col-span-1">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                Janela fértil
-              </p>
-              <p className="font-serif text-base">
-                {fmt(marks.fertileStart)} – {fmt(marks.fertileEnd)}
-              </p>
-              <p className="text-[11px] text-muted-foreground">ciclo de {model.cycleLen} dias</p>
-            </div>
-          </div>
-        </div>
-      </div>
-      <p className="mt-4 text-center text-[11px] text-muted-foreground md:text-left">
-        Estimativas com base no seu histórico. Não substituem métodos contraceptivos nem
-        acompanhamento médico.
-      </p>
-    </div>
-  );
-}
-
-const WEEKDAYS_PT = ["D", "S", "T", "Q", "Q", "S", "S"];
-
-function CicloCalendario({ model }: { model: CycleModel }) {
-  const [monthOffset, setMonthOffset] = useState(0);
-  const today = startOfDay(new Date());
-  const base = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-  const monthLabel = base.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
-  const gridStart = addDays(base, -base.getDay());
-  const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
-
-  function cellClass(d: Date): string {
-    const inMonth = d.getMonth() === base.getMonth();
-    const isToday = ymd(d) === ymd(today);
-    const { phase, actual } = classifyDay(d, model);
-    let tone = "text-foreground/70";
-    if (actual) tone = "bg-rose-500 text-white font-semibold";
-    else if (phase === "menstruacao")
-      tone = "border border-dashed border-rose-400 text-rose-500 dark:text-rose-300";
-    else if (phase === "ovulacao") tone = "bg-emerald-600 text-white font-semibold";
-    else if (phase === "fertil") tone = "bg-emerald-400/25 text-emerald-700 dark:text-emerald-300";
-    const ring = isToday ? " ring-2 ring-foreground ring-offset-2 ring-offset-card" : "";
-    const dim = inMonth ? "" : " opacity-35";
-    return `flex aspect-square items-center justify-center rounded-full text-xs ${tone}${ring}${dim}`;
-  }
-
-  const legend: { label: string; swatch: string }[] = [
-    { label: "Período", swatch: "bg-rose-500" },
-    { label: "Previsão", swatch: "border border-dashed border-rose-400" },
-    { label: "Fértil", swatch: "bg-emerald-400/40" },
-    { label: "Ovulação", swatch: "bg-emerald-600" },
-  ];
-
-  return (
-    <div className="rounded-3xl border border-border bg-card p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <button
-          onClick={() => setMonthOffset((m) => m - 1)}
-          aria-label="Mês anterior"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
-        >
-          ‹
-        </button>
-        <p className="font-serif text-lg capitalize">{monthLabel}</p>
-        <button
-          onClick={() => setMonthOffset((m) => m + 1)}
-          aria-label="Próximo mês"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
-        >
-          ›
-        </button>
-      </div>
-      <div className="grid grid-cols-7 gap-1">
-        {WEEKDAYS_PT.map((w, i) => (
-          <div
-            key={i}
-            className="pb-1 text-center text-[11px] font-medium uppercase text-muted-foreground"
-          >
-            {w}
-          </div>
-        ))}
-        {days.map((d, i) => (
-          <div key={i} className={cellClass(d)}>
-            {d.getDate()}
-          </div>
-        ))}
-      </div>
-      <div className="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-1.5">
-        {legend.map((l) => (
-          <span
-            key={l.label}
-            className="flex items-center gap-1.5 text-[11px] text-muted-foreground"
-          >
-            <span className={`h-3 w-3 shrink-0 rounded-full ${l.swatch}`} />
-            {l.label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const SAUDE_MULHER_SUBTABS = [
-  { key: "ciclo", label: "Ciclo menstrual" },
-  { key: "preventivos", label: "Preventivos" },
-] as const;
-
-/** Hub "Saúde da mulher": Ciclo Menstrual + Preventivos numa tela só. */
-function SaudeMulherHub() {
-  const [sub, setSub] = useState<(typeof SAUDE_MULHER_SUBTABS)[number]["key"]>("ciclo");
-  return (
-    <div className="space-y-5">
-      <div className="scrollbar-hide flex gap-2 overflow-x-auto">
-        {SAUDE_MULHER_SUBTABS.map((s) => (
-          <button
-            key={s.key}
-            onClick={() => setSub(s.key)}
-            className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
-              sub === s.key
-                ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-      <Fade key={sub}>
-        {sub === "ciclo" && <CicloMenstrualTab />}
-        {sub === "preventivos" && <PreventivosTab />}
-      </Fade>
-    </div>
-  );
-}
-
-function CicloMenstrualTab() {
-  const [cycles, setCycles] = useState<MenstrualCycle[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split("T")[0]);
-  const [newFlow, setNewFlow] = useState("normal");
-  const [newSymptoms, setNewSymptoms] = useState<string[]>([]);
-  const [newNotes, setNewNotes] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [endingId, setEndingId] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
-
-  async function load() {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setLoading(false);
-      return;
-    }
-    const res = await getRecentCycles({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setCycles(res.cycles);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function handleLogStart() {
-    setSubmitting(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setSubmitting(false);
-      return;
-    }
-    const res = await logCycleStart({
-      data: {
-        accessToken: s.session.access_token,
-        startDate: newStartDate,
-        flowIntensity: newFlow,
-        symptoms: newSymptoms,
-        notes: newNotes || null,
-      },
-    });
-    if (res.ok) {
-      setShowForm(false);
-      setNewSymptoms([]);
-      setNewNotes("");
-      await load();
-    } else {
-      toast.error("Não foi possível salvar o ciclo. Tente novamente.");
-    }
-    setSubmitting(false);
-  }
-
-  async function handleMarkEnd(cycleId: string) {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) return;
-    const res = await updateCycleEnd({
-      data: { accessToken: s.session.access_token, cycleId, endDate },
-    });
-    if (!res.ok) {
-      toast.error("Não foi possível salvar o fim do ciclo. Tente novamente.");
-      return;
-    }
-    setEndingId(null);
-    await load();
-  }
-
-  async function handleDelete(cycleId: string) {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) return;
-    const res = await deleteCycle({ data: { accessToken: s.session.access_token, cycleId } });
-    if (!res.ok) {
-      toast.error("Não foi possível excluir o ciclo. Tente novamente.");
-      return;
-    }
-    await load();
-  }
-
-  const model = useMemo(() => buildCycleModel(cycles), [cycles]);
-
-  if (loading) return <TabSkeleton />;
-
-  return (
-    <div className="space-y-6">
-      {/* Ciclo visual — estilo Apple Health */}
-      {model ? (
-        <Stagger className="space-y-4">
-          <StaggerItem>
-            <CicloHero model={model} />
-          </StaggerItem>
-          <StaggerItem>
-            <CicloCalendario model={model} />
-          </StaggerItem>
-        </Stagger>
-      ) : (
-        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
-          <p className="mb-2 text-4xl">🌸</p>
-          <p className="font-serif text-lg">Seu ciclo, visual e previsível</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Registre seu período abaixo para ver o anel de fases, a janela fértil e a previsão do
-            próximo ciclo — como no app de saúde do celular.
-          </p>
-        </div>
-      )}
-
-      {/* Log button */}
-      {!showForm ? (
-        <button
-          onClick={() => setShowForm(true)}
-          className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-white"
-        >
-          + Registrar período
-        </button>
-      ) : (
-        <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
-          <h3 className="font-semibold">Novo registro de período</h3>
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Data de início *</label>
-              <input
-                type="date"
-                value={newStartDate}
-                onChange={(e) => setNewStartDate(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1.5">Intensidade do fluxo</label>
-              <select
-                value={newFlow}
-                onChange={(e) => setNewFlow(e.target.value)}
-                className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
-              >
-                <option value="leve">Leve</option>
-                <option value="normal">Normal</option>
-                <option value="intenso">Intenso</option>
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Sintomas</label>
-            <div className="flex flex-wrap gap-2">
-              {TPM_SYMPTOMS.map((s) => (
-                <button
-                  key={s}
-                  onClick={() =>
-                    setNewSymptoms((prev) =>
-                      prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s],
-                    )
-                  }
-                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                    newSymptoms.includes(s)
-                      ? "bg-primary text-white"
-                      : "bg-secondary text-muted-foreground hover:text-primary"
-                  }`}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1.5">Observações</label>
-            <textarea
-              value={newNotes}
-              onChange={(e) => setNewNotes(e.target.value)}
-              rows={2}
-              className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm resize-none"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={handleLogStart}
-              disabled={submitting}
-              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-white disabled:opacity-40"
-            >
-              {submitting ? "Salvando..." : "Salvar"}
-            </button>
-            <button
-              onClick={() => setShowForm(false)}
-              className="rounded-full border border-border px-5 py-2 text-sm font-medium"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Cycle history */}
-      {cycles.length === 0 ? (
-        <div className="py-14 text-center">
-          <p className="text-4xl mb-3">📅</p>
-          <p className="font-serif text-xl text-foreground/70">Nenhum ciclo registrado</p>
-          <p className="mt-2 text-sm text-muted-foreground">Registre seu primeiro ciclo acima.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <h3 className="font-semibold">Histórico de ciclos</h3>
-          {cycles.map((cycle, i) => {
-            const duration = cycleLengthDays(cycle);
-            const gapToNext =
-              i > 0
-                ? Math.round(
-                    (new Date(cycles[i - 1].start_date + "T00:00:00").getTime() -
-                      new Date(cycle.start_date + "T00:00:00").getTime()) /
-                      86400000,
-                  )
-                : null;
-            const isActive = !cycle.end_date;
-            return (
-              <div
-                key={cycle.id}
-                className={`rounded-2xl border p-4 ${isActive ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      {isActive && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">
-                          Ativo
-                        </span>
-                      )}
-                      <p className="font-medium text-sm">
-                        {new Date(cycle.start_date + "T00:00:00").toLocaleDateString("pt-BR", {
-                          day: "2-digit",
-                          month: "long",
-                          year: "numeric",
-                        })}
-                        {cycle.end_date &&
-                          ` — ${new Date(cycle.end_date + "T00:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long" })}`}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
-                      {duration !== null && <span>Duração: {duration} dias</span>}
-                      {gapToNext !== null && <span>Ciclo: {gapToNext} dias</span>}
-                      {cycle.flow_intensity && <span>Fluxo: {cycle.flow_intensity}</span>}
-                    </div>
-                    {cycle.symptoms.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1.5">
-                        {cycle.symptoms.map((s) => (
-                          <span key={s} className="rounded-full bg-secondary px-2 py-0.5 text-xs">
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex gap-2 shrink-0">
-                    {isActive &&
-                      (endingId === cycle.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
-                          />
-                          <button
-                            onClick={() => handleMarkEnd(cycle.id)}
-                            className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
-                          >
-                            Ok
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setEndingId(cycle.id)}
-                          className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
-                        >
-                          Encerrar
-                        </button>
-                      ))}
-                    <button
-                      onClick={() => handleDelete(cycle.id)}
-                      aria-label="Excluir este ciclo"
-                      className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─────────────────────────────────────────────────────────
-   Feature 40b — Preventivos
-───────────────────────────────────────────────────────── */
-
-type ExamDef = {
-  key: string;
-  name: string;
-  emoji: string;
-  frequency: string;
-  frequencyMonths: number;
-  description: string;
-  ageFrom?: number;
-};
-
-const PREVENTIVE_EXAMS: ExamDef[] = [
-  {
-    key: "papanicolau",
-    name: "Papanicolau",
-    emoji: "🔬",
-    frequency: "Anual",
-    frequencyMonths: 12,
-    description:
-      "Rastreamento do câncer de colo do útero. Após 2 exames normais seguidos, pode ser feito a cada 3 anos.",
-  },
-  {
-    key: "mamografia",
-    name: "Mamografia",
-    emoji: "🩻",
-    frequency: "Anual (40+)",
-    frequencyMonths: 12,
-    description:
-      "Rastreamento do câncer de mama. A partir de 40 anos ou 35 anos em caso de histórico familiar.",
-    ageFrom: 40,
-  },
-  {
-    key: "ultrassom_tv",
-    name: "Ultrassom Pélvico",
-    emoji: "📡",
-    frequency: "Anual",
-    frequencyMonths: 12,
-    description:
-      "Avaliação dos ovários, útero e endométrio. Detecta cistos, miomas e outras alterações.",
-  },
-  {
-    key: "glicemia",
-    name: "Glicemia em Jejum",
-    emoji: "🩸",
-    frequency: "Anual",
-    frequencyMonths: 12,
-    description: "Rastreamento de diabetes e pré-diabetes.",
-  },
-  {
-    key: "colesterol",
-    name: "Perfil Lipídico",
-    emoji: "💉",
-    frequency: "A cada 5 anos",
-    frequencyMonths: 60,
-    description: "Colesterol total, HDL, LDL e triglicérides. Risco cardiovascular.",
-  },
-  {
-    key: "tsh",
-    name: "TSH / T4 Livre",
-    emoji: "🦋",
-    frequency: "A cada 2 anos",
-    frequencyMonths: 24,
-    description: "Função da tireoide. Importante para mulheres em idade fértil.",
-    ageFrom: 35,
-  },
-  {
-    key: "pressao_arterial",
-    name: "Pressão Arterial",
-    emoji: "💊",
-    frequency: "Semestral",
-    frequencyMonths: 6,
-    description:
-      "Controle da pressão arterial. Hipertensão é silenciosa — medir regularmente é fundamental.",
-  },
-  {
-    key: "dentista",
-    name: "Dentista",
-    emoji: "🦷",
-    frequency: "Semestral",
-    frequencyMonths: 6,
-    description:
-      "Saúde bucal com impacto direto na saúde geral. Cáries e inflamações gengivas elevam risco sistêmico.",
-  },
-  {
-    key: "dermatologista",
-    name: "Mapeamento de Pintas",
-    emoji: "☀️",
-    frequency: "Anual",
-    frequencyMonths: 12,
-    description: "Dermatoscopia para rastreamento do melanoma e outros cânceres de pele.",
-  },
-  {
-    key: "oftalmologista",
-    name: "Oftalmologista",
-    emoji: "👁️",
-    frequency: "A cada 2 anos",
-    frequencyMonths: 24,
-    description: "Avaliação da visão, pressão intraocular e saúde ocular.",
-  },
-];
-
-function nextDueDate(lastDone: string | null, frequencyMonths: number): Date | null {
-  if (!lastDone) return null;
-  const d = new Date(lastDone + "T00:00:00");
-  d.setMonth(d.getMonth() + frequencyMonths);
-  return d;
-}
-
-function PreventivosTab() {
-  const [reminders, setReminders] = useState<PreventiveReminder[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editDate, setEditDate] = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function load() {
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setLoading(false);
-      return;
-    }
-    const res = await getPreventiveReminders({ data: { accessToken: s.session.access_token } });
-    if (res.ok) setReminders(res.reminders);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function handleSave() {
-    if (!editingKey) return;
-    setSaving(true);
-    const { data: s } = await supabase.auth.getSession();
-    if (!s.session?.access_token) {
-      setSaving(false);
-      return;
-    }
-    await setPreventiveReminder({
-      data: {
-        accessToken: s.session.access_token,
-        examKey: editingKey,
-        lastDoneDate: editDate || null,
-        notes: editNotes || null,
-      },
-    });
-    setEditingKey(null);
-    await load();
-    setSaving(false);
-  }
-
-  if (loading) return <TabSkeleton />;
-
-  const reminderMap = Object.fromEntries(reminders.map((r) => [r.exam_key, r]));
-  const today = new Date();
-
-  // Group: overdue, due soon (within 60 days), ok
-  const examGroups = PREVENTIVE_EXAMS.map((exam) => {
-    const r = reminderMap[exam.key];
-    const nextDue = r?.last_done_date ? nextDueDate(r.last_done_date, exam.frequencyMonths) : null;
-    const daysUntil = nextDue ? Math.round((nextDue.getTime() - today.getTime()) / 86400000) : null;
-    let status: "overdue" | "soon" | "ok" | "never" = "never";
-    if (r?.last_done_date) {
-      if (daysUntil !== null) {
-        if (daysUntil < 0) status = "overdue";
-        else if (daysUntil <= 60) status = "soon";
-        else status = "ok";
-      }
-    }
-    return { exam, r, nextDue, daysUntil, status };
-  });
-
-  const overdueCount = examGroups.filter((e) => e.status === "overdue").length;
-  const soonCount = examGroups.filter((e) => e.status === "soon").length;
-  const neverCount = examGroups.filter((e) => e.status === "never").length;
-
-  return (
-    <div className="space-y-6">
-      {/* Summary */}
-      <div className="grid grid-cols-3 gap-3">
-        {[
-          {
-            label: "Em atraso",
-            value: overdueCount,
-            color: "text-red-600 bg-red-50 border-red-200",
-          },
-          {
-            label: "Em breve",
-            value: soonCount,
-            color: "text-primary bg-primary/6 border-primary/20",
-          },
-          {
-            label: "Não registrado",
-            value: neverCount,
-            color: "text-muted-foreground bg-secondary border-border",
-          },
-        ].map((s) => (
-          <div key={s.label} className={`rounded-2xl border p-4 text-center ${s.color}`}>
-            <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-xs mt-1">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Exam list */}
-      <div className="space-y-3">
-        {examGroups.map(({ exam, r, nextDue, daysUntil, status }) => {
-          const isEditing = editingKey === exam.key;
-          const statusColor =
-            status === "overdue"
-              ? "border-red-200 bg-red-50"
-              : status === "soon"
-                ? "border-primary/20 bg-primary/6"
-                : status === "ok"
-                  ? "border-green-200 bg-green-50"
-                  : "border-border bg-card";
-          const statusEmoji =
-            status === "overdue" ? "⚠️" : status === "soon" ? "🔔" : status === "ok" ? "✅" : "📋";
-
-          return (
-            <div key={exam.key} className={`rounded-2xl border p-4 ${statusColor}`}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-3 flex-1">
-                  <span className="text-xl shrink-0 mt-0.5">{exam.emoji}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{exam.name}</p>
-                      <span className="text-sm">{statusEmoji}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{exam.description}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Frequência recomendada: {exam.frequency}
-                    </p>
-                    {r?.last_done_date && (
-                      <p className="text-xs mt-1">
-                        Último:{" "}
-                        {new Date(r.last_done_date + "T00:00:00").toLocaleDateString("pt-BR")}
-                        {nextDue && ` · Próximo: ${nextDue.toLocaleDateString("pt-BR")} `}
-                        {daysUntil !== null && (
-                          <span
-                            className={
-                              daysUntil < 0
-                                ? "text-red-600 font-medium"
-                                : daysUntil <= 60
-                                  ? "text-primary font-medium"
-                                  : "text-green-600"
-                            }
-                          >
-                            {daysUntil < 0
-                              ? `(${Math.abs(daysUntil)} dias em atraso)`
-                              : daysUntil === 0
-                                ? "(hoje)"
-                                : `(em ${daysUntil} dias)`}
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {r?.notes && (
-                      <p className="text-xs text-muted-foreground mt-0.5 italic">"{r.notes}"</p>
-                    )}
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    setEditingKey(isEditing ? null : exam.key);
-                    setEditDate(r?.last_done_date ?? "");
-                    setEditNotes(r?.notes ?? "");
-                  }}
-                  className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
-                >
-                  {isEditing ? "Fechar" : r?.last_done_date ? "Atualizar" : "Registrar"}
-                </button>
-              </div>
-              {isEditing && (
-                <div className="mt-4 pt-4 border-t border-border/50 space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Data do último exame</label>
-                      <input
-                        type="date"
-                        value={editDate}
-                        onChange={(e) => setEditDate(e.target.value)}
-                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Observações</label>
-                      <input
-                        value={editNotes}
-                        onChange={(e) => setEditNotes(e.target.value)}
-                        placeholder="Resultado, local, médico..."
-                        className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-sm"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving}
-                    className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-white disabled:opacity-40"
-                  >
-                    {saving ? "Salvando..." : "Salvar"}
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <p className="text-xs text-center text-muted-foreground pb-4">
-        Frequências baseadas nas diretrizes da FEBRASGO e CFM. Consulte seu médico para orientações
-        individualizadas.
-      </p>
-    </div>
-  );
-}
+/* ⚠️ `SaudeMulherHub`, `PreventivosTab` e a tabela de exames mudaram-se para
+   `src/components/saude-mulher.tsx`. Esta é a metade da grade da Saúde que
+   SOME por nove meses — numa conta de gestante ela não existe —, e por isso
+   era a mais difícil de olhar. A bancada é /preview-saude-mulher. */
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MÉDICO TAB — perfil completo do médico associado (DOCTOR config)
@@ -20281,6 +14769,22 @@ function MédicoTab() {
   const [semMatch, setSemMatch] = useState(false);
   /** A lista veio sem os filtros (banco sem as colunas do perfil). */
   const [filtrosFora, setFiltrosFora] = useState(false);
+  /**
+   * ⚠️ **"NÃO CONSEGUI LER" TINHA A CARA DE "ELE NÃO ESTÁ AQUI".**
+   *
+   * `searchDoctors` devolve `{ ok: false, error }` quando a leitura falha — e a
+   * tela descartava o sinal, caía em `results: []` com `searched: true`, e
+   * escrevia **"Nenhum médico com esse nome"**. Uma queda de rede fazia o app
+   * afirmar, sobre o mundo real, que o obstetra dela não está na plataforma.
+   *
+   * Nesta aba isso é o pior desfecho possível: ela procura o SEU médico, lê que
+   * ele não existe aqui, e **para de procurar**. O vínculo que liga uma gestação
+   * de alto risco ao obstetra dela morre numa frase que não era verdade.
+   *
+   * ⚠️ É a mesma correção que `meuFeed`, `sugestoesDoFeed` e `buscarPerfis`
+   * ganharam na Comunidade (`motivo: "instavel"`), deixada de pé aqui.
+   */
+  const [falhouABusca, setFalhouABusca] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
 
@@ -20329,10 +14833,14 @@ function MédicoTab() {
          obstetras aleatórios como se fossem o resultado da busca, cada um com
          um botão "Solicitar". Pedir vínculo ao médico errado era o desfecho
          provável. */
+      setFalhouABusca(!res.ok);
       setSemMatch(res.ok ? !!res.semCorrespondencia : false);
       setFiltrosFora(res.ok ? !!res.filtrosIgnorados : false);
       setResults(res.ok ? res.doctors : []);
     } catch {
+      /* Queda de rede é o MESMO caso: o que não pode acontecer é a tela
+         concluir "ele não está aqui" a partir de uma lista que ninguém leu. */
+      setFalhouABusca(true);
       setResults([]);
     }
     setSearched(true);
@@ -20376,10 +14884,8 @@ function MédicoTab() {
   return (
     <div className="space-y-6 pb-8">
       {doctor ? (
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            Meu obstetra
-          </p>
+        <div className="rounded-2xl card-material p-6">
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu obstetra</p>
           <h2 className="mt-1 font-serif text-2xl text-foreground">
             {doctor.display_name || "Obstetra"}
           </h2>
@@ -20392,6 +14898,16 @@ function MédicoTab() {
             Você está vinculada a este obstetra. No <strong>Chat IA</strong>, o assistente responde
             com o estilo e as condutas que o seu médico validou.
           </p>
+          {/* ─── ONDE ELE ATENDE ──────────────────────────────────────────
+              ⚠️ O médico cadastra vários consultórios no painel e a paciente
+              via um campo de texto solto do perfil dele — e, uma vez vinculada,
+              endereço NENHUM. `listDoctorAddresses` é pública, existe desde a
+              primeira migração do painel e tinha zero chamadores.
+
+              O custo é ela ir ao lugar errado: um obstetra que atende na segunda
+              e na quinta em endereços diferentes é o caso comum, e falta em
+              consultório de alto risco é vaga perdida duas vezes. */}
+          <ConsultoriosDoMedico doctorId={doctor.id} />
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
               to="/agendamento"
@@ -20409,9 +14925,7 @@ function MédicoTab() {
         </div>
       ) : pending ? (
         <div className="rounded-2xl border border-amber-300 bg-amber-50 p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-700">
-            Solicitação enviada
-          </p>
+          <p className="font-serif text-[15px] font-semibold text-amber-700">Solicitação enviada</p>
           <h2 className="mt-1 font-serif text-xl text-foreground">
             Aguardando {pending.doctor.display_name || "o médico"} aceitar
           </h2>
@@ -20428,10 +14942,8 @@ function MédicoTab() {
           </button>
         </div>
       ) : (
-        <div className="rounded-2xl border border-border bg-card p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            Meu obstetra
-          </p>
+        <div className="rounded-2xl card-material p-6">
+          <p className="font-serif text-[15px] font-semibold text-primary">Meu obstetra</p>
           <h2 className="mt-1 font-serif text-xl text-foreground">Encontre o seu obstetra</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Busque pelo nome do seu médico e envie uma solicitação. Quando ele aceitar, seu
@@ -20441,7 +14953,7 @@ function MédicoTab() {
       )}
 
       {(!doctor || showSearch) && !pending && (
-        <div className="rounded-2xl border border-border bg-card p-6">
+        <div className="rounded-2xl card-material p-6">
           <form onSubmit={doSearch} className="flex gap-2">
             <input
               value={query}
@@ -20458,14 +14970,33 @@ function MédicoTab() {
             </button>
           </form>
           <div className="mt-4 space-y-2">
-            {searched && results.length === 0 && (
+            {falhouABusca && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 dark:bg-amber-500/10">
+                <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
+                  Não consegui carregar a lista agora
+                </p>
+                <p className="mt-0.5 text-xs leading-snug text-amber-900/80 dark:text-amber-100/80">
+                  Isso é a nossa conexão, não o cadastro do seu médico — ele pode muito bem estar
+                  aqui.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => doSearch()}
+                  disabled={searching}
+                  className="mt-2 min-h-[44px] rounded-full border border-amber-400 px-4 text-sm font-medium text-amber-900 disabled:opacity-40 dark:text-amber-100"
+                >
+                  {searching ? "Buscando…" : "Tentar de novo"}
+                </button>
+              </div>
+            )}
+            {searched && !falhouABusca && results.length === 0 && (
               <p className="text-sm text-muted-foreground">
                 Nenhum médico com esse nome. Tente só o sobrenome, ou deixe o campo vazio e toque em
                 Buscar para ver todos os obstetras do app.
               </p>
             )}
             {filtrosFora && results.length > 0 && (
-              <p className="rounded-xl bg-secondary/60 p-3 text-[12px] leading-snug text-muted-foreground">
+              <p className="rounded-xl bg-secondary/60 p-3 text-xs leading-snug text-muted-foreground">
                 Esta lista está sem filtros — mostrando todos os obstetras do app.
               </p>
             )}
@@ -20474,7 +15005,7 @@ function MédicoTab() {
                 <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">
                   Não encontramos “{query.trim()}” no app
                 </p>
-                <p className="mt-0.5 text-[12px] leading-snug text-amber-900/80 dark:text-amber-100/80">
+                <p className="mt-0.5 text-xs leading-snug text-amber-900/80 dark:text-amber-100/80">
                   Seu médico talvez ainda não esteja aqui. Abaixo estão os obstetras que já atendem
                   pelo app — confira o nome antes de solicitar.
                 </p>
@@ -20501,7 +15032,7 @@ function MédicoTab() {
                       não tem cidade preenchida — é o mesmo dado, e ela só
                       quer saber se é perto. */}
                   {(d.city || d.endereco_cidade || d.years_experience) && (
-                    <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {[
                         d.city
                           ? `${d.city}${d.state ? `/${d.state}` : ""}`
@@ -20516,7 +15047,7 @@ function MédicoTab() {
                       faz antes de solicitar. Sem elas, "Solicitar" era um pedido
                       no escuro — e ela descobria o preço depois de aceita. */}
                   {(d.accepts_insurance || d.accepts_private || d.consultation_price_brl) && (
-                    <p className="mt-1 flex flex-wrap gap-1 text-[10px]">
+                    <p className="mt-1 flex flex-wrap gap-1 text-xs">
                       {d.accepts_insurance && (
                         <span className="rounded-full bg-secondary px-1.5 py-0.5">💳 Convênio</span>
                       )}
@@ -20534,9 +15065,7 @@ function MédicoTab() {
                     </p>
                   )}
                   {d.endereco ? (
-                    <p className="mt-1 truncate text-[10px] text-muted-foreground">
-                      📍 {d.endereco}
-                    </p>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">📍 {d.endereco}</p>
                   ) : null}
                 </div>
                 <button
@@ -20623,7 +15152,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-2xl">Plano de parto</p>
         <p className="mt-2 text-sm text-muted-foreground">
           Registre suas preferências para compartilhar com o seu médico e a equipe da maternidade. O
@@ -20632,7 +15161,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Tipo de parto */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+      <div className="rounded-3xl card-material p-6 space-y-3">
         <p className="font-serif text-lg">Tipo de parto desejado</p>
         {[
           { value: "normal", label: "Parto normal / vaginal" },
@@ -20654,7 +15183,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Alívio da dor */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-3">
+      <div className="rounded-3xl card-material p-6 space-y-3">
         <p className="font-serif text-lg">Alívio da dor (marque os que aceitar)</p>
         {PAIN_RELIEF_OPTIONS.map((opt) => (
           <label key={opt} className="flex cursor-pointer items-center gap-3">
@@ -20670,7 +15199,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Presença e procedimentos */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-3xl card-material p-6 space-y-4">
         <p className="font-serif text-lg">Presença e procedimentos</p>
         <PlanoField
           label="Quem você quer presente no parto"
@@ -20704,7 +15233,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
       </div>
 
       {/* Ambiente */}
-      <div className="rounded-3xl border border-border bg-card p-6 space-y-4">
+      <div className="rounded-3xl card-material p-6 space-y-4">
         <p className="font-serif text-lg">Ambiente</p>
         <PlanoField
           label="Iluminação"
@@ -20725,7 +15254,7 @@ function PlanoPártoTab({ profile }: { profile: Profile | null }) {
           <textarea
             className="rounded-xl border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
             rows={4}
-            placeholder="Alergias, medo específico, pedidos especiais..."
+            placeholder="Alergias, medo específico, pedidos especiais…"
             value={plan.notes}
             onChange={(e) => setPlan({ ...plan, notes: e.target.value })}
           />
@@ -20798,7 +15327,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* O que é normal sentir */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-xl">O que é normal sentir</p>
         <ul className="mt-4 space-y-3 text-sm text-muted-foreground">
           {[
@@ -20839,19 +15368,46 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       </div>
 
       {/* Redes de apoio */}
-      <div className="rounded-3xl border border-border bg-card p-6">
+      <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-xl">Redes de apoio</p>
+        {/*
+          ⚠️ O CVV É TELEFONE, E ELE NÃO DISCAVA.
+          O cartão inteiro era um `<a href="https://www.cvv.org.br">`, com o
+          "188" escrito só na descrição. Numa tela de crise emocional, o toque
+          abria um site e pedia que ela achasse o número lá dentro — e a
+          diferença entre "um toque disca" e "abre um site" é a distância que
+          ela pode não ter agora.
+          ⚠️ E a régua já existia no vizinho: a tela da EPDS, no mesmo arquivo,
+          usa `href="tel:188"` desde que existe. Aqui ela não tinha sido
+          aplicada. O 188 vem PRIMEIRO na lista, e em vermelho, porque é o
+          único destes três que atende agora.
+        */}
         <div className="mt-4 space-y-3">
+          <a
+            href="tel:188"
+            className="press flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4"
+          >
+            <span className="text-2xl">📞</span>
+            <div className="min-w-0">
+              <p className="font-medium text-sm text-foreground">
+                CVV — Centro de Valorização da Vida
+              </p>
+              <p className="mt-0.5 text-lg font-bold text-red-600">188</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Apoio emocional 24 horas, gratuito e sigiloso. Toque para ligar agora.
+              </p>
+            </div>
+          </a>
           {[
+            {
+              name: "CVV — chat online",
+              desc: "Se você preferir escrever em vez de falar, o CVV também atende por chat.",
+              url: "https://www.cvv.org.br",
+            },
             {
               name: "ALMA — Apoio em Luto Materno",
               desc: "Comunidade de apoio para mães que vivenciaram perdas gestacionais. Grupos online e presenciais.",
               url: "https://www.almaluto.com.br",
-            },
-            {
-              name: "CVV — Centro de Valorização da Vida",
-              desc: "Apoio emocional 24h — ligue 188 (gratuito) ou acesse o chat online.",
-              url: "https://www.cvv.org.br",
             },
             {
               name: "FEBRASGO — Saúde Mental na Gestação",

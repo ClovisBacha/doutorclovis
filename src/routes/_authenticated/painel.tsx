@@ -64,7 +64,7 @@ import {
   type AbaDaPaciente,
 } from "@/lib/abas-da-paciente";
 import { FilaDeTrabalho, type ItemFila } from "@/components/fila-de-trabalho";
-import { FilaDeDenuncias } from "@/components/fila-de-denuncias";
+import { NumerosDaComunidade } from "@/components/numeros-da-comunidade";
 import { GradeDeHorarios } from "@/components/grade-de-horarios";
 import {
   ESTILO_SINAL,
@@ -94,6 +94,9 @@ import { deCampoLocal, montarAgenda, paraCampoLocal } from "@/lib/agenda-unifica
 import { rolarAte } from "@/lib/rolar-ate";
 import type { PanelTab } from "@/lib/abas-do-painel";
 import { TETO_AUTOATENDIMENTO } from "@/lib/planos-medico";
+import { PesquisaNps } from "@/components/pesquisa-nps";
+import { EmissoesDaPaciente } from "@/components/emissoes-da-paciente";
+import { ConvitesDoMedico } from "@/components/convites-do-medico";
 import { MesadaDoMedico } from "@/components/mesada-do-medico";
 import {
   listMyAddresses,
@@ -483,6 +486,40 @@ function PainelPage() {
     const novo = sosPendentes.find((a) => !sosAdiados.has(a.id));
     if (novo) setSosAberto(novo);
   }, [sosPendentes, sosAdiados, sosAberto]);
+  /**
+   * ⚠️ **A FILA DE MODERAÇÃO NÃO TINHA CONTADOR EM LUGAR NENHUM.** Ela vive
+   * dentro da aba de entrada, então quem estivesse noutra aba não tinha como
+   * saber que ela cresceu — e uma denúncia de risco clínico pode esperar
+   * semanas sem nada apitar.
+   *
+   * ⚠️ **A busca é PRÓPRIA e independente da aba**: `FilaDeDenuncias` é
+   * desmontada ao trocar de aba, então pendurar o número nela deixaria a fita
+   * mostrando zero exatamente quando ele precisa do aviso.
+   *
+   * ⚠️ **`null` (não consegui contar) NÃO vira 0.** Zero AFIRMA que a fila está
+   * limpa, e é a frase mais perigosa que um painel de moderação pode dizer
+   * errado — a fita simplesmente não desenha número nenhum.
+   */
+  const [denunciasAbertas, setDenunciasAbertas] = useState<number | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const ses = await supabase.auth.getSession();
+        const t = ses.data.session?.access_token;
+        if (!t) return;
+        const { contarDenunciasAbertas } = await import("@/lib/moderacao.functions");
+        const r = await contarDenunciasAbertas({ data: { accessToken: t } });
+        if (vivo && r.ok) setDenunciasAbertas(r.total);
+      } catch {
+        /* Sem número: a fita não desenha nada. Ver o comentário acima. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, []);
   const [teleconsultas, setTeleconsultas] = useState<TeleconsultaSession[]>([]);
   const [privateConsults, setPrivateConsults] = useState<any[]>([]);
   const [engagement, setEngagement] = useState<{
@@ -858,7 +895,7 @@ function PainelPage() {
   if (loading)
     return (
       <div className="mx-auto max-w-5xl px-5 py-20 text-center text-muted-foreground">
-        Carregando...
+        Carregando…
       </div>
     );
 
@@ -887,6 +924,7 @@ function PainelPage() {
      não há trabalho. */
   const pendingQs = pendingExato ?? questions.filter((q) => !q.answered).length;
   const unseenForms = preForms.filter((f) => !f.seen_by_doctor).length;
+
   const novasPacientes = pedidosVinculo.length;
   const sosNaoAtendidos = sosPendentes.length;
 
@@ -1149,6 +1187,9 @@ function PainelPage() {
              revelá-lo. */
           "Pacientes 👩‍🍼": novasPacientes + unseenForms,
           Perguntas: pendingQs,
+          /* A fila de moderação mora DENTRO do Painel, que é a aba de entrada —
+             o número na fita é o que chama quem está noutra aba. */
+          "Painel 📊": denunciasAbertas ?? 0,
           /* Salas abertas contam para a AGENDA: "Teleconsultas" deixou de
              ser aba e virou seção do calendário. */
           Calendário: teleconsultas.filter((s) => s.status === "sala_aberta").length,
@@ -1225,10 +1266,23 @@ function PainelPage() {
             ]}
           />
 
-          {/* ⚠️ A fila de denúncias da caixinha. Ela SÓ desenha quando há algo —
-              ver o cabeçalho do componente. E o lugar é este porque a fila de
-              trabalho é onde mora "o que ainda precisa dele". */}
-          <FilaDeDenuncias />
+          {/**
+           * ⚠️ **A FILA DE DENÚNCIAS SAIU DAQUI, e o motivo é uma corrente
+           * fechada.**
+           *
+           * `denunciasAbertas` só admite quem está em `ADMIN_EMAILS`, e este
+           * painel REDIRECIONA o super-admin para `/admin` algumas centenas de
+           * linhas acima. A única pessoa que podia ler a fila era expulsa da
+           * tela que a mostrava: toda denúncia entrava num lugar inalcançável,
+           * com o app prometendo à paciente "a gente vai olhar".
+           *
+           * Ela mora em `/admin` → Moderação. Um médico comum nunca a viu (o
+           * servidor recusava), então nada foi tirado dele. */}
+
+          {/* ⚠️ A aba mais movimentada do app não tinha NENHUM número aqui: o
+              dono não tinha como responder "ela está viva?" sem abrir o app de
+              uma paciente, e uma aba social que esfria esfria em silêncio. */}
+          <NumerosDaComunidade />
         </div>
       )}
 
@@ -1373,6 +1427,10 @@ function PainelPage() {
                   ok: r.ok,
                   erro: r.ok ? undefined : (r.error ?? undefined),
                   avisou: r.ok ? r.avisou : undefined,
+                  /* Sem repassar, o aviso da duracao morre aqui — foi assim que
+                     `parcial: true` ficou meses com zero leitores nesta base. */
+                  duracaoNaoFicou: r.ok ? r.duracaoNaoFicou : undefined,
+                  duracaoQueValeu: r.ok ? r.duracaoQueValeu : undefined,
                 };
               }}
               aoEnviarLink={async (ev) => {
@@ -1569,6 +1627,16 @@ function PainelPage() {
                 para a lista delas. Pedido do dono: "vai ser lá que o médico
                 dará os presentinhos". */}
             <MesadaDoMedico tokenFn={token} pacientes={engagement?.patients ?? []} />
+            {/* ─── O CÓDIGO QUE A PACIENTE PEDE, E QUE NINGUÉM GERAVA ────────
+                Três telas do app dela dizem "Digite o código do seu médico" e
+                prometem um ano de Premium. `generateInviteCode` estava escrita,
+                testada e com a cota mensal resolvida no servidor — e sem UM
+                chamador no app: ela pedia o código, ele procurava no painel e
+                não achava, e a conclusão razoável dela era que ele não quis dar.
+
+                Fica ao lado da mesada pela mesma razão que trouxe a mesada para
+                cá: dar um ano de Premium é uma ação sobre uma paciente. */}
+            <ConvitesDoMedico tokenFn={token} />
             {/* ─── A LISTA DE PRÉ-CONSULTAS SAIU DAQUI (ago/2026) ────────────
                 Era uma seção própria, com o título "Pré-consultas" escrito na
                 aba — pedido do dono: "não tem que estar escrito ali". O selo
@@ -1603,6 +1671,13 @@ function PainelPage() {
                 porta. */}
             <SairDaClinicaCard tokenFn={token} />
             <MeuPerfilSection tokenFn={token} onIrParaPacientes={() => setTab("Pacientes 👩‍🍼")} />
+            {/* ⚠️ O NPS separa MÉDICO de PACIENTE no relatório do dono
+                (`byRole`), e o lado do médico não tinha como responder — o
+                agregado dele ficava em zero para sempre. `careMode={false}`
+                porque Modo Cuidado é da PACIENTE: um médico não tem esse
+                estado, e passar `undefined` calaria a pesquisa para sempre
+                deste lado. */}
+            <PesquisaNps tokenFn={token} careMode={false} />
           </>
         )}
         {tab === "Engajamento" && (
@@ -2155,6 +2230,21 @@ const HERO_TONE: Record<string, { wrap: string; icon: string; value: string }> =
   muted: { wrap: "border-border bg-card", icon: "bg-secondary", value: "text-foreground" },
 };
 
+/** Ponto de estado de um canal do Cérebro. Verde = ligado; cinza = desligado —
+ *  nunca vermelho, que é a cor de "quebrou" e não a de "não liguei". */
+function PontoDeCanal({ ligado, nome }: { ligado: boolean; nome: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        aria-hidden
+        className={`h-2 w-2 rounded-full ${ligado ? "bg-emerald-400" : "bg-white/40"}`}
+      />
+      <span className={ligado ? "" : "opacity-70"}>{nome}</span>
+      <span className="sr-only">{ligado ? "ligado" : "desligado"}</span>
+    </span>
+  );
+}
+
 function HeroCard({
   icon,
   value,
@@ -2233,8 +2323,14 @@ function BrainValueCard({
               {active ? "Treinar mais respostas →" : "Treinar meu cérebro →"}
             </button>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-2 text-xs font-medium">
-              {brain.enabledApp ? "✅ App" : "⭕ App"} ·{" "}
-              {brain.enabledWhatsapp ? "✅ WhatsApp" : "⭕ WhatsApp"}
+              {/* ⚠️ BOLINHA DESENHADA, e não ✅/⭕. O ⭕ é VERMELHO em todo
+                  sistema, então "desligado" — que é uma escolha dele — aparecia
+                  com a cor de ERRO ao lado de um ✅ verde. E emoji ignora a cor
+                  do texto, então os dois eram os únicos elementos desta pílula
+                  que não seguiam o material dela. Desligado é NEUTRO. */}
+              <PontoDeCanal ligado={brain.enabledApp} nome="App" />
+              <span aria-hidden>·</span>
+              <PontoDeCanal ligado={brain.enabledWhatsapp} nome="WhatsApp" />
             </span>
           </div>
         </div>
@@ -2314,7 +2410,7 @@ function RecentQuestionsCard({
       <div className="flex items-center justify-between gap-2">
         <p className="font-serif text-lg">Perguntas aguardando você</p>
         {pending > 0 && (
-          <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+          <span className="rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
             {pending}
           </span>
         )}
@@ -3418,7 +3514,7 @@ function PreConsultaCard({
           {ficha ? (
             <PatientReportView data={ficha} formData={form} onPrint={() => window.print()} />
           ) : (
-            <p className="text-sm text-muted-foreground">Carregando relatório...</p>
+            <p className="text-sm text-muted-foreground">Carregando relatório…</p>
           )}
         </div>
       )}
@@ -3611,12 +3707,12 @@ function EngagementSection({
     }
     setLoadingReport(userId);
     setErroReport((e) => ({ ...e, [userId]: false }));
-    /* ─── SEM `try`, O BOTÃO FICAVA EM "..." PARA SEMPRE ────────────────────
+    /* ─── SEM `try`, O BOTÃO FICAVA EM "Abrindo…" PARA SEMPRE ────────────────────
      *
      * `tokenFn()` devolve string vazia quando a sessão expira e o validador do
      * servidor exige `min(10)` — a chamada é REJEITADA, e a promessa estoura.
      * Sem `catch`/`finally`, `setLoadingReport(null)` nunca rodava: o botão
-     * "Ver relatório" virava "..." e ficava assim, desabilitado, até o médico
+     * "Ver relatório" virava "Abrindo…" e ficava assim, desabilitado, até o médico
      * recarregar a página. Ele fica clicando num botão morto.
      *
      * E com `res.ok` falso a linha expandia sem nada dentro — silêncio no lugar
@@ -3803,7 +3899,7 @@ function EngagementSection({
                       disabled={loadingReport === p.id}
                       className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
                     >
-                      {loadingReport === p.id ? "..." : "Ver relatório"}
+                      {loadingReport === p.id ? "Abrindo…" : "Ver relatório"}
                     </button>
                   </div>
                   {expandedId === p.id && erroReport[p.id] && (
@@ -3864,7 +3960,7 @@ function EngagementSection({
                       disabled={loadingReport === p.id}
                       className="rounded-full border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
                     >
-                      {loadingReport === p.id ? "..." : "Ver relatório"}
+                      {loadingReport === p.id ? "Abrindo…" : "Ver relatório"}
                     </button>
                   </div>
                   {expandedId === p.id && erroReport[p.id] && (
@@ -4126,7 +4222,7 @@ function TeleconsultasSection({
      *
      * O servidor passou a barrar a nota SOAP por plano e devolve
      * `{ ok:false, error: fraseDoGancho("cerebro") }`. Aqui só `res.ok` era
-     * olhado: o botão voltava do "..." e não acontecia nada.
+     * olhado: o botão voltava do "Abrindo…" e não acontecia nada.
      *
      * A aba Teleconsultas não é filtrada por plano — o `podeIA` do painel cobre
      * só a aba Cérebro —, então o médico no Free vê o botão, digita a consulta
@@ -4136,7 +4232,7 @@ function TeleconsultasSection({
      *
      * E o `try/catch` porque `tokenFn()` devolve string vazia com a sessão
      * expirada: sem ele, `setGeneratingNote(null)` nunca roda e o botão fica em
-     * "..." até o F5. */
+     * "Abrindo…" até o F5. */
     try {
       const tk = await tokenFn();
       const res = await generateClinicalNote({
@@ -4240,7 +4336,7 @@ function TeleconsultasSection({
             disabled={creating || !form.patientUserId}
             className="rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
-            {creating ? "Criando..." : "Criar teleconsulta"}
+            {creating ? "Criando…" : "Criar teleconsulta"}
           </button>
         </div>
       )}
@@ -4437,7 +4533,7 @@ function TeleconsultasSection({
                             disabled={generatingNote === s.id || !(noteBullets[s.id] ?? "").trim()}
                             className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-50"
                           >
-                            {generatingNote === s.id ? "Gerando..." : "✨ Gerar nota SOAP"}
+                            {generatingNote === s.id ? "Gerando…" : "✨ Gerar nota SOAP"}
                           </button>
                         </div>
 
@@ -4452,7 +4548,7 @@ function TeleconsultasSection({
                                 disabled={savingNote === s.id}
                                 className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-60"
                               >
-                                {savingNote === s.id ? "Salvando..." : "💾 Salvar nota"}
+                                {savingNote === s.id ? "Salvando…" : "💾 Salvar nota"}
                               </button>
                               <button
                                 onClick={() =>
@@ -6626,7 +6722,7 @@ function BrainReviewCard({
     <div className="rounded-3xl border border-amber-400/50 bg-amber-50/60 p-6 shadow-[var(--shadow-card)]">
       <p className="font-serif text-xl">
         ✋ Respostas que uma paciente não achou úteis{" "}
-        <span className="ml-1 rounded-full bg-amber-500 px-2 py-0.5 align-middle text-xs font-semibold text-white">
+        <span className="ml-1 rounded-full bg-amber-700 px-2 py-0.5 align-middle text-xs font-semibold text-white">
           {itens.length}
         </span>
       </p>
@@ -7001,7 +7097,7 @@ function BrainGapsCard({
           <p className="font-serif text-xl">
             🕳️ O que a IA não soube responder
             {gaps.length > 0 && (
-              <span className="ml-2 rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+              <span className="ml-2 rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
                 {gaps.length}
               </span>
             )}
@@ -7413,7 +7509,7 @@ function BrainSettingsCard({
             disabled={saving}
             className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
           >
-            {saving ? "Salvando..." : "Salvar estilo"}
+            {saving ? "Salvando…" : "Salvar estilo"}
           </button>
         </div>
       )}
@@ -7604,7 +7700,7 @@ function BrainTrainCard({
                 value={answers[q.id] ?? ""}
                 onChange={(e) => setAnswers((a) => ({ ...a, [q.id]: e.target.value }))}
                 rows={3}
-                placeholder="Escreva como você responderia a essa paciente..."
+                placeholder="Escreva como você responderia a essa paciente…"
                 className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
               />
               <button
@@ -7612,7 +7708,7 @@ function BrainTrainCard({
                 disabled={sendingId === q.id || !(answers[q.id] ?? "").trim()}
                 className="mt-2 rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
               >
-                {sendingId === q.id ? "Treinando..." : "Responder e treinar"}
+                {sendingId === q.id ? "Treinando…" : "Responder e treinar"}
               </button>
             </div>
           ))}
@@ -7877,7 +7973,7 @@ function BrainKnowledgeCard({
               disabled={adding || !newQuestion.trim() || !newAnswer.trim()}
               className="rounded-full bg-primary px-4 py-2 text-xs font-medium text-primary-foreground disabled:opacity-40"
             >
-              {adding ? "Adicionando..." : "+ Adicionar ao cérebro"}
+              {adding ? "Adicionando…" : "+ Adicionar ao cérebro"}
             </button>
           </div>
 
@@ -7918,7 +8014,7 @@ function BrainKnowledgeCard({
                   disabled={adding}
                   className="rounded-full border border-amber-400 px-4 py-2 text-xs font-medium disabled:opacity-40"
                 >
-                  {adding ? "Adicionando..." : "Criar mesmo assim"}
+                  {adding ? "Adicionando…" : "Criar mesmo assim"}
                 </button>
                 <button
                   onClick={() => setParecida(null)}
@@ -7936,7 +8032,7 @@ function BrainKnowledgeCard({
       <input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar na base (pergunta ou resposta)..."
+        placeholder="Buscar na base (pergunta ou resposta)…"
         className="mt-4 w-full rounded-xl border border-input bg-background px-3 py-2 text-sm"
       />
 
@@ -8034,7 +8130,7 @@ function BrainKnowledgeCard({
                       disabled={savingEdit || !editQ.trim() || !editA.trim()}
                       className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"
                     >
-                      {savingEdit ? "Salvando..." : "Salvar"}
+                      {savingEdit ? "Salvando…" : "Salvar"}
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
@@ -8115,7 +8211,7 @@ function BrainPlaygroundCard({
           disabled={asking || !question.trim()}
           className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground disabled:opacity-40"
         >
-          {asking ? "Pensando..." : "Perguntar"}
+          {asking ? "Pensando…" : "Perguntar"}
         </button>
       </div>
 
@@ -9016,7 +9112,16 @@ function GoogleCalendarCard({ tokenFn }: { tokenFn: () => Promise<string> }) {
     setBusy(true);
     try {
       const tk = await tokenFn();
-      await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      /* ⚠️ **`{ ok: false }` CHEGA NUM 200 NORMAL** — o `finally` nao pega, e o
+       * `try` tampouco. A tela dizia "Agenda desconectada.", apagava o e-mail e
+       * marcava desconectado; na abertura seguinte a agenda voltava conectada,
+       * e ele nao tem como saber se a integracao esta viva. Numa tela cujo
+       * assunto e quem enxerga a agenda dele, isso e o pior desfecho. */
+      const r = await disconnectGoogleCalendar({ data: { accessToken: tk } });
+      if (!r.ok) {
+        toast.error("Nao consegui desconectar a agenda — ela continua conectada. Tente de novo.");
+        return;
+      }
       setConnected(false);
       setEmail(null);
       toast.success("Agenda desconectada.");
@@ -10397,7 +10502,7 @@ function MeuPerfilSection({
           disabled={saving}
           className="mt-5 rounded-full bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {saving ? "Salvando..." : "Salvar perfil"}
+          {saving ? "Salvando…" : "Salvar perfil"}
         </button>
       </div>
     </div>
@@ -11107,7 +11212,7 @@ function PacientesSection({
         <div className="flex items-center gap-2">
           <h2 className="font-serif text-xl">Solicitações pendentes</h2>
           {requests.length > 0 && (
-            <span className="rounded-full bg-amber-500 px-2 py-0.5 text-xs font-bold text-white">
+            <span className="rounded-full bg-amber-700 px-2 py-0.5 text-xs font-bold text-white">
               {requests.length}
             </span>
           )}
@@ -11339,7 +11444,7 @@ function InvitePatientModal({
             href={`https://wa.me/?text=${encodeURIComponent(message)}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white"
+            className="rounded-full bg-emerald-700 px-5 py-2 text-sm font-semibold text-white"
           >
             Enviar no WhatsApp
           </a>
@@ -11406,6 +11511,10 @@ function AcoesDaPaciente({
   onIrParaAgenda?: () => void;
 }) {
   const [escolhendo, setEscolhendo] = useState<"exame" | "prescricao" | null>(null);
+  /* Sobe a cada emissão enviada: a lista do que ele já mandou relê na hora,
+     senão ele acabaria de emitir e continuaria vendo a lista de antes — e o
+     bloco existe justamente para impedir a segunda emissão. */
+  const [emitidas, setEmitidas] = useState(0);
   const [envio, setEnvio] = useState<{
     tipo: TipoDeEmissao;
     titulo: string;
@@ -11475,6 +11584,17 @@ function AcoesDaPaciente({
           </button>
         )}
       </div>
+      {/* ─── O QUE ELE JÁ EMITIU PARA ELA ───────────────────────────────────
+          ⚠️ `emissoesDaPaciente` existia inteira e sem chamador nenhum: ele
+          emitia, o documento chegava na aba dela, e do lado dele o rastro
+          sumia. Na consulta seguinte ele decidia o que pedir sem enxergar o
+          que ELE MESMO pediu no mês passado — exame repetido é agulha à toa,
+          receita repetida é dose dobrada.
+
+          Fica AQUI, ao lado dos botões que emitem, e não numa aba própria: é a
+          mesma decisão que tirou o receituário de aba e o pôs dentro do cartão
+          da paciente já escolhida. */}
+      <EmissoesDaPaciente pacienteId={p.id} tokenFn={tokenFn} recarregar={emitidas} />
 
       {/* ── Escolher o modelo ── */}
       {escolhendo && (
@@ -11553,7 +11673,15 @@ function AcoesDaPaciente({
           conteudoInicial={envio.conteudo}
           tokenFn={tokenFn}
           paciente={p}
-          onFechar={() => setEnvio(null)}
+          onFechar={() => {
+            setEnvio(null);
+            /* ⚠️ A releitura acontece no FECHAMENTO, e não só no sucesso: o
+               componente de envio chama `onFechar` nos dois casos, e o custo de
+               distinguir seria uma prop nova num componente compartilhado. Uma
+               leitura a mais quando ele cancela é mais barata que a lista ficar
+               velha depois de emitir — que é justamente quando ela importa. */
+            setEmitidas((n) => n + 1);
+          }}
         />
       )}
     </>

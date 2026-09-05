@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import { Menu, X, Smartphone, User } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/logo-obstetrica.png";
 import logoWhite from "@/assets/logo-obstetrica-white.png";
 import { useHeroDark } from "@/components/hero-theme";
+import { useSessaoDoSite } from "@/lib/use-sessao-do-site";
 
 const navPublic = [
   { to: "/gestacao", label: "Gestação" },
@@ -22,14 +22,10 @@ const navAuth = [
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
+  /* Ver `useSessaoDoSite`: o import do cliente é DINÂMICO, para o Supabase
+     não entrar no pedaço de entrada que toda página baixa antes de pintar. */
+  const signedIn = useSessaoDoSite();
   const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSignedIn(!!data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSignedIn(!!s));
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);

@@ -30,11 +30,169 @@ const rotas = readdirSync("src/routes")
 /* Estados que só existem com parâmetro — os mesmos que a prosa do CLAUDE.md
    documenta como "impossíveis de fotografar" sem eles. */
 const EXTRAS = [
+  /* ⚠️ O CRONÔMETRO DE CONTRAÇÕES — a tela clínica de maior consequência do
+     app, e a que passou mais tempo sem NENHUMA bancada. O estado `instavel` é
+     o que importa: a leitura falhando já silenciou o botão do 192 (o banner de
+     análise, único lugar da tela com "Ligar 192 (SAMU)", vive atrás de duas
+     contrações na janela). Nenhum destes se fabrica numa conta de teste. */
+  "/preview-contracoes?estado=instavel",
+  "/preview-contracoes?estado=parto",
+  "/preview-contracoes?estado=curso",
+  "/preview-contracoes?estado=normal",
+  /* ⚠️ Os chutes: a tela que MEDE um sintoma vermelho. `alerta` é o estado que
+     a bancada existe para provar — duas horas com quatro movimentos, com o
+     aviso e o botão do 192 na tela —, e `instavel` é a leitura que falhou, que
+     NÃO pode virar "nunca registrou". */
+  "/preview-chutes?estado=alerta",
+  "/preview-chutes?estado=instavel",
+  "/preview-chutes?estado=contando",
+  "/preview-chutes?estado=historico",
+  "/preview-chutes?estado=luto",
+  /* ⚠️ Peso, pressão e glicemia: `parcial` é o estado que mais engana — a
+     leitura falhou COM dados à mostra, que é o caso de depois de salvar. */
+  "/preview-saude-registros?estado=parcial",
+  "/preview-saude-registros?estado=instavel",
+  "/preview-saude-registros?estado=grave",
+  "/preview-saude-registros?estado=normal",
+  "/preview-saude-registros?estado=semperfil",
+  /* ⚠️ A nutricionista virtual: `carregando` é a bolha vazia que renderiza "…"
+     — indistinguível de um "…" que nunca termina —, e `erro` é o aviso do
+     servidor virando bolha. Os dois só nascem de cota estourada ou falha de
+     rede no instante certo. */
+  "/preview-nutricao?estado=conversa",
+  "/preview-nutricao?estado=votou",
+  "/preview-nutricao?estado=carregando",
+  "/preview-nutricao?estado=erro",
+  "/preview-nutricao?estado=conversa&luto=1",
+  /* As ferramentas da nutricionista e a água: dependem de um toque e do
+     `localStorage`, então só a bancada as desenha. */
+  "/preview-nutricao?estado=saudacao&ferramenta=comer&agua=3",
+  "/preview-nutricao?estado=saudacao&ferramenta=alivio",
+  "/preview-nutricao?estado=conversa&luto=1&ferramenta=prato",
+  /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
+     existe —, então era a mais difícil de olhar. E é onde o anel de fases
+     derrubava a hidratação por 17 dígitos num `cx` de SVG. */
+  "/preview-saude-mulher?tela=ciclo",
+  "/preview-saude-mulher?tela=ciclo&estado=instavel",
+  "/preview-saude-mulher?tela=ciclo&gestante=1",
+  "/preview-saude-mulher?tela=preventivos",
+  "/preview-saude-mulher?tela=preventivos&estado=instavel",
+  /* ⚠️ Os dois que o PRINT do dono destapou: o ciclo em curso (a data quebrava
+     em três linhas com o selo, "Encerrar" e × na mesma faixa) e o histórico
+     velho (a previsão não pode voltar projetando um período de dez meses). */
+  "/preview-saude-mulher?tela=ciclo&ativo=1",
+  "/preview-saude-mulher?tela=ciclo&velho=1",
+  /* ⚠️ O bloco com DADO VELHO: ele mostrava o último valor sem limite de
+     recência, e uma pressão de meses atrás lia como o estado de hoje. */
+  "/preview-saude?w=24&dados=2",
+  /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
+     Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
+     duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum
+     relato. A varredura de disco abre só o padrão; estes quatro são os casos
+     que decidem. */
+  "/preview-abertura?ceu=anoitecer",
+  "/preview-abertura?ceu=nenhum",
+  "/preview-abertura?medico=1",
+  "/preview-abertura?sos=1",
+  /* A saúde do banco: os três estados que mais importam — faltando, incerto e
+     sem chave de serviço — não se fabricam num banco em dia, que é justamente
+     o banco de quem desenvolve. */
+  "/preview-banco?estado=incerto",
+  "/preview-banco?estado=verde",
+  "/preview-banco?estado=semchave",
+  "/preview-banco?estado=falhou",
+  "/preview-banco?estado=nunca",
+  /* ⚠️ **A COMUNIDADE INTEIRA, e não cinco telas dela.**
+   *
+   * `preview-instagram` é UMA rota com VINTE sub-telas atrás de `?tela=` — a
+   * varredura de disco pega a rota e desenha só o padrão (o feed). As outras
+   * dezenove ficavam de fora, e é exatamente onde a aba cresceu: comentários,
+   * filtro de palavras, conversa, story, espelho, busca, salvos, atividade.
+   *
+   * Uma leva de defeitos passou por `tsc` limpo, lint limpo e 4.400 testes
+   * verdes e só apareceu quando alguém ABRIU a tela — que é a razão de este job
+   * existir. Cobrir cinco de vinte é ter o job e não ter a cobertura.
+   *
+   * ⚠️ **Sub-tela nova entra aqui à mão.** A varredura de disco não tem como
+   * adivinhar um valor de `?tela=`; `comunidade.test.ts` cobra que todo destino
+   * do hub exista, mas quem abre a página é esta lista. */
   "/preview-instagram?tela=perfil&meu=1",
+  "/preview-instagram?tela=perfil&restrito=1",
+  "/preview-instagram?tela=perfil&silenciado=1",
+  "/preview-instagram?tela=mais",
   "/preview-instagram?tela=caixinha",
+  "/preview-instagram?tela=caixinha&perguntas=0",
+  "/preview-instagram?tela=caixinha&caixinha=0",
+  "/preview-instagram?tela=comentarios",
+  "/preview-rede?pausada=1",
+  "/preview-instagram?tela=bloqueados",
+  "/preview-moderacao",
+  "/preview-moderacao?falhou=1",
+  "/preview-moderacao?vazio=1",
+  "/preview-moderacao?ficha=1",
+  "/preview-moderacao?ficha=1&suspensa=1",
+  "/preview-instagram?suspensa=1",
+  "/preview-moderacao?instavel=1",
+  "/preview-instagram?tela=escondidos",
+  "/preview-instagram?tela=escondidos&vazio=1",
+  "/preview-instagram?tela=escondidos&instavel=1",
+  "/preview-instagram?tela=curtidos",
+  "/preview-instagram?tela=curtidos&instavel=1",
+  "/preview-instagram?tela=desfechos",
+  "/preview-instagram?tela=desfechos&instavel=1",
+  "/preview-instagram?palavraOculta=1",
+  "/preview-instagram?tela=perfil&favorita=1",
+  "/preview-instagram?tela=conversas&notas=1",
+  "/preview-instagram?tela=conversa&oculta=1",
+  "/preview-instagram?tela=bloqueados&vazio=1",
+  "/preview-instagram?tela=bloqueados&instavel=1",
+  "/preview-instagram?tela=comentarios&conversa=fechados",
+  /* A ordem por curtidas e o rascunho guardado: os dois só se enxergam com o
+     parâmetro — um post com poucos comentários desenha a mesma lista nas duas
+     ordens, e o rascunho exige fechar o app no meio de uma frase. */
+  "/preview-instagram?tela=comentarios&ordem=relevantes",
+  "/preview-instagram?tela=comentarios&rascunhoComent=1",
+  /* Os quatro cartões do primeiro minuto: abrem UMA vez na vida da conta, e o
+     "já vi" viaja na nuvem — sem o parâmetro, ninguém os vê de novo. */
+  "/preview-instagram?onboarding=1",
+  /* ⚠️ Sub-tela nova entra AQUI à mão — a varredura de disco lê as ROTAS, e não
+     tem como adivinhar um valor de `?tela=`. */
+  "/preview-instagram?tela=story&videoStory=1",
+  "/preview-instagram?tela=story&sensivelStory=1",
+  "/preview-instagram?memoria=1",
+  "/preview-instagram?tela=perfil&meu=1&album=1",
+  "/preview-instagram?tela=filtro",
+  "/preview-instagram?tela=conversa",
+  "/preview-instagram?tela=conversas",
+  "/preview-instagram?tela=mandar",
+  "/preview-instagram?tela=story",
+  "/preview-instagram?tela=story&meu=1",
+  "/preview-instagram?tela=conferir",
+  "/preview-instagram?tela=conferir&rascunhoStory=1",
+  "/preview-instagram?tela=perfil&fixados=1",
+  "/preview-instagram?tela=story&quadro=1",
+  "/preview-instagram?tela=arquivo",
+  "/preview-instagram?tela=grupo",
+  "/preview-instagram?tela=grupo-novo",
+  "/preview-instagram?tela=grupo-chamar",
+  "/preview-instagram?tela=arquivo&vazio=1",
+  "/preview-instagram?tela=arquivo&instavel=1",
+  "/preview-instagram?tela=espelho",
+  "/preview-instagram?tela=espelho&trancado=1",
+  "/preview-instagram?tela=busca",
+  "/preview-instagram?tela=salvos",
+  "/preview-instagram?tela=atividade",
+  "/preview-instagram?tela=lista",
+  "/preview-instagram?tela=lista&remover=0",
+  "/preview-instagram?tela=editar",
+  "/preview-instagram?tela=post",
+  "/preview-instagram?tela=tag",
+  "/preview-instagram?tela=esboco",
+  "/preview-instagram?tela=arquivados",
   "/preview-instagram?tela=novo&comFoto=1",
   "/preview-instagram?vazio=1",
   "/preview-instagram?luto=1",
+  "/preview-instagram?sugeridas=0",
   "/preview-presentes?dona=1",
   "/preview-conta?privacidade=1",
   "/preview-sos-medico?magro=1",

@@ -217,6 +217,67 @@ export const FONTES: FonteDoExport[] = [
     colunas: "requested_date, requested_time, confirmed_date, confirmed_time, status, notes",
     porque: "os pedidos de consulta dela",
   },
+  /* ─── A COMUNIDADE ─────────────────────────────────────────────────────────
+   *
+   * ⚠️ **VINTE E SETE TABELAS `rede_*` no banco, e ZERO no export.** A aba
+   * nasceu depois desta lista e ninguém voltou aqui: ela baixava "todos os meus
+   * dados" e não vinha uma publicação, um comentário, uma mensagem nem um
+   * story. O direito de portabilidade cobre o que ela ESCREVEU, e a Comunidade
+   * é hoje onde ela mais escreve.
+   *
+   * ⚠️ **SÓ O QUE ELA PRODUZIU, e nunca o que fizeram com ela.** Quem reagiu ao
+   * post dela, quem a segue e quem a bloqueou são dados de TERCEIROS: um export
+   * com a lista de quem a bloqueou entregaria, num arquivo que ela pode mandar
+   * por WhatsApp, uma decisão que essas pessoas tomaram em silêncio — e o
+   * silêncio é o recurso. Pelo mesmo motivo `rede_denuncias` fica de fora:
+   * a denúncia que ELA fez tem o nome de quem ela denunciou.
+   *
+   * ⚠️ **E `rede_perguntas` FICA DE FORA INTEIRA, mesmo a que ela mandou.** A
+   * catraca já a proibia, e a proibição está certa: é a tabela mais sensível da
+   * aba, porque o anonimato da caixinha é o recurso. Exportar até a metade dela
+   * cria mais uma superfície por onde o autor pode vazar — hoje, ou no dia em
+   * que alguém trocar a coluna do recorte por engano. O ganho (reler o que ela
+   * perguntou) não paga o risco de derrubar o anonimato para todo mundo.
+   */
+  {
+    tabela: "rede_posts",
+    coluna: "autor_id",
+    chave: "publicacoes",
+    colunas:
+      "texto, visibilidade, criado_em, editado_em, arquivado_em, fixado_em, " +
+      "alt_texto, marco_tipo, marco_dias, enquete_opcoes, quem_comenta",
+    porque: "as publicações são dela, e a legenda é texto que ela escreveu",
+  },
+  {
+    tabela: "rede_stories",
+    coluna: "autor_id",
+    chave: "stories",
+    colunas:
+      "texto, visibilidade, criado_em, expira_em, carimbo_semana, " +
+      "destacado_em, destaque_titulo, enquete_opcoes, pergunta_aberta",
+    porque: "o story some em 24 h da tela, mas a linha é dela enquanto existir",
+  },
+  {
+    tabela: "rede_comentarios",
+    coluna: "autor_id",
+    chave: "comentarios",
+    colunas: "texto, criado_em, editado_em, apagado_em",
+    porque: "o comentário é texto dela, e some da tela quando o post sai do ar",
+  },
+  {
+    tabela: "rede_mensagens",
+    coluna: "autor_id",
+    chave: "mensagens_diretas",
+    colunas: "texto, criada_em, apagada_em",
+    porque: "o que ela escreveu no direct — e só o que ELA escreveu",
+  },
+  {
+    tabela: "rede_notas",
+    coluna: "autor_id",
+    chave: "notas",
+    colunas: "texto, criada_em, expira_em",
+    porque: "a nota é uma frase dela, e vive 24 h",
+  },
 ];
 
 /**

@@ -324,12 +324,21 @@ export const presentearIndicada = createServerFn({ method: "POST" })
 
     /* 2 · o bolso, RELIDO */
     const ciclo = cicloAtual();
-    const { data: pagasCru } = await sb
+    /* ⚠️ **NÃO CONSEGUIR RELER O BOLSO RECUSA.** O `error` era descartado e
+       `pagasCru ?? []` virava lista vazia: `gasto` ia a ZERO, `0 + 30 > 300`
+       era falso, e o presente saía. Numa oscilação do banco a mesada inteira
+       deixava de existir — e não uma vez: cada chamada recalcularia zero, e a
+       criadora distribuiria sem teto até a leitura voltar.
+
+       ⚠️ E o motivo é PRÓPRIO: "sem_bolso" sobre uma leitura que falhou faria
+       a criadora concluir que a mesada dela acabou no dia 3 do mês. */
+    const { data: pagasCru, error: erroDoBolso } = await sb
       .from("sementinhas_ledger")
       .select("dedupe_key")
       .eq("reason", RAZAO_PRESENTE_INFLUENCIADORA)
       .like("dedupe_key", `criadora:${criadora.code}:%:${ciclo}`);
-    const gasto = ((pagasCru ?? []) as unknown[]).length * PRESENTE_DA_INFLUENCIADORA;
+    if (erroDoBolso || !pagasCru) return { ok: false as const, motivo: "instavel" as const };
+    const gasto = (pagasCru as unknown[]).length * PRESENTE_DA_INFLUENCIADORA;
     if (gasto + PRESENTE_DA_INFLUENCIADORA > MESADA_DA_INFLUENCIADORA) {
       return { ok: false as const, motivo: "sem_bolso" as const };
     }

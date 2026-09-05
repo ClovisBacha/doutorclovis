@@ -86,7 +86,15 @@ export function DiaDaAgenda({
   /** Só os deste dia, já filtrados. */
   eventos: EventoDaAgenda[];
   pacientes: PacienteDoSelect[];
-  aoMarcar: (v: NovaConsulta) => Promise<{ ok: boolean; erro?: string; avisou?: boolean }>;
+  aoMarcar: (v: NovaConsulta) => Promise<{
+    ok: boolean;
+    erro?: string;
+    avisou?: boolean;
+    /* A coluna `duration_minutes` foi descartada pelo recuo — a duracao que ele
+       escolheu NAO ficou gravada. Ver `marcarConsultaNoDia`. */
+    duracaoNaoFicou?: boolean;
+    duracaoQueValeu?: number;
+  }>;
   /** Abre a sala e manda o convite. `null` quando o evento não tem sala. */
   aoEnviarLink?: (evento: EventoDaAgenda) => Promise<{ ok: boolean; erro?: string }>;
   /** Busca e-mail e telefone do cadastro dela. Sem isto, os dois campos ficam
@@ -188,6 +196,25 @@ export function DiaDaAgenda({
       toast.success(
         r.avisou ? "Consulta marcada — ela foi avisada ✓" : "Consulta marcada. Avise-a você mesmo.",
       );
+      /* ─── A DURACAO NAO FICOU ─────────────────────────────────────────────
+       *
+       * ⚠️ Medido contra o banco de producao: `duration_minutes` nao existe la,
+       * e o recuo do servidor a descartava EM SILENCIO. Ele marcava 60 minutos,
+       * lia "Consulta marcada", e o horario voltava a ficar livre 30 minutos
+       * depois — a segunda paciente entrando em cima da primeira.
+       *
+       * ⚠️ Aviso SEPARADO e com `duration: 10000`: emendar isto na frase de
+       * sucesso faria a linha mais importante ser lida como detalhe. E ele so
+       * aparece quando a duracao escolhida DIFERE do padrao — senao seria ruido
+       * numa tela usada dezenas de vezes por dia. */
+      if (r.duracaoNaoFicou) {
+        toast.warning(
+          `⚠️ A duração não ficou salva: esta consulta vale ${r.duracaoQueValeu ?? 30} min. ` +
+            `Rode o APLICAR_DURACAO_DA_CONSULTA.sql no Supabase — até lá, o horário seguinte ` +
+            `pode ser marcado por cima.`,
+          { duration: 10000 },
+        );
+      }
       setAbrindoForm(false);
       setNome("");
       setEmail("");

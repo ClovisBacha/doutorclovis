@@ -27,7 +27,14 @@ import { memoryBlock } from "./chat-memory.server";
 import { buildClinicalBlock } from "@/routes/api/chat";
 
 const chat = readFileSync("src/routes/api/chat.ts", "utf8");
-const tela = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
+/* ⚠️ O chat (ChatTab, WABubble, buildPatientContext…) saiu de minha-conta.tsx
+   para src/components/chat-tab.tsx em set/2026. Este teste confere coisas dos
+   DOIS arquivos, então lê os dois juntos — uma asserção que procura texto do
+   chat aqui continua encontrando. */
+const tela =
+  readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8") +
+  "\n" +
+  readFileSync("src/components/chat-tab.tsx", "utf8");
 const memoria = readFileSync("src/lib/chat-memory.server.ts", "utf8");
 
 describe("1. a idade gestacional some da TELA INTEIRA, não de duas abas", () => {
@@ -245,5 +252,69 @@ describe("8. os dois últimos vizinhos", () => {
        de fonte confiável, as perguntas que ela fez antes da perda. */
     const i = chat.indexOf("async function buildPendenciasBlock");
     expect(chat.slice(i, i + 1200)).toContain('if (careMode) return "";');
+  });
+});
+
+/**
+ * ⚠️ O PORTAL PÓS-PARTO — o pior lugar do app para o Modo Cuidado faltar.
+ *
+ * `setCareMode` grava `care_mode` e **não limpa `birth_date`**. Numa perda
+ * DEPOIS do nascimento (natimorto, óbito neonatal), a data está preenchida e o
+ * Portal abria inteiro: *"Helena nasceu! 3 semanas de vida"*, com o convite a
+ * marcar o primeiro sorriso e o calendário de 24 vacinas de um bebê que morreu.
+ * A aba era a ÚNICA da lista sem a prop — as quatro vizinhas já recebiam.
+ *
+ * ⚠️ **E ESTE TESTE COBRA AS DUAS METADES, porque o conserto óbvio é o defeito
+ * oposto.** Esconder a aba tiraria dela justamente as duas coisas que importam
+ * MAIS depois de uma perda: a **EPDS** (cuja décima pergunta é ideação de
+ * autolesão, no momento de risco máximo de depressão perinatal) e o
+ * **Retorno** (a consulta de puerpério, onde hemorragia, infecção e
+ * pré-eclâmpsia de pós-parto são pegas). O corpo dela passou pelo parto do
+ * mesmo jeito.
+ */
+describe("o Portal Pós-parto no Modo Cuidado", () => {
+  const PORTAL = (() => {
+    const i = tela.indexOf("function PosPartoTab(");
+    expect(i).toBeGreaterThan(-1);
+    const j = tela.indexOf("\nfunction ", i + 1);
+    return tela.slice(i, j === -1 ? undefined : j);
+  })();
+
+  test("⚠️ a aba recebe a bandeira", () => {
+    expect(tela).toMatch(/<PosPartoTab[\s\S]{0,120}careMode=\{careMode\}/);
+    expect(PORTAL).toMatch(/careMode/);
+  });
+
+  test("⚠️ as três abas do bebê saem — fita E corpo", () => {
+    /* A fita, para ela não ver o convite; o corpo, porque outras abas deste
+       arquivo já ganharam `initialSub` e uma sub-tela inicial acrescentada
+       amanhã abriria "Marcos" por link, sem passar pela fita. */
+    for (const sub of ["amamentação", "marcos", "vacinas"]) {
+      expect(PORTAL).toContain(`{!careMode && subTab === "${sub}"`);
+    }
+  });
+
+  test("⚠️ Bem-estar (EPDS) e Retorno FICAM — o Modo Cuidado não desliga cuidado", () => {
+    /* A metade que impede o conserto de virar o defeito oposto. As duas
+       precisam continuar alcançáveis pela fita no luto. */
+    /* ⚠️ O RAMO DO LUTO, e só ele. A primeira versão cortava no `];`, que é o
+       fim da EXPRESSÃO inteira — então o `noLuto` continha as duas listas e o
+       teste passava sobre um ramo que ainda oferecia "Marcos". O corte é o
+       `: [` do ramo de quem não está em luto. */
+    const i = PORTAL.indexOf("const subTabs");
+    expect(i).toBeGreaterThan(-1);
+    const j = PORTAL.indexOf("\n    : [", i);
+    expect(j).toBeGreaterThan(i);
+    const noLuto = PORTAL.slice(i, j);
+    expect(noLuto).toContain('key: "saúde"');
+    expect(noLuto).toContain('key: "retorno"');
+    expect(noLuto).not.toContain('key: "marcos"');
+    expect(noLuto).not.toContain('key: "vacinas"');
+  });
+
+  test("⚠️ o cabeçalho deixa de anunciar um nascimento", () => {
+    const i = PORTAL.indexOf("{careMode ? (");
+    expect(i).toBeGreaterThan(-1);
+    expect(i).toBeLessThan(PORTAL.indexOf("nasceu!"));
   });
 });

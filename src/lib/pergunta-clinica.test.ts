@@ -234,3 +234,172 @@ describe("⚠️ uma lista só, dois usos", () => {
     expect(fonte).not.toMatch(/impede (?:toda|qualquer) pergunta cl(í|i)nica/i);
   });
 });
+
+describe("⚠️ os quatro defeitos que a auditoria mediu (ago/2026)", () => {
+  /**
+   * Os quatro saíram de rodar a régua contra frases que uma gestante escreve de
+   * verdade — não de ler o código. Dois eram falsos NEGATIVOS (conduta passando
+   * inteira) e dois eram falsos POSITIVOS, que custam mais: o app acusando a
+   * paciente de dar conselho médico no post de nascimento dela.
+   */
+
+  test("⚠️ 'se eu fosse você' roteia — nas DUAS grafias", () => {
+    /* A regex tinha a pessoa trocada: só reconhecia "se fosse eu" e "se fosse
+       comigo", e a forma mais comum em português era justamente a que faltava.
+
+       ⚠️ E a primeira correção falhou pela metade: com `\b` no fim, a forma COM
+       acento não casava — `\b` do JavaScript é ASCII e não enxerga fronteira
+       depois do `ê`. É a mesma armadilha de `temPalavraOculta`. */
+    expect(triarTexto("se eu fosse você eu esperava até amanhã")).not.toBe("publicavel");
+    expect(triarTexto("se eu fosse voce eu nao ia")).not.toBe("publicavel");
+    expect(triarTexto("se eu fosse tu eu ficava em casa")).not.toBe("publicavel");
+  });
+
+  test("⚠️ o imperativo AFIRMATIVO de conduta roteia", () => {
+    /* A lista só tinha a negativa ("não tome", "não vá"). "Toma buscopan que
+       resolve" — uma paciente mandando outra tomar antiespasmódico — saía
+       publicável, com o nome do consultório em volta. */
+    for (const t of [
+      "toma buscopan que resolve",
+      "toma dipirona que passa",
+      "usa essa pomada que resolve",
+      "beba um chá de canela",
+      "toma o remédio dela",
+    ]) {
+      expect({ t, r: triarTexto(t) }).not.toEqual({ t, r: "publicavel" });
+    }
+  });
+
+  test("⚠️ mas o imperativo SEM objeto de tratamento é conversa normal", () => {
+    /* É o que salva o recurso: sem exigir o objeto, metade da conversa da aba
+       iria para o consultório. */
+    for (const t of [
+      "toma um café comigo?",
+      "toma cuidado com o degrau",
+      "usa esse carrinho, é ótimo",
+      "faz o bolo que eu levo o refri",
+    ]) {
+      expect({ t, r: triarTexto(t) }).toEqual({ t, r: "publicavel" });
+    }
+  });
+
+  test("⚠️ O POST DE NASCIMENTO NÃO É RECUSADO", () => {
+    /* "deu tudo certo" entrou como tranquilização anedótica, e é também — e
+       sobretudo — a frase com que se anuncia um nascimento. O post mais feliz
+       da paciente era barrado com um recado que a acusa de dar conselho
+       médico. A forma perigosa continua pega pelos outros ramos. */
+    expect(triarTexto("deu tudo certo, ele nasceu 3,2kg 🥹")).toBe("publicavel");
+    expect(triarTexto("nasceu! está tudo bem com os dois 💛")).toBe("publicavel");
+    expect(triarTexto("deu tudo certo no chá de bebê!")).toBe("publicavel");
+    /* E o que ela substituiu continua roteando. */
+    expect(triarTexto("comigo foi assim e não precisei ir")).not.toBe("publicavel");
+    expect(triarTexto("no meu caso passou sozinho")).not.toBe("publicavel");
+  });
+
+  test("⚠️ um par de números NÃO é pressão quando tem substantivo depois", () => {
+    /* O ramo do par solto não tinha faixa nenhuma: QUALQUER `N por N` abria a
+       Central de Emergência. Medido: "marcamos o chá pra 12 por 10 pessoas".
+       E esse falso positivo é o mais caro da régua — ela aprende que o alarme
+       dispara por qualquer coisa e passa a ignorá-lo. */
+    for (const t of [
+      "marcamos o chá de bebê pra 12 por 10 pessoas",
+      "12 por 10 convidados vieram",
+      "comprei 3 por 2 na farmácia",
+      "às 12 por volta do meio-dia",
+    ]) {
+      expect({ t, r: triarTexto(t) }).not.toEqual({ t, r: "emergencia" });
+    }
+  });
+
+  test("⚠️ e a pressão de verdade continua sendo emergência", () => {
+    expect(triarTexto("minha pressão deu 15 por 10 hoje")).toBe("emergencia");
+    expect(triarTexto("minha pressão deu 16 por 11")).toBe("emergencia");
+    expect(triarTexto("pa 160 por 110")).toBe("emergencia");
+    /* Sem a palavra `pressão`, o par solto ainda conta — desde que termine ali. */
+    expect(triarTexto("deu 15 por 10")).toBe("emergencia");
+  });
+});
+
+const PASSA = [
+  "deu tudo certo, nasceu 3,4kg às 5h da manhã 💛",
+  "nasceu! 48cm, tudo perfeito",
+  "meu chá é dia 12 por volta das 15h",
+  "comprei o berço 1 por 2 metros",
+  "quantas semanas vocês estavam quando sentiram?",
+  "alguém indica maternidade em BH?",
+  "tô com saudade de dormir de barriga pra baixo",
+  "que barriga linda!",
+  "a mala já tá pronta 🧳",
+  "fiz o enxoval todo em promoção 3 por 2",
+  "toma um sorvete comigo hoje?",
+  "usa esse aplicativo, é ótimo",
+  "faz o bolo que eu levo o refri",
+  "passa lá em casa depois",
+  "hoje completei 30 semanas 🎉",
+  "vou de cesárea marcada dia 20",
+  "meu médico é ótimo, recomendo",
+  "cansaço nível 1000 hoje",
+  "aplica o protetor solar sempre",
+  "bebe bastante água nesse calor",
+  "meu parto foi tranquilo, durou 6h",
+  "amanhã tenho ultrassom morfológico",
+  "se eu fosse rica comprava tudo",
+  "alguém já fez chá revelação?",
+];
+const ROTEIA = [
+  "toma buscopan que resolve",
+  "toma dipirona que passa",
+  "usa essa pomada que resolve",
+  "beba um chá de canela pra descer",
+  "se eu fosse você não ia no PS",
+  "se eu fosse voce esperava amanha",
+  "no seu lugar eu ficaria em casa",
+  "não precisa ir no pronto socorro",
+  "comigo foi assim e não precisei ir",
+  "no meu caso passou sozinho",
+  "minha pressão deu 16 por 11",
+  "deu 15 por 10 agora",
+  "pa 160 por 110",
+  "ficaria em casa e esperaria passar",
+  "toma o remédio dela que é o mesmo",
+  "não tome nada, espera passar",
+  /* O passado em primeira pessoa: a forma MAIS persuasiva, e passava inteira. */
+  "tomei buscopan e resolveu",
+  "eu tomei dipirona e passou",
+  /* A tranquilização anedótica, que a remoção de "deu tudo certo" reabriu. */
+  "comigo deu tudo certo",
+  "deu tudo certo comigo, relaxa",
+  "beba um chá de camomila",
+  "toma um chá de canela que ajuda",
+];
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A BATERIA AMPLA — 40 frases que uma gestante brasileira escreveria
+   ══════════════════════════════════════════════════════════════════════════ */
+/**
+ * ⚠️ **ESTA BATERIA ACHOU UM FALSO NEGATIVO QUE OS TESTES PONTUAIS NÃO
+ * PEGARAM.** "deu 15 por 10 agora" saía publicável — a trava do par de números
+ * exigia que ele TERMINASSE ali, e quem relata pressão quase sempre põe uma
+ * palavra de tempo depois ("agora", "hoje", "de manhã").
+ *
+ * A lição de método: régua de texto se prova em VOLUME, contra frases reais.
+ * Um teste por regra pega o caso que o autor imaginou; quarenta frases pegam o
+ * que ele não imaginou.
+ *
+ * ⚠️ **AS DUAS DIREÇÕES IMPORTAM, e a de cima importa MAIS.** Um falso positivo
+ * é o app acusando a paciente de dar conselho médico no post de nascimento
+ * dela, ou abrindo a Central de Emergência por causa de um chá de bebê — e o
+ * custo é ela aprender que o alarme deste app não vale leitura.
+ */
+describe("⚠️ a régua contra 40 frases reais", () => {
+  test("nenhum falso POSITIVO — o app não acusa quem não deve", () => {
+    const maus = PASSA.filter((t) => triarTexto(t) !== "publicavel").map(
+      (t) => `${triarTexto(t)}: ${t}`,
+    );
+    expect(maus).toEqual([]);
+  });
+  test("nenhum falso NEGATIVO — conduta perigosa não passa", () => {
+    const maus = ROTEIA.filter((t) => triarTexto(t) === "publicavel");
+    expect(maus).toEqual([]);
+  });
+});

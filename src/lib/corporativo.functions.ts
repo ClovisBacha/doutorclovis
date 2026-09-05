@@ -72,12 +72,29 @@ export const joinCorporate = createServerFn({ method: "POST" })
       .eq("status", "ativo")
       .single();
     if (!account) return { ok: false as const, error: "Código inválido ou inativo." };
-    // Count current seats
-    const { count } = await db
+    /* ─── NÃO CONSEGUIR CONTAR RECUSA ────────────────────────────────────
+     *
+     * ⚠️ O `error` era descartado e `count ?? 0` fazia `0 >= max_seats` ser
+     * FALSO: qualquer falha de leitura — rede, RLS, coluna ausente — concedia
+     * a vaga. O teto contratado deixava de existir em silêncio, e cada vaga é
+     * um acesso pago que a empresa não comprou.
+     *
+     * A pergunta de triagem é sempre a mesma: **se esta leitura voltar vazia,
+     * alguma coisa fica mais PERMITIDA?** Aqui fica — então o erro recusa.
+     *
+     * ⚠️ E o recado distingue os dois casos. "Limite atingido" sobre uma
+     * contagem que falhou faria a paciente (e o RH) concluírem que o contrato
+     * acabou, num mês em que ainda há vagas. */
+    const { count, error: erroDaContagem } = await db
       .from("patient_profiles")
       .select("*", { count: "exact", head: true })
       .eq("corporate_account_id", account.id);
-    if ((count ?? 0) >= account.max_seats)
+    if (erroDaContagem || count === null)
+      return {
+        ok: false as const,
+        error: "Não consegui conferir as vagas desta empresa agora — tente de novo.",
+      };
+    if (count >= account.max_seats)
       return { ok: false as const, error: "Limite de vagas atingido para esta empresa." };
     // Link user
     const { error } = await db

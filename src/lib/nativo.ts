@@ -77,6 +77,35 @@ export function ehNativo(): boolean {
   return ponte()?.isNativePlatform?.() === true;
 }
 
+/**
+ * "ELA JÁ ESTÁ USANDO O APP?" — instalado na Tela de Início OU dentro da casca.
+ *
+ * ⚠️ Ele existe porque `display-mode: standalone` sozinho é FALSO na casca do
+ * Capacitor, e sozinho já custou dois defeitos: o puxar-para-atualizar não
+ * existia no app nativo, e o banner "Instalar o app" aparecia DENTRO dele —
+ * mandando a paciente "tocar em compartilhar ↑" numa tela que não tem barra de
+ * navegador.
+ *
+ * ⚠️ **Ele NÃO deve desligar nada no Safari comum do iPhone.** É lá que
+ * instalar destrava o push, e o push é o canal do aviso de consulta e do
+ * retorno do SOS — esconder o convite ali tiraria da paciente o caminho para
+ * receber emergência.
+ *
+ * ⚠️ **Lê `window`/`navigator`: só vale no cliente.** Quem chama decide num
+ * EFEITO, nunca no render — no servidor ele responde `false`, e decidir no
+ * render trocaria um banner a mais por uma quebra de hidratação.
+ */
+export function ehAppInstalado(): boolean {
+  if (typeof window === "undefined") return false;
+  if (ehNativo()) return true;
+  try {
+    if (window.matchMedia?.("(display-mode: standalone)").matches) return true;
+  } catch {
+    /* navegador sem matchMedia de display-mode */
+  }
+  return (navigator as unknown as { standalone?: boolean }).standalone === true;
+}
+
 /** `"ios"`, `"android"` ou `"web"`. */
 export function plataforma(): string {
   return ponte()?.getPlatform?.() ?? "web";
@@ -148,6 +177,9 @@ export function prepararNativo(): void {
     esconderSplash();
     ligarBotaoVoltar(App);
   });
+  /* O toque num aviso leva ao lugar do aviso — ver `ligarToqueNoAviso`. Ele é
+     carregado à parte porque o plugin de push é pesado e só existe na casca. */
+  void import("@/lib/push-nativo").then((m) => m.ligarToqueNoAviso()).catch(() => {});
 }
 
 /**
@@ -340,6 +372,38 @@ export function tocarPadrao(padrao: number[]): void {
   } catch {
     /* sem haptics */
   }
+}
+
+/**
+ * O RETORNO TÁTIL DE UM DESFECHO — "deu certo" e "não deu".
+ *
+ * ⚠️ Ele existe porque o SOS era o único gesto de CONSEQUÊNCIA do app
+ * inteiramente mudo ao dedo, e o canal que sobrava não é confiável: no iPhone
+ * no SILENCIOSO o alarme de Web Audio simplesmente não toca (o WebKit trata
+ * isso como o bug 237322 — Web Audio É silenciado pelo botão físico). Numa
+ * emergência, a paciente apertava o botão vermelho e não recebia sinal nenhum
+ * de que alguma coisa tinha acontecido.
+ *
+ * ⚠️ **NÃO é `tocarPadrao` com outro nome.** No iOS o `Haptics.notification`
+ * é um padrão do SISTEMA, com a assinatura tátil que o iPhone usa para
+ * "concluído" e "falhou" — a paciente já a conhece de todo outro app. Uma
+ * agenda de impactos nossa soaria como uma vibração qualquer.
+ *
+ * ⚠️ **Nunca lança e nunca espera.** Ele é chamado no caminho do socorro; um
+ * `await` aqui atrasaria o envio, e uma exceção o derrubaria.
+ */
+export function hapticoDeAviso(tipo: "sucesso" | "erro"): void {
+  const haptics = carregados.Haptics;
+  if (ehNativo() && haptics?.notification) {
+    void haptics
+      .notification({ type: (tipo === "sucesso" ? "SUCCESS" : "ERROR") as never })
+      ?.catch(() => {});
+    return;
+  }
+  /* Fora da casca: dois pulsos curtos para o sucesso, três longos para o erro.
+     ⚠️ O erro DESCE e repete, como o som — é o que a deixa distinguir os dois
+     sem olhar para a tela, que é a situação inteira do SOS. */
+  tocarPadrao(tipo === "sucesso" ? [18, 60, 18] : [45, 90, 45, 90, 45]);
 }
 
 /** Interrompe o que estiver tocando. */

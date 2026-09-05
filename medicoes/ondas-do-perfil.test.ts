@@ -29,12 +29,33 @@
  */
 import { describe, expect, mock, test } from "bun:test";
 
-const LATENCIA = 5; // ms artificiais por ida, só para as ondas ficarem distinguíveis
+/**
+ * Latência artificial por ida, só para as ondas ficarem distinguíveis.
+ *
+ * ⚠️ **VINTE E CINCO, e não cinco — e o número é de RELAÇÃO SINAL/RUÍDO.** O
+ * agrupamento junta o que começa a menos de meia latência do carimbo anterior;
+ * com 5 ms, a folga era 2,5 ms, e o jitter do próprio contêiner (medido: 1 a
+ * 3 ms entre chamadas do MESMO `Promise.all`) chegava a atravessá-la. O teste
+ * então acusava uma cascata que não existe — aconteceu, e mandou-me investigar
+ * uma consulta que estava na onda certa.
+ *
+ * ⚠️ **E 25 NÃO BASTOU sob carga.** Medido: rodando a suíte ao mesmo tempo que
+ * a varredura das bancadas (um Chromium com dezenas de páginas), o jitter
+ * atravessou os 12,5 ms e o teste acusou uma cascata inexistente — uma vez em
+ * cerca de seis execuções. Um teste que falha uma vez em seis é pior que teste
+ * nenhum: as pessoas passam a re-rodar sem ler, e no dia em que o vermelho for
+ * de verdade ele é ignorado junto.
+ *
+ * Com 50, a folga é 25 ms — mais que qualquer jitter medido —, e uma onda de
+ * verdade continua custando os 50 inteiros. O preço é o teste levar cerca de um
+ * segundo, e é barato.
+ */
+const LATENCIA = 50;
 type Registro = { t: number; alvo: string; detalhe: string; fim?: number };
 const log: Registro[] = [];
 
 /**
- * O teto, e ele é EXATO — 10, que é o medido depois do conserto.
+ * O teto, e ele é EXATO — 9, que é o medido hoje.
  *
  * ⚠️ **Um teto frouxo não trava nada.** Ele começou em 12 "para não atrapalhar
  * trabalho honesto", e a mutação provou o problema na hora: re-serializar as
@@ -46,7 +67,19 @@ const log: Registro[] = [];
  * da economia — o número existe para a mudança ser deliberada, não para ser
  * impossível.
  */
-const TETO_DE_ONDAS = 10;
+/**
+ * ⚠️ **DESCEU DE 10 PARA 9, e não foi conserto nenhum: foi a MEDIÇÃO que ficou
+ * honesta.** Com a latência simulada em 5 ms, duas chamadas do mesmo
+ * `Promise.all` que saíssem com 3 ms de diferença atravessavam a folga de
+ * agrupamento e eram contadas como duas ondas. Subindo a latência para 25 ms
+ * (ver `LATENCIA`), o ruído passou a caber na folga com sobra — e o que sempre
+ * foram nove ondas parou de ser lido como dez.
+ *
+ * ⚠️ Baixar o teto junto é obrigatório: deixá-lo em 10 sobre uma medida de 9 é
+ * folga, e folga é dívida pré-aprovada — a mutação já provou que uma onda de
+ * folga faz a cascata que este teste existe para impedir passar VERDE.
+ */
+const TETO_DE_ONDAS = 9;
 let t0 = 0;
 
 /** Uma URL assinada que vence em um minuto — força a renovação. */
@@ -296,7 +329,20 @@ test("⚠️ abrir um perfil não pode voltar a ser uma cascata", async () => {
         `  t=${String(l.t).padStart(4)}ms→${String(l.fim ?? "?").padStart(4)}  ${l.alvo.padEnd(17)} ${l.detalhe}`,
     ),
   );
-  const ondas = new Set(log.map((l) => l.t)).size;
+  /* ⚠️ **ONDA É AGRUPAMENTO POR FOLGA, nunca `t` distinto.** Contar carimbos
+     distintos parece equivalente e não é: duas chamadas do MESMO `Promise.all`
+     saem com microssegundos de diferença e podem cair em 79 e 80 ao arredondar
+     — e aí a medição acusa uma cascata que não existe. Medido: a mesma árvore
+     deu 10 e 11 em execuções seguidas, e o teto reprovou por 1 ms de jitter.
+
+     Uma onda de verdade custa `LATENCIA` inteira (é o que a ida anterior
+     esperou). Então tudo que começa a menos de meia latência do carimbo
+     anterior é a MESMA onda, e a fronteira fica bem longe do ruído. */
+  const carimbos = [...new Set(log.map((l) => l.t))].sort((a, b) => a - b);
+  let ondas = carimbos.length ? 1 : 0;
+  for (let i = 1; i < carimbos.length; i++) {
+    if (carimbos[i] - carimbos[i - 1] > LATENCIA / 2) ondas++;
+  }
   console.log(
     `\nTOTAL idas: ${log.length}  |  ONDAS SERIAIS (t distintos): ${ondas}  |  tempo total ${total}ms com ${LATENCIA}ms/ida`,
   );

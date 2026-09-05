@@ -42,10 +42,17 @@ import { join } from "node:path";
 const FONTES = [
   "src/lib/rede-social.functions.ts",
   "src/lib/caixinha.functions.ts",
+  "src/lib/conversa.functions.ts",
+  "src/lib/comentarios.functions.ts",
+  "src/lib/mencoes.functions.ts",
   /* ⚠️ Os dois módulos da Fase 5 ficavam de fora, e o próprio comentário acima
      diz que "um módulo novo fora desta lista é o buraco que a catraca existe
      para fechar". As oito funções deles têm porta hoje — mas ter porta hoje é
      exatamente o que era verdade das sete que a catraca nasceu para pegar. */
+  /* ⚠️ O grupo do direct entra JUNTO com o módulo — não depois. Foi assim que
+     `influenciadora` e o chá de bebê acabaram com funções mortas: o módulo
+     nasceu, a catraca não soube, e ninguém ficou vermelho. */
+  "src/lib/grupo.functions.ts",
   "src/lib/desafio-em-grupo.functions.ts",
   "src/lib/influenciadora.functions.ts",
   /* ⚠️ **E o chá de bebê ficava de fora, com DUAS funções mortas.**
@@ -212,6 +219,26 @@ const REGUAS = [
   "src/lib/cache-do-feed.ts",
   "src/lib/pergunta-clinica.ts",
   "src/lib/aula-compartilhavel.ts",
+  /**
+   * ⚠️ **ESTES TRÊS ENTRARAM DEPOIS, e a falta deles custou uma régua morta.**
+   *
+   * `acharNaConversa` (a busca dentro da conversa) foi escrita, testada e
+   * documentada em prosa — e passou dias sem UMA linha de tela. A catraca não
+   * pegou porque `conversa.ts` simplesmente não estava nesta lista: ela cobria
+   * onze módulos e a rede tem muito mais.
+   *
+   * A lição não é sobre a busca: é que **uma catraca com lista à mão precisa da
+   * lista crescendo junto com o código**, senão ela dá a sensação de cobertura
+   * exatamente onde não há. Módulo de régua novo entra aqui no mesmo commit.
+   */
+  "src/lib/conversa.ts",
+  "src/lib/comentarios.ts",
+  "src/lib/onboarding-da-comunidade.ts",
+  /* ⚠️ Entrou DEPOIS de o buraco custar: `agruparPorPessoa` viveu aqui pura,
+     testada e com ZERO chamadores — a tabela era escrita em sete pontos e lida
+     em nenhum, e a catraca não alcançava este módulo porque a lista é à mão.
+     Módulo de régua novo entra no MESMO commit que o cria. */
+  "src/lib/triagem-barrada.ts",
 ];
 
 /**

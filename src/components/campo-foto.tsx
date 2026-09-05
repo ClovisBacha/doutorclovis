@@ -149,7 +149,7 @@ export function CampoFoto({
               </button>
             )}
           </div>
-          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             Um rosto é a maior diferença entre dois cards. A imagem é cortada em quadrado e reduzida
             no seu aparelho — não gasta seus dados.
           </p>

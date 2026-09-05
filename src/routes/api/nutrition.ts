@@ -28,7 +28,7 @@ async function consultorioDaPaciente(
 ): Promise<{ doctorId: string | null; patientId: string; careMode: boolean }> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data } = await (supabaseAdmin as any)
+    const { data, error } = await (supabaseAdmin as any)
       .from("patient_profiles")
       /* `care_mode` VEM JUNTO. Este endpoint consultava o mesmo perfil que o
          chat e não perguntava pelo luto — e o system prompt abaixo instrui a
@@ -36,14 +36,37 @@ async function consultorioDaPaciente(
       .select("doctor_id,care_mode")
       .eq("id", userId)
       .maybeSingle();
+    /**
+     * ⚠️ AS DUAS PONTAS FALHAVAM ABERTAS, e as duas com a mesma aritmética:
+     * o `error` era descartado, e o PostgREST devolve `data: null` numa falha
+     * sem LANÇAR — `Boolean(null)` é `false`, ou seja **"não está de luto"**.
+     *
+     * O custo é o pior desfecho que este produto tem: `NUTRITION_SYSTEM` manda
+     * tratar a paciente como GESTANTE e adaptar tudo ao trimestre. Uma
+     * oscilação de rede fazia a nutrição conversar sobre a gestação com quem
+     * acabou de perdê-la.
+     *
+     * ⚠️ E a assimetria decide o lado seguro, que NÃO é o mesmo dos dois
+     * campos. Para `doctorId`, "não sei" → segue sem o cérebro, e a resposta
+     * sai consolidada: degradação inofensiva. Para `careMode`, "não sei" →
+     * trata como LUTO: uma gestante recebe orientação genérica em vez de
+     * orientação por trimestre (chato, reversível na tentativa seguinte),
+     * contra o app falar do bebê de quem o perdeu (irreversível).
+     */
+    if (error) {
+      console.error("[nutricao] perfil ilegível — assumindo Modo Cuidado", error);
+      return { doctorId: null, patientId: userId, careMode: true };
+    }
     return {
       doctorId: (data?.doctor_id as string | null) ?? null,
       patientId: userId,
       careMode: Boolean(data?.care_mode),
     };
-  } catch {
-    /* Falha de banco não pode derrubar o chat dela: segue sem o cérebro. */
-    return { doctorId: null, patientId: userId, careMode: false };
+  } catch (e) {
+    /* Falha de banco não pode derrubar o chat dela: segue sem o cérebro — e
+       pelo mesmo motivo acima, sem falar da gestação. */
+    console.error("[nutricao] perfil inacessível — assumindo Modo Cuidado", e);
+    return { doctorId: null, patientId: userId, careMode: true };
   }
 }
 

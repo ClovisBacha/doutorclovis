@@ -76,7 +76,7 @@ jobs:
       - run: bun run lint
 
   bancadas:
-    name: Bancadas — abre as telas e lê o console
+    name: Bancadas — abre as telas, toca nos controles e lê o console
     runs-on: ubuntu-latest
     # ⚠️ ESTE JOB EXISTE POR UM DEFEITO CONCRETO: um `getServerSnapshot`
     # devolvendo `[]` novo a cada leitura pôs a barra de navegação em laço
@@ -143,6 +143,18 @@ jobs:
             echo "o servidor não respondeu em 120s"; cat /tmp/dev.log; exit 1; }
 
       - run: bun run varrer:bancadas
+
+      # ⚠️ **A VARREDURA DE INTERAÇÃO PEGA O QUE A DE CARGA NÃO PEGA.**
+      #
+      # A de cima abre a tela e lê o console; esta TOCA nos controles. Foi ela
+      # que achou a barrinha do story misturando o atalho `animation` com o
+      # longhand `animationPlayState` — o React só avisa na REPINTURA que o
+      # toque provoca, e o defeito era real: numa repintura o atalho reescrevia
+      # o play-state e a barra voltava a correr sozinha enquanto o dedo a
+      # segurava.
+      #
+      # Ela roda DEPOIS, no mesmo servidor: subir um segundo dobraria o job.
+      - run: bun run varrer:interacao
 
       # O log do servidor ajuda a diagnosticar quando o job falha — sem ele,
       # "a página não desenhou nada" não diz se foi a tela ou o servidor.

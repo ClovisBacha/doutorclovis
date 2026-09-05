@@ -25,7 +25,27 @@
  *  3. **Seguidores e seguindo não são públicos.** A única divergência de
  *     produto, e está pesquisada — ver `NUMEROS_PUBLICOS`.
  */
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { OnboardingDaComunidade } from "@/components/onboarding-da-comunidade";
+import { codificarFoto } from "@/lib/codificar-imagem";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
+import { intercalarDescobertas } from "@/lib/sugestoes";
+import {
+  MOTIVOS_SENSIVEIS,
+  deveBorrar,
+  rotuloDoMotivo,
+  veuDoPost,
+  type RazaoDoVeu,
+} from "@/lib/conteudo-sensivel";
+import {
+  chaveDoRascunhoDeStory,
+  lerRascunhoDeStory,
+  paraGuardar as guardarRascunhoDeStory,
+  type RascunhoDoStory,
+} from "@/lib/rascunho-do-story";
+import { type Filho, diasEntre, linhaDoPerfil, mesesEntre } from "@/lib/filhos";
+import { marcosSugeridos, mesversarioDeHoje, textoDoMarco } from "@/lib/marcos";
+import { SEGUNDOS_MAX, recadoDaRecusa, recusaDoVideo } from "@/lib/video-do-post";
+import { MAXIMO_DE_FILHOS } from "@/lib/filhos.functions";
 import {
   ABAS_DO_PERFIL,
   ANEL_NOVO,
@@ -55,6 +75,7 @@ import {
   OPCOES_MIN,
   rotuloDeVotos,
   LIMITE_DA_BIO,
+  LINK_DA_BIO_MAX,
   LIMITE_DO_TEXTO,
   MINIMO_DA_BUSCA,
   postEhValido,
@@ -64,12 +85,25 @@ import {
   textoDoAviso,
   totalDeReacoes,
   VISIBILIDADES,
+  QUEM_COMENTA,
+  QUEM_COMENTA_PADRAO,
+  apertarQuemComenta,
+  type QuemComenta,
   type AulaNoPost,
   type TipoDeReacao,
   type Visibilidade,
+  TEXTO_DO_STORY_MAX,
+  VISIBILIDADES_DO_STORY,
+  VISIBILIDADE_DO_STORY_PADRAO,
+  camadaDoStory,
+  type VisibilidadeDoStory,
 } from "@/lib/rede-social";
 import { LIMITE_DA_PERGUNTA, recadoDoDesfecho, type DesfechoDaPergunta } from "@/lib/caixinha-tela";
 import { publicarAtalhos, type AtalhoDaAba } from "@/lib/atalhos-da-aba";
+import { MaisDaComunidade, type GrupoDoMais } from "./mais-da-comunidade";
+import { CaixaDeEntrada, Conversa, MandarPublicacao, subirFoto } from "@/components/rede-conversa";
+import { Comentarios } from "@/components/rede-comentarios";
+import type { ConversaNaTela } from "@/lib/conversa.functions";
 import { linkDeIndicacao, linkDoWhatsApp, mensagemDeConvite, SITE } from "@/lib/indicacao";
 /* Import ESTÁTICO: régua pura, sem servidor e sem DOM — ver `lugar-no-feed.ts`. */
 import {
@@ -91,7 +125,13 @@ import { hapticTap } from "@/lib/haptics";
 import { aplicarSugestao, LADO_PARA_A_IA } from "@/lib/legenda-sugerida";
 import { MARCADAS_MAX, textoDeMarcadas } from "@/lib/marcacoes";
 import { MOTIVOS, type MotivoDaDenuncia } from "@/lib/denuncias";
+import { tagDaBusca } from "@/lib/mencoes";
+import { BUSCAS_RECENTES_MAX, chaveDasBuscasRecentes, comBuscaNova } from "@/lib/sugestoes";
+import { ChamarParaGrupo, ConversaDoGrupo, CriarGrupo, MeusGrupos } from "@/components/rede-grupo";
+import type { GrupoNaTela } from "@/lib/grupo.functions";
 import { CELULA_DA_GRADE, LADO_DA_MINIATURA, urlDaGrade, valeMiniatura } from "@/lib/miniatura";
+import { criarPilhaDeTelas } from "@/lib/pilha-de-telas";
+import { useVoltar } from "@/lib/use-voltar";
 import {
   esquecerDoCache,
   guardarNoCache,
@@ -123,6 +163,7 @@ import type {
   BolhaDeStory,
   PerfilNaTela,
   PostNaTela,
+  StoryArquivado,
 } from "@/lib/rede-social.functions";
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -196,7 +237,7 @@ export function BolinhaDeStory({
           <Foto url={url} nome={nome} lado={FOTO_DO_STORY} />
         </span>
       </span>
-      <span className="w-full truncate text-center text-[11px] leading-tight text-foreground/80">
+      <span className="w-full truncate text-center text-xs leading-tight text-foreground/80">
         {rotulo}
       </span>
     </button>
@@ -221,16 +262,63 @@ export type Story = { id: string; nome: string; avatarUrl: string | null; novo: 
 export const FileiraDeStories = memo(function FileiraDeStories({
   stories,
   aoTocar,
+  aoAbrirMais,
 }: {
   stories: Story[];
   aoTocar?: (id: string) => void;
+  /**
+   * A PRIMEIRA bolinha da fileira: ⊞ "Mais", que abre o hub de portas (Chá de
+   * bebê, Amigas, Álbum, Nome, Acompanhante).
+   *
+   * ⚠️ Ela mora AQUI, e não num cabeçalho, porque o cabeçalho do feed saiu a
+   * pedido do dono ("o primeiro elemento da aba será os stories"). Sem ela, o
+   * hub só se alcançava tocando de novo no ícone da barra — um gesto que nada
+   * anuncia — e as cinco portas ficavam a quatro toques atrás de um segredo
+   * (estudo de navegação, set/2026).
+   *
+   * ⚠️ PRIMEIRA, não última: com cinco stories ela caía fora da tela (medido:
+   * x=544 num viewport de 393) — uma porta que só aparece rolando é o defeito
+   * que ela veio consertar.
+   */
+  aoAbrirMais?: () => void;
 }) {
-  if (stories.length === 0) return null;
+  if (stories.length === 0 && !aoAbrirMais) return null;
   return (
     <div className="-mx-4 border-b border-border">
       {/* Rola na horizontal e sangra nas laterais — a última bolinha tem de
           encostar na borda da tela, senão a fileira parece ter acabado. */}
       <div className="flex gap-1 overflow-x-auto px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {aoAbrirMais && (
+          <button
+            type="button"
+            onClick={aoAbrirMais}
+            aria-label="Mais da Comunidade: chá de bebê, amigas, álbum e acompanhante"
+            className="press flex shrink-0 flex-col items-center gap-1"
+            style={{ width: CAIXA_DO_STORY + 12 }}
+          >
+            <span
+              className="flex items-center justify-center rounded-full border-2 border-dashed border-primary/50 bg-primary/5 text-primary"
+              style={{ width: CAIXA_DO_STORY, height: CAIXA_DO_STORY }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                aria-hidden
+                className="h-7 w-7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3.5" y="3.5" width="7" height="7" rx="2" />
+                <rect x="13.5" y="3.5" width="7" height="7" rx="2" />
+                <rect x="3.5" y="13.5" width="7" height="7" rx="2" />
+                <rect x="13.5" y="13.5" width="7" height="7" rx="2" />
+              </svg>
+            </span>
+            <span className="w-full truncate text-center text-xs text-muted-foreground">Mais</span>
+          </button>
+        )}
         {stories.map((s) => (
           <BolinhaDeStory
             key={s.id}
@@ -301,77 +389,70 @@ function CoracaoDoToque() {
  * lápis amarelo-e-marrom ao lado dele lê como adesivo colado ali.
  */
 /**
- * O SELETOR DE MOTIVO — usado no post e no perfil.
+ * ⚠️ `EscolherMotivo` MUDOU DE ARQUIVO — ver `escolher-motivo.tsx`.
  *
- * ⚠️ **Catálogo fechado, e nunca campo livre.** A razão está em `denuncias.ts`:
- * texto aberto num app de gestação é onde alguém escreve a informação clínica
- * de OUTRA pessoa, e esse texto iria para uma tela de administração, gravado,
- * sobre quem nunca soube.
+ * Ela é usada pela Comunidade E pela fila do painel, e importá-la daqui puxava
+ * `rede-instagram.tsx` inteiro para o pacote do painel — junto com a régua
+ * clínica, que tem `(?<!` nas fronteiras e não pode viajar para lá. A catraca
+ * "a régua clínica não entra no pacote do navegador" pegou na hora.
  *
- * ⚠️ **Um componente só, e não duas cópias.** As duas portas (post e perfil)
- * precisam oferecer exatamente os mesmos motivos — duas listas divergiriam no
- * primeiro ajuste, e a fila passaria a receber motivos que a tela do outro lado
- * não sabe nomear.
+ * A re-exportação existe para não quebrar quem já a importava daqui.
  */
-export function EscolherMotivo({
-  titulo,
-  aviso,
-  aoCancelar,
-  aoEnviar,
-}: {
-  titulo: string;
-  aviso: string;
-  aoCancelar: () => void;
-  aoEnviar: (motivo: MotivoDaDenuncia) => void;
-}) {
-  const [motivo, setMotivo] = useState<MotivoDaDenuncia | null>(null);
+import { EscolherMotivo } from "@/components/escolher-motivo";
+export { EscolherMotivo };
+
+/**
+ * O PINO.
+ *
+ * ⚠️ **DESENHADO, e não 📌.** O emoji sai com cores próprias em cada sistema
+ * (vermelho no iOS, cinza-azulado no Android) e não tem dois estados — e aqui
+ * ele PRECISA distinguir "fixado" de "fixar", que é a diferença entre um toque
+ * inofensivo e desfixar sem querer. É a mesma lição do 📞 da emergência e do
+ * marcador de salvar.
+ */
+/**
+ * O ícone de "pôr no story" — um retângulo de story com um ⊕.
+ *
+ * ⚠️ Desenhado, e não um emoji: nenhum emoji quer dizer "story", e os
+ * candidatos (📖, ➕, 🔄) já significam outra coisa em outro lugar desta mesma
+ * fileira.
+ */
+function IconeStoryDePost() {
   return (
-    <div className="rounded-2xl border border-border bg-muted/40 p-3">
-      <p className="text-[13px] font-semibold leading-snug">{titulo}</p>
-      {/* ⚠️ Diz que é CALADO: sem isso ela hesita achando que a outra vai
-          saber — a mesma razão pela qual o bloqueio é mudo. */}
-      <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">{aviso}</p>
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[17px] w-[17px]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="4" y="2.5" width="16" height="19" rx="3.5" />
+      <path d="M12 8.5v7M8.5 12h7" />
+    </svg>
+  );
+}
 
-      <div className="mt-2.5 space-y-1">
-        {MOTIVOS.map((m) => (
-          <button
-            key={m.motivo}
-            type="button"
-            onClick={() => setMotivo(m.motivo)}
-            aria-pressed={motivo === m.motivo}
-            className={`press block min-h-[44px] w-full rounded-xl border px-3 py-1.5 text-left ${
-              motivo === m.motivo ? "border-primary bg-primary/10" : "border-border"
-            }`}
-          >
-            <span className="block text-[13px] font-medium">{m.rotulo}</span>
-            <span className="block text-[11px] leading-tight text-muted-foreground">
-              {m.explica}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-2.5 flex gap-2">
-        <button
-          type="button"
-          onClick={aoCancelar}
-          className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          /* ⚠️ Só habilita com motivo escolhido: sem isso a fila recebe
-             "outro" por omissão, e o campo que existe para dizer POR QUÊ passa
-             a não dizer nada. */
-          disabled={!motivo}
-          onClick={() => motivo && aoEnviar(motivo)}
-          className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground disabled:opacity-45"
-        >
-          Denunciar
-        </button>
-      </div>
-    </div>
+function IconePino({ aceso }: { aceso: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[17px] w-[17px]"
+      /* Cheio quando aceso: a silhueta preenchida lê como "está ligado" à
+         primeira vista, sem depender só da cor — que é o que falta para quem
+         não distingue bem os tons. */
+      fill={aceso ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={1.9}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M9 3h6l-1 5 3.5 3.5H6.5L10 8z" />
+      <path d="M12 11.5V21" />
+    </svg>
   );
 }
 
@@ -413,11 +494,17 @@ function Carrossel({
   urls,
   aoToqueDuplo,
   comparacao,
+  altTexto,
+  autorNome,
 }: {
   urls: string[];
   aoToqueDuplo?: () => void;
   /** "Então e agora": os rótulos das DUAS primeiras fotos. */
   comparacao?: { antes: string; agora: string } | null;
+  /** A descrição que a autora escreveu. Ver o `alt` abaixo. */
+  altTexto?: string | null;
+  /** Para o `alt` genérico quando não há descrição. */
+  autorNome?: string;
 }) {
   const [i, setI] = useState(0);
   const caixa = useRef<HTMLDivElement>(null);
@@ -427,6 +514,31 @@ function Carrossel({
   const [batida, setBatida] = useState(0);
   const desce = useRef({ x: 0, y: 0 });
   const ultimo = useRef(0);
+  /**
+   * ⚠️ **ATÉ QUE FOTO DO CARROSSEL JÁ PODE BAIXAR** — e este número existe
+   * porque `loading="lazy"` NÃO resolve o eixo horizontal.
+   *
+   * Medido no Chromium, numa página com o mesmo formato deste carrossel: em
+   * seis publicações de cinco fotos, ele baixa **três fotos de cada uma das
+   * cinco primeiras** — quinze arquivos — enquanto a paciente vê UMA. O `lazy`
+   * funciona descendo (as publicações lá embaixo não vêm) e não funciona para
+   * o lado: as fotos 2 e 3 estão fora da tela e vêm assim mesmo.
+   * `width`/`height` no `<img>` não muda nada — medido com e sem.
+   *
+   * ⚠️ **A REGRA É "a da vez MAIS a seguinte", e não só a da vez.** Segurar
+   * tudo menos a primeira economizaria mais e cobraria em outra moeda: a foto
+   * seguinte apareceria EM BRANCO durante o deslize, numa rede ruim, e o
+   * deslize é justamente o gesto com que ela descobre que há mais foto. Numa
+   * publicação de ultrassom isso é péssimo. Com a vizinha pronta, o carrossel
+   * continua instantâneo e ainda assim são DUAS em vez de três.
+   *
+   * A conta com o tamanho real de uma foto nossa em WebP: um carrossel de
+   * cinco custa **170 kB em vez de 255**, sem tirar nitidez de nada.
+   *
+   * Ele só SOBE (`Math.max`): voltar para a primeira não pode descarregar o
+   * que já veio, senão folhear para trás baixaria tudo de novo.
+   */
+  const [ate, setAte] = useState(0);
 
   if (urls.length === 0) return null;
 
@@ -465,13 +577,45 @@ function Carrossel({
           const el = e.currentTarget;
           const n = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
           if (n !== i) setI(n);
+          /* Libera a vizinha assim que o dedo começa a andar — o `scroll`
+             dispara no primeiro pixel, muito antes de o encaixe terminar. */
+          setAte((v) => Math.max(v, n + 1));
         }}
+        /* ⚠️ `touch-action: manipulation` NÃO É SUPÉRFLUO AQUI, e é por isso que
+             ele tem comentário: esta `div` tem gesto de TOQUE DUPLO próprio
+             (`aoSoltar`, janela de 320 ms, que dá ❤️). Sem a declaração, o
+             navegador continua com o direito de ler os mesmos dois toques como
+             ZOOM — ela toca duas vezes na ultrassom para curtir e a página
+             amplia. A regra de `styles.css` alcança botão e afins; isto é uma
+             `div`, e fica de fora.
+             ⚠️ Nunca `none` (mataria a rolagem lateral do próprio carrossel) e
+             nunca `user-scalable=no` no viewport: o zoom por PINÇA é
+             acessibilidade, e é o que a paciente com pouca visão usa. */
         className="flex w-full snap-x snap-mandatory overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        style={{ aspectRatio: String(RAZAO_DO_POST) }}
+        style={{ aspectRatio: String(RAZAO_DO_POST), touchAction: "manipulation" }}
       >
         {urls.map((u, n) => (
           <div key={n} className="relative w-full shrink-0 snap-center overflow-hidden bg-muted/40">
-            <img src={u} alt="" className="h-full w-full object-cover" loading="lazy" />
+            {/* ⚠️ **`alt` NUNCA VAZIO, e a diferença é entre "existe uma foto
+                aqui" e silêncio.** `alt=""` faz o leitor de tela PULAR a imagem:
+                quem navega assim nem saberia que há uma publicação com foto. Com
+                descrição, ela é lida; sem, entra o genérico com o nome de quem
+                publicou — que é pouco, mas é verdade. */}
+            <img
+              /* ⚠️ Sem `src` a imagem não é pedida — é isso que segura o
+                 download. O `<div>` continua ocupando a largura inteira, então
+                 a geometria do encaixe não muda e o carrossel não pula. */
+              src={n <= ate + 1 ? u : undefined}
+              alt={
+                altTexto?.trim()
+                  ? urls.length > 1
+                    ? `${altTexto.trim()} (foto ${n + 1} de ${urls.length})`
+                    : altTexto.trim()
+                  : `Publicação de ${autorNome ?? "alguém"}${urls.length > 1 ? `, foto ${n + 1} de ${urls.length}` : ""}`
+              }
+              className="h-full w-full object-cover"
+              loading="lazy"
+            />
             {/* ⚠️ O carimbo pousa DENTRO da foto, e não numa faixa em volta:
                 quem salva a imagem para mandar no WhatsApp leva a semana junto,
                 que é metade do valor do formato. E só nas DUAS primeiras — as
@@ -501,7 +645,7 @@ function Carrossel({
         <>
           {/* O contador no canto, como eles fazem — é o que diz de cara que
               há mais de uma foto, antes de a pessoa tentar deslizar. */}
-          <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-medium tabular-nums text-white">
+          <span className="absolute right-2.5 top-2.5 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium tabular-nums text-white">
             {i + 1}/{urls.length}
           </span>
           <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1">
@@ -591,17 +735,75 @@ function IconeMarcador({ cheio }: { cheio: boolean }) {
  * todos os cartões, e `aplicar` já preserva a identidade de quem não mudou
  * (`if (p.id !== post.id) return p`). Aí `memo` funciona: repinta um cartão.
  */
+/**
+ * O véu do conteúdo sensível.
+ *
+ * ⚠️ **BORRA, NUNCA ESCONDE — e essa é a diferença que importa.** Esconder
+ * seria o app decidindo que aquilo não deve ser lido, e a experiência de quem
+ * perdeu uma gestação é exatamente o que esta comunidade não pode calar. O que
+ * ele faz é dar UM SEGUNDO para a leitora decidir.
+ *
+ * ⚠️ **O rótulo diz o ASSUNTO sem contar a história** (catálogo fechado, ver
+ * `conteudo-sensivel.ts`): é o que ela lê ANTES de escolher.
+ */
+function Sensivel({
+  motivo,
+  razao,
+  aoRevelar,
+  children,
+}: {
+  motivo: string | null | undefined;
+  /**
+   * Por que está recolhido.
+   *
+   * ⚠️ **`"palavra"` NÃO diz QUAL palavra**, e isso é o recurso: ela escondeu
+   * aquilo de propósito, e escrever a palavra no rótulo entregaria exatamente o
+   * que o filtro existe para não entregar.
+   */
+  razao?: RazaoDoVeu;
+  aoRevelar: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative">
+      {/* `select-none` e `pointer-events-none`: sob o véu nada é tocável nem
+          copiável — senão o toque atravessaria para o carrossel por baixo. */}
+      <div className="pointer-events-none select-none blur-2xl" aria-hidden>
+        {children}
+      </div>
+      <button
+        type="button"
+        onClick={aoRevelar}
+        className="press absolute inset-0 flex flex-col items-center justify-center gap-1 bg-background/40 px-6 text-center"
+      >
+        <span className="text-[13px] font-semibold">
+          {razao === "palavra" ? "Escondido pelo seu filtro de palavras" : rotuloDoMotivo(motivo)}
+        </span>
+        <span className="text-xs text-muted-foreground">Toque para ver</span>
+      </button>
+    </div>
+  );
+}
+
 export const PostInstagram = memo(function PostInstagram({
   post,
   aoReagir,
   aoAbrirPerfil,
   aoSalvar,
+  aoRepublicar,
+  aoCompartilhar,
+  aoLinkPublico,
+  aoStoryComPost,
+  aoAbrirTag,
+  aoMandarParaConversa,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
   aoVerQuemReagiu,
   aoEditar,
+  aoFixar,
   aoVer,
   sugerido = false,
 }: {
@@ -621,6 +823,31 @@ export const PostInstagram = memo(function PostInstagram({
   aoVer?: (id: string) => void;
   /** Guardar/desguardar. Sem ele o marcador não aparece. */
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
+  /**
+   * Abre (ou fecha) o LINK PÚBLICO desta publicação.
+   *
+   * ⚠️ **É OUTRA coisa que o ↗.** O ↗ tira a FOTO do app (`navigator.share`
+   * com o arquivo); isto entrega um ENDEREÇO que abre sem conta nenhuma — é
+   * assim que uma publicação chega ao WhatsApp da família.
+   *
+   * ⚠️ **Só na própria, e só na camada `publico`** — quem confere é o servidor.
+   * Um link para um post `amigas` seria a porta dos fundos da visibilidade: o
+   * desabafo escrito para seis pessoas passaria a abrir sem conta nenhuma.
+   */
+  aoLinkPublico?: (post: PostNaTela) => void;
+  /** Levar esta publicação para o compositor de story. */
+  aoStoryComPost?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   /** Só faz sentido no post DELA — a tela confere `souAAutora`. */
   aoApagar?: (post: PostNaTela) => void;
   /**
@@ -644,6 +871,8 @@ export const PostInstagram = memo(function PostInstagram({
    * quando gravou, senão o texto dela sumiria junto com a recusa.
    */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  /** Fixar (ou soltar) no topo do perfil. Só no post dela. */
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
   /** Ver quem reagiu. Só no post DELA — ver a nota na linha de ações. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** Veio do algoritmo, não de quem ela segue. */
@@ -651,6 +880,29 @@ export const PostInstagram = memo(function PostInstagram({
 }) {
   const [escolhendo, setEscolhendo] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
+  /**
+   * ⚠️ **"REVELADO" É POR LEITURA, e NUNCA é gravado.**
+   *
+   * Guardar que ela já revelou faria o aviso valer uma vez só — e o segundo
+   * encontro com o mesmo post, numa noite pior, chegaria sem aviso nenhum.
+   */
+  const [revelado, setRevelado] = useState(false);
+  /**
+   * A régua mora em `conteudo-sensivel.ts`, e ela tem DUAS razões: a marca da
+   * autora e o FILTRO DE PALAVRAS dela.
+   *
+   * ⚠️ **O filtro não alcançava o feed** — protegia comentários e direct, e a
+   * palavra que ela escondeu a atingia rolando, no lugar mais exposto do app. O
+   * véu é o mesmo (caixa do tamanho da foto, sem mídia no DOM); o que muda é o
+   * rótulo, e é ele que ela lê antes de decidir.
+   */
+  const razaoDoVeu = veuDoPost({
+    sensivel: !!post.sensivel,
+    batePalavra: !!post.batePalavraMinha,
+    souAAutora: !!post.souAAutora,
+    revelado,
+  });
+  const borrar = razaoDoVeu !== null;
   /** `null` = não está editando. String = o texto em edição. */
   const [editando, setEditando] = useState<string | null>(null);
   const [salvandoTexto, setSalvandoTexto] = useState(false);
@@ -724,7 +976,7 @@ export const PostInstagram = memo(function PostInstagram({
                 sem avisar — e num app de gestação de alto risco a pessoa
                 precisa saber se está lendo uma amiga ou uma desconhecida. */}
             {sugerido && (
-              <span className="block text-[11px] leading-tight text-muted-foreground">
+              <span className="block text-xs leading-tight text-muted-foreground">
                 Sugerido para você
               </span>
             )}
@@ -733,8 +985,17 @@ export const PostInstagram = memo(function PostInstagram({
                 e empurram a hora do post para a linha de baixo. Régua em
                 `marcacoes.ts`, testada. */}
             {textoDeMarcadas(post.marcadas.map((m) => m.nome)) && (
-              <span className="block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="block truncate text-xs leading-tight text-muted-foreground">
                 {textoDeMarcadas(post.marcadas.map((m) => m.nome))}
+              </span>
+            )}
+            {/* ⚠️ **O LUGAR É TEXTO, e NÃO um link para um mapa.** O rótulo é o
+                que ela escreveu; transformá-lo em endereço convidaria a tela a
+                resolver a localização — e é exatamente isso que este campo
+                existe para não fazer. */}
+            {post.lugar && (
+              <span className="block truncate text-xs leading-tight text-muted-foreground">
+                📍 {post.lugar}
               </span>
             )}
           </span>
@@ -757,6 +1018,27 @@ export const PostInstagram = memo(function PostInstagram({
             <IconeLapis />
           </button>
         )}
+        {/* 📌 Fixar — só no post DELA, e ao lado do lápis pela mesma razão:
+            é um CONSERTO da vitrine, não uma ação de fim de linha. A grade do
+            perfil é cronológica pura, e é isso que faz o primeiro ultrassom
+            afundar embaixo de trezentas fotos.
+
+            ⚠️ **Aceso quando já está fixado**, com o rótulo dizendo o que o
+            toque faz: um pino que parece igual nos dois estados obriga a tocar
+            para descobrir — e aqui descobrir custa desfixar sem querer. */}
+        {post.souAAutora && aoFixar && (
+          <button
+            type="button"
+            onClick={() => aoFixar(post, !post.fixadoEm)}
+            aria-label={post.fixadoEm ? "Soltar do topo do perfil" : "Fixar no topo do perfil"}
+            aria-pressed={!!post.fixadoEm}
+            className={`press grid h-11 w-9 shrink-0 place-items-center ${
+              post.fixadoEm ? "text-foreground" : "text-muted-foreground"
+            }`}
+          >
+            <IconePino aceso={!!post.fixadoEm} />
+          </button>
+        )}
         {((post.souAAutora && aoApagar) ||
           (!post.souAAutora && aoDenunciar) ||
           (post.souMarcada && aoTirarMarcacao)) && (
@@ -764,7 +1046,7 @@ export const PostInstagram = memo(function PostInstagram({
             type="button"
             onClick={() => setConfirmando(true)}
             aria-label="Opções da publicação"
-            className="press grid h-11 w-9 shrink-0 place-items-center text-lg leading-none text-muted-foreground"
+            className="press grid h-11 w-11 shrink-0 place-items-center text-lg leading-none text-muted-foreground"
           >
             ⋯
           </button>
@@ -790,7 +1072,7 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoTirarMarcacao(post)}
-            className="press text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+            className="press inline-flex min-h-[44px] items-center text-xs font-medium text-muted-foreground underline underline-offset-2"
           >
             Tirar minha marcação
           </button>
@@ -886,10 +1168,32 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
-      {post.imagemUrl && (
+      {/* ⚠️ `!post.videoUrl` — o vídeo tem prioridade e o carrossel se cala.
+          Ver o comentário do player, logo abaixo. */}
+      {/* ⚠️ **SOB O VÉU NÃO HÁ IMAGEM NENHUMA — nem borrada.**
+          Borrar a foto de verdade com CSS ainda a BAIXA e a deixa no DOM: quem
+          quisesse a leria pelo inspetor, e o 4G dela pagaria por uma foto que
+          ela decidiu não ver. Aqui entra uma caixa do MESMO tamanho, e o
+          carrossel só é montado quando ela toca — a foto nem sai do servidor.
+
+          ⚠️ E o tamanho tem de bater (`aspect-[4/5]`, o teto do feed): com uma
+          caixa menor, revelar empurraria o feed inteiro para baixo e ela
+          perderia o lugar onde estava lendo. */}
+      {post.imagemUrl && !post.videoUrl && borrar ? (
+        <Sensivel
+          motivo={post.motivoSensivel}
+          razao={razaoDoVeu ?? undefined}
+          aoRevelar={() => setRevelado(true)}
+        >
+          <div className="aspect-[4/5] w-full bg-muted" />
+        </Sensivel>
+      ) : null}
+      {post.imagemUrl && !post.videoUrl && !borrar && (
         <Carrossel
           urls={fotos}
           comparacao={post.comparacao}
+          altTexto={post.altTexto}
+          autorNome={post.autorNome}
           /* ⚠️ O toque duplo SEMPRE dá coração, e nunca TIRA. É assim no modelo,
              e o motivo é o gesto: quem toca duas vezes está dizendo "gostei",
              não "mudei de ideia". Se ele alternasse, tocar duas vezes num post
@@ -936,7 +1240,9 @@ export const PostInstagram = memo(function PostInstagram({
           <button
             type="button"
             onClick={() => aoVerQuemReagiu(post)}
-            className="press flex min-w-0 items-center gap-1.5"
+            /* ⚠️ 44px de ALTURA: a fileira de emojis desenha 22px, e é ela que
+               a autora toca para ver quem respondeu ao post dela. */
+            className="press flex min-h-[44px] min-w-0 items-center gap-1.5"
             aria-label={`Ver quem reagiu — ${total}`}
           >
             <span aria-hidden className="flex -space-x-1.5 text-[15px] leading-none">
@@ -978,13 +1284,106 @@ export const PostInstagram = memo(function PostInstagram({
         {/* O marcador fica na PONTA DIREITA, separado das reações pelo vão que
             sobra — é o arranjo deles, e ele diz uma coisa verdadeira: guardar é
             gesto privado (ninguém vê, nem a autora), reagir é gesto social. */}
+        {/* ⚠️ **REPUBLICAR SÓ APARECE ONDE ELE CABE**, e as três condições são
+            as três formas de o botão mentir: no post DELA seria uma cópia de si
+            mesma; num post que não é público, republicar ampliaria a audiência
+            que a autora escolheu; e num post que JÁ é republicação, o quadro
+            apontaria para outro quadro. O servidor confere as três de novo. */}
+        {aoRepublicar && !post.souAAutora && post.visibilidade === "publico" && !post.ehRepost && (
+          <button
+            type="button"
+            onClick={() => aoRepublicar(post)}
+            aria-label="Republicar"
+            className="press ml-auto flex h-11 w-11 items-center justify-center leading-none text-[15px]"
+          >
+            ↻
+          </button>
+        )}
+        {/* ⚠️ **COMPARTILHAR SÓ A PRÓPRIA PUBLICAÇÃO.** A régua está em
+            `compartilhar-post.ts`, e a razão é que aqui não existe página
+            pública de post: o que sairia é a FOTO, e foto que sai do app não
+            volta. Compartilhar a ultrassom de outra paciente no WhatsApp da
+            família é tirar dela a decisão de onde a imagem circula. */}
+        {aoCompartilhar && post.souAAutora && (
+          <button
+            type="button"
+            onClick={() => aoCompartilhar(post)}
+            aria-label="Compartilhar"
+            className="press ml-auto flex h-11 w-11 items-center justify-center leading-none text-[15px]"
+          >
+            ↗
+          </button>
+        )}
+        {/* ⚠️ O LINK só aparece na PRÓPRIA publicação e na camada `publico` — e
+            o servidor reconfere as duas coisas. */}
+        {aoLinkPublico && post.souAAutora && post.visibilidade === "publico" && (
+          <button
+            type="button"
+            onClick={() => aoLinkPublico(post)}
+            aria-label="Link da publicação"
+            className="press flex h-11 w-11 items-center justify-center leading-none text-[15px]"
+          >
+            🔗
+          </button>
+        )}
+        {/* 📖 **ADICIONAR AO SEU STORY.**
+
+            ⚠️ **A régua é a do ↻ republicar, e NÃO a do ↗ compartilhar.** O ↗
+            tira a FOTO do app e a solta no mundo, e por isso só vale na própria
+            publicação; isto aqui põe o ENDEREÇO dela dentro de um story, onde
+            quem abrir passa por `podeVerPost` como em qualquer outro lugar — se
+            a pessoa não podia ver, continua não podendo.
+
+            ⚠️ **Só publicação PÚBLICA**, e o servidor reconfere (camada E perfil
+            da autora). Um story alcança todas as seguidoras: deixar
+            compartilhar a camada `amigas` faria o story ser a porta dos fundos
+            da visibilidade — o desabafo escrito para seis chegaria a trezentas.
+
+            ⚠️ **E não vale na própria**: para a dela existe o ↗ e o próprio
+            compositor. Oferecer os dois no mesmo cartão faria a paciente
+            escolher entre duas coisas que ela não tem como distinguir. */}
+        {aoStoryComPost &&
+          !post.souAAutora &&
+          post.visibilidade === "publico" &&
+          !post.ehRepost && (
+            <button
+              type="button"
+              onClick={() => aoStoryComPost(post)}
+              aria-label="Adicionar ao seu story"
+              className="press flex h-11 w-11 items-center justify-center text-[15px] leading-none"
+            >
+              <IconeStoryDePost />
+            </button>
+          )}
+        {/* ⚠️ **MANDAR PARA UMA AMIGA VALE PARA QUALQUER PUBLICAÇÃO — inclusive
+            a de outra pessoa — e isso NÃO contradiz a régua do ↗ acima.** São
+            duas coisas diferentes: o ↗ tira a FOTO do app e a solta no mundo
+            (irreversível, e por isso só a própria); este manda o ENDEREÇO do
+            post para dentro de uma conversa, onde quem abrir passa por
+            `postQueEuVejo` como em qualquer outro lugar. Se a pessoa não podia
+            ver o post, continua não podendo. */}
+        {aoMandarParaConversa && (
+          <button
+            type="button"
+            onClick={() => aoMandarParaConversa(post)}
+            aria-label="Mandar para uma conversa"
+            className="press flex h-11 w-11 items-center justify-center leading-none text-[15px]"
+          >
+            ✈
+          </button>
+        )}
         {aoSalvar && (
           <button
             type="button"
             onClick={() => aoSalvar(post, !post.salvo)}
             aria-label={post.salvo ? "Tirar dos salvos" : "Salvar"}
             aria-pressed={post.salvo}
-            className="press ml-auto leading-none"
+            /* ⚠️ 44px: o marcador desenha 22×22 e o alvo media o desenho. */
+            className={`press flex h-11 w-11 items-center justify-center leading-none ${
+              aoRepublicar && !post.souAAutora && post.visibilidade === "publico" && !post.ehRepost
+                ? "ml-1"
+                : "ml-auto"
+            }`}
           >
             <IconeMarcador cheio={post.salvo} />
           </button>
@@ -1103,7 +1502,7 @@ export const PostInstagram = memo(function PostInstagram({
                     </svg>
                   )}
                   {jaVotou && (
-                    <span className="shrink-0 text-[12px] font-semibold tabular-nums text-muted-foreground">
+                    <span className="shrink-0 text-xs font-semibold tabular-nums text-muted-foreground">
                       {fatia}%
                       {/* ⚠️ A PORCENTAGEM e o NÚMERO, os dois. "67%" são dois
                           votos de três, e numa base pequena a porcentagem
@@ -1122,7 +1521,7 @@ export const PostInstagram = memo(function PostInstagram({
             /* ⚠️ Ela precisa saber ANTES que o voto não se troca — a PK do
                banco garante um por pessoa, e descobrir isso tocando é o tipo de
                surpresa que faz alguém desconfiar do app inteiro. */
-            <p className="pt-0.5 text-[11px] text-muted-foreground">
+            <p className="pt-0.5 text-xs text-muted-foreground">
               Toque para votar — o voto não muda depois.
             </p>
           )}
@@ -1136,7 +1535,7 @@ export const PostInstagram = memo(function PostInstagram({
           continua anônima depois de respondida. */}
       {post.pergunta && (
         <div className="mx-4 mt-2 rounded-xl border-l-2 border-primary/40 bg-muted/40 px-3 py-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Perguntaram
           </p>
           <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-snug">{post.pergunta}</p>
@@ -1156,12 +1555,127 @@ export const PostInstagram = memo(function PostInstagram({
         </div>
       )}
 
+      {/* ⚠️ **A ORIGINAL VEM NUM QUADRO, e o que ela NÃO tem importa.** Sem
+          reações, sem botão de salvar, sem comentário: quem interage é a
+          republicação. Repetir os controles faria a paciente reagir ao quadro
+          achando que reage à autora original — e o número iria para o lugar
+          errado.
+
+          ⚠️ E "publicação não disponível" NÃO é uma falha a esconder: é o
+          estado de quando a autora arquivou. Mostrar uma cópia do texto faria a
+          republicação sobreviver à decisão dela de tirar do ar. */}
+      {post.ehRepost && (
+        <div className="mx-4 mt-2 rounded-xl border border-border p-3">
+          {post.repost ? (
+            <>
+              <button
+                type="button"
+                onClick={() => aoAbrirPerfil?.(post.repost!.autorId)}
+                className="press text-xs font-semibold"
+              >
+                {post.repost.autorNome}
+              </button>
+              {post.repost.texto && (
+                <p className="mt-0.5 whitespace-pre-wrap break-words text-[13px] leading-snug">
+                  {post.repost.texto}
+                </p>
+              )}
+              {post.repost.imagemUrl && (
+                <img
+                  src={post.repost.imagemUrl}
+                  alt=""
+                  className="mt-2 w-full rounded-lg object-cover"
+                />
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-muted-foreground">Publicação não disponível.</p>
+          )}
+        </div>
+      )}
+
+      {/* ⚠️ **O VÍDEO SUBSTITUI O CARROSSEL, nunca convive com ele.** Um post
+          é uma coisa ou outra; deixar os dois faria a paciente rolar fotos e
+          encontrar um vídeo tocando no meio, com o som do anterior ainda
+          rodando. O compositor já impede escolher os dois. */}
+
+      {/* ⚠️ `playsInline` É OBRIGATÓRIO — sem ele o iPhone abre o vídeo em TELA
+          CHEIA ao tocar, tirando a paciente do feed. `muted` porque autoplay
+          com som é recusado por todo navegador e, aqui, seria pior se
+          funcionasse: som saindo sozinho numa sala de espera. `preload` só dos
+          metadados: o feed não pode baixar todo vídeo que passa pela tela no
+          4G dela. */}
+      {post.videoUrl &&
+        (borrar ? (
+          <Sensivel
+            motivo={post.motivoSensivel}
+            razao={razaoDoVeu ?? undefined}
+            aoRevelar={() => setRevelado(true)}
+          >
+            <div className="mt-1 aspect-[4/5] w-full bg-black" />
+          </Sensivel>
+        ) : (
+          <>
+            <video
+              src={post.videoUrl}
+              className="mt-1 w-full bg-black"
+              controls
+              loop
+              muted
+              playsInline
+              preload="metadata"
+            />
+            {/* ⚠️ **A LEGENDA FICA ABAIXO, e não numa faixa sobre o vídeo.**
+                Sobreposta, ela cobre justamente o que a paciente está olhando —
+                e num vídeo de barriga o centro do quadro é o assunto. Aqui ela
+                serve aos dois casos que motivaram o recurso: quem usa leitor de
+                tela, e a mãe que assiste sem som com o bebê dormindo no colo. */}
+            {post.videoLegenda && (
+              <p className="mx-4 mt-1.5 text-[13px] leading-snug text-muted-foreground">
+                {post.videoLegenda}
+              </p>
+            )}
+          </>
+        ))}
+
+      {/* ⚠️ O MARCO É CALCULADO NA PINTURA, a partir dos DIAS que o banco
+          guarda — nunca de um texto gravado. Um "3 meses" salvo continuaria
+          dizendo "3 meses" daqui a um ano, e o álbum inteiro passaria a mentir
+          a idade. Aqui o post de um ano atrás segue contando a idade que o bebê
+          tinha naquele dia. */}
+      {post.marco && textoDoMarco(post.marco.tipo, post.marco.dias) && (
+        <div className="mx-4 mt-2 rounded-xl bg-primary/10 px-3 py-2">
+          <p className="text-[13px] font-semibold leading-snug">
+            {textoDoMarco(post.marco.tipo, post.marco.dias)}
+          </p>
+        </div>
+      )}
+
+      {/* ⚠️ **O TEXTO TAMBÉM ENTRA NO VÉU, e não só a mídia.** Numa publicação
+          sobre uma perda, é a LEGENDA que carrega a notícia — borrar a foto e
+          deixar a frase à mostra entregaria exatamente o que o aviso existe para
+          poupar. O NOME fica de fora: quem publicou não é a parte sensível, e
+          escondê-lo faria o post parecer anônimo. */}
       {post.texto && (
         <p className="px-4 pt-1.5 text-[14px] leading-snug">
           <span className="font-semibold">{post.autorNome}</span>
           {post.autorOficial && <SeloOficial />}
           {post.autorPremium && <SeloPremium />}{" "}
-          <span className="whitespace-pre-wrap">{post.texto}</span>
+          {borrar ? (
+            <button
+              type="button"
+              onClick={() => setRevelado(true)}
+              className="press italic text-muted-foreground"
+            >
+              {rotuloDoMotivo(post.motivoSensivel)} — toque para ler
+            </button>
+          ) : (
+            <TextoComLinks
+              texto={post.texto}
+              aoAbrirArroba={aoAbrirArroba}
+              aoAbrirTag={aoAbrirTag}
+            />
+          )}
         </p>
       )}
 
@@ -1173,7 +1687,7 @@ export const PostInstagram = memo(function PostInstagram({
       {/* ⚠️ Sem caixa alta: "3 h" virava "3 H" e "18 de agosto de 2026" virava
           um berro de duas linhas. O modelo mudou para minúscula anos atrás, e
           em português a versão em caixa alta lê pior que em inglês. */}
-      <p className="px-4 pt-1 text-[11px] text-muted-foreground">
+      <p className="px-4 pt-1 text-xs text-muted-foreground">
         {/* ⚠️ **QUANTAS VIRAM — só no post DELA, e só o número.** O servidor
             devolve `null` para quem não é a autora, então esta linha não pode
             virar um contador público de audiência nem por engano.
@@ -1217,6 +1731,67 @@ export const PostInstagram = memo(function PostInstagram({
  * duas ficam lado a lado, três ou quatro fecham o quadrado. Uma grade fixa de
  * 2×2 com uma foto só deixaria três buracos cinza.
  */
+/**
+ * O cartão da MEMÓRIA — "há um ano, você publicou isto".
+ *
+ * ⚠️ **NÃO HÁ CONDIÇÃO NENHUMA AQUI.** Quem decide se esta memória pode existir
+ * é `memoriaDeHoje`, com as CINCO travas, no servidor. Uma segunda régua nesta
+ * tela é como a foto da barriga de uma gestação que terminou volta na abertura
+ * do app — e este é o recurso da aba que mais pode machucar com um acerto de
+ * calendário.
+ *
+ * ⚠️ **O texto NÃO COMEMORA.** "Que ano incrível!" cai numa mulher que pode ter
+ * passado o ano no hospital. `textoDaMemoria` diz o FATO e para aí, e ele vem
+ * pronto do servidor — escrevê-lo aqui abriria a porta para o adjetivo.
+ */
+function CartaoDaMemoria({
+  memoria,
+  aoVer,
+}: {
+  memoria: { post: PostNaTela; texto: string };
+  aoVer?: (postId: string) => void;
+}) {
+  /* ⚠️ **A marca de "vista" sai daqui, do MONTAR — e não do servidor.** A tela
+     mostra um cartão de cada vez, então uma memória suprimida pela retrospectiva
+     seria queimada sem nunca ter aparecido. E a Trava 4 vale para a vida toda:
+     ela não voltaria.
+     ⚠️ `useRef` porque o efeito pode rodar duas vezes em desenvolvimento, e o
+     `id` nas deps porque a memória do dia seguinte é outra. */
+  const marcada = useRef<string | null>(null);
+  useEffect(() => {
+    if (marcada.current === memoria.post.id) return;
+    marcada.current = memoria.post.id;
+    aoVer?.(memoria.post.id);
+  }, [memoria.post.id, aoVer]);
+
+  return (
+    <div className="mb-3 overflow-hidden rounded-2xl border border-border">
+      <p className="bg-muted px-3 py-2 text-[13px] font-semibold text-foreground">
+        {memoria.texto}
+      </p>
+      {/* ⚠️ **16:10, e não o 4:5 do feed — a razão é a DOBRA, e foi medida.**
+          Com a proporção do feed o cartão dava ~460px e empurrava o primeiro
+          post para y=839 num aparelho de 852: treze pixels de publicação
+          visível, ou seja, o feed inteiro fora da dobra. É exatamente o arranjo
+          que o dono pediu para corrigir, e a razão pela qual só um cartão
+          aparece por vez.
+          ⚠️ E `cover`, não `contain`: num recorte de 245px o `contain` deixaria
+          a foto vertical com 160px de largura no meio de 393, cercada de vazio.
+          O recorte CENTRAL de uma foto de barriga mostra a barriga. */}
+      {memoria.post.imagemUrl && (
+        <img
+          src={memoria.post.miniaturaUrl ?? memoria.post.imagemUrl}
+          alt={memoria.post.altTexto ?? "A sua publicação de um ano atrás"}
+          className="aspect-[16/10] w-full object-cover"
+        />
+      )}
+      {memoria.post.texto && (
+        <p className="px-3 py-2 text-[13px] text-muted-foreground">{memoria.post.texto}</p>
+      )}
+    </div>
+  );
+}
+
 export function CartaoDaSemana({
   retro,
   aoFechar,
@@ -1232,9 +1807,7 @@ export function CartaoDaSemana({
     >
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
-            Sua semana
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">Sua semana</p>
           <p className="mt-0.5 text-[14px] leading-snug">{fraseDaRetrospectiva(retro)}</p>
         </div>
         <button
@@ -1276,20 +1849,36 @@ export function CartaoDaSemana({
 
 export function TelaPrincipal({
   posts,
+  aoAbrirSecoes,
+  pausada = false,
+  suspensa = false,
+  aoReativar,
+  soSeguindo = false,
   stories = [],
   sugestoes = [],
   pessoas = [],
   aoSeguirPessoa,
   aoReagir,
   aoSalvar,
+  aoRepublicar,
+  aoCompartilhar,
+  aoAbrirTag,
+  instavel,
+  aoTentarDeNovo,
+  aoMandarParaConversa,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
   aoEditar,
+  aoFixar,
+  aoStoryComPost,
   aoVerQuemReagiu,
   retro,
   aoFecharRetro,
+  memoria,
+  aoVerMemoria,
   aoAbrirPerfil,
   aoVer,
   aoTocarStory,
@@ -1306,7 +1895,39 @@ export function TelaPrincipal({
   aoCompararAgora,
   aoDispensarEntao,
 }: {
+  /** Abre o hub de portas da Comunidade — a bolinha ⊞ "Mais" da fileira. */
+  aoAbrirSecoes?: () => void;
+  /**
+   * A leitura do feed FALHOU — diferente de "não há nada".
+   *
+   * ⚠️ Os dois são a mesma imagem e conclusões opostas: no vazio ela convida
+   * uma amiga; na falha ela acha que as amigas sumiram. O servidor distingue
+   * (`ctx.degradado`), e esta prop é o outro lado.
+   */
+  instavel?: boolean;
+  /** Refaz a leitura. Sem a prop, o botão de tentar de novo não aparece. */
+  aoTentarDeNovo?: () => void;
+  /**
+   * A conta dela está pausada na rede.
+   *
+   * ⚠️ **A FAIXA É OBRIGATÓRIA, senão o interruptor parece quebrado.** A pausa
+   * esconde ela dos OUTROS — e o feed é o que ela vê, então sem a faixa nada
+   * muda na tela dela e a conclusão razoável é que a pausa não pegou. Aí ela
+   * publica imaginando que está invisível.
+   */
+  pausada?: boolean;
+  /**
+   * ⚠️ **Decisão da PLATAFORMA, e não dela.** As três (luto, pausa, suspensão)
+   * escondem a pessoa pela mesma régua; o que as separa é quem decidiu — e por
+   * isso esta é a ÚNICA em que o app FALA. Uma conta que some da Comunidade sem
+   * uma palavra faz a paciente concluir que o app quebrou.
+   */
+  suspensa?: boolean;
+  /** Sem a prop, a faixa avisa e não oferece o caminho de volta. */
+  aoReativar?: () => void;
   posts: PostNaTela[];
+  /** `true` = a paciente pediu para ver só quem ela segue. Ver `feed_so_seguindo`. */
+  soSeguindo?: boolean;
   stories?: Story[];
   /**
    * A ZONA DE SUGESTÕES — publicações de quem ela NÃO segue.
@@ -1339,6 +1960,18 @@ export function TelaPrincipal({
   aoSeguirPessoa?: (id: string) => void;
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
+  /** O link público desta publicação — ver `PostInstagram`. */
+  aoLinkPublico?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -1347,10 +1980,22 @@ export function TelaPrincipal({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Salvar a legenda editada — ver `PostInstagram`. */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
+  aoStoryComPost?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
   retro?: Retrospectiva | null;
+  /**
+   * A memória do dia — "há um ano, você publicou isto".
+   *
+   * ⚠️ Quem DECIDE se ela existe é `memoriaDeHoje` (pura, com as CINCO travas),
+   * no servidor. Aqui só se desenha: uma condição a mais nesta tela seria a
+   * segunda régua do recurso mais perigoso da aba.
+   */
+  memoria?: { post: PostNaTela; texto: string } | null;
+  /** Marca a memória como vista. Chamada quando o cartão MONTA. */
+  aoVerMemoria?: (postId: string) => void;
   aoFecharRetro?: () => void;
   aoAbrirPerfil?: (id: string) => void;
   /**
@@ -1386,6 +2031,54 @@ export function TelaPrincipal({
   /** Leva ao Caminho, onde a atividade acontece. */
   aoIrParaOJogo?: () => void;
 }) {
+  /**
+   * ⚠️ O CONJUNTO, e não `sugestoes.some(...)` dentro do laço: com 20 postagens
+   * e 10 descobertas isso seriam 200 comparações a cada pintura do feed, e o
+   * feed repinta a cada reação.
+   */
+  const idsSugeridos = useMemo(() => new Set(sugestoes.map((p) => p.id)), [sugestoes]);
+
+  /**
+   * O QUE VAI À TELA.
+   *
+   * ⚠️ No modo fechado a lista é a dela e nada mais — costurar descobertas ali
+   * seria ignorar a configuração que ela ligou.
+   */
+  const naTela = useMemo(
+    (): PostNaTela[] => (soSeguindo ? posts : intercalarDescobertas(posts, sugestoes)),
+    [soSeguindo, posts, sugestoes],
+  );
+
+  /**
+   * ⚠️ **A ZONA DE "PUBLICAÇÕES SUGERIDAS" NO RODAPÉ SAIU — ela não tinha
+   * estado válido nenhum.**
+   *
+   * Ela nasceu no arranjo do "você está em dia": as descobertas só apareciam
+   * DEPOIS que o feed de quem ela segue acabava, abaixo de um divisor. Esse
+   * arranjo foi revertido a pedido do dono (ver o cabeçalho de `sugestoes.ts`)
+   * e hoje `naTela` INTERLAÇA — e `intercalarDescobertas` empurra as sobras
+   * todas para o fim, então **no modo padrão as sugestões já estão inteiras na
+   * tela** quando a paciente chega ao rodapé.
+   *
+   * Os dois modos, e nenhum deles quer a zona:
+   *
+   * - **misturado (o padrão)**: repetir ali mostrava a MESMA publicação duas
+   *   vezes na mesma rolagem — uma interlaçada e outra no rodapé. E chave
+   *   repetida derruba a lista inteira do React.
+   * - **"Só quem eu sigo" ligado**: a tela promete por escrito "Seu feed
+   *   mostra apenas quem você segue", e a zona entregava exatamente o
+   *   contrário. O interruptor tornava as estranhas MAIS visíveis.
+   *
+   * ⚠️ **A fileira de PESSOAS fica**, e a distinção é a do texto: ela é
+   * descoberta de gente para seguir, não conteúdo do feed. Sem ela, quem ligou
+   * a chave nunca teria como fazer o feed fechado ter conteúdo.
+   *
+   * ⚠️ **E o convite ganhou condição PRÓPRIA.** Ele vivia pendurado na mesma
+   * condição da zona: tirando `sobrouSugestao` de lá, ele sumiria junto para
+   * quem não tem nenhuma pessoa sugerida — que é justamente quem mais precisa
+   * trazer alguém.
+   */
+
   const fim = useRef<HTMLDivElement>(null);
 
   /* ⚠️ A sentinela é um `IntersectionObserver`, e não um ouvinte de `scroll`:
@@ -1419,6 +2112,51 @@ export function TelaPrincipal({
           comiam a primeira dobra inteira de um iPhone. As ações não sumiram:
           viraram as bolinhas que sobem ao tocar de novo no ícone da Comunidade
           na barra de baixo (`publicarAtalhos`, em `RedeNoApp`). */}
+      {/* ⚠️ **A FAIXA DA PAUSA VEM ANTES DE TUDO**, inclusive do desafio: ela
+          muda o significado de tudo que vem abaixo — publicar, comentar e
+          reagir continuam funcionando, e ninguém vai ver. Enterrada no meio da
+          rolagem, seria um aviso que ela encontra depois de já ter publicado. */}
+      {/* ⚠️ **A SUSPENSÃO VEM ANTES DA PAUSA, e nunca as duas juntas.** Ela
+          muda mais coisa: a pausa ela desfaz num toque, a suspensão não. Ver as
+          duas faria ela tocar em "Reativar" e não acontecer nada.
+
+          ⚠️ **E o texto NÃO acusa.** Ele diz o FATO e o caminho — quem lê isto
+          é uma gestante, e um texto de tribunal numa tela de app de saúde é uma
+          crueldade desnecessária. O motivo detalhado vai por outro canal, com
+          nome e voz humana. */}
+      {suspensa && (
+        <div className="mb-3 rounded-2xl border border-destructive/40 bg-destructive/5 p-3">
+          <p className="text-[13px] font-semibold">Sua conta da Comunidade está indisponível</p>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            Você não aparece na Comunidade por enquanto, e o que você publicou não foi apagado. Isso
+            vale só para esta aba: as suas consultas, os seus registros e a conversa com o seu
+            médico continuam normais.
+          </p>
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
+            Se você acha que houve um engano, fale com o consultório — a gente revê.
+          </p>
+        </div>
+      )}
+
+      {!suspensa && pausada && (
+        <div className="mb-3 rounded-2xl border border-border bg-muted/60 p-3">
+          <p className="text-[13px] font-semibold">Sua conta está pausada</p>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            Ninguém te encontra e as suas publicações não aparecem para mais ninguém. Nada foi
+            apagado.
+          </p>
+          {aoReativar && (
+            <button
+              type="button"
+              onClick={aoReativar}
+              className="press mt-2 min-h-[44px] rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+            >
+              Reativar a minha conta
+            </button>
+          )}
+        </div>
+      )}
+
       {desafio && (
         <CartaoDoDesafio
           desafio={desafio}
@@ -1427,7 +2165,7 @@ export function TelaPrincipal({
         />
       )}
 
-      <FileiraDeStories stories={stories} aoTocar={aoTocarStory} />
+      <FileiraDeStories stories={stories} aoTocar={aoTocarStory} aoAbrirMais={aoAbrirSecoes} />
 
       {/* ⚠️ **A PRÓXIMA LIVE, e ela vem DEPOIS dos stories.** Acima deles
           empurraria a fileira para fora da primeira dobra — o arranjo exato que
@@ -1445,13 +2183,19 @@ export function TelaPrincipal({
           será os stories"). */}
       {retro && aoFecharRetro && <CartaoDaSemana retro={retro} aoFechar={aoFecharRetro} />}
 
-      {/* ⚠️ **UM CARTÃO DE CADA VEZ.** A retrospectiva de domingo e o lembrete
-          podem cair no mesmo dia, e dois cartões empilhados entre os stories e
-          o primeiro post empurram o feed inteiro para fora da dobra — que é
-          exatamente o arranjo que o dono pediu para corrigir. A retrospectiva
-          ganha: ela só existe aos domingos, e o lembrete volta na semana
-          seguinte por conta própria. */}
-      {!retro && lembreteEntao && aoCompararAgora && aoDispensarEntao && (
+      {/* ⚠️ **UM CARTÃO DE CADA VEZ, e a ordem é por QUEM VOLTA.** Três podem
+          cair no mesmo dia, e empilhados entre os stories e o primeiro post
+          empurram o feed inteiro para fora da dobra — o arranjo que o dono
+          pediu para corrigir.
+
+          A retrospectiva ganha de todos: ela só existe aos domingos. A MEMÓRIA
+          vem em seguida, e nunca depois do lembrete: ela tem janela de três
+          dias e **não volta nunca** (a Trava 4 vale para a vida toda), enquanto
+          o lembrete do "então e agora" reaparece por conta própria. Perder a
+          memória é perder para sempre; perder o lembrete é adiá-lo. */}
+      {!retro && memoria && <CartaoDaMemoria memoria={memoria} aoVer={aoVerMemoria} />}
+
+      {!retro && !memoria && lembreteEntao && aoCompararAgora && aoDispensarEntao && (
         <CartaoDoEntaoEAgora
           foto={lembreteEntao.imagemUrl}
           criadoEm={lembreteEntao.criadoEm}
@@ -1461,22 +2205,46 @@ export function TelaPrincipal({
       )}
 
       {posts.length === 0 && sugestoes.length === 0 && pessoas.length === 0 ? (
-        <>
-          <p className="pb-4 pt-12 text-center text-sm text-muted-foreground">
-            Ainda não há nada por aqui 💛
-          </p>
-          {/* ⚠️ **O CONVITE MORA NO VAZIO, e é aqui que ele vale.** Uma paciente
+        instavel ? (
+          /* ⚠️ **A TELA DO "NÃO CARREGOU", e ela não existia.** O vazio dizia
+              "Ainda não há nada por aqui 💛" para os dois casos — e oferecia o
+              convite, ou seja, mandava a paciente trazer uma amiga por causa de
+              uma falha de rede. Aqui ela tem o que fazer: tentar de novo. */
+          <div className="pb-4 pt-12 text-center">
+            <p className="text-sm text-muted-foreground">Não consegui carregar o feed agora.</p>
+            {aoTentarDeNovo && (
+              <button
+                type="button"
+                onClick={aoTentarDeNovo}
+                className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[14px] font-semibold"
+              >
+                Tentar de novo
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <p className="pb-4 pt-12 text-center text-sm text-muted-foreground">
+              Ainda não há nada por aqui 💛
+            </p>
+            {/* ⚠️ **O CONVITE MORA NO VAZIO, e é aqui que ele vale.** Uma paciente
               que abre a Comunidade e não vê nada tem duas saídas: seguir
               alguém que ela não conhece, ou trazer quem ela conhece. A segunda
               é a que faz a aba existir para ela — e é a que traz gente nova
               para o app. O mesmo cartão fecha o feed lá embaixo. */}
-          {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
-        </>
+            {convite && <ConvidarPeloWhatsApp codigo={convite.codigo} />}
+          </>
+        )
       ) : (
-        posts.map((p) => (
+        naTela.map((p) => (
           <PostInstagram
             key={p.id}
             post={p}
+            /* ⚠️ O RÓTULO SOBREVIVEU À MISTURA, e ele é a proteção inteira.
+               Interlaçar desconhecidas sem avisar faria a paciente ler um
+               relato duro sem saber se veio de uma amiga ou de uma estranha —
+               é a única versão desta mudança que eu não faria. */
+            sugerido={idsSugeridos.has(p.id)}
             /* ⚠️ AS MESMAS REFERÊNCIAS PARA TODOS OS CARTÕES — nunca um fecho
                por post. É isto que faz o `memo` do cartão valer alguma coisa;
                com `(t) => aoReagir(p, t)` as props mudam a cada pintura e o
@@ -1484,11 +2252,18 @@ export function TelaPrincipal({
                mudou-se para DENTRO do cartão, que já tem `post.souAAutora`. */
             aoReagir={aoReagir}
             aoSalvar={aoSalvar}
+            aoRepublicar={aoRepublicar}
+            aoCompartilhar={aoCompartilhar}
+            aoAbrirTag={aoAbrirTag}
+            aoMandarParaConversa={aoMandarParaConversa}
+            aoAbrirArroba={aoAbrirArroba}
             aoApagar={aoApagar}
             aoDenunciar={aoDenunciar}
             aoVotar={aoVotar}
             aoTirarMarcacao={aoTirarMarcacao}
             aoEditar={aoEditar}
+            aoFixar={aoFixar}
+            aoStoryComPost={aoStoryComPost}
             aoVerQuemReagiu={aoVerQuemReagiu}
             aoAbrirPerfil={aoAbrirPerfil}
             aoVer={aoVer}
@@ -1514,7 +2289,7 @@ export function TelaPrincipal({
           esta cláusula a fileira INTEIRA sumia, levando junto o interruptor que
           a desligaria. Beco sem saída, exatamente o que a aba de assinatura já
           pagou uma vez. */}
-      {!temMais && (pessoas.length > 0 || sugestoes.length > 0 || mesmaFase) && (
+      {!temMais && (pessoas.length > 0 || mesmaFase || !!convite) && (
         <>
           {posts.length > 0 && <EmDia />}
 
@@ -1526,34 +2301,6 @@ export function TelaPrincipal({
               mesmaFase={mesmaFase}
               aoTrocarFase={aoTrocarFase}
             />
-          )}
-
-          {sugestoes.length > 0 && (
-            <>
-              <h2 className="px-0 pb-1 pt-4 text-[14px] font-semibold">Publicações sugeridas</h2>
-              {sugestoes.map((p) => (
-                <PostInstagram
-                  key={p.id}
-                  post={p}
-                  /* O rótulo é OBRIGATÓRIO — ver `PostInstagram`. */
-                  sugerido
-                  aoReagir={aoReagir}
-                  aoSalvar={aoSalvar}
-                  aoVotar={aoVotar}
-                  aoTirarMarcacao={aoTirarMarcacao}
-                  aoEditar={aoEditar}
-                  /* ⚠️ **E ISTO FALTAVA, justamente aqui.** Esta zona é o ÚNICO
-                     lugar do app onde aparece publicação de quem ela não
-                     escolheu seguir — e era o único sem o ⋯ de denunciar. O
-                     post de estranha é exatamente o que a diretriz 1.2 exige
-                     que se possa denunciar, e o feed de quem ela segue, que é o
-                     caso menos provável, tinha o botão. */
-                  aoDenunciar={aoDenunciar}
-                  aoVerQuemReagiu={aoVerQuemReagiu}
-                  aoAbrirPerfil={aoAbrirPerfil}
-                />
-              ))}
-            </>
           )}
 
           {/* ⚠️ **E O CONVITE FECHA O FEED.** Quem chegou até aqui viu tudo que
@@ -1602,7 +2349,7 @@ function CartaoDoEntaoEAgora({
     semanas >= 1 ? `${semanas} ${semanas === 1 ? "semana" : "semanas"}` : `${dias} dias`;
 
   return (
-    <div className="my-3 flex items-center gap-3 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-card)]">
+    <div className="my-3 flex items-center gap-3 rounded-2xl card-material p-3">
       <img
         src={foto}
         alt=""
@@ -1612,7 +2359,7 @@ function CartaoDoEntaoEAgora({
       />
       <div className="min-w-0 flex-1">
         <p className="text-[14px] font-semibold leading-snug">Faz {quando} desde esta foto</p>
-        <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
           Dá para pôr as duas lado a lado.
         </p>
         <button
@@ -1675,7 +2422,7 @@ function ConvidarPeloWhatsApp({ codigo }: { codigo: string | null }) {
   const texto = mensagemDeConvite(link);
 
   return (
-    <div className="my-6 rounded-3xl border border-border bg-card p-5 text-center shadow-[var(--shadow-card)]">
+    <div className="my-6 rounded-3xl card-material p-5 text-center">
       <p className="text-[15px] font-semibold">Chame quem já está com você</p>
       <p className="mx-auto mt-1 max-w-[30ch] text-[13px] leading-snug text-muted-foreground">
         Sua irmã, a amiga do trabalho, a prima que está grávida junto. Quem entra pelo seu link já
@@ -1710,7 +2457,7 @@ function ConvidarPeloWhatsApp({ codigo }: { codigo: string | null }) {
               toast.error("Não deu para copiar. Tente pelo WhatsApp.");
             }
           }}
-          className="press min-h-[44px] rounded-full border border-border px-4 text-[14px] font-medium"
+          className="press min-h-[44px] rounded-full pill-3d px-4 text-[14px] font-medium"
         >
           Copiar o convite
         </button>
@@ -1787,7 +2534,7 @@ function FileiraDePessoas({
           role="switch"
           aria-checked={mesmaFase}
           onClick={() => aoTrocarFase(!mesmaFase)}
-          className="press mb-3 flex w-full items-center gap-2.5 rounded-full border border-border px-3 py-2 text-left"
+          className="press mb-3 flex w-full items-center gap-2.5 rounded-full pill-3d px-3 py-2 text-left"
         >
           <span
             aria-hidden
@@ -1801,7 +2548,7 @@ function FileiraDePessoas({
               }`}
             />
           </span>
-          <span className="min-w-0 flex-1 truncate text-[12.5px]">{ROTULO_DO_FILTRO}</span>
+          <span className="min-w-0 flex-1 truncate text-xs">{ROTULO_DO_FILTRO}</span>
         </button>
       )}
 
@@ -1810,7 +2557,7 @@ function FileiraDePessoas({
           interruptor parecer quebrado e entregaria justamente quem ela pediu
           para não ver. */}
       {mesmaFase && pessoas.length === 0 && (
-        <p className="pb-2 text-[12.5px] leading-snug text-muted-foreground">{VAZIO_DO_FILTRO}</p>
+        <p className="pb-2 text-xs leading-snug text-muted-foreground">{VAZIO_DO_FILTRO}</p>
       )}
       <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pessoas.map((p) => {
@@ -1833,7 +2580,7 @@ function FileiraDePessoas({
                 {p.premium && <SeloPremium />}
               </p>
               {p.bio && (
-                <p className="line-clamp-1 w-full text-center text-[11px] leading-tight text-muted-foreground">
+                <p className="line-clamp-1 w-full text-center text-xs leading-tight text-muted-foreground">
                   {p.bio}
                 </p>
               )}
@@ -1849,7 +2596,7 @@ function FileiraDePessoas({
                    nome de duas linhas empurrava o botão para baixo do da
                    vizinha — uma fileira de botões em degrau. */
                 className={`press mt-auto w-full rounded-lg py-1.5 text-[13px] font-semibold ${
-                  jaSegue ? "border border-border" : "bg-primary text-primary-foreground"
+                  jaSegue ? "pill-3d" : "btn-3d bg-primary text-primary-foreground"
                 }`}
               >
                 {jaSegue ? "Seguindo" : "Seguir"}
@@ -1870,7 +2617,7 @@ function Numero({ valor, rotulo }: { valor: number; rotulo: string }) {
   return (
     <span className="flex flex-col items-center">
       <span className="text-[15px] font-semibold tabular-nums leading-tight">{valor}</span>
-      <span className="text-[12px] leading-tight text-muted-foreground">{rotulo}</span>
+      <span className="text-xs leading-tight text-muted-foreground">{rotulo}</span>
     </span>
   );
 }
@@ -1911,7 +2658,7 @@ export function CaixinhaNoPerfil({
       <button
         type="button"
         onClick={() => !inerte && setAberta(true)}
-        className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+        className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[14px] font-medium"
       >
         💬 Mandar uma pergunta
       </button>
@@ -1955,7 +2702,7 @@ export function CaixinhaNoPerfil({
           existem por razões opostas: sem a primeira ninguém pergunta, e sem a
           segunda a caixinha vira o lugar onde se pede conduta médica a uma
           leiga — que é o que fechou os comentários deste app. */}
-      <p className="mt-1 text-[12px] leading-snug text-muted-foreground">
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
         Ela não vê quem perguntou. Para dúvidas do seu corpo, quem responde é o seu médico — mande
         por aqui mesmo que eu levo até ele.
       </p>
@@ -1967,7 +2714,7 @@ export function CaixinhaNoPerfil({
         placeholder="Sua pergunta…"
         className="mt-2 w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
       />
-      <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+      <div className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
         {texto.length}/{LIMITE_DA_PERGUNTA}
       </div>
       <div className="mt-1.5 flex gap-2">
@@ -2117,6 +2864,7 @@ export function PerfilCarregando({
 export function TelaDePerfil({
   perfil,
   posts,
+  album,
   aoSeguir,
   aoVoltar,
   aoAbrirPost,
@@ -2124,17 +2872,36 @@ export function TelaDePerfil({
   temMais = false,
   aoAbrirLista,
   aoAbrirSalvos,
+  aoAbrirCurtidos,
+  aoAbrirEscondidos,
+  aoEsconderStory,
   aoBloquear,
   aoDenunciarPerfil,
+  aoFavoritar,
+  parecidas,
+  aoSeguirParecida,
+  aoVerParecida,
   aoSilenciar,
+  aoRestringir,
   aoAbrirEspelho,
   aoAplicarCodigo,
   aoPerguntar,
   aoAbrirSOS,
   somenteLeitura = false,
+  aoMandarMensagem,
 }: {
   perfil: PerfilNaTela;
   posts: PostNaTela[];
+  /**
+   * O álbum da gestação — as MESMAS publicações, do começo, por semana.
+   *
+   * ⚠️ **Só no perfil DELA.** Agrupar por semana carimba uma linha do tempo
+   * gestacional em cada publicação; num perfil que outra pessoa abre, os
+   * títulos "22 semanas" publicariam a semana de TODO post, por cima da chave
+   * `mostrar_semana`. Quem monta é `meuAlbum`, no servidor, que não tem
+   * `alvoId` — aqui a lista simplesmente não chega para terceiros.
+   */
+  album?: { chave: string; titulo: string; posts: PostNaTela[] }[] | null;
   aoSeguir?: () => void;
   aoVoltar?: () => void;
   aoAbrirPost?: (id: string) => void;
@@ -2154,12 +2921,45 @@ export function TelaDePerfil({
   aoAbrirLista?: (tipo: "seguidores" | "seguindo") => void;
   /** Só no próprio perfil — a coleção é privada e não existe a de ninguém. */
   aoAbrirSalvos?: () => void;
+  /** Abre "o que eu reagi". Só no próprio perfil, como os salvos. */
+  aoAbrirCurtidos?: () => void;
+  /** Abre a lista de quem NÃO vê o meu story. Só no próprio perfil. */
+  aoAbrirEscondidos?: () => void;
+  /**
+   * Esconde o meu story DESTA pessoa — o "Ocultar story de" do Instagram.
+   *
+   * ⚠️ `undefined` no próprio perfil: esconder de si mesma tiraria a fileira
+   * dela da tela dela, e o servidor recusa de qualquer jeito.
+   */
+  aoEsconderStory?: () => void;
   /** Só no perfil de terceiro. */
   aoBloquear?: () => void;
   /** Denunciar ESTE perfil para a plataforma. Ver `EscolherMotivo`. */
   aoDenunciarPerfil?: (motivo: MotivoDaDenuncia) => void;
+  /** Favoritar (ou tirar). O estado atual vem em `perfil.favorita`. */
+  aoFavoritar?: (favoritar: boolean) => void;
+  /**
+   * Contas para descobrir depois de seguir alguém.
+   *
+   * ⚠️ **Elas NÃO derivam do perfil aberto** — ver o comentário no ponto de uso.
+   * A lista de seguidores deste app não é pública, e "parecidas com a Ana" seria
+   * a lista de amigas da Ana com outro nome.
+   */
+  parecidas?: PessoaNaLista[];
+  aoSeguirParecida?: (id: string) => void;
+  /** Abre o perfil de uma sugerida. Sem a prop, o cartão só oferece "Seguir". */
+  aoVerParecida?: (id: string) => void;
   /** Silenciar (ou voltar a ouvir). O estado atual vem em `perfil.silenciado`. */
-  aoSilenciar?: (silenciar: boolean) => void;
+  aoSilenciar?: (silenciar: boolean, quais?: { calaPosts: boolean; calaStories: boolean }) => void;
+  /**
+   * Restringir (ou liberar) os comentários desta pessoa.
+   *
+   * ⚠️ **NÃO é o bloqueio nem o silenciar.** Silenciar tira as publicações dela
+   * do MEU feed; bloquear corta os dois lados e ela descobre. Restringir não
+   * muda nada do que ela vê — só quem LÊ o comentário dela nas minhas fotos.
+   * O estado atual vem em `perfil.restrito`.
+   */
+  aoRestringir?: (restringir: boolean) => void;
   /** Abre "ver como os outros veem". Só no próprio perfil. */
   aoAbrirEspelho?: () => void;
   /** Aplica o código de embaixadora deste perfil. Irreversível — ver a tela. */
@@ -2187,8 +2987,27 @@ export function TelaDePerfil({
    * e sem volta.
    */
   somenteLeitura?: boolean;
+  /**
+   * Abrir conversa com esta pessoa.
+   *
+   * ⚠️ Opcional de propósito: sob o espelho e nas bancadas o botão não existe,
+   * e `somenteLeitura` já o desliga. Duas travas porque este é o único controle
+   * do perfil que CRIA uma linha nova no banco a partir do perfil de terceiro.
+   */
+  aoMandarMensagem?: (id: string) => void;
 }) {
   const [aba, setAba] = useState<AbaDoPerfil>("grade");
+  /**
+   * Grade ou álbum.
+   *
+   * ⚠️ **Um seletor DENTRO de "Publicações", e não uma terceira aba.** Uma aba
+   * que só existe no perfil dela mudaria a barra entre um perfil e outro — e
+   * este repositório já decidiu que a barra tem DUAS abas, porque "três abas
+   * vazias ao lado de uma cheia entregam a sensação de um app pela metade". O
+   * álbum é a MESMA coleção lida de outro jeito, que é exatamente a relação que
+   * o seletor de ordem dos comentários já modela.
+   */
+  const [comoAlbum, setComoAlbum] = useState(false);
   const [confirmandoBloqueio, setConfirmandoBloqueio] = useState(false);
   const [denunciandoPerfil, setDenunciandoPerfil] = useState(false);
   const [confirmandoCodigo, setConfirmandoCodigo] = useState(false);
@@ -2200,6 +3019,24 @@ export function TelaDePerfil({
   const abrirLista = agir(aoAbrirLista);
   const abrirSalvos = agir(aoAbrirSalvos);
   const bloquear = agir(aoBloquear);
+  /**
+   * ⚠️ **O ⋯ NÃO PODE SER GATEADO POR `bloquear`.** Ele era — e por isso
+   * "Story escondido de…", que é uma lista sobre os MEUS stories, morava
+   * dentro de um menu que só existe no perfil DOS OUTROS: no meu, onde ela
+   * é oferecida, não havia ⋯ nenhum. Recurso escrito, testado e sem porta.
+   *
+   * Achado abrindo a bancada — `tsc`, lint e a suíte inteira estavam verdes,
+   * porque o botão É renderizado no código; ele só nunca aparece onde importa.
+   */
+  const temOpcoes = !!(
+    bloquear ||
+    agir(aoEsconderStory) ||
+    agir(aoAbrirEscondidos) ||
+    aoSilenciar ||
+    aoFavoritar ||
+    aoRestringir ||
+    aoDenunciarPerfil
+  );
   const perguntar = agir(aoPerguntar);
 
   /* Só os POSTS aparecem na grade; o "Do bebê" é a aba própria. */
@@ -2223,7 +3060,7 @@ export function TelaDePerfil({
             type="button"
             onClick={aoVoltar}
             aria-label="Voltar"
-            className="press -ml-1 text-xl leading-none"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
           >
             ‹
           </button>
@@ -2244,12 +3081,29 @@ export function TelaDePerfil({
             <IconeMarcador cheio={false} />
           </button>
         )}
-        {bloquear && (
+        {/* ⚠️ **"O que eu reagi" é OUTRA coisa que os salvos**, e por isso tem
+            botão próprio: salvar é um gesto DELIBERADO de guardar; reagir é o
+            gesto rápido de quem passou por ali. É por esta lista que se
+            reencontra a publicação que ela viu, achou linda, e não guardou. */}
+        {agir(aoAbrirCurtidos) && (
+          <button
+            type="button"
+            onClick={aoAbrirCurtidos}
+            aria-label="O que você reagiu"
+            className="press flex h-11 w-11 items-center justify-center text-[15px] leading-none"
+          >
+            ♡
+          </button>
+        )}
+        {temOpcoes && (
           <button
             type="button"
             onClick={() => setConfirmandoBloqueio((v) => !v)}
             aria-label="Opções deste perfil"
-            className="press px-1 text-lg leading-none text-muted-foreground"
+            /* ⚠️ 44px: media 26×18 — e é a porta ÚNICA de bloquear, silenciar,
+               restringir e denunciar. O alvo mais importante da tela era o
+               menor. */
+            className="press -mr-2 flex h-11 w-11 items-center justify-center text-lg leading-none text-muted-foreground"
           >
             ⋯
           </button>
@@ -2260,31 +3114,38 @@ export function TelaDePerfil({
           faz antes de fazer: desfaz o seguir nos dois sentidos e some com um
           do outro. Um "Bloquear" sem essa frase parece reversível — e é, mas
           o vínculo que ele desfez não volta sozinho. */}
-      {confirmandoBloqueio && bloquear && (
+      {confirmandoBloqueio && temOpcoes && (
         <div className="mx-4 mt-2 rounded-2xl border border-border bg-muted/40 p-3">
-          <p className="text-[13px] leading-snug">
-            Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
-            seguir.
-          </p>
-          <div className="mt-2 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirmandoBloqueio(false)}
-              className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
-            >
-              Não
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setConfirmandoBloqueio(false);
-                bloquear();
-              }}
-              className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
-            >
-              Bloquear
-            </button>
-          </div>
+          {/* ⚠️ **A CONFIRMAÇÃO DE BLOQUEIO É A ÚNICA PARTE QUE EXIGE
+              `bloquear`** — no meu próprio perfil o painel abre sem ela, com
+              as opções que são minhas. */}
+          {bloquear && (
+            <>
+              <p className="text-[13px] leading-snug">
+                Bloquear {perfil.nome}? Vocês deixam de se ver por aqui, e quem seguia quem deixa de
+                seguir.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmandoBloqueio(false)}
+                  className="press flex-1 rounded-xl border border-border py-1.5 text-[13px]"
+                >
+                  Não
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoBloqueio(false);
+                    bloquear();
+                  }}
+                  className="press flex-1 rounded-xl bg-destructive py-1.5 text-[13px] font-semibold text-destructive-foreground"
+                >
+                  Bloquear
+                </button>
+              </div>
+            </>
+          )}
 
           {/* ⚠️ **SILENCIAR É O DEGRAU DE BAIXO, e ele faltava.** Só existia
               bloquear — que desfaz o seguir nos dois sentidos e que a própria
@@ -2292,25 +3153,149 @@ export function TelaDePerfil({
               conhecem da vida real (a irmã, a cunhada, a amiga do trabalho),
               não ter o meio-termo faz alguém bloquear a irmã, ou desistir da
               aba. Aqui o vínculo CONTINUA: some só do feed. */}
-          {aoSilenciar && (
+          {/* ⚠️ **POSTS E STORIES, SEPARADOS — antes calava os dois de uma
+              vez.** Quem quer só descansar dos stories de alguém (o formato mais
+              frequente e mais invasivo) perdia as publicações junto, e acabava
+              não silenciando ninguém.
+
+              ⚠️ **E "silenciar tudo" continua sendo UM toque**, na primeira
+              linha: a escolha fina é para quem quer, e obrigar todo mundo a
+              decidir entre duas caixas transformaria um gesto de alívio numa
+              configuração. */}
+          {/* ⚠️ **FAVORITAR É O OPOSTO DE SILENCIAR, e fica ao lado dele.**
+              Num feed cronológico, quem segue trinta pessoas perde a publicação
+              da amiga que está passando por alguma coisa. E ele é CALADO, como
+              o silenciar — o rótulo diz isso, senão ela hesita. */}
+          {aoFavoritar && (
             <button
               type="button"
               onClick={() => {
                 setConfirmandoBloqueio(false);
-                aoSilenciar(!perfil.silenciado);
+                aoFavoritar(!perfil.favorita);
+              }}
+              className="press block min-h-[44px] w-full text-left text-[14px]"
+            >
+              {perfil.favorita ? "Tirar dos favoritos" : "Adicionar aos favoritos"}
+            </button>
+          )}
+          {/* ⚠️ **ESCONDER O STORY é o degrau entre "nada" e "silenciar".** A
+              camada (`seguidores`/`amigas`) é grossa; isto é o "não quero que
+              ESTA pessoa veja". E o texto diz que é calado — sem a frase, ela
+              imagina que a pessoa é avisada, e não esconde. */}
+          {agir(aoEsconderStory) && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoEsconderStory?.();
               }}
               className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
             >
-              {perfil.silenciado
-                ? `Voltar a ver ${perfil.nome} no feed`
-                : `Silenciar ${perfil.nome} no feed`}
+              Esconder meus stories de {perfil.nome}
             </button>
           )}
+          {agir(aoAbrirEscondidos) && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoAbrirEscondidos?.();
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              Story escondido de…
+            </button>
+          )}
+          {aoSilenciar &&
+            (perfil.silenciado ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmandoBloqueio(false);
+                  aoSilenciar(false);
+                }}
+                className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+              >
+                Voltar a ver {perfil.nome}
+              </button>
+            ) : (
+              <div className="mt-2 flex flex-col gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoBloqueio(false);
+                    aoSilenciar(true);
+                  }}
+                  className="press min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+                >
+                  Silenciar {perfil.nome}
+                </button>
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBloqueio(false);
+                      aoSilenciar(true, { calaPosts: true, calaStories: false });
+                    }}
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-xs"
+                  >
+                    Só as publicações
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmandoBloqueio(false);
+                      aoSilenciar(true, { calaPosts: false, calaStories: true });
+                    }}
+                    className="press min-h-[44px] flex-1 rounded-xl border border-border text-xs"
+                  >
+                    Só os stories
+                  </button>
+                </div>
+              </div>
+            ))}
           {aoSilenciar && (
-            <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
               {perfil.silenciado
                 ? "As publicações dela voltam a aparecer no seu feed."
                 : "Você continua seguindo, e o perfil dela continua aqui — só o feed para de trazer as publicações. Ela não é avisada."}
+            </p>
+          )}
+
+          {/* ⚠️ **RESTRINGIR É O DEGRAU ENTRE SILENCIAR E BLOQUEAR, e ele
+              resolve um caso que os outros dois não resolvem.** Silenciar tira
+              as publicações DELA do meu feed; bloquear corta tudo e ela
+              descobre. Restringir não faz nem um nem outro: ela continua
+              seguindo e continua vendo tudo — o que muda é que o COMENTÁRIO
+              dela nas minhas fotos só aparece para ela.
+
+              É a saída para a cunhada que comenta demais: bloquear tem custo
+              social (vira briga de família) e é justamente esse custo que faz a
+              paciente não usar o bloqueio e continuar recebendo o que a
+              machuca. */}
+          {aoRestringir && (
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmandoBloqueio(false);
+                aoRestringir(!perfil.restrito);
+              }}
+              className="press mt-2 min-h-[44px] w-full rounded-xl border border-border text-[13px] font-medium"
+            >
+              {perfil.restrito
+                ? `Deixar de restringir ${perfil.nome}`
+                : `Restringir ${perfil.nome}`}
+            </button>
+          )}
+          {aoRestringir && (
+            /* ⚠️ **O TEXTO DIZ QUE ELA NÃO É AVISADA, e diz o que NÃO muda.**
+               Sem a segunda metade, a paciente lê "restringir" como "bloquear
+               parcial" e não usa — ou usa achando que a pessoa para de ver as
+               fotos dela, o que seria uma promessa falsa. */
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              {perfil.restrito
+                ? "Os comentários dela voltam a aparecer para todo mundo."
+                : "Os comentários dela nas suas publicações passam a aparecer só para ela — e para você, marcados. Ela continua seguindo, continua vendo tudo, e não é avisada."}
             </p>
           )}
 
@@ -2327,7 +3312,7 @@ export function TelaDePerfil({
                 setConfirmandoBloqueio(false);
                 setDenunciandoPerfil(true);
               }}
-              className="press mt-2 w-full text-[12px] font-medium text-muted-foreground underline underline-offset-2"
+              className="press mt-2 w-full text-xs font-medium text-muted-foreground underline underline-offset-2"
             >
               Denunciar este perfil para a plataforma
             </button>
@@ -2360,19 +3345,25 @@ export function TelaDePerfil({
                 rotulo={posts.length === 1 ? "publicação" : "publicações"}
               />
             )}
-            {/* ⚠️ Os dois números de AUDIÊNCIA só no próprio perfil. É a única
-                divergência deliberada do modelo, e ela está pesquisada em
-                `NUMEROS_PUBLICOS`: um placar público mede popularidade num
-                momento em que ela já está sendo medida clinicamente. */}
-            {perfil.souEu && (
-              <>
-                <button type="button" onClick={() => abrirLista?.("seguidores")} className="press">
-                  <Numero valor={perfil.meusSeguidores ?? 0} rotulo="seguidores" />
-                </button>
-                <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
-                  <Numero valor={perfil.euSigo ?? 0} rotulo="seguindo" />
-                </button>
-              </>
+            {/* ⚠️ OS NÚMEROS SÃO PÚBLICOS AGORA, por decisão do dono. Antes
+                apareciam só no próprio perfil, e a razão (clínica) está guardada
+                em `NUMEROS_PUBLICOS` para quem reabrir o assunto.
+
+                ⚠️ `!= null` e não `?? 0`: `null` quer dizer "não sei" (perfil
+                fora de alcance, ou a busca, que não conta de propósito). Um zero
+                no lugar do desconhecido afirmaria que ninguém a segue. */}
+            {perfil.seguidores != null && (
+              <button type="button" onClick={() => abrirLista?.("seguidores")} className="press">
+                <Numero valor={perfil.seguidores} rotulo="seguidores" />
+              </button>
+            )}
+            {(perfil.souEu ? (perfil.euSigo ?? perfil.seguindo) : perfil.seguindo) != null && (
+              <button type="button" onClick={() => abrirLista?.("seguindo")} className="press">
+                <Numero
+                  valor={(perfil.souEu ? (perfil.euSigo ?? perfil.seguindo) : perfil.seguindo) ?? 0}
+                  rotulo="seguindo"
+                />
+              </button>
             )}
           </div>
         </div>
@@ -2385,6 +3376,23 @@ export function TelaDePerfil({
             ⚠️ E eles NÃO entram no cabeçalho do post: lá o carimbo seria a
             semana de HOJE sobre um post de seis semanas atrás, que é o defeito
             que `haQuantoPublicou` acabou de consertar. */}
+        {/* ⚠️ A LINHA DOS FILHOS FICA ACIMA DOS SELOS, e a ordem é a vida dela.
+            O selo da semana morre no dia do parto; esta linha continua verdade
+            por anos — "Mãe da Helena, 3 meses", "Mãe de 2, grávida do terceiro".
+            É ela que faz o perfil ter assunto depois que a barriga acaba, e por
+            isso vem primeiro. */}
+        {perfil.linhaDosFilhos && (
+          <p className="mt-2 text-[13px] font-medium leading-snug">{perfil.linhaDosFilhos}</p>
+        )}
+
+        {/* ⚠️ **O `@` FICA ABAIXO DO NOME, e é texto — não botão.** Ele é o
+            ENDEREÇO desta pessoa, e quem já está no perfil dela não tem para
+            onde ir tocando nele. Some inteiro sem `@`: quem nunca escolheu não
+            precisa ver um espaço vazio, e a linha nunca vira "sem apelido". */}
+        {perfil.handle && (
+          <p className="mt-0.5 text-[13px] text-muted-foreground">@{perfil.handle}</p>
+        )}
+
         {(perfil.seloSemana || perfil.seloBebe) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
             {/* ⚠️ `text-primary` sobre `primary/12` media 3,87:1 — abaixo do piso
@@ -2399,12 +3407,12 @@ export function TelaDePerfil({
                 custa um `TS1005` que aponta para a linha do `<span>`. Já está
                 escrito no CLAUDE.md, e eu caí nele de novo. */}
             {perfil.seloSemana && (
-              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-[12px] font-semibold text-foreground">
+              <span className="rounded-full bg-primary/12 px-2.5 py-1 text-xs font-semibold text-foreground">
                 🤰 {perfil.seloSemana}
               </span>
             )}
             {perfil.seloBebe && (
-              <span className="rounded-full bg-muted/70 px-2.5 py-1 text-[12px] font-medium">
+              <span className="rounded-full bg-muted/70 px-2.5 py-1 text-xs font-medium">
                 💛 {perfil.seloBebe}
               </span>
             )}
@@ -2412,6 +3420,73 @@ export function TelaDePerfil({
         )}
 
         {perfil.bio && <p className="mt-3 text-[14px] leading-snug">{perfil.bio}</p>}
+
+        {/* ⚠️ **O LINK DA BIO, e ele é o único lugar do app onde texto de uma
+            paciente vira um `href` na tela de outra.** Quem limpa é o SERVIDOR
+            (`limparLinkDaBio`, na gravação): só `http`/`https` chegam aqui. Uma
+            segunda conferência nesta linha divergiria da primeira, e a
+            divergência aparece como `javascript:` clicável.
+
+            ⚠️ `rel="noopener noreferrer nofollow"` e `target="_blank"`: sem
+            `noopener`, a página aberta ganha `window.opener` e pode navegar a
+            NOSSA aba para onde quiser — com a paciente achando que continua no
+            app. E o texto mostra o endereço SEM o esquema, que é como as
+            pessoas leem um link. */}
+        {/* ⚠️ **SÓ DEPOIS DE SEGUIR, e nunca antes.** A fileira existe para o
+            momento em que ela acabou de escolher alguém — mostrá-la num perfil
+            que ela ainda está decidindo se acompanha transforma a tela numa
+            vitrine de outras pessoas, e a decisão que ela veio tomar fica em
+            segundo plano. */}
+        {perfil.meuVinculo === "ativo" && !perfil.souEu && (parecidas ?? []).length > 0 && (
+          <section className="mt-3">
+            <h3 className="text-[13px] font-semibold">Talvez você conheça</h3>
+            {/* ⚠️ A régua é DITA: sem a frase, ela lê a fileira como "parecidas
+                com esta pessoa" — e este app não deriva nada do grafo de
+                terceiro. */}
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+              Contas abertas com gente em comum com você.
+            </p>
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {(parecidas ?? []).map((p) => (
+                <div
+                  key={p.id}
+                  className="flex w-[104px] shrink-0 flex-col items-center gap-1 rounded-2xl border border-border p-2"
+                >
+                  <button
+                    type="button"
+                    onClick={() => aoVerParecida?.(p.id)}
+                    className="press flex flex-col items-center gap-1"
+                  >
+                    <Foto url={p.avatarUrl} nome={p.nome} lado={44} />
+                    <span className="w-full truncate text-center text-xs font-medium">
+                      {p.nome}
+                    </span>
+                  </button>
+                  {aoSeguirParecida && (
+                    <button
+                      type="button"
+                      onClick={() => aoSeguirParecida(p.id)}
+                      className="press min-h-[44px] w-full rounded-full bg-primary px-2 text-xs font-semibold text-primary-foreground"
+                    >
+                      Seguir
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {perfil.bioLink && (
+          <a
+            href={perfil.bioLink}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="press mt-1 block min-h-[44px] truncate text-[14px] font-medium text-primary"
+          >
+            🔗 {perfil.bioLink.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+          </a>
+        )}
 
         {/* ─── O CÓDIGO DA EMBAIXADORA ──────────────────────────────────────
             ⚠️ **Nunca num toque só.** `ref_code` é gravado UMA VEZ e nunca
@@ -2424,7 +3499,7 @@ export function TelaDePerfil({
             publicação. */}
         {perfil.codigoDeEmbaixadora && (
           <div className="mt-3 rounded-2xl border border-border p-3">
-            <p className="text-[12px] text-muted-foreground">Código de embaixadora</p>
+            <p className="text-xs text-muted-foreground">Código de embaixadora</p>
             <p className="mt-0.5 font-mono text-[15px] font-semibold tracking-wide">
               {perfil.codigoDeEmbaixadora}
             </p>
@@ -2434,7 +3509,7 @@ export function TelaDePerfil({
                   <button
                     type="button"
                     onClick={() => setConfirmandoCodigo(true)}
-                    className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[13px] font-semibold"
+                    className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[13px] font-semibold"
                   >
                     Usar este código
                   </button>
@@ -2445,7 +3520,7 @@ export function TelaDePerfil({
                       <span className="font-semibold">{perfil.codigoDeEmbaixadora}</span> como quem
                       te trouxe ao app? Você ganha 150 🌱 de boas-vindas.
                     </p>
-                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                       Isso vale uma vez só e não dá para trocar depois — é o mesmo campo onde entra
                       o código da sua médica, se ela te passou um.
                     </p>
@@ -2456,7 +3531,7 @@ export function TelaDePerfil({
                         que fica exposto não é um nome qualquer: é "esta pessoa é
                         paciente de um app de gestação de alto risco", que é dado
                         de saúde por inferência. */}
-                    <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+                    <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                       Quem te trouxe passa a ver o seu primeiro nome numa lista, para poder te
                       presentear. Nada mais do seu acompanhamento aparece para ela.
                     </p>
@@ -2486,18 +3561,39 @@ export function TelaDePerfil({
           </div>
         )}
 
-        <button
-          type="button"
-          onClick={seguir}
-          disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
-          className={`press mt-3 w-full rounded-lg py-1.5 text-[14px] font-semibold ${
-            perfil.meuVinculo || perfil.souEu
-              ? "border border-border"
-              : "bg-primary text-primary-foreground"
-          }`}
-        >
-          {rotuloDoBotao}
-        </button>
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            onClick={seguir}
+            disabled={perfil.souEu || perfil.meuVinculo === "pendente"}
+            className={`press flex-1 rounded-lg py-1.5 text-[14px] font-semibold ${
+              perfil.meuVinculo || perfil.souEu
+                ? "pill-3d"
+                : "btn-3d bg-primary text-primary-foreground"
+            }`}
+          >
+            {rotuloDoBotao}
+          </button>
+
+          {/* ⚠️ **"MENSAGEM" SÓ APARECE ONDE A CONVERSA PODE EXISTIR.**
+              Nunca no próprio perfil, nunca sob o espelho (onde a tela finge
+              ser a visão de uma estranha e todo controle é inerte), e nunca em
+              perfil fora de alcance — ali o servidor recusaria, e um botão que
+              promete e devolve erro é pior que a ausência dele.
+
+              ⚠️ E ele NÃO some quando ela não me segue: aí a conversa nasce
+              como PEDIDO, que é o desenho. Escondê-lo faria a caixa de pedidos
+              existir sem nenhuma porta que a alimentasse. */}
+          {!perfil.souEu && !somenteLeitura && aoMandarMensagem && (
+            <button
+              type="button"
+              onClick={() => aoMandarMensagem(perfil.id)}
+              className="press flex-1 rounded-lg pill-3d py-1.5 text-[14px] font-semibold"
+            >
+              Mensagem
+            </button>
+          )}
+        </div>
 
         {/* ⚠️ A caixinha aparece a QUEM VISITA, nunca à dona — no perfil dela o
             que existe é a caixa cheia, que mora no hub. E ela nasce do campo
@@ -2521,7 +3617,7 @@ export function TelaDePerfil({
           <button
             type="button"
             onClick={aoAbrirEspelho}
-            className="press mt-2 w-full rounded-lg border border-border py-1.5 text-[14px] font-medium"
+            className="press mt-2 w-full rounded-lg pill-3d py-1.5 text-[14px] font-medium"
           >
             👁 Ver como os outros veem
           </button>
@@ -2547,16 +3643,62 @@ export function TelaDePerfil({
       </div>
 
       {aba === "grade" ? (
-        /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
-           divergiriam na primeira vez que a proporção da célula mudasse, e ela
-           já mudou uma vez (1:1 → 3:4, em 2025). */
-        <GradeDePosts
-          posts={naGrade}
-          vazio="Nenhuma publicação ainda."
-          aoAbrirPost={abrirPost}
-          aoChegarNoFim={aoChegarNoFim}
-          temMais={temMais}
-        />
+        <>
+          {/* ⚠️ **O SELETOR SÓ APARECE QUANDO MUDA ALGUMA COISA.** Com menos de
+              duas seções o álbum é a grade com um título em cima, e um controle
+              que não muda nada ensina que os controles desta tela não valem —
+              a mesma régua do "Hoje eu não desço ao chão" e do seletor de ordem
+              dos comentários. */}
+          {(album?.length ?? 0) >= 2 && (
+            <div className="flex gap-1 px-3 pt-3">
+              {[
+                { v: false, r: "Grade" },
+                { v: true, r: "Álbum" },
+              ].map((o) => (
+                <button
+                  key={o.r}
+                  type="button"
+                  onClick={() => setComoAlbum(o.v)}
+                  aria-pressed={comoAlbum === o.v}
+                  className={`press min-h-[44px] rounded-full px-4 text-[13px] font-medium ${
+                    comoAlbum === o.v
+                      ? "bg-foreground text-background"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {o.r}
+                </button>
+              ))}
+            </div>
+          )}
+          {comoAlbum && album ? (
+            /* ⚠️ **A MESMA `GradeDePosts` por seção**, e nunca uma grade nova:
+                a proporção da célula já mudou uma vez (1:1 → 3:4, em 2025), e
+                duas cópias divergiriam na próxima.
+                ⚠️ E sem sentinela aqui — o álbum vem inteiro do servidor numa
+                consulta só; a paginação é da grade cronológica. */
+            <div>
+              {album.map((s) => (
+                <section key={s.chave}>
+                  <h2 className="px-3 pb-1 pt-4 text-[13px] font-semibold text-muted-foreground">
+                    {s.titulo}
+                  </h2>
+                  <GradeDePosts posts={s.posts} vazio="" aoAbrirPost={abrirPost} />
+                </section>
+              ))}
+            </div>
+          ) : (
+            /* A grade é a MESMA dos salvos (`GradeDePosts`) — duas cópias
+               divergiriam na primeira vez que a proporção da célula mudasse. */
+            <GradeDePosts
+              posts={naGrade}
+              vazio="Nenhuma publicação ainda."
+              aoAbrirPost={abrirPost}
+              aoChegarNoFim={aoChegarNoFim}
+              temMais={temMais}
+            />
+          )}
+        </>
       ) : perfil.bebe ? (
         /* ⚠️ Esta aba existia VAZIA desde o primeiro dia, prometendo "os marcos
             da gestação vão aparecer aqui 💛" — em qualquer perfil, inclusive o
@@ -2583,7 +3725,7 @@ export function TelaDePerfil({
             </div>
           </div>
           <p className="mt-4 text-[14px] leading-snug">{perfil.bebe.sobre}</p>
-          <p className="mt-4 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-4 text-xs leading-snug text-muted-foreground">
             O tamanho é uma média da semana — cada bebê cresce no ritmo dele.
           </p>
         </div>
@@ -2634,12 +3776,30 @@ type Onde =
   | { t: "atividade" }
   | { t: "salvos" }
   | { t: "arquivados" }
+  | { t: "arquivo-stories" }
+  | { t: "bloqueados" }
+  /** De quem eu escondi o meu story — o "Ocultar story de" do Instagram. */
+  | { t: "escondidos" }
+  /** O que eu reagi. É a lista que faltava ao lado dos salvos. */
+  | { t: "curtidos" }
+  /** O que aconteceu com o que eu denunciei. */
+  | { t: "desfechos" }
+  | { t: "favoritas" }
   | { t: "busca" }
   | { t: "caixinha" }
+  | { t: "conversas" }
+  | { t: "conversa" }
+  | { t: "explorar" }
+  | { t: "grupo" }
+  | { t: "grupo-novo" }
+  | { t: "grupo-chamar" }
+  | { t: "tag"; tag: string }
   | { t: "espelho" };
 
 export function RedeNoApp({
   careMode = false,
+  bancadaOnboarding,
+  adiarOnboarding = false,
   onAbrirSecoes,
   onIrParaOJogo,
   onAbrirSOS,
@@ -2647,6 +3807,16 @@ export function RedeNoApp({
   sinalDeVoltarAoFeed = 0,
 }: {
   careMode?: boolean;
+  /** Só a bancada: força os quatro cartões sem tocar no blob da jornada. */
+  bancadaOnboarding?: boolean;
+  /**
+   * O ritual de boas-vindas está na tela — segure os quatro cartões.
+   *
+   * ⚠️ Duas telas cheias no primeiro minuto seriam dois tutoriais. Ele NÃO
+   * some: quem adiou encontra o tutorial na abertura seguinte, com o app já
+   * personalizado — a mesma decisão do tutorial do mascote.
+   */
+  adiarOnboarding?: boolean;
   onAbrirSecoes?: () => void;
   /**
    * A Central de Emergência.
@@ -2677,6 +3847,62 @@ export function RedeNoApp({
 }) {
   const [posts, setPosts] = useState<PostNaTela[]>([]);
   const [onde, setOnde] = useState<Onde>({ t: "feed" });
+
+  /* ═══ O VOLTAR DO ANDROID DENTRO DA COMUNIDADE (set/2026) ═══
+     Esta aba tem 25 destinos e 67 chamadas de `setOnde` — e nenhuma delas era
+     um passo que o botão de voltar do aparelho soubesse desfazer. Medido: de
+     um perfil aberto, o voltar do Android minimizava o app.
+
+     ⚠️ A PILHA É OBSERVADA, e não escrita em cada `setOnde`. Empilhar no ponto
+     de uso exigiria tocar nas 67 chamadas, e a 68ª — escrita amanhã — nasceria
+     sem. Um efeito que olha `onde` mudar pega TODAS, inclusive as que ainda
+     não existem. É a mesma lição do piso de 16px dos campos.
+
+     ⚠️ A RÉGUA MORA EM `src/lib/pilha-de-telas.ts` — o teto, o zerar na raiz e
+     o "o passo do próprio voltar não é empilhado". Aqui ficam só os fios,
+     porque `RedeNoApp` NÃO TEM BANCADA: `/preview-instagram` monta as telas
+     internas direto, nunca ele. Enterrada neste arquivo, esta lógica não teria
+     como ser exercitada em lugar nenhum. */
+  const pilhaDeTelas = useRef(criarPilhaDeTelas<Onde>((o) => o.t === "feed"));
+  const ondeAnterior = useRef<Onde>(onde);
+  useEffect(() => {
+    const anterior = ondeAnterior.current;
+    ondeAnterior.current = onde;
+    pilhaDeTelas.current.andou(anterior, onde);
+  }, [onde]);
+
+  /* ⚠️ No FEED ela NÃO se registra — e é isso que faz a subida de aba de
+     `minha-conta` assumir a vez. Registrada sempre, esta aba engoliria o
+     voltar para sempre e a paciente ficaria presa na Comunidade. */
+  useVoltar(onde.t !== "feed", () => {
+    setOnde(pilhaDeTelas.current.voltar() ?? { t: "feed" });
+  });
+
+  /* ⚠️ ABRIR UMA TELA COMEÇA NO COMEÇO DELA (set/2026).
+     O reset de rolagem de `minha-conta` depende de `[tab, mobileHome,
+     hubAberto]`, e dentro da Comunidade `tab` continua sendo "Feed" nos 25
+     destinos — então ele nunca disparava aqui. Medido a 393×852: lendo o feed
+     em 3.000 px e abrindo um perfil, o navegador clampa em 1.361 — o RODAPÉ do
+     perfil, a última fileira da grade, sem avatar nem nome à vista. É o
+     defeito que o comentário de `minha-conta` descreve com todas as letras
+     ("caía no rodapé de uma tela que nunca tinha visto"), sobrevivendo dentro
+     da aba com mais destinos do app.
+
+     ⚠️ O FEED É A EXCEÇÃO, e ela é obrigatória: quem restaura o lugar dela é
+     `lugar-no-feed.ts`, e rolar ao topo aqui atropelaria isso — o app
+     esqueceria onde ela parou de ler toda vez que ela voltasse.
+
+     ⚠️ `instant`, nunca `auto`: o `<html>` tem `scroll-behavior: smooth`, e a
+     volta sairia como uma rolagem animada de milhares de pixels. Mesma lição
+     de `lugar-no-feed`.
+
+     ⚠️ E é `useLayoutEffect`: com `useEffect` o navegador chega a PINTAR o
+     rodapé da tela nova antes de saltar, que é o pisca que ele veio tirar. */
+  useLayoutEffect(() => {
+    if (onde.t === "feed") return;
+    if (typeof window === "undefined") return;
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+  }, [onde]);
 
   const [perfil, setPerfil] = useState<PerfilNaTela | null>(null);
   /**
@@ -2709,7 +3935,78 @@ export function RedeNoApp({
   const [salvos, setSalvos] = useState<PostNaTela[]>([]);
   /** A gaveta: o que ela tirou do ar. */
   const [arquivados, setArquivados] = useState<PostNaTela[]>([]);
+  /** `null` = ainda carregando · `[]` = ela não publicou nenhum. Ver o handler. */
+  const [arquivoStories, setArquivoStories] = useState<StoryArquivado[] | null>(null);
+  const [arquivoStoriesInstavel, setArquivoStoriesInstavel] = useState(false);
+  const [proximoArquivo, setProximoArquivo] = useState<string | null>(null);
+  /** `null` = carregando · `[]` = ela não bloqueou ninguém · `"erro"` = não deu. */
+  const [escondidos, setEscondidos] = useState<PessoaNaLista[] | null>(null);
+  const [curtidos, setCurtidos] = useState<PostNaTela[] | null>(null);
+  const [desfechos, setDesfechos] = useState<
+    { id: string; alvo: string; motivo: string; em: string; desfecho: string | null }[] | null
+  >(null);
+  const [bloqueados, setBloqueados] = useState<PessoaNaLista[] | "erro" | null>(null);
+  /** A lista "ver primeiro". `"erro"` = a leitura falhou; `null` = carregando. */
+  const [favoritas, setFavoritas] = useState<PostNaTela[] | "erro" | null>(null);
+  /** O story que está sendo mandado para uma conversa. */
+  const [mandandoStory, setMandandoStory] = useState<string | null>(null);
+  const [grupoAberto, setGrupoAberto] = useState<GrupoNaTela | null>(null);
+  /** A grade do Explorar. `"erro"` = a leitura falhou; `null` = carregando. */
+  const [explorar, setExplorar] = useState<
+    | {
+        posts: PostNaTela[];
+        tags: { tag: string; quantas: number }[];
+      }
+    | "erro"
+    | null
+  >(null);
+  const [encaminhando, setEncaminhando] = useState<{
+    deConversaId: string;
+    mensagemId: string;
+  } | null>(null);
+  /**
+   * ⚠️ **A CONTA PAUSADA PRECISA DE UM AVISO, senão o botão parece quebrado.**
+   * Ela pausa nas configurações, volta ao feed e tudo continua igual — porque a
+   * pausa esconde ela dos OUTROS, e o feed é o que ela vê. Sem a faixa, a
+   * conclusão razoável é que a pausa não pegou, e ela publicaria imaginando que
+   * está invisível.
+   *
+   * ⚠️ **E ela continua LENDO enquanto pausada, de propósito.** Cortar a leitura
+   * derrubaria conversas abertas com quem está apoiando ela — e é o mesmo
+   * desenho que o Modo Cuidado já tem: o que some é ela na rede dos outros, não
+   * a rede para ela.
+   */
+  const [pausada, setPausada] = useState(false);
+  /** ⚠️ Decisão da PLATAFORMA, e não dela — por isso ela é avisada. */
+  const [suspensa, setSuspensa] = useState(false);
   const [sugestoes, setSugestoes] = useState<PostNaTela[]>([]);
+  /** Quantas conversas pedem resposta. Alimenta o emblema do atalho. */
+  const [msgsNaoLidas, setMsgsNaoLidas] = useState(0);
+  /**
+   * A primeira linha, já escrita, quando a conversa nasce de uma sugestão.
+   *
+   * ⚠️ **Mora AQUI e não dentro de `Conversa`.** Aquele componente é montado e
+   * desmontado ao trocar de tela; com o rascunho lá dentro, voltar do perfil da
+   * pessoa e reabrir a conversa reescreveria a frase por cima do que ela já
+   * tivesse digitado. É a mesma lição do passo do tutorial e do `sub` do
+   * `RegistrosHub`.
+   */
+  const [rascunhoDaConversa, setRascunhoDaConversa] = useState<string | null>(null);
+  /** A publicação que ela está mandando para alguém. `null` = folha fechada. */
+  const [mandandoPost, setMandandoPost] = useState<string | null>(null);
+  /** A leitura do feed falhou — diferente de "não há nada". */
+  const [feedInstavel, setFeedInstavel] = useState(false);
+  const [conversaAberta, setConversaAberta] = useState<ConversaNaTela | null>(null);
+  /** A publicação que ela está republicando, enquanto o compositor está aberto. */
+  const [repostando, setRepostando] = useState<PostNaTela | null>(null);
+  /**
+   * A escolha dela: `true` = só quem eu sigo.
+   *
+   * ⚠️ **NASCE `false`, e o padrão é o aberto.** Uma rede social que abre vazia
+   * para quem acabou de chegar não dá a ninguém motivo para voltar — e conta
+   * nova não segue ninguém. Quem quiser o fechado liga nas configurações.
+   */
+  const [soSeguindo, setSoSeguindo] = useState(false);
   /**
    * O código de indicação dela — o que faz o convite TRAZER alguém.
    *
@@ -2736,6 +4033,25 @@ export function RedeNoApp({
    */
   const [entaoEscolhido, setEntaoEscolhido] = useState<string | null>(null);
 
+  /**
+   * A memória do dia, ou `null`.
+   *
+   * ⚠️ Quem decide é o SERVIDOR (`memoriaDeHoje`, com as cinco travas). A tela
+   * só desenha o que vier — e falha de rede vira `null`, que é o lado seguro
+   * deste recurso: um agrado que não aconteceu, contra devolver a foto de uma
+   * perda.
+   */
+  const [memoria, setMemoria] = useState<{ post: PostNaTela; texto: string } | null>(null);
+  /**
+   * O álbum da gestação — só do MEU perfil.
+   *
+   * ⚠️ Quem monta é `meuAlbum`, que não tem `alvoId`: mesmo que esta tela
+   * pedisse o álbum de outra pessoa, o servidor devolveria o dela. Aqui a
+   * consulta nem sai quando o perfil aberto não é o meu.
+   */
+  const [album, setAlbum] = useState<
+    { chave: string; titulo: string; posts: PostNaTela[] }[] | null
+  >(null);
   const [lembreteEntao, setLembreteEntao] = useState<{
     id: string;
     imagemUrl: string;
@@ -2863,6 +4179,18 @@ export function RedeNoApp({
   const [persona, setPersona] = useState<Persona>("estranha");
   /** A foto escolhida, esperando a conferência antes de virar story. */
   const [conferindoStory, setConferindoStory] = useState<string | null>(null);
+  /**
+   * O vídeo do story, já subido, esperando publicar.
+   *
+   * ⚠️ **Ele sobe no instante em que ela escolhe o arquivo, e não no publicar.**
+   * Um vídeo de 50 MB no botão "Publicar" deixaria a tela parada meio minuto
+   * depois do gesto que ela lê como "acabou" — e o compositor já tem a capa na
+   * frente dela enquanto o arquivo viaja.
+   */
+  const [videoDoStory, setVideoDoStory] = useState<{
+    caminho: string;
+    segundos: number;
+  } | null>(null);
   /** A semana que ela pode carimbar — do servidor, e `null` quando não há. */
   const [semanaDoCarimbo, setSemanaDoCarimbo] = useState<string | null>(null);
   const [desafio, setDesafio] = useState<DesafioNaTela | null>(null);
@@ -2925,9 +4253,18 @@ export function RedeNoApp({
     apagar: (_p: PostNaTela) => {},
     denunciar: (_p: PostNaTela, _m: MotivoDaDenuncia) => {},
     tirarMarcacao: (_p: PostNaTela) => {},
+    fixar: (_p: PostNaTela, _v: boolean) => {},
+    storyComPost: (_p: PostNaTela) => {},
     editar: async (_p: PostNaTela, _t: string) => false,
     verQuemReagiu: (_p: PostNaTela) => {},
     abrirPerfil: (_id: string) => {},
+    abrirArroba: (_handle: string) => {},
+    abrirTag: (_tag: string) => {},
+    mandarParaConversa: (_p: PostNaTela) => {},
+    republicar: (_p: PostNaTela) => {},
+    compartilhar: (_p: PostNaTela) => {},
+    linkPublico: (_p: PostNaTela) => {},
+    tocarStory: (_autorId: string) => {},
     ver: (_id: string) => {},
   });
   /* ─── O LOTE DE "VISTOS" ─────────────────────────────────────────────────
@@ -2980,9 +4317,18 @@ export function RedeNoApp({
     apagar: (p) => void apagar(p),
     denunciar: (p, m) => void denunciarPost(p, m),
     tirarMarcacao: (p) => void tirarMarcacao(p),
+    fixar: (p, v) => void fixarNoPerfil(p, v),
+    storyComPost: (p) => void storyComPost(p),
     editar: (p, t) => editarLegenda(p, t),
     verQuemReagiu: (p) => void verQuemReagiu(p),
     abrirPerfil: (id) => void abrirPerfil(id),
+    abrirArroba: (h) => void abrirPorArroba(h),
+    abrirTag: (t) => void abrirTag(t),
+    mandarParaConversa: (p) => setMandandoPost(p.id),
+    republicar: (p) => republicar(p),
+    compartilhar: (p) => void compartilhar(p),
+    linkPublico: (p) => void abrirLinkPublico(p),
+    tocarStory: (id) => void verStory(id),
     ver: (id) => marcarPostVisto(id),
   };
   useEffect(() => {
@@ -3013,8 +4359,37 @@ export function RedeNoApp({
       denunciar: (p: PostNaTela, m: MotivoDaDenuncia) => ultimas.current.denunciar(p, m),
       tirarMarcacao: (p: PostNaTela) => ultimas.current.tirarMarcacao(p),
       editar: (p: PostNaTela, t: string) => ultimas.current.editar(p, t),
+      /* ⚠️ Estável, como as irmãs — ver o bloco abaixo sobre o `memo`. */
+      fixar: (p: PostNaTela, v: boolean) => ultimas.current.fixar(p, v),
+      storyComPost: (p: PostNaTela) => ultimas.current.storyComPost(p),
       verQuemReagiu: (p: PostNaTela) => ultimas.current.verQuemReagiu(p),
       abrirPerfil: (id: string) => ultimas.current.abrirPerfil(id),
+      /* ⚠️ **Referência estável, como as irmãs.** Um fecho novo por render
+         faria o `memo` do cartão errar em TODO post do feed — e a legenda com
+         `@` e `#` está em cada um deles. É o mesmo defeito que já custou
+         232 ms por reação nesta lista. */
+      abrirArroba: (h: string) => ultimas.current.abrirArroba(h),
+      abrirTag: (t: string) => ultimas.current.abrirTag(t),
+      mandarParaConversa: (p: PostNaTela) => ultimas.current.mandarParaConversa(p),
+      /**
+       * ⚠️ **AS TRÊS ÚLTIMAS ENTRARAM AQUI PORQUE O `memo` NUNCA ACERTAVA.**
+       *
+       * `republicar`, `compartilhar` e `verStory` são declarações de função no
+       * corpo de `RedeNoApp` — identidade NOVA a cada pintura — e eram passadas
+       * a `TelaPrincipal` fora deste objeto. `PostInstagram` e
+       * `FileiraDeStories` são `memo` sem comparador próprio: uma prop com
+       * identidade nova basta para a comparação rasa falhar, e ela falhava em
+       * TODO cartão do feed, a cada render.
+       *
+       * É o mesmo defeito que já custou 232 ms por reação nesta lista e que o
+       * dono relatou como "bugado e lerdo".
+       */
+      republicar: (p: PostNaTela) => ultimas.current.republicar(p),
+      compartilhar: (p: PostNaTela) => ultimas.current.compartilhar(p),
+      /* ⚠️ Pelo objeto estável, como as irmãs: um fecho novo por render faria o
+         `memo` errar em todo cartão do feed. */
+      linkPublico: (p: PostNaTela) => ultimas.current.linkPublico(p),
+      tocarStory: (autorId: string) => ultimas.current.tocarStory(autorId),
       ver: (id: string) => ultimas.current.ver(id),
     }),
     [],
@@ -3216,6 +4591,68 @@ export function RedeNoApp({
   }, [onde.t, euId, paraComparar, careMode]);
 
   /**
+   * A MEMÓRIA DO DIA.
+   *
+   * ⚠️ **Uma ida por abertura do FEED, e nada é decidido aqui.** As cinco
+   * travas moram em `memoriaDeHoje`, no servidor: uma condição nesta tela seria
+   * a segunda régua do recurso que mais pode machucar nesta aba.
+   *
+   * ⚠️ E falha vira `null` — o lado seguro deste recurso, ao contrário de quase
+   * todo o resto da rede: o pior caso de calar é um agrado que não aconteceu; o
+   * pior caso de mostrar é devolver a foto de uma perda.
+   */
+  useEffect(() => {
+    if (onde.t !== "feed" || !euId) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { memoriaDoFeed } = await import("@/lib/rede-social.functions");
+        const r = await memoriaDoFeed({ data: { accessToken: t } });
+        if (!vivo) return;
+        setMemoria(r.ok ? (r.memoria ?? null) : null);
+      } catch {
+        if (vivo) setMemoria(null);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, euId]);
+
+  /**
+   * O ÁLBUM — buscado só quando o perfil aberto é o MEU.
+   *
+   * ⚠️ **A consulta nem sai para o perfil de terceiro**, e isso é cinto sobre
+   * suspensório: `meuAlbum` não tem `alvoId`, então ela devolveria o MEU álbum
+   * de qualquer jeito — e desenhá-lo no perfil de outra pessoa seria pior que
+   * não tê-lo. Aqui a corrente fecha nos dois lados.
+   */
+  useEffect(() => {
+    if (onde.t !== "perfil" || !perfil?.souEu) {
+      setAlbum(null);
+      return;
+    }
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { meuAlbum } = await import("@/lib/rede-social.functions");
+        const r = await meuAlbum({ data: { accessToken: t } });
+        if (!vivo) return;
+        setAlbum(r.ok ? r.secoes : null);
+      } catch {
+        if (vivo) setAlbum(null);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [onde.t, perfil?.souEu, perfil?.id]);
+
+  /**
    * O RASCUNHO — lido do aparelho ao abrir o compositor, e só uma vez.
    *
    * ⚠️ **Lido no ABRIR, e não a cada render**: o compositor reescreve o
@@ -3252,11 +4689,50 @@ export function RedeNoApp({
 
   useEffect(() => {
     if (onde.t !== "novo" || !euId) return;
+    let doAparelho: RascunhoDoPost | null = null;
     try {
-      setRascunho(lerRascunho(localStorage.getItem(chaveDoRascunho(euId)), new Date()));
+      doAparelho = lerRascunho(localStorage.getItem(chaveDoRascunho(euId)), new Date());
     } catch {
-      setRascunho(null);
+      doAparelho = null;
     }
+    setRascunho(doAparelho);
+    /**
+     * ⚠️ **O DO APARELHO VENCE, sempre — e o do servidor só entra quando não há
+     * nenhum.**
+     *
+     * O do servidor pode ser de meia hora atrás, escrito no outro celular;
+     * sobrepô-lo ao que ela acabou de digitar aqui seria trocar o texto de agora
+     * pelo de antes, sem ela pedir. Ele existe para o caso que o `localStorage`
+     * não cobre: ela escreve no celular, o celular acaba, e ela abre no
+     * computador.
+     */
+    if (doAparelho) return;
+    let vivo = true;
+    void (async () => {
+      try {
+        const t = await token();
+        if (!t) return;
+        const { meuRascunho } = await import("@/lib/rede-social.functions");
+        const r = await meuRascunho({ data: { accessToken: t } });
+        if (!vivo || !r.ok || !r.rascunho) return;
+        /* ⚠️ Só o que o servidor guarda: os outros campos vêm do tipo, e
+           inventar enquete/marcadas a partir de um rascunho que não as tem
+           ofereceria de volta algo que ela nunca escreveu. */
+        setRascunho({
+          texto: r.rascunho.texto,
+          visibilidade: (r.rascunho.visibilidade ?? "amigas") as Visibilidade,
+          enquete: null,
+          comAula: false,
+          marcadas: [],
+          em: r.rascunho.em,
+        });
+      } catch {
+        /* Sem rede: fica o que o aparelho tem, que é o caso normal. */
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
     /* Só ao ENTRAR na tela: `euId` não muda dentro dela. */
   }, [onde.t, euId]);
 
@@ -3286,9 +4762,102 @@ export function RedeNoApp({
       } catch {
         /* sem armazenamento, ou cota cheia: o compositor segue funcionando */
       }
+      /**
+       * ⚠️ **E O SERVIDOR TAMBÉM — é a rede de segurança da TROCA DE CELULAR.**
+       *
+       * O rascunho do aparelho é mais rápido (não espera rede) e guarda o que o
+       * do servidor não guarda; ele CONTINUA sendo quem manda na tela. O do
+       * servidor existe para o caso que o `localStorage` não cobre: ela escreve
+       * no celular, o celular acaba, e ela abre no computador.
+       *
+       * ⚠️ **Sem `await`, e sem recado na tela.** O texto já está guardado no
+       * aparelho e está escrito na frente dela: um erro sobre uma rede de
+       * segurança faria ela achar que perdeu o que está vendo.
+       */
+      void (async () => {
+        try {
+          const t = await token();
+          if (!t) return;
+          const { salvarRascunho } = await import("@/lib/rede-social.functions");
+          await salvarRascunho({
+            data: {
+              accessToken: t,
+              texto: r?.texto ?? null,
+              visibilidade: r?.visibilidade ?? null,
+              /* ⚠️ O LUGAR não está no rascunho do aparelho (`RascunhoDoPost`
+                 guarda texto, camada, enquete, aula e marcadas). Mandar `null`
+                 aqui é honesto — a coluna existe para quando ele entrar, e
+                 inventar um campo que o tipo não tem só quebraria o `tsc`. */
+              lugar: null,
+            },
+          });
+        } catch {
+          /* Idem: o do aparelho já guardou. */
+        }
+      })();
     },
     [euId],
   );
+
+  /**
+   * O RASCUNHO DO STORY — mesmo desenho do rascunho do post, e por isso mesmo
+   * com identificadores PRÓPRIOS.
+   *
+   * ⚠️ **`guardarRascunhoDoStory`, e nunca `guardarRascunho`.** O do post está
+   * dez linhas acima com o nome curto; reusá-lo aqui gravaria o story na chave
+   * da publicação e apagaria o rascunho dela ao publicar um story. Foi só
+   * olhar a lista de ocorrências que isso apareceu.
+   *
+   * ⚠️ **`useCallback` com `[euId]`**, pela mesma razão do irmão: a referência
+   * entra num `useEffect` lá dentro do compositor, e uma nova a cada pintura
+   * reiniciaria o relógio de 700 ms a cada letra — ou seja, nunca gravaria.
+   */
+  const guardarRascunhoDoStory = useCallback(
+    (r: Omit<RascunhoDoStory, "em"> | null) => {
+      if (!euId) return;
+      try {
+        const chave = chaveDoRascunhoDeStory(euId);
+        if (!r) {
+          localStorage.removeItem(chave);
+          return;
+        }
+        const saida = guardarRascunhoDeStory(r, new Date());
+        if (saida.guardar) localStorage.setItem(chave, saida.texto);
+        else localStorage.removeItem(chave);
+      } catch {
+        /* sem armazenamento, ou cota cheia: o compositor segue funcionando */
+      }
+    },
+    [euId],
+  );
+
+  /**
+   * O que estava guardado, lido quando a conferência ABRE.
+   *
+   * ⚠️ Lido no instante em que a tela abre, e não num `useState` inicial: o
+   * compositor de story é montado e desmontado a cada foto escolhida, e um
+   * inicializador leria uma vez só, na primeira.
+   */
+  const [rascunhoDeStory, setRascunhoDeStory] = useState<RascunhoDoStory | null>(null);
+  /**
+   * A publicação que vai dentro do story que está sendo montado.
+   *
+   * ⚠️ Estado do PAI, e não do compositor: `ConferirStory` é montado e
+   * desmontado a cada foto escolhida, e guardar ali faria a referência sumir
+   * numa remontagem — publicando um story com a foto da publicação e sem o
+   * quadro que explica de quem ela é.
+   */
+  const [postNoStory, setPostNoStory] = useState<string | null>(null);
+  useEffect(() => {
+    if (!conferindoStory || !euId) return;
+    try {
+      setRascunhoDeStory(
+        lerRascunhoDeStory(localStorage.getItem(chaveDoRascunhoDeStory(euId)), new Date()),
+      );
+    } catch {
+      setRascunhoDeStory(null);
+    }
+  }, [conferindoStory, euId]);
 
   /**
    * Quem eu posso marcar — carregada UMA vez, ao abrir o compositor.
@@ -3370,6 +4939,93 @@ export function RedeNoApp({
    * `publicar` já tinha resolvido. O texto vem do SERVIDOR: decidir aqui por
    * que foi recusado seria uma segunda régua clínica no navegador.
    */
+  /**
+   * FIXAR (ou soltar) no topo do perfil.
+   *
+   * ⚠️ **A tela pinta DEPOIS do servidor, e não antes.** O teto de três é
+   * conferido lá com o que o BANCO tem — entre a abertura da tela e o toque
+   * cabem outros aparelhos —, e uma pintura otimista mostraria o pino aceso
+   * numa quarta fixada que foi recusada. É o oposto da reação, onde pintar na
+   * hora vale porque nada pode recusar.
+   *
+   * ⚠️ **E o recado do teto vem com o NÚMERO**, que o servidor manda: "no
+   * máximo 3" diz o que fazer; "não foi possível fixar" não diz nada.
+   */
+  /**
+   * LEVAR UMA PUBLICAÇÃO PARA O COMPOSITOR DE STORY.
+   *
+   * ⚠️ **A FOTO DO POST VIRA O FUNDO DO STORY, e a cópia é deliberada.** O
+   * banco guarda só o id (`post_de`), e o quadro é resolvido na leitura — mas o
+   * FUNDO precisa ser um arquivo do story, porque a publicação pode ser
+   * arquivada a qualquer momento e a coluna é `ON DELETE SET NULL`. Sem a
+   * cópia, o story de outra pessoa ficaria em branco por uma decisão que não é
+   * dela. É o mesmo desenho do Instagram, e pela mesma razão.
+   *
+   * ⚠️ **Sem foto, não vai.** Publicação só de texto não tem o que virar fundo,
+   * e um story de fundo cinza com um cartão em cima não é o que ela pediu — a
+   * saída certa aí é o ✈ (mandar para uma conversa), que já existe.
+   */
+  async function storyComPost(post: PostNaTela) {
+    const { toast } = await import("sonner");
+    const url = post.imagemUrl;
+    if (!url) {
+      toast.error("Esta publicação não tem foto para virar story.");
+      return;
+    }
+    try {
+      /* ⚠️ Passa pelo MESMO `prepararFotoDoPost` de sempre — ele reduz e
+         normaliza o formato. Mandar a URL assinada crua faria o servidor
+         receber um endereço em vez de uma imagem. */
+      const r = await fetch(url);
+      const blob = await r.blob();
+      const dataUrl = await prepararFotoDoPost(
+        new File([blob], "story.jpg", { type: blob.type || "image/jpeg" }),
+      );
+      if (!dataUrl) {
+        toast.error("Não deu para preparar a foto.");
+        return;
+      }
+      setPostNoStory(post.id);
+      setConferindoStory(dataUrl);
+    } catch {
+      toast.error("Não deu para abrir o compositor agora.");
+    }
+  }
+
+  async function fixarNoPerfil(post: PostNaTela, fixar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { fixarPost } = await import("@/lib/rede-social.functions");
+      const r = await fixarPost({ data: { accessToken: t, postId: post.id, fixar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "cheio"
+            ? `Você já tem ${"teto" in r ? r.teto : 3} publicações fixadas. Solte uma para fixar outra.`
+            : r.motivo === "sem_suporte"
+              ? "Fixar ainda não está pronto no servidor."
+              : "Não deu para fixar agora.",
+        );
+        return;
+      }
+      /* ⚠️ A grade RECARREGA, e a tela não reordena sozinha: a posição das
+         fixadas é decidida no servidor (consulta à parte, fora da paginação), e
+         reproduzir essa ordem aqui seria a segunda régua que um dia diverge. */
+      const carimbo = fixar ? new Date().toISOString() : null;
+      setPosts((ps) => ps.map((p) => (p.id === post.id ? { ...p, fixadoEm: carimbo } : p)));
+      /* ⚠️ A grade do perfil tem estado PRÓPRIO (`doPerfil`), separado do feed:
+         sem esta linha o pino acenderia no feed e a grade — que é justamente
+         onde a fixação aparece — continuaria mostrando o estado velho até uma
+         recarga. */
+      setDoPerfil((ps) => ps.map((p) => (p.id === post.id ? { ...p, fixadoEm: carimbo } : p)));
+      toast.success(fixar ? "Fixada no topo do seu perfil." : "Solta do topo.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para fixar agora.");
+    }
+  }
+
   async function editarLegenda(post: PostNaTela, texto: string): Promise<boolean> {
     try {
       const t = await token();
@@ -3449,17 +5105,33 @@ export function RedeNoApp({
       if (r.ok) {
         setPosts(r.posts);
         setProximo(r.proximo);
+        setFeedInstavel(false);
+      } else if ("motivo" in r && r.motivo === "instavel") {
+        /* ⚠️ **"NÃO CARREGOU" NÃO PODE TER A CARA DE "NÃO HÁ NADA".** São a
+           mesma imagem e conclusões opostas: no primeiro ela convida uma amiga,
+           no segundo ela acha que as amigas sumiram. O servidor agora distingue
+           (ver `ctx.degradado`); esta linha é o outro lado. */
+        setFeedInstavel(true);
       }
       if (st.ok) setBolhas(st.bolhas);
       if (meu.ok) {
         setEuId(meu.perfil.id);
+        setPausada(!!(meu as { pausada?: boolean }).pausada);
+        setSuspensa(!!(meu as { suspensa?: boolean }).suspensa);
         setMeuAvatar(meu.perfil.avatarUrl ?? null);
         setSemanaDoCarimbo(meu.semanaDoCarimbo);
+        /* ⚠️ A preferência chega JUNTO com o feed, na mesma rodada. Buscá-la
+           depois faria a tela abrir misturada e, um instante depois, encolher
+           para o modo fechado — as publicações sumindo debaixo do dedo de quem
+           justamente pediu para não ver estranhas. */
+        setSoSeguindo(meu.perfil.feedSoSeguindo);
       }
       if (at.ok) {
         setAvisos(at.itens);
         setNaoVistas(at.novas);
       }
+      /* O emblema das mensagens, na mesma abertura. Ver `contarNaoLidas`. */
+      void contarNaoLidas();
       /* ⚠️ Guardado só quando o FEED veio: com `r.ok` falso o cache gravaria
          uma tela vazia e a próxima volta pintaria "nada por aqui" na hora,
          sobre uma conta que tem publicações. */
@@ -3635,16 +5307,245 @@ export function RedeNoApp({
    * ali no momento do toque faria "silenciar" parecer "bloquear" — que é
    * exatamente a confusão que este botão existe para desfazer.
    */
-  async function silenciarPerfil(alvoId: string, calar: boolean) {
+  /**
+   * REATIVAR — o caminho de volta, a um toque da faixa.
+   *
+   * ⚠️ **A faixa precisa DESTE botão, e não de "vá nas configurações".** Quem
+   * pausou e quer voltar já está olhando o feed; mandá-la procurar um
+   * interruptor três telas adiante é como uma pausa vira uma saída.
+   */
+  /**
+   * A LISTA DAS FAVORITAS — cronológica, como o feed.
+   *
+   * ⚠️ Ela reusa `meuFeed` com um recorte, e não uma consulta própria: uma
+   * segunda montagem de post repetiria `podeVerPost`, as assinaturas de URL e as
+   * reações — e a divergência apareceria como post vazando numa lista e não na
+   * outra.
+   */
+  async function marcarFavorita(alvoId: string, ligar: boolean) {
+    /* Pinta antes, como o silenciar: é um toque num menu. */
+    setPerfil((p) => (p && p.id === alvoId ? { ...p, favorita: ligar } : p));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { favoritar } = await import("@/lib/rede-social.functions");
+      const r = await favoritar({ data: { accessToken: t, alvoId, favoritar: ligar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) throw new Error("recusado");
+      toast.success(
+        ligar ? "Adicionada aos favoritos. Ela não é avisada." : "Tirada dos favoritos.",
+      );
+    } catch {
+      setPerfil((p) => (p && p.id === alvoId ? { ...p, favorita: !ligar } : p));
+    }
+  }
+
+  async function abrirFavoritas() {
+    setOnde({ t: "favoritas" });
+    setFavoritas(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuFeed } = await import("@/lib/rede-social.functions");
+      const r = await meuFeed({ data: { accessToken: t, soFavoritas: true } });
+      /* ⚠️ "Você não tem favoritas" sobre uma falha de leitura a faria
+         favoritar de novo alguém que já está lá. */
+      setFavoritas(r.ok ? r.posts : "erro");
+    } catch {
+      setFavoritas("erro");
+    }
+  }
+
+  async function denunciarUmStory(storyId: string, motivo: MotivoDaDenuncia) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarStory } = await import("@/lib/rede-social.functions");
+      const r = await denunciarStory({ data: { accessToken: t, storyId, motivo } });
+      const { toast } = await import("sonner");
+      /* ⚠️ **`sem_suporte` NÃO pode virar "fica registrada".** Sem o CHECK novo
+         o banco recusa o alvo `story`, e prometer registro sobre uma linha que
+         não gravou é a promessa que este app já quebrou uma vez, com
+         `denunciado_em` escrito e nunca lido. */
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "sem_suporte"
+            ? "A denúncia de story ainda não está disponível aqui."
+            : "Não deu para denunciar agora.",
+        );
+        return;
+      }
+      toast.success("Denúncia registrada. A gente vai olhar.");
+    } catch {
+      /* Sem rede, a folha fecha e nada é prometido. */
+    }
+  }
+
+  /**
+   * O EXPLORAR — e ele NÃO é um feed por relevância.
+   *
+   * ⚠️ **A grade sai de `sugestoesDoFeed`, que já é a régua desta aba:** perfil
+   * público, publicação pública, `podeVerPost` por cima, e ordenação por elos em
+   * comum e recência — nunca por engajamento. Uma consulta própria aqui abriria
+   * a porta para "o que está bombando", e numa base de alto risco o que mais
+   * engaja é o post da EMERGÊNCIA.
+   */
+  async function abrirExplorar() {
+    setOnde({ t: "explorar" });
+    setExplorar(null);
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/rede-social.functions");
+      /* Grade e tags na MESMA onda: são independentes, e em série a lista de
+         assuntos só apareceria depois da grade inteira. */
+      const [sug, tg] = await Promise.all([
+        mod.sugestoesDoFeed({ data: { accessToken: t } }),
+        mod.tagsEmAlta({ data: { accessToken: t } }),
+      ]);
+      /* ⚠️ "Não há nada para descobrir" e "não carregou" são a mesma imagem e
+         conclusões opostas — a primeira faz ela convidar uma amiga, a segunda
+         faz ela achar que a rede morreu. */
+      if (!sug.ok) {
+        setExplorar("erro");
+        return;
+      }
+      setExplorar({ posts: sug.posts, tags: tg.ok ? tg.tags : [] });
+    } catch {
+      setExplorar("erro");
+    }
+  }
+
+  /**
+   * ⚠️ **O RECADO DIZ QUE ELA VOLTA.** Sem isso, "Arquivada" lê como o "Sair"
+   * que está logo acima no mesmo menu — e a paciente que queria só limpar a
+   * caixa acha que encerrou a conversa.
+   */
+  async function arquivarEstaConversa(conversaId: string, arquivar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { arquivarConversa } = await import("@/lib/conversa.functions");
+      const r = await arquivarConversa({ data: { accessToken: t, conversaId, arquivar } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error("Não deu para arquivar agora.");
+        return;
+      }
+      toast.success(arquivar ? "Arquivada. Volta se ela escrever." : "De volta para as mensagens.");
+      setOnde({ t: "conversas" });
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para arquivar agora.");
+    }
+  }
+
+  async function fixarEstaConversa(conversaId: string, fixar: boolean) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { fixarConversa } = await import("@/lib/conversa.functions");
+      const r = await fixarConversa({ data: { accessToken: t, conversaId, fixar } });
+      const { toast } = await import("sonner");
+      /* ⚠️ `sem_suporte` = o banco ainda não tem a coluna. Dizer "fixado" sobre
+         uma conversa que não vai subir é a tela mentindo sobre a própria
+         lista. */
+      if (!r.ok) {
+        toast.error("Não deu para fixar agora.");
+        return;
+      }
+      toast.success(fixar ? "Fixada no topo. Só na sua lista." : "Tirada do topo.");
+      setConversaAberta((c) =>
+        c && c.id === conversaId ? { ...c, fixadaEm: fixar ? new Date().toISOString() : null } : c,
+      );
+    } catch {
+      /* Sem rede, o menu fecha e nada é prometido. */
+    }
+  }
+
+  async function denunciarEstaConversa(conversaId: string, motivo: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { denunciarConversa } = await import("@/lib/conversa.functions");
+      const r = await denunciarConversa({
+        data: { accessToken: t, conversaId, motivo: motivo as never },
+      });
+      const { toast } = await import("sonner");
+      /* ⚠️ **`sem_suporte` NÃO pode virar "fica registrada".** Sem o CHECK novo
+         o banco recusa o alvo `conversa`, e prometer registro sobre uma linha
+         que não gravou é a promessa que este app já quebrou uma vez. */
+      if (!r.ok) {
+        toast.error(
+          "motivo" in r && r.motivo === "sem_suporte"
+            ? "A denúncia de conversa ainda não está disponível aqui."
+            : "Não deu para denunciar agora.",
+        );
+        return;
+      }
+      toast.success("Denúncia registrada. A gente vai olhar.");
+    } catch {
+      /* Sem rede, a folha fecha e nada é prometido. */
+    }
+  }
+
+  async function reativarMinhaConta() {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { pausarMinhaRede } = await import("@/lib/rede-social.functions");
+      const r = await pausarMinhaRede({ data: { accessToken: t, pausar: false } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error("Não deu para reativar agora.");
+        return;
+      }
+      setPausada(false);
+      toast.success("Sua conta voltou 💛");
+      void carregarFeed();
+    } catch {
+      /* Sem rede, a faixa continua — que é a verdade. */
+    }
+  }
+
+  async function silenciarPerfil(
+    alvoId: string,
+    calar: boolean,
+    quais?: { calaPosts: boolean; calaStories: boolean },
+  ) {
     setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: calar } : p));
     try {
       const t = await token();
       if (!t) return;
       const { silenciar } = await import("@/lib/rede-social.functions");
-      const r = await silenciar({ data: { accessToken: t, alvoId, silenciar: calar } });
+      const r = await silenciar({
+        data: {
+          accessToken: t,
+          alvoId,
+          silenciar: calar,
+          calaPosts: quais?.calaPosts,
+          calaStories: quais?.calaStories,
+        },
+      });
       const { toast } = await import("sonner");
       if (r.ok) {
-        toast.success(calar ? "Silenciada. Ela não é avisada." : "Voltou para o seu feed.");
+        /* ⚠️ **`parcial` diz que a ESCOLHA não pegou**, e a tela precisa contar:
+           se ela pediu para calar só os stories e o banco (sem as colunas) calou
+           os dois, dizer "pronto" seria mentir sobre o alcance do próprio
+           silêncio dela. */
+        if ("parcial" in r && r.parcial) {
+          toast.success("Silenciada — por enquanto, publicações e stories.");
+        } else {
+          toast.success(
+            !calar
+              ? "Voltou para o seu feed."
+              : quais && !quais.calaPosts
+                ? "Stories silenciados. Ela não é avisada."
+                : quais && !quais.calaStories
+                  ? "Publicações silenciadas. Ela não é avisada."
+                  : "Silenciada. Ela não é avisada.",
+          );
+        }
         void carregarFeed();
       } else {
         setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: !calar } : p));
@@ -3652,6 +5553,43 @@ export function RedeNoApp({
       }
     } catch {
       setPerfil((p) => (p && p.id === alvoId ? { ...p, silenciado: !calar } : p));
+    }
+  }
+
+  /**
+   * RESTRINGIR — e a tela pinta ANTES, como o silenciar.
+   *
+   * ⚠️ **NÃO recarrega o feed.** Silenciar muda o que aparece no feed e por isso
+   * o recarrega; restringir não tira nada do feed — muda só quem lê o comentário
+   * dela. Recarregar aqui seria uma volta ao servidor por nada, na tela mais
+   * pesada do app.
+   */
+  async function restringirPerfil(alvoId: string, restringirAgora: boolean) {
+    setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: restringirAgora } : p));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { restringir } = await import("@/lib/comentarios.functions");
+      const r = await restringir({
+        data: { accessToken: t, alvoId, restringir: restringirAgora },
+      });
+      const { toast } = await import("sonner");
+      if (r.ok) {
+        toast.success(
+          restringirAgora
+            ? "Restringida. Ela não é avisada."
+            : "Os comentários dela voltam a aparecer.",
+        );
+      } else {
+        setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: !restringirAgora } : p));
+        toast.error(
+          r.motivo === "sem_suporte"
+            ? "Restringir ainda não está pronto no servidor."
+            : "Não deu para mudar agora.",
+        );
+      }
+    } catch {
+      setPerfil((p) => (p && p.id === alvoId ? { ...p, restrito: !restringirAgora } : p));
     }
   }
 
@@ -3671,13 +5609,11 @@ export function RedeNoApp({
 
   async function removerSeguidor(quemId: string) {
     /* ⚠️ Some da lista na hora, e o CONTADOR do perfil desce junto: o número
-       vive em `perfil.meusSeguidores`, e sem isto a lista mostraria 11 pessoas
+       vive em `perfil.seguidores`, e sem isto a lista mostraria 11 pessoas
        embaixo de um "12 seguidores". */
     setGente((g) => g.filter((p) => p.id !== quemId));
     setPerfil((p) =>
-      p && p.meusSeguidores != null
-        ? { ...p, meusSeguidores: Math.max(0, p.meusSeguidores - 1) }
-        : p,
+      p && p.seguidores != null ? { ...p, seguidores: Math.max(0, p.seguidores - 1) } : p,
     );
     try {
       const t = await token();
@@ -3740,12 +5676,23 @@ export function RedeNoApp({
 
   /* O feed acabou (não há página seguinte) → a zona de sugestões pode nascer.
      Também cobre a conta NOVA, em que o feed nasce vazio e `proximo` é `null`:
-     ali a fileira de pessoas é a única coisa útil na tela. */
+     ali a fileira de pessoas é a única coisa útil na tela.
+
+     ⚠️ **E NO MODO MISTURADO ELAS SÃO PEDIDAS JÁ NA ABERTURA** (`!soSeguindo`),
+     não ao chegar no fim. A costura precisa das descobertas em mãos desde a
+     primeira pintura; esperar o fim da rolagem faria o feed abrir puro e as
+     desconhecidas aparecerem de repente no meio do que ela já estava lendo,
+     empurrando o post para baixo do dedo. */
   useEffect(() => {
-    if (careMode || carregando || proximo) return;
+    if (careMode) return;
+    if (!soSeguindo) {
+      void carregarSugestoes();
+      return;
+    }
+    if (carregando || proximo) return;
     void carregarSugestoes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [careMode, carregando, proximo]);
+  }, [careMode, carregando, proximo, soSeguindo]);
 
   /**
    * A zona de sugestões.
@@ -3794,6 +5741,228 @@ export function RedeNoApp({
       void carregarDesafio();
     }
   }
+
+  /**
+   * Quantas conversas pedem resposta.
+   *
+   * ⚠️ Vem JUNTO com o feed, na abertura — o emblema é o que faz alguém tocar
+   * no atalho. Buscando só ao abrir a caixa, o número nasceria sempre zerado e
+   * ninguém saberia que tem mensagem. É a mesma razão pela qual a atividade já
+   * vem junto.
+   */
+  /**
+   * Abre (ou cria) a conversa com alguém, a partir do perfil.
+   *
+   * ⚠️ **QUEM DECIDE SE PODE É O SERVIDOR**, e a tela só conta o desfecho. Uma
+   * régua aqui divergiria de `podeIniciarConversa` no primeiro ajuste — e a
+   * divergência apareceria como um botão que abre uma tela vazia, ou como um
+   * botão escondido de quem tinha direito a ele.
+   */
+  /**
+   * ⚠️ **LIMPA A REPUBLICAÇÃO AO SAIR DO COMPOSITOR, e num EFEITO.**
+   *
+   * Sem isto, a publicação seguinte nasceria republicando algo que ninguém
+   * pediu. E a primeira versão fazia `setRepostando(null)` no meio do render —
+   * o `tsc` pegou pelo lado errado (a comparação já estava estreitada), mas o
+   * defeito real é outro: mudar estado durante a pintura é anti-padrão do React
+   * e custa um render a mais em toda troca de tela.
+   */
+  useEffect(() => {
+    if (onde.t !== "novo") setRepostando(null);
+  }, [onde.t]);
+
+  /**
+   * COMPARTILHAR A PRÓPRIA PUBLICAÇÃO PARA FORA.
+   *
+   * ⚠️ **ENTREGA O ARQUIVO AO SISTEMA, e cai para o texto quando não dá.** Um
+   * `share({files})` num navegador que só aceita texto falha DEPOIS de a
+   * paciente tocar, com a folha do sistema já aberta — `comoCompartilhar`
+   * pergunta antes.
+   *
+   * ⚠️ **A IMAGEM É BAIXADA DA URL ASSINADA, e por isso pode falhar.** Ela tem
+   * validade, e a rede dela pode estar ruim. Falhou o arquivo, vai o texto: o
+   * pior caso é a amiga receber o link sem a foto, e não um botão que não faz
+   * nada.
+   */
+  async function compartilhar(post: PostNaTela) {
+    const { comoCompartilhar, podeCompartilharPost, textoDoCompartilhamento } =
+      await import("@/lib/compartilhar-post");
+    /* A régua de novo aqui, e não só no botão: o botão some para post alheio,
+       mas quem garante é isto. */
+    if (
+      podeCompartilharPost({
+        souAAutora: post.souAAutora,
+        temImagem: !!post.imagemUrl,
+        temVideo: !!post.videoUrl,
+        temTexto: !!post.texto,
+      })
+    ) {
+      return;
+    }
+
+    const modo = comoCompartilhar(navigator as never);
+    if (modo === "nenhum") return;
+
+    const texto = textoDoCompartilhamento(post.texto, linkDeIndicacao(meuCodigo));
+
+    if (modo === "arquivo" && post.imagemUrl) {
+      try {
+        const r = await fetch(post.imagemUrl);
+        if (r.ok) {
+          const blob = await r.blob();
+          const arq = new File([blob], "obstetrica.jpg", { type: blob.type || "image/jpeg" });
+          if (navigator.canShare?.({ files: [arq] })) {
+            await navigator.share({ files: [arq], text: texto });
+            return;
+          }
+        }
+      } catch {
+        /* Cai para o texto, logo abaixo. */
+      }
+    }
+    try {
+      await navigator.share({ text: texto });
+    } catch {
+      /* Ela cancelou a folha do sistema — não é erro. */
+    }
+  }
+
+  /**
+   * REPUBLICAR — abre o compositor já com a original anexada.
+   *
+   * ⚠️ **NÃO PUBLICA DIRETO.** Republicar sem escrever nada é o gesto que enche
+   * o feed de cópias sem contexto; o compositor obriga a passar pela tela, e é
+   * ali que ela decide o texto e a camada da própria publicação. E é o mesmo
+   * caminho de qualquer post, então a régua clínica e a triagem continuam
+   * valendo — um repost sem compositor as pularia.
+   */
+  function republicar(post: PostNaTela) {
+    setRepostando(post);
+    setOnde({ t: "novo" });
+  }
+
+  async function abrirConversaCom(alvoId: string, rascunho?: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/conversa.functions");
+      const r = await mod.abrirConversa({ data: { accessToken: t, alvoId } });
+      if (!r.ok) {
+        /* ⚠️ Bloqueio e fora-de-alcance dizem a MESMA coisa na tela. Separar os
+           dois contaria que o bloqueio existe — a mesma razão pela qual o
+           servidor confere o bloqueio antes do alcance. */
+        /* ⚠️ `sonner` entra por import DINÂMICO, como em todo este arquivo:
+           estático ele toca `document` ao carregar e derruba o `bun test`
+           inteiro — a lição de `assinatura.ts`. */
+        const { toast } = await import("sonner");
+        toast.error("Não é possível enviar mensagem para esta pessoa.");
+        return;
+      }
+      const { minhasConversas } = await import("@/lib/conversa.functions");
+      const lista = await minhasConversas({ data: { accessToken: t } });
+      const c = lista.ok ? lista.conversas.find((x) => x.id === r.id) : null;
+      if (!c) return;
+      setRascunhoDaConversa(rascunho ?? null);
+      setConversaAberta(c);
+      setOnde({ t: "conversa" });
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para abrir a conversa agora.");
+    }
+  }
+
+  /**
+   * RESPONDER AO STORY — vira mensagem direta, com o story anexado.
+   *
+   * ⚠️ **NÃO abre a conversa.** No modelo, responder a um story manda e devolve
+   * a pessoa ao story seguinte: ela está assistindo, não conversando. Abrir a
+   * caixa aqui tiraria a paciente do meio de uma sequência que ela escolheu ver.
+   *
+   * ⚠️ **A recusa é DITA, e nunca em silêncio.** A trava de uma-mensagem-antes-
+   * do-aceite vale aqui também: quem não é seguida de volta manda uma e espera.
+   * Sem o recado, o "Enviado 💛" já pintado na tela viraria mentira.
+   */
+  async function responderAoStory(
+    autorId: string,
+    storyId: string,
+    texto: string,
+    foto?: File | null,
+  ) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const mod = await import("@/lib/conversa.functions");
+      const abriu = await mod.abrirConversa({ data: { accessToken: t, alvoId: autorId } });
+      const { toast } = await import("sonner");
+      if (!abriu.ok) {
+        toast.error("Não é possível enviar mensagem para esta pessoa.");
+        return;
+      }
+      /* ⚠️ **A foto sobe DEPOIS de a conversa existir, e não antes.** O caminho
+         no balde é conferido contra a conversa (`minhaConversa`) — sem o id não
+         há como pedir a URL assinada. E se ela falhar, a mensagem SAI mesmo
+         assim, só sem a foto: perder o texto que ela escreveu por causa do
+         anexo seria o pior desfecho, e o story some em 24 h. */
+      let imagemPath: string | undefined;
+      if (foto) {
+        const caminho = await subirFoto(t, abriu.id, foto);
+        if (caminho) imagemPath = caminho;
+        else toast.error("A foto não subiu — mandei só o texto.");
+      }
+      const r = await mod.enviarMensagem({
+        data: {
+          accessToken: t,
+          conversaId: abriu.id,
+          texto,
+          imagemPath,
+          refTipo: "story",
+          refId: storyId,
+        },
+      });
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "aguardando_aceite"
+            ? "Você já mandou uma mensagem. Espere a resposta."
+            : r.motivo === "emergencia"
+              ? "Isso precisa de atendimento. Use o botão de emergência."
+              : "Não deu para enviar agora.",
+        );
+        return;
+      }
+      void contarNaoLidas();
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para enviar agora.");
+    }
+  }
+
+  const contarNaoLidas = useCallback(async () => {
+    try {
+      const t = await token();
+      if (!t) return;
+      /* ⚠️ **O EMBLEMA CONTAVA SÓ AS CONVERSAS DE DUAS.** Uma mensagem de
+         grupo não acendia número nenhum: a bolinha do grupo existe, e vive
+         DENTRO da lista de grupos, que só se vê depois de já ter aberto a aba
+         Mensagens. Ou seja, o aviso só chegava a quem já tinha ido olhar. */
+      const [{ minhasConversas }, { meusGrupos }] = await Promise.all([
+        import("@/lib/conversa.functions"),
+        import("@/lib/grupo.functions"),
+      ]);
+      const [r, g] = await Promise.all([
+        minhasConversas({ data: { accessToken: t } }),
+        meusGrupos({ data: { accessToken: t } }),
+      ]);
+      /* ⚠️ Cada metade conta a sua. Uma falha na leitura dos grupos não pode
+         zerar o número das conversas — o emblema some e ela deixa de abrir a
+         mensagem que existe. */
+      const deConversas = r.ok ? r.naoLidas : 0;
+      const deGrupos = g.ok ? g.grupos.filter((x) => x.naoLida).length : 0;
+      if (r.ok || g.ok) setMsgsNaoLidas(deConversas + deGrupos);
+    } catch {
+      /* Sem o número o atalho fica sem emblema, que é o estado de quem não tem
+         mensagem — nunca um erro na tela. */
+    }
+  }, []);
 
   async function carregarSugestoes(fase = mesmaFase) {
     /* ⚠️ A trava é de PRIMEIRA CARGA, e trocar o filtro precisa furá-la: sem
@@ -3883,6 +6052,37 @@ export function RedeNoApp({
     return null;
   }
 
+  /**
+   * O `@` DE UMA MENÇÃO VIRA UM PERFIL.
+   *
+   * ⚠️ **A resolução é do SERVIDOR, e um `@` que não existe não é erro de
+   * app.** Legenda é texto livre: qualquer pessoa escreve `@` seguido de
+   * qualquer coisa, e transformar isso num alerta vermelho faria a tela gritar
+   * por causa de uma palavra. Um aviso curto e a tela fica onde estava.
+   */
+  async function abrirPorArroba(handle: string) {
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const s = await supabase.auth.getSession();
+      const token = s.data.session?.access_token;
+      if (!token) return;
+      const { perfilPorHandle } = await import("@/lib/mencoes.functions");
+      const r = await perfilPorHandle({ data: { accessToken: token, handle } });
+      if (r.ok) {
+        void abrirPerfil(r.id);
+        return;
+      }
+      const { toast } = await import("sonner");
+      toast(r.motivo === "nao_achei" ? `Não encontrei @${handle}.` : "Não deu para abrir agora.");
+    } catch {
+      /* Sem rede, o toque não leva a lugar nenhum — e é melhor que um erro. */
+    }
+  }
+
+  async function abrirTag(tag: string) {
+    setOnde({ t: "tag", tag });
+  }
+
   async function abrirPerfil(id: string) {
     setPerfil(null);
     /* ⚠️ O ESBOÇO ANTES DA IDA AO SERVIDOR. Sem ele, `onde.t === "perfil"` com
@@ -3919,6 +6119,29 @@ export function RedeNoApp({
       const r = await verPerfil({ data: { accessToken: t, alvoId: id } });
       if (r.ok) {
         setPerfil(r.perfil);
+        /**
+         * ⚠️ **A RESTRIÇÃO VEM NUMA CONSULTA PRÓPRIA, e não em `verPerfil`.**
+         *
+         * Aquela função monta o perfil que QUALQUER pessoa vê, e um campo
+         * "você me restringe?" ali viajaria no perfil de terceiro — que é
+         * exatamente o vazamento que destruiria o recurso: o silêncio é a única
+         * coisa que separa restringir de bloquear.
+         *
+         * ⚠️ E ela roda DEPOIS de o perfil estar na tela, num `try` próprio: o
+         * botão nasce em "Restringir" (o estado de quem não restringiu) e se
+         * corrige; uma falha aqui não pode segurar a abertura do perfil.
+         */
+        void (async () => {
+          try {
+            const { minhasRestricoes } = await import("@/lib/comentarios.functions");
+            const rr = await minhasRestricoes({ data: { accessToken: t } });
+            if (rr.ok) {
+              setPerfil((p) => (p && p.id === id ? { ...p, restrito: rr.ids.includes(id) } : p));
+            }
+          } catch {
+            /* O botão fica em "Restringir", que é o estado mais comum. */
+          }
+        })();
         setDoPerfil(r.posts);
         setProximoDoPerfil(r.proximo);
         guardarNoCache(chave, { perfil: r.perfil, posts: r.posts, proximo: r.proximo });
@@ -3976,14 +6199,135 @@ export function RedeNoApp({
     }
   }
 
-  async function abrirLista(tipo: "seguidores" | "seguindo") {
+  /**
+   * ABRE O LINK PÚBLICO e o entrega pronto para colar.
+   *
+   * ⚠️ **Vai o LINK para a área de transferência, e não uma URL crua num
+   * `share` de arquivo.** Colado no WhatsApp, um endereço sozinho já diz o que
+   * é (o cartão do link mostra a foto); e é o mesmo caminho do convite das
+   * Amigas, que aprendeu isso da forma cara.
+   */
+  async function abrirLinkPublico(post: PostNaTela) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { linkPublicoDoPost } = await import("@/lib/rede-social.functions");
+      const r = await linkPublicoDoPost({ data: { accessToken: t, postId: post.id, abrir: true } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        /* ⚠️ Cada recusa tem recado PRÓPRIO: "não deu" sobre uma publicação que
+           ela fechou para as amigas não diz o que fazer diferente. */
+        return toast.error(
+          r.motivo === "nao_e_publico"
+            ? "Só publicação aberta a todo mundo tem link."
+            : r.motivo === "arquivado"
+              ? "Esta publicação está arquivada."
+              : "Não deu para gerar o link agora.",
+        );
+      }
+      const { linkDaPublicacao } = await import("@/lib/link-da-publicacao");
+      const url = linkDaPublicacao(r.codigo);
+      if (!url) return toast.error("Não deu para gerar o link agora.");
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copiado. Qualquer pessoa com ele abre esta publicação.");
+      } catch {
+        /* ⚠️ Sem área de transferência (navegador antigo, permissão negada), o
+           link NÃO se perde: ele aparece no recado para ela copiar à mão. */
+        toast.success(url);
+      }
+    } catch {
+      /* Sem rede: o botão continua ali. */
+    }
+  }
+
+  async function abrirEscondidos() {
+    setEscondidos(null);
+    setOnde({ t: "escondidos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusEscondidosDoStory } = await import("@/lib/rede-social.functions");
+      const r = await meusEscondidosDoStory({ data: { accessToken: t } });
+      /* ⚠️ Falha vira `"erro"`, e NUNCA lista vazia: "você não escondeu de
+         ninguém" faria ela esconder de novo, ou desistir. */
+      setEscondidos(r.ok ? r.gente : ("erro" as any));
+    } catch {
+      setEscondidos("erro" as any);
+    }
+  }
+
+  async function mostrarStoryDeNovo(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { esconderStoryDe } = await import("@/lib/rede-social.functions");
+      const r = await esconderStoryDe({ data: { accessToken: t, alvoId, esconder: false } });
+      const { toast } = await import("sonner");
+      if (!r.ok) return toast.error("Não deu para desfazer agora.");
+      /* A lista se corrige na tela sem esperar outra ida à rede. */
+      setEscondidos((v) => (Array.isArray(v) ? v.filter((p) => p.id !== alvoId) : v));
+      toast.success("Ela volta a ver seus stories.");
+    } catch {
+      /* Fica como está; o botão continua ali. */
+    }
+  }
+
+  async function esconderMeuStoryDe(alvoId: string) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { esconderStoryDe } = await import("@/lib/rede-social.functions");
+      const r = await esconderStoryDe({ data: { accessToken: t, alvoId, esconder: true } });
+      const { toast } = await import("sonner");
+      /* ⚠️ O recado NÃO nomeia ninguém e diz que é calado: sem a segunda
+         frase, ela imagina que a pessoa foi avisada — e não esconde. */
+      if (!r.ok) return toast.error("Não deu para esconder agora.");
+      toast.success("Pronto. Ela não é avisada.");
+    } catch {
+      /* Idem. */
+    }
+  }
+
+  async function abrirCurtidos() {
+    setCurtidos(null);
+    setOnde({ t: "curtidos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusCurtidos } = await import("@/lib/rede-social.functions");
+      const r = await meusCurtidos({ data: { accessToken: t } });
+      setCurtidos(r.ok ? r.posts : ("erro" as any));
+    } catch {
+      setCurtidos("erro" as any);
+    }
+  }
+
+  async function abrirDesfechos() {
+    setDesfechos(null);
+    setOnde({ t: "desfechos" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusDesfechos } = await import("@/lib/rede-social.functions");
+      const r = await meusDesfechos({ data: { accessToken: t } });
+      setDesfechos(r.ok ? r.desfechos : ("erro" as any));
+    } catch {
+      setDesfechos("erro" as any);
+    }
+  }
+
+  async function abrirLista(tipo: "seguidores" | "seguindo", alvoId?: string) {
     setGente([]);
     setOnde({ t: "lista", tipo });
     try {
       const t = await token();
       if (!t) return;
       const { listaDeGente } = await import("@/lib/rede-social.functions");
-      const r = await listaDeGente({ data: { accessToken: t, tipo } });
+      /* ⚠️ O alvo vai como está; quem confere se ela pode ver é o SERVIDOR
+         (`alcancaOPerfil`). Uma segunda régua aqui diria "indisponível" sobre um
+         perfil que o servidor abriria — ou o contrário, que é pior. */
+      const r = await listaDeGente({ data: { accessToken: t, tipo, alvoId } });
       if (r.ok) setGente(r.gente);
     } catch {
       /* Lista vazia; a tela já diz "ninguém por aqui ainda". */
@@ -4033,27 +6377,69 @@ export function RedeNoApp({
     }
   }
 
+  const seguindoEmVoo = useRef(false);
+
   async function seguir() {
     if (!perfil || perfil.souEu) return;
+    /* ⚠️ UM TOQUE POR VEZ. A ida à rede leva centenas de milissegundos, e sem
+       trava o segundo toque dispara a ação OPOSTA sobre um estado que ainda
+       não voltou — ela toca duas vezes e acaba não seguindo. `useRef` porque
+       um estado só valeria no render seguinte. */
+    if (seguindoEmVoo.current) return;
+    seguindoEmVoo.current = true;
+
+    /* ⚠️ O RÓTULO MUDA NO TOQUE, e o conteúdo NÃO.
+       O mesmo botão na fileira de sugeridas já responde na hora; no perfil ele
+       esperava a rede, e a paciente tocava de novo achando que não tinha
+       pegado. O otimismo fica no RÓTULO: nunca pintar publicação de perfil
+       privado antes do aceite — isso seria mostrar o que a régua recusa.
+       O estado provisório sai da MESMA régua do rótulo (`perfil.publico`
+       decide entre `ativo` e `pendente`), nunca de um palpite. */
+    const antes = perfil.meuVinculo;
+    const otimista =
+      antes === "ativo" ? null : perfil.publico ? ("ativo" as const) : ("pendente" as const);
+    setPerfil({ ...perfil, meuVinculo: otimista });
+
     try {
       const t = await token();
-      if (!t) return;
+      if (!t) {
+        setPerfil({ ...perfil, meuVinculo: antes });
+        return;
+      }
       const mod = await import("@/lib/rede-social.functions");
-      if (perfil.meuVinculo === "ativo") {
-        await mod.deixarDeSeguir({ data: { accessToken: t, alvoId: perfil.id } });
-        setPerfil({ ...perfil, meuVinculo: null });
-      } else if (!perfil.meuVinculo) {
+      if (antes === "ativo") {
+        /* ⚠️ **O RETORNO ERA DESCARTADO — e o ramo LOGO ABAIXO, na MESMA
+         * funcao, le o dele.** `{ ok: false }` chega num 200 NORMAL, entao o
+         * `catch` nao pega: o botao virava "Seguir", ela saia da tela achando
+         * que tinha deixado de seguir, e na proxima abertura estava seguindo de
+         * novo. Nao ha erro, nao ha log — so o app desfazendo uma decisao dela.
+         *
+         * A regra ja estava aplicada dois ramos abaixo (`if (r.ok) setPerfil`);
+         * o que faltava era valer para os dois. */
+        const r = await mod.deixarDeSeguir({ data: { accessToken: t, alvoId: perfil.id } });
+        /* ⚠️ DESFAZ TAMBÉM QUANDO `r.ok` É FALSO — e não só no `catch`.
+           `{ ok: false }` chega numa resposta 200 NORMAL, que nenhum
+           `try/catch` pega: sem esta linha, o botão ficaria dizendo o
+           contrário do que o servidor gravou. É o defeito que este mesmo
+           ramo já pagou uma vez. */
+        setPerfil({ ...perfil, meuVinculo: r.ok ? null : antes });
+      } else if (!antes) {
         const r = await mod.seguir({ data: { accessToken: t, alvoId: perfil.id } });
-        if (r.ok) setPerfil({ ...perfil, meuVinculo: r.estado });
+        setPerfil({ ...perfil, meuVinculo: r.ok ? r.estado : antes });
       }
     } catch {
-      /* O botão volta ao estado real na próxima abertura do perfil. */
+      /* Desfaz na hora: o botão dizendo "Seguindo" sobre uma rede que caiu é
+         pior que o botão não ter respondido. */
+      setPerfil({ ...perfil, meuVinculo: antes });
+    } finally {
+      seguindoEmVoo.current = false;
     }
   }
 
   async function salvarPerfil(m: {
     nome?: string;
     bio?: string | null;
+    bioLink?: string | null;
     avatar?: string | null;
   }): Promise<boolean> {
     try {
@@ -4061,7 +6447,16 @@ export function RedeNoApp({
       if (!t) return false;
       const { salvarPerfilSocial } = await import("@/lib/rede-social.functions");
       const r = await salvarPerfilSocial({ data: { accessToken: t, ...m } });
-      if (!r.ok) return false;
+      if (!r.ok) {
+        /* ⚠️ **A RECUSA DA BIO PRECISA SER DITA.** Devolver `false` mudo faz o
+           botão de salvar não fazer nada — e ela não tem como adivinhar que a
+           descrição foi recusada por falar de sintoma. */
+        if ("recado" in r && r.recado) {
+          const { toast } = await import("sonner");
+          toast.error(r.recado);
+        }
+        return false;
+      }
       /* Recarrega do servidor em vez de aplicar o que eu mandei: a foto volta
          como URL ASSINADA do balde, e não como a data URL que subiu — pintar a
          data URL aqui deixaria a tela certa e o banco diferente. */
@@ -4077,13 +6472,24 @@ export function RedeNoApp({
     marcadas: string[];
     /** O post antigo que vira a primeira foto do "então e agora". */
     comparacaoCom: string | null;
+    /** A descrição da foto, para leitores de tela. */
+    altTexto?: string | null;
+    /** ⚠️ Um RÓTULO que ela escreve, nunca coordenada. */
+    lugar?: string | null;
     texto: string | null;
     fotos: string[];
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
     miniatura?: string | null;
     visibilidade: Visibilidade;
+    quemComenta?: QuemComenta;
     enquete: string[];
     aula: AulaNoPost | null;
+    /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
+    marco?: { tipo: string; dias: number | null } | null;
+    /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
+    video?: { caminho: string; segundos: number | null } | null;
+    /** A publicação republicada. Conferida no servidor. */
+    repostDe?: string | null;
   }): Promise<boolean> {
     try {
       const t = await token();
@@ -4100,10 +6506,16 @@ export function RedeNoApp({
           miniatura: p.miniatura ?? null,
           extras: p.fotos.slice(1),
           visibilidade: p.visibilidade,
+          quemComenta: p.quemComenta,
           enquete: p.enquete,
           aula: p.aula,
+          marco: p.marco ?? null,
+          video: p.video ?? null,
+          repostDe: p.repostDe ?? null,
           marcadas: p.marcadas,
           comparacaoCom: p.comparacaoCom ?? undefined,
+          altTexto: p.altTexto ?? undefined,
+          lugar: p.lugar ?? undefined,
         },
       });
       if (!r.ok) {
@@ -4238,6 +6650,135 @@ export function RedeNoApp({
     }
   }
 
+  /**
+   * O ARQUIVO DE STORIES.
+   *
+   * ⚠️ **Estado próprio, e não o de `arquivados`.** São duas listas de tipos
+   * diferentes (`StoryArquivado` contra `PostNaTela`), e reusar o estado faria a
+   * tela dos posts arquivados desenhar stories na volta de uma navegação.
+   *
+   * ⚠️ E `null` é "ainda não carregou", `[]` é "não publicou nenhum": juntar os
+   * dois faria a tela dizer "você ainda não publicou stories" enquanto a lista
+   * vem — para quem tem trinta.
+   */
+  /**
+   * A LISTA DE QUEM EU BLOQUEEI.
+   *
+   * ⚠️ `"erro"` é um estado PRÓPRIO, e não uma lista vazia: "você não bloqueou
+   * ninguém" faria ela concluir que o bloqueio não pegou — e talvez bloquear de
+   * novo, ou desistir de bloquear.
+   */
+  async function abrirBloqueados() {
+    setBloqueados(null);
+    setOnde({ t: "bloqueados" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusBloqueados } = await import("@/lib/rede-social.functions");
+      const r = await meusBloqueados({ data: { accessToken: t } });
+      setBloqueados(r.ok ? r.pessoas : "erro");
+    } catch {
+      setBloqueados("erro");
+    }
+  }
+
+  /** Desbloquear, da própria lista. */
+  async function desbloquear(id: string) {
+    const antes = bloqueados;
+    setBloqueados((b) => (Array.isArray(b) ? b.filter((p) => p.id !== id) : b));
+    try {
+      const t = await token();
+      if (!t) return;
+      const { bloquear } = await import("@/lib/rede-social.functions");
+      const r = await bloquear({ data: { accessToken: t, alvoId: id, bloquear: false } });
+      if (!r.ok) {
+        setBloqueados(antes);
+        const { toast } = await import("sonner");
+        toast.error("Não deu para desbloquear agora.");
+      }
+    } catch {
+      setBloqueados(antes);
+    }
+  }
+
+  async function abrirArquivoDeStories() {
+    setArquivoStories(null);
+    setArquivoStoriesInstavel(false);
+    setOnde({ t: "arquivo-stories" });
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuArquivoDeStories } = await import("@/lib/rede-social.functions");
+      const r = await meuArquivoDeStories({ data: { accessToken: t } });
+      if (r.ok) {
+        setArquivoStories(r.stories);
+        setProximoArquivo(r.proximo);
+        return;
+      }
+      /* ⚠️ **"NÃO CARREGOU" NÃO PODE TER A CARA DE "NÃO HÁ NADA"** — a mesma
+         lição do feed instável. Aqui é pior: "você nunca publicou um story" é a
+         frase mais errada que esta tela pode dizer a quem publicou trinta. */
+      setArquivoStoriesInstavel(true);
+    } catch {
+      setArquivoStoriesInstavel(true);
+    }
+  }
+
+  /** A próxima leva do arquivo. */
+  async function maisDoArquivoDeStories() {
+    if (!proximoArquivo) return;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meuArquivoDeStories } = await import("@/lib/rede-social.functions");
+      const r = await meuArquivoDeStories({ data: { accessToken: t, antesDe: proximoArquivo } });
+      if (!r.ok) return;
+      /* ⚠️ Junta SEM repetir por id: duas páginas podem se sobrepor, e chave
+         repetida derruba a lista inteira do React. */
+      setArquivoStories((ps) => {
+        const vistos = new Set((ps ?? []).map((x) => x.id));
+        return [...(ps ?? []), ...r.stories.filter((x) => !vistos.has(x.id))];
+      });
+      setProximoArquivo(r.proximo);
+    } catch {
+      /* A lista que já está na tela continua. */
+    }
+  }
+
+  /**
+   * Destacar (ou soltar) um story.
+   *
+   * ⚠️ **Pinta DEPOIS do servidor**, como o fixar: o teto é conferido lá com o
+   * que o banco tem, e uma pintura otimista acenderia o selo num destaque que
+   * foi recusado.
+   */
+  async function destacarNoPerfil(storyId: string, destacar: boolean, titulo?: string | null) {
+    try {
+      const t = await token();
+      if (!t) return;
+      const { destacarStory } = await import("@/lib/rede-social.functions");
+      const r = await destacarStory({ data: { accessToken: t, storyId, destacar, titulo } });
+      const { toast } = await import("sonner");
+      if (!r.ok) {
+        toast.error(
+          r.motivo === "cheio"
+            ? `Você já tem ${"teto" in r ? r.teto : 10} stories em destaque. Solte um para destacar outro.`
+            : r.motivo === "sem_suporte"
+              ? "Destacar ainda não está pronto no servidor."
+              : "Não deu para destacar agora.",
+        );
+        return;
+      }
+      setArquivoStories((ps) =>
+        (ps ?? []).map((x) => (x.id === storyId ? { ...x, destacado: destacar } : x)),
+      );
+      toast.success(destacar ? "No destaque do seu perfil." : "Fora do destaque.");
+    } catch {
+      const { toast } = await import("sonner");
+      toast.error("Não deu para destacar agora.");
+    }
+  }
+
   async function abrirArquivados() {
     setArquivados([]);
     setOnde({ t: "arquivados" });
@@ -4265,7 +6806,18 @@ export function RedeNoApp({
       const t = await token();
       if (!t) return;
       const { desarquivarPost } = await import("@/lib/rede-social.functions");
-      await desarquivarPost({ data: { accessToken: t, postId: post.id } });
+      const r = await desarquivarPost({ data: { accessToken: t, postId: post.id } });
+      /* ⚠️ **O `try/catch` NÃO PEGA ISTO**, e era o engano: a função devolve
+         `{ ok: false }` numa resposta 200 NORMAL — não lança. Com o resultado
+         descartado, a publicação sumia da gaveta (a pintura otimista da linha
+         de cima), não voltava ao feed, e ela ficava sem ela nas DUAS listas,
+         sem nenhum recado. Concluiria que perdeu a publicação. */
+      if (!r.ok) {
+        const { toast } = await import("sonner");
+        toast.error("Não deu para trazer de volta agora.");
+        void abrirArquivados();
+        return;
+      }
       void carregarFeed();
     } catch {
       void abrirArquivados();
@@ -4374,11 +6926,25 @@ export function RedeNoApp({
 
   async function publicarStory(
     dataUrl: string,
+    texto: string,
+    camada: VisibilidadeDoStory,
     carimbar: boolean,
     enquete: string[],
     perguntaAberta: boolean,
+    marcadas: string[],
+    maisFotos: string[],
   ) {
     setConferindoStory(null);
+    /* ⚠️ Lido ANTES de zerar: o `setPostNoStory(null)` abaixo é assíncrono, e
+       ler o estado depois dele mandaria `null` para o servidor — o story sairia
+       sem o quadro, com a foto de outra pessoa e nada dizendo de quem é.
+       ⚠️ E o VÍDEO tem exatamente o mesmo perigo, com uma diferença: o arquivo
+       já está no balde. Ler depois de zerar publicaria um story de capa
+       PARADA, e o vídeo que ela gravou ficaria órfão no Storage. */
+    const comPost = postNoStory;
+    const comVideo = videoDoStory;
+    setPostNoStory(null);
+    setVideoDoStory(null);
     try {
       const t = await token();
       if (!t) return;
@@ -4387,13 +6953,27 @@ export function RedeNoApp({
         data: {
           accessToken: t,
           imagem: dataUrl,
-          texto: null,
+          /* ⚠️ Vazio vira `null`, e não `""`: a coluna é anulável e um string
+             vazio faria a leitura desenhar uma faixa de texto sem texto por
+             cima da foto. */
+          texto: texto.trim() || null,
           carimbarSemana: carimbar,
           enquete,
           perguntaAberta,
+          postDe: comPost,
+          visibilidade: camada,
+          marcadas,
+          maisFotos,
+          video: comVideo,
         },
       });
       if (r.ok) {
+        /* ⚠️ Publicou, o rascunho some — senão a próxima abertura oferece de
+           volta o story que ela ACABOU de publicar.
+           ⚠️ E o nome é `guardarRascunhoDoStory`, NUNCA `guardarRascunho`: esse
+           já existe neste arquivo e é o do POST. Reusá-lo aqui apagaria o
+           rascunho da publicação dela ao publicar um story. */
+        guardarRascunhoDoStory(null);
         void carregarFeed();
         return;
       }
@@ -4533,6 +7113,14 @@ export function RedeNoApp({
    * atividades novas congelaria no valor da montagem, e a bolinha diria "3"
    * depois de ela ter lido as três.
    */
+  /* A folha "Mais" da Comunidade — ver `MaisDaComunidade`. Fecha sozinha ao
+     sair do feed: os itens dela agem sobre o feed, e uma folha aberta por cima
+     de outra tela ofereceria "Salvos" em cima do perfil de alguém. */
+  const [maisAberto, setMaisAberto] = useState(false);
+  useEffect(() => {
+    if (onde.t !== "feed") setMaisAberto(false);
+  }, [onde.t]);
+
   useEffect(() => {
     if (onde.t !== "feed") return;
     /* ⚠️ **Em Modo Cuidado as bolinhas NÃO somem — elas encolhem.** Sumindo,
@@ -4555,14 +7143,30 @@ export function RedeNoApp({
           : [],
       );
     }
+    /* ⚠️ **QUATRO de uso diário e a bolinha "Mais" — nunca a lista inteira.**
+       O leque chegou a CATORZE bolinhas numa coluna: passava por cima do
+       relógio do celular, repetia ícones e misturava uso diário com segurança
+       (pedido do dono, com a foto: "muitas opções e muito confuso"). O resto
+       mora em `MaisDaComunidade`, em três grupos com ícone próprio. Função
+       nova entra LÁ, num grupo — não aqui. */
     const atalhos: AtalhoDaAba[] = [
-      { id: "buscar", rotulo: "Buscar", icone: "buscar", aoTocar: () => setOnde({ t: "busca" }) },
       {
         id: "atividade",
         rotulo: "Atividade",
         icone: "coracao",
         emblema: naoVistas,
         aoTocar: () => void abrirAtividade(),
+      },
+      /* ⚠️ A CAIXA DE ENTRADA FICA AO LADO DA ATIVIDADE, e não no cabeçalho:
+         ele foi removido a pedido do dono ("cada aba não precisa ocupar esse
+         espaço que é precioso"), e as ações viraram estas bolinhas. Pôr um
+         ícone de mensagem no topo desfaria aquela decisão. */
+      {
+        id: "mensagens",
+        rotulo: "Mensagens",
+        icone: "balao",
+        emblema: msgsNaoLidas,
+        aoTocar: () => setOnde({ t: "conversas" }),
       },
       { id: "publicar", rotulo: "Publicar", icone: "mais", aoTocar: () => setOnde({ t: "novo" }) },
       {
@@ -4573,34 +7177,15 @@ export function RedeNoApp({
           if (euId) void abrirPerfil(euId);
         },
       },
-      { id: "salvos", rotulo: "Salvos", icone: "marcador", aoTocar: () => void abrirSalvos() },
       {
-        id: "arquivados",
-        rotulo: "Arquivados",
-        icone: "grade",
-        aoTocar: () => void abrirArquivados(),
-      },
-      {
-        id: "caixinha",
-        rotulo: "Caixinha",
-        icone: "balao",
-        /* ⚠️ O emblema conta as SEM RESPOSTA, e não o total: uma caixa com
-           quarenta perguntas já respondidas diria "40" para sempre, e o número
-           deixaria de significar trabalho. Mesma régua do contador da fita do
-           painel. */
+        id: "mais",
+        rotulo: "Mais",
+        icone: "pontos",
+        /* O emblema da caixinha sobe para a bolinha "Mais": sem isso, uma
+           pergunta sem resposta ficaria invisível até ela abrir a folha. */
         emblema: naCaixa,
-        aoTocar: () => setOnde({ t: "caixinha" }),
+        aoTocar: () => setMaisAberto(true),
       },
-      ...(onAbrirSecoes
-        ? [
-            {
-              id: "secoes",
-              rotulo: "Chá de bebê, álbum…",
-              icone: "grade" as const,
-              aoTocar: onAbrirSecoes,
-            },
-          ]
-        : []),
     ];
     return publicarAtalhos("comunidade", atalhos);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -4656,7 +7241,7 @@ export function RedeNoApp({
   if (careMode) {
     return (
       <div className="px-4 py-10">
-        <div className="rounded-3xl border border-border bg-card p-8 text-center">
+        <div className="rounded-3xl card-material p-8 text-center">
           <p className="text-sm leading-relaxed text-muted-foreground">
             O feed está em pausa enquanto o Modo Cuidado estiver ligado.
           </p>
@@ -4664,7 +7249,7 @@ export function RedeNoApp({
             <button
               type="button"
               onClick={onAbrirSecoes}
-              className="press mt-4 rounded-full border border-border px-5 py-2 text-xs font-semibold text-foreground"
+              className="press mt-4 rounded-full pill-3d px-5 py-2 text-xs font-semibold text-foreground"
             >
               Ver Amigas, Álbum e Acompanhante
             </button>
@@ -4682,10 +7267,32 @@ export function RedeNoApp({
         /* ⚠️ A semana vem do MEU perfil, que a tela já carregou — e `null`
            quando não há o que carimbar (sem DUM, pós-parto, Modo Cuidado). */
         semana={semanaDoCarimbo}
-        aoCancelar={() => setConferindoStory(null)}
-        aoPublicar={({ carimbar, enquete, perguntaAberta }) =>
-          void publicarStory(conferindoStory, carimbar, enquete, perguntaAberta)
+        aoCancelar={() => {
+          setConferindoStory(null);
+          /* ⚠️ Desistiu, a referência some: sem isto, a PRÓXIMA foto que ela
+             escolhesse sairia com o quadro de uma publicação que ela já tinha
+             largado. E o vídeo junto, pela mesma razão: a próxima FOTO sairia
+             com o vídeo de antes pendurado nela. */
+          setPostNoStory(null);
+          setVideoDoStory(null);
+        }}
+        aoPublicar={({ texto, camada, carimbar, enquete, perguntaAberta, marcadas, maisFotos }) =>
+          void publicarStory(
+            conferindoStory,
+            texto,
+            camada,
+            carimbar,
+            enquete,
+            perguntaAberta,
+            marcadas,
+            maisFotos,
+          )
         }
+        /* A MESMA lista do compositor de post — nunca uma busca. */
+        amigasParaMarcar={paraMarcar}
+        rascunho={rascunhoDeStory}
+        aoGuardarRascunho={guardarRascunhoDoStory}
+        temVideo={!!videoDoStory}
       />
     );
   }
@@ -4693,8 +7300,17 @@ export function RedeNoApp({
   if (vendoStory) {
     return (
       <VisorDeStory
+        /* ⚠️ Fecha o visor ANTES de abrir a publicação: o visor é `fixed
+           inset-0`, e navegar por baixo dele deixaria a paciente na tela do
+           post sem conseguir vê-la. */
+        aoMandarStory={(id) => setMandandoStory(id)}
+        aoAbrirPublicacao={(id) => {
+          setVendoStory(null);
+          acoes.ver(id);
+        }}
         aoVotarNoStory={votarNoStory}
         aoReagirAoStory={reagirNoStory}
+        aoResponderStory={(a, sid, t, f) => void responderAoStory(a, sid, t, f)}
         aoPerguntarNoStory={perguntarNoStory}
         bolha={vendoStory}
         aoFechar={() => setVendoStory(null)}
@@ -4702,6 +7318,9 @@ export function RedeNoApp({
         souEu={vendoStory.autorId === euId}
         aoQuemViu={quemViu}
         aoApagarStory={apagarStory}
+        /* ⚠️ A denúncia é do story DELA — `souEu` já esconde o botão, e o
+           servidor recusa o próprio de qualquer forma. */
+        aoDenunciarStory={(id, motivo) => void denunciarUmStory(id, motivo)}
       />
     );
   }
@@ -4709,6 +7328,9 @@ export function RedeNoApp({
   if (onde.t === "novo") {
     return (
       <NovoPost
+        /* ⚠️ A original vai ao compositor, e sai de lá ao fechar: sem limpar,
+           a próxima publicação nasceria republicando algo sem ninguém pedir. */
+        repostando={repostando}
         aoSugerirLegenda={sugerirLegenda}
         amigasParaMarcar={paraMarcar}
         rascunho={rascunho}
@@ -4741,12 +7363,121 @@ export function RedeNoApp({
     );
   }
 
+  if (onde.t === "conversa" && conversaAberta) {
+    return (
+      <Conversa
+        conversa={conversaAberta}
+        rascunho={rascunhoDaConversa}
+        aoFixar={(v) => void fixarEstaConversa(conversaAberta.id, v)}
+        aoArquivar={(v) => void arquivarEstaConversa(conversaAberta.id, v)}
+        aoDenunciarConversa={(m) => void denunciarEstaConversa(conversaAberta.id, m)}
+        /* ⚠️ Guarda a mensagem e abre a folha de escolher PARA ONDE: a lista de
+           conversas é a mesma de `MandarPublicacao`, e reusá-la evita uma
+           segunda régua de "com quem eu posso falar". */
+        aoEncaminhar={(mensagemId) =>
+          setEncaminhando({ deConversaId: conversaAberta.id, mensagemId })
+        }
+        /* ⚠️ Só o POST abre. O story vive 24 h e o id dele deixa de resolver —
+           levar a paciente a uma tela de "não existe mais" é pior que um cartão
+           que só conta o que aconteceu. */
+        aoAbrirRef={(tipo, id) => {
+          if (tipo === "post") abrirPost(id);
+        }}
+        aoVoltar={() => {
+          setConversaAberta(null);
+          setRascunhoDaConversa(null);
+          setOnde({ t: "conversas" });
+          /* ⚠️ Recarrega o emblema ao SAIR da conversa, não ao entrar: quem
+             acabou de ler não pode voltar para a lista com o ponto ainda
+             aceso. */
+          void contarNaoLidas();
+        }}
+        aoAbrirPerfil={abrirPerfil}
+      />
+    );
+  }
+
+  if (onde.t === "grupo" && grupoAberto) {
+    return (
+      <ConversaDoGrupo
+        grupo={grupoAberto}
+        aoVoltar={() => setOnde({ t: "conversas" })}
+        aoConvidar={() => setOnde({ t: "grupo-chamar" })}
+      />
+    );
+  }
+
+  if (onde.t === "grupo-novo") {
+    return (
+      <CriarGrupo
+        /* ⚠️ A MESMA lista de `amigasParaMarcar` — nunca uma busca por nome. */
+        candidatas={paraMarcar ?? []}
+        aoFechar={() => setOnde({ t: "conversas" })}
+        aoCriado={() => setOnde({ t: "conversas" })}
+      />
+    );
+  }
+
+  if (onde.t === "grupo-chamar" && grupoAberto) {
+    return (
+      <ChamarParaGrupo
+        grupo={grupoAberto}
+        candidatas={paraMarcar ?? []}
+        aoFechar={() => setOnde({ t: "grupo" })}
+        aoChamou={() => setOnde({ t: "conversas" })}
+      />
+    );
+  }
+
+  if (onde.t === "conversas") {
+    return (
+      <CaixaDeEntrada
+        /* ⚠️ **A LISTA DE GRUPOS VIVE DENTRO DA CAIXA DE ENTRADA**, e não numa
+           aba própria: um grupo é uma conversa, e separá-los faria a paciente
+           procurar em dois lugares a mesma pergunta ("quem falou comigo?"). */
+        grupos={
+          <MeusGrupos
+            aoAbrir={(g) => {
+              setGrupoAberto(g);
+              setOnde({ t: "grupo" });
+            }}
+            aoCriar={() => setOnde({ t: "grupo-novo" })}
+          />
+        }
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrir={(c) => {
+          setConversaAberta(c);
+          setOnde({ t: "conversa" });
+        }}
+        /* ⚠️ **O RASCUNHO CAI NO CAMPO, e o app NUNCA manda sozinho.** Escrever
+           para uma estranha é o degrau que faz a maioria desistir, e oferecer a
+           primeira linha derruba esse degrau; mandar por ela seria pôr o nome
+           dela numa frase que ela não escolheu — a mesma decisão do
+           agradecimento do chá de bebê e da transcrição do diário. */
+        aoFalarCom={(id, rascunho) => void abrirConversaCom(id, rascunho)}
+      />
+    );
+  }
+
+  if (onde.t === "tag") {
+    return (
+      <TelaDaTag
+        tag={onde.tag}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrirPost={abrirPost}
+        acoes={acoes}
+      />
+    );
+  }
+
   if (onde.t === "busca") {
     return (
       <TelaDeBusca
         aoVoltar={() => setOnde({ t: "feed" })}
         aoBuscar={buscar}
         aoAbrirPerfil={abrirPerfil}
+        aoAbrirTag={acoes.abrirTag}
+        euId={euId}
       />
     );
   }
@@ -4757,6 +7488,252 @@ export function RedeNoApp({
         posts={salvos}
         aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
         aoAbrirPost={abrirPost}
+      />
+    );
+  }
+
+  if (onde.t === "explorar") {
+    return (
+      <div className="mx-auto max-w-md pb-24">
+        <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "feed" })}
+            aria-label="Voltar"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+          >
+            ‹
+          </button>
+          <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Explorar</h1>
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "busca" })}
+            aria-label="Buscar"
+            className="press flex h-11 w-11 items-center justify-center text-[16px]"
+          >
+            🔍
+          </button>
+        </header>
+
+        {/* ⚠️ **A RÉGUA É DITA, e ela é o recurso.** Sem a frase, a paciente lê o
+            Explorar como "o que está bombando" — e este app decidiu não ter isso:
+            numa base de alto risco, o post que mais engaja é o da EMERGÊNCIA. */}
+        <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+          Publicações de quem deixou o perfil aberto. Nada aqui é escolhido por número de reações.
+        </p>
+
+        {explorar === "erro" ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+            <button
+              type="button"
+              onClick={() => void abrirExplorar()}
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        ) : explorar === null ? (
+          <div className="grid grid-cols-3 gap-0.5">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="dc-esqueleto aspect-[3/4] w-full" />
+            ))}
+          </div>
+        ) : (
+          <>
+            {/* ⚠️ **AS TAGS VÊM ANTES DA GRADE**, e não depois: elas são o
+                caminho para um assunto, e a grade é o acaso. Quem abre o
+                Explorar com uma pergunta na cabeça encontra a pergunta
+                primeiro. */}
+            {explorar.tags.length > 0 && (
+              <div className="mb-3 flex gap-2 overflow-x-auto px-1 pb-1">
+                {explorar.tags.map((t) => (
+                  <button
+                    key={t.tag}
+                    type="button"
+                    onClick={() => acoes.abrirTag(t.tag)}
+                    className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-[13px]"
+                  >
+                    #{t.tag}{" "}
+                    {/* ⚠️ O número é o de PUBLICAÇÕES, e ele bate com o que a
+                        página da tag entrega — a contagem passa pela mesma
+                        régua de visibilidade. */}
+                    <span className="tabular-nums text-muted-foreground">{t.quantas}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {explorar.posts.length === 0 ? (
+              <p className="px-6 py-16 text-center text-[13px] leading-snug text-muted-foreground">
+                Ainda não há nada para descobrir. Só aparece aqui quem deixou o perfil aberto.
+              </p>
+            ) : (
+              <div className="grid grid-cols-3 gap-0.5">
+                {explorar.posts.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => acoes.ver(p.id)}
+                    className="press relative aspect-[3/4] w-full overflow-hidden bg-muted"
+                  >
+                    {p.miniaturaUrl || p.imagemUrl ? (
+                      <img
+                        src={p.miniaturaUrl ?? p.imagemUrl ?? ""}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      /* ⚠️ Post só de texto existe (`postEhValido`), e sem este
+                         ramo ele viraria um quadrado cinza vazio na grade. */
+                      <span className="line-clamp-4 block p-2 text-left text-xs leading-snug">
+                        {p.texto}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
+
+  if (onde.t === "favoritas") {
+    return (
+      <div className="mx-auto max-w-md pb-24">
+        <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+          <button
+            type="button"
+            onClick={() => setOnde({ t: "feed" })}
+            aria-label="Voltar"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+          >
+            ‹
+          </button>
+          <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Favoritas</h1>
+        </header>
+        {/* ⚠️ A régua é DITA: sem a frase, quem favoritou alguém e não vê nada
+            conclui que o recurso quebrou, quando ela só não publicou ainda. E a
+            segunda frase é a que impede o mal-entendido de sempre — favoritar
+            NÃO avisa ninguém. */}
+        <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+          Só quem você marcou como favorita, na ordem do tempo. Ninguém é avisada.
+        </p>
+        {favoritas === "erro" ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+            <button
+              type="button"
+              onClick={() => void abrirFavoritas()}
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          </div>
+        ) : favoritas === null ? (
+          <div className="space-y-3 px-1">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className="dc-esqueleto h-64 w-full rounded-2xl" />
+            ))}
+          </div>
+        ) : favoritas.length === 0 ? (
+          <p className="px-1 py-16 text-center text-sm text-muted-foreground">
+            Você ainda não marcou ninguém como favorita. No perfil de alguém, toque em ⋯.
+          </p>
+        ) : (
+          /* ⚠️ **AS AÇÕES SÃO AS MESMAS DO FEED, e vêm do objeto ESTÁVEL.**
+             Passar fechos inline aqui faria o `memo` do cartão errar em toda
+             pintura — o defeito que já custou 232 ms por reação nesta lista. E
+             um cartão sem ações seria uma publicação que ela vê e não pode
+             tocar, o que lê como app quebrado. */
+          favoritas.map((p) => (
+            <PostInstagram
+              key={p.id}
+              post={p}
+              aoReagir={acoes.reagir}
+              aoSalvar={acoes.guardar}
+              aoAbrirPerfil={acoes.abrirPerfil}
+              aoVer={acoes.ver}
+              aoAbrirArroba={acoes.abrirArroba}
+              aoAbrirTag={acoes.abrirTag}
+              aoDenunciar={acoes.denunciar}
+              aoVotar={acoes.votar}
+              aoMandarParaConversa={acoes.mandarParaConversa}
+            />
+          ))
+        )}
+      </div>
+    );
+  }
+
+  if (onde.t === "escondidos") {
+    /* ⚠️ **Sem esta tela o esconder é um beco sem saída.** Ele é CALADO e a
+       pessoa some da fileira dela, então desfazer exigiria lembrar de quem foi.
+       É o mesmo defeito que o bloqueio teve até ganhar a lista de bloqueados. */
+    return (
+      <ListaDeBloqueados
+        titulo="Story escondido de"
+        /* ⚠️ **O TEXTO PADRÃO É O DO BLOQUEIO, e aqui ele MENTE**: quem está
+           nesta lista continua vendo o perfil, as publicações e tudo o mais —
+           o que ela não vê é o story. Herdar "não vê você na Comunidade" faria
+           a paciente achar que escondeu muito mais do que escondeu. */
+        explicacao="Quem está aqui não vê os seus stories. O resto continua igual, e ninguém é avisada."
+        vazio="Você não escondeu seu story de ninguém."
+        rotuloDaAcao="Voltar a mostrar"
+        pessoas={escondidos}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDesbloquear={(id) => void mostrarStoryDeNovo(id)}
+        aoTentarDeNovo={() => void abrirEscondidos()}
+      />
+    );
+  }
+
+  if (onde.t === "curtidos") {
+    return (
+      <GradeSimples
+        titulo="O que você reagiu"
+        vazio="Você ainda não reagiu a nada."
+        posts={curtidos}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoAbrirPost={(id) => void abrirPost(id)}
+        aoTentarDeNovo={() => void abrirCurtidos()}
+      />
+    );
+  }
+
+  if (onde.t === "desfechos") {
+    return (
+      <MeusDesfechos
+        desfechos={desfechos}
+        aoVoltar={() => setOnde({ t: "feed" })}
+        aoTentarDeNovo={() => void abrirDesfechos()}
+      />
+    );
+  }
+
+  if (onde.t === "bloqueados") {
+    return (
+      <ListaDeBloqueados
+        pessoas={bloqueados}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDesbloquear={(id) => void desbloquear(id)}
+        aoTentarDeNovo={() => void abrirBloqueados()}
+      />
+    );
+  }
+
+  if (onde.t === "arquivo-stories") {
+    return (
+      <ArquivoDeStories
+        stories={arquivoStories}
+        instavel={arquivoStoriesInstavel}
+        aoVoltar={() => setOnde(perfil ? { t: "perfil", id: perfil.id } : { t: "feed" })}
+        aoDestacar={(id, v, titulo) => void destacarNoPerfil(id, v, titulo)}
+        aoChegarNoFim={() => void maisDoArquivoDeStories()}
+        temMais={!!proximoArquivo}
+        aoTentarDeNovo={() => void abrirArquivoDeStories()}
       />
     );
   }
@@ -4869,6 +7846,17 @@ export function RedeNoApp({
     return (
       <TelaDoPost
         post={oPost}
+        aoAbrirTag={acoes.abrirTag}
+        aoAbrirArroba={acoes.abrirArroba}
+        /* ⚠️ **AS TRÊS FALTAVAM AQUI, e esta é a tela que a GRADE abre.** O
+           componente aceitava as props e as repassava ao cartão; o único
+           chamador não as passava. Quem chega ao post pelo perfil — o caminho
+           mais comum depois do feed — não tinha republicar, compartilhar nem
+           mandar para uma conversa, e nada na tela explicava a diferença. */
+        aoRepublicar={acoes.republicar}
+        aoCompartilhar={acoes.compartilhar}
+        aoLinkPublico={acoes.linkPublico}
+        aoMandarParaConversa={acoes.mandarParaConversa}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
         aoVotar={acoes.votar}
@@ -4876,6 +7864,8 @@ export function RedeNoApp({
         aoDenunciar={acoes.denunciar}
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoEditar={acoes.editar}
+        aoFixar={acoes.fixar}
+        aoStoryComPost={acoes.storyComPost}
         /* ⚠️ **Faltava, e este é o caminho mais provável do recurso.** A autora
            abre a grade do próprio perfil e toca num post de duas semanas atrás:
            é AQUI que ela quer saber quem reagiu. Sem a prop, o resumo com os
@@ -4913,13 +7903,43 @@ export function RedeNoApp({
       <TelaDePerfil
         perfil={perfil}
         posts={doPerfil}
+        album={perfil.souEu ? album : null}
         aoChegarNoFim={maisDoPerfil}
         temMais={!!proximoDoPerfil}
+        aoMandarMensagem={(id) => void abrirConversaCom(id)}
         aoVoltar={() => setOnde({ t: "feed" })}
         aoSeguir={perfil.souEu ? () => setOnde({ t: "editar" }) : seguir}
+        /**
+         * ⚠️ **"CONTAS PARECIDAS" AQUI NÃO DERIVA DO PERFIL ABERTO, e essa é a
+         * decisão inteira.**
+         *
+         * O Instagram monta essa fileira a partir de quem a pessoa que você
+         * acabou de seguir segue — e isso, aqui, VAZARIA O GRAFO DELA. A lista
+         * de seguidores deste app não é pública de propósito: num app de
+         * gestação de alto risco, quem acompanha quem é o círculo social da
+         * pessoa, e "parecidas com a Ana" é a lista de amigas da Ana com outro
+         * nome.
+         *
+         * O que chega aqui são as sugeridas do MEU feed — as mesmas de
+         * `sugestoesDoFeed`, ordenadas por elos COMIGO e nunca por audiência. É
+         * menos preciso e é o único que não conta a vida de terceiro.
+         */
+        parecidas={pessoas.filter((p) => p.id !== perfil.id).slice(0, 6)}
+        aoSeguirParecida={(id) => void seguirPessoa(id)}
+        aoVerParecida={(id) => void abrirPerfil(id)}
         aoAbrirPost={abrirPost}
-        aoAbrirLista={perfil.souEu ? abrirLista : undefined}
+        /* ⚠️ **A LISTA ABRE EM QUALQUER PERFIL QUE ELA CONSEGUE VER** — decisão
+           do dono: "é pra usar as mesmas coisas que tem no Instagram". Ela era
+           oferecida só no próprio perfil. Quem decide de verdade é
+           `alcancaOPerfil`, no SERVIDOR: perfil público abre para qualquer uma,
+           fechado só para quem já foi aceita. */
+        aoAbrirLista={(tipo) => void abrirLista(tipo, perfil.id)}
         aoAbrirSalvos={perfil.souEu ? abrirSalvos : undefined}
+        aoAbrirCurtidos={perfil.souEu ? () => void abrirCurtidos() : undefined}
+        aoAbrirEscondidos={perfil.souEu ? () => void abrirEscondidos() : undefined}
+        /* ⚠️ Só no perfil de TERCEIRO: esconder de si mesma tiraria a fileira
+           dela da tela dela, e o servidor recusa de qualquer jeito. */
+        aoEsconderStory={perfil.souEu ? undefined : () => void esconderMeuStoryDe(perfil.id)}
         aoAbrirEspelho={
           perfil.souEu
             ? () => {
@@ -4930,7 +7950,11 @@ export function RedeNoApp({
         }
         aoBloquear={perfil.souEu ? undefined : () => bloquear(perfil.id)}
         aoDenunciarPerfil={perfil.souEu ? undefined : (m) => void denunciarUmPerfil(perfil.id, m)}
-        aoSilenciar={perfil.souEu ? undefined : (v) => void silenciarPerfil(perfil.id, v)}
+        aoSilenciar={
+          perfil.souEu ? undefined : (v, quais) => void silenciarPerfil(perfil.id, v, quais)
+        }
+        aoFavoritar={perfil.souEu ? undefined : (v) => void marcarFavorita(perfil.id, v)}
+        aoRestringir={perfil.souEu ? undefined : (v) => void restringirPerfil(perfil.id, v)}
         aoAplicarCodigo={aplicarCodigo}
         aoPerguntar={(texto) => perguntarPara(perfil.id, texto)}
         /* ⚠️ Bandeira vermelha abre a Central de Emergência — a MESMA que a
@@ -4950,23 +7974,179 @@ export function RedeNoApp({
 
   return (
     <>
+      {/* ⚠️ **SÓ SOBRE O FEED, e não sobre a aba inteira.** Esta linha está
+          DEPOIS de todos os `if (onde.t === …) return`, então o tutorial nunca
+          abre por cima do perfil, do direct ou da caixinha — telas para as
+          quais a paciente NAVEGOU, e onde quatro cartões de boas-vindas seriam
+          uma interrupção do que ela foi fazer. */}
+      {!adiarOnboarding && (
+        <OnboardingDaComunidade careMode={careMode} bancada={bancadaOnboarding} />
+      )}
       <input
         ref={arquivoDoStory}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         className="hidden"
         onChange={async (e) => {
           const f = e.target.files?.[0];
           e.target.value = "";
           if (!f) return;
+          const { toast } = await import("sonner");
+          if (f.type.startsWith("video/")) {
+            /* ⚠️ **A CAPA VEM ANTES DA RECUSA**, e é dela que sai a duração: o
+               `size` e o `type` dão para conferir na hora, mas quantos segundos
+               o arquivo tem só o decodificador sabe. */
+            const capa = await capaDoVideo(f);
+            if (!capa) {
+              toast.error("Não deu para ler esse vídeo.");
+              return;
+            }
+            const { recusaDoVideo, recadoDaRecusa } = await import("@/lib/video-do-post");
+            const recusa = recusaDoVideo({
+              tipo: f.type,
+              bytes: f.size,
+              segundos: capa.segundos,
+            });
+            if (recusa) {
+              toast.error(recadoDaRecusa(recusa));
+              return;
+            }
+            const t = await token();
+            if (!t) return;
+            const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+            const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+            if (!r.ok) {
+              toast.error("Não deu para enviar o vídeo agora.");
+              return;
+            }
+            const { supabase } = await import("@/integrations/supabase/client");
+            /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — o mesmo
+               caminho do vídeo do post. Passar 50 MB pelo servidor seria a
+               função inteira estourando o limite de corpo. */
+            const up = await supabase.storage.from("rede").uploadToSignedUrl(r.caminho, r.token, f);
+            if (up.error) {
+              toast.error("Não deu para enviar o vídeo agora.");
+              return;
+            }
+            setVideoDoStory({ caminho: r.caminho, segundos: capa.segundos });
+            setConferindoStory(capa.capa);
+            return;
+          }
           /* ⚠️ `prepararFotoDoStory`, e não `prepararAvatar`: aquele corta um
              QUADRADO de 512px no centro, e o story é 9:16 exibido inteiro. */
           const d = await prepararFotoDoStory(f);
           if (d) setConferindoStory(d);
         }}
       />
+      {maisAberto && (
+        <MaisDaComunidade
+          onFechar={() => setMaisAberto(false)}
+          grupos={
+            [
+              {
+                id: "minhas",
+                titulo: "Minhas coisas",
+                itens: [
+                  {
+                    id: "salvos",
+                    rotulo: "Salvos",
+                    descricao: "As publicações que você guardou",
+                    icone: "salvos",
+                    aoTocar: () => void abrirSalvos(),
+                  },
+                  {
+                    id: "arquivados",
+                    rotulo: "Arquivados",
+                    descricao: "Publicações que você tirou do ar",
+                    icone: "arquivados",
+                    aoTocar: () => void abrirArquivados(),
+                  },
+                  {
+                    /* ⚠️ **Com nome que o separa de "Arquivados"**: os dois
+                       guardam o que saiu do ar; "Meus stories" diz o formato,
+                       que é a única coisa que os distingue. */
+                    id: "arquivo-stories",
+                    rotulo: "Meus stories",
+                    descricao: "Tudo o que você já publicou por 24 horas",
+                    icone: "stories",
+                    aoTocar: () => void abrirArquivoDeStories(),
+                  },
+                  {
+                    /* ⚠️ **"VER PRIMEIRO" É UMA LISTA À PARTE, e não uma
+                       reordenação do feed** — a razão está em `favoritar`. */
+                    id: "favoritas",
+                    rotulo: "Favoritas",
+                    descricao: "O que as pessoas que você marcou publicaram",
+                    icone: "favoritas",
+                    aoTocar: () => void abrirFavoritas(),
+                  },
+                ],
+              },
+              {
+                id: "descobrir",
+                titulo: "Descobrir",
+                itens: [
+                  {
+                    id: "explorar",
+                    rotulo: "Explorar",
+                    descricao: "Publicações públicas e assuntos em alta",
+                    icone: "explorar",
+                    aoTocar: () => void abrirExplorar(),
+                  },
+                  {
+                    id: "buscar",
+                    rotulo: "Buscar",
+                    descricao: "Pessoas com perfil público e #assuntos",
+                    icone: "buscar",
+                    aoTocar: () => setOnde({ t: "busca" }),
+                  },
+                ],
+              },
+              {
+                id: "seguranca",
+                titulo: "Segurança",
+                itens: [
+                  {
+                    /* ⚠️ **SEM ESTA PORTA, BLOQUEAR ERA UM BECO SEM SAÍDA**: a
+                       única entrada era o ⋯ do perfil, e o bloqueio esconde o
+                       perfil. */
+                    id: "bloqueados",
+                    rotulo: "Bloqueados",
+                    descricao: "Quem você bloqueou, e desbloquear",
+                    icone: "bloqueados",
+                    aoTocar: () => void abrirBloqueados(),
+                  },
+                  {
+                    /* ⚠️ Denúncia sem retorno é a que ninguém faz duas vezes. */
+                    id: "desfechos",
+                    rotulo: "Suas denúncias",
+                    descricao: "O que aconteceu com cada uma",
+                    icone: "denuncias",
+                    aoTocar: () => void abrirDesfechos(),
+                  },
+                  {
+                    id: "caixinha",
+                    rotulo: "Caixinha",
+                    descricao: "Perguntas anônimas que você recebeu",
+                    icone: "caixinha",
+                    /* ⚠️ Conta as SEM RESPOSTA, e não o total — mesma régua do
+                       contador da fita do painel. */
+                    emblema: naCaixa,
+                    aoTocar: () => setOnde({ t: "caixinha" }),
+                  },
+                ],
+              },
+            ] satisfies GrupoDoMais[]
+          }
+        />
+      )}
       <TelaPrincipal
         posts={posts}
+        aoAbrirSecoes={onAbrirSecoes}
+        soSeguindo={soSeguindo}
+        aoRepublicar={acoes.republicar}
+        aoCompartilhar={acoes.compartilhar}
+        aoLinkPublico={acoes.linkPublico}
         stories={fileira}
         aoReagir={acoes.reagir}
         aoSalvar={acoes.guardar}
@@ -4976,6 +8156,26 @@ export function RedeNoApp({
         aoTirarMarcacao={acoes.tirarMarcacao}
         aoVerQuemReagiu={acoes.verQuemReagiu}
         aoAbrirPerfil={acoes.abrirPerfil}
+        aoAbrirArroba={acoes.abrirArroba}
+        aoAbrirTag={acoes.abrirTag}
+        aoMandarParaConversa={acoes.mandarParaConversa}
+        /* ⚠️ **SEM ESTAS DUAS, A TELA DO "NÃO CARREGOU" NUNCA APARECERIA** — e
+           eu teria trocado um vazio silencioso por outro. É a mesma falta que a
+           auditoria achou em `aoEditar` e nas três ações da tela do post. */
+        instavel={feedInstavel}
+        aoTentarDeNovo={() => void carregarFeed()}
+        pausada={pausada}
+        suspensa={suspensa}
+        aoReativar={() => void reativarMinhaConta()}
+        /* ⚠️ **O LÁPIS NUNCA CHEGAVA AO FEED.** `TelaPrincipal` declarava a
+           prop e a repassava aos cartões; o único chamador não a passava. E
+           `meuFeed` põe os posts DELA primeiro, com comentário explícito de que
+           o teto nunca pode cortar o que ela publicou — então o post editável
+           está ali, com o lápis invisível. O ⋯ do post próprio só oferece
+           "tirar do ar", que é a decisão oposta. */
+        aoEditar={acoes.editar}
+        aoFixar={acoes.fixar}
+        aoStoryComPost={acoes.storyComPost}
         /* ⚠️ Referência estável, como as outras: um fecho por post faria o
            `memo` do cartão nunca acertar — e este é o feed, a lista mais longa
            do app. */
@@ -4994,7 +8194,7 @@ export function RedeNoApp({
         sugestoes={sugestoes}
         pessoas={pessoas}
         aoSeguirPessoa={seguirPessoa}
-        aoTocarStory={verStory}
+        aoTocarStory={acoes.tocarStory}
         convite={{ codigo: meuCodigo }}
         lembreteEntao={lembreteEntao}
         aoCompararAgora={() => {
@@ -5005,6 +8205,15 @@ export function RedeNoApp({
         }}
         aoDispensarEntao={() => setLembreteEntao(null)}
         retro={retro}
+        memoria={memoria}
+        aoVerMemoria={(postId) => {
+          void (async () => {
+            const t = await token();
+            if (!t) return;
+            const { marcarMemoriaVista } = await import("@/lib/rede-social.functions");
+            await marcarMemoriaVista({ data: { accessToken: t, postId } });
+          })();
+        }}
         aoFecharRetro={() => {
           setRetro(null);
           try {
@@ -5014,6 +8223,39 @@ export function RedeNoApp({
           }
         }}
       />
+      {/* ⚠️ **A FOLHA VIVE FORA da `<TelaPrincipal>`, como as irmãs.** Ela é
+          `fixed inset-0`; dentro da lista, um `overflow` de qualquer ancestral
+          a recortaria — e ela apareceria pela metade, sem erro nenhum. */}
+      {mandandoPost && (
+        <MandarPublicacao
+          alvo={{ tipo: "post", id: mandandoPost }}
+          aoFechar={() => setMandandoPost(null)}
+        />
+      )}
+      {/* ⚠️ A MESMA folha do post — duas divergiriam no primeiro ajuste, e a
+          régua que importa (só conversas que JÁ existem) precisaria ser escrita
+          duas vezes. */}
+      {/* ⚠️ A MESMA folha do mandar publicação/story — a lista de para-quem é a
+          mesma, e é ela que carrega a trava de só oferecer conversas que já
+          existem. */}
+      {encaminhando && (
+        <MandarPublicacao
+          alvo={{
+            tipo: "mensagem",
+            id: encaminhando.mensagemId,
+            deConversaId: encaminhando.deConversaId,
+          }}
+          aoFechar={() => setEncaminhando(null)}
+        />
+      )}
+
+      {mandandoStory && (
+        <MandarPublicacao
+          alvo={{ tipo: "story", id: mandandoStory }}
+          aoFechar={() => setMandandoStory(null)}
+        />
+      )}
+
       {/* ⚠️ FORA da `<TelaPrincipal>`: a folha é `fixed` e cobre a tela inteira,
           e dentro da lista ela herdaria o empilhamento do cartão. */}
       {quemReagiu && (
@@ -5052,23 +8294,268 @@ async function prepararAvatar(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, sx, sy, lado, lado, 0, 0, LADO_DO_AVATAR, LADO_DO_AVATAR);
-    return canvas.toDataURL("image/jpeg", 0.82);
+    return codificarFoto(canvas, 0.82);
   } catch {
     return null;
   }
+}
+
+/**
+ * OS FILHOS, NA TELA DE EDITAR O PERFIL.
+ *
+ * ⚠️ **É AQUI QUE A ABA DEIXA DE MORRER NO PARTO.** Enquanto a identidade saía
+ * de `lmp_date`, a conta perdia o assunto no dia do nascimento. Com a lista de
+ * filhos, ela deixa de ser "grávida de 28 semanas" e passa a ser "mãe da
+ * Helena, de 3 meses" — que continua verdade por anos.
+ *
+ * ⚠️ **A LINHA É MOSTRADA ENQUANTO ELA DIGITA**, e não só depois de salvar. É a
+ * única forma de ela entender que a lista de filhos VIRA a frase do perfil: sem
+ * o espelho, "cadastrar filho" parece burocracia sem efeito visível.
+ */
+/**
+ * A data de hoje em São Paulo, como `YYYY-MM-DD`.
+ *
+ * ⚠️ **NÃO É `new Date().toISOString()`.** Aquele devolve UTC, e das 21h à
+ * meia-noite ele já está no dia seguinte — a idade do bebê apareceria um dia a
+ * mais para quem abre o app à noite, que é justamente quando as mães abrem.
+ */
+function hojeEmSaoPaulo(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+function MeusFilhos({ hoje, bancada }: { hoje: string; bancada?: Filho[] }) {
+  const [filhos, setFilhos] = useState<Filho[] | null>(bancada ?? null);
+  const [erro, setErro] = useState(false);
+  const [ocupado, setOcupado] = useState(false);
+
+  async function token() {
+    const { supabase } = await import("@/integrations/supabase/client");
+    const s = await supabase.auth.getSession();
+    return s.data.session?.access_token ?? null;
+  }
+
+  const recarregar = useCallback(async () => {
+    /* ⚠️ A BANCADA NÃO FALA COM O SERVIDOR. Sem sessão, `meusFilhos` devolve
+       "sessao" e a tela mostraria só o erro — que é exatamente o estado que ela
+       NÃO precisa provar. O dado é fabricado; o desenho é o de produção. */
+    if (bancada) return;
+    try {
+      const t = await token();
+      if (!t) return;
+      const { meusFilhos } = await import("@/lib/filhos.functions");
+      const r = await meusFilhos({ data: { accessToken: t } });
+      /* ⚠️ `null` e `[]` são coisas DIFERENTES, e a tela precisa distinguir:
+         lista vazia é "ela não cadastrou ninguém" e mostra o convite; falha de
+         leitura é "não sei" e não pode desenhar uma mãe de três como se ela não
+         tivesse filhos. */
+      if (r.ok) {
+        setFilhos(r.filhos);
+        setErro(false);
+      } else {
+        setErro(true);
+      }
+    } catch {
+      setErro(true);
+    }
+  }, [bancada]);
+
+  useEffect(() => {
+    void recarregar();
+  }, [recarregar]);
+
+  async function mexer(fn: () => Promise<unknown>) {
+    if (bancada || ocupado) return;
+    setOcupado(true);
+    try {
+      await fn();
+      await recarregar();
+    } finally {
+      setOcupado(false);
+    }
+  }
+
+  async function acrescentar(comoGestacao: boolean) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { salvarFilho } = await import("@/lib/filhos.functions");
+      await salvarFilho({
+        data: {
+          accessToken: t,
+          /* ⚠️ Nasce SEM data e sem nome. Pedir tudo de uma vez num formulário
+             modal é o que faz a paciente desistir no primeiro campo; ela
+             preenche o que quiser, na linha, depois. */
+          ...(comoGestacao ? {} : { nascidoEm: hoje }),
+        },
+      });
+    });
+  }
+
+  async function mudar(id: string, campos: Record<string, unknown>) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { salvarFilho } = await import("@/lib/filhos.functions");
+      await salvarFilho({ data: { accessToken: t, id, ...campos } as never });
+    });
+  }
+
+  async function remover(id: string) {
+    await mexer(async () => {
+      const t = await token();
+      if (!t) return;
+      const { removerFilho } = await import("@/lib/filhos.functions");
+      await removerFilho({ data: { accessToken: t, id } });
+    });
+  }
+
+  const linha = filhos ? linhaDoPerfil(filhos, hoje) : null;
+
+  return (
+    <section className="mt-6 border-t border-border pt-5">
+      <h2 className="text-[15px] font-semibold">Meus filhos</h2>
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">
+        É daqui que sai a frase do seu perfil. Nome e sexo são opcionais.
+      </p>
+
+      {/* ⚠️ O ESPELHO DA FRASE. Sem ele, cadastrar filho parece burocracia sem
+          efeito — e é justamente o efeito que faz valer a pena preencher. */}
+      {linha && (
+        <p className="mt-3 rounded-xl bg-muted/60 px-3 py-2 text-[13px] font-medium">{linha}</p>
+      )}
+
+      {erro && (
+        <p className="mt-3 text-[13px] text-muted-foreground">
+          Não consegui carregar agora. Tente de novo daqui a pouco.
+        </p>
+      )}
+
+      {filhos?.map((f) => (
+        <div key={f.id} className="mt-3 rounded-xl border border-border p-3">
+          <div className="flex items-center gap-2">
+            <input
+              value={f.nome ?? ""}
+              onChange={(e) =>
+                setFilhos(
+                  (l) => l?.map((x) => (x.id === f.id ? { ...x, nome: e.target.value } : x)) ?? l,
+                )
+              }
+              onBlur={(e) => void mudar(f.id, { nome: e.target.value.slice(0, 40) || null })}
+              placeholder="Nome (opcional)"
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+            />
+            <button
+              type="button"
+              aria-label="Remover"
+              disabled={ocupado}
+              onClick={() => void remover(f.id)}
+              className="press shrink-0 rounded-lg px-2 py-1.5 text-[13px] text-muted-foreground"
+            >
+              Remover
+            </button>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {/* ⚠️ TRÊS estados, e "não sei" é um deles — não um vazio sem nome.
+                O sexo só existe aqui para a concordância ("gêmeas"), e obrigar
+                a escolher faria a tela pedir um dado que muita gente não tem. */}
+            {(["f", "m", null] as const).map((s) => (
+              <button
+                key={String(s)}
+                type="button"
+                disabled={ocupado}
+                onClick={() => void mudar(f.id, { sexo: s })}
+                className={`press rounded-full px-3 py-1 text-xs ${
+                  f.sexo === s ? "btn-3d bg-primary text-primary-foreground" : "bg-muted"
+                }`}
+              >
+                {s === "f" ? "Menina" : s === "m" ? "Menino" : "Não sei"}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-2 flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">
+              {f.nascidoEm ? "Nasceu em" : "Previsto para"}
+            </label>
+            <input
+              type="date"
+              value={(f.nascidoEm ?? f.previstoPara ?? "").slice(0, 10)}
+              onChange={(e) =>
+                void mudar(
+                  f.id,
+                  f.nascidoEm ? { nascidoEm: e.target.value } : { previstoPara: e.target.value },
+                )
+              }
+              className="rounded-lg border border-border bg-background px-2 py-1 text-sm"
+            />
+          </div>
+
+          {/* ⚠️ O NASCIMENTO É UM BOTÃO, e é o momento que o app inteiro
+              esperava. Ele troca `previsto_para` por `nascido_em` — e é essa
+              troca que muda a frase do perfil de "grávida" para "mãe". */}
+          {!f.nascidoEm && (
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void mudar(f.id, { nascidoEm: hoje, previstoPara: null })}
+              className="press mt-2 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
+            >
+              Já nasceu 💛
+            </button>
+          )}
+        </div>
+      ))}
+
+      {(filhos?.length ?? 0) < MAXIMO_DE_FILHOS && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void acrescentar(true)}
+            className="press rounded-full pill-3d px-3 py-1.5 text-[13px]"
+          >
+            + Estou esperando
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => void acrescentar(false)}
+            className="press rounded-full pill-3d px-3 py-1.5 text-[13px]"
+          >
+            + Já nasceu
+          </button>
+        </div>
+      )}
+    </section>
+  );
 }
 
 export function EditarPerfil({
   perfil,
   aoSalvar,
   aoFechar,
+  filhosDeMentira,
 }: {
   perfil: PerfilNaTela;
-  aoSalvar: (m: { nome?: string; bio?: string | null; avatar?: string | null }) => Promise<boolean>;
+  /** Só a bancada preenche. Ver `MeusFilhos`. */
+  filhosDeMentira?: Filho[];
+  aoSalvar: (m: {
+    nome?: string;
+    bio?: string | null;
+    bioLink?: string | null;
+    avatar?: string | null;
+  }) => Promise<boolean>;
   aoFechar: () => void;
 }) {
   const [nome, setNome] = useState(perfil.nome);
   const [bio, setBio] = useState(perfil.bio ?? "");
+  const [bioLink, setBioLink] = useState(perfil.bioLink ?? "");
   const [avatar, setAvatar] = useState<string | null>(perfil.avatarUrl);
   const [salvando, setSalvando] = useState(false);
   const arquivo = useRef<HTMLInputElement>(null);
@@ -5079,6 +8566,9 @@ export function EditarPerfil({
     const ok = await aoSalvar({
       nome: nome.trim() || undefined,
       bio: bio.trim() || null,
+      /* ⚠️ Vazio vira `null`, e não `""`: a coluna é anulável, e um string
+         vazio faria o perfil desenhar um link para lugar nenhum. */
+      bioLink: bioLink.trim() || null,
       /* ⚠️ Só manda a foto se ela MUDOU. Reenviar a mesma URL a cada
          salvamento subiria um arquivo novo no balde toda vez, e o antigo
          ficaria órfão lá dentro — cem edições de bio viram cem fotos. */
@@ -5131,7 +8621,7 @@ export function EditarPerfil({
 
       <div className="space-y-4 px-4">
         <label className="block">
-          <span className="text-[12px] text-muted-foreground">Nome</span>
+          <span className="text-xs text-muted-foreground">Nome</span>
           <input
             value={nome}
             onChange={(e) => setNome(e.target.value.slice(0, 60))}
@@ -5139,17 +8629,46 @@ export function EditarPerfil({
           />
         </label>
         <label className="block">
-          <span className="text-[12px] text-muted-foreground">Bio</span>
+          <span className="text-xs text-muted-foreground">Bio</span>
           <textarea
             value={bio}
             onChange={(e) => setBio(e.target.value.slice(0, LIMITE_DA_BIO))}
             rows={2}
             className="mt-1 w-full resize-none border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
           />
-          <span className="mt-0.5 block text-right text-[11px] tabular-nums text-muted-foreground">
+          <span className="mt-0.5 block text-right text-xs tabular-nums text-muted-foreground">
             {bio.length}/{LIMITE_DA_BIO}
           </span>
         </label>
+
+        {/* ⚠️ **CAMPO PRÓPRIO, e não um link solto DENTRO da bio.** Varrer a bio
+            atrás de `http` transformaria qualquer texto com endereço num link —
+            inclusive o que ela escreveu sem querer que fosse clicável.
+
+            ⚠️ E a tela NÃO valida nada: quem limpa é `limparLinkDaBio`, no
+            servidor. Uma régua aqui recusaria o que o servidor aceita (ou o
+            contrário), e o `href` é o único lugar do app onde texto de uma
+            paciente vira comportamento na tela de outra. */}
+        <label className="mt-4 block">
+          <span className="text-xs font-medium text-muted-foreground">Link</span>
+          <input
+            value={bioLink}
+            onChange={(e) => setBioLink(e.target.value.slice(0, LINK_DA_BIO_MAX))}
+            inputMode="url"
+            placeholder="instagram.com/seu-perfil"
+            className="mt-1 w-full border-b border-border bg-transparent pb-1.5 text-[15px] outline-none"
+          />
+          <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+            Aparece no seu perfil, embaixo da descrição. Pode deixar em branco.
+          </span>
+        </label>
+
+        {/* ⚠️ OS FILHOS FICAM ABAIXO DA BIO, e a ordem importa: a bio é o que
+            ela escreve, os filhos são o que o app DERIVA. Invertido, a tela
+            pediria o dado estruturado antes de ela ter entendido que existe uma
+            frase automática — e o espelho da frase é o que faz preencher valer
+            a pena. */}
+        <MeusFilhos hoje={hojeEmSaoPaulo()} bancada={filhosDeMentira} />
       </div>
     </div>
   );
@@ -5212,7 +8731,7 @@ export function ListaDeGente({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -5236,7 +8755,7 @@ export function ListaDeGente({
                       {p.nome}
                     </span>
                     {p.bio && (
-                      <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                      <span className="block truncate text-xs leading-tight text-muted-foreground">
                         {p.bio}
                       </span>
                     )}
@@ -5369,7 +8888,7 @@ export function FolhaDeQuemReagiu({
                 <Foto url={g.avatarUrl} nome={g.nome} lado={40} />
                 <span
                   aria-hidden
-                  className="absolute -bottom-0.5 -right-1 grid h-[20px] w-[20px] place-items-center rounded-full bg-card text-[12px] leading-none ring-1 ring-border/70"
+                  className="absolute -bottom-0.5 -right-1 grid h-[20px] w-[20px] place-items-center rounded-full bg-card text-xs leading-none ring-1 ring-border/70"
                 >
                   {g.emoji}
                 </span>
@@ -5380,7 +8899,7 @@ export function FolhaDeQuemReagiu({
                     precisa dizer o que é sem depender de o desenho ser
                     reconhecido, e é a informação mais valiosa da lista. */}
                 {g.ehMeuMedico && (
-                  <span className="block text-[11px] font-semibold leading-tight text-primary">
+                  <span className="block text-xs font-semibold leading-tight text-primary">
                     Seu obstetra
                   </span>
                 )}
@@ -5392,15 +8911,91 @@ export function FolhaDeQuemReagiu({
   );
 }
 
+/**
+ * O TEXTO COM `@` E `#` VIRANDO LINK.
+ *
+ * ⚠️ **NÃO USA `dangerouslySetInnerHTML`.** A legenda é texto de terceiro — a
+ * única forma segura de destacar pedaços dela é quebrar em nós de React, nunca
+ * montar HTML a partir do que a paciente escreveu.
+ *
+ * ⚠️ **E O `@` VIRA LINK MESMO SEM SABER SE O PERFIL EXISTE.** Conferir cada
+ * menção contra o banco custaria uma consulta por publicação do feed; quem
+ * descobre que não existe é a tela de destino, que já sabe dizer "perfil
+ * indisponível". O pior caso é um toque que não leva a lugar nenhum — contra
+ * uma legenda que carrega o feed inteiro.
+ */
+/**
+ * ⚠️ **EXPORTADA para o COMENTÁRIO, e não copiada.** O `@` já virava link na
+ * legenda do post e continuava texto cru embaixo dela — no lugar onde a menção
+ * é mais usada. Uma segunda implementação divergiria da primeira, e a
+ * divergência apareceria como o mesmo `@` sendo link num lugar e não no outro.
+ */
+export function TextoComLinks({
+  texto,
+  aoAbrirArroba,
+  aoAbrirTag,
+}: {
+  texto: string;
+  /**
+   * ⚠️ **RECEBE O `@`, NUNCA UM id — e por isso é prop PRÓPRIA.** A primeira
+   * versão reaproveitava `aoAbrirPerfil`, que espera um uuid: o toque numa
+   * menção pediria ao servidor o perfil de id "marina" e a tela responderia
+   * "indisponível", que é o pior desfecho possível — a menção existe, a pessoa
+   * existe, e o app diz que não. Quem traduz `@` em id é `perfilPorHandle`.
+   */
+  aoAbrirArroba?: (handle: string) => void;
+  aoAbrirTag?: (tag: string) => void;
+}) {
+  const pedacos = texto.split(/(@[a-z0-9._]{1,30}|#[\p{L}\p{N}_]{1,60})/giu);
+  return (
+    <span className="whitespace-pre-wrap">
+      {pedacos.map((p, i) => {
+        if (/^@/.test(p) && aoAbrirArroba) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => aoAbrirArroba(p.slice(1).toLowerCase())}
+              className="press font-semibold text-primary"
+            >
+              {p}
+            </button>
+          );
+        }
+        if (/^#/.test(p) && aoAbrirTag) {
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => aoAbrirTag(p.slice(1).toLowerCase())}
+              className="press font-semibold text-primary"
+            >
+              {p}
+            </button>
+          );
+        }
+        return <span key={i}>{p}</span>;
+      })}
+    </span>
+  );
+}
+
 export function TelaDoPost({
   post,
   aoReagir,
   aoSalvar,
+  aoRepublicar,
+  aoCompartilhar,
+  aoAbrirTag,
+  aoMandarParaConversa,
+  aoAbrirArroba,
   aoApagar,
   aoDenunciar,
   aoVotar,
   aoTirarMarcacao,
   aoEditar,
+  aoFixar,
+  aoStoryComPost,
   aoVerQuemReagiu,
   aoVoltar,
   aoAbrirPerfil,
@@ -5409,6 +9004,18 @@ export function TelaDoPost({
   /* As ações carregam o POST — ver a nota de desempenho em `PostInstagram`. */
   aoReagir: (post: PostNaTela, t: TipoDeReacao | null) => void;
   aoSalvar?: (post: PostNaTela, salvar: boolean) => void;
+  /** Republicar. Só chega onde cabe — ver o comentário do botão. */
+  aoRepublicar?: (post: PostNaTela) => void;
+  /** Compartilhar para fora. Só a própria — ver `compartilhar-post.ts`. */
+  aoCompartilhar?: (post: PostNaTela) => void;
+  /** O link público desta publicação — ver `PostInstagram`. */
+  aoLinkPublico?: (post: PostNaTela) => void;
+  /** Abrir a página de uma `#`. */
+  aoAbrirTag?: (tag: string) => void;
+  /** Abre a folha de mandar esta publicação para uma conversa. */
+  aoMandarParaConversa?: (post: PostNaTela) => void;
+  /** Abrir o perfil por trás de um `@`. Ver `TextoComLinks`. */
+  aoAbrirArroba?: (handle: string) => void;
   aoApagar?: (post: PostNaTela) => void;
   /** Denunciar o post de outra pessoa. Ver `PostInstagram`. */
   aoDenunciar?: (post: PostNaTela, motivo: MotivoDaDenuncia) => void;
@@ -5417,6 +9024,8 @@ export function TelaDoPost({
   aoTirarMarcacao?: (post: PostNaTela) => void;
   /** Salvar a legenda editada — ver `PostInstagram`. */
   aoEditar?: (post: PostNaTela, texto: string) => Promise<boolean>;
+  aoFixar?: (post: PostNaTela, fixar: boolean) => void;
+  aoStoryComPost?: (post: PostNaTela) => void;
   /** Ver quem reagiu. Só no post DELA. */
   aoVerQuemReagiu?: (post: PostNaTela) => void;
   /** O resumo da semana, ou `null`. Ver `CartaoDaSemana`. */
@@ -5432,7 +9041,7 @@ export function TelaDoPost({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -5442,14 +9051,27 @@ export function TelaDoPost({
         post={post}
         aoReagir={aoReagir}
         aoSalvar={aoSalvar}
+        aoRepublicar={aoRepublicar}
+        aoCompartilhar={aoCompartilhar}
+        aoAbrirTag={aoAbrirTag}
+        aoMandarParaConversa={aoMandarParaConversa}
+        aoAbrirArroba={aoAbrirArroba}
         aoApagar={aoApagar}
         aoDenunciar={aoDenunciar}
         aoVotar={aoVotar}
         aoTirarMarcacao={aoTirarMarcacao}
         aoEditar={aoEditar}
+        aoFixar={aoFixar}
+        aoStoryComPost={aoStoryComPost}
         aoVerQuemReagiu={aoVerQuemReagiu}
         aoAbrirPerfil={aoAbrirPerfil}
       />
+      {/* ⚠️ **OS COMENTÁRIOS SÓ EXISTEM NA TELA DO POST, nunca no feed.**
+          No feed eles custariam uma consulta por publicação a cada rolagem, e
+          transformariam a leitura num mural de opinião — que é exatamente o que
+          o número dos 20,9% recomenda evitar. Quem quer comentar abre o post,
+          e esse toque a mais é uma trava barata contra o comentário impulsivo. */}
+      <Comentarios postId={post.id} aoAbrirPerfil={aoAbrirPerfil} />
     </div>
   );
 }
@@ -5461,6 +9083,223 @@ export function TelaDoPost({
 /** Quanto cada story fica na tela antes de passar sozinho. */
 const DURACAO_DO_STORY = 5000;
 
+/**
+ * O ARQUIVO DE STORIES — tudo o que ela já publicou.
+ *
+ * ⚠️ **Grade quadrada, e não a 3:4 do perfil.** A grade do perfil imita o
+ * Instagram porque ali as células são recortes de FOTOS DE POST; aqui cada
+ * célula é um story inteiro (9:16), e um recorte 3:4 sobre uma imagem vertical
+ * come a metade de cima — que num story de gestação é justamente onde fica o
+ * texto que ela escreveu.
+ */
+export function ArquivoDeStories({
+  stories,
+  instavel,
+  aoVoltar,
+  aoDestacar,
+  aoChegarNoFim,
+  temMais = false,
+  aoTentarDeNovo,
+}: {
+  /** `null` = ainda carregando. `[]` = ela não publicou nenhum. */
+  stories: StoryArquivado[] | null;
+  instavel?: boolean;
+  aoVoltar: () => void;
+  aoDestacar?: (storyId: string, destacar: boolean, titulo?: string | null) => void;
+  aoChegarNoFim?: () => void;
+  temMais?: boolean;
+  aoTentarDeNovo?: () => void;
+}) {
+  /** O story que está ganhando nome. `null` = a folha está fechada. */
+  const [nomeando, setNomeando] = useState<{ id: string; titulo: string } | null>(null);
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Meus stories</h1>
+      </header>
+
+      {/* ⚠️ A explicação vem ANTES da grade, e diz as duas coisas que a paciente
+          não tem como adivinhar: que o app guardou tudo, e que ninguém mais vê
+          isto. Sem a segunda, ela olha a lista achando que aquilo continua no
+          ar. */}
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+        Tudo o que você publicou fica guardado aqui — só para você. Toque na estrela para deixar um
+        no seu perfil.
+      </p>
+
+      {instavel ? (
+        /* ⚠️ **"Não carregou" NUNCA tem a cara de "não há nada".** "Você ainda
+           não publicou stories" é a frase mais errada que esta tela pode dizer a
+           quem publicou trinta. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar seus stories agora.</p>
+          {aoTentarDeNovo && (
+            <button
+              type="button"
+              onClick={aoTentarDeNovo}
+              className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+            >
+              Tentar de novo
+            </button>
+          )}
+        </div>
+      ) : stories === null ? (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 9 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto aspect-square w-full" />
+          ))}
+        </div>
+      ) : stories.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Você ainda não publicou nenhum story.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-0.5">
+            {stories.map((st) => (
+              <div key={st.id} className="relative aspect-square overflow-hidden bg-muted/60">
+                {st.imagemUrl ? (
+                  <img
+                    src={st.imagemUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                    decoding="async"
+                  />
+                ) : (
+                  <span className="line-clamp-4 block p-2 text-left text-xs leading-snug text-foreground/70">
+                    {st.texto}
+                  </span>
+                )}
+
+                {/* ⚠️ **"No ar" é a informação que muda o que ela faz.** Um story
+                    ainda dentro das 24 h pode ser apagado do visor; um que já
+                    saiu, não. Sem a pílula, as duas células são idênticas. */}
+                {st.noAr && (
+                  <span className="pointer-events-none absolute left-1 top-1 rounded-full bg-black/55 px-1.5 py-0.5 text-xs font-semibold text-white">
+                    no ar
+                  </span>
+                )}
+
+                {/* ⚠️ **O NOME DO DESTAQUE, e ele é o recurso.** Sem ele o
+                    perfil mostra uma grade de imagens: "Ultrassons" e "Chá de
+                    bebê" são o que faz alguém tocar. */}
+                {st.destacado && st.destaqueTitulo && (
+                  <span className="pointer-events-none absolute inset-x-1 bottom-1 truncate rounded-full bg-black/55 px-1.5 py-0.5 text-center text-xs font-semibold text-white">
+                    {st.destaqueTitulo}
+                  </span>
+                )}
+
+                {aoDestacar && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      /* ⚠️ **O NOME É PEDIDO NO ATO DE DESTACAR, e nunca depois.**
+                         Um segundo passo ("agora dê um nome") é um passo que a
+                         maioria pula — e aí o destaque volta a ser uma grade de
+                         imagens. Nomear continua OPCIONAL: um destaque sem nome
+                         é melhor que nenhum.
+
+                         ⚠️ E é uma folha da PRÓPRIA tela, nunca `window.prompt`:
+                         no app instalado o diálogo do sistema abre com o nome do
+                         domínio em cima, que é a cara de "site embrulhado" que a
+                         diretriz 4.2 da Apple reprova. */
+                      if (st.destacado) {
+                        aoDestacar(st.id, false, null);
+                        return;
+                      }
+                      setNomeando({ id: st.id, titulo: st.texto ?? "" });
+                    }}
+                    aria-label={st.destacado ? "Tirar do destaque" : "Deixar no perfil"}
+                    aria-pressed={st.destacado}
+                    /* ⚠️ 44px de alvo com o desenho pequeno: a célula tem ~130px
+                       e um botão de 44 visível cobriria a foto. O `after`
+                       estende a área do dedo sem mover o desenho — a mesma
+                       solução do × da linha de comentário. */
+                    className="press absolute bottom-1 right-1 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white after:absolute after:-inset-2.5 after:content-['']"
+                  >
+                    <IconeEstrela cheia={st.destacado} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {aoChegarNoFim && temMais && (
+            <SentinelaDaGrade aoChegar={aoChegarNoFim} quantos={stories.length} />
+          )}
+        </>
+      )}
+
+      {nomeando && aoDestacar && (
+        <div className="fixed inset-x-0 bottom-0 z-30 rounded-t-3xl border-t border-border bg-card p-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
+          <p className="text-[14px] font-semibold">Nome do destaque</p>
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            É o que aparece no seu perfil — "Ultrassons", "Chá de bebê". Pode deixar em branco.
+          </p>
+          <input
+            value={nomeando.titulo}
+            onChange={(e) => setNomeando({ ...nomeando, titulo: e.target.value.slice(0, 24) })}
+            maxLength={24}
+            placeholder="Ultrassons"
+            className="mt-2 w-full rounded-2xl border border-border bg-background px-3 py-2 text-[14px]"
+          />
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setNomeando(null)}
+              className="press min-h-[44px] text-[13px] text-muted-foreground"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                aoDestacar(nomeando.id, true, nomeando.titulo.trim() || null);
+                setNomeando(null);
+              }}
+              className="press min-h-[44px] rounded-full bg-primary px-4 text-[13px] font-semibold text-primary-foreground"
+            >
+              Deixar no perfil
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A estrela do destaque.
+ *
+ * ⚠️ Desenhada, e não ⭐: o emoji tem cor própria em cada sistema e não tem dois
+ * estados — e aqui ele precisa distinguir "está no perfil" de "pôr no perfil".
+ * Mesma lição do pino e do 📞 da emergência.
+ */
+function IconeEstrela({ cheia }: { cheia: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-hidden
+      className="h-[13px] w-[13px]"
+      fill={cheia ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" />
+    </svg>
+  );
+}
+
 export function VisorDeStory({
   bolha,
   aoFechar,
@@ -5468,9 +9307,13 @@ export function VisorDeStory({
   souEu = false,
   aoQuemViu,
   aoApagarStory,
+  aoDenunciarStory,
   aoVotarNoStory,
   aoPerguntarNoStory,
   aoReagirAoStory,
+  aoResponderStory,
+  aoAbrirPublicacao,
+  aoMandarStory,
 }: {
   bolha: BolhaDeStory;
   aoFechar: () => void;
@@ -5479,18 +9322,61 @@ export function VisorDeStory({
   souEu?: boolean;
   /** `null` = não deu para ler (nunca "ninguém viu") — ver `quemViu`. */
   aoQuemViu?: (storyId: string) => Promise<PessoaNaLista[] | null>;
+  /** Abrir a publicação compartilhada dentro do story. */
+  aoAbrirPublicacao?: (postId: string) => void;
+  /** Mandar este story para uma conversa. */
+  aoMandarStory?: (storyId: string) => void;
   aoApagarStory?: (storyId: string) => void;
+  /** `undefined` = é o story dela, ou a tela de fora não liga a denúncia. */
+  aoDenunciarStory?: (storyId: string, motivo: MotivoDaDenuncia) => void;
   /** Votar na enquete deste story. */
   aoVotarNoStory?: (storyId: string, opcao: number) => void;
   /** Mandar uma pergunta pela caixinha aberta neste story. */
   aoPerguntarNoStory?: (donaId: string, texto: string, storyId: string) => Promise<string | null>;
   /** Reagir a este story. `null` tira a reação. */
   aoReagirAoStory?: (storyId: string, tipo: TipoDeReacao | null) => void;
+  /**
+   * Manda a resposta como mensagem direta, com o story anexado.
+   *
+   * ⚠️ A FOTO é opcional e vai pelo MESMO caminho da foto da conversa — nunca
+   * um segundo jeito de subir, que divergiria na regra da pasta.
+   */
+  aoResponderStory?: (autorId: string, storyId: string, texto: string, foto?: File | null) => void;
 }) {
   const [i, setI] = useState(0);
+  const [resposta, setResposta] = useState("");
+  /**
+   * A foto que ela anexou à resposta, ainda não enviada.
+   *
+   * ⚠️ **Anexar PARA o story** (ver o efeito do relógio). Sem isso o story
+   * avança enquanto ela olha a prévia, e a foto sairia grudada num story que ela
+   * já não está vendo — o anexo apontaria para outra coisa. É o mesmo motivo
+   * pelo qual a enquete e a folha de "visto por" param o relógio.
+   */
+  const [fotoDaResposta, setFotoDaResposta] = useState<File | null>(null);
+  const escolherFoto = useRef<HTMLInputElement>(null);
+  /** Por story: já respondi este? A bolha tem vários. */
+  const [respondido, setRespondido] = useState<Record<string, boolean>>({});
   /* O voto que ela acabou de dar, para a tela responder na hora sem esperar a
      rede — a mesma decisão otimista da reação. */
   const [voteiAgora, setVoteiAgora] = useState<Record<string, number>>({});
+  /**
+   * O véu do aviso de conteúdo — POR STORY, e morre ao trocar de story.
+   *
+   * ⚠️ **Revelar um não revela os outros.** Ela marcou aquele; o seguinte pode
+   * ser outra coisa, e uma decisão que vaza para o story de baixo desfaz o
+   * aviso pela lateral. Mesma régua do filtro de palavras nos comentários.
+   */
+  const [reveladoStory, setReveladoStory] = useState<string | null>(null);
+  /**
+   * Quanto dura o vídeo deste story, em ms — lido do próprio arquivo.
+   *
+   * ⚠️ **`null` até o metadado chegar**, e aí vale o padrão de cinco segundos:
+   * cravar a duração antes de saber cortaria o vídeo, e esperar por ela
+   * deixaria o story parado se o arquivo nunca carregasse.
+   */
+  const [duracaoDoVideo, setDuracaoDoVideo] = useState<number | null>(null);
+
   /* A reação que ela acabou de dar, para a tela responder sem esperar a rede. */
   const [reagiAgora, setReagiAgora] = useState<Record<string, TipoDeReacao | null>>({});
   const [pergunta, setPergunta] = useState("");
@@ -5501,7 +9387,51 @@ export function VisorDeStory({
   /** `null` = folha fechada · `"erro"` = não deu para ler · lista = a verdade. */
   const [quemViu, setQuemViu] = useState<PessoaNaLista[] | "erro" | null>(null);
   const [confirmando, setConfirmando] = useState(false);
+  const [denunciando, setDenunciando] = useState(false);
+  /* ⚠️ Trocou de story: a duração do vídeo anterior não vale mais, e o véu
+     revelado também não — ela marcou AQUELE, e o de baixo pode ser outra
+     coisa. */
+  useEffect(() => {
+    setDuracaoDoVideo(null);
+    /* ⚠️ E a foto anexada some junto: ela a escolheu para AQUELE story. Mantê-la
+       faria o anexo seguir para o próximo, e o `refId` da mensagem apontaria
+       para uma coisa que ela nunca quis responder. */
+    setFotoDaResposta(null);
+  }, [i]);
+
+  /**
+   * O endereço local da prévia.
+   *
+   * ⚠️ **`URL.createObjectURL` PRECISA de `revokeObjectURL`**: sem isso cada
+   * foto trocada deixa o arquivo inteiro preso na memória da aba até ela
+   * fechar o app — e numa fileira de stories ela troca várias vezes.
+   */
+  const [previaDaFoto, setPreviaDaFoto] = useState<string | null>(null);
+  useEffect(() => {
+    if (!fotoDaResposta) {
+      setPreviaDaFoto(null);
+      return;
+    }
+    const url = URL.createObjectURL(fotoDaResposta);
+    setPreviaDaFoto(url);
+    return () => URL.revokeObjectURL(url);
+  }, [fotoDaResposta]);
+
   const atual = bolha.stories[i];
+  /**
+   * ⚠️ **A régua é `deveBorrar`, a MESMA do post — nunca uma condição escrita
+   * aqui.** Duas réguas para "esconder ou não" divergiriam no primeiro ajuste,
+   * e a divergência apareceria como o véu valendo no feed e não no story.
+   */
+  const borrado = deveBorrar({
+    sensivel: !!atual?.sensivel,
+    /* ⚠️ `souEu` é a prop de "esta bolha é a MINHA", e uma bolha é de uma
+       autora só — então ela responde exatamente "sou a autora deste story".
+       Ela nunca vê o próprio borrado: sabe o que publicou, e borrar seria
+       tratá-la como quem precisa ser protegida do que decidiu contar. */
+    souAAutora: souEu,
+    revelado: reveladoStory === atual?.id,
+  });
 
   /* ⚠️ Marca como visto ao ENTRAR no story, não ao sair. Quem fecha o app no
      meio já viu aquele — e marcar na saída deixaria o anel aceso para sempre
@@ -5526,13 +9456,38 @@ export function VisorDeStory({
        continuam funcionando, então nunca há como ficar presa. */
     const enqueteEsperando =
       !!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null;
-    if (pausado || quemViu || confirmando || enqueteEsperando || !atual) return;
+    /* ⚠️ **A FOTO ANEXADA PARA O STORY.** Sem isto ele avança enquanto ela olha
+       a prévia, e a foto sairia grudada num story que ela já não está vendo — o
+       anexo apontaria para outra coisa, para sempre. Mesma razão da enquete e
+       da folha de "visto por". */
+    if (pausado || quemViu || confirmando || enqueteEsperando || fotoDaResposta || !atual) return;
+    /* ⚠️ **O VÍDEO MANDA NO RELÓGIO, e o véu também.** Cinco segundos cravados
+       cortariam ao meio um vídeo de vinte — e ela nunca veria o fim daquilo que
+       a amiga gravou. E um story marcado como sensível não pode passar sozinho
+       enquanto ela decide se quer ver: o véu SEGURA o relógio, senão a decisão
+       que a tela pede acontece com o story já trocando. */
+    if (borrado) return;
+    /* ⚠️ **A duração é do story ATUAL.** Ela é zerada na troca (abaixo): sem
+       isso, o story seguinte — que pode ser uma foto — herdaria o relógio do
+       vídeo de vinte segundos que veio antes. */
+    const duracao = duracaoDoVideo ?? DURACAO_DO_STORY;
     const t = setTimeout(() => {
       if (i + 1 < bolha.stories.length) setI(i + 1);
       else aoFechar();
-    }, DURACAO_DO_STORY);
+    }, duracao);
     return () => clearTimeout(t);
-  }, [i, pausado, quemViu, confirmando, atual?.id, voteiAgora]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    i,
+    pausado,
+    quemViu,
+    confirmando,
+    atual?.id,
+    voteiAgora,
+    borrado,
+    duracaoDoVideo,
+    fotoDaResposta,
+  ]);
 
   if (!atual) return null;
 
@@ -5550,8 +9505,18 @@ export function VisorDeStory({
                    vazias. `animationPlayState` é o que faz o dedo pausar a
                    barra junto com o relógio — sem isso a barra correria
                    sozinha e chegaria ao fim antes da foto trocar. */
-                animation:
-                  n === i ? `dc-story-barra ${DURACAO_DO_STORY}ms linear forwards` : undefined,
+                /* ⚠️ **LONGHANDS, e NUNCA o atalho `animation`.** Misturar o
+                   atalho com `animationPlayState` no mesmo objeto de estilo faz
+                   o React avisar ("don't mix shorthand and non-shorthand
+                   properties") — e o aviso é sobre um defeito real: numa
+                   repintura o atalho REESCREVE o `animation-play-state`, e a
+                   barra volta a correr sozinha enquanto o dedo a segura. Era
+                   exatamente o travamento que o comentário abaixo diz impedir.
+                   Achado varrendo a Comunidade com INTERAÇÃO, não só carga. */
+                animationName: n === i ? "dc-story-barra" : undefined,
+                animationDuration: n === i ? `${DURACAO_DO_STORY}ms` : undefined,
+                animationTimingFunction: n === i ? "linear" : undefined,
+                animationFillMode: n === i ? "forwards" : undefined,
                 /* A barrinha para JUNTO com o relógio — se ela continuasse
                    correndo, chegaria ao fim antes de a foto trocar, que lê
                    como travamento. */
@@ -5559,6 +9524,7 @@ export function VisorDeStory({
                   pausado ||
                   quemViu ||
                   confirmando ||
+                  fotoDaResposta ||
                   (!!atual?.enquete && (voteiAgora[atual.id] ?? atual.enquete.meuVoto) == null)
                     ? "paused"
                     : "running",
@@ -5587,10 +9553,101 @@ export function VisorDeStory({
           composição inteira, e cortar as bordas engole texto que a pessoa
           escreveu na foto. */}
       <div className="relative min-h-0 flex-1">
-        {atual.imagemUrl && (
-          <img src={atual.imagemUrl} alt="" className="h-full w-full object-contain" />
+        {/* ⚠️ **ROLAGEM NATIVA com `scroll-snap`, e NUNCA `transform` por
+            estado.** É a mesma decisão do carrossel do post: o deslizar tem
+            inércia e resistência de borda que o sistema calcula, e
+            reimplementar dá sempre um arrasto que parece quase certo e nunca é.
+
+            ⚠️ E o carrossel do story tem uma trava a mais: ele vive DENTRO de
+            uma tela cujas metades avançam e voltam o story. `stopPropagation`
+            no contêiner é o que impede um deslize horizontal de virar um
+            avanço — sem ele, folhear as fotos pularia o story inteiro. */}
+        {borrado ? (
+          /* ⚠️ **SOB O VÉU NÃO HÁ MÍDIA NENHUMA NO DOM — nem borrada.** Borrar
+              com CSS ainda BAIXA o arquivo e o deixa na página: quem quisesse o
+              leria pelo inspetor, e o 4G dela pagaria por um vídeo que ela
+              decidiu não ver. Aqui não existe `<img>` nem `<video>` até ela
+              tocar. É a mesma decisão do véu do feed.
+              ⚠️ E o TEXTO entra junto: num story sobre uma perda é a frase que
+              carrega a notícia. */
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setReveladoStory(atual.id);
+            }}
+            /* ⚠️ **`z-20`, acima das metades invisíveis de avançar/voltar.**
+                Sem isto o botão "Próximo" (`inset-y-0 right-0 w-2/3`) fica POR
+                CIMA do véu e engole o toque: ela toca querendo decidir, o story
+                AVANÇA, e o seguinte aparece sem véu nenhum — a decisão que a
+                tela pede nunca acontece. É a mesma trava que a enquete e a
+                caixinha já têm, e o véu nasceu sem ela; quem pegou foi a foto
+                da bancada, não o `tsc`. */
+            className="absolute inset-0 z-20 flex h-full w-full flex-col items-center justify-center gap-2 bg-neutral-900 px-8 text-center"
+          >
+            {atual.motivoSensivel && (
+              <span className="rounded-full bg-white/15 px-3 py-1 text-xs text-white">
+                {atual.motivoSensivel}
+              </span>
+            )}
+            <span className="text-[15px] font-semibold text-white">Toque para ver</span>
+            <span className="text-xs text-white/70">
+              Quem publicou marcou este story como sensível.
+            </span>
+          </button>
+        ) : atual.videoUrl ? (
+          /* ⚠️ **`playsInline` e `autoPlay` MUDO.** Sem `playsInline` o iPhone
+              abre o vídeo no player de tela cheia do sistema e o story
+              desaparece por baixo dele; sem `muted` o navegador recusa tocar
+              sozinho, e a paciente veria um quadro parado sem saber que era
+              vídeo. O som ela liga nos controles. */
+          <video
+            key={atual.id}
+            src={atual.videoUrl}
+            poster={atual.imagemUrl ?? undefined}
+            autoPlay
+            muted
+            playsInline
+            controls
+            onClick={(e) => e.stopPropagation()}
+            onLoadedMetadata={(e) => {
+              const d = (e.target as HTMLVideoElement).duration;
+              /* ⚠️ Só um número FINITO manda no relógio: `Infinity` (stream sem
+                 duração) faria o story nunca avançar. */
+              setDuracaoDoVideo(Number.isFinite(d) && d > 0 ? d * 1000 : null);
+            }}
+            className="h-full w-full object-contain"
+          />
+        ) : (atual.imagens ?? []).length > 1 ? (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex h-full w-full snap-x snap-mandatory overflow-x-auto"
+          >
+            {(atual.imagens ?? []).map((u, i) => (
+              <img
+                key={`${u}-${i}`}
+                src={u}
+                alt=""
+                className="h-full w-full shrink-0 snap-center object-contain"
+              />
+            ))}
+          </div>
+        ) : (
+          atual.imagemUrl && (
+            <img src={atual.imagemUrl} alt="" className="h-full w-full object-contain" />
+          )
         )}
-        {atual.texto && (
+        {/* ⚠️ Os pontinhos ficam ABAIXO da barrinha do tempo, e não no lugar
+            dela: as duas contam coisas diferentes (quantas fotos × quanto falta
+            do story), e juntá-las faria a paciente ler uma como a outra. */}
+        {!borrado && (atual.imagens ?? []).length > 1 && !atual.videoUrl && (
+          <div className="pointer-events-none absolute inset-x-0 top-8 flex justify-center gap-1">
+            {(atual.imagens ?? []).map((_, i) => (
+              <span key={i} className="h-1 w-1 rounded-full bg-white/70" />
+            ))}
+          </div>
+        )}
+        {!borrado && atual.texto && (
           <p className="absolute inset-x-0 bottom-8 px-6 text-center text-[16px] font-medium text-white drop-shadow-lg">
             {atual.texto}
           </p>
@@ -5614,12 +9671,65 @@ export function VisorDeStory({
           </span>
         )}
 
+        {/* ⚠️ **O QUADRO DA PUBLICAÇÃO COMPARTILHADA.**
+
+            Ele vem RESOLVIDO PARA QUEM ASSISTE — o servidor passa a publicação
+            por `podeVerPost` com o contexto de quem abriu, e quando a régua
+            recusa o campo chega `null` e o story continua inteiro. A tela nunca
+            decide isso: uma segunda régua aqui seria a divergência que aparece
+            como publicação de perfil fechado dentro do story de outra pessoa.
+
+            ⚠️ **`z-20`, acima das metades invisíveis de avançar/voltar** — sem
+            isso, tocar no quadro avançaria o story em vez de abrir a
+            publicação, e o cartão seria um desenho que ninguém consegue usar. É
+            a mesma lição da enquete, três blocos abaixo.
+
+            ⚠️ **E o toque PAUSA o relógio antes de navegar**: sem isso o story
+            avança por baixo enquanto a publicação abre, e ao voltar ela está
+            noutro lugar da fileira. */}
+        {atual.postCompartilhado && (
+          <button
+            type="button"
+            onClick={() => {
+              /* Pausa o relógio ANTES de navegar: sem isso o story avança por
+                 baixo enquanto a publicação abre, e ao voltar ela está noutro
+                 lugar da fileira. */
+              setPausado(true);
+              aoAbrirPublicacao?.(atual.postCompartilhado!.id);
+            }}
+            className="press absolute inset-x-6 bottom-24 z-20 flex items-center gap-3 rounded-2xl bg-black/55 p-2.5 text-left backdrop-blur-sm"
+          >
+            {atual.postCompartilhado.imagemUrl ? (
+              <img
+                src={atual.postCompartilhado.imagemUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-xl object-cover"
+              />
+            ) : (
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-white/15 text-lg">
+                🖼
+              </span>
+            )}
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-semibold text-white">
+                {atual.postCompartilhado.autorNome}
+              </span>
+              {atual.postCompartilhado.texto && (
+                <span className="line-clamp-2 block text-xs leading-snug text-white/80">
+                  {atual.postCompartilhado.texto}
+                </span>
+              )}
+            </span>
+            <span className="shrink-0 text-xs font-semibold text-white/90">Ver</span>
+          </button>
+        )}
+
         {/* ⚠️ A ENQUETE E A CAIXINHA vivem ACIMA das metades invisíveis
             (`z-20`): sem isso, tocar numa opção cairia no "avançar story", e a
             enquete seria um desenho que ninguém consegue usar.
             ⚠️ E as duas PAUSAM o relógio enquanto estão na tela — responder uma
             pergunta leva mais que os cinco segundos do story. */}
-        {atual.enquete && (
+        {!borrado && atual.enquete && (
           <div className="absolute inset-x-6 bottom-24 z-20 space-y-2">
             {(() => {
               const meu = voteiAgora[atual.id] ?? atual.enquete!.meuVoto;
@@ -5675,7 +9785,7 @@ export function VisorDeStory({
               });
             })()}
             {(voteiAgora[atual.id] ?? atual.enquete.meuVoto) === null && (
-              <p className="text-center text-[11px] text-white/75">
+              <p className="text-center text-xs text-white/75">
                 Toque para votar — o voto não muda depois.
               </p>
             )}
@@ -5693,7 +9803,12 @@ export function VisorDeStory({
 
             ⚠️ `z-20`, acima das metades invisíveis de avançar/voltar — sem
             isso, tocar num emoji avançaria o story. */}
-        {!souEu && aoReagirAoStory && !atual.enquete && !atual.perguntaAberta && (
+        {/* ⚠️ **E NUNCA SOB O VÉU.** A foto da bancada pegou: com o aviso de
+            conteúdo em pé, a fileira de emojis continuava à mostra — ela
+            reagiria a um story que não viu, e o afago chegaria à caixa da
+            autora vindo de quem não leu nada. Sob o véu a tela pede UMA
+            decisão, e mais nada é oferecido. */}
+        {!borrado && !souEu && aoReagirAoStory && !atual.enquete && !atual.perguntaAberta && (
           <div className="absolute inset-x-3 bottom-24 z-20">
             <div className="flex items-center gap-0.5 overflow-x-auto rounded-full bg-black/45 px-1.5 py-1 backdrop-blur-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {REACOES.map((r, n) => {
@@ -5722,18 +9837,126 @@ export function VisorDeStory({
                 );
               })}
             </div>
-            {/* ⚠️ Diz PARA ONDE VAI. No modelo a reação vira mensagem direta;
-                aqui não existe mensagem direta, e sem esta frase ela acha que
-                mandou um recado que ninguém vai ler. */}
-            <p className="mt-1 text-center text-[11px] text-white/75">
+            {/* ⚠️ Diz PARA ONDE VAI. Sem esta frase ela acha que mandou um
+                recado que ninguém vai ler. */}
+            <p className="mt-1 text-center text-xs text-white/75">
               {(reagiAgora[atual.id] ?? atual.minhaReacao)
                 ? "Ela vai ver na caixa dela 💛"
                 : "Toque para reagir — ela vê o seu nome"}
             </p>
+
+            {/* ─── RESPONDER AO STORY ────────────────────────────────────────
+                ⚠️ **É A ORIGEM Nº 1 DE MENSAGEM DIRETA no modelo, e ela não
+                existia.** O direct só nascia pelo botão do PERFIL — ou seja,
+                ela precisava decidir escrever ANTES de ter assunto. Aqui o
+                assunto está na tela: é a foto que a amiga acabou de publicar.
+
+                ⚠️ **A mensagem carrega o STORY como anexo** (`ref_tipo`), e não
+                o texto "sobre o seu story de hoje": em 24 h o story some, e uma
+                frase solta na conversa perderia o contexto para sempre. */}
+            {!borrado && aoResponderStory && (
+              <div className="mt-2">
+                {respondido[atual.id] ? (
+                  <p className="rounded-full bg-black/45 px-4 py-2 text-center text-xs text-white backdrop-blur-sm">
+                    Enviado 💛
+                  </p>
+                ) : (
+                  <>
+                    <input
+                      ref={escolherFoto}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        e.target.value = "";
+                        if (f) setFotoDaResposta(f);
+                      }}
+                    />
+                    {/* ⚠️ **A PRÉVIA É OBRIGATÓRIA.** Sem ela, escolher a foto
+                        mandaria a mensagem às cegas: ela não veria o que
+                        anexou, e não teria como desistir. E o × devolve a
+                        resposta ao texto puro — e destrava o relógio. */}
+                    {previaDaFoto && (
+                      <div className="mb-2 flex items-center gap-2 rounded-2xl bg-black/45 p-2 backdrop-blur-sm">
+                        <img
+                          src={previaDaFoto}
+                          alt="A foto que vai junto com a sua resposta"
+                          className="h-14 w-14 rounded-xl object-cover"
+                        />
+                        <span className="flex-1 text-xs text-white/85">
+                          Vai junto com a sua resposta
+                        </span>
+                        <button
+                          type="button"
+                          aria-label="Tirar a foto da resposta"
+                          onClick={() => setFotoDaResposta(null)}
+                          className="press -m-2 flex h-11 w-11 items-center justify-center text-xl leading-none text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/40 p-1 backdrop-blur-sm">
+                      {/* ⚠️ Desenhado, e não 📷: o emoji tem cor própria em cada
+                          sistema, e este fica sobre a foto de outra pessoa. */}
+                      <button
+                        type="button"
+                        aria-label="Anexar uma foto à resposta"
+                        onClick={() => escolherFoto.current?.click()}
+                        className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white"
+                      >
+                        <svg
+                          viewBox="0 0 24 24"
+                          className="h-5 w-5"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={1.8}
+                          aria-hidden="true"
+                        >
+                          <rect x="3" y="6" width="18" height="14" rx="3" />
+                          <circle cx="12" cy="13" r="3.2" />
+                          <path d="M8.5 6 10 3.6h4L15.5 6" strokeLinejoin="round" />
+                        </svg>
+                      </button>
+                      <input
+                        value={resposta}
+                        onChange={(e) => setResposta(e.target.value.slice(0, 500))}
+                        placeholder="Responder…"
+                        aria-label={`Responder ao story de ${bolha.autorNome}`}
+                        className="min-h-[44px] flex-1 rounded-full bg-transparent px-3 text-[13px] text-white placeholder:text-white/60 focus:outline-none"
+                      />
+                      {/* ⚠️ **A FOTO SOZINHA JÁ É MENSAGEM** — o servidor aceita
+                          corpo só com imagem. Exigir texto faria o anexo virar
+                          um enfeite de uma frase obrigatória. */}
+                      <button
+                        type="button"
+                        disabled={!resposta.trim() && !fotoDaResposta}
+                        onClick={() => {
+                          const t = resposta.trim();
+                          const f = fotoDaResposta;
+                          if (!t && !f) return;
+                          /* ⚠️ Marca ANTES de a rede responder: a paciente
+                             precisa ver que o toque valeu, e o story continua
+                             correndo. */
+                          setRespondido((r) => ({ ...r, [atual.id]: true }));
+                          setResposta("");
+                          setFotoDaResposta(null);
+                          aoResponderStory(bolha.autorId, atual.id, t, f);
+                        }}
+                        className="press min-h-[44px] shrink-0 rounded-full bg-white/90 px-3.5 text-[13px] font-semibold text-black disabled:opacity-40"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {atual.perguntaAberta && !souEu && aoPerguntarNoStory && (
+        {!borrado && atual.perguntaAberta && !souEu && aoPerguntarNoStory && (
           <div className="absolute inset-x-6 bottom-24 z-20">
             {mandada ? (
               /* ⚠️ Não repete a pergunta na tela depois de enviada: a caixinha é
@@ -5744,7 +9967,7 @@ export function VisorDeStory({
               </p>
             ) : (
               <div className="rounded-2xl bg-black/40 p-2.5 backdrop-blur-sm">
-                <p className="px-1 pb-1.5 text-[12px] text-white/85">
+                <p className="px-1 pb-1.5 text-xs text-white/85">
                   Pergunte o que quiser — ela não vê quem perguntou.
                 </p>
                 <div className="flex items-end gap-2">
@@ -5776,9 +9999,7 @@ export function VisorDeStory({
                     {mandando ? "…" : "Enviar"}
                   </button>
                 </div>
-                {recado && (
-                  <p className="px-1 pt-1.5 text-[12px] leading-snug text-white">{recado}</p>
-                )}
+                {recado && <p className="px-1 pt-1.5 text-xs leading-snug text-white">{recado}</p>}
               </div>
             )}
           </div>
@@ -5829,6 +10050,33 @@ export function VisorDeStory({
               👁 Ver quem viu
             </button>
           )}
+          {/* ✈ **MANDAR O STORY PARA UMA CONVERSA.**
+
+              ⚠️ **SÓ O MEU, e a restrição é de VISIBILIDADE, não de escopo.**
+              Encaminhar o story de outra pessoa é o uso mais comum num app de
+              fotos — e aqui seria a porta dos fundos da camada que os stories
+              acabaram de ganhar: um story marcado "só amigas" chegaria a quem
+              não é amiga dela, pela mão de quem é. O post pode ser mandado
+              porque quem abrir passa por `podeVerPost`; o story não tem esse
+              caminho de leitura por id.
+
+              ⚠️ E ele importa MAIS que no post: o story expira em 24 h, então
+              mandar é justamente o que o salva. */}
+          {aoMandarStory && (
+            <button
+              type="button"
+              onClick={() => {
+                /* Pausa antes de abrir a folha, senão o story avança por baixo
+                   dela e ao voltar ela está noutro. */
+                setPausado(true);
+                aoMandarStory(atual.id);
+              }}
+              aria-label="Mandar este story para uma conversa"
+              className="press text-[15px] text-white/85"
+            >
+              ✈
+            </button>
+          )}
           {aoApagarStory && (
             <button
               type="button"
@@ -5839,6 +10087,76 @@ export function VisorDeStory({
               🗑
             </button>
           )}
+        </div>
+      )}
+
+      {/* ⚠️ **DENUNCIAR — e o story era a ÚLTIMA superfície sem isto.**
+          Post, perfil, comentário, pergunta e mensagem já tinham. E aqui pesa
+          mais que em todas: o story EXPIRA em 24 h, então o que não for
+          denunciado agora nunca chega à plataforma — a próxima paciente recebe
+          a mesma coisa da mesma pessoa, e ninguém soube. Bloquear existe, e
+          bloquear não deixa rastro nenhum.
+
+          ⚠️ Só no story DELA: denunciar o próprio não quer dizer nada. */}
+      {/* ⚠️ **"com Fulana" no story, e é a MESMA régua do post** — quem está em
+          Modo Cuidado, quem pausou e quem ela bloqueou já saíram da lista no
+          servidor. Aqui é só o desenho. */}
+      {atual && (atual.marcadas ?? []).length > 0 && (
+        <span className="pointer-events-none absolute inset-x-4 bottom-16 z-10 truncate rounded-full bg-black/45 px-3 py-1 text-center text-xs text-white">
+          com {(atual.marcadas ?? []).map((m) => m.nome).join(", ")}
+        </span>
+      )}
+
+      {!souEu && atual && aoDenunciarStory && (
+        <div className="absolute inset-x-0 bottom-0 z-10 flex items-center px-4 pb-[calc(1rem+var(--safe-area-inset-bottom,0px))]">
+          <button
+            type="button"
+            onClick={() => {
+              setPausado(true);
+              setDenunciando(true);
+            }}
+            className="press ml-auto min-h-[44px] text-[13px] text-white/70"
+          >
+            Denunciar
+          </button>
+        </div>
+      )}
+
+      {denunciando && atual && aoDenunciarStory && (
+        <div className="absolute inset-x-0 bottom-0 z-20 rounded-t-3xl bg-card p-4">
+          <p className="text-[14px] font-semibold">Denunciar este story?</p>
+          {/* ⚠️ A tela NÃO promete o que vai acontecer com a pessoa — a fila é
+              da plataforma, e prometer remoção seria prometer o que ninguém
+              garante. Mesma decisão das outras cinco denúncias. */}
+          <p className="mt-1 text-xs leading-snug text-muted-foreground">
+            A gente vai olhar. O story some em 24 horas; a denúncia fica.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {MOTIVOS.map((m) => (
+              <button
+                key={m.motivo}
+                type="button"
+                onClick={() => {
+                  aoDenunciarStory(atual.id, m.motivo);
+                  setDenunciando(false);
+                  setPausado(false);
+                }}
+                className="press min-h-[44px] rounded-full pill-3d px-3 text-xs"
+              >
+                {m.rotulo}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setDenunciando(false);
+              setPausado(false);
+            }}
+            className="press mt-3 min-h-[44px] text-[13px] text-muted-foreground"
+          >
+            Cancelar
+          </button>
         </div>
       )}
 
@@ -5944,7 +10262,7 @@ export function TelaDeAtividade({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -5985,14 +10303,14 @@ export function TelaDeAtividade({
                     <button
                       type="button"
                       onClick={() => aoResponder(a.quemId, false)}
-                      className="press rounded-lg border border-border px-2.5 py-1.5 text-[12px]"
+                      className="press rounded-lg pill-3d px-2.5 py-1.5 text-xs"
                     >
                       Agora não
                     </button>
                     <button
                       type="button"
                       onClick={() => aoResponder(a.quemId, true)}
-                      className="press rounded-lg bg-primary px-2.5 py-1.5 text-[12px] font-semibold text-primary-foreground"
+                      className="press rounded-lg bg-primary px-2.5 py-1.5 text-xs font-semibold text-primary-foreground"
                     >
                       Aceitar
                     </button>
@@ -6038,6 +10356,25 @@ export function TelaDeAtividade({
  * A proporção é PRESERVADA, ao contrário do avatar: o modelo aceita retrato,
  * paisagem e quadrado, e recortar aqui decidiria pelo enquadramento dela.
  */
+/**
+ * A QUALIDADE DE TODA FOTO QUE SOBE DAQUI — publicação, story e capa de vídeo.
+ *
+ * ⚠️ **0,72, e desceu de 0,80 por causa da conta de banda.** Medido, codificando
+ * a mesma imagem no canvas do navegador: **266 KB a 0,80 contra 197 KB a 0,72**
+ * — 26% a menos numa foto que a paciente vê a 393 pontos de largura. A
+ * diferença entre as duas existe num monitor, com a imagem ampliada; na tela
+ * onde esta foto de fato aparece, não.
+ *
+ * ⚠️ **Abaixo de 0,70 o JPEG começa a mostrar blocagem em PELE e em CÉU**, que
+ * é exatamente do que uma foto de gestação é feita — por isso 0,72 e não menos.
+ * O ganho seguinte não vem de espremer mais: vem de mandar menos PIXELS para
+ * quem tem tela de densidade 2, que é a escada de versões.
+ *
+ * ⚠️ **Um número só para as três**: publicação, story e capa de vídeo aparecem
+ * no mesmo tamanho de tela, e três constantes divergiriam no primeiro ajuste.
+ */
+const QUALIDADE_DA_FOTO = 0.72;
+
 const LADO_DA_FOTO = 1080;
 async function prepararFotoDoPost(file: File): Promise<string | null> {
   try {
@@ -6049,7 +10386,7 @@ async function prepararFotoDoPost(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return codificarFoto(canvas, QUALIDADE_DA_FOTO);
   } catch {
     return null;
   }
@@ -6084,7 +10421,7 @@ async function prepararMiniatura(file: File): Promise<string | null> {
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     /* 0,75 e não 0,8: num quadrado de 130px o olho não distingue, e a diferença
        de peso é real. */
-    return canvas.toDataURL("image/jpeg", 0.75);
+    return codificarFoto(canvas, 0.75);
   } catch {
     /* Sem miniatura a grade cai na foto cheia — nunca se perde a publicação. */
     return null;
@@ -6119,7 +10456,7 @@ async function reduzirParaIA(dataUrl: string): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.72);
+    return codificarFoto(canvas, 0.72);
   } catch {
     return null;
   }
@@ -6151,9 +10488,73 @@ async function prepararFotoDoStory(file: File): Promise<string | null> {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg", 0.8);
+    return codificarFoto(canvas, QUALIDADE_DA_FOTO);
   } catch {
     return null;
+  }
+}
+
+/**
+ * A CAPA do story de vídeo, tirada do próprio arquivo.
+ *
+ * ⚠️ **`imagem_path` é `NOT NULL` em `rede_stories`, então a capa não é
+ * enfeite** — sem ela o story de vídeo simplesmente não grava. E ela é o que a
+ * BOLINHA da fileira desenha: a decisão de tocar acontece ali, e um quadrado
+ * preto no convite é um story que ninguém abre.
+ *
+ * ⚠️ **O quadro é o de 0,1 s, e nunca o de zero.** Em muitos arquivos o
+ * primeiro quadro é preto (fade de abertura do próprio celular), e a capa
+ * sairia toda escura — exatamente o defeito que ela veio evitar.
+ *
+ * Devolve `null` quando não dá: o chamador recusa o vídeo em vez de publicar um
+ * story sem capa.
+ */
+async function capaDoVideo(file: File): Promise<{ capa: string; segundos: number } | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    const v = document.createElement("video");
+    v.muted = true;
+    v.playsInline = true;
+    v.preload = "metadata";
+    v.src = url;
+    const pronto = await new Promise<boolean>((ok) => {
+      /* ⚠️ Teto de tempo: um arquivo que o navegador não consegue decodificar
+         deixaria a tela presa em "enviando" para sempre, sem erro nenhum. */
+      const desiste = setTimeout(() => ok(false), 8000);
+      v.onerror = () => {
+        clearTimeout(desiste);
+        ok(false);
+      };
+      v.onloadeddata = () => {
+        clearTimeout(desiste);
+        ok(true);
+      };
+      v.onseeked = () => {
+        clearTimeout(desiste);
+        ok(true);
+      };
+      /* Pedir o segundo 0,1 dispara `seeked`; se o arquivo for mais curto que
+         isso, `loadeddata` responde antes. */
+      v.currentTime = 0.1;
+    });
+    if (!pronto || !v.videoWidth) return null;
+    const escala = Math.min(
+      1,
+      LADO_DO_STORY.largura / v.videoWidth,
+      LADO_DO_STORY.altura / v.videoHeight,
+    );
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(v.videoWidth * escala);
+    canvas.height = Math.round(v.videoHeight * escala);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+    const segundos = Number.isFinite(v.duration) ? v.duration : 0;
+    return { capa: codificarFoto(canvas, QUALIDADE_DA_FOTO), segundos };
+  } catch {
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -6163,7 +10564,9 @@ const FOTOS_POR_POST = 10;
 export function NovoPost({
   aoFechar,
   aoPublicar,
+  repostando,
   aulaDeHoje,
+  filhosDeMentira,
   aoSugerirLegenda,
   amigasParaMarcar,
   rascunho,
@@ -6174,18 +10577,38 @@ export function NovoPost({
 }: {
   aoFechar: () => void;
   /** Devolve `true` quando publicou. A tela só fecha nesse caso. */
+  /** Só a bancada preenche — a tira de marcos precisa de um bebê nascido. */
+  filhosDeMentira?: Filho[];
+  /** A publicação sendo republicada, quando o compositor abriu por ela. */
+  repostando?: PostNaTela | null;
   aoPublicar: (p: {
     texto: string | null;
+    /** ⚠️ Um RÓTULO que ela escreve, nunca coordenada — ver o campo na tela. */
+    lugar?: string | null;
     fotos: string[];
     /** A versão de 480px da primeira foto. `null` é normal — ver `miniatura.ts`. */
     miniatura?: string | null;
     visibilidade: Visibilidade;
+    quemComenta?: QuemComenta;
     enquete: string[];
     aula: AulaNoPost | null;
+    /** O marco do bebê, com a idade em DIAS. Ver `marcos.ts`. */
+    marco?: { tipo: string; dias: number | null } | null;
+    /** O vídeo JÁ SUBIDO ao Storage — só o caminho viaja. Ver `video-do-post.ts`. */
+    video?: { caminho: string; segundos: number | null } | null;
+    /** A publicação republicada. Conferida no servidor. */
+    repostDe?: string | null;
     /** Os ids de quem estava junto. O servidor confere cada um. */
     marcadas: string[];
     /** O post antigo que vira a primeira foto, ou `null`. */
     comparacaoCom: string | null;
+    /** A descrição da foto, para leitores de tela. */
+    altTexto?: string | null;
+    /** A autora marcou como sensível — ver `conteudo-sensivel.ts`. */
+    sensivel?: boolean;
+    motivoSensivel?: string | null;
+    /** A legenda do vídeo, para quem assiste sem som ou com leitor de tela. */
+    videoLegenda?: string | null;
   }) => Promise<boolean>;
   /**
    * A aula que ela fez hoje, para anexar com um toque.
@@ -6264,6 +10687,26 @@ export function NovoPost({
    * sem ela. Desenhar é síncrono e custa milissegundos: `momentoComoDataUrl`
    * é canvas puro, sem rede.
    */
+  /**
+   * A descrição da foto, para leitores de tela.
+   *
+   * ⚠️ **Recolhida por padrão.** É acessibilidade, não legenda: quem precisa
+   * sabe o que é, e um segundo campo aberto entre a foto e o botão faria parte
+   * das pacientes achar que precisa preencher os dois.
+   */
+  const [altTexto, setAltTexto] = useState("");
+  /**
+   * ⚠️ **QUEM MARCA É QUEM PUBLICA, e o app NUNCA marca sozinho.**
+   *
+   * A tentação é marcar o que a régua clínica reconhece, ou todo post de quem
+   * está em luto. A segunda contaria o luto dela para quem visse a marca. Ver
+   * `MARCA_AUTOMATICA` em `conteudo-sensivel.ts`.
+   */
+  const [sensivel, setSensivel] = useState(false);
+  const [motivoSensivel, setMotivoSensivel] = useState<string>(MOTIVOS_SENSIVEIS[0].id);
+  const [videoLegenda, setVideoLegenda] = useState("");
+  const [lugar, setLugar] = useState("");
+  const [altAberto, setAltAberto] = useState(false);
   const [fotos, setFotos] = useState<string[]>(() => {
     if (!momentoInicial || typeof document === "undefined") return [];
     const url = cartaoDoMomento(momentoInicial);
@@ -6271,11 +10714,59 @@ export function NovoPost({
   });
   /* ⚠️ O padrão é o mais FECHADO. O erro possível aqui é publicar para menos
      gente do que ela queria — nunca para mais. */
+  const [quemComenta, setQuemComenta] = useState<QuemComenta>(QUEM_COMENTA_PADRAO);
   const [vis, setVis] = useState<Visibilidade>("amigas");
   /* `null` = sem enquete. Duas opções vazias é o estado inicial de quem abriu
      a enquete e ainda não escreveu — e não uma enquete inválida na tela. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
   const [comAula, setComAula] = useState(false);
+
+  /**
+   * O BEBÊ MAIS NOVO QUE JÁ NASCEU — é dele que o marco fala.
+   *
+   * ⚠️ **O MAIS NOVO, e não o primeiro da lista.** Uma mãe de dois publica o
+   * mesversário do caçula; oferecer "3 meses" quando o bebê de 3 meses é o
+   * segundo filho, e a lista devolve o mais velho, poria a idade errada num
+   * post que a família inteira vai ver.
+   */
+  const [filhosDela, setFilhosDela] = useState<Filho[]>(filhosDeMentira ?? []);
+  /** O vídeo já subido: `{caminho, segundos}`. `null` = publicação de foto. */
+  const [video, setVideo] = useState<{ caminho: string; segundos: number | null } | null>(null);
+  const [subindoVideo, setSubindoVideo] = useState(false);
+  const arquivoDeVideo = useRef<HTMLInputElement>(null);
+  const [marco, setMarco] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (filhosDeMentira) return;
+    void (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const t = (await supabase.auth.getSession()).data.session?.access_token;
+        if (!t) return;
+        const { meusFilhos } = await import("@/lib/filhos.functions");
+        const r = await meusFilhos({ data: { accessToken: t } });
+        if (r.ok) setFilhosDela(r.filhos);
+      } catch {
+        /* Sem filhos carregados o compositor fica como sempre foi: a tira de
+           marcos não aparece, e publicar continua funcionando. */
+      }
+    })();
+  }, [filhosDeMentira]);
+
+  const hojeStr = hojeEmSaoPaulo();
+  const caculaNascido = (() => {
+    const nascidos = filhosDela.filter((f) => f.nascidoEm);
+    if (nascidos.length === 0) return null;
+    return nascidos.reduce((a, b) => ((a.nascidoEm ?? "") > (b.nascidoEm ?? "") ? a : b));
+  })();
+  const bebeNascido = !!caculaNascido;
+  const diasDoBebe = caculaNascido?.nascidoEm ? diasEntre(caculaNascido.nascidoEm, hojeStr) : null;
+  const mesesDoBebe = caculaNascido?.nascidoEm
+    ? (mesesEntre(caculaNascido.nascidoEm, hojeStr) ?? 0)
+    : 0;
+  const mesversarioHoje = caculaNascido?.nascidoEm
+    ? mesversarioDeHoje(caculaNascido.nascidoEm, hojeStr)
+    : null;
   /**
    * A miniatura da PRIMEIRA foto.
    *
@@ -6299,6 +10790,11 @@ export function NovoPost({
   const enqueteOk = opcoes === null || enqueteValida(opcoesLimpas);
   const temConteudo =
     postEhValido({ texto, temImagem: fotos.length > 0 }) || opcoesLimpas.length >= OPCOES_MIN;
+  /* ⚠️ O campo da descrição segue as FOTOS, e não o vídeo: um vídeo não tem
+     `alt`, e oferecer o campo ali prometeria uma acessibilidade que o
+     elemento não entrega. */
+  const temFoto = fotos.length > 0;
+  const temVideo = !!video;
   const podeEnviar = temConteudo && enqueteOk && !enviando;
 
   /* ⚠️ GUARDA COM ATRASO (700 ms). Sem isso, cada letra digitada seria uma
@@ -6353,13 +10849,30 @@ export function NovoPost({
     setErro(null);
     const ok = await aoPublicar({
       texto: texto.trim() || null,
+      lugar: lugar.trim() || null,
       fotos,
       miniatura,
       visibilidade: vis,
+      /* ⚠️ Apertada AQUI também, e não só no servidor: a tela pode ter a camada
+         `todos` guardada de quando a visibilidade era `publico` e ela tê-la
+         fechado depois — mandar `todos` faria o servidor apertar em silêncio, e
+         a autora acharia que abriu a conversa. */
+      quemComenta: apertarQuemComenta({ visibilidade: vis, quemComenta }),
       enquete: opcoes ? opcoesLimpas : [],
       aula: comAula ? (aulaDeHoje ?? null) : null,
+      /* ⚠️ Os DIAS vão junto, e é isso que faz o post não envelhecer: a tela
+         recalcula "3 meses" a cada pintura, em vez de repetir um texto salvo. */
+      marco: marco && bebeNascido ? { tipo: marco, dias: diasDoBebe } : null,
+      video,
+      repostDe: repostando?.id ?? null,
       marcadas,
       comparacaoCom: entao,
+      altTexto: altTexto.trim() || null,
+      sensivel,
+      /* O motivo só viaja com a marca ligada — senão fica um rótulo pendurado
+         num post que não borra. */
+      motivoSensivel: sensivel ? motivoSensivel : null,
+      videoLegenda: videoLegenda.trim() || null,
     });
     setEnviando(false);
     if (ok) {
@@ -6381,7 +10894,7 @@ export function NovoPost({
           type="button"
           onClick={aoFechar}
           aria-label="Fechar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -6402,7 +10915,7 @@ export function NovoPost({
             texto errado. */}
         {rascunho && !ofereceu && (
           <div className="mb-2 flex items-center gap-2 rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2">
-            <p className="min-w-0 flex-1 text-[12px] leading-snug">
+            <p className="min-w-0 flex-1 text-xs leading-snug">
               Você tinha começado a escrever aqui.
             </p>
             <button
@@ -6415,7 +10928,7 @@ export function NovoPost({
                 setMarcadas(rascunho.marcadas);
                 setOfereceu(true);
               }}
-              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-[12px] font-semibold text-primary-foreground"
+              className="press shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground"
             >
               Recuperar
             </button>
@@ -6444,9 +10957,127 @@ export function NovoPost({
         {/* O contador só aparece perto do fim: um número piscando a cada letra
             desde a primeira transforma escrever num exercício de caber. */}
         {texto.length > LIMITE_DO_TEXTO - 80 && (
-          <p className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+          <p className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
             {LIMITE_DO_TEXTO - texto.length}
           </p>
+        )}
+
+        {/* ─── A DESCRIÇÃO DA FOTO ────────────────────────────────────────
+            ⚠️ **SÓ COM FOTO, e RECOLHIDA.** É acessibilidade, não legenda: quem
+            precisa dela sabe o que é, e quem não precisa não deve ter um campo
+            a mais entre a foto e o botão de publicar. Um segundo campo aberto
+            aqui faria parte das pacientes achar que precisa preencher os dois.
+
+            ⚠️ **E não é opcional por preguiça.** A diretriz de acessibilidade da
+            Apple cobra isto na revisão, e o app é instalado por quem usa leitor
+            de tela: sem descrição, a foto do ultrassom de uma amiga é uma
+            lacuna silenciosa no meio do feed. */}
+        {/* ⚠️ **O LUGAR É UM RÓTULO QUE ELA ESCREVE, e nunca coordenada nem
+            autocompletar.** Guardar latitude e longitude de uma gestante — e
+            devolvê-las a quem abre o post — é dado de localização precisa numa
+            base de alto risco. E um catálogo de endereços transformaria o campo
+            numa lista de maternidades com as pacientes de cada uma, que é
+            exatamente o cruzamento que a régua de "nada clínico no perfil"
+            existe para impedir. */}
+        <input
+          value={lugar}
+          onChange={(e) => setLugar(e.target.value.slice(0, 60))}
+          placeholder="📍 Onde? (opcional)"
+          aria-label="O lugar desta publicação"
+          className="mt-2 min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+        />
+
+        {/* ⚠️ **A MARCA É DELA, e o app nunca a põe sozinho.** Marcar
+            automaticamente o que a régua clínica reconhece — ou todo post de
+            quem está em luto — seria o app decidindo que a história dela é
+            sensível, e a segunda contaria o luto dela para quem visse a marca.
+
+            ⚠️ E o texto diz o que a marca FAZ ("borra, não esconde"): sem isso
+            ela hesita, achando que o post vai sumir do feed. */}
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setSensivel((v) => !v)}
+            aria-pressed={sensivel}
+            className="press min-h-[36px] text-xs font-medium text-muted-foreground"
+          >
+            {sensivel ? "✓ Marcado como sensível" : "Marcar como conteúdo sensível"}
+          </button>
+          {sensivel && (
+            <>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {MOTIVOS_SENSIVEIS.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setMotivoSensivel(m.id)}
+                    aria-pressed={motivoSensivel === m.id}
+                    className={`press min-h-[36px] rounded-full border px-3 text-xs ${
+                      motivoSensivel === m.id
+                        ? "border-primary bg-primary/10 font-semibold"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {m.rotulo}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                A publicação continua no feed. Ela aparece borrada, com este aviso, e quem quiser
+                toca para ver.
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* ⚠️ **A LEGENDA DO VÍDEO só aparece com vídeo escolhido.** Um campo de
+            legenda ao lado de uma foto promete um recurso que o elemento não
+            entrega — a mesma razão pela qual a descrição da foto só aparece com
+            foto. */}
+        {temVideo && (
+          <div className="mt-2">
+            <input
+              value={videoLegenda}
+              onChange={(e) => setVideoLegenda(e.target.value.slice(0, 600))}
+              placeholder="O que é dito no vídeo"
+              aria-label="Legenda do vídeo"
+              className="min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+            />
+            <p className="mt-1 text-xs leading-snug text-muted-foreground">
+              Para quem assiste sem som e para quem usa leitor de tela.
+            </p>
+          </div>
+        )}
+
+        {temFoto && (
+          <div className="mt-2">
+            {!altAberto ? (
+              <button
+                type="button"
+                onClick={() => setAltAberto(true)}
+                className="press min-h-[36px] text-xs font-medium text-muted-foreground"
+              >
+                {altTexto.trim() ? "✓ Descrição escrita" : "Descrever a foto (acessibilidade)"}
+              </button>
+            ) : (
+              <>
+                <input
+                  value={altTexto}
+                  onChange={(e) => setAltTexto(e.target.value.slice(0, 300))}
+                  placeholder="O que a foto mostra"
+                  aria-label="Descrição da foto para leitores de tela"
+                  className="min-h-[44px] w-full rounded-2xl border border-border bg-background px-3 text-[13px]"
+                />
+                {/* ⚠️ Diz PARA QUEM serve. Sem a frase, ela escreve uma segunda
+                    legenda — e o leitor de tela lê as duas, uma atrás da
+                    outra. */}
+                <p className="mt-1 text-xs leading-snug text-muted-foreground">
+                  Lida em voz alta por quem usa leitor de tela. Descreva o que aparece, sem repetir
+                  a legenda.
+                </p>
+              </>
+            )}
+          </div>
         )}
 
         {/* ⚠️ SÓ COM FOTO. É uma legenda PARA a imagem: sem imagem o modelo não
@@ -6469,13 +11100,13 @@ export function NovoPost({
                 "mandaram minha ultrassom para alguém" de uma escolha
                 informada. */}
             {sugestoes === null && !pensando && (
-              <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+              <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
                 A foto é enviada só para escrever a sugestão, e não fica guardada.
               </p>
             )}
 
             {sugestoes !== null && sugestoes.length === 0 && !pensando && (
-              <p className="mt-1.5 text-[12px] text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 Não consegui pensar em nada para esta foto. Escreva do seu jeito 💛
               </p>
             )}
@@ -6499,7 +11130,7 @@ export function NovoPost({
                     {sug}
                   </button>
                 ))}
-                <p className="pt-0.5 text-[11px] text-muted-foreground">
+                <p className="pt-0.5 text-xs text-muted-foreground">
                   Toque para usar — dá para editar depois.
                 </p>
               </div>
@@ -6521,7 +11152,7 @@ export function NovoPost({
                 {/* A PRIMEIRA leva o selo — sem ele ninguém sabe qual vai
                     aparecer na grade do perfil. */}
                 {n === 0 && (
-                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-[10px] text-white">
+                  <span className="absolute bottom-1 left-1 rounded bg-black/60 px-1.5 text-xs text-white">
                     capa
                   </span>
                 )}
@@ -6559,7 +11190,7 @@ export function NovoPost({
               <div className="mt-2 rounded-2xl border border-border p-2">
                 {/* ⚠️ Diz o TETO na tela. Descobrir o limite só ao tocar na
                     sexta amiga é o tipo de recusa que parece defeito. */}
-                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                <p className="px-1 pb-1.5 text-xs text-muted-foreground">
                   Até {MARCADAS_MAX} pessoas, entre as suas amigas do app.
                 </p>
                 <div className="max-h-56 space-y-0.5 overflow-y-auto">
@@ -6656,7 +11287,7 @@ export function NovoPost({
 
             {entao && (
               <div className="mt-2 rounded-2xl border border-border p-2">
-                <p className="px-1 pb-1.5 text-[11px] text-muted-foreground">
+                <p className="px-1 pb-1.5 text-xs text-muted-foreground">
                   Escolha a foto de antes. As semanas entram sozinhas.
                 </p>
                 <div className="flex gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -6701,7 +11332,7 @@ export function NovoPost({
               <button
                 type="button"
                 onClick={() => setOpcoes(null)}
-                className="press text-[12px] text-muted-foreground"
+                className="press text-xs text-muted-foreground"
               >
                 tirar
               </button>
@@ -6727,7 +11358,7 @@ export function NovoPost({
               <button
                 type="button"
                 onClick={() => setOpcoes((os) => [...(os ?? []), ""])}
-                className="press mt-2 text-[13px] font-medium text-primary"
+                className="press mt-1 inline-flex min-h-[44px] items-center text-[13px] font-medium text-primary"
               >
                 + opção
               </button>
@@ -6735,17 +11366,49 @@ export function NovoPost({
             {/* ⚠️ O aviso do voto único aparece ANTES de publicar, e não só
                 para quem vota: quem cria a enquete precisa saber que não dá
                 para corrigir depois — post não se edita. */}
-            <p className="mt-2 text-[11px] leading-snug text-muted-foreground">
+            <p className="mt-2 text-xs leading-snug text-muted-foreground">
               Cada pessoa vota uma vez, e o voto não muda. Você vê só os números — nunca quem votou
               em quê.
             </p>
             {!enqueteOk && opcoesLimpas.length > 0 && (
-              <p className="mt-1 text-[12px] text-destructive">
+              <p className="mt-1 text-xs text-destructive">
                 {opcoesLimpas.length < OPCOES_MIN
                   ? `Escreva pelo menos ${OPCOES_MIN} opções.`
                   : "As opções precisam ser diferentes entre si."}
               </p>
             )}
+          </div>
+        )}
+
+        {/* ─── O MARCO DO BEBÊ ──────────────────────────────────────────
+            ⚠️ **SÓ APARECE PARA QUEM TEM BEBÊ NASCIDO.** Oferecer "primeiro
+            sorriso" a uma gestante é oferecer um botão que não tem como ser
+            usado — e, pior, num app onde nem toda gestação termina bem.
+
+            ⚠️ E A LISTA NÃO ESCONDE NADA: `marcosSugeridos` REORDENA pela idade
+            e mantém o catálogo inteiro. Um bebê que anda aos vinte meses tem de
+            achar "primeiros passos" na tela. */}
+        {bebeNascido && (
+          <div className="mt-3">
+            <p className="text-[13px] font-medium">Um marco de hoje?</p>
+            <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {marcosSugeridos(mesesDoBebe).map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMarco((v) => (v === m.id ? null : m.id))}
+                  aria-pressed={marco === m.id}
+                  className={`press shrink-0 rounded-full border px-3 py-1.5 text-[13px] ${
+                    marco === m.id ? "border-primary bg-primary/10 text-primary" : "border-border"
+                  }`}
+                >
+                  {m.emoji}{" "}
+                  {m.id === "mesversario" && mesversarioHoje
+                    ? `${mesversarioHoje} ${mesversarioHoje === 1 ? "mês" : "meses"}`
+                    : m.titulo}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -6768,7 +11431,7 @@ export function NovoPost({
             entre "as amigas" e "qualquer pessoa" é a diferença entre contar
             uma notícia e publicá-la. */}
         <div className="mt-3">
-          <p className="text-[12px] font-medium text-muted-foreground">Quem vai ver</p>
+          <p className="text-xs font-medium text-muted-foreground">Quem vai ver</p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {VISIBILIDADES.map((v) => (
               <button
@@ -6783,10 +11446,241 @@ export function NovoPost({
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">
             {VISIBILIDADES.find((v) => v.chave === vis)?.sub}
           </p>
         </div>
+
+        {/* ⚠️ **QUEM PODE COMENTAR — a camada que faltava.**
+
+            Até agora era tudo ou nada: fechar os comentários para todo mundo.
+            Num app cuja decisão central foi limitar conselho de leiga, "só
+            amigas podem comentar" é a peça que deixa a publicação visível e
+            restringe QUEM opina.
+
+            ⚠️ **A lista é APERTADA contra a camada de visibilidade.** Um post
+            `amigas` com "todo mundo pode comentar" é combinação sem sentido —
+            as pessoas a quem "todo mundo" se refere não veem a publicação —, e
+            oferecê-la faria a autora acreditar que abriu a conversa quando não
+            abriu nada. A régua é `apertarQuemComenta`, e não um `filter` escrito
+            aqui. */}
+        <div className="mt-3">
+          <p className="text-xs font-medium text-muted-foreground">Quem pode comentar</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {QUEM_COMENTA.filter(
+              (q) => apertarQuemComenta({ visibilidade: vis, quemComenta: q.chave }) === q.chave,
+            ).map((q) => (
+              <button
+                key={q.chave}
+                type="button"
+                onClick={() => setQuemComenta(q.chave)}
+                className={`press rounded-full px-3 py-1.5 text-[13px] ${
+                  apertarQuemComenta({ visibilidade: vis, quemComenta }) === q.chave
+                    ? "bg-primary/15 font-semibold text-primary"
+                    : "bg-muted/60"
+                }`}
+              >
+                {q.rotulo}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ⚠️ A ORIGINAL À VISTA NO COMPOSITOR. Sem ela, a paciente escreve
+            sem lembrar o que está republicando — e o quadro só apareceria
+            depois de publicado, quando não dá mais para mudar de ideia. */}
+        {repostando && (
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Republicando</p>
+            <p className="mt-0.5 text-xs font-semibold">{repostando.autorNome}</p>
+            {repostando.texto && (
+              <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
+            )}
+          </div>
+        )}
+
+        {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
+            deixar escolher ambos faria a paciente montar um post que a tela não
+            sabe pintar. O botão some quando já há foto, e vice-versa. */}
+        {fotos.length === 0 && (
+          <button
+            type="button"
+            disabled={subindoVideo}
+            onClick={() => arquivoDeVideo.current?.click()}
+            className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+              video ? "border-primary bg-primary/10 text-primary" : "border-border"
+            }`}
+          >
+            {subindoVideo
+              ? "Enviando o vídeo…"
+              : video
+                ? "Vídeo anexado ✓ (tocar para trocar)"
+                : `🎬 Anexar um vídeo (até ${SEGUNDOS_MAX}s)`}
+          </button>
+        )}
+
+        <input
+          ref={arquivoDeVideo}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setErro(null);
+
+            /* ⚠️ A DURAÇÃO É MEDIDA ANTES DE SUBIR. Subir 40 MB para descobrir
+               que passa de um minuto é gastar o 4G dela para nada — e a recusa
+               chegaria depois da espera, que é a pior ordem possível. */
+            const segundos = await new Promise<number | null>((ok) => {
+              try {
+                const v = document.createElement("video");
+                v.preload = "metadata";
+                v.onloadedmetadata = () => ok(Number.isFinite(v.duration) ? v.duration : null);
+                v.onerror = () => ok(null);
+                v.src = URL.createObjectURL(f);
+              } catch {
+                ok(null);
+              }
+            });
+
+            const recusa = recusaDoVideo({ tipo: f.type, bytes: f.size, segundos });
+            if (recusa) {
+              setErro(recadoDaRecusa(recusa));
+              return;
+            }
+
+            setSubindoVideo(true);
+            try {
+              /* ⚠️ Sessão lida AQUI: o `token()` do `RedeNoApp` não alcança
+                 este componente, e importar por prop só para isto acrescentaria
+                 uma assinatura a um compositor que já tem quinze. */
+              const { supabase: sb } = await import("@/integrations/supabase/client");
+              const t = (await sb.auth.getSession()).data.session?.access_token;
+              if (!t) return;
+              const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+              const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+              if (!r.ok) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              const { supabase } = await import("@/integrations/supabase/client");
+              /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — não
+                 passa pelo servidor. É o ponto todo desta mudança. */
+              const up = await supabase.storage
+                .from("rede")
+                .uploadToSignedUrl(r.caminho, r.token, f);
+              if (up.error) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              setVideo({ caminho: r.caminho, segundos });
+            } catch {
+              setErro("Não deu para enviar o vídeo agora.");
+            } finally {
+              setSubindoVideo(false);
+            }
+          }}
+        />
+
+        {/* ⚠️ A ORIGINAL À VISTA NO COMPOSITOR. Sem ela, a paciente escreve
+            sem lembrar o que está republicando — e o quadro só apareceria
+            depois de publicado, quando não dá mais para mudar de ideia. */}
+        {repostando && (
+          <div className="mt-3 rounded-xl border border-border p-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Republicando</p>
+            <p className="mt-0.5 text-xs font-semibold">{repostando.autorNome}</p>
+            {repostando.texto && (
+              <p className="mt-0.5 line-clamp-3 text-[13px] leading-snug">{repostando.texto}</p>
+            )}
+          </div>
+        )}
+
+        {/* ⚠️ **VÍDEO OU FOTO, nunca os dois.** O cartão desenha um ou outro, e
+            deixar escolher ambos faria a paciente montar um post que a tela não
+            sabe pintar. O botão some quando já há foto, e vice-versa. */}
+        {fotos.length === 0 && (
+          <button
+            type="button"
+            disabled={subindoVideo}
+            onClick={() => arquivoDeVideo.current?.click()}
+            className={`press mt-3 w-full rounded-xl border py-2 text-[14px] font-medium ${
+              video ? "border-primary bg-primary/10 text-primary" : "border-border"
+            }`}
+          >
+            {subindoVideo
+              ? "Enviando o vídeo…"
+              : video
+                ? "Vídeo anexado ✓ (tocar para trocar)"
+                : `🎬 Anexar um vídeo (até ${SEGUNDOS_MAX}s)`}
+          </button>
+        )}
+
+        <input
+          ref={arquivoDeVideo}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f) return;
+            setErro(null);
+
+            /* ⚠️ A DURAÇÃO É MEDIDA ANTES DE SUBIR. Subir 40 MB para descobrir
+               que passa de um minuto é gastar o 4G dela para nada — e a recusa
+               chegaria depois da espera, que é a pior ordem possível. */
+            const segundos = await new Promise<number | null>((ok) => {
+              try {
+                const v = document.createElement("video");
+                v.preload = "metadata";
+                v.onloadedmetadata = () => ok(Number.isFinite(v.duration) ? v.duration : null);
+                v.onerror = () => ok(null);
+                v.src = URL.createObjectURL(f);
+              } catch {
+                ok(null);
+              }
+            });
+
+            const recusa = recusaDoVideo({ tipo: f.type, bytes: f.size, segundos });
+            if (recusa) {
+              setErro(recadoDaRecusa(recusa));
+              return;
+            }
+
+            setSubindoVideo(true);
+            try {
+              /* ⚠️ Sessão lida AQUI: o `token()` do `RedeNoApp` não alcança
+                 este componente, e importar por prop só para isto acrescentaria
+                 uma assinatura a um compositor que já tem quinze. */
+              const { supabase: sb } = await import("@/integrations/supabase/client");
+              const t = (await sb.auth.getSession()).data.session?.access_token;
+              if (!t) return;
+              const { urlParaSubirVideo } = await import("@/lib/rede-social.functions");
+              const r = await urlParaSubirVideo({ data: { accessToken: t, tipo: f.type } });
+              if (!r.ok) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              const { supabase } = await import("@/integrations/supabase/client");
+              /* ⚠️ **VAI DIRETO PARA O STORAGE**, com o token assinado — não
+                 passa pelo servidor. É o ponto todo desta mudança. */
+              const up = await supabase.storage
+                .from("rede")
+                .uploadToSignedUrl(r.caminho, r.token, f);
+              if (up.error) {
+                setErro("Não deu para enviar o vídeo agora.");
+                return;
+              }
+              setVideo({ caminho: r.caminho, segundos });
+            } catch {
+              setErro("Não deu para enviar o vídeo agora.");
+            } finally {
+              setSubindoVideo(false);
+            }
+          }}
+        />
 
         <input
           ref={arquivo}
@@ -6888,8 +11782,24 @@ export function GradeDePosts({
               />
             ) : (
               /* Post só de texto na grade: mostra o texto, não um buraco. */
-              <span className="line-clamp-4 block p-2 text-left text-[11px] leading-snug text-foreground/70">
+              <span className="line-clamp-4 block p-2 text-left text-xs leading-snug text-foreground/70">
                 {p.texto}
+              </span>
+            )}
+            {/* ⚠️ **O PINO NA CÉLULA, e ele é para QUEM VISITA.** Sem marca
+                nenhuma, as três primeiras simplesmente parecem as mais
+                recentes — e quem abre o perfil não tem como saber que aquilo é
+                um recorte escolhido. É a mesma razão do rótulo "Sugerido para
+                você": o que muda a ordem tem de se anunciar.
+
+                Sobre o canto e com sombra, porque pousa em cima da FOTO: um
+                ícone sem contorno some numa foto clara. */}
+            {p.fixadoEm && (
+              <span
+                className="pointer-events-none absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/45 text-white"
+                aria-label="Fixada no topo"
+              >
+                <IconePino aceso />
               </span>
             )}
           </button>
@@ -6953,7 +11863,7 @@ export function TelaDosSalvos({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -6962,13 +11872,101 @@ export function TelaDosSalvos({
       {/* ⚠️ O texto diz que ninguém vê esta lista, e isso não é enfeite: no
           modelo, "salvo" é a única coleção privada de verdade, e quem não sabe
           disso usa o marcador com o mesmo cuidado de uma curtida pública. */}
-      <p className="px-4 pb-2 text-[12px] leading-snug text-muted-foreground">
+      <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
         Só você vê o que guardou aqui — nem quem publicou fica sabendo.
       </p>
       {/* Sem padding lateral, como a grade do perfil: a célula da grade encosta
           na borda no modelo, e uma das duas com respiro faria a mesma grade
           parecer duas. */}
       <GradeDePosts posts={posts} vazio="Você ainda não guardou nada." aoAbrirPost={aoAbrirPost} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   A PÁGINA DE UMA #
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * O QUE UMA `#` REÚNE.
+ *
+ * ⚠️ **SÓ POST PÚBLICO, por decisão explícita do dono.** É o ponto inteiro da
+ * régua: a `#` é um lugar aberto, e quem chega nela não segue ninguém. Um post
+ * de camada `amigas` aparecendo aqui seria a porta dos fundos da visibilidade —
+ * o recorte está na CONSULTA (`postsDaTag`), antes de `montarPosts`, e nunca
+ * num filtro depois.
+ *
+ * ⚠️ **E É GRADE, NÃO FEED.** Uma tag reúne desconhecidas por assunto; em
+ * formato de feed, com legenda e reações à mostra, ela leria como "pessoas que
+ * eu sigo" — que é exatamente a confusão que o rótulo "Sugerido para você"
+ * existe para impedir. A grade é uma vitrine: quem quiser ler, abre.
+ */
+export function TelaDaTag({
+  tag,
+  aoVoltar,
+  aoAbrirPost,
+  acoes,
+}: {
+  tag: string;
+  aoVoltar: () => void;
+  aoAbrirPost?: (id: string) => void;
+  /** Só para a bancada poder injetar posts sem servidor. */
+  acoes?: unknown;
+}) {
+  const [posts, setPosts] = useState<PostNaTela[] | null>(null);
+  void acoes;
+
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const { supabase } = await import("@/integrations/supabase/client");
+        const s = await supabase.auth.getSession();
+        const token = s.data.session?.access_token;
+        if (!token) {
+          if (vivo) setPosts([]);
+          return;
+        }
+        const { postsDaTag } = await import("@/lib/mencoes.functions");
+        const r = await postsDaTag({ data: { accessToken: token, tag } });
+        if (vivo) setPosts(r.ok ? (r.posts as PostNaTela[]) : []);
+      } catch {
+        if (vivo) setPosts([]);
+      }
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [tag]);
+
+  return (
+    <div>
+      <header className="flex h-11 items-center gap-2 px-4">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
+        >
+          ‹
+        </button>
+        <h1 className="truncate text-[16px] font-semibold">#{tag}</h1>
+      </header>
+      {/* ⚠️ A régua é DITA. Sem esta linha, quem publicou para as amigas e não
+          se vê aqui conclui que a tag está quebrada — e quem publicou em
+          público não sabe que a foto dela virou vitrine aberta. */}
+      <p className="px-4 pb-2 text-xs leading-snug text-muted-foreground">
+        Aqui aparecem só as publicações abertas a qualquer pessoa no app.
+      </p>
+      {posts === null ? (
+        <p className="px-4 py-10 text-center text-[13px] text-muted-foreground">Carregando…</p>
+      ) : (
+        <GradeDePosts
+          posts={posts}
+          vazio={`Ninguém publicou em #${tag} ainda.`}
+          aoAbrirPost={aoAbrirPost}
+        />
+      )}
     </div>
   );
 }
@@ -7001,7 +11999,7 @@ export function TelaDosArquivados({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -7010,7 +12008,7 @@ export function TelaDosArquivados({
       {/* ⚠️ Diz que NINGUÉM MAIS VÊ, e diz que as reações continuam lá. As duas
           coisas são a razão de arquivar ser diferente de apagar, e nenhuma das
           duas é adivinhável. */}
-      <p className="px-4 pb-3 text-[12px] leading-snug text-muted-foreground">
+      <p className="px-4 pb-3 text-xs leading-snug text-muted-foreground">
         Ninguém mais vê o que está aqui. As reações e a data continuam guardadas — se você trouxer
         de volta, volta como estava.
       </p>
@@ -7032,20 +12030,20 @@ export function TelaDosArquivados({
               ) : (
                 /* Post só de texto: um quadrado com a primeira linha, para a
                    lista não ter buraco cinza. */
-                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted/50 px-1 text-center text-[10px] leading-tight text-muted-foreground">
+                <span className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-muted/50 px-1 text-center text-xs leading-tight text-muted-foreground">
                   {(p.texto ?? "").slice(0, 28) || "sem texto"}
                 </span>
               )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px]">{p.texto ?? "Sem legenda"}</span>
-                <span className="block text-[11px] text-muted-foreground">
+                <span className="block text-xs text-muted-foreground">
                   {haQuantoPublicou(p.criadoEm, Date.now())}
                 </span>
               </span>
               <button
                 type="button"
                 onClick={() => aoDesarquivar(p)}
-                className="press min-h-[44px] shrink-0 rounded-full border border-border px-3 text-[12px] font-medium"
+                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-3 text-xs font-medium"
               >
                 Trazer de volta
               </button>
@@ -7065,14 +12063,51 @@ export function TelaDeBusca({
   aoVoltar,
   aoBuscar,
   aoAbrirPerfil,
+  aoAbrirTag,
+  euId,
 }: {
+  /** Só para a chave do histórico local — ver `chaveDasBuscasRecentes`. */
+  euId?: string | null;
   aoVoltar: () => void;
   aoBuscar: (termo: string) => Promise<PessoaNaLista[]>;
   aoAbrirPerfil?: (id: string) => void;
+  /** Abre a página da tag. Sem a prop, a linha da `#` não aparece. */
+  aoAbrirTag?: (tag: string) => void;
 }) {
   const [termo, setTermo] = useState("");
   const [achados, setAchados] = useState<PessoaNaLista[]>([]);
   const [buscando, setBuscando] = useState(false);
+  /**
+   * ⚠️ **AS BUSCAS RECENTES FICAM NO APARELHO, e nunca no servidor.**
+   *
+   * O que ela procura é o nome de pessoas e de assuntos — e num app de gestação
+   * de alto risco, "quem eu procurei" é um dado que não precisa existir em lugar
+   * nenhum além da tela dela. É a mesma decisão da busca DENTRO da conversa.
+   *
+   * ⚠️ E a chave carrega o id da conta: o aparelho é compartilhado, e a lista de
+   * quem a mãe procurou não pode aparecer para a filha que usa o mesmo celular.
+   */
+  const [recentes, setRecentes] = useState<string[]>([]);
+  useEffect(() => {
+    if (!euId) return;
+    try {
+      const cru = localStorage.getItem(chaveDasBuscasRecentes(euId));
+      setRecentes(cru ? (JSON.parse(cru) as string[]).slice(0, BUSCAS_RECENTES_MAX) : []);
+    } catch {
+      /* Storage bloqueado (janela privada) — a busca funciona sem histórico. */
+    }
+  }, [euId]);
+
+  function guardarBusca(t: string) {
+    if (!euId) return;
+    const nova = comBuscaNova(recentes, t);
+    setRecentes(nova);
+    try {
+      localStorage.setItem(chaveDasBuscasRecentes(euId), JSON.stringify(nova));
+    } catch {
+      /* Sem storage, o histórico vive só nesta sessão. */
+    }
+  }
   /* ⚠️ Descarta resposta ATRASADA: quem digita "ana" dispara três buscas, e a
      de "an" pode voltar depois da de "ana". Mesma trava do `contatoDaPaciente`
      no painel do médico. */
@@ -7094,6 +12129,10 @@ export function TelaDeBusca({
       if (daVez.current !== meu) return;
       setAchados(r);
       setBuscando(false);
+      /* ⚠️ **GUARDA SÓ O QUE ACHOU ALGUÉM.** Guardar toda tecla digitada encheria
+         o histórico com prefixos ("a", "an", "ana") — e o histórico existe para
+         ela voltar a uma busca que valeu. */
+      if (r.length > 0) guardarBusca(t);
     }, 450);
     return () => clearTimeout(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -7106,7 +12145,7 @@ export function TelaDeBusca({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -7118,6 +12157,35 @@ export function TelaDeBusca({
           className="h-9 min-w-0 flex-1 rounded-xl bg-muted/60 px-3 text-[14px]"
         />
       </header>
+
+      {/* ⚠️ **A BUSCA ACHAVA PERFIL E MAIS NADA.** Quem ouviu falar de
+          `#trigemeas` numa conversa não tinha caminho nenhum até lá — a página
+          da tag existia e só se chegava nela tocando numa legenda que já a
+          continha: só quem já a tinha encontrado conseguia encontrá-la.
+
+          ⚠️ E ela NÃO consulta o servidor: `tagDaBusca` responde pelo FORMATO do
+          termo. Uma consulta "existe esta tag?" por tecla digitada seria uma ida
+          ao banco para uma pergunta que a própria página da tag responde melhor
+          — com o vazio dela, que explica a régua ("só publicações públicas"). */}
+      {tagDaBusca(termo) && aoAbrirTag && (
+        <button
+          type="button"
+          onClick={() => aoAbrirTag(tagDaBusca(termo)!)}
+          className="press flex w-full items-center gap-3 border-b border-border px-4 py-2.5 text-left"
+        >
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-[18px] font-semibold">
+            #
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[14px] font-semibold leading-tight">
+              #{tagDaBusca(termo)}
+            </span>
+            <span className="block truncate text-xs leading-tight text-muted-foreground">
+              Ver publicações com esta tag
+            </span>
+          </span>
+        </button>
+      )}
 
       {termo.trim().length > 0 && termo.trim().length < MINIMO_DA_BUSCA ? (
         <p className="py-10 text-center text-[13px] text-muted-foreground">
@@ -7133,11 +12201,50 @@ export function TelaDeBusca({
            abriu o perfil aparece na busca. Sem isso, procurar a irmã e não
            achar lê como app quebrado — quando na verdade a irmã está protegida
            exatamente como escolheu. */
-        <p className="px-6 py-10 text-center text-[13px] leading-snug text-muted-foreground">
-          {termo.trim()
-            ? "Ninguém com esse nome por aqui. Só aparece na busca quem deixou o perfil público."
-            : "Procure por alguém que você já conhece."}
-        </p>
+        <>
+          {/* ⚠️ **O HISTÓRICO SÓ APARECE COM O CAMPO VAZIO.** Enquanto ela
+              digita, o que importa é o resultado — e uma lista de buscas antigas
+              embaixo de "ninguém com esse nome" competiria com a explicação que
+              ensina a régua. */}
+          {!termo.trim() && recentes.length > 0 && (
+            <div className="px-4 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-muted-foreground">Recentes</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRecentes([]);
+                    try {
+                      if (euId) localStorage.removeItem(chaveDasBuscasRecentes(euId));
+                    } catch {
+                      /* Sem storage, some só desta sessão. */
+                    }
+                  }}
+                  className="press min-h-[44px] text-xs text-muted-foreground"
+                >
+                  Limpar
+                </button>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-2">
+                {recentes.map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setTermo(r)}
+                    className="press min-h-[44px] rounded-full pill-3d px-3 text-[13px]"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="px-6 py-10 text-center text-[13px] leading-snug text-muted-foreground">
+            {termo.trim()
+              ? "Ninguém com esse nome por aqui. Só aparece na busca quem deixou o perfil público."
+              : "Procure por alguém que você já conhece."}
+          </p>
+        </>
       ) : (
         <ul>
           {achados.map((p) => (
@@ -7153,7 +12260,7 @@ export function TelaDeBusca({
                     {p.nome}
                   </span>
                   {p.bio && (
-                    <span className="block truncate text-[12px] leading-tight text-muted-foreground">
+                    <span className="block truncate text-xs leading-tight text-muted-foreground">
                       {p.bio}
                     </span>
                   )}
@@ -7213,7 +12320,7 @@ export function EspelhoDoPerfil({
           type="button"
           onClick={aoVoltar}
           aria-label="Voltar"
-          className="press -ml-1 text-xl"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl"
         >
           ‹
         </button>
@@ -7227,7 +12334,7 @@ export function EspelhoDoPerfil({
               key={p.chave}
               type="button"
               onClick={() => aoTrocarPersona(p.chave)}
-              className={`press flex-1 rounded-xl px-2 py-2 text-[12px] font-semibold ${
+              className={`press flex-1 rounded-xl px-2 py-2 text-xs font-semibold ${
                 p.chave === persona ? "bg-primary text-primary-foreground" : "bg-muted/60"
               }`}
             >
@@ -7235,7 +12342,7 @@ export function EspelhoDoPerfil({
             </button>
           ))}
         </div>
-        <p className="mt-1.5 text-[12px] leading-snug text-muted-foreground">{escolhida?.sub}</p>
+        <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{escolhida?.sub}</p>
       </div>
 
       {carregando ? (
@@ -7264,7 +12371,7 @@ export function EspelhoDoPerfil({
         </p>
       )}
 
-      <p className="px-6 pb-8 pt-2 text-center text-[12px] leading-snug text-muted-foreground">
+      <p className="px-6 pb-8 pt-2 text-center text-xs leading-snug text-muted-foreground">
         Nada do seu acompanhamento aparece aqui para ninguém — peso, pressão, exames e consultas são
         só seus e do seu médico.
       </p>
@@ -7298,20 +12405,115 @@ export function ConferirStory({
   semana,
   aoCancelar,
   aoPublicar,
+  amigasParaMarcar,
+  rascunho,
+  aoGuardarRascunho,
+  temVideo,
 }: {
   /** Data URL da foto já reduzida. */
   imagem: string;
   /** "28 semanas", ou `null` quando não há o que carimbar. */
   semana: string | null;
   aoCancelar: () => void;
-  aoPublicar: (opts: { carimbar: boolean; enquete: string[]; perguntaAberta: boolean }) => void;
+  aoPublicar: (opts: {
+    texto: string;
+    camada: VisibilidadeDoStory;
+    carimbar: boolean;
+    enquete: string[];
+    perguntaAberta: boolean;
+    marcadas: string[];
+    maisFotos: string[];
+  }) => void;
+  /**
+   * Quem ela pode marcar — a MESMA lista do compositor de post.
+   *
+   * ⚠️ **Só dentro do grafo já conectado, e NUNCA uma busca.** Buscar por nome
+   * transformaria a base de pacientes numa lista navegável, e num app de
+   * gestação de alto risco esse é o dado que menos pode vazar.
+   */
+  amigasParaMarcar?: { id: string; nome: string; avatar: string | null }[] | null;
+  /** O rascunho guardado, quando há um. Ver `rascunho-do-story.ts`. */
+  rascunho?: RascunhoDoStory | null;
+  /** Guardar o que ela digitou. Recebe `null` quando não há mais nada a guardar. */
+  aoGuardarRascunho?: (r: Omit<RascunhoDoStory, "em"> | null) => void;
+  /**
+   * O story é de VÍDEO — a `imagem` é a capa tirada do arquivo.
+   *
+   * ⚠️ **Com vídeo, o carrossel não é oferecido.** Um story é ou o vídeo, ou a
+   * sequência de fotos: `imagem_path` é a capa nos dois casos, e acrescentar
+   * fotos a um vídeo faria a segunda foto virar um story que nunca aparece.
+   * Botão que promete e não entrega é pior que botão ausente.
+   */
+  temVideo?: boolean;
 }) {
   const [carimbar, setCarimbar] = useState(false);
   const [enviando, setEnviando] = useState(false);
+  const [marcadas, setMarcadas] = useState<string[]>([]);
+  const [abrindoMarcar, setAbrindoMarcar] = useState(false);
+  /**
+   * As fotos do carrossel além da primeira.
+   *
+   * ⚠️ **Quatro, e não nove como o post.** O story é folheado com o dedo em pé,
+   * com a barrinha correndo: cinco já é uma sequência que muita gente não
+   * termina, e o formato existe para ser rápido.
+   */
+  const [maisFotos, setMaisFotos] = useState<string[]>([]);
+  const arquivoExtra = useRef<HTMLInputElement>(null);
   /* `null` = sem enquete. Duas vazias é o estado de quem abriu e ainda não
      escreveu — a mesma forma do compositor de post. */
   const [opcoes, setOpcoes] = useState<string[] | null>(null);
   const [caixinha, setCaixinha] = useState(false);
+  /**
+   * ⚠️ **O CAMPO DE TEXTO NÃO EXISTIA, e o servidor esperava por ele desde o
+   * primeiro dia.** `publicarStory` aceita 200 caracteres, passa a régua
+   * clínica neles e grava a coluna — e a tela mandava `texto: null` cravado.
+   * Era o gênero inteiro faltando: um story sem legenda é uma foto muda.
+   */
+  const [texto, setTexto] = useState("");
+  /**
+   * ⚠️ **O STORY ERA O ÚNICO CONTEÚDO SEM CAMADA — e é o mais íntimo.** Ele ia
+   * sempre para o público mais largo que ela tem. A régua e o padrão vivem em
+   * `rede-social.ts`: `seguidores`, que é o comportamento que os stories já
+   * tinham — fechar por padrão mudaria o alcance de quem não pediu nada.
+   */
+  const [camada, setCamada] = useState<VisibilidadeDoStory>(VISIBILIDADE_DO_STORY_PADRAO);
+  /* ⚠️ **OFERECE, NUNCA PREENCHE SOZINHO** — a decisão do rascunho do post,
+     pela mesma razão: encher o campo com o texto de ontem no momento em que ela
+     abre para publicar outra coisa é como um story sai errado, e story não se
+     edita depois de publicado. */
+  const [ofereceu, setOfereceu] = useState(false);
+  const temRascunho = !!rascunho && !ofereceu;
+
+  /**
+   * Guarda o que ela digitou, com atraso.
+   *
+   * ⚠️ **O `return` da primeira pintura é obrigatório, e a falta dele APAGAVA o
+   * rascunho ao abrir** — é o defeito que o compositor de post já pagou. Sem
+   * ele o efeito roda na montagem com os campos vazios e, 700 ms depois,
+   * `paraGuardar` devolve `guardar: false` (a regra certa: rascunho vazio
+   * apaga). A faixa continuava na tela porque o texto já estava em memória,
+   * então quem tocasse em "Recuperar" na hora não via nada de errado — e quem
+   * voltasse depois perdia o texto para sempre, com a única prova sumindo
+   * junto.
+   */
+  const primeiraPintura = useRef(true);
+  useEffect(() => {
+    if (primeiraPintura.current) {
+      primeiraPintura.current = false;
+      return;
+    }
+    if (!aoGuardarRascunho) return;
+    const t = setTimeout(() => {
+      aoGuardarRascunho({
+        texto,
+        enquete: opcoes,
+        perguntaAberta: caixinha,
+        carimbarSemana: carimbar,
+        camada,
+      });
+    }, 700);
+    return () => clearTimeout(t);
+  }, [texto, opcoes, caixinha, carimbar, camada, aoGuardarRascunho]);
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black">
@@ -7337,7 +12539,16 @@ export function ConferirStory({
           desenhava a pílula na tarja preta abaixo da imagem — a moldura ficava
           fora da moldura. A caixa de dentro encolhe até a foto, e o carimbo se
           posiciona contra ela. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center">
+      {/* ⚠️ **`overflow-hidden` NÃO É ENFEITE — sem ele a foto cobre o painel.**
+          O `max-h-full` da imagem resolve contra a altura do contêiner, e num
+          item flexível essa altura só fica definida DEPOIS do layout: no
+          instante em que o painel de baixo cresceu (o campo de texto e a faixa
+          do rascunho entraram), a imagem passou a pintar por cima da primeira
+          coisa do painel. Medido: a faixa "Você tinha começado um story"
+          aparecia cortada ao meio, e o botão "Recuperar" ficava INALCANÇÁVEL —
+          a foto interceptava o toque. Foi a bancada que mostrou; nenhuma
+          asserção estava perto disso. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden">
         <div className="relative max-h-full">
           <img src={imagem} alt="" className="block max-h-full w-auto object-contain" />
           {carimbar && semana && (
@@ -7352,6 +12563,84 @@ export function ConferirStory({
         className="shrink-0 space-y-3 px-4 pb-4 pt-3"
         style={{ paddingBottom: "max(1rem, var(--safe-bottom))" }}
       >
+        {temRascunho && (
+          /* ⚠️ Pergunta, e não preenche. E o "Descartar" some com o rascunho de
+             vez: sem ele, dizer não uma vez faria a faixa voltar na abertura
+             seguinte, para sempre. */
+          <div className="flex items-center gap-2 rounded-2xl bg-white/12 px-3 py-2.5">
+            <p className="min-w-0 flex-1 text-[13px] leading-snug text-white">
+              Você tinha começado um story.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setTexto(rascunho?.texto ?? "");
+                setOpcoes(rascunho?.enquete ?? null);
+                setCaixinha(!!rascunho?.perguntaAberta);
+                setCarimbar(!!rascunho?.carimbarSemana);
+                /* ⚠️ A camada volta pelo mesmo caminho: sem isto, ela escreve um
+                   story marcado "só amigas", é interrompida, recupera — e
+                   publica ABERTO sem reparar. */
+                setCamada(camadaDoStory(rascunho?.camada));
+                setOfereceu(true);
+              }}
+              className="press min-h-[44px] shrink-0 rounded-full bg-white px-3 text-[13px] font-semibold text-black"
+            >
+              Recuperar
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setOfereceu(true);
+                aoGuardarRascunho?.(null);
+              }}
+              className="press min-h-[44px] shrink-0 px-2 text-[13px] text-white/80"
+            >
+              Descartar
+            </button>
+          </div>
+        )}
+
+        {/* ⚠️ O contador aparece a partir de 140 e não desde o zero: um número
+            piscando ao lado de cada letra transforma escrever numa prova. */}
+        <div className="relative">
+          <textarea
+            value={texto}
+            onChange={(e) => setTexto(e.target.value.slice(0, TEXTO_DO_STORY_MAX))}
+            rows={2}
+            placeholder="Escreva alguma coisa (opcional)"
+            className="w-full resize-none rounded-2xl bg-white/95 px-3 py-2.5 text-[14px] text-foreground placeholder:text-muted-foreground"
+          />
+          {texto.length >= 140 && (
+            <span className="pointer-events-none absolute bottom-2 right-3 text-xs tabular-nums text-muted-foreground">
+              {TEXTO_DO_STORY_MAX - texto.length}
+            </span>
+          )}
+        </div>
+
+        {/* ⚠️ **QUEM VÊ, e a escolha é por PUBLICAÇÃO.** Duas opções e não três:
+            `publico` fica de fora porque a fileira de bolinhas não tem rótulo de
+            procedência nenhum — a paciente abriria achando que é de alguém que
+            ela segue. O post pode ser público porque toda publicação de fora
+            carrega "Sugerido para você"; o story não carrega. */}
+        <div className="flex gap-2">
+          {VISIBILIDADES_DO_STORY.map((v) => (
+            <button
+              key={v.chave}
+              type="button"
+              role="radio"
+              aria-checked={camada === v.chave}
+              onClick={() => setCamada(v.chave)}
+              className={`press min-h-[44px] flex-1 rounded-2xl px-3 text-left ${
+                camada === v.chave ? "bg-white text-black" : "bg-white/12 text-white"
+              }`}
+            >
+              <span className="block text-[13px] font-semibold">{v.rotulo}</span>
+              <span className="block text-xs opacity-70">{v.sub}</span>
+            </button>
+          ))}
+        </div>
+
         {semana ? (
           <button
             type="button"
@@ -7371,7 +12660,7 @@ export function ConferirStory({
           /* Sem semana não há carimbo, e a tela não finge que há: sem DUM,
              depois do parto ou em Modo Cuidado, o controle simplesmente não
              existe. */
-          <p className="text-center text-[12px] text-white/60">
+          <p className="text-center text-xs text-white/60">
             Sem a data da última menstruação no perfil, não dá para carimbar a semana.
           </p>
         )}
@@ -7427,7 +12716,7 @@ export function ConferirStory({
               <button
                 type="button"
                 onClick={() => setOpcoes((v) => [...(v ?? []), ""])}
-                className="press text-[12px] text-white/80 underline underline-offset-2"
+                className="press text-xs text-white/80 underline underline-offset-2"
               >
                 Mais uma opção
               </button>
@@ -7440,9 +12729,90 @@ export function ConferirStory({
               pergunta: publicar a caixinha sem saber que as respostas vêm sem
               nome muda o que ela decide perguntar — e o que ela decide
               publicar. */
-          <p className="text-center text-[12px] leading-snug text-white/75">
+          <p className="text-center text-xs leading-snug text-white/75">
             Quem responder não aparece para você — a caixinha é anônima.
           </p>
+        )}
+
+        {/* ⚠️ **O CARROSSEL DE STORY, com teto de cinco.** O botão some quando
+            elas acabam — um botão que não faz nada ensina que os botões desta
+            tela não valem. */}
+        <input
+          ref={arquivoExtra}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={async (e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (!f || maisFotos.length >= 4) return;
+            /* ⚠️ **`prepararFotoDoStory`, e não a do post.** O story é 9:16 e o
+               post é 4:5 — usar a preparação errada faria a foto extra sair com
+               enquadramento diferente das outras do mesmo carrossel. */
+            const pronta = await prepararFotoDoStory(f);
+            if (pronta) setMaisFotos((v) => [...v, pronta]);
+          }}
+        />
+        {/* ⚠️ Com vídeo, a faixa DIZ o que está indo. A tela mostra a capa
+            PARADA, e sem esta linha ela pareceria um story de foto — e ela
+            publicaria achando que o vídeo não entrou. */}
+        {temVideo && (
+          <p className="mb-2 rounded-2xl bg-white/15 px-3 py-2 text-[13px] text-white">
+            🎬 Vídeo — a capa é o primeiro quadro
+          </p>
+        )}
+        {/* ⚠️ **Com vídeo, o carrossel NÃO é oferecido.** Um story é ou o
+            vídeo, ou a sequência de fotos: `imagem_path` é a capa nos dois
+            casos, e a segunda foto viraria um story que nunca aparece. Botão
+            que promete e não entrega é pior que botão ausente. */}
+        {!temVideo && maisFotos.length < 4 && (
+          <button
+            type="button"
+            onClick={() => arquivoExtra.current?.click()}
+            className="press mb-2 min-h-[44px] w-full rounded-2xl bg-white/15 px-3 text-left text-[13px] text-white"
+          >
+            {maisFotos.length === 0
+              ? "🖼 Juntar mais fotos"
+              : `🖼 ${maisFotos.length + 1} fotos (tocar para mais)`}
+          </button>
+        )}
+
+        {/* ⚠️ **MARCAR ALGUÉM NO STORY — e a lista é a MESMA do post.** Só quem
+            ela já conhece; não há busca por nome, e nunca haverá. */}
+        {amigasParaMarcar && amigasParaMarcar.length > 0 && (
+          <div className="mb-2">
+            <button
+              type="button"
+              onClick={() => setAbrindoMarcar((v) => !v)}
+              className="press min-h-[44px] w-full rounded-2xl bg-white/15 px-3 text-left text-[13px] text-white"
+            >
+              {marcadas.length === 0
+                ? "👭 Marcar alguém"
+                : `👭 ${marcadas.length} marcada${marcadas.length > 1 ? "s" : ""}`}
+            </button>
+            {abrindoMarcar && (
+              <div className="mt-1 max-h-40 overflow-y-auto rounded-2xl bg-black/40 p-1">
+                {amigasParaMarcar.map((a) => {
+                  const marcada = marcadas.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() =>
+                        setMarcadas((v) => (marcada ? v.filter((x) => x !== a.id) : [...v, a.id]))
+                      }
+                      className={`press flex min-h-[44px] w-full items-center gap-2 rounded-xl px-2 text-left text-[13px] ${
+                        marcada ? "bg-white/20 text-white" : "text-white/85"
+                      }`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                      {marcada && <span aria-hidden>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         )}
 
         <button
@@ -7451,6 +12821,10 @@ export function ConferirStory({
           onClick={() => {
             setEnviando(true);
             aoPublicar({
+              texto: texto.trim(),
+              camada,
+              marcadas,
+              maisFotos,
               carimbar: carimbar && !!semana,
               /* ⚠️ A MESMA `limparOpcoes` do post — nunca um `filter` escrito
                  aqui, que aceitaria o que o servidor recusa. */
@@ -7501,7 +12875,7 @@ export function CartaoDoDesafio({
 
   return (
     <section className="-mx-4 mb-2 border-b border-border bg-primary/[0.04] px-4 py-3">
-      <p className="text-[12px] font-semibold uppercase tracking-wide text-primary">
+      <p className="text-xs font-semibold uppercase tracking-wide text-primary">
         Desafio da semana
       </p>
       <p className="mt-1 text-[15px] font-semibold leading-snug">
@@ -7523,7 +12897,7 @@ export function CartaoDoDesafio({
               </>
             )}
           </p>
-          {doGrupo && <p className="mt-0.5 text-[12px] text-muted-foreground">{doGrupo}</p>}
+          {doGrupo && <p className="mt-0.5 text-xs text-muted-foreground">{doGrupo}</p>}
           <div className="mt-2 flex gap-2">
             {!fechei && aoIrParaOJogo && (
               <button
@@ -7630,7 +13004,7 @@ export function TelaDaCaixinha({
             type="button"
             onClick={aoVoltar}
             aria-label="Voltar"
-            className="press -ml-1 text-xl leading-none"
+            className="press -ml-2 flex h-11 w-11 items-center justify-center text-xl leading-none"
           >
             ‹
           </button>
@@ -7644,7 +13018,7 @@ export function TelaDaCaixinha({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[14px] font-semibold">Aceitar perguntas</p>
-            <p className="mt-0.5 text-[12px] leading-snug text-muted-foreground">
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
               Quem abre o seu perfil pode te mandar uma pergunta sem se identificar. Você responde
               quando quiser — e a resposta vira uma publicação sua.
             </p>
@@ -7668,7 +13042,7 @@ export function TelaDaCaixinha({
         </div>
         {/* ⚠️ Fechar a caixa NÃO apaga o que já chegou, e a tela diz isso: sem
             a frase, quem fecha acha que perdeu as perguntas e não fecha. */}
-        <p className="mt-2 text-[12px] leading-snug text-muted-foreground">
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">
           Fechando, ninguém manda perguntas novas — as que já chegaram continuam aqui.
         </p>
       </div>
@@ -7683,14 +13057,14 @@ export function TelaDaCaixinha({
 
       {semResposta.length > 0 && (
         <>
-          <h2 className="mx-4 mt-5 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mx-4 mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Sem resposta
           </h2>
           <ul className="mt-1.5 flex flex-col gap-2 px-4">
             {semResposta.map((p) => (
               <li key={p.id} className="rounded-2xl border border-border p-3">
                 <p className="whitespace-pre-wrap text-[14px] leading-snug">{p.texto}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {haQuantoPublicou(p.criadoEm, Date.now())}
                 </p>
 
@@ -7704,7 +13078,7 @@ export function TelaDaCaixinha({
                       aria-label="Sua resposta"
                       className="w-full resize-none rounded-lg border border-border bg-background p-2 text-[14px]"
                     />
-                    <div className="mt-1 text-right text-[11px] tabular-nums text-muted-foreground">
+                    <div className="mt-1 text-right text-xs tabular-nums text-muted-foreground">
                       {texto.length}/{LIMITE_DO_TEXTO}
                     </div>
 
@@ -7715,10 +13089,10 @@ export function TelaDaCaixinha({
                           key={v.chave}
                           type="button"
                           onClick={() => setVisibilidade(v.chave)}
-                          className={`press rounded-full px-2.5 py-1 text-[12px] ${
+                          className={`press rounded-full px-2.5 py-1 text-xs ${
                             visibilidade === v.chave
-                              ? "bg-primary text-primary-foreground"
-                              : "border border-border"
+                              ? "btn-3d bg-primary text-primary-foreground"
+                              : "pill-3d"
                           }`}
                         >
                           {v.rotulo}
@@ -7730,7 +13104,7 @@ export function TelaDaCaixinha({
                         o único lugar que sabe por que a resposta foi recusada, e
                         um texto local divergiria da régua no primeiro ajuste. */}
                     {recado && (
-                      <p className="mt-2 rounded-lg bg-muted/60 p-2 text-[12px] leading-snug">
+                      <p className="mt-2 rounded-lg bg-muted/60 p-2 text-xs leading-snug">
                         {recado}
                       </p>
                     )}
@@ -7780,7 +13154,7 @@ export function TelaDaCaixinha({
                       type="button"
                       onClick={() => setMenu((m) => (m === p.id ? null : p.id))}
                       aria-label="Opções desta pergunta"
-                      className="press rounded-xl border border-border px-3 text-[15px] leading-none text-muted-foreground"
+                      className="press flex h-11 min-w-[44px] items-center justify-center rounded-xl border border-border px-3 text-[15px] leading-none text-muted-foreground"
                     >
                       ⋯
                     </button>
@@ -7861,7 +13235,7 @@ export function TelaDaCaixinha({
 
       {respondidas.length > 0 && (
         <>
-          <h2 className="mx-4 mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h2 className="mx-4 mt-6 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Respondidas
           </h2>
           <ul className="mt-1.5 flex flex-col gap-2 px-4">
@@ -7875,7 +13249,7 @@ export function TelaDaCaixinha({
                   <button
                     type="button"
                     onClick={() => aoAbrirPost(p.postId!)}
-                    className="press mt-2 text-[13px] font-medium text-primary"
+                    className="press mt-1 inline-flex min-h-[44px] items-center text-[13px] font-medium text-primary"
                   >
                     Ver a publicação
                   </button>
@@ -7911,12 +13285,12 @@ function CartaoDaLive({ live }: { live: LiveNoTopo }) {
         }`}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-primary">
+        <p className="text-xs font-bold uppercase tracking-wider text-primary">
           {live.aoVivo ? "Ao vivo agora" : "Próxima live"}
         </p>
         <p className="truncate text-[14px] font-semibold leading-tight">{live.titulo}</p>
         {!live.aoVivo && (
-          <p className="text-[12px] leading-tight text-muted-foreground">
+          <p className="text-xs leading-tight text-muted-foreground">
             {quandoAcontece(live.quando, Date.now())}
           </p>
         )}
@@ -7988,5 +13362,261 @@ function SeloOficial() {
       />
       <path d="m10.8 15.3-3-3 1.3-1.3 1.7 1.7 4.1-4.1 1.3 1.3-5.4 5.4Z" fill="#fff" />
     </svg>
+  );
+}
+
+/**
+ * A LISTA DE QUEM ELA BLOQUEOU.
+ *
+ * ⚠️ **COMPONENTE PRÓPRIO por causa da BANCADA.** Ela era a única tela de
+ * segurança da aba sem bancada — e os três estados que mais importam (falhou,
+ * carregando, ninguém) não se fabricam numa conta de teste: seria preciso
+ * bloquear alguém de verdade, ou derrubar a rede na hora certa. Enquanto vivia
+ * dentro de `RedeNoApp`, olhar para ela era impossível.
+ *
+ * ⚠️ E ela NÃO busca nada: recebe tudo por prop, como o alerta de SOS e o
+ * prontuário. É o que torna a bancada possível sem uma linha de mudança no
+ * comportamento.
+ */
+/**
+ * A lista de quem foi tirada de perto — bloqueadas, ou com o story escondido.
+ *
+ * ⚠️ **UMA tela para as duas, e não duas cópias.** O desenho é idêntico (lista
+ * com foto, nome e um botão de desfazer) e as duas existem pela MESMA razão:
+ * bloquear e esconder são gestos CALADOS, então sem uma lista a pessoa some e
+ * desfazer exigiria lembrar de quem foi. Duas cópias divergiriam no primeiro
+ * ajuste — e o estado que mais importa aqui (`"erro"`, que nunca pode virar
+ * "você não tem ninguém") ficaria certo numa e errado na outra.
+ */
+/**
+ * Uma grade com cabeçalho — os salvos, o que ela reagiu.
+ *
+ * ⚠️ **A grade é a MESMA `GradeDePosts` de todo lugar**, e não uma nova: a
+ * proporção da célula já mudou uma vez (1:1 → 3:4, em 2025), e duas cópias
+ * divergiriam na próxima.
+ */
+export function GradeSimples({
+  titulo,
+  vazio,
+  posts,
+  aoVoltar,
+  aoAbrirPost,
+  aoTentarDeNovo,
+}: {
+  titulo: string;
+  vazio: string;
+  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = nada. */
+  posts: PostNaTela[] | "erro" | null;
+  aoVoltar: () => void;
+  aoAbrirPost: (id: string) => void;
+  aoTentarDeNovo: () => void;
+}) {
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">{titulo}</h1>
+      </header>
+      {posts === "erro" ? (
+        /* ⚠️ "Você não reagiu a nada" sobre uma falha de leitura é a frase mais
+           errada possível para quem reagiu a duzentas publicações. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : posts === null ? (
+        <div className="grid grid-cols-3 gap-0.5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto aspect-[3/4] w-full" />
+          ))}
+        </div>
+      ) : (
+        <GradeDePosts posts={posts} vazio={vazio} aoAbrirPost={aoAbrirPost} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * O QUE ACONTECEU COM O QUE ELA DENUNCIOU.
+ *
+ * ⚠️ **A tela prometia "fica registrada para a gente olhar" e o desfecho nunca
+ * voltava.** Denúncia sem retorno é a que ninguém faz duas vezes — e aqui a
+ * alternativa é o bloqueio cego, que não deixa rastro nenhum para a plataforma:
+ * a reincidente segue reincidindo, e a próxima paciente recebe a mesma coisa.
+ *
+ * ⚠️ **NADA aqui nomeia a pessoa denunciada.** Nem o nome, nem a foto, nem o
+ * texto. Devolver quem foi transformaria a denúncia num canal de confronto — e
+ * a denúncia é justamente o caminho de quem NÃO quer confrontar.
+ */
+export function MeusDesfechos({
+  desfechos,
+  aoVoltar,
+  aoTentarDeNovo,
+}: {
+  desfechos:
+    | { id: string; alvo: string; motivo: string; em: string; desfecho: string | null }[]
+    | "erro"
+    | null;
+  aoVoltar: () => void;
+  aoTentarDeNovo: () => void;
+}) {
+  const oQueFoi = (d: string | null) =>
+    d === "removido"
+      ? "A publicação saiu do ar."
+      : d === "avisado"
+        ? "A conta foi avisada."
+        : d === "sem_acao"
+          ? "Olhamos e não encontramos motivo para agir."
+          : /* ⚠️ Sem a coluna do desfecho (banco antes do SQL), a linha continua
+               à mostra — só sem o "o que aconteceu". Esconder as denúncias
+               resolvidas por causa de um campo novo seria pior. */
+            "Já foi analisada.";
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">Suas denúncias</h1>
+      </header>
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">
+        O que a gente fez com o que você denunciou. Ninguém sabe que foi você.
+      </p>
+      {desfechos === "erro" ? (
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : desfechos === null ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto h-14 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : desfechos.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          Nada por aqui. O que você denunciar aparece assim que a gente olhar.
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {desfechos.map((d) => (
+            <li key={d.id} className="rounded-xl border border-border p-3">
+              <p className="text-[13px] font-semibold">{oQueFoi(d.desfecho)}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {d.alvo === "perfil" ? "Perfil" : d.alvo === "story" ? "Story" : "Publicação"} ·{" "}
+                {haQuantoPublicou(d.em, Date.now())}
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+export function ListaDeBloqueados({
+  pessoas,
+  aoVoltar,
+  aoDesbloquear,
+  aoTentarDeNovo,
+  titulo = "Bloqueados",
+  explicacao = "Quem está aqui não vê você na Comunidade, e não é avisada de nada.",
+  vazio = "Você não bloqueou ninguém.",
+  rotuloDaAcao = "Desbloquear",
+}: {
+  /** `null` = carregando. `"erro"` = a leitura falhou. `[]` = ninguém. */
+  pessoas: PessoaNaLista[] | "erro" | null;
+  aoVoltar: () => void;
+  aoDesbloquear: (id: string) => void;
+  aoTentarDeNovo: () => void;
+  titulo?: string;
+  /** ⚠️ Diz o que a lista faz E o que ela NÃO faz — é o que separa a proteção
+      do confronto. Sem a frase, ela hesita em usar com alguém que conhece. */
+  explicacao?: string;
+  vazio?: string;
+  rotuloDaAcao?: string;
+}) {
+  return (
+    <div className="mx-auto max-w-md pb-24">
+      <header className="sticky top-0 z-20 flex items-center gap-1 bg-background/95 py-2 backdrop-blur">
+        <button
+          type="button"
+          onClick={aoVoltar}
+          aria-label="Voltar"
+          className="press -ml-2 flex h-11 w-11 items-center justify-center text-lg leading-none"
+        >
+          ‹
+        </button>
+        <h1 className="min-w-0 flex-1 text-[16px] font-semibold">{titulo}</h1>
+      </header>
+      {/* ⚠️ A explicação diz o que o bloqueio faz e o que ele NÃO faz — a
+          pessoa bloqueada nunca é avisada, e isso é o que separa a proteção do
+          confronto. Sem a frase, ela hesita em bloquear alguém que conhece da
+          vida real. */}
+      <p className="px-1 pb-3 text-[13px] leading-snug text-muted-foreground">{explicacao}</p>
+      {pessoas === "erro" ? (
+        /* ⚠️ "Você não bloqueou ninguém" sobre uma falha de leitura a faria
+           bloquear de novo — ou desistir de bloquear. */
+        <div className="py-16 text-center">
+          <p className="text-sm text-muted-foreground">Não deu para carregar a lista agora.</p>
+          <button
+            type="button"
+            onClick={aoTentarDeNovo}
+            className="press mt-3 min-h-[44px] rounded-full pill-3d px-5 text-[13px] font-semibold"
+          >
+            Tentar de novo
+          </button>
+        </div>
+      ) : pessoas === null ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="dc-esqueleto h-12 w-full rounded-xl" />
+          ))}
+        </div>
+      ) : pessoas.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">{vazio}</p>
+      ) : (
+        <ul>
+          {pessoas.map((p) => (
+            <li key={p.id} className="flex items-center gap-2.5 py-2">
+              <Foto url={p.avatarUrl} nome={p.nome} lado={40} />
+              <span className="min-w-0 flex-1 truncate text-[14px] font-medium">{p.nome}</span>
+              <button
+                type="button"
+                onClick={() => aoDesbloquear(p.id)}
+                className="press min-h-[44px] shrink-0 rounded-full pill-3d px-4 text-[13px] font-semibold"
+              >
+                {rotuloDaAcao}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

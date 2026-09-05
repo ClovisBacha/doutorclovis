@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getAlbumByToken, addAlbumPostPublic, type AlbumPostPublico } from "@/lib/family.functions";
@@ -45,7 +46,7 @@ function AlbumPage() {
       setPosts(res.posts);
       setCodigoDeConvite(res.codigoDeConvite ?? null);
     } catch {
-      // Falha de rede: sem isso a tela ficava em "Carregando álbum..." p/ sempre.
+      // Falha de rede: sem isso a tela ficava em "Carregando álbum…" p/ sempre.
       setError("Não foi possível carregar o álbum. Verifique a conexão e recarregue.");
     } finally {
       setLoading(false);
@@ -67,7 +68,7 @@ function AlbumPage() {
         const ctx = canvas.getContext("2d");
         if (!ctx) return;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        setImageData(canvas.toDataURL("image/jpeg", 0.75));
+        setImageData(codificarFoto(canvas, 0.75));
       };
       img.src = ev.target?.result as string;
     };
@@ -101,7 +102,7 @@ function AlbumPage() {
     } catch {
       toast.error("Falha de conexão — tente novamente.");
     } finally {
-      // Antes, um throw deixava o botão preso em "Salvando..." para sempre.
+      // Antes, um throw deixava o botão preso em "Salvando…" para sempre.
       setSubmitting(false);
     }
   }
@@ -109,7 +110,7 @@ function AlbumPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center text-muted-foreground">
-        Carregando álbum...
+        Carregando álbum…
       </div>
     );
   }
@@ -175,7 +176,7 @@ function AlbumPage() {
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
-              placeholder="Legenda (opcional)..."
+              placeholder="Legenda (opcional)…"
               className="w-full rounded-xl border border-border bg-background px-4 py-2 text-sm"
             />
             <div className="flex flex-wrap gap-2">
@@ -199,7 +200,7 @@ function AlbumPage() {
               disabled={submitting || !authorName.trim() || (!caption && !imageData && !emoji)}
               className="rounded-full bg-primary px-6 py-2 text-sm font-medium text-white disabled:opacity-40"
             >
-              {submitting ? "Salvando..." : "Publicar memória"}
+              {submitting ? "Salvando…" : "Publicar memória"}
             </button>
           </div>
         </div>

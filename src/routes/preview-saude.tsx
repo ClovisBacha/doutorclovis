@@ -23,6 +23,9 @@ export const Route = createFileRoute("/preview-saude")({
      que `preview-jogo` documenta para `?tela=`. */
   validateSearch: (q: Record<string, unknown>) => ({
     w: q.w == null || q.w === "" ? null : Number(q.w),
+    dados: q.dados == null ? 0 : Number(q.dados),
+    /* `?cabecalhos=1`: os cinco cabeçalhos de sub-tela no lugar da grade. */
+    cabecalhos: q.cabecalhos === "1" || q.cabecalhos === 1 || q.cabecalhos === true,
   }),
   head: () => ({
     meta: [{ title: "Bancada da Saúde" }, { name: "robots", content: "noindex" }],
@@ -31,11 +34,29 @@ export const Route = createFileRoute("/preview-saude")({
 });
 
 function PreviewSaude() {
-  const { w } = Route.useSearch();
+  const { w, dados, cabecalhos } = Route.useSearch();
   return (
     <div className="fixed inset-0 z-[50] overflow-y-auto bg-background px-4 py-5">
       <p className="mb-4 font-serif text-xl">Sua saúde</p>
-      <HubSaude onAbrir={() => {}} weeks={Number.isFinite(w) ? (w as number) : null} />
+      <HubSaude
+        onAbrir={() => {}}
+        cabecalhos={cabecalhos}
+        weeks={Number.isFinite(w) ? (w as number) : null}
+        bancada={
+          dados === 2
+            ? /* ⚠️ O caso do dado VELHO: passado o prazo o número SOME e o bloco
+                 volta ao rótulo — o dono não quer "quando" escrito, e um número
+                 de cinco meses atrás não pode se passar por atual. */
+              { Saúde: null, chutes: null, contracoes: null }
+            : dados
+              ? {
+                  Saúde: { valor: "68,4 kg", legenda: "pressão 118/76" },
+                  chutes: { valor: "12", legenda: "chutes" },
+                  contracoes: { valor: "2", legenda: "contrações" },
+                }
+              : undefined
+        }
+      />
     </div>
   );
 }

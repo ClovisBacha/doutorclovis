@@ -134,9 +134,13 @@ describe("Modo Cuidado", () => {
         'if (await euEmCuidado(sb, eu)) return { ok: false as const, motivo: "indisponivel" as const };',
       );
       expect(c).not.toContain("(meu as any)?.care_mode");
-      /* E ANTES de qualquer escrita. */
+      /* E ANTES de qualquer escrita.
+         ⚠️ A escrita do story deixou de ser um `.insert(` solto e virou uma
+         escada (`inserirDescendo`). A GARANTIA é a ordem — o portão antes de
+         gravar —, nunca a forma de gravar: travar `.insert(` reprovava um
+         código que só ficou melhor. */
       const portao = c.indexOf("euEmCuidado");
-      const escreveu = c.indexOf(".insert(");
+      const escreveu = c.search(/\.insert\(|inserirDescendo\(/);
       expect(portao).toBeGreaterThan(-1);
       expect(escreveu).toBeGreaterThan(portao);
     }
@@ -147,14 +151,14 @@ describe("Modo Cuidado", () => {
     // perda de quem entrou em luto.
     const c = corpoDe("verPerfil").replace(/\s+/g, " ");
     expect(c).toContain(
-      "if (!a || a.care_mode || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu))",
+      "if (foraDaRede(a) || (ctx.bloqueio.has(data.alvoId) && data.alvoId !== eu))",
     );
     expect(c).toContain('motivo: "indisponivel" as const');
     expect(c).not.toMatch(/motivo: ["'`](luto|bloqueada|cuidado)/);
   });
 
   test("⚠️ quem está em Modo Cuidado some da fila de PEDIDOS", () => {
-    expect(corpoDe("meuPerfilSocial")).toContain("q.care_mode");
+    expect(corpoDe("meuPerfilSocial")).toContain("foraDaRede(q)");
   });
 });
 
@@ -178,23 +182,77 @@ describe("reagir", () => {
 });
 
 describe("os avisos", () => {
-  test("⚠️ SÓ o pedido para seguir manda push", () => {
-    // O push deste app é o mesmo canal do aviso de emergência. Um coraçãozinho
-    // de madrugada gasta o canal que um dia vai avisar de uma consulta.
-    expect(corpoDe("reagir")).not.toContain("sendPushToUser");
-    expect(corpoDe("publicarPost")).not.toContain("sendPushToUser");
+  test("⚠️ o push sai de UMA porta, e passa pela régua", () => {
+    /**
+     * ⚠️ **A GARANTIA É "uma porta só, depois da régua", e não ONDE ela fica.**
+     *
+     * Este teste travava o bloco de push dentro de `seguir`, e foi assim que
+     * SETE das oito espécies ficaram mudas: `textoDoAviso` tinha frase escrita
+     * para todas, e só o pedido empurrava. Centralizar em `registrarAtividade`
+     * — o único caminho por onde um aviso nasce — deixou o teste vermelho sobre
+     * uma mudança que só apertou a garantia. Décima vez nesta base.
+     */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    expect(corpo).toContain("sendPushToUser(opts.donoId");
+    /* A régua decide, e vem ANTES. */
+    const iRegua = corpo.indexOf("podeAvisar(opts.especie, desligados)");
+    const iPush = corpo.indexOf("sendPushToUser(");
+    expect(iRegua).toBeGreaterThan(-1);
+    expect(iPush).toBeGreaterThan(iRegua);
+  });
+
+  test("⚠️ e NENHUM handler tem uma segunda opinião sobre push", () => {
+    /* Duas réguas para "isto merece push?" divergem no primeiro aviso novo — e
+       a divergência gasta o canal por onde chega o aviso de emergência. */
+    /**
+     * ⚠️ **`corpoDe` vai até o próximo `export const`, e `avisarQuemMeFavoritou`
+     * é uma função NÃO exportada logo depois de `publicarPost`** — a fatia a
+     * engolia inteira, e o teste acusava um push que não é do handler. O
+     * recorte para no primeiro `\nasync function` também.
+     *
+     * E o aviso das favoritas é a exceção declarada: ele nasce de PUBLICAR, não
+     * de um aviso na caixa ♡, e por isso não passa por `registrarAtividade`.
+     * Quem o cobra é `avisos-da-rede.test.ts`.
+     */
+    const ate = (fn: string) => {
+      const c = corpoDe(fn);
+      const i = c.indexOf("\nasync function ");
+      return i < 0 ? c : c.slice(0, i);
+    };
+    for (const fn of ["reagir", "publicarPost", "seguir", "votar"]) {
+      expect({ fn, temPush: ate(fn).includes("sendPushToUser") }).toEqual({
+        fn,
+        temPush: false,
+      });
+    }
+  });
+
+  test("⚠️ o push NÃO chega a quem está fora da rede", () => {
+    /* Luto ou pausa: o Modo Cuidado existe para o app parar de cutucar, e o
+       push é a cutucada mais direta que existe. */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    const iFora = corpo.indexOf("foraDaRede(dono)");
+    expect(iFora).toBeGreaterThan(-1);
+    expect(corpo.indexOf("sendPushToUser(")).toBeGreaterThan(iFora);
+  });
+
+  test("⚠️ e o aviso só sai DEPOIS de a linha gravar", () => {
+    /* Avisar sobre uma linha que não gravou manda a paciente abrir uma caixa
+       onde não há nada — o defeito que o presente do médico já teve. */
+    const fonte = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ");
+    const i = fonte.indexOf("export async function registrarAtividade");
+    const corpo = fonte.slice(i, fonte.indexOf("\nexport const minhaAtividade", i));
+    const iGuarda = corpo.indexOf("if (error) return;");
+    expect(iGuarda).toBeGreaterThan(-1);
+    expect(corpo.indexOf("sendPushToUser(")).toBeGreaterThan(iGuarda);
+  });
+
+  test("a espécie que vai ao push é a MESMA que foi à caixa", () => {
     const c = corpoDe("seguir").replace(/\s+/g, " ");
-    /* ⚠️ **Pela RÉGUA, e não por um `if` local.** `avisoMandaPush` existia com a
-       decisão escrita e ZERO chamadores, enquanto aqui morava um
-       `estado === "pendente"` que dizia a mesma coisa por acaso — duas réguas
-       para "isto merece push?", que divergem no primeiro aviso novo. O QUE ela
-       decide está testado por comportamento em `rede-social.test.ts`; aqui só se
-       cobra que o servidor não tenha uma segunda opinião. */
-    expect(c).toContain("if (avisoMandaPush(especie)) {");
-    expect(c).not.toContain('if (estado === "pendente") {');
-    expect(c.indexOf("sendPushToUser")).toBeGreaterThan(c.indexOf("avisoMandaPush(especie)"));
-    /* E a espécie que vai para o push é a MESMA que foi para a caixa — não uma
-       segunda derivação do estado. */
     expect(c).toContain(
       "await registrarAtividade(sb, { donoId: data.alvoId, quemId: eu, especie })",
     );
@@ -224,31 +282,32 @@ describe("o que é dela", () => {
     expect(c).not.toContain(".delete(");
   });
 
-  test("⚠️ o contador de seguidores é `null` para terceiros — e para o espelho", () => {
-    // Não existe placar público de audiência: ele mede popularidade num
-    // momento em que ela já está sendo medida clinicamente.
+  test("⚠️ o contador de seguidores é PÚBLICO — e a busca continua sem contar", () => {
+    // ⚠️ ESTA AFIRMAÇÃO FOI INVERTIDA POR DECISÃO DO DONO, e o teste foi
+    // reescrito em vez de apagado.
     //
-    // ⚠️ Este teste ficou VERMELHO quando o espelho nasceu, e a tentação era
-    // afrouxá-lo. A afirmação que ele guarda não mudou — só ganhou um caso: o
-    // número continua saindo apenas no MEU perfil, e agora nem nele quando a
-    // tela está fingindo ser a de uma visitante (senão a prévia mostraria à
-    // "estranha" um contador que ela nunca veria).
+    // O que ele guardava: não existe placar público de audiência, porque ele
+    // mede popularidade num momento em que ela já está sendo medida
+    // clinicamente. O argumento continua de pé e vive em `NUMEROS_PUBLICOS`.
+    //
+    // O que venceu: "é uma rede social, são pessoas que vão seguir a pessoa, e
+    // é pra mostrar sim". Uma rede social sem contador não lê como discrição,
+    // lê como versão incompleta.
     const c = corpoDe("verPerfil").replace(/\s+/g, " ");
-    /* ⚠️ O que importa é o `null` nos DOIS casos de terceiro (visitante e
-       espelho) — o número real só existe no ramo do meio. A asserção antiga
-       cravava o literal `0`, e por isso continuava verde sobre o defeito que
-       ela deveria ter pegado: o contador REAL nunca chegava à tela, e o perfil
-       dizia "0 seguidores" logo acima de uma lista com doze pessoas. */
-    /* ⚠️ A CONTAGEM mudou de lugar (subiu para o `Promise.all` que colapsou as
-       cinco esperas do fim), e a asserção seguiu ela — nunca saiu. O que ela
-       guarda é a mesma coisa: `null` nos DOIS casos de terceiro. */
-    expect(c).toMatch(
-      /persona \|\| data\.alvoId !== eu \? Promise\.resolve\(null\) : contarSeguidores\(sb, eu\)/,
-    );
-    expect(c).toContain("meusSeguidores: seguidores,");
-    expect(c).not.toContain("meusSeguidores: persona ? null : data.alvoId === eu ? 0 : null");
-    expect(c).toMatch(/euSigo: persona \? null : data\.alvoId === eu \? [^:]+ : null/);
-    expect(corpoDe("buscarPerfis")).toContain("meusSeguidores: null");
+    /* Conta para QUALQUER perfil, não só o próprio — é isso que mudou. */
+    expect(c).toContain("contarSeguidores(sb, data.alvoId)");
+    expect(c).toContain("contarSeguindo(sb, data.alvoId)");
+    /* ⚠️ E não pode voltar a depender de quem olha: um `data.alvoId === eu`
+       em volta da contagem é o defeito antigo de volta. */
+    expect(c).not.toMatch(/data\.alvoId !== eu \? Promise\.resolve\(null\) : contarSeguidores/);
+
+    /* ⚠️ A BUSCA CONTINUA SEM CONTAR, de propósito: são até 20 perfis por
+       consulta, e contar os dois lados de cada um seriam 40 idas ao banco para
+       desenhar uma lista que ninguém lê por número. `null` ali quer dizer "não
+       contei", e a tela sabe distinguir isso de zero. */
+    const b = corpoDe("buscarPerfis").replace(/\s+/g, " ");
+    expect(b).toContain("seguidores: null");
+    expect(b).toContain("seguindo: null");
   });
 
   test("todas as funções exigem sessão", () => {
@@ -315,7 +374,7 @@ describe("editar a legenda", () => {
   /* ⚠️ Foto, enquete, visibilidade, marcações e comparação NÃO mudam: editar a
      camada de quem vê depois de o post ter sido lido não desfaz a leitura, e
      trocar a foto faria as reações apontarem para uma imagem que ninguém viu. */
-  test("⚠️ só o TEXTO muda", () => {
+  test("⚠️ só o que ela ESCREVE muda — nunca a visibilidade", () => {
     const c = corpoDe("editarPost");
     /* ⚠️ **A ÂNCORA É CONFERIDA ANTES DO RECORTE — e sem isso este teste
        mentia.** `indexOf` devolve **−1** quando a âncora some, e `slice(-1)`
@@ -329,8 +388,18 @@ describe("editar a legenda", () => {
     expect(i).toBeGreaterThan(-1);
     const gravacao = c.slice(i);
     /* E o recorte tem de conter o `update` de verdade, senão ele não mede nada. */
-    expect(gravacao).toContain('.from("rede_posts").update(campos)');
-    expect(gravacao).toContain("gravar({ texto");
+    expect(gravacao).toContain(".update(campos)");
+    /* ⚠️ **O NOME DO TESTE MUDOU DE "só o TEXTO" PARA "só o que ela ESCREVE".**
+       `altTexto` — a descrição da foto para leitores de tela — passou a ser
+       editável, e ela é conteúdo dela como a legenda: um `alt` errado que não
+       se corrige é pior que nenhum. A asserção antiga cobrava `gravar({ texto`
+       colado e ficou vermelha sobre essa adição legítima.
+
+       O que continua proibido é o mesmo, e é o que importa: a EDIÇÃO NÃO
+       REESCREVE A CAMADA DE VISIBILIDADE, a foto, a enquete nem a comparação —
+       nada que mude quem vê o post depois de meia dúzia de pessoas já o terem
+       lido. */
+    expect(gravacao).toContain("texto,");
     for (const proibido of ["visibilidade:", "imagem_path:", "enquete_opcoes:", "comparacao_de:"]) {
       /* O `select` de conferência pode citar as colunas; o que não pode é
          gravá-las. Por isso a busca é pelo trecho do `update`. */
@@ -388,21 +457,43 @@ describe("reagir ao story", () => {
      ele. Sem isso, um uuid sorteado que respondesse `ok` confirmaria a
      existência de um story privado. */
   test("⚠️ só reage quem enxerga o story", () => {
+    /**
+     * ⚠️ **A GARANTIA É "o portão roda antes da escrita", e não a grafia dele.**
+     * As vinte linhas do portão viviam DUPLICADAS aqui e em `votarNoStory` — e
+     * a terceira cópia ia nascer em `denunciarStory`. Hoje são uma régua só
+     * (`storyQueEuVejo`), e este teste travava o bloco inline: ficou vermelho
+     * sobre uma unificação que só APERTOU a garantia. Nona vez nesta base.
+     */
     const c = corpoDe("reagirAoStory").replace(/\s+/g, " ");
-    expect(c).toContain("const podeVer =");
-    expect(c).toContain("!autor.care_mode");
-    expect(c).toContain("ctx.bloqueio.has(");
-    const conferiu = c.indexOf("const podeVer =");
-    const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
+    const conferiu = c.indexOf("storyQueEuVejo(sb, data.storyId, eu");
     expect(conferiu).toBeGreaterThan(-1);
+    const gravou = c.indexOf('.from("rede_story_reacoes") .upsert(');
     expect(gravou === -1 ? c.indexOf(".upsert(") : gravou).toBeGreaterThan(conferiu);
+  });
+
+  test("⚠️ e a régua ÚNICA cruza os quatro portões", () => {
+    /* Autora fora da rede (luto ou pausa), bloqueio, o vínculo (sigo ou amiga)
+       e a CAMADA do story. Uma cópia divergente apareceria como ação aceita
+       sobre um story que a fileira esconde. */
+    const s = FONTE.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\s+/g, " ");
+    const i = s.indexOf("async function storyQueEuVejo");
+    const regra = s.slice(i, i + 1400);
+    expect(regra).toContain("!foraDaRede(autor)");
+    expect(regra).toContain("ctx.bloqueio.has(autorId)");
+    expect(regra).toContain("ctx.sigo.has(autorId) || ctx.amigas.has(autorId)");
+    expect(regra).toContain("storyAlcanca({");
+    /* ⚠️ E a autora sempre enxerga o próprio, inclusive o fechado. */
+    expect(regra).toContain("(story as any).autor_id === eu) return story");
   });
 
   /* ⚠️ Story vencido não recebe reação: ele some da tela em 24h, e aceitar
      depois encheria a Atividade dela com afagos a uma coisa que ninguém mais
      vê — e abriria caminho para mexer com quem já parou de publicar. */
   test("⚠️ story vencido é recusado", () => {
-    expect(corpoDe("reagirAoStory").replace(/\s+/g, " ")).toContain(
+    /* A regra vive na régua única — ver o teste acima. */
+    const s = FONTE.replace(/\s+/g, " ");
+    const i = s.indexOf("async function storyQueEuVejo");
+    expect(s.slice(i, i + 900)).toContain(
       "new Date((story as any).expira_em).getTime() < Date.now()",
     );
   });
@@ -428,19 +519,162 @@ describe("reagir ao story", () => {
   });
 });
 
+describe("⚠️ a escada de recuo das colunas do perfil", () => {
+  /**
+   * ⚠️ **ESTE TESTE NASCEU DE UM DEFEITO MEU, EM PRODUÇÃO.**
+   *
+   * Acrescentei `feed_so_seguindo` à lista principal e não à escada. O banco do
+   * dono — que já tinha o selo, a conta oficial e a caixinha — falhava no
+   * degrau 1 E no 2 (que ainda pedia a coluna nova) e caía no 3, apagando em
+   * silêncio o selo da semana, o selo do bebê e a caixinha: três recursos que
+   * ele já usava, sumindo por uma coluna que ele nem sabia que existia.
+   *
+   * O comentário de `COLUNAS_SEM_OFICIAL` já descrevia esse cenário palavra por
+   * palavra. Faltava alguém cobrando.
+   */
+  const CODIGO_REDE = readFileSync("src/lib/rede-social.functions.ts", "utf8");
+
+  function listaDe(nome: string): string {
+    const m = new RegExp(`const ${nome} =([\\s\\S]*?);`).exec(CODIGO_REDE);
+    if (!m) throw new Error(`lista não encontrada: ${nome}`);
+    return m[1];
+  }
+
+  test("⚠️ cada degrau REMOVE de verdade a coluna do degrau acima", () => {
+    /* Um degrau que ainda pede a coluna que fez o degrau anterior falhar não é
+       degrau nenhum: os dois caem juntos, e a escada vira um tobogã até o
+       último — que é onde os recursos somem. */
+    expect(listaDe("COLUNAS_SEM_ARROBA")).toContain('replace("handle, quem_pode_mencionar, ", "")');
+    const semFeed = listaDe("COLUNAS_SEM_FEED");
+    expect(semFeed).toContain('replace("feed_so_seguindo, ", "")');
+    expect(semFeed).toContain('"handle, quem_pode_mencionar, "');
+    const semOficial = listaDe("COLUNAS_SEM_OFICIAL");
+    expect(semOficial).toContain('replace("conta_oficial, ", "")');
+    expect(semOficial).toContain('"feed_so_seguindo, "');
+    expect(semOficial).toContain('"handle, quem_pode_mencionar, "');
+  });
+
+  test("⚠️ as listas de recuo são DERIVADAS, nunca copiadas à mão", () => {
+    /* Duas listas escritas à mão divergem no primeiro ajuste — e aqui a
+       divergência aparece como recurso sumindo, sem erro nenhum. */
+    /* ⚠️ **DERIVA DE ALGUMA lista, e não obrigatoriamente da CHEIA.** O teste
+       travava `COLUNAS_DO_PERFIL` e ficou vermelho no dia em que um degrau NOVO
+       (a pausa) entrou no topo — e os de baixo passaram a derivar dele, que é
+       exatamente o certo: um degrau que continuasse pedindo a coluna que o
+       degrau acima já provou não existir cairia pela mesma razão. O que importa
+       é a derivação, e nunca de qual constante. */
+    for (const lista of [
+      "COLUNAS_SEM_PAUSA",
+      "COLUNAS_SEM_ARROBA",
+      "COLUNAS_SEM_FEED",
+      "COLUNAS_SEM_OFICIAL",
+    ]) {
+      const corpo = listaDe(lista);
+      expect({ lista, derivada: /COLUNAS_(DO_PERFIL|SEM_\w+)\.replace/.test(corpo) }).toEqual({
+        lista,
+        derivada: true,
+      });
+    }
+  });
+
+  test("⚠️ a escada é percorrida de cima para baixo, um degrau de cada vez", () => {
+    const c = CODIGO_REDE.replace(/\s+/g, " ");
+    /* ⚠️ A entrada cai no degrau mais ALTO, não direto no fundo — e o teste
+       NÃO trava QUAL é o mais alto: a escada ganha degraus a cada coluna nova
+       (a suspensão entrou por cima dos avisos), e travar o nome faria este
+       teste reprovar toda vez que a rede crescesse, que é exatamente quando
+       ele mais precisa estar verde. O que se cobra é a FORMA: a entrada chama
+       ALGUM degrau, e cada degrau chama o seguinte. */
+    expect(c).toMatch(/error \? await sem[A-Za-z]+\(sb, faltando\)/);
+    expect(c).toContain("if (error) return semAsColunasDosAvisos(sb, ids)");
+    expect(c).toContain("if (error) return semAColunaDaPausa(sb, ids)");
+    /* E cada degrau conhece o seguinte. Um degrau que não chama o de baixo é
+       um degrau que devolve lista vazia — e `montarPosts` descarta todo post
+       cujo autor não está no Map: feed vazio, sem erro nenhum. */
+    expect(c).toContain("if (error) return semAColunaDoArroba(sb, ids)");
+    expect(c).toContain("if (error) return semAColunaDoFeed(sb, ids)");
+    expect(c).toContain("if (error) return semAColunaNova(sb, ids)");
+    expect(c).toContain("if (error) return semAsColunasDoSelo(sb, ids)");
+  });
+
+  test("⚠️ toda coluna nova do perfil precisa de degrau", () => {
+    /* A regra que faltava. `COLUNAS_DO_PERFIL` cresce a cada recurso, e o
+       deploy chega SEMPRE antes de o dono rodar o SQL — uma coluna sem degrau
+       derruba a escada inteira até o fundo. */
+    const principais = listaDe("COLUNAS_DO_PERFIL")
+      .replace(/["+\n]/g, " ")
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+    /* As que nasceram depois do degrau do selo têm de aparecer num `replace`. */
+    for (const nova of [
+      "bio_link",
+      "avisos_desligados",
+      "rede_pausada_em",
+      "conta_oficial",
+      "feed_so_seguindo",
+      "handle",
+      "quem_pode_mencionar",
+    ]) {
+      expect({ nova, naPrincipal: principais.includes(nova) }).toEqual({ nova, naPrincipal: true });
+      /* ⚠️ **PROCURA DENTRO DOS `replace(...)`, e não no arquivo inteiro.**
+         A primeira versão desta linha era `CODIGO_REDE.includes("handle, ")` —
+         e passava com ZERO degraus, porque `handle, ` está escrito na própria
+         `COLUNAS_DO_PERFIL` três linhas acima. Um teste que casa a palavra em
+         qualquer lugar do arquivo é um teste que fica verde exatamente quando
+         a coluna nova é acrescentada sem degrau, que é o defeito que ele
+         existe para pegar.
+
+         ⚠️ E não é "um `replace` POR coluna": `handle` e `quem_pode_mencionar`
+         nascem no MESMO SQL e saem juntas num `replace` só. O que se cobra é
+         que a coluna apareça em ALGUM recorte. */
+      const recortes = [...CODIGO_REDE.matchAll(/\.replace\(\s*"([^"]+)"/g)].map((m) => m[1]);
+      expect({ nova, temDegrau: recortes.some((r) => r.includes(nova)) }).toEqual({
+        nova,
+        temDegrau: true,
+      });
+    }
+  });
+});
+
 describe("higiene", () => {
   test('nenhum `select("*")`', () => {
     expect(CODIGO).not.toMatch(/select\(\s*["'`]\*/);
   });
 
-  test("⚠️ e não existe comentário em lugar nenhum", () => {
-    // Decisão do dono sobre a pesquisa: 20,9% das respostas com conselho em
-    // fóruns de gestação estavam erradas, e o grupo não se autocorrige.
+  /**
+   * ⚠️ **ESTE TESTE AFIRMAVA UMA MENTIRA, e estava VERDE.**
+   *
+   * O nome dizia "não existe comentário em lugar nenhum" e o escopo era UM
+   * arquivo — `rede-social.functions.ts`. Os comentários entraram no produto por
+   * decisão do dono, com régua clínica própria: existem `comentarios.ts`,
+   * `comentarios.functions.ts`, `rede-comentarios.tsx` e a tabela
+   * `rede_comentarios`. O teste continuava verde por ACIDENTE da separação de
+   * módulos — as ocorrências de "coment" no arquivo medido são todas PROSA, e
+   * `semComentarios` as remove antes da busca.
+   *
+   * Um teste verde afirmando o contrário do produto é pior que nenhum: a
+   * próxima pessoa a ler a suíte conclui que a decisão ainda vale.
+   *
+   * O que sobrou é a afirmação VERDADEIRA e que importa: **este arquivo não
+   * conhece comentário**. A régua e as escritas moram em `comentarios.*`, e
+   * misturá-las aqui recriaria a segunda cópia que o projeto proíbe.
+   */
+  test("⚠️ este arquivo não conhece comentário — eles moram em `comentarios.*`", () => {
     expect(CODIGO).not.toContain("rede_comentarios");
-    expect(CODIGO).not.toMatch(/\bcomentar\b|\bcomentario\b/i);
   });
 
-  test("⚠️ cada DELETE do arquivo é deliberado, e eles são onze", () => {
+  test("⚠️ e o produto TEM comentários, com régua própria", () => {
+    /* A contraprova, para o teste de cima nunca voltar a ser lido como "a aba
+       não tem comentário". A pesquisa que os barrou por meses (20,9% das
+       respostas com conselho erradas, 5,5% danosas) segue verdadeira — o que
+       mudou é que eles entraram COM triagem, e não sem. */
+    const regua = readFileSync("src/lib/comentarios.ts", "utf8");
+    expect(regua).toContain("triarComentario");
+    expect(readFileSync("src/lib/comentarios.functions.ts", "utf8")).toContain("rede_comentarios");
+  });
+
+  test("⚠️ cada DELETE do arquivo é deliberado, e eles são catorze", () => {
     // Contar não basta — um número solto passa a mentir no dia em que alguém
     // troca um MARCA por um APAGA e ajusta o total. Cada um é nomeado, com o
     // motivo, e o total confere para pegar o sexto que aparecer sem revisão.
@@ -512,7 +746,36 @@ describe("higiene", () => {
     expect(rs).toContain('.eq("story_id", data.storyId)');
     expect(rs).toContain('.eq("quem_id", eu)');
 
-    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(11);
+    /* ⚠️ E o DÉCIMO SEGUNDO: tirar alguém dos FAVORITOS. Mesma natureza do
+       silêncio e da reação — a linha não guarda história nenhuma, e um
+       "favorita: false" marcado faria a lista crescer para sempre com o
+       registro de quem ela um dia quis ver primeiro. `.eq("quem_id", eu)` é o
+       portão: sem ele, um id no corpo do pedido tiraria a favorita de OUTRA. */
+    const fav = corpoDe("favoritar").replace(/\s+/g, " ");
+    expect(fav).toContain(".delete(");
+    expect(fav).toContain('.eq("quem_id", eu)');
+    expect(fav).toContain('.eq("favorita_id", data.alvoId)');
+
+    /* ⚠️ E o DÉCIMO TERCEIRO: voltar a MOSTRAR o story a quem ela escondeu.
+       Mesma natureza do silêncio — a linha não guarda história, e um
+       "escondido: false" marcado faria a lista crescer para sempre com o
+       registro de quem ela um dia escondeu. `.eq("quem_id", eu)` é o portão:
+       sem ele, um id no corpo do pedido desfaria o esconder de OUTRA. */
+    const esc = corpoDe("esconderStoryDe").replace(/\s+/g, " ");
+    expect(esc).toContain(".delete(");
+    expect(esc).toContain('.eq("quem_id", eu)');
+    expect(esc).toContain('.eq("escondido_id", data.alvoId)');
+
+    /* ⚠️ E o DÉCIMO QUARTO: o RASCUNHO vazio apaga a linha. Guardar um rascunho
+       em branco faria a próxima abertura oferecer "você tinha um rascunho" para
+       devolver nada — e ele é o oposto do post, que é arquivado: aqui não há o
+       que preservar, porque nada foi publicado. `.eq("autor_id", eu)` é o
+       portão. */
+    const ras = corpoDe("salvarRascunho").replace(/\s+/g, " ");
+    expect(ras).toContain(".delete(");
+    expect(ras).toContain('.eq("autor_id", eu)');
+
+    expect((CODIGO.match(/\.delete\(/g) ?? []).length).toBe(14);
   });
 
   test("⚠️ denunciar um post confere a VISIBILIDADE antes de gravar", () => {
@@ -655,9 +918,33 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
   });
 
   test("⚠️ ninguém do círculo dela entra — nem quem ela já pediu para seguir", () => {
-    // Sugerir alguém para quem ela acabou de mandar pedido é o app esquecendo
-    // o que ela fez cinco minutos atrás.
-    expect(C).toContain("id === eu || ctx.sigo.has(id) || ctx.bloqueio.has(id) || jaPedi.has(id)");
+    /**
+     * Sugerir alguém para quem ela acabou de mandar pedido é o app esquecendo o
+     * que ela fez cinco minutos atrás.
+     *
+     * ⚠️ **A VERSÃO ANTERIOR TRAVAVA A CORRENTE INTEIRA numa string só**, e
+     * reprovou o acréscimo de `ctx.silenciados` — que FECHA uma porta por onde
+     * a silenciada voltava. Um teste que exige a lista exata de termos torna
+     * impossível acrescentar um sem editá-lo, e quem edita um teste vermelho
+     * com pressa apaga a asserção em vez de entendê-la.
+     *
+     * Cada termo é cobrado por si. Trocar QUALQUER um por `true` continua
+     * reprovando; acrescentar um sexto passa, que é o comportamento certo.
+     */
+    const i = C.indexOf("const fora =");
+    expect(i).toBeGreaterThan(-1);
+    const pred = C.slice(i, C.indexOf(";", i));
+    for (const termo of [
+      "id === eu",
+      "ctx.sigo.has(id)",
+      "ctx.bloqueio.has(id)",
+      /* ⚠️ O silêncio entrou aqui depois — ver `silenciar.test.ts`, que cobra
+         as quatro portas de uma vez. */
+      "ctx.silenciados.has(id)",
+      "jaPedi.has(id)",
+    ]) {
+      expect(pred).toContain(termo);
+    }
     expect(C).toContain('.eq("estado", "pendente")');
   });
 
@@ -665,7 +952,7 @@ describe("sugerido para você — o pool é estreito, e o estreitamento é o rec
     // Sem isso a sugestão vira a porta dos fundos da busca, e o Modo Cuidado
     // volta à tela de estranhas pela lateral.
     expect(C).toContain("podeAparecerNaBusca({");
-    expect(C).toContain("emCuidado: !!p.care_mode");
+    expect(C).toContain("emCuidado: foraDaRede(p)");
   });
 
   test("⚠️ o post é montado por `montarPosts`, nunca à mão", () => {
@@ -782,28 +1069,33 @@ describe("o carimbo do story — Fase 3", () => {
     expect(pub).not.toMatch(/semana: .*(semanas|seloSemana)/);
   });
 
-  test("⚠️ publicar não quebra em banco sem as colunas, e são TRÊS degraus", () => {
-    // O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
-    // falhar INTEIRO — não só o carimbo.
-    //
-    // ⚠️ E são três degraus, um por LEVA de colunas: o cheio (enquete +
-    // pergunta), o do meio (só o carimbo) e o mínimo. Um recuo que pulasse
-    // direto para o mínimo apagaria o carimbo de quem já rodou AQUELE SQL, só
-    // porque o SQL da enquete ainda não rodou.
+  test("⚠️ publicar não quebra em banco sem as colunas: UM degrau por LEVA", () => {
+    /**
+     * O deploy chega antes do SQL: sem o recuo, publicar um story passaria a
+     * falhar INTEIRO — não só o carimbo. E um recuo que pulasse direto para o
+     * mínimo apagaria o carimbo de quem já rodou AQUELE SQL, só porque o SQL da
+     * enquete ainda não rodou.
+     *
+     * ⚠️ **A GARANTIA É "uma leva de SQL por degrau", e não o NÚMERO deles.**
+     * A versão anterior cravava TRÊS e travava a grafia dos três inserts — e
+     * reprovou no dia em que a escada virou uma só, com seis degraus, que é o
+     * conserto de um defeito grave (ela gravava DUAS vezes). Um número à mão
+     * aqui obriga a editar o teste a cada `APLICAR_` novo, e quem edita um
+     * teste vermelho com pressa apaga a asserção em vez de entendê-la.
+     */
     const pub = corpoDe("publicarStory").replace(/\s+/g, " ");
-    expect(pub).toContain("const base = { autor_id: eu, imagem_path: caminho, texto: data.texto }");
-    expect(pub).toContain("enquete_opcoes: enquete");
-    expect(pub).toContain(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
-    expect(pub).toContain(".insert(base)");
-    /* A ordem dos degraus: do mais completo ao mínimo. Os marcadores são os
-       que distinguem um insert do outro — `enquete_opcoes` só existe no
-       primeiro, e o segundo fecha as chaves logo depois do carimbo. */
-    const cheio = pub.indexOf("pergunta_aberta: data.perguntaAberta === true");
-    const meio = pub.indexOf(".insert({ ...base, carimbo_semana: data.carimbarSemana === true })");
-    const minimo = pub.indexOf(".insert(base)");
-    expect(cheio).toBeGreaterThan(-1);
-    expect(meio).toBeGreaterThan(cheio);
-    expect(minimo).toBeGreaterThan(meio);
+    const escada = pub.slice(pub.indexOf("const DEGRAUS"), pub.indexOf("inserirDescendo"));
+    /* Cada degrau nomeia o SQL que o destrava — é isso que faz a mensagem de
+       recuo dizer à pessoa o que rodar. */
+    const sqls = [...escada.matchAll(/rode (APLICAR_[A-Z_]+\.sql)/g)].map((m) => m[1]);
+    expect(new Set(sqls).size).toBeGreaterThanOrEqual(4);
+    /* E nenhum degrau mistura colunas de SQLs diferentes: faltar uma apagaria
+       recursos que o banco TEM.
+       ⚠️ Conta `colunas: [`, e não `aviso:` — a ANOTAÇÃO DE TIPO da escada
+       também tem um `aviso:`, e contá-lo dava um degrau a mais. É a mesma
+       armadilha de substring que já enganou meia dúzia de testes aqui. */
+    const degraus = escada.split("colunas: [").length - 1;
+    expect(degraus).toBe(sqls.length);
   });
 
   /* ⚠️ A enquete do story passa pela MESMA régua do post e pela MESMA triagem
@@ -815,8 +1107,11 @@ describe("o carimbo do story — Fase 3", () => {
     expect(pub).toContain("limparOpcoes(data.enquete ?? [])");
     expect(pub).toContain("enqueteValida(opcoes)");
     const triagem = pub.indexOf("for (const o of enquete)");
-    const grava = pub.indexOf("const base = {");
+    /* ⚠️ A âncora é a GRAVAÇÃO, seja qual for a forma dela — a versão anterior
+       usava `const base = {`, que sumiu quando a escada virou uma só. */
+    const grava = pub.indexOf("inserirDescendo(");
     expect(triagem).toBeGreaterThan(-1);
+    expect(grava).toBeGreaterThan(-1);
     expect(triagem).toBeLessThan(grava);
   });
 
@@ -888,7 +1183,16 @@ describe("⚠️ a régua clínica roda no CANAL PRINCIPAL", () => {
        quisesse dar o conselho perigoso não usava a caixinha, publicava. */
     const c = corpoDe("publicarPost").replace(/\s+/g, " ");
     expect(c).toContain("triarTexto");
-    expect(c).toContain('for (const trecho of [data.texto ?? "", ...opcoes])');
+    /* ⚠️ **COBRA O CONJUNTO, e não a lista literal.** A versão anterior travava
+       a string exata `[data.texto ?? "", ...opcoes]` e ficou vermelha no dia em
+       que `altTexto` entrou na triagem — uma cobertura ESTRITAMENTE maior. Um
+       teste que reprova mais proteção é um teste que ensina a tirá-la. */
+    const laco = /for \(const trecho of \[([^\]]*)\]\)/.exec(c);
+    expect({ tem: !!laco }).toEqual({ tem: true });
+    const dentro = laco?.[1] ?? "";
+    for (const campo of ["data.texto", "data.altTexto", "...opcoes"]) {
+      expect({ campo, triado: dentro.includes(campo) }).toEqual({ campo, triado: true });
+    }
     expect(c).toContain('desfecho !== "publicavel"');
     /* E RECUSA antes de gravar — depois do insert seria um post publicado com
        erro na tela. */
@@ -936,6 +1240,63 @@ describe("⚠️ Modo Cuidado de QUEM LÊ, no servidor", () => {
     }
   });
 
+  /**
+   * ⚠️ **A ASSERÇÃO ACIMA MEDE A POSIÇÃO DA CHAMADA, e não que o VALOR gateia
+   * — e a mutação que prova isso aconteceu de verdade, nesta sessão.**
+   *
+   * Trocando `if (await euEmCuidado(sb, eu)) { return … }` por
+   * `await euEmCuidado(sb, eu);`, a chamada continua no mesmo lugar, as duas
+   * asserções de cima continuam verdadeiras, e a suíte inteira fica VERDE —
+   * com a paciente que acabou de perder a gestação voltando a ver o feed
+   * completo.
+   *
+   * Não é hipótese: um agente de verificação aplicou exatamente essa mutação e
+   * não a restaurou. O portão passou horas apagado num checkout limpo, e
+   * nenhum dos 4.400 testes reclamou.
+   *
+   * ⚠️ **Isto continua sendo asserção sobre o FONTE, e isso é o segundo
+   * melhor.** O primeiro seria a régua pura, testável por comportamento — mas
+   * `euEmCuidado` lê o banco, e extrair o portão exigiria mudar as quatro
+   * funções. O que dá para fazer sem refatorar é cobrar a FORMA da guarda, e
+   * conferir por mutação que ela pega.
+   */
+  /**
+   * ⚠️ **O PORTÃO DE ALCANCE DO PERFIL, e ele também estava sem teste.**
+   *
+   * Mutar `perfilPublico: !!a.perfil_publico` para `perfilPublico: true` deixa
+   * a suíte inteira verde — e com o uuid em mãos (ele viaja em toda reação,
+   * todo story visto, todo pedido de seguir) qualquer paciente autenticada
+   * abriria QUALQUER perfil fechado, com a idade gestacional e o nome do bebê
+   * dentro.
+   *
+   * ⚠️ **E o espelho AFIRMA essa tranca para ela**: a paciente lê "ela não
+   * consegue abrir o seu perfil" e liga o selo confiando nisso. Uma tela de
+   * verificação que erra para o lado de "você está protegida" é pior que não
+   * existir — está escrito no CLAUDE.md, e era exatamente o estado do código.
+   */
+  test("⚠️ o alcance do perfil sai da COLUNA, nunca de um literal", () => {
+    const c = corpoDe("verPerfil").replace(/\s+/g, " ");
+    const chamada = /alcancaOPerfil\(\{([^}]*)\}/.exec(c);
+    expect({ tem: !!chamada }).toEqual({ tem: true });
+    const args = chamada?.[1] ?? "";
+    /* Deriva da linha do banco — não de `true`, não de uma constante. */
+    expect(args).toContain("perfilPublico: !!a.perfil_publico");
+    expect(args).not.toMatch(/perfilPublico:\s*(true|false)\b/);
+    /* E a recusa sai da função, em vez de seguir montando o perfil. */
+    const depois = c.slice(c.indexOf("alcancaOPerfil({"));
+    expect(/if \(!alcanca\)\s*\{?[^{}]{0,400}return/.test(depois)).toBe(true);
+  });
+
+  test("⚠️ e o VALOR de `euEmCuidado` gateia — não basta chamar", () => {
+    for (const nome of ["meuFeed", "storiesDoFeed", "sugestoesDoFeed", "minhaAtividade"]) {
+      const c = corpoDe(nome).replace(/\s+/g, " ");
+      /* A chamada tem de estar dentro de um `if`, e o corpo desse `if` tem de
+         sair da função. `[^{]*` impede casar um `if` de outro assunto. */
+      const guarda = /if \(await euEmCuidado\(sb, eu\)\)\s*\{?[^{}]{0,200}return/.exec(c);
+      expect({ nome, gateia: !!guarda }).toEqual({ nome, gateia: true });
+    }
+  });
+
   test("⚠️ falha ao ler o `care_mode` conta como EM CUIDADO", () => {
     /* A única direção segura: errar para um lado é um feed vazio por uma
        abertura; para o outro, é a tela que o Modo Cuidado existe para impedir. */
@@ -972,12 +1333,49 @@ describe("o post comparado", () => {
     expect(checagem).toContain("entao = (velho as any).id as string");
   });
 
-  /* ⚠️ E o recuo por coluna ausente publica SEM o carimbo, nunca sem as fotos:
-     perder a publicação inteira por causa de um enfeite é a troca errada. */
-  test("⚠️ o recuo não carrega `comparacao_de`", () => {
+  /**
+   * ⚠️ **ESTE TESTE FOI REESCRITO, e a versão antiga reprovava código MELHOR.**
+   *
+   * Ela exigia `not.toContain("comparacao_de")` no recuo inteiro — o que era
+   * verdade enquanto havia UM degrau só, que ia direto ao mínimo. A auditoria
+   * mostrou que esse degrau único é o defeito: as colunas do INSERT vêm de
+   * QUATRO `APLICAR_` diferentes, e uma faltando derrubava a enquete, o vídeo e
+   * o marco do bebê junto — em silêncio.
+   *
+   * Com o recuo em camadas, `comparacao_de` continua no recuo (nas tentativas
+   * de cima) e só cai na última. A asserção antiga ficaria vermelha sobre a
+   * correção — e um teste que reprova código melhor é um teste que ensina a
+   * relaxá-lo.
+   *
+   * O que se cobra agora é a INTENÇÃO: existe um piso mínimo com as fotos, e o
+   * carimbo não está nele.
+   */
+  test("⚠️ o piso do recuo tem as fotos e NÃO tem o carimbo", () => {
+    /* Perder a publicação inteira por causa de um enfeite é a troca errada; e
+       publicar sem as fotos não é publicar. */
+    const i = corpo.indexOf("const base: Record<string, unknown> = {");
+    expect(i).toBeGreaterThan(-1);
+    const piso = corpo.slice(i, corpo.indexOf("};", i));
+    expect(piso).toContain("imagem_path: caminho");
+    expect(piso).toContain("visibilidade: data.visibilidade");
+    expect(piso).not.toContain("comparacao_de");
+  });
+
+  test("⚠️ e o recuo desce UMA camada por vez, nunca direto ao piso", () => {
+    /* O degrau único era o defeito: num banco que rodou três dos quatro SQLs,
+       uma coluna faltando levava junto a enquete que ela acabou de montar, o
+       vídeo que ela subiu e o marco do bebê. */
     const recuo = corpo.slice(corpo.indexOf("if (error) {"));
-    expect(recuo).not.toContain("comparacao_de");
-    expect(recuo).toContain("imagem_path: caminho");
+    expect(recuo).toContain("CAMADAS");
+    /* As quatro origens de coluna, cada uma na sua camada. */
+    for (const sql of [
+      "APLICAR_COMENTARIOS_E_LIMITES",
+      "APLICAR_VIDEO_NO_POST",
+      "APLICAR_COMUNIDADE_VIVA",
+      "APLICAR_REDE_SOCIAL",
+    ]) {
+      expect({ sql, tem: recuo.includes(sql) }).toEqual({ sql, tem: true });
+    }
   });
 });
 
@@ -996,7 +1394,7 @@ describe("a marcação respeita o bloqueio", () => {
     expect(corpo).toContain("bloqueio: { has(id: string): boolean }");
     expect(corpo).toContain("if (bloqueio.has(l.quem_id)) continue;");
     /* E o Modo Cuidado continua ao lado — são dois portões, não um. */
-    expect(corpo).toContain("p.care_mode");
+    expect(corpo).toContain("foraDaRede(p)");
   });
 
   test("⚠️ e quem passa é o `ctx.bloqueio` de quem está vendo", () => {
@@ -1068,7 +1466,7 @@ describe("gravar as marcações", () => {
 
   test("e o bloqueio e o Modo Cuidado continuam fechando", () => {
     expect(corpo).toContain("ctx.bloqueio.has(id)");
-    expect(corpo).toContain("emCuidado: !p || !!p.care_mode");
+    expect(corpo).toContain("emCuidado: foraDaRede(p)");
   });
 });
 
@@ -1084,14 +1482,24 @@ describe("gravar as marcações", () => {
  * sabia que existia.
  */
 describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
-  test("⚠️ há um degrau entre a lista cheia e a lista sem selo", () => {
-    const p = funcaoInterna("perfisPorId");
-    // O erro do select cheio cai no degrau do meio, nunca direto no de baixo.
-    expect(p).toContain("semAColunaNova(sb, faltando)");
-    expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
+  test("⚠️ há degrau entre a lista cheia e a lista sem selo", () => {
+    /* ⚠️ **ESTE TESTE TRAVAVA O NOME DO DEGRAU, e por isso errou duas vezes.**
+       Ele cravava `semAColunaNova(sb, faltando)` na entrada — então reprovou
+       quando um degrau NOVO (`semAColunaDoFeed`) entrou por cima, que é código
+       correto; e teria PASSADO se eu tivesse acrescentado a coluna sem degrau
+       nenhum, que era o defeito de verdade. Assinatura em vez de intenção, a
+       armadilha que este arquivo documenta em outros três lugares.
 
+       O que ele guarda agora é a INTENÇÃO: a entrada cai no degrau mais alto,
+       nunca direto no fundo. */
+    const p = funcaoInterna("perfisPorId");
+    expect(p).not.toContain("semAsColunasDoSelo(sb, ids)");
+    expect(p).toMatch(/error \? await semA[A-Za-z]+\(sb, faltando\)/);
+
+    /* E a escada chega ao fundo passando por todos: cada degrau conhece o
+       seguinte, e o último é o que tira o selo. */
+    expect(funcaoInterna("semAColunaDoFeed")).toContain("semAColunaNova(sb, ids)");
     const meio = funcaoInterna("semAColunaNova");
-    // E o degrau do meio conhece o de baixo: banco sem selo nenhum ainda desce.
     expect(meio).toContain("semAsColunasDoSelo(sb, ids)");
     expect(meio).toContain("COLUNAS_SEM_OFICIAL");
   });
@@ -1099,7 +1507,7 @@ describe("o recuo de coluna nova é por COLUNA, e não um degrau só", () => {
   /* ⚠️ Derivada, nunca copiada: duas listas escritas à mão divergem no primeiro
      ajuste, e aqui a divergência apareceria como recurso sumindo, sem erro. */
   test("⚠️ a lista do meio é DERIVADA da cheia", () => {
-    expect(CODIGO).toContain('COLUNAS_DO_PERFIL.replace("conta_oficial, ", "")');
+    expect(CODIGO).toContain('COLUNAS_SEM_PAUSA.replace("conta_oficial, ", "")');
   });
 
   /* ⚠️ Ausente vale `false` nos DOIS degraus — nunca `undefined` viajando até
@@ -1356,14 +1764,99 @@ describe("a grade do perfil pagina", () => {
   });
 
   /**
-   * ⚠️ O CURSOR SAI DE `brutos`, E NÃO DA LISTA JÁ FILTRADA.
+   * ⚠️ O CURSOR SAI DA LISTA CRONOLÓGICA QUE O BANCO DEVOLVEU, e nunca da que
+   * a régua já filtrou nem da que carrega as fixadas na frente.
    *
-   * A régua de visibilidade filtra depois de ler: uma página em que
-   * `podeVerPost` recusou tudo devolveria a lista vazia, o cursor viraria `null`
-   * e a grade pararia ali — escondendo para sempre o que vem depois.
+   * Da lista FILTRADA seria errado porque `podeVerPost` corta depois de ler:
+   * uma página em que a régua recusou tudo devolveria lista vazia, o cursor
+   * viraria `null` e a grade pararia ali — escondendo para sempre o que vem
+   * depois.
+   *
+   * ⚠️ **E de `brutos` PASSOU A SER ERRADO quando as fixadas entraram.** Hoje
+   * `brutos` é "as fixadas na frente + a página cronológica": o comprimento
+   * dele passa de `POSTS_POR_PAGINA` na primeira tela, a comparação por
+   * igualdade daria `false`, e a **paginação morreria depois da primeira
+   * página**, em silêncio. E o último item dele poderia ser uma fixada, cuja
+   * data mandaria a segunda página começar meses atrás.
+   *
+   * ⚠️ A versão anterior deste teste travava a string `brutos.length === …` e
+   * reprovou justamente o conserto. Hoje ele cobra a GARANTIA: a medida vem de
+   * uma lista puramente cronológica, e nunca da já filtrada.
    */
-  test("⚠️ `proximo` é medido pelo que o BANCO devolveu", () => {
-    expect(c).toContain("brutos.length === POSTS_POR_PAGINA");
+  test("⚠️ `proximo` é medido pela lista CRONOLÓGICA que o banco devolveu", () => {
+    expect(c).toContain("cronologicos.length === POSTS_POR_PAGINA");
     expect(c).not.toContain("daGrade.length === POSTS_POR_PAGINA");
+    expect(c).not.toContain("brutos.length === POSTS_POR_PAGINA");
+  });
+});
+
+describe("⚠️ o quadro da republicação respeita o PERFIL, não só a camada", () => {
+  /**
+   * ⚠️ **ESTE TESTE EXISTE PORQUE EU DECLAREI O DEFEITO FALSO ANTES DE
+   * VERIFICAR DIREITO.**
+   *
+   * Um auditor apontou "a republicação contorna a camada do post". Eu li o
+   * `visibilidade !== "publico"` nos dois caminhos, concluí que estava coberto,
+   * e escrevi no CLAUDE.md que o achado não sobrevivera.
+   *
+   * A camada estava conferida. O PERFIL não. A régua é
+   * `autor.publico || sigoAtivo || somosAmigas` — um post `publico` de perfil
+   * PRIVADO alcança só quem segue, e o perfil nasce privado. O quadro entregava
+   * texto, foto e nome a quem a autora nunca aceitou.
+   *
+   * Conferir metade de uma régua e dizer "está coberto" é como um vazamento
+   * sobrevive a uma auditoria.
+   */
+  test("a leitura exige `perfil_publico` da autora original", () => {
+    const c = CODIGO.replace(/\s+/g, " ");
+    const i = c.indexOf("originais.set(");
+    expect(i).toBeGreaterThan(-1);
+    const bloco = c.slice(Math.max(0, i - 700), i);
+    expect(bloco).toContain("perfil_publico");
+  });
+
+  test("⚠️ e falha FECHADO quando o perfil da autora não veio", () => {
+    /* `a?.care_mode` com `a` indefinido é falsy — o conteúdo era montado por
+       uma falha de leitura. O resto do arquivo falha fechado; aqui a exceção
+       era silenciosa. */
+    const c = CODIGO.replace(/\s+/g, " ");
+    const i = c.indexOf("originais.set(");
+    const bloco = c.slice(Math.max(0, i - 700), i);
+    /* ⚠️ **`foraDaRede` FALHA FECHADO e vem PRIMEIRO na corrente** — perfil
+       ausente responde `true`, o `||` curto-circuita e a linha nunca toca em
+       `a.perfil_publico` (que num `undefined` lançaria). É o mesmo trabalho que
+       o `if (!a ||` fazia, agora numa régua só, e ela cobre a PAUSA junto. */
+    expect(bloco).toMatch(/if \(foraDaRede\(a\) \|\|/);
+    expect(bloco).not.toContain("a?.care_mode");
+  });
+
+  test("⚠️ e a ESCRITA também confere — as duas pontas", () => {
+    /* A autora pode fechar o perfil DEPOIS de o repost existir (a leitura cobre
+       isso), e pode ter o perfil fechado no momento da republicação (a escrita
+       cobre isso). Uma ponta só deixa metade do caminho aberto. */
+    const c = corpoDe("publicarPost").replace(/\s+/g, " ");
+    /* ⚠️ Recorta da LEITURA do perfil até a decisão: `repostValido` é montado
+       em várias linhas, e `indexOf(";")` cortava na primeira delas. */
+    const i = c.indexOf("donoDoOriginal");
+    expect(i).toBeGreaterThan(-1);
+    const regra = c.slice(i, c.indexOf("if (!repostValido)", i));
+    /**
+     * ⚠️ **A LEITURA TEM DE ENTRAR NA DECISÃO, e não só existir.** A primeira
+     * versão procurava `perfil_publico` no trecho — e o `select` que traz a
+     * coluna já a contém, então trocar o termo da condição por `true` passava
+     * verde. Cobra-se o USO do valor lido.
+     *
+     * ⚠️ **E A SEGUNDA VERSÃO TRAVOU A GRAFIA `donoDoOriginal?.perfil_publico`**,
+     * o que reprovou código estritamente MELHOR: pôr `!!donoDoOriginal &&` na
+     * frente da corrente (para o portão não depender de o termo anterior fechar
+     * por acidente) permite largar o `?.`, e o teste ficou vermelho sobre uma
+     * mudança que só apertou o portão. Hoje o `select` é RECORTADO e o que se
+     * cobra é o USO das duas colunas na decisão — as duas grafias passam, e
+     * trocar qualquer uma por `true` continua reprovando.
+     */
+    const semSelect = regra.replace(/\.select\([^)]*\)/g, "");
+    expect(semSelect).toMatch(/donoDoOriginal\??\.perfil_publico/);
+    expect(semSelect).toMatch(/foraDaRede\(donoDoOriginal\)/);
+    expect(regra).toContain('visibilidade === "publico"');
   });
 });

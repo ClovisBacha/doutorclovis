@@ -75,7 +75,7 @@ export function TestimonialsSection() {
           transition={{ duration: 0.7 }}
           className="flex flex-col items-center justify-center max-w-2xl mx-auto text-center"
         >
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em] text-primary">
             Depoimentos
           </div>
           <h2 className="mt-5 font-serif text-4xl md:text-5xl tracking-tight text-foreground">
