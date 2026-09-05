@@ -27,7 +27,18 @@ function semComentarios(caminho: string): string {
 }
 
 const SOS = semComentarios("src/components/emergency-sheet.tsx");
-const CONTA = semComentarios("src/routes/_authenticated/minha-conta.tsx");
+/**
+ * ⚠️ O CRONÔMETRO SAIU DE `minha-conta.tsx` (set/2026) e esta catraca ficou
+ * VERMELHA só porque o caminho mudou — a garantia não mudou uma linha.
+ *
+ * E o modo como ela ficou vermelha é a lição: o `corpoDe` roda no corpo do
+ * `describe`, ou seja FORA de um `test()`. Com a âncora sumindo, o `indexOf`
+ * devolve −1 e o `expect` estoura ali — e o `bun` conta isso como **`error`**,
+ * nunca como `fail`. O portão local, que julgava por `grep "^ 0 fail"`, disse
+ * "tudo verde" sobre uma suíte que a CI reprovou dez minutos depois. O passo
+ * dos testes passou a ser julgado pelo CÓDIGO DE SAÍDA no mesmo commit.
+ */
+const CONTRACOES = semComentarios("src/components/contracoes-tab.tsx");
 const NATIVO = semComentarios("src/lib/nativo.ts");
 
 /** O corpo de uma função, contado por chaves a partir da assinatura. */
@@ -89,7 +100,7 @@ describe("o SOS responde ao dedo", () => {
 });
 
 describe("a contração marca o instante do dedo", () => {
-  const corpo = corpoDe(CONTA, "async function startContraction()");
+  const corpo = corpoDe(CONTRACOES, "async function startContraction()");
 
   test("⚠️ `started_at` é carimbado no CLIENTE, não pelo relógio do servidor", () => {
     /* `ended_at` sempre foi o instante do dedo (`new Date()` dentro do

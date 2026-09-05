@@ -3118,6 +3118,7 @@ function MinhaContaPage() {
                     medico={meuMedico}
                     instavel={perfilInstavel}
                     aoTentar={refreshAll}
+                    careMode={careMode}
                   />
                 )}
                 {tab === "Pós-parto" && (
@@ -6948,6 +6949,7 @@ function CardTab({
   medico,
   instavel = false,
   aoTentar,
+  careMode = false,
 }: {
   profile: Profile | null;
   gest: Gest;
@@ -6957,6 +6959,22 @@ function CardTab({
   aoTentar?: () => void;
   /** Médico da paciente; `null` = usa o dono da instalação. */
   medico?: DoctorContato | null;
+  /**
+   * ⚠️ ESTA PROP FALTAVA, E ESTA É A FICHA QUE O SOCORRISTA LÊ.
+   *
+   * A folha do SOS já recebe o Modo Cuidado desde ago/2026 — `tituloDaFicha`
+   * vira "PACIENTE OBSTÉTRICA" e a idade gestacional sai. A carteirinha, que é
+   * a MESMA informação num documento permanente e com QR, ficou de fora: no
+   * luto ela continuava carimbando "GESTANTE", o nome do bebê e uma DPP que
+   * não vai acontecer.
+   *
+   * E não é só o custo emocional. Um bebê que não vai nascer e uma data de
+   * parto que não existe são informação ERRADA para quem vai atendê-la — é a
+   * mesma razão pela qual a ficha do SOS troca o rótulo em vez de apagá-la
+   * inteira. Sangue, alergias, medicações e contato FICAM: quem perdeu uma
+   * gestação continua sendo paciente obstétrica.
+   */
+  careMode?: boolean;
 }) {
   /* Tudo-ou-nada, e sem fundador.
   
@@ -6978,23 +6996,49 @@ function CardTab({
   const due = profile
     ? (profile.due_date ?? (profile.lmp_date ? dueDateFromLmp(profile.lmp_date) : null))
     : null;
-  const updatedAt = new Date().toLocaleString("pt-BR");
+  /**
+   * ⚠️ "ATUALIZADO EM" MENTIA, e a mentira era sobre a idade de um dado
+   * clínico. Ele carimbava `new Date()` — a hora em que a TELA ABRIU —, então
+   * o socorrista lia "Atualizado em: 05/09/2026 04:55" e concluía que a lista
+   * de alergias tinha sido conferida minutos atrás. Ela pode ter seis meses.
+   *
+   * `patient_profiles.updated_at` existe, mas hoje só é escrito quando o
+   * MÉDICO edita o perfil (`doctors.functions.ts`); os salvamentos da própria
+   * paciente não o movem e não há gatilho. Mostrá-lo seria trocar uma data
+   * falsa para mais por uma falsa para menos.
+   *
+   * Então o que fica é o que É verdade: o QR foi GERADO agora. E a tela
+   * convida a conferir, em vez de afirmar frescor que o app não conhece.
+   */
+  const geradoEm = new Date().toLocaleString("pt-BR");
+
+  /* ⚠️ NUNCA "Nenhuma"/"Nenhum" — a mesma régua da folha do SOS, que já diz
+     "nenhuma informada". Campo em branco quer dizer que ela NÃO PREENCHEU, e
+     "nada relatado" não é "não tem": a diferença entre os dois é uma
+     prescrição. Vale para o QR e para a tela. */
+  const alergias = profile?.allergies || "não informado";
+  const medicacoes = profile?.medications || "não informado";
+  const rotuloDaFicha = careMode ? "PACIENTE OBSTÉTRICA" : "GESTANTE";
 
   const cardText = profile
     ? [
-        `🚨 CARTEIRINHA DE EMERGÊNCIA — GESTANTE`,
+        `🚨 CARTEIRINHA DE EMERGÊNCIA — ${rotuloDaFicha}`,
         `Paciente: ${profile.display_name ?? "—"}`,
-        `Bebê: ${profile.baby_name ?? "—"}`,
-        `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
-        `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
+        /* No Modo Cuidado saem as três linhas que falam de uma gestação em
+           curso — as outras continuam inteiras. */
+        careMode ? null : `Bebê: ${profile.baby_name ?? "—"}`,
+        careMode ? null : `IG: ${gest ? `${gest.weeks}s ${gest.days}d` : "—"}`,
+        careMode
+          ? null
+          : `DPP: ${due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}`,
         `Tipo sanguíneo: ${profile.blood_type ?? "—"}`,
-        `Alergias: ${profile.allergies ?? "Nenhuma"}`,
-        `Medicamentos: ${profile.medications ?? "Nenhum"}`,
+        `Alergias: ${alergias}`,
+        `Medicamentos: ${medicacoes}`,
         `Contato de emergência: ${profile.emergency_contact ?? "—"} — ${profile.emergency_phone ?? "—"}`,
         // Sem vínculo a linha sai fora do QR: melhor o hospital não ver
         // médico nenhum do que ver o nome errado.
         medLinha ? `Médico: ${medLinha}` : null,
-        `Atualizado: ${updatedAt}`,
+        `Gerado em: ${geradoEm}`,
       ]
         .filter(Boolean)
         .join("\n")
@@ -7032,10 +7076,21 @@ function CardTab({
   if (!profile)
     return <p className="text-sm text-muted-foreground">Preencha seu perfil primeiro.</p>;
 
-  function copyCard() {
-    navigator.clipboard.writeText(cardText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  /**
+   * ⚠️ "✓ Copiado!" APARECIA SEM NINGUÉM TER OLHADO A RESPOSTA. `writeText`
+   * devolve uma promessa que REJEITA quando o navegador nega o acesso — num
+   * WKWebView sem permissão, fora de contexto seguro, ou com a aba em segundo
+   * plano. A tela dizia que copiou, ela colava no WhatsApp do marido e não
+   * vinha nada, num documento de emergência.
+   */
+  async function copyCard() {
+    try {
+      await navigator.clipboard.writeText(cardText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Não consegui copiar. Tire um print desta tela ou mostre o QR.");
+    }
   }
 
   return (
@@ -7048,24 +7103,28 @@ function CardTab({
               Carteirinha de emergência
             </p>
             <h2 className="mt-1.5 font-serif text-2xl">{profile.display_name ?? "—"}</h2>
-            {profile.baby_name && (
+            {!careMode && profile.baby_name && (
               <p className="text-sm text-muted-foreground">Bebê: {profile.baby_name}</p>
             )}
           </div>
           <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-            GESTANTE
+            {rotuloDaFicha}
           </span>
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-          <Info label="IG atual" value={gest ? `${gest.weeks}s ${gest.days}d` : "—"} />
-          <Info
-            label="DPP"
-            value={due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
-          />
+          {!careMode && (
+            <Info label="IG atual" value={gest ? `${gest.weeks}s ${gest.days}d` : "—"} />
+          )}
+          {!careMode && (
+            <Info
+              label="DPP"
+              value={due ? new Date(due + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+            />
+          )}
           <Info label="Tipo sanguíneo" value={profile.blood_type ?? "—"} />
-          <Info label="Alergias" value={profile.allergies || "Nenhuma"} />
-          <Info label="Medicamentos" value={profile.medications || "Nenhum"} />
+          <Info label="Alergias" value={alergias} />
+          <Info label="Medicamentos" value={medicacoes} />
           <Info label="Contato emergência" value={profile.emergency_contact ?? "—"} />
           {profile.emergency_phone && (
             <Info label="Tel. emergência" value={profile.emergency_phone} />
@@ -7073,8 +7132,21 @@ function CardTab({
           {medLinha ? <Info label="Médico" value={medLinha} /> : null}
         </div>
 
+        {/* ⚠️ Diz o que É verdade. O QR foi gerado agora; os DADOS são os que ela
+            deixou no Perfil, e o app não sabe quando ela os conferiu pela
+            última vez. Ver o comentário de `geradoEm`. */}
         <div className="mt-5 rounded-xl bg-card/60 p-3 text-xs text-muted-foreground">
-          Atualizado em: {updatedAt}
+          <p>QR gerado em: {geradoEm}</p>
+          <p className="mt-1">
+            Os dados vêm do seu Perfil.{" "}
+            <button
+              type="button"
+              onClick={() => onNavigate("Perfil")}
+              className="press font-semibold text-primary underline underline-offset-2"
+            >
+              Conferir agora
+            </button>
+          </p>
         </div>
 
         <div className="mt-6 flex flex-col items-center border-t border-primary/20 pt-5">
@@ -16843,17 +16915,44 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
       {/* Redes de apoio */}
       <div className="rounded-3xl card-material p-6">
         <p className="font-serif text-xl">Redes de apoio</p>
+        {/*
+          ⚠️ O CVV É TELEFONE, E ELE NÃO DISCAVA.
+          O cartão inteiro era um `<a href="https://www.cvv.org.br">`, com o
+          "188" escrito só na descrição. Numa tela de crise emocional, o toque
+          abria um site e pedia que ela achasse o número lá dentro — e a
+          diferença entre "um toque disca" e "abre um site" é a distância que
+          ela pode não ter agora.
+          ⚠️ E a régua já existia no vizinho: a tela da EPDS, no mesmo arquivo,
+          usa `href="tel:188"` desde que existe. Aqui ela não tinha sido
+          aplicada. O 188 vem PRIMEIRO na lista, e em vermelho, porque é o
+          único destes três que atende agora.
+        */}
         <div className="mt-4 space-y-3">
+          <a
+            href="tel:188"
+            className="press flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4"
+          >
+            <span className="text-2xl">📞</span>
+            <div className="min-w-0">
+              <p className="font-medium text-sm text-foreground">
+                CVV — Centro de Valorização da Vida
+              </p>
+              <p className="mt-0.5 text-lg font-bold text-red-600">188</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Apoio emocional 24 horas, gratuito e sigiloso. Toque para ligar agora.
+              </p>
+            </div>
+          </a>
           {[
+            {
+              name: "CVV — chat online",
+              desc: "Se você preferir escrever em vez de falar, o CVV também atende por chat.",
+              url: "https://www.cvv.org.br",
+            },
             {
               name: "ALMA — Apoio em Luto Materno",
               desc: "Comunidade de apoio para mães que vivenciaram perdas gestacionais. Grupos online e presenciais.",
               url: "https://www.almaluto.com.br",
-            },
-            {
-              name: "CVV — Centro de Valorização da Vida",
-              desc: "Apoio emocional 24h — ligue 188 (gratuito) ou acesse o chat online.",
-              url: "https://www.cvv.org.br",
             },
             {
               name: "FEBRASGO — Saúde Mental na Gestação",

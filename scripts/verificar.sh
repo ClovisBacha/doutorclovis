@@ -57,12 +57,32 @@ fi
 # tempo do portão e, pior, permitia que as três execuções DISCORDASSEM entre si
 # num teste intermitente — o portão passando a depender de qual rodada alguém
 # olhasse.
+# ⚠️ **E ELE JULGAVA POR TEXTO, NÃO PELO CÓDIGO DE SAÍDA — foi assim que um
+# commit vermelho foi empurrado para a produção.** A regra era `grep "^ 0 fail"`,
+# e o `bun` tem TRÊS contadores: `pass`, `fail` e **`error`**. Um `describe` cujo
+# CORPO estoura (uma âncora de `indexOf` que devolve −1 no escopo do módulo, um
+# import quebrado) não conta como `fail` — conta como `error`, e o resumo sai
+# **"5679 pass · 0 fail · 1 error"**. O portão leu o "0 fail", imprimiu
+# "— tudo verde", e a CI reprovou o mesmo commit dez minutos depois.
+#
+# É a MESMA lição que o `tsc` e o `lint` já aprenderam vinte linhas acima —
+# julgue pelo código de saída — e o passo dos testes era o único que ainda não
+# a tinha. O `bun test` sai 1 com qualquer vermelho, `error` incluído.
 passo "testes"
 saida=$(bun test src/ 2>&1); rc=$?
-printf '%s\n' "$saida" | grep -E "^ [0-9]+ (pass|fail)" | tr '\n' ' '; echo
-if ! printf '%s\n' "$saida" | grep -qE "^ 0 fail"; then
-  echo "  TESTES VERMELHOS:"
-  printf '%s\n' "$saida" | grep -E "^\(fail\)" | head -8
+printf '%s\n' "$saida" | grep -E "^ [0-9]+ (pass|fail|error)" | tr '\n' ' '; echo
+if [ "$rc" != "0" ]; then
+  printf '%s\n' "$saida" | grep -qE "^\(fail\)" && {
+    echo "  TESTES VERMELHOS:"
+    printf '%s\n' "$saida" | grep -E "^\(fail\)" | head -8
+  }
+  # ⚠️ `error` é o caso que não aparece em nenhuma linha `(fail)`. Sem imprimir
+  # o trecho, o portão diria só "FALHOU" sobre uma suíte cheia de verde, e a
+  # pessoa procuraria o defeito no lugar errado.
+  printf '%s\n' "$saida" | grep -qE "^ [1-9][0-9]* error" && {
+    echo "  ⚠️  ERRO FORA DE TESTE (corpo de describe, import, âncora no módulo):"
+    printf '%s\n' "$saida" | grep -A6 "Unhandled error between tests" | head -12
+  }
   # ⚠️ Sem a linha de resumo, o `bun` morreu antes de terminar (falta de
   # memória, import quebrado). Isso é vermelho, e nunca "nenhum teste falhou".
   printf '%s\n' "$saida" | grep -qE "^ [0-9]+ pass" || {
