@@ -198,6 +198,46 @@ export function sinalContracoesPrematuras(o: {
 }
 
 /**
+ * MOVIMENTOS REDUZIDOS — a régua que o contador de chutes anunciava e não
+ * aplicava.
+ *
+ * ⚠️ Redução de movimentos fetais é um dos NOVE SINTOMAS VERMELHOS de
+ * `triage.ts`, e a tela que o mede era a única do app sem régua e sem caminho
+ * para socorro: ela escrevia "o ideal é sentir 10 em até 2 horas", contava até
+ * dez, e quando as duas horas passavam com quatro movimentos o cronômetro
+ * simplesmente seguia correndo. A paciente lia "4 / 10 chutes" e "02:15:00", e
+ * o app não dizia uma palavra sobre o que isso quer dizer nem sobre o que
+ * fazer.
+ *
+ * ⚠️ **O CORTE NÃO É INVENTADO AQUI: é o que a própria tela já anuncia**, e é o
+ * método de contagem até dez que se ensina no pré-natal. Esta função não cria
+ * critério novo — ela põe num lugar só o critério que estava escrito na
+ * interface e em nenhuma decisão.
+ *
+ * Antes da 28ª semana devolve `null`: a contagem formal começa ali, e o texto
+ * da tela diz isso. Alarmar antes é ensinar a ignorar o alarme.
+ */
+export function sinalMovimentosReduzidos(o: {
+  semanas?: number | null;
+  /** Movimentos contados na sessão. */
+  movimentos?: number | null;
+  /** Há quanto tempo a sessão está aberta, em minutos. */
+  minutos?: number | null;
+}): Sinal | null {
+  const s = o.semanas;
+  const mov = o.movimentos;
+  const min = o.minutos;
+  if (s == null || !Number.isFinite(s) || s < 28) return null;
+  if (mov == null || !Number.isFinite(mov)) return null;
+  if (min == null || !Number.isFinite(min) || min < 120) return null;
+  if (mov >= 10) return null;
+  return {
+    gravidade: "grave",
+    nota: `Você sentiu ${mov} ${mov === 1 ? "movimento" : "movimentos"} em 2 horas, e o esperado são 10. Ligue para o seu médico agora ou procure a maternidade.`,
+  };
+}
+
+/**
  * Silêncio: há quanto tempo ela não registra nada no app.
  *
  * Os cortes são de produto, não clínicos. Duas semanas é o intervalo em que uma

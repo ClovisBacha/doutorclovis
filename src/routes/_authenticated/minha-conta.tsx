@@ -124,6 +124,7 @@ import { toast } from "sonner";
 import { MOOD_LABEL, dayGreeting } from "@/lib/humor-e-saudacao";
 import { BabyTab } from "@/components/baby-tab";
 import {
+  sinalMovimentosReduzidos,
   sinalContracoesPrematuras,
   sinalGlicemia,
   sinalPressao,
@@ -4096,6 +4097,23 @@ function KicksTab({
   const mins = Math.floor(elapsed / 60000);
   const secs = Math.floor((elapsed % 60000) / 1000);
 
+  /**
+   * ⚠️ **A TELA ANUNCIAVA A RÉGUA E NÃO A APLICAVA.** Ela escreve "o ideal é
+   * sentir 10 em até 2 horas", conta até dez, e quando as duas horas passavam
+   * com quatro movimentos o cronômetro seguia correndo: "4 / 10 chutes" e
+   * "02:15:00", sem uma palavra sobre o que isso quer dizer nem sobre o que
+   * fazer. Redução de movimentos fetais é um dos NOVE sintomas VERMELHOS de
+   * `triage.ts`, e esta era a única tela que mede um deles sem régua e sem
+   * caminho para socorro — a irmã dela, o cronômetro de contrações, tem o
+   * botão do 192 desde sempre.
+   *
+   * A régua mora em `sinais-clinicos.ts`, junto das outras, e não aqui: o
+   * CLAUDE.md proíbe duplicar limite clínico fora dela.
+   */
+  const movimentosReduzidos = active
+    ? sinalMovimentosReduzidos({ semanas: weeks, movimentos: count, minutos: elapsed / 60000 })
+    : null;
+
   // Stats from history
   const completeSessions = history.filter((s) => s.kick_count >= 10);
   const avgMins =
@@ -4173,6 +4191,31 @@ function KicksTab({
             <p className="mt-4 text-sm text-muted-foreground">
               ⏱ {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
             </p>
+            {/* ⚠️ O caminho de socorro, no formato que o cronômetro de
+                contrações já usa: a frase da régua e DOIS toques — o médico
+                dela e o 192. Nada aqui depende de a sessão ser encerrada:
+                encerrar é a última coisa que ela deve estar pensando agora. */}
+            {movimentosReduzidos && (
+              <div className="mt-4 rounded-2xl border border-rose-400 bg-rose-100 p-4 text-left text-rose-900">
+                <p className="font-semibold">⚠️ Ligue para o seu médico agora</p>
+                <p className="mt-0.5 text-sm">{movimentosReduzidos.nota}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <a
+                    href="tel:192"
+                    className="press inline-flex h-11 items-center rounded-full bg-rose-600 px-4 font-semibold text-white"
+                  >
+                    Ligar 192 (SAMU)
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.("Consultas")}
+                    className="press inline-flex h-11 items-center rounded-full border border-rose-300 bg-white px-4 font-semibold text-rose-900"
+                  >
+                    Falar com o meu médico
+                  </button>
+                </div>
+              </div>
+            )}
             <button
               onClick={() => stop()}
               className="mt-3 text-xs text-muted-foreground hover:text-destructive"
