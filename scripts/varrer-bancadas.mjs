@@ -48,6 +48,13 @@ const EXTRAS = [
   "/preview-chutes?estado=contando",
   "/preview-chutes?estado=historico",
   "/preview-chutes?estado=luto",
+  /* ⚠️ Peso, pressão e glicemia: `parcial` é o estado que mais engana — a
+     leitura falhou COM dados à mostra, que é o caso de depois de salvar. */
+  "/preview-saude-registros?estado=parcial",
+  "/preview-saude-registros?estado=instavel",
+  "/preview-saude-registros?estado=grave",
+  "/preview-saude-registros?estado=normal",
+  "/preview-saude-registros?estado=semperfil",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum

@@ -60,9 +60,25 @@ describe("nenhum passo falha ABERTO", () => {
 
   test("⚠️ os testes: sem linha de resumo é VERMELHO, nunca 'nenhum falhou'", () => {
     /* Se o `bun` morre antes do resumo (falta de memória, import quebrado), não
-       há `0 fail` nem `N pass` — e isso não pode ser lido como suíte limpa. */
-    expect(CODIGO).toMatch(/grep -qE "\^ \[0-9\]\+ pass"/);
-    expect(CODIGO).toMatch(/a suíte não rodou inteira/);
+       há `0 fail` nem `N pass` — e isso não pode ser lido como suíte limpa.
+
+       ⚠️ A asserção antiga travava a GRAFIA (`grep -qE`) e reprovou o conserto
+       que fez este passo IMPRIMIR as falhas: `grep -q` dentro de cano com
+       `set -o pipefail` sai 141 por SIGPIPE, e o `&&` seguinte entendia "não
+       achou". O que se cobra é a CORRENTE — a ausência da linha de resumo tem
+       de levar ao aviso —, e ela aceita as duas escritas. */
+    const i = CODIGO.indexOf("a suíte não rodou inteira");
+    expect(i).toBeGreaterThan(0);
+
+    /* O guarda logo acima do aviso testa uma variável VAZIA... */
+    const guarda = CODIGO.slice(0, i).lastIndexOf("if [ -z ");
+    expect(guarda).toBeGreaterThan(0);
+    const nomeDaVar = /if \[ -z "\$([A-Za-z_][A-Za-z0-9_]*)"/.exec(CODIGO.slice(guarda, i))?.[1];
+    expect(nomeDaVar).toBeTruthy();
+
+    /* ...e essa variável é ligada à procura pela linha de resumo do bun. */
+    const ligacao = new RegExp(`${nomeDaVar}=\\$\\([^)]*grep -q?E "\\^ \\[0-9\\]\\+ pass"`);
+    expect(CODIGO).toMatch(ligacao);
   });
 
   test("⚠️ a trava do git continua conferindo a árvore ATRASADA", () => {

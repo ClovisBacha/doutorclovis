@@ -79,6 +79,11 @@ const CONTRACOES = semComentarios(readFileSync("src/components/contracoes-tab.ts
  *  por isso que o helper aceita o arquivo ao lado do nome. */
 const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
 
+/** ⚠️ O QUARTO corte (set/2026): peso, pressão e glicemia. Quinta vez que uma
+ *  catraca fica vermelha por mudança de caminho — e a razão de o helper aceitar
+ *  o arquivo ao lado do nome. */
+const SAUDE = semComentarios(readFileSync("src/components/health-tab.tsx", "utf8"));
+
 /** As cinco de mesma forma: lê o erro, e o vazio vem DEPOIS do instável. */
 const TELAS = [
   { nome: "JournalTab", vazio: "Seu diário começará aqui", marca: "setInstavel(true)" },
@@ -118,6 +123,7 @@ const TELAS = [
     nome: "HealthTab",
     vazio: "Você ainda não registrou nada",
     marca: "setInstavel(true)",
+    arquivo: SAUDE,
   },
   {
     nome: "KicksTab",

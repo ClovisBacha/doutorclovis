@@ -72,23 +72,32 @@ passo "testes"
 saida=$(bun test src/ 2>&1); rc=$?
 printf '%s\n' "$saida" | grep -E "^ [0-9]+ (pass|fail|error)" | tr '\n' ' '; echo
 if [ "$rc" != "0" ]; then
-  printf '%s\n' "$saida" | grep -qE "^\(fail\)" && {
-    echo "  TESTES VERMELHOS:"
-    printf '%s\n' "$saida" | grep -E "^\(fail\)" | head -8
-  }
+  # ⚠️ **NADA DE `grep -q` DENTRO DE CANO AQUI — foi assim que este passo
+  # reprovou SEM DIZER O QUÊ.** `grep -q` sai no primeiro acerto e fecha o cano;
+  # o `printf` do lado esquerdo leva SIGPIPE e sai 141; e com `set -o pipefail`
+  # o status do CANO INTEIRO vira 141, então o `&&` seguinte entende "não achou"
+  # e pula o bloco. O portão imprimia "3 fail" e mais nada — que é exatamente o
+  # "FALHOU sem dizer onde" que o comentário abaixo existe para impedir.
+  # A saída de cada busca é guardada ANTES de ser julgada.
+  vermelhos=$(printf '%s\n' "$saida" | grep -E "^\(fail\)" | head -8 || true)
+  [ -n "$vermelhos" ] && { echo "  TESTES VERMELHOS:"; printf '%s\n' "$vermelhos"; }
+
   # ⚠️ `error` é o caso que não aparece em nenhuma linha `(fail)`. Sem imprimir
   # o trecho, o portão diria só "FALHOU" sobre uma suíte cheia de verde, e a
   # pessoa procuraria o defeito no lugar errado.
-  printf '%s\n' "$saida" | grep -qE "^ [1-9][0-9]* error" && {
+  temErro=$(printf '%s\n' "$saida" | grep -E "^ [1-9][0-9]* error" || true)
+  if [ -n "$temErro" ]; then
     echo "  ⚠️  ERRO FORA DE TESTE (corpo de describe, import, âncora no módulo):"
-    printf '%s\n' "$saida" | grep -A6 "Unhandled error between tests" | head -12
-  }
+    printf '%s\n' "$saida" | grep -A6 "Unhandled error between tests" | head -12 || true
+  fi
+
   # ⚠️ Sem a linha de resumo, o `bun` morreu antes de terminar (falta de
   # memória, import quebrado). Isso é vermelho, e nunca "nenhum teste falhou".
-  printf '%s\n' "$saida" | grep -qE "^ [0-9]+ pass" || {
+  temResumo=$(printf '%s\n' "$saida" | grep -E "^ [0-9]+ pass" || true)
+  if [ -z "$temResumo" ]; then
     echo "  ⚠️  o bun não chegou ao resumo (código $rc) — a suíte não rodou inteira"
     printf '%s\n' "$saida" | limpo | tail -6
-  }
+  fi
   falhou=1
 fi
 

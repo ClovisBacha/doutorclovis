@@ -199,9 +199,9 @@ describe("os outros quatro lugares concordam com a régua", () => {
     expect(SERVIDOR.includes('"23514"')).toBe(true);
     expect(SERVIDOR.includes("teto_antigo_no_banco")).toBe(true);
     expect(MEDICO.includes("teto_antigo_no_banco")).toBe(true);
-    const paciente = semComentarios(
-      readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"),
-    );
+    /* ⚠️ A tela de registros da paciente saiu para `health-tab.tsx` (set/2026)
+       — o `23514` continua nomeado, só mudou de arquivo. */
+    const paciente = semComentarios(readFileSync("src/components/health-tab.tsx", "utf8"));
     expect(paciente.includes('"23514"')).toBe(true);
   });
 
