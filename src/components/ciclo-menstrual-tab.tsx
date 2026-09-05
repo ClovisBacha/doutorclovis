@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Stagger, StaggerItem } from "@/components/motion-primitives";
 import { TabSkeleton } from "@/components/tab-skeleton";
+import { casaDoDesenho } from "@/lib/casa-do-desenho";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import {
   deleteCycle,
@@ -67,8 +68,12 @@ function CicloHero({ model }: { model: CycleModel }) {
   const radius = 90;
   const dots = Array.from({ length: model.cycleLen }, (_, i) => {
     const angle = (i / model.cycleLen) * 2 * Math.PI - Math.PI / 2;
-    const x = cx + radius * Math.cos(angle);
-    const y = cy + radius * Math.sin(angle);
+    /* ⚠️ ARREDONDADO, e é o que impede o React de descartar a árvore: o
+       navegador arredonda ao reler `cx`/`cy` do SVG, e 17 dígitos nunca
+       casam. Medido aqui: `cx={39.635166577877314}` contra
+       `cx="39.63516657787733"`. Mesma régua da trilha do Jogo. */
+    const x = casaDoDesenho(cx + radius * Math.cos(angle));
+    const y = casaDoDesenho(cy + radius * Math.sin(angle));
     const p = phaseForCycleDay(i + 1, model.cycleLen, model.periodLen);
     const isToday = i + 1 === dayInCycle;
     return { x, y, dot: PHASE_META[p].dot, isToday };
@@ -237,9 +242,19 @@ function CicloCalendario({ model }: { model: CycleModel }) {
   );
 }
 
-export function CicloMenstrualTab({ gestante = false }: { gestante?: boolean }) {
-  const [cycles, setCycles] = useState<MenstrualCycle[]>([]);
-  const [loading, setLoading] = useState(true);
+export function CicloMenstrualTab({
+  gestante = false,
+  bancada,
+}: {
+  gestante?: boolean;
+  /* ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
+     desenho. O anel de fases e o calendário só existem com ciclos gravados, e
+     a faixa de "não consegui ler" só nasce de uma falha de rede — sem isto,
+     conferir esta tela exigia uma conta com meses de registro. */
+  bancada?: { cycles?: MenstrualCycle[]; instavel?: boolean };
+}) {
+  const [cycles, setCycles] = useState<MenstrualCycle[]>(bancada?.cycles ?? []);
+  const [loading, setLoading] = useState(!bancada);
   const [showForm, setShowForm] = useState(false);
   const [newStartDate, setNewStartDate] = useState(new Date().toISOString().split("T")[0]);
   const [newFlow, setNewFlow] = useState("normal");
@@ -249,7 +264,10 @@ export function CicloMenstrualTab({ gestante = false }: { gestante?: boolean }) 
   const [endingId, setEndingId] = useState<string | null>(null);
   const [endDate, setEndDate] = useState(new Date().toISOString().split("T")[0]);
   /* ⚠️ Falha de leitura NÃO é lista vazia — ver `NaoConsegueLer`. */
-  const [instavel, setInstavel] = useState(false);
+  const [instavel, setInstavel] = useState(bancada?.instavel ?? false);
+  /* ⚠️ Guarda BOOLEANO, e não o objeto: um literal remontado a cada render
+     faria o efeito re-rodar em toda pintura. */
+  const ehBancada = bancada != null;
 
   async function load() {
     const { data: s } = await supabase.auth.getSession();
@@ -271,8 +289,9 @@ export function CicloMenstrualTab({ gestante = false }: { gestante?: boolean }) 
   }
 
   useEffect(() => {
+    if (ehBancada) return;
     load();
-  }, []);
+  }, [ehBancada]);
 
   async function handleLogStart() {
     setSubmitting(true);

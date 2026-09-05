@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { casaDoDesenho } from "@/lib/casa-do-desenho";
 import { IconeDoSom } from "@/components/arte-dos-sons";
 import { paraLike } from "@/lib/like-seguro";
 import { createPortal } from "react-dom";
@@ -1367,15 +1368,12 @@ type PathNode =
  * ⚠️ Vale para toda posição calculada com `Math.sin`/`Math.cos` que vá parar
  * num `style` — não só para estas duas.
  */
-function casaDaTrilha(v: number): number {
-  return Math.round(v * 1000) / 1000;
-}
 
 function buildPhaseNodes(phase: Phase): { nodes: PathNode[]; height: number } {
   const nodes: PathNode[] = [];
   let y = 30;
   let row = 0;
-  const xOf = (r: number) => casaDaTrilha(50 + 27 * Math.sin((r * Math.PI) / 4));
+  const xOf = (r: number) => casaDoDesenho(50 + 27 * Math.sin((r * Math.PI) / 4));
 
   for (let w = phase.from; w <= phase.to; w++) {
     nodes.push({ kind: "week-header", week: w, y });
@@ -1424,7 +1422,7 @@ function buildFullJourney(
   let y = 8;
   let row = 0;
   let mascotIdx = 0;
-  const xOf = (r: number) => casaDaTrilha(50 + 26 * Math.sin((r * Math.PI) / 4));
+  const xOf = (r: number) => casaDoDesenho(50 + 26 * Math.sin((r * Math.PI) / 4));
 
   // Mascote grande ao lado do caminho (Duolingo), do lado oposto ao nó da linha
   const maybeMascot = (x: number, rowY: number, rowH: number) => {
@@ -1591,7 +1589,11 @@ function WeekBar({
 
 function polar(cx: number, cy: number, r: number, deg: number) {
   const rad = ((deg - 90) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  /* ⚠️ Pela MESMA régua do resto: aqui o valor vira o `d` de um `<path>`, que
+     é string e não perde casas na releitura — mas deixar UMA trigonometria
+     fora da régua é como a próxima nasce fora dela também. Três casas num
+     `viewBox` de 100 é 0,001 unidade. */
+  return { x: casaDoDesenho(cx + r * Math.cos(rad)), y: casaDoDesenho(cy + r * Math.sin(rad)) };
 }
 function arcPath(cx: number, cy: number, r: number, start: number, end: number) {
   const s = polar(cx, cy, r, start);

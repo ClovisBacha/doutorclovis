@@ -138,9 +138,17 @@ describe("⚠️ e o ciclo não prevê período para uma gestante", () => {
   const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
   test("a tela sabe que ela está grávida", () => {
-    expect(CICLO).toMatch(/export function CicloMenstrualTab\(\{ gestante/);
-    /* E quem informa é o hub, a partir da idade gestacional real. */
-    expect(CONTA).toContain("<CicloMenstrualTab gestante={weeks != null} />");
+    /* ⚠️ Cobra a PROP, e não a grafia da assinatura: quando a tela ganhou a
+       prop `bancada`, o prettier quebrou o `({ gestante` em várias linhas e
+       esta asserção reprovou um código que não mudou de comportamento. É a
+       enésima vez nesta base — cobre a garantia, nunca a escrita. */
+    expect(CICLO).toMatch(/export function CicloMenstrualTab\(\{[\s\S]{0,200}?gestante/);
+    /* E quem informa é o hub, a partir da idade gestacional real.
+       ⚠️ O hub mudou-se para `src/components/saude-mulher.tsx` (set/2026) — a
+       garantia é a mesma, e o que se cobra é a CORRENTE: a aba passa a semana
+       ao hub, e o hub a converte em "é gestante?" para o ciclo. */
+    const MULHER = semComentarios(readFileSync("src/components/saude-mulher.tsx", "utf8"));
+    expect(MULHER).toMatch(/gestante=\{weeks != null\}/);
     expect(CONTA).toContain("<SaudeMulherHub weeks={gest?.weeks ?? null} />");
   });
 

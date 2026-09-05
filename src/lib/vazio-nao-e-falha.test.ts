@@ -75,6 +75,12 @@ const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.ts
  *  vermelha a catraca que guarda o único botão do 192 desta aba. */
 const CONTRACOES = semComentarios(readFileSync("src/components/contracoes-tab.tsx", "utf8"));
 
+/** ⚠️ O QUINTO corte (set/2026): a saúde da mulher — o ciclo e os preventivos.
+ *  Ela SOME por nove meses (`mostrarSaudeDaMulher`), e era a metade da grade da
+ *  Saúde sem bancada nenhuma. Mesma lição dos blocos acima: a garantia não
+ *  mudou, mudou o endereço. */
+const MULHER = semComentarios(readFileSync("src/components/saude-mulher.tsx", "utf8"));
+
 /** ⚠️ O TERCEIRO corte (set/2026): os chutes. Mesma lição, quarta vez — e é
  *  por isso que o helper aceita o arquivo ao lado do nome. */
 const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
@@ -268,7 +274,7 @@ describe("o vazio não pode ser a falha", () => {
     expect(fn).toMatch(/const \{ data: rows, error \} = await/);
     expect(fn).toMatch(/if \(error\) return \{ ok: false as const/);
 
-    const c = componente("PreventivosTab");
+    const c = componente("PreventivosTab", MULHER);
     /* A CORRENTE, e não a presença da string — a mesma régua do bloco acima:
        quem liga o estado de falha está dentro de um ramo que fala de erro. */
     const k = c.indexOf("setInstavel(true)");
@@ -290,7 +296,7 @@ describe("o vazio não pode ser a falha", () => {
        data que ela acabou de digitar, e a leitura razoável é que ela errou o
        campo. Numa tela de preventivos isso vira um exame que ela acha que
        registrou e o app não conhece. */
-    const c = componente("PreventivosTab");
+    const c = componente("PreventivosTab", MULHER);
     const i = c.indexOf("async function handleSave(");
     expect(i).toBeGreaterThan(-1);
     const fn = c.slice(i, c.indexOf("\n  }", i));

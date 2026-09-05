@@ -64,6 +64,14 @@ const EXTRAS = [
   "/preview-nutricao?estado=carregando",
   "/preview-nutricao?estado=erro",
   "/preview-nutricao?estado=conversa&luto=1",
+  /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
+     existe —, então era a mais difícil de olhar. E é onde o anel de fases
+     derrubava a hidratação por 17 dígitos num `cx` de SVG. */
+  "/preview-saude-mulher?tela=ciclo",
+  "/preview-saude-mulher?tela=ciclo&estado=instavel",
+  "/preview-saude-mulher?tela=ciclo&gestante=1",
+  "/preview-saude-mulher?tela=preventivos",
+  "/preview-saude-mulher?tela=preventivos&estado=instavel",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum

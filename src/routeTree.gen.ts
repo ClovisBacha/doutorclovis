@@ -21,6 +21,7 @@ import { Route as PreviewSosRouteImport } from './routes/preview-sos'
 import { Route as PreviewSonsRouteImport } from './routes/preview-sons'
 import { Route as PreviewSomRouteImport } from './routes/preview-som'
 import { Route as PreviewSaudeRegistrosRouteImport } from './routes/preview-saude-registros'
+import { Route as PreviewSaudeMulherRouteImport } from './routes/preview-saude-mulher'
 import { Route as PreviewSaudeClinicaRouteImport } from './routes/preview-saude-clinica'
 import { Route as PreviewSaudeRouteImport } from './routes/preview-saude'
 import { Route as PreviewReguaRouteImport } from './routes/preview-regua'
@@ -175,6 +176,11 @@ const PreviewSomRoute = PreviewSomRouteImport.update({
 const PreviewSaudeRegistrosRoute = PreviewSaudeRegistrosRouteImport.update({
   id: '/preview-saude-registros',
   path: '/preview-saude-registros',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewSaudeMulherRoute = PreviewSaudeMulherRouteImport.update({
+  id: '/preview-saude-mulher',
+  path: '/preview-saude-mulher',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewSaudeClinicaRoute = PreviewSaudeClinicaRouteImport.update({
@@ -721,6 +727,7 @@ export interface FileRoutesByFullPath {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
   '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -829,6 +836,7 @@ export interface FileRoutesByTo {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
   '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -939,6 +947,7 @@ export interface FileRoutesById {
   '/preview-regua': typeof PreviewReguaRoute
   '/preview-saude': typeof PreviewSaudeRoute
   '/preview-saude-clinica': typeof PreviewSaudeClinicaRoute
+  '/preview-saude-mulher': typeof PreviewSaudeMulherRoute
   '/preview-saude-registros': typeof PreviewSaudeRegistrosRoute
   '/preview-som': typeof PreviewSomRoute
   '/preview-sons': typeof PreviewSonsRoute
@@ -1049,6 +1058,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
     | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
@@ -1157,6 +1167,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
     | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
@@ -1266,6 +1277,7 @@ export interface FileRouteTypes {
     | '/preview-regua'
     | '/preview-saude'
     | '/preview-saude-clinica'
+    | '/preview-saude-mulher'
     | '/preview-saude-registros'
     | '/preview-som'
     | '/preview-sons'
@@ -1376,6 +1388,7 @@ export interface RootRouteChildren {
   PreviewReguaRoute: typeof PreviewReguaRoute
   PreviewSaudeRoute: typeof PreviewSaudeRoute
   PreviewSaudeClinicaRoute: typeof PreviewSaudeClinicaRoute
+  PreviewSaudeMulherRoute: typeof PreviewSaudeMulherRoute
   PreviewSaudeRegistrosRoute: typeof PreviewSaudeRegistrosRoute
   PreviewSomRoute: typeof PreviewSomRoute
   PreviewSonsRoute: typeof PreviewSonsRoute
@@ -1498,6 +1511,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-saude-registros'
       fullPath: '/preview-saude-registros'
       preLoaderRoute: typeof PreviewSaudeRegistrosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-saude-mulher': {
+      id: '/preview-saude-mulher'
+      path: '/preview-saude-mulher'
+      fullPath: '/preview-saude-mulher'
+      preLoaderRoute: typeof PreviewSaudeMulherRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-saude-clinica': {
@@ -2252,6 +2272,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewReguaRoute: PreviewReguaRoute,
   PreviewSaudeRoute: PreviewSaudeRoute,
   PreviewSaudeClinicaRoute: PreviewSaudeClinicaRoute,
+  PreviewSaudeMulherRoute: PreviewSaudeMulherRoute,
   PreviewSaudeRegistrosRoute: PreviewSaudeRegistrosRoute,
   PreviewSomRoute: PreviewSomRoute,
   PreviewSonsRoute: PreviewSonsRoute,
