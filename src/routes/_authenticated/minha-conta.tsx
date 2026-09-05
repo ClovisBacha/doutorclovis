@@ -925,10 +925,18 @@ export function HubSaude({
   return (
     <GradeHub
       itens={itens}
-      /* Quatro é o caso da gestação (Saúde da mulher sai de cena): dois por
-         linha, preenchendo a tela. Com cinco — fora da gestação — volta ao
-         quadrado, senão a quinta ficaria sozinha numa linha esticada. */
-      preencherTela={itens.length === 4}
+      /* ⚠️ SEMPRE o bloco grande — e isto foi um RECURSO MORTO por um tempo.
+         A condição aqui era `itens.length === 4`, escrita quando "Saúde da
+         mulher" saía da grade durante a gestação. Quando os cinco ladrilhos
+         passaram a aparecer SEMPRE (o estudo de navegação: no celular a função
+         sumia por nove meses), a condição virou constante FALSA — e com ela
+         morreram as duas coisas que o dono tinha pedido: os blocos que
+         "preenchem a tela" e O NÚMERO DELA dentro deles, que só é desenhado
+         atrás de `preencherTela`. As três consultas ao banco continuavam
+         saindo a cada visita e o resultado era jogado fora.
+
+         Nada mais no app usa `preencherTela` — ele existe para esta grade. */
+      preencherTela
       onAbrir={(k) => {
         const item = itens.find((i) => i.key === k);
         if (item) onAbrir(item.destino, item.subDestino);

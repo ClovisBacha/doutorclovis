@@ -63,9 +63,15 @@ export function GradeHub({
    * desperdício quando são quatro.
    *
    * A altura desconta o que a página já reserva: a folga de topo com a área
-   * segura, o cabeçalho da aba e o rodapé da barra flutuante. `min-h` impede
-   * que uma tela muito baixa (celular deitado) esmague os ladrilhos até o
-   * texto sumir — ali ela volta a rolar, que é o comportamento certo.
+   * segura, o cabeçalho da aba e o rodapé da barra flutuante.
+   *
+   * ⚠️ É `min-h` NO CONTÊINER e um piso POR LINHA (`auto-rows-[minmax(…,1fr)]`),
+   * e nunca uma altura fixa com `auto-rows-fr` — a versão anterior repartia uma
+   * altura FECHADA entre as linhas, e isso só fecha a conta com DUAS. Com três
+   * (cinco ladrilhos) cada linha caía para ~196px, o ícone sozinho já pede 144,
+   * e o `overflow-hidden` cortava justamente o RÓTULO: o bloco mostrava o
+   * número e escondia o nome do que ele é. Medido a 393, 375, 320 e 430px de
+   * largura: 291px por ladrilho, nada cortado em nenhuma.
    */
   preencherTela?: boolean;
 }) {
@@ -73,7 +79,7 @@ export function GradeHub({
     <div
       className={
         preencherTela
-          ? "grid auto-rows-fr grid-cols-2 gap-3 h-[calc(100svh-var(--safe-top)-var(--safe-bottom)-15rem)] min-h-[26rem]"
+          ? "grid auto-rows-[minmax(15.5rem,1fr)] grid-cols-2 gap-3 min-h-[calc(100svh-var(--safe-top)-var(--safe-bottom)-15rem)]"
           : "grid grid-cols-2 gap-3"
       }
     >
