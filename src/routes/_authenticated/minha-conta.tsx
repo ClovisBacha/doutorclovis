@@ -126,7 +126,7 @@ import { BabyTab } from "@/components/baby-tab";
 import { KicksTab } from "@/components/kicks-tab";
 import { HealthTab } from "@/components/health-tab";
 import { NutricaoTab } from "@/components/nutricao-tab";
-import { diasEntre, haQuantoTempo, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
+import { diasEntre, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
 import { SaudeMulherHub } from "@/components/saude-mulher";
 import { Field } from "@/components/campo";
 import {
@@ -896,31 +896,25 @@ export function HubSaude({
           saude.systolic != null && saude.diastolic != null
             ? `${saude.systolic}/${saude.diastolic}`
             : null;
-        /* ⚠️ QUANDO O REGISTRO É VELHO, A LEGENDA DIZ ISSO.
-           O bloco mostrava o ÚLTIMO valor sem limite nenhum de recência: uma
-           paciente que parou de registrar há cinco meses lia
-           "68,4 kg · pressão 118/76" como se fosse o estado dela hoje — e uma
-           pressão tranquilizadora de cinco meses atrás, numa gestante que pode
-           estar em 150/100 agora, é a pior forma de dado velho.
-           Os dois blocos vizinhos já tinham essa régua (chutes só diz "hoje" ou
-           "ontem"; contrações só conta hoje); este não tinha.
-           ⚠️ Até uma semana a legenda fica como sempre foi: peso e pressão não
-           são medidos todo dia, e carimbar "há 2 dias" no caso comum seria
-           ruído no lugar de informação. */
-        const idade = saude.log_date ? haQuantoTempo(saude.log_date, agora) : null;
+        /* ⚠️ NADA DE "QUANDO" ESCRITO NO BLOCO — decisão do dono, com o print
+           na mão ("quando que fez não preciso deixar escrito"). O que fica é o
+           NÚMERO e o que ele é.
+           ⚠️ Mas o dado VELHO continua não podendo se passar por atual: uma
+           pressão de cinco meses atrás lida como o estado de hoje é a pior
+           forma de dado velho. Sem poder escrever "há 3 meses", o que sobra é
+           a régua dos blocos vizinhos — passado o prazo, o número SOME e o
+           bloco volta ao rótulo, que sempre foi verdade. Sete dias, porque
+           peso e pressão não se medem todo dia. */
         const velho = saude.log_date ? diasEntre(saude.log_date, agora) > 7 : false;
-        /* ⚠️ Espaço NÃO-QUEBRÁVEL dentro da recência: medido a 393px, a
-           legenda quebrava como "pressão 118/76 · há 3" / "meses". Assim ela
-           quebra ANTES do "há", e a recência fica inteira na segunda linha. */
-        const quando = velho && idade ? idade.replace(/ /g, "\u00A0") : null;
-        const juntar = (base: string) => (quando ? `${base} · ${quando}` : base);
         /* O peso é o valor grande; a pressão vai na legenda. Sem peso, a
            pressão sobe para o valor — o bloco nunca fica com legenda solta. */
-        d["Saúde"] = peso
-          ? { valor: peso, legenda: pa ? juntar(`pressão ${pa}`) : (quando ?? undefined) }
-          : pa
-            ? { valor: pa, legenda: juntar("pressão") }
-            : null;
+        d["Saúde"] = velho
+          ? null
+          : peso
+            ? { valor: peso, legenda: pa ? `pressão ${pa}` : undefined }
+            : pa
+              ? { valor: pa, legenda: "pressão" }
+              : null;
       }
       if (chutes && chutes.kick_count != null) {
         /* ⚠️ NUNCA `String(started_at).slice(0, 10)`: a coluna é `timestamptz`
@@ -928,16 +922,15 @@ export function HubSaude({
            21h30 do dia 5 chega como dia 6, não casava com "hoje" nem com
            "ontem", e o contador SUMIA do bloco. Quem conta movimentos no
            horário que a tela recomenda era quem nunca via o número. */
+        /* `quandoFoi` continua sendo o FILTRO (hoje ou ontem, senão o número
+           some) — só não vai mais para o texto. */
         const quando = quandoFoi(chutes.started_at, agora);
-        d["chutes"] = quando
-          ? { valor: String(chutes.kick_count), legenda: `chutes ${quando}` }
-          : null;
+        d["chutes"] = quando ? { valor: String(chutes.kick_count), legenda: "chutes" } : null;
       }
       if (contr && contr.length > 0) {
-        const ult = new Date(contr[0].started_at);
-        const hh = String(ult.getHours()).padStart(2, "0");
-        const mm = String(ult.getMinutes()).padStart(2, "0");
-        d["contracoes"] = { valor: `${contr.length} hoje`, legenda: `última às ${hh}:${mm}` };
+        /* A consulta já recorta o dia (`desdeMeiaNoite`); o "hoje" e a hora da
+           última saíram do TEXTO a pedido do dono. */
+        d["contracoes"] = { valor: String(contr.length), legenda: "contrações" };
       }
       setDados(d);
     })().catch(() => {

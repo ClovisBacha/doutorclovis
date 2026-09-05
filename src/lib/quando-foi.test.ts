@@ -91,7 +91,7 @@ describe("a grade da Saúde usa a régua", () => {
   });
 });
 
-describe("o bloco da Saúde não afirma atualidade sobre dado velho", () => {
+describe("o bloco da Saúde não afirma atualidade sobre dado velho — sem escrever quando", () => {
   const CONTA = semProsa(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
   const BLOCO = (() => {
     const i = CONTA.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
@@ -99,21 +99,23 @@ describe("o bloco da Saúde não afirma atualidade sobre dado velho", () => {
     return CONTA.slice(i, j);
   })();
 
-  test("⚠️ a legenda diz QUANDO, e o corte vem de `diasEntre`", () => {
-    /* Mostrava o último valor sem limite nenhum: quem parou de registrar há
-       cinco meses lia "pressão 118/76" como o estado de hoje. */
-    expect(BLOCO).toContain("haQuantoTempo(saude.log_date");
-    expect(BLOCO).toMatch(/diasEntre\(saude\.log_date, agora\) > \d+/);
+  test("⚠️ passado o prazo, o número SOME — nunca vira 'há N meses' na legenda", () => {
+    /* Decisão do dono: nada de "quando" escrito no bloco. O que sobrou para o
+       dado velho não se passar por atual é a régua dos vizinhos: some. */
+    expect(BLOCO).toMatch(/velho = saude\.log_date \? diasEntre\(saude\.log_date, agora\) > \d+/);
+    expect(BLOCO).toMatch(/d\["Saúde"\] = velho\s*\? null/);
+    expect(BLOCO).not.toContain("haQuantoTempo(");
   });
 
-  test("⚠️ até o corte, a legenda fica como sempre foi", () => {
-    /* Carimbar "há 2 dias" no caso comum seria ruído: peso e pressão não são
-       medidos todo dia. */
-    expect(BLOCO).toMatch(/velho && idade \? [^:]+ : null/);
+  test("⚠️ nenhuma legenda do bloco carrega tempo", () => {
+    expect(BLOCO).not.toMatch(/hoje|ontem|última às|há\s/);
+    expect(BLOCO).toContain('legenda: "chutes"');
+    expect(BLOCO).toContain('legenda: "contrações"');
   });
 
-  test("⚠️ a recência não quebra no meio", () => {
-    /* Medido a 393px: sem isto a legenda quebrava como "… há 3" / "meses". */
-    expect(BLOCO).toContain("\\u00A0");
+  test("e o filtro de recência dos chutes continua sendo `quandoFoi`", () => {
+    expect(BLOCO).toMatch(
+      /const quando = quandoFoi\(chutes\.started_at, agora\);\s*d\["chutes"\] = quando \?/,
+    );
   });
 });
