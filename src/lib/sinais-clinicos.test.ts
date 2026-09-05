@@ -221,23 +221,38 @@ describe("contrações regulares antes das 37 semanas", () => {
   test("o cronômetro usa a régua, e o teste da semana vem ANTES dos cortes de parto", () => {
     /* Sem a ordem, o caso perigoso — padrão leve antes do termo — só seria
        alcançado depois de passar pelos cortes de trabalho de parto ativo, que
-       o classificariam como normal. */
-    /* ⚠️ O cronômetro saiu de `minha-conta.tsx` (set/2026) e esta catraca ficou
-       vermelha só porque o CAMINHO mudou — a garantia não mudou uma linha. É a
-       mesma lição que `vazio-nao-e-falha.test.ts` já registra no helper
-       `componente(nome, arquivo)`: o teste precisa saber onde procurar.
-       ⚠️ E as duas âncoras são CONFERIDAS: `indexOf` devolve −1 quando o alvo
-       some, e `slice(-1, …)` devolve string vazia — uma fatia vazia deixa
-       asserção de ORDEM passar em branco. */
-    const arq = readFileSync("src/components/contracoes-tab.tsx", "utf8");
-    const i = arq.indexOf("function analyzeContractions(");
+       o classificariam como normal.
+
+       ⚠️ **ESTA ASSERÇÃO JÁ ENVELHECEU DUAS VEZES, e da segunda ela estava
+       ESCONDENDO dois defeitos.** Ela cobrava a string
+       `sinalContracoesPrematuras({ semanas: weeks` — ou seja, provava que a
+       CHAMADA existia, e nada sobre o que ela recebia nem sobre quando era
+       alcançada. Por baixo dela a régua ficava barrada por uma duração que não
+       usa, e a MÉDIA do intervalo apagava o alerta. As duas coisas silenciavam
+       o "Ligue para o seu médico agora" antes das 37 semanas.
+
+       O conserto não foi escrever mais uma asserção de texto: a régua saiu do
+       componente para `src/lib/analise-de-contracoes.ts`, onde é pura, e o que
+       a guarda agora é `analise-de-contracoes.test.ts`, que a EXERCITA. O que
+       fica aqui é só a ORDEM — a única garantia que se lê melhor no fonte que
+       no comportamento. */
+    /* ⚠️ SEM OS COMENTÁRIOS. O comentário que EXPLICA por que a régua tem de
+       vir antes do corte de `completed` contém, por definição, a string
+       `completed.length < 2` — e a primeira versão desta asserção ficou
+       vermelha por causa da própria prosa que documenta o conserto. É a
+       enésima vez nesta base, e ela quebra nos dois sentidos. */
+    const arq = readFileSync("src/lib/analise-de-contracoes.ts", "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const i = arq.indexOf("export function analyzeContractions(");
     expect(i).toBeGreaterThan(-1);
-    const fim = arq.indexOf("\nexport function ContracoesTab", i);
-    expect(fim).toBeGreaterThan(i);
-    const corpo = arq.slice(i, fim);
-    expect(corpo).toContain("sinalContracoesPrematuras({ semanas: weeks");
-    expect(corpo.indexOf("sinalContracoesPrematuras")).toBeLessThan(
-      corpo.indexOf("avgInterval <= 3"),
-    );
+    const corpo = arq.slice(i);
+    const regua = corpo.indexOf("sinalContracoesPrematuras(");
+    expect(regua).toBeGreaterThan(-1);
+    /* Antes dos cortes de trabalho de parto… */
+    expect(regua).toBeLessThan(corpo.indexOf("avgInterval <= 3"));
+    /* …e antes do corte que exige contrações TERMINADAS, que é o que a barrava
+       com a segunda contração ainda em curso. */
+    expect(regua).toBeLessThan(corpo.indexOf("completed.length < 2"));
   });
 });

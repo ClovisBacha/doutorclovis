@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { hapticTap } from "@/lib/haptics";
 import { hapticoDeAviso } from "@/lib/nativo";
-import { sinalContracoesPrematuras } from "@/lib/sinais-clinicos";
+import { analyzeContractions } from "@/lib/analise-de-contracoes";
 import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 
 /* ---------- Contrações ---------- */
@@ -60,84 +60,6 @@ const INTENSITY_COLOR = [
  * A régua nova mora em `sinais-clinicos.ts`, com as outras, porque CLAUDE.md é
  * explícito: nunca duplique um limite clínico fora daquele arquivo.
  */
-function analyzeContractions(
-  list: Contraction[],
-  weeks: number | null,
-): {
-  status: "normal" | "atencao" | "alerta" | "urgente";
-  label: string;
-  detail: string;
-} {
-  if (list.length < 2)
-    return {
-      status: "normal",
-      label: "Monitorando",
-      detail: "Registre mais contrações para análise do padrão.",
-    };
-
-  const completed = list.filter((c) => c.ended_at != null);
-  if (completed.length < 2)
-    return { status: "normal", label: "Monitorando", detail: "Continue registrando." };
-
-  // Average duration (seconds)
-  const avgDur =
-    completed.reduce((sum, c) => {
-      const dur = (new Date(c.ended_at!).getTime() - new Date(c.started_at).getTime()) / 1000;
-      return sum + dur;
-    }, 0) / completed.length;
-
-  // Average interval between contractions (minutes)
-  const sorted = [...list].sort(
-    (a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime(),
-  );
-  const intervals: number[] = [];
-  for (let i = 1; i < sorted.length; i++) {
-    const interval =
-      (new Date(sorted[i].started_at).getTime() - new Date(sorted[i - 1].started_at).getTime()) /
-      60000;
-    intervals.push(interval);
-  }
-  const avgInterval = intervals.reduce((s, x) => s + x, 0) / intervals.length;
-
-  /* ─── PREMATURIDADE VEM ANTES DE TUDO ────────────────────────────────────
-     Antes das 37 semanas, contração regular é sinal vermelho independentemente
-     de quão "leve" o padrão parece — e é justamente o padrão leve que a régua
-     de trabalho de parto classificaria como normal. Por isso este teste vem
-     PRIMEIRO: ele não pode ser alcançado só depois de a paciente passar pelos
-     cortes de parto ativo. */
-  const prematuro = sinalContracoesPrematuras({ semanas: weeks, intervaloMin: avgInterval });
-  if (prematuro)
-    return {
-      status: "urgente",
-      label: "⚠️ Ligue para o seu médico agora",
-      detail: `${prematuro.nota} Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
-    };
-
-  if (avgInterval <= 3 && avgDur >= 60)
-    return {
-      status: "urgente",
-      label: "⚠️ Vá para a maternidade agora",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — trabalho de parto avançado.`,
-    };
-  if (avgInterval <= 5 && avgDur >= 45)
-    return {
-      status: "alerta",
-      label: "Trabalho de parto ativo",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — ligue para o consultório.`,
-    };
-  if (avgInterval <= 10 && avgDur >= 30)
-    return {
-      status: "atencao",
-      label: "Atenção — padrão irregular",
-      detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s — monitore de perto.`,
-    };
-  return {
-    status: "normal",
-    label: "Padrão normal",
-    detail: `Contrações a cada ${avgInterval.toFixed(0)} min por ${avgDur.toFixed(0)}s.`,
-  };
-}
-
 export function ContracoesTab({
   weeks,
   bancada,
