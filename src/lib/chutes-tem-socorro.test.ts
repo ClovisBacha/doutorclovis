@@ -148,19 +148,28 @@ describe("⚠️ e o ciclo não prevê período para uma gestante", () => {
        garantia é a mesma, e o que se cobra é a CORRENTE: a aba passa a semana
        ao hub, e o hub a converte em "é gestante?" para o ciclo. */
     const MULHER = semComentarios(readFileSync("src/components/saude-mulher.tsx", "utf8"));
-    expect(MULHER).toMatch(/gestante=\{weeks != null\}/);
-    expect(CONTA).toContain("<SaudeMulherHub weeks={gest?.weeks ?? null} />");
+    /* ⚠️ "Gestante" é gestação SEM nascimento registrado. `computeGestation`
+       conta para sempre, então `weeks != null` — a régua anterior — continuava
+       verdadeiro depois do parto, e o aviso "a previsão volta depois do parto"
+       era falso. O print do dono é que destapou. */
+    expect(MULHER).toMatch(/gestante=\{gestante\}/);
+    expect(CONTA).toMatch(/<SaudeMulherHub gestante=\{gest != null && !profile\?\.birth_date\}/);
   });
 
   test("⚠️ grávida, o anel e a projeção não são desenhados", () => {
-    expect(CICLO).toMatch(/gestante \? null : model \?/);
+    /* A decisão passou a ser `mostraPrevisao`, que exige `!gestante` E um
+       último período recente (`previsaoAindaVale`) — a grafia antiga
+       `gestante ? null` travava só a bandeira, e a bandeira sozinha deixava o
+       pós-parto voltar projetando o período de antes da gravidez. */
+    expect(CICLO).toMatch(/mostraPrevisao = model != null && !gestante && /);
+    expect(CICLO).toContain("!mostraPrevisao ? null : model ?");
   });
 
   test("⚠️ e o convite a 'registrar para ver a previsão' também não", () => {
     /* Ele prometia exatamente o que o aviso acima diz estar pausado — duas
        frases se contradizendo na mesma tela. O `gestante ? null` cobre os DOIS
        ramos, e é por isso que ele vem antes do `model ?`. */
-    const i = CICLO.indexOf("gestante ? null : model ?");
+    const i = CICLO.indexOf("!mostraPrevisao ? null : model ?");
     expect(i).toBeGreaterThan(-1);
     expect(CICLO.indexOf("Registre seu período abaixo")).toBeGreaterThan(i);
   });

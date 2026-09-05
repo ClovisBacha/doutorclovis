@@ -34,11 +34,15 @@ const SAUDE_MULHER_SUBTABS = [
 
 /** Hub "Saúde da mulher": Ciclo Menstrual + Preventivos numa tela só. */
 export function SaudeMulherHub({
-  weeks,
+  gestante,
   initialSub,
   bancada,
 }: {
-  weeks: number | null;
+  /** ⚠️ É "está grávida AGORA", e não "tem semana": quem calcula é a aba, e
+      ela desliga isto quando o nascimento é registrado — `computeGestation`
+      conta para sempre, então `weeks != null` continuaria verdadeiro depois do
+      parto e o aviso "a previsão volta depois do parto" seria falso. */
+  gestante: boolean;
   /** Abre direto numa sub-tela — é o que a bancada usa para fotografar os
       preventivos sem um toque, e o mesmo mecanismo que os outros hubs têm. */
   initialSub?: (typeof SAUDE_MULHER_SUBTABS)[number]["key"];
@@ -77,7 +81,7 @@ export function SaudeMulherHub({
       <Fade key={sub}>
         {sub === "ciclo" && (
           <CicloMenstrualTab
-            gestante={weeks != null}
+            gestante={gestante}
             bancada={
               bancada && { cycles: bancada.cycles ?? [], instavel: bancada.instavel ?? false }
             }

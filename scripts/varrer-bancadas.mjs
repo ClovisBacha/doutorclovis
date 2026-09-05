@@ -72,6 +72,11 @@ const EXTRAS = [
   "/preview-saude-mulher?tela=ciclo&gestante=1",
   "/preview-saude-mulher?tela=preventivos",
   "/preview-saude-mulher?tela=preventivos&estado=instavel",
+  /* ⚠️ Os dois que o PRINT do dono destapou: o ciclo em curso (a data quebrava
+     em três linhas com o selo, "Encerrar" e × na mesma faixa) e o histórico
+     velho (a previsão não pode voltar projetando um período de dez meses). */
+  "/preview-saude-mulher?tela=ciclo&ativo=1",
+  "/preview-saude-mulher?tela=ciclo&velho=1",
   /* ⚠️ O bloco com DADO VELHO: ele mostrava o último valor sem limite de
      recência, e uma pressão de meses atrás lia como o estado de hoje. */
   "/preview-saude?w=24&dados=2",

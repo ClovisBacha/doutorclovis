@@ -3195,7 +3195,10 @@ function MinhaContaPage() {
                 {tab === "Saúde da mulher" && (
                   <div className="space-y-5">
                     <CabecalhoDaSaude chave="Saúde da mulher" />
-                    <SaudeMulherHub weeks={gest?.weeks ?? null} />
+                    {/* ⚠️ `gest` existe para sempre depois do parto (a conta não
+                        para). "Gestante" aqui é gestação SEM nascimento
+                        registrado — senão a previsão do ciclo nunca voltaria. */}
+                    <SaudeMulherHub gestante={gest != null && !profile?.birth_date} />
                   </div>
                 )}
                 {tab === "Médico" && <MédicoTab />}

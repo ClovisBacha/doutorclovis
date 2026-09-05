@@ -22,12 +22,20 @@ import type { MenstrualCycle, PreventiveReminder } from "@/lib/saudefeminina.fun
  *                            registrado" zera o atraso de um preventivo
  *   `?gestante=1`        — ⚠️ na gestação a PREVISÃO do ciclo fica pausada: o
  *                            anel some e o histórico fica
+ *   `?ativo=1`           — um ciclo em curso (selo "Ativo", "Encerrar" e ×):
+ *                            foi o print do dono que mostrou a data quebrando
+ *                            em três linhas com os três na mesma faixa
+ *   `?velho=1`           — o último período tem 10 meses: a projeção seria
+ *                            chute, e o anel NÃO pode voltar só porque o parto
+ *                            foi registrado
  */
 export const Route = createFileRoute("/preview-saude-mulher")({
   validateSearch: (q: Record<string, unknown>) => ({
     tela: q.tela == null ? "ciclo" : String(q.tela),
     estado: q.estado == null ? "normal" : String(q.estado),
     gestante: q.gestante == null ? false : Boolean(q.gestante),
+    ativo: q.ativo == null ? false : Boolean(q.ativo),
+    velho: q.velho == null ? false : Boolean(q.velho),
   }),
   head: () => ({
     meta: [{ title: "Bancada da saúde da mulher" }, { name: "robots", content: "noindex" }],
@@ -75,23 +83,36 @@ const PREVENTIVOS: PreventiveReminder[] = [
 ];
 
 function Pagina() {
-  const { tela, estado, gestante } = Route.useSearch();
+  const { tela, estado, gestante, ativo, velho } = Route.useSearch();
 
+  /* `ativo`: o primeiro ciclo fica sem `end_date`. `velho`: todo o histórico
+     recua 300 dias — o formato do dado é o mesmo, só a idade muda. */
+  const recua = (ymd: string | null, dias: number) =>
+    ymd
+      ? new Date(Date.parse(ymd + "T12:00:00-03:00") - dias * 86400000).toISOString().slice(0, 10)
+      : ymd;
+  const ciclos = CICLOS.map((c, i) => ({
+    ...c,
+    start_date: velho ? recua(c.start_date, 300)! : c.start_date,
+    end_date: ativo && i === 0 ? null : velho ? recua(c.end_date, 300) : c.end_date,
+  }));
   const bancada =
     estado === "instavel"
       ? { cycles: [], reminders: [], instavel: true }
       : estado === "vazio"
         ? { cycles: [], reminders: [] }
-        : { cycles: CICLOS, reminders: PREVENTIVOS };
+        : { cycles: ciclos, reminders: PREVENTIVOS };
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       <p className="mb-4 text-xs text-muted-foreground">
         Bancada · <strong>{tela}</strong> · estado <strong>{estado}</strong>
         {gestante ? " · gestante (previsão pausada)" : ""}
+        {ativo ? " · ciclo ativo" : ""}
+        {velho ? " · histórico velho" : ""}
       </p>
       <SaudeMulherHub
-        weeks={gestante ? 38 : null}
+        gestante={gestante}
         initialSub={tela === "preventivos" ? "preventivos" : "ciclo"}
         bancada={bancada}
       />

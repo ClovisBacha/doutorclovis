@@ -22,6 +22,7 @@ import {
   cycleLengthDays,
   diffDays,
   phaseForCycleDay,
+  previsaoAindaVale,
   startOfDay,
   upcomingMarks,
   ymd,
@@ -355,6 +356,12 @@ export function CicloMenstrualTab({
   }
 
   const model = useMemo(() => buildCycleModel(cycles), [cycles]);
+  /* ⚠️ A previsão só existe enquanto o último período é RECENTE. Gestante é o
+     motivo mais comum de ele envelhecer — mas depois do parto, ou para quem
+     parou de registrar, projetar a partir de um período de meses atrás daria
+     um "dia do ciclo" fabricado. Ver `previsaoAindaVale`. */
+  const historicoVelho = model != null && !previsaoAindaVale(model.lastStart, new Date());
+  const mostraPrevisao = model != null && !gestante && !historicoVelho;
 
   if (loading) return <TabSkeleton />;
 
@@ -375,22 +382,33 @@ export function CicloMenstrualTab({
         tela DIZ por que o anel sumiu — um bloco que some sem explicação lê como
         recurso quebrado.
       */}
-      {gestante && (
+      {gestante ? (
         <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-sm">
           <p className="font-semibold">A previsão do ciclo fica pausada na gestação</p>
           <p className="mt-1 text-muted-foreground">
             Não faz sentido estimar próximo período nem janela fértil agora. O que você já registrou
-            continua aqui embaixo, e a previsão volta depois do parto.
+            continua aqui embaixo — e a previsão volta depois do parto, assim que você registrar o
+            primeiro período.
           </p>
         </div>
-      )}
+      ) : historicoVelho ? (
+        /* ⚠️ O FATO, e não uma cobrança: "você não registrou" cairia em quem
+           acabou de ter o bebê ou passou meses internada. */
+        <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-sm">
+          <p className="font-semibold">A previsão está pausada</p>
+          <p className="mt-1 text-muted-foreground">
+            O último período registrado já tem mais de três meses, e estimar o próximo a partir dele
+            seria chute. Quando você registrar um período novo, o anel e o calendário voltam.
+          </p>
+        </div>
+      ) : null}
       {
         /* Ciclo visual — estilo Apple Health.
           ⚠️ Na gestação NÃO cai no `else`: aquele bloco convida a "registrar o
           período abaixo para ver o anel de fases, a janela fértil e a previsão
           do próximo ciclo" — a promessa exata que o aviso acima acabou de
           dizer que está pausada, duas frases se contradizendo na mesma tela. */
-        gestante ? null : model ? (
+        !mostraPrevisao ? null : model ? (
           <Stagger className="space-y-4">
             <StaggerItem>
               <CicloHero model={model} />
@@ -521,19 +539,65 @@ export function CicloMenstrualTab({
                   )
                 : null;
             const isActive = !cycle.end_date;
+            const acoes = (
+              <div className="flex items-center gap-2 shrink-0">
+                {isActive &&
+                  (endingId === cycle.id ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
+                      />
+                      <button
+                        onClick={() => handleMarkEnd(cycle.id)}
+                        className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
+                      >
+                        Ok
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setEndingId(cycle.id)}
+                      className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
+                    >
+                      Encerrar
+                    </button>
+                  ))}
+                <button
+                  onClick={() => handleDelete(cycle.id)}
+                  aria-label="Excluir este ciclo"
+                  /* ⚠️ ALVO DE 44px, e crescendo DE VERDADE — não por
+                         `after:-inset`. No ciclo ativo há o botão "Encerrar" a
+                         8px daqui: um pseudo-elemento estendido cobriria a
+                         borda dele, e tocar ali APAGARIA o ciclo em vez de
+                         encerrá-lo. É a lição do ✕ do chá de bebê. O `-my`
+                         devolve a altura que o quadrado tomou. */
+                  className="-my-2 flex h-11 w-11 items-center justify-center rounded-full border border-border text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
+                >
+                  ×
+                </button>
+              </div>
+            );
             return (
               <div
                 key={cycle.id}
                 className={`rounded-2xl border p-4 ${isActive ? "border-primary/40 bg-primary/5" : "border-border bg-card"}`}
               >
+                {/* ⚠️ Medido no aparelho do dono, a 393px: com o selo "Ativo" na
+                    MESMA linha da data e "Encerrar" + × à direita, sobravam ~90px
+                    para "05 de setembro de 2026" — três linhas. O selo ganhou
+                    linha própria e, no ciclo ativo, as ações descem para um
+                    rodapé: a data volta a ter a largura do cartão. */}
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="min-w-0 flex-1">
+                    {isActive && (
+                      <span className="mb-1 inline-block rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">
+                        Ativo
+                      </span>
+                    )}
                     <div className="flex items-center gap-2">
-                      {isActive && (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-white">
-                          Ativo
-                        </span>
-                      )}
                       <p className="font-medium text-sm">
                         {new Date(cycle.start_date + "T00:00:00").toLocaleDateString("pt-BR", {
                           day: "2-digit",
@@ -559,46 +623,11 @@ export function CicloMenstrualTab({
                       </div>
                     )}
                   </div>
-                  <div className="flex gap-2 shrink-0">
-                    {isActive &&
-                      (endingId === cycle.id ? (
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            className="rounded-xl border border-border bg-background px-2 py-1 text-xs"
-                          />
-                          <button
-                            onClick={() => handleMarkEnd(cycle.id)}
-                            className="rounded-full bg-primary px-3 py-1 text-xs font-medium text-white"
-                          >
-                            Ok
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setEndingId(cycle.id)}
-                          className="rounded-full border border-border px-3 py-1 text-xs font-medium hover:border-primary hover:text-primary"
-                        >
-                          Encerrar
-                        </button>
-                      ))}
-                    <button
-                      onClick={() => handleDelete(cycle.id)}
-                      aria-label="Excluir este ciclo"
-                      /* ⚠️ ALVO DE 44px, e crescendo DE VERDADE — não por
-                         `after:-inset`. No ciclo ativo há o botão "Encerrar" a
-                         8px daqui: um pseudo-elemento estendido cobriria a
-                         borda dele, e tocar ali APAGARIA o ciclo em vez de
-                         encerrá-lo. É a lição do ✕ do chá de bebê. O `-my`
-                         devolve a altura que o quadrado tomou. */
-                      className="-my-2 flex h-11 w-11 items-center justify-center rounded-full border border-border text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
-                    >
-                      ×
-                    </button>
-                  </div>
+                  {!isActive && acoes}
                 </div>
+                {/* No ciclo ATIVO as ações descem para um rodapé: é o único caso com
+                    dois controles, e era o que espremia a data. */}
+                {isActive && <div className="mt-3 flex justify-end">{acoes}</div>}
               </div>
             );
           })}

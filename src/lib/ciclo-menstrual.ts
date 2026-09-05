@@ -167,6 +167,33 @@ export function buildCycleModel(cycles: MenstrualCycle[]): CycleModel | null {
   return { cycleLen, periodLen, lastStart, actualPeriod };
 }
 
+/**
+ * ATÉ QUANDO A PREVISÃO VALE.
+ *
+ * ⚠️ `buildCycleModel` projeta o ciclo médio para a frente a partir do ÚLTIMO
+ * período registrado — e não sabe a idade dele. Com um período de nove meses
+ * atrás, `cycleDayFor` devolve um "dia do ciclo" que é só a data de hoje
+ * módulo 28: um número fabricado, com "próximo período" e "janela fértil"
+ * fabricados junto. Foi assim que o anel previu período para uma gestante.
+ *
+ * A gestação é o motivo mais comum de o histórico envelhecer, mas não é o
+ * único: o pós-parto (a promessa "volta depois do parto" não pode voltar
+ * projetando o período de antes da gravidez) e quem simplesmente parou de
+ * registrar caem na mesma régua. Uma bandeira de "gestante" sozinha deixaria
+ * os outros dois de fora.
+ *
+ * 90 dias é o teto do modelo (45) vezes dois: dois ciclos inteiros sem
+ * registro, e a projeção passa a ser chute.
+ */
+export const PREVISAO_VALE_ATE_DIAS = 90;
+
+export function previsaoAindaVale(lastStart: Date, today: Date): boolean {
+  const dias = Math.floor(
+    (startOfDay(today).getTime() - startOfDay(lastStart).getTime()) / 86400000,
+  );
+  return dias >= 0 && dias <= PREVISAO_VALE_ATE_DIAS;
+}
+
 export function cycleLengthDays(cycle: MenstrualCycle): number | null {
   if (!cycle.end_date) return null;
   const start = new Date(cycle.start_date + "T00:00:00");
