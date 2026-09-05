@@ -43,13 +43,23 @@ function PreviewSaude() {
         cabecalhos={cabecalhos}
         weeks={Number.isFinite(w) ? (w as number) : null}
         bancada={
-          dados
-            ? {
-                Saúde: { valor: "68,4 kg", legenda: "pressão 118/76" },
-                chutes: { valor: "12", legenda: "chutes hoje" },
-                contracoes: { valor: "3 hoje", legenda: "última às 14:20" },
+          dados === 2
+            ? /* ⚠️ O caso do dado VELHO: o bloco mostrava o último valor sem
+                 limite de recência, e "pressão 118/76" de cinco meses atrás
+                 lia como o estado de hoje. A legenda só diz "quando" acima de
+                 uma semana — e é esta a foto que prova que ela cabe. */
+              {
+                Saúde: { valor: "68,4 kg", legenda: "pressão 118/76 · há\u00A03\u00A0meses" },
+                chutes: null,
+                contracoes: null,
               }
-            : undefined
+            : dados
+              ? {
+                  Saúde: { valor: "68,4 kg", legenda: "pressão 118/76" },
+                  chutes: { valor: "12", legenda: "chutes hoje" },
+                  contracoes: { valor: "3 hoje", legenda: "última às 14:20" },
+                }
+              : undefined
         }
       />
     </div>

@@ -126,7 +126,7 @@ import { BabyTab } from "@/components/baby-tab";
 import { KicksTab } from "@/components/kicks-tab";
 import { HealthTab } from "@/components/health-tab";
 import { NutricaoTab } from "@/components/nutricao-tab";
-import { inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
+import { diasEntre, haQuantoTempo, inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
 import { SaudeMulherHub } from "@/components/saude-mulher";
 import { Field } from "@/components/campo";
 import {
@@ -896,12 +896,30 @@ export function HubSaude({
           saude.systolic != null && saude.diastolic != null
             ? `${saude.systolic}/${saude.diastolic}`
             : null;
+        /* ⚠️ QUANDO O REGISTRO É VELHO, A LEGENDA DIZ ISSO.
+           O bloco mostrava o ÚLTIMO valor sem limite nenhum de recência: uma
+           paciente que parou de registrar há cinco meses lia
+           "68,4 kg · pressão 118/76" como se fosse o estado dela hoje — e uma
+           pressão tranquilizadora de cinco meses atrás, numa gestante que pode
+           estar em 150/100 agora, é a pior forma de dado velho.
+           Os dois blocos vizinhos já tinham essa régua (chutes só diz "hoje" ou
+           "ontem"; contrações só conta hoje); este não tinha.
+           ⚠️ Até uma semana a legenda fica como sempre foi: peso e pressão não
+           são medidos todo dia, e carimbar "há 2 dias" no caso comum seria
+           ruído no lugar de informação. */
+        const idade = saude.log_date ? haQuantoTempo(saude.log_date, agora) : null;
+        const velho = saude.log_date ? diasEntre(saude.log_date, agora) > 7 : false;
+        /* ⚠️ Espaço NÃO-QUEBRÁVEL dentro da recência: medido a 393px, a
+           legenda quebrava como "pressão 118/76 · há 3" / "meses". Assim ela
+           quebra ANTES do "há", e a recência fica inteira na segunda linha. */
+        const quando = velho && idade ? idade.replace(/ /g, "\u00A0") : null;
+        const juntar = (base: string) => (quando ? `${base} · ${quando}` : base);
         /* O peso é o valor grande; a pressão vai na legenda. Sem peso, a
            pressão sobe para o valor — o bloco nunca fica com legenda solta. */
         d["Saúde"] = peso
-          ? { valor: peso, legenda: pa ? `pressão ${pa}` : undefined }
+          ? { valor: peso, legenda: pa ? juntar(`pressão ${pa}`) : (quando ?? undefined) }
           : pa
-            ? { valor: pa, legenda: "pressão" }
+            ? { valor: pa, legenda: juntar("pressão") }
             : null;
       }
       if (chutes && chutes.kick_count != null) {

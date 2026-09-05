@@ -72,6 +72,9 @@ const EXTRAS = [
   "/preview-saude-mulher?tela=ciclo&gestante=1",
   "/preview-saude-mulher?tela=preventivos",
   "/preview-saude-mulher?tela=preventivos&estado=instavel",
+  /* ⚠️ O bloco com DADO VELHO: ele mostrava o último valor sem limite de
+     recência, e uma pressão de meses atrás lia como o estado de hoje. */
+  "/preview-saude?w=24&dados=2",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum

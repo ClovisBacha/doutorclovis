@@ -407,17 +407,30 @@ export function NutricaoTab({
                       </span>
                     ) : (
                       <>
+                        {/* ⚠️ ALVO DE 44px, e aqui ele NÃO pode sair de um
+                            `after:-inset`. Medido antes: 16×18px — o menor
+                            controle do app da paciente, e o ÚNICO caminho que
+                            ela tem para corrigir uma orientação alimentar
+                            errada (o 👎 chega na fila do médico).
+                            ⚠️ O truque do pseudo-elemento serviria se o botão
+                            fosse sozinho; aqui são dois VIZINHOS e opostos, e
+                            estendê-los faria os alvos se encavalarem — tocar
+                            entre eles acertaria o contrário do que ela quis.
+                            É a lição do ✕ do chá de bebê: truque de
+                            pseudo-elemento não conserta encavalamento.
+                            Os `-m` devolvem o espaço que o quadrado tomou, para
+                            o desenho da bolha não mudar. */}
                         <button
                           onClick={() => votar(i, true)}
                           aria-label="Esta resposta ajudou"
-                          className="text-xs opacity-50 hover:opacity-100"
+                          className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
                         >
                           👍
                         </button>
                         <button
                           onClick={() => votar(i, false)}
                           aria-label="Esta resposta não ajudou"
-                          className="text-xs opacity-50 hover:opacity-100"
+                          className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
                         >
                           👎
                         </button>
@@ -455,12 +468,12 @@ export function NutricaoTab({
             placeholder={
               careMode ? "Pergunte sobre alimentação…" : "Pergunte sobre alimentação na gestação…"
             }
-            className="flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
+            className="min-h-[44px] flex-1 rounded-full border border-input bg-background px-4 py-2 text-sm"
           />
           <button
             onClick={() => send()}
             disabled={loading}
-            className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
+            className="min-h-[44px] rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground disabled:opacity-60"
           >
             {loading ? "Enviando…" : "Enviar"}
           </button>

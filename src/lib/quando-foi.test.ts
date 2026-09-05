@@ -90,3 +90,30 @@ describe("a grade da Saúde usa a régua", () => {
     expect(BLOCO).not.toMatch(/gte\("started_at", `\$\{[a-z]+\}T00:00:00`\)/);
   });
 });
+
+describe("o bloco da Saúde não afirma atualidade sobre dado velho", () => {
+  const CONTA = semProsa(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+  const BLOCO = (() => {
+    const i = CONTA.indexOf("const [dados, setDados] = useState<Record<string, Dado | null>>");
+    const j = CONTA.indexOf("setDados(d);", i);
+    return CONTA.slice(i, j);
+  })();
+
+  test("⚠️ a legenda diz QUANDO, e o corte vem de `diasEntre`", () => {
+    /* Mostrava o último valor sem limite nenhum: quem parou de registrar há
+       cinco meses lia "pressão 118/76" como o estado de hoje. */
+    expect(BLOCO).toContain("haQuantoTempo(saude.log_date");
+    expect(BLOCO).toMatch(/diasEntre\(saude\.log_date, agora\) > \d+/);
+  });
+
+  test("⚠️ até o corte, a legenda fica como sempre foi", () => {
+    /* Carimbar "há 2 dias" no caso comum seria ruído: peso e pressão não são
+       medidos todo dia. */
+    expect(BLOCO).toMatch(/velho && idade \? [^:]+ : null/);
+  });
+
+  test("⚠️ a recência não quebra no meio", () => {
+    /* Medido a 393px: sem isto a legenda quebrava como "… há 3" / "meses". */
+    expect(BLOCO).toContain("\\u00A0");
+  });
+});

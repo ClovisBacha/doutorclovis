@@ -125,3 +125,28 @@ describe("as duas telas que prometiam sem confirmar", () => {
     expect(CONTA).toMatch(/votos\[i\] === "fila"/);
   });
 });
+
+describe("o 👍👎 da nutrição pode ser acertado com o dedo", () => {
+  const TELA = readFileSync("src/components/nutricao-tab.tsx", "utf8");
+
+  test("⚠️ os dois têm alvo de 44px", () => {
+    /* Medido antes: 16×18px — o menor controle do app da paciente, e o ÚNICO
+       caminho que ela tem para corrigir uma orientação alimentar errada. */
+    const votos = TELA.split('aria-label="Esta resposta')
+      .slice(1)
+      .map((t) => t.slice(0, 260));
+    expect(votos).toHaveLength(2);
+    for (const v of votos) expect(v).toMatch(/h-11 w-11/);
+  });
+
+  test("⚠️ e NÃO por pseudo-elemento: eles são vizinhos e opostos", () => {
+    /* `after:-inset` estende o alvo sem mover o desenho — serve para um botão
+       sozinho. Aqui os dois se encavalariam, e tocar entre eles acertaria o
+       contrário do que ela quis. É a lição do ✕ do chá de bebê. */
+    const i = TELA.indexOf('aria-label="Esta resposta ajudou"');
+    const j = TELA.indexOf('aria-label="Esta resposta não ajudou"');
+    expect(i).toBeGreaterThan(-1);
+    expect(j).toBeGreaterThan(i);
+    expect(TELA.slice(i, j + 300)).not.toContain("after:-inset");
+  });
+});
