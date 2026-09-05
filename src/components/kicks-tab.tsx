@@ -68,10 +68,10 @@ export function KicksTab({
     ativa?: { count: number; minutos: number };
   };
 }) {
-  const [active, setActive] = useState<KickSession | null>(
-    bancada?.ativa
-      ? ({ id: "bancada", started_at: "", ended_at: null, kick_count: 0 } as KickSession)
-      : null,
+  /* ⚠️ A sessão em curso é LOCAL — ela só vira linha no banco quando termina.
+     Ver o comentário de `start()`. */
+  const [active, setActive] = useState<{ startedAt: string } | null>(
+    bancada?.ativa ? { startedAt: "2026-09-05T20:00:00-03:00" } : null,
   );
   const [count, setCount] = useState(bancada?.ativa?.count ?? 0);
   const [history, setHistory] = useState<KickSession[]>(bancada?.history ?? []);
@@ -119,19 +119,28 @@ export function KicksTab({
     return () => clearInterval(t);
   }, [active, ehBancada]);
 
-  async function start() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { data, error } = await (supabase as any)
-      .from("kick_sessions")
-      .insert({ user_id: u.user.id, kick_count: 0 })
-      .select()
-      .single();
-    if (error) {
-      toast.error("Não foi possível iniciar a sessão. Tente novamente.");
-      return;
-    }
-    setActive(data);
+  /* ─── A SESSÃO SÓ VIRA LINHA QUANDO ELA ENCERRA ───────────────────────────
+     ⚠️ Antes, tocar em "Iniciar sessão" INSERIA na hora uma linha com
+     `kick_count: 0` e `ended_at` nulo. Quem abria a tela e desistia — fechou o
+     app, o telefone dormiu, trocou de aba — deixava essa linha para sempre.
+
+     Ela não aparece no histórico DELA (a lista filtra por `ended_at`), mas
+     `clinical_events` une `kick_sessions` sem filtro nenhum: no prontuário e
+     no "o que mudou desde a última consulta" o médico lia
+     **"Movimentos — 0 movimentos"**, uma afirmação clínica que nunca
+     aconteceu. Ela não sentiu zero; ela nem começou a contar.
+
+     ⚠️ **E O CONSERTO NÃO PODE SER "só gravar se houver chute".** Zero
+     movimentos em duas horas é exatamente o alarme que esta tela existe para
+     dar — é um dos nove sintomas vermelhos. O que separa os dois casos não é a
+     contagem, é o ENCERRAMENTO: quem encerra registrou, mesmo que em zero;
+     quem abandonou não registrou nada.
+
+     O relógio passa a viver só no aparelho até `stop()`. A sessão em curso
+     continua não sobrevivendo ao fechamento do app — isso já era assim, porque
+     `count` sempre foi estado do React. */
+  function start() {
+    setActive({ startedAt: new Date().toISOString() });
     setCount(0);
     startRef.current = Date.now();
     setElapsed(0);
@@ -149,11 +158,23 @@ export function KicksTab({
 
   async function stop(finalCount = count) {
     if (!active) return;
-    const { error } = await (supabase as any)
-      .from("kick_sessions")
-      .update({ ended_at: new Date().toISOString(), kick_count: finalCount })
-      .eq("id", active.id);
+    const { data: u } = await supabase.auth.getUser();
+    if (!u.user) {
+      toast.error("Não foi possível salvar a sessão. Tente novamente.");
+      return;
+    }
+    /* ⚠️ `started_at` vai EXPLÍCITO, e não pelo `DEFAULT now()` do banco: a
+       sessão começou quando ela tocou em "Iniciar", não quando ela encerrou —
+       e a duração é o que dá sentido a "10 em 2 horas". */
+    const { error } = await (supabase as any).from("kick_sessions").insert({
+      user_id: u.user.id,
+      started_at: active.startedAt,
+      ended_at: new Date().toISOString(),
+      kick_count: finalCount,
+    });
     if (error) {
+      /* ⚠️ NÃO limpa a tela: a contagem dela continua à mostra para ela poder
+         tentar de novo. Zerar aqui perderia duas horas de contagem. */
       toast.error("Não foi possível salvar a sessão. Tente novamente.");
       return;
     }

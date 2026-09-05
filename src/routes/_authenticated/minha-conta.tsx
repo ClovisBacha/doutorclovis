@@ -126,6 +126,7 @@ import { BabyTab } from "@/components/baby-tab";
 import { KicksTab } from "@/components/kicks-tab";
 import { HealthTab } from "@/components/health-tab";
 import { NutricaoTab } from "@/components/nutricao-tab";
+import { inicioDeHojeISO, quandoFoi } from "@/lib/quando-foi";
 import { SaudeMulherHub } from "@/components/saude-mulher";
 import { Field } from "@/components/campo";
 import {
@@ -858,7 +859,12 @@ export function HubSaude({
     if (ehBancada) return;
     let vivo = true;
     (async () => {
-      const hoje = ymdLocal();
+      /* ⚠️ O INSTANTE da meia-noite DELA, e não uma data solta: mandar
+         `"2026-09-05T00:00:00"` sem fuso faz o Postgres ler em UTC, e em São
+         Paulo isso arrasta as contrações das 21h de ONTEM para dentro do
+         "hoje". Ver `src/lib/quando-foi.ts`. */
+      const agora = new Date();
+      const desdeMeiaNoite = inicioDeHojeISO(agora);
       const [saude, chutes, contr] = await Promise.all([
         supabase
           .from("health_logs")
@@ -876,7 +882,7 @@ export function HubSaude({
         supabase
           .from("contraction_logs")
           .select("started_at")
-          .gte("started_at", `${hoje}T00:00:00`)
+          .gte("started_at", desdeMeiaNoite)
           .order("started_at", { ascending: false })
           .limit(50)
           .then((r) => (r.error ? null : (r.data ?? null))),
@@ -899,13 +905,12 @@ export function HubSaude({
             : null;
       }
       if (chutes && chutes.kick_count != null) {
-        const dia = String(chutes.started_at).slice(0, 10);
-        const quando =
-          dia === hoje
-            ? "hoje"
-            : dia === ymdLocal(new Date(Date.now() - 86400000))
-              ? "ontem"
-              : null;
+        /* ⚠️ NUNCA `String(started_at).slice(0, 10)`: a coluna é `timestamptz`
+           e o PostgREST devolve em UTC. Medido em São Paulo — uma sessão às
+           21h30 do dia 5 chega como dia 6, não casava com "hoje" nem com
+           "ontem", e o contador SUMIA do bloco. Quem conta movimentos no
+           horário que a tela recomenda era quem nunca via o número. */
+        const quando = quandoFoi(chutes.started_at, agora);
         d["chutes"] = quando
           ? { valor: String(chutes.kick_count), legenda: `chutes ${quando}` }
           : null;
