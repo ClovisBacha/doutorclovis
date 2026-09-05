@@ -126,3 +126,74 @@ describe("⚠️ e a tela usa isso, sem nunca reescrever o dado em silêncio", (
     expect(c).toContain("vou avaliar pelos sintomas");
   });
 });
+
+describe("⚠️ e uma falha de rede não pode apagar a orientação", () => {
+  /*
+    `assessSymptoms` é servidor por dois motivos: escrever a explicação com IA e
+    gravar a triagem para o médico. Mas o NÍVEL nunca veio da IA — vem de
+    `assessLevel`, que é regra pura e já está no pacote do navegador (esta tela
+    importa `RED_SYMPTOMS` do mesmo arquivo). E o texto do caso sem IA é
+    `LEVEL_FALLBACK`, também puro.
+
+    ⚠️ Ou seja: sem rede o app tinha, na mão, exatamente a mesma resposta que
+    daria com o servidor de pé sem chave de IA — e respondia "Não foi possível
+    avaliar os sintomas" a quem marcou sangramento.
+  */
+  function corpo() {
+    const i = CONTA.indexOf("function AlertsTab(");
+    expect(i).toBeGreaterThan(-1);
+    return CONTA.slice(i, CONTA.indexOf("\nfunction ", i + 1));
+  }
+
+  test("o catch RESPONDE, e responde pela régua compartilhada", () => {
+    const c = corpo();
+    const i = c.lastIndexOf("} catch {");
+    expect(i).toBeGreaterThan(-1);
+    const ramo = c.slice(i, c.indexOf("} finally {", i));
+    /* ⚠️ A CORRENTE, e não a presença: `void assessLevel(...)` ao lado de um
+       `local` fabricado deixa as duas strings no arquivo e o `setResult`
+       desenhando outra coisa. O que se cobra é que o valor DESENHADO venha da
+       régua. */
+    expect(ramo).toMatch(/const local = assessLevel\(/);
+    expect(ramo).toMatch(/setResult\(\{ \.\.\.local, message: LEVEL_FALLBACK\[local\.level\] \}\)/);
+    /* ⚠️ E a mesma pressão que o servidor receberia — senão a resposta de
+       fora e a de dentro divergiriam no caso que mais importa. */
+    expect(ramo).toMatch(/systolic: pressao\?\.systolic \?\? null/);
+  });
+
+  test("⚠️ e o `toast` de 'não foi possível avaliar' não volta", () => {
+    /* Ele era a tela inteira de erro sobre uma triagem que o app sabia
+       responder. */
+    expect(corpo()).not.toContain("Não foi possível avaliar os sintomas");
+  });
+
+  test("⚠️ o que NÃO se finge é o registro", () => {
+    const c = corpo();
+    const i = c.lastIndexOf("} catch {");
+    const ramo = c.slice(i, c.indexOf("} finally {", i));
+    /* `registrou: false` é o que faz a caixa dizer que o médico não vai ver —
+       e isso é verdade, e muda o que ela faz a seguir. */
+    expect(ramo).toContain("setRegistrou(false)");
+    expect(ramo).toContain("setSemRede(true)");
+    /* E a tela tem um texto PRÓPRIO para esse caso: o genérico de "não
+       consegui registrar" não explica que a avaliação saiu daqui de dentro. */
+    /* ⚠️ E o GUARDA do texto, não o texto: trocar `{semRede && (` por
+       `{false && (` deixava a frase no arquivo e a faixa fora da tela. */
+    const t = c.indexOf("Você está sem conexão");
+    expect(t).toBeGreaterThan(-1);
+    const chave = c.lastIndexOf("{", t);
+    expect(chave).toBeGreaterThan(-1);
+    expect(c.slice(chave, t)).toMatch(/semRede/);
+    expect(c).toMatch(/!semRede && registrou === false/);
+  });
+
+  test("a bandeira é zerada a cada nova avaliação", () => {
+    /* Sem isto, a faixa de "sem conexão" sobreviveria a uma tentativa que deu
+       certo depois — e a tela diria que o médico não viu algo que ele viu. */
+    const c = corpo();
+    const i = c.indexOf("async function avaliar(");
+    expect(i).toBeGreaterThan(-1);
+    const fn = c.slice(i, c.indexOf("try {", i));
+    expect(fn).toContain("setSemRede(false)");
+  });
+});

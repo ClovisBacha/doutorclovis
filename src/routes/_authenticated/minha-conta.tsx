@@ -145,7 +145,13 @@ import {
 import { faltamTrofeus, trofeusExigidos } from "@/lib/trofeus";
 import { BabyIllustration, BABY_TONES } from "@/components/baby-illustration";
 import { assessSymptoms, saveTriageLog } from "@/lib/triage.functions";
-import { RED_SYMPTOMS, YELLOW_SYMPTOMS, type RiskLevel } from "@/lib/triage";
+import {
+  RED_SYMPTOMS,
+  YELLOW_SYMPTOMS,
+  assessLevel,
+  LEVEL_FALLBACK,
+  type RiskLevel,
+} from "@/lib/triage";
 import {
   submitPreConsulta,
   getMyPreConsultas,
@@ -6973,6 +6979,8 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
    * que a gravação falhe. O que mudou é ela saber que o registro não foi.
    */
   const [registrou, setRegistrou] = useState<boolean | null>(null);
+  /** A avaliação saiu da régua DO CELULAR, porque o servidor não respondeu. */
+  const [semRede, setSemRede] = useState(false);
   const [result, setResult] = useState<{
     level: RiskLevel;
     reasons: string[];
@@ -7006,6 +7014,7 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
   async function avaliar() {
     setLoading(true);
     setResult(null);
+    setSemRede(false);
     try {
       /* A sessão vai junto: sem ela a orientação continua saindo (a régua é de
          regra, não de IA), mas escrita à mão em vez de gerada. Ver o cabeçalho
@@ -7051,9 +7060,33 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
         /* sessão indisponível — a triagem já foi mostrada, seguimos */
       }
     } catch {
-      toast.error(
-        "Não foi possível avaliar os sintomas. Tente novamente ou ligue para o consultório.",
-      );
+      /**
+       * ⚠️ **UMA FALHA DE REDE APAGAVA A ORIENTAÇÃO INTEIRA — e a régua que a
+       * produz já está no celular, sem uso.**
+       *
+       * `assessSymptoms` é servidor por dois motivos: escrever a explicação com
+       * IA e gravar a triagem para o médico. Mas o NÍVEL nunca veio da IA —
+       * vem de `assessLevel`, que é regra pura e já está no pacote do
+       * navegador (esta tela importa `RED_SYMPTOMS` do mesmo arquivo). E o
+       * texto do caso sem IA é `LEVEL_FALLBACK`, também puro.
+       *
+       * Ou seja: sem rede o app tinha, na mão, exatamente a mesma resposta que
+       * daria com o servidor de pé sem chave de IA — e respondia "Não foi
+       * possível avaliar os sintomas" a quem marcou sangramento. Numa aba cujo
+       * assunto são os nove sintomas VERMELHOS, essa é a hora em que ela mais
+       * precisa da frase "procure atendimento agora: ligue 192".
+       *
+       * ⚠️ E o que NÃO se pode fingir é o registro: `setRegistrou(false)` faz a
+       * tela dizer, na caixa, que o médico não vai ver isto — que é verdade, e
+       * é a informação que muda o que ela faz a seguir.
+       */
+      const local = assessLevel([...selected], {
+        systolic: pressao?.systolic ?? null,
+        diastolic: pressao?.diastolic ?? null,
+      });
+      setResult({ ...local, message: LEVEL_FALLBACK[local.level] });
+      setRegistrou(false);
+      setSemRede(true);
     } finally {
       setLoading(false);
     }
@@ -7198,7 +7231,18 @@ function AlertsTab({ weeks }: { weeks: number | null }) {
               E é texto NA CAIXA, nunca um `toast`: ela rola a tela lendo a
               orientação, e um aviso que some em cinco segundos é um aviso que
               não aconteceu. */}
-          {registrou === false && result.level !== "verde" && (
+          {/* ⚠️ Sem rede, a orientação acima saiu da régua DO CELULAR — a mesma
+              que o servidor usa, com o mesmo texto de quando não há IA. O que
+              muda é que ela não foi registrada, e a paciente precisa saber
+              disso: é o que decide se ela também liga para o consultório. */}
+          {semRede && (
+            <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900">
+              Você está sem conexão. Avaliei pelos sinais que você marcou, com a mesma régua de
+              sempre — a orientação acima vale. O que não deu foi registrar na sua conta, então o
+              seu médico não vai ver por aqui.
+            </p>
+          )}
+          {!semRede && registrou === false && result.level !== "verde" && (
             <p className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-3 text-[13px] leading-snug text-amber-900">
               Não consegui registrar isto na sua conta — então seu médico não vai ver por aqui. A
               orientação acima vale do mesmo jeito. Se puder, fale com o consultório.
