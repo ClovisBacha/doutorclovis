@@ -3160,7 +3160,7 @@ function MinhaContaPage() {
                 {tab === "Saúde da mulher" && (
                   <div className="space-y-5">
                     <CabecalhoDaSaude chave="Saúde da mulher" />
-                    <SaudeMulherHub />
+                    <SaudeMulherHub weeks={gest?.weeks ?? null} />
                   </div>
                 )}
                 {tab === "Médico" && <MédicoTab />}
@@ -16221,7 +16221,7 @@ const SAUDE_MULHER_SUBTABS = [
 ] as const;
 
 /** Hub "Saúde da mulher": Ciclo Menstrual + Preventivos numa tela só. */
-function SaudeMulherHub() {
+function SaudeMulherHub({ weeks }: { weeks: number | null }) {
   const [sub, setSub] = useState<(typeof SAUDE_MULHER_SUBTABS)[number]["key"]>("ciclo");
   return (
     <div className="space-y-5">
@@ -16241,7 +16241,7 @@ function SaudeMulherHub() {
         ))}
       </div>
       <Fade key={sub}>
-        {sub === "ciclo" && <CicloMenstrualTab />}
+        {sub === "ciclo" && <CicloMenstrualTab gestante={weeks != null} />}
         {sub === "preventivos" && <PreventivosTab />}
       </Fade>
     </div>

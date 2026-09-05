@@ -237,7 +237,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
   );
 }
 
-export function CicloMenstrualTab() {
+export function CicloMenstrualTab({ gestante = false }: { gestante?: boolean }) {
   const [cycles, setCycles] = useState<MenstrualCycle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -332,26 +332,56 @@ export function CicloMenstrualTab() {
 
   return (
     <div className="space-y-6">
-      {/* Ciclo visual — estilo Apple Health */}
-      {model ? (
-        <Stagger className="space-y-4">
-          <StaggerItem>
-            <CicloHero model={model} />
-          </StaggerItem>
-          <StaggerItem>
-            <CicloCalendario model={model} />
-          </StaggerItem>
-        </Stagger>
-      ) : (
-        <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
-          <p className="mb-2 text-4xl">🌸</p>
-          <p className="font-serif text-lg">Seu ciclo, visual e previsível</p>
-          <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Registre seu período abaixo para ver o anel de fases, a janela fértil e a previsão do
-            próximo ciclo — como no app de saúde do celular.
+      {/*
+        ⚠️ **DURANTE A GESTAÇÃO O ANEL NÃO PROJETA NADA.**
+
+        `cycleDayFor` faz aritmética modular sobre a data do último período: com
+        uma DUM de meses atrás ela devolve um "dia do ciclo" alegremente, e a
+        tela escrevia **"Próximo período em 9 dias"** e **"Janela fértil"** para
+        uma gestante — que passou a poder chegar aqui quando o ladrilho "Saúde
+        da mulher" deixou de sumir da grade durante a gestação (set/2026).
+
+        ⚠️ **O HISTÓRICO FICA.** O que sai é a PROJEÇÃO, nunca o que ela
+        registrou: apagar os ciclos dela seria a diferença entre "não está aqui
+        agora" e "não existe mais", que é o que separa arrumar de apagar. E a
+        tela DIZ por que o anel sumiu — um bloco que some sem explicação lê como
+        recurso quebrado.
+      */}
+      {gestante && (
+        <div className="rounded-2xl border border-border bg-secondary/40 p-4 text-sm">
+          <p className="font-semibold">A previsão do ciclo fica pausada na gestação</p>
+          <p className="mt-1 text-muted-foreground">
+            Não faz sentido estimar próximo período nem janela fértil agora. O que você já registrou
+            continua aqui embaixo, e a previsão volta depois do parto.
           </p>
         </div>
       )}
+      {
+        /* Ciclo visual — estilo Apple Health.
+          ⚠️ Na gestação NÃO cai no `else`: aquele bloco convida a "registrar o
+          período abaixo para ver o anel de fases, a janela fértil e a previsão
+          do próximo ciclo" — a promessa exata que o aviso acima acabou de
+          dizer que está pausada, duas frases se contradizendo na mesma tela. */
+        gestante ? null : model ? (
+          <Stagger className="space-y-4">
+            <StaggerItem>
+              <CicloHero model={model} />
+            </StaggerItem>
+            <StaggerItem>
+              <CicloCalendario model={model} />
+            </StaggerItem>
+          </Stagger>
+        ) : (
+          <div className="rounded-3xl border border-dashed border-border bg-card p-8 text-center">
+            <p className="mb-2 text-4xl">🌸</p>
+            <p className="font-serif text-lg">Seu ciclo, visual e previsível</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Registre seu período abaixo para ver o anel de fases, a janela fértil e a previsão do
+              próximo ciclo — como no app de saúde do celular.
+            </p>
+          </div>
+        )
+      }
 
       {/* Log button */}
       {!showForm ? (

@@ -117,3 +117,48 @@ describe("⚠️ e a tela oferece o caminho, e não só o número", () => {
     expect(texto).toMatch(/movimento/);
   });
 });
+
+describe("⚠️ e o ciclo não prevê período para uma gestante", () => {
+  /*
+    `cycleDayFor` faz aritmética modular sobre a data do último período: com uma
+    DUM de meses atrás ela devolve um "dia do ciclo" alegremente, e a tela
+    escrevia "Próximo período em 9 dias" e "Janela fértil" para uma gestante.
+
+    ⚠️ E isso passou a ser ALCANÇÁVEL quando o ladrilho "Saúde da mulher" deixou
+    de sumir da grade durante a gestação (set/2026, estudo de navegação): a
+    porta abriu, e a projeção continuou de pé atrás dela.
+  */
+  const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
+
+  test("a tela sabe que ela está grávida", () => {
+    expect(CICLO).toMatch(/export function CicloMenstrualTab\(\{ gestante/);
+    /* E quem informa é o hub, a partir da idade gestacional real. */
+    expect(CONTA).toContain("<CicloMenstrualTab gestante={weeks != null} />");
+    expect(CONTA).toContain("<SaudeMulherHub weeks={gest?.weeks ?? null} />");
+  });
+
+  test("⚠️ grávida, o anel e a projeção não são desenhados", () => {
+    expect(CICLO).toMatch(/gestante \? null : model \?/);
+  });
+
+  test("⚠️ e o convite a 'registrar para ver a previsão' também não", () => {
+    /* Ele prometia exatamente o que o aviso acima diz estar pausado — duas
+       frases se contradizendo na mesma tela. O `gestante ? null` cobre os DOIS
+       ramos, e é por isso que ele vem antes do `model ?`. */
+    const i = CICLO.indexOf("gestante ? null : model ?");
+    expect(i).toBeGreaterThan(-1);
+    expect(CICLO.indexOf("Registre seu período abaixo")).toBeGreaterThan(i);
+  });
+
+  test("⚠️ o histórico dela FICA, e a tela diz por que o anel sumiu", () => {
+    /* Apagar os ciclos registrados seria a diferença entre "não está aqui
+       agora" e "não existe mais". E um bloco que some sem explicação lê como
+       recurso quebrado. */
+    expect(CICLO).toContain("A previsão do ciclo fica pausada na gestação");
+    expect(CICLO).toContain("continua aqui embaixo");
+    /* A lista de ciclos não é gateada por `gestante`. */
+    const i = CICLO.indexOf("cycles.map(");
+    expect(i).toBeGreaterThan(-1);
+    expect(CICLO.slice(Math.max(0, i - 200), i)).not.toContain("gestante");
+  });
+});
