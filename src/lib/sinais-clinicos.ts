@@ -40,7 +40,16 @@ export function sinalPressao(sistolica?: number | null, diastolica?: number | nu
      ficha o lugar da última medida de verdade. Um número que não pode existir
      tem que dizer que não pode existir. */
   if (!Number.isFinite(sistolica) || !Number.isFinite(diastolica)) return null;
-  if (sistolica < 50 || sistolica > 300 || diastolica < 20 || diastolica > 200) {
+  /* ⚠️ SÓ O PISO É IMPLAUSÍVEL — NÃO HÁ TETO (set/2026, decisão do dono: "vai
+     que a pessoa tem mais de 350 kg, tire esse limite e outros que podem
+     existir").
+
+     E aqui o teto era pior que um formulário chato: com ele, um 320/190 REAL
+     caía nesta linha como "atenção — implausível" e era REBAIXADO abaixo de
+     qualquer vermelho na fila de trabalho do médico. Sem ele, cai em
+     `faixaPressao` e sai GRAVE, que é o que ele é. Errar para o lado de
+     alarmar é o único lado seguro de uma régua clínica. */
+  if (sistolica < 50 || diastolica < 20) {
     return { gravidade: "atencao", nota: "Valor de pressão implausível" };
   }
   /* Campos trocados: avalia o par NA ORDEM CERTA e mantém a gravidade dele.
@@ -107,7 +116,10 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
        três, que era o efeito de `atencao`. */
     return { gravidade: "grave", nota: "Valor implausível — confira a unidade (mg/dL)" };
   }
-  if (valor <= 0 || valor > 900) {
+  /* Sem teto, pela mesma razão da pressão: com `> 900`, uma glicemia de 950 —
+     que é cetoacidose — saía "implausível/atenção" e ordenava abaixo de um 185
+     rotulado GRAVE. O piso fica: zero e negativo não são medida. */
+  if (valor <= 0) {
     return { gravidade: "atencao", nota: "Valor de glicemia implausível" };
   }
   /* Hipoglicemia grave vem ANTES do teto alto: 25 mg/dL é neuroglicopenia,
@@ -331,16 +343,56 @@ export type CampoClinico =
   | "sleep_hours"
   | "steps";
 
-const FAIXAS: Record<CampoClinico, { min: number; max: number; nome: string; unidade: string }> = {
-  systolic: { min: 50, max: 300, nome: "A sistólica", unidade: "mmHg" },
-  diastolic: { min: 20, max: 200, nome: "A diastólica", unidade: "mmHg" },
-  glucose_mg_dl: { min: 20, max: 900, nome: "A glicemia", unidade: "mg/dL" },
-  weight_kg: { min: 25, max: 350, nome: "O peso", unidade: "kg" },
-  spo2: { min: 50, max: 100, nome: "A saturação", unidade: "%" },
-  heart_rate_bpm: { min: 30, max: 250, nome: "A frequência cardíaca", unidade: "bpm" },
-  sleep_hours: { min: 0, max: 24, nome: "O sono", unidade: "h" },
-  steps: { min: 0, max: 200000, nome: "Os passos", unidade: "" },
+export type FaixaDeEntrada = {
+  /** O piso, INCLUSIVO — salvo com `acimaDe`, que o torna exclusivo. */
+  min: number;
+  /** Torna o piso exclusivo: `> min` em vez de `>= min`. Serve ao peso. */
+  acimaDe?: true;
+  /**
+   * Ausente = SEM TETO, e isso é o padrão.
+   *
+   * ⚠️ Só existe onde o máximo é DEFINIÇÃO da grandeza, nunca plausibilidade:
+   * saturação não passa de 100% porque 100% é "todo o oxigênio", e um dia não
+   * tem mais de 24 horas. Peso, pressão, glicemia e passos não têm teto — o
+   * corpo de alguém não é um argumento para recusar o número dela.
+   */
+  max?: number;
+  nome: string;
+  unidade: string;
 };
+
+/* ⚠️ SEM TETO DE PLAUSIBILIDADE (set/2026). Os tetos daqui nasceram de chute
+   ("que peso é razoável?") e o dono os derrubou depois de a paciente ver
+   "O peso precisa ficar entre 25 e 350 kg" ao digitar o peso dela. Um app de
+   saúde que RECUSA o número de uma pessoa real está errado duas vezes: ela não
+   consegue registrar, e o médico não vê o dado que mais importaria. */
+export const FAIXAS: Record<CampoClinico, FaixaDeEntrada> = {
+  systolic: { min: 50, nome: "A sistólica", unidade: "mmHg" },
+  diastolic: { min: 20, nome: "A diastólica", unidade: "mmHg" },
+  glucose_mg_dl: { min: 20, nome: "A glicemia", unidade: "mg/dL" },
+  weight_kg: { min: 0, acimaDe: true, nome: "O peso", unidade: "kg" },
+  spo2: { min: 50, max: 100, nome: "A saturação", unidade: "%" },
+  heart_rate_bpm: { min: 30, nome: "A frequência cardíaca", unidade: "bpm" },
+  sleep_hours: { min: 0, max: 24, nome: "O sono", unidade: "h" },
+  steps: { min: 0, nome: "Os passos", unidade: "" },
+};
+
+/** A frase que a paciente lê. Sem teto ela fala só do piso. */
+export function fraseDaFaixa(f: FaixaDeEntrada): string {
+  const un = f.unidade ? ` ${f.unidade}` : "";
+  if (f.max != null) {
+    return `${f.nome} precisa ficar entre ${f.min} e ${f.max}${un}. Confira o número.`;
+  }
+  if (f.acimaDe) return `${f.nome} precisa ser maior que ${f.min}${un}. Confira o número.`;
+  return `${f.nome} precisa ser ${f.min}${un} ou mais. Confira o número.`;
+}
+
+/** A régua, num lugar só — a tela da paciente e a do médico leem esta. */
+export function foraDaFaixa(f: FaixaDeEntrada, n: number): boolean {
+  if (f.acimaDe ? n <= f.min : n < f.min) return true;
+  if (f.max != null && n > f.max) return true;
+  return false;
+}
 
 /** `null` quando está tudo bem; a frase para a paciente quando não está. */
 export function validaEntrada(campo: CampoClinico, bruto: string): string | null {
@@ -355,9 +407,7 @@ export function validaEntrada(campo: CampoClinico, bruto: string): string | null
   if (campo === "glucose_mg_dl" && n > 0 && n < 20) {
     return "Esse valor parece estar em mmol/L. O app usa mg/dL — multiplique por 18 (ex.: 5,4 → 97).";
   }
-  if (n < f.min || n > f.max) {
-    return `${f.nome} precisa ficar entre ${f.min} e ${f.max}${f.unidade ? ` ${f.unidade}` : ""}. Confira o número.`;
-  }
+  if (foraDaFaixa(f, n)) return fraseDaFaixa(f);
   return null;
 }
 

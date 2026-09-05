@@ -881,14 +881,15 @@ export const salvarConsulta = createServerFn({ method: "POST" })
         achados: z.string().max(8000).optional(),
         conduta: z.string().max(8000).optional(),
         resumoPaciente: z.string().max(4000).optional(),
-        /* As faixas repetem as de `sinais-clinicos.ts` e as do CHECK do banco.
-           Validar aqui é o que faz o médico ver "a diastólica precisa ficar
-           entre 20 e 200" em vez do erro genérico do Postgres. */
-        systolic: z.number().int().min(50).max(300).nullable().optional(),
-        diastolic: z.number().int().min(20).max(200).nullable().optional(),
-        pesoKg: z.number().min(25).max(350).nullable().optional(),
-        alturaUterinaCm: z.number().min(5).max(60).nullable().optional(),
-        bpmFetal: z.number().int().min(60).max(220).nullable().optional(),
+        /* ⚠️ SÓ PISO, NENHUM TETO (set/2026) — a mesma decisão de
+           `sinais-clinicos.ts` e dos CHECKs do banco. O piso continua porque
+           zero e negativo não são medida; o teto saiu porque plausibilidade
+           chutada recusa o número de uma paciente real. */
+        systolic: z.number().int().min(50).nullable().optional(),
+        diastolic: z.number().int().min(20).nullable().optional(),
+        pesoKg: z.number().positive().nullable().optional(),
+        alturaUterinaCm: z.number().positive().nullable().optional(),
+        bpmFetal: z.number().int().min(60).nullable().optional(),
       })
       .parse(i),
   )
@@ -953,6 +954,13 @@ export const salvarConsulta = createServerFn({ method: "POST" })
         // Índice único: a mesma consulta já foi registrada.
         if (code === "23505") {
           return { ok: false as const, id: null, motivo: "duplicada" as const };
+        }
+        /* ⚠️ O DEPLOY CHEGA ANTES DO SQL, SEMPRE — é o estado normal desta
+           produção. Nessa janela o app aceita um peso de 400 kg e o banco o
+           recusa pelo CHECK antigo (23514). "Confira os valores" seria conselho
+           errado: o número está certo, e repetir falha para sempre. */
+        if (code === "23514") {
+          return { ok: false as const, id: null, motivo: "teto_antigo_no_banco" as const };
         }
         return { ok: false as const, id: null };
       }

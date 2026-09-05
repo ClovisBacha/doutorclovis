@@ -5636,7 +5636,16 @@ function HealthTab({
     if (form.notes) payload.notes = form.notes;
     const { error } = await (supabase as any).from("health_logs").insert(payload);
     if (error) {
-      toast.error("Erro ao salvar o registro. Tente novamente.");
+      /* ⚠️ O DEPLOY CHEGA ANTES DO SQL. Nessa janela o app já aceita o número
+         (os tetos de plausibilidade saíram) e o banco ainda o recusa pelo CHECK
+         antigo — 23514. "Tente novamente" é conselho errado aqui: o número dela
+         está certo, e repetir falha para sempre. */
+      const codigo = (error as { code?: string }).code;
+      toast.error(
+        codigo === "23514"
+          ? "O número está certo, mas o banco do app ainda não aceita esse valor. Já estamos ajustando — anote e mostre ao seu médico na consulta."
+          : "Erro ao salvar o registro. Tente novamente.",
+      );
       return;
     }
     triggerAchievementsCheck();

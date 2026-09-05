@@ -97,9 +97,13 @@ describe("glicemia", () => {
     expect(r?.nota).toContain("unidade");
   });
 
-  test("zero e absurdos não passam como normal", () => {
+  test("zero não passa como normal — e o número ALTO é grave, não implausível", () => {
     expect(sinalGlicemia(0)?.gravidade).toBe("atencao");
-    expect(sinalGlicemia(1200)?.gravidade).toBe("atencao");
+    /* ⚠️ Isto já foi `atencao`, e era o defeito: com o teto de 900, uma glicemia
+       de 1200 saía "implausível" e ordenava ABAIXO de um 185 rotulado grave, na
+       fila de trabalho do médico. Um número alto demais para ser plausível é,
+       antes disso, um número alto — e cetoacidose é emergência. */
+    expect(sinalGlicemia(1200)?.gravidade).toBe("grave");
   });
 });
 
@@ -160,10 +164,15 @@ describe("validação na entrada", () => {
   });
 
   /* DEFEITO REAL: `if (form.systolic)` com estado em string — "0" é truthy. */
-  test("recusa o impossível", () => {
+  test("recusa o impossível — o que é impossível, e não o que é incomum", () => {
     expect(validaRegistro({ systolic: "0", diastolic: "0" })).toBeTruthy();
-    expect(validaRegistro({ weight_kg: "999" })).toBeTruthy();
+    /* ⚠️ `weight_kg: "999"` era recusado aqui, e o dono derrubou esse teto: um
+       peso alto é o peso de alguém. O que continua impossível é o que não é
+       medida — zero, negativo — e o que a DEFINIÇÃO da grandeza proíbe. */
+    expect(validaRegistro({ weight_kg: "999" })).toBe(null);
+    expect(validaRegistro({ weight_kg: "0" })).toBeTruthy();
     expect(validaRegistro({ spo2: "10" })).toBeTruthy();
+    expect(validaRegistro({ spo2: "101" })).toBeTruthy();
   });
 
   test("pressão pela metade é recusada com a frase certa", () => {
