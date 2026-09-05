@@ -273,6 +273,16 @@ const CantinhoTab = lazy(() =>
 const RedeNoApp = lazy(() =>
   import("@/components/rede-instagram").then((m) => ({ default: m.RedeNoApp })),
 );
+
+/**
+ * ⚠️ O TOCADOR DE DORMIR, e ele é `lazy()` pela mesma conta dos três acima:
+ * ele carrega `som-continuo` + `som-receitas` + `som-primitivas` (as trinta e
+ * duas receitas), e quem abre o app para ver a semana do bebê não pode pagar
+ * isso na abertura.
+ */
+const SonsParaDormir = lazy(() =>
+  import("@/components/sons-para-dormir").then((m) => ({ default: m.SonsParaDormir })),
+);
 import { ensureInitialJourneyPull, lsGet, lsSet } from "@/lib/journey-sync";
 import {
   CHAVE_DICA,
@@ -3100,7 +3110,15 @@ function MinhaContaPage() {
                   </div>
                 )}
                 {tab === "Bem-estar" && (
-                  <BemEstarHub gest={gest} onNavigate={goToTab} careMode={careMode} />
+                  <BemEstarHub
+                    gest={gest}
+                    onNavigate={goToTab}
+                    careMode={careMode}
+                    /* O MESMO `consultasSub` que Registros, Consultas e Bebê já
+                       usam — era o único hub que não o recebia, e por isso a
+                       porta "Sons para dormir" do ☰ caía na grade. */
+                    initialSub={consultasSub}
+                  />
                 )}
                 {tab === "Alertas" && <AlertsTab weeks={gest?.weeks ?? null} />}
                 {tab === "Acompanhante" && (
@@ -3374,14 +3392,41 @@ export const BEMESTAR_SUBTABS = [
     caixa: "border-violet-200/70 from-violet-50 to-fuchsia-50/60",
     tinta: "text-violet-600",
   },
+  /*
+    ⚠️ **ESTE LADRILHO ENTREGAVA OUTRO RECURSO — e um que faz o CONTRÁRIO do
+    que ele promete.**
+
+    Ele dizia "Sons · Relaxar e dormir" e abria `SonsBebêTab`, que são cinco
+    sons feitos em **Web Audio** — e o iOS SUSPENDE o `AudioContext` quando o
+    aparelho bloqueia. Ou seja: o ladrilho de dormir abria um tocador que para
+    no segundo em que ela apoia o celular na mesa de cabeceira. É literalmente
+    o defeito que `sons-para-dormir.tsx` foi escrito para evitar, e o
+    comentário de lá diz isso com todas as letras.
+
+    E o `mapa-do-app` promete, para `tab: "Bem-estar", sub: "sons"`, "Chuva,
+    mar, ventre e mais trinta — **tocam com a tela apagada**". O tocador que
+    cumpre isso (WAV + `<audio loop>`, sobrevive à tela apagada, com card na
+    tela de bloqueio) existia e só era alcançável DENTRO da aba Jogo.
+
+    Agora são dois ladrilhos, cada um dizendo o que entrega.
+  */
   {
     key: "sons",
-    label: "Sons",
-    sub: "Relaxar e dormir",
+    label: "Sons para dormir",
+    sub: "Chuva, mar e mais 30 — com a tela apagada",
     Icon: AudioLines,
     imagem: ARTE_GRADE.sons,
     caixa: "border-sky-200/70 from-sky-50 to-blue-50/60",
     tinta: "text-sky-600",
+  },
+  {
+    key: "sons-bebe",
+    label: "Sons para o bebê",
+    sub: "O que ele escuta daí de dentro",
+    Icon: Baby,
+    imagem: ARTE_GRADE.sons,
+    caixa: "border-indigo-200/70 from-indigo-50 to-violet-50/60",
+    tinta: "text-indigo-600",
   },
   {
     key: "exercicios",
@@ -3416,12 +3461,33 @@ function BemEstarHub({
   gest,
   onNavigate,
   careMode = false,
+  initialSub = null,
 }: {
   gest: Gest;
   onNavigate: (tab: string) => void;
   careMode?: boolean;
+  /**
+   * ⚠️ ESTE HUB ERA O ÚNICO DOS CINCO SEM `initialSub`, e por isso o
+   * `mapa-do-app` apontava para uma sub-tela que ele não sabia abrir:
+   * "Sons para dormir" (`tab: "Bem-estar", sub: "sons"`) caía na GRADE, e a
+   * paciente tinha de adivinhar em qual dos seis quadrados o app queria pôr
+   * ela. `mapa-do-app.test.ts` cobra que toda `sub` exista no hub daquela aba;
+   * o que faltava era o hub SABER receber.
+   */
+  initialSub?: string | null;
 }) {
-  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(null);
+  const [sub, setSub] = useState<(typeof BEMESTAR_SUBTABS)[number]["key"] | null>(() =>
+    initialSub && initialSub !== "sons"
+      ? (initialSub as (typeof BEMESTAR_SUBTABS)[number]["key"])
+      : null,
+  );
+  /**
+   * O tocador de dormir é uma FOLHA `fixed inset-0`, com tema escuro e botão de
+   * fechar próprios — ele não cabe dentro da moldura do `VoltarDaGrade`, que
+   * desenharia um cabeçalho claro por baixo de uma tela preta. Então ele abre
+   * POR CIMA da grade, e fechar devolve a grade onde ela estava.
+   */
+  const [dormirAberto, setDormirAberto] = useState(initialSub === "sons");
   /**
    * ⚠️ AS MEDITAÇÕES SAEM DA GRADE NO MODO CUIDADO.
    *
@@ -3437,16 +3503,36 @@ function BemEstarHub({
    * tirar "Nome do bebê" e manter Amigas — o que sai é o que fala no presente
    * sobre um bebê que vai nascer.
    */
+  /* ⚠️ E "Sons para o bebê" SAI JUNTO no Modo Cuidado — ele é literalmente o
+     que o bebê escuta daí de dentro, e o portão que já tirava as meditações
+     existe por essa exata razão. O tocador de DORMIR fica: `porFamilia(luto)`
+     dentro dele já esconde o coração e o ventre, e dormir mal é justamente o
+     que ela tem depois de uma perda. */
   const itens = careMode
-    ? BEMESTAR_SUBTABS.filter((x) => x.key !== "meditacoes")
+    ? BEMESTAR_SUBTABS.filter((x) => x.key !== "meditacoes" && x.key !== "sons-bebe")
     : BEMESTAR_SUBTABS;
   const atual = itens.find((s) => s.key === sub);
+
+  /* A folha do tocador vive fora do `if` da grade: ela cobre a tela inteira, e
+     o que estiver por baixo continua onde estava quando ela fechar. */
+  const folhaDeDormir = dormirAberto ? (
+    <Suspense fallback={null}>
+      <SonsParaDormir aoFechar={() => setDormirAberto(false)} careMode={careMode} />
+    </Suspense>
+  ) : null;
+
   if (!sub || !atual) {
     return (
-      <GradeHub
-        itens={itens}
-        onAbrir={(k) => setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"])}
-      />
+      <>
+        <GradeHub
+          itens={itens}
+          onAbrir={(k) => {
+            if (k === "sons") setDormirAberto(true);
+            else setSub(k as (typeof BEMESTAR_SUBTABS)[number]["key"]);
+          }}
+        />
+        {folhaDeDormir}
+      </>
     );
   }
   return (
@@ -3454,11 +3540,14 @@ function BemEstarHub({
       <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
       <Fade key={sub}>
         {sub === "meditacoes" && <MeditacoesTab gest={gest} careMode={careMode} />}
-        {sub === "sons" && <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />}
+        {sub === "sons-bebe" && (
+          <SonsBebêTab gest={gest} careMode={careMode} onNavigate={onNavigate} />
+        )}
         {sub === "exercicios" && <ExerciciosTab gest={gest} />}
         {sub === "humor" && <HumorTab />}
         {sub === "apoio" && <ApoioEmocionalTab onNavigate={onNavigate} />}
       </Fade>
+      {folhaDeDormir}
     </div>
   );
 }
@@ -11296,8 +11385,24 @@ const SOUND_INFO: Record<
     icon: "🌊",
   },
   binaural: {
-    label: "Batidas binaurais",
-    description: "Dois tons levemente diferentes criam uma sensação de relaxamento profundo.",
+    label: "Dois tons",
+    /*
+      ⚠️ **ERA UMA ALEGAÇÃO SEM EVIDÊNCIA, E ELA FALHAVA DUAS VEZES.**
+
+      1. "Criam uma sensação de relaxamento profundo" é exatamente o tipo de
+         afirmação que `afinacao.ts` existe para barrar: num app de gestação de
+         alto risco, prometer efeito sem evidência ao lado de uma triagem de
+         pré-eclâmpsia ensina que este app afirma coisas que não sustenta — e a
+         próxima afirmação que ela vai desacreditar é a que importa.
+         ⚠️ A catraca de `afinacao.test.ts` não alcança esta linha: o gatilho
+         dela é "432 / Hz / afinação", e aqui não há nenhum. A proteção é o
+         texto.
+      2. E o nome "batidas binaurais" descreve um efeito que depende de cada
+         ouvido receber um tom DIFERENTE. No alto-falante do celular os dois
+         tons se somam no ar antes de chegar nela: sem fone, o que a
+         palavra promete não acontece de jeito nenhum. Agora o texto diz isso.
+    */
+    description: "Dois tons próximos, um em cada lado. Use fone para ouvir como foi feito.",
     minWeek: 24,
     icon: "🎵",
   },

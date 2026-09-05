@@ -123,6 +123,17 @@ export const FUNCOES_DO_APP: readonly FuncaoDoApp[] = [
     noLuto: true,
   },
   {
+    id: "sons-do-bebe",
+    titulo: "Sons para o bebê",
+    descricao: "O que ele escuta daí de dentro — batimento, chuva e ninar.",
+    dica: "dá para tocar para o bebê o batimento e o ninar que ele escuta daí de dentro?",
+    tab: "Bem-estar",
+    sub: "sons-bebe",
+    grupo: "e-o-bebe",
+    /* Fala do bebê — sai no Modo Cuidado, junto com o ladrilho. */
+    noLuto: false,
+  },
+  {
     id: "saude-da-mulher",
     titulo: "Saúde da mulher",
     descricao: "Ciclo, mamas e colo — e o que fica para depois do parto.",
