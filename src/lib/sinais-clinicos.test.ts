@@ -222,9 +222,19 @@ describe("contrações regulares antes das 37 semanas", () => {
     /* Sem a ordem, o caso perigoso — padrão leve antes do termo — só seria
        alcançado depois de passar pelos cortes de trabalho de parto ativo, que
        o classificariam como normal. */
-    const conta = readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8");
-    const i = conta.indexOf("function analyzeContractions(");
-    const corpo = conta.slice(i, conta.indexOf("\nfunction ContracoesTab", i));
+    /* ⚠️ O cronômetro saiu de `minha-conta.tsx` (set/2026) e esta catraca ficou
+       vermelha só porque o CAMINHO mudou — a garantia não mudou uma linha. É a
+       mesma lição que `vazio-nao-e-falha.test.ts` já registra no helper
+       `componente(nome, arquivo)`: o teste precisa saber onde procurar.
+       ⚠️ E as duas âncoras são CONFERIDAS: `indexOf` devolve −1 quando o alvo
+       some, e `slice(-1, …)` devolve string vazia — uma fatia vazia deixa
+       asserção de ORDEM passar em branco. */
+    const arq = readFileSync("src/components/contracoes-tab.tsx", "utf8");
+    const i = arq.indexOf("function analyzeContractions(");
+    expect(i).toBeGreaterThan(-1);
+    const fim = arq.indexOf("\nexport function ContracoesTab", i);
+    expect(fim).toBeGreaterThan(i);
+    const corpo = arq.slice(i, fim);
     expect(corpo).toContain("sinalContracoesPrematuras({ semanas: weeks");
     expect(corpo.indexOf("sinalContracoesPrematuras")).toBeLessThan(
       corpo.indexOf("avgInterval <= 3"),

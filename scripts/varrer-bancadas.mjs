@@ -30,6 +30,15 @@ const rotas = readdirSync("src/routes")
 /* Estados que só existem com parâmetro — os mesmos que a prosa do CLAUDE.md
    documenta como "impossíveis de fotografar" sem eles. */
 const EXTRAS = [
+  /* ⚠️ O CRONÔMETRO DE CONTRAÇÕES — a tela clínica de maior consequência do
+     app, e a que passou mais tempo sem NENHUMA bancada. O estado `instavel` é
+     o que importa: a leitura falhando já silenciou o botão do 192 (o banner de
+     análise, único lugar da tela com "Ligar 192 (SAMU)", vive atrás de duas
+     contrações na janela). Nenhum destes se fabrica numa conta de teste. */
+  "/preview-contracoes?estado=instavel",
+  "/preview-contracoes?estado=parto",
+  "/preview-contracoes?estado=curso",
+  "/preview-contracoes?estado=normal",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum

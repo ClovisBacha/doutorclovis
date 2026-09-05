@@ -46,6 +46,7 @@ import { Route as PreviewEmissoesRouteImport } from './routes/preview-emissoes'
 import { Route as PreviewCustoRouteImport } from './routes/preview-custo'
 import { Route as PreviewConvitesRouteImport } from './routes/preview-convites'
 import { Route as PreviewConviteRouteImport } from './routes/preview-convite'
+import { Route as PreviewContracoesRouteImport } from './routes/preview-contracoes'
 import { Route as PreviewContaRouteImport } from './routes/preview-conta'
 import { Route as PreviewConsultoriosRouteImport } from './routes/preview-consultorios'
 import { Route as PreviewConquistasRouteImport } from './routes/preview-conquistas'
@@ -297,6 +298,11 @@ const PreviewConvitesRoute = PreviewConvitesRouteImport.update({
 const PreviewConviteRoute = PreviewConviteRouteImport.update({
   id: '/preview-convite',
   path: '/preview-convite',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PreviewContracoesRoute = PreviewContracoesRouteImport.update({
+  id: '/preview-contracoes',
+  path: '/preview-contracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PreviewContaRoute = PreviewContaRouteImport.update({
@@ -668,6 +674,7 @@ export interface FileRoutesByFullPath {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
@@ -772,6 +779,7 @@ export interface FileRoutesByTo {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
@@ -878,6 +886,7 @@ export interface FileRoutesById {
   '/preview-conquistas': typeof PreviewConquistasRoute
   '/preview-consultorios': typeof PreviewConsultoriosRoute
   '/preview-conta': typeof PreviewContaRoute
+  '/preview-contracoes': typeof PreviewContracoesRoute
   '/preview-convite': typeof PreviewConviteRoute
   '/preview-convites': typeof PreviewConvitesRoute
   '/preview-custo': typeof PreviewCustoRoute
@@ -984,6 +993,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
     | '/preview-convites'
     | '/preview-custo'
@@ -1088,6 +1098,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
     | '/preview-convites'
     | '/preview-custo'
@@ -1193,6 +1204,7 @@ export interface FileRouteTypes {
     | '/preview-conquistas'
     | '/preview-consultorios'
     | '/preview-conta'
+    | '/preview-contracoes'
     | '/preview-convite'
     | '/preview-convites'
     | '/preview-custo'
@@ -1299,6 +1311,7 @@ export interface RootRouteChildren {
   PreviewConquistasRoute: typeof PreviewConquistasRoute
   PreviewConsultoriosRoute: typeof PreviewConsultoriosRoute
   PreviewContaRoute: typeof PreviewContaRoute
+  PreviewContracoesRoute: typeof PreviewContracoesRoute
   PreviewConviteRoute: typeof PreviewConviteRoute
   PreviewConvitesRoute: typeof PreviewConvitesRoute
   PreviewCustoRoute: typeof PreviewCustoRoute
@@ -1621,6 +1634,13 @@ declare module '@tanstack/react-router' {
       path: '/preview-convite'
       fullPath: '/preview-convite'
       preLoaderRoute: typeof PreviewConviteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/preview-contracoes': {
+      id: '/preview-contracoes'
+      path: '/preview-contracoes'
+      fullPath: '/preview-contracoes'
+      preLoaderRoute: typeof PreviewContracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/preview-conta': {
@@ -2143,6 +2163,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreviewConquistasRoute: PreviewConquistasRoute,
   PreviewConsultoriosRoute: PreviewConsultoriosRoute,
   PreviewContaRoute: PreviewContaRoute,
+  PreviewContracoesRoute: PreviewContracoesRoute,
   PreviewConviteRoute: PreviewConviteRoute,
   PreviewConvitesRoute: PreviewConvitesRoute,
   PreviewCustoRoute: PreviewCustoRoute,

@@ -70,6 +70,11 @@ function componente(nome: string, arquivo = CONTA) {
  */
 const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.tsx", "utf8"));
 
+/** ⚠️ O SEGUNDO corte (set/2026): as contrações. Mesma lição do bloco acima,
+ *  e a razão de o helper aceitar o arquivo — sem ele, mover a tela deixaria
+ *  vermelha a catraca que guarda o único botão do 192 desta aba. */
+const CONTRACOES = semComentarios(readFileSync("src/components/contracoes-tab.tsx", "utf8"));
+
 /** As cinco de mesma forma: lê o erro, e o vazio vem DEPOIS do instável. */
 const TELAS = [
   { nome: "JournalTab", vazio: "Seu diário começará aqui", marca: "setInstavel(true)" },
@@ -126,7 +131,7 @@ describe("o vazio não pode ser a falha", () => {
 });
 
 describe("⚠️ as contrações: a falha não pode calar o 192", () => {
-  const c = componente("ContracoesTab");
+  const c = componente("ContracoesTab", CONTRACOES);
 
   test("a leitura confere o erro e não vira lista vazia", () => {
     expect(c).toMatch(/const \{ data, error \} = await[\s\S]{0,200}contraction_logs/);
