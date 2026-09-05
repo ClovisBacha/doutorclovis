@@ -31,12 +31,19 @@ const semComentarios = (f: string) =>
 
 const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
 
+/**
+ * ⚠️ A tela saiu de `minha-conta.tsx` para `src/components/kicks-tab.tsx`
+ * (set/2026), justamente para poder ganhar bancada — e este teste ficou
+ * vermelho só porque o CAMINHO mudou. Quarta vez nesta noite; a garantia não
+ * mudou uma linha em nenhuma delas.
+ */
+const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
+
 function corpoDaTela() {
-  const i = CONTA.indexOf("function KicksTab(");
+  const i = CHUTES.indexOf("export function KicksTab(");
   expect(i).toBeGreaterThan(-1);
-  const j = CONTA.indexOf("\nfunction ", i + 1);
-  expect(j).toBeGreaterThan(i);
-  return CONTA.slice(i, j);
+  /* Ela é a última do arquivo, então a fatia vai até o fim. */
+  return CHUTES.slice(i);
 }
 
 describe("⚠️ a régua dos movimentos, exercitada", () => {

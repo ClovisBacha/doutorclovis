@@ -75,6 +75,10 @@ const CICLO = semComentarios(readFileSync("src/components/ciclo-menstrual-tab.ts
  *  vermelha a catraca que guarda o único botão do 192 desta aba. */
 const CONTRACOES = semComentarios(readFileSync("src/components/contracoes-tab.tsx", "utf8"));
 
+/** ⚠️ O TERCEIRO corte (set/2026): os chutes. Mesma lição, quarta vez — e é
+ *  por isso que o helper aceita o arquivo ao lado do nome. */
+const CHUTES = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
+
 /** As cinco de mesma forma: lê o erro, e o vazio vem DEPOIS do instável. */
 const TELAS = [
   { nome: "JournalTab", vazio: "Seu diário começará aqui", marca: "setInstavel(true)" },
@@ -119,6 +123,7 @@ const TELAS = [
     nome: "KicksTab",
     vazio: "Nenhuma sessão registrada ainda",
     marca: "setInstavel(true)",
+    arquivo: CHUTES,
   },
   {
     nome: "HumorTab",

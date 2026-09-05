@@ -39,6 +39,15 @@ const EXTRAS = [
   "/preview-contracoes?estado=parto",
   "/preview-contracoes?estado=curso",
   "/preview-contracoes?estado=normal",
+  /* ⚠️ Os chutes: a tela que MEDE um sintoma vermelho. `alerta` é o estado que
+     a bancada existe para provar — duas horas com quatro movimentos, com o
+     aviso e o botão do 192 na tela —, e `instavel` é a leitura que falhou, que
+     NÃO pode virar "nunca registrou". */
+  "/preview-chutes?estado=alerta",
+  "/preview-chutes?estado=instavel",
+  "/preview-chutes?estado=contando",
+  "/preview-chutes?estado=historico",
+  "/preview-chutes?estado=luto",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum
