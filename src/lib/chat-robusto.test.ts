@@ -164,10 +164,16 @@ describe("os três chats leem erro do mesmo jeito", () => {
      outro lugar. Teste que encontra a string no vizinho é teste que não
      protege ninguém. */
   const nutricao = (() => {
-    const ini = contaBruta.indexOf("function NutricaoTab");
-    if (ini < 0) throw new Error("NutricaoTab não está em minha-conta.tsx");
-    const fim = contaBruta.indexOf("\nfunction ", ini + 10);
-    return contaBruta.slice(ini, fim > 0 ? fim : undefined);
+    /* ⚠️ A tela mudou-se para `src/components/nutricao-tab.tsx` — ela não tinha
+       como ser fotografada enquanto morava num arquivo de rota. A GARANTIA aqui
+       não mudou uma linha; mudou o arquivo. É a mesma quebra de caminho que
+       `ContracoesTab`, `startContraction`, `KicksTab` e `HealthTab` já
+       custaram, e é por isso que se cobra a corrente, nunca o endereço. */
+    const fonte = readFileSync("src/components/nutricao-tab.tsx", "utf8");
+    const ini = fonte.indexOf("function NutricaoTab");
+    if (ini < 0) throw new Error("NutricaoTab não está em nutricao-tab.tsx");
+    const fim = fonte.indexOf("\nfunction ", ini + 10);
+    return fonte.slice(ini, fim > 0 ? fim : undefined);
   })();
   const endpointNutricao = readFileSync("src/routes/api/nutrition.ts", "utf8");
 

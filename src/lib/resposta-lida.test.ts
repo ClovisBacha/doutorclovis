@@ -106,7 +106,11 @@ describe("as duas telas que prometiam sem confirmar", () => {
   });
 
   test("⚠️ o 👎 da nutrição só promete o médico quando o servidor enfileirou", () => {
-    const CONTA = semComentarios(readFileSync("src/routes/_authenticated/minha-conta.tsx", "utf8"));
+    /* ⚠️ A tela mudou-se para `src/components/nutricao-tab.tsx` — o corte é o
+       que permitiu fotografá-la. A GARANTIA cobrada aqui não mudou; mudou o
+       arquivo, que é a mesma quebra de caminho que meia dúzia de testes já
+       pagaram nesta base. */
+    const CONTA = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
     const i = CONTA.indexOf("async function votar(indice: number");
     expect(i).toBeGreaterThan(-1);
     const corpo = CONTA.slice(i, CONTA.indexOf("\n  }", i));

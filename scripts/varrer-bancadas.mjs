@@ -55,6 +55,15 @@ const EXTRAS = [
   "/preview-saude-registros?estado=grave",
   "/preview-saude-registros?estado=normal",
   "/preview-saude-registros?estado=semperfil",
+  /* ⚠️ A nutricionista virtual: `carregando` é a bolha vazia que renderiza "…"
+     — indistinguível de um "…" que nunca termina —, e `erro` é o aviso do
+     servidor virando bolha. Os dois só nascem de cota estourada ou falha de
+     rede no instante certo. */
+  "/preview-nutricao?estado=conversa",
+  "/preview-nutricao?estado=votou",
+  "/preview-nutricao?estado=carregando",
+  "/preview-nutricao?estado=erro",
+  "/preview-nutricao?estado=conversa&luto=1",
   /* ⚠️ O PRIMEIRO QUADRO — o estado em que o botão de socorro não existia.
      Ele vive atrás do login, dura uma fração de segundo e acontece no meio de
      duas idas à rede: foi assim que a barra de baixo sumiu dali sem nenhum

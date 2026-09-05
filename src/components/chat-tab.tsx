@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Bolha } from "@/components/bolha";
 import { avisoQuePodeAparecer, lerLinhaDoStream, passoDaDigitacao } from "@/lib/chat-stream";
 import { supabase } from "@/integrations/supabase/client";
+import { useJanelaDoTeclado } from "@/lib/janela-do-teclado";
 import { DOCTOR } from "@/lib/doctor.config";
 import { nomeDoMedico } from "@/lib/nome-do-medico";
 import { getMyDoctorLink } from "@/lib/patientlink.functions";
@@ -867,28 +868,12 @@ export function ChatTab({
      do teclado, e a página por baixo fica travada (`overflow: hidden` no
      body enquanto o chat está montado). No computador ele continua uma caixa
      estática de 72vh, dentro da página. */
-  const [janela, setJanela] = useState<{ h: number; top: number } | null>(null);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const vv = window.visualViewport;
-    const celular = () => window.matchMedia("(max-width: 767px)").matches;
-    const medir = () => {
-      if (!celular() || !vv) {
-        setJanela(null);
-        return;
-      }
-      setJanela({ h: Math.round(vv.height), top: Math.round(vv.offsetTop) });
-    };
-    medir();
-    vv?.addEventListener("resize", medir);
-    vv?.addEventListener("scroll", medir);
-    window.addEventListener("resize", medir);
-    return () => {
-      vv?.removeEventListener("resize", medir);
-      vv?.removeEventListener("scroll", medir);
-      window.removeEventListener("resize", medir);
-    };
-  }, []);
+  /* ⚠️ A MEDIÇÃO MUDOU-SE PARA `src/lib/janela-do-teclado.ts`. Ela estava
+     escrita aqui dentro, e a Nutricionista Virtual — que a paciente abre na
+     MESMA tela, trocando de aba — ficou com uma caixa de `55vh` que o teclado
+     espremia a 111px. Duas cópias da mesma medição divergem no primeiro
+     ajuste, e a divergência aparece como um dos dois chats se escondendo. */
+  const janela = useJanelaDoTeclado();
   useEffect(() => {
     if (typeof document === "undefined") return;
     if (!window.matchMedia("(max-width: 767px)").matches) return;
