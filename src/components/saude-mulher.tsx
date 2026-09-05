@@ -61,7 +61,13 @@ export function SaudeMulherHub({
             className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-semibold transition-colors ${
               sub === s.key
                 ? "bg-primary text-primary-foreground"
-                : "border border-border text-foreground/55 hover:text-foreground/80"
+                : /* ⚠️ `/60`, e não `/55`: medido, `/55` dá 3,88:1 — abaixo do mínimo de
+                     4,5 para um controle ATIVO (desabilitado seria isento; este não é).
+                     É o mesmo defeito que os chips de categoria da Loja já
+                     tiveram, no mesmo tom, noutro arquivo. E não sobe mais que
+                     isso: o chip ESCOLHIDO mede 4,72, e `/65` daria mais
+                     contraste ao que ela NÃO escolheu. */
+                  "border border-border text-foreground/60 hover:text-foreground/80"
             }`}
           >
             {s.label}
@@ -334,12 +340,22 @@ export function PreventivosTab({
           {
             label: "Em atraso",
             value: overdueCount,
-            color: "text-red-600 bg-red-50 border-red-200",
+            /* ⚠️ `-700`: `red-600` sobre `red-50` mede 4,36:1, abaixo do mínimo
+               para 13px. É a mesma decisão da varredura de botões — escurecer o
+               tom, mantendo a cor que codifica o estado. */
+            color: "text-red-700 bg-red-50 border-red-200",
           },
           {
             label: "Em breve",
             value: soonCount,
-            color: "text-primary bg-primary/6 border-primary/20",
+            /* ⚠️ ÂMBAR, e não o rosa da marca. Duas razões, e a segunda é a
+               que decide: `text-primary` sobre `bg-primary/6` mede 4,21:1 a
+               13px — abaixo do mínimo —, e escurecer não é possível sem mexer
+               no tom da marca inteira. E o rosa não CODIFICA urgência: os três
+               contadores viram vermelho / rosa / cinza, onde o do meio deveria
+               dizer "atenção". Vermelho = venceu · âmbar = está chegando ·
+               cinza = nunca registrado. */
+            color: "text-amber-700 bg-amber-50 border-amber-200",
           },
           {
             label: "Não registrado",
@@ -391,11 +407,16 @@ export function PreventivosTab({
                         {daysUntil !== null && (
                           <span
                             className={
+                              /* ⚠️ `-700` nos três: medido a 13px, `red-600`
+                                 dá 4,36:1 e `green-600` fica pior ainda —
+                                 abaixo do mínimo de 4,5. E é justamente aqui
+                                 que mora "(396 dias em atraso)", a frase que
+                                 diz que um rastreamento venceu. */
                               daysUntil < 0
-                                ? "text-red-600 font-medium"
+                                ? "text-red-700 font-medium"
                                 : daysUntil <= 60
                                   ? "text-primary font-medium"
-                                  : "text-green-600"
+                                  : "text-green-700"
                             }
                           >
                             {daysUntil < 0

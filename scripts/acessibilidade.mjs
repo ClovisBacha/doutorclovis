@@ -37,6 +37,15 @@ const ROTAS = [
   "/preview-conquistas?quantas=16",
   "/preview-loja-sementinhas?saldo=118",
   "/preview-presentes?dona=1",
+  /* ⚠️ AS CINCO TELAS DO CORAÇÃO entraram aqui em set/2026, e não antes porque
+     não eram fotografáveis: sem bancada, esta varredura não tinha como abri-las.
+     Foi assim que o 👍👎 da nutrição passou meses com alvo de 16×18px. */
+  "/preview-saude-registros?estado=normal",
+  "/preview-chutes?estado=contando",
+  "/preview-contracoes?estado=parto",
+  "/preview-nutricao?estado=conversa",
+  "/preview-saude-mulher?tela=ciclo",
+  "/preview-saude-mulher?tela=preventivos",
 ];
 
 const caminho = process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium";
@@ -62,15 +71,30 @@ const MEDIR = () => {
     b: f.b * f.a + g.b * (1 - f.a),
     a: 1,
   });
+  /* ⚠️ **TERCEIRA ARMADILHA, e esta REPROVA O CERTO.** As duas anteriores estão
+     no cabeçalho: o `oklch` lido por regex (aprovou seis textos a 1,03:1) e o
+     fundo translúcido não composto (reprovou vinte links a 2,30:1). Esta é o
+     `background-image`: um botão que pinta com gradiente tem
+     `background-color: transparent`, então a pilha sobe até o creme da página e
+     um texto BRANCO sobre um gradiente rosa escuro "mede" 1,01:1.
+     Medido no contador de chutes (`.liquid-pulse`, radial-gradient) e no botão
+     de contração.
+     Não dá para compor um gradiente a partir do CSS computado — então o
+     honesto é dizer que o método NÃO ALCANÇA aquele texto, e listá-lo à parte.
+     Um número inventado ali faria alguém "consertar" um texto que está certo. */
   const fundoReal = (el) => {
     const pilha = [];
     let n = el;
+    let pintadoPorImagem = false;
     while (n) {
-      const c = parse(getComputedStyle(n).backgroundColor);
+      const st = getComputedStyle(n);
+      if (st.backgroundImage && st.backgroundImage !== "none") pintadoPorImagem = true;
+      const c = parse(st.backgroundColor);
       if (c.a > 0) pilha.push(c);
       if (c.a >= 1) break;
       n = n.parentElement;
     }
+    if (pintadoPorImagem) return null;
     let base = { r: 255, g: 255, b: 255, a: 1 };
     for (let i = pilha.length - 1; i >= 0; i--) base = sobre(pilha[i], base);
     return base;
@@ -96,7 +120,7 @@ const MEDIR = () => {
     return r.width > 0 && r.height > 0 && s.visibility !== "hidden" && s.opacity !== "0";
   };
 
-  const out = { contraste: [], alvo: [], semNome: [], semAlt: [] };
+  const out = { contraste: [], alvo: [], semNome: [], semAlt: [], naoMedivel: [] };
 
   /* CONTRASTE — só folhas com texto próprio. */
   for (const el of document.querySelectorAll("p,span,a,button,h1,h2,h3,h4,label,li,td,th,div")) {
@@ -105,8 +129,17 @@ const MEDIR = () => {
     const s = getComputedStyle(el);
     const px = parseFloat(s.fontSize);
     const bold = +s.fontWeight >= 700;
-    const fg = sobre(parse(s.color), fundoReal(el.parentElement || el));
-    const r = razao(fg, fundoReal(el));
+    const fundo = fundoReal(el);
+    /* ⚠️ Pintado por gradiente: o método não alcança. Vai para a lista de
+       "olhe com o olho", NUNCA para a de reprovados — um número inventado ali
+       faria alguém consertar um texto que está certo. */
+    if (!fundo) {
+      out.naoMedivel.push({ px, t: t.slice(0, 40) });
+      continue;
+    }
+    const fundoDoPai = fundoReal(el.parentElement || el) ?? fundo;
+    const fg = sobre(parse(s.color), fundoDoPai);
+    const r = razao(fg, fundo);
     const grande = px >= 24 || (px >= 18.66 && bold);
     if (r < (grande ? 3 : 4.5)) out.contraste.push({ r, px, t: t.slice(0, 40) });
   }
@@ -148,7 +181,7 @@ const MEDIR = () => {
   return out;
 };
 
-const total = { contraste: 0, alvo: 0, semNome: 0, semAlt: 0 };
+const total = { contraste: 0, alvo: 0, semNome: 0, semAlt: 0, naoMedivel: 0 };
 for (const rota of ROTAS) {
   const p = await ctx.newPage();
   try {
@@ -164,11 +197,14 @@ for (const rota of ROTAS) {
       r.alvo.slice(0, 4).forEach((x) => console.log(`   alvo ${x.w}×${x.h} "${x.t}"`));
       r.semNome.slice(0, 3).forEach((x) => console.log(`   sem nome: ${x.html}`));
       r.semAlt.slice(0, 3).forEach((x) => console.log(`   sem alt: …${x.src}`));
+      if (r.naoMedivel.length)
+        console.log(`   (${r.naoMedivel.length} sobre gradiente — o método não alcança, olhe)`);
     }
     total.contraste += r.contraste.length;
     total.alvo += r.alvo.length;
     total.semNome += r.semNome.length;
     total.semAlt += r.semAlt.length;
+    total.naoMedivel += r.naoMedivel.length;
   } catch (e) {
     console.log(`\n■ ${rota} — não abriu: ${String(e).slice(0, 80)}`);
   }
@@ -176,5 +212,6 @@ for (const rota of ROTAS) {
 }
 await b.close();
 console.log(
-  `\n${ROTAS.length} telas · contraste ${total.contraste} · alvo ${total.alvo} · sem nome ${total.semNome} · sem alt ${total.semAlt}`,
+  `\n${ROTAS.length} telas · contraste ${total.contraste} · alvo ${total.alvo} · sem nome ${total.semNome} · sem alt ${total.semAlt}` +
+    `\n${total.naoMedivel} textos sobre gradiente — não medíveis por CSS, precisam de olho`,
 );

@@ -178,14 +178,23 @@ function CicloCalendario({ model }: { model: CycleModel }) {
     const inMonth = d.getMonth() === base.getMonth();
     const isToday = ymd(d) === ymd(today);
     const { phase, actual } = classifyDay(d, model);
-    let tone = "text-foreground/70";
+    /* ⚠️ `/85` e não `/70`: medido, 70% dá 3,65:1 a 13px — abaixo do mínimo.
+       E o medidor SUBESTIMA o problema, porque ele lê a cor e ignora a
+       `opacity` do elemento: nos dias de outro mês o real é ainda pior. */
+    let tone = "text-foreground/85";
     if (actual) tone = "bg-rose-500 text-white font-semibold";
     else if (phase === "menstruacao")
       tone = "border border-dashed border-rose-400 text-rose-500 dark:text-rose-300";
-    else if (phase === "ovulacao") tone = "bg-emerald-600 text-white font-semibold";
+    /* ⚠️ `-700`: branco sobre `emerald-600` mede 3,65:1 a 13px — e este é o dia
+       mais importante do calendário. Mesma decisão da varredura de botões:
+       escurecer o tom, mantendo a cor que codifica a fase. */ else if (phase === "ovulacao")
+      tone = "bg-emerald-700 text-white font-semibold";
     else if (phase === "fertil") tone = "bg-emerald-400/25 text-emerald-700 dark:text-emerald-300";
     const ring = isToday ? " ring-2 ring-foreground ring-offset-2 ring-offset-card" : "";
-    const dim = inMonth ? "" : " opacity-35";
+    /* ⚠️ `/50` e não `/35`: medido, 35% dá 3,65:1 num número de calendário —
+       ele continua sendo informação (a paciente lê a virada do mês), e a
+       hierarquia se mantém, porque o dia DO mês fica em 100%. */
+    const dim = inMonth ? "" : " opacity-50";
     return `flex aspect-square items-center justify-center rounded-full text-xs ${tone}${ring}${dim}`;
   }
 
@@ -193,7 +202,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
     { label: "Período", swatch: "bg-rose-500" },
     { label: "Previsão", swatch: "border border-dashed border-rose-400" },
     { label: "Fértil", swatch: "bg-emerald-400/40" },
-    { label: "Ovulação", swatch: "bg-emerald-600" },
+    { label: "Ovulação", swatch: "bg-emerald-700" },
   ];
 
   return (
@@ -202,7 +211,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
         <button
           onClick={() => setMonthOffset((m) => m - 1)}
           aria-label="Mês anterior"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
         >
           ‹
         </button>
@@ -210,7 +219,7 @@ function CicloCalendario({ model }: { model: CycleModel }) {
         <button
           onClick={() => setMonthOffset((m) => m + 1)}
           aria-label="Próximo mês"
-          className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-primary"
         >
           ›
         </button>
@@ -578,7 +587,13 @@ export function CicloMenstrualTab({
                     <button
                       onClick={() => handleDelete(cycle.id)}
                       aria-label="Excluir este ciclo"
-                      className="rounded-full border border-border px-2 py-1 text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
+                      /* ⚠️ ALVO DE 44px, e crescendo DE VERDADE — não por
+                         `after:-inset`. No ciclo ativo há o botão "Encerrar" a
+                         8px daqui: um pseudo-elemento estendido cobriria a
+                         borda dele, e tocar ali APAGARIA o ciclo em vez de
+                         encerrá-lo. É a lição do ✕ do chá de bebê. O `-my`
+                         devolve a altura que o quadrado tomou. */
+                      className="-my-2 flex h-11 w-11 items-center justify-center rounded-full border border-border text-xs text-muted-foreground hover:border-red-300 hover:text-red-500"
                     >
                       ×
                     </button>
