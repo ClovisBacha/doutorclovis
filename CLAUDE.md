@@ -13692,3 +13692,175 @@ script passou), e minutos depois o arquivo tinha a forma original de volta — o
 nova é o que impede que ele suma de novo em silêncio. **Quando um conserto
 desaparece sem explicação, a resposta não é reaplicar e seguir: é reaplicar e
 travar.**
+
+## A nutricionista virou ferramenta: sete funções, e uma recusada por medição (set/2026)
+
+Pedido do dono, em três voltas: _"o chat da nutrição está muito vibe codado,
+vamos ser mais inteligentes"_, depois _"o que mais os grandes apps de nutrição
+têm que poderíamos fazer"_, e por fim _"pode fazer tudo isso agora, verifique
+várias vezes até ficar perfeito"_. Sete itens, aplicados em três ondas.
+
+### O que cada ferramenta NÃO pode ser
+
+- **A nutricionista conhece a paciente** (`nutricao-perfil.ts` +
+  `nutricao-contexto.server.ts`). Alergia, medicação, trimestre, glicemia e
+  ganho de peso entram no prompt. ⚠️ **A alergia vem PRIMEIRO e sobrevive ao
+  Modo Cuidado** — é segurança, e vale mais depois de uma perda, não menos.
+  ⚠️ E a instrução **"NUNCA proponha restrição calórica"** é colada logo depois
+  do número do ganho: solta no prompt, o modelo transforma "acima da faixa" num
+  plano de emagrecimento.
+- **O que tenho em casa.** A pergunta que nenhum app grande faz e que é a do
+  Brasil real: fim do mês, geladeira do jeito que está. `perguntaDoQueTenho`
+  manda **"use SÓ o que eu listei"**, e a compra sugerida é opcional, no fim —
+  um app que só sabe sugerir salmão e quinoa é um app que ela fecha.
+- **Os suplementos do médico.** Checklist do que já está em
+  `patient_profiles.medications`; **o app NUNCA sugere suplemento**, e sem
+  prescrição a seção não existe — um checklist vazio convidaria a inventar um.
+  ⚠️ O resumo é FATO, nunca cobrança (teste com regex proibindo "falta",
+  "esqueceu", "atrasado"): quem esquece o ferro numa gestação de alto risco já
+  tem quem cobre.
+- **O convite da hora.** `refeicaoDaHora` converte os sete momentos nas quatro
+  refeições que a ferramenta conhece — ⚠️ a madrugada e a ceia caem em
+  "Lanche", nunca num jantar às 3h. A hora é lida num EFEITO: o relógio do
+  servidor não é o dela, e `new Date()` no render diverge na hidratação.
+- ⚠️ **As chaves do dia são `dc-agua:` e `dc-suplementos:`, NUNCA `dc-path-`**
+  — essa viaja no blob da jornada e dispara um push por escrita. E os dois
+  prefixos são distintos de propósito: um deles ser prefixo do outro faria uma
+  varredura levar a outra junto (há teste).
+
+### ⚠️ O ITEM 5 MUDOU DE FORMA POR MEDIÇÃO, e é a lição mais reaproveitável
+
+O plano era **consulta de rótulo pelo NOME num catálogo aberto** (Open Food
+Facts). Medido ANTES de construir, com quatro produtos brasileiros de verdade:
+
+| consulta         | o que voltou                                            |
+| ---------------- | ------------------------------------------------------- |
+| leite condensado | **"Leite Moça": 4,66 g de açúcar/100 g** (o real é ~55) |
+| requeijão        | "Cremoso Gordura Reduzida": **sódio 0**                 |
+| biscoito maisena | um biscoito de **chocolate** em primeiro lugar          |
+| iogurte natural  | **não devolveu JSON nenhum**                            |
+
+Os dois concorrentes na MESMA lista do leite condensado diziam 55. É erro de
+12×, numa linha escrita por um desconhecido.
+
+⚠️ **Numa paciente com diabetes gestacional, "Leite Moça: 4,66 g de açúcar" não
+é um dado ruim — é o app afirmando o contrário do que é verdade sobre o produto
+mais açucarado da prateleira.** E um aviso embaixo do número não desfaz a
+leitura do número; é a mesma classe que `afinacao.ts` nomeia ("o app afirma
+coisas sem evidência, e a próxima afirmação que ela vai desacreditar é a que
+importa"). Pior para ALERGIA, que é o uso que mais justificaria a ferramenta:
+uma lista de ingredientes desatualizada falha por **OMISSÃO**.
+
+**A saída não foi cancelar o item — foi trocar a FONTE.** A foto do rótulo dá o
+mesmo dado vindo da embalagem que está na mão dela, com a formulação de agora,
+do país certo: estritamente melhor em todos os eixos, e custa o mesmo endpoint
+da foto do prato. ⚠️ Ela **LÊ e nunca decide** — "pode comer?" é a outra
+ferramenta, que passa pela conversa com o histórico dela; um veredito sobre o
+produto inteiro seria prescrição a partir de uma foto que pode mostrar metade
+do rótulo.
+
+**A régua de decisão que fica:** quando uma fonte externa alimenta afirmação
+clínica, mede-se a QUALIDADE dela com casos reais antes de desenhar a tela. Se
+o erro possível é um número errado numa direção que muda conduta, a fonte não
+serve — e a pergunta seguinte é se existe outra fonte para o mesmo dado.
+
+### `/api/prato` — e a catraca da cota que me pegou
+
+⚠️ **A foto NÃO é guardada em lugar nenhum** (nem balde, nem coluna, nem URL), e
+a tela diz isso ANTES do toque — é foto da cozinha dela e do supermercado onde
+ela está. Mesma decisão do áudio do diário.
+
+⚠️ **E ELA NÃO PODE COBRAR DA FRANQUIA CLÍNICA.** Eu tinha escrito
+`canal: "nutricao"` com o argumento de que "é a mesma nutricionista, e separar
+partiria o custo em dois lugares". `travas-do-servidor.test.ts` reprovou e
+estava certa: `CANAIS_DA_COTA` é a franquia de DÚVIDA CLÍNICA da gestante, e
+visão custa uma ordem de grandeza mais que texto — **três fotos de prato podiam
+consumir a cota de que ela precisa para perguntar sobre dor de cabeça com vista
+embaçada**. Canal próprio, fora da cota, como o `diario` da transcrição.
+
+⚠️ **`FOTO_LADO_MAX` é 1024, e não os 512 do avatar**: o modelo precisa LER a
+tabela nutricional de um rótulo, que é texto miúdo. A 512 a leitura falha — e
+leitura de rótulo que erra o número é o defeito que a ferramenta existe para
+não ter.
+
+⚠️ **`consultorioDaPaciente` virou módulo** (`consultorio-da-paciente.server.ts`).
+Ela falha FECHADO no Modo Cuidado, e a segunda cópia faria a resposta da FOTO
+falar da gestação de quem acabou de perdê-la. Duas catracas travavam a GRAFIA
+dela e passaram a cobrar a garantia.
+
+### ⚠️ O APAGADOR DE COMENTÁRIOS ENGOLIA CÓDIGO — e agora há régua única
+
+Esta armadilha já estava escrita neste arquivo, e ela mordeu de novo: o
+`accept="image/(estrela)"` do seletor de foto tem uma barra-asterisco DENTRO de
+uma string, e o apagador por regex abre um "comentário" ali que só fecha
+centenas de linhas abaixo.
+
+**Medido:** o cartão da câmera inteiro sumia do que os testes viam, e **TRÊS
+arquivos** passaram a ler um fonte com buraco — dois ficaram vermelhos sobre
+código que não mudou, e **um continuou VERDE com uma asserção negativa cega**,
+que é a direção perigosa. O terceiro (`janela-do-teclado.test.ts`) eu nem sabia
+que existia; quem o achou foi a catraca nova.
+
+**`src/lib/sem-comentarios.ts`** ancora a abertura no **começo da linha**, que é
+onde todo comentário de bloco deste repositório começa — uma barra-asterisco no
+meio de uma linha é sempre outra coisa (string, glob, expressão regular). Isso
+resolve as DUAS formas ingênuas que este arquivo já documentava: a de regex e a
+do varredor que conhece strings (que abre uma no apóstrofo de uma prosa em
+JSX). ⚠️ E a de linha exige espaço ou aspa antes das duas barras, senão ela come
+`https://exemplo.com` de dentro de uma string.
+
+⚠️ **Ela NÃO é um analisador de JavaScript e não deve virar um.** Se um dia um
+comentário de bloco precisar começar no meio de uma linha, a resposta é mover o
+comentário.
+
+⚠️ **E escrever a prosa disto custou uma volta:** a primeira redação citava a
+sequência de fechamento LITERALMENTE, e ela fechou o próprio comentário — a
+armadilha mordendo dentro do texto que a explica. Nos comentários deste
+repositório ela aparece por extenso ou como "(estrela)", nunca com os
+caracteres.
+
+⚠️ **Os outros ~60 arquivos que apagam comentário de `.tsx` NÃO foram
+mexidos**, de propósito: catraca que obriga a mutirão é catraca que alguém
+desliga. A catraca nova cobre só a tela que ganhou o hazard, e tem contraprova
+de que morde (roda o apagador ingênuo e cobra que ele engula uma âncora de
+código conhecida).
+
+### ⚠️ `corpoDe` estourava quando a função era a ÚLTIMA do arquivo
+
+`luto-falha-fechado.test.ts` corta da assinatura até o próximo `\nfunction `.
+Ao virar módulo, `consultorioDaPaciente` deixou de ter um depois dela: o corte
+estourou no ESCOPO DO MÓDULO e o arquivo inteiro saiu com **"0 pass, 0 fail,
+1 error"** — ou seja, **nenhuma daquelas travas de luto rodou**, e o que contou
+foi só o aviso de "erro fora de teste" do portão. Sem fim à vista, o corpo vai
+até o fim do arquivo — e há asserção de que o corte não engoliu uma segunda
+função, que é como uma fatia começa a mentir.
+
+### ⚠️ E A SONDA DE PRODUÇÃO MENTIU VINTE VEZES
+
+O probe reportou "ainda a versão anterior" a cada 30 s por dez minutos sobre um
+deploy que **já estava no ar**. Duas causas somadas, e as duas valem para toda
+verificação de produção daqui:
+
+1. ⚠️ **O WAF da Vercel devolve 403 para `curl` sem UA de navegador**
+   (`x-vercel-mitigated: deny`). O corpo vem vazio, o `grep` não acha, e um
+   probe que trate "não achei" como "versão antiga" **afirma um veredito sobre
+   uma requisição que foi NEGADA**. É a mesma família do ✅ impresso sobre um
+   `ERR_CONNECTION_REFUSED`: **medir sem conferir que a leitura aconteceu é
+   falha aberta**.
+2. ⚠️ **O marcador não está no HTML do SSR** — a bancada monta no cliente,
+   então a busca tem de ser dentro dos PEDAÇOS JS que a página pede.
+
+**Conferido no fim:** os dois marcadores das ondas 2 e 3 vivem no MESMO pedaço
+(`/assets/nutricao-tab-*.js`), então a busca por pedaço funciona — o que fazia
+a sonda dizer "versão anterior" era o 403 do WAF, não a ausência do código.
+
+**E o jeito mais barato ainda:** `curl -sL -o /dev/null -w "%{url_effective}"`.
+O `validateSearch` da rota reescreve a URL com TODOS os parâmetros dela — então
+a URL canônica que a produção devolve traz os nomes novos (`receita=`,
+`tomados=`, `hora=-1`) e prova qual commit está servindo, sem baixar chunk
+nenhum.
+
+**Bancadas:** `/preview-nutricao?receita=...&hora=16` (o checklist e o convite)
+· `&ferramenta=casa` (a geladeira) · `&tomados=...` · `&hora=3` (a madrugada) ·
+`?estado=foto` (a resposta da foto, que nasce de um seletor de arquivo e de uma
+chamada de visão).
