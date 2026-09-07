@@ -23,8 +23,15 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *
  * E `?w=` muda o trimestre (chips e nutrientes), `?luto=1` liga o Modo Cuidado
  * — onde o cartão de nutrientes, os chips e a semana somem —, `?agua=5` põe
- * cinco copos no contador e `?ferramenta=comer|prato|alivio` abre o painel
+ * cinco copos no contador e `?ferramenta=comer|prato|alivio|casa` abre o painel
  * daquela ferramenta (os dois dependem de `localStorage` e de um toque).
+ *
+ * ⚠️ `?receita=` é a PRESCRIÇÃO (o campo livre de `medications`), e não a lista
+ * pronta: é ela que `itensDaPrescricao` tem de saber recortar, e cravar a lista
+ * aprovaria um recorte que a produção nunca faz. `?tomados=` marca o que já foi
+ * tomado hoje (vive no `localStorage`), e `?hora=` crava o relógio DELA — sem
+ * ele, o convite do momento muda de texto conforme a hora em que se fotografa,
+ * e duas fotos deixam de ser comparáveis.
  */
 export const Route = createFileRoute("/preview-nutricao")({
   validateSearch: (q: Record<string, unknown>) => ({
@@ -35,6 +42,10 @@ export const Route = createFileRoute("/preview-nutricao")({
     luto: q.luto == null ? false : Boolean(q.luto),
     agua: q.agua == null || q.agua === "" ? 0 : Number(q.agua),
     ferramenta: q.ferramenta == null ? "" : String(q.ferramenta),
+    receita: q.receita == null ? "" : String(q.receita),
+    tomados: q.tomados == null ? "" : String(q.tomados),
+    /* ⚠️ `-1` e não `0`: zero é meia-noite, uma hora legítima. */
+    hora: q.hora == null || q.hora === "" ? -1 : Number(q.hora),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -73,7 +84,7 @@ const TRES: ChatMsg[] = [
 ];
 
 function Pagina() {
-  const { w, estado, luto, agua, ferramenta } = Route.useSearch();
+  const { w, estado, luto, agua, ferramenta, receita, tomados, hora } = Route.useSearch();
 
   const bancada =
     estado === "conversa"
@@ -98,11 +109,11 @@ function Pagina() {
             : undefined;
   const extras = {
     agua,
-    ferramenta: (["comer", "prato", "alivio"].includes(ferramenta) ? ferramenta : undefined) as
-      | "comer"
-      | "prato"
-      | "alivio"
-      | undefined,
+    ferramenta: (["comer", "prato", "alivio", "casa"].includes(ferramenta)
+      ? ferramenta
+      : undefined) as "comer" | "prato" | "alivio" | "casa" | undefined,
+    suplementos: tomados ? tomados.split(",").filter(Boolean) : undefined,
+    hora: hora >= 0 && hora <= 23 ? hora : undefined,
   };
 
   return (
@@ -110,6 +121,8 @@ function Pagina() {
       <p className="mb-4 text-xs text-muted-foreground">
         Bancada · estado <strong>{estado}</strong> · semana <strong>{w}</strong>
         {luto ? " · Modo Cuidado" : ""}
+        {hora >= 0 ? ` · ${String(hora).padStart(2, "0")}h` : ""}
+        {receita ? " · com prescrição" : ""}
       </p>
       <NutricaoTab
         gest={{ weeks: w, days: 0, totalDays: w * 7 } as never}
@@ -118,6 +131,7 @@ function Pagina() {
             id: "b",
             display_name: "Ana Souza",
             baby_name: "Helena",
+            medications: receita || null,
             lmp_date: null,
             due_date: null,
             reference_date: null,

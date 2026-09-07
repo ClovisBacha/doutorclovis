@@ -16,7 +16,18 @@
  * `ChatMsg`, `Gest` e `Profile` viajam por `import type` — apagados na
  * compilação, então não há dependência de execução do arquivo de rota.
  */
-import { Droplets, Leaf, Minus, Plus, Search, Send, UtensilsCrossed } from "lucide-react";
+import {
+  Check,
+  Droplets,
+  Leaf,
+  Minus,
+  Pill,
+  Plus,
+  Refrigerator,
+  Search,
+  Send,
+  UtensilsCrossed,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -31,12 +42,20 @@ import {
   REFEICOES,
   chaveDaAgua,
   chavesDeAguaVencidas,
+  chaveDosSuplementos,
+  chavesDeSuplementosVencidas,
+  itensDaPrescricao,
   limparAlimento,
+  limparIngredientes,
   perguntaDeAlivio,
   perguntaDoPrato,
+  perguntaDoQueTenho,
   perguntaPossoComer,
+  refeicaoDaHora,
+  resumoDosSuplementos,
   type Refeicao,
 } from "@/lib/nutricao-ferramentas";
+import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
 import { alturaNoFluxo, useJanelaDoTeclado } from "@/lib/janela-do-teclado";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
@@ -140,7 +159,7 @@ function semAnimacaoNutricao(): boolean {
    verde-limão. As três "ferramentas" abrem um painel e mandam a pergunta
    pronta para a MESMA conversa — nada responde fora do chat. */
 
-type Ferramenta = "comer" | "prato" | "alivio";
+type Ferramenta = "comer" | "prato" | "alivio" | "casa";
 
 function Avatar({ tamanho }: { tamanho: number }) {
   return (
@@ -230,6 +249,9 @@ export function NutricaoTab({
         `localStorage` e de um toque, e por isso eram impossíveis de fotografar. */
     agua?: number;
     ferramenta?: Ferramenta;
+    /** Quais suplementos já foram marcados hoje, e a hora do relógio dela. */
+    suplementos?: string[];
+    hora?: number;
   };
 }) {
   const ehBancada = bancada != null;
@@ -274,6 +296,7 @@ export function NutricaoTab({
   /* ─── AS FERRAMENTAS ─────────────────────────────────────────────────────── */
   const [ferramenta, setFerramenta] = useState<Ferramenta | null>(bancada?.ferramenta ?? null);
   const [alimento, setAlimento] = useState("");
+  const [temEmCasa, setTemEmCasa] = useState("");
   const conversaRef = useRef<HTMLDivElement>(null);
   /** Manda a pergunta pronta e leva a paciente até a conversa. */
   function perguntar(texto: string) {
@@ -281,6 +304,54 @@ export function NutricaoTab({
     setAlimento("");
     void send(texto);
     conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /* ─── A HORA DELA ─────────────────────────────────────────────────────────
+     ⚠️ Num EFEITO, nunca no render: o relógio do servidor não é o dela, e um
+     convite derivado da hora divergiria entre as duas execuções — é a
+     divergência de hidratação que já deixou este app sem abrir. `null` até
+     montar, e aí o convite não aparece. */
+  const [hora, setHora] = useState<number | null>(bancada?.hora ?? null);
+  useEffect(() => {
+    if (ehBancada) return;
+    setHora(new Date().getHours());
+  }, [ehBancada]);
+
+  /* ─── OS SUPLEMENTOS QUE O MÉDICO PRESCREVEU ──────────────────────────────
+     ⚠️ O app NÃO sugere suplemento — ele acompanha o que já foi prescrito. A
+     lista sai de `medications` do perfil; o "tomei hoje" mora no aparelho, um
+     dia por vez, pela mesma razão da água (a chave `dc-path-` viajaria no blob
+     da jornada e dispararia um push por toque). */
+  const suplementos = itensDaPrescricao(profile?.medications);
+  const [tomados, setTomados] = useState<string[]>(bancada?.suplementos ?? []);
+  useEffect(() => {
+    if (ehBancada || !suplementos.length) return;
+    try {
+      const cru = localStorage.getItem(chaveDosSuplementos(ymdLocal()));
+      const lidos: unknown = cru ? JSON.parse(cru) : [];
+      setTomados(
+        Array.isArray(lidos) ? lidos.filter((x): x is string => typeof x === "string") : [],
+      );
+    } catch {
+      setTomados([]);
+    }
+    /* `suplementos.length` e não a lista: um array remontado a cada render
+       faria o efeito re-rodar em toda pintura. */
+  }, [ehBancada, suplementos.length]);
+
+  function alternarSuplemento(item: string) {
+    const proximo = tomados.includes(item) ? tomados.filter((x) => x !== item) : [...tomados, item];
+    setTomados(proximo);
+    if (ehBancada) return;
+    try {
+      const hoje = ymdLocal();
+      chavesDeSuplementosVencidas(Object.keys(localStorage), hoje).forEach((k) =>
+        localStorage.removeItem(k),
+      );
+      localStorage.setItem(chaveDosSuplementos(hoje), JSON.stringify(proximo));
+    } catch {
+      /* sem armazenamento, a marca vive só nesta abertura */
+    }
   }
 
   /* ─── A ÁGUA DO DIA ───────────────────────────────────────────────────────
@@ -485,7 +556,7 @@ export function NutricaoTab({
           mesma conversa — nada responde fora do chat. Em Modo Cuidado elas
           ficam (comer bem é dela), e o texto não diz "gestação". */}
       <section aria-label="Ferramentas da nutrição">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <CartaoFerramenta
             aberta={ferramenta === "comer"}
             icone={<Search className="h-[18px] w-[18px]" strokeWidth={2} />}
@@ -506,6 +577,16 @@ export function NutricaoTab({
             titulo="Alívio"
             legenda="Enjoo, azia…"
             onClick={() => setFerramenta(ferramenta === "alivio" ? null : "alivio")}
+          />
+          {/* ⚠️ A pergunta que nenhum app grande faz, e que é a do Brasil real:
+              fim do mês, a geladeira do jeito que está. Um app que só sabe
+              sugerir salmão e quinoa é um app que ela fecha. */}
+          <CartaoFerramenta
+            aberta={ferramenta === "casa"}
+            icone={<Refrigerator className="h-[18px] w-[18px]" strokeWidth={2} />}
+            titulo="O que tenho"
+            legenda="Cozinhar com o que há"
+            onClick={() => setFerramenta(ferramenta === "casa" ? null : "casa")}
           />
         </div>
 
@@ -557,6 +638,41 @@ export function NutricaoTab({
           </div>
         )}
 
+        {ferramenta === "casa" && (
+          <form
+            className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const ing = limparIngredientes(temEmCasa);
+              if (ing) perguntar(perguntaDoQueTenho(ing, momentoDoDia(hora ?? 12)));
+            }}
+          >
+            <label htmlFor="tem-em-casa" className="block text-sm font-semibold text-foreground">
+              O que você tem em casa?
+            </label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Separe por vírgula. A receita sai só com o que você listar.
+            </p>
+            <textarea
+              id="tem-em-casa"
+              value={temEmCasa}
+              onChange={(e) => setTemEmCasa(e.target.value)}
+              rows={2}
+              maxLength={200}
+              placeholder="Ex.: ovo, arroz, feijão, cenoura, banana"
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. */
+              className="mt-2 w-full resize-none rounded-2xl border border-lime-200 bg-white px-4 py-2.5 text-[16px] text-foreground outline-none placeholder:text-muted-foreground focus:border-lime-500"
+            />
+            <button
+              type="submit"
+              disabled={!limparIngredientes(temEmCasa) || loading}
+              className="btn-3d press mt-2 min-h-[44px] w-full rounded-full bg-lime-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              Montar {momentoDoDia(hora ?? 12)} com isso
+            </button>
+          </form>
+        )}
+
         {ferramenta === "alivio" && (
           <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
             <p className="text-sm font-semibold text-foreground">O que está incomodando?</p>
@@ -570,6 +686,99 @@ export function NutricaoTab({
           </div>
         )}
       </section>
+
+      {/* ─── O CONVITE DA HORA ──────────────────────────────────────────
+          ⚠️ Só depois de montar (a `hora` nasce `null`), porque o relógio do
+          servidor não é o dela. E só fora do Modo Cuidado com a conversa ainda
+          no começo: um convite a cada abertura vira letreiro.
+
+          ⚠️ E ele SOME com uma ferramenta aberta — a foto da bancada mostrou
+          "Montar almoço com isso" e "Vamos montar um almoço equilibrado?" um em
+          cima do outro, dois convites para a mesma refeição. Quem abriu uma
+          ferramenta já escolheu por onde começar; o convite é o atalho de quem
+          ainda não escolheu nada. */}
+      {!careMode && hora != null && ferramenta === null && messages.length <= 1 && (
+        <button
+          type="button"
+          onClick={() => perguntar(perguntaDoPrato(refeicaoDaHora(hora)))}
+          className="card-material press flex w-full items-center gap-3 rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3 text-left"
+        >
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-lime-700 ring-1 ring-lime-200/80">
+            <UtensilsCrossed className="h-5 w-5" strokeWidth={2} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[15px] font-semibold leading-snug text-foreground">
+              {conviteDoMomento(hora)}
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              Toque para montar agora
+            </span>
+          </span>
+        </button>
+      )}
+
+      {/* ─── OS SUPLEMENTOS QUE O MÉDICO PRESCREVEU ─────────────────────
+          ⚠️ O app NUNCA sugere suplemento — ele acompanha o que já está no
+          perfil dela. Sem prescrição, a seção não existe: um checklist vazio
+          convidaria a inventar um. */}
+      {suplementos.length > 0 && (
+        <section
+          aria-label="Suplementos de hoje"
+          className="card-material rounded-2xl border border-lime-200/70 p-3"
+        >
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="font-serif text-[15px] font-semibold text-foreground">
+              <Pill
+                className="mr-1.5 inline h-4 w-4 -translate-y-px text-lime-700"
+                strokeWidth={2}
+              />
+              Do seu médico, hoje
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {resumoDosSuplementos(
+                tomados.filter((t) => suplementos.includes(t)).length,
+                suplementos.length,
+              )}
+            </p>
+          </div>
+          <ul className="mt-2 space-y-1.5">
+            {suplementos.map((item) => {
+              const feito = tomados.includes(item);
+              return (
+                <li key={item}>
+                  <button
+                    type="button"
+                    onClick={() => alternarSuplemento(item)}
+                    aria-pressed={feito}
+                    className="press flex min-h-[44px] w-full items-center gap-3 rounded-xl px-1 text-left"
+                  >
+                    <span
+                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+                        feito
+                          ? "border-lime-700 bg-lime-700 text-white"
+                          : "border-lime-300 bg-white text-transparent"
+                      }`}
+                    >
+                      <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                    </span>
+                    <span
+                      className={`min-w-0 flex-1 text-[15px] ${
+                        feito ? "text-muted-foreground line-through" : "text-foreground"
+                      }`}
+                    >
+                      {item}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {/* ⚠️ A frase existe para a marca não virar cobrança nem conduta. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Marcar aqui é só para você lembrar. Dose e horário são do seu médico.
+          </p>
+        </section>
+      )}
 
       {/* ─── A ÁGUA DO DIA ──────────────────────────────────────────────
           Contador, não meta clínica: 8 copos é REFERÊNCIA e a tela diz. */}

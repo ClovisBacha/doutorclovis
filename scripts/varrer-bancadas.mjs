@@ -69,6 +69,15 @@ const EXTRAS = [
   "/preview-nutricao?estado=saudacao&ferramenta=comer&agua=3",
   "/preview-nutricao?estado=saudacao&ferramenta=alivio",
   "/preview-nutricao?estado=conversa&luto=1&ferramenta=prato",
+  "/preview-nutricao?estado=saudacao&ferramenta=casa&hora=12",
+  /* ⚠️ O checklist de suplementos NASCE da prescrição do médico: sem
+     `?receita=` ele não existe, e essa é a metade que precisa ser vista. O
+     `?hora=` crava o relógio DELA — sem ele, o convite do momento muda de
+     texto conforme a hora em que a varredura roda. */
+  "/preview-nutricao?estado=saudacao&receita=%C3%81cido%20f%C3%B3lico%2C%20Sulfato%20ferroso%3B%20Vitamina%20D&hora=16",
+  "/preview-nutricao?estado=saudacao&receita=Ferro%20e%20C%C3%A1lcio&tomados=Ferro&hora=9",
+  "/preview-nutricao?estado=saudacao&luto=1&receita=Ferro%20e%20C%C3%A1lcio&hora=16",
+  "/preview-nutricao?estado=saudacao&hora=3",
   /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
      existe —, então era a mais difícil de olhar. E é onde o anel de fases
      derrubava a hidratação por 17 dígitos num `cx` de SVG. */
