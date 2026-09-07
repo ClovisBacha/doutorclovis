@@ -21,12 +21,33 @@
  *
  * Uso:  node scripts/varrer-interacao.mjs        (precisa do dev em 8080)
  */
+import { existsSync } from "node:fs";
 import { chromium } from "playwright";
 
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:8080";
 
 /** Cada roteiro: uma tela e os controles que valem tocar. */
 const ROTEIRO = [
+  /* ⚠️ A NUTRIÇÃO É A ABA MAIS DEPENDENTE DE TOQUE do app da paciente: as
+     quatro ferramentas, a câmera, os copos de água e o checklist do médico só
+     existem depois de um dedo. A varredura de bancadas abre a tela e lê o
+     console; ela NÃO alcança nada disso — e foi por isso que a nutrição entrou
+     aqui no dia em que ganhou a geladeira, os suplementos e a foto. */
+  {
+    q: "/preview-nutricao?w=24&hora=16",
+    nome: "nutrição · as quatro ferramentas",
+    passos: [
+      { clique: "Posso comer?" },
+      { clique: "Meu prato" },
+      { clique: /Alívio/ },
+      { clique: "O que tenho" },
+    ],
+  },
+  {
+    q: "/preview-nutricao?w=24&receita=Ferro%20e%20C%C3%A1lcio&hora=16",
+    nome: "nutrição · suplementos e água",
+    passos: [{ clique: "Ferro" }, { clique: "Bebi um copo" }, { clique: "Tirar um copo" }],
+  },
   {
     q: "/preview-instagram",
     nome: "feed · reagir",
@@ -88,7 +109,22 @@ const ROTEIRO = [
 /** Ruído de ambiente, não da tela — a mesma lista da varredura de bancadas. */
 const RUIDO = /fonts\.goog|favicon|429|ERR_CONNECTION_RESET|ERR_NAME_NOT_RESOLVED|net::ERR_ABORTED/;
 
-const navegador = await chromium.launch();
+/* ⚠️ **O MESMO RECUO DE CAMINHO DA VARREDURA DE BANCADAS, e ele FALTAVA.**
+   Aqui o Chromium vive em `/opt/pw-browsers/chromium`; no GitHub Actions quem
+   instala é `playwright install`, que põe em `~/.cache/ms-playwright` — e um
+   `executablePath` fixo faria o Playwright procurar um binário que não existe
+   lá. O caminho só é passado quando o arquivo EXISTE.
+
+   ⚠️ Sem isto a varredura de interação **só rodava na CI**, e a CI chega
+   TARDE: este repositório registra que ela publica em produção 53 segundos
+   depois de um job reprovar. Uma varredura que o autor não consegue rodar é
+   uma varredura que não pega nada antes de a paciente receber. Medido: com a
+   versão do Playwright atualizada, `chromium.launch()` sem caminho estourava
+   com "Executable doesn't exist" na máquina de desenvolvimento. */
+const caminhoLocal = process.env.PLAYWRIGHT_CHROMIUM ?? "/opt/pw-browsers/chromium";
+const navegador = await chromium.launch({
+  ...(existsSync(caminhoLocal) ? { executablePath: caminhoLocal } : {}),
+});
 const ctx = await navegador.newContext({ viewport: { width: 393, height: 852 } });
 let ruins = 0;
 
