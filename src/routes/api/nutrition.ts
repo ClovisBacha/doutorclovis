@@ -205,6 +205,17 @@ export const Route = createFileRoute("/api/nutrition")({
             ? `\n\n${brain.block}\nO bloco acima é do médico que acompanha esta ${quemE}. Use como referência de conduta e tom, respeitando integralmente o contexto clínico acima. Quando a dúvida dela não estiver coberta por ele, responda com informação nutricional consolidada e diga, com acolhimento, que registrou a pergunta para ele.`
             : "";
 
+        /* ─── A NUTRICIONISTA PASSA A CONHECER A PACIENTE ──────────────────
+           Até aqui o prompt era GENÉRICO: sem alergias, sem medicações, sem
+           trimestre, sem glicemia, sem peso — e as três primeiras já estavam
+           preenchidas no perfil desde a primeira migration. Uma nutricionista
+           que não sabe da alergia pode sugerir camarão para quem é alérgica.
+           ⚠️ Falha calada: sem contexto ela responde como sempre respondeu.
+           Ver `nutricao-perfil.ts` para o que entra, o que some no luto, e por
+           que a atenção glicêmica não é um interruptor novo. */
+        const { blocoDaNutricao } = await import("@/lib/nutricao-contexto.server");
+        const blocoDaPaciente = await blocoDaNutricao(patientId, careMode);
+
         /* O TETO DE ENTRADA. Este endpoint manda `body.messages` direto ao
            modelo: nada impedia um POST com mil mensagens de dez mil
            caracteres. Uma "resposta" na cota, um milhão de tokens na fatura. */
@@ -214,7 +225,8 @@ export const Route = createFileRoute("/api/nutrition")({
         const google = createChatProvider(key);
         const result = streamText({
           model: google(process.env.CHAT_MODEL || DEFAULT_CHAT_MODEL),
-          system: (careMode ? NUTRICAO_EM_LUTO : NUTRITION_SYSTEM) + blocoDoMedico,
+          system:
+            (careMode ? NUTRICAO_EM_LUTO : NUTRITION_SYSTEM) + blocoDaPaciente + blocoDoMedico,
           messages: await convertToModelMessages(comTeto),
           providerOptions: {
             google: {

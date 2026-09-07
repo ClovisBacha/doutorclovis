@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { Field } from "@/components/campo";
+import { iomGain } from "@/lib/curva-de-ganho";
 import { NaoConsegueLer } from "@/components/nao-consegui-ler";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
@@ -45,31 +46,6 @@ export type HealthLog = {
   sleep_hours: number | null;
   notes: string | null;
 };
-
-/* ⚠️ A CURVA DO IOM veio junto: ela é clínica, e só esta tela a usa. */
-// IOM 2009 expected weight gain corridor at gestational week w, given pre-pregnancy BMI
-function iomGain(week: number, bmi: number): { min: number; max: number } {
-  let rMin: number, rMax: number;
-  if (bmi < 18.5) {
-    rMin = 0.44;
-    rMax = 0.58;
-  } else if (bmi < 25) {
-    rMin = 0.35;
-    rMax = 0.5;
-  } else if (bmi < 30) {
-    rMin = 0.23;
-    rMax = 0.33;
-  } else {
-    rMin = 0.17;
-    rMax = 0.27;
-  }
-
-  if (week <= 12) {
-    const f = week / 12;
-    return { min: f * 0.5, max: f * 2.0 };
-  }
-  return { min: 0.5 + (week - 12) * rMin, max: 2.0 + (week - 12) * rMax };
-}
 
 export function HealthTab({
   gest,
