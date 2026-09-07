@@ -9,6 +9,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { semComentarios } from "./sem-comentarios";
+
 import {
   ALIMENTO_MAX,
   ALIVIOS,
@@ -43,11 +45,19 @@ const MOMENTOS = [
   "madrugada",
 ] as const;
 
-const semProsa = (t: string) =>
-  t
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, "")
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/[^\n]*/g, "");
+/**
+ * ⚠️ A TELA PASSA POR `semComentarios`, e nunca por um apagador por regex.
+ *
+ * `nutricao-tab.tsx` tem `accept="image/(estrela)"` no seletor de foto, e a
+ * barra-asterisco dentro dessa string faz um apagador ingênuo engolir centenas
+ * de linhas. Medido: o cartão da câmera inteiro sumia do que o teste via, e
+ * duas asserções deste arquivo, sobre código que não mudou, ficaram vermelhas.
+ * Numa asserção NEGATIVA teria sido pior — ela ficaria verde em silêncio.
+ *
+ * A régua única ancora a abertura no COMEÇO DA LINHA, que é onde todo
+ * comentário de bloco deste repositório começa. O porquê está lá.
+ */
+const TELA_CRUA = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
 
 describe("posso comer?", () => {
   test("fora do luto, a pergunta é sobre a gestação", () => {
@@ -95,13 +105,13 @@ describe("a água do dia", () => {
   });
   test("8 copos é a referência, e a tela diz que é referência", () => {
     expect(META_COPOS).toBe(8);
-    const TELA = semProsa(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+    const TELA = TELA_CRUA;
     expect(TELA).toMatch(/Referência de cerca de 2 litros/);
   });
 });
 
 describe("a tela usa a régua, e não frases soltas", () => {
-  const TELA = semProsa(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+  const TELA = TELA_CRUA;
   test("as três ferramentas mandam pela régua", () => {
     expect(TELA).toMatch(/perguntar\(perguntaPossoComer\(a, careMode\)\)/);
     expect(TELA).toMatch(/perguntar\(perguntaDoPrato\(r\)\)/);
@@ -225,7 +235,7 @@ describe("os suplementos que o médico prescreveu", () => {
 });
 
 describe("a tela desenha as três peças novas", () => {
-  const TELA = semProsa(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+  const TELA = TELA_CRUA;
   test("a geladeira manda pela régua, com o momento da hora", () => {
     expect(TELA).toMatch(/perguntar\(perguntaDoQueTenho\(ing, momentoDoDia\(hora \?\? 12\)\)\)/);
     expect(TELA).toMatch(/const ing = limparIngredientes\(temEmCasa\);/);
@@ -243,6 +253,15 @@ describe("a tela desenha as três peças novas", () => {
     expect(i).toBeGreaterThan(-1);
     expect(TELA.slice(Math.max(0, i - 200), i)).toMatch(/useEffect\(\(\) => \{/);
   });
+  test("⚠️ a bolha respeita as quebras de linha da resposta", () => {
+    /* O modelo responde em LINHAS — "para a próxima, duas ideias:" e depois
+       duas linhas com marcador. Sem `whitespace-pre-wrap` elas colam num
+       parágrafo só, e a foto da bancada mostrou a lista virando uma parede com
+       os marcadores no meio da frase. O Chat IA já rendia assim; esta bolha
+       tinha ficado de fora. */
+    expect(TELA).toMatch(/max-w-\[80%\] whitespace-pre-wrap/);
+  });
+
   test("marcar um suplemento varre as chaves vencidas antes de gravar", () => {
     const i = TELA.indexOf("function alternarSuplemento");
     expect(i).toBeGreaterThan(-1);

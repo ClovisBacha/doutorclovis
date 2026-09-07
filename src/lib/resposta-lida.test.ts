@@ -26,8 +26,7 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
-const semComentarios = (t: string) =>
-  t.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+import { semComentarios } from "./sem-comentarios";
 
 /**
  * A instrução IMEDIATAMENTE seguinte a uma chamada.

@@ -171,9 +171,18 @@ describe("6. o servidor da Nutrição também sabe do luto", () => {
    * calava e o servidor anunciava, assim que ela digitasse a primeira palavra.
    */
   const nutricao = readFileSync("src/routes/api/nutrition.ts", "utf8");
+  /* ⚠️ A LEITURA DO PERFIL MUDOU DE ARQUIVO, e a garantia é a mesma.
+     `consultorioDaPaciente` virou módulo no dia em que a foto do prato passou
+     a precisar da mesma decisão — copiar as quinze linhas faria a resposta da
+     FOTO falar da gestação de quem a perdeu. Este teste travava a GRAFIA e
+     ficou vermelho sobre uma mudança que só apertou a garantia; hoje ele cobra
+     o que importa: o servidor da nutrição resolve o luto por uma régua que lê
+     `care_mode`. */
+  const regua = readFileSync("src/lib/consultorio-da-paciente.server.ts", "utf8");
 
   test("o perfil é lido com care_mode", () => {
-    expect(nutricao).toContain('.select("doctor_id,care_mode")');
+    expect(nutricao).toContain("consultorioDaPaciente(usuario.id)");
+    expect(regua).toContain('.select("doctor_id,care_mode")');
   });
 
   test("existe um prompt próprio para quem perdeu a gestação", () => {

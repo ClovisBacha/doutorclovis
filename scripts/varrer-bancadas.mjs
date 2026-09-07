@@ -78,6 +78,9 @@ const EXTRAS = [
   "/preview-nutricao?estado=saudacao&receita=Ferro%20e%20C%C3%A1lcio&tomados=Ferro&hora=9",
   "/preview-nutricao?estado=saudacao&luto=1&receita=Ferro%20e%20C%C3%A1lcio&hora=16",
   "/preview-nutricao?estado=saudacao&hora=3",
+  /* ⚠️ A resposta da FOTO: ela nasce de um seletor de arquivo e de uma chamada
+     de visão, ou seja, é impossível de olhar sem fotografar um prato real. */
+  "/preview-nutricao?estado=foto&hora=16",
   /* ⚠️ A saúde da mulher SOME por nove meses — numa conta de gestante ela não
      existe —, então era a mais difícil de olhar. E é onde o anel de fases
      derrubava a hidratação por 17 dígitos num `cx` de SVG. */

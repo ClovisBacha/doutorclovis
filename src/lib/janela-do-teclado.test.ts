@@ -13,6 +13,8 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
+import { semComentarios } from "./sem-comentarios";
+
 import { alturaNoFluxo, PISO_DA_CAIXA } from "./janela-do-teclado";
 
 /** Sem os comentários: eles CITAM os padrões proibidos para explicá-los. */
@@ -52,7 +54,12 @@ describe("a altura da caixa no fluxo", () => {
 
 describe("uma régua só para os dois chats", () => {
   const CHAT = semProsa(readFileSync("src/components/chat-tab.tsx", "utf8"));
-  const NUTRI = semProsa(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+  /* ⚠️ ESTA TELA PASSA POR `semComentarios`, e não pelo apagador local.
+     Ela tem `accept="image/(estrela)"` no seletor de foto, e a barra-asterisco
+     dentro dessa string faz um apagador por regex engolir centenas de linhas —
+     medido. A asserção de baixo é NEGATIVA, ou seja, ela ficaria VERDE em
+     silêncio sobre o buraco: é a direção perigosa da armadilha. */
+  const NUTRI = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
 
   test("⚠️ nenhum dos dois mede o `visualViewport` por conta própria", () => {
     /* Era assim que estava: a medição inteira dentro do Chat IA, e a Nutrição

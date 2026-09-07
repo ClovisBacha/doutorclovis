@@ -17,6 +17,7 @@
  * compilação, então não há dependência de execução do arquivo de rota.
  */
 import {
+  Camera,
   Check,
   Droplets,
   Leaf,
@@ -24,6 +25,7 @@ import {
   Pill,
   Plus,
   Refrigerator,
+  ScanLine,
   Search,
   Send,
   UtensilsCrossed,
@@ -55,6 +57,8 @@ import {
   resumoDosSuplementos,
   type Refeicao,
 } from "@/lib/nutricao-ferramentas";
+import { FOTO_LADO_MAX, tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
+import { codificarFoto } from "@/lib/codificar-imagem";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
 import { alturaNoFluxo, useJanelaDoTeclado } from "@/lib/janela-do-teclado";
@@ -170,6 +174,48 @@ function Avatar({ tamanho }: { tamanho: number }) {
       <img src={icNutricao} alt="" width={tamanho * 0.72} height={tamanho * 0.72} />
     </span>
   );
+}
+
+/**
+ * A foto reduzida no aparelho dela.
+ *
+ * ⚠️ Falha devolve `null`, e quem chama manda o arquivo ORIGINAL: o teto do
+ * servidor é folgado justamente para caber esse caso. Recusar aqui trocaria
+ * uma foto grande por uma ferramenta que não funciona no aparelho cujo canvas
+ * é bloqueado.
+ */
+async function reduzirParaAFoto(file: File): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const escala = Math.min(1, FOTO_LADO_MAX / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const url = codificarFoto(canvas, 0.82);
+    return await (await fetch(url)).blob();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * ⚠️ CADA MOTIVO TEM RECADO PRÓPRIO, e o genérico não diz o que fazer
+ * diferente. "Muitas fotos" faz ela esperar; "não consegui ver" faz ela
+ * fotografar de novo com mais luz — e o mesmo texto para os dois faria ela
+ * tentar de novo justamente quando tentar de novo não adianta.
+ */
+function recadoDaFoto(motivo?: string): string {
+  if (motivo === "muitas")
+    return "Recebi bastante foto agora há pouco. Tente de novo em alguns minutos 💛";
+  if (motivo === "grande") return "Essa foto ficou pesada demais para eu abrir. Tente tirar outra.";
+  if (motivo === "formato")
+    return "Não consegui abrir esse arquivo. Vale uma foto tirada agora pela câmera.";
+  if (motivo === "vazio")
+    return "Não consegui enxergar o que tem aí. Tente de novo com mais luz e a foto mais de perto.";
+  return "Não consegui ler essa foto agora. Tente de novo daqui a pouco — e, se preferir, me conte por escrito o que tem no prato.";
 }
 
 function CartaoFerramenta({
@@ -338,6 +384,65 @@ export function NutricaoTab({
     /* `suplementos.length` e não a lista: um array remontado a cada render
        faria o efeito re-rodar em toda pintura. */
   }, [ehBancada, suplementos.length]);
+
+  /* ─── A FOTO ─────────────────────────────────────────────────────────────
+     ⚠️ A imagem NÃO passa pela conversa: ela vai por `/api/prato`, e o que
+     entra no histórico é o TÍTULO ("📷 Foto do meu prato") mais a resposta. É
+     o que mantém `/api/nutrition` recebendo só texto — a decisão que o
+     comentário dele explica — e o que permite ela continuar perguntando sobre
+     o mesmo prato na conversa depois. */
+  const entradaDaFoto = useRef<HTMLInputElement | null>(null);
+  const [assuntoDaFoto, setAssuntoDaFoto] = useState<AssuntoDaFoto>("prato");
+
+  function escolherFoto(assunto: AssuntoDaFoto) {
+    setAssuntoDaFoto(assunto);
+    /* O valor é limpo ANTES de abrir: sem isso, escolher a MESMA foto duas
+       vezes seguidas não dispara `change` e o toque não faz nada. */
+    if (entradaDaFoto.current) entradaDaFoto.current.value = "";
+    entradaDaFoto.current?.click();
+  }
+
+  async function mandarFoto(file: File, assunto: AssuntoDaFoto) {
+    if (loading) return;
+    const titulo = tituloDaFoto(assunto);
+    const next: ChatMsg[] = [...messages, { role: "user", content: titulo }];
+    setMessages(next);
+    setFerramenta(null);
+    setLoading(true);
+    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    try {
+      /* ⚠️ A REDUÇÃO ACONTECE NO APARELHO, e o lado é 1024 (e não os 512 do
+         avatar): o modelo precisa LER a tabela nutricional de um rótulo, que é
+         texto miúdo, e a 512 a leitura falha. */
+      const menor = await reduzirParaAFoto(file);
+      const corpo = new FormData();
+      corpo.append("foto", menor ?? file, "foto.webp");
+      corpo.append("assunto", assunto);
+      const { data: sess } = await supabase.auth.getSession();
+      const res = await fetch("/api/prato", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sess.session?.access_token ?? ""}` },
+        body: corpo,
+      });
+      const r = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        texto?: string;
+        motivo?: string;
+      } | null;
+      /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL em alguns caminhos,
+         e um `catch` não o pega: quem decide é o VALOR. Sem isto a bolha
+         renderiza "…" para sempre — o defeito que a conversa já pagou aqui. */
+      if (!res.ok || !r?.ok || !r.texto) {
+        setMessages([...next, { role: "assistant", content: recadoDaFoto(r?.motivo) }]);
+        return;
+      }
+      setMessages([...next, { role: "assistant", content: r.texto }]);
+    } catch {
+      setMessages([...next, { role: "assistant", content: recadoDaFoto() }]);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function alternarSuplemento(item: string) {
     const proximo = tomados.includes(item) ? tomados.filter((x) => x !== item) : [...tomados, item];
@@ -588,6 +693,64 @@ export function NutricaoTab({
             legenda="Cozinhar com o que há"
             onClick={() => setFerramenta(ferramenta === "casa" ? null : "casa")}
           />
+        </div>
+
+        {/* ─── A CÂMERA ────────────────────────────────────────────────────
+            ⚠️ Ela é uma faixa de LARGURA INTEIRA, e não um quinto quadrado:
+            cinco cartões numa grade de duas colunas deixam um sozinho na
+            última fileira, e as duas fotos são o MESMO gesto (abrir a câmera)
+            com dois assuntos — dois quadrados duplicariam a afordância da
+            câmera lado a lado.
+
+            ⚠️ E o `<input>` é UM só, com `capture="environment"`: no iPhone
+            ele abre a câmera traseira direto, que é o gesto de quem está com
+            o prato na frente ou o pote na mão. Dois inputs dariam duas caixas
+            de permissão para a mesma coisa. */}
+        <input
+          ref={entradaDaFoto}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void mandarFoto(f, assuntoDaFoto);
+          }}
+        />
+        <div className="card-material mt-2 rounded-2xl border border-lime-200/70 p-3">
+          <p className="text-sm font-semibold text-foreground">
+            <Camera
+              className="mr-1.5 inline h-4 w-4 -translate-y-px text-lime-700"
+              strokeWidth={2}
+            />
+            Me mostre por foto
+          </p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => escolherFoto("prato")}
+              className="btn-3d press flex min-h-[44px] items-center justify-center gap-2 rounded-full bg-lime-700 px-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              <UtensilsCrossed className="h-4 w-4" strokeWidth={2} />
+              Meu prato
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => escolherFoto("rotulo")}
+              className="pill-3d press flex min-h-[44px] items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold text-lime-800 disabled:opacity-50"
+            >
+              <ScanLine className="h-4 w-4" strokeWidth={2} />
+              Um rótulo
+            </button>
+          </div>
+          {/* ⚠️ A frase da foto NÃO é política de privacidade escondida: ela é
+              dita ANTES do toque, no lugar onde a decisão acontece. É foto da
+              cozinha dela e do supermercado onde ela está. */}
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            A foto vira texto na hora e não fica guardada em lugar nenhum.
+          </p>
         </div>
 
         {ferramenta === "comer" && (
@@ -861,7 +1024,13 @@ export function NutricaoTab({
               >
                 {!dela && <Avatar tamanho={28} />}
                 <div
-                  className={`max-w-[80%] px-4 py-2.5 text-[15px] leading-relaxed ${
+                  /* ⚠️ `whitespace-pre-wrap`: o modelo responde em LINHAS —
+                     "para a próxima, duas ideias:" e depois duas linhas com
+                     marcador. Sem isto elas colavam num parágrafo só, e a foto
+                     da bancada mostrou a lista virando uma parede de texto com
+                     os "•" no meio da frase. O Chat IA já rendia assim; esta
+                     bolha ficou de fora. */
+                  className={`max-w-[80%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed ${
                     dela
                       ? "rounded-3xl rounded-br-md bg-lime-700 text-white shadow-[0_10px_22px_-12px_rgba(77,124,15,0.7)]"
                       : "card-material rounded-3xl rounded-bl-md text-foreground"

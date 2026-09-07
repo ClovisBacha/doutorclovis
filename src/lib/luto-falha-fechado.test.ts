@@ -51,13 +51,50 @@ function corpoDe(fonte: string, assinatura: string): string {
   /* ⚠️ A âncora é conferida: `indexOf` devolve −1 quando o alvo some, e uma
      fatia a partir de −1 deixa asserção passar em branco. */
   expect(i).toBeGreaterThan(-1);
-  const j = fonte.indexOf("\nfunction ", i + 1);
-  expect(j).toBeGreaterThan(i);
-  return fonte.slice(i, j);
+  /* ⚠️ A FUNÇÃO PODE SER A ÚLTIMA DO ARQUIVO, e a primeira versão disto não
+     previa: ao virar módulo próprio, `consultorioDaPaciente` deixou de ter um
+     `\nfunction ` depois dela, o corte estourou no ESCOPO DO MÓDULO e o
+     arquivo inteiro saiu com "0 pass, 0 fail, 1 error" — ou seja, nenhuma
+     destas travas rodou, e só o aviso de erro-fora-de-teste do portão contou.
+     Sem fim à vista, o corpo vai até o fim do arquivo. */
+  const proxima = ["\nfunction ", "\nexport function ", "\nexport async function "]
+    .map((m) => fonte.indexOf(m, i + 1))
+    .filter((k) => k > i);
+  const j = proxima.length ? Math.min(...proxima) : fonte.length;
+  const corpo = fonte.slice(i, j);
+  /* E o corte não pode engolir uma segunda função: seria a fatia inteira
+     passando por "o corpo desta", que é como uma asserção começa a mentir. */
+  expect(corpo.slice(assinatura.length)).not.toMatch(/\n(export )?(async )?function /);
+  return corpo;
 }
 
+/**
+ * ⚠️ A RÉGUA MUDOU DE ARQUIVO, E A GARANTIA FICOU MAIOR.
+ *
+ * `consultorioDaPaciente` nasceu privada dentro de `api/nutrition.ts`. No dia
+ * em que `api/prato.ts` (a foto do prato e do rótulo) precisou da mesma
+ * decisão, a tentação era copiar as quinze linhas — e a cópia divergiria no
+ * primeiro conserto, aparecendo como a resposta da FOTO falando da gestação de
+ * quem acabou de perdê-la. Ela virou módulo, e a catraca passou a cobrar
+ * também que ninguém escreva a segunda cópia.
+ */
+const REGUA = readFileSync("src/lib/consultorio-da-paciente.server.ts", "utf8");
+const PRATO = readFileSync("src/routes/api/prato.ts", "utf8");
+
 describe("⚠️ o Modo Cuidado da nutrição falha FECHADO", () => {
-  const corpo = corpoDe(NUTRICAO, "async function consultorioDaPaciente(");
+  const corpo = corpoDe(REGUA, "export async function consultorioDaPaciente(");
+
+  test("⚠️ os DOIS endpoints usam a mesma régua — nunca uma segunda leitura", () => {
+    for (const [nome, fonte] of [
+      ["nutrition", NUTRICAO],
+      ["prato", PRATO],
+    ] as const) {
+      expect(`${nome}:${fonte.includes("consultorioDaPaciente(usuario.id)")}`).toBe(`${nome}:true`);
+      /* E nenhum dos dois relê o perfil por conta própria: uma segunda leitura
+         seria a segunda régua, com o `Boolean(null)` de volta. */
+      expect(`${nome}:${/\.select\("doctor_id/.test(fonte)}`).toBe(`${nome}:false`);
+    }
+  });
 
   test("o erro da leitura é OLHADO — não basta o try/catch", () => {
     /* O PostgREST resolve com `{ data, error }`; um `catch` em volta pega a

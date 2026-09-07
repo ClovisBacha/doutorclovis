@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { clientIp, makeRateLimiter } from "@/lib/rate-limit.server";
+import { consultorioDaPaciente } from "@/lib/consultorio-da-paciente.server";
 import { naoAutorizado, usuarioDaRequisicao } from "@/lib/api-auth.server";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createChatProvider, DEFAULT_CHAT_MODEL } from "@/lib/ai-gateway.server";
@@ -18,57 +19,6 @@ Regras absolutas:
 - Se a paciente informar sua semana gestacional, adapte as orientações ao trimestre.
 - Mencione alimentos que devem ser EVITADOS quando relevante (peixes com mercúrio, queijos não pasteurizados, carnes cruas, álcool, embutidos em excesso).
 - Valorize uma alimentação variada, colorida e baseada em alimentos in natura.`;
-
-/**
- * O consultório desta paciente. Sem médico vinculado → sem cérebro, e a
- * nutrição responde com informação consolidada, como sempre respondeu.
- */
-async function consultorioDaPaciente(
-  userId: string,
-): Promise<{ doctorId: string | null; patientId: string; careMode: boolean }> {
-  try {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await (supabaseAdmin as any)
-      .from("patient_profiles")
-      /* `care_mode` VEM JUNTO. Este endpoint consultava o mesmo perfil que o
-         chat e não perguntava pelo luto — e o system prompt abaixo instrui a
-         tratar a paciente como gestante e a adaptar tudo ao trimestre. */
-      .select("doctor_id,care_mode")
-      .eq("id", userId)
-      .maybeSingle();
-    /**
-     * ⚠️ AS DUAS PONTAS FALHAVAM ABERTAS, e as duas com a mesma aritmética:
-     * o `error` era descartado, e o PostgREST devolve `data: null` numa falha
-     * sem LANÇAR — `Boolean(null)` é `false`, ou seja **"não está de luto"**.
-     *
-     * O custo é o pior desfecho que este produto tem: `NUTRITION_SYSTEM` manda
-     * tratar a paciente como GESTANTE e adaptar tudo ao trimestre. Uma
-     * oscilação de rede fazia a nutrição conversar sobre a gestação com quem
-     * acabou de perdê-la.
-     *
-     * ⚠️ E a assimetria decide o lado seguro, que NÃO é o mesmo dos dois
-     * campos. Para `doctorId`, "não sei" → segue sem o cérebro, e a resposta
-     * sai consolidada: degradação inofensiva. Para `careMode`, "não sei" →
-     * trata como LUTO: uma gestante recebe orientação genérica em vez de
-     * orientação por trimestre (chato, reversível na tentativa seguinte),
-     * contra o app falar do bebê de quem o perdeu (irreversível).
-     */
-    if (error) {
-      console.error("[nutricao] perfil ilegível — assumindo Modo Cuidado", error);
-      return { doctorId: null, patientId: userId, careMode: true };
-    }
-    return {
-      doctorId: (data?.doctor_id as string | null) ?? null,
-      patientId: userId,
-      careMode: Boolean(data?.care_mode),
-    };
-  } catch (e) {
-    /* Falha de banco não pode derrubar o chat dela: segue sem o cérebro — e
-       pelo mesmo motivo acima, sem falar da gestação. */
-    console.error("[nutricao] perfil inacessível — assumindo Modo Cuidado", e);
-    return { doctorId: null, patientId: userId, careMode: true };
-  }
-}
 
 /**
  * A última coisa que a paciente escreveu — é ela que procura no cérebro.

@@ -102,6 +102,7 @@ import { Route as ApiTranscribeRouteImport } from './routes/api/transcribe'
 import { Route as ApiTranscreverDiarioRouteImport } from './routes/api/transcrever-diario'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe-webhook'
 import { Route as ApiPushWeeklyTickRouteImport } from './routes/api/push-weekly-tick'
+import { Route as ApiPratoRouteImport } from './routes/api/prato'
 import { Route as ApiNutritionRouteImport } from './routes/api/nutrition'
 import { Route as ApiMpWebhookRouteImport } from './routes/api/mp-webhook'
 import { Route as ApiMeditacaoTickRouteImport } from './routes/api/meditacao-tick'
@@ -583,6 +584,11 @@ const ApiPushWeeklyTickRoute = ApiPushWeeklyTickRouteImport.update({
   path: '/api/push-weekly-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPratoRoute = ApiPratoRouteImport.update({
+  id: '/api/prato',
+  path: '/api/prato',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNutritionRoute = ApiNutritionRouteImport.update({
   id: '/api/nutrition',
   path: '/api/nutrition',
@@ -753,6 +759,7 @@ export interface FileRoutesByFullPath {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -862,6 +869,7 @@ export interface FileRoutesByTo {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -973,6 +981,7 @@ export interface FileRoutesById {
   '/api/meditacao-tick': typeof ApiMeditacaoTickRoute
   '/api/mp-webhook': typeof ApiMpWebhookRoute
   '/api/nutrition': typeof ApiNutritionRoute
+  '/api/prato': typeof ApiPratoRoute
   '/api/push-weekly-tick': typeof ApiPushWeeklyTickRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/api/transcrever-diario': typeof ApiTranscreverDiarioRoute
@@ -1084,6 +1093,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1193,6 +1203,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1303,6 +1314,7 @@ export interface FileRouteTypes {
     | '/api/meditacao-tick'
     | '/api/mp-webhook'
     | '/api/nutrition'
+    | '/api/prato'
     | '/api/push-weekly-tick'
     | '/api/stripe-webhook'
     | '/api/transcrever-diario'
@@ -1411,6 +1423,7 @@ export interface RootRouteChildren {
   ApiMeditacaoTickRoute: typeof ApiMeditacaoTickRoute
   ApiMpWebhookRoute: typeof ApiMpWebhookRoute
   ApiNutritionRoute: typeof ApiNutritionRoute
+  ApiPratoRoute: typeof ApiPratoRoute
   ApiPushWeeklyTickRoute: typeof ApiPushWeeklyTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   ApiTranscreverDiarioRoute: typeof ApiTranscreverDiarioRoute
@@ -2080,6 +2093,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPushWeeklyTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/prato': {
+      id: '/api/prato'
+      path: '/api/prato'
+      fullPath: '/api/prato'
+      preLoaderRoute: typeof ApiPratoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/nutrition': {
       id: '/api/nutrition'
       path: '/api/nutrition'
@@ -2295,6 +2315,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeditacaoTickRoute: ApiMeditacaoTickRoute,
   ApiMpWebhookRoute: ApiMpWebhookRoute,
   ApiNutritionRoute: ApiNutritionRoute,
+  ApiPratoRoute: ApiPratoRoute,
   ApiPushWeeklyTickRoute: ApiPushWeeklyTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   ApiTranscreverDiarioRoute: ApiTranscreverDiarioRoute,

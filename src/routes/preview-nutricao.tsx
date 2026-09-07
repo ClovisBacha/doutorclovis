@@ -20,6 +20,10 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *   `?estado=carregando` — ⚠️ a bolha vazia: ela renderiza "…" e é
  *                            indistinguível de um "…" que nunca termina
  *   `?estado=erro`       — o aviso do servidor virando bolha
+ *   `?estado=foto`       — ⚠️ a resposta da FOTO na conversa: ela nasce de um
+ *                            seletor de arquivo e de uma chamada de visão, ou
+ *                            seja, é impossível de fotografar sem tirar uma
+ *                            foto de um prato de verdade
  *
  * E `?w=` muda o trimestre (chips e nutrientes), `?luto=1` liga o Modo Cuidado
  * — onde o cartão de nutrientes, os chips e a semana somem —, `?agua=5` põe
@@ -67,6 +71,25 @@ const CONVERSA: ChatMsg[] = [
   { role: "assistant", content: RESPOSTA },
 ];
 
+/* ⚠️ O que entra no histórico é o TÍTULO da foto, nunca a imagem: é o que
+   mantém `/api/nutrition` recebendo só texto. */
+const FOTO: ChatMsg[] = [
+  { role: "user", content: "📷 Foto do meu prato" },
+  {
+    role: "assistant",
+    content:
+      "Vejo arroz, feijão, um bife grelhado e duas rodelas de tomate.\n\n" +
+      "O que já está bom: o feijão com arroz junto é uma dupla que aproveita " +
+      "muito melhor o ferro do que os dois separados, e a carne ajuda no mesmo " +
+      "caminho.\n\n" +
+      "Para a próxima, duas ideias:\n" +
+      "• Uma verdura de folha escura ao lado (couve refogada, agrião) — elas " +
+      "trazem folato e cabem no mesmo prato.\n" +
+      "• Um pedaço de laranja ou meio limão espremido no feijão: a vitamina C " +
+      "faz o ferro do feijão render mais.",
+  },
+];
+
 /* Três respostas para caber os três desfechos do voto na mesma foto. */
 const TRES: ChatMsg[] = [
   { role: "user", content: PERGUNTA },
@@ -87,26 +110,28 @@ function Pagina() {
   const { w, estado, luto, agua, ferramenta, receita, tomados, hora } = Route.useSearch();
 
   const bancada =
-    estado === "conversa"
-      ? { mensagens: CONVERSA }
-      : estado === "votou"
-        ? { mensagens: TRES, votos: { 2: true, 4: false, 6: "fila" as const } }
-        : estado === "carregando"
-          ? {
-              mensagens: [CONVERSA[0], { role: "assistant" as const, content: "" }],
-              carregando: true,
-            }
-          : estado === "erro"
+    estado === "foto"
+      ? { mensagens: FOTO }
+      : estado === "conversa"
+        ? { mensagens: CONVERSA }
+        : estado === "votou"
+          ? { mensagens: TRES, votos: { 2: true, 4: false, 6: "fila" as const } }
+          : estado === "carregando"
             ? {
-                mensagens: [
-                  CONVERSA[0],
-                  {
-                    role: "assistant" as const,
-                    content: "Você atingiu o limite de mensagens de hoje. Tente de novo amanhã.",
-                  },
-                ],
+                mensagens: [CONVERSA[0], { role: "assistant" as const, content: "" }],
+                carregando: true,
               }
-            : undefined;
+            : estado === "erro"
+              ? {
+                  mensagens: [
+                    CONVERSA[0],
+                    {
+                      role: "assistant" as const,
+                      content: "Você atingiu o limite de mensagens de hoje. Tente de novo amanhã.",
+                    },
+                  ],
+                }
+              : undefined;
   const extras = {
     agua,
     ferramenta: (["comer", "prato", "alivio", "casa"].includes(ferramenta)
