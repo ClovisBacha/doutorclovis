@@ -13850,6 +13850,14 @@ verificação de produção daqui:
 2. ⚠️ **O marcador não está no HTML do SSR** — a bancada monta no cliente,
    então a busca tem de ser dentro dos PEDAÇOS JS que a página pede.
 
+⚠️ **E UMA TERCEIRA CAUSA, no mesmo dia: o pedaço lido para dentro de uma
+VARIÁVEL DE SHELL.** `R=$(curl …)` e depois `echo "$R" | grep` sobre 26 KB de
+JS minificado com acentos devolveu ❌ para os CINCO marcadores que, medidos no
+ARQUIVO um minuto depois, estavam todos lá. **Baixe para um arquivo e procure
+no arquivo** — e confira o código HTTP e o tamanho antes de tratar "não achei"
+como veredito. As três causas desta noite são a mesma falha: **medir sem
+conferir que a leitura aconteceu é falha ABERTA.**
+
 **Conferido no fim:** os dois marcadores das ondas 2 e 3 vivem no MESMO pedaço
 (`/assets/nutricao-tab-*.js`), então a busca por pedaço funciona — o que fazia
 a sonda dizer "versão anterior" era o 403 do WAF, não a ausência do código.
