@@ -604,7 +604,7 @@ const TABS = [
   "Chá de bebê",
   "Feed",
   "Calendário",
-  "Registros",
+  "Meu dia a dia",
   "Saúde",
   "Nutrição",
   "Bem-estar",
@@ -640,7 +640,7 @@ export type Tab = (typeof TABS)[number];
 const CATEGORIES: { label: string; tabs: readonly Tab[] }[] = [
   {
     label: "Gestação",
-    tabs: ["Bebê", "Caminho", "Calendário", "Registros", "Carteirinha"],
+    tabs: ["Bebê", "Caminho", "Calendário", "Meu dia a dia", "Carteirinha"],
   },
   {
     label: "Saúde",
@@ -750,7 +750,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
     Icon: Footprints,
     caixa: "border-sky-200/70 from-sky-50 to-cyan-50/60",
     tinta: "text-sky-600",
-    destino: "Registros",
+    destino: "Meu dia a dia",
     subDestino: "chutes",
   },
   {
@@ -761,7 +761,7 @@ const HUB_SAUDE: LadrilhoDaSaude[] = [
     Icon: Timer,
     caixa: "border-orange-200/70 from-orange-50 to-amber-50/60",
     tinta: "text-orange-600",
-    destino: "Registros",
+    destino: "Meu dia a dia",
     subDestino: "contracoes",
   },
   {
@@ -1522,7 +1522,7 @@ function MinhaContaPage() {
    *
    * Nasceu com os atalhos de Chutes e Contrações na grade da Saúde: eles abrem
    * `Registros`, que é uma aba de OUTRA seção. Sem isto, a seta não encontra
-   * nada — `tabToSection("Registros")` não é "saude" e `origem` fica vazia,
+   * nada — `tabToSection("Meu dia a dia")` não é "saude" e `origem` fica vazia,
    * porque o hub troca a aba direto — e cai na regra do fim, despejando a
    * paciente na tela do bebê. É o mesmo defeito que a regra 2 do `voltarDaBarra`
    * existe para consertar, só que por um caminho novo.
@@ -3132,12 +3132,13 @@ function MinhaContaPage() {
                     consultasSub={consultasSub}
                   />
                 )}
-                {tab === "Registros" && (
+                {tab === "Meu dia a dia" && (
                   <RegistrosHub
                     profile={profile}
                     gest={gest}
                     careMode={careMode}
                     onNavigate={goToTab}
+                    aoVoltarDeFora={voltarDaBarra}
                     initialSub={consultasSub}
                   />
                 )}
@@ -3511,7 +3512,9 @@ function BemEstarHub({
   initialSub = null,
 }: {
   gest: Gest;
-  onNavigate: (tab: string) => void;
+  /* A sub-tela viaja junto — é o que faz "Abrir meu diário" cair no diário, e
+     não na grade. `goToTab` já aceita os dois argumentos. */
+  onNavigate: (tab: string, sub?: string) => void;
   careMode?: boolean;
   /**
    * ⚠️ ESTE HUB ERA O ÚNICO DOS CINCO SEM `initialSub`, e por isso o
@@ -3652,12 +3655,29 @@ function RegistrosHub({
   gest,
   careMode = false,
   onNavigate,
+  aoVoltarDeFora,
   initialSub = null,
 }: {
   profile: Profile | null;
   gest: Gest;
   careMode?: boolean;
   onNavigate?: (t: Tab) => void;
+  /**
+   * ⚠️ **A SETA DE DENTRO, QUANDO ELA VEIO DE FORA — e este era o defeito que
+   * o dono viu.**
+   *
+   * Vindo de Saúde → Chutes, a tela desenha DUAS setas a poucos pixels uma da
+   * outra, com destinos diferentes: a da barra de cima volta para a Saúde (o
+   * lugar de onde ela veio), e a de dentro do cabeçalho fazia `setSub(null)` —
+   * despejando na grade de Registros, com Diário e Linha do tempo, que ela
+   * nunca pediu. Palavras dele: "quando você clica pra voltar, ele abre uma
+   * outra aba com diário, com linha do tempo".
+   *
+   * ⚠️ E o conserto NÃO é a seta de dentro sumir sempre: este hub também é
+   * aberto SEM `initialSub` (pelo ☰ e pelo mapa do app), e aí ela está certa.
+   * O que ele precisa distinguir é "vim de fora" de "abri a grade".
+   */
+  aoVoltarDeFora?: () => void;
   /**
    * Sub-tela para abrir direto, como em `ConsultasHub` e `BebeHub`.
    *
@@ -3671,30 +3691,61 @@ function RegistrosHub({
   const [sub, setSub] = useState<SubDeRegistros | null>(
     () => REGISTROS_SUBTABS.find((s) => s.key === initialSub)?.key ?? null,
   );
+  /* "Esta sub-tela foi pedida de FORA?" — e ela deixa de ser assim que a
+     paciente toca num ladrilho da grade daqui. */
+  const [veioDeFora, setVeioDeFora] = useState(() =>
+    REGISTROS_SUBTABS.some((s) => s.key === initialSub),
+  );
   /* ⚠️ O valor inicial de `useState` só vale na MONTAGEM. Voltando ao hub da
      Saúde e tocando no outro atalho, a aba continua sendo "Registros" — o
      componente não remonta, e a paciente que pediu Contrações caía em Chutes,
      a sub-tela da vez anterior. O efeito é o que faz o segundo pedido valer. */
   useEffect(() => {
     const pedida = REGISTROS_SUBTABS.find((s) => s.key === initialSub)?.key;
-    if (pedida) setSub(pedida);
+    if (pedida) {
+      setSub(pedida);
+      setVeioDeFora(true);
+    }
   }, [initialSub]);
   const atual = REGISTROS_SUBTABS.find((s) => s.key === sub);
   if (!sub || !atual) {
     return (
-      <GradeHub
-        /* ⚠️ No Modo Cuidado o ladrilho de Chutes sai daqui também — as duas
+      <div className="space-y-3">
+        {/* ⚠️ O NOME NOVO NÃO ANUNCIA QUE ALI SE CRONOMETRA CONTRAÇÃO, e essa é
+            a fraqueza real dele — por isso ele vem ACOMPANHADO da frase que
+            nomeia as quatro. "Registros" colidia com a lista de peso, pressão
+            e glicemia da aba Saúde ("✏️ Ver e corrigir meus registros") e com
+            o "Registros" do painel do médico; "Meu diário" colidiria com a
+            sub-tela Diário aqui dentro. */}
+        <p className="px-1 text-sm text-muted-foreground">
+          O que você anota e cronometra: o diário, os movimentos do bebê, as contrações e a linha do
+          tempo de tudo que você já registrou.
+        </p>
+        <GradeHub
+          /* ⚠️ No Modo Cuidado o ladrilho de Chutes sai daqui também — as duas
            portas do mesmo destino, ou a que sobra reabre o convite. O
            cronômetro de contrações FICA: quem perdeu a gestação pode estar em
            trabalho de parto. */
-        itens={REGISTROS_SUBTABS.filter((i) => !(careMode && i.key === "chutes"))}
-        onAbrir={(k) => setSub(k as (typeof REGISTROS_SUBTABS)[number]["key"])}
-      />
+          itens={REGISTROS_SUBTABS.filter((i) => !(careMode && i.key === "chutes"))}
+          onAbrir={(k) => {
+            setSub(k as (typeof REGISTROS_SUBTABS)[number]["key"]);
+            setVeioDeFora(false);
+          }}
+        />
+      </div>
     );
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade
+        rotulo={atual.label}
+        ladrilho={atual}
+        /* ⚠️ UMA TELA, UM VOLTAR. Vindo de fora, a seta de dentro faz o MESMO
+           que a de cima — senão são duas setas a poucos pixels uma da outra
+           com destinos diferentes, e a de dentro despeja numa grade que ela
+           não pediu. */
+        onVoltar={veioDeFora && aoVoltarDeFora ? aoVoltarDeFora : () => setSub(null)}
+      />
       <Fade key={sub}>
         {sub === "diario" && <JournalTab profile={profile} gest={gest} />}
         {sub === "chutes" && (
@@ -3840,7 +3891,15 @@ function BebeHub({
   }
   return (
     <div className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade
+        rotulo={atual.label}
+        ladrilho={atual}
+        /* ⚠️ UMA TELA, UM VOLTAR. Vindo de fora, a seta de dentro faz o MESMO
+           que a de cima — senão são duas setas a poucos pixels uma da outra
+           com destinos diferentes, e a de dentro despeja numa grade que ela
+           não pediu. */
+        onVoltar={() => setSub(null)}
+      />
       <Fade key={sub}>
         {sub === "semana" && (
           <BabyTab
@@ -7581,7 +7640,15 @@ function ConsultasHub({
   }
   return (
     <div ref={rootRef} className="space-y-5">
-      <VoltarDaGrade rotulo={atual.label} ladrilho={atual} onVoltar={() => setSub(null)} />
+      <VoltarDaGrade
+        rotulo={atual.label}
+        ladrilho={atual}
+        /* ⚠️ UMA TELA, UM VOLTAR. Vindo de fora, a seta de dentro faz o MESMO
+           que a de cima — senão são duas setas a poucos pixels uma da outra
+           com destinos diferentes, e a de dentro despeja numa grade que ela
+           não pediu. */
+        onVoltar={() => setSub(null)}
+      />
       <Fade key={sub}>
         {sub === "agenda" && <ConsultasTab />}
         {sub === "preparo" && <PreConsultaTab profile={profile} gest={gest} />}
@@ -15332,7 +15399,13 @@ function PlanoField({
 }
 
 /* ---------- Apoio Emocional ---------- */
-function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }) {
+function ApoioEmocionalTab({
+  onNavigate,
+}: {
+  /* ⚠️ A sub-tela vai junto: o botão promete o DIÁRIO e entregava a grade,
+     custando um quarto toque. */
+  onNavigate: (tab: string, sub?: string) => void;
+}) {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-primary/20 bg-[image:var(--gradient-warm)] p-8">
@@ -15457,7 +15530,7 @@ function ApoioEmocionalTab({ onNavigate }: { onNavigate: (tab: string) => void }
           O diário é um espaço só seu — sem julgamentos, sem respostas certas.
         </p>
         <button
-          onClick={() => onNavigate("Registros")}
+          onClick={() => onNavigate("Meu dia a dia", "diario")}
           className="mt-4 rounded-full bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground"
         >
           Abrir meu diário

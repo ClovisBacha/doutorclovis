@@ -41,7 +41,7 @@ export type AppTab =
   | "Bebê"
   | "Caminho"
   | "Calendário"
-  | "Registros"
+  | "Meu dia a dia"
   | "Saúde"
   | "Nutrição"
   | "Bem-estar"

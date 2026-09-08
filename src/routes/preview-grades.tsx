@@ -34,7 +34,7 @@ const GRUPOS = [
   { nome: "Consultas", itens: CONSULTAS_SUBTABS },
   { nome: "Bebê", itens: BEBE_SUBTABS },
   { nome: "Bem-estar", itens: BEMESTAR_SUBTABS },
-  { nome: "Registros", itens: REGISTROS_SUBTABS },
+  { nome: "Meu dia a dia", itens: REGISTROS_SUBTABS },
 ];
 
 function PreviewGrades() {

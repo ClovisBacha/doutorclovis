@@ -32,7 +32,7 @@ function subTelasDe(hub: string): Set<string> {
 }
 
 const HUB_DA_ABA: Record<string, string> = {
-  Registros: "REGISTROS_SUBTABS",
+  "Meu dia a dia": "REGISTROS_SUBTABS",
   Bebê: "BEBE_SUBTABS",
   Consultas: "CONSULTAS_SUBTABS",
   "Bem-estar": "BEMESTAR_SUBTABS",
@@ -198,8 +198,8 @@ describe("dicaDaSemana", () => {
 
 describe("idDaFuncao e a busca", () => {
   test("o mais específico vence; a aba sem sub cai na entrada sem sub", () => {
-    expect(idDaFuncao("Registros", "chutes")).toBe("chutes");
-    expect(idDaFuncao("Registros", "diario")).toBe("diario");
+    expect(idDaFuncao("Meu dia a dia", "chutes")).toBe("chutes");
+    expect(idDaFuncao("Meu dia a dia", "diario")).toBe("diario");
     expect(idDaFuncao("Bebê", null)).toBe("semana");
     expect(idDaFuncao("Bem-estar", null)).toBe("bem-estar");
     expect(idDaFuncao("Bem-estar", "sons")).toBe("sons");

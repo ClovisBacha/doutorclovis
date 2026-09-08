@@ -55,7 +55,9 @@ export function HealthTab({
 }: {
   gest: Gest;
   profile: Profile | null;
-  onNavigate: (tab: string) => void;
+  /* A sub-tela viaja junto — é ela que abre a linha do tempo direto, e não a
+     grade. `goToTab` já aceita os dois argumentos. */
+  onNavigate: (tab: string, sub?: string) => void;
   /**
    * ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca um
    * desenho à parte — e com a mesma FORMA das props, porque uma bancada que
@@ -839,6 +841,22 @@ export function HealthTab({
           Então ela recolhe. Fechada não ocupa tela; aberta é o que a paciente
           procura quando quer arrumar alguma coisa — e o rótulo passa a dizer
           isso, em vez de fingir ser um resumo. */}
+      {/* ⚠️ A PORTA DA LINHA DO TEMPO, e ela faltava dos DOIS lados.
+          A linha do tempo lê cinco fontes, e TRÊS delas moram noutras abas —
+          peso, pressão e glicemia são registrados AQUI. Nenhuma dessas abas
+          tinha link para ela, e é por isso que ela é a função que ninguém sabe
+          que existe. */}
+      <button
+        type="button"
+        onClick={() => onNavigate("Meu dia a dia", "timeline")}
+        className="press min-h-11 w-full rounded-2xl card-material px-5 py-3 text-left text-sm font-medium"
+      >
+        🕘 Ver a minha linha do tempo
+        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+          tudo o que eu já registrei, em ordem
+        </span>
+      </button>
+
       <details className="rounded-2xl card-material">
         <summary className="cursor-pointer px-5 py-3 text-sm font-medium">
           ✏️ Ver e corrigir meus registros

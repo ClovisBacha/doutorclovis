@@ -58,8 +58,14 @@ describe("o que a grade da Saúde oferece", () => {
 
   test("os atalhos abrem a tela REAL, e não uma cópia", () => {
     /* Duas implementações de contagem de chutes divergiriam no primeiro
-       conserto. Os ladrilhos apontam para `Registros` com a sub-tela. */
-    expect(gradeDaSaude).toContain('destino: "Registros"');
+       conserto. Os ladrilhos apontam para o hub dos registros com a sub-tela.
+
+       ⚠️ A aba mudou de NOME em set/2026 ("Registros" → "Meu dia a dia", para
+       unir diário, chutes, contrações e linha do tempo debaixo de um nome que
+       não colide com a lista de medições da Saúde nem com o "Registros" do
+       painel do médico). O rótulo É a chave da aba, então esta asserção
+       acompanha — o que ela garante continua sendo o VÍNCULO. */
+    expect(gradeDaSaude).toContain('destino: "Meu dia a dia"');
     expect(gradeDaSaude).toContain('subDestino: "chutes"');
     expect(gradeDaSaude).toContain('subDestino: "contracoes"');
   });

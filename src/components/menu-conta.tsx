@@ -98,9 +98,11 @@ const MENU_CONTA: {
     Icon: CalendarDays,
   },
   {
-    tab: "Registros",
-    label: "Registros",
-    sub: "Diário, chutes e contrações",
+    tab: "Meu dia a dia",
+    label: "Meu dia a dia",
+    /* ⚠️ A LINHA DO TEMPO ENTRA NA LISTA. Ela era justamente a função que
+       ninguém sabia que existe — e o subtítulo que a anunciava a OMITIA. */
+    sub: "Diário, chutes, contrações e a linha do tempo",
     Icon: NotebookPen,
   },
   {
