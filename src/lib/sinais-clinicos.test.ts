@@ -247,12 +247,24 @@ describe("contrações regulares antes das 37 semanas", () => {
     const i = arq.indexOf("export function analyzeContractions(");
     expect(i).toBeGreaterThan(-1);
     const corpo = arq.slice(i);
-    const regua = corpo.indexOf("sinalContracoesPrematuras(");
-    expect(regua).toBeGreaterThan(-1);
+    /* ⚠️ `indexOf` devolve −1 quando a âncora SOME, e `x < -1` é falso: a
+       asserção reprova alto neste sentido e passaria em silêncio no outro
+       (`toBeGreaterThan(-1)`). `onde` recusa o −1 nomeando quem sumiu — foi
+       assim que esta asserção envelheceu pela TERCEIRA vez, quando os cortes
+       de parto trocaram de nome na reescrita por semana gestacional. */
+    const onde = (alvo: string) => {
+      const j = corpo.indexOf(alvo);
+      expect(`${alvo}: ${j > -1}`).toBe(`${alvo}: true`);
+      return j;
+    };
+    const regua = onde("sinalContracoesPrematuras(");
     /* Antes dos cortes de trabalho de parto… */
-    expect(regua).toBeLessThan(corpo.indexOf("avgInterval <= 3"));
-    /* …e antes do corte que exige contrações TERMINADAS, que é o que a barrava
-       com a segunda contração ainda em curso. */
-    expect(regua).toBeLessThan(corpo.indexOf("completed.length < 2"));
+    expect(regua).toBeLessThan(onde("intervalo <= 3"));
+    /* …e antes do único ramo que exige contração TERMINADA, que é o que a
+       barrava com a segunda contração ainda em curso. */
+    /* ⚠️ `if (duracao == null)` COM O `if`: a expressão solta `duracao == null`
+       aparece antes, dentro do objeto de medidas, e ancorar nela media a
+       ocorrência errada — a armadilha de substring, pela enésima vez. */
+    expect(regua).toBeLessThan(onde("if (duracao == null)"));
   });
 });

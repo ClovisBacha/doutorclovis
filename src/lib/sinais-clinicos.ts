@@ -198,6 +198,45 @@ export function sinalContracoesPrematuras(o: {
 }
 
 /**
+ * SEIS EM UMA HORA — o mesmo piso do NICHD, pela porta que o intervalo não vê.
+ *
+ * ⚠️ **A régua acima e esta NÃO são a mesma conta**, e há um caso real entre as
+ * duas. O NICHD publica os dois lados do mesmo número: sintoma de trabalho de
+ * parto prematuro é "contractions every 10 minutes or more often", e "it is not
+ * normal to have frequent uterine contractions, such as six or more in one
+ * hour". Aritmeticamente parecem equivalentes — e não são quando os intervalos
+ * ficam logo acima do corte: **seis contrações com 11 minutos entre elas cabem
+ * em 55 minutos**. O intervalo diz 11 (não dispara); a contagem da hora diz 6
+ * (dispara). É a paciente de 31 semanas que passou a hora inteira contraindo e
+ * cuja tela dizia que estava tudo dentro do esperado.
+ *
+ * A janela é de SESSENTA MINUTOS por definição da fonte, e é a mesma janela que
+ * o "1" final do padrão 5-1-1 significa. Média das últimas N contrações
+ * responde outra pergunta.
+ *
+ * Fonte: NICHD — What are the symptoms of preterm labor?
+ *
+ * ⚠️ Sem semana conhecida devolve `null`, como a irmã: quem decide o lado
+ * seguro quando a semana falta é o CHAMADOR (`faseDoCronometro`), e não esta
+ * função — inventar prematuridade aqui alarmaria quem está de 39.
+ */
+export function sinalContracoesFrequentes(o: {
+  semanas?: number | null;
+  /** Quantas contrações COMEÇARAM nos últimos 60 minutos. */
+  naUltimaHora?: number | null;
+}): Sinal | null {
+  const s = o.semanas;
+  const n = o.naUltimaHora;
+  if (s == null || !Number.isFinite(s) || n == null || !Number.isFinite(n)) return null;
+  if (s >= 37) return null;
+  if (n < 6) return null;
+  return {
+    gravidade: "grave",
+    nota: `${Math.floor(n)} contrações em uma hora antes das 37 semanas (você está com ${Math.floor(s)}) não é o esperado. Ligue para o seu médico agora.`,
+  };
+}
+
+/**
  * MOVIMENTOS REDUZIDOS — a régua que o contador de chutes anunciava e não
  * aplicava.
  *

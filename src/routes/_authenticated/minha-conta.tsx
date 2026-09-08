@@ -3686,7 +3686,9 @@ function RegistrosHub({
             onNavigate={onNavigate}
           />
         )}
-        {sub === "contracoes" && <ContracoesTab weeks={gest?.weeks ?? null} />}
+        {sub === "contracoes" && (
+          <ContracoesTab weeks={gest?.weeks ?? null} onNavigate={onNavigate} />
+        )}
         {sub === "timeline" && <TimelineTab profile={profile} gest={gest} />}
       </Fade>
     </div>

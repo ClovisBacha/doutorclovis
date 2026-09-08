@@ -27,6 +27,8 @@ import { SilencioDoCuidado } from "@/components/silencio-do-cuidado";
 import { supabase } from "@/integrations/supabase/client";
 import { triggerAchievementsCheck } from "@/lib/checar-conquistas";
 import { hapticKick } from "@/lib/haptics";
+import { dataHoraCurta } from "@/lib/hora-do-registro";
+import { relogioDeSessao } from "@/lib/relogio-de-sessao";
 import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 /* ⚠️ `import type` — o tipo é apagado na compilação, então isto NÃO cria
@@ -184,23 +186,10 @@ export function KicksTab({
     triggerAchievementsCheck();
   }
 
-  const mins = Math.floor(elapsed / 60000);
-  const secs = Math.floor((elapsed % 60000) / 1000);
-  /**
-   * ⚠️ **"125:00" NÃO É UM RELÓGIO.** O formato era `mm:ss` cravado, então a
-   * sessão que passa de uma hora — que é o caso NORMAL desta tela, cujo prazo
-   * é de DUAS horas — saía como "125:00". Quem lê mm:ss lê aquilo como cento e
-   * vinte e cinco minutos só depois de pensar; a leitura imediata é de um
-   * relógio quebrado.
-   *
-   * Passada a hora, ele vira `h:mm:ss`. Foi a FOTO da bancada que mostrou —
-   * nenhuma asserção chegava perto disso.
-   */
-  const horas = Math.floor(mins / 60);
-  const relogio =
-    horas > 0
-      ? `${horas}:${String(mins % 60).padStart(2, "0")}:${String(secs).padStart(2, "0")}`
-      : `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  /* ⚠️ O relógio mora em `lib/` e as DUAS telas de cronômetro leem a mesma
+     função. A razão inteira — "125:00 não é um relógio", e o "3502:18" que a
+     tela irmã mostrava — está escrita lá. */
+  const relogio = relogioDeSessao(elapsed);
 
   /**
    * ⚠️ **A TELA ANUNCIAVA A RÉGUA E NÃO A APLICAVA.** Ela escreve "o ideal é
@@ -390,12 +379,7 @@ export function KicksTab({
                 key={s.id}
                 className="flex items-center justify-between rounded-xl border border-border bg-card p-4 text-sm"
               >
-                <span>
-                  {new Date(s.started_at).toLocaleString("pt-BR", {
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  })}
-                </span>
+                <span>{dataHoraCurta(s.started_at)}</span>
                 <span className="flex items-center gap-2 text-muted-foreground">
                   {s.kick_count >= 10 && (
                     <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">

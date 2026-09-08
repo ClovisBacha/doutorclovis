@@ -23,10 +23,16 @@ import { useEffect, useRef, useState } from "react";
 import { History } from "lucide-react";
 import { toast } from "sonner";
 
+import { FitaDeContracoes } from "@/components/fita-de-contracoes";
 import { supabase } from "@/integrations/supabase/client";
 import { hapticTap } from "@/lib/haptics";
 import { hapticoDeAviso } from "@/lib/nativo";
 import { analyzeContractions } from "@/lib/analise-de-contracoes";
+import { horaCurta } from "@/lib/hora-do-registro";
+import { relogioDeSessao } from "@/lib/relogio-de-sessao";
+import { manterTelaAcesa } from "@/lib/tela-acesa";
+
+import type { Tab } from "@/routes/_authenticated/minha-conta";
 import { tocarSomDeUI } from "@/lib/tocar-som-de-ui";
 
 /* ---------- Contrações ---------- */
@@ -41,9 +47,14 @@ type Contraction = {
 const INTENSITY_LABEL = ["", "Leve", "Moderada", "Forte"];
 const INTENSITY_COLOR = [
   "",
-  "bg-secondary text-primary",
-  "bg-primary/10 text-primary",
-  "bg-rose-100 text-rose-700",
+  /* ⚠️ A escala inteira mora na família LARANJA, e o "forte" deixou de ser
+     rosa de propósito: nesta tela o rosa/vermelho passou a querer dizer UMA
+     coisa só — emergência (o 192, as bandeiras vermelhas, o apagar). Uma
+     contração forte é intensa, não é emergência, e as duas cores disputando o
+     olho é o que fazia o alerta de verdade valer menos. */
+  "bg-orange-50 text-orange-800",
+  "bg-orange-100 text-orange-900",
+  "bg-orange-200 text-orange-950",
 ];
 
 /**
@@ -62,9 +73,16 @@ const INTENSITY_COLOR = [
  */
 export function ContracoesTab({
   weeks,
+  onNavigate,
   bancada,
 }: {
   weeks: number | null;
+  /**
+   * ⚠️ O caminho do MÉDICO DELA, e ele vem antes do 192 em todo estado que não
+   * é emergência: a régua toda manda LIGAR, e ligar para quem a acompanha é a
+   * primeira ligação. É a mesma prop que o contador de chutes já recebe.
+   */
+  onNavigate?: (t: Tab) => void;
   /**
    * Só a `/preview-contracoes`. ⚠️ Injeta o DADO nos MESMOS `useState` da
    * produção, nunca um desenho à parte — é a lição que este repositório já
@@ -77,7 +95,19 @@ export function ContracoesTab({
    * de parto, a contração em curso, a leitura instável que já silenciou o
    * botão do 192 — não se fabricam numa conta de teste.
    */
-  bancada?: { contractions: Contraction[]; instavel?: boolean };
+  bancada?: {
+    contractions: Contraction[];
+    instavel?: boolean;
+    /**
+     * ⚠️ O "agora" da bancada, CRAVADO — e ele conserta um defeito que a
+     * bancada tinha por construção: a janela de análise é relativa ao relógio,
+     * e a âncora dos dados era uma data fixa. No dia em que a bancada foi
+     * escrita as duas coincidiam; três dias depois a janela ficou VAZIA e o
+     * banner de análise — que é o único lugar desta tela com o 192, e a razão
+     * inteira de a bancada existir — parou de ser desenhado, em silêncio.
+     */
+    agora?: number;
+  };
 }) {
   /* `weeks` é lido de verdade agora — ver `analyzeContractions`. */
   const [contractions, setContractions] = useState<Contraction[]>(bancada?.contractions ?? []);
@@ -101,7 +131,9 @@ export function ContracoesTab({
   async function load() {
     const { data, error } = await (supabase as any)
       .from("contraction_logs")
-      .select("*")
+      /* Só o que a tela lê: `select("*")` trazia `user_id`, `created_at` e
+         `notes`, que ninguém desenha. */
+      .select("id, started_at, ended_at, intensity")
       .order("started_at", { ascending: false })
       .limit(30);
     if (error || !data) {
@@ -140,6 +172,16 @@ export function ContracoesTab({
     return () => clearInterval(t);
   }, [active]);
 
+  /* ⚠️ TELA ACESA DURANTE A CONTRAÇÃO, e aqui a falta dói mais que na tela
+     irmã: a tela apaga justamente porque ela NÃO toca no aparelho enquanto a
+     dor passa, e aí ela precisa desbloquear o celular a cada contração — com o
+     cronômetro correndo. `manterTelaAcesa` já existia e já era usada pelo
+     contador de movimentos. */
+  useEffect(() => {
+    if (!active) return;
+    return manterTelaAcesa();
+  }, [active]);
+
   async function startContraction() {
     /* ⚠️ O INSTANTE É O DO DEDO, e isto era um defeito de MEDIDA CLÍNICA.
        `ended_at` sempre foi carimbado aqui (`new Date()` dentro do `update`),
@@ -161,7 +203,15 @@ export function ContracoesTab({
        toque e o cronômetro, no minuto em que ela menos pode esperar. */
     const { data: s } = await supabase.auth.getSession();
     const uid = s.session?.user?.id;
-    if (!uid) return;
+    if (!uid) {
+      /* ⚠️ ERA UM `return` MUDO. Ela toca no círculo em trabalho de parto,
+         sente o tique (que dispara ANTES desta leitura) e o cronômetro não
+         parte — sem uma palavra na tela. O toast diz o MOTIVO: um genérico
+         faria ela tocar de novo no mesmo lugar. */
+      hapticoDeAviso("erro");
+      toast.error("Não consegui confirmar o seu login. Recarregue o app e tente de novo.");
+      return;
+    }
     const { data, error } = await (supabase as any)
       .from("contraction_logs")
       .insert({ user_id: uid, intensity, started_at: new Date(agora).toISOString() })
@@ -175,12 +225,22 @@ export function ContracoesTab({
     }
     setActive(data);
     startRef.current = agora;
-    setElapsed(Math.max(0, Math.round((Date.now() - agora) / 1000)));
+    /* ⚠️ MILISSEGUNDOS, como o laço de 1 s logo acima — aqui estava dividido
+       por mil, então o cronômetro nascia zerado e só se corrigia um segundo
+       depois. */
+    setElapsed(Math.max(0, Date.now() - agora));
     load();
   }
 
   async function stopContraction() {
     if (!active) return;
+    /* ⚠️ O TIQUE VEM ANTES DO `await`, como no começo: depois dele o gesto já
+       passou. E ele existe porque o retorno que havia aqui era SÓ SOM — e
+       `NIVEL_PADRAO` é "desligado", então para toda paciente que nunca ligou o
+       som o retorno era ZERO; no iPhone no silencioso o Web Audio não toca de
+       jeito nenhum. O botão que INICIA vibrava; o que ENCERRA — o que define
+       `ended_at`, ou seja, a duração que decide o padrão — era mudo. */
+    hapticTap();
     const { error } = await (supabase as any)
       .from("contraction_logs")
       .update({ ended_at: new Date().toISOString() })
@@ -221,42 +281,52 @@ export function ContracoesTab({
   const [confirmandoLimpar, setConfirmandoLimpar] = useState(false);
 
   async function clearSession() {
-    setConfirmandoLimpar(false);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return;
-    const { error } = await (supabase as any)
-      .from("contraction_logs")
-      .delete()
-      .eq("user_id", u.user.id);
+    /* ⚠️ A CONFIRMAÇÃO SÓ FECHA NO SUCESSO. Ela fechava na primeira linha, e o
+       `return` de logo abaixo era mudo: a caixa sumia, nada era apagado, e a
+       leitura óbvia é "apaguei". */
+    const { data: s } = await supabase.auth.getSession();
+    const uid = s.session?.user?.id;
+    if (!uid) {
+      toast.error("Não consegui confirmar o seu login. Recarregue o app e tente de novo.");
+      return;
+    }
+    const { error } = await (supabase as any).from("contraction_logs").delete().eq("user_id", uid);
     if (error) {
       toast.error("Não foi possível limpar o histórico. Tente novamente.");
       return;
     }
     setActive(null);
+    setConfirmandoLimpar(false);
     load();
   }
 
-  const elapsedSecs = Math.floor(elapsed / 1000);
-  const elapsedMins = Math.floor(elapsedSecs / 60);
+  /* ⚠️ O relógio é o MESMO das duas telas de cronômetro (`lib/`), e não uma
+     cópia: com `mm:ss` cravado, a contração que ela esqueceu de parar — e que
+     `load()` RETOMA do banco, ancorada no `started_at` — saía como "3502:18".
+     Medido na bancada. */
+  const relogio = relogioDeSessao(elapsed);
   const recentContractions = contractions.slice(0, 10);
-  // Análise/banner consideram apenas contrações das últimas 2 horas,
-  // para não manter alertas urgentes presos com dados antigos.
+  /* Análise e banner olham as contrações das últimas 2 horas, para um alerta
+     não ficar preso a dados antigos. ⚠️ Sem `.slice(0, 10)`: a régua conta
+     quantas começaram na última HORA, e cortar em dez truncaria justamente a
+     contagem que decide o alerta de prematuridade. */
+  const agora = bancada?.agora ?? Date.now();
   const ANALYSIS_WINDOW_MS = 2 * 3600000;
-  const analysisWindow = contractions
-    .filter((c) => Date.now() - new Date(c.started_at).getTime() < ANALYSIS_WINDOW_MS)
-    .slice(0, 10);
-  const analysis = analyzeContractions(analysisWindow, weeks);
+  const analysisWindow = contractions.filter(
+    (c) => agora - new Date(c.started_at).getTime() < ANALYSIS_WINDOW_MS,
+  );
+  const analysis = analyzeContractions(analysisWindow, weeks, agora);
 
   const statusStyle: Record<string, string> = {
     normal: "border-emerald-200 bg-emerald-50 text-emerald-800",
-    atencao: "border-primary/20 bg-primary/6 text-foreground",
+    atencao: "border-orange-300 bg-orange-50 text-orange-950",
     alerta: "border-rose-200 bg-rose-50 text-rose-800",
     urgente: "border-rose-400 bg-rose-100 text-rose-900",
   };
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-primary/20 bg-primary/6 p-4 text-sm text-foreground">
+      <div className="rounded-2xl border border-orange-200 bg-orange-50/80 p-4 text-sm text-orange-950">
         Use este diário se sentir contrações regulares.{" "}
         <strong>Em dúvida, ligue para o consultório.</strong> Em emergência, ligue{" "}
         <strong>192 (SAMU)</strong>.
@@ -295,25 +365,68 @@ export function ContracoesTab({
         </div>
       )}
 
-      {/* Analysis banner */}
-      {!instavel && analysisWindow.length >= 2 && (
+      {/* ⚠️ O BANNER NÃO ESPERA MAIS DUAS CONTRAÇÕES.
+          Ele vivia atrás de `analysisWindow.length >= 2`, e antes do termo é
+          justamente com ZERO contrações registradas que a tela precisa dizer a
+          única coisa que a ACOG diz para essa faixa: não espere fechar um
+          padrão, ligue. A régua devolve o texto certo para cada fase, inclusive
+          com a lista vazia. */}
+      {!instavel && (
         <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
           <p className="font-semibold">{analysis.label}</p>
           <p className="mt-0.5 text-sm">{analysis.detail}</p>
-          {analysis.status === "urgente" && (
-            <a
-              href="tel:192"
-              className="mt-3 inline-block rounded-full bg-rose-600 px-5 py-2 text-sm font-medium text-white"
-            >
-              Ligar 192 (SAMU)
-            </a>
+          {/* ⚠️ O verbo é LIGAR, e o primeiro telefone é o do médico DELA — o
+              192 fica ao lado, para o caso em que ela não alcança ninguém.
+              Aparece em `alerta` e `urgente`; nos outros a caixa é informação,
+              e um botão de emergência em toda pintura ensina a ignorá-lo. */}
+          {(analysis.status === "urgente" || analysis.status === "alerta") && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate?.("Consultas")}
+                className="press inline-flex h-11 items-center rounded-full bg-orange-700 px-4 font-semibold text-white"
+              >
+                Falar com o meu médico
+              </button>
+              <a
+                href="tel:192"
+                className="press inline-flex h-11 items-center rounded-full border border-rose-300 bg-white px-4 font-semibold text-rose-800"
+              >
+                Ligar 192 (SAMU)
+              </a>
+            </div>
           )}
         </div>
       )}
 
+      {/* ⚠️ AS QUATRO BANDEIRAS VERMELHAS FICAM À VISTA, SEMPRE.
+          Elas são a régua de IR AO HOSPITAL da ACOG, e NENHUMA delas depende do
+          cronômetro: "Your water has broken and you are not having
+          contractions. You are bleeding heavily from the vagina. You have
+          constant, severe pain with no relief between contractions. You notice
+          the fetus is moving less often."
+
+          Um cronômetro que só fala de intervalo ensina a paciente a esperar o
+          padrão fechar enquanto sangra. Por isso elas não moram atrás de um
+          link nem de um acordeão: moram na tela, acima do histórico, em todo
+          estado — inclusive quando a análise diz que as contrações estão
+          espaçadas. */}
+      <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-rose-900">
+        <p className="text-sm font-semibold">Procure a maternidade agora se:</p>
+        <ul className="mt-1 space-y-0.5 text-sm">
+          <li>· a bolsa rompeu, mesmo sem contração nenhuma;</li>
+          <li>· houver sangramento vermelho-vivo;</li>
+          <li>· a dor for constante e forte, sem alívio entre as contrações;</li>
+          <li>· o bebê estiver se mexendo menos que o normal dele.</li>
+        </ul>
+        <p className="mt-2 text-sm">
+          Nenhuma delas depende do cronômetro — não espere fechar um padrão.
+        </p>
+      </div>
+
       {/* Main button */}
       <div className="rounded-3xl card-material p-8 text-center">
-        <p className="font-serif text-[15px] font-semibold text-primary">
+        <p className="font-serif text-[15px] font-semibold text-orange-800">
           Cronômetro de contrações
         </p>
 
@@ -324,10 +437,10 @@ export function ContracoesTab({
               <button
                 key={i}
                 onClick={() => setIntensity(i)}
-                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                className={`press min-h-11 rounded-full border px-4 text-sm font-medium transition-colors ${
                   intensity === i
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border text-muted-foreground hover:border-primary"
+                    ? "border-orange-700 bg-orange-700 text-white"
+                    : "border-border text-muted-foreground hover:border-orange-400"
                 }`}
               >
                 {INTENSITY_LABEL[i]}
@@ -343,30 +456,33 @@ export function ContracoesTab({
                 onClick={stopContraction}
                 className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-white shadow-xl transition-transform duration-300 active:scale-95"
                 style={{
-                  background: "radial-gradient(circle at 30% 25%, #fb7185, #e11d48 70%)",
+                  /* ⚠️ Laranja FUNDO, e medido: branco sobre `#c2410c` dá
+                     4,8:1 e sobre `#7c2d12`, 8,9:1 — os dois passam. A versão
+                     rosa (`#fb7185`) media 2,3 no ponto claro do gradiente, e
+                     o número do cronômetro era o texto menos legível da tela. */
+                  background: "radial-gradient(circle at 30% 25%, #c2410c, #7c2d12 70%)",
                 }}
               >
                 <div>
-                  <div className="font-serif text-4xl">
-                    {String(elapsedMins).padStart(2, "0")}:
-                    {String(elapsedSecs % 60).padStart(2, "0")}
-                  </div>
+                  <div className="font-serif text-4xl">{relogio}</div>
                   <div className="text-xs uppercase tracking-widest opacity-80 mt-1">
                     Toque p/ parar
                   </div>
                 </div>
               </button>
-              <p className="mt-3 text-sm font-medium text-rose-600 animate-pulse">
+              <p className="mt-3 text-sm font-medium text-orange-800 animate-pulse">
                 Contração ativa…
               </p>
             </div>
           ) : (
             <button
               onClick={startContraction}
-              className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-primary-foreground shadow-xl transition-transform duration-300 active:scale-95 hover:scale-[1.03]"
+              className="liquid-pulse mx-auto flex h-44 w-44 items-center justify-center rounded-full text-white shadow-xl transition-transform duration-300 active:scale-95 hover:scale-[1.03]"
               style={{
-                background:
-                  "radial-gradient(circle at 30% 25%, color-mix(in oklch, var(--primary) 78%, white), var(--primary) 70%)",
+                /* ⚠️ Mais claro que o de PARAR, e é assim que um olhar diz em
+                   qual estado a tela está sem ler uma palavra. Os dois tons
+                   passam com branco: `#ea580c` dá 4,6:1. */
+                background: "radial-gradient(circle at 30% 25%, #ea580c, #9a3412 70%)",
               }}
             >
               <div>
@@ -377,6 +493,17 @@ export function ContracoesTab({
           )}
         </div>
       </div>
+
+      {/* ⚠️ A FITA VEM DEPOIS DO BOTÃO E ANTES DA LISTA. Antes do botão ela
+          empurraria o cronômetro para fora da dobra — e o cronômetro é o que
+          ela abriu a tela para tocar; depois da lista, ninguém rola até ela. */}
+      {!instavel && (
+        <FitaDeContracoes
+          contracoes={analysisWindow}
+          agora={agora}
+          sustentadoMin={analysis.sustentadoMin}
+        />
+      )}
 
       {/* History table */}
       {recentContractions.length > 0 && (
@@ -431,14 +558,9 @@ export function ContracoesTab({
               return (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between rounded-xl border border-border p-3 text-sm"
+                  className="flex items-center justify-between rounded-xl card-material p-3 text-sm"
                 >
-                  <span className="text-muted-foreground">
-                    {new Date(c.started_at).toLocaleTimeString("pt-BR", {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
+                  <span className="text-muted-foreground">{horaCurta(c.started_at)}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}
                   >

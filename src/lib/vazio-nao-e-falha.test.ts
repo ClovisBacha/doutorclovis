@@ -337,8 +337,24 @@ describe("⚠️ as contrações: a falha não pode calar o 192", () => {
 
   test("⚠️ o banner de análise não é desenhado sobre uma lista que falhou", () => {
     /* Sem isto, `analysisWindow` fica vazio e o banner some — junto com o
-       único botão do SAMU desta tela. */
-    expect(c).toMatch(/!instavel && analysisWindow\.length >= 2/);
+       único botão do SAMU desta tela.
+
+       ⚠️ **ESTA ASSERÇÃO TRAVAVA A GRAFIA, e reprovou uma melhoria.** Ela
+       cobrava `!instavel && analysisWindow.length >= 2` — e o `>= 2` SAIU de
+       propósito na reescrita por semana gestacional: antes do termo é
+       justamente com ZERO contrações registradas que a tela precisa dizer a
+       única coisa que a ACOG diz para aquela faixa ("não espere fechar um
+       padrão, ligue"). O portão que importa é o `!instavel`, e ele continua
+       inteiro. Décima terceira vez nesta base: cobre a GARANTIA, nunca a
+       escrita. */
+    const i = c.search(/\{!instavel && \(/);
+    expect(`portao: ${i > -1}`).toBe("portao: true");
+    /* E o banner que ele guarda é o da análise — o que carrega o label e o
+       detail da régua, e o par de botões de ligar. */
+    const bloco = c.slice(i, i + 1800);
+    expect(bloco).toContain("{analysis.label}");
+    expect(bloco).toContain("{analysis.detail}");
+    expect(bloco).toContain('href="tel:192"');
   });
 
   test("⚠️ e o aviso de falha OFERECE o caminho que o banner daria", () => {

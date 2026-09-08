@@ -39,6 +39,13 @@ const EXTRAS = [
   "/preview-contracoes?estado=parto",
   "/preview-contracoes?estado=curso",
   "/preview-contracoes?estado=normal",
+  /* ⚠️ A semana decide QUAL RÉGUA vale, então cada faixa é um estado próprio —
+     e o `?w=` vazio (sem DUM) é o que cai na régua mais cuidadosa. */
+  "/preview-contracoes?estado=cinco&w=39",
+  "/preview-contracoes?estado=seis&w=31",
+  "/preview-contracoes?estado=parto&w=16",
+  "/preview-contracoes?estado=normal&w=41",
+  "/preview-contracoes?estado=normal&w=",
   /* ⚠️ Os chutes: a tela que MEDE um sintoma vermelho. `alerta` é o estado que
      a bancada existe para provar — duas horas com quatro movimentos, com o
      aviso e o botão do 192 na tela —, e `instavel` é a leitura que falhou, que
