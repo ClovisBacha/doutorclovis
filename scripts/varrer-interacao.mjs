@@ -44,17 +44,17 @@ const ROTEIRO = [
     ],
   },
   {
-    /* A conversa em TELA CHEIA nasce de um toque e morre em outro: o chip do
-       cartão compacto abre o painel, a seta o fecha SEM perder a conversa, e
-       "Continuar a conversa" o reabre. Nenhum dos três estados existe na
-       varredura que só abre a tela. */
-    q: "/preview-nutricao?w=24&hora=16",
-    nome: "nutrição · a conversa abre em tela cheia, fecha e volta",
-    passos: [
-      { clique: "Quanta proteína preciso por dia?" },
-      { clique: "Voltar" },
-      { clique: "Continuar a conversa" },
-    ],
+    /* A conversa em TELA CHEIA morre num toque e volta em outro: a seta fecha
+       o painel SEM perder a conversa, e "Continuar a conversa" o reabre.
+       ⚠️ O roteiro parte do painel JÁ ABERTO (`painel=1`), e não do chip do
+       cartão compacto: o chip ENVIA a pergunta, e sem sessão a bancada recebe
+       um 401 no console — foi assim que a primeira versão deste roteiro
+       reprovou a CI. O chip abrindo o painel é conferido pela varredura de
+       bancadas (`?estado=saudacao` a 393px mostra o cartão) e pela medição
+       local; aqui o que se toca é o que só nasce de um dedo. */
+    q: "/preview-nutricao?estado=conversa&painel=1",
+    nome: "nutrição · a conversa fecha e volta",
+    passos: [{ clique: "Voltar" }, { clique: "Continuar a conversa" }],
   },
   {
     q: "/preview-nutricao?w=24&receita=Ferro%20e%20C%C3%A1lcio&hora=16",

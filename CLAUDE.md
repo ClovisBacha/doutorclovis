@@ -14459,6 +14459,15 @@ vez.** O script contava ocorrências de `scrollIntoView` para provar que só
 restara a de `abrirConversa`, e o comentário novo que explica por que a lista
 usa `scrollTop` citava a palavra. Contar texto é contar prosa junto.
 
+⚠️ **E O ROTEIRO DE INTERAÇÃO REPROVOU A CI NA PRIMEIRA VERSÃO — por um 401.**
+Ele começava tocando num chip do cartão compacto, e o chip ENVIA a pergunta:
+sem sessão, a bancada recebe um 401 no console, e a varredura conta isso como
+problema — com razão, porque uma chamada não autenticada saindo de uma bancada
+é justamente o que ela existe para acusar. O roteiro passou a partir do painel
+JÁ ABERTO (`painel=1`) e toca só o que não fala com o servidor: a seta e o
+"Continuar a conversa". A regra que fica: **roteiro de interação toca em
+controle LOCAL; o que dispara rede se prova na medição, com a rede forjada.**
+
 **Ficam para a próxima leva:** a foto do prato aparecendo na conversa (só em
 memória — o servidor continua sem guardar nada) e um formatador leve para as
 respostas em lista, sem trazer o `react-markdown` inteiro.
