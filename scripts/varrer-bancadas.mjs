@@ -45,7 +45,7 @@ const EXTRAS = [
   "/preview-contracoes?estado=seis&w=31",
   "/preview-contracoes?estado=parto&w=16",
   "/preview-contracoes?estado=normal&w=41",
-  "/preview-contracoes?estado=normal&w=",
+  "/preview-contracoes?estado=normal&semdum=1",
   /* ⚠️ Os chutes: a tela que MEDE um sintoma vermelho. `alerta` é o estado que
      a bancada existe para provar — duas horas com quatro movimentos, com o
      aviso e o botão do 192 na tela —, e `instavel` é a leitura que falhou, que
@@ -55,6 +55,12 @@ const EXTRAS = [
   "/preview-chutes?estado=contando",
   "/preview-chutes?estado=historico",
   "/preview-chutes?estado=luto",
+  "/preview-chutes?estado=serie",
+  "/preview-chutes?estado=instavel-historico",
+  /* ⚠️ Sem DUM: a régua dos movimentos NÃO pode calar, e este era o estado
+     impossível de fotografar — ele precisou de parâmetro próprio, porque o
+     router descarta `?w=` antes de a bancada ver. */
+  "/preview-chutes?estado=alerta&semdum=1",
   /* ⚠️ Peso, pressão e glicemia: `parcial` é o estado que mais engana — a
      leitura falhou COM dados à mostra, que é o caso de depois de salvar. */
   "/preview-saude-registros?estado=parcial",
@@ -66,6 +72,7 @@ const EXTRAS = [
      — indistinguível de um "…" que nunca termina —, e `erro` é o aviso do
      servidor virando bolha. Os dois só nascem de cota estourada ou falha de
      rede no instante certo. */
+  "/preview-nutricao?semdum=1",
   "/preview-nutricao?estado=conversa",
   "/preview-nutricao?estado=votou",
   "/preview-nutricao?estado=carregando",

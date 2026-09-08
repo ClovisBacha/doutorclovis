@@ -59,6 +59,7 @@ import {
 } from "@/lib/nutricao-ferramentas";
 import { FOTO_LADO_MAX, tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
 import { codificarFoto } from "@/lib/codificar-imagem";
+import { nutricaoDaSemana } from "@/lib/nutricao-da-semana";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
 import { alturaNoFluxo, useJanelaDoTeclado } from "@/lib/janela-do-teclado";
@@ -344,6 +345,9 @@ export function NutricaoTab({
   const [alimento, setAlimento] = useState("");
   const [temEmCasa, setTemEmCasa] = useState("");
   const conversaRef = useRef<HTMLDivElement>(null);
+  /* ⚠️ Estado PRÓPRIO, e não o `input` da caixa de baixo: dois campos ligados
+     ao mesmo estado se escreveriam um no outro enquanto ela digita. */
+  const [pergunta, setPergunta] = useState("");
   /** Manda a pergunta pronta e leva a paciente até a conversa. */
   function perguntar(texto: string) {
     setFerramenta(null);
@@ -653,8 +657,68 @@ export function NutricaoTab({
     }
   }
 
+  /* A frase da semana — régua pura, com as cinco proibições escritas lá. */
+  const daSemana = nutricaoDaSemana(gest?.weeks ?? null, careMode);
+
   return (
     <div className="space-y-5">
+      {/* ─── A PORTA: A PERGUNTA, E A SEMANA DELA ─────────────────────────
+          ⚠️ **O QUE SOBE PARA O TOPO É O CAMPO, e não a caixa de conversa
+          inteira.** A caixa tem 55vh; movida para cá, as quatro ferramentas —
+          que são as portas mais usadas — cairiam abaixo da dobra. O que a
+          paciente precisa ver primeiro é que dá para PERGUNTAR; a conversa
+          cresce a partir daí, no lugar onde ela já mora.
+
+          E o pedido do dono bate com o que se mede: a dúvida dominante da
+          gestante é de SEGURANÇA ("posso comer X?"), buscada online por 96%
+          delas — e o que elas encontram é ruim (30% dos sites sem fonte
+          nenhuma). O campo abre com essa pergunta escrita no placeholder. */}
+      <section aria-label="A sua semana e a sua pergunta" className="space-y-3">
+        {daSemana && (
+          /* ⚠️ O SUJEITO DA FRASE É O BEBÊ, e isso não é tom: 81,5% das
+             gestantes usam app de gestação para acompanhar o desenvolvimento
+             FETAL, contra 26,2% para nutrição. A nutrição pega carona no motor
+             que já existe em vez de competir com ele. */
+          <div className="rounded-3xl card-material p-4">
+            <p className="font-serif text-[15px] font-semibold text-lime-800">{daSemana.titulo}</p>
+            <p className="mt-1 text-sm leading-snug text-foreground">{daSemana.texto}</p>
+          </div>
+        )}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const t = pergunta.trim();
+            if (!t) return;
+            setPergunta("");
+            void send(t);
+            conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+          className="flex items-end gap-2"
+        >
+          <div className="card-material flex min-h-[52px] flex-1 items-center rounded-[26px] px-4">
+            <input
+              value={pergunta}
+              onChange={(e) => setPergunta(e.target.value)}
+              aria-label="Perguntar à nutricionista"
+              placeholder="Posso comer…?"
+              /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. A regra
+                 global já sobe campo no aparelho; aqui vai explícito porque
+                 este é o primeiro campo que a paciente toca na aba. */
+              className="min-h-[52px] w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !pergunta.trim()}
+            aria-label="Perguntar"
+            className="btn-3d press flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-lime-700 text-white disabled:opacity-50"
+          >
+            <Send className="h-[21px] w-[21px] -translate-x-px translate-y-px" strokeWidth={1.9} />
+          </button>
+        </form>
+      </section>
+
       {/* ─── AS FERRAMENTAS ─────────────────────────────────────────────
           As três perguntas que só uma nutricionista recebe, prontas para
           tocar. Cada uma abre um painel e manda a pergunta MONTADA para a

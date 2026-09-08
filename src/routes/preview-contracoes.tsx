@@ -43,7 +43,21 @@ export const Route = createFileRoute("/preview-contracoes")({
        ⚠️ E `?w=` VAZIO é um estado de verdade nesta tela — é a gestante sem
        DUM, que cai na régua mais cuidadosa —, então ele vira `null` em vez de
        cair no padrão. */
-    w: q.w == null ? 34 : q.w === "" ? null : Number(q.w),
+    /* ⚠️ **O ESTADO "SEM DUM" PEDE UM SENTINELA, e não um parâmetro vazio.**
+       Medido: o router DESCARTA `?w=` antes de `validateSearch` ver, e a URL
+       volta normalizada com o padrão — ou seja, o estado que mais importa aqui
+       (a gestante sem semana, para quem a régua não pode calar) era impossível
+       de fotografar, e a bancada mostrava um estado que ela não estava
+       provando. `?w=sem` é explícito e sobrevive à revalidação. */
+    w: q.w == null || q.w === "" ? 34 : Number(q.w),
+    /* ⚠️ **O ESTADO "SEM DUM" PRECISOU DE UM PARÂMETRO PRÓPRIO.**
+       Medido: o router DESCARTA `?w=` antes de `validateSearch` ver, e a URL
+       volta normalizada com o padrão; `?w=sem` também não sobrevive à
+       revalidação. Ou seja, o estado que mais importa aqui — a gestante sem
+       semana, para quem a régua NÃO pode calar — era impossível de fotografar,
+       e a bancada mostrava um estado que ela não estava provando. Booleano
+       sobrevive: é o mesmo caminho do `?luto=`. */
+    semdum: q.semdum == null ? false : Boolean(q.semdum),
     estado: q.estado == null ? "vazio" : String(q.estado),
   }),
   head: () => ({
@@ -100,7 +114,8 @@ function montar(estado: string) {
 }
 
 function Pagina() {
-  const { w, estado } = Route.useSearch();
+  const { w: wBruto, semdum, estado } = Route.useSearch();
+  const w = semdum ? null : wBruto;
   return (
     <div className="fixed inset-0 z-[50] overflow-y-auto bg-background px-4 py-5">
       <p className="mb-1 font-serif text-xl">Contrações</p>

@@ -41,7 +41,25 @@ export const Route = createFileRoute("/preview-nutricao")({
   validateSearch: (q: Record<string, unknown>) => ({
     /* ⚠️ `== null` e nunca `=== undefined`: o router serializa e revalida, e na
        segunda passada chega `null` — `Number(null)` é 0. */
+    /* ⚠️ `?w=` VAZIO é um estado de verdade: é a gestante sem DUM, e a frase
+       da semana NÃO pode aparecer para ela — uma frase genérica com cara de
+       personalizada ensina que o "para a sua semana" não quer dizer nada.
+       Sem este parâmetro o estado seria impossível de fotografar. */
+    /* ⚠️ **O ESTADO "SEM DUM" PEDE UM SENTINELA, e não um parâmetro vazio.**
+       Medido: o router DESCARTA `?w=` antes de `validateSearch` ver, e a URL
+       volta normalizada com o padrão — ou seja, o estado que mais importa aqui
+       (a gestante sem semana, para quem a régua não pode calar) era impossível
+       de fotografar, e a bancada mostrava um estado que ela não estava
+       provando. `?w=sem` é explícito e sobrevive à revalidação. */
     w: q.w == null || q.w === "" ? 24 : Number(q.w),
+    /* ⚠️ **O ESTADO "SEM DUM" PRECISOU DE UM PARÂMETRO PRÓPRIO.**
+       Medido: o router DESCARTA `?w=` antes de `validateSearch` ver, e a URL
+       volta normalizada com o padrão; `?w=sem` também não sobrevive à
+       revalidação. Ou seja, o estado que mais importa aqui — a gestante sem
+       semana, para quem a régua NÃO pode calar — era impossível de fotografar,
+       e a bancada mostrava um estado que ela não estava provando. Booleano
+       sobrevive: é o mesmo caminho do `?luto=`. */
+    semdum: q.semdum == null ? false : Boolean(q.semdum),
     estado: q.estado == null ? "saudacao" : String(q.estado),
     luto: q.luto == null ? false : Boolean(q.luto),
     agua: q.agua == null || q.agua === "" ? 0 : Number(q.agua),
@@ -107,7 +125,18 @@ const TRES: ChatMsg[] = [
 ];
 
 function Pagina() {
-  const { w, estado, luto, agua, ferramenta, receita, tomados, hora } = Route.useSearch();
+  const {
+    w: wBruto,
+    semdum,
+    estado,
+    luto,
+    agua,
+    ferramenta,
+    receita,
+    tomados,
+    hora,
+  } = Route.useSearch();
+  const w = semdum ? null : wBruto;
 
   const bancada =
     estado === "foto"
@@ -144,13 +173,16 @@ function Pagina() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-6">
       <p className="mb-4 text-xs text-muted-foreground">
-        Bancada · estado <strong>{estado}</strong> · semana <strong>{w}</strong>
+        Bancada · estado <strong>{estado}</strong> · semana <strong>{w ?? "—"}</strong>
         {luto ? " · Modo Cuidado" : ""}
         {hora >= 0 ? ` · ${String(hora).padStart(2, "0")}h` : ""}
         {receita ? " · com prescrição" : ""}
       </p>
       <NutricaoTab
-        gest={{ weeks: w, days: 0, totalDays: w * 7 } as never}
+        /* ⚠️ `gest` NULO quando a semana falta — é assim que a produção chega
+           aqui quando não há DUM, e é o estado que a frase da semana precisa
+           calar. */
+        gest={w == null ? null : ({ weeks: w, days: 0, totalDays: w * 7 } as never)}
         profile={
           {
             id: "b",
