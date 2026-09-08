@@ -28,7 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { hapticTap } from "@/lib/haptics";
 import { hapticoDeAviso } from "@/lib/nativo";
 import { analyzeContractions } from "@/lib/analise-de-contracoes";
-import { horaCurta } from "@/lib/hora-do-registro";
+import { intervaloCurto, rotuloDoInstante } from "@/lib/hora-do-registro";
 import { relogioDeSessao } from "@/lib/relogio-de-sessao";
 import { manterTelaAcesa } from "@/lib/tela-acesa";
 
@@ -568,7 +568,11 @@ export function ContracoesTab({
                   key={c.id}
                   className="flex items-center justify-between rounded-xl card-material p-3 text-sm"
                 >
-                  <span className="text-muted-foreground">{horaCurta(c.started_at)}</span>
+                  <span className="text-muted-foreground">
+                    {/* ⚠️ A hora sozinha numa lista de dez, que atravessa
+                        episódios de dias diferentes, AFIRMA que foi hoje. */}
+                    {rotuloDoInstante(c.started_at, agora)}
+                  </span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${INTENSITY_COLOR[c.intensity] ?? ""}`}
                   >
@@ -576,7 +580,7 @@ export function ContracoesTab({
                   </span>
                   <span className="text-muted-foreground">
                     {dur != null ? `${dur}s` : "ativa"}
-                    {interval != null && ` · intervalo ${interval}min`}
+                    {interval != null && ` · intervalo ${intervaloCurto(interval)}`}
                   </span>
                 </div>
               );

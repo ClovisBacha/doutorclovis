@@ -39,6 +39,7 @@ const EXTRAS = [
   "/preview-contracoes?estado=parto",
   "/preview-contracoes?estado=curso",
   "/preview-contracoes?estado=normal",
+  "/preview-contracoes?estado=episodios",
   /* ⚠️ A semana decide QUAL RÉGUA vale, então cada faixa é um estado próprio —
      e o `?w=` vazio (sem DUM) é o que cai na régua mais cuidadosa. */
   "/preview-contracoes?estado=cinco&w=39",

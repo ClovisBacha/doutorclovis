@@ -14210,6 +14210,43 @@ CRESCENTE e o componente desenha a lista na ordem em que a recebe, enquanto
 histórico de cabeça para baixo — um arranjo que a produção nunca produz. A fita
 do alto não denunciava, porque a régua reordena por conta própria.
 
+### ⚠️ A LISTA DE CONTRAÇÕES DIZIA QUE TUDO FOI HOJE
+
+A lista mostra as DEZ últimas, e contração se registra em EPISÓDIOS: quem
+cronometrou uma noite de Braxton-Hicks anteontem e voltou a cronometrar hoje via
+as duas misturadas, com a hora sozinha em cada linha. Ela lê essa lista para
+contar ao médico quando começaram — e reportar como de hoje uma contração de
+outro dia é errar o dado que a conversa inteira gira em torno.
+
+E o intervalo entre os dois episódios saía **"intervalo 2220min"**: ruído com
+cara de medida, escrito na unidade do alarme. O intervalo só quer dizer alguma
+coisa DENTRO de um episódio — a própria `analyzeContractions` olha as duas
+últimas horas e nada além.
+
+- **`rotuloDoInstante`** deixa curto o que é de hoje (é quase toda linha, e a
+  lista é densa) e carrega o dia no que não é. ⚠️ A comparação é do dia CIVIL no
+  fuso do consultório, nunca `getDate()`: o servidor roda em UTC e das 21h à
+  meia-noite ele já está no dia seguinte — a linha das 23h30 apareceria com data
+  toda noite.
+- **`intervaloCurto`** passa a horas acima de duas. ⚠️ E o corte é de TEMPO,
+  nunca de calendário: 23h50 e 00h10 são vinte minutos e o MESMO episódio, e uma
+  régua por data os separaria justamente na noite em que isso mais importa.
+
+#### ⚠️ E A FOTO DESFEZ UMA DECISÃO MINHA — inclusive a de reaproveitar
+
+Eu escrevi o rótulo do "não é hoje" com `dataHoraCurta` ("04/09/2026, 00:20"),
+que era uma função da noite anterior **sem chamador nenhum**. A foto mediu o
+resultado: a linha quebrava em DUAS, a altura ia de 48 para 66px e a terceira
+coluna quebrava junto — porque o **ANO** é a parte que nunca informa nada numa
+lista de dez contrações e é a que custa o espaço. Com `diaCurto + horaCurta` são
+onze caracteres em vez de dezessete, e as dez linhas voltam a 48px.
+
+⚠️ **E aí a conclusão honesta virou o contrário da que eu estava perseguindo:**
+`dataHoraCurta` não estava sem chamador por esquecimento — ela estava sem
+chamador porque o ano não pertence a nenhuma destas listas. Ela SAIU. Procurar
+um uso para uma função morta é como uma tela ganha um desenho que ninguém
+pediu; o teste é sempre o mesmo — **existe uma tela que fica melhor com ela?**
+
 **Aplicar no Supabase:** `supabase/APLICAR_FORCA_DO_MOVIMENTO.sql`.
 
 **Bancadas novas:** `/preview-chutes?estado=serie` (doze contagens, o gráfico
@@ -14217,5 +14254,6 @@ com a faixa) · `?estado=instavel-historico` · `?estado=alerta&semdum=1` ·
 `?estado=ultima-incompleta` (a última que não fechou dez) ·
 `/preview-contracoes?estado=cinco&w=39` (o 5-1-1 sustentado por uma hora) ·
 `?estado=seis&w=31` (seis em 55 min, o caso que separa as duas réguas do NICHD)
-· `?estado=parto&w=16` · `?estado=normal&w=41` · `?estado=normal&semdum=1` ·
+· `?estado=episodios` (a lista que atravessa dias) ·
+`?estado=parto&w=16` · `?estado=normal&w=41` · `?estado=normal&semdum=1` ·
 `/preview-nutricao?semdum=1`.

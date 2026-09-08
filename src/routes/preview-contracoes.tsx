@@ -110,6 +110,23 @@ function montar(estado: string) {
     return { contractions: [linha(0, null, 2), linha(9, 45, 2), linha(19, 40, 2)], agora };
   if (estado === "normal")
     return { contractions: [linha(5, 35, 1), linha(35, 30, 1), linha(70, 28, 2)], agora };
+  if (estado === "episodios")
+    /* ⚠️ **A LISTA MOSTRA AS DEZ ÚLTIMAS, E ELAS SÃO REGISTRADAS EM EPISÓDIOS.**
+       Quem cronometrou uma noite de Braxton-Hicks anteontem e voltou a
+       cronometrar hoje vê as duas misturadas — e a hora sozinha em cada linha
+       AFIRMA que tudo foi hoje. Nenhum outro estado desta bancada atravessa
+       dias, então este é o único que prova a data na linha e o intervalo em
+       horas. A janela da análise continua sendo de duas horas, então a régua
+       clínica não muda: o que este estado exercita é a LISTA. */
+    return {
+      contractions: [
+        linha(6, 40, 2),
+        linha(24, 38, 2),
+        linha(41, 35, 1),
+        ...[0, 9, 18, 27, 36, 45].map((m) => linha(60 * 38 + m, 32, 1)),
+      ],
+      agora,
+    };
   return { contractions: [], agora };
 }
 
