@@ -102,7 +102,7 @@ const FOTO: ChatMsg[] = [
     role: "assistant",
     content:
       "Vejo arroz, feijão, um bife grelhado e duas rodelas de tomate.\n\n" +
-      "O que já está bom: o feijão com arroz junto é uma dupla que aproveita " +
+      "**O que já está bom:** o feijão com arroz junto é uma dupla que aproveita " +
       "muito melhor o ferro do que os dois separados, e a carne ajuda no mesmo " +
       "caminho.\n\n" +
       "Para a próxima, duas ideias:\n" +
@@ -112,6 +112,21 @@ const FOTO: ChatMsg[] = [
       "faz o ferro do feijão render mais.",
   },
 ];
+
+/* A miniatura da bancada: um SVG inline com cara de prato — a de verdade
+   nasce de um seletor de arquivo, e um data URL de SVG desenha num <img>
+   exatamente como o WebP que a tela gera. */
+const MINIATURA =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 240">' +
+      '<rect width="320" height="240" fill="#e7d9c6"/>' +
+      '<circle cx="160" cy="120" r="96" fill="#fbf7ef" stroke="#d6c7b0" stroke-width="6"/>' +
+      '<ellipse cx="128" cy="112" rx="42" ry="30" fill="#f2e6c7"/>' +
+      '<ellipse cx="196" cy="128" rx="38" ry="26" fill="#6b4a2f"/>' +
+      '<circle cx="164" cy="92" r="14" fill="#d94a3d"/>' +
+      "</svg>",
+  );
 
 /* Três respostas para caber os três desfechos do voto na mesma foto. */
 const TRES: ChatMsg[] = [
@@ -146,7 +161,7 @@ function Pagina() {
 
   const bancada =
     estado === "foto"
-      ? { mensagens: FOTO }
+      ? { mensagens: FOTO, fotos: { 1: MINIATURA } }
       : estado === "conversa"
         ? { mensagens: CONVERSA }
         : estado === "votou"

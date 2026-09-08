@@ -62,6 +62,8 @@ import {
 } from "@/lib/nutricao-ferramentas";
 import { FOTO_LADO_MAX, tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-nutricao";
 import { codificarFoto } from "@/lib/codificar-imagem";
+import { semMarcas } from "@/lib/texto-leve";
+import { TextoLeve } from "@/components/texto-leve";
 import { nutricaoDaSemana } from "@/lib/nutricao-da-semana";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
@@ -190,20 +192,36 @@ function Avatar({ tamanho }: { tamanho: number }) {
  * uma foto grande por uma ferramenta que não funciona no aparelho cujo canvas
  * é bloqueado.
  */
-async function reduzirParaAFoto(file: File): Promise<Blob | null> {
+/** O lado da miniatura que fica na conversa. Cabe numa bolha de 80% de 393px
+ *  e pesa poucos KB — é só para ela reconhecer QUAL foto a resposta comenta. */
+const MINIATURA_LADO = 320;
+
+async function reduzirParaAFoto(
+  file: File,
+): Promise<{ blob: Blob | null; miniatura: string | null }> {
   try {
     const bitmap = await createImageBitmap(file);
-    const escala = Math.min(1, FOTO_LADO_MAX / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * escala));
-    canvas.height = Math.max(1, Math.round(bitmap.height * escala));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    const url = codificarFoto(canvas, 0.82);
-    return await (await fetch(url)).blob();
+    const desenhar = (ladoMax: number, qualidade: number) => {
+      const escala = Math.min(1, ladoMax / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * escala));
+      canvas.height = Math.max(1, Math.round(bitmap.height * escala));
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return codificarFoto(canvas, qualidade);
+    };
+    const grande = desenhar(FOTO_LADO_MAX, 0.82);
+    /* A miniatura sai do MESMO bitmap: decodificar uma foto de celular duas
+       vezes custaria o dobro no aparelho mais lento. E ela fica só em MEMÓRIA
+       (um data URL no estado da tela) — nada é gravado, nem aqui nem no
+       servidor, que continua sem guardar foto nenhuma. */
+    const miniatura = desenhar(MINIATURA_LADO, 0.7);
+    bitmap.close();
+    const blob = grande ? await (await fetch(grande)).blob() : null;
+    return { blob, miniatura };
   } catch {
-    return null;
+    return { blob: null, miniatura: null };
   }
 }
 
@@ -315,6 +333,10 @@ export function NutricaoTab({
     /** O painel da conversa aberto em tela cheia — o estado que só existe no
         celular e depois de um toque, e por isso era impossível de fotografar. */
     aberta?: boolean;
+    /** As miniaturas por índice da mensagem — a foto do prato só existe em
+        memória depois de um seletor de arquivo, e por isso era impossível de
+        fotografar. */
+    fotos?: Record<number, string>;
   };
 }) {
   const ehBancada = bancada != null;
@@ -342,6 +364,9 @@ export function NutricaoTab({
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(bancada?.carregando ?? false);
+  /* A miniatura da foto que ela mandou, por índice da mensagem. SÓ em memória:
+     morre com a tela, nunca vai ao `localStorage` nem ao servidor. */
+  const [fotos, setFotos] = useState<Record<number, string>>(bancada?.fotos ?? {});
   /* ─── A CONVERSA É UM PAINEL, NÃO UMA CAIXA NA PÁGINA ─────────────────────
      Ela era uma caixa de 55vh DENTRO da página rolável: dois rolos disputando
      o dedo, e a resposta cortada no meio da palavra na borda da caixa (a foto
@@ -457,7 +482,8 @@ export function NutricaoTab({
       /* ⚠️ A REDUÇÃO ACONTECE NO APARELHO, e o lado é 1024 (e não os 512 do
          avatar): o modelo precisa LER a tabela nutricional de um rótulo, que é
          texto miúdo, e a 512 a leitura falha. */
-      const menor = await reduzirParaAFoto(file);
+      const { blob: menor, miniatura } = await reduzirParaAFoto(file);
+      if (miniatura) setFotos((f) => ({ ...f, [next.length - 1]: miniatura }));
       const corpo = new FormData();
       corpo.append("foto", menor ?? file, "foto.webp");
       corpo.append("assunto", assunto);
@@ -1137,7 +1163,7 @@ export function NutricaoTab({
         {temConversa ? (
           <>
             <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-snug text-foreground">
-              {ultimaResposta}
+              {semMarcas(ultimaResposta)}
             </p>
             <button
               type="button"
@@ -1249,8 +1275,26 @@ export function NutricaoTab({
                         className="relative block h-2 w-12 rounded-full bg-foreground/12"
                       />
                     </>
+                  ) : dela ? (
+                    <>
+                      {/* A foto que ela mandou, em cima do título — para ela
+                          saber QUAL prato a resposta comenta. Só em memória. */}
+                      {dela && fotos[i] && (
+                        <img
+                          src={fotos[i]}
+                          alt="A foto que você mandou"
+                          className="mb-1.5 block max-h-44 w-full rounded-2xl object-cover"
+                        />
+                      )}
+                      {m.content || "…"}
+                    </>
+                  ) : m.content ? (
+                    /* Negrito e lista em nós de React — a resposta vem em
+                       linhas com "•" e, às vezes, um `**assim**`; crua, a bolha
+                       mostrava os asteriscos. */
+                    <TextoLeve texto={m.content} />
                   ) : (
-                    m.content || "…"
+                    "…"
                   )}
                   {/* Só nas respostas da IA, e não na saudação (i > 0). */}
                   {m.role === "assistant" && i > 0 && m.content && (

@@ -14476,3 +14476,41 @@ respostas em lista, sem trazer o `react-markdown` inteiro.
 · `?estado=votou&painel=1` (os três polegares preenchidos) ·
 `?estado=carregando&painel=1` (a varredura no lugar do "…") · `?estado=saudacao`
 (o cartão compacto na aba, a 393px).
+
+### A foto na conversa, e o negrito que era asterisco (set/2026)
+
+Os itens 6 e 7 da lista aprovada pelo dono — os dois que tinham ficado para
+depois do painel.
+
+- **A foto do prato aparece na bolha dela**, em cima do título "📷 Foto do
+  meu prato". Antes a resposta comentava um prato que a tela não mostrava, e
+  com duas fotos seguidas ela não sabia qual era qual. ⚠️ **SÓ em memória**:
+  um data URL de 320px no estado da tela (`fotos`, por índice da mensagem),
+  que morre com a aba. Nada vai ao `localStorage` e nada vai ao servidor — o
+  histórico que sobe continua sendo só `content`, e `/api/prato` continua
+  sem guardar foto nenhuma. Há teste cobrando as três coisas.
+- ⚠️ **A miniatura nasce do MESMO bitmap da redução** (`reduzirParaAFoto`
+  devolve `{ blob, miniatura }`): decodificar uma foto de celular duas vezes
+  custaria o dobro justamente no aparelho mais lento. E `bitmap.close()`
+  depois — antes ele ficava vivo até o coletor passar.
+- **`src/lib/texto-leve.ts`** é a régua pura de negrito e lista — e NÃO é
+  Markdown, de propósito: o `react-markdown` inteiro já foi tirado do pacote
+  de entrada uma vez, e aqui a pergunta são duas marcas. Ela devolve BLOCOS
+  (parágrafos e listas, com trechos em negrito), e `texto-leve.tsx` os
+  desenha em nós de React — nunca HTML, porque o texto vem do modelo.
+  ⚠️ Um `**` solto fica literal: no meio do streaming o par ainda não chegou,
+  e ele fecha sozinho quando o resto do texto entra. ⚠️ `**Negrito**` no
+  começo da linha NÃO é marcador de lista (o `*` vem seguido de `*`, não de
+  espaço) — há teste. ⚠️ E sem marca nenhuma o texto sai como STRING, o
+  caminho que a bolha sempre teve.
+- **Só a resposta da IA passa pelo formatador**; o que ela digitou continua
+  cru. E a prévia do cartão compacto (`line-clamp-3`) usa `semMarcas`, senão
+  o asterisco que sumiu da bolha reapareceria na aba.
+- ⚠️ **`whitespace-pre-wrap` continua na bolha** (o teste antigo pinava, e com
+  razão): as linhas de um mesmo parágrafo são unidas por `\n` dentro do `<p>`,
+  e é o `pre-wrap` que as quebra.
+
+**Bancadas:** `/preview-nutricao?estado=foto&painel=1` (a miniatura — um SVG
+inline com cara de prato, porque a de verdade nasce de um seletor de arquivo
+—, um negrito e a lista com marcador) · `?estado=foto` (o cartão compacto sem
+as marcas).
