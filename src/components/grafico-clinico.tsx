@@ -237,7 +237,17 @@ export function GraficoClinico({
                       onMouseEnter={() => setAtivo({ i, j })}
                       onFocus={() => setAtivo({ i, j })}
                       tabIndex={0}
-                      role="button"
+                      /* ⚠️ **`role="img"`, e NUNCA `role="button"`.** Ele não
+                         tem `onClick` nem ação de teclado: um leitor de tela
+                         anunciava "botão", ela apertava Enter e nada
+                         acontecia. E medido, o alvo rende 13×13px — a varredura
+                         de acessibilidade o contava, com razão, como um
+                         controle de toque muito abaixo dos 44px. Ele não é um
+                         controle: é um PONTO DE DADO com descrição, focável
+                         para quem navega por teclado enxergar o balão. Os
+                         valores continuam legíveis por outros dois caminhos —
+                         a fita de estatísticas e a lista logo abaixo. */
+                      role="img"
                       aria-label={`${s.rotulo} ${p.valor} ${s.unidade} em ${diaCurto(p.em)}`}
                     />
                     <circle

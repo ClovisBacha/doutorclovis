@@ -113,3 +113,20 @@ describe("3. o desenho", () => {
     expect(dia.pontos).toEqual([]);
   });
 });
+
+describe("⚠️ o ponto do gráfico não se anuncia como botão", () => {
+  test('o alvo do ponto é `role="img"`, e não `role="button"`', async () => {
+    /* Ele não tem `onClick` nem ação de teclado: anunciar "botão" faz a
+       paciente apertar Enter e nada acontecer — e a varredura de
+       acessibilidade o contava como um controle de toque de 13×13px, muito
+       abaixo dos 44. É um ponto de dado com descrição, e os valores continuam
+       legíveis pela fita de estatísticas e pela lista abaixo. */
+    const { readFileSync } = await import("node:fs");
+    const { semComentarios } = await import("@/lib/sem-comentarios");
+    const codigo = semComentarios(readFileSync("src/components/grafico-clinico.tsx", "utf8"));
+    expect(codigo).not.toContain('role="button"');
+    /* E o alvo continua existindo, maior que a marca — 4px de ponto com 4px de
+       alvo é impossível de acertar no celular. */
+    expect(codigo).toMatch(/r=\{14\}[\s\S]{0,200}fill="transparent"/);
+  });
+});

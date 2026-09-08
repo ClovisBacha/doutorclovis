@@ -14247,6 +14247,70 @@ chamador porque o ano não pertence a nenhuma destas listas. Ela SAIU. Procurar
 um uso para uma função morta é como uma tela ganha um desenho que ninguém
 pediu; o teste é sempre o mesmo — **existe uma tela que fica melhor com ela?**
 
+### ⚠️ A RÉGUA NOVA CONTRA A ANTIGA, EM 20.475 COMBINAÇÕES
+
+A fase de refutação do workflow adversarial morreu no limite de sessão (7 de 34
+agentes), então a lista de "refutados" não tinha sido refutada por mérito. A
+checagem que faltava é a que mede o RISCO da reescrita: **existe algum caso em
+que a régua nova é MENOS urgente que a de `fb39146`?** Ela foi feita rodando as
+duas lado a lado — a antiga recuperada do git e apontada para os mesmos
+`sinais-clinicos` (conferido: `sinalContracoesPrematuras` não mudou).
+
+A grade: 13 semanas (incluindo `null`) × 14 intervalos × 9 durações × 6
+tamanhos de lista × com e sem contração em curso, mais **sete padrões
+irregulares** que a grade uniforme não alcança — o vão longo seguido de regular
+(`[30,5,5,5]`), o inverso (`[1,12,12]`) e os que a prosa da mediana nomeia.
+
+| medida                                   |        |
+| ---------------------------------------- | ------ |
+| combinações comparadas                   | 20.475 |
+| **viraram `normal`** (perderiam o botão) | **0**  |
+| **eram `urgente` e deixaram de ser**     | **0**  |
+| **caíram dois degraus**                  | **0**  |
+| ficaram MAIS urgentes                    | 7.937  |
+| … e destas, de `normal` para `urgente`   | 711    |
+
+⚠️ **As 1.197 quedas aparentes são todas `alerta → atencao`, e `alerta` NÃO
+EXISTE MAIS na régua nova** — o vocabulário passou a ser normal · atenção ·
+urgente. Ou seja, não é queda de gravidade: é o degrau do meio com outro nome. O
+que prova isso não é o nome, é a TELA: ela desenha "Falar com o meu médico" para
+**todo** status diferente de `normal` (o 192 continua exclusivo do `urgente`),
+então o caminho de contato não some em nenhuma das 20.475.
+
+E os 711 `normal → urgente` são o que a reescrita veio ganhar: casos em que a
+régua antiga não dizia nada e a nova manda ligar.
+
+⚠️ **A lição de método:** comparar a versão nova com a ANTIGA numa grade é mais
+barato que qualquer leitura, e é a única forma de provar que uma reescrita
+clínica não perdeu terreno. O que importa não é a contagem bruta de diferenças —
+é a PROFUNDIDADE da queda e o DESTINO dela. Uma diferença que mantém o botão de
+ligar é redesenho; uma que chega a `normal` é regressão.
+
+### ⚠️ O PONTO DO GRÁFICO SE ANUNCIAVA COMO BOTÃO
+
+A varredura de acessibilidade acusou `alvo 13×13 "Tempo até 10 18 min em 03/09"`
+na bancada dos chutes, e ela estava certa: o alvo invisível do ponto é
+`role="button"` com `tabIndex={0}` — e **não tem `onClick` nem ação de teclado**.
+Um leitor de tela anunciava "botão", a paciente apertava Enter, e nada
+acontecia.
+
+⚠️ **E o tamanho é real, não artefato:** o círculo é `r={14}` em unidades do
+`viewBox` (600 de largura), que numa fita de ~330px é escalado por ~0,55 — 13px
+de alvo, muito abaixo dos 44. A varredura conta `[role="button"]` como controle
+de toque, e por isso o acusou.
+
+`role="img"`: ele é um PONTO DE DADO com descrição, focável para quem navega por
+teclado enxergar o balão — e nunca um controle. Os valores continuam legíveis
+por outros dois caminhos, a fita de estatísticas e a lista logo abaixo. Medido
+depois: os achados de alvo caem de 60 para 57, e nas telas de chutes e
+contrações só sobram o link de pular e o ☰ do SITE, que têm régua própria.
+
+⚠️ **E isto é do `GraficoClinico`, que é PRÉ-EXISTENTE.** A propriedade sempre
+esteve lá; o que mudou foi o público — até esta noite ele só era desenhado no
+prontuário do médico, no computador. **Trazer um componente do painel para o app
+da paciente é trazer as propriedades dele junto**, e a varredura é o que
+descobre quais.
+
 **Aplicar no Supabase:** `supabase/APLICAR_FORCA_DO_MOVIMENTO.sql`.
 
 **Bancadas novas:** `/preview-chutes?estado=serie` (doze contagens, o gráfico
