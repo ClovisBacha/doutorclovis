@@ -266,7 +266,26 @@ export function sinalMovimentosReduzidos(o: {
   const s = o.semanas;
   const mov = o.movimentos;
   const min = o.minutos;
-  if (s == null || !Number.isFinite(s) || s < 28) return null;
+  /**
+   * ⚠️ **SEM SEMANA, A RÉGUA VALE — e isto era uma FALHA ABERTA no eixo que
+   * mais importa.** A linha era `if (s == null || !Number.isFinite(s) || s <
+   * 28) return null`: sem DUM cadastrada, ou com o perfil ainda carregando, a
+   * paciente abria a tela, o botão continuava lá, o cronômetro corria, e
+   * passadas DUAS HORAS com três movimentos não aparecia nem o aviso nem o
+   * 192. O sintoma vermelho era MEDIDO e CALADO.
+   *
+   * ⚠️ E note a assimetria com as irmãs de prematuridade, que é deliberada:
+   * lá, sem semana, alarmar seria INVENTAR um quadro (prematuridade de quem
+   * pode estar de 39). Aqui não há quadro a inventar — os dois limites desta
+   * régua (dez movimentos, duas horas) não dependem da semana; a semana só
+   * decide se a contagem já COMEÇOU. Não saber quando começou não é motivo
+   * para calar sobre duas horas de contagem que já aconteceram.
+   *
+   * Com a semana CONHECIDA e abaixo de 28, ela continua calando: a contagem
+   * formal começa ali, e alarmar antes ensina a ignorar o alarme.
+   */
+  const semanaConhecida = s != null && Number.isFinite(s);
+  if (semanaConhecida && (s as number) < 28) return null;
   if (mov == null || !Number.isFinite(mov)) return null;
   if (min == null || !Number.isFinite(min) || min < 120) return null;
   if (mov >= 10) return null;

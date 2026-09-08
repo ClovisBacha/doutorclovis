@@ -73,13 +73,30 @@ describe("⚠️ a régua dos movimentos, exercitada", () => {
     expect(sinalMovimentosReduzidos({ semanas: 24, movimentos: 2, minutos: 150 })).toBeNull();
   });
 
-  test("sem semana, sem contagem ou sem relógio, ela cala", () => {
-    expect(sinalMovimentosReduzidos({ semanas: null, movimentos: 2, minutos: 150 })).toBeNull();
+  test("sem contagem ou sem relógio, ela cala", () => {
     expect(sinalMovimentosReduzidos({ semanas: 32, movimentos: null, minutos: 150 })).toBeNull();
     expect(sinalMovimentosReduzidos({ semanas: 32, movimentos: 2, minutos: null })).toBeNull();
+  });
+
+  test("⚠️ MAS SEM SEMANA ELA NÃO CALA — era falha ABERTA no eixo que importa", () => {
+    /* Sem DUM cadastrada, ou com o perfil ainda carregando, a paciente contava
+       duas horas com três movimentos e a tela não dizia uma palavra: o sintoma
+       vermelho era medido e calado. Os dois limites desta régua — dez
+       movimentos, duas horas — não dependem da semana; a semana só decide se a
+       contagem já COMEÇOU, e não saber isso não é motivo para calar sobre duas
+       horas que já aconteceram.
+
+       ⚠️ E a assimetria com as réguas de prematuridade é deliberada: lá, sem
+       semana, alarmar seria INVENTAR um quadro (prematuridade de quem pode
+       estar de 39). Aqui não há quadro a inventar. */
     expect(
-      sinalMovimentosReduzidos({ semanas: Number.NaN, movimentos: 2, minutos: 150 }),
-    ).toBeNull();
+      sinalMovimentosReduzidos({ semanas: null, movimentos: 3, minutos: 130 })?.gravidade,
+    ).toBe("grave");
+    expect(
+      sinalMovimentosReduzidos({ semanas: Number.NaN, movimentos: 2, minutos: 150 })?.gravidade,
+    ).toBe("grave");
+    /* E ela continua não alarmando quando a contagem fechou. */
+    expect(sinalMovimentosReduzidos({ semanas: null, movimentos: 10, minutos: 130 })).toBeNull();
   });
 
   test("o texto conta o que ELA viu, no singular e no plural", () => {

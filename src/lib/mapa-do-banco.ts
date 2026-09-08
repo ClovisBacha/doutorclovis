@@ -324,6 +324,15 @@ export const MAPA_DO_BANCO: readonly ArquivoDoBanco[] = [
     ],
   },
   {
+    arquivo: "APLICAR_FORCA_DO_MOVIMENTO.sql",
+    alvos: [
+      {
+        tabela: "kick_sessions",
+        colunas: ["strength"],
+      },
+    ],
+  },
+  {
     arquivo: "APLICAR_FOTO_E_ULTIMA_VEZ.sql",
     alvos: [
       {

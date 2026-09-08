@@ -1,4 +1,6 @@
 import { useId, useMemo, useState } from "react";
+import { diaCurto } from "@/lib/hora-do-registro";
+
 import type { Serie } from "@/lib/clinical.functions";
 
 /**
@@ -131,7 +133,7 @@ export function GraficoClinico({
   if (!desenho) {
     return (
       <figure className="rounded-2xl border border-border bg-background p-4">
-        <figcaption className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        <figcaption className="font-serif text-[15px] font-semibold text-muted-foreground">
           {titulo}
         </figcaption>
         {/* Diz o que falta, e não "sem dados": a paciente registrar duas vezes é
@@ -151,7 +153,7 @@ export function GraficoClinico({
   return (
     <figure className={`rounded-2xl border border-border bg-background p-4 ${TOKENS_DE_COR}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <figcaption className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+        <figcaption className="font-serif text-[15px] font-semibold text-muted-foreground">
           {titulo}
         </figcaption>
         {/* O último valor como número grande: é o que ele lê primeiro, e um
@@ -236,9 +238,7 @@ export function GraficoClinico({
                       onFocus={() => setAtivo({ i, j })}
                       tabIndex={0}
                       role="button"
-                      aria-label={`${s.rotulo} ${p.valor} ${s.unidade} em ${new Date(
-                        p.em,
-                      ).toLocaleDateString("pt-BR")}`}
+                      aria-label={`${s.rotulo} ${p.valor} ${s.unidade} em ${diaCurto(p.em)}`}
                     />
                     <circle
                       cx={x(p.em)}
@@ -307,21 +307,11 @@ export function GraficoClinico({
             <span className="font-semibold text-foreground">
               {usaveis[ativo.i].pontos[ativo.j].valor} {usaveis[ativo.i].unidade}
             </span>{" "}
-            · {usaveis[ativo.i].rotulo} ·{" "}
-            {new Date(usaveis[ativo.i].pontos[ativo.j].em).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-              year: "2-digit",
-            })}
+            · {usaveis[ativo.i].rotulo} · {diaCurto(usaveis[ativo.i].pontos[ativo.j].em)}
           </>
         ) : (
           <>
-            {usaveis[0].pontos.length} registros ·{" "}
-            {new Date(usaveis[0].pontos[0].em).toLocaleDateString("pt-BR", {
-              day: "2-digit",
-              month: "short",
-            })}{" "}
-            até hoje
+            {usaveis[0].pontos.length} registros · {diaCurto(usaveis[0].pontos[0].em)} até hoje
             {/* A faixa verde ao fundo precisa se explicar: sem isto ela é uma
                 mancha, e o médico não sabe se ela vale 90–140 ou 70–100. Em
                 texto, e não como rótulo dentro do SVG — texto lá dentro escala

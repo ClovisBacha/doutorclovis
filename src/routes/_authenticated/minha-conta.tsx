@@ -828,12 +828,26 @@ function CabecalhoDaSaude({ chave }: { chave: string }) {
 export function HubSaude({
   onAbrir,
   weeks,
+  careMode,
   bancada,
   cabecalhos,
 }: {
   onAbrir: (t: Tab, sub?: string) => void;
   /** Semana gestacional — `null` quando não há gestação configurada. */
   weeks: number | null;
+  /**
+   * ⚠️ **NO MODO CUIDADO O LADRILHO DE CHUTES SAI DA GRADE.** Ele convida a
+   * "contar os movimentos" — depois do batimento, é a tela mais dolorosa do
+   * app para quem acabou de perder a gestação. O histórico dela NÃO é apagado
+   * (é a memória dela, a mesma decisão que manteve `exam_files` e o Álbum de
+   * pé); o que sai é o convite.
+   *
+   * ⚠️ E o CRONÔMETRO DE CONTRAÇÕES FICA, de propósito: quem perdeu a gestação
+   * pode estar em trabalho de parto, e a decisão já está escrita no próprio
+   * componente. O Modo Cuidado faz o app parar de FALAR DO BEBÊ, nunca de
+   * socorrer.
+   */
+  careMode?: boolean;
   /**
    * Só a `/preview-saude`: os números prontos, sem sessão. Sem isto a bancada
    * mostraria sempre o bloco VAZIO — o único estado que ela não precisava provar.
@@ -945,7 +959,7 @@ export function HubSaude({
      continua listada no menu" — e esse menu é o de computador, escondido no
      celular. No aparelho a função sumia por nove meses (estudo de navegação,
      set/2026). O que muda com a fase é a LEGENDA, não a porta. */
-  const itens = HUB_SAUDE.map((i) => ({
+  const itens = HUB_SAUDE.filter((i) => !(careMode && i.key === "chutes")).map((i) => ({
     ...i,
     sub:
       i.key === "Saúde da mulher" && !mostrarSaudeDaMulher(weeks)
@@ -2950,6 +2964,7 @@ function MinhaContaPage() {
             {hubAberto === "saude" && (
               <div className="mt-5 md:hidden">
                 <HubSaude
+                  careMode={careMode}
                   weeks={gest?.weeks ?? null}
                   onAbrir={(t, sub) => {
                     setHubAberto(null);
@@ -3668,7 +3683,11 @@ function RegistrosHub({
   if (!sub || !atual) {
     return (
       <GradeHub
-        itens={REGISTROS_SUBTABS}
+        /* ⚠️ No Modo Cuidado o ladrilho de Chutes sai daqui também — as duas
+           portas do mesmo destino, ou a que sobra reabre o convite. O
+           cronômetro de contrações FICA: quem perdeu a gestação pode estar em
+           trabalho de parto. */
+        itens={REGISTROS_SUBTABS.filter((i) => !(careMode && i.key === "chutes"))}
         onAbrir={(k) => setSub(k as (typeof REGISTROS_SUBTABS)[number]["key"])}
       />
     );

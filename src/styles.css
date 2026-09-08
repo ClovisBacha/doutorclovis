@@ -755,7 +755,26 @@
   position: absolute;
   inset: 0;
   border-radius: 9999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.35), transparent 70%);
+  /* ⚠️ **UM ANEL, E NÃO UM DISCO — e isto era um defeito de LEGIBILIDADE
+     medido.** O gradiente ia do centro para fora com 35% de branco, e o pulso
+     começa em `scale(1)` com `opacity: 0.5`: no início de cada volta o halo
+     cobria o botão INTEIRO, por cima do fundo dele e por baixo do texto. Com
+     dois pseudo-elementos defasados em 1,3 s, um deles está sempre nessa
+     metade da volta.
+
+     Medido no pixel, no maior número do contador de movimentos: o "4" dava
+     **1,60:1** e "/ 10 chutes", **1,87** — o texto mais importante da tela era
+     o menos legível dela, e nenhuma troca de cor de fundo consertaria, porque
+     quem clareava não era o fundo.
+
+     Começando transparente até 62% do raio, o anel nasce FORA do texto e cresce
+     para fora, que é o que o pulso sempre quis desenhar. */
+  background: radial-gradient(
+    circle,
+    transparent 62%,
+    rgba(255, 255, 255, 0.38) 78%,
+    transparent 100%
+  );
   z-index: -1;
   animation: liquidPulse 2.6s ease-out infinite;
 }

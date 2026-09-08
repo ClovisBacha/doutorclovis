@@ -43,7 +43,27 @@ describe("começar não grava nada", () => {
   });
 
   test("ele guarda o instante do início, que é o que dá sentido à duração", () => {
-    expect(corpo("start")).toMatch(/setActive\(\{\s*startedAt:/);
+    /* ⚠️ A asserção cobrava `setActive({ startedAt:` com os dois pontos — e
+       reprovou o dia em que o instante virou uma `const` e o objeto passou a
+       usar a forma curta (`setActive({ startedAt })`), que é o MESMO
+       comportamento. Cobre a garantia: o instante nasce aqui e é o que vai
+       para o estado E para a sessão guardada. */
+    const c = corpo("start");
+    expect(c).toMatch(/const startedAt = new Date\(\)\.toISOString\(\)/);
+    expect(c).toMatch(/setActive\(\{\s*startedAt/);
+  });
+
+  test("⚠️ e ele GRAVA a sessão no aparelho — trocar de sub-tela apagava duas horas", () => {
+    /* `RegistrosHub` renderiza `<Fade key={sub}>`: tocar em Contrações, no
+       Diário ou na seta DESMONTA esta aba, e a contagem era estado do React.
+       O pior caminho era o do SOCORRO — o botão do cartão vermelho troca de
+       aba, ou seja, o único caminho de contato DESTRUÍA a contagem que
+       produziu o alarme. */
+    expect(corpo("start")).toContain("guardarSessao(uid,");
+    expect(corpo("tap")).toContain("guardarSessao(uid,");
+    /* E encerrar LIMPA — senão a sessão salva reapareceria na abertura
+       seguinte, com o relógio de uma contagem que já virou linha. */
+    expect(corpo("stop")).toContain("guardarSessao(uid, null)");
   });
 });
 
