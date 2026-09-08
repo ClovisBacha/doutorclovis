@@ -19,6 +19,7 @@
 import {
   Camera,
   Check,
+  ChevronLeft,
   Droplets,
   Leaf,
   Minus,
@@ -28,6 +29,8 @@ import {
   ScanLine,
   Search,
   Send,
+  ThumbsDown,
+  ThumbsUp,
   UtensilsCrossed,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -62,7 +65,9 @@ import { codificarFoto } from "@/lib/codificar-imagem";
 import { nutricaoDaSemana } from "@/lib/nutricao-da-semana";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
-import { alturaNoFluxo, useJanelaDoTeclado } from "@/lib/janela-do-teclado";
+import { useJanelaDoTeclado } from "@/lib/janela-do-teclado";
+import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
+import { useVoltar } from "@/lib/use-voltar";
 import { submitBrainFeedback } from "@/lib/secondbrain.functions";
 
 const NUTRIENT_TIPS: Record<1 | 2 | 3, { nutrient: string; why: string; foods: string }[]> = {
@@ -307,6 +312,9 @@ export function NutricaoTab({
     /** Quais suplementos já foram marcados hoje, e a hora do relógio dela. */
     suplementos?: string[];
     hora?: number;
+    /** O painel da conversa aberto em tela cheia — o estado que só existe no
+        celular e depois de um toque, e por isso era impossível de fotografar. */
+    aberta?: boolean;
   };
 }) {
   const ehBancada = bancada != null;
@@ -334,19 +342,34 @@ export function NutricaoTab({
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(bancada?.carregando ?? false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  /* ─── A CAIXA DEIXA DE ENCOLHER JUNTO COM O TECLADO ────────────────────────
-     `55vh` mede a tela INTEIRA, e no iPhone o teclado NÃO mexe nela — só no
-     `visualViewport`. A caixa continuava com 469px numa janela visível de
-     ~500: não cabia junto com o campo, o navegador rolava a página, e a
-     conversa que ela acabou de pedir ficava espremida. Medido com o
-     `visualViewport` forjado em 500: caixa 469 → 380, lista 305 → 216.
-     ⚠️ Em repouso `alturaNoFluxo` devolve `null` e o desenho de todo dia não
-     muda um pixel; só com o teclado aberto a caixa passa a valer o que SOBRA.
-     A régua é a MESMA do Chat IA (`lib/janela-do-teclado.ts`) — a paciente usa
-     os dois na mesma tela trocando de aba, e duas medições divergiriam. */
+  /* ─── A CONVERSA É UM PAINEL, NÃO UMA CAIXA NA PÁGINA ─────────────────────
+     Ela era uma caixa de 55vh DENTRO da página rolável: dois rolos disputando
+     o dedo, e a resposta cortada no meio da palavra na borda da caixa (a foto
+     do dono terminava em "como sal"). No celular a conversa passa a abrir em
+     TELA CHEIA — o MESMO invólucro do Chat IA: `fixed`, medindo a janela que
+     sobra quando o teclado sobe, a lista rolando por dentro, o compositor
+     pousado em cima do teclado e a página travada por baixo. A porta continua
+     na aba (a frase da semana, o campo, as ferramentas); mandar a primeira
+     pergunta é o que abre o painel, e a seta do cabeçalho o fecha SEM perder a
+     conversa. No computador ela continua uma caixa dentro da página.
+     ⚠️ A medição do teclado é a MESMA do Chat IA (`lib/janela-do-teclado.ts`):
+     a paciente usa os dois na mesma tela, e duas medições divergiriam. */
+  const [aberta, setAberta] = useState(bancada?.aberta ?? false);
   const janela = useJanelaDoTeclado();
-  const alturaDaCaixa = alturaNoFluxo(janela);
+  const listaRef = useRef<HTMLDivElement>(null);
+  /* ⚠️ `janela` só existe no celular (o hook devolve `null` no computador),
+     então travar a página e registrar o voltar só acontecem onde o painel
+     cobre a tela. O voltar do Android FECHA o painel em vez de sair da aba. */
+  useTravarRolagemDeFundo(aberta && janela != null);
+  useVoltar(aberta && janela != null, () => setAberta(false));
+  /* A lista fica no fim ao abrir, a cada mensagem e quando o teclado encolhe o
+     painel — senão a última resposta some atrás do compositor. É `scrollTop`,
+     nunca o rolar-até-a-vista do elemento: este rolaria também a PÁGINA por
+     baixo. */
+  useEffect(() => {
+    const el = listaRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, aberta, janela?.h]);
 
   /* ─── AS FERRAMENTAS ─────────────────────────────────────────────────────── */
   const [ferramenta, setFerramenta] = useState<Ferramenta | null>(bancada?.ferramenta ?? null);
@@ -356,12 +379,20 @@ export function NutricaoTab({
   /* ⚠️ Estado PRÓPRIO, e não o `input` da caixa de baixo: dois campos ligados
      ao mesmo estado se escreveriam um no outro enquanto ela digita. */
   const [pergunta, setPergunta] = useState("");
+  /** Abre a conversa: em tela cheia no celular; no computador, rola até a caixa. */
+  function abrirConversa() {
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+      setAberta(true);
+      return;
+    }
+    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   /** Manda a pergunta pronta e leva a paciente até a conversa. */
   function perguntar(texto: string) {
     setFerramenta(null);
     setAlimento("");
     void send(texto);
-    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    abrirConversa();
   }
 
   /* ─── A HORA DELA ─────────────────────────────────────────────────────────
@@ -421,7 +452,7 @@ export function NutricaoTab({
     setMessages(next);
     setFerramenta(null);
     setLoading(true);
-    conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    abrirConversa();
     try {
       /* ⚠️ A REDUÇÃO ACONTECE NO APARELHO, e o lado é 1024 (e não os 512 do
          avatar): o modelo precisa LER a tabela nutricional de um rótulo, que é
@@ -552,10 +583,6 @@ export function NutricaoTab({
     }
   }
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   async function send(text?: string) {
     const msg = (text ?? input).trim();
     if (!msg || loading) return;
@@ -682,6 +709,16 @@ export function NutricaoTab({
 
   /* A frase da semana — régua pura, com as cinco proibições escritas lá. */
   const daSemana = nutricaoDaSemana(gest?.weeks ?? null, careMode);
+  /* ⚠️ O subtítulo era `truncate`, e o que ele cortava no aparelho era
+     justamente "não substitui avaliação nutricional individual" — a metade que
+     importa. Duas linhas, sempre. */
+  const subtitulo = careMode
+    ? "Orientações de alimentação — não substitui avaliação nutricional individual."
+    : "Orientações para a sua gestação — não substitui avaliação nutricional individual.";
+  const temConversa = messages.length > 1;
+  const ultimaResposta =
+    [...messages].reverse().find((m) => m.role === "assistant" && m.content.trim())?.content ??
+    greeting;
 
   return (
     <div className="space-y-5">
@@ -715,7 +752,7 @@ export function NutricaoTab({
             if (!t) return;
             setPergunta("");
             void send(t);
-            conversaRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+            abrirConversa();
           }}
           className="flex items-end gap-2"
         >
@@ -1081,29 +1118,99 @@ export function NutricaoTab({
         </div>
       </section>
 
-      {/* ─── A CONVERSA ─────────────────────────────────────────────────── */}
-      <div
-        ref={conversaRef}
-        className="card-material flex scroll-mt-4 flex-col overflow-hidden rounded-3xl border border-lime-200/70"
-        style={{ height: alturaDaCaixa ?? "55vh" }}
-      >
-        <div className="flex items-center gap-3 border-b border-lime-100 bg-gradient-to-r from-lime-50 to-amber-50/60 px-4 py-3">
+      {/* ─── A CONVERSA ─────────────────────────────────────────────────
+          No celular ela tem duas formas. FECHADA é este cartão curto, na aba:
+          a saudação e as primeiras perguntas — ou, com conversa começada, a
+          última resposta e "Continuar a conversa". ABERTA é o painel em tela
+          cheia logo abaixo, o mesmo invólucro do Chat IA. No computador o
+          painel é a caixa de sempre, dentro da página, e o cartão não existe. */}
+      <div className="card-material rounded-3xl border border-lime-200/70 p-4 md:hidden">
+        <div className="flex items-center gap-3">
           <Avatar tamanho={40} />
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="font-serif text-[17px] font-semibold leading-tight text-foreground">
               Nutricionista virtual
             </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {careMode
-                ? "Orientações de alimentação — não substitui avaliação nutricional individual."
-                : "Orientações para a sua gestação — não substitui avaliação nutricional individual."}
-            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{subtitulo}</p>
           </div>
         </div>
+        {temConversa ? (
+          <>
+            <p className="mt-3 line-clamp-3 whitespace-pre-wrap text-sm leading-snug text-foreground">
+              {ultimaResposta}
+            </p>
+            <button
+              type="button"
+              onClick={() => setAberta(true)}
+              className="btn-3d press mt-3 flex min-h-[44px] w-full items-center justify-center rounded-full bg-lime-700 px-4 text-[15px] font-semibold text-white"
+            >
+              Continuar a conversa
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-sm leading-snug text-foreground">{greeting}</p>
+            {/* Em Modo Cuidado somem: NUTRITION_CHIPS traz "Posso comer tâmara
+                para preparar o parto?" e coisas do tipo. */}
+            {!careMode && (
+              <div className="scrollbar-hide -mx-4 mt-3 flex gap-2 overflow-x-auto px-4">
+                {chips.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => {
+                      abrirConversa();
+                      void send(c);
+                    }}
+                    className="pill-3d press min-h-[44px] shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold text-lime-800"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
-        <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3">
+      <div
+        ref={conversaRef}
+        role={aberta ? "dialog" : undefined}
+        aria-label="Conversa com a nutricionista"
+        className={`scroll-mt-4 ${
+          aberta ? "fixed inset-x-0 top-0 z-[45] flex h-[100dvh] flex-col bg-background" : "hidden"
+        } md:static md:z-auto md:flex md:h-[55vh] md:flex-col md:overflow-hidden md:rounded-3xl md:border md:border-lime-200/70 md:bg-card md:shadow-[var(--shadow-card)]`}
+        style={aberta && janela ? { height: janela.h, top: janela.top } : undefined}
+      >
+        <header className="flex items-center gap-3 border-b border-lime-100 bg-gradient-to-r from-lime-50 to-amber-50/60 px-3 pb-2.5 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:px-4 md:py-3">
+          {/* A seta fecha o PAINEL e guarda a conversa — a barra de voltar da
+              página fica por baixo dele, e sem isto ela não teria como sair. */}
+          <button
+            type="button"
+            onClick={() => setAberta(false)}
+            aria-label="Voltar"
+            className="press -ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-foreground md:hidden"
+          >
+            <ChevronLeft className="h-6 w-6" strokeWidth={2} />
+          </button>
+          <Avatar tamanho={40} />
+          <div className="min-w-0 flex-1">
+            <p className="font-serif text-[17px] font-semibold leading-tight text-foreground">
+              Nutricionista virtual
+            </p>
+            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{subtitulo}</p>
+          </div>
+        </header>
+
+        <div
+          ref={listaRef}
+          className="flex-1 space-y-2 overflow-y-auto overscroll-contain px-3 py-3"
+        >
           {messages.map((m, i) => {
             const dela = m.role === "user";
+            /* A bolha VAZIA enquanto a resposta não chegou: era um "…" parado,
+               que lê como travou. Vira a mesma varredura de luz do Chat IA. */
+            const pensando = !dela && !m.content && loading && i === messages.length - 1;
             return (
               <div
                 key={i}
@@ -1117,18 +1224,56 @@ export function NutricaoTab({
                      da bancada mostrou a lista virando uma parede de texto com
                      os "•" no meio da frase. O Chat IA já rendia assim; esta
                      bolha ficou de fora. */
+                  /* A bolha DELA é um tom suave com texto escuro, e não o
+                     bloco verde-escuro cheio: a pergunta dela costuma ser um
+                     parágrafo, e o que ela veio ler é a resposta. Texto escuro
+                     sobre lime-100 passa folgado — descer o fundo cheio de 700
+                     é onde o branco começaria a reprovar. */
                   className={`max-w-[80%] whitespace-pre-wrap px-4 py-2.5 text-[15px] leading-relaxed ${
                     dela
-                      ? "rounded-3xl rounded-br-md bg-lime-700 text-white shadow-[0_10px_22px_-12px_rgba(77,124,15,0.7)]"
+                      ? "rounded-3xl rounded-br-md bg-lime-100 text-lime-950 ring-1 ring-lime-200/80"
                       : "card-material rounded-3xl rounded-bl-md text-foreground"
-                  }`}
+                  } ${pensando ? "relative overflow-hidden" : ""}`}
                 >
-                  {m.content || "…"}
+                  {pensando ? (
+                    <>
+                      <span
+                        aria-hidden
+                        className="dc-think-sweep absolute inset-y-0 -left-1/3 w-1/3 bg-[linear-gradient(90deg,transparent,rgba(77,124,15,0.28),transparent)]"
+                      />
+                      <span role="status" className="sr-only">
+                        Pensando
+                      </span>
+                      <span
+                        aria-hidden
+                        className="relative block h-2 w-12 rounded-full bg-foreground/12"
+                      />
+                    </>
+                  ) : (
+                    m.content || "…"
+                  )}
                   {/* Só nas respostas da IA, e não na saudação (i > 0). */}
                   {m.role === "assistant" && i > 0 && m.content && (
                     <div className="mt-1.5 flex items-center gap-2">
                       {votos[i] !== undefined ? (
-                        <span className="text-xs text-muted-foreground">
+                        /* O voto dado fica DESENHADO, e não só dito: o polegar
+                           preenchido é o estado; a frase é o agradecimento. */
+                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          {votos[i] === true ? (
+                            <ThumbsUp
+                              className="h-[15px] w-[15px] text-lime-700"
+                              fill="currentColor"
+                              strokeWidth={1.8}
+                              aria-hidden
+                            />
+                          ) : (
+                            <ThumbsDown
+                              className="h-[15px] w-[15px] text-lime-700"
+                              fill="currentColor"
+                              strokeWidth={1.8}
+                              aria-hidden
+                            />
+                          )}
                           {votos[i] === true
                             ? "Obrigada 💛"
                             : votos[i] === "fila"
@@ -1142,20 +1287,23 @@ export function NutricaoTab({
                               estendê-los faria os alvos se encavalarem —
                               tocar entre eles acertaria o contrário do que
                               ela quis. É a lição do ✕ do chá de bebê. Os
-                              `-m` devolvem o espaço que o quadrado tomou. */}
+                              `-m` devolvem o espaço que o quadrado tomou.
+                              ⚠️ E são DESENHADOS, não emoji: 👍 tem cor
+                              própria em cada sistema, e a 50% de opacidade
+                              lia como desabilitado. */}
                           <button
                             onClick={() => votar(i, true)}
                             aria-label="Esta resposta ajudou"
-                            className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
+                            className="-my-2 -ml-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
                           >
-                            👍
+                            <ThumbsUp className="h-[18px] w-[18px]" strokeWidth={1.9} />
                           </button>
                           <button
                             onClick={() => votar(i, false)}
                             aria-label="Esta resposta não ajudou"
-                            className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-sm opacity-50 hover:opacity-100"
+                            className="-my-2 flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-lime-700"
                           >
-                            👎
+                            <ThumbsDown className="h-[18px] w-[18px]" strokeWidth={1.9} />
                           </button>
                         </>
                       )}
@@ -1165,7 +1313,6 @@ export function NutricaoTab({
               </div>
             );
           })}
-          <div ref={messagesEndRef} />
         </div>
 
         {/* Sugestões: em Modo Cuidado somem. NUTRITION_CHIPS traz "Posso comer
@@ -1184,14 +1331,14 @@ export function NutricaoTab({
           </div>
         )}
 
-        <div className="flex items-end gap-2 border-t border-lime-100 bg-card/92 px-3 py-2">
+        <div className="flex items-end gap-2 border-t border-lime-100 bg-card/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 md:pb-2">
           <div className="card-material flex min-h-[44px] flex-1 items-center rounded-[22px] px-4">
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && send()}
               aria-label="Mensagem"
-              placeholder={careMode ? "Pergunte sobre alimentação…" : "Pergunte sobre alimentação…"}
+              placeholder="Pergunte sobre alimentação…"
               /* ⚠️ 16px, nunca menos — o zoom do Safari ao focar. */
               className="min-h-[44px] w-full bg-transparent text-[16px] text-foreground outline-none placeholder:text-muted-foreground"
             />

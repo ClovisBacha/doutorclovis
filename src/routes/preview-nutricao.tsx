@@ -32,7 +32,8 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *
  * ⚠️ `?receita=` é a PRESCRIÇÃO (o campo livre de `medications`), e não a lista
  * pronta: é ela que `itensDaPrescricao` tem de saber recortar, e cravar a lista
- * aprovaria um recorte que a produção nunca faz. `?tomados=` marca o que já foi
+ * aprovaria um recorte que a produção nunca faz. `?painel=1` abre a conversa em
+ * TELA CHEIA (a forma do celular — a 393px de largura; no computador é a caixa). `?tomados=` marca o que já foi
  * tomado hoje (vive no `localStorage`), e `?hora=` crava o relógio DELA — sem
  * ele, o convite do momento muda de texto conforme a hora em que se fotografa,
  * e duas fotos deixam de ser comparáveis.
@@ -68,6 +69,10 @@ export const Route = createFileRoute("/preview-nutricao")({
     tomados: q.tomados == null ? "" : String(q.tomados),
     /* ⚠️ `-1` e não `0`: zero é meia-noite, uma hora legítima. */
     hora: q.hora == null || q.hora === "" ? -1 : Number(q.hora),
+    /* O painel da conversa em TELA CHEIA. Só existe no celular e só nasce de
+       um toque (mandar a primeira pergunta) — sem isto a forma que a paciente
+       de fato usa seria impossível de fotografar. */
+    painel: q.painel == null ? false : Boolean(q.painel),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -135,6 +140,7 @@ function Pagina() {
     receita,
     tomados,
     hora,
+    painel,
   } = Route.useSearch();
   const w = semdum ? null : wBruto;
 
@@ -168,6 +174,7 @@ function Pagina() {
       : undefined) as "comer" | "prato" | "alivio" | "casa" | undefined,
     suplementos: tomados ? tomados.split(",").filter(Boolean) : undefined,
     hora: hora >= 0 && hora <= 23 ? hora : undefined,
+    aberta: painel,
   };
 
   return (

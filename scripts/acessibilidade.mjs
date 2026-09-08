@@ -43,7 +43,9 @@ const ROTAS = [
   "/preview-saude-registros?estado=normal",
   "/preview-chutes?estado=contando",
   "/preview-contracoes?estado=parto",
-  "/preview-nutricao?estado=conversa",
+  /* O painel em tela cheia — a 393px o estado sem `painel=1` mede a aba com
+     o cartão compacto, e não a conversa. */
+  "/preview-nutricao?estado=conversa&painel=1",
   "/preview-saude-mulher?tela=ciclo",
   "/preview-saude-mulher?tela=preventivos",
 ];

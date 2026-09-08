@@ -3,33 +3,32 @@
  *
  * O `visualViewport` é a única coisa que sabe quanto de tela restou depois de
  * o teclado do celular abrir — `100vh`, `100dvh` e `vh` em geral continuam
- * medindo a tela INTEIRA. Uma caixa de chat dimensionada em `vh` encolhe
- * proporcionalmente junto com nada: ela fica do mesmo tamanho e some por baixo
- * do teclado, ou (quando o navegador reporta a janela menor) encolhe a 55% de
- * uma tela que já é metade.
+ * medindo a tela INTEIRA. Um painel de chat dimensionado em `vh` não encolhe
+ * junto com nada: ele fica do mesmo tamanho e some por baixo do teclado.
  *
  * ⚠️ **NO IPHONE O TECLADO NÃO MEXE EM `innerHeight` — só no
- * `visualViewport`.** É por isso que `55vh` não encolhe: a caixa continua com
- * os mesmos 469px de uma tela de 852, e metade dela fica ATRÁS do teclado.
- * Medido com o `visualViewport` forjado em 500 (o teclado do iPhone come
- * ~350px): a caixa de 469 não cabe nos 500 visíveis junto com mais nada, o
- * navegador rola a página para trazer o campo à vista, e o que sobra da
- * conversa é uma faixa. Com a régua: caixa **469 → 380**, lista **305 → 216**,
- * e o conjunto cabe inteiro na janela visível.
+ * `visualViewport`.** Medido com o `visualViewport` forjado em 500 (o teclado
+ * do iPhone come ~350px de uma tela de 852): uma caixa de 55vh continuava com
+ * 469px, não cabia nos 500 visíveis junto com mais nada, o navegador rolava a
+ * página para trazer o campo à vista, e o que sobrava da conversa era uma
+ * faixa.
  *
- * ⚠️ **A RÉGUA MORA AQUI PORQUE JÁ HAVIA DOIS CHATS.** O Chat IA resolveu isso
- * com o estado e os dois ouvintes escritos DENTRO do componente; a
- * Nutricionista Virtual, que a paciente abre na MESMA tela trocando de aba,
- * ficou com a caixa de `55vh`. Uma segunda cópia da medição divergiria da
- * primeira no próximo ajuste, e a divergência apareceria como um dos dois
- * chats voltando a se esconder.
+ * ⚠️ **A RÉGUA MORA AQUI PORQUE HÁ DOIS CHATS.** O Chat IA e a Nutricionista
+ * Virtual são abertos na MESMA tela, trocando de aba. Uma segunda cópia da
+ * medição divergiria da primeira no próximo ajuste, e a divergência
+ * apareceria como um dos dois chats voltando a se esconder atrás do teclado.
  *
- * ⚠️ **E ISTO NÃO É O CASO DA TELA PEQUENA.** Medido a 393×500 (celular
- * deitado, ou uma janela pequena no computador), a lista cai para **111px** —
- * e ali `visualViewport` bate com a tela, então esta régua NÃO age de
- * propósito: numa tela que é pequena de verdade, repartir 55% dela é uma
- * decisão de desenho, não um defeito. Confundir os dois casos foi o primeiro
- * diagnóstico desta correção, e ele consertava um e media o outro.
+ * Os dois são hoje PAINÉIS em tela cheia no celular (`fixed`, com a altura e o
+ * topo vindos daqui), e a lista rola por dentro. A régua "caixa no fluxo" que
+ * existia para a Nutrição — quando ela era uma caixa de 55vh dentro da página
+ * — saiu junto com a caixa: um chat dentro de uma página rolável eram dois
+ * rolos disputando o dedo, e a resposta cortada no meio da palavra na borda.
+ *
+ * ⚠️ **E ISTO NÃO É O CASO DA TELA PEQUENA.** A 393×500 (celular deitado, ou
+ * uma janela pequena no computador) o `visualViewport` bate com a tela, e o
+ * painel simplesmente mede a tela inteira. Confundir os dois casos foi o
+ * primeiro diagnóstico da correção original, e ele consertava um e media o
+ * outro.
  */
 import { useEffect, useState } from "react";
 
@@ -42,30 +41,6 @@ export type JanelaVisivel = {
       a divergência de hidratação que já deixou este app sem abrir. */
   tela: number;
 };
-
-/** Altura mínima que a caixa do chat nunca desce, mesmo com o teclado aberto. */
-export const PISO_DA_CAIXA = 260;
-
-/**
- * A altura da caixa de conversa que fica no FLUXO da página (o caso da
- * Nutrição, que tem o cartão de nutrientes acima dela).
- *
- * ⚠️ Em repouso devolve `null` — a caixa fica com a altura em `vh` que o CSS
- * já dá, e o desenho de todo dia não muda uma linha. Só com o teclado aberto
- * ela passa a valer o que SOBRA, e não uma fração de uma tela que encolheu.
- *
- * @param janela  o `visualViewport` medido, ou `null` no computador
- * @param reserva quanto do que sobra fica para o que não é a conversa
- */
-export function alturaNoFluxo(janela: JanelaVisivel | null, reserva = 120): number | null {
-  if (!janela) return null;
-  const tela = janela.tela;
-  /* Sem teclado o `visualViewport` bate com a tela — e aí não há o que
-     corrigir. A folga de 40px cobre a barra do navegador aparecendo e
-     sumindo, que não é teclado. */
-  if (janela.h >= tela - 40) return null;
-  return Math.max(PISO_DA_CAIXA, Math.round(janela.h - reserva));
-}
 
 /** Mede o `visualViewport` no celular; devolve `null` no computador. */
 export function useJanelaDoTeclado(): JanelaVisivel | null {

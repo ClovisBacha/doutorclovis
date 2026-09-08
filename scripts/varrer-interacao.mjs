@@ -44,6 +44,19 @@ const ROTEIRO = [
     ],
   },
   {
+    /* A conversa em TELA CHEIA nasce de um toque e morre em outro: o chip do
+       cartão compacto abre o painel, a seta o fecha SEM perder a conversa, e
+       "Continuar a conversa" o reabre. Nenhum dos três estados existe na
+       varredura que só abre a tela. */
+    q: "/preview-nutricao?w=24&hora=16",
+    nome: "nutrição · a conversa abre em tela cheia, fecha e volta",
+    passos: [
+      { clique: "Quanta proteína preciso por dia?" },
+      { clique: "Voltar" },
+      { clique: "Continuar a conversa" },
+    ],
+  },
+  {
     q: "/preview-nutricao?w=24&receita=Ferro%20e%20C%C3%A1lcio&hora=16",
     nome: "nutrição · suplementos e água",
     passos: [{ clique: "Ferro" }, { clique: "Bebi um copo" }, { clique: "Tirar um copo" }],

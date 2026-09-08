@@ -76,6 +76,15 @@ const EXTRAS = [
      rede no instante certo. */
   "/preview-nutricao?semdum=1",
   "/preview-nutricao?estado=conversa",
+  /* ⚠️ `painel=1` é a conversa em TELA CHEIA — a forma que a paciente usa no
+     celular. Sem ele, a 393px, o que se abre é a aba com o cartão compacto
+     ("Continuar a conversa"), e o painel inteiro ficaria sem ninguém olhar. */
+  "/preview-nutricao?estado=conversa&painel=1",
+  "/preview-nutricao?estado=votou&painel=1",
+  "/preview-nutricao?estado=carregando&painel=1",
+  "/preview-nutricao?estado=erro&painel=1",
+  "/preview-nutricao?estado=foto&painel=1",
+  "/preview-nutricao?estado=conversa&luto=1&painel=1",
   "/preview-nutricao?estado=votou",
   "/preview-nutricao?estado=carregando",
   "/preview-nutricao?estado=erro",

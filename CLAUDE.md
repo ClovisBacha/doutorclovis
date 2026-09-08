@@ -14397,3 +14397,73 @@ NOME exista como valor, não a forma da linha.
 (reescrito: a forja continua fechada E a resposta assinada volta) ·
 `chat-stream.test.ts` (a assinatura nos dois formatos) ·
 `foto-da-nutricao.test.ts` (as travas novas do endpoint).
+
+## A conversa da nutrição virou um painel, e não uma caixa na página (set/2026)
+
+Pergunta do dono, depois do conserto do histórico: _"em relação a questões
+visuais, o que acha que podemos melhorar nesse chat da nutricionista?"_ Sete
+itens levantados a partir das fotos dele; ele aprovou, e os cinco primeiros
+entraram nesta leva.
+
+- ⚠️ **O DEFEITO PRINCIPAL ERA DE ESTRUTURA, não de estilo.** A conversa era uma
+  caixa de 55vh DENTRO da página rolável: dois rolos disputando o dedo, e a
+  resposta cortada no meio da palavra na borda da caixa (a foto dele terminava
+  em "como sal"). No celular ela passou a abrir em **tela cheia**, no MESMO
+  invólucro do Chat IA: `fixed`, medindo a janela que sobra quando o teclado
+  sobe (a régua única de `janela-do-teclado.ts`), a lista rolando por dentro, o
+  compositor em cima do teclado e a página travada por baixo
+  (`useTravarRolagemDeFundo`). Medido com o `visualViewport` forjado em 500:
+  painel 500, Enviar em 492.
+- **A PORTA CONTINUA NA ABA** — a frase da semana, o campo, as ferramentas, a
+  água e os suplementos. O que abre o painel é a primeira pergunta (o campo do
+  topo, um chip, uma ferramenta, a foto). Fechada, a conversa vira um cartão
+  compacto na aba: a saudação e as primeiras perguntas, ou — com conversa
+  começada — a última resposta e "Continuar a conversa". ⚠️ **A seta fecha SEM
+  perder a conversa**, e o voltar do Android faz o mesmo (`useVoltar`), em vez
+  de sair da aba.
+- ⚠️ **No computador nada mudou de forma**: a caixa continua dentro da página
+  (`md:static md:h-[55vh]`), pelo mesmo truque de classes do Chat IA. O cartão
+  compacto é `md:hidden`.
+- ⚠️ **`alturaNoFluxo` SAIU.** Ela existia para a caixa no fluxo encolher com o
+  teclado; sem caixa no fluxo é régua sem chamador, e régua sem chamador é
+  prosa com cara de código. O teste dos dois chats passou a cobrar a garantia
+  nova — os dois dimensionam o painel por `janela.h`/`janela.top` — em vez da
+  grafia `alturaDaCaixa ?? "55vh"`.
+- **Os 👍👎 viraram polegares DESENHADOS** (Lucide), a 6,5:1 em vez de emoji a
+  50% de opacidade, que lia como desabilitado e tem cor própria em cada
+  sistema. Depois do voto o polegar fica PREENCHIDO ao lado do agradecimento —
+  o estado é desenhado, não só dito. O alvo continua 44×44 sem `after:-inset`
+  (a lição dos vizinhos opostos, que o teste já cobrava).
+- **O subtítulo deixou de ser `truncate`**: o que ele cortava no aparelho era
+  justamente "não substitui avaliação nutricional individual". Duas linhas,
+  nos dois lugares.
+- **A bolha vazia enquanto a resposta não chegou** era um "…" parado, que lê
+  como travou. Virou a MESMA varredura de luz do Chat IA (`dc-think-sweep`),
+  com "Pensando" na região de status.
+- **A bolha DELA** deixou de ser o bloco `lime-700` cheio com sombra colorida —
+  a pergunta dela costuma ser um parágrafo, e o que ela veio ler é a resposta.
+  É `lime-100` com texto `lime-950`: **13,49:1 medido**. ⚠️ Descer o fundo
+  CHEIO de 700 era o caminho errado — é exatamente onde o branco começa a
+  reprovar (a lição dos botões da Loja); a saída é inverter o par, não
+  clarear o fundo.
+
+⚠️ **As duas varreduras de CI rodam a 393px, e ali o estado antigo passou a
+mostrar o CARTÃO, não a conversa.** Sem `&painel=1` a varredura de bancadas e a
+de acessibilidade mediriam a aba com "Continuar a conversa" e chamariam isso de
+conversa. Os estados com painel entraram nas duas listas, e o roteiro de
+interação toca os três instantes que só nascem de um dedo (chip abre, seta
+fecha, "Continuar" reabre).
+
+⚠️ **E a prosa quebrou a minha própria asserção de patch — pela décima quinta
+vez.** O script contava ocorrências de `scrollIntoView` para provar que só
+restara a de `abrirConversa`, e o comentário novo que explica por que a lista
+usa `scrollTop` citava a palavra. Contar texto é contar prosa junto.
+
+**Ficam para a próxima leva:** a foto do prato aparecendo na conversa (só em
+memória — o servidor continua sem guardar nada) e um formatador leve para as
+respostas em lista, sem trazer o `react-markdown` inteiro.
+
+**Bancadas:** `/preview-nutricao?estado=conversa&painel=1` (o painel, a 393px)
+· `?estado=votou&painel=1` (os três polegares preenchidos) ·
+`?estado=carregando&painel=1` (a varredura no lugar do "…") · `?estado=saudacao`
+(o cartão compacto na aba, a 393px).
