@@ -121,6 +121,41 @@ describe("o servidor", () => {
     expect(API).toMatch(/foto\.size > FOTO_BYTES_MAX/);
     expect(API).toMatch(/!ehImagemAceita\(foto\.type\)/);
   });
+  test("⚠️ o pensamento está DESLIGADO e a saída tem teto — a mesma decisão da conversa", () => {
+    /* Numa imagem, o raciocínio ligado é o que separa três segundos de vinte;
+       e a função morre em 30. Sem isto a paciente recebia um 504 sem nome. */
+    expect(API).toMatch(/thinkingConfig: \{ thinkingBudget: 0 \}/);
+    expect(API).toMatch(/maxOutputTokens/);
+    expect(API).toMatch(/BLOCK_ONLY_HIGH/);
+    expect(API).toMatch(/AbortSignal\.timeout\(/);
+  });
+  test("⚠️ cada falha tem NOME — nunca um 'falhou' só", () => {
+    /* A garantia é o NOME existir como valor devolvido — não a forma da linha
+       (um deles sai de um ternário). */
+    for (const motivo of [
+      "demorou",
+      "rede",
+      "bloqueada",
+      "vazio",
+      "sem_foto",
+      "formato",
+      "grande",
+    ]) {
+      expect(API).toMatch(new RegExp(`motivo[^;]*"${motivo}"`));
+    }
+    expect(API).toMatch(/motivo: `gemini_\$\{resposta\.status\}`/);
+    expect(API).not.toMatch(/motivo: "falhou"/);
+  });
+  test("⚠️ `File` não é `instanceof` — o global varia por runtime", () => {
+    expect(API).not.toMatch(/instanceof File/);
+  });
+  test("todas as partes de texto, não só a primeira", () => {
+    expect(API).not.toMatch(/parts\?\.\[0\]\?\.text/);
+  });
+  test("a resposta sai ASSINADA para voltar ao fio da conversa", () => {
+    expect(API).toMatch(/assinarTurno\(chave, usuario\.id, texto\)/);
+    expect(API).toMatch(/json\(\{ ok: true, texto, assinatura \}\)/);
+  });
   test("⚠️ resposta vazia é ERRO, nunca sucesso mudo", () => {
     /* Sem isto a bolha renderiza "…" para sempre — o defeito que a conversa
        desta mesma aba já pagou. */

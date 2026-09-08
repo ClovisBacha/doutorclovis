@@ -6583,7 +6583,13 @@ function ApagarConversas() {
 }
 
 /* ---------- Chat IA ---------- */
-export type ChatMsg = { role: "user" | "assistant"; content: string };
+export type ChatMsg = {
+  role: "user" | "assistant";
+  content: string;
+  /** A assinatura do servidor sobre uma resposta da nutrição — é o que a
+      deixa voltar ao modelo como turno do assistente (`turno-assinado.server.ts`). */
+  assinatura?: string;
+};
 
 /* ---------- Calendário do Pré-natal ---------- */
 

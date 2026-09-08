@@ -64,8 +64,16 @@ export const Route = createFileRoute("/api/prato")({
           return json({ ok: false, motivo: "invalido" }, 400);
         }
 
-        const foto = formData.get("foto");
-        if (!(foto instanceof File) || foto.size === 0) {
+        /* ⚠️ NÃO `instanceof File`: o global `File` existe ou não conforme o
+           runtime, e um ReferenceError aqui virava 500 sem motivo nenhum. O
+           que importa é a FORMA — tem bytes, tem tipo, tem tamanho. */
+        const foto = formData.get("foto") as Blob | string | null;
+        if (
+          !foto ||
+          typeof foto === "string" ||
+          typeof (foto as Blob).arrayBuffer !== "function" ||
+          foto.size === 0
+        ) {
           return json({ ok: false, motivo: "sem_foto" }, 400);
         }
         if (foto.size > FOTO_BYTES_MAX) return json({ ok: false, motivo: "grande" }, 413);
@@ -104,6 +112,10 @@ export const Route = createFileRoute("/api/prato")({
           resposta = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            /* ⚠️ TETO DE TEMPO abaixo do da função (30 s): sem ele, uma leitura
+               lenta morre com a função e a paciente recebe um 504 sem motivo.
+               Com ele, ela recebe "demorou" e a instrução de tentar de novo. */
+            signal: AbortSignal.timeout(22_000),
             body: JSON.stringify({
               contents: [
                 {
@@ -118,22 +130,44 @@ export const Route = createFileRoute("/api/prato")({
                   ],
                 },
               ],
-              /* Ler um rótulo é a tarefa em que inventar é o defeito. */
-              generationConfig: { temperature: 0.2 },
+              generationConfig: {
+                /* Ler um rótulo é a tarefa em que inventar é o defeito. */
+                temperature: 0.2,
+                /* ⚠️ A MESMA DECISÃO DA CONVERSA (`/api/nutrition`): o
+                   raciocínio do modelo sai do mesmo orçamento e do mesmo
+                   relógio da resposta. Aqui ele NÃO estava desligado, e numa
+                   imagem ele é o que separa três segundos de vinte. */
+                thinkingConfig: { thinkingBudget: 0 },
+                maxOutputTokens: 700,
+              },
+              /* O filtro padrão do Gemini é mal calibrado para comida de
+                 verdade — um prato com carne crua ou um rótulo de vinho sem
+                 álcool já disparam. O MESMO limiar da conversa. */
+              safetySettings: [
+                { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
+                { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_ONLY_HIGH" },
+              ],
             }),
           });
         } catch (e) {
-          console.error("[prato] a leitura da foto não saiu", e);
-          return json({ ok: false, motivo: "falhou" }, 502);
+          /* ⚠️ Cada falha tem NOME. Antes, tudo isto era "falhou" e virava uma
+             frase só na tela — e o log da Vercel era o único lugar onde a
+             causa existia. */
+          const demorou = (e as { name?: string })?.name === "TimeoutError";
+          console.error("[prato] a leitura da foto não saiu", demorou ? "tempo esgotado" : e);
+          return json({ ok: false, motivo: demorou ? "demorou" : "rede" }, 502);
         }
 
         if (!resposta.ok) {
           console.error("[prato] Gemini recusou", resposta.status, await resposta.text());
-          return json({ ok: false, motivo: "falhou" }, 502);
+          return json({ ok: false, motivo: `gemini_${resposta.status}` }, 502);
         }
 
         const dados = (await resposta.json()) as {
-          candidates?: { content?: { parts?: { text?: string }[] } }[];
+          candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+          promptFeedback?: { blockReason?: string };
           usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number };
         };
 
@@ -168,14 +202,37 @@ export const Route = createFileRoute("/api/prato")({
           /* medir é opcional; responder não pode falhar por causa da medição */
         }
 
-        const texto = (dados.candidates?.[0]?.content?.parts?.[0]?.text ?? "")
+        /* ⚠️ BLOQUEADA é outra coisa que VAZIA. "Tente com mais luz" para uma
+           foto que o filtro recusou por ter gente nela manda a paciente repetir
+           o que não vai funcionar; o recado certo é enquadrar só a comida. */
+        const bloqueada =
+          !!dados.promptFeedback?.blockReason || dados.candidates?.[0]?.finishReason === "SAFETY";
+        if (bloqueada) {
+          console.error(
+            "[prato] bloqueada pelo filtro",
+            dados.promptFeedback?.blockReason ?? "SAFETY",
+          );
+          return json({ ok: false, motivo: "bloqueada" }, 502);
+        }
+        /* ⚠️ TODAS as partes de texto, e não `parts[0]`: o modelo pode dividir a
+           resposta, e ficar com a primeira entregava metade e chamava de tudo. */
+        const texto = (dados.candidates?.[0]?.content?.parts ?? [])
+          .map((p) => p.text ?? "")
+          .join("")
           .replace(/^```[a-z]*\n?|```$/g, "")
           .trim();
         /* Vazio não é sucesso mudo: a tela precisa distinguir "não consegui
            ler" de uma resposta que chegou. Sem isto, a bolha renderiza "…"
            para sempre — o defeito que a conversa já pagou aqui. */
         if (!texto) return json({ ok: false, motivo: "vazio" }, 502);
-        return json({ ok: true, texto });
+        /* ASSINADA como a conversa: é o que deixa "o que eu poderia
+           acrescentar?" logo depois da foto funcionar — sem a assinatura, a
+           descrição do prato cairia do histórico e a pergunta seguinte
+           perderia o assunto. Ver `turno-assinado.server.ts`. */
+        const { assinarTurno, chaveDeAssinatura } = await import("@/lib/turno-assinado.server");
+        const chave = chaveDeAssinatura(process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const assinatura = chave ? assinarTurno(chave, usuario.id, texto) : undefined;
+        return json({ ok: true, texto, assinatura });
       },
     },
   },

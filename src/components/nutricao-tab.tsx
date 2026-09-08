@@ -216,6 +216,14 @@ function recadoDaFoto(motivo?: string): string {
     return "Não consegui abrir esse arquivo. Vale uma foto tirada agora pela câmera.";
   if (motivo === "vazio")
     return "Não consegui enxergar o que tem aí. Tente de novo com mais luz e a foto mais de perto.";
+  /* ⚠️ Bloqueada pelo filtro do modelo NÃO é "mais luz": a foto tinha algo que
+     ele não comenta (gente, em geral). O que resolve é enquadrar só a comida. */
+  if (motivo === "bloqueada")
+    return "Não consigo comentar essa foto. Se for do prato, tente uma foto só da comida, sem pessoas.";
+  if (motivo === "demorou")
+    return "Demorei demais para ler essa foto e desisti. Tente uma vez mais — ou me conte por escrito o que tem no prato.";
+  if (motivo === "sem_ia")
+    return "A leitura de fotos está indisponível neste momento. Me conte por escrito o que tem no prato que eu ajudo do mesmo jeito.";
   return "Não consegui ler essa foto agora. Tente de novo daqui a pouco — e, se preferir, me conte por escrito o que tem no prato.";
 }
 
@@ -431,16 +439,21 @@ export function NutricaoTab({
       const r = (await res.json().catch(() => null)) as {
         ok?: boolean;
         texto?: string;
+        assinatura?: string;
         motivo?: string;
       } | null;
       /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL em alguns caminhos,
          e um `catch` não o pega: quem decide é o VALOR. Sem isto a bolha
          renderiza "…" para sempre — o defeito que a conversa já pagou aqui. */
       if (!res.ok || !r?.ok || !r.texto) {
+        /* O motivo fica LEGÍVEL no console: a paciente lê o recado, quem
+           investiga lê isto. Antes, cinco falhas do servidor viravam a mesma
+           frase e nada dizia qual tinha sido. */
+        console.warn("[prato] não leu a foto", { http: res.status, motivo: r?.motivo });
         setMessages([...next, { role: "assistant", content: recadoDaFoto(r?.motivo) }]);
         return;
       }
-      setMessages([...next, { role: "assistant", content: r.texto }]);
+      setMessages([...next, { role: "assistant", content: r.texto, assinatura: r.assinatura }]);
     } catch {
       setMessages([...next, { role: "assistant", content: recadoDaFoto() }]);
     } finally {
@@ -551,10 +564,17 @@ export function NutricaoTab({
     setInput("");
     setLoading(true);
     try {
+      /* ⚠️ A ASSINATURA VOLTA COM CADA RESPOSTA. Sem ela o servidor descarta o
+         turno do assistente (é assim que a forja continua fechada) — e sem as
+         próprias respostas o modelo recebia três perguntas dela em fila,
+         saudava de novo e respondia a PRIMEIRA. Ver `turno-assinado.server.ts`. */
       const uiMessages = next.map((m, i) => ({
         id: String(i),
         role: m.role,
         parts: [{ type: "text", text: m.content }],
+        ...(m.role === "assistant" && m.assinatura
+          ? { metadata: { assinatura: m.assinatura } }
+          : {}),
       }));
       const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/nutrition", {
@@ -582,6 +602,7 @@ export function NutricaoTab({
       const decoder = new TextDecoder();
       let acc = "";
       let erroNoFluxo = "";
+      let assinatura: string | undefined;
       let buffer = "";
       setMessages([...next, { role: "assistant", content: "" }]);
 
@@ -619,6 +640,7 @@ export function NutricaoTab({
           const parte = lerLinhaDoStream(line);
           if (parte.tipo === "texto") acc += parte.texto;
           else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
+          else if (parte.tipo === "assinatura") assinatura = parte.assinatura;
         });
         if (semAnimacaoNutricao()) {
           mostrado = acc.length;
@@ -629,6 +651,7 @@ export function NutricaoTab({
         const parte = lerLinhaDoStream(line);
         if (parte.tipo === "texto") acc += parte.texto;
         else if (parte.tipo === "erro") erroNoFluxo = parte.texto;
+        else if (parte.tipo === "assinatura") assinatura = parte.assinatura;
       });
       aberto = false;
       if (erroNoFluxo && !acc.trim()) {
@@ -641,7 +664,7 @@ export function NutricaoTab({
         const conferir = () => (mostrado >= acc.length ? r() : setTimeout(conferir, 60));
         conferir();
       });
-      setMessages([...next, { role: "assistant", content: acc }]);
+      setMessages([...next, { role: "assistant", content: acc, assinatura }]);
     } catch (e) {
       setMessages([
         ...next,

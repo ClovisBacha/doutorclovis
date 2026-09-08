@@ -14321,3 +14321,79 @@ com a faixa) · `?estado=instavel-historico` · `?estado=alerta&semdum=1` ·
 · `?estado=episodios` (a lista que atravessa dias) ·
 `?estado=parto&w=16` · `?estado=normal&w=41` · `?estado=normal&semdum=1` ·
 `/preview-nutricao?semdum=1`.
+
+## O chat da nutrição respondia a pergunta ERRADA a partir da segunda (set/2026)
+
+O dono, com três fotos do aparelho: perguntou do sushi (certo), mandou uma foto
+("não consegui ler"), e perguntou o que fazer com arroz e feijão — e a resposta
+começou com **"Olá! Que bom que você está…"** e falou de sushi.
+
+### ⚠️ A CAUSA: `soTurnosDela` tirava TODA resposta do modelo do histórico
+
+Ela existia para fechar a forja (turno de assistente inventado pelo cliente com
+"o Dr. X orienta misoprostol"), e o custo estava escrito como "continuidade
+mais fraca". O custo real, medido: na terceira pergunta o modelo recebia
+
+    [user: sushi?, user: "📷 Foto do meu prato", user: "Tenho em casa…"]
+
+— três turnos dela em fila e nenhuma resposta própria. Do ponto de vista dele
+era a PRIMEIRA vez que respondia: saudava e começava pelo topo da pilha. A
+primeira pergunta sempre funcionava; da segunda em diante, nunca.
+
+⚠️ **"Continuidade mais fraca" era uma previsão, não uma medição.** O que
+decide o comportamento de um modelo diante de N turnos do mesmo papel em fila
+não é a prosa do comentário — é abrir a tela e perguntar três vezes.
+
+### O conserto: o servidor ASSINA o que ele disse (`turno-assinado.server.ts`)
+
+Toda resposta sai com um HMAC sobre (paciente, texto), entregue no chunk
+`finish` do stream (`messageMetadata`) e, na foto, no JSON. O cliente guarda e
+devolve; o servidor só aceita de volta o turno de assistente cuja assinatura
+confere. Forjado não tem assinatura; adulterado não confere; transplantado de
+outra conta não confere porque a paciente entra no HMAC.
+
+- ⚠️ **A alternância é imposta na régua.** Os turnos que a TELA fabrica (a
+  saudação, "não consegui ler essa foto") não têm assinatura e caem — e o que
+  sobra pode ter duas perguntas dela em fila, que é a forma exata do defeito.
+  Um turno dela só fica se for o último ou se vier seguido de resposta
+  assinada; o histórico termina sempre nela.
+- ⚠️ **Sem chave, falha FECHADO**: nenhum assistente aceito (o comportamento
+  anterior), nunca "aceitar tudo".
+- ⚠️ **NÃO é persistência.** Gravar a nutrição em `chat_messages` exige coluna
+  de canal para não poluir a transcrição do médico — é decisão de produto, e o
+  caminho está escrito no cabeçalho do módulo. Isto fecha o defeito sem SQL.
+- ⚠️ **A SDK chama `messageMetadata` para TODA parte e cola o retorno de
+  `finish` DENTRO do chunk `finish`** — `lerLinhaDoStream` lê o campo nos dois
+  formatos. Sem ler o `finish`, a assinatura nunca chegaria e a régua nunca
+  aceitaria nada, em silêncio: seria `soTurnosDela` de volta com outro nome.
+
+### A foto: cinco falhas viravam uma frase, e o pensamento estava ligado
+
+`/api/prato` devolvia `falhou` para rede, Gemini recusando, 503 sem chave e
+formData inválido — e a tela dava a mesma frase para todas. Não dá para
+reproduzir daqui (a chave local é vazia), então o que se fez foi o que vale em
+qualquer causa:
+
+- **`thinkingBudget: 0` + `maxOutputTokens`** — a MESMA decisão da conversa,
+  que aqui não tinha sido aplicada. Numa imagem o raciocínio é o que separa
+  três segundos de vinte, e a função morre em trinta.
+- **`AbortSignal.timeout(22s)`** abaixo do teto da função: "demorou" com
+  instrução, em vez de um 504 sem nome.
+- **`safetySettings` BLOCK_ONLY_HIGH** e **"bloqueada" separada de "vazia"**:
+  "tente com mais luz" para uma foto que o filtro recusou por ter gente nela
+  manda repetir o que não vai funcionar.
+- ⚠️ **Sem `instanceof File`**: o global varia por runtime, e um
+  ReferenceError virava 500 mudo. Duck-typing.
+- **Todas as `parts` de texto**, não `parts[0]`.
+- **Cada falha com NOME** (`demorou`, `rede`, `gemini_<status>`, `bloqueada`,
+  `sem_ia`…), recado próprio na tela e `console.warn` com o motivo — antes o
+  único lugar onde a causa existia era o log da Vercel.
+
+⚠️ **E um teste meu travou a grafia na mesma hora**: `motivo: "demorou"` não
+existe no fonte (é um ternário). Décima quarta vez nesta base. Cobre-se que o
+NOME exista como valor, não a forma da linha.
+
+**Testes:** `turno-assinado.test.ts` (a régua) · `historico-forjado.test.ts`
+(reescrito: a forja continua fechada E a resposta assinada volta) ·
+`chat-stream.test.ts` (a assinatura nos dois formatos) ·
+`foto-da-nutricao.test.ts` (as travas novas do endpoint).
