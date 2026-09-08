@@ -12,6 +12,7 @@ import {
   leituraDeHoje,
   serieDeChutes,
   tempoAte10,
+  ultimaContagem,
   type SessaoDeChutes,
 } from "@/lib/serie-de-chutes";
 
@@ -163,5 +164,79 @@ describe("⚠️ e o degrau da coluna nova — a gravação não pode parar por 
     /* A primeira tentativa leva a força; a segunda, a linha sem ela. */
     expect(corpo).toMatch(/insert\(\{ \.\.\.linha, strength: forca \}\)/);
     expect(corpo).toMatch(/insert\(linha\)/);
+  });
+});
+
+describe('⚠️ "A última" sai da ÚLTIMA SESSÃO REAL, e não do último ponto da série', () => {
+  /* O caso medido pela revisão adversarial: cinco contagens normais e a de
+     ONTEM com seis movimentos em duas horas. Antes, a fita mostrava os 11 min
+     de anteontem e a frase dizia "A última ficou dentro dele." — sossego
+     afirmativo sobre um dia que não era o último. */
+  const HISTORICO = [
+    sessao(1, 120, 6),
+    sessao(2, 11),
+    sessao(3, 9),
+    sessao(4, 13),
+    sessao(5, 10),
+    sessao(6, 12),
+  ];
+
+  test("a que não chegou a dez é a última, e ela é dita como INCOMPLETA", () => {
+    const u = ultimaContagem(HISTORICO)!;
+    expect(u.estado).toBe("incompleta");
+    expect(u.estado === "incompleta" && u.movimentos).toBe(6);
+    expect(u.em).toBe(HISTORICO[0].started_at);
+  });
+
+  test("⚠️ e o último PONTO da série continua sendo outro dia — as duas perguntas são diferentes", () => {
+    const serie = serieDeChutes(HISTORICO);
+    /* A série descarta a incompleta de propósito (ver `tempoAte10`). */
+    expect(serie[serie.length - 1].em).toBe(HISTORICO[1].started_at);
+    /* E é por isso que a leitura da série NÃO pode ser apresentada como "a
+       última" quando a última de verdade não fechou dez. */
+    expect(leituraDeHoje(serie, faixaPessoal(serie, 5))).toBe("dentro");
+  });
+
+  test("a ordem recebida não muda a resposta — crescente ou decrescente", () => {
+    const crescente = [...HISTORICO].reverse();
+    expect(ultimaContagem(crescente)).toEqual(ultimaContagem(HISTORICO));
+  });
+
+  test("com dez ou mais e duração usável, ela é COMPLETA e traz os minutos", () => {
+    const u = ultimaContagem([sessao(2, 11), sessao(1, 9)])!;
+    expect(u.estado).toBe("completa");
+    expect(u.estado === "completa" && u.minutos).toBe(9);
+  });
+
+  test("⚠️ doze movimentos numa sessão esquecida aberta NÃO viram 'não chegou a 10'", () => {
+    /* Ela sai da série pelo teto de duas horas, que é corte de OUTLIER — e
+       chamá-la de incompleta seria o app afirmando o contrário do que houve. */
+    const u = ultimaContagem([sessao(2, 11), sessao(1, 8 * 60, 12)])!;
+    expect(u.estado).toBe("sem-medida");
+  });
+
+  test("sessão ainda ABERTA não é a última — quem a mostra é o cronômetro", () => {
+    const aberta: SessaoDeChutes = { ...sessao(0, 10), ended_at: null };
+    const u = ultimaContagem([aberta, sessao(2, 11)])!;
+    expect(u.em).toBe(sessao(2, 11).started_at);
+  });
+
+  test("sem sessão nenhuma, não há última", () => {
+    expect(ultimaContagem([])).toBeNull();
+  });
+
+  test("⚠️ e a TELA não deriva 'a última' do último ponto da série", async () => {
+    /* O que se cobra é a GARANTIA, e não a grafia: a fita e a frase saem da
+       régua, e o último ponto da série não é usado como rótulo de "a última".
+       `.at(-1)` entra na proibição junto com o índice — as duas formas são o
+       mesmo defeito escrito de dois jeitos. */
+    const { readFileSync } = await import("node:fs");
+    const { semComentarios } = await import("@/lib/sem-comentarios");
+    const codigo = semComentarios(readFileSync("src/components/kicks-tab.tsx", "utf8"));
+    expect(codigo).toContain("ultimaContagem(history)");
+    expect(codigo).not.toMatch(/serie\s*\.at\(\s*-1\s*\)|serie\[serie\.length - 1\]/);
+    /* E a frase da leitura só sai quando a última contagem FECHOU dez —
+       sem esse portão, o sossego volta a falar do dia errado. */
+    expect(codigo).toMatch(/estado !== "completa"|estado === "completa"/);
   });
 });

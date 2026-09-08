@@ -400,13 +400,13 @@ export function HealthTab({
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-5">
         <div className="press glass-card glass-emerald rounded-3xl p-5">
-          <p className="font-serif text-[15px] font-semibold text-emerald-600">⚖️ Último peso</p>
+          <p className="font-serif text-[15px] font-semibold text-emerald-800">⚖️ Último peso</p>
           <p className="mt-2 font-serif text-3xl">
             {last?.weight_kg ? `${last.weight_kg} kg` : "—"}
           </p>
         </div>
         <div className="press glass-card glass-teal rounded-3xl p-5">
-          <p className="font-serif text-[15px] font-semibold text-teal-600">
+          <p className="font-serif text-[15px] font-semibold text-teal-800">
             📈 {ganhoDesdeOInicio ? "Ganho total" : "Ganho desde o 1º registro"}
           </p>
           <p className="mt-2 font-serif text-3xl">
@@ -417,7 +417,7 @@ export function HealthTab({
           className={`press rounded-3xl p-5 ${bpStatus?.color === "rose" ? "glass-card glass-rose" : bpStatus?.color === "amber" ? "glass-card glass-amber" : "glass-card glass-blue"}`}
         >
           <p
-            className={`font-serif text-[15px] font-semibold ${bpStatus?.color === "rose" ? "text-rose-600" : bpStatus?.color === "amber" ? "text-amber-600" : "text-blue-600"}`}
+            className={`font-serif text-[15px] font-semibold ${bpStatus?.color === "rose" ? "text-rose-700" : bpStatus?.color === "amber" ? "text-amber-800" : "text-blue-800"}`}
           >
             🩺 Última PA
           </p>
@@ -428,7 +428,7 @@ export function HealthTab({
           </p>
           {bpStatus && (
             <p
-              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-700" : bpStatus.color === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+              className={`mt-1 text-xs font-medium ${bpStatus.color === "rose" ? "text-rose-800" : bpStatus.color === "amber" ? "text-amber-900" : "text-emerald-800"}`}
             >
               {bpStatus.label}
             </p>
@@ -464,14 +464,14 @@ export function HealthTab({
               className={`press rounded-3xl p-5 ${gColor === "rose" ? "glass-card glass-rose" : gColor === "amber" ? "glass-card glass-amber" : "glass-card glass-sky"}`}
             >
               <p
-                className={`font-serif text-[15px] font-semibold ${gColor === "rose" ? "text-rose-600" : gColor === "amber" ? "text-amber-600" : "text-sky-600"}`}
+                className={`font-serif text-[15px] font-semibold ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-800" : "text-sky-800"}`}
               >
                 🍬 Glicemia
               </p>
               <p className="mt-2 font-serif text-3xl">{gv != null ? `${gv} mg/dL` : "—"}</p>
               {gLabel && (
                 <p
-                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-700" : gColor === "amber" ? "text-amber-700" : "text-emerald-700"}`}
+                  className={`mt-1 text-xs font-medium ${gColor === "rose" ? "text-rose-800" : gColor === "amber" ? "text-amber-900" : "text-emerald-800"}`}
                 >
                   {gLabel}
                 </p>

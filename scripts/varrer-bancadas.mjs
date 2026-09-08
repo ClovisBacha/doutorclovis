@@ -57,6 +57,7 @@ const EXTRAS = [
   "/preview-chutes?estado=luto",
   "/preview-chutes?estado=serie",
   "/preview-chutes?estado=instavel-historico",
+  "/preview-chutes?estado=ultima-incompleta",
   /* ⚠️ Sem DUM: a régua dos movimentos NÃO pode calar, e este era o estado
      impossível de fotografar — ele precisou de parâmetro próprio, porque o
      router descarta `?w=` antes de a bancada ver. */

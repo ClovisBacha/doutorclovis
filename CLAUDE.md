@@ -13872,3 +13872,350 @@ nenhum.
 · `&ferramenta=casa` (a geladeira) · `&tomados=...` · `&hora=3` (a madrugada) ·
 `?estado=foto` (a resposta da foto, que nasce de um seletor de arquivo e de uma
 chamada de visão).
+
+## A noite dos dois cronômetros: chutes, contrações, navegação e nutrição (set/2026)
+
+Pedido do dono para uma noite inteira, sem ele por perto: gráfico de evolução
+nos chutes, tudo o que dá para melhorar nas duas telas, **"exatamente adaptável
+para a semana"** nas contrações, azul nos chutes e laranja nas contrações,
+unificar diário/chutes/contrações/linha do tempo debaixo de um nome, e trazer o
+chat da nutrição para a frente com uma frase da semana dela. Na ordem que ele
+deu: **mapear, ver o que fica melhor, aplicar, e verificar.**
+
+O mapeamento foi uma pesquisa em fontes primárias (ACOG, NICE NG235, RCOG
+Green-top 57, SOGC 441, PSANZ/Stillbirth CRE, NICHD, March of Dimes, Diretriz
+Nacional de Assistência ao Parto Normal) mais uma auditoria de código. **Ele
+mudou o plano em quatro pontos**, e cada um está escrito abaixo com o número
+que o decidiu.
+
+### ⚠️ A TRILHA MANDAVA ESPERAR ANTES DE PROCURAR SOCORRO
+
+O primeiro achado não era de tela nenhuma: era do conteúdo. Quatro dias da
+jornada — 189, 206, 255 e 276, ou seja as semanas 27, 29, 36 e 39 — ensinavam o
+mesmo passo a passo diante de movimento fetal reduzido:
+
+> "coma algo, beba algo gelado, deite de lado e observe; **se ainda assim**
+> estiverem reduzidos, procure no mesmo dia".
+
+A frase parece cuidadosa e é o contrário: ela põe um degrau de espera entre a
+paciente PERCEBER a mudança e ela PEDIR AJUDA, na janela de maior risco de
+natimortalidade. E a diretriz é explícita sobre ESTE passo — PSANZ Rec. 2:
+_"presentation should not be delayed through efforts to stimulate the baby with
+food or drink"_. O Count the Kicks, que é o app de referência do gênero,
+RETIROU a mesma orientação do próprio material.
+
+⚠️ **E o app já dizia o certo no dia 290** ("não espere amanhecer nem tente
+truques em casa para o bebê acordar"): a régua existia e valia num dia só.
+
+`aula-nao-adia-socorro.test.ts` lê SÓ o que a aula apresenta como CERTO —
+texto, curiosidade, explicação e as alternativas do gabarito. ⚠️ O distrator
+errado PODE dizer "tomar algo gelado e esperar": é assim que a aula ensina que
+aquilo não se faz, e uma varredura sobre o arquivo inteiro reprovaria a aula
+consertada. ⚠️ E a afirmação viaja com o CONTEXTO (o enunciado da pergunta): a
+explicação que estava no ar não continha a palavra "movimento" — só o enunciado
+acima dela continha, e casando frase a frase a catraca passava verde exatamente
+sobre a frase que ela existe para pegar.
+
+### As contrações: a régua passou a ser OUTRA por semana gestacional
+
+⚠️ **1. O 5-1-1 NÃO É RECOMENDAÇÃO DE DIRETRIZ NENHUMA.** Lido nos três
+documentos: não está no FAQ da ACOG (que manda LIGAR, sem número), não está no
+NICE NG235 (que manda triagem POR TELEFONE, sem limiar) e não está na Diretriz
+Nacional, que usa DILATAÇÃO (4 cm) e nunca frequência. É convenção de
+maternidade, útil e amplamente ensinada. O app pode acompanhá-la; não pode
+chancelá-la — por isso ele a chama de **"o padrão combinado"**, e há teste
+cobrando a palavra.
+
+⚠️ **2. ANTES DE 37 SEMANAS A ACOG NÃO DÁ NÚMERO — DÁ "NÃO ESPERE":** _"If you
+have any signs or symptoms of preterm labor, do not wait. Call the office of
+your ob-gyn right away or go to the hospital."_ A tela escrevia **"Padrão
+normal"** para uma gestante de 28 semanas com contrações a cada 12 minutos.
+Numa gestação de alto risco o custo de uma frase de sossego é um corticoide que
+não foi dado. Hoje, antes do termo, **nenhum estado devolve palavra de
+sossego** — nem com a lista VAZIA, que é justamente quando a frase mais importa.
+
+⚠️ **3. O ALERTA MANDA LIGAR, NUNCA DIAGNOSTICA.** A versão no ar escrevia
+"Trabalho de parto ativo" e "⚠️ Vá para a maternidade agora" — as duas frases
+que o material do setor nomeia como as erradas (_"alerts should say call your
+provider, not go now or you are in active labor"_), porque fase ativa não se
+afirma sem exame do colo e porque a decisão entre ligar e ir é do serviço dela.
+`cronometro-nao-diagnostica.test.ts` RODA a régua em 208 cenários (13 padrões ×
+16 semanas) e lê o que ela DEVOLVE — foi uma catraca de TEXTO que deixou passar
+os dois defeitos que ele existe para impedir.
+
+⚠️ **4. A JANELA É DE 60 MINUTOS, e não "as últimas N contrações".** O "1"
+final do 5-1-1 quer dizer SUSTENTADO POR UMA HORA, e o piso do NICHD é por
+hora. Daí `naUltimaHora` e `sustentadoMin` — "elas estão vindo neste ritmo há
+60 min" é a informação que quase nenhum app do gênero mostra.
+
+**`faseDoCronometro`** divide em quatro: `sem-regua` (<20s, onde trabalho de
+parto prematuro nem é definido), `pre-termo`, `termo`, `pos-termo`.
+⚠️ **Sem DUM, ou com semana implausível, cai na régua de PRÉ-TERMO** — a
+assimetria de dano é clara (aplicar a régua de termo a uma de 30 semanas
+TRANQUILIZA quem precisa ligar; o contrário manda ligar quem já ia), e é o mesmo
+"não sei = o lado seguro" de `fichaResolvida` e `conjuntoDeBloqueio`.
+
+⚠️ **`sinalContracoesFrequentes` (6 em 60 min, NICHD) pega um caso que o
+intervalo NÃO vê:** seis contrações de 11 em 11 minutos cabem em 55 minutos. O
+intervalo diz 11 (não dispara); a contagem da hora diz 6 (dispara). O NICHD
+publica os dois lados do mesmo número, e eles não são a mesma conta perto do
+corte.
+
+⚠️ **E antes das 20 semanas o alerta CONTINUA, com outro texto.** O limite é o
+mesmo — quem o declara é `sinais-clinicos.ts` —, mas a nota daquela régua fala
+em prematuridade, e trabalho de parto prematuro é definido a partir de 20
+semanas. Numa gestante de 16, dizer "prematuridade" seria afirmar um quadro
+errado; o que não muda é a ação.
+
+**As quatro bandeiras vermelhas da ACOG ficam À VISTA o tempo todo** — bolsa
+rota sem contração, sangramento vivo, dor constante sem alívio, movimento
+reduzido. Nenhuma depende do cronômetro, e um cronômetro que só fala de
+intervalo ensina a esperar o padrão fechar enquanto sangra.
+
+**A fita da última hora** desenha barra = DURAÇÃO e vão = INTERVALO: os dois
+critérios que a ACOG ensina, lidos de uma vez, sem conta nenhuma. ⚠️ Ela NÃO é
+o `GraficoClinico` — aquele é série de VALOR (um ponto por medida); aqui cada
+contração ocupa um intervalo no eixo e o vão entre elas é metade da informação.
+
+### Os chutes: o gráfico é o TEMPO ATÉ 10, e a linha esperada é PLANA
+
+⚠️ **É a pesquisa que fixa o eixo.** Winje 2011 (n = 1786, contagem diária das
+28 semanas ao parto): a média fica em ~10 minutos e **não sobe** no terceiro
+trimestre — 9,43 min entre 28 e 31 semanas, 9,16 entre 32 e 36, 10,88 a partir
+de 37. Winje 2012 vai além: idade gestacional MAIOR associou-se a tempos mais
+CURTOS, _"refuting the wide-spread notion that fetal activity decreases in late
+pregnancy"_. Um gráfico com a faixa esperada SUBINDO ensinaria, com a autoridade
+de um desenho, o mito que a própria trilha chama de perigoso.
+
+⚠️ **E a régua da faixa é a MEDIANA DELA, nunca um corte populacional.** Winje
+aplicou os limiares publicados à população inteira: o de Moore (menos de 10 em
+2 h) tem sensibilidade de **5%** para desfecho subótimo e se associou apenas a
+sobrepeso materno; o de Kuwata (25/35 min) sobe para 44% e **dispara em 41% das
+gestações NORMAIS**. Por isso: quartis das últimas quatorze, faixa só a partir
+de CINCO contagens, e a leitura de hoje contra ela é um CONVITE A OLHAR — não
+pinta ponto de vermelho e não é gravidade.
+
+⚠️ **Só sessão que chegou a DEZ vira ponto.** Misturar "4 movimentos em 2 horas"
+como um ponto de 120 min INVERTE o sinal: o alarme viraria o ponto mais alto da
+série, lido como "o bebê está mais lento". E o mesmo teto de 120 min descarta a
+sessão esquecida aberta, que entraria como um ponto de oito horas.
+
+⚠️ **`sinalMovimentosReduzidos` CALAVA sem DUM — falha ABERTA no eixo que mais
+importa.** `if (s == null || ... || s < 28) return null`: sem semana cadastrada,
+ou com o perfil ainda carregando, a paciente contava DUAS HORAS com três
+movimentos e a tela não dizia nem o aviso nem o 192. ⚠️ E a assimetria com as
+réguas de prematuridade é deliberada: lá, sem semana, alarmar seria INVENTAR um
+quadro; aqui não há quadro a inventar — os dois limites (dez movimentos, duas
+horas) não dependem da semana, que só decide se a contagem já COMEÇOU.
+
+⚠️ **O caminho de socorro ficou na tela INTEIRA.** Ele nascia dentro do cartão
+vermelho — depois de duas horas E abaixo de dez. PSANZ Rec. 3, textual:
+_"subjective maternal concern about DFM overrides any definition of DFM based
+on numbers of fetal movements"_. A percepção dela ganha do número, então o botão
+não pode depender do número. ⚠️ É uma linha discreta, e não um segundo cartão
+vermelho: dois blocos de alarme apagam a hierarquia do que dispara de verdade.
+
+⚠️ **A SESSÃO SOBREVIVE a trocar de sub-tela, e o pior caminho era o do
+socorro.** `<Fade key={sub}>` desmonta a aba, e o botão do cartão vermelho troca
+de aba: o único caminho de contato DESTRUÍA a contagem de duas horas que
+produziu o alarme — a evidência que ela ia contar ao médico. ⚠️ A chave é
+`dc-chutes-sessao:<uid>` e NÃO leva o prefixo `dc-path-` (aquele viaja no blob
+da jornada e dispara um PUSH por gravação, e aqui a gravação é por toque); leva
+o id da conta (aparelho compartilhado); e vence em 4 horas — depois disso é
+abandono, não pausa.
+
+**A FORÇA passou a ser registrada** (Heazell 2017: redução de FREQUÊNCIA aOR
+2,97; redução de FORÇA aOR **2,53** — quase o mesmo peso, e o app só media a
+primeira). Três níveis, não a escala de 1 a 5 do Count the Kicks: a tela irmã já
+usa três, e duas escalas no mesmo hub ensinam a decodificar. ⚠️ "Mais fraco"
+NÃO vira alarme automático — seria um limiar clínico novo inventado fora de
+`sinais-clinicos.ts`; ele oferece o caminho de contato com a frase que a
+literatura sustenta.
+
+**26 semanas para OBSERVAR** (SOGC Guideline 441, nov/2023, que SUBSTITUI a de
+2007: _"regularly monitor fetal movements from 26 weeks... regardless of the
+technique"_). ⚠️ O piso NUMÉRICO continua em 28, onde ele nasceu (ACOG/PSANZ).
+
+⚠️ **No Modo Cuidado o ladrilho de Chutes sai das DUAS grades** — o convite
+acontecia antes do toque. O de Contrações FICA: quem perdeu a gestação pode
+estar em trabalho de parto. E o histórico não é apagado: é a memória dela.
+
+### ⚠️ O `.liquid-pulse` era um DISCO por cima do texto
+
+Medido no pixel: o "4" do contador dava **1,60:1** e "/ 10 chutes", **1,87** —
+o texto mais importante da tela era o menos legível dela, e nenhuma troca de cor
+de FUNDO consertaria, porque quem clareava não era o fundo.
+
+A causa: o pseudo-elemento é `radial-gradient(rgba(255,255,255,0.35), ...)` com
+`z-index: -1` dentro de um `isolation: isolate`. Descendente de z negativo pinta
+DEPOIS do fundo do pai e ANTES do conteúdo dele — ou seja, entre o fundo e a
+letra. E a animação começa em `scale(1)` com `opacity: 0.5`, com dois
+pseudo-elementos defasados em 1,3 s: um deles está sempre nessa metade da volta.
+
+Virou um **ANEL** (transparente até 62% do raio), que nasce fora do texto e
+cresce para fora — que é o que o pulso sempre quis desenhar. Vale para as duas
+telas de cronômetro.
+
+### ⚠️ AS QUATRO ARMADILHAS DE MEDIÇÃO DESTA NOITE
+
+O medidor de tela (`olhar.mjs`, no scratchpad) errou de quatro jeitos, e os
+quatro são reaproveitáveis:
+
+1. ⚠️ **Ler `ctx.fillStyle` de volta NÃO resolve cor nos formatos novos.** O
+   Chromium devolve `oklch(...)` igualzinho, o regex de `rgba(` não casa, e o
+   elemento é PULADO **em silêncio**. `text-primary-foreground` sumia da medição
+   inteira, e o botão com gradiente do contador "não existia". Resolver é PINTAR
+   o pixel (`fillRect` + `getImageData`) e ler o que foi pintado.
+2. ⚠️ **Gradiente vive em `background-image` e não aparece em
+   `backgroundColor`.** A pilha sobe até o branco da página e o texto branco de
+   um botão colorido mede 1,0 — reprovado por engano.
+3. ⚠️ **E a correção ingênua disso — amostrar um ANEL na borda da caixa — mente
+   em botão de canto redondo:** o fundo do PAI aparece nos cantos, e a primeira
+   versão mediu o rosa-100 do cartão atrás de um botão rosa-600. O que serve é a
+   **MÁSCARA DE GLIFO**: fotografa-se duas vezes, a segunda com `color:
+transparent`, e o fundo lido é o da segunda foto exatamente onde a primeira
+   difere dela. Canto redondo, gradiente, imagem e sombra saem certos por
+   construção.
+4. ⚠️ **RAIZ VAZIA É MEDIÇÃO QUE MENTE.** Com um seletor que casou o elemento
+   errado, oito estados da bancada saíram "0 erros, 0 contrastes, 0 alvos" — um
+   relatório perfeito sobre uma caixa sem texto nenhum. O medidor agora FALHA
+   ALTO quando a raiz não tem texto.
+
+⚠️ **E a foto é do ELEMENTO, não da página, quando a bancada é um `fixed
+inset-0` que rola por dentro:** `fullPage` fotografa o DOCUMENTO, e o que sai é
+o rodapé do site por baixo do overlay, com a tela cortada na metade.
+
+### ⚠️ A BANCADA DAS CONTRAÇÕES TINHA UM DEFEITO POR CONSTRUÇÃO
+
+A janela de análise é relativa ao RELÓGIO e a âncora dos dados era uma DATA
+FIXA. No dia em que ela foi escrita as duas coincidiam; três dias depois a
+janela ficou VAZIA e o banner de análise — o único lugar da tela com o botão do
+192, e a razão inteira de a bancada existir — parou de ser desenhado, em
+silêncio. Hoje ela crava as DUAS pontas (`bancada.agora`), e `analyzeContractions`
+recebe o "agora" como PARÂMETRO.
+
+⚠️ **E o estado "sem DUM" precisou de um parâmetro PRÓPRIO nas três bancadas.**
+Medido: o router DESCARTA `?w=` antes de `validateSearch` ver, e a URL volta
+normalizada com o padrão; `?w=sem` também não sobrevive à revalidação (a
+primeira passada nem chega como string). O estado que mais importa — a gestante
+sem semana — era impossível de fotografar. **`?semdum=1`** é booleano e
+sobrevive, pelo mesmo caminho do `?luto=`.
+
+### A navegação: uma tela, um voltar
+
+⚠️ **O QUE O DONO VIU ERA UM DEFEITO, e renomear não o consertava.** Vindo de
+Saúde → Chutes, a tela desenhava DUAS setas a poucos pixels uma da outra com
+destinos diferentes: a da barra de cima voltava para a Saúde e a de dentro do
+cabeçalho fazia `setSub(null)`, despejando na grade com Diário e Linha do tempo.
+Palavras dele: _"quando você clica pra voltar, ele abre uma outra aba com
+diário, com linha do tempo"_.
+
+⚠️ **E o conserto NÃO é a seta de dentro sumir sempre:** este hub também é
+aberto SEM `initialSub` (pelo ☰ e pelo mapa do app), e aí ela está certa.
+`veioDeFora` distingue "vim de fora" de "abri a grade", e deixa de valer assim
+que ela toca num ladrilho daqui.
+
+**"Registros" virou "Meu dia a dia"**, com o subtítulo nomeando as quatro. As
+colisões eram medidas: com a lista de peso/pressão/glicemia da aba Saúde ("✏️
+Ver e corrigir meus registros") e com o "Registros" do painel do médico; "Meu
+diário" colidiria com a sub-tela Diário lá dentro; "Acompanhamento" fica a uma
+letra de "Acompanhante", na mesma lista do ☰. ⚠️ A troca foi nome a nome e
+NUNCA por busca-e-troca cega — o painel do médico tem `rotulo="Registros"` e
+"Registros de saúde", e uma substituição global quebraria a tela clínica; o
+`tsc` cobre o resto, porque o rótulo É o tipo da aba.
+
+**As três portas que faltavam:** "Abrir meu diário" prometia o diário e
+entregava a grade; o subtítulo do ☰ omitia justamente a Linha do tempo (a função
+que ninguém sabe que existe); e a aba Saúde ganhou "🕘 Ver a minha linha do
+tempo" — ela lê cinco fontes e TRÊS são registradas ali, e nenhuma aba tinha
+link para ela.
+
+### A nutrição: a pergunta abre a aba, e a semana fala pelo bebê
+
+⚠️ **O que sobe para o topo é o CAMPO, e não a caixa de conversa inteira.** Ela
+tem 55vh; movida para cá, as quatro ferramentas — as portas mais usadas —
+cairiam abaixo da dobra. O placeholder é a pergunta que ela de fato faz: a
+dúvida dominante da gestante é de SEGURANÇA ("posso comer X?"), buscada online
+por 96% delas, e o que elas encontram é ruim (30% dos sites sem fonte nenhuma).
+
+**A frase da semana tem o BEBÊ como sujeito**, e isso não é tom: 81,5% das
+gestantes usam app de gestação para acompanhar o desenvolvimento FETAL, contra
+26,2% para nutrição. A nutrição pega carona no motor que já existe.
+
+As cinco proibições de `nutricao-da-semana.ts`, cada uma com dano documentado:
+nenhuma sugere SUPLEMENTO (quem indica é o profissional, e o checklist do app
+nasce do que o MÉDICO prescreveu); ⚠️ a do 1º trimestre não fala em FECHAR O
+TUBO NEURAL (ele fecha até ~28 dias pós-concepção, antes de muitas mulheres
+saberem que estão grávidas — na semana 8 aquilo vira culpa retroativa); nenhuma
+CALORIA, meta de peso ou dieta (uso regular de app de dieta se associa a hábitos
+problemáticos com comida, e ~13% das puérperas têm transtorno alimentar); nada
+no Modo Cuidado; e **sem semana conhecida, não há frase** — uma frase genérica
+com cara de personalizada ensina que o "para a sua semana" não quer dizer nada.
+
+### ⚠️ E as asserções que travavam a GRAFIA, de novo
+
+Quatro nesta noite, e as quatro reprovaram MELHORIAS: o `>= 2` do banner de
+análise (que saiu de propósito — antes do termo é com a lista VAZIA que a frase
+mais importa), duas âncoras de corte que mudaram de nome na reescrita, e
+`setActive({ startedAt:` com os dois pontos, quebrada quando o objeto passou à
+forma curta. **Décima terceira vez nesta base: cobre a GARANTIA, nunca a
+escrita.**
+
+⚠️ E a armadilha de substring mordeu mais uma: `duracao == null` aparece antes,
+dentro do objeto de medidas, então a âncora do RAMO precisa do `if (` junto.
+
+### ⚠️ "A ÚLTIMA" DESCREVIA UM DIA ANTERIOR — o achado da revisão adversarial
+
+Três lentes leram a noite inteira e um cético tentou refutar cada achado. Dois
+sobreviveram; este é o segundo, e ele estava na fita de estatísticas dos chutes.
+
+`serieDeChutes` descarta **de propósito** toda sessão que não chegou a dez (ver
+`tempoAte10`: misturar a de quatro movimentos em duas horas como "ponto de 120
+min" INVERTE o sinal do gráfico). Está certo para o GRÁFICO — e é falso para um
+cartão rotulado **"A última"**.
+
+Medido: histórico com doze contagens normais de 8 a 14 minutos e a sessão de
+ONTEM com seis movimentos em duas horas, que é exatamente o caso que dispara o
+alerta vermelho. A fita mostrava **"A última: 34 min"** (a contagem de
+anteontem) e a frase saía **"A última ficou dentro dele."** — reasseguramento
+afirmativo sobre um dia que não é o último, na tela que mede um dos nove
+sintomas VERMELHOS de `triage.ts`.
+
+- **A régua é `ultimaContagem` (`serie-de-chutes.ts`), e ela é PURA**: "a
+  última" é um RÓTULO, e a pergunta que ele faz ("qual foi a última contagem
+  que ela fez?") é diferente da que a série responde ("como está a tendência do
+  tempo até dez?"). Duas perguntas, duas funções.
+- ⚠️ **`kick_count < 10` é o que define "não fechou", NUNCA `tempoAte10` ser
+  nulo.** Uma sessão de doze movimentos esquecida aberta a noite inteira sai da
+  série pelo TETO de duas horas — é corte de OUTLIER —, e chamá-la de "não
+  chegou a 10" seria o app afirmando o contrário do que aconteceu. Ela cai num
+  terceiro estado, `sem-medida`: o cartão não mostra número e a frase se cala.
+- ⚠️ **A ordem é recalculada dentro da régua.** A série chega crescente e a
+  lista da tela chega DECRESCENTE; uma régua que confiasse na ordem recebida
+  rotularia o dia errado conforme o chamador.
+- ⚠️ **Sessão ainda ABERTA não é "a última"** — ela é a contagem em curso, e
+  quem a mostra é o cronômetro no alto. Repeti-la aqui seria a mesma contagem
+  descrita duas vezes, com dois sentidos.
+- **E a frase da leitura só sai quando a última FECHOU dez.** Sem esse portão,
+  o sossego volta a falar do dia errado por outro caminho.
+
+⚠️ **E A BANCADA NÃO TINHA COMO PROVAR ISTO.** No `?estado=historico` a sessão
+incompleta é a MAIS ANTIGA, então `ultimaContagem` ali é completa e o defeito
+não aparecia. `?estado=ultima-incompleta` é o caso medido, e entrou na varredura
+da CI — a varredura de disco abre só o padrão.
+
+⚠️ **E A FOTO PEGOU UM SEGUNDO DEFEITO, na própria bancada:** `SERIE` era
+CRESCENTE e o componente desenha a lista na ordem em que a recebe, enquanto
+`load()` pede `order("started_at", { ascending: false })`. A bancada mostrava o
+histórico de cabeça para baixo — um arranjo que a produção nunca produz. A fita
+do alto não denunciava, porque a régua reordena por conta própria.
+
+**Aplicar no Supabase:** `supabase/APLICAR_FORCA_DO_MOVIMENTO.sql`.
+
+**Bancadas novas:** `/preview-chutes?estado=serie` (doze contagens, o gráfico
+com a faixa) · `?estado=instavel-historico` · `?estado=alerta&semdum=1` ·
+`?estado=ultima-incompleta` (a última que não fechou dez) ·
+`/preview-contracoes?estado=cinco&w=39` (o 5-1-1 sustentado por uma hora) ·
+`?estado=seis&w=31` (seis em 55 min, o caso que separa as duas réguas do NICHD)
+· `?estado=parto&w=16` · `?estado=normal&w=41` · `?estado=normal&semdum=1` ·
+`/preview-nutricao?semdum=1`.

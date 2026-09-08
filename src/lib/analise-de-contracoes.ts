@@ -234,11 +234,39 @@ export function analyzeContractions(
       sustentadoMin: sustentado(inicios, 10),
     };
 
+  /* ─── OS CORTES DE INTERVALO E DURAÇÃO ────────────────────────────────────
+     Eles valem no termo e no pós-termo — e TAMBÉM quando a semana é
+     desconhecida, que é a correção mais importante desta régua.
+
+     ⚠️ **SEM DUM, A VERSÃO ANTERIOR TIRAVA O CAMINHO DE LIGAR DE UMA PACIENTE
+     EM TRABALHO DE PARTO.** `faseDoCronometro(null)` cai em `pre-termo` (o lado
+     seguro), as duas réguas de prematuridade devolvem `null` sem semana (de
+     propósito — elas não inventam um quadro), e o ramo de pré-termo respondia
+     sempre `atencao`. Medido: doze contrações na última hora, de 3 em 3
+     minutos, 70 s cada, numa gestante sem `lmp_date` — a versão anterior
+     devolvia `urgente` COM o botão do SAMU, e a nova devolvia
+     "Sem a sua semana, uso a régua mais cuidadosa". A régua mais cuidadosa
+     tinha ficado a MENOS cuidadosa exatamente onde importava.
+
+     ⚠️ E o texto continua não afirmando semana nenhuma: o que roda sem DUM são
+     os CORTES, que só escalam. */
+  const cortes = cortesDoPadrao({
+    intervalo,
+    duracao,
+    inicios,
+    naUltimaHora,
+    posTermo: fase === "pos-termo",
+    /* ⚠️ Sem DUM os cortes ESCALAM, mas o texto não pode citar o 5-1-1: ele é
+       o combinado do TERMO, e ela pode estar de trinta semanas. O que ela
+       precisa ler é o que fazer — ligar —, e não o nome de uma convenção que
+       talvez não valha para ela. */
+    semSemana: !semanaConhecida,
+  });
+
   if (fase === "pre-termo") {
-    /* ⚠️ Sem semana conhecida, `sinalContracoesPrematuras` devolve `null` de
-       propósito — ela não inventa prematuridade. Quem segura o lado seguro é
-       ESTE ramo: a régua de pré-termo continua valendo, e o texto não afirma
-       nenhuma semana. */
+    /* Se o padrão já é de trabalho de parto, o alerta vale — e ele vence o
+       texto de contexto, que continua embaixo para quem não chegou lá. */
+    if (!semanaConhecida && cortes && cortes.status !== "normal") return { ...medidas, ...cortes };
     return {
       ...medidas,
       status: "atencao",
@@ -252,65 +280,105 @@ export function analyzeContractions(
     };
   }
 
-  /* ─── TERMO E PÓS-TERMO ───────────────────────────────────────────────────
-     Aqui o 5-1-1 passa a fazer sentido — como o combinado que a maternidade
-     ensina, e sempre abaixo das bandeiras vermelhas, que a tela mostra o tempo
-     todo. Nenhum destes textos afirma fase do parto. */
-  const posTermo = fase === "pos-termo";
+  return { ...medidas, ...cortes };
+}
+
+/**
+ * Os cortes do padrão, no termo — e a razão de eles NÃO dependerem da duração
+ * para escalar.
+ *
+ * ⚠️ **A DURAÇÃO É A MEDIDA MENOS CONFIÁVEL DESTA TELA.** Quem a produz é uma
+ * mulher com dor: ela aperta "iniciar" tarde e "encerrar" cedo, e o erro é
+ * SEMPRE para menos. A versão anterior pendurava a escada inteira nela — todos
+ * os degraus exigiam `duracao >= 60 | 45 | 30` —, então bastava sub-cronometrar
+ * para tudo desabar até o `else`. Medido: **trinta contrações na última hora,
+ * de 1 em 1 minuto, cronometradas em 20 s, devolviam `normal` com o rótulo
+ * "Ainda espaçadas"** — uma afirmação factualmente falsa, numa caixa VERDE, a
+ * um centímetro do número "30 contrações na última hora".
+ *
+ * ⚠️ E sem NENHUMA contração encerrada — o caso comum de quem está com dor e só
+ * aperta um botão — a resposta era "Falta a duração: encerre as contrações para
+ * eu saber quanto tempo elas duram": o app com vinte contrações em mãos pedindo
+ * lição de casa. A régua de pré-termo, no mesmo arquivo, já declarava que NÃO
+ * exige contração encerrada; no termo tinha sido feito o oposto.
+ *
+ * ⚠️ O corte de 10 minutos NÃO é inventado aqui: é o mesmo "regular" que
+ * `sinalContracoesPrematuras` já usa, e ele entra só para IMPEDIR o verde —
+ * "ainda espaçadas" com um minuto de intervalo é falso em qualquer leitura.
+ */
+function cortesDoPadrao(o: {
+  intervalo: number;
+  duracao: number | null;
+  inicios: number[];
+  naUltimaHora: number;
+  posTermo: boolean;
+  semSemana?: boolean;
+}): {
+  status: AnaliseDeContracoes["status"];
+  label: string;
+  detail: string;
+  sustentadoMin: number | null;
+} {
+  const { intervalo, duracao, inicios, naUltimaHora, posTermo, semSemana } = o;
   const cauda = posTermo
     ? " A partir das 41 semanas quem decide é o acompanhamento do consultório, e não o padrão do cronômetro."
     : "";
+  const iv = Math.round(intervalo);
+  const dur = duracao == null ? "" : `, de cerca de ${Math.round(duracao)}s`;
+  const pedirDuracao =
+    duracao == null ? " Encerre as contrações para eu acompanhar também quanto elas duram." : "";
 
-  if (duracao == null)
+  if (intervalo <= 3 && duracao != null && duracao >= 60)
     return {
-      ...medidas,
-      status: "atencao",
-      label: "Falta a duração",
-      detail: `${frase(naUltimaHora)}, a cada ${Math.round(intervalo)} min. Encerre as contrações para eu saber quanto tempo elas duram.${cauda}`,
-      sustentadoMin: sustentado(inicios, 10),
-    };
-
-  if (intervalo <= 3 && duracao >= 60)
-    return {
-      ...medidas,
       status: "urgente",
       label: "⚠️ Ligue agora para o seu médico ou para a maternidade",
-      detail: `${frase(naUltimaHora)}, de cerca de ${Math.round(duracao)}s, a cada ${Math.round(intervalo)} min.${cauda}`,
+      detail: `${frase(naUltimaHora)}${dur}, a cada ${iv} min.${cauda}`,
       sustentadoMin: sustentado(inicios, 3),
     };
 
-  if (intervalo <= 5 && duracao >= 45) {
+  if (intervalo <= 5 && duracao != null && duracao >= 45) {
     const segurando = sustentado(inicios, 5);
     /* ⚠️ O "1" final do 5-1-1 quer dizer UMA HORA assim — e é justamente esse
        "há quanto tempo" que quase nenhum app do gênero mostra. */
     const fechou = segurando != null && segurando >= 60;
     return {
-      ...medidas,
       status: fechou ? "alerta" : "atencao",
-      label: fechou
-        ? "O padrão combinado (5-1-1) se manteve por uma hora — ligue para o consultório"
-        : "Perto do padrão combinado (5-1-1)",
-      detail: fechou
-        ? `${frase(naUltimaHora)}, de cerca de ${Math.round(duracao)}s, a cada ${Math.round(intervalo)} min.${cauda}`
-        : `${frase(naUltimaHora)}, de cerca de ${Math.round(duracao)}s, a cada ${Math.round(intervalo)} min. O combinado pede uma hora assim — está assim há ${segurando ?? 0} min.${cauda}`,
+      label: semSemana
+        ? "Elas estão vindo perto uma da outra — ligue para o seu médico"
+        : fechou
+          ? "O padrão combinado (5-1-1) se manteve por uma hora — ligue para o consultório"
+          : "Perto do padrão combinado (5-1-1)",
+      detail:
+        fechou || semSemana
+          ? `${frase(naUltimaHora)}${dur}, a cada ${iv} min.${cauda}`
+          : `${frase(naUltimaHora)}${dur}, a cada ${iv} min. O combinado pede uma hora assim — está assim há ${segurando ?? 0} min.${cauda}`,
       sustentadoMin: segurando,
     };
   }
 
-  if (intervalo <= 10 && duracao >= 30)
+  /* ⚠️ O INTERVALO SOZINHO JÁ ESCALA — ver o cabeçalho: a duração não pode ser
+     a única porta, porque ela é a medida que mais erra para menos. */
+  if (intervalo <= 5)
     return {
-      ...medidas,
+      status: "atencao",
+      label: "Elas estão vindo perto uma da outra",
+      detail: `${frase(naUltimaHora)}${dur}, a cada ${iv} min. Ligue para o consultório se elas seguirem assim.${pedirDuracao}${cauda}`,
+      sustentadoMin: sustentado(inicios, 5),
+    };
+
+  if (intervalo <= 10)
+    return {
       status: "atencao",
       label: "Estão ficando mais próximas",
-      detail: `${frase(naUltimaHora)}, de cerca de ${Math.round(duracao)}s, a cada ${Math.round(intervalo)} min. Em dúvida, ligue para o consultório.${cauda}`,
+      detail: `${frase(naUltimaHora)}${dur}, a cada ${iv} min. Em dúvida, ligue para o consultório.${pedirDuracao}${cauda}`,
       sustentadoMin: sustentado(inicios, 10),
     };
 
   return {
-    ...medidas,
+    /* Verde SÓ acima de dez minutos de intervalo, e nunca no pós-termo. */
     status: posTermo ? "atencao" : "normal",
     label: "Ainda espaçadas",
-    detail: `${frase(naUltimaHora)}, de cerca de ${Math.round(duracao)}s, a cada ${Math.round(intervalo)} min. Em dúvida, ligue para o consultório.${cauda}`,
+    detail: `${frase(naUltimaHora)}${dur}, a cada ${iv} min. Em dúvida, ligue para o consultório.${cauda}`,
     sustentadoMin: sustentado(inicios, 10),
   };
 }

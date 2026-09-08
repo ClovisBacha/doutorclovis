@@ -375,11 +375,17 @@ export function ContracoesTab({
         <div className={`rounded-2xl border p-4 ${statusStyle[analysis.status]}`}>
           <p className="font-semibold">{analysis.label}</p>
           <p className="mt-0.5 text-sm">{analysis.detail}</p>
-          {/* ⚠️ O verbo é LIGAR, e o primeiro telefone é o do médico DELA — o
-              192 fica ao lado, para o caso em que ela não alcança ninguém.
-              Aparece em `alerta` e `urgente`; nos outros a caixa é informação,
-              e um botão de emergência em toda pintura ensina a ignorá-lo. */}
-          {(analysis.status === "urgente" || analysis.status === "alerta") && (
+          {/* ⚠️ **O CAMINHO DO MÉDICO APARECE SEMPRE QUE A ANÁLISE NÃO É
+              "NORMAL" — e isto conserta um buraco medido.** Ele vivia atrás de
+              `urgente || alerta`, e o ramo de PRÉ-TERMO devolve sempre
+              `atencao`: a paciente lia "não espere fechar um padrão, ligue para
+              o seu médico" e não havia, na tela inteira, um telefone tocável.
+
+              ⚠️ E os dois botões NÃO são a mesma coisa: "falar com o meu
+              médico" é o verbo da régua e vale em toda faixa; o **192 continua
+              exclusivo do `urgente`**, porque um botão de emergência em toda
+              pintura ensina a ignorá-lo. */}
+          {analysis.status !== "normal" && (
             <div className="mt-3 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -388,12 +394,14 @@ export function ContracoesTab({
               >
                 Falar com o meu médico
               </button>
-              <a
-                href="tel:192"
-                className="press inline-flex h-11 items-center rounded-full border border-rose-300 bg-white px-4 font-semibold text-rose-800"
-              >
-                Ligar 192 (SAMU)
-              </a>
+              {analysis.status === "urgente" && (
+                <a
+                  href="tel:192"
+                  className="press inline-flex h-11 items-center rounded-full border border-rose-300 bg-white px-4 font-semibold text-rose-800"
+                >
+                  Ligar 192 (SAMU)
+                </a>
+              )}
             </div>
           )}
         </div>

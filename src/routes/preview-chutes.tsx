@@ -85,7 +85,23 @@ const SERIE: KickSession[] = [
   [60 * 24 * 3, 10, 11],
   [60 * 24 * 2, 10, 9],
   [60 * 24 * 1, 10, 34],
-].map(([h, c, d]) => sessao(h, c, d));
+]
+  .map(([h, c, d]) => sessao(h, c, d))
+  /* ⚠️ **DECRESCENTE, porque é assim que a produção entrega.** `load()` pede
+     `order("started_at", { ascending: false })` e o componente desenha a lista
+     na ordem em que a recebe: com a lista crescente, a bancada mostrava o
+     histórico de cabeça para baixo — um arranjo que o app nunca produz. A fita
+     do alto não muda (a régua reordena por conta própria), e é justamente por
+     isso que só a FOTO pegava. */
+  .reverse();
+
+/* ⚠️ **O CASO QUE A FITA EXISTE PARA NÃO ERRAR, e que nenhum outro estado
+   desta bancada produzia.** Doze contagens normais e a de ONTEM com seis
+   movimentos em duas horas — exatamente o que dispara o alerta vermelho. Antes
+   da régua `ultimaContagem`, "A última" mostrava os 34 min de anteontem e a
+   frase dizia "A última ficou dentro dele.". No `HISTORICO` a incompleta é a
+   MAIS ANTIGA, então ela nunca provou nada disto. */
+const ULTIMA_INCOMPLETA: KickSession[] = [sessao(60 * 20, 6, 120), ...SERIE];
 
 const HISTORICO: KickSession[] = [
   sessao(60 * 20, 10, 24),
@@ -118,7 +134,9 @@ function Pagina() {
               ? { history: HISTORICO }
               : estado === "serie"
                 ? { history: SERIE }
-                : { history: [] };
+                : estado === "ultima-incompleta"
+                  ? { history: ULTIMA_INCOMPLETA }
+                  : { history: [] };
 
   return (
     <div className="mx-auto max-w-lg px-4 py-6">

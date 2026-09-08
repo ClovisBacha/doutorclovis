@@ -35,6 +35,7 @@ import {
   FRASE_DA_LINHA_PLANA,
   leituraDeHoje,
   serieDeChutes,
+  ultimaContagem,
 } from "@/lib/serie-de-chutes";
 import { guardarSessao, lerSessao } from "@/lib/sessao-guardada";
 import { sinalMovimentosReduzidos } from "@/lib/sinais-clinicos";
@@ -144,7 +145,7 @@ export function KicksTab({
     const { data, error } = await (supabase as any)
       .from("kick_sessions")
       /* Só o que a tela lê: `select("*")` trazia `user_id` e `created_at`. */
-      .select("id, started_at, ended_at, kick_count")
+      .select("id, started_at, ended_at, kick_count, strength")
       .not("ended_at", "is", null)
       .gte("started_at", desde)
       .order("started_at", { ascending: false })
@@ -314,7 +315,12 @@ export function KicksTab({
   const serie = serieDeChutes(history);
   const faixa = faixaPessoal(serie);
   const leitura = leituraDeHoje(serie, faixa);
-  const ultimo = serie.length ? serie[serie.length - 1] : null;
+  /* ⚠️ **"A última" NÃO é o último ponto da série.** A série descarta de
+     propósito toda contagem que não chegou a dez, e um cartão rotulado "A
+     última" apresentando um dia anterior é reasseguramento sobre o dia errado
+     — na tela que mede um dos nove sintomas VERMELHOS. A régua está em
+     `serie-de-chutes.ts`, com o caso medido. */
+  const ultima = ultimaContagem(history);
 
   /* Modo Cuidado: a aba inteira se cala. Ela oferecia "conte 10
      movimentos de {nome do bebê}" — o convite mais doloroso possível para
@@ -534,8 +540,20 @@ export function KicksTab({
             <div>
               <p className="text-[13px] font-medium text-sky-800">A última</p>
               <p className="mt-1 font-serif text-2xl tabular-nums">
-                {ultimo ? Math.round(ultimo.valor) : "—"}
-                {ultimo && <span className="ml-1 text-sm font-normal">min</span>}
+                {/* ⚠️ A que não fechou dez mostra os MOVIMENTOS, e não um
+                    tempo: ela não tem tempo até dez, e herdar o de outro dia
+                    era o defeito. A unidade ao lado é o que separa os dois. */}
+                {ultima?.estado === "completa"
+                  ? Math.round(ultima.minutos)
+                  : ultima?.estado === "incompleta"
+                    ? ultima.movimentos
+                    : "—"}
+                {ultima?.estado === "completa" && (
+                  <span className="ml-1 text-sm font-normal">min</span>
+                )}
+                {ultima?.estado === "incompleta" && (
+                  <span className="ml-1 text-sm font-normal">mov</span>
+                )}
               </p>
             </div>
             <div>
@@ -551,13 +569,21 @@ export function KicksTab({
             {faixa
               ? `Mediana de ${Math.round(faixa.mediana)} min em ${faixa.sessoes} contagens, nos últimos 90 dias.`
               : "Preciso de umas 5 contagens completas para saber qual é o seu normal."}{" "}
-            {leitura === "acima"
-              ? "A última ficou acima dele."
-              : leitura === "abaixo"
-                ? "A última ficou abaixo dele."
-                : leitura === "dentro"
-                  ? "A última ficou dentro dele."
-                  : ""}
+            {/* ⚠️ A leitura da série SÓ é dita quando a última contagem real é
+                a mesma que fechou o último ponto. Quando ela não chegou a dez,
+                o que a paciente precisa ler é isso — e nunca um "ficou dentro
+                do normal" sobre um dia anterior. */}
+            {ultima?.estado === "incompleta"
+              ? `A última contagem parou em ${ultima.movimentos} ${ultima.movimentos === 1 ? "movimento" : "movimentos"} e não chegou a 10, então ela não entra nessa conta.`
+              : ultima?.estado !== "completa"
+                ? ""
+                : leitura === "acima"
+                  ? "A última ficou acima dele."
+                  : leitura === "abaixo"
+                    ? "A última ficou abaixo dele."
+                    : leitura === "dentro"
+                      ? "A última ficou dentro dele."
+                      : ""}
           </p>
         </div>
       )}
@@ -626,6 +652,21 @@ export function KicksTab({
                 ) : (
                   <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
                     {s.kick_count}
+                  </span>
+                )}
+                {/* ⚠️ A FORÇA É LIDA AQUI, e isto não é enfeite: sem um leitor,
+                    a coluna seria escrita e nunca vista — a corrente quebrada
+                    que este repositório já pagou meia dúzia de vezes. É o eixo
+                    com aOR 2,53 para desfecho ruim, e é comparando com as
+                    outras noites que ela percebe a MUDANÇA. */}
+                {s.strength === 1 && (
+                  <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900">
+                    mais fraco
+                  </span>
+                )}
+                {s.strength === 3 && (
+                  <span className="rounded-full bg-sky-100 px-2 py-0.5 text-xs text-sky-900">
+                    mais forte
                   </span>
                 )}
                 {/* O minuto é o dado da série — ele vem por último e alinhado à

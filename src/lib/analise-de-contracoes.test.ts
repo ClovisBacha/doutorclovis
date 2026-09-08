@@ -206,10 +206,43 @@ describe("os cortes de trabalho de parto, a partir das 37 semanas", () => {
     expect(r.label).toBe("Ainda espaçadas");
   });
 
-  test("sem duração nenhuma, ela pede o encerramento em vez de afirmar padrão", () => {
-    const lista = comIntervalos([6]).map((c) => ({ ...c, ended_at: null }));
+  test("⚠️ SEM DURAÇÃO NENHUMA, o INTERVALO ainda escala — e ela não vira 'normal'", () => {
+    /* A duração é a medida menos confiável desta tela: quem a produz é uma
+       mulher com dor, que aperta "iniciar" tarde e "encerrar" cedo, e o erro é
+       SEMPRE para menos. A versão anterior pendurava a escada inteira nela —
+       com nenhuma contração encerrada, a resposta era "Falta a duração:
+       encerre as contrações", o app com vinte contrações em mãos pedindo lição
+       de casa. */
+    const lista = comIntervalos([2, 2, 2, 2]).map((c) => ({ ...c, ended_at: null }));
     const r = analisar(lista, 39);
-    expect(r.label).toContain("Falta a duração");
+    expect(r.status).toBe("atencao");
+    expect(r.label).toContain("perto uma da outra");
+    /* E ela continua PEDINDO a duração — só que como nota, e não como resposta. */
+    expect(r.detail).toContain("quanto elas duram");
+  });
+
+  test("⚠️ e trinta contrações de 1 em 1 minuto NUNCA são 'ainda espaçadas'", () => {
+    /* Medido na versão anterior: 30 na última hora, cronometradas em 20s,
+       devolviam `normal` com o rótulo "Ainda espaçadas" — uma afirmação
+       factualmente falsa numa caixa VERDE. O corte de 10 min não é inventado
+       aqui: é o mesmo "regular" que `sinalContracoesPrematuras` já usa. */
+    const r = analisar(comIntervalos(Array(29).fill(1), 20), 39);
+    expect(r.status).not.toBe("normal");
+    expect(r.label).not.toContain("espaçadas");
+  });
+
+  test("⚠️ e SEM DUM o padrão de trabalho de parto volta a mandar LIGAR", () => {
+    /* A régua "mais cuidadosa" tinha ficado a MENOS cuidadosa: `pre-termo`
+       respondia sempre `atencao`, e as duas réguas de prematuridade calam sem
+       semana de propósito. Doze contrações de 3 em 3 minutos, 70s cada. */
+    const r = analisar(comIntervalos(Array(11).fill(3), 70), null);
+    expect(r.status).toBe("urgente");
+    expect(r.label).toContain("Ligue");
+    /* ⚠️ E o texto NÃO cita o 5-1-1: é o combinado do TERMO, e ela pode estar
+       de trinta semanas. */
+    const cinco = analisar(comIntervalos(Array(13).fill(5), 50), null);
+    expect(cinco.status).not.toBe("normal");
+    expect(`${cinco.label} ${cinco.detail}`).not.toContain("5-1-1");
   });
 });
 

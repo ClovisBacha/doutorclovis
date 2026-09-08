@@ -157,3 +157,53 @@ export function leituraDeHoje(pontos: PontoDaSerie[], faixa: FaixaPessoal | null
  */
 export const FRASE_DA_LINHA_PLANA =
   "Em uma gestação saudável esta linha fica plana. O bebê não se mexe menos perto do fim — ele muda o jeito de se mexer.";
+
+/**
+ * ⚠️ **"A ÚLTIMA" É UM RÓTULO, E NÃO UM PONTO DA SÉRIE — e confundir os dois
+ * fazia a tela dar sossego sobre um dia que não era o último.**
+ *
+ * `serieDeChutes` descarta de propósito toda sessão que não chegou a dez
+ * (ver `tempoAte10`): está certo para o GRÁFICO, e é falso para um cartão
+ * escrito "A última". Medido: histórico com cinco contagens normais de 9 a 13
+ * minutos e a sessão de ONTEM com seis movimentos em duas horas — exatamente o
+ * caso que dispara o alerta vermelho — e a fita mostrava "A última: 11 min"
+ * (a contagem de dois dias antes) com a frase "A última ficou dentro dele.".
+ * Reasseguramento afirmativo, na tela que mede um dos nove sintomas VERMELHOS.
+ *
+ * ⚠️ **`kick_count < 10` É O QUE DEFINE "não fechou", e nunca `tempoAte10ser
+ * nulo`.** Uma sessão de doze movimentos esquecida aberta a noite inteira sai
+ * da série pelo TETO (é outlier), e chamá-la de "não chegou a 10" seria o app
+ * afirmando o contrário do que aconteceu. Ela cai em `sem-medida`: o cartão
+ * não mostra número e a frase se cala — que é a única coisa verdadeira a
+ * dizer sobre uma duração que não dá para usar.
+ *
+ * ⚠️ **A ORDEM É RECALCULADA AQUI, e não herdada de quem chama.** A série
+ * chega crescente e a lista da tela chega DECRESCENTE; uma régua que confiasse
+ * na ordem recebida rotularia o dia errado conforme o chamador.
+ *
+ * ⚠️ **Sessão ainda ABERTA não é "a última".** Ela é a contagem em curso, e
+ * quem a mostra é o cronômetro no alto da tela — repeti-la aqui como um fato
+ * encerrado seria a mesma contagem descrita duas vezes, com dois sentidos.
+ */
+export type UltimaContagem =
+  | { estado: "completa"; em: string; minutos: number }
+  | { estado: "incompleta"; em: string; movimentos: number }
+  | { estado: "sem-medida"; em: string };
+
+export function ultimaContagem(sessoes: SessaoDeChutes[]): UltimaContagem | null {
+  let ultima: SessaoDeChutes | null = null;
+  for (const s of sessoes) {
+    if (!s.ended_at) continue;
+    const t = new Date(s.started_at).getTime();
+    if (!Number.isFinite(t)) continue;
+    if (!ultima || t > new Date(ultima.started_at).getTime()) ultima = s;
+  }
+  if (!ultima) return null;
+
+  const movimentos = Number.isFinite(ultima.kick_count) ? Math.max(0, ultima.kick_count) : 0;
+  if (movimentos < 10) return { estado: "incompleta", em: ultima.started_at, movimentos };
+
+  const minutos = tempoAte10(ultima);
+  if (minutos == null) return { estado: "sem-medida", em: ultima.started_at };
+  return { estado: "completa", em: ultima.started_at, minutos };
+}

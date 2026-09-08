@@ -258,13 +258,17 @@ describe("contrações regulares antes das 37 semanas", () => {
       return j;
     };
     const regua = onde("sinalContracoesPrematuras(");
-    /* Antes dos cortes de trabalho de parto… */
-    expect(regua).toBeLessThan(onde("intervalo <= 3"));
-    /* …e antes do único ramo que exige contração TERMINADA, que é o que a
-       barrava com a segunda contração ainda em curso. */
-    /* ⚠️ `if (duracao == null)` COM O `if`: a expressão solta `duracao == null`
-       aparece antes, dentro do objeto de medidas, e ancorar nela media a
-       ocorrência errada — a armadilha de substring, pela enésima vez. */
-    expect(regua).toBeLessThan(onde("if (duracao == null)"));
+    /* Antes dos cortes de trabalho de parto — que hoje moram numa função
+       PRÓPRIA (`cortesDoPadrao`), porque eles também rodam quando a semana é
+       desconhecida. O que se cobra continua sendo a ORDEM. */
+    expect(regua).toBeLessThan(onde("cortesDoPadrao({"));
+    /* ⚠️ E NENHUM ramo exige mais contração TERMINADA para escalar — era isso
+       que barrava o alerta com a segunda contração ainda em curso, e o defeito
+       tinha voltado pelo lado do TERMO, onde os três degraus pediam
+       `duracao >= 60 | 45 | 30`. Hoje o intervalo sozinho já escala, e o que se
+       cobra é isso: existem cortes que olham SÓ o intervalo. */
+    const cortes = arq.slice(arq.indexOf("function cortesDoPadrao("));
+    expect(cortes).toContain("if (intervalo <= 5)");
+    expect(cortes).toContain("if (intervalo <= 10)");
   });
 });
