@@ -108,8 +108,20 @@ jobs:
       # verdade ele é ignorado junto.
       # Nada aqui usa o Chrome da Google: o navegador é o Chromium do
       # Playwright, baixado do CDN dele.
-      - name: Tira a fonte apt da Google (ela não é usada aqui)
-        run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
+      # ⚠️ POR CONTEÚDO, e nunca pelo nome do arquivo: a primeira tentativa
+      # apagou `google-chrome*.list` e o job caiu igual — o runner declara a
+      # fonte noutro arquivo (o formato `deb822` usa `.sources`). Apagar pelo
+      # nome é adivinhar; procurar o HOST é medir. E o passo CONFERE que não
+      # sobrou nenhuma, senão ele "passaria" sem ter feito nada — falha aberta
+      # num passo cujo trabalho inteiro é remover uma coisa.
+      - name: Tira as fontes apt da Google (não são usadas aqui)
+        run: |
+          for f in $(sudo grep -rl 'dl\.google\.com' /etc/apt/sources.list.d /etc/apt/sources.list 2>/dev/null); do
+            echo "removendo $f"; sudo rm -f "$f"
+          done
+          if sudo grep -rq 'dl\.google\.com' /etc/apt/sources.list.d /etc/apt/sources.list 2>/dev/null; then
+            echo "ainda há fonte apt apontando para dl.google.com"; exit 1
+          fi
       - run: bunx playwright install --with-deps chromium
 
       # ⚠️ O servidor de DESENVOLVIMENTO, e não o build: o build gera
