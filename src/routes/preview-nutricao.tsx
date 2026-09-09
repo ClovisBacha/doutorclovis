@@ -87,6 +87,12 @@ export const Route = createFileRoute("/preview-nutricao")({
        seja só existe depois de uma conversa de verdade contra o banco. `-1` é
        "não sei", que é o estado em que a linha não aparece. */
     amostra: q.amostra == null || q.amostra === "" ? -1 : Number(q.amostra),
+    /* ⚠️ O PÓS-PARTO: `?pos=N` são os dias de vida do bebê. A tela deriva a
+       idade de `birth_date` contra HOJE, e cravar só a data faria a frase
+       mudar a cada semana (a armadilha da bancada das contrações) — então as
+       DUAS pontas são cravadas: nascimento fixo, e `hoje` = nascimento + N.
+       `-1` é "não pariu". */
+    pos: q.pos == null || q.pos === "" ? -1 : Number(q.pos),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -172,8 +178,14 @@ function Pagina() {
     painel,
     bloqueio,
     amostra,
+    pos,
   } = Route.useSearch();
   const w = semdum ? null : wBruto;
+  /* Nascimento fixo; o "hoje" anda com `pos`. Os dois em UTC para a soma de
+     dias não atravessar horário de verão. */
+  const NASCIMENTO = "2026-08-01";
+  const hojeDoPos =
+    pos >= 0 ? new Date(Date.UTC(2026, 7, 1 + pos)).toISOString().slice(0, 10) : undefined;
 
   const bancada =
     estado === "foto"
@@ -211,6 +223,7 @@ function Pagina() {
       | "teto_diario"
       | undefined,
     amostra: amostra >= 0 ? amostra : undefined,
+    hoje: hojeDoPos,
   };
 
   return (
@@ -220,6 +233,7 @@ function Pagina() {
         {luto ? " · Modo Cuidado" : ""}
         {hora >= 0 ? ` · ${String(hora).padStart(2, "0")}h` : ""}
         {receita ? " · com prescrição" : ""}
+        {pos >= 0 ? ` · bebê com ${pos} dias` : ""}
       </p>
       <NutricaoTab
         /* ⚠️ `gest` NULO quando a semana falta — é assim que a produção chega
@@ -232,6 +246,7 @@ function Pagina() {
             display_name: "Ana Souza",
             baby_name: "Helena",
             medications: receita || null,
+            birth_date: pos >= 0 ? NASCIMENTO : null,
             lmp_date: null,
             due_date: null,
             reference_date: null,

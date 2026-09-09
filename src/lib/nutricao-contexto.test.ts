@@ -1,0 +1,114 @@
+/**
+ * A PACIENTE QUE A PRODUÇÃO TEM E A MÁQUINA DE DESENVOLVIMENTO NÃO: a que
+ * pariu há vinte dias com a DUM ainda no perfil.
+ *
+ * ⚠️ Este teste RODA o adaptador puro com essa linha. Antes dele, o prompt da
+ * nutricionista dizia "Está na semana 42 da gestação (3º trimestre)" para uma
+ * mulher com o bebê no colo — medido em set/2026 — e nenhum teste de texto
+ * tinha como pegar, porque o defeito só existe numa combinação de colunas.
+ */
+import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+
+import { blocoDaPaciente } from "./nutricao-perfil";
+import { perfilNutricionalDe } from "./nutricao-contexto";
+import { nutricaoDoPosParto } from "./nutricao-da-semana";
+import { semComentarios } from "./sem-comentarios";
+
+const AGORA = new Date("2026-09-09T15:00:00");
+const dias = (n: number) => {
+  const d = new Date(AGORA);
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/* DUM a 300 dias: `computeGestation` devolve a semana 42 (o teto dela). */
+const PARIU = { lmp_date: dias(300), birth_date: dias(20), allergies: "camarão" };
+
+describe("⚠️ a nutricionista sabe que ela pariu", () => {
+  test("com `birth_date`, a gestação é nula e o pós-parto entra com a idade do bebê", () => {
+    const p = perfilNutricionalDe({ perfil: PARIU, logs: [], careMode: false, agora: AGORA });
+    expect(p.posParto).toBe(true);
+    expect(p.diasDoBebe).toBe(20);
+    expect(p.semanas).toBeNull();
+    expect(p.trimestre).toBeNull();
+    /* E a alergia continua sendo a primeira coisa. */
+    expect(p.alergias).toBe("camarão");
+  });
+
+  test("⚠️ o prompt não diz mais 'semana 42 da gestação' — diz puerpério", () => {
+    const bloco = blocoDaPaciente(
+      perfilNutricionalDe({ perfil: PARIU, logs: [], careMode: false, agora: AGORA }),
+    );
+    expect(bloco).not.toMatch(/semana 42|3º trimestre/);
+    expect(bloco).toMatch(/JÁ TEVE O BEBÊ.*o bebê tem 2 semanas/);
+    expect(bloco).toMatch(/ALERGIAS/);
+  });
+
+  test("e a frase da tela para o mesmo caso não é a da reta final", () => {
+    expect(nutricaoDoPosParto(20)!.titulo).not.toMatch(/ganhando peso para nascer/);
+  });
+
+  test("sem `birth_date`, a gestação continua em curso", () => {
+    const p = perfilNutricionalDe({
+      perfil: { lmp_date: dias(140) },
+      logs: [],
+      careMode: false,
+      agora: AGORA,
+    });
+    expect(p.posParto).toBe(false);
+    expect(p.semanas).toBe(20);
+    expect(p.trimestre).toBe(2);
+  });
+
+  test("⚠️ o LUTO vence: `birth_date` preenchida num natimorto NÃO vira pós-parto", () => {
+    const p = perfilNutricionalDe({ perfil: PARIU, logs: [], careMode: true, agora: AGORA });
+    expect(p.posParto).toBe(false);
+    expect(p.diasDoBebe).toBeNull();
+    expect(p.semanas).toBeNull();
+    expect(blocoDaPaciente(p)).not.toMatch(/beb[êe]|amament|semana/i);
+  });
+
+  test("data de nascimento no FUTURO (erro de digitação) não vira idade negativa", () => {
+    const p = perfilNutricionalDe({
+      perfil: { birth_date: dias(-5) },
+      logs: [],
+      careMode: false,
+      agora: AGORA,
+    });
+    expect(p.posParto).toBe(true);
+    expect(p.diasDoBebe).toBeNull();
+  });
+});
+
+describe("⚠️ as pontas que a régua não alcança", () => {
+  const SERVIDOR = semComentarios(readFileSync("src/lib/nutricao-contexto.server.ts", "utf8"));
+  const TELA = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+
+  test("o servidor PEDE `birth_date`, com degrau para o banco sem a coluna", () => {
+    expect(SERVIDOR).toMatch(/birth_date/);
+    expect(SERVIDOR).toMatch(/colunaAusente\(perfilCheio\?\.error\)/);
+    expect(SERVIDOR).toMatch(/replace\(",birth_date", ""\)/);
+    /* E o que ele monta passa pela régua pura — nunca uma segunda versão dela. */
+    expect(SERVIDOR).toMatch(/perfilNutricionalDe\(\{ perfil, logs, careMode, agora \}\)/);
+  });
+
+  test("a tela deriva o pós-parto de `birth_date` e troca a frase, a saudação e o foco", () => {
+    expect(TELA).toMatch(/const posParto = !careMode && !!profile\?\.birth_date/);
+    expect(TELA).toMatch(/nutricaoDoPosParto\(diasDoBebe, careMode\)/);
+    expect(TELA).toMatch(/nutricionista virtual para o pós-parto/);
+    expect(TELA).toMatch(/Orientações para o seu pós-parto/);
+    /* "Foco do 3º trimestre" não aparece para quem já pariu. */
+    expect(TELA).toMatch(
+      /\{!careMode && !posParto && \(\s*<section aria-label="Nutrientes em foco"/,
+    );
+  });
+
+  test("⚠️ os dois prompts de sistema conhecem a puérpera", () => {
+    const API = readFileSync("src/routes/api/nutrition.ts", "utf8");
+    const FOTO = readFileSync("src/lib/foto-da-nutricao.ts", "utf8");
+    expect(API).toMatch(/gestantes e puérperas/);
+    expect(API).toMatch(/JÁ TEVE O BEBÊ/);
+    expect(FOTO).toMatch(/JÁ TEVE O BEBÊ/);
+  });
+});

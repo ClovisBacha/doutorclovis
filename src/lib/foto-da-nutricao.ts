@@ -89,6 +89,7 @@ const COMUM = [
   "- Não julgue o que ela comeu. Ninguém precisa de nota pela refeição de ontem.",
   "- Frases curtas, tom de quem está do lado dela. Sem markdown pesado, sem tabela.",
   "- Se a foto não mostrar o que foi pedido, diga isso em uma linha e peça outra foto.",
+  "- Se o que você sabe dela disser que ela JÁ TEVE O BEBÊ, fale para o pós-parto (e para a amamentação só se ela amamentar), nunca como se ainda estivesse grávida.",
 ].join("\n");
 
 /**

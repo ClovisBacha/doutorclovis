@@ -14,11 +14,19 @@
  * `consultorioDaPaciente`, que já falha FECHADO (não sei = luto). Uma segunda
  * leitura do mesmo campo poderia discordar da primeira.
  */
-import { blocoDaPaciente, type PerfilNutricional } from "./nutricao-perfil";
-import { imcPreGestacional } from "./curva-de-ganho";
+import { blocoDaPaciente } from "./nutricao-perfil";
+import { perfilNutricionalDe, type LinhaDeSaude, type LinhaDoPerfil } from "./nutricao-contexto";
+import { colunaAusente } from "./postgrest";
 
 /** 30 dias: o suficiente para um padrão glicêmico, curto o bastante para ser o agora. */
 const JANELA_DIAS = 30;
+
+/* ⚠️ `birth_date` nasceu numa migration posterior (`20260608210000_postpartum`).
+   Num banco sem ela o select inteiro voltaria 42703 e a nutricionista perderia
+   a ALERGIA por causa de uma coluna que ela nem precisava — daí o degrau. */
+const COLUNAS_DO_PERFIL =
+  "allergies,medications,height_cm,pre_pregnancy_weight_kg,prior_gestational_diabetes," +
+  "lmp_date,reference_date,reference_weeks,reference_days,birth_date";
 
 export async function blocoDaNutricao(
   patientId: string,
@@ -27,20 +35,18 @@ export async function blocoDaNutricao(
 ): Promise<string> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { sinalGlicemia } = await import("./sinais-clinicos");
-    const { computeGestation, trimesterForWeek } = await import("./gestacao");
     const desde = new Date(agora.getTime() - JANELA_DIAS * 86400000).toISOString().slice(0, 10);
 
-    /* Duas leituras independentes, uma onda só. */
-    const [perfilRes, logsRes] = await Promise.all([
+    const lerPerfil = (colunas: string) =>
       (supabaseAdmin as any)
         .from("patient_profiles")
-        .select(
-          "allergies,medications,height_cm,pre_pregnancy_weight_kg,prior_gestational_diabetes," +
-            "lmp_date,reference_date,reference_weeks,reference_days",
-        )
+        .select(colunas)
         .eq("id", patientId)
-        .maybeSingle(),
+        .maybeSingle();
+
+    /* Duas leituras independentes, uma onda só. */
+    const [perfilCheio, logsRes] = await Promise.all([
+      lerPerfil(COLUNAS_DO_PERFIL),
       (supabaseAdmin as any)
         .from("health_logs")
         .select("log_date,weight_kg,glucose_mg_dl")
@@ -49,6 +55,9 @@ export async function blocoDaNutricao(
         .order("log_date", { ascending: false })
         .limit(60),
     ]);
+    const perfilRes = colunaAusente(perfilCheio?.error)
+      ? await lerPerfil(COLUNAS_DO_PERFIL.replace(",birth_date", ""))
+      : perfilCheio;
 
     /* ⚠️ O perfil falhando cala TUDO: sem ele não há alergia, e um bloco sem a
        alergia é justamente o que faz este recurso existir. O histórico falhando
@@ -57,62 +66,14 @@ export async function blocoDaNutricao(
       console.error("[nutricao] perfil ilegível — respondendo sem contexto", perfilRes.error);
       return "";
     }
-    const perfil = perfilRes?.data as Record<string, unknown> | null;
+    const perfil = perfilRes?.data as LinhaDoPerfil | null;
     if (!perfil) return "";
 
-    const gest = careMode
-      ? null
-      : computeGestation({
-          lmp: perfil.lmp_date as string | null,
-          referenceDate: perfil.reference_date as string | null,
-          referenceWeeks: perfil.reference_weeks as number | null,
-          referenceDays: perfil.reference_days as number | null,
-          today: agora,
-        });
+    const logs = (
+      logsRes?.error ? [] : ((logsRes?.data ?? []) as LinhaDeSaude[])
+    ) as LinhaDeSaude[];
 
-    const logs = (logsRes?.error ? [] : ((logsRes?.data ?? []) as Record<string, unknown>[])) as {
-      log_date: string;
-      weight_kg: number | null;
-      glucose_mg_dl: number | null;
-    }[];
-
-    /* Peso: o mais recente da janela, contra o peso pré-gestacional. */
-    const pesoAtual = logs.find((l) => l.weight_kg != null)?.weight_kg ?? null;
-    const prePreg = perfil.pre_pregnancy_weight_kg as number | null;
-    const altura = perfil.height_cm as number | null;
-    const imc = prePreg != null && altura != null ? imcPreGestacional(prePreg, altura) : null;
-    const ganhoKg = pesoAtual != null && prePreg != null ? pesoAtual - prePreg : null;
-
-    /* Glicemia: a última, e quantas fora do alvo na janela. */
-    const comGlicemia = logs.filter((l) => l.glucose_mg_dl != null);
-    const ultima = comGlicemia[0] ?? null;
-    const sinalDaUltima = ultima ? sinalGlicemia(ultima.glucose_mg_dl) : null;
-    const alteradas = comGlicemia.filter((l) => {
-      const s = sinalGlicemia(l.glucose_mg_dl);
-      return s != null && s.gravidade !== "normal";
-    }).length;
-
-    const p: PerfilNutricional = {
-      careMode,
-      alergias: perfil.allergies as string | null,
-      medicacoes: perfil.medications as string | null,
-      semanas: gest?.weeks ?? null,
-      trimestre: gest ? trimesterForWeek(gest.weeks) : null,
-      imc,
-      ganhoKg,
-      glicemia:
-        ultima && sinalDaUltima
-          ? {
-              valor: ultima.glucose_mg_dl as number,
-              alterada: sinalDaUltima.gravidade !== "normal",
-              quando: new Date(`${ultima.log_date}T12:00:00`).toLocaleDateString("pt-BR"),
-            }
-          : null,
-      dmgAnterior: Boolean(perfil.prior_gestational_diabetes),
-      glicemiasAlteradas: alteradas,
-      hora: agora.getHours(),
-    };
-    return blocoDaPaciente(p);
+    return blocoDaPaciente(perfilNutricionalDe({ perfil, logs, careMode, agora }));
   } catch (e) {
     console.error("[nutricao] contexto inacessível — respondendo sem ele", e);
     return "";

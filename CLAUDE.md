@@ -14740,3 +14740,53 @@ se dá o Premium.
 `&amostra=2` · `&amostra=1` · `&amostra=0` (as três formas do aviso). As cinco
 só nascem de um 402 do servidor e de um cabeçalho de resposta — sem a bancada,
 fotografá-las exigiria gastar o teto de dez perguntas de uma conta real.
+
+## A nutricionista passou a saber que ela pariu (set/2026)
+
+Pergunta do dono: _"pensando na aba de nutricionista e o propósito do nosso
+site, que nota você dá para a personalização?"_ Medido antes de opinar: **6,5**
+— e o primeiro item da lista não era melhoria, era DEFEITO.
+
+### ⚠️ COM O BEBÊ NO COLO, O PROMPT DIZIA "SEMANA 42 DA GESTAÇÃO"
+
+`computeGestation` conta para sempre e faz teto em 42. Com a DUM a 300 dias e
+`birth_date` preenchida (medido), a nutricionista recebia _"Está na semana 42
+da gestação (3º trimestre)"_ e a tela mostrava _"Ele está ganhando peso para
+nascer"_ e _"vou focar nas necessidades da semana 42"_. O resto do app já lia
+`birth_date` (`faseDe`, `ehPosParto`, `mesesEntre`); os três módulos da
+nutrição — contexto do servidor, frase da semana e a aba — eram os únicos que
+ignoravam a coluna.
+
+- **`perfilNutricionalDe` (`nutricao-contexto.ts`) é a parte PURA do
+  adaptador**, e existe separada por uma razão: poder ser EXECUTADA num teste
+  com a paciente que a produção tem e a máquina de desenvolvimento não. Nenhum
+  teste de texto pegaria isto — o defeito só existe numa combinação de colunas.
+- ⚠️ **O pós-parto SUBSTITUI a semana, e não se soma a ela.** Semana,
+  trimestre e faixa de ganho da IOM são de gestação EM CURSO; para quem já
+  pariu, os três são falsos. Entra o fato ("ELA JÁ TEVE O BEBÊ") e a idade
+  dele, na unidade que ela usaria (`idadeDoBebe`).
+- ⚠️ **A AMAMENTAÇÃO ENTRA COMO HIPÓTESE, NUNCA COMO AFIRMAÇÃO** — no prompt,
+  nas frases (`nutricaoDoPosParto`) e nos chips: sempre "se estiver
+  amamentando". O app não sabe se ela amamenta, e afirmar isso a quem não
+  conseguiu é a pior frase possível. Há teste com regex nos dois lados.
+- ⚠️ **O LUTO VENCE O PÓS-PARTO.** `care_mode` não limpa `birth_date`
+  (natimorto, óbito neonatal): `posParto` sai `false` no Modo Cuidado, senão o
+  bloco diria "ela já teve o bebê … se estiver amamentando" para quem acabou de
+  perdê-lo. Mesma precedência em `blocoDaPaciente`, na frase e na tela.
+- **`birth_date` entrou no select COM degrau** (`colunaAusente` → relê sem
+  ela): a coluna nasceu numa migration posterior, e sem o degrau um banco
+  atrasado perderia a ALERGIA por causa de uma coluna que a nutricionista nem
+  precisava.
+- **Os dois prompts de sistema** (conversa e foto) passaram a conhecer a
+  puérpera; a foto já passava pelo MESMO bloco da paciente, então a moldura
+  precisava acompanhar.
+- ⚠️ **A bancada crava as DUAS pontas** (`?pos=N`: nascimento fixo e
+  `hoje` = nascimento + N). A idade do bebê é `birth_date` contra hoje, e
+  cravar só a data faria a frase mudar a cada semana — a armadilha da bancada
+  das contrações, pela segunda vez evitada.
+
+Três mutantes em vermelho (o servidor ignorando `birth_date`, o luto deixando
+de vencer, a tela ignorando a coluna).
+
+**Bancadas:** `/preview-nutricao?pos=20` · `?pos=200` · `?pos=20&luto=1` (nada
+de pós-parto no luto) — as três na varredura da CI.

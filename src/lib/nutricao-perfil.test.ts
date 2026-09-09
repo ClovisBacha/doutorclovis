@@ -13,6 +13,7 @@ import {
   TEXTO_LIVRE_MAX,
   blocoDaPaciente,
   conviteDoMomento,
+  idadeDoBebe,
   momentoDoDia,
   recortar,
   type PerfilNutricional,
@@ -180,5 +181,48 @@ describe("o endpoint usa a régua", () => {
   test("o bloco entra no system, junto do prompt certo", () => {
     expect(API).toContain("blocoDaNutricao(patientId, careMode)");
     expect(API).toMatch(/NUTRICAO_EM_LUTO : NUTRITION_SYSTEM\) \+ blocoDaPaciente/);
+  });
+});
+
+describe("⚠️ ela já pariu — o bloco fala do puerpério, nunca da semana 42", () => {
+  /* Medido em set/2026 com a DUM a 300 dias e `birth_date` preenchida: o
+     prompt dizia "Está na semana 42 da gestação (3º trimestre)" para uma
+     mulher com o bebê no colo. `posParto` SUBSTITUI a semana. */
+  const b = blocoDaPaciente({
+    ...base,
+    posParto: true,
+    diasDoBebe: 20,
+    semanas: 42,
+    trimestre: 3,
+    imc: 22,
+    ganhoKg: 12,
+  });
+
+  test("diz que ela já teve o bebê, com a idade dele", () => {
+    expect(b).toMatch(/JÁ TEVE O BEBÊ/);
+    expect(b).toMatch(/o bebê tem 2 semanas/);
+  });
+
+  test("⚠️ e a semana gestacional, o trimestre e a faixa de ganho SOMEM", () => {
+    expect(b).not.toMatch(/semana \d+ da gestação|trimestre\)|faixa de referência/);
+  });
+
+  test("⚠️ a amamentação entra como HIPÓTESE, nunca como afirmação", () => {
+    /* O app não sabe se ela amamenta, e afirmar isso a quem não conseguiu é
+       a pior frase possível. */
+    expect(b).toMatch(/SE ela estiver amamentando/);
+    expect(b).not.toMatch(/ela (está|esta) amamentando/i);
+  });
+
+  test("⚠️ o LUTO vence o pós-parto — `birth_date` não é limpa num natimorto", () => {
+    const luto = blocoDaPaciente({ ...base, careMode: true, posParto: true, diasDoBebe: 20 });
+    expect(luto).toBe("");
+  });
+
+  test("a idade do bebê fala na unidade que ela usaria", () => {
+    expect(idadeDoBebe(1)).toBe("o bebê nasceu há 1 dia");
+    expect(idadeDoBebe(9)).toBe("o bebê nasceu há 9 dias");
+    expect(idadeDoBebe(35)).toBe("o bebê tem 5 semanas");
+    expect(idadeDoBebe(61)).toBe("o bebê tem 2 meses");
   });
 });

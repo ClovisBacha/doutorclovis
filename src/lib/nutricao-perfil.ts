@@ -28,6 +28,16 @@ export type PerfilNutricional = {
   medicacoes?: string | null;
   semanas?: number | null;
   trimestre?: 1 | 2 | 3 | null;
+  /**
+   * ⚠️ ELA JÁ TEVE O BEBÊ. `birth_date` preenchida no perfil. Quando é
+   * verdadeiro, `semanas`/`trimestre`/ganho NÃO entram — `computeGestation`
+   * conta para sempre, e uma mulher a 20 dias do parto apareceria como
+   * "semana 42 da gestação (3º trimestre)". Foi exatamente o que o prompt
+   * dizia até set/2026 (medido com DUM −300 dias).
+   */
+  posParto?: boolean;
+  /** Dias de vida do bebê; `null` quando a data não é legível. */
+  diasDoBebe?: number | null;
   imc?: number | null;
   ganhoKg?: number | null;
   /** Última glicemia dela, e se estava alterada (régua de `sinais-clinicos`). */
@@ -92,6 +102,15 @@ export function recortar(t: string | null | undefined): string | null {
   return s ? s.slice(0, TEXTO_LIVRE_MAX) : null;
 }
 
+/** "há 3 dias" · "há 5 semanas" · "há 4 meses" — a unidade que ela mesma usaria. */
+export function idadeDoBebe(dias: number): string {
+  const d = Math.max(0, Math.floor(dias));
+  if (d < 14) return d === 1 ? "o bebê nasceu há 1 dia" : `o bebê nasceu há ${d} dias`;
+  if (d < 60) return `o bebê tem ${Math.floor(d / 7)} semanas`;
+  const m = Math.floor(d / 30);
+  return m === 1 ? "o bebê tem 1 mês" : `o bebê tem ${m} meses`;
+}
+
 export function blocoDaPaciente(p: PerfilNutricional): string {
   const linhas: string[] = [];
 
@@ -110,7 +129,19 @@ export function blocoDaPaciente(p: PerfilNutricional): string {
     );
   }
 
-  if (!p.careMode) {
+  if (!p.careMode && p.posParto) {
+    /* ⚠️ O PÓS-PARTO SUBSTITUI A SEMANA, e não se soma a ela. A semana
+       gestacional, o trimestre e a faixa de ganho da IOM são de uma gestação
+       EM CURSO; para quem já pariu, os três são falsos. O que entra no lugar
+       é o fato e a idade do bebê — e a amamentação vai como HIPÓTESE ("se
+       estiver amamentando"), nunca como afirmação: o app não sabe se ela
+       amamenta, e afirmar isso a quem não conseguiu é a pior frase possível. */
+    linhas.push(
+      `- ELA JÁ TEVE O BEBÊ: está no pós-parto${
+        p.diasDoBebe != null ? `, ${idadeDoBebe(p.diasDoBebe)}` : ""
+      }. Responda para o PUERPÉRIO (recuperação do corpo dela, sono quebrado, refeições rápidas de uma mão só) e, SE ela estiver amamentando, para a amamentação — pergunte antes de assumir. NUNCA fale como se ela ainda estivesse grávida, e nunca cite semana gestacional ou trimestre.`,
+    );
+  } else if (!p.careMode) {
     if (p.semanas != null && p.trimestre) {
       linhas.push(`- Está na semana ${p.semanas} da gestação (${p.trimestre}º trimestre).`);
     }

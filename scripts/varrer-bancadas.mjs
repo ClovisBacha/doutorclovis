@@ -75,6 +75,8 @@ const EXTRAS = [
      servidor virando bolha. Os dois só nascem de cota estourada ou falha de
      rede no instante certo. */
   "/preview-nutricao?semdum=1",
+  "/preview-nutricao?pos=20",
+  "/preview-nutricao?pos=20&luto=1",
   "/preview-nutricao?estado=conversa",
   /* ⚠️ `painel=1` é a conversa em TELA CHEIA — a forma que a paciente usa no
      celular. Sem ele, a 393px, o que se abre é a aba com o cartão compacto

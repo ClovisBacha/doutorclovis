@@ -67,7 +67,8 @@ import { FOTO_LADO_MAX, tituloDaFoto, type AssuntoDaFoto } from "@/lib/foto-da-n
 import { codificarFoto } from "@/lib/codificar-imagem";
 import { semMarcas } from "@/lib/texto-leve";
 import { TextoLeve } from "@/components/texto-leve";
-import { nutricaoDaSemana } from "@/lib/nutricao-da-semana";
+import { nutricaoDaSemana, nutricaoDoPosParto } from "@/lib/nutricao-da-semana";
+import { diasEntre } from "@/lib/filhos";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
 import { ymdLocal } from "@/lib/utils";
 import { useJanelaDoTeclado } from "@/lib/janela-do-teclado";
@@ -160,6 +161,16 @@ const NUTRITION_CHIPS: Record<1 | 2 | 3, string[]> = {
     "Posso comer tâmara para preparar o parto?",
   ],
 };
+
+/* ⚠️ Os chips de trimestre são de gestação em curso ("Posso comer tâmara para
+   preparar o parto?"). Para quem já pariu, as perguntas são estas — e NENHUMA
+   afirma que ela amamenta: a de amamentação começa com "se". */
+const CHIPS_DO_POS_PARTO: string[] = [
+  "O que comer para recuperar do parto?",
+  "Se eu estiver amamentando, o que muda na minha alimentação?",
+  "Refeições rápidas de uma mão só para os dias com o bebê no colo",
+  "Estou sem tempo de comer — o que deixar pronto?",
+];
 
 /** Mesma preferência que o chat principal respeita. */
 function semAnimacaoNutricao(): boolean {
@@ -352,23 +363,41 @@ export function NutricaoTab({
     /** Quantas perguntas grátis sobram — o número chega num cabeçalho de
         resposta, então ele só existe depois de uma conversa de verdade. */
     amostra?: number;
+    /** O "hoje" cravado, `YYYY-MM-DD`. A idade do bebê é `birth_date` contra
+        hoje; com o hoje do relógio a bancada mostraria outra frase a cada
+        semana — a mesma armadilha da bancada das contrações. */
+    hoje?: string;
   };
 }) {
   const ehBancada = bancada != null;
-  const trimester = gest ? trimesterForWeek(gest.weeks) : 2;
+  /* ⚠️ ELA JÁ PARIU. `birth_date` é o sinal que o resto do app usa (`faseDe`,
+     `ehPosParto`), e esta aba era a única que o ignorava: `gest` continua
+     vindo preenchido depois do parto (a DUM fica no perfil), então a saudação
+     dizia "vou focar nas necessidades da semana 42" e o cabeçalho, "Ele está
+     ganhando peso para nascer" — com o bebê no colo. O luto vence: no Modo
+     Cuidado `birth_date` pode estar preenchida (natimorto), e "pós-parto" com
+     "se estiver amamentando" seria a frase que ele existe para calar. */
+  const posParto = !careMode && !!profile?.birth_date;
+  const diasDoBebe = posParto
+    ? diasEntre(profile!.birth_date as string, bancada?.hoje ?? ymdLocal())
+    : null;
+  const gestEmCurso = posParto ? null : gest;
+  const trimester = gestEmCurso ? trimesterForWeek(gestEmCurso.weeks) : 2;
   const tips = NUTRIENT_TIPS[trimester as 1 | 2 | 3];
-  const chips = NUTRITION_CHIPS[trimester as 1 | 2 | 3];
+  const chips = posParto ? CHIPS_DO_POS_PARTO : NUTRITION_CHIPS[trimester as 1 | 2 | 3];
   const firstName = profile?.display_name?.split(" ")[0];
 
   const greeting = [
     firstName ? `Olá, ${firstName}!` : "Olá!",
     // Mesma regra do Chat IA: em Modo Cuidado, nada de semana nem trimestre.
-    !careMode && gest
-      ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gest.weeks}.`
+    !careMode && gestEmCurso
+      ? `No ${trimester}º trimestre, vou focar nas necessidades da semana ${gestEmCurso.weeks}.`
       : "",
     careMode
       ? "Sou sua nutricionista virtual. Estou aqui para o que você precisar sobre alimentação."
-      : "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
+      : posParto
+        ? "Sou sua nutricionista virtual para o pós-parto. Como posso ajudar com a sua alimentação hoje?"
+        : "Sou sua nutricionista gestacional virtual. Como posso ajudar com sua alimentação hoje?",
   ]
     .filter(Boolean)
     .join(" ");
@@ -787,14 +816,19 @@ export function NutricaoTab({
     }
   }
 
-  /* A frase da semana — régua pura, com as cinco proibições escritas lá. */
-  const daSemana = nutricaoDaSemana(gest?.weeks ?? null, careMode);
+  /* A frase da semana — régua pura, com as cinco proibições escritas lá. Depois
+     do parto a régua é OUTRA (por dias de vida do bebê), nunca a da semana 42. */
+  const daSemana = posParto
+    ? nutricaoDoPosParto(diasDoBebe, careMode)
+    : nutricaoDaSemana(gestEmCurso?.weeks ?? null, careMode);
   /* ⚠️ O subtítulo era `truncate`, e o que ele cortava no aparelho era
      justamente "não substitui avaliação nutricional individual" — a metade que
      importa. Duas linhas, sempre. */
   const subtitulo = careMode
     ? "Orientações de alimentação — não substitui avaliação nutricional individual."
-    : "Orientações para a sua gestação — não substitui avaliação nutricional individual.";
+    : posParto
+      ? "Orientações para o seu pós-parto — não substitui avaliação nutricional individual."
+      : "Orientações para a sua gestação — não substitui avaliação nutricional individual.";
   const temConversa = messages.length > 1;
   const ultimaResposta =
     [...messages].reverse().find((m) => m.role === "assistant" && m.content.trim())?.content ??
@@ -1498,7 +1532,7 @@ export function NutricaoTab({
       {/* ─── O FOCO DO TRIMESTRE ───────────────────────────────────────
           Some em Modo Cuidado: "Formação óssea do bebê" e "Desenvolvimento do
           cérebro fetal" são o conteúdo dele. */}
-      {!careMode && (
+      {!careMode && !posParto && (
         <section aria-label="Nutrientes em foco">
           <div className="mb-2 flex items-baseline justify-between px-1">
             <p className="font-serif text-[17px] font-semibold text-foreground">

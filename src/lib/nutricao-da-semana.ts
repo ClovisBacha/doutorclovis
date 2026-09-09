@@ -108,6 +108,68 @@ const FAIXAS: Faixa[] = [
   },
 ];
 
+/* ─── DEPOIS DO PARTO ──────────────────────────────────────────────────────
+   ⚠️ `computeGestation` conta para sempre: sem estas faixas, quem pariu na
+   39ª lia "Ele está ganhando peso para nascer" com o bebê no colo (medido:
+   DUM −300 dias caía na faixa 37–42). A régua é por DIAS DE VIDA, e as três
+   proibições continuam valendo — mais uma: NENHUMA frase afirma que ela
+   amamenta. O app não sabe, e afirmar isso a quem não conseguiu é a pior
+   frase possível; amamentação entra como "se estiver amamentando". */
+type FaixaPosParto = { deDias: number; ateDias: number } & FraseDaSemana;
+
+const POS_PARTO: FaixaPosParto[] = [
+  {
+    deDias: 0,
+    ateDias: 13,
+    titulo: "Os primeiros dias com ele",
+    texto:
+      "O seu corpo está se recuperando do parto e as noites são quebradas: comida pronta para pegar com uma mão — fruta, pão com queijo, ovo cozido, sopa — vale mais agora que qualquer prato elaborado, e água ao alcance sempre.",
+  },
+  {
+    deDias: 14,
+    ateDias: 41,
+    titulo: "Ele mama, e você repõe",
+    texto:
+      "Se estiver amamentando, a fome e a sede sobem de verdade: arroz com feijão, carne ou ovo e uma fruta a cada refeição, e um copo de água toda vez que ele mamar, repõem o que sai no leite e no cansaço.",
+  },
+  {
+    deDias: 42,
+    ateDias: 180,
+    titulo: "A rotina começa a se acomodar",
+    texto:
+      "Ele começa a ter horários e você volta a conseguir sentar para comer: feijão, carne e folhas escuras repõem o ferro que o parto levou, e comer com uma fruta cítrica faz o corpo aproveitar bem mais.",
+  },
+  {
+    deDias: 181,
+    ateDias: 365,
+    titulo: "Ele está começando a comer",
+    texto:
+      "Ele prova a comida da casa, e a sua mesa vira o exemplo dele: a mesma panela de feijão, o mesmo legume cozido e a fruta amassada servem para os dois — sem sal e sem açúcar no prato dele, com tempero e sabor no seu.",
+  },
+];
+
+/**
+ * @param dias     dias de vida do bebê; `null` quando não há data.
+ * @param careMode Modo Cuidado — `birth_date` NÃO é limpa numa perda depois do
+ *                 nascimento, e "Ele mama" seria a frase que o luto existe para calar.
+ */
+export function nutricaoDoPosParto(
+  dias: number | null | undefined,
+  careMode = false,
+): FraseDaSemana | null {
+  if (careMode) return null;
+  if (dias == null || !Number.isFinite(dias)) return null;
+  const d = Math.floor(dias);
+  const faixa = POS_PARTO.find((f) => d >= f.deDias && d <= f.ateDias);
+  return faixa ? { titulo: faixa.titulo, texto: faixa.texto } : null;
+}
+
+/** Só para o teste varrer todas as faixas sem reescrever a tabela. */
+export const FAIXAS_DO_POS_PARTO: readonly FraseDaSemana[] = POS_PARTO.map((f) => ({
+  titulo: f.titulo,
+  texto: f.texto,
+}));
+
 /**
  * @param semanas  a semana gestacional; `null` quando não há DUM.
  * @param careMode Modo Cuidado — a frase tem o bebê como sujeito.
