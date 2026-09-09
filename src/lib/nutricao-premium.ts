@@ -33,15 +33,50 @@
  * Quantas perguntas por dia uma assinante tem.
  *
  * ⚠️ **O NÚMERO SAI DA MARGEM, e não do gosto.** A 10 por dia o pior caso é
- * 300 por mês: ~R$ 5,10 de modelo, que a `custo-da-nutricao.test.ts` cobra
- * ficar em torno de 30% da receita líquida no preço recomendado — a MESMA
- * fatia que o plano do médico já aceita ("a IA é 30%", em
- * `docs/custo-de-infraestrutura.md`). Mexer neste número sem refazer aquela
- * conta é mudar a margem sem saber.
+ * 300 perguntas no mês: ~R$ 5,32 de modelo. `custo-da-nutricao.test.ts` cobra
+ * essa conta contra os preços de `promo.ts`, e não contra um preço escrito
+ * aqui — o dia em que o dono reajustar, a conta reajusta junto.
  *
- * E ele é folgado de propósito: quem planeja as refeições da semana faz cinco
- * ou seis perguntas de uma vez. O teto existe para o caso extremo, não para
- * ser encontrado no uso normal.
+ * ⚠️ **QUEM DIMENSIONA O TETO É O PLANO ANUAL, e não o mensal.** O anual sai
+ * por ~R$ 9,16/mês (R$ 109,90 cobrados de uma vez), menos da METADE do mensal
+ * — então dimensionar pelo mensal seria dimensionar pelo caso fácil. Medido,
+ * com a taxa cheia da loja e as dez perguntas usadas todo dia:
+ *
+ *   · mensal (R$ 19,90) → IA em 38% do líquido, sobra R$ 8,59
+ *   · **anual (R$ 9,16) → IA em 83% do líquido, sobra R$ 1,07**
+ *
+ * É apertado, e é POSITIVO — que é exatamente o que o teto compra. Sem teto, a
+ * mesma assinante anual a trinta perguntas por dia leva a conta a **R$ −9,56**.
+ *
+ * ⚠️ **E ISSO PÕE O NÚMERO PERTO DA BORDA.** Medido por mutação, subindo o
+ * teto um degrau de cada vez:
+ *
+ *   · a **11** a fração do mensal passa de 40% e o teste fica vermelho;
+ *   · a **12** o anual sobra **um centavo** — menos que a própria conta de
+ *     infraestrutura da paciente, e o segundo guarda fica vermelho também;
+ *   · a **13** o anual fica negativo.
+ *
+ * O 10 tem UM degrau de folga, não vinte. Subir este número sem refazer a
+ * conta é escolher prejuízo sem saber, e é por isso que os dois guardas de
+ * `custo-da-nutricao.test.ts` são derivados (a fatia do médico, e a sobra
+ * contra o custo de infra) em vez de escolhidos.
+ *
+ * (A decisão do dono, set/2026, foi manter os preços de hoje e dimensionar o
+ * teto para o PIOR caso: "vamos continuar cobrando os preços que temos e
+ * deixar o limite de mensagens no pior caso". A alternativa medida — subir o
+ * Premium para R$ 24,90, onde a IA cairia a 30% — foi considerada e NÃO
+ * adotada. Fica escrito para ser uma decisão, e não um esquecimento.)
+ *
+ * ⚠️ **O TETO É SÓ DA NUTRICIONISTA.** Ele conta as linhas de
+ * `CANAIS_DA_NUTRICIONISTA` (`nutricao` e `prato`) e mais nada: o chat clínico
+ * do médico — que ELE paga, pela franquia do plano dele — nunca é limitado por
+ * este número. `nutricao-so-da-nutricionista.test.ts` é a catraca disso.
+ *
+ * ⚠️ **E "perto da borda" é do lado da MARGEM, nunca do lado dela.** Para a
+ * paciente o número é folgado — o uso esperado é de duas por dia, e quem
+ * planeja as refeições da semana faz cinco ou seis de uma vez. O teto existe
+ * para o caso extremo, não para ser encontrado no uso normal; quem está
+ * apertado contra ele é a conta, não a assinante.
  */
 export const LIMITE_DIARIO = 10;
 

@@ -14561,18 +14561,43 @@ que faria alguém "economizar" desligando a leitura de rótulo.
 
 Rodando `margemMensal` com os preços reais e as duas taxas de loja:
 
-| cenário                                 | IA/mês        | sobra        |
-| --------------------------------------- | ------------- | ------------ |
-| **sem teto**, 30 msg/dia, R$19,90 · 30% | R$ 15,95      | **R$ −2,04** |
-| com teto (10/dia), R$19,90 · 30%        | R$ 5,32 (38%) | R$ 8,59      |
-| com teto, R$24,90 · 30%                 | R$ 5,32 (30%) | R$ 12,09     |
-| uso realista (2/dia), R$19,90 · 30%     | R$ 1,06 (8%)  | R$ 12,84     |
+| cenário (taxa cheia da loja, 30%)         | IA/mês        | sobra        |
+| ----------------------------------------- | ------------- | ------------ |
+| **sem teto**, 30 msg/dia, mensal R$ 19,90 | R$ 15,95      | **R$ −2,04** |
+| **sem teto**, 30 msg/dia, anual R$ 9,16   | R$ 15,95      | **R$ −9,56** |
+| com teto (10/dia), mensal R$ 19,90        | R$ 5,32 (38%) | R$ 8,59      |
+| **com teto (10/dia), anual R$ 9,16**      | R$ 5,32 (83%) | **R$ 1,07**  |
+| uso realista (2/dia), mensal R$ 19,90     | R$ 1,06 (8%)  | R$ 12,84     |
 
-Sem teto a margem vira **negativa** com uma paciente entusiasmada — e o teto de
-**10 por dia** põe o PIOR caso em ~30% da receita líquida no preço recomendado,
-que é a MESMA fatia que o plano do médico já aceita
-(`docs/custo-de-infraestrutura.md`). O número não é gosto: mexer nele sem
-refazer esta conta é mudar a margem sem saber, e há teste cobrando isso.
+Sem teto a margem vira **negativa** com uma paciente entusiasmada, e o teto a
+põe de volta no positivo. O número não é gosto: mexer nele sem refazer esta
+conta é mudar a margem sem saber, e há teste cobrando isso.
+
+⚠️ **E QUEM DIMENSIONA O TETO É O PLANO ANUAL, não o mensal — essa linha
+faltava na primeira análise.** O anual sai por **R$ 9,16/mês** (R$ 109,90
+cobrados de uma vez), menos da METADE do mensal: dimensionar pelo mensal seria
+dimensionar pelo caso FÁCIL, e a assinante anual que usa as dez todo dia é o
+pior caso que o produto de fato tem.
+
+⚠️ **A 10 por dia o anual deixa R$ 1,07 — e o número tem UM degrau de folga,
+não vinte.** Medido por mutação, subindo o teto de um em um: a **11** a fatia
+do mensal passa de 40% e o teste fica vermelho; a **12** o anual sobra um
+CENTAVO (menos que a própria conta de infraestrutura da paciente, e o segundo
+guarda cai também); a **13** o anual fica negativo. Do lado da PACIENTE o teto
+continua folgado — o uso esperado é 2 por dia; quem está apertado contra ele é
+a conta.
+
+⚠️ **E os dois guardas são DERIVADOS, nunca escolhidos** — a fatia que o plano
+do médico já aceita, e a sobra contra o custo de infra. "Sobra positiva"
+sozinha seria fraca demais: a R$ 9,16 o anual ainda é positivo a 12 por dia,
+por um centavo, e um teto justificado por um centavo estaria justificado por
+nada.
+
+⚠️ **E o teste larga o preço escrito à mão: ele importa `MENSAL_CENTAVOS` e
+`ANUAL_MENSAL_EQUIV_CENTAVOS` de `promo.ts`.** Uma cópia do preço dentro do
+teste divergiria no primeiro reajuste, e a divergência apareceria como um teste
+VERDE afirmando uma margem que o produto não tem — a pior mentira que um teste
+de margem pode contar. É a mesma lei de `loja-coerente.test.ts`.
 
 ### A régua (`nutricao-premium.ts`), e a ordem dela é o desenho
 
@@ -14654,13 +14679,40 @@ que já existe — que é exatamente o que o dono propôs na primeira mensagem
 assinem o premium"), e é o desenho que está no código: a amostra de três
 perguntas por semana é a vitrine, e a conversa diária é do Premium.
 
-**Recomendação, com a conta atrás:** manter a nutricionista DENTRO do Premium e
-pôr o Premium em **R$ 24,90/mês** (ou ~R$ 14,90 equivalente no anual). É o
-preço em que o PIOR caso do teto fica em 30% da receita líquida mesmo com a
-taxa de 30% da loja — a mesma fatia que o plano do médico já aceita —, e o
-anual cai dentro do teto da categoria. R$ 19,90 também fecha (38% no pior caso,
-8% no uso realista); abaixo disso a margem fica apertada demais para o pior
-caso com a taxa cheia.
+### ⚠️ A DECISÃO DO DONO: os preços FICAM, e o teto cobre o pior caso
+
+Eu recomendei subir o Premium para R$ 24,90 (onde a IA cairia a 30% do líquido
+no pior caso). **Ele recusou**, com todas as letras: _"de primeiro momento
+vamos continuar cobrando os preços que temos e deixar o limite de mensagens no
+pior caso, limite nesse caso somente do plano nutricionista"_.
+
+Então o que vale, e está no código:
+
+|                     |                                                                  |
+| ------------------- | ---------------------------------------------------------------- |
+| **preço**           | **fica** — R$ 19,90/mês e R$ 109,90/ano, intocados em `promo.ts` |
+| **teto**            | dimensionado para o PIOR caso, que é o anual a R$ 9,16/mês       |
+| **alcance do teto** | **só a nutricionista** — nunca o chat clínico do médico          |
+
+⚠️ **A recomendação recusada fica escrita no parágrafo acima, com a conta
+atrás, para ser uma decisão e não um esquecimento** — se um dia o dono quiser
+revê-la, o número e a razão estão aqui, e a pesquisa de mercado que os produziu
+está na seção anterior. O que não pode acontecer é a prosa continuar apresentando como
+"recomendação vigente" um preço que ele já disse que não quer: este repositório
+já registrou três vezes que prosa desatualizada enganou alguém, e uma
+recomendação de PREÇO seria a mais cara delas.
+
+⚠️ **E "só do plano nutricionista" foi verificado mecanicamente, não assumido.**
+`decidirAcesso` e `usoDaNutricionista` são chamadas por exatamente dois
+arquivos (`/api/nutrition` e `/api/prato`); a conta lê só
+`CANAIS_DA_NUTRICIONISTA`; e `CANAIS_DA_COTA` não contém nenhum dos dois.
+**`nutricao-so-da-nutricionista.test.ts` é a catraca dos DOIS lados da
+fronteira** — porque ela já foi rompida em uma direção (a nutrição descontando
+da franquia do médico) e a outra não tinha guarda nenhuma: nada impedia alguém
+de pôr o teto em `/api/chat.ts` "para limitar a IA", e aí um limite de PRODUTO
+passaria a calar o canal de CUIDADO que o médico já pagou. Quatro mutações em
+vermelho, mais a contraprova de que o nome citado só num comentário continua
+verde.
 
 ### As armadilhas desta leva
 
