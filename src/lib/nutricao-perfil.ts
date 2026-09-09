@@ -64,6 +64,20 @@ export type PerfilNutricional = {
   tomados?: string[] | null;
   /** 0–23, o relógio DELA — decide a sugestão de refeição da vez. */
   hora?: number | null;
+  /**
+   * Como ela vem se sentindo: o humor que ELA marcou no diário nos últimos
+   * dias, agregado por RÓTULO DE CATÁLOGO (`MOOD_LABEL`), nunca o texto do
+   * diário. Mais frequente primeiro.
+   */
+  humores?: { rotulo: string; vezes: number }[] | null;
+  /**
+   * Sintomas que ela marcou na triagem do app e que mudam o prato (vômitos,
+   * tontura, inchaço, ardor ao urinar) — rótulo de catálogo (`ALL_SYMPTOMS`),
+   * nunca a nota livre da triagem.
+   */
+  sintomas?: { rotulo: string; quando: string }[] | null;
+  /** Ela passou pela triagem com sinal VERMELHO nos últimos dias. */
+  triagemDeAlerta?: boolean;
 };
 
 /* ─── O LANCHE PELA HORA ────────────────────────────────────────────────────
@@ -236,6 +250,41 @@ export function blocoDaPaciente(p: PerfilNutricional): string {
   if ((p.pressoesAlteradas ?? 0) >= 2) {
     linhas.push(
       `- ATENÇÃO À PRESSÃO: ela registrou ${p.pressoesAlteradas} pressões fora da faixa nos últimos 30 dias. Priorize orientação sobre SÓDIO (ultraprocessados, embutidos, temperos prontos, caldos, salgadinhos) e sobre potássio de alimento (feijão, banana, folhas, batata). NUNCA diga que ela tem pressão alta ou pré-eclâmpsia, e NUNCA sugira parar, trocar ou dosar remédio: quem diz isso é o médico. Se ela relatar dor de cabeça forte, vista embaçada, dor na boca do estômago ou inchaço súbito, oriente procurar atendimento AGORA.`,
+    );
+  }
+
+  /* ─── COMO ELA VEM PASSANDO ─────────────────────────────────────────────
+     ⚠️ SÓ CATÁLOGO ENTRA AQUI. O emoji do diário vira o rótulo de `MOOD_LABEL`
+     e o id do sintoma vira o rótulo de `ALL_SYMPTOMS`; o texto do diário e a
+     nota da triagem NUNCA chegam ao prompt — é a mesma decisão de
+     `buildCycleMoodBlock` no chat clínico (privacidade, e um teste real gravou
+     uma instrução de prompt num campo livre da paciente). Sobrevive ao Modo
+     Cuidado: é sobre ELA, e o tom de quem está triste importa mais no luto. */
+  if (p.humores?.length) {
+    linhas.push(
+      `- Como ela vem se sentindo (o que ELA marcou no diário nos últimos dias, mais frequente primeiro): ${p.humores
+        .map((h) => `${h.rotulo} ${h.vezes}×`)
+        .join(", ")}. Use com sensibilidade para acolher e ajustar o tom; não recite.`,
+    );
+    const malEstar = p.humores.find((h) => h.rotulo === "Mal-estar" && h.vezes >= 2);
+    if (malEstar) {
+      linhas.push(
+        `- ENJOO/MAL-ESTAR FREQUENTE: pergunte o que ela tem conseguido comer e oriente o que costuma cair melhor (porções pequenas e frequentes, alimentos secos e frios, líquidos em goles entre as refeições e não junto). NUNCA trate isso como dieta nem faça diagnóstico; se ela não segura líquidos ou está perdendo peso, oriente falar com o médico dela.`,
+      );
+    }
+  }
+  if (p.sintomas?.length) {
+    linhas.push(
+      `- Sintomas que ela marcou na triagem do app nos últimos dias: ${p.sintomas
+        .map((s) => `${s.rotulo} (${s.quando})`)
+        .join(
+          ", ",
+        )}. Considere isso ao sugerir (vômitos → porções pequenas e líquidos em goles; tontura → não pular refeições; inchaço → menos sódio; ardor ao urinar → água ao longo do dia). NUNCA diagnostique nem trate: a triagem já encaminhou, e quem conduz é o médico.`,
+    );
+  }
+  if (p.triagemDeAlerta) {
+    linhas.push(
+      `- Ela passou pela triagem de sintomas com sinal de ALERTA nos últimos dias. Se ela mencionar qualquer sintoma nesta conversa, oriente procurar o médico dela ou atendimento ANTES de qualquer sugestão de comida — nunca responda a um sinal de alerta com um cardápio.`,
     );
   }
 

@@ -18,7 +18,9 @@ import { blocoDaPaciente } from "./nutricao-perfil";
 import {
   perfilNutricionalDe,
   type DoAparelho,
+  type LinhaDaTriagem,
   type LinhaDeSaude,
+  type LinhaDoDiario,
   type LinhaDoPerfil,
 } from "./nutricao-contexto";
 import { colunaAusente } from "./postgrest";
@@ -59,8 +61,12 @@ export async function blocoDaNutricao(
         .eq("id", patientId)
         .maybeSingle();
 
-    /* Duas leituras independentes, uma onda só. */
-    const [perfilCheio, logsRes] = await Promise.all([
+    /* Quatro leituras independentes, uma onda só.
+       ⚠️ Do diário SÓ `mood`, e da triagem SÓ `level` e `symptoms`: o texto do
+       diário (`content`) e a nota da triagem (`note`) são o que a paciente
+       ESCREVEU, e não entram no prompt — a régua pura só conhece catálogo, e
+       o que não é pedido ao banco não tem como vazar. */
+    const [perfilCheio, logsRes, diarioRes, triagemRes] = await Promise.all([
       lerPerfil(DEGRAUS_DO_PERFIL[0]),
       (supabaseAdmin as any)
         .from("health_logs")
@@ -69,6 +75,21 @@ export async function blocoDaNutricao(
         .gte("log_date", desde)
         .order("log_date", { ascending: false })
         .limit(60),
+      (supabaseAdmin as any)
+        .from("journal_entries")
+        .select("entry_date,mood")
+        .eq("user_id", patientId)
+        .gte("entry_date", desde)
+        .not("mood", "is", null)
+        .order("entry_date", { ascending: false })
+        .limit(40),
+      (supabaseAdmin as any)
+        .from("triage_logs")
+        .select("created_at,level,symptoms")
+        .eq("user_id", patientId)
+        .gte("created_at", `${desde}T00:00:00Z`)
+        .order("created_at", { ascending: false })
+        .limit(20),
     ]);
     /* Desce a escada enquanto a falta for de COLUNA; qualquer outro erro para. */
     let perfilRes = perfilCheio;
@@ -90,7 +111,13 @@ export async function blocoDaNutricao(
       logsRes?.error ? [] : ((logsRes?.data ?? []) as LinhaDeSaude[])
     ) as LinhaDeSaude[];
 
-    return blocoDaPaciente(perfilNutricionalDe({ perfil, logs, careMode, agora, doAparelho }));
+    /* Diário e triagem falhando calam só a parte deles — como o histórico. */
+    const diario = (diarioRes?.error ? [] : (diarioRes?.data ?? [])) as LinhaDoDiario[];
+    const triagens = (triagemRes?.error ? [] : (triagemRes?.data ?? [])) as LinhaDaTriagem[];
+
+    return blocoDaPaciente(
+      perfilNutricionalDe({ perfil, logs, careMode, agora, doAparelho, diario, triagens }),
+    );
   } catch (e) {
     console.error("[nutricao] contexto inacessível — respondendo sem ele", e);
     return "";

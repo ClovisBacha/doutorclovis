@@ -22,6 +22,8 @@ import { computeGestation, trimesterForWeek } from "./gestacao";
 import { sinalGlicemia, sinalPressao } from "./sinais-clinicos";
 import { imcPreGestacional } from "./curva-de-ganho";
 import { diasEntre } from "./filhos";
+import { MOOD_LABEL } from "./humor-e-saudacao";
+import { ALL_SYMPTOMS } from "./triage";
 import type { PerfilNutricional } from "./nutricao-perfil";
 
 export type LinhaDoPerfil = {
@@ -47,6 +49,80 @@ export type LinhaDeSaude = {
   systolic?: number | null;
   diastolic?: number | null;
 };
+
+/** Uma linha do diário — SÓ o emoji do humor; `content` nunca é pedido ao banco. */
+export type LinhaDoDiario = { entry_date: string; mood: string | null };
+/** Uma linha da triagem — nível e ids de catálogo; `note` nunca é pedido ao banco. */
+export type LinhaDaTriagem = { created_at: string; level: string; symptoms: string[] | null };
+
+/* ─── COMO ELA VEM PASSANDO ─────────────────────────────────────────────
+   ⚠️ NADA que ela ESCREVEU entra: o emoji vira o rótulo de `MOOD_LABEL` e o
+   id do sintoma vira o rótulo de `ALL_SYMPTOMS`; o que não está no catálogo
+   é DESCARTADO. É a mesma allowlist de `textoDaPaciente` no chat clínico,
+   pela mesma razão — um campo livre da paciente já carregou uma instrução de
+   prompt uma vez. */
+export const JANELA_HUMOR_DIAS = 7;
+export const JANELA_TRIAGEM_DIAS = 14;
+export const JANELA_ALERTA_DIAS = 7;
+export const HUMORES_MAX = 4;
+/** Os sintomas da triagem que mudam o PRATO. Os vermelhos ficam de fora um a
+    um: eles viram só o aviso de alerta — sangramento não é assunto de cardápio. */
+export const SINTOMAS_QUE_MUDAM_O_PRATO: readonly string[] = [
+  "vomito",
+  "tontura",
+  "inchaco_pes",
+  "ardor_urinar",
+];
+
+export function humoresDe(
+  linhas: LinhaDoDiario[] | null | undefined,
+  agora: Date,
+): { rotulo: string; vezes: number }[] {
+  if (!linhas?.length) return [];
+  const desde = ymdDe(new Date(agora.getTime() - JANELA_HUMOR_DIAS * 86400000));
+  const conta = new Map<string, number>();
+  for (const l of linhas) {
+    if (typeof l.entry_date !== "string" || l.entry_date < desde) continue;
+    const rotulo = typeof l.mood === "string" ? MOOD_LABEL[l.mood] : undefined;
+    if (!rotulo) continue; /* fora do catálogo: descarta, nunca passa o cru */
+    conta.set(rotulo, (conta.get(rotulo) ?? 0) + 1);
+  }
+  return [...conta.entries()]
+    .map(([rotulo, vezes]) => ({ rotulo, vezes }))
+    .sort((x, y) => y.vezes - x.vezes)
+    .slice(0, HUMORES_MAX);
+}
+
+export function triagemDe(
+  linhas: LinhaDaTriagem[] | null | undefined,
+  agora: Date,
+): { sintomas: { rotulo: string; quando: string }[]; alerta: boolean } {
+  if (!linhas?.length) return { sintomas: [], alerta: false };
+  const desdeSintomas = agora.getTime() - JANELA_TRIAGEM_DIAS * 86400000;
+  const desdeAlerta = agora.getTime() - JANELA_ALERTA_DIAS * 86400000;
+  const rotuloDe = new Map(ALL_SYMPTOMS.map((s) => [s.id, s.label]));
+  const vistos = new Map<string, string>();
+  let alerta = false;
+  const ordenadas = [...linhas].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  );
+  for (const l of ordenadas) {
+    const t = new Date(l.created_at).getTime();
+    if (!Number.isFinite(t) || t > agora.getTime() + 60000) continue;
+    if (l.level === "vermelho" && t >= desdeAlerta) alerta = true;
+    if (t < desdeSintomas) continue;
+    for (const id of l.symptoms ?? []) {
+      if (typeof id !== "string" || !SINTOMAS_QUE_MUDAM_O_PRATO.includes(id)) continue;
+      const rotulo = rotuloDe.get(id);
+      if (!rotulo || vistos.has(rotulo)) continue; /* fica a ocorrência mais recente */
+      vistos.set(rotulo, new Date(t).toLocaleDateString("pt-BR"));
+    }
+  }
+  return {
+    sintomas: [...vistos.entries()].map(([rotulo, quando]) => ({ rotulo, quando })),
+    alerta,
+  };
+}
 
 /**
  * O que a TELA manda junto do pedido: água e suplementos vivem só no
@@ -94,8 +170,13 @@ export function perfilNutricionalDe(args: {
   careMode: boolean;
   agora: Date;
   doAparelho?: DoAparelho;
+  /** O humor do diário (só o emoji) e a triagem (só nível e ids) — ver acima. */
+  diario?: LinhaDoDiario[] | null;
+  triagens?: LinhaDaTriagem[] | null;
 }): PerfilNutricional {
-  const { perfil, logs, careMode, agora, doAparelho } = args;
+  const { perfil, logs, careMode, agora, doAparelho, diario, triagens } = args;
+  const humores = humoresDe(diario, agora);
+  const triagem = triagemDe(triagens, agora);
 
   const nascimento =
     typeof perfil.birth_date === "string" && perfil.birth_date ? perfil.birth_date : null;
@@ -175,5 +256,8 @@ export function perfilNutricionalDe(args: {
     agua: doAparelho?.agua ?? null,
     tomados: doAparelho?.tomados ?? null,
     hora: agora.getHours(),
+    humores: humores.length ? humores : null,
+    sintomas: triagem.sintomas.length ? triagem.sintomas : null,
+    triagemDeAlerta: triagem.alerta,
   };
 }

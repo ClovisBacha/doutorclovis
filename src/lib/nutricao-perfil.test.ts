@@ -273,3 +273,43 @@ describe("a pressão, a água e os suplementos entram no bloco", () => {
     expect(blocoDaPaciente({ ...base, agua: { copos: 0, meta: 0 } })).not.toMatch(/Água hoje/);
   });
 });
+
+describe("como ela vem passando — o bloco fala do rótulo, com sensibilidade e sem cobrar", () => {
+  test("humor e sintomas entram; um mal-estar só não acende a linha de enjoo", () => {
+    const b = blocoDaPaciente({
+      ...base,
+      humores: [
+        { rotulo: "Cansada", vezes: 3 },
+        { rotulo: "Mal-estar", vezes: 1 },
+      ],
+      sintomas: [{ rotulo: "Tonturas leves", quando: "07/09/2026" }],
+    });
+    expect(b).toMatch(/Cansada 3×, Mal-estar 1×/);
+    expect(b).not.toMatch(/ENJOO\/MAL-ESTAR FREQUENTE/);
+    expect(b).toMatch(/Tonturas leves \(07\/09\/2026\)/);
+    expect(b).toMatch(/NUNCA diagnostique/);
+  });
+  test("dois mal-estares acendem a orientação, e ela manda ao médico quando não segura líquidos", () => {
+    const b = blocoDaPaciente({ ...base, humores: [{ rotulo: "Mal-estar", vezes: 2 }] });
+    expect(b).toMatch(/ENJOO\/MAL-ESTAR FREQUENTE/);
+    expect(b).toMatch(/NUNCA trate isso como dieta/);
+    expect(b).toMatch(/não segura líquidos.*médico/);
+  });
+  test("⚠️ o alerta da triagem vem sozinho e põe o médico ANTES da comida", () => {
+    const b = blocoDaPaciente({ ...base, triagemDeAlerta: true });
+    expect(b).toMatch(/sinal de ALERTA/);
+    expect(b).toMatch(/ANTES de qualquer sugestão de comida/);
+    expect(b).not.toMatch(/sangramento|movimentos/i);
+  });
+  test("nenhuma dessas linhas cobra nem diagnostica", () => {
+    const b = blocoDaPaciente({
+      ...base,
+      humores: [{ rotulo: "Mal-estar", vezes: 5 }],
+      sintomas: [{ rotulo: "Inchaço nos pés e tornozelos", quando: "07/09/2026" }],
+      triagemDeAlerta: true,
+    });
+    expect(b).not.toMatch(
+      /você (não|precisa|deveria)|est[áa] atrasad|ela tem (pré|hiper|hiperêmese|anemia)/i,
+    );
+  });
+});
