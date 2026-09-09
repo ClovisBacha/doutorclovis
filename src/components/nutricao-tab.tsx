@@ -38,6 +38,7 @@ import { ehNativo } from "@/lib/nativo";
 import { recadoDaAmostra, recadoDoBloqueio, type MotivoDoBloqueio } from "@/lib/nutricao-premium";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { colunaAusente, tabelaAusente } from "@/lib/postgrest";
 
 import type { ChatMsg, Gest, Profile } from "@/routes/_authenticated/minha-conta";
 import { supabase } from "@/integrations/supabase/client";
@@ -96,7 +97,12 @@ const NUTRIENT_TIPS: Record<1 | 2 | 3, { nutrient: string; why: string; foods: s
       why: "Suporte ao volume de sangue",
       foods: "Carne vermelha magra, feijão + vitamina C",
     },
-    { nutrient: "Vitamina B6", why: "Alivia enjoo matinal", foods: "Banana, batata, frango, atum" },
+    /* ⚠️ Sem atum, pela mesma razão da frase da semana: o app manda limitá-lo. */
+    {
+      nutrient: "Vitamina B6",
+      why: "Alivia enjoo matinal",
+      foods: "Banana, batata, frango, salmão",
+    },
     {
       nutrient: "Água",
       why: "Hidratação e redução do enjoo",
@@ -459,7 +465,7 @@ export function NutricaoTab({
       /* ⚠️ PGRST204 é a coluna que ainda não nasceu (o SQL chega depois do
          código): dizer "não foi possível" mandaria ela tentar de novo o que
          não vai passar. Diz o que é. */
-      if ((error as { code?: string } | null)?.code === "PGRST204") {
+      if (colunaAusente(error)) {
         toast.error("Este campo ainda não está disponível — em breve.");
         return;
       }
@@ -518,8 +524,14 @@ export function NutricaoTab({
       const { error } = await (supabase as any)
         .from("nutricao_mensagens")
         .insert(parParaGravar(uid, pergunta, resposta));
-      /* Tabela ausente é o banco atrás do SQL — normal, e cala. */
-      if (error && (error as { code?: string }).code !== "42P01") {
+      /* ⚠️ Tabela ausente é o banco atrás do SQL — normal, e cala. E quem
+         responde isso ao NAVEGADOR é **PGRST205**, nunca 42P01: o PostgREST
+         barra a tabela desconhecida no schema cache e o erro nem chega ao
+         Postgres. Com o teste escrito à mão só no 42P01, quem ainda não rodou
+         `APLICAR_MEMORIA_DA_NUTRICAO.sql` registrava um aviso a CADA resposta
+         da nutricionista — e alarme que grita sempre é alarme que se aprende a
+         ignorar. `tabelaAusente` conhece os dois. */
+      if (error && !tabelaAusente(error)) {
         console.warn("[nutricao] troca não gravou", error);
       }
     })().catch((e) => console.warn("[nutricao] troca não gravou", e));
@@ -678,6 +690,16 @@ export function NutricaoTab({
       if (res.status === 402) {
         setBloqueio(r?.motivo === "bloqueado:teto_diario" ? "teto_diario" : "sem_premium");
         setMessages(messages);
+        /* ⚠️ **A MINIATURA SAI JUNTO.** `fotos` é indexado pela POSIÇÃO da
+           mensagem, e o rollback devolve o histórico sem o turno dela: o
+           índice fica livre, e a PRÓXIMA mensagem — uma pergunta de texto —
+           passava a ser desenhada com a foto do prato que ela tentou mandar.
+           Os outros ramos de erro mantêm `next`, então o índice continua
+           valendo; só a porta fechada volta atrás. */
+        setFotos((f) => {
+          const { [next.length - 1]: _, ...resto } = f;
+          return resto;
+        });
         return;
       }
       if (!res.ok || !r?.ok || !r.texto) {

@@ -104,8 +104,13 @@ describe("⚠️ as pontas que a régua não alcança", () => {
   });
 
   test("a coluna que ainda não nasceu tem recado PRÓPRIO, e não 'tente de novo'", () => {
+    /* ⚠️ A asserção é sobre a GARANTIA (existe recuo de coluna ausente, e o
+       recado dele é o específico), nunca sobre o código escrito à mão: travar
+       `code === "PGRST204"` já reprovou uma vez a troca pelo helper
+       `colunaAusente`, que cobre PGRST204 **e** 42703 — ou seja, reprovou uma
+       mudança que só apertou a cobertura. */
     expect(TAB).toMatch(
-      /code === "PGRST204"\)\s*\{\s*toast\.error\("Este campo ainda não está disponível/,
+      /(colunaAusente\(error\)|code === "PGRST204")\)\s*\{\s*toast\.error\("Este campo ainda não está disponível/,
     );
   });
 

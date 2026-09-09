@@ -12996,6 +12996,177 @@ texto auxiliar do Jogo e o ✕ do chá, ambos já registrados como decisão do
 dono) · nas bancadas da paciente fora do Jogo, zero pílulas de contorno e
 zero cartões de contorno restantes.
 
+## A nutricionista parou de afirmar o que o app não sabe (set/2026)
+
+Pedido do dono depois da rodada do prompt: aplicar o que ainda estava pendente
+da minha própria lista. Sete itens, e o primeiro é o mais caro: **três lugares
+em que o app AFIRMAVA um fato clínico que ele não tem como saber.**
+
+### ⚠️ 1. "GLICEMIA 118 (dentro do alvo)" — a afirmação mais perigosa da leva
+
+`sinalGlicemia` usa o corte permissivo de 140 **de propósito**, e o comentário
+dela diz por quê: _o app nunca pergunta se a medida foi em JEJUM ou depois de
+comer_, e pintar de laranja uma glicemia normal medida depois do almoço seria
+alarme falso. O efeito colateral é que **118 mg/dL cai em `normal` — e 118 em
+jejum é ALTERADO** (o alvo de rastreio em jejum é <95).
+
+Os dois blocos de prompt coladavam **"(dentro do alvo)"** nesse número: o da
+nutricionista e o `buildMedidasBlock` do **chat clínico**, que é o que o cérebro
+do médico lê. Ou seja: o app dizia à IA que uma glicemia possivelmente alterada
+estava boa, e a IA repetia isso para a paciente com a voz do consultório.
+
+Hoje os dois dizem o FATO e o que o app NÃO sabe: o número, a data, e
+_"o app NÃO registra se foi em jejum ou depois de comer … NUNCA afirme que este
+valor está dentro do alvo; pergunte a ela quando mediu antes de comentar"_.
+
+- ⚠️ **A PRESSÃO fica como estava, e a distinção é a razão inteira:** ali os
+  dois números SÃO a medida inteira e não existe ambiguidade de jejum.
+- ⚠️ **E os dois leitores são cobrados JUNTOS** por um teste só. Consertar um e
+  deixar o vizinho de pé é a forma mais comum de defeito deste repositório.
+- ⚠️ **A asserção é sobre a AFIRMAÇÃO, nunca sobre a palavra.** A proibição
+  contém a frase proibida ("NUNCA diga que este valor está … dentro do alvo"),
+  então um `not.toContain` cru fica vermelho exatamente sobre o conserto. O que
+  se cobra é que nada ANTES do "NUNCA" reivindique o alvo.
+
+### ⚠️ 2. A MÃE DE GÊMEOS ERA MEDIDA PELA FAIXA DE UM FETO
+
+`iomGain` é a curva semanal do IOM/NAM 2009 para gestação **de um bebê**, e o
+bloco desenhava com ela a posição do ganho de QUALQUER paciente — inclusive a
+de gêmeos, cuja faixa é outra. O app dizia "dentro da faixa de referência" sobre
+uma faixa que não vale para ela.
+
+- ⚠️ **O app CALA a posição e nunca inventa uma curva.** As faixas provisórias
+  do IOM para gemelar são **de TERMO** (peso adequado 17–25 kg, sobrepeso
+  14–23, obesidade 11–19), não existem para baixo peso e não existem para
+  trigêmeos — transformá-las numa curva semanal seria fabricar o número que o
+  conserto veio impedir. O que sai é o FATO (o ganho dela) mais "quem define a
+  faixa de uma gestação múltipla é o médico".
+- **A entrada vem de `patient_filhos`** (`aCaminho(filhos).length >= 2`), pela
+  leitura ÚNICA `lerFilhos` — nunca um `select` novo —, na mesma onda das
+  outras quatro.
+- ⚠️ **NÃO SABER VALE UM BEBÊ**, que é o estado de hoje: a tabela ausente ou a
+  leitura falhando devolvem `false` e a faixa continua a de sempre. Calar por
+  dúvida a tiraria de toda paciente sempre que a tabela oscilasse.
+
+### ⚠️ 3. A PERDA DE PESO NÃO ESCALAVA — o app tinha os dois pesos e não fazia a conta
+
+A única menção a perda de peso no prompt vinha de carona na linha de enjoo, e
+só quando ela marcava "Mal-estar" duas vezes no diário. **Quem registrava o peso
+caindo há um mês e não escrevia no diário não disparava nada.**
+
+- **`sinalPerdaDePeso` mora em `sinais-clinicos.ts`**, porque é um LIMITE
+  CLÍNICO e o arquivo declara que nenhum se escreve fora dele. O corte é 5% do
+  peso pré-gestacional — o mesmo 5% da definição de hiperêmese, ao lado de
+  vômitos persistentes e desidratação, que este app não mede e não vai afirmar.
+- ⚠️ **NUNCA `grave`.** Perda isolada não é emergência de minutos, e marcá-la
+  grave poria uma queda de 3 kg acima de um SANGRAMENTO na fila do consultório.
+- ⚠️ **Quem gateia é o CHAMADOR**: depois do parto e no luto o corpo perde peso,
+  e é esperado. A régua só compara dois números.
+- ⚠️ **E ela NÃO depende do IMC.** O bloco do ganho exige altura (para o IMC);
+  amarrada a ele, a perda de peso não sairia para a paciente sem altura
+  cadastrada — que existe.
+- ⚠️ **E a mutação achou uma guarda MORTA que eu tinha acabado de escrever:**
+  `if (perdaKg <= 0) return normal` nunca muda resposta nenhuma (quem ganhou
+  peso tem `pct` negativo e já cai no corte). Guarda que não muda nada é
+  armadilha para quem ler depois — a mesma lição do adiamento do NPS. Saiu.
+
+### ⚠️ 4. O PROMPT BASE NÃO TINHA UMA LINHA SOBRE ALERGIA
+
+A instrução de alergia vivia **só dentro do bloco de contexto** — e
+`blocoDaNutricao` falha CALADA de propósito: qualquer leitura ruim devolve `""`.
+Numa oscilação de rede a nutricionista respondia a partir do prompt base, que
+não dizia uma palavra sobre alergia, e sugeria camarão para quem tem alergia a
+frutos do mar.
+
+Hoje a regra está nos DOIS prompts (o normal e o do luto), e a metade que
+importa é a segunda: ⚠️ **bloco ausente NÃO vale "ela não tem alergia" — vale
+PERGUNTAR.** É o mesmo fail-closed do resto do app.
+
+### ⚠️ 5. Três instruções que brigavam entre si
+
+- **"NUNCA dê valores calóricos rígidos SEM CONHECER O PERFIL COMPLETO"** — o
+  condicional dizia ao modelo que bastava conhecer o perfil para dar número, e o
+  bloco de contexto passou a entregar IMC, ganho, semana e glicemia: a exceção
+  estava sendo satisfeita todo dia, numa base em que ~13% das puérperas têm
+  transtorno alimentar. Virou incondicional.
+- **"Seja concisa (3–6 frases)"** brigava com as três ferramentas da aba, que
+  pedem uma lista (prato, receita, o que tem em casa). O limite continua na
+  conversa e abre exceção nomeada para elas.
+- **A lista de evitar não tinha CAFEÍNA, CHÁ DE ERVA nem a higiene da
+  TOXOPLASMOSE** — as três perguntas mais comuns da gestação, que a paciente ia
+  buscar fora do app. ⚠️ E o chá nunca é liberado sem o médico: vários são
+  desaconselhados, e "pode tomar" dito pela IA do consultório é conduta.
+
+### ⚠️ 6. O APP RECOMENDAVA O PEIXE QUE ELE MESMO MANDA LIMITAR
+
+A frase da semana 32–36 dizia _"sardinha, **atum** e outros peixes … duas vezes
+por semana"_, e o cartão de vitamina B6 listava atum — enquanto
+`brain-starter-pack.ts` manda "evite … atum em excesso" e a lista de evitar fala
+em "peixes com mercúrio". Duas peças respondendo à MESMA pergunta ("que peixe eu
+como?") e nunca comparadas.
+
+Ficaram sardinha e salmão, com "de baixo mercúrio" escrito. ⚠️ Tirar o peixe
+inteiro seria trocar uma contradição por uma omissão — o DHA é o assunto da
+semana. Há teste em `contradicoes-fechadas`.
+
+### 7. O que o médico escreveu para ela na última consulta
+
+`consultations.resumo_paciente` — o campo rotulado "o que ela pode ver", escrito
+por ele PARA ela — existe desde jul/2026 e a nutricionista nunca o leu. Num
+consultório de alto risco isso é o buraco de personalização que mais importa: a
+paciente com diabetes gestacional confirmada recebia a mesma resposta de todo
+mundo.
+
+- ⚠️ **SÓ `resumo_paciente`, e ele nem PEDE `achados`/`conduta`** — o que não é
+  lido não vaza. É a mesma linha que `minhasConsultas` e o export da LGPD já
+  traçam; um terceiro leitor traçando-a noutro lugar seria o vazamento.
+- ⚠️ **UMA, a mais recente.** Um histórico de resumos seria o prontuário dela
+  dentro do prompt por outro caminho.
+- ⚠️ **SEÇÃO PRÓPRIA, e não mais uma linha da lista.** O cabeçalho de lá diz
+  "dados que ela registrou no app", e este texto é de OUTRA PESSOA — pendurá-lo
+  ali erraria a procedência, que é justamente o que torna a entrada segura.
+- ⚠️ **CONTEXTO, NUNCA INSTRUÇÃO**: vai entre aspas, com a data, dizendo que é
+  texto dele para ela — "NUNCA repita como se fosse orientação sua, NUNCA
+  prescreva, dose ou mude nada a partir disso, NUNCA dê nome a diagnóstico".
+- ⚠️ **NO MODO CUIDADO NEM É LIDA**, e o portão é estrutural (a consulta não
+  sai): o resumo fala da gestação em curso.
+
+### 8. Três pontas que falhavam em silêncio
+
+- ⚠️ **Tabela ausente no NAVEGADOR é `PGRST205`, nunca `42P01`.** A gravação da
+  memória testava só o segundo, então quem não rodou
+  `APLICAR_MEMORIA_DA_NUTRICAO.sql` registrava um aviso a CADA resposta da
+  nutricionista — alarme que grita sempre é alarme que se aprende a ignorar.
+  Os dois helpers de `postgrest.ts` (`tabelaAusente`, `colunaAusente`) existem
+  para isso e não estavam sendo usados aqui.
+- ⚠️ **A porta fechada deixava a foto pendurada na mensagem seguinte.** `fotos`
+  é indexado pela POSIÇÃO da mensagem; o 402 desfaz o turno dela e a miniatura
+  ficava no índice liberado — a próxima pergunta, de TEXTO, era desenhada com a
+  foto do prato que ela tentou mandar.
+- ⚠️ **O select de `health_logs` não tem escada, e isso é seguro HOJE por um
+  motivo que pode acabar:** as cinco colunas são das primeiras migrations, então
+  não há degrau a derivar (uma escada agora seria código morto). O risco é a
+  PRÓXIMA coluna — um 42703 derruba o select inteiro e a nutricionista perde
+  peso, glicemia E pressão de uma vez, sem nada quebrado. Há teste que fica
+  vermelho para quem acrescentar coluna ali.
+
+### ⚠️ E as armadilhas de teste, de novo
+
+- **Dois testes travavam a GRAFIA da chamada** e reprovaram uma chamada que só
+  ganhou argumento — décima sexta vez. O que se cobra hoje é que cada ENTRADA
+  chegue à régua, e `argumentosDe` conta parênteses (um `\([^)]*\)` para no
+  primeiro `)` e deixa verde a mutação que nunca chegou ao argumento).
+- ⚠️ **Uma âncora de fatia num COMENTÁRIO**: eu fechei o recorte do chat em
+  "Alterados dos", que `semComentarios` apaga — `indexOf` devolveu −1, a fatia
+  foi até o fim do arquivo e a mutação passou verde. **As duas âncoras de uma
+  fatia são de CÓDIGO**, e a fatia tem asserção de tamanho.
+- ⚠️ **E um `not.toMatch` cru sobre a palavra proibida** ficava vermelho sobre o
+  próprio conserto, porque a PROIBIÇÃO cita a frase. Cobre-se a afirmação.
+
+**Sem SQL:** tudo sai de tabelas e colunas que já existem — `patient_filhos`
+(`APLICAR_COMUNIDADE_VIVA.sql`) e `consultations` (`APLICAR_CONSULTA.sql`) têm
+recuo próprio, então quem não os rodou continua exatamente como estava.
+
 ## O leque da Comunidade voltou a caber na tela (set/2026)
 
 O dono, com a foto do aparelho: _"muitas opções e muito confuso"_. O leque

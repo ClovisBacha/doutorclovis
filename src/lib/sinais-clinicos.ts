@@ -133,6 +133,54 @@ export function sinalGlicemia(valor?: number | null): Sinal | null {
 }
 
 /**
+ * PERDA DE PESO NA GESTAÇÃO EM CURSO.
+ *
+ * ⚠️ **A RÉGUA MORA AQUI PORQUE É UM LIMITE CLÍNICO**, e este arquivo declara
+ * que nenhum deles se escreve fora dele. A nutricionista é a primeira leitora;
+ * o painel do médico pode passar a ser a segunda, e aí as duas dizem a mesma
+ * coisa sobre o mesmo peso.
+ *
+ * O corte é **5% do peso pré-gestacional** — o número operacional que a
+ * literatura usa para separar o enjoo comum do primeiro trimestre do quadro
+ * que pede avaliação (é o mesmo 5% da definição de hiperêmese gravídica, ao
+ * lado de vômitos persistentes e desidratação, que este app não mede e não vai
+ * afirmar).
+ *
+ * ⚠️ **NUNCA `grave`.** Perda de peso isolada não é emergência de minutos: é
+ * motivo de a paciente falar com o médico dela. Marcar grave aqui poria uma
+ * queda de 3 kg acima de um sangramento na fila do consultório.
+ *
+ * ⚠️ **E ELA NÃO VALE DEPOIS DO PARTO NEM NO LUTO** — o corpo perde peso nos
+ * dois casos, e é esperado. Quem gateia isso é o chamador; a régua só sabe
+ * comparar dois números.
+ */
+export const PERDA_DE_PESO_PCT = 5;
+
+export function sinalPerdaDePeso(
+  pesoAtualKg?: number | null,
+  pesoPreGestacionalKg?: number | null,
+): Sinal | null {
+  if (pesoAtualKg == null || pesoPreGestacionalKg == null) return null;
+  if (!Number.isFinite(pesoAtualKg) || !Number.isFinite(pesoPreGestacionalKg)) return null;
+  /* Os dois pisos de `FAIXAS_PLAUSIVEIS` para peso: número que não pode ser
+     peso não vira perda de peso. */
+  if (pesoAtualKg <= 0 || pesoPreGestacionalKg <= 0) return null;
+  const perdaKg = pesoPreGestacionalKg - pesoAtualKg;
+  const pct = (perdaKg / pesoPreGestacionalKg) * 100;
+  /* ⚠️ Um `if (perdaKg <= 0)` acima disto seria CÓDIGO MORTO: quem ganhou peso
+     tem `pct` negativo, que já cai aqui e devolve o mesmo `normal`. Ele estava
+     escrito, a mutação que o apagava passou VERDE, e uma guarda que não muda
+     resposta nenhuma é armadilha para quem ler depois — a mesma lição do
+     adiamento do NPS. Quem responde por "ganhar peso não é perder" é esta
+     linha, e há teste com esse nome. */
+  if (pct < PERDA_DE_PESO_PCT) return { gravidade: "normal", nota: "" };
+  return {
+    gravidade: "atencao",
+    nota: `Perdeu ${perdaKg.toFixed(1)} kg desde antes da gestação (${pct.toFixed(0)}% do peso)`,
+  };
+}
+
+/**
  * Saturação de oxigênio.
  *
  * Existe porque o dado atravessava o sistema inteiro — a paciente registra, a

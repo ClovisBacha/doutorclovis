@@ -14,8 +14,10 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import {
+  PERDA_DE_PESO_PCT,
   diasDeSilencio,
   sinalGlicemia,
+  sinalPerdaDePeso,
   sinalPressao,
   sinalSaturacao,
   sinalSilencio,
@@ -270,5 +272,58 @@ describe("contrações regulares antes das 37 semanas", () => {
     const cortes = arq.slice(arq.indexOf("function cortesDoPadrao("));
     expect(cortes).toContain("if (intervalo <= 5)");
     expect(cortes).toContain("if (intervalo <= 10)");
+  });
+});
+
+describe("⚠️ perda de peso na gestação em curso", () => {
+  /* O app tinha os dois pesos e nunca fazia esta conta: a única menção a perda
+     de peso no prompt da nutricionista vinha de carona na linha de enjoo, e só
+     quando ela marcava "Mal-estar" duas vezes no diário. Quem registrava o
+     peso caindo há um mês e não escrevia no diário não disparava nada. */
+  test("abaixo do corte não é sinal — o enjoo do 1º trimestre é comum", () => {
+    /* 68 → 65,6 kg é 3,5%: perda real, e abaixo do que pede avaliação. */
+    expect(sinalPerdaDePeso(65.6, 68)?.gravidade).toBe("normal");
+  });
+
+  test(`a partir de ${PERDA_DE_PESO_PCT}% do peso pré-gestacional, atenção`, () => {
+    const s = sinalPerdaDePeso(66.5, 70); // 5% exatos
+    expect(s?.gravidade).toBe("atencao");
+    expect(s?.nota).toMatch(/3[,.]5 kg/);
+    expect(s?.nota).toMatch(/5% do peso/);
+  });
+
+  test("⚠️ NUNCA `grave` — perda isolada não é emergência de minutos", () => {
+    /* Marcar grave aqui poria uma queda de peso acima de um SANGRAMENTO na
+       fila do consultório, que é a ordenação ao contrário. */
+    for (const atual of [60, 50, 40, 30]) {
+      expect(sinalPerdaDePeso(atual, 70)?.gravidade).not.toBe("grave");
+    }
+  });
+
+  test("ganhar peso não é perder — e zero também não", () => {
+    expect(sinalPerdaDePeso(74, 70)?.gravidade).toBe("normal");
+    expect(sinalPerdaDePeso(70, 70)?.gravidade).toBe("normal");
+  });
+
+  test("sem um dos dois pesos ela CALA, nunca chuta", () => {
+    expect(sinalPerdaDePeso(null, 70)).toBeNull();
+    expect(sinalPerdaDePeso(66, null)).toBeNull();
+    expect(sinalPerdaDePeso(undefined, undefined)).toBeNull();
+  });
+
+  test("número impossível não vira alarme", () => {
+    expect(sinalPerdaDePeso(NaN, 70)).toBeNull();
+    expect(sinalPerdaDePeso(0, 70)).toBeNull();
+    expect(sinalPerdaDePeso(66, -70)).toBeNull();
+    expect(sinalPerdaDePeso(66, Infinity)).toBeNull();
+  });
+
+  test("⚠️ o limite mora AQUI, e não numa cópia dentro da nutrição", () => {
+    /* `sinais-clinicos` declara que nenhum limite clínico se escreve fora
+       dele. A nutricionista é a primeira leitora; o painel do médico pode ser
+       a segunda, e as duas têm de dizer a mesma coisa sobre o mesmo peso. */
+    const nutricao = readFileSync("src/lib/nutricao-contexto.ts", "utf8");
+    expect(nutricao).toContain("sinalPerdaDePeso");
+    expect(nutricao).not.toMatch(/\b5\s*\/\s*100|0\.05\b/);
   });
 });

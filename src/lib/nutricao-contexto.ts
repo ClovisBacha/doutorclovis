@@ -19,7 +19,7 @@
  * para quem acabou de perdê-lo. A precedência é a mesma de `blocoDaPaciente`.
  */
 import { computeGestation, trimesterForWeek } from "./gestacao";
-import { sinalGlicemia, sinalPressao } from "./sinais-clinicos";
+import { sinalGlicemia, sinalPerdaDePeso, sinalPressao } from "./sinais-clinicos";
 import { imcPreGestacional } from "./curva-de-ganho";
 import { diasEntre } from "./filhos";
 import { MOOD_LABEL } from "./humor-e-saudacao";
@@ -173,6 +173,23 @@ export function perfilNutricionalDe(args: {
   /** O humor do diário (só o emoji) e a triagem (só nível e ids) — ver acima. */
   diario?: LinhaDoDiario[] | null;
   triagens?: LinhaDaTriagem[] | null;
+  /**
+   * Ela está esperando mais de um bebê (`patient_filhos` com `nascido_em` nulo).
+   *
+   * ⚠️ **NÃO SABER VALE UM BEBÊ**, que é o estado de hoje: a leitura falhando
+   * devolve `false` e o bloco desenha a faixa de um feto só — exatamente o que
+   * o app fazia antes deste campo existir. O contrário (calar por dúvida)
+   * tiraria a faixa de toda paciente sempre que a tabela oscilasse.
+   */
+  gestacaoMultipla?: boolean;
+  /**
+   * O que o médico escreveu PARA ELA na última consulta (`resumo_paciente`).
+   *
+   * ⚠️ Chega pronto do servidor, que já o gateia no Modo Cuidado (nem lê). O
+   * portão é repetido aqui de propósito: é o único texto de terceiro do bloco,
+   * e o `careMode` desta função é a fonte da verdade do resto dele.
+   */
+  resumoDoMedico?: { texto: string; quando: string } | null;
 }): PerfilNutricional {
   const { perfil, logs, careMode, agora, doAparelho, diario, triagens } = args;
   const humores = humoresDe(diario, agora);
@@ -201,6 +218,18 @@ export function perfilNutricionalDe(args: {
   const altura = perfil.height_cm ?? null;
   const imc = prePreg != null && altura != null ? imcPreGestacional(prePreg, altura) : null;
   const ganhoKg = pesoAtual != null && prePreg != null ? pesoAtual - prePreg : null;
+
+  /* ⚠️ A PERDA DE PESO SÓ VALE NA GESTAÇÃO EM CURSO. Depois do parto e no luto
+     o corpo perde peso, e é esperado — a régua de `sinais-clinicos` só compara
+     dois números, e quem gateia é este chamador (o comentário dela diz isso).
+     ⚠️ E ela NÃO exige altura: o bloco do ganho exige (precisa do IMC), e a
+     paciente sem altura cadastrada — que existe — ficaria sem nenhum dos
+     dois. */
+  const sinalDaPerda = careMode || posParto ? null : sinalPerdaDePeso(pesoAtual, prePreg);
+  const perdaDePeso =
+    sinalDaPerda && sinalDaPerda.gravidade !== "normal" && pesoAtual != null && prePreg != null
+      ? { kg: prePreg - pesoAtual, pct: ((prePreg - pesoAtual) / prePreg) * 100 }
+      : null;
 
   /* Glicemia: a última, e quantas fora do alvo na janela. */
   const comGlicemia = logs.filter((l) => l.glucose_mg_dl != null);
@@ -232,11 +261,15 @@ export function perfilNutricionalDe(args: {
     diasDoBebe: diasDoBebe != null && diasDoBebe >= 0 ? diasDoBebe : null,
     imc,
     ganhoKg,
+    gestacaoMultipla: Boolean(args.gestacaoMultipla) && !careMode && !posParto,
+    resumoDoMedico: careMode ? null : (args.resumoDoMedico ?? null),
+    perdaDePeso,
     glicemia:
       ultima && sinalDaUltima
         ? {
             valor: ultima.glucose_mg_dl as number,
             alterada: sinalDaUltima.gravidade !== "normal",
+            nota: sinalDaUltima.nota,
             quando: new Date(`${ultima.log_date}T12:00:00`).toLocaleDateString("pt-BR"),
           }
         : null,

@@ -94,6 +94,124 @@ describe("⚠️ a nutricionista sabe que ela pariu", () => {
   });
 });
 
+/**
+ * Os argumentos de uma chamada, contando parênteses.
+ *
+ * ⚠️ Um `\\([^)]*\\)` para no PRIMEIRO `)` — e a chamada aqui tem objetos e
+ * chamadas aninhadas dentro. A fatia curta fica verde sem nunca ter chegado ao
+ * argumento que o teste existe para cobrar.
+ */
+function argumentosDe(fonte: string, marcador: string): string {
+  const i = fonte.indexOf(marcador);
+  if (i < 0) throw new Error(`marcador não encontrado: ${marcador}`);
+  let n = 0;
+  for (let j = i + marcador.length - 1; j < fonte.length; j++) {
+    if (fonte[j] === "(") n++;
+    else if (fonte[j] === ")" && --n === 0) return fonte.slice(i + marcador.length, j);
+  }
+  throw new Error("parênteses não fecham");
+}
+
+describe("⚠️ a perda de peso é gateada pelo CHAMADOR, não pela régua", () => {
+  /* `sinalPerdaDePeso` só compara dois números — e o comentário dela diz que
+     quem decide se aquilo faz sentido é este adaptador. Depois do parto e no
+     luto o corpo perde peso, e é ESPERADO. */
+  const GRAVIDA = { lmp_date: dias(90), pre_pregnancy_weight_kg: 70 };
+  const LOGS = [{ log_date: dias(2), weight_kg: 65, glucose_mg_dl: null }] as any;
+
+  test("na gestação em curso ela sai, com os kg e a proporção", () => {
+    const p = perfilNutricionalDe({ perfil: GRAVIDA, logs: LOGS, careMode: false, agora: AGORA });
+    expect(p.perdaDePeso).not.toBeNull();
+    expect(p.perdaDePeso!.kg).toBeCloseTo(5, 5);
+    expect(p.perdaDePeso!.pct).toBeCloseTo(7.14, 1);
+  });
+
+  test("⚠️ no Modo Cuidado, NÃO — e o bloco também não fala nisso", () => {
+    const p = perfilNutricionalDe({ perfil: GRAVIDA, logs: LOGS, careMode: true, agora: AGORA });
+    expect(p.perdaDePeso).toBeNull();
+    expect(blocoDaPaciente(p)).not.toMatch(/PERDA DE PESO/);
+  });
+
+  test("⚠️ depois do parto, NÃO — perder peso ali é o esperado", () => {
+    const p = perfilNutricionalDe({
+      perfil: { ...PARIU, pre_pregnancy_weight_kg: 70 },
+      logs: LOGS,
+      careMode: false,
+      agora: AGORA,
+    });
+    expect(p.posParto).toBe(true);
+    expect(p.perdaDePeso).toBeNull();
+  });
+
+  test("abaixo do corte da régua, nada — o adaptador não inventa um segundo limite", () => {
+    const p = perfilNutricionalDe({
+      perfil: GRAVIDA,
+      logs: [{ log_date: dias(2), weight_kg: 68, glucose_mg_dl: null }] as any,
+      careMode: false,
+      agora: AGORA,
+    });
+    expect(p.perdaDePeso).toBeNull();
+  });
+
+  test("⚠️ e a gestação múltipla não sobrevive ao luto nem ao pós-parto", () => {
+    const emCurso = perfilNutricionalDe({
+      perfil: GRAVIDA,
+      logs: [],
+      careMode: false,
+      agora: AGORA,
+      gestacaoMultipla: true,
+    });
+    expect(emCurso.gestacaoMultipla).toBe(true);
+    for (const caso of [
+      { perfil: GRAVIDA, careMode: true },
+      { perfil: PARIU, careMode: false },
+    ]) {
+      const p = perfilNutricionalDe({
+        perfil: caso.perfil,
+        logs: [],
+        careMode: caso.careMode,
+        agora: AGORA,
+        gestacaoMultipla: true,
+      });
+      expect(p.gestacaoMultipla).toBe(false);
+    }
+  });
+
+  test("sem a entrada, vale UM bebê — que é o estado de hoje", () => {
+    const p = perfilNutricionalDe({ perfil: GRAVIDA, logs: [], careMode: false, agora: AGORA });
+    expect(p.gestacaoMultipla).toBe(false);
+  });
+});
+
+describe("⚠️ o resumo da consulta não sobrevive ao Modo Cuidado", () => {
+  const GRAVIDA = { lmp_date: dias(90) };
+  const RESUMO = { texto: "Está tudo bem com a Helena.", quando: "12/08/2026" };
+
+  test("na gestação em curso ele chega ao bloco", () => {
+    const p = perfilNutricionalDe({
+      perfil: GRAVIDA,
+      logs: [],
+      careMode: false,
+      agora: AGORA,
+      resumoDoMedico: RESUMO,
+    });
+    expect(p.resumoDoMedico).toEqual(RESUMO);
+    expect(blocoDaPaciente(p)).toContain("Está tudo bem com a Helena.");
+  });
+
+  test("⚠️ no luto NÃO — o resumo fala da gestação em curso", () => {
+    const p = perfilNutricionalDe({
+      perfil: GRAVIDA,
+      logs: [],
+      careMode: true,
+      agora: AGORA,
+      resumoDoMedico: RESUMO,
+    });
+    expect(p.resumoDoMedico).toBeNull();
+    expect(blocoDaPaciente(p)).not.toContain("Helena");
+  });
+});
+
 describe("⚠️ as pontas que a régua não alcança", () => {
   const SERVIDOR = semComentarios(readFileSync("src/lib/nutricao-contexto.server.ts", "utf8"));
   const TELA = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
@@ -103,10 +221,50 @@ describe("⚠️ as pontas que a régua não alcança", () => {
     expect(SERVIDOR).toMatch(/colunaAusente\(perfilRes\?\.error\)/);
     expect(SERVIDOR).toMatch(/replace\(",birth_date", ""\)/);
     /* E o que ele monta passa pela régua pura, COM o contexto do aparelho — sem
-       ele, água e suplementos morreriam no servidor em silêncio. */
-    expect(SERVIDOR).toMatch(
-      /perfilNutricionalDe\(\{ perfil, logs, careMode, agora, doAparelho, diario, triagens \}\)/,
+       ele, água e suplementos morreriam no servidor em silêncio.
+       ⚠️ A asserção cobra a GARANTIA (cada entrada chega à régua), nunca a
+       grafia da chamada: travar o literal já reprovou uma vez a chamada que só
+       ganhou um argumento a mais. */
+    const chamada = argumentosDe(SERVIDOR, "perfilNutricionalDe(");
+    for (const entrada of [
+      "perfil",
+      "logs",
+      "careMode",
+      "agora",
+      "doAparelho",
+      "diario",
+      "triagens",
+    ]) {
+      expect(chamada).toContain(entrada);
+    }
+  });
+
+  test("⚠️ a consulta entra SÓ pelo `resumo_paciente`, e nem é LIDA no luto", () => {
+    /* `achados` e `conduta` são o prontuário, escrito para outro médico — e
+       eles nem aparecem no `select`: o que não é pedido não tem como vazar.
+       É a mesma linha que `minhasConsultas` e o export da LGPD já traçam. */
+    const sel = SERVIDOR.slice(SERVIDOR.indexOf('.from("consultations")'));
+    expect(sel.slice(0, 300)).toContain('.select("occurred_at,resumo_paciente")');
+    expect(sel.slice(0, 300)).not.toMatch(/achados|conduta/);
+    /* UMA, a mais recente: um histórico de resumos seria o prontuário dela
+       dentro do prompt por outro caminho. */
+    expect(sel.slice(0, 400)).toMatch(/\.limit\(1\)/);
+    /* ⚠️ E o portão do luto é ESTRUTURAL — a consulta nem sai. */
+    const antes = SERVIDOR.slice(0, SERVIDOR.indexOf('.from("consultations")'));
+    expect(antes.slice(-200)).toMatch(/careMode\s*\?\s*Promise\.resolve\(null\)/);
+  });
+
+  test("⚠️ e a gestação MÚLTIPLA chega pela leitura única de `patient_filhos`", () => {
+    /* A faixa de ganho que o bloco desenha é de UM feto. Sem esta entrada, a
+       mãe de gêmeos era medida pela régua errada e o app dizia se o ganho dela
+       estava "dentro do esperado" sobre uma faixa que não vale para ela. */
+    expect(SERVIDOR).toMatch(/lerFilhos\(/);
+    expect(argumentosDe(SERVIDOR, "perfilNutricionalDe(")).toMatch(
+      /gestacaoMultipla:.*aCaminho\(filhos\)\.length >= 2/,
     );
+    /* ⚠️ Falha de leitura (inclusive tabela ausente) vale UM bebê, que é o
+       estado de hoje — calar a faixa por dúvida a tiraria de todo mundo. */
+    expect(argumentosDe(SERVIDOR, "perfilNutricionalDe(")).toMatch(/filhos \? .* : false/);
   });
 
   test("a tela deriva o pós-parto de `birth_date` e troca a frase, a saudação e o foco", () => {

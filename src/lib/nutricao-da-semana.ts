@@ -97,7 +97,15 @@ const FAIXAS: Faixa[] = [
     ate: 36,
     titulo: "O cérebro dele está no auge",
     texto:
-      "É agora que ele monta a maior parte do cérebro e da retina — sardinha, atum e outros peixes que você já come, duas vezes por semana, são a melhor fonte disso.",
+      /* ⚠️ **SEM ATUM, e a razão é o próprio app.** O banco do cérebro
+         (`brain-starter-pack.ts`) manda "evite … atum em excesso" e nomeia os
+         de baixo mercúrio (sardinha, tilápia, salmão); a lista de evitar do
+         prompt fala em "peixes com mercúrio". Escrever "atum" aqui era o app
+         recomendando duas vezes por semana o peixe que ele mesmo manda
+         limitar — e a paciente lê "atum" como o enlatado E como o bife de
+         atum, que é justamente o de mercúrio alto. Os nomeados são os que as
+         duas pontas já concordam. */
+      "É agora que ele monta a maior parte do cérebro e da retina — sardinha, salmão e outros peixes de baixo mercúrio, duas vezes por semana, são a melhor fonte disso.",
   },
   {
     de: 37,

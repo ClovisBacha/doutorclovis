@@ -24,6 +24,8 @@ import {
   type LinhaDoPerfil,
 } from "./nutricao-contexto";
 import { colunaAusente } from "./postgrest";
+import { lerFilhos } from "./filhos.functions";
+import { aCaminho } from "./filhos";
 
 /** 30 dias: o suficiente para um padrão glicêmico, curto o bastante para ser o agora. */
 const JANELA_DIAS = 30;
@@ -66,8 +68,19 @@ export async function blocoDaNutricao(
        diário (`content`) e a nota da triagem (`note`) são o que a paciente
        ESCREVEU, e não entram no prompt — a régua pura só conhece catálogo, e
        o que não é pedido ao banco não tem como vazar. */
-    const [perfilCheio, logsRes, diarioRes, triagemRes] = await Promise.all([
+    const [perfilCheio, logsRes, diarioRes, triagemRes, filhos, consultaRes] = await Promise.all([
       lerPerfil(DEGRAUS_DO_PERFIL[0]),
+      /* ⚠️ **ESTE SELECT NÃO TEM ESCADA, e é seguro HOJE por um motivo que
+         pode acabar:** as cinco colunas existem desde as primeiras migrations,
+         então não há degrau a derivar — uma escada agora seria um recuo que
+         nunca roda, código morto com cara de proteção (a mesma lição da guarda
+         que saiu de `sinalPerdaDePeso`).
+         ⚠️ **O que NÃO pode acontecer é alguém acrescentar uma coluna nova
+         aqui sem degrau.** O 42703 derruba o select INTEIRO, e num golpe só a
+         nutricionista perde peso, glicemia E pressão — sem erro na tela, sem
+         nada quebrado: os três recursos simplesmente deixam de existir. Quem
+         acrescentar coluna aqui deriva a escada por remoção, como
+         `DEGRAUS_DO_PERFIL` acima. */
       (supabaseAdmin as any)
         .from("health_logs")
         .select("log_date,weight_kg,glucose_mg_dl,systolic,diastolic")
@@ -90,6 +103,36 @@ export async function blocoDaNutricao(
         .gte("created_at", `${desde}T00:00:00Z`)
         .order("created_at", { ascending: false })
         .limit(20),
+      /* ⚠️ **Quinta leitura, na MESMA onda** — e ela existe porque a faixa de
+         ganho de peso que o bloco desenha é de UM feto. `lerFilhos` é o leitor
+         único de `patient_filhos` (nunca um `select` novo aqui) e devolve
+         `null` em qualquer erro, inclusive tabela ausente: quem ainda não
+         rodou `APLICAR_COMUNIDADE_VIVA.sql` continua exatamente como estava.
+         ⚠️ **NÃO SABER VALE UM BEBÊ**, que é o estado de hoje — calar a faixa
+         por dúvida a tiraria de toda paciente sempre que a tabela oscilasse. */
+      lerFilhos(supabaseAdmin as any, patientId).catch(() => null),
+      /* ⚠️ **O QUE O MÉDICO ESCREVEU PARA ELA na última consulta.** Este
+         consultório é de gestação de ALTO RISCO, e a nutricionista não sabia
+         nada do que foi diagnosticado nesta gestação: a paciente com diabetes
+         gestacional confirmada recebia a mesma resposta de todo mundo.
+         ⚠️ **SÓ `resumo_paciente`** — o campo rotulado "o que ela pode ver",
+         escrito para ela. `achados` e `conduta` são o prontuário, escrito para
+         outro médico, e nem são PEDIDOS aqui: o que não é lido não vaza. É a
+         mesma linha que `minhasConsultas` e o export da LGPD já traçam.
+         ⚠️ **UMA, a mais recente.** Um histórico de resumos seria o prontuário
+         dela dentro do prompt por outro caminho.
+         ⚠️ **NO MODO CUIDADO NEM É LIDA** — o resumo fala da gestação em
+         curso, e um portão estrutural é melhor que um `if` no fim. */
+      careMode
+        ? Promise.resolve(null)
+        : (supabaseAdmin as any)
+            .from("consultations")
+            .select("occurred_at,resumo_paciente")
+            .eq("user_id", patientId)
+            .not("resumo_paciente", "is", null)
+            .order("occurred_at", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
     ]);
     /* Desce a escada enquanto a falta for de COLUNA; qualquer outro erro para. */
     let perfilRes = perfilCheio;
@@ -111,12 +154,32 @@ export async function blocoDaNutricao(
       logsRes?.error ? [] : ((logsRes?.data ?? []) as LinhaDeSaude[])
     ) as LinhaDeSaude[];
 
+    /* A consulta falhando (inclusive tabela ausente) cala só a seção dela. */
+    const consulta = consultaRes?.error ? null : (consultaRes?.data ?? null);
+    const resumoDoMedico =
+      consulta && typeof consulta.resumo_paciente === "string" && consulta.resumo_paciente.trim()
+        ? {
+            texto: consulta.resumo_paciente,
+            quando: new Date(consulta.occurred_at).toLocaleDateString("pt-BR"),
+          }
+        : null;
+
     /* Diário e triagem falhando calam só a parte deles — como o histórico. */
     const diario = (diarioRes?.error ? [] : (diarioRes?.data ?? [])) as LinhaDoDiario[];
     const triagens = (triagemRes?.error ? [] : (triagemRes?.data ?? [])) as LinhaDaTriagem[];
 
     return blocoDaPaciente(
-      perfilNutricionalDe({ perfil, logs, careMode, agora, doAparelho, diario, triagens }),
+      perfilNutricionalDe({
+        perfil,
+        logs,
+        careMode,
+        agora,
+        doAparelho,
+        diario,
+        triagens,
+        gestacaoMultipla: filhos ? aCaminho(filhos).length >= 2 : false,
+        resumoDoMedico,
+      }),
     );
   } catch (e) {
     console.error("[nutricao] contexto inacessível — respondendo sem ele", e);
