@@ -15,7 +15,12 @@
  * leitura do mesmo campo poderia discordar da primeira.
  */
 import { blocoDaPaciente } from "./nutricao-perfil";
-import { perfilNutricionalDe, type LinhaDeSaude, type LinhaDoPerfil } from "./nutricao-contexto";
+import {
+  perfilNutricionalDe,
+  type DoAparelho,
+  type LinhaDeSaude,
+  type LinhaDoPerfil,
+} from "./nutricao-contexto";
 import { colunaAusente } from "./postgrest";
 
 /** 30 dias: o suficiente para um padrão glicêmico, curto o bastante para ser o agora. */
@@ -40,6 +45,8 @@ export async function blocoDaNutricao(
   patientId: string,
   careMode: boolean,
   agora = new Date(),
+  /** O que a tela mandou (água e suplementos de hoje) — já saneado por `doAparelhoDe`. */
+  doAparelho?: DoAparelho,
 ): Promise<string> {
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -57,7 +64,7 @@ export async function blocoDaNutricao(
       lerPerfil(DEGRAUS_DO_PERFIL[0]),
       (supabaseAdmin as any)
         .from("health_logs")
-        .select("log_date,weight_kg,glucose_mg_dl")
+        .select("log_date,weight_kg,glucose_mg_dl,systolic,diastolic")
         .eq("user_id", patientId)
         .gte("log_date", desde)
         .order("log_date", { ascending: false })
@@ -83,7 +90,7 @@ export async function blocoDaNutricao(
       logsRes?.error ? [] : ((logsRes?.data ?? []) as LinhaDeSaude[])
     ) as LinhaDeSaude[];
 
-    return blocoDaPaciente(perfilNutricionalDe({ perfil, logs, careMode, agora }));
+    return blocoDaPaciente(perfilNutricionalDe({ perfil, logs, careMode, agora, doAparelho }));
   } catch (e) {
     console.error("[nutricao] contexto inacessível — respondendo sem ele", e);
     return "";

@@ -11,7 +11,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 
 import { blocoDaPaciente } from "./nutricao-perfil";
-import { perfilNutricionalDe } from "./nutricao-contexto";
+import { AGUA_MAX, TOMADOS_MAX, doAparelhoDe, perfilNutricionalDe } from "./nutricao-contexto";
 import { nutricaoDoPosParto } from "./nutricao-da-semana";
 import { semComentarios } from "./sem-comentarios";
 
@@ -89,8 +89,11 @@ describe("⚠️ as pontas que a régua não alcança", () => {
     expect(SERVIDOR).toMatch(/birth_date/);
     expect(SERVIDOR).toMatch(/colunaAusente\(perfilRes\?\.error\)/);
     expect(SERVIDOR).toMatch(/replace\(",birth_date", ""\)/);
-    /* E o que ele monta passa pela régua pura — nunca uma segunda versão dela. */
-    expect(SERVIDOR).toMatch(/perfilNutricionalDe\(\{ perfil, logs, careMode, agora \}\)/);
+    /* E o que ele monta passa pela régua pura, COM o contexto do aparelho — sem
+       ele, água e suplementos morreriam no servidor em silêncio. */
+    expect(SERVIDOR).toMatch(
+      /perfilNutricionalDe\(\{ perfil, logs, careMode, agora, doAparelho \}\)/,
+    );
   });
 
   test("a tela deriva o pós-parto de `birth_date` e troca a frase, a saudação e o foco", () => {
@@ -135,5 +138,59 @@ describe("as preferências atravessam o adaptador", () => {
       expect(DEGRAUS_DO_PERFIL[i - 1]!.startsWith(DEGRAUS_DO_PERFIL[i]!)).toBe(true);
     }
     for (const d of DEGRAUS_DO_PERFIL) expect(d).not.toMatch(/,,|,$/);
+  });
+});
+
+describe("a pressão sai de health_logs pela régua de sinais-clinicos", () => {
+  const logs = [
+    { log_date: "2026-09-08", weight_kg: null, glucose_mg_dl: null, systolic: 144, diastolic: 92 },
+    { log_date: "2026-09-05", weight_kg: null, glucose_mg_dl: null, systolic: 118, diastolic: 76 },
+    { log_date: "2026-09-01", weight_kg: null, glucose_mg_dl: null, systolic: 141, diastolic: 88 },
+    { log_date: "2026-08-30", weight_kg: 70, glucose_mg_dl: 92, systolic: null, diastolic: null },
+  ];
+  test("a última com os dois números, e quantas fora da faixa", () => {
+    const p = perfilNutricionalDe({ perfil: {}, logs, careMode: false, agora: AGORA });
+    expect(p.pressao?.sistolica).toBe(144);
+    expect(p.pressao?.alterada).toBe(true);
+    expect(p.pressoesAlteradas).toBe(2);
+  });
+  test("sem pressão registrada, nada", () => {
+    const p = perfilNutricionalDe({ perfil: {}, logs: [logs[3]!], careMode: false, agora: AGORA });
+    expect(p.pressao).toBeNull();
+    expect(p.pressoesAlteradas).toBe(0);
+  });
+});
+
+describe("⚠️ o que vem do aparelho é ENTRADA DO CLIENTE, e é saneado", () => {
+  test("o caso bom passa inteiro", () => {
+    expect(doAparelhoDe({ agua: 3, meta: 8, tomados: ["ferro", "ácido fólico"] })).toEqual({
+      agua: { copos: 3, meta: 8 },
+      tomados: ["ferro", "ácido fólico"],
+    });
+  });
+  test("número fora do plausível, string longa e lista longa são cortados", () => {
+    expect(doAparelhoDe({ agua: AGUA_MAX + 1, meta: 8 }).agua).toBeNull();
+    expect(doAparelhoDe({ agua: -1, meta: 8 }).agua).toBeNull();
+    expect(doAparelhoDe({ agua: 2.5, meta: 8 }).agua).toBeNull();
+    expect(doAparelhoDe({ agua: 2, meta: 0 }).agua).toBeNull();
+    const longa = doAparelhoDe({
+      tomados: Array.from({ length: 50 }, (_, i) => `s${i} ` + "x".repeat(200)),
+    });
+    expect(longa.tomados).toHaveLength(TOMADOS_MAX);
+    for (const t of longa.tomados!) expect(t.length).toBeLessThanOrEqual(40);
+  });
+  test("lixo vira nada — nunca lança", () => {
+    expect(doAparelhoDe(null)).toEqual({ agua: null, tomados: null });
+    expect(doAparelhoDe("x")).toEqual({ agua: null, tomados: null });
+    expect(doAparelhoDe({ tomados: [1, null, { a: 1 }] }).tomados).toEqual([]);
+  });
+  test("e os dois endpoints passam por ele antes do bloco", () => {
+    const API = readFileSync("src/routes/api/nutrition.ts", "utf8");
+    const PRATO = readFileSync("src/routes/api/prato.ts", "utf8");
+    expect(API).toMatch(/doAparelhoDe\(body\.contexto\)/);
+    expect(PRATO).toMatch(/doAparelhoDe\(contexto\)/);
+    const TAB = semComentarios(readFileSync("src/components/nutricao-tab.tsx", "utf8"));
+    expect(TAB).toMatch(/contexto: doAparelho\(\)/);
+    expect(TAB).toMatch(/corpo\.append\("contexto", JSON\.stringify\(doAparelho\(\)\)\)/);
   });
 });

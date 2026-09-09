@@ -78,7 +78,7 @@ export const Route = createFileRoute("/api/nutrition")({
           return new Response("Muitas mensagens em pouco tempo. Aguarde.", { status: 429 });
         }
 
-        const body = (await request.json()) as { messages?: unknown };
+        const body = (await request.json()) as { messages?: unknown; contexto?: unknown };
         if (!Array.isArray(body.messages)) {
           return new Response("Messages required", { status: 400 });
         }
@@ -200,7 +200,15 @@ export const Route = createFileRoute("/api/nutrition")({
            Ver `nutricao-perfil.ts` para o que entra, o que some no luto, e por
            que a atenção glicêmica não é um interruptor novo. */
         const { blocoDaNutricao } = await import("@/lib/nutricao-contexto.server");
-        const blocoDaPaciente = await blocoDaNutricao(patientId, careMode);
+        /* Água e suplementos de HOJE vivem só no aparelho dela e viajam no
+           corpo (`contexto`); `doAparelhoDe` sanea antes de virar prompt. */
+        const { doAparelhoDe } = await import("@/lib/nutricao-contexto");
+        const blocoDaPaciente = await blocoDaNutricao(
+          patientId,
+          careMode,
+          new Date(),
+          doAparelhoDe(body.contexto),
+        );
 
         /* O TETO DE ENTRADA. Este endpoint manda `body.messages` direto ao
            modelo: nada impedia um POST com mil mensagens de dez mil

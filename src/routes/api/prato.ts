@@ -116,7 +116,21 @@ export const Route = createFileRoute("/api/prato")({
         let blocoDaPaciente = "";
         try {
           const { blocoDaNutricao } = await import("@/lib/nutricao-contexto.server");
-          blocoDaPaciente = await blocoDaNutricao(patientId, careMode);
+          const { doAparelhoDe } = await import("@/lib/nutricao-contexto");
+          /* O mesmo `contexto` da conversa, como JSON num campo do formulário.
+             JSON inválido vira contexto vazio — nunca derruba a foto. */
+          let contexto: unknown = null;
+          try {
+            contexto = JSON.parse(String(formData.get("contexto") ?? "null"));
+          } catch {
+            contexto = null;
+          }
+          blocoDaPaciente = await blocoDaNutricao(
+            patientId,
+            careMode,
+            new Date(),
+            doAparelhoDe(contexto),
+          );
         } catch (e) {
           console.error("[prato] contexto da paciente não veio", e);
         }

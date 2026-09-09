@@ -14842,3 +14842,41 @@ apontá-lo.
 **Bancada:** `/preview-nutricao?prefs=vegetariana` (o cartão preenchido; digitar
 faz o "Guardar" aparecer). A memória não tem bancada de propósito: o estado
 "conversa carregada de ontem" é indistinguível de `?estado=conversa`.
+
+### A pressão, a água e os suplementos chegaram ao prompt (set/2026)
+
+Item 3 da mesma nota. A nutricionista lia peso e glicemia de `health_logs` e
+ignorava `systolic`/`diastolic` na MESMA linha; e a água e os suplementos do
+dia viviam só no `localStorage` (`dc-agua:`, `dc-suplementos:`), então o
+servidor nunca soube que ela tinha bebido três copos e marcado o ferro.
+
+- **A pressão sai da MESMA régua do chat principal** (`sinalPressao`, em
+  `sinais-clinicos.ts` — nunca um limite daqui): a última medida com os dois
+  números, e quantas fora da faixa em 30 dias. ⚠️ **Sobrevive ao Modo
+  Cuidado** (é do corpo dela; hipertensão de puerpério existe) — o que sai no
+  luto é a NOTA da régua, que fala de gestação; fica o fato e "FORA da
+  faixa". Duas fora acendem a ATENÇÃO À PRESSÃO: sódio e potássio de
+  alimento, **nunca diagnóstico, nunca mexer em remédio**, e os quatro sinais
+  de alarme (cefaleia forte, vista embaçada, dor epigástrica, inchaço súbito)
+  mandam procurar atendimento AGORA.
+- **Água e suplementos viajam COM o pedido** (`contexto` no JSON da conversa e
+  num campo do formulário da foto — o MESMO objeto, `doAparelho()`), porque
+  não há outro jeito de o servidor saber. ⚠️ **É ENTRADA DO CLIENTE e passa por
+  `doAparelhoDe` antes de virar prompt**: inteiro fora de 0–30 vira nada,
+  string é cortada em 40, lista em 12, lixo vira `{null,null}` sem lançar. Um
+  corpo montado à mão não injeta parágrafo no prompt por este campo.
+- ⚠️ **São FATO, com a ordem de não cobrar colada** ("NÃO cobre isso; se vier
+  ao caso, mencione uma vez, com leveza"). "Você ainda não tomou o ferro"
+  numa gestação de alto risco é a frase que faz ela parar de marcar — e de
+  perguntar. `tomados: null` (a tela não mandou) não escreve nada;
+  `tomados: []` (mandou, e ela não marcou) escreve o fato sem cobrança.
+
+⚠️ **Três testes antigos travavam a GRAFIA da chamada**
+(`blocoDaNutricao(patientId, careMode)`, em dois arquivos, e a chamada da régua
+pura no servidor) e reprovaram uma chamada que só ganhou dois argumentos.
+Passaram a cobrar a garantia. ⚠️ E a minha própria asserção nova nasceu FROUXA
+— `(, doAparelho)?` opcional deixava verde o servidor que jogasse o contexto
+fora; a mutação pegou, e agora o argumento é obrigatório no regex.
+
+**Sem SQL:** `systolic`/`diastolic` existem desde a migration
+`20260607122031`, e o resto viaja no pedido.

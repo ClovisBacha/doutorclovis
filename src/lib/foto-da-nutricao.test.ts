@@ -112,7 +112,9 @@ describe("o servidor", () => {
        segunda leitura aqui faria a resposta da foto falar da gestação de quem
        acabou de perdê-la. */
     expect(API).toMatch(/consultorioDaPaciente\(usuario\.id\)/);
-    expect(API).toMatch(/blocoDaNutricao\(patientId, careMode\)/);
+    /* A garantia (o MESMO `careMode` da régua entra no bloco), não a grafia: a
+       chamada ganhou o "agora" e o contexto do aparelho. */
+    expect(API).toMatch(/blocoDaNutricao\(\s*patientId,\s*careMode/);
   });
   test("⚠️ assunto desconhecido cai em PRATO, o prompt que não lê números", () => {
     expect(API).toMatch(/bruto === "rotulo" \? "rotulo" : "prato"/);

@@ -179,7 +179,8 @@ describe("a curva do IOM é uma régua só", () => {
 describe("o endpoint usa a régua", () => {
   const API = semProsa(readFileSync("src/routes/api/nutrition.ts", "utf8"));
   test("o bloco entra no system, junto do prompt certo", () => {
-    expect(API).toContain("blocoDaNutricao(patientId, careMode)");
+    /* A garantia, não a grafia: a chamada ganhou o "agora" e o contexto do aparelho. */
+    expect(API).toMatch(/blocoDaNutricao\(\s*patientId,\s*careMode/);
     expect(API).toMatch(/NUTRICAO_EM_LUTO : NUTRITION_SYSTEM\) \+ blocoDaPaciente/);
   });
 });
@@ -224,5 +225,51 @@ describe("⚠️ ela já pariu — o bloco fala do puerpério, nunca da semana 4
     expect(idadeDoBebe(9)).toBe("o bebê nasceu há 9 dias");
     expect(idadeDoBebe(35)).toBe("o bebê tem 5 semanas");
     expect(idadeDoBebe(61)).toBe("o bebê tem 2 meses");
+  });
+});
+
+describe("a pressão, a água e os suplementos entram no bloco", () => {
+  const pa = {
+    sistolica: 142,
+    diastolica: 92,
+    alterada: true,
+    nota: "Pressão elevada",
+    quando: "01/09/2026",
+  };
+
+  test("a última pressão, com a nota da régua", () => {
+    expect(blocoDaPaciente({ ...base, pressao: pa })).toMatch(
+      /142\/92 em 01\/09\/2026 — Pressão elevada/,
+    );
+    expect(blocoDaPaciente({ ...base, pressao: { ...pa, alterada: false } })).toMatch(
+      /dentro da faixa/,
+    );
+  });
+
+  test("⚠️ no luto a pressão FICA (é do corpo dela) e a nota da gestação sai", () => {
+    const b = blocoDaPaciente({ ...base, careMode: true, pressao: pa });
+    expect(b).toMatch(/142\/92/);
+    expect(b).not.toMatch(/Pressão elevada/);
+    expect(b).toMatch(/FORA da faixa/);
+  });
+
+  test("duas fora da faixa acendem a atenção — sódio, e NUNCA diagnóstico ou remédio", () => {
+    const b = blocoDaPaciente({ ...base, pressoesAlteradas: 2 });
+    expect(b).toMatch(/ATENÇÃO À PRESSÃO/);
+    expect(b).toMatch(/NUNCA diga que ela tem pressão alta ou pré-eclâmpsia/);
+    expect(b).toMatch(/NUNCA sugira parar, trocar ou dosar remédio/);
+    expect(blocoDaPaciente({ ...base, pressoesAlteradas: 1 })).not.toMatch(/ATENÇÃO À PRESSÃO/);
+  });
+
+  test("água e suplementos de hoje são FATO, com a ordem de não cobrar", () => {
+    const b = blocoDaPaciente({ ...base, agua: { copos: 3, meta: 8 }, tomados: ["ferro"] });
+    expect(b).toMatch(/Água hoje: 3 de 8 copos/);
+    expect(b).toMatch(/tomados hoje: ferro\./);
+    const nenhum = blocoDaPaciente({ ...base, tomados: [] });
+    expect(nenhum).toMatch(/ainda não marcou nenhum suplemento/);
+    expect(nenhum).toMatch(/NÃO cobre/);
+    /* `null` = a tela não mandou: nada de suplemento no bloco. */
+    expect(blocoDaPaciente({ ...base, tomados: null })).not.toMatch(/suplemento/);
+    expect(blocoDaPaciente({ ...base, agua: { copos: 0, meta: 0 } })).not.toMatch(/Água hoje/);
   });
 });

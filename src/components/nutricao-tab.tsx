@@ -639,6 +639,7 @@ export function NutricaoTab({
       const corpo = new FormData();
       corpo.append("foto", menor ?? file, "foto.webp");
       corpo.append("assunto", assunto);
+      corpo.append("contexto", JSON.stringify(doAparelho()));
       const { data: sess } = await supabase.auth.getSession();
       const res = await fetch("/api/prato", {
         method: "POST",
@@ -701,6 +702,12 @@ export function NutricaoTab({
      e o dia local muda entre as duas execuções — é a divergência de hidratação
      que já deixou este app sem abrir. `null` = ainda não li. */
   const [agua, setAgua] = useState<number | null>(bancada?.agua ?? null);
+  /* O que a nutricionista ganha de HOJE: a água e os suplementos marcados. Só
+     existem no aparelho, então viajam com cada pedido — a conversa e a foto
+     mandam o MESMO objeto. O servidor sanea (`doAparelhoDe`). */
+  function doAparelho() {
+    return { agua: agua ?? undefined, meta: META_COPOS, tomados };
+  }
   useEffect(() => {
     if (ehBancada) return;
     try {
@@ -800,7 +807,7 @@ export function NutricaoTab({
           // O endpoint agora exige sessão: era proxy aberto para o Gemini.
           Authorization: `Bearer ${sess.session?.access_token ?? ""}`,
         },
-        body: JSON.stringify({ messages: uiMessages }),
+        body: JSON.stringify({ messages: uiMessages, contexto: doAparelho() }),
       });
       /* `res.ok` ANTES do corpo — e isto era um "..." eterno.
          O código checava só `!res.body`, e 429 (limitador), 401 (sessão) e o

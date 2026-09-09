@@ -19,7 +19,7 @@
  * para quem acabou de perdê-lo. A precedência é a mesma de `blocoDaPaciente`.
  */
 import { computeGestation, trimesterForWeek } from "./gestacao";
-import { sinalGlicemia } from "./sinais-clinicos";
+import { sinalGlicemia, sinalPressao } from "./sinais-clinicos";
 import { imcPreGestacional } from "./curva-de-ganho";
 import { diasEntre } from "./filhos";
 import type { PerfilNutricional } from "./nutricao-perfil";
@@ -44,7 +44,44 @@ export type LinhaDeSaude = {
   log_date: string;
   weight_kg: number | null;
   glucose_mg_dl: number | null;
+  systolic?: number | null;
+  diastolic?: number | null;
 };
+
+/**
+ * O que a TELA manda junto do pedido: água e suplementos vivem só no
+ * `localStorage` dela, e o servidor não tem outro jeito de saber.
+ *
+ * ⚠️ É ENTRADA DO CLIENTE, e passa por aqui antes de virar prompt: número
+ * fora do plausível vira nada, string longa é cortada, lista longa é cortada.
+ * Um corpo montado à mão não pode injetar um parágrafo no prompt por este
+ * campo.
+ */
+export type DoAparelho = {
+  agua?: { copos: number; meta: number } | null;
+  tomados?: string[] | null;
+};
+export const AGUA_MAX = 30;
+export const TOMADOS_MAX = 12;
+export const TOMADO_CHARS_MAX = 40;
+export function doAparelhoDe(bruto: unknown): DoAparelho {
+  const o = (bruto && typeof bruto === "object" ? bruto : {}) as Record<string, unknown>;
+  const inteiro = (v: unknown, max: number) =>
+    typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= max ? v : null;
+  const copos = inteiro(o.agua, AGUA_MAX);
+  const meta = inteiro(o.meta, AGUA_MAX);
+  const tomados = Array.isArray(o.tomados)
+    ? o.tomados
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.replace(/\s+/g, " ").trim().slice(0, TOMADO_CHARS_MAX))
+        .filter(Boolean)
+        .slice(0, TOMADOS_MAX)
+    : null;
+  return {
+    agua: copos != null && meta != null && meta > 0 ? { copos, meta } : null,
+    tomados,
+  };
+}
 
 /** `YYYY-MM-DD` do instante, no relógio LOCAL do servidor — o mesmo que `computeGestation` usa. */
 function ymdDe(d: Date): string {
@@ -56,8 +93,9 @@ export function perfilNutricionalDe(args: {
   logs: LinhaDeSaude[];
   careMode: boolean;
   agora: Date;
+  doAparelho?: DoAparelho;
 }): PerfilNutricional {
-  const { perfil, logs, careMode, agora } = args;
+  const { perfil, logs, careMode, agora, doAparelho } = args;
 
   const nascimento =
     typeof perfil.birth_date === "string" && perfil.birth_date ? perfil.birth_date : null;
@@ -92,6 +130,16 @@ export function perfilNutricionalDe(args: {
     return s != null && s.gravidade !== "normal";
   }).length;
 
+  /* Pressão: a última com os DOIS números, e quantas fora da faixa. A régua é
+     a de `sinais-clinicos` — ela já trata o par implausível e o invertido. */
+  const comPressao = logs.filter((l) => l.systolic != null && l.diastolic != null);
+  const ultimaPA = comPressao[0] ?? null;
+  const sinalPA = ultimaPA ? sinalPressao(ultimaPA.systolic, ultimaPA.diastolic) : null;
+  const pressoesAlteradas = comPressao.filter((l) => {
+    const s = sinalPressao(l.systolic, l.diastolic);
+    return s != null && s.gravidade !== "normal";
+  }).length;
+
   return {
     careMode,
     alergias: perfil.allergies ?? null,
@@ -113,6 +161,19 @@ export function perfilNutricionalDe(args: {
         : null,
     dmgAnterior: Boolean(perfil.prior_gestational_diabetes),
     glicemiasAlteradas: alteradas,
+    pressao:
+      ultimaPA && sinalPA
+        ? {
+            sistolica: ultimaPA.systolic as number,
+            diastolica: ultimaPA.diastolic as number,
+            alterada: sinalPA.gravidade !== "normal",
+            nota: sinalPA.nota,
+            quando: new Date(`${ultimaPA.log_date}T12:00:00`).toLocaleDateString("pt-BR"),
+          }
+        : null,
+    pressoesAlteradas,
+    agua: doAparelho?.agua ?? null,
+    tomados: doAparelho?.tomados ?? null,
     hora: agora.getHours(),
   };
 }

@@ -48,6 +48,20 @@ export type PerfilNutricional = {
   dmgAnterior?: boolean;
   /** Quantas glicemias alteradas nos últimos 30 dias. */
   glicemiasAlteradas?: number;
+  /** Última pressão dela (régua de `sinais-clinicos`, nunca um limite daqui). */
+  pressao?: {
+    sistolica: number;
+    diastolica: number;
+    alterada: boolean;
+    nota: string;
+    quando: string;
+  } | null;
+  /** Quantas pressões fora da faixa nos últimos 30 dias. */
+  pressoesAlteradas?: number;
+  /** O que ela registrou HOJE no aparelho — nunca chega ao banco. */
+  agua?: { copos: number; meta: number } | null;
+  /** Os suplementos que ela marcou como tomados hoje; `[]` = nenhum ainda. */
+  tomados?: string[] | null;
   /** 0–23, o relógio DELA — decide a sugestão de refeição da vez. */
   hora?: number | null;
 };
@@ -201,6 +215,45 @@ export function blocoDaPaciente(p: PerfilNutricional): string {
       .join(" e ");
     linhas.push(
       `- ATENÇÃO GLICÊMICA: ela ${porque}. Priorize orientação sobre TIPO e DISTRIBUIÇÃO de carboidrato (integral em vez de refinado, fracionar em 5–6 refeições, combinar carboidrato com proteína ou fibra), e evite sugerir doces, sucos e massas refinadas sem essa combinação. NUNCA diga que ela tem diabetes gestacional nem faça diagnóstico: quem diz isso é o médico.`,
+    );
+  }
+
+  /* ─── A PRESSÃO ─────────────────────────────────────────────────────────
+     A mesma régua do chat principal (`buildMedidasBlock`): última medida e
+     quantas fora da faixa. É sobre o corpo DELA, então sobrevive ao Modo
+     Cuidado — hipertensão de puerpério existe. O que muda no luto é a NOTA da
+     régua, que fala de gestação: sai a nota, fica o fato. */
+  if (p.pressao) {
+    const como = p.pressao.alterada
+      ? p.careMode
+        ? " — FORA da faixa de referência"
+        : ` — ${p.pressao.nota}`
+      : " (dentro da faixa de referência)";
+    linhas.push(
+      `- Última pressão registrada por ela: ${p.pressao.sistolica}/${p.pressao.diastolica} em ${p.pressao.quando}${como}.`,
+    );
+  }
+  if ((p.pressoesAlteradas ?? 0) >= 2) {
+    linhas.push(
+      `- ATENÇÃO À PRESSÃO: ela registrou ${p.pressoesAlteradas} pressões fora da faixa nos últimos 30 dias. Priorize orientação sobre SÓDIO (ultraprocessados, embutidos, temperos prontos, caldos, salgadinhos) e sobre potássio de alimento (feijão, banana, folhas, batata). NUNCA diga que ela tem pressão alta ou pré-eclâmpsia, e NUNCA sugira parar, trocar ou dosar remédio: quem diz isso é o médico. Se ela relatar dor de cabeça forte, vista embaçada, dor na boca do estômago ou inchaço súbito, oriente procurar atendimento AGORA.`,
+    );
+  }
+
+  /* ─── O QUE ELA REGISTROU HOJE NO APARELHO ────────────────────────────────
+     Água e suplementos vivem só no `localStorage` e viajam com o pedido. São
+     FATO de hoje, e a instrução de não cobrar vem colada: "você ainda não
+     tomou o ferro" numa gestação de alto risco é a frase que faz ela parar de
+     marcar — e de perguntar. */
+  if (p.agua && p.agua.meta > 0) {
+    linhas.push(
+      `- Água hoje: ${p.agua.copos} de ${p.agua.meta} copos (a referência é do app; quem ajusta é o médico). Se couber, lembre com leveza — nunca cobre.`,
+    );
+  }
+  if (p.tomados) {
+    linhas.push(
+      p.tomados.length
+        ? `- Suplementos que ela marcou como tomados hoje: ${p.tomados.join(", ")}.`
+        : `- Ela ainda não marcou nenhum suplemento como tomado hoje. NÃO cobre isso; se vier ao caso, mencione uma vez, com leveza.`,
     );
   }
 
