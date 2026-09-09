@@ -14514,3 +14514,177 @@ depois do painel.
 inline com cara de prato, porque a de verdade nasce de um seletor de arquivo
 —, um negrito e a lista com marcador) · `?estado=foto` (o cartão compacto sem
 as marcas).
+
+## A nutricionista virou do Premium, e a conta foi MEDIDA antes (set/2026)
+
+Pedido do dono, em duas voltas: _"podemos então deixar essa aba do chat do
+nutricionista exclusivo para premium"_ e, na mesma noite, _"as mensagens do
+médico são pagas pelo médico; no plano premium somente essa da nutricionista
+deveria ser paga pela paciente"_ — mais _"às vezes mesmo pagando, você acha que
+a gente coloca um limite ali de mensagens por dia? porque eu acredito que a
+nossa margem não seja tão grande"_ e _"aproveite e faça também o cálculo"_.
+
+### ⚠️ A NUTRIÇÃO COBRAVA DA FRANQUIA DO MÉDICO — e ia ser vendida à paciente
+
+`CANAIS_DA_COTA` era `["app", "nutricao"]`: toda pergunta à nutricionista
+descontava da franquia de IA do **plano do médico**. Vender o mesmo recurso à
+paciente sem tirar `nutricao` dali faria os DOIS pagarem pela mesma mensagem —
+e o defeito nem seria visível: a cota dele encolheria por um recurso que ele não
+usa, e ninguém teria a que apontar.
+
+⚠️ **Deixar a CONTAGEM não é deixar o PORTÃO.** O que saiu foi o canal da
+franquia; o portão de cobertura do cérebro continua governado pela cota dele —
+é ele que decide se a VOZ do médico entra na resposta. `recorte-da-cota.test.ts`
+ganhou uma trava para `nutricao`/`prato` nunca voltarem à lista.
+
+### A conta, medida a partir dos prompts REAIS (`custo-da-nutricao.ts`)
+
+⚠️ **A PRIMEIRA ESTIMATIVA QUE EU DEI AO DONO ESTAVA BAIXA POR UM FATOR DE
+DOIS**, e a causa é registrável: eu chutei o system prompt em ~500 tokens.
+Medido, ele tem **14.743 caracteres (~3.950 tokens)**. Por isso o cálculo virou
+MÓDULO com teste, e não prosa: preço não se escreve em prosa, e uma conta que
+ninguém consegue rodar de novo envelhece sem avisar.
+
+|                                                   |                   |
+| ------------------------------------------------- | ----------------- |
+| uma mensagem de TEXTO (com 4 turnos de histórico) | **1,77 centavos** |
+| uma FOTO de prato                                 | **0,68 centavos** |
+| infra por paciente/mês                            | 0,024 centavos    |
+
+⚠️ **A FOTO É MAIS BARATA QUE O TEXTO, e isso é contraintuitivo.** Uma imagem
+de 1024px são 1.032 tokens (2×2 ladrilhos de 768 × 258) e ela vai SEM
+histórico; uma conversa carrega o prompt de sistema mais quatro turnos
+anteriores toda vez. Há teste com esse nome, porque a intuição contrária é o
+que faria alguém "economizar" desligando a leitura de rótulo.
+
+### ⚠️ O TETO DIÁRIO ERA MESMO NECESSÁRIO — o dono estava certo
+
+Rodando `margemMensal` com os preços reais e as duas taxas de loja:
+
+| cenário                                 | IA/mês        | sobra        |
+| --------------------------------------- | ------------- | ------------ |
+| **sem teto**, 30 msg/dia, R$19,90 · 30% | R$ 15,95      | **R$ −2,04** |
+| com teto (10/dia), R$19,90 · 30%        | R$ 5,32 (38%) | R$ 8,59      |
+| com teto, R$24,90 · 30%                 | R$ 5,32 (30%) | R$ 12,09     |
+| uso realista (2/dia), R$19,90 · 30%     | R$ 1,06 (8%)  | R$ 12,84     |
+
+Sem teto a margem vira **negativa** com uma paciente entusiasmada — e o teto de
+**10 por dia** põe o PIOR caso em ~30% da receita líquida no preço recomendado,
+que é a MESMA fatia que o plano do médico já aceita
+(`docs/custo-de-infraestrutura.md`). O número não é gosto: mexer nele sem
+refazer esta conta é mudar a margem sem saber, e há teste cobrando isso.
+
+### A régua (`nutricao-premium.ts`), e a ordem dela é o desenho
+
+`decidirAcesso` responde na ordem: **1)** o teto do dia, **2)** assinante,
+**3)** Modo Cuidado, **4)** "não sei se ela assina", **5)** a amostra da semana.
+
+- ⚠️ **O TETO É O PRIMEIRO, E NÃO TEM EXCEÇÃO** — nem para a assinante, nem
+  para o Modo Cuidado, nem para o perfil ilegível. As isenções abaixo dispensam
+  o PREMIUM, nunca o teto: é ele que impede um laço (dois aparelhos, um toque
+  nervoso, um script) de virar prejuízo, e uma exceção aqui vira ilimitado.
+- ⚠️ **MODO CUIDADO NÃO VÊ PAYWALL.** É a precedência que o app inteiro já
+  aplica — quem perdeu a gestação não recebe convite de assinatura —, e comer
+  bem depois de uma perda continua sendo cuidado. Continua limitado pelo teto.
+- ⚠️ **AS DUAS LEITURAS FALHAM ABERTAS, e cada uma por uma razão diferente.**
+  `quiz_premium` ilegível → libera: bloquear uma paciente que PAGA por um
+  defeito nosso é pior que uma pergunta não cobrada. A contagem de uso ilegível
+  → libera **com `console.error`**: uma indisponibilidade custa dinheiro
+  limitado pela duração dela; uma parede quebraria o recurso para todo mundo. E
+  o teto vem antes das duas, então nenhuma isenção vira ilimitada.
+- ⚠️ **`AMOSTRA_SEMANAL = 0` fecha a porta INTEIRAMENTE, sem código novo** — é
+  a alavanca de uma linha se o dono quiser Premium estrito. Há teste.
+
+### ⚠️ O PORTÃO TEM DE VIR ANTES DO GASTO, e isso ganhou catraca própria
+
+Nos dois endpoints ele roda antes de montar o contexto do cérebro / converter a
+imagem e chamar o modelo. **Um portão escrito depois da chamada recusa a
+resposta e paga a conta do mesmo jeito** — ou seja, o teto que existe para
+proteger a margem passaria a custar exatamente o que veio impedir.
+`nutricao-portao.test.ts` cobra a ORDEM (e a saída, não só a consulta: mover a
+régua para cima e deixar o `return` depois do modelo é o pior dos dois mundos).
+
+### ⚠️ SEM O AVISO, A PACIENTE DESCOBRE A PAREDE BATENDO NELA
+
+O requisito estava escrito no tipo `Acesso` desde o primeiro commit e ficou uma
+volta sem tela: ela usa as três perguntas da amostra ao longo de uma semana, sem
+nada dizendo que são contadas, e na quarta encontra um convite de assinatura que
+parece ter aparecido do nada.
+
+- ⚠️ **É um CABEÇALHO de resposta (`X-Nutricionista-Amostra`), e não
+  `messageMetadata`.** A metadata só chega no chunk `finish`, ou seja depois de
+  a resposta inteira ter sido lida; o cabeçalho chega ANTES do primeiro byte, e
+  a tela já sabe o que dizer enquanto o texto digita. Na foto a resposta já é
+  JSON, então ele viaja como campo (`restantesNaAmostra`).
+- ⚠️ **`null` é "não sei", e "não sei" NÃO FALA.** A contagem falha aberta de
+  propósito; um número inventado aqui seria pior que o silêncio — dizer "resta
+  1" para quem tem três encurtaria a amostra por causa de uma falha de rede. Um
+  `?? 0` na tela diria "essa foi a última" para toda assinante.
+- ⚠️ **O aviso some quando a porta fecha**: com o cartão do Premium na tela,
+  "resta 1" seria a contagem de uma coisa que já acabou.
+- ⚠️ **E O 402 DEVOLVE A PERGUNTA.** Engolir o texto faria ela perder o que
+  acabou de digitar para ver um convite — e reescrevê-lo depois de assinar. A
+  mensagem sai da lista e volta para o campo, intacta.
+
+⚠️ **E A FOTO DA BANCADA PEGOU O TEXTO DO CARTÃO.** Ele dizia _"Você **tem** 3
+perguntas por semana para experimentar"_ — presente do indicativo, numa tela que
+só existe porque as três já foram usadas: lido como oferta, na hora exata em que
+a porta fechou. Hoje ele diz o FATO e QUANDO ela volta. Nenhuma asserção estava
+perto disso; quem viu foi a foto.
+
+### O preço: o que a pesquisa achou, e por que ela mudou a pergunta
+
+Levantamento em fontes primárias do mercado brasileiro:
+
+|                                                      | assinatura                  |
+| ---------------------------------------------------- | --------------------------- |
+| apps de gestação (BR)                                | R$ 6,58 a 8,33/mês no anual |
+| teto da categoria de saúde/bem-estar (BR)            | R$ 7 a 20/mês no anual      |
+| os dois maiores apps de gestação                     | **grátis**                  |
+| Ovia (nutrição+gestação)                             | não cobra do consumidor     |
+| **uma consulta com nutricionista** (tabela FNN 2026) | **R$ 214,28**               |
+
+⚠️ **CONVERTER PREÇO EM DÓLAR SUPERESTIMA O BRASIL EM ~2×** — é o erro mais
+fácil aqui, e ele levaria a um preço que ninguém paga.
+
+⚠️ **E ISSO REFORMULA A PERGUNTA:** um assistente de nutrição por IA **não
+sustenta um SKU próprio** neste mercado. Ele é um MOTIVO para assinar o Premium
+que já existe — que é exatamente o que o dono propôs na primeira mensagem
+("algumas outras coisas do nutricionista grátis para atrair que as pessoas
+assinem o premium"), e é o desenho que está no código: a amostra de três
+perguntas por semana é a vitrine, e a conversa diária é do Premium.
+
+**Recomendação, com a conta atrás:** manter a nutricionista DENTRO do Premium e
+pôr o Premium em **R$ 24,90/mês** (ou ~R$ 14,90 equivalente no anual). É o
+preço em que o PIOR caso do teto fica em 30% da receita líquida mesmo com a
+taxa de 30% da loja — a mesma fatia que o plano do médico já aceita —, e o
+anual cai dentro do teto da categoria. R$ 19,90 também fecha (38% no pior caso,
+8% no uso realista); abaixo disso a margem fica apertada demais para o pior
+caso com a taxa cheia.
+
+### As armadilhas desta leva
+
+⚠️ **TRÊS ASSERÇÕES TRAVAVAM A GRAFIA, e as três reprovaram consertos que só
+APERTAM a garantia** — `const { data, error }` (que virou `let` por causa do
+degrau da coluna nova), `json({ ok: true, texto, assinatura })` (que ganhou um
+campo) e `.select("doctor_id,care_mode")` (que virou constante). É a décima
+quarta vez nesta base: **cobre a GARANTIA, nunca a escrita.**
+
+⚠️ **E EU COMETI A ARMADILHA DE SUBSTRING NO TESTE QUE ESCREVI PARA CONSERTAR O
+TEXTO**: `not.toContain("você tem")` reprovava "com o que **você tem** em
+casa", que é a frase que descreve a ferramenta. A asserção certa é sobre a
+AFIRMAÇÃO (`/você tem \d+ pergunta/`), nunca sobre a palavra.
+
+⚠️ **E um `head -10` num pipe MATOU o script de fotos pelo meio** (SIGPIPE): o
+último estado não foi fotografado e nada avisou. Redirecione para arquivo e
+leia o arquivo — a mesma lição que o probe de produção já pagou aqui.
+
+**Sem SQL:** tudo sai de `patient_profiles.quiz_premium` e de `ai_usage`, que já
+existem. ⚠️ E `quiz_premium` é **REVOGADA** de `authenticated` — a paciente não
+se dá o Premium.
+
+**Bancadas:** `/preview-nutricao?estado=conversa&painel=1&bloqueio=sem_premium`
+(o cartão com o botão) · `&bloqueio=teto_diario` (o que a assinante vê) ·
+`&amostra=2` · `&amostra=1` · `&amostra=0` (as três formas do aviso). As cinco
+só nascem de um 402 do servidor e de um cabeçalho de resposta — sem a bancada,
+fotografá-las exigiria gastar o teto de dez perguntas de uma conta real.

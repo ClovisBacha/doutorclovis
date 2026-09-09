@@ -182,7 +182,14 @@ describe("6. o servidor da Nutrição também sabe do luto", () => {
 
   test("o perfil é lido com care_mode", () => {
     expect(nutricao).toContain("consultorioDaPaciente(usuario.id)");
-    expect(regua).toContain('.select("doctor_id,care_mode")');
+    /* ⚠️ O QUE IMPORTA É `care_mode` VIR NO MESMO SELECT DE `doctor_id`, EM
+       TODO DEGRAU — pedir só `doctor_id` foi o que deixou o luto de fora por
+       meses. A lista virou constante quando a leitura ganhou o recuo da coluna
+       nova, e travar a string exata reprovou uma mudança que não afrouxa nada.
+       Aqui se cobra a garantia: toda lista de colunas do arquivo traz as duas. */
+    const listas = [...regua.matchAll(/"(doctor_id[^"]*)"/g)].map((m) => m[1]);
+    expect(listas.length).toBeGreaterThan(0);
+    for (const l of listas) expect(`${l}:${l.includes("care_mode")}`).toBe(`${l}:true`);
   });
 
   test("existe um prompt próprio para quem perdeu a gestação", () => {

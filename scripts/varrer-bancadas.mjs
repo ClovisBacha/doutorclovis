@@ -84,6 +84,11 @@ const EXTRAS = [
   "/preview-nutricao?estado=carregando&painel=1",
   "/preview-nutricao?estado=erro&painel=1",
   "/preview-nutricao?estado=foto&painel=1",
+  /* As duas portas fechadas e o aviso da amostra — só nascem de um 402 e de
+     um cabeçalho de resposta, ou seja de uma conta real com o teto gasto. */
+  "/preview-nutricao?estado=conversa&painel=1&bloqueio=sem_premium",
+  "/preview-nutricao?estado=conversa&painel=1&bloqueio=teto_diario",
+  "/preview-nutricao?estado=conversa&painel=1&amostra=1",
   "/preview-nutricao?estado=conversa&luto=1&painel=1",
   "/preview-nutricao?estado=votou",
   "/preview-nutricao?estado=carregando",

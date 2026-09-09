@@ -90,7 +90,25 @@ export const Route = createFileRoute("/api/prato")({
         /* ⚠️ O MESMO `consultorioDaPaciente` da conversa, e não uma segunda
            leitura: é ele que falha FECHADO no Modo Cuidado. Uma cópia aqui
            faria a resposta da foto falar da gestação de quem a perdeu. */
-        const { patientId, careMode } = await consultorioDaPaciente(usuario.id);
+        const { patientId, careMode, premium } = await consultorioDaPaciente(usuario.id);
+
+        /* ─── O MESMO PORTÃO DA CONVERSA, PELA MESMA RÉGUA ─────────────────
+           A foto e a pergunta de texto dividem UM teto: para a paciente as
+           duas são "perguntar à nutricionista", e dois contadores separados
+           seriam duas coisas para ela entender onde há uma só.
+
+           ⚠️ E ele vem ANTES de ler a foto em base64 e antes do modelo — o
+           trabalho caro não pode acontecer para quem já foi barrada. */
+        const { usoDaNutricionista } = await import("@/lib/nutricao-premium.server");
+        const { decidirAcesso } = await import("@/lib/nutricao-premium");
+        const uso = await usoDaNutricionista(patientId);
+        const acesso = decidirAcesso({
+          premium,
+          careMode,
+          usadasHoje: uso.hoje,
+          usadasNaSemana: uso.semana,
+        });
+        if (!acesso.pode) return json({ ok: false, motivo: `bloqueado:${acesso.motivo}` }, 402);
 
         /* ⚠️ E o MESMO bloco da paciente da conversa: é dele que sai a alergia,
            que é a única coisa nesta tela que pode fazer mal de verdade. Ele já
@@ -232,7 +250,18 @@ export const Route = createFileRoute("/api/prato")({
         const { assinarTurno, chaveDeAssinatura } = await import("@/lib/turno-assinado.server");
         const chave = chaveDeAssinatura(process.env.SUPABASE_SERVICE_ROLE_KEY);
         const assinatura = chave ? assinarTurno(chave, usuario.id, texto) : undefined;
-        return json({ ok: true, texto, assinatura });
+        /* Quantas ainda sobram da amostra grátis — o mesmo aviso que a
+           conversa manda por cabeçalho. Aqui a resposta já é JSON, então ele
+           viaja como campo: sem isso, a paciente que gasta a amostra na FOTO
+           descobre a parede batendo nela. `null` para quem assina. */
+        return json({
+          ok: true,
+          texto,
+          assinatura,
+          restantesNaAmostra: acesso.amostra
+            ? Math.max(0, (acesso.restantesNaAmostra ?? 1) - 1)
+            : null,
+        });
       },
     },
   },

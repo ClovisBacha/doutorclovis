@@ -33,6 +33,9 @@ import {
   ThumbsUp,
   UtensilsCrossed,
 } from "lucide-react";
+import { podeComprarAqui } from "@/lib/canal-de-venda";
+import { ehNativo } from "@/lib/nativo";
+import { recadoDaAmostra, recadoDoBloqueio, type MotivoDoBloqueio } from "@/lib/nutricao-premium";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -303,12 +306,18 @@ export function NutricaoTab({
   profile,
   gest,
   careMode = false,
+  aoAssinar,
   bancada,
 }: {
   profile: Profile | null;
   gest: Gest;
   /** Mesma razão do Chat IA: em Modo Cuidado, nada de semana nem trimestre. */
   careMode?: boolean;
+  /** Abre a tela de assinatura. ⚠️ **Opcional de propósito**: sem ela o cartão
+      do Premium só explica, e nunca desenha um botão que não leva a lugar
+      nenhum — o defeito de "botão que promete uma ação e não faz nada" que
+      este repositório já pagou três vezes. */
+  aoAssinar?: () => void;
   /* ⚠️ A bancada injeta o DADO nos MESMOS `useState` da produção, nunca o
      desenho: é a lição do `?streak=41` da folha da chama. Sem ela, a bolha
      vazia do "…", o erro do fluxo e os TRÊS desfechos do 👎 exigiriam uma
@@ -337,6 +346,12 @@ export function NutricaoTab({
         memória depois de um seletor de arquivo, e por isso era impossível de
         fotografar. */
     fotos?: Record<number, string>;
+    /** A porta fechada — ela só nasce de um 402 do servidor, e por isso era
+        impossível de fotografar sem gastar o teto de uma conta real. */
+    bloqueio?: MotivoDoBloqueio;
+    /** Quantas perguntas grátis sobram — o número chega num cabeçalho de
+        resposta, então ele só existe depois de uma conversa de verdade. */
+    amostra?: number;
   };
 }) {
   const ehBancada = bancada != null;
@@ -380,6 +395,17 @@ export function NutricaoTab({
      ⚠️ A medição do teclado é a MESMA do Chat IA (`lib/janela-do-teclado.ts`):
      a paciente usa os dois na mesma tela, e duas medições divergiriam. */
   const [aberta, setAberta] = useState(bancada?.aberta ?? false);
+
+  /* ─── A PORTA DO PREMIUM ────────────────────────────────────────────────
+     `null` = aberta. Os dois motivos dizem coisas DIFERENTES e por isso não
+     podem virar um booleano: o teto do dia promete a volta amanhã; o Premium
+     oferece a assinatura. Um cartão só, genérico, faria a assinante que bateu
+     no teto ver um convite para assinar o que ela já assina. */
+  const [bloqueio, setBloqueio] = useState<MotivoDoBloqueio | null>(bancada?.bloqueio ?? null);
+  /* Quantas ainda sobram da amostra grátis. `null` é "não sei" — e "não sei"
+     não fala (ver `recadoDaAmostra`). A assinante também fica em `null`: o
+     servidor só manda o número quando a resposta veio da amostra. */
+  const [amostra, setAmostra] = useState<number | null>(bancada?.amostra ?? null);
   const janela = useJanelaDoTeclado();
   const listaRef = useRef<HTMLDivElement>(null);
   /* ⚠️ `janela` só existe no celular (o hook devolve `null` no computador),
@@ -498,10 +524,19 @@ export function NutricaoTab({
         texto?: string;
         assinatura?: string;
         motivo?: string;
+        restantesNaAmostra?: number | null;
       } | null;
       /* ⚠️ `{ ok: false }` chega numa resposta 200 NORMAL em alguns caminhos,
          e um `catch` não o pega: quem decide é o VALOR. Sem isto a bolha
          renderiza "…" para sempre — o defeito que a conversa já pagou aqui. */
+      /* A foto passa pelo MESMO portão, e o 402 dela é a mesma porta. Sem
+         este ramo, bater no teto com uma foto viraria "não consegui ler essa
+         foto" — um recado que manda ela tentar de novo o que não vai passar. */
+      if (res.status === 402) {
+        setBloqueio(r?.motivo === "bloqueado:teto_diario" ? "teto_diario" : "sem_premium");
+        setMessages(messages);
+        return;
+      }
       if (!res.ok || !r?.ok || !r.texto) {
         /* O motivo fica LEGÍVEL no console: a paciente lê o recado, quem
            investiga lê isto. Antes, cinco falhas do servidor viravam a mesma
@@ -510,6 +545,7 @@ export function NutricaoTab({
         setMessages([...next, { role: "assistant", content: recadoDaFoto(r?.motivo) }]);
         return;
       }
+      setAmostra(r.restantesNaAmostra ?? null);
       setMessages([...next, { role: "assistant", content: r.texto, assinatura: r.assinatura }]);
     } catch {
       setMessages([...next, { role: "assistant", content: recadoDaFoto() }]);
@@ -646,10 +682,28 @@ export function NutricaoTab({
          sempre — sem erro, sem retry, sem nada dizendo o que houve. É o mesmo
          defeito que o chat principal e o widget do site já corrigiram; este
          ficou. */
+      /* ─── 402 É A PORTA, NÃO UM ERRO ────────────────────────────────
+         ⚠️ E ela DEVOLVE o que a paciente escreveu. Engolir a pergunta faria
+         ela perder o texto que acabou de digitar para ver um convite de
+         assinatura — e reescrevê-lo depois de assinar. A mensagem sai da lista
+         e volta para o campo, intacta. */
+      if (res.status === 402) {
+        const corpo = (await res.json().catch(() => null)) as { motivo?: string } | null;
+        setBloqueio(corpo?.motivo === "teto_diario" ? "teto_diario" : "sem_premium");
+        setMessages(messages);
+        setInput(msg);
+        return;
+      }
       if (!res.ok) {
         const corpo = await res.text().catch(() => "");
         throw new Error(avisoQuePodeAparecer(corpo) ?? "");
       }
+      /* ⚠️ O CABEÇALHO CHEGA ANTES DO PRIMEIRO BYTE do corpo, e é por isso que
+         ele é cabeçalho e não metadata do stream: a tela já sabe quantas
+         sobram enquanto a resposta ainda está digitando. Ausente = assinante
+         (ou leitura degradada), e aí a linha não aparece. */
+      const sobram = res.headers.get("X-Nutricionista-Amostra");
+      setAmostra(sobram === null ? null : Number(sobram));
       if (!res.body) throw new Error("");
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -1373,6 +1427,49 @@ export function NutricaoTab({
               </button>
             ))}
           </div>
+        )}
+
+        {/* ─── A PORTA DO PREMIUM ────────────────────────────────────────
+            ⚠️ Acima do compositor, e não no lugar dele: o campo continua na
+            tela com o que ela escreveu dentro. Tirá-lo faria a pergunta sumir
+            junto com a resposta que ela não teve. */}
+        {bloqueio && (
+          <div className="border-t border-lime-100 bg-lime-50/70 px-4 py-3">
+            <p className="font-serif text-[15px] font-semibold text-lime-950">
+              {recadoDoBloqueio(bloqueio).titulo}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-lime-900">
+              {recadoDoBloqueio(bloqueio).texto}
+            </p>
+            {/* ⚠️ O botão só existe no cartão do PREMIUM. Oferecer assinatura a
+                quem bateu no teto seria vender o que ela já comprou. */}
+            {bloqueio === "sem_premium" && aoAssinar && (
+              <button
+                onClick={() => {
+                  const v = podeComprarAqui("premium_paciente", ehNativo());
+                  /* ⚠️ O veredito vem da régua de canal, nunca de um `if`
+                     local: a paciente assina pela loja, e com o IAP desligado
+                     não há compra em canal nenhum. O mesmo botão vira a compra
+                     de verdade no dia em que ele ligar, sem tela nova. */
+                  if (v.pode) aoAssinar?.();
+                  else toast(v.texto);
+                }}
+                className="btn-3d press mt-3 min-h-[44px] w-full rounded-full bg-lime-700 px-4 text-[15px] font-semibold text-white"
+              >
+                Conhecer o Premium
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* ─── A AMOSTRA CONTA EM VOZ ALTA ─────────────────────────────
+            ⚠️ Só quando a porta está ABERTA: com o cartão do Premium na tela,
+            "resta 1" seria a contagem de uma coisa que já acabou. E o texto
+            sai da régua, nunca daqui — é o que o dono relê. */}
+        {!bloqueio && recadoDaAmostra(amostra) && (
+          <p className="border-t border-lime-100 bg-lime-50/50 px-4 py-2 text-xs text-lime-900">
+            {recadoDaAmostra(amostra)}
+          </p>
         )}
 
         <div className="flex items-end gap-2 border-t border-lime-100 bg-card/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 md:pb-2">

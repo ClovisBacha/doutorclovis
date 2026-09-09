@@ -130,7 +130,39 @@ export const Route = createFileRoute("/api/nutrition")({
            ligou ("usar no chat do app"), e a nutrição é o app. Inventar um
            canal novo faria o cérebro nascer DESLIGADO aqui por default-deny,
            e ninguém entenderia por quê. */
-        const { doctorId, patientId, careMode } = await consultorioDaPaciente(usuario.id);
+        const { doctorId, patientId, careMode, premium } = await consultorioDaPaciente(usuario.id);
+
+        /* ─── O PORTÃO DO PREMIUM, ANTES DE QUALQUER CHAMADA PAGA ──────────
+           ⚠️ **A POSIÇÃO É A METADE DO CONSERTO.** Ele vem ANTES de
+           `getBrainContextResolved` — que faz busca vetorial e pode gastar um
+           embedding — e antes do modelo. Um portão colocado depois recusaria a
+           resposta e pagaria por ela do mesmo jeito: exatamente o oposto do
+           que ele existe para fazer.
+
+           Quem paga a nutricionista é a PACIENTE, no Premium; o chat clínico
+           continua sendo do médico. Ver `nutricao-premium.ts` para as duas
+           isenções (Modo Cuidado e perfil ilegível) e por que nenhuma delas
+           dispensa o teto diário. */
+        const { usoDaNutricionista } = await import("@/lib/nutricao-premium.server");
+        const { decidirAcesso } = await import("@/lib/nutricao-premium");
+        const uso = await usoDaNutricionista(patientId);
+        const acesso = decidirAcesso({
+          premium,
+          careMode,
+          usadasHoje: uso.hoje,
+          usadasNaSemana: uso.semana,
+        });
+        if (!acesso.pode) {
+          /* 402 com CORPO ESTRUTURADO, e não uma frase.
+             `avisoQuePodeAparecer` recusa JSON de propósito (ele existe para
+             não vazar nome de variável na bolha), então uma frase aqui viraria
+             erro genérico na tela. O cliente lê `motivo` e desenha o cartão
+             certo — o do Premium ou o do teto, que dizem coisas diferentes. */
+          return new Response(JSON.stringify({ bloqueado: true, motivo: acesso.motivo }), {
+            status: 402,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         const ultima = ultimaPergunta(soDela);
         const { getBrainContextResolved } = await import("@/lib/secondbrain.server");
         const brain =
@@ -230,6 +262,24 @@ export const Route = createFileRoute("/api/nutrition")({
            mensagem seguinte como turno do assistente de verdade. */
         let respondido = "";
         return result.toUIMessageStreamResponse({
+          /* ─── QUANTAS AINDA SOBRAM DA AMOSTRA ──────────────────────────────
+             ⚠️ **UM CABEÇALHO, e não `messageMetadata`.** A metadata só chega
+             no chunk `finish`, ou seja depois de a resposta inteira ter sido
+             lida; o cabeçalho chega ANTES do primeiro byte e a tela já sabe o
+             que dizer enquanto a resposta digita.
+
+             E ele existe por uma razão de produto: sem aviso, quem não assina
+             usa três perguntas ao longo da semana e bate numa parede que nunca
+             viu chegar. "Ela descobre a parede batendo nela" é exatamente o
+             que a régua deste recurso proíbe. Vai só na amostra — a assinante
+             não precisa contar nada. */
+          headers: acesso.amostra
+            ? {
+                "X-Nutricionista-Amostra": String(
+                  Math.max(0, (acesso.restantesNaAmostra ?? 1) - 1),
+                ),
+              }
+            : undefined,
           originalMessages: body.messages as UIMessage[],
           messageMetadata: ({ part }) => {
             if (part.type === "text-delta") respondido += part.text;

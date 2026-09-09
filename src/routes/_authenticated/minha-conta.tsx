@@ -3151,7 +3151,15 @@ function MinhaContaPage() {
                 {tab === "Nutrição" && (
                   <div className="space-y-5">
                     <CabecalhoDaSaude chave="Nutrição" />
-                    <NutricaoTab profile={profile} gest={gest} careMode={careMode} />
+                    <NutricaoTab
+                      profile={profile}
+                      gest={gest}
+                      careMode={careMode}
+                      /* A porta do Premium abre a MESMA oferta de todo o resto
+                         do app — uma segunda tela de assinatura divergiria da
+                         primeira no dia em que o preço mudasse. */
+                      aoAssinar={() => setPremiumOpen(true)}
+                    />
                   </div>
                 )}
                 {tab === "Bem-estar" && (

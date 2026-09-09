@@ -25,6 +25,11 @@ import type { ChatMsg } from "@/routes/_authenticated/minha-conta";
  *                            seja, é impossível de fotografar sem tirar uma
  *                            foto de um prato de verdade
  *
+ * `?bloqueio=sem_premium` mostra a porta do Premium (com o botão) e
+ * `?bloqueio=teto_diario` a do teto de hoje — as duas só nascem de um 402 do
+ * servidor. `?amostra=2` põe o aviso de quantas perguntas grátis sobram, que
+ * chega num cabeçalho de resposta e por isso não se fabrica sem conversar.
+ *
  * E `?w=` muda o trimestre (chips e nutrientes), `?luto=1` liga o Modo Cuidado
  * — onde o cartão de nutrientes, os chips e a semana somem —, `?agua=5` põe
  * cinco copos no contador e `?ferramenta=comer|prato|alivio|casa` abre o painel
@@ -73,6 +78,15 @@ export const Route = createFileRoute("/preview-nutricao")({
        um toque (mandar a primeira pergunta) — sem isto a forma que a paciente
        de fato usa seria impossível de fotografar. */
     painel: q.painel == null ? false : Boolean(q.painel),
+    /* ⚠️ A PORTA FECHADA só nasce de um 402 do servidor — fotografá-la numa
+       conta real exigiria gastar o teto de dez perguntas do dia, ou não
+       assinar e queimar a amostra da semana. `sem_premium` é o cartão com o
+       botão; `teto_diario` é o que a assinante vê. */
+    bloqueio: q.bloqueio == null ? "" : String(q.bloqueio),
+    /* Quantas sobram da amostra: o número chega num CABEÇALHO de resposta, ou
+       seja só existe depois de uma conversa de verdade contra o banco. `-1` é
+       "não sei", que é o estado em que a linha não aparece. */
+    amostra: q.amostra == null || q.amostra === "" ? -1 : Number(q.amostra),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -156,6 +170,8 @@ function Pagina() {
     tomados,
     hora,
     painel,
+    bloqueio,
+    amostra,
   } = Route.useSearch();
   const w = semdum ? null : wBruto;
 
@@ -190,6 +206,11 @@ function Pagina() {
     suplementos: tomados ? tomados.split(",").filter(Boolean) : undefined,
     hora: hora >= 0 && hora <= 23 ? hora : undefined,
     aberta: painel,
+    bloqueio: (["sem_premium", "teto_diario"].includes(bloqueio) ? bloqueio : undefined) as
+      | "sem_premium"
+      | "teto_diario"
+      | undefined,
+    amostra: amostra >= 0 ? amostra : undefined,
   };
 
   return (
@@ -219,6 +240,11 @@ function Pagina() {
           } as never
         }
         careMode={luto}
+        /* ⚠️ SEM ISTO O BOTÃO DO PREMIUM NÃO É DESENHADO — ele só existe quando
+           há para onde ir, e a bancada aprovaria um cartão sem saída. O toque
+           cai na régua de canal de verdade (hoje: "a compra ainda não está
+           aberta"), que é o que a produção faz. */
+        aoAssinar={() => {}}
         bancada={{ ...(bancada ?? {}), ...extras }}
       />
     </div>

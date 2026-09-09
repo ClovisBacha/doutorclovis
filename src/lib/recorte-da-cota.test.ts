@@ -57,11 +57,11 @@ describe("o recorte da cota", () => {
   const { q, filtros } = consultaFalsa();
   aplicarRecorteDaCota(q);
 
-  test("conta os chats clínicos do app — o que o portão consegue parar", () => {
+  test("conta o chat clínico do app — o que o portão consegue parar", () => {
     /* O portão vive em `getBrainContext`. Contar o que ele não consegue
        interromper faria a cota estourar por um trabalho que ninguém tem como
        frear — e a gestante ficaria sem resposta clínica por causa disso. */
-    expect(filtros).toEqual([{ op: "in", coluna: "canal", valor: "app,nutricao" }]);
+    expect(filtros).toEqual([{ op: "in", coluna: "canal", valor: "app" }]);
   });
 
   test("é uma lista de PERMISSÃO, não de exclusão", () => {
@@ -77,13 +77,24 @@ describe("o recorte da cota", () => {
     expect(filtros).toHaveLength(1);
   });
 
-  test("os canais são literalmente 'app' e 'nutricao'", () => {
-    /* Literais, e não derivados da constante: um teste que só a reafirma passa
+  test("o canal é literalmente 'app', e mais nenhum", () => {
+    /* Literal, e não derivado da constante: um teste que só a reafirma passa
        verde quando alguém troca 'app' por 'whatsapp'. Foi medido nesta base —
        mutar um limiar deixava a suíte inteira verde.
-       Os dois são chat CLÍNICO da paciente com o cérebro do médico. Um terceiro
-       aqui precisa ser essa mesma coisa, e não "mais um lugar que usa IA". */
-    expect([...CANAIS_DA_COTA].sort()).toEqual(["app", "nutricao"]);
+       O que entra aqui é chat CLÍNICO da paciente com o cérebro do médico, e
+       pago por ELE. Um segundo canal precisa ser essa mesma coisa, e não "mais
+       um lugar que usa IA". */
+    expect([...CANAIS_DA_COTA].sort()).toEqual(["app"]);
+  });
+
+  test("⚠️ a NUTRIÇÃO não pode voltar: quem paga por ela é a paciente", () => {
+    /* Ela esteve nesta lista até set/2026 e saiu quando virou item do Premium
+       da paciente. Reintroduzi-la cobraria a MESMA conversa duas vezes — a
+       franquia do médico e a assinatura dela —, e ninguém veria: as duas
+       cobranças são invisíveis uma para a outra.
+       Quem limita a nutrição hoje é `nutricao-premium.ts`. */
+    expect([...CANAIS_DA_COTA]).not.toContain("nutricao");
+    expect([...CANAIS_DA_COTA]).not.toContain("prato");
   });
 });
 

@@ -99,8 +99,15 @@ describe("⚠️ o Modo Cuidado da nutrição falha FECHADO", () => {
   test("o erro da leitura é OLHADO — não basta o try/catch", () => {
     /* O PostgREST resolve com `{ data, error }`; um `catch` em volta pega a
        queda de rede e deixa passar exatamente o caso comum, que é o banco
-       recusando a consulta. */
-    expect(corpo).toMatch(/const \{ data, error \} = await/);
+       recusando a consulta.
+
+       ⚠️ `const` OU `let` — e a diferença não é estilo: no dia em que a leitura
+       ganhou o degrau de recuo da coluna nova (`quiz_premium`), ela precisou
+       ser reatribuída, e esta asserção reprovou uma mudança que só APERTOU a
+       garantia. É a décima quarta vez nesta base; a régua continua sendo cobrar
+       o que o código GARANTE — o `error` é destruturado e é olhado —, nunca a
+       palavra com que ele foi escrito. */
+    expect(corpo).toMatch(/(?:const|let) \{ data, error \} = await/);
     expect(corpo).toMatch(/if \(error\)/);
   });
 

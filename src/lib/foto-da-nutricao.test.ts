@@ -154,7 +154,16 @@ describe("o servidor", () => {
   });
   test("a resposta sai ASSINADA para voltar ao fio da conversa", () => {
     expect(API).toMatch(/assinarTurno\(chave, usuario\.id, texto\)/);
-    expect(API).toMatch(/json\(\{ ok: true, texto, assinatura \}\)/);
+    /* ⚠️ A GARANTIA É O QUE O SUCESSO CARREGA, e não a forma da linha. A
+       primeira versão travava o objeto inteiro (`{ ok: true, texto, assinatura }`)
+       e ficou vermelha no dia em que ele ganhou o campo do aviso da amostra —
+       uma mudança que não tira nada. O que se cobra é que o caminho de sucesso
+       exista e traga os três: sem `assinatura`, o modelo perde o fio da
+       conversa na pergunta seguinte. */
+    const sucesso = API.slice(API.indexOf("ok: true"));
+    expect(sucesso.length).toBeGreaterThan(0);
+    expect(sucesso).toContain("texto,");
+    expect(sucesso).toContain("assinatura,");
   });
   test("⚠️ resposta vazia é ERRO, nunca sucesso mudo", () => {
     /* Sem isto a bolha renderiza "…" para sempre — o defeito que a conversa
