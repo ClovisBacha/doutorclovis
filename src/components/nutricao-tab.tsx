@@ -70,6 +70,14 @@ import { TextoLeve } from "@/components/texto-leve";
 import { nutricaoDaSemana, nutricaoDoPosParto } from "@/lib/nutricao-da-semana";
 import { diasEntre } from "@/lib/filhos";
 import { conviteDoMomento, momentoDoDia } from "@/lib/nutricao-perfil";
+import {
+  PREFERENCIAS_MAX,
+  TURNOS_DA_MEMORIA,
+  limparPreferencias,
+  parParaGravar,
+  turnosDaMemoria,
+  type LinhaDaMemoria,
+} from "@/lib/nutricao-memoria";
 import { ymdLocal } from "@/lib/utils";
 import { useJanelaDoTeclado } from "@/lib/janela-do-teclado";
 import { useTravarRolagemDeFundo } from "@/lib/use-travar-rolagem";
@@ -367,6 +375,8 @@ export function NutricaoTab({
         hoje; com o hoje do relógio a bancada mostraria outra frase a cada
         semana — a mesma armadilha da bancada das contrações. */
     hoje?: string;
+    /** As preferências já escritas — a coluna só existe depois do SQL. */
+    preferencias?: string;
   };
 }) {
   const ehBancada = bancada != null;
@@ -411,6 +421,93 @@ export function NutricaoTab({
   /* A miniatura da foto que ela mandou, por índice da mensagem. SÓ em memória:
      morre com a tela, nunca vai ao `localStorage` nem ao servidor. */
   const [fotos, setFotos] = useState<Record<number, string>>(bancada?.fotos ?? {});
+
+  /* ─── AS PREFERÊNCIAS DELA ──────────────────────────────────────────────
+     O que ela não come e o que prefere, escrito por ela AQUI (é onde ela
+     pensa em comida), gravado em `patient_profiles.food_preferences` e lido
+     pelo servidor no bloco da paciente. Não é alergia — a alergia continua no
+     Perfil, com a instrução de segurança própria. */
+  const [preferencias, setPreferencias] = useState(
+    bancada?.preferencias ?? profile?.food_preferences ?? "",
+  );
+  const [prefsGravadas, setPrefsGravadas] = useState(preferencias);
+  const [gravandoPrefs, setGravandoPrefs] = useState(false);
+  async function gravarPreferencias() {
+    const limpa = limparPreferencias(preferencias) ?? "";
+    if (ehBancada) {
+      setPrefsGravadas(limpa);
+      return;
+    }
+    setGravandoPrefs(true);
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) throw new Error("sessao");
+      const { error } = await (supabase as any)
+        .from("patient_profiles")
+        .update({ food_preferences: limpa || null })
+        .eq("id", uid);
+      /* ⚠️ PGRST204 é a coluna que ainda não nasceu (o SQL chega depois do
+         código): dizer "não foi possível" mandaria ela tentar de novo o que
+         não vai passar. Diz o que é. */
+      if ((error as { code?: string } | null)?.code === "PGRST204") {
+        toast.error("Este campo ainda não está disponível — em breve.");
+        return;
+      }
+      if (error) throw error;
+      setPrefsGravadas(limpa);
+      toast.success("Guardei. A nutricionista passa a levar isso em conta.");
+    } catch (e) {
+      console.warn("[nutricao] preferências não gravaram", e);
+      toast.error("Não consegui guardar agora. Tente de novo.");
+    } finally {
+      setGravandoPrefs(false);
+    }
+  }
+
+  /* ─── A MEMÓRIA CURTA ───────────────────────────────────────────────────
+     Os últimos turnos voltam na abertura, e cada troca que CHEGA é gravada.
+     A régua (o que volta, o que se grava, e por que nada disso no luto) está
+     em `nutricao-memoria.ts`. Falha em silêncio: sem memória ela responde
+     como sempre respondeu. */
+  const memoriaLida = useRef(false);
+  useEffect(() => {
+    if (ehBancada || careMode || memoriaLida.current) return;
+    memoriaLida.current = true;
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) return;
+      const { data, error } = await (supabase as any)
+        .from("nutricao_mensagens")
+        .select("role,content,assinatura,created_at")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(TURNOS_DA_MEMORIA);
+      if (error || !data?.length) return;
+      const turnos = turnosDaMemoria(data as LinhaDaMemoria[]);
+      if (!turnos.length) return;
+      /* Só se ela ainda não começou a conversar nesta visita: uma pergunta
+         já feita não pode ser empurrada para baixo de ontem. */
+      setMessages((atual) => (atual.length <= 1 ? [atual[0], ...turnos] : atual));
+    })().catch((e) => console.warn("[nutricao] memória não veio", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  function guardarTroca(pergunta: string, resposta: { content: string; assinatura?: string }) {
+    if (ehBancada || careMode || !resposta.content.trim()) return;
+    (async () => {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user.id;
+      if (!uid) return;
+      const { error } = await (supabase as any)
+        .from("nutricao_mensagens")
+        .insert(parParaGravar(uid, pergunta, resposta));
+      /* Tabela ausente é o banco atrás do SQL — normal, e cala. */
+      if (error && (error as { code?: string }).code !== "42P01") {
+        console.warn("[nutricao] troca não gravou", error);
+      }
+    })().catch((e) => console.warn("[nutricao] troca não gravou", e));
+  }
   /* ─── A CONVERSA É UM PAINEL, NÃO UMA CAIXA NA PÁGINA ─────────────────────
      Ela era uma caixa de 55vh DENTRO da página rolável: dois rolos disputando
      o dedo, e a resposta cortada no meio da palavra na borda da caixa (a foto
@@ -576,6 +673,7 @@ export function NutricaoTab({
       }
       setAmostra(r.restantesNaAmostra ?? null);
       setMessages([...next, { role: "assistant", content: r.texto, assinatura: r.assinatura }]);
+      guardarTroca(next[next.length - 1]!.content, { content: r.texto, assinatura: r.assinatura });
     } catch {
       setMessages([...next, { role: "assistant", content: recadoDaFoto() }]);
     } finally {
@@ -801,6 +899,7 @@ export function NutricaoTab({
         conferir();
       });
       setMessages([...next, { role: "assistant", content: acc, assinatura }]);
+      guardarTroca(msg, { content: acc, assinatura });
     } catch (e) {
       setMessages([
         ...next,
@@ -1180,6 +1279,42 @@ export function NutricaoTab({
           </p>
         </section>
       )}
+
+      {/* ─── O QUE ELA NÃO COME, E O QUE PREFERE ─────────────────────────
+          Escrito por ela, aqui. Sobrevive ao Modo Cuidado (é sobre ela, não
+          sobre a gestação). NÃO é alergia, e a tela diz isso. */}
+      <section
+        aria-label="Suas preferências alimentares"
+        className="card-material rounded-2xl border border-lime-200/70 bg-gradient-to-r from-lime-50 to-amber-50/60 p-3.5"
+      >
+        <p className="font-serif text-[15px] font-semibold text-foreground">
+          O que você não come, e o que prefere
+        </p>
+        <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+          Vegetariana, sem porco, não gosta de peixe, come muito arroz com feijão… A nutricionista
+          leva isso em conta em toda sugestão. Alergia é no Perfil.
+        </p>
+        <textarea
+          value={preferencias}
+          onChange={(e) => setPreferencias(e.target.value.slice(0, PREFERENCIAS_MAX))}
+          rows={2}
+          maxLength={PREFERENCIAS_MAX}
+          placeholder="Ex.: vegetariana; não como fígado; adoro fruta"
+          className="mt-2 w-full resize-none rounded-xl border border-lime-200/80 bg-white/80 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-lime-300"
+        />
+        {(limparPreferencias(preferencias) ?? "") !== prefsGravadas && (
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void gravarPreferencias()}
+              disabled={gravandoPrefs}
+              className="btn-3d press min-h-[44px] rounded-full bg-lime-700 px-5 text-sm font-semibold text-white disabled:opacity-40"
+            >
+              {gravandoPrefs ? "Guardando…" : "Guardar"}
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* ─── A ÁGUA DO DIA ──────────────────────────────────────────────
           Contador, não meta clínica: 8 copos é REFERÊNCIA e a tela diz. */}

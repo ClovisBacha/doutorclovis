@@ -78,13 +78,21 @@ export const apagarMinhasConversas = createServerFn({ method: "POST" })
     const sb = supabaseAdmin as any;
     const uid = u.user.id;
 
-    for (const tabela of ["chat_messages", "chat_memory"]) {
-      const { error } = await sb.from(tabela).delete().eq("patient_id", uid);
+    /* ⚠️ A conversa com a NUTRICIONISTA mora noutra tabela, apontada por
+       `user_id` (é escrita pela paciente, por RLS) — e "apagar minhas
+       conversas" que deixasse essa de pé seria a promessa pela metade. */
+    const conversas: [string, string][] = [
+      ["chat_messages", "patient_id"],
+      ["chat_memory", "patient_id"],
+      ["nutricao_mensagens", "user_id"],
+    ];
+    for (const [conversa, porQuem] of conversas) {
+      const { error } = await sb.from(conversa).delete().eq(porQuem, uid);
       /* Tabela ausente é normal num banco atrás das migrations — não há o que
          apagar. Qualquer outro erro é conversa que FICOU, e dizer "apagamos"
          seria a mesma mentira que a exclusão de conta contava. */
       if (error && (error as { code?: string }).code !== "42P01") {
-        console.error("[conversas] não foi possível apagar", tabela, error);
+        console.error("[conversas] não foi possível apagar", conversa, error);
         return { ok: false as const, motivo: "falhou" as const };
       }
     }

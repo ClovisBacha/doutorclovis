@@ -87,7 +87,7 @@ describe("⚠️ as pontas que a régua não alcança", () => {
 
   test("o servidor PEDE `birth_date`, com degrau para o banco sem a coluna", () => {
     expect(SERVIDOR).toMatch(/birth_date/);
-    expect(SERVIDOR).toMatch(/colunaAusente\(perfilCheio\?\.error\)/);
+    expect(SERVIDOR).toMatch(/colunaAusente\(perfilRes\?\.error\)/);
     expect(SERVIDOR).toMatch(/replace\(",birth_date", ""\)/);
     /* E o que ele monta passa pela régua pura — nunca uma segunda versão dela. */
     expect(SERVIDOR).toMatch(/perfilNutricionalDe\(\{ perfil, logs, careMode, agora \}\)/);
@@ -110,5 +110,30 @@ describe("⚠️ as pontas que a régua não alcança", () => {
     expect(API).toMatch(/gestantes e puérperas/);
     expect(API).toMatch(/JÁ TEVE O BEBÊ/);
     expect(FOTO).toMatch(/JÁ TEVE O BEBÊ/);
+  });
+});
+
+describe("as preferências atravessam o adaptador", () => {
+  test("`food_preferences` vira `preferencias`", () => {
+    const p = perfilNutricionalDe({
+      perfil: { food_preferences: "vegetariana" },
+      logs: [],
+      careMode: false,
+      agora: AGORA,
+    });
+    expect(p.preferencias).toBe("vegetariana");
+  });
+
+  test("⚠️ a escada do select desce UMA coluna por vez, derivada por remoção", async () => {
+    const { DEGRAUS_DO_PERFIL } = await import("./nutricao-contexto.server");
+    expect(DEGRAUS_DO_PERFIL).toHaveLength(3);
+    expect(DEGRAUS_DO_PERFIL[0]).toMatch(/birth_date,food_preferences$/);
+    expect(DEGRAUS_DO_PERFIL[1]).toMatch(/birth_date$/);
+    expect(DEGRAUS_DO_PERFIL[2]).not.toMatch(/birth_date|food_preferences/);
+    /* Cada degrau é prefixo do de cima: descer só TIRA. */
+    for (let i = 1; i < DEGRAUS_DO_PERFIL.length; i++) {
+      expect(DEGRAUS_DO_PERFIL[i - 1]!.startsWith(DEGRAUS_DO_PERFIL[i]!)).toBe(true);
+    }
+    for (const d of DEGRAUS_DO_PERFIL) expect(d).not.toMatch(/,,|,$/);
   });
 });

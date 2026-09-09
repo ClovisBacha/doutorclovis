@@ -21,12 +21,20 @@ import { colunaAusente } from "./postgrest";
 /** 30 dias: o suficiente para um padrão glicêmico, curto o bastante para ser o agora. */
 const JANELA_DIAS = 30;
 
-/* ⚠️ `birth_date` nasceu numa migration posterior (`20260608210000_postpartum`).
-   Num banco sem ela o select inteiro voltaria 42703 e a nutricionista perderia
-   a ALERGIA por causa de uma coluna que ela nem precisava — daí o degrau. */
+/* ⚠️ `birth_date` (migration `20260608210000_postpartum`) e `food_preferences`
+   (`APLICAR_MEMORIA_DA_NUTRICAO.sql`) nasceram DEPOIS da alergia. Num banco sem
+   uma delas o select inteiro voltaria 42703 e a nutricionista perderia a
+   ALERGIA por causa de uma coluna que ela nem precisava — daí a escada, UM
+   degrau por coluna, do SQL mais novo para o mais velho, cada degrau derivado
+   do de cima por remoção (duas listas à mão divergem no primeiro ajuste). */
 const COLUNAS_DO_PERFIL =
   "allergies,medications,height_cm,pre_pregnancy_weight_kg,prior_gestational_diabetes," +
-  "lmp_date,reference_date,reference_weeks,reference_days,birth_date";
+  "lmp_date,reference_date,reference_weeks,reference_days,birth_date,food_preferences";
+export const DEGRAUS_DO_PERFIL: readonly string[] = [
+  COLUNAS_DO_PERFIL,
+  COLUNAS_DO_PERFIL.replace(",food_preferences", ""),
+  COLUNAS_DO_PERFIL.replace(",food_preferences", "").replace(",birth_date", ""),
+];
 
 export async function blocoDaNutricao(
   patientId: string,
@@ -46,7 +54,7 @@ export async function blocoDaNutricao(
 
     /* Duas leituras independentes, uma onda só. */
     const [perfilCheio, logsRes] = await Promise.all([
-      lerPerfil(COLUNAS_DO_PERFIL),
+      lerPerfil(DEGRAUS_DO_PERFIL[0]),
       (supabaseAdmin as any)
         .from("health_logs")
         .select("log_date,weight_kg,glucose_mg_dl")
@@ -55,9 +63,11 @@ export async function blocoDaNutricao(
         .order("log_date", { ascending: false })
         .limit(60),
     ]);
-    const perfilRes = colunaAusente(perfilCheio?.error)
-      ? await lerPerfil(COLUNAS_DO_PERFIL.replace(",birth_date", ""))
-      : perfilCheio;
+    /* Desce a escada enquanto a falta for de COLUNA; qualquer outro erro para. */
+    let perfilRes = perfilCheio;
+    for (let d = 1; d < DEGRAUS_DO_PERFIL.length && colunaAusente(perfilRes?.error); d++) {
+      perfilRes = await lerPerfil(DEGRAUS_DO_PERFIL[d]);
+    }
 
     /* ⚠️ O perfil falhando cala TUDO: sem ele não há alergia, e um bloco sem a
        alergia é justamente o que faz este recurso existir. O histórico falhando

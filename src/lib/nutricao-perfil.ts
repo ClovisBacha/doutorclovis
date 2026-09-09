@@ -26,6 +26,8 @@ export type PerfilNutricional = {
   /** Texto livre do perfil — o que ELA escreveu, sem reescrever. */
   alergias?: string | null;
   medicacoes?: string | null;
+  /** O que ela NÃO come e o que prefere — escrito por ela. Não é alergia. */
+  preferencias?: string | null;
   semanas?: number | null;
   trimestre?: 1 | 2 | 3 | null;
   /**
@@ -126,6 +128,15 @@ export function blocoDaPaciente(p: PerfilNutricional): string {
   if (medicacoes) {
     linhas.push(
       `- Medicações/suplementos em uso: ${medicacoes}. Considere interações com alimentos (ex.: ferro com cálcio ou café), mas NUNCA mude dose nem horário — isso é do médico.`,
+    );
+  }
+  /* As preferências sobrevivem ao Modo Cuidado pela mesma razão da alergia:
+     são sobre ELA, não sobre a gestação — e sugerir carne a quem escreveu que
+     é vegetariana é o app ignorando o que ela disse. */
+  const preferencias = recortar(p.preferencias);
+  if (preferencias) {
+    linhas.push(
+      `- Preferências e restrições alimentares que ELA escreveu: ${preferencias}. Respeite-as em toda sugestão — não proponha o que ela disse que não come, e monte as ideias a partir do que ela prefere. Isto NÃO é alergia (a alergia, quando existe, está acima).`,
     );
   }
 

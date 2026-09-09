@@ -66,6 +66,14 @@ export const FONTES: FonteDoExport[] = [
     porque: "o cadastro que ela mesma preencheu",
   },
   {
+    tabela: "nutricao_mensagens",
+    coluna: "user_id",
+    chave: "conversa_com_a_nutricionista",
+    /* Sem a `assinatura`: é um HMAC do servidor, não é dado dela. */
+    colunas: "role, content, created_at",
+    porque: "o que ela perguntou à nutricionista e o que recebeu — texto dela, para ela",
+  },
+  {
     tabela: "journal_entries",
     coluna: "user_id",
     chave: "diario",

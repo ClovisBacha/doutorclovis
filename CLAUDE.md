@@ -14790,3 +14790,55 @@ de vencer, a tela ignorando a coluna).
 
 **Bancadas:** `/preview-nutricao?pos=20` · `?pos=200` · `?pos=20&luto=1` (nada
 de pós-parto no luto) — as três na varredura da CI.
+
+### A nutricionista lembra: as preferências dela e a conversa de ontem (set/2026)
+
+Item 2 da mesma nota 6,5. Medido antes: a nutricionista lia DUAS tabelas
+(perfil e `health_logs`); não havia onde ela dizer "sou vegetariana" (a
+alergia é outra coisa), e a conversa morria com a aba — a pergunta de ontem
+sobre o ferro não existia hoje, e o modelo recomeçava do zero a cada visita.
+
+- **`patient_profiles.food_preferences`** — texto livre escrito por ELA, na
+  própria aba (é onde ela pensa em comida), com o recado dizendo que alergia é
+  no Perfil. Entra no bloco do prompt logo depois da medicação, **sobrevive ao
+  Modo Cuidado** (é sobre ela, não sobre a gestação) e diz ao modelo "isto NÃO
+  é alergia". ⚠️ A coluna que ainda não nasceu tem recado PRÓPRIO na tela
+  (`PGRST204` → "ainda não está disponível"), nunca "tente de novo" — mandaria
+  ela repetir o que não vai passar.
+- **`nutricao_mensagens`** — os últimos doze turnos, dela por RLS. ⚠️ **NÃO é
+  `chat_messages`**: aquela é a transcrição CLÍNICA que o médico lê no
+  prontuário, e a nutrição ali poluiria o que ele lê. ⚠️ **Quem grava é a
+  TELA, e só depois de a resposta CHEGAR** (nos dois caminhos, texto e foto):
+  gravar a pergunta antes deixaria, numa falha, uma pergunta órfã que na visita
+  seguinte volta sem resposta — o modelo receberia duas perguntas dela em fila,
+  a forma exata do defeito que a assinatura consertou. A `assinatura` viaja
+  junto e é o que deixa a resposta voltar ao modelo como turno próprio; uma
+  linha forjada pelo navegador não tem assinatura válida e é descartada pelo
+  servidor — guardar não é confiar.
+- ⚠️ **NADA NO MODO CUIDADO — nem lê, nem grava.** Uma conversa de antes da
+  perda pode falar do bebê, e trazê-la de volta seria a porta dos fundos do
+  portão de luto. O que já está gravado fica: é dela.
+- **A memória não empurra uma pergunta já feita nesta visita**: só entra se a
+  conversa ainda estiver na saudação.
+- **"Apagar minhas conversas" leva a da nutricionista junto** (pela coluna
+  certa, `user_id`), o **export LGPD** ganhou o bloco (sem a assinatura, que é
+  do servidor), e a exclusão de conta cai por `CASCADE`.
+- **O select do perfil virou ESCADA de três degraus** (`DEGRAUS_DO_PERFIL`),
+  um por coluna nova, derivados por remoção — num banco sem `food_preferences`
+  a nutricionista não pode perder a ALERGIA.
+
+⚠️ **Dois testes antigos reprovaram por GRAFIA e por DISTÂNCIA**, os dois sobre
+código estritamente melhor: `'["chat_messages", "chat_memory"]'` literal (a
+lista virou pares tabela/coluna) e uma janela de 900 caracteres que passou a
+cortar antes do `motivo: "falhou"`. Os dois passaram a cobrar a garantia, e a
+janela vai até a próxima função. ⚠️ E `esquecimento-da-ia.test.ts` recorta do
+`const daIa` até o PRIMEIRO `for (const [tabela` do arquivo — o meu laço,
+que vinha antes, zerou a janela dele. O laço novo usa outros nomes; a catraca
+antiga fica como está.
+
+**Aplicar no Supabase:** `supabase/APLICAR_MEMORIA_DA_NUTRICAO.sql`. Sem ele
+nada quebra: a coluna e a tabela têm degrau, e a aba Banco do admin passa a
+apontá-lo.
+**Bancada:** `/preview-nutricao?prefs=vegetariana` (o cartão preenchido; digitar
+faz o "Guardar" aparecer). A memória não tem bancada de propósito: o estado
+"conversa carregada de ontem" é indistinguível de `?estado=conversa`.

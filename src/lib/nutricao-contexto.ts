@@ -36,6 +36,8 @@ export type LinhaDoPerfil = {
   reference_days?: number | null;
   /** Ausente num banco sem a coluna — o degrau do servidor a tira do select. */
   birth_date?: string | null;
+  /** Idem: `APLICAR_MEMORIA_DA_NUTRICAO.sql`. */
+  food_preferences?: string | null;
 };
 
 export type LinhaDeSaude = {
@@ -94,6 +96,7 @@ export function perfilNutricionalDe(args: {
     careMode,
     alergias: perfil.allergies ?? null,
     medicacoes: perfil.medications ?? null,
+    preferencias: perfil.food_preferences ?? null,
     semanas: gest?.weeks ?? null,
     trimestre: gest ? trimesterForWeek(gest.weeks) : null,
     posParto,

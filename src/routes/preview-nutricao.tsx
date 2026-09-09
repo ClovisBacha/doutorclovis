@@ -93,6 +93,8 @@ export const Route = createFileRoute("/preview-nutricao")({
        DUAS pontas são cravadas: nascimento fixo, e `hoje` = nascimento + N.
        `-1` é "não pariu". */
     pos: q.pos == null || q.pos === "" ? -1 : Number(q.pos),
+    /* As preferências já escritas — o cartão com texto e sem botão "Guardar". */
+    prefs: q.prefs == null ? "" : String(q.prefs),
   }),
   head: () => ({
     meta: [{ title: "Bancada da nutrição" }, { name: "robots", content: "noindex" }],
@@ -179,6 +181,7 @@ function Pagina() {
     bloqueio,
     amostra,
     pos,
+    prefs,
   } = Route.useSearch();
   const w = semdum ? null : wBruto;
   /* Nascimento fixo; o "hoje" anda com `pos`. Os dois em UTC para a soma de
@@ -224,6 +227,7 @@ function Pagina() {
       | undefined,
     amostra: amostra >= 0 ? amostra : undefined,
     hoje: hojeDoPos,
+    preferencias: prefs || undefined,
   };
 
   return (

@@ -480,6 +480,8 @@ export type Profile = {
   height_cm?: number | null;
   pre_pregnancy_weight_kg?: number | null;
   medications?: string | null;
+  /** O que ela não come e prefere — escrito na aba da nutrição. Não é alergia. */
+  food_preferences?: string | null;
   birth_date?: string | null;
   pregnancy_number?: number | null;
   prior_bp_elevated?: boolean | null;

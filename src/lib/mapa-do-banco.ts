@@ -546,6 +546,19 @@ export const MAPA_DO_BANCO: readonly ArquivoDoBanco[] = [
     ],
   },
   {
+    arquivo: "APLICAR_MEMORIA_DA_NUTRICAO.sql",
+    alvos: [
+      {
+        tabela: "nutricao_mensagens",
+        colunas: [],
+      },
+      {
+        tabela: "patient_profiles",
+        colunas: ["food_preferences"],
+      },
+    ],
+  },
+  {
     arquivo: "APLICAR_MENCOES_E_TAGS.sql",
     alvos: [
       {
