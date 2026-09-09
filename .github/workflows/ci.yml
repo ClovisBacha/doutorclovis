@@ -96,6 +96,20 @@ jobs:
 
       # O Chromium do Playwright, e só ele — os outros dois navegadores
       # dobrariam o tempo do job sem pegar nada a mais.
+      #
+      # ⚠️ E A LISTA DA GOOGLE SAI ANTES. `--with-deps` roda `apt-get update`
+      # com TODAS as fontes do runner, e a do Chrome (`dl.google.com`) serve
+      # de vez em quando um índice cujo hash não bate: "Hash Sum mismatch", e o
+      # `apt` inteiro sai com 100. Este job reprovou duas vezes seguidas — o
+      # push e o `rerun` — sem que uma linha do nosso código tivesse mudado, e
+      # a mensagem ("Failed to install browsers") não diz que a causa é um
+      # espelho de terceiro. **Job que reprova por motivo alheio ao código é
+      # job que se aprende a ignorar**, e no dia em que o vermelho for de
+      # verdade ele é ignorado junto.
+      # Nada aqui usa o Chrome da Google: o navegador é o Chromium do
+      # Playwright, baixado do CDN dele.
+      - name: Tira a fonte apt da Google (ela não é usada aqui)
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome*.list
       - run: bunx playwright install --with-deps chromium
 
       # ⚠️ O servidor de DESENVOLVIMENTO, e não o build: o build gera
